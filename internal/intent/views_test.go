@@ -460,3 +460,32 @@ func TestAViewGroupNeedsAFacet(t *testing.T) {
 		t.Errorf("bundled group %q, problems %s", v.Group, problems.Error())
 	}
 }
+
+func TestAViewGroupProblemPointsAtTheLayerThatSetIt(t *testing.T) {
+	_, problems := loadFacets(t, "[views.waiting]\ngroup = \"task.since_movement\"\n")
+	i := slices.IndexFunc(problems, func(p Problem) bool { return p.Field == "views.waiting.group" })
+	if i < 0 || problems[i].Line != 2 || !strings.HasSuffix(problems[i].File, ViewsFile) || problems[i].File == ViewsFile {
+		t.Fatalf("problems: %+v", problems)
+	}
+}
+
+func TestABadFacetOverrideKeepsWhatItWouldReplace(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nsort = \"bogus\"\n\n[facets.moved.buckets.1d]\nwithin = \"soon\"\n")
+	for _, f := range []string{"facets.risk.sort", "facets.moved.buckets.1d.within"} {
+		if !strings.Contains(problems.Error(), f) {
+			t.Errorf("no problem for %s: %s", f, problems.Error())
+		}
+	}
+	risk, _ := facetOf(views, "risk")
+	moved, _ := facetOf(views, "moved")
+	if risk.Sort != "rank" || len(risk.Rank) != 3 || len(moved.Buckets) != 6 || moved.Buckets[0].Within != 24*time.Hour {
+		t.Errorf("risk %+v, moved %+v", risk, moved)
+	}
+}
+
+func TestAFactNamedByAMetaKeyIsNoFact(t *testing.T) {
+	_, problems := loadFacets(t, "[facets.meta]\nfact = \"\\u0000now\"\nlabel = \"Meta\"\n")
+	if !strings.Contains(problems.Error(), "facets.meta.fact") {
+		t.Errorf("problems: %s", problems.Error())
+	}
+}

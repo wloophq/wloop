@@ -401,15 +401,22 @@ type Server struct {
 	// heldStates are the states stored tasks hold that the profile does not declare, as of the last
 	// recategorize pass.
 	heldStates atomic.Pointer[[]string]
-	jobs       map[string]*job
-	token      string
-	warnings   *warnings
-	grace      time.Duration
-	hub        *hub
-	model      *readmodel.Model
-	modelOnce  sync.Once
-	viewer     viewerCache
-	app        *AppState
+	// facetCheck is the last facetProblems, for the profile and the catalog version it was computed on.
+	facetCheck struct {
+		sync.Mutex
+		loaded  *intentload.Loaded
+		version string
+		out     intentload.Problems
+	}
+	jobs      map[string]*job
+	token     string
+	warnings  *warnings
+	grace     time.Duration
+	hub       *hub
+	model     *readmodel.Model
+	modelOnce sync.Once
+	viewer    viewerCache
+	app       *AppState
 	// presenters are the compiled-in plugins' presenters, built once.
 	presenters     map[unit.ProviderID]Presenter
 	presentersOnce sync.Once

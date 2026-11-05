@@ -113,6 +113,19 @@ type FacetSpec struct {
 	// Strip says each row's strip is colored by the facet's first value,
 	// its rank the strip's legend.
 	Strip bool `json:"strip,omitempty"`
+	// Providers are the providers a merged facet (Provider "") came from; never served.
+	Providers []string `json:"-"`
+}
+
+// Sources are the providers the facet comes from, none for a facet of the profile.
+func (f FacetSpec) Sources() []string {
+	if len(f.Providers) > 0 {
+		return f.Providers
+	}
+	if f.Provider != "" {
+		return []string{f.Provider}
+	}
+	return nil
 }
 
 type Bucket struct {

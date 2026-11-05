@@ -51,6 +51,7 @@ func addFacet(facets []api.FacetSpec, f api.FacetSpec) []api.FacetSpec {
 		return append(facets, f)
 	}
 	m := &facets[i]
+	m.Providers = append(slices.Clone(m.Sources()), f.Sources()...)
 	m.Provider = ""
 	m.Menu = m.Menu || f.Menu
 	m.Strip = m.Strip || f.Strip

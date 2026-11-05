@@ -1051,3 +1051,20 @@ func TestAFacetThatDisagreesWithAPluginIsAHealthWarning(t *testing.T) {
 		t.Errorf("the bundled profile warns: %v", clean.Warnings)
 	}
 }
+
+func TestFacetProblemsAreComputedOncePerProfileAndCatalog(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Views.Facets = slices.Clone(l.Views.Facets)
+	i := slices.IndexFunc(l.Views.Facets, func(f intentload.FacetDef) bool { return f.ID == "risk" })
+	l.Views.Facets[i].Sort = "text"
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	first := r.s.facetProblems(&l)
+	if len(first) == 0 {
+		t.Fatal("no problem")
+	}
+	l.Views.Facets[i].Sort = "rank"
+	if again := r.s.facetProblems(&l); len(again) != len(first) {
+		t.Errorf("recomputed for the same profile and catalog: %d then %d", len(first), len(again))
+	}
+}

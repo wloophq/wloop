@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -52,8 +51,8 @@ func CheckFacets(task []intentload.FacetDef, plugin []api.FacetSpec) intentload.
 	for i, a := range plugin {
 		for _, b := range plugin[i+1:] {
 			if diff := a.MechanicsDiff(b); a.ID == b.ID && diff != "" {
-				out = append(out, intentload.Problem{File: "plugins/" + b.Provider + "/plugin.toml", Field: "source.ui.facets." + b.ID,
-					Msg: fmt.Sprintf("the %s plugin's facet %s differs from the %s plugin's: %s", b.Provider, b.ID, a.Provider, diff)})
+				out = append(out, intentload.Problem{File: "plugins/" + strings.Join(b.Sources(), "+") + "/plugin.toml", Field: "source.ui.facets." + b.ID,
+					Msg: fmt.Sprintf("the facet %s of %s differs from that of %s: %s", b.ID, sources(b), sources(a), diff)})
 			}
 		}
 	}
@@ -61,12 +60,14 @@ func CheckFacets(task []intentload.FacetDef, plugin []api.FacetSpec) intentload.
 		mine := taskFacet(f)
 		for _, p := range plugin {
 			if diff := p.MechanicsDiff(mine); p.ID == f.ID && diff != "" {
-				out = append(out, f.Problem(diffKey(diff), "facets.%s differs from the %s plugin's facet %s: %s", f.ID, cmp.Or(p.Provider, "plugins'"), p.ID, diff))
+				out = append(out, f.Problem(diffKey(diff), "facets.%s differs from the facet %s of %s: %s", f.ID, p.ID, sources(p), diff))
 			}
 		}
 	}
 	return out
 }
+
+func sources(f api.FacetSpec) string { return "plugin " + strings.Join(f.Sources(), "+") }
 
 func diffKey(diff string) string {
 	for _, k := range []string{"group", "sort", "match", "buckets"} {

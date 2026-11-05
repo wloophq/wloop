@@ -1225,7 +1225,14 @@ func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
 
 // facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, match or bucket.
 func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
-	return catalog.CheckFacets(l.Views.Facets, s.readModel().Catalog().Facets)
+	c := s.readModel().Catalog()
+	k := &s.facetCheck
+	k.Lock()
+	defer k.Unlock()
+	if k.loaded != l || k.version != c.Version {
+		k.loaded, k.version, k.out = l, c.Version, catalog.CheckFacets(l.Views.Facets, c.Facets)
+	}
+	return k.out
 }
 
 // feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units

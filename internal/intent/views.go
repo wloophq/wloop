@@ -87,6 +87,14 @@ type ViewDef struct {
 	HideDisabled, RemoveClean                   bool
 	When                                        workflow.Predicate
 	ownEmpty                                    string
+	groupAt                                     *sheet
+}
+
+func (v ViewDef) groupProblem(format string, args ...any) Problem {
+	if v.groupAt == nil {
+		return Problem{File: ViewsFile, Field: "views." + v.ID + ".group", Msg: fmt.Sprintf(format, args...)}
+	}
+	return v.groupAt.problem("views."+v.ID+".group", format, args...)
 }
 
 // SortKey is a fact a view sorts by, descending when Desc.
@@ -322,9 +330,12 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 			dst *string
 		}{{"sort", m.Sort, &f.Sort}, {"match", m.Match, &f.Match}, {"merge", m.Merge, &f.Merge}, {"units", m.Units, &f.Units}} {
 			if o.v != nil {
+				n := len(s.problems)
 				s.oneOf(path+"."+o.key, *o.v, builtin.ValuesOf(builtin.SurfaceViews, "facets.*."+o.key))
-				*o.dst = *o.v
-				set(o.key)
+				if len(s.problems) == n {
+					*o.dst = *o.v
+					set(o.key)
+				}
 			}
 		}
 		if m.Group != nil {
@@ -344,7 +355,7 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 			f.Values = maps.Clone(m.Values)
 		}
 		if m.Buckets != nil {
-			f.Buckets = nil
+			buckets, bad := []FacetBucket(nil), false
 			for _, b := range declared(s, path+".buckets", m.Buckets) {
 				bucket := FacetBucket{ID: b, Label: b}
 				mb := m.Buckets[b]
@@ -353,12 +364,16 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 					d, err := duration.Parse(*mb.Within)
 					if err != nil {
 						s.add(path+".buckets."+b+".within", "%s", err)
+						bad = true
 					}
 					bucket.Within = d
 				}
-				f.Buckets = append(f.Buckets, bucket)
+				buckets = append(buckets, bucket)
 			}
-			set("buckets")
+			if !bad {
+				f.Buckets = buckets
+				set("buckets")
+			}
 		}
 		f.from["id"] = s
 		switch {
@@ -407,7 +422,7 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			}
 		}
 		if m.Group != nil {
-			v.Group = strings.TrimSpace(*m.Group)
+			v.Group, v.groupAt = strings.TrimSpace(*m.Group), s
 		}
 		if m.Sort != nil {
 			v.Sort, v.SortText = sortKeys(*m.Sort), strings.TrimSpace(*m.Sort)
@@ -516,7 +531,7 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 			v.When = pred
 		}
 		if _, ok := env[v.Group]; v.Group != "" && !ok {
-			out = append(out, Problem{File: ViewsFile, Field: path + ".group", Msg: fmt.Sprintf("%s names no fact of a view over %s%s", v.Group, v.Over, expr.DidYouMean(v.Group, facts))})
+			out = append(out, v.groupProblem("%s names no fact of a view over %s%s", v.Group, v.Over, expr.DidYouMean(v.Group, facts)))
 			v.Group = ""
 		}
 		var keep []SortKey
@@ -555,9 +570,11 @@ func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
 	var out Problems
 	env := ViewEnv(task.OverTasks, tasks)
 	fields := recordFields(records)
-	names := append(env.Names(), slices.Sorted(maps.Keys(fields))...)
+	facts := env.Names()
+	names := append(slices.Clone(facts), slices.Sorted(maps.Keys(fields))...)
 	d.Facets = slices.DeleteFunc(d.Facets, func(f FacetDef) bool {
 		typ, ok := env[f.Fact]
+		ok = ok && slices.Contains(facts, f.Fact)
 		_, isField := fields[f.Fact]
 		switch {
 		case !ok && !isField:
@@ -574,7 +591,7 @@ func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
 		if v.Over != task.OverTasks || v.Group == "" || slices.ContainsFunc(d.Facets, func(f FacetDef) bool { return f.Fact == v.Group }) {
 			continue
 		}
-		out = append(out, Problem{File: ViewsFile, Field: "views." + v.ID + ".group", Msg: v.Group + " is read by no facet of " + ViewsFile})
+		out = append(out, v.groupProblem("%s is read by no facet of %s", v.Group, ViewsFile))
 		v.Group = ""
 	}
 	return out
