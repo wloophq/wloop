@@ -128,7 +128,7 @@ process.stdout.write(JSON.stringify({ Wait: bars(dashWaitOption(rows, lens, pal)
 		t.Errorf("kind %v, want %v", got.Kind, want)
 	}
 	if want := map[string]int{"acme/api": 2, "acme/web": 1}; !mapsEqual(got.Repo, want) {
-		t.Errorf("repo %v, want %v: the repo panel ignores repo: but keeps wait:me", got.Repo, want)
+		t.Errorf("where %v, want %v: the where panel ignores where: but keeps wait:me", got.Repo, want)
 	}
 	if want := map[string]int{"ana": 1, "me": 1}; !mapsEqual(got.Authors, want) {
 		t.Errorf("authors %v, want %v", got.Authors, want)
