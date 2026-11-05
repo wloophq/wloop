@@ -545,13 +545,13 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
-var rowFuncs = []string{"specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
+var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
 	"columnSort", "sortPick", "rowHead", "rowTr", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet", "heldFacet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
 var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
-	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
+	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "stripTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
 	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
@@ -577,14 +577,15 @@ func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
 	for i, c := range cases {
 		g := got[i]
 		wait, _ := c["facets"].(map[string][]string)
-		want := "nobody"
+		want, class := "", ""
 		if len(wait["wait"]) > 0 {
 			want = wait["wait"][0]
+			class = "w-" + want
 		}
 		loop := c["kind"] == "loop_working" || c["kind"] == "loop_waiting"
 		says := slices.Contains(strings.Split(g.Label, ", "), "me")
 		switch {
-		case g.Cat != want || g.Class != "w-"+g.Cat:
+		case g.Cat != want || g.Class != class:
 			t.Errorf("%v: cat %s class %s, want %s", c, g.Cat, g.Class, want)
 		case !loop && (g.Cat == "me") != says:
 			t.Errorf("%v: %s while the label says %q", c, g.Cat, g.Label)

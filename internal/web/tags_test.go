@@ -124,7 +124,7 @@ process.stdout.write(JSON.stringify({
 
 func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	src := appJS(t)
-	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(offered),"} {
+	for _, want := range []string{`mine ? "mine" : ""`, `title: stripTitle(r)`, `mine ? mineMark() : null`, "stripLegend(lens, offered),"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -160,11 +160,11 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		row(4, "ana", "loop_working", "me", "a review round runs"),
 		row(5, "ana", "draft", "nobody", ""),
 	}
-	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "waitField", "waitCat", "waitClass", "isMine", "stripTitle",
+	nodeRun(t, prelude, []string{"isSet", "age", "stamp", "resolveWho", "waitingLabel", "fold", "specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "stripTip", "isMine", "stripTitle", "viewStrip",
 		"intakeWaiting", "intakeChip", "lensWords", "fillWord", "tagChips", "briefTags", "mineMark", "copySlot", "card", "stripLegend"}, `process.stdout.write(JSON.stringify({
   cards: input.map((r) => card(r, "").children[0].attrs),
   titles: input.map(stripTitle),
-  legend: stripLegend(),
+  legend: stripLegend({ stripSpec: viewStrip("mine") }),
 }));`, wireRows("Me", time.Now(), rows...), &got)
 	classes := func(i int) []string { return strings.Fields(got.Cards[i]["class"].(string)) }
 	if !slices.Contains(classes(0), "mine") || slices.Contains(classes(1), "mine") {

@@ -60,7 +60,7 @@ func (c Catalog) Facets() []api.FacetSpec {
 		w := t.Facets[f.ID]
 		spec := api.FacetSpec{ID: f.ID, Label: cmp.Or(w.Label, f.ID), Provider: c.Source.Provider, Group: f.Group, Sort: f.Sort,
 			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
-			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass)}
+			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass), Colors: maps.Clone(w.Colors)}
 		if w.LabelPrefix != nil {
 			spec.LabelPrefix = *w.LabelPrefix
 		}

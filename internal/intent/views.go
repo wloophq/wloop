@@ -50,6 +50,8 @@ type FacetDef struct {
 	// LabelPrefix goes before the label of each value the facet shows on a row.
 	LabelPrefix        string
 	Group, Menu, Strip bool
+	// Colors are the strip hues of the facet's values, by value.
+	Colors map[string]string
 	// Show is where the facet's values show on a task's row.
 	Show         Show
 	Rank         []string
@@ -180,6 +182,7 @@ type mFacet struct {
 	Match       *string            `toml:"match"`
 	Menu        *bool              `toml:"menu"`
 	Strip       *bool              `toml:"strip"`
+	Colors      map[string]string  `toml:"colors"`
 	Buckets     map[string]mBucket `toml:"buckets"`
 	Merge       *string            `toml:"merge"`
 	Units       *string            `toml:"units"`
@@ -389,6 +392,11 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 		}
 		if m.Strip != nil {
 			f.Strip = *m.Strip
+		}
+		if m.Colors != nil {
+			if readColors(s, path, m.Colors) {
+				f.Colors = mergeMap(f.Colors, m.Colors, func(_, y string) string { return y })
+			}
 		}
 		if m.Rank != nil {
 			f.Rank = slices.Clone(m.Rank)

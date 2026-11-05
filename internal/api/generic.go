@@ -125,6 +125,8 @@ type FacetSpec struct {
 	// Strip says each row's strip is colored by the facet's first value,
 	// its rank the strip's legend.
 	Strip bool `json:"strip,omitempty"`
+	// Colors are the strip hues of the facet's values (builtin.StripColors names them), by value.
+	Colors map[string]string `json:"colors,omitempty"`
 	// Show is the part of a row the facet's values show in (builtin.ShowParts names them); "" keeps the facet to the lens.
 	Show string `json:"show,omitempty"`
 	// ShowOnly are the values the part shows, all of them when empty.
@@ -151,11 +153,14 @@ type FacetDisplay struct {
 	LabelPrefix string            `json:"label_prefix,omitempty"`
 	RowClass    map[string]string `json:"row_class,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
+	Strip       bool              `json:"strip,omitempty"`
+	Colors      map[string]string `json:"colors,omitempty"`
 }
 
 // Display is the facet's own display keys.
 func (f FacetSpec) Display() FacetDisplay {
-	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix, RowClass: f.RowClass, Labels: f.Labels}
+	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix, RowClass: f.RowClass, Labels: f.Labels,
+		Strip: f.Strip, Colors: f.Colors}
 }
 
 // For is the facet as provider's rows show it: its display keys replaced by provider's on a merged facet,
@@ -166,6 +171,7 @@ func (f FacetSpec) For(provider string) FacetSpec {
 		return f
 	}
 	f.Show, f.ShowOnly, f.ShowValues, f.LabelPrefix, f.RowClass = d.Show, d.ShowOnly, d.ShowValues, d.LabelPrefix, d.RowClass
+	f.Strip, f.Colors = d.Strip, d.Colors
 	if len(d.Labels) > 0 {
 		f.Labels = d.Labels
 	}

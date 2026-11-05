@@ -20,6 +20,7 @@ var RowWords = []RowWord{
 	{Key: "filter_group", Vars: []string{}, Doc: "What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label."},
 	{Key: "list_count", Vars: []string{"unit", "shown", "total"}, Doc: "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`."},
 	{Key: "countdown_title", Vars: []string{"time"}, Doc: "The tooltip of a pending round's countdown, over the `{{.time}}` it sends at."},
+	{Key: "legend_title", Vars: []string{}, Doc: "The tooltip of the legend of a view's strip, the colors of its strip facet's values."},
 	{Key: "sort_by", Vars: []string{"label"}, Doc: "A column head's tooltip, over the `{{.label}}` of the facet it sorts by."},
 	{Key: "col_unit", Vars: []string{}, Doc: "The head of the column of a row's title, ref and flags in a view whose rows mix kinds."},
 	{Key: "col_who", Vars: []string{}, Doc: "The head of the column of whom a row waits on and its situation."},

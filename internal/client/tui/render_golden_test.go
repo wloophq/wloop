@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/wloophq/wloop/internal/api/lens"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"os"
 	"path/filepath"
 	"slices"
@@ -152,7 +153,11 @@ func TestRenderGolden(t *testing.T) {
 func slackGolden(t *testing.T, color bool) *Model {
 	conv := func(key, label, title, waits string, since time.Duration, stalled bool) api.Row {
 		r := api.Row{Unit: unit.Unit{Provider: "slack", Key: key}, Label: label, Title: title, Kind: "waits_on_viewer", Views: []string{"slack"},
-			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled}, Facets: map[string][]string{"waits-on": {waits}}}
+			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled}, Facets: map[string][]string{"waits-on": {waits}, "turn": {"me"}, "situation": {"waits_on_viewer"},
+				"age": {now.Add(-since).UTC().Format(time.RFC3339)}}}
+		if waits != "me" {
+			r.Kind, r.Facets["turn"], r.Facets["situation"] = "waits_on_others", []string{"others"}, []string{"waits_on_others"}
+		}
 		if channel, ok := strings.CutPrefix(label, "#"); ok {
 			r.Facets["where"] = []string{channel}
 		}
@@ -163,9 +168,9 @@ func slackGolden(t *testing.T, color bool) *Model {
 		conv("T1/C2/3.3", "#general", "Who owns the flaky upload test?", "me", 5*24*time.Hour, true))
 	c := servedCatalog(t)
 	c.Views = append(c.Views, api.ViewSpec{ID: "slack", Label: "Slack", Provider: "slack", Rows: true, Surfaces: []string{"tui"}, Unit: "Conversation"})
-	c.Facets = append(c.Facets, api.FacetSpec{ID: "where", Label: "Where", Provider: "slack", Group: true, Match: "suffix", Menu: true, Show: "ref", LabelPrefix: "#"},
-		api.FacetSpec{ID: "waits-on", Label: "Waits on (person)", Provider: "slack", Group: true, Match: "team", Menu: true, Show: "who"})
-	c.Situations = append(c.Situations, api.SituationSpec{Provider: "slack", Kind: "waits_on_viewer", Label: "waits on you"})
+	slack := psource.BundledCatalog("slack")
+	c.Facets = append(c.Facets, slack.Facets()...)
+	c.Situations = append(c.Situations, slack.Situations()...)
 	m.SetCatalog(c)
 	m.navigate("slack")
 	m.SetColor(color)

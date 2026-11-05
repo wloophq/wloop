@@ -243,10 +243,12 @@ function taskModel(e, open, copy, lens) {
   const w = lens.words || {};
   const item = { facets: e.facets || {} };
   const parts = rowParts(item, lens.specs, w);
+  const strip = stripOf(item, lens.specs);
   const draft = isDraftTask(e);
   const due = roleValue(e, "deadline");
+  const scope = taskSlot(e.id, copy);
   return {
-    key: e.id, scope: taskSlot(e.id, copy), item, parts, words: w, selected: e.id === open,
+    key: e.id, scope, item, parts, words: w, selected: e.id === open,
     open: draft ? null : () => writeHash({ task: e.id, pr: "" }),
     href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
     title: e.title || e.id,
@@ -258,8 +260,9 @@ function taskModel(e, open, copy, lens) {
       e.wake && e.wake.until ? h("span", { class: "flag due" }, fillWord(w.until, { date: shortDate(e.wake.until) })) : null,
       e.extraction_lag ? h("span", { class: "flag due", title: w.unread_title }, fillWord(w.unread, { lag: shortLag(e.extraction_lag) })) : null],
     after: [projectFacts(e, w), draft ? draftCard(e, "outbox") : null],
+    lead: stripDot(strip, lens, scope, w),
     why: e.reason || "",
-    cls: ["task-row", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
+    cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
   };
 }
 

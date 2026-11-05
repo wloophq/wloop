@@ -32,6 +32,8 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.match", In: SurfaceViews, Kind: KindEnum, Values: named("exact", "suffix", "prefix", "team"), Default: "exact", Doc: "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team."},
 	{Path: "facets.*.menu", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "Whether the facet is offered in the filter menu."},
 	{Path: "facets.*.strip", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "Whether each row's strip is colored by the facet's first value, its rank the strip's legend."},
+	{Path: "facets.*.colors", In: SurfaceViews, Kind: KindMap, Doc: ColorsDoc},
+	{Path: "facets.*.colors.*", In: SurfaceViews, Kind: KindEnum, Values: StripColors, Doc: "One value's hue."},
 	{Path: "facets.*.buckets", In: SurfaceViews, Kind: KindMap, Doc: "For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest."},
 	{Path: "facets.*.buckets.*", In: SurfaceViews, Kind: KindTable, Doc: "A bucket, by its id."},
 	{Path: "facets.*.buckets.*.within", In: SurfaceViews, Kind: KindDur, Doc: "How long ago an instant may be and still fall in the bucket."},
@@ -69,6 +71,15 @@ func ShowParts() []Value {
 		{Name: "aside", Doc: "Beside the reason: its workspace and links."}}
 }
 
+// StripColors are the hues a strip facet's value may take, the design's colors of whom a row waits on.
+func StripColors() []Value {
+	return []Value{{Name: "me", Doc: "Yours: the next step is the viewer's."},
+		{Name: "author", Doc: "Someone else's, such as a pull request's author."},
+		{Name: "reviewer", Doc: "Another person's, apart from the author, such as a reviewer."},
+		{Name: "loop", Doc: "The loop's: an agent works on it or is due to."},
+		{Name: "nobody", Doc: "Nobody's: a faint strip."}}
+}
+
 // ShowValues are how many of an item's values a facet shows.
 func ShowValues() []Value {
 	return []Value{{Name: "all", Doc: "Every value, in the item's order."}, {Name: "first", Doc: "The first value alone."}}
@@ -78,4 +89,5 @@ func ShowValues() []Value {
 const (
 	ShowDoc       = "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show."
 	ShowValuesDoc = "How many of an item's values the part shows: all, or the first alone."
+	ColorsDoc     = "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's."
 )

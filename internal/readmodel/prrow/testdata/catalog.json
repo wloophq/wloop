@@ -1,5 +1,5 @@
 {
-  "version": "0a82dbec648d",
+  "version": "b83eea507395",
   "views": [
     {
       "id": "mine",
@@ -171,7 +171,14 @@
         "reviewer": "Waiting on a reviewer"
       },
       "menu": true,
-      "strip": true
+      "strip": true,
+      "colors": {
+        "author": "author",
+        "loop": "loop",
+        "me": "me",
+        "nobody": "nobody",
+        "reviewer": "reviewer"
+      }
     },
     {
       "id": "waits-on",

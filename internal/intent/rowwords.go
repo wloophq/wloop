@@ -1,6 +1,11 @@
 package intent
 
-import "github.com/wloophq/wloop/internal/intent/builtin"
+import (
+	"maps"
+	"slices"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
+)
 
 // RowWords are the words of a row beside its facets, by builtin.RowWords' keys.
 type RowWords struct {
@@ -14,6 +19,7 @@ type RowWords struct {
 	FilterGroup      string
 	ListCount        string
 	CountdownTitle   string
+	LegendTitle      string
 	SortBy           string
 	ColUnit          string
 	ColWho           string
@@ -66,6 +72,8 @@ func (w *RowWords) field(key string) *string {
 		return &w.ListCount
 	case "countdown_title":
 		return &w.CountdownTitle
+	case "legend_title":
+		return &w.LegendTitle
 	case "sort_by":
 		return &w.SortBy
 	case "col_unit":
@@ -203,6 +211,15 @@ func readShow(s *sheet, path string, v any, values *string, sh *Show) {
 			sh.Values = *values
 		}
 	}
+}
+
+// readColors says whether every hue of a facet's colors at path is one of builtin.StripColors.
+func readColors(s *sheet, path string, colors map[string]string) bool {
+	n := len(s.problems)
+	for _, v := range slices.Sorted(maps.Keys(colors)) {
+		s.oneOf(path+".colors."+v, colors[v], builtin.StripColors())
+	}
+	return len(s.problems) == n
 }
 
 // Set are the words w sets, by key.

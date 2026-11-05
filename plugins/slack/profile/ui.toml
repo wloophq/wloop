@@ -1,5 +1,6 @@
 # The words of the views, facets and situations the Slack plugin's manifest
-# declares. A user profile's plugins/slack/ui.toml replaces the keys it sets.
+# declares, and where each facet shows on a conversation's row. A user
+# profile's plugins/slack/ui.toml replaces the keys it sets.
 
 [views.slack]
 label = "Slack"
@@ -17,6 +18,21 @@ label_prefix = "#"
 [facets.waits-on]
 label = "Waits on (person)"
 show = "who"
+
+[facets.turn]
+label = "Whose turn"
+values = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
+colors = { me = "me", others = "author", nobody = "nobody" }
+
+[facets.situation]
+label = "Situation"
+values = { waits_on_viewer = "waits on you", needs_closure = "needs closing", new = "new", waits_on_others = "waits on others", fyi = "for your information", resolved = "resolved" }
+show = "kind"
+
+[facets.age]
+label = "Waiting for"
+buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
+show = "age"
 
 [situations]
 waits_on_viewer = "waits on you"

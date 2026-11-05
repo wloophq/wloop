@@ -49,6 +49,21 @@
             "description": "For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.",
             "type": "object"
           },
+          "colors": {
+            "additionalProperties": {
+              "description": "One value's hue.",
+              "enum": [
+                "me",
+                "author",
+                "reviewer",
+                "loop",
+                "nobody"
+              ],
+              "type": "string"
+            },
+            "description": "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.",
+            "type": "object"
+          },
           "empty": {
             "description": "What a group of tasks with no value shows.",
             "type": "string"
@@ -327,6 +342,10 @@
           "description": "What the terminal says after a group pick, over the picked entry's `{{.label}}`.",
           "type": "string"
         },
+        "legend_title": {
+          "description": "The tooltip of the legend of a view's strip, the colors of its strip facet's values.",
+          "type": "string"
+        },
         "list_count": {
           "description": "A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.",
           "type": "string"
@@ -437,6 +456,7 @@
         "filter_title",
         "filter_title_group",
         "grouped",
+        "legend_title",
         "list_count",
         "no_group",
         "no_lens",

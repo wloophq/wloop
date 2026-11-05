@@ -176,8 +176,8 @@ process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, 
 }
 
 // A row offers a facet button only for a value it holds, so clicking it keeps the row in the list: a thread
-// row, which has no strip facet, shows its dot as plain text, and another provider's kind facet places nothing
-// on it.
+// row, whose provider has no strip facet, shows no dot even holding another provider's strip facet, and another
+// provider's kind facet places nothing on it.
 func TestARowFiltersOnlyByTheFacetsItHolds(t *testing.T) {
 	var catalog map[string]any
 	if err := json.Unmarshal([]byte(servedCatalog(t)), &catalog); err != nil {
@@ -212,8 +212,8 @@ process.stdout.write(JSON.stringify(input.rows.map((r) => filters(tr(r)))));`,
 			t.Errorf("a thread row filters by a facet it lacks: %q in %q", label, got[0])
 		}
 	}
-	if len(got[1]) != 2 || strings.Contains(strings.Join(got[1], " "), "situation") {
-		t.Errorf("a row holding the strip and kind facets offers %q, want its strip and waits-on", got[1])
+	if len(got[1]) != 1 || strings.Contains(strings.Join(got[1], " "), "situation") {
+		t.Errorf("a row holding GitHub's strip and kind facets offers %q, want its waits-on alone", got[1])
 	}
 }
 

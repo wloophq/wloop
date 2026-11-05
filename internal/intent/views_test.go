@@ -581,3 +581,35 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 		t.Errorf("problems: %s", got)
 	}
 }
+
+func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"me\", ana = \"author\" }\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if w, _ := facetOf(views, "waits-on"); !maps.Equal(w.Colors, map[string]string{"me": "me", "ana": "author"}) {
+		t.Errorf("waits-on colors %v", w.Colors)
+	}
+	if _, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"pink\" }\n"); !strings.Contains(problems.Error(), "facets.waits-on.colors.me") {
+		t.Errorf("an unknown hue: %v", problems)
+	}
+	plugin, user := t.TempDir(), t.TempDir()
+	for dir, body := range map[string]string{plugin: "[facets.turn]\nlabel = \"Turn\"\ncolors = { me = \"me\", others = \"author\" }\n", user: "[facets.turn]\ncolors = { others = \"reviewer\" }\n"} {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got := texts["acme"].Facets["turn"].Colors; !maps.Equal(got, map[string]string{"me": "me", "others": "reviewer"}) {
+		t.Errorf("turn colors %v", got)
+	}
+	if err := os.WriteFile(filepath.Join(user, UIFile), []byte("[facets.turn]\ncolors = { others = \"pink\" }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}); !strings.Contains(problems.Error(), "facets.turn.colors.others") {
+		t.Errorf("an unknown hue in ui.toml: %v", problems)
+	}
+}

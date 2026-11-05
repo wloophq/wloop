@@ -76,7 +76,7 @@ func deriveOrder(spec *api.FacetSpec, f intentload.FacetDef, tasks intentload.Ta
 
 func taskFacet(f intentload.FacetDef) api.FacetSpec {
 	spec := api.FacetSpec{ID: f.ID, Label: f.Label, Fact: f.Fact, Group: f.Group, Sort: f.Sort, Rank: slices.Clone(f.Rank), Labels: maps.Clone(f.Values),
-		Empty: f.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
+		Empty: f.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip, Colors: maps.Clone(f.Colors),
 		Show: f.Show.Part, ShowOnly: slices.Clone(f.Show.Only), ShowValues: f.Show.Values, LabelPrefix: f.LabelPrefix}
 	for _, b := range f.Buckets {
 		within := ""

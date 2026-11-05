@@ -90,6 +90,7 @@ type UIFacet struct {
 	ShowValues  *string           `toml:"show_values"`
 	LabelPrefix *string           `toml:"label_prefix"`
 	RowClass    map[string]string `toml:"row_class"`
+	Colors      map[string]string `toml:"colors"`
 	// Show is where the facet's values show on the plugin's rows, read from ShowRaw and ShowValues.
 	Show Show `toml:"-"`
 }
@@ -137,6 +138,9 @@ func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
 				m.Facets[id] = f
 			}
+			if f.Colors != nil {
+				readColors(s, "facets."+id, f.Colors)
+			}
 		}
 		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
 		if problems = append(problems, s.problems...); len(s.problems) > 0 {
@@ -173,6 +177,7 @@ func mergeUI(into, over UITexts) UITexts {
 		a.Values = mergeMap(a.Values, b.Values, func(_, y string) string { return y })
 		a.Buckets = mergeMap(a.Buckets, b.Buckets, func(_, y string) string { return y })
 		a.RowClass = mergeMap(a.RowClass, b.RowClass, func(_, y string) string { return y })
+		a.Colors = mergeMap(a.Colors, b.Colors, func(_, y string) string { return y })
 		if b.ShowRaw != nil {
 			a.ShowRaw, a.Show.Part, a.Show.Only = b.ShowRaw, b.Show.Part, b.Show.Only
 		}

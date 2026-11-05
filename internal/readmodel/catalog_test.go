@@ -74,3 +74,18 @@ func TestFacetsOfTheSameIDWithOtherMechanicsStayApart(t *testing.T) {
 		t.Fatalf("conflicting facets %+v", got)
 	}
 }
+
+func TestAMergedFacetKeepsWhichProvidersItIsTheStripOf(t *testing.T) {
+	gh := facetPresenter{facets: []api.FacetSpec{{ID: "turn", Provider: "github", Group: true, Strip: true, Colors: map[string]string{"me": "me"}}}}
+	sl := facetPresenter{facets: []api.FacetSpec{{ID: "turn", Provider: "slack", Group: true}}}
+	got := facetByID(readmodel.BuildCatalog(gh, sl), "turn")
+	if len(got) != 1 {
+		t.Fatalf("turn facets %+v", got)
+	}
+	if g := got[0].For("github"); !g.Strip || g.Colors["me"] != "me" {
+		t.Errorf("github's turn %+v", g.Display())
+	}
+	if s := got[0].For("slack"); s.Strip || s.Colors != nil {
+		t.Errorf("slack's turn %+v", s.Display())
+	}
+}

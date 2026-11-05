@@ -62,6 +62,7 @@ row_class = { me = "mine" }
 [facets.wait]
 label = "Waits on (role)"
 values = { author = "Waiting on the author", loop = "In loop", me = "Waiting on me", nobody = "Waiting on nobody", reviewer = "Waiting on a reviewer" }
+colors = { author = "author", loop = "loop", me = "me", nobody = "nobody", reviewer = "reviewer" }
 
 [facets.waits-on]
 label = "Waits on (person)"

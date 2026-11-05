@@ -303,6 +303,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
 - `facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
+- `facets.<name>.colors` (table by name): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
+- `facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
 - `facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
 - `facets.<name>.buckets.<name>` (table): A bucket, by its id.
 - `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
@@ -336,6 +343,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
 - `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
@@ -801,6 +809,13 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it.
 - `facets.<name>.row_class` (table): The class of a row that holds a value, by value, such as `{ me = "mine" }`, which the cockpit's stylesheet colors.
 - `facets.<name>.row_class.<name>` (string): One value's class.
+- `facets.<name>.colors` (table): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
+- `facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
 - `facets.<name>.empty` (string): What a row with no value shows.
 - `facets.<name>.values` (table): How each value shows, by value; a value it does not name shows as itself.
 - `facets.<name>.values.<name>` (string): One value's text.
@@ -835,6 +850,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
 - `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
 - `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
 - `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
 - `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
 - `lens.col_who` (template): The head of the column of whom a row waits on and its situation.

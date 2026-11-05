@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], specs: [], fields: [], lens: [], strip: "", kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -39,7 +39,6 @@ function applyCatalog(c) {
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
   catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
-  catalog.strip = ((c.facets || []).find((f) => f.strip) || {}).id || "";
   catalog.details = c.details || [];
   catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
 }
@@ -509,19 +508,56 @@ function waitingLabel(row) {
   return (sm(row).waits_on || "").split(", ").map((w) => resolveWho(row, w)).join(", ");
 }
 
-// waitField is the served facet whose value colors a row's strip.
-function waitField() {
-  return catalog.fields.find((f) => f.id === catalog.strip);
+// stripSpec is the facet that colors the strip of provider's items among specs ("" for a task's), as that
+// provider shows it; null when the provider has none.
+function stripSpec(specs, provider) {
+  for (const s of specs || []) {
+    if (s.provider && s.provider !== provider) continue;
+    const spec = specFor(s, provider);
+    if (spec.strip) return spec;
+  }
+  return null;
 }
 
-// waitCat is the class of whom a row waits on its strip shows: me, the
-// loop, a reviewer, the author, or nobody.
+// stripColor is the hue a strip facet's value colors a strip with.
+function stripColor(spec, value) {
+  return ((spec && spec.colors) || {})[value] || "nobody";
+}
+
+// stripOf is an item's strip: its provider's strip facet, the item's first value of it, that value's hue and
+// label; null when the provider has no strip or the item no value of it.
+function stripOf(it, specs) {
+  const spec = stripSpec(specs, it.provider || "");
+  const value = spec ? ((it.facets || {})[spec.id] || []).find((v) => v && fold(v) !== "none") : "";
+  return value ? { spec, value, color: stripColor(spec, value), label: (spec.labels || {})[value] || value } : null;
+}
+
+function rowStrip(row) {
+  return stripOf({ facets: row.facets || {}, provider: unitOf(row).provider }, catalog.specs);
+}
+
+// waitCat is the value of a row's strip facet, "" when it has no strip.
 function waitCat(row) {
-  return facetValues(row, catalog.strip)[0] || "nobody";
+  const s = rowStrip(row);
+  return s ? s.value : "";
+}
+
+// waitColor is the hue of a row's strip.
+function waitColor(row) {
+  const s = rowStrip(row);
+  return s ? s.color : "nobody";
 }
 
 function waitClass(row) {
-  return "w-" + waitCat(row);
+  const s = rowStrip(row);
+  return s ? "w-" + s.color : "";
+}
+
+// stripTip is what a strip says: its value's label, the people it names in a hue of someone else's, then the
+// row's kind.
+function stripTip(strip, who, kind) {
+  const named = strip && (strip.color === "author" || strip.color === "reviewer") && who ? ` (${who})` : "";
+  return [strip ? strip.label + named : "", kind].filter(Boolean).join(": ");
 }
 
 function isMine(author) {
@@ -531,10 +567,7 @@ function isMine(author) {
 
 // stripTitle names whom the row's strip says it waits on, and why.
 function stripTitle(row) {
-  const cat = waitCat(row);
-  const who = cat === "author" || cat === "reviewer" ? ` (${waitingLabel(row)})` : "";
-  const f = waitField();
-  return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
+  return [stripTip(rowStrip(row), waitingLabel(row), rowKindLabel(row)), sm(row).reason].filter(Boolean).join(". ");
 }
 
 function isMuted(p) {
@@ -697,12 +730,19 @@ function defaultSortLabel(view) {
   return (catalog.views.find((v) => v.id === view) || {}).default_sort || (typeof tasksState === "object" && (tasksState.catalog || {}).default_sort) || "";
 }
 
-// boardGroupField is the field a board of view groups by when nothing is picked: the facet that colors the
-// strip (a task view's from its profile, a row view's from its plugins) when the view offers it; "" otherwise.
+// viewStrip is the facet that colors the strip of view's items: a task view's from its profile, a row view's
+// from its provider, a view of mixed rows the first a plugin serves; null when none does.
+function viewStrip(view) {
+  if (typeof isCoreView === "function" && isCoreView(view)) return stripSpec(((typeof tasksState === "object" && tasksState.catalog) || {}).facets, "");
+  const provider = (catalog.views.find((v) => v.id === view) || {}).provider || "";
+  return provider ? stripSpec(catalog.specs, provider) : catalog.specs.find((f) => f.strip) || null;
+}
+
+// boardGroupField is the field a board of view groups by when nothing is picked: the facet that colors its
+// strip when the view offers it; "" otherwise.
 function boardGroupField(view, offered) {
-  const core = typeof isCoreView === "function" && isCoreView(view);
-  const id = core ? (((tasksState.catalog || {}).facets || []).find((f) => f.strip) || {}).id : catalog.strip;
-  return id && offered.some((f) => f.id === id) ? id : "";
+  const s = viewStrip(view);
+  return s && offered.some((f) => f.id === s.id) ? s.id : "";
 }
 
 // lensWords are what the lens bar says, from the views catalog.
@@ -727,9 +767,10 @@ function lensOf(route) {
   const core = typeof isCoreView === "function" && isCoreView(view);
   const provider = core ? "" : (catalog.views.find((v) => v.id === view) || {}).provider || "";
   const specs = core ? ((typeof tasksState === "object" && tasksState.catalog) || {}).facets || [] : catalog.specs;
+  const strip = viewStrip(view);
   return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
     fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view),
-    specs, provider, words: rowWords(provider), strip: core ? (specs.find((f) => f.strip) || {}).id || "" : catalog.strip };
+    specs, provider, words: rowWords(provider), strip: (strip || {}).id || "", stripSpec: strip };
 }
 
 // rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
@@ -749,7 +790,7 @@ function effectiveGroup(lens) {
   if (lens.group) return lens.group;
   if (lens.defaultGroup) return lens.defaultGroup;
   if (lens.layout !== "board") return "";
-  return lens.boardGroup === undefined ? catalog.strip : lens.boardGroup;
+  return lens.boardGroup === undefined ? (viewStrip(lens.view) || {}).id || "" : lens.boardGroup;
 }
 
 function cmp(a, b) {
@@ -1043,12 +1084,13 @@ function lensChips(lens, applied) {
   });
 }
 
-function stripLegend(fields) {
-  const f = waitField();
-  if (!f || !f.rank || (fields && !fields.some((x) => x.id === f.id))) return null;
-  return h("span", { class: "legend", title: "The strip on the left of each row is the color of whom it waits on" },
-    h("span", { class: "lens-label" }, `${f.label}:`),
-    f.rank.map((cat) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), f.show ? f.show(cat) : cat)));
+// stripLegend is the hues of lens's strip facet, in its rank, when fields offer it.
+function stripLegend(lens, fields) {
+  const s = lens.stripSpec;
+  if (!s || !s.rank || (fields && !fields.some((x) => x.id === s.id))) return null;
+  return h("span", { class: "legend", title: (lens.words || lensWords()).legend_title || undefined },
+    h("span", { class: "lens-label" }, `${s.label}:`),
+    s.rank.map((v) => h("span", { class: "lg w-" + stripColor(s, v) }, h("span", { class: "sw", "aria-hidden": "true" }), (s.labels || {})[v] || v)));
 }
 
 function lensSelect(id, label, value, options, onchange) {
@@ -1113,7 +1155,7 @@ function lensBar(lens, res) {
       onclick: () => writeHash({ s: field + (desc ? "" : "-desc") }),
     }, desc ? "↓" : "↑"),
     h("div", { class: "toggle", role: "group", "aria-label": "Layout" }, toggle("", "List"), toggle("board", "Board")),
-    stripLegend(offered),
+    stripLegend(lens, offered),
     ...lensChips(lens),
     picked ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: "Stop grouping", onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
       `Grouped by ${picked.label.toLowerCase()} ×`) : null,
@@ -1335,6 +1377,7 @@ function specFor(spec, provider) {
   const d = (spec.displays || {})[provider];
   if (!d) return spec;
   return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
+    strip: !!d.strip, colors: d.colors,
     labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
 }
 
@@ -1422,7 +1465,7 @@ function pieceButtons(m, lens, part) {
 function rowColumnDefs() {
   return [
     { id: "unit", cls: "c-pr", parts: ["ref"], has: () => true },
-    { id: "who", cls: "c-wait", parts: ["who", "kind"], has: (m) => !!(m.parts.who || m.parts.kind || m.lead) },
+    { id: "who", cls: "c-wait", parts: ["strip", "who", "kind"], has: (m) => !!(m.parts.who || m.parts.kind || m.lead) },
     { id: "since", cls: "c-for", parts: ["age"], has: (m) => !!(m.parts.age || m.age) },
     { id: "why", cls: "c-why", parts: [], has: (m) => !!m.why },
     { id: "aside", cls: "c-where", parts: ["aside"], has: (m) => !!(m.parts.aside || (m.aside || []).some(Boolean)) },
@@ -1435,9 +1478,15 @@ function rowColumns(models) {
   return rowColumnDefs().filter((c) => models.some((m) => c.has(m)));
 }
 
-// columnSort is the field a column's head sorts by: the first sortable facet of its parts.
+// columnSort is the field a column's head sorts by: the first sortable facet of its parts, the strip's the
+// view's strip facet.
 function columnSort(col, lens) {
   for (const part of col.parts) {
+    if (part === "strip") {
+      const f = lens.strip ? fieldById(lens.strip, lens.fields) : null;
+      if (f && f.sort) return f;
+      continue;
+    }
     for (const s of lens.specs || []) {
       const f = fieldById(s.id, lens.fields);
       if (f && f.sort && specFor(s, lens.provider || "").show === part) return f;
@@ -1521,8 +1570,7 @@ function rowModel(r, pr, lens, copy) {
   const scope = copySlot("row", key, copy);
   const n = Number.isInteger((p.brief || {}).open_questions) ? p.brief.open_questions : 0;
   const ws = p.workspace || {};
-  const strip = waitField();
-  const cat = waitCat(r);
+  const strip = stripOf(item, lens.specs);
   const why = sm(r).reason || "";
   const groups = new Set((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => fold(x.name || "")));
   const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
@@ -1534,15 +1582,22 @@ function rowModel(r, pr, lens, copy) {
       p.head && lens.ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, lens.ts)) : null,
       n > 0 ? h("span", { class: "pill qs", title: fillWord(w.questions_title, { n }) }, fillWord(w.questions, { n })) : null],
     flags: [r.stale ? h("span", { class: "flag stale", title: w.stale_title }, w.stale) : null, intakeChip(r, w)],
-    lead: strip ? heldFacet(r, lens, catalog.strip, cat, h("span", { class: "dot", "aria-hidden": "true", "data-field": catalog.strip, "data-value": cat }, "●"), `facet:${scope}:${catalog.strip}`) : null,
+    lead: stripDot(strip, lens, scope, w),
     age: roundGate(r) ? countdown(r) : null,
     why,
     asideLead: ws.display_name ? h("span", { class: "ws" }, ws.display_name) : null,
     aside: [(ws.agent_states || []).length ? h("span", { class: "agent" }, ws.agent_states.join(", ")) : null, rowLink(r, scope)],
     actions: actionButtons(r, "row", { scope }),
-    cls: [strip ? waitClass(r) : "", ...rowClasses(item, lens.specs)],
-    tip: [[strip && strip.show ? strip.show(cat) : "", ...(parts.kind || []).map((x) => x.label)].filter(Boolean).join(": "), why].filter(Boolean).join(". "),
+    cls: [strip ? "w-" + strip.color : "", ...rowClasses(item, lens.specs)],
+    tip: [stripTip(strip, waitingLabel(r), (parts.kind || []).map((x) => x.label).join(", ")), why].filter(Boolean).join(". "),
   };
+}
+
+// stripDot is the dot of an item's strip, a facet button that filters by its value; null without a strip.
+function stripDot(strip, lens, scope, words) {
+  if (!strip) return null;
+  const id = strip.spec.id;
+  return facet(lens, id, strip.value, h("span", { class: "dot", "aria-hidden": "true", "data-field": id, "data-value": strip.value }, "●"), `facet:${scope}:${id}`, { words });
 }
 
 // groupQualifier is the filter that keeps only a group's rows: a tag key's
@@ -1589,7 +1644,7 @@ function rowTable(res, model, lens, cols) {
     if (!grouped) return h("tbody", {}, rows);
     const id = `g-${lens.view}-${i}`;
     return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field && g.field === lens.strip ? " w-" + g.key : "") },
+      h("tr", { class: "g-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") },
         h("th", { scope: "rowgroup", colspan: cols.length },
           h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
             `${collapsed ? "▸" : "▾"} ${g.label}`),
@@ -1694,7 +1749,7 @@ function emptyNote(view, q) {
 function lane(g, lens, title, item) {
   const label = g.label || title;
   return h("section", { class: "lane", "aria-label": label },
-    h("h2", { class: "lane-head" + (g.field && g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, label),
+    h("h2", { class: "lane-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") }, h("span", {}, label),
       h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
     h("ol", { class: "cards" }, g.rows.map((it) => item(it, multiCopy(g.field) ? g.key : ""))));
 }

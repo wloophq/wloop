@@ -33,6 +33,8 @@ var uiGrammar = []Key{
 	{Path: "facets.*.label_prefix", In: SurfaceUI, Kind: KindText, Doc: "Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it."},
 	{Path: "facets.*.row_class", In: SurfaceUI, Kind: KindTable, Doc: "The class of a row that holds a value, by value, such as `{ me = \"mine\" }`, which the cockpit's stylesheet colors."},
 	{Path: "facets.*.row_class.*", In: SurfaceUI, Kind: KindText, Doc: "One value's class."},
+	{Path: "facets.*.colors", In: SurfaceUI, Kind: KindTable, Doc: ColorsDoc},
+	{Path: "facets.*.colors.*", In: SurfaceUI, Kind: KindEnum, Values: StripColors, Doc: "One value's hue."},
 	{Path: "facets.*.empty", In: SurfaceUI, Kind: KindText, Doc: "What a row with no value shows."},
 	{Path: "facets.*.values", In: SurfaceUI, Kind: KindTable, Doc: "How each value shows, by value; a value it does not name shows as itself."},
 	{Path: "facets.*.values.*", In: SurfaceUI, Kind: KindText, Doc: "One value's text."},
