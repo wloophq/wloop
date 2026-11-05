@@ -794,7 +794,10 @@ func (s *Server) counters(ctx context.Context) *api.Counters {
 	if s.deps.Tasks == nil {
 		return nil
 	}
-	c, err := s.deps.Tasks.Counts(ctx, "")
+	return s.countersOf(s.deps.Tasks.Counts(ctx, ""))
+}
+
+func (s *Server) countersOf(c task.Counters, err error) *api.Counters {
 	if err != nil {
 		s.logf("tasks: counters: %v", err)
 		return nil
@@ -1388,16 +1391,21 @@ func (s *Server) feedTasks(ctx context.Context) {
 // nothing moved but rows no task holds.
 func (s *Server) publishTasks(ctx context.Context, c port.Change) {
 	rows, all := s.moved.take()
-	held, err := s.deps.Tasks.Held(ctx, rows)
+	held := rows
+	snap, err := s.deps.Tasks.Snapshot(ctx)
 	if err != nil {
 		s.logf("tasks feed: %v", err)
-		held = rows
+	} else {
+		held = snap.Held(rows)
 	}
 	if c.Empty() && !all && len(held) == 0 {
 		return
 	}
 	pos := s.hub.position()
-	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Counters: s.counters(ctx), All: c.All || all}
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all}
+	if err == nil {
+		ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+	}
 	if !ch.All {
 		units := slices.Concat(c.Units, held)
 		slices.SortFunc(units, api.CompareUnits)

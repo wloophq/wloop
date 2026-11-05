@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -90,7 +89,13 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 		r.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: db.Tasks(), Clock: fixedClock(tasksNow)})
 		loaded := bundledLoaded
 		if d.Intents != nil {
-			loaded = func() *intentload.Loaded { return cmp.Or(d.Intents(), bundledLoaded()) }
+			intents := d.Intents
+			loaded = func() *intentload.Loaded {
+				if l := intents(); l != nil {
+					return l
+				}
+				return bundledLoaded()
+			}
 		}
 		r.facts = countedLensFacts(db, loaded, tasksNow, &r.factReads, func(ctx context.Context, u unit.Unit) (facttask.Link, error) {
 			if !r.linked {

@@ -13,8 +13,10 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -188,9 +190,16 @@ func TestAListPageComputesEachTasksFactsOnce(t *testing.T) {
 	}
 }
 
+// profileOnce is the bundled profile loaded once, so a benchmark times what serves a page, not the load.
+func profileOnce() func() *intentload.Loaded {
+	l := bundledLoaded()
+	return func() *intentload.Loaded { return l }
+}
+
 func BenchmarkTasksPage(b *testing.B) {
-	r := newTasksRig(b, nil)
-	r.s.deps.Row = catalog.RowOf(bundledLoaded, lensFacts(r.db, bundledLoaded, tasksNow))
+	loaded := profileOnce()
+	r := newTasksRig(b, func(d *Deps) { d.Intents = loaded })
+	r.s.deps.Row = catalog.RowOf(loaded, lensFacts(r.db, loaded, tasksNow))
 	ctx := context.Background()
 	const n = 300
 	var ts []task.Task
@@ -211,6 +220,26 @@ func BenchmarkTasksPage(b *testing.B) {
 		if rec.Code != 200 {
 			b.Fatalf("%d: %s", rec.Code, rec.Body)
 		}
+	}
+}
+
+// BenchmarkPublishTasks times the tasks feed's publish of a burst of row changes over n stored tasks, half
+// of the burst's units held by a task.
+func BenchmarkPublishTasks(b *testing.B) {
+	loaded := profileOnce()
+	r := newTasksRig(b, func(d *Deps) { d.Intents = loaded })
+	ctx := context.Background()
+	const n, burst = 300, 40
+	r.withFacetRows(manyTasks(b, r, n))
+	var units []unit.Unit
+	for i := range burst {
+		units = append(units, unit.Unit{Provider: unit.GitHub, Key: "acme/api#" + strconv.Itoa(i+1)})
+		units = append(units, unit.Unit{Provider: unit.GitHub, Key: "acme/web#" + strconv.Itoa(i+1)})
+	}
+	r.s.moved.attach()
+	for b.Loop() {
+		r.s.moved.add(api.Change{Units: units})
+		r.s.publishTasks(ctx, port.Change{})
 	}
 }
 

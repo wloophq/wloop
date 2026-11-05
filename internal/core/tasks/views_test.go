@@ -83,9 +83,44 @@ func TestTasksSinceResendsTheTasksHoldingAMovedUnit(t *testing.T) {
 	if page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, nil); err != nil || len(page.Tasks) != 0 || len(page.Removed) != 0 {
 		t.Fatalf("the page since naming none: %+v %v", page, err)
 	}
-	held, err := r.svc.Held(ctx, []unit.Unit{thread, {Provider: "slack", Key: "T1/C1/2"}, pr})
-	if err != nil || !slices.Equal(held, []unit.Unit{thread, pr}) {
-		t.Fatalf("held %v %v", held, err)
+}
+
+// readCounted counts the reads of the stored tasks.
+type readCounted struct {
+	coretasks.Store
+	reads int
+}
+
+func (s *readCounted) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	s.reads++
+	return s.Store.Tasks(ctx, q)
+}
+
+// TestASnapshotHoldsAndCountsFromOneRead checks that the units the stored tasks hold and the counters over
+// them come from one read of the store.
+func TestASnapshotHoldsAndCountsFromOneRead(t *testing.T) {
+	ctx := context.Background()
+	r := newRig()
+	pr, thread := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, unit.Unit{Provider: "slack", Key: "T1/C1/1"}
+	r.put(t, task.Task{ID: "a", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{pr}})
+	r.put(t, task.Task{ID: "b", State: "inbox", Category: task.CategoryInbox, Items: []task.ItemRef{{Unit: thread, Item: "i1"}}})
+	r.put(t, task.Task{ID: "c", State: "next", Category: task.CategoryReady})
+	store := &readCounted{Store: r.store}
+	svc := coretasks.New(coretasks.Deps{Store: store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Views: r.lens.Views, ViewEval: r.lens.Eval})
+	snap, err := svc.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held := snap.Held([]unit.Unit{thread, {Provider: "slack", Key: "T1/C1/2"}, pr}); !slices.Equal(held, []unit.Unit{thread, pr}) {
+		t.Fatalf("held %v", held)
+	}
+	c, err := snap.Counts(ctx, "")
+	if err != nil || c.Views["inbox"] != 2 {
+		t.Fatalf("counters %+v %v", c, err)
+	}
+	if store.reads != 1 {
+		t.Fatalf("%d reads of the stored tasks, want 1", store.reads)
 	}
 }
 

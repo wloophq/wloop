@@ -393,11 +393,11 @@ func (s *Service) Counts(ctx context.Context, area string) (task.Counters, error
 // CountsWhere is Counts over the tasks keep holds, every task when nil, keep reading them inside the pass its ctx carries: each view, area and context counts only
 // the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows the lists.
 func (s *Service) CountsWhere(ctx context.Context, area string, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	n, err := s.Snapshot(ctx)
 	if err != nil {
 		return task.Counters{}, err
 	}
-	return s.counts(WithPass(ctx, &Pass{Tasks: all}), area, all, keep)
+	return s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, keep)
 }
 
 func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
@@ -545,17 +545,30 @@ func holdsAny(e task.Task, units map[unit.Unit]bool) bool {
 	return false
 }
 
-// Held are those of units a stored task holds, as its own or an item's, in their order.
-func (s *Service) Held(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {
-	if len(units) == 0 {
-		return nil, nil
-	}
+// Snapshot is the stored tasks read once, for the calls that must agree on them, such as the tasks feed's
+// publish of the units they hold and the counters.
+type Snapshot struct {
+	s    *Service
+	pass *Pass
+}
+
+// Snapshot reads every stored task, whatever its category.
+func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
 	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
 	if err != nil {
-		return nil, err
+		return Snapshot{}, err
 	}
-	pass := &Pass{Tasks: all}
-	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !pass.Holds(u) }), nil
+	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
+}
+
+// Held are those of units a task of n holds, as its own or an item's, in their order.
+func (n Snapshot) Held(units []unit.Unit) []unit.Unit {
+	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !n.pass.Holds(u) })
+}
+
+// Counts are the counters of the profile's views over area, over the tasks of n.
+func (n Snapshot) Counts(ctx context.Context, area string) (task.Counters, error) {
+	return n.s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, nil)
 }
 
 // delta splits the tasks written since a position into those in the paged view and the ids of those not.
