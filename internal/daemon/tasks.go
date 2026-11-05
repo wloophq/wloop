@@ -50,7 +50,7 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | 
 
 // taskInputs are the notes after which a change carries the counters: a view reads the tasks, their gates,
 // their wakes, their units' records and their links.
-const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks
+const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks | port.TopicPlacements
 
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}

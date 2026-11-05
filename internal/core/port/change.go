@@ -42,6 +42,7 @@ const (
 	TopicTimeline                       // events on a task or a unit linked to one
 	TopicRuns                           // a task's runs: its turns' sessions and workspaces
 	TopicRecords                        // a unit's records, such as its brief (noted with TopicLoopEvents)
+	TopicPlacements                     // placements
 )
 
 // pr_seen notes nothing. A write that inserts events notes SourceEvents or

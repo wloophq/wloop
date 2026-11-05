@@ -76,8 +76,8 @@ func TestTasksSinceResendsTheTasksHoldingAMovedUnit(t *testing.T) {
 		t.Fatal(err)
 	}
 	since := coretasks.Since{Epoch: first.Epoch, Rev: first.Rev}
-	page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, []unit.Unit{pr, thread})
-	if err != nil || page.Full || !slices.Equal(pageIDs(page.Tasks), []task.ID{"a", "b"}) || !slices.Equal(page.Removed, []task.ID{"c"}) {
+	page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, []unit.Unit{pr, thread, task.UnitOf("d")})
+	if err != nil || page.Full || !slices.Equal(pageIDs(page.Tasks), []task.ID{"a", "b", "d"}) || !slices.Equal(page.Removed, []task.ID{"c"}) {
 		t.Fatalf("the page since naming the units: %+v %v", page, err)
 	}
 	if page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, nil); err != nil || len(page.Tasks) != 0 || len(page.Removed) != 0 {

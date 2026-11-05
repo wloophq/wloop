@@ -531,8 +531,11 @@ func withHolding(changed, all []task.Task, units []unit.Unit) []task.Task {
 	return out
 }
 
-// holdsAny says whether e holds one of units, as its own or an item's.
+// holdsAny says whether e holds one of units: its own unit, one of its units or an item's.
 func holdsAny(e task.Task, units map[unit.Unit]bool) bool {
+	if units[task.UnitOf(e.ID)] {
+		return true
+	}
 	for _, u := range e.Units {
 		if units[u] {
 			return true
