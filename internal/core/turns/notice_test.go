@@ -189,3 +189,46 @@ func TestANoticeBeforeTheRecordIsAckedStillOwesARecord(t *testing.T) {
 		t.Fatalf("a stop after acting on the answer with no record: %+v", got)
 	}
 }
+
+func TestARefusedAnswerTheAgentReadsCountsAsDelivered(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	c := fixed(t0)
+	s.Clock = c
+	putTurn(store, true)
+	reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws", AgentSession: "s1", StartedAt: t0.Add(-2 * time.Hour), MCPAt: t0.Add(-2 * time.Hour)})
+	sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-5 * time.Minute)})
+	sess.Hold("term_1")
+	ctx := context.Background()
+	got, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 9, Gate: 4, OptionID: "publish", Source: turn.Cockpit})
+	if got.Route != turn.Refused || err == nil {
+		t.Fatalf("%+v %v", got, err)
+	}
+	c.advance(6 * time.Second)
+	if err := s.MarkRead(ctx, r7, []int64{bookOf(t, store, r7).Answers[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+	b := bookOf(t, store, r7)
+	a := b.Answers[0]
+	if a.Route != turn.Typed || !a.ReadAt.Equal(t0.Add(6*time.Second)) || !a.NoticedAt.Equal(a.ReadAt) {
+		t.Fatalf("answer %+v", a)
+	}
+	if _, ok := b.AnsweredAt(1); !ok || !b.QuestionAnswered(turn.Intent(dintent.Review)) {
+		t.Fatalf("the read answer does not answer the question: %+v", b.Answers)
+	}
+	routed := kinds(store.Events(), turns.KindAnswerRouted)
+	if len(routed) != 2 || routed[1].Key != "1:typed" || !strings.Contains(routed[1].Data, "read") {
+		t.Fatalf("routed %+v", routed)
+	}
+}
+
+func TestARefusedAnswerTheAgentNeverReadStillAsksAgain(t *testing.T) {
+	s, store, _, _, _ := newService(t)
+	putTurn(store, true, turn.Answer{ID: 1, TurnSeq: 1, OptionID: "publish", Route: turn.Refused, At: t0, Message: 9},
+		turn.Answer{ID: 2, TurnSeq: 1, OptionID: "hold", Route: turn.Typed, At: t0, Message: 9})
+	if err := s.MarkRead(context.Background(), r7, []int64{2}); err != nil {
+		t.Fatal(err)
+	}
+	if a := bookOf(t, store, r7).Answers[0]; a.Route != turn.Refused || !a.ReadAt.IsZero() {
+		t.Fatalf("answer %+v", a)
+	}
+}
