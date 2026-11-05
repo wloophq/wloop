@@ -18,6 +18,9 @@ func lensCatalog() api.ViewsCatalog {
 		Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Group: "task.state"}, {ID: "mine", Label: "Mine", Badge: true},
 			{ID: "sends", Label: "Sends", Over: "gates"}},
 		States: []api.StateSpec{{Name: "parked", Label: "Parked", Category: "waiting"}, {Name: "doing", Label: "Doing", Category: "active"}},
+		Facets: []api.FacetSpec{{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Rank: []string{"parked", "doing"},
+			Labels: map[string]string{"parked": "Parked", "doing": "Doing"}, Empty: "none"}},
+		Lens: api.LensWords{DefaultGroup: "{{.label}} (default)", NoGroup: "None"}, DefaultSort: "View order",
 		Verbs: []api.VerbSpec{{Verb: "park", Handler: "waiting", Label: "Park", Input: "Parked on whom"}, {Verb: "toss", Handler: "drop", Label: "Toss"},
 			{Verb: "hand", Handler: "delegate", Label: "Hand", Input: "What should the agent do"}, {Verb: "tidy", Label: "Tidy"}},
 	}
@@ -25,6 +28,7 @@ func lensCatalog() api.ViewsCatalog {
 
 func lensTask(id, title, state string) api.TaskView {
 	e := task(id, title, state)
+	e.Facets = map[string][]string{"state": {state}}
 	e.Verbs = []api.VerbState{{Verb: "park", Enabled: true}, {Verb: "toss", Enabled: true}, {Verb: "hand", Enabled: true}, {Verb: "tidy", Enabled: true}}
 	return e
 }
@@ -194,5 +198,139 @@ func TestAViewSaysWhatItListsInTheHelpAndWhatItShowsEmpty(t *testing.T) {
 	press(m, Key{Rune: '?'})
 	if screen := squash(screenOf(m, 400, 120)); !strings.Contains(screen, "Tasks waiting too long.") {
 		t.Errorf("the help lacks the view's summary:\n%s", screen)
+	}
+}
+
+func whereTask(id, title, state, where string) api.TaskView {
+	e := lensTask(id, title, state)
+	e.Facets["where"] = []string{where}
+	return e
+}
+
+func whereModel(t *testing.T) *Model {
+	c := lensCatalog()
+	c.Facets = append(c.Facets, api.FacetSpec{ID: "where", Label: "Where", Group: true, Menu: true, Sort: "text", Empty: "nowhere"})
+	m := newModel(t)
+	m.SetViews(c)
+	m.SetTasks("stalled", []api.TaskView{whereTask("t-1", "Ship the export", "doing", "general"), whereTask("t-2", "Call the bank", "parked", "ops"),
+		whereTask("t-3", "Read the spec", "doing", "general")}, api.Counters{})
+	return m
+}
+
+func titles(tasks []api.TaskView) []string {
+	var out []string
+	for _, e := range tasks {
+		out = append(out, e.Title)
+	}
+	return out
+}
+
+func TestTheTUIFiltersATaskViewByQualifier(t *testing.T) {
+	m := whereModel(t)
+	filterBy(m, "where:general")
+	if got := titles(m.visibleTasks()); !slices.Equal(got, []string{"Read the spec", "Ship the export"}) && !slices.Equal(got, []string{"Ship the export", "Read the spec"}) {
+		t.Fatalf("where:general keeps %v", got)
+	}
+	press(m, Key{Name: KeyEsc})
+	filterBy(m, "-where:general")
+	if got := titles(m.visibleTasks()); !slices.Equal(got, []string{"Call the bank"}) {
+		t.Fatalf("-where:general keeps %v", got)
+	}
+	press(m, Key{Name: KeyEsc})
+	filterBy(m, "where:general spec")
+	if got := titles(m.visibleTasks()); !slices.Equal(got, []string{"Read the spec"}) {
+		t.Fatalf("a qualifier and a word keep %v", got)
+	}
+	press(m, Key{Name: KeyEsc})
+	filterBy(m, "nowhere:general")
+	if got := m.visibleTasks(); len(got) != 0 {
+		t.Fatalf("an unknown field is a free word nothing holds, kept %v", titles(got))
+	}
+}
+
+func TestTheTUIFiltersARowViewByQualifier(t *testing.T) {
+	m := newModel(t)
+	a, b := row(7, "Batch export", "review", "needs-me"), row(8, "Cache warmup", "review", "needs-me")
+	a.Facets["where"], b.Facets["where"] = []string{"acme/api"}, []string{"acme/web"}
+	m.SetData([]api.Row{a, b}, api.Health{})
+	filterBy(m, "where:acme/web")
+	if got := m.visible(); len(got) != 1 || got[0].Unit != b.Unit {
+		t.Fatalf("where:acme/web keeps %v", got)
+	}
+	press(m, Key{Name: KeyEsc})
+	filterBy(m, "-where:web")
+	if got := m.visible(); len(got) != 1 || got[0].Unit != a.Unit {
+		t.Fatalf("-where:web keeps %v", got)
+	}
+}
+
+func TestTheTUIGroupsByAnOfferedField(t *testing.T) {
+	m := whereModel(t)
+	press(m, Key{Rune: '='})
+	if want := "group: Where"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	screen := screenOf(m, 120, 20)
+	general, ops := strings.Index(screen, " general\n"), strings.Index(screen, " ops\n")
+	if general < 0 || ops < general || strings.Index(screen, "Read the spec") > ops || strings.Index(screen, "Call the bank") < ops {
+		t.Fatalf("tasks are not under their where heads:\n%s", screen)
+	}
+	press(m, Key{Rune: '='})
+	if want := "group: None"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	if screen := screenOf(m, 120, 20); strings.Contains(screen, " general\n") || strings.Contains(screen, " Parked\n") {
+		t.Fatalf("a view picked to no group still shows heads:\n%s", screen)
+	}
+	press(m, Key{Rune: '='})
+	if want := "group: State (default)"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	if screen := screenOf(m, 120, 20); !strings.Contains(screen, " Parked\n") {
+		t.Fatalf("the view's own group is back, without its heads:\n%s", screen)
+	}
+}
+
+func TestTheTUIOffersOnlyTheViewsFields(t *testing.T) {
+	m := whereModel(t)
+	var seen []string
+	for range 5 {
+		press(m, Key{Rune: '='})
+		seen = append(seen, m.status)
+	}
+	want := []string{"group: Where", "group: None", "group: State (default)", "group: Where", "group: None"}
+	if !slices.Equal(seen, want) {
+		t.Fatalf("the group menu went %q, want %q", seen, want)
+	}
+	m.SetTasks("stalled", []api.TaskView{lensTask("t-1", "Ship the export", "doing")}, api.Counters{})
+	seen = nil
+	for range 3 {
+		press(m, Key{Rune: '='})
+		seen = append(seen, m.status)
+	}
+	if want := []string{"group: State (default)", "group: None", "group: State (default)"}; !slices.Equal(seen, want) {
+		t.Fatalf("with no task holding where the menu went %q, want %q", seen, want)
+	}
+}
+
+func TestTheTUISortsByAnOfferedField(t *testing.T) {
+	m := whereModel(t)
+	press(m, Key{Rune: '='}, Key{Rune: '='}, Key{Rune: '-'})
+	if want := "sort: Where"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	if got := titles(m.visibleTasks()); !slices.Equal(got, []string{"Ship the export", "Read the spec", "Call the bank"}) {
+		t.Fatalf("sorted by where: %v", got)
+	}
+	press(m, Key{Rune: '-'})
+	if want := "sort: Where (descending)"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
+	}
+	if got := titles(m.visibleTasks()); !slices.Equal(got, []string{"Call the bank", "Ship the export", "Read the spec"}) {
+		t.Fatalf("sorted by where descending: %v", got)
+	}
+	press(m, Key{Rune: '-'})
+	if want := "sort: View order"; m.status != want {
+		t.Fatalf("status %q, want %q", m.status, want)
 	}
 }

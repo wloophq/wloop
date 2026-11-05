@@ -14,6 +14,9 @@ import (
 
 var navHelp = []helpItem{{"↑↓", "move"}, {"g", "view"}, {"/", "filter"}, {"^K", "actions"}}
 
+// lensHelp are the keys of the lens, which follow the filter on the lists.
+var lensHelp = []helpItem{{"=", "group"}, {"-", "sort"}}
+
 var quitHelp = helpItem{"q", "quit"}
 
 var keysHelp = helpItem{"?", "keys"}
@@ -28,6 +31,7 @@ const factLabel = 9
 // views, the list of the current one, the selected pull request's detail,
 // a status line and the help or prompt line.
 func (m *Model) Render(width, height int, now time.Time) []string {
+	m.now = now
 	if width < 20 || height < 5 {
 		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
 	}
@@ -55,7 +59,7 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if l, ok := m.loadingLine(m.rowsLoading, width); ok {
 		lines, body = append(lines, l), body-1
 	}
-	rows := m.visible()
+	rows, heads := m.visibleRows()
 	cur := m.cursor(rows)
 	var detail []string
 	if r, ok := m.selected(); ok && width >= 40 && body >= 8 {
@@ -75,7 +79,7 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if len(rows) == 0 {
 		lines = append(lines, "  "+m.t.Dim(termfmt.Cut(m.empty(), width-2)))
 	} else {
-		lines = append(lines, m.list(rows, cur, width, listHeight, now)...)
+		lines = append(lines, m.list(rows, heads, cur, width, listHeight, now)...)
 	}
 	if len(detail) > 0 {
 		lines = append(append(lines, ""), detail...)
@@ -118,7 +122,8 @@ func (m *Model) tabs(width int) string {
 		first = m.views[i].Provider
 	}
 	for i, v := range m.views {
-		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
+		shown, _ := m.in(v.ID)
+		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(shown)), i})
 	}
 	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
 	mine := 0
@@ -223,7 +228,7 @@ func around(g []tab, view, width int) []tab {
 
 // list lays the view's rows out in aligned columns, as status does, and
 // shows the height of them around the cursor.
-func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []string {
+func (m *Model) list(rows []api.Row, heads []string, cur, width, height int, now time.Time) []string {
 	t := m.t
 	cols := []termfmt.Column{{Right: true}, {}, {Flex: true}}
 	brief := width >= 100
@@ -263,9 +268,12 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 		cells[i] = append(c, termfmt.Cell{Text: m.waitCell(r, waitMax)})
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
-	start := max(0, cur-height+1)
 	var out []string
-	for i := start; i < len(rows) && i < start+height; i++ {
+	var at []int
+	for i := range rows {
+		if heads[i] != "" {
+			out, at = append(out, " "+t.Bold(termfmt.Cut(oneLine(heads[i]), width-1))), append(at, -1)
+		}
 		mark := []byte("   ")
 		if i == cur {
 			mark[0] = '>'
@@ -277,9 +285,9 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 		if i == cur && t.Color {
 			line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
 		}
-		out = append(out, line)
+		out, at = append(out, line), append(at, i)
 	}
-	return out
+	return window(out, slices.Index(at, cur), height)
 }
 
 // shortRef is a unit's label within w cells: a label of the form
@@ -625,7 +633,7 @@ func (m *Model) helpItems() []helpItem {
 			verbs, _ := m.verbHelp(e)
 			items = append(items, verbs...)
 		}
-		return append(items, navHelp...)
+		return append(items, withLens(navHelp)...)
 	}
 	if m.view == m.planView() {
 		if it, ok := m.selectedItem(); ok {
@@ -640,7 +648,13 @@ func (m *Model) helpItems() []helpItem {
 			}
 		}
 	}
-	return append(items, navHelp...)
+	return append(items, withLens(navHelp)...)
+}
+
+// withLens is nav with the lens keys after the filter's.
+func withLens(nav []helpItem) []helpItem {
+	i := slices.IndexFunc(nav, func(h helpItem) bool { return h.key == "/" }) + 1
+	return slices.Concat(nav[:i], lensHelp, nav[i:])
 }
 
 // help is the help line unstyled and uncut.

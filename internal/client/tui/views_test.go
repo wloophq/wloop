@@ -33,7 +33,18 @@ func viewsCatalog() api.ViewsCatalog {
 		{Verb: "sequential", Handler: "sequential", Label: "Sequential"}}
 	props := []api.PropSpec{{Name: "focus", Type: "enum", Values: []string{"on", "off"}, Role: "star"}, {Name: "contexts", Type: "string[]", Role: "contexts"},
 		{Name: "area", Type: "string", Role: "area"}, {Name: "due", Type: "date", Role: "deadline"}}
-	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props}
+	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props, Facets: taskFacets(),
+		Lens: api.LensWords{DefaultGroup: "{{.label}} (default)", NoGroup: "None"}, DefaultSort: "View order"}
+}
+
+func taskFacets() []api.FacetSpec {
+	return []api.FacetSpec{
+		{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Sort: "rank", Rank: []string{"inbox", "next", "waiting", "someday"}, Empty: "none"},
+		{ID: "context", Fact: "task.prop.contexts", Label: "Context", Group: true, Menu: true, Sort: "text", Rank: []string{"computer", "calls"},
+			Labels: map[string]string{"computer": "@computer", "calls": "@calls"}, Empty: "none"},
+		{ID: "waits-on", Fact: "task.owed_by", Label: "Waits on", Group: true, Menu: true, Sort: "text", Empty: "none"},
+		{ID: "where", Label: "Where", Group: true, Menu: true, Sort: "text", Empty: "nowhere"},
+	}
 }
 
 var allVerbs = []string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss"}
@@ -60,13 +71,15 @@ func task(id, title, state string, contexts ...string) api.TaskView {
 		b, _ := json.Marshal(contexts)
 		props = map[string]json.RawMessage{"contexts": b}
 	}
-	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props,
+	facets := map[string][]string{"state": {state}, "context": contexts}
+	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props, Facets: facets,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
 func waitingOn(e api.TaskView, names ...string) api.TaskView {
 	if len(names) > 0 {
 		e.OwedBy = names[0]
+		e.Facets["waits-on"] = names[:1]
 	}
 	return e
 }

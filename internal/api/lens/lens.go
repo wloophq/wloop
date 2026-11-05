@@ -4,6 +4,7 @@ package lens
 
 import (
 	"cmp"
+	"maps"
 	"math"
 	"regexp"
 	"slices"
@@ -201,7 +202,7 @@ func GroupField(id string, specs map[string]api.FacetSpec) (api.FacetSpec, func(
 		}
 		return out
 	}
-	return api.FacetSpec{ID: id, Label: spec.Label + " " + key, Group: true, Empty: "no " + key}, keys, true
+	return api.FacetSpec{ID: id, Label: spec.Label + " " + key, Group: true, Menu: true, Empty: "no " + key}, keys, true
 }
 
 // GroupByKeys groups like GroupBy, an item under each of the keys the function gives, "none" without one.
@@ -318,4 +319,62 @@ func compareKeys(spec api.FacetSpec, a, b string, desc bool) int {
 		return -c
 	}
 	return c
+}
+
+// Merge lists the specs of lists once per id, at the position of the first and with the last's spec.
+func Merge(lists ...[]api.FacetSpec) []api.FacetSpec {
+	var out []api.FacetSpec
+	at := map[string]int{}
+	for _, l := range lists {
+		for _, s := range l {
+			if i, ok := at[s.ID]; ok {
+				out[i] = s
+				continue
+			}
+			at[s.ID] = len(out)
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// ByID indexes specs by id.
+func ByID(specs []api.FacetSpec) map[string]api.FacetSpec {
+	out := make(map[string]api.FacetSpec, len(specs))
+	for _, s := range specs {
+		out[s.ID] = s
+	}
+	return out
+}
+
+// Offered are the fields a list's menus offer: the specs some item has a value of, in order, then a
+// "tag:<key>" field for each key of the prefix-match "tag" facet's values the items hold.
+func Offered(items []Item, specs []api.FacetSpec) []api.FacetSpec {
+	has := map[string]bool{}
+	tagKeys := map[string]bool{}
+	for _, it := range items {
+		for id, vs := range it.Facets {
+			if slices.ContainsFunc(vs, func(v string) bool { return v != "" }) {
+				has[id] = true
+			}
+		}
+		for _, v := range it.Facets["tag"] {
+			if key, _, ok := strings.Cut(v, ":"); ok && tagKeyRE.MatchString(key) {
+				tagKeys[key] = true
+			}
+		}
+	}
+	var out []api.FacetSpec
+	for _, s := range specs {
+		if has[s.ID] {
+			out = append(out, s)
+		}
+	}
+	byID := ByID(specs)
+	for _, key := range slices.Sorted(maps.Keys(tagKeys)) {
+		if spec, _, ok := GroupField("tag:"+key, byID); ok {
+			out = append(out, spec)
+		}
+	}
+	return out
 }

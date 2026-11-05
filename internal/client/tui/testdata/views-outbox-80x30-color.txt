@@ -27,4 +27,4 @@
 
 
 [33mwarning: app: notifications are off[39m
-[1ma[22m [2mapprove[22m  [1mBackspace[22m [2mdismiss[22m  [1m↑↓[22m [2mmove[22m  [1mg[22m [2mview[22m  [1m/[22m [2mfilter[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m
+[1ma[22m [2mapprove[22m  [1mBackspace[22m [2mdismiss[22m  [1m↑↓[22m [2mmove[22m  [1mg[22m [2mview[22m  [1m/[22m [2mfilter[22m  [1m=[22m [2mgroup[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

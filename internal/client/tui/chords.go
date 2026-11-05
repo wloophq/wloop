@@ -23,7 +23,7 @@ const (
 const shiftDigits = "!@#$%^&*("
 
 // coreActions are the served core actions that are not task verbs.
-var coreActions = []string{"move:", "detail:", "nav:", "area:", "answer:", "step:", "palette", "help", "filter", "open-source", "capture", "quit"}
+var coreActions = []string{"move:", "detail:", "nav:", "group:", "sort:", "area:", "answer:", "step:", "palette", "help", "filter", "open-source", "capture", "quit"}
 
 // handlerAsks are the handlers whose verbs ask for a value on the bottom
 // line first, the question the verb's served input; args turns the answer
@@ -254,6 +254,10 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 		n, _ := strconv.Atoi(strings.TrimPrefix(a, "answer:"))
 		c, ok = m.answer(q, n, k.Read)
 		return c, ok, true
+	case a == "group:cycle":
+		m.cycleGroup()
+	case a == "sort:cycle":
+		m.cycleSort()
 	case a == "palette":
 		m.openPalette()
 	case a == "help":

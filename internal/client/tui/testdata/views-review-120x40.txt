@@ -37,4 +37,4 @@
 
 
 
-Enter step done  ] next step  [ previous step  ↑↓ move  g view  / filter  ^K actions  ? keys  q quit
+Enter step done  ] next step  [ previous step  ↑↓ move  g view  / filter  = group  - sort  ^K actions  ? keys  q quit

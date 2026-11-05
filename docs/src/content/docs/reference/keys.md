@@ -25,6 +25,8 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `e` | done |
 | `Backspace` | dismiss |
 | `o` | open the source |
+| `=` | group by the next field the view offers (terminal): the view's own, each other field, then none |
+| `-` | sort by the next field the view offers (terminal): the view's own order, then each field ascending and descending |
 | `n` | capture |
 | `1`-`9` | the gate's intent of that number, in the order the gate lists them, while a gate is focused; in the terminal, pick a draft the open detail lists when it asks no question |
 
