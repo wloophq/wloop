@@ -27,6 +27,7 @@ type caseExpectation struct {
 		Shown  []int `json:"shown"`
 		Groups []struct {
 			Key   string `json:"key"`
+			Label string `json:"label"`
 			Items []int  `json:"items"`
 		} `json:"groups"`
 	} `json:"want"`
@@ -64,15 +65,25 @@ func TestLensCases(t *testing.T) {
 		if c.Group == "" {
 			continue
 		}
-		groups := lens.GroupBy(pick(table.Items, shown), specs[c.Group], table.Now)
+		spec, keys, ok := lens.GroupField(c.Group, specs)
+		if !ok {
+			t.Errorf("group field %q is unknown", c.Group)
+			continue
+		}
+		var groups []lens.Group
+		if keys != nil {
+			groups = lens.GroupByKeys(pick(table.Items, shown), spec, keys)
+		} else {
+			groups = lens.GroupBy(pick(table.Items, shown), spec, table.Now)
+		}
 		if len(groups) != len(c.Want.Groups) {
 			t.Errorf("q %q group %q: %d groups, want %d: %+v", c.Q, c.Group, len(groups), len(c.Want.Groups), groups)
 			continue
 		}
 		for i, g := range groups {
 			want := c.Want.Groups[i]
-			if g.Key != want.Key || !slices.Equal(remap(shown, g.Items), want.Items) {
-				t.Errorf("q %q group %q: group %d is %s %v, want %s %v", c.Q, c.Group, i, g.Key, remap(shown, g.Items), want.Key, want.Items)
+			if g.Key != want.Key || g.Label != want.Label || !slices.Equal(remap(shown, g.Items), want.Items) {
+				t.Errorf("q %q group %q: group %d is %s %q %v, want %s %q %v", c.Q, c.Group, i, g.Key, g.Label, remap(shown, g.Items), want.Key, want.Label, want.Items)
 			}
 		}
 	}

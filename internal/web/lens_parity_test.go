@@ -10,6 +10,7 @@ type lensWant struct {
 	Shown  []int `json:"shown"`
 	Groups []struct {
 		Key   string `json:"key"`
+		Label string `json:"label"`
 		Items []int  `json:"items"`
 	} `json:"groups"`
 }
@@ -40,7 +41,7 @@ process.stdout.write(JSON.stringify(input.cases.map((c) => {
   const at = (rows) => rows.map((x) => input.items.indexOf(x));
   const flat = pipelineOf(input.items, lens, null);
   const out = { shown: at(flat.groups[0].rows) };
-  if (c.group) out.groups = pipelineOf(input.items, { ...lens, group: c.group }, null).groups.map((g) => ({ key: g.key, items: at(g.rows) }));
+  if (c.group) out.groups = pipelineOf(input.items, { ...lens, group: c.group }, null).groups.map((g) => ({ key: g.key, label: g.label, items: at(g.rows) }));
   return out;
 })));`, map[string]any{"now": table.Now, "specs": table.Specs, "items": table.Items, "cases": table.Cases}, &got)
 	if len(got) != len(table.Cases) {

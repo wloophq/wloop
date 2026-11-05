@@ -291,7 +291,8 @@ function tagKeys(rows) {
 }
 
 function normValue(field, raw) {
-  return fold(unquote(String(raw || "")));
+  const v = fold(unquote(String(raw || "")));
+  return v === "@me" ? "me" : v;
 }
 
 // qualifierOf reads a field:value term of a field that filters; anything else
@@ -679,7 +680,11 @@ function groupItems(f, items) {
   };
   for (const it of items) {
     const ks = f.keys ? f.keys(it) : [itemKey(f, it)];
-    for (const k of new Set(ks.length ? ks : ["none"])) add(k).rows.push(it);
+    const seen = new Set();
+    for (const k of ks.length ? ks : ["none"]) {
+      if (!seen.has(fold(k))) add(k).rows.push(it);
+      seen.add(fold(k));
+    }
   }
   if (f.id === "lane") for (const id of f.rank || []) add(id);
   return [...buckets.values()].sort((a, b) => keyOrder(f, a.key, b.key, false));

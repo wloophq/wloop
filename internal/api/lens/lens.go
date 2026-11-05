@@ -36,7 +36,8 @@ type Query struct {
 
 var (
 	tokenRE     = regexp.MustCompile(`[^\s\x0B\p{Z}\x{FEFF}"]*"[^"]*"?|[^\s\x0B\p{Z}\x{FEFF}"]+`)
-	qualifierRE = regexp.MustCompile(`(?i)^(-?)([a-z][a-z-]*):(.+)$`)
+	qualifierRE = regexp.MustCompile(`^(-?)([a-zA-Z][a-zA-Z-]*):([^\n\r\x{2028}\x{2029}]+)$`)
+	tagKeyRE    = regexp.MustCompile(`^([a-z-]+)$`)
 )
 
 func unquote(s string) string {
@@ -53,6 +54,9 @@ func Parse(q string, specs map[string]api.FacetSpec) Query {
 		if m := qualifierRE.FindStringSubmatch(tok); m != nil {
 			field := strings.ToLower(m[2])
 			value := api.Fold(unquote(m[3]))
+			if value == "@me" {
+				value = "me"
+			}
 			if _, ok := specs[field]; ok && value != "" {
 				out.Quals = append(out.Quals, Qualifier{Field: field, Value: value, Neg: m[1] == "-"})
 				continue
@@ -155,16 +159,7 @@ func bucketOf(buckets []api.Bucket, value string, now time.Time) string {
 	if err != nil {
 		return ""
 	}
-	delta := now.Sub(at)
-	for _, b := range buckets {
-		if b.Within == "" {
-			return b.ID
-		}
-		if d, err := time.ParseDuration(b.Within); err == nil && delta < d {
-			return b.ID
-		}
-	}
-	return ""
+	return api.BucketOf(buckets, now, at)
 }
 
 // Group is the items of one value of a facet; Items index the slice GroupBy read.
@@ -176,13 +171,49 @@ type Group struct {
 // GroupBy puts each item under its first value of spec, under "none" without one, or under each of its
 // values when the facet matches by prefix. Groups come in rank order, then by name, "none" last.
 func GroupBy(items []Item, spec api.FacetSpec, now time.Time) []Group {
-	byKey := map[string]*Group{}
-	var order []*Group
-	for i, it := range items {
+	return groupWith(items, spec, func(it Item) []string {
 		keys := rawValues(it, spec, now)
 		if spec.Match != "prefix" && len(keys) > 1 {
 			keys = keys[:1]
 		}
+		return keys
+	})
+}
+
+// GroupField resolves a group field id: a facet's own, or "<facet>:<key>" for a prefix-match facet, which
+// groups by the values starting with "<key>:", an item under each of them. For the second kind it returns the
+// keys of an item, to give GroupByKeys; for the first, nil keys and GroupBy applies.
+func GroupField(id string, specs map[string]api.FacetSpec) (api.FacetSpec, func(Item) []string, bool) {
+	if spec, ok := specs[id]; ok {
+		return spec, nil, true
+	}
+	facet, key, found := strings.Cut(id, ":")
+	spec, ok := specs[facet]
+	if !found || !ok || spec.Match != "prefix" || !tagKeyRE.MatchString(key) {
+		return api.FacetSpec{}, nil, false
+	}
+	keys := func(it Item) []string {
+		var out []string
+		for _, v := range it.Facets[facet] {
+			if strings.HasPrefix(v, key+":") {
+				out = append(out, v)
+			}
+		}
+		return out
+	}
+	return api.FacetSpec{ID: id, Label: spec.Label + " " + key, Group: true, Empty: "no " + key}, keys, true
+}
+
+// GroupByKeys groups like GroupBy, an item under each of the keys the function gives, "none" without one.
+func GroupByKeys(items []Item, spec api.FacetSpec, keys func(Item) []string) []Group {
+	return groupWith(items, spec, keys)
+}
+
+func groupWith(items []Item, spec api.FacetSpec, keysOf func(Item) []string) []Group {
+	byKey := map[string]*Group{}
+	var order []*Group
+	for i, it := range items {
+		keys := keysOf(it)
 		if len(keys) == 0 {
 			keys = []string{none}
 		}

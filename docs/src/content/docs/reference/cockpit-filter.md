@@ -14,7 +14,7 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 | Qualifier | Matches |
 |---|---|
 | `repo:` | the repository; `repo:api` matches any owner |
-| `author:` | the author; `author:me` for yours |
+| `author:` | the author; `author:@me` for yours |
 | `wait:` | whom it waits on, by role: `me`, `loop`, `reviewer`, `author`, `nobody` |
 | `waits-on:` | a person or team it waits on |
 | `kind:` | the situation |
@@ -30,7 +30,7 @@ The counts follow the filter in every view. The rail (the tabs in the terminal) 
 Values of one qualifier widen, different qualifiers narrow, and a leading `-` leaves a value out:
 
 ```text
-repo:api is:stalled -author:me
+repo:api is:stalled -author:@me
 wait:reviewer size:l size:xl
 ci:failure tag:lang:go
 ```

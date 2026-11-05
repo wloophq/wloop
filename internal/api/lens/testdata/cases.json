@@ -30,6 +30,7 @@
    "id": "status",
    "label": "Status",
    "group": true,
+   "empty": "no status",
    "rank": [
     "needs-me",
     "waiting",
@@ -46,6 +47,11 @@
    "label": "Opened",
    "group": true,
    "sort": "time",
+   "rank": [
+    "today",
+    "week",
+    "older"
+   ],
    "buckets": [
     {
      "id": "today",
@@ -242,6 +248,51 @@
    "texts": [
     "fix: unknown:x notes"
    ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/zeta"
+    ],
+    "author": [
+     "dan"
+    ],
+    "waits-on": [],
+    "tag": [
+     "Lang:Go",
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-03T12:00:00Z"
+    ],
+    "risk": []
+   },
+   "texts": [
+    "Café deploy"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/my repo"
+    ],
+    "author": [
+     "dan"
+    ],
+    "waits-on": [],
+    "tag": [],
+    "status": [],
+    "opened": [],
+    "risk": [
+     "medium"
+    ]
+   },
+   "texts": [
+    "Spaced repo"
+   ]
   }
  ],
  "cases": [
@@ -254,7 +305,9 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ]
    }
   },
@@ -313,6 +366,22 @@
    }
   },
   {
+   "q": "cafe",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
+   "q": "café",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
    "q": "where:widgets",
    "want": {
     "shown": [
@@ -337,13 +406,31 @@
    }
   },
   {
+   "q": "where:\"my repo\"",
+   "want": {
+    "shown": [
+     7
+    ]
+   }
+  },
+  {
+   "q": "-where:\"my repo\" author:dan",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
    "q": "-where:widgets",
    "want": {
     "shown": [
      1,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ]
    }
   },
@@ -354,6 +441,26 @@
      0,
      1,
      2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:ana　author:bia",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "where:acme/api author:bia",
+   "want": {
+    "shown": [
+     1,
      4
     ]
    }
@@ -377,6 +484,12 @@
    }
   },
   {
+   "q": "risK:high",
+   "want": {
+    "shown": []
+   }
+  },
+  {
    "q": "tag:area",
    "want": {
     "shown": [
@@ -392,7 +505,8 @@
     "shown": [
      0,
      2,
-     5
+     5,
+     6
     ]
    }
   },
@@ -401,7 +515,8 @@
    "want": {
     "shown": [
      2,
-     5
+     5,
+     6
     ]
    }
   },
@@ -438,6 +553,23 @@
    }
   },
   {
+   "q": "waits-on:@me",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:@me",
+   "want": {
+    "shown": [
+     3
+    ]
+   }
+  },
+  {
    "q": "opened:today",
    "want": {
     "shown": [
@@ -450,7 +582,8 @@
    "q": "opened:week",
    "want": {
     "shown": [
-     1
+     1,
+     6
     ]
    }
   },
@@ -467,7 +600,8 @@
    "q": "opened:none",
    "want": {
     "shown": [
-     3
+     3,
+     7
     ]
    }
   },
@@ -478,7 +612,9 @@
      1,
      2,
      3,
-     5
+     5,
+     6,
+     7
     ]
    }
   },
@@ -510,7 +646,8 @@
     "shown": [
      0,
      2,
-     4
+     4,
+     6
     ]
    }
   },
@@ -532,19 +669,24 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ],
     "groups": [
      {
       "key": "needs-me",
+      "label": "Needs me",
       "items": [
        0,
        2,
-       4
+       4,
+       6
       ]
      },
      {
       "key": "waiting",
+      "label": "Waiting",
       "items": [
        1,
        5
@@ -552,8 +694,16 @@
      },
      {
       "key": "done",
+      "label": "Done",
       "items": [
        3
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no status",
+      "items": [
+       7
       ]
      }
     ]
@@ -569,11 +719,14 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ],
     "groups": [
      {
       "key": "low",
+      "label": "low",
       "items": [
        0,
        5
@@ -581,12 +734,15 @@
      },
      {
       "key": "medium",
+      "label": "medium",
       "items": [
-       2
+       2,
+       7
       ]
      },
      {
       "key": "high",
+      "label": "high",
       "items": [
        1,
        4
@@ -594,8 +750,10 @@
      },
      {
       "key": "none",
+      "label": "no risk",
       "items": [
-       3
+       3,
+       6
       ]
      }
     ]
@@ -611,11 +769,14 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ],
     "groups": [
      {
       "key": "area:billing",
+      "label": "area:billing",
       "items": [
        0,
        4
@@ -623,28 +784,79 @@
      },
      {
       "key": "area:search",
+      "label": "area:search",
       "items": [
        1
       ]
      },
      {
       "key": "lang:go",
+      "label": "lang:go",
       "items": [
        0,
        2,
-       5
+       5,
+       6
       ]
      },
      {
       "key": "lang:rust",
+      "label": "lang:rust",
       "items": [
        5
       ]
      },
      {
       "key": "none",
+      "label": "no tag",
       "items": [
-       3
+       3,
+       7
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "tag:lang",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "lang:go",
+      "label": "lang:go",
+      "items": [
+       0,
+       2,
+       5,
+       6
+      ]
+     },
+     {
+      "key": "lang:rust",
+      "label": "lang:rust",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no lang",
+      "items": [
+       1,
+       3,
+       4,
+       7
       ]
      }
     ]
@@ -660,11 +872,14 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ],
     "groups": [
      {
       "key": "acme/api",
+      "label": "acme/api",
       "items": [
        1,
        4
@@ -672,21 +887,38 @@
      },
      {
       "key": "acme/docs",
+      "label": "acme/docs",
       "items": [
        3
       ]
      },
      {
+      "key": "acme/my repo",
+      "label": "acme/my repo",
+      "items": [
+       7
+      ]
+     },
+     {
       "key": "acme/web",
+      "label": "acme/web",
       "items": [
        5
       ]
      },
      {
       "key": "acme/widgets",
+      "label": "acme/widgets",
       "items": [
        0,
        2
+      ]
+     },
+     {
+      "key": "acme/zeta",
+      "label": "acme/zeta",
+      "items": [
+       6
       ]
      }
     ]
@@ -702,18 +934,14 @@
      2,
      3,
      4,
-     5
+     5,
+     6,
+     7
     ],
     "groups": [
      {
-      "key": "older",
-      "items": [
-       2,
-       5
-      ]
-     },
-     {
       "key": "today",
+      "label": "today",
       "items": [
        0,
        4
@@ -721,14 +949,26 @@
      },
      {
       "key": "week",
+      "label": "week",
       "items": [
-       1
+       1,
+       6
+      ]
+     },
+     {
+      "key": "older",
+      "label": "older",
+      "items": [
+       2,
+       5
       ]
      },
      {
       "key": "none",
+      "label": "none",
       "items": [
-       3
+       3,
+       7
       ]
      }
     ]
@@ -742,9 +982,11 @@
      0,
      5,
      2,
+     7,
      1,
      4,
-     3
+     3,
+     6
     ]
    }
   },
@@ -757,9 +999,11 @@
      1,
      4,
      2,
+     7,
      0,
      5,
-     3
+     3,
+     6
     ]
    }
   },
@@ -769,9 +1013,11 @@
    "want": {
     "shown": [
      3,
+     7,
      2,
      5,
      1,
+     6,
      0,
      4
     ]
@@ -785,10 +1031,12 @@
     "shown": [
      4,
      0,
+     6,
      1,
      5,
      2,
-     3
+     3,
+     7
     ]
    }
   },
@@ -800,9 +1048,11 @@
      1,
      4,
      3,
+     7,
      5,
      0,
-     2
+     2,
+     6
     ]
    }
   },
@@ -819,12 +1069,14 @@
     "groups": [
      {
       "key": "low",
+      "label": "low",
       "items": [
        0
       ]
      },
      {
       "key": "medium",
+      "label": "medium",
       "items": [
        2
       ]
