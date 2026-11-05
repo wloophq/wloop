@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -273,6 +274,15 @@ func TestTaskListsTheOpenTasksOfEnabledPlugins(t *testing.T) {
 			t.Errorf("facts of %s: %v, want ErrUnitGone", id, err)
 		}
 	}
+}
+
+func TestTaskFactsFollowTheUnitsContract(t *testing.T) {
+	t.Parallel()
+	automationtest.RunUnits(t, unit.Task, func(t *testing.T) automation.Units {
+		e := newEnv(t)
+		e.task(waiting("t-01", chatA, monday))
+		return e.p
+	})
 }
 
 func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
