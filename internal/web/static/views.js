@@ -74,37 +74,42 @@ function tasksURL(view, area, ctx, since, units) {
 // FILTER_COUNT_DELAY_MS lets a burst of keystrokes ask for the counts once.
 const FILTER_COUNT_DELAY_MS = 250;
 
-// countersURL counts area, every area when "", narrowed to the tasks
-// holding each of ts.
-function countersURL(area, ts) {
+// countersURL counts area, every area when "", narrowed to the tasks the
+// lens query q keeps.
+function countersURL(area, q) {
   const p = new URLSearchParams();
   if (area) p.set("area", area);
-  for (const t of ts || []) p.append("term", t);
-  const q = p.toString();
-  return "/api/counters" + (q ? "?" + q : "");
+  if (q) p.set("q", q);
+  const query = p.toString();
+  return "/api/counters" + (query ? "?" + query : "");
+}
+
+// filterQuery is the filter as the daemon reads it, qualifiers and all.
+function filterQuery(route) {
+  return String(route.q || "").trim();
 }
 
 // viewCounters are the counts the rail, the area picker and the context
-// chips show: with free words in the filter, those of the tasks it keeps,
+// chips show: with a filter, those of the tasks it keeps,
 // the last read while a newer one is on its way; null before the first.
 function viewCounters(route) {
-  if (!filterTerms(route.q).length) return tasksState.counters;
+  if (!filterQuery(route)) return tasksState.counters;
   const f = tasksState.filtered;
   return f && f.area === (route.area || "") ? f.counters : null;
 }
 
-// filteredKey names the counts of the free words of route in its area.
+// filteredKey names the counts of the filter of route in its area.
 function filteredKey(route) {
-  return [route.area || "", ...filterTerms(route.q)].join("\u0000");
+  return [route.area || "", filterQuery(route)].join("\u0000");
 }
 
-// loadFiltered reads the counters the filter's free words narrow, once
-// the words stop changing for FILTER_COUNT_DELAY_MS; only the latest read
+// loadFiltered reads the counters the filter narrows, once
+// the query stops changing for FILTER_COUNT_DELAY_MS; only the latest read
 // is kept, and a failed one leaves the rail without counts.
 async function loadFiltered(route) {
-  const ts = filterTerms(route.q);
+  const q = filterQuery(route);
   const seq = ++tasksState.filterSeq;
-  if (!ts.length) {
+  if (!q) {
     tasksState.filtered = null;
     return;
   }
@@ -112,7 +117,7 @@ async function loadFiltered(route) {
   if (!tasksState.filtered || tasksState.filtered.key !== key) await new Promise((done) => setTimeout(done, FILTER_COUNT_DELAY_MS));
   if (seq !== tasksState.filterSeq) return;
   try {
-    const c = await getJSON(countersURL(route.area, ts));
+    const c = await getJSON(countersURL(route.area, q));
     if (seq === tasksState.filterSeq) tasksState.filtered = { key, area: route.area || "", counters: c };
   } catch {
     if (seq === tasksState.filterSeq) tasksState.filtered = null;

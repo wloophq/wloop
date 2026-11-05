@@ -84,10 +84,10 @@ const route = { view: "fits-now", area: "", ctx: [], task: "", q: "invoice" };
 	if want := []any{1.0, 3.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0}; !slices.Equal(got.Cleared, want) {
 		t.Errorf("rail without free words %v, want %v", got.Cleared, want)
 	}
-	if want := "/api/counters?term=invoice"; len(got.URLs) == 0 || got.URLs[0] != want {
+	if want := "/api/counters?q=invoice"; len(got.URLs) == 0 || got.URLs[0] != want {
 		t.Errorf("urls %v, want first %s", got.URLs, want)
 	}
-	if last := got.URLs[len(got.URLs)-1]; last != "/api/counters?area=OSS&term=invoice&term=the+client" {
+	if last := got.URLs[len(got.URLs)-1]; last != "/api/counters?area=OSS&q=invoice+%22the+client%22" {
 		t.Errorf("an area and a quoted phrase read %s", last)
 	}
 	if got.Head != "2 of 3" {

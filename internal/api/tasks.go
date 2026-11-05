@@ -17,7 +17,7 @@ import (
 
 // The tasks' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
 // context as "a,b", since, a Since's String, and TasksUnits) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
-// serves the counters of the query parameter area (narrowed to the tasks holding each CountersTerm), DigestPath the daily digest of the query parameter day
+// serves the counters of the query parameter area (narrowed to the tasks the lens query CountersQuery keeps), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
 	ViewsPath    = "/api/views"

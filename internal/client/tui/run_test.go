@@ -66,7 +66,7 @@ type fakeDaemon struct {
 	taskDelta   map[string][]api.TaskView
 	counters    api.Counters
 	taskAsks    []taskAsk
-	counterAsks [][]string
+	counterAsks []string
 	drafts      []api.Draft
 	taskDos     []taskDo
 	resolves    []gateResolve
@@ -137,11 +137,11 @@ func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api
 	return page, nil
 }
 
-// Counters counts each view's tasks holding every term.
-func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (api.Counters, error) {
+// Counters counts each view's tasks holding every word of query.
+func (f *fakeDaemon) Counters(_ context.Context, area, query string) (api.Counters, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.counterAsks = append(f.counterAsks, terms)
+	f.counterAsks = append(f.counterAsks, query)
 	if f.down {
 		return api.Counters{}, errors.New("connection refused")
 	}
@@ -149,7 +149,7 @@ func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (
 	for v, es := range f.tasks {
 		c.Views[v] = 0
 		for _, e := range es {
-			if api.TaskMatches(e, terms) {
+			if api.TaskMatches(e, strings.Fields(query)) {
 				c.Views[v]++
 			}
 		}

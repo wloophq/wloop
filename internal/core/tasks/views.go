@@ -390,9 +390,9 @@ func (s *Service) Counts(ctx context.Context, area string) (task.Counters, error
 	return s.CountsWhere(ctx, area, nil)
 }
 
-// CountsWhere is Counts over the tasks keep holds, every task when nil: each view, area and context counts only
+// CountsWhere is Counts over the tasks keep holds, every task when nil, keep reading them inside the pass its ctx carries: each view, area and context counts only
 // the tasks of its list that keep takes, so a client's filter narrows the counters as it narrows the lists.
-func (s *Service) CountsWhere(ctx context.Context, area string, keep func(task.Task) (bool, error)) (task.Counters, error) {
+func (s *Service) CountsWhere(ctx context.Context, area string, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
 	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
 	if err != nil {
 		return task.Counters{}, err
@@ -400,7 +400,7 @@ func (s *Service) CountsWhere(ctx context.Context, area string, keep func(task.T
 	return s.counts(WithPass(ctx, &Pass{Tasks: all}), area, all, keep)
 }
 
-func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(task.Task) (bool, error)) (task.Counters, error) {
+func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
 	kept := map[task.ID]bool{}
 	keeps := func(e task.Task) (bool, error) {
 		if keep == nil {
@@ -409,7 +409,7 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 		k, seen := kept[e.ID]
 		if !seen {
 			var err error
-			if k, err = keep(e); err != nil {
+			if k, err = keep(ctx, e); err != nil {
 				return false, err
 			}
 			kept[e.ID] = k

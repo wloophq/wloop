@@ -69,14 +69,14 @@ func (c *Client) TaskDo(ctx context.Context, id, verb string, req api.TaskReques
 	return res, err
 }
 
-// Counters are the counters of area, "" for every area, of the tasks holding every term.
-func (c *Client) Counters(ctx context.Context, area string, terms ...string) (api.Counters, error) {
+// Counters are the counters of area, "" for every area, of the tasks the lens query keeps, every task when "".
+func (c *Client) Counters(ctx context.Context, area, query string) (api.Counters, error) {
 	q := url.Values{}
 	if area != "" {
 		q.Set("area", area)
 	}
-	if len(terms) > 0 {
-		q[api.CountersTerm] = terms
+	if query != "" {
+		q.Set(api.CountersQuery, query)
 	}
 	path := api.CountersPath
 	if len(q) > 0 {

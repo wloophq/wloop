@@ -794,7 +794,7 @@ func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
 		d.mu.Lock()
 		asks := slices.Clone(d.counterAsks)
 		d.mu.Unlock()
-		if len(asks) == 0 || !slices.Equal(asks[len(asks)-1], []string{"computer"}) {
+		if len(asks) == 0 || asks[len(asks)-1] != "computer" {
 			t.Errorf("counter asks %v", asks)
 		}
 		term.press(Key{Name: KeyEsc})

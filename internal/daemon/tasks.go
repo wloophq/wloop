@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -739,21 +740,25 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, q := r.Context(), r.URL.Query()
-	var terms []string
-	for _, t := range q[api.CountersTerm] {
-		if t = strings.TrimSpace(t); t != "" {
-			terms = append(terms, t)
-		}
-	}
 	var c task.Counters
 	var err error
-	if len(terms) == 0 {
+	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
 		c, err = g.Counts(ctx, q.Get("area"))
 	} else {
+		specs := s.taskFacetSpecs()
+		query, now := lens.Parse(text, specs), s.deps.Now()
 		vs := s.taskViews(ctx, g, false)
-		c, err = g.CountsWhere(ctx, q.Get("area"), func(e task.Task) (bool, error) {
+		preloaded := false
+		c, err = g.CountsWhere(ctx, q.Get("area"), func(ctx context.Context, e task.Task) (bool, error) {
+			if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
+				preloaded = true
+				vs.readRows(ctx, pass.Tasks)
+			}
 			v, err := vs.view(ctx, e)
-			return err == nil && api.TaskMatches(v, terms), err
+			if err != nil {
+				return false, err
+			}
+			return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
 		})
 	}
 	if err != nil {
@@ -761,6 +766,18 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, wireCounters(c))
+}
+
+// taskFacetSpecs are the facets a query over tasks can name: the plugins' and the profile's, one spec by id.
+func (s *Server) taskFacetSpecs() map[string]api.FacetSpec {
+	specs := map[string]api.FacetSpec{}
+	for _, f := range s.rowsCatalog().Facets {
+		specs[f.ID] = f
+	}
+	for _, f := range s.viewsCatalog().Facets {
+		specs[f.ID] = f
+	}
+	return specs
 }
 
 func (s *Server) writeTask(w http.ResponseWriter, ctx context.Context, g *coretasks.Service, e task.Task) {

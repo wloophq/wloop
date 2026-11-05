@@ -9,9 +9,8 @@ import (
 	"unicode"
 )
 
-// CountersTerm is the query parameter of CountersPath, repeated, that counts only the tasks holding every
-// term, as TaskMatches reads them.
-const CountersTerm = "term"
+// CountersQuery is the query parameter of CountersPath that counts only the tasks a lens query keeps.
+const CountersQuery = "q"
 
 // accents folds the accents Portuguese and Spanish titles carry, without golang.org/x/text.
 var accents = strings.NewReplacer(

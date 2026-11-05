@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strconv"
 	"sync/atomic"
@@ -21,6 +22,12 @@ import (
 type facetRows map[unit.Unit]map[string][]string
 
 func (facetRows) Provider() unit.ProviderID { return "fake" }
+
+func (facetRows) Views() []api.ViewSpec           { return nil }
+func (facetRows) Situations() []api.SituationSpec { return nil }
+func (facetRows) Facets() []api.FacetSpec {
+	return []api.FacetSpec{{ID: "where", Label: "Where", Match: "suffix"}}
+}
 
 func (p facetRows) Listed(context.Context) ([]unit.Unit, error) {
 	out := []unit.Unit{}
@@ -204,5 +211,55 @@ func BenchmarkTasksPage(b *testing.B) {
 		if rec.Code != 200 {
 			b.Fatalf("%d: %s", rec.Code, rec.Body)
 		}
+	}
+}
+
+func TestCountersHonorQualifiers(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	rows := facetRows{}
+	var ts []task.Task
+	for i, where := range []string{"general", "general", "random"} {
+		u := unit.Unit{Provider: "slack", Key: fmt.Sprintf("T1/C%d/1700000000.000100", i)}
+		rows[u] = map[string][]string{"where": {where}}
+		ts = append(ts, task.Task{ID: task.ID(fmt.Sprintf("t-%d", i+1)), State: "inbox", Category: task.CategoryInbox, Title: "Answer", Units: []unit.Unit{u}})
+	}
+	r.withFacetRows(rows)
+	r.put(t, ts...)
+	for q, want := range map[string]int{"": 3, "where:general": 2, "-where:general": 1, "where:general where:random": 3, "where:nowhere": 0, "answer where:random": 1} {
+		var c api.Counters
+		if code := get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersQuery: {q}}.Encode(), &c); code != 200 {
+			t.Fatalf("%q: %d", q, code)
+		}
+		if got := c.Views["inbox"]; got != want {
+			t.Errorf("q=%q counts %d in the inbox, want %d", q, got, want)
+		}
+	}
+}
+
+func TestAFilteredCountReadsEachTasksFactsAndRowsOnce(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	const n = 40
+	r.withFacetRows(manyTasks(t, r, n))
+	var reads atomic.Int32
+	r.s.readRows = func(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error) {
+		reads.Add(1)
+		got, _, _, err := r.s.readModel().ReadMany(ctx, units)
+		return got, err
+	}
+	r.factReads.Store(0)
+	var c api.Counters
+	if code := get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersQuery: {"where:acme/api"}}.Encode(), &c); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	if c.Views["needs-me"] != n {
+		t.Fatalf("counts %v, want %d in needs-me", c.Views, n)
+	}
+	if got := r.factReads.Load(); got != n {
+		t.Errorf("%d facts reads for %d tasks, want %d", got, n, n)
+	}
+	if got := reads.Load(); got != 1 {
+		t.Errorf("%d row reads for %d tasks, want 1", got, n)
 	}
 }

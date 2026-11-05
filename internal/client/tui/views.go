@@ -77,14 +77,14 @@ func (m *Model) SetFilteredCounters(area string, c api.Counters) {
 	}
 }
 
-// FilterTerms are the filter's words.
-func (m *Model) FilterTerms() []string { return strings.Fields(string(m.filter)) }
+// FilterQuery is the filter as typed, trimmed: the lens query the daemon counts with.
+func (m *Model) FilterQuery() string { return strings.TrimSpace(string(m.filter)) }
 
 // tabCounters are the counts the task tabs show: with a filter, those of the
 // tasks it keeps, the last read while a newer one is on its way; nil
 // before the first.
 func (m *Model) tabCounters() *api.Counters {
-	if len(m.FilterTerms()) == 0 {
+	if m.FilterQuery() == "" {
 		return &m.counters
 	}
 	return m.filtered

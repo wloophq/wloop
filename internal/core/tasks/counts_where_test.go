@@ -17,7 +17,7 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	r.put(t, task.Task{ID: "nx-b", State: "next", Category: task.CategoryReady, Title: "review Hiring", Props: task.Props{"area": {Text: "Hiring"}, "contexts": {List: []string{"@reply"}}}})
 	r.put(t, task.Task{ID: "dn-a", State: "done", Category: task.CategoryDone, Title: "invoice sent"})
 	r.svc.RegisterView(task.OverGates, "draft:", outbox{drafts: []task.Task{{ID: "draft:1", Title: "invoice reply"}, {ID: "draft:2", Title: "hello"}}})
-	invoice := func(e task.Task) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
+	invoice := func(_ context.Context, e task.Task) (bool, error) { return strings.Contains(e.Title, "invoice"), nil }
 	c, err := r.svc.CountsWhere(ctx, "", invoice)
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestCountsWhereCountsOnlyTheKeptTasksOfEachView(t *testing.T) {
 	if c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 || c.Contexts["@reply"] != 1 || c.Badge != 2 {
 		t.Errorf("areas %v contexts %v badge %d", c.Areas, c.Contexts, c.Badge)
 	}
-	all, err := r.svc.CountsWhere(ctx, "Hiring", func(task.Task) (bool, error) { return true, nil })
+	all, err := r.svc.CountsWhere(ctx, "Hiring", func(context.Context, task.Task) (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatal(err)
 	}

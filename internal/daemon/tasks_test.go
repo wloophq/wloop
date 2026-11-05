@@ -823,7 +823,7 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 	r.put(t, mixedTasks()...)
 	for _, area := range []string{"", "OSS"} {
 		for _, terms := range [][]string{{"launch"}, {"oss"}, {"OSS", "decide"}, {"nothing-holds-this"}} {
-			q := url.Values{api.CountersTerm: terms}
+			q := url.Values{api.CountersQuery: {strings.Join(terms, " ")}}
 			if area != "" {
 				q.Set("area", area)
 			}
@@ -846,7 +846,7 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 		}
 	}
 	var c api.Counters
-	if get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersTerm: {"launch"}}.Encode(), &c); c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 {
+	if get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersQuery: {"launch"}}.Encode(), &c); c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 {
 		t.Errorf("areas under a filter: %v", c.Areas)
 	}
 }
