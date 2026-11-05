@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ func TestRowLinkNamesItsProvider(t *testing.T) {
 	b.WriteString(jsFunction(t, src, "pl"))
 	b.WriteString(pluginsJS(t))
 	var got []string
-	nodeRun(t, b.String(), []string{"where"}, `
+	nodeRun(t, b.String(), []string{"where", "rowLink", "roveStop"}, `
 applyPlugins(input.plugins);
 process.stdout.write(JSON.stringify(input.rows.map((r) => {
   const a = where(r, "row:x").find((n) => n.tag === "a");
@@ -81,12 +82,12 @@ globalThis.document = { activeElement: null, body: { classList: { add() {} } } }
 	}
 }
 
-func TestGroupChipFiltersToItsRow(t *testing.T) {
+func TestEveryWhoChipFiltersToItsRow(t *testing.T) {
 	row := map[string]any{
 		"unit": map[string]string{"provider": "slack", "key": slackUnit.Key}, "label": "#general", "title": "Deploy plan", "kind": "waits_on_others",
 		"views": []string{"slack", "all"}, "summary": map[string]any{"waits_on": "@team-a, Ana, channel participants"},
 		"facets":  map[string][]string{"conversation": {"#general"}, "waits-on": {"@team-a", "Ana", "channel participants"}},
-		"payload": map[string]any{"waits_on": []map[string]string{{"key": "group:S0001", "name": "@team-a"}, {"key": "slack:U0002", "name": "Ana"}, {"key": "group:channel participants", "name": "channel participants"}}},
+		"payload": map[string]any{"waits_on": []map[string]string{{"key": "group:S0001", "name": "@Team-A"}, {"key": "slack:U0002", "name": "Ana"}, {"key": "group:channel participants", "name": "channel participants"}}},
 	}
 	other := map[string]any{"unit": map[string]string{"provider": "slack", "key": "T0001/C0002/1700000000.000200"}, "label": "#random", "kind": "waits_on_others",
 		"views": []string{"slack", "all"}, "summary": map[string]any{"waits_on": "Bo"}, "facets": map[string][]string{"waits-on": {"Bo"}}}
@@ -94,17 +95,21 @@ func TestGroupChipFiltersToItsRow(t *testing.T) {
 		Titles []string
 		Shown  [][]string
 	}
-	nodeRun(t, lensPrelude(t)+treeJS, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "facet", "whoFacets", "pl", "sm",
-		"qualifierToken", "toggledQualifier", "withoutQualifiers"), `
-const lens0 = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
-const chips = whoFacets(input.rows[0], lens0, "row:x:").filter((n) => n && n.tag === "button");
-const shown = chips.map((c) => {
-  const q = toggledQualifier("", "waits-on", text(c), false);
+	nodeRun(t, cockpitScript(t), nil, `
+const c = input.catalog;
+c.facets.push({ id: "waits-on", label: "Waits on (person)", provider: "slack", group: true, match: "team", menu: true, show: "who" });
+applyCatalog(c);
+tasksState.catalog = input.views;
+const lens0 = lensOf({ ...readHash(), view: "all" });
+const m = rowModel(input.rows[0], "", lens0, "");
+const chips = pieceButtons(m, lens0, "who");
+const shown = chips.map((b) => {
+  const q = toggledQualifier("", "waits-on", b.textContent, false);
   const lens = { view: "all", q, ts: terms(q), quals: qualifiers(q), filters: filtersOf(qualifiers(q)), group: "", sort: "", layout: "", done: false };
   return pipeline(input.rows, lens).groups.flatMap((g) => g.rows.map((r) => r.label));
 });
-process.stdout.write(JSON.stringify({ Titles: chips.map((c) => c.attrs["aria-label"]), Shown: shown }));`,
-		map[string]any{"rows": []any{row, other}}, &got)
+process.stdout.write(JSON.stringify({ Titles: chips.map((b) => b.attrs["aria-label"]), Shown: shown }));`,
+		map[string]any{"rows": []any{row, other}, "catalog": json.RawMessage(servedCatalog(t)), "views": servedViews(t)}, &got)
 	want := []string{"Filter by waits on (group) @team-a", "Filter by waits on (person) Ana", "Filter by waits on (group) channel participants"}
 	if !slices.Equal(got.Titles, want) {
 		t.Errorf("chips %q, want %q", got.Titles, want)
@@ -116,25 +121,15 @@ process.stdout.write(JSON.stringify({ Titles: chips.map((c) => c.attrs["aria-lab
 	}
 }
 
-func TestUnitColumnNamesTheViewsProvider(t *testing.T) {
+func TestUnitColumnNamesTheViewsUnit(t *testing.T) {
 	views := []api.ViewSpec{{ID: "needs-me", Provider: "github", Rows: true, Unit: "Pull request"},
 		{ID: "all", Provider: "github", Rows: true}, {ID: "slack", Provider: "slack", Rows: true, Unit: "Conversation"}}
-	var got []map[string]string
+	var got []string
 	nodeRun(t, `const catalog = { views: [] };
-const fieldById = (id) => ({ where: { label: "Where" } })[id];
-`, []string{"unitColumn"}, `catalog.views = input.views;
-process.stdout.write(JSON.stringify(["needs-me", "slack", "all"].map(unitColumn)));`, map[string]any{"views": views}, &got)
-	want := []map[string]string{{"title": "Pull request", "sort": "where", "sortTitle": "Sort by where"},
-		{"title": "Conversation", "sort": "where", "sortTitle": "Sort by where"}, {"title": "Item", "sort": "where", "sortTitle": "Sort by where"}}
-	if len(got) != 3 {
-		t.Fatalf("columns %v", got)
-	}
-	for i := range want {
-		for k, v := range want[i] {
-			if got[i][k] != v {
-				t.Errorf("view %d %s = %q, want %q", i, k, got[i][k], v)
-			}
-		}
+`, []string{"unitTitle"}, `catalog.views = input.views;
+process.stdout.write(JSON.stringify(["needs-me", "slack", "all"].map((v) => unitTitle(v, { words: { col_unit: "Item" } }))));`, map[string]any{"views": views}, &got)
+	if want := []string{"Pull request", "Conversation", "Item"}; !slices.Equal(got, want) {
+		t.Errorf("columns %q, want %q", got, want)
 	}
 }
 

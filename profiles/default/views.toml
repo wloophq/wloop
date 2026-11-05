@@ -24,16 +24,67 @@ sorted         = "sort: {{.label}}"
 descending     = "{{.label}} (descending)"
 no_lens        = "nothing to group or sort here"
 
+# What a row says beside its facets: its age, its facet buttons, its
+# columns' heads, and the flags no facet carries. A plugin's ui.toml may
+# replace any of these for its own rows.
+age_now            = "now"
+age_minutes        = "{{.m}}m"
+age_hours          = "{{.h}}h {{.m}}m"
+age_days           = "{{.d}}d {{.h}}h"
+filter_label       = "Filter by {{.label}} {{.value}}"
+filter_title       = "Filter by {{.label}} {{.value}} · Alt+click leaves it out"
+filter_title_group = "Filter by {{.label}} {{.value}} · Shift+click groups by {{.group}} · Alt+click leaves it out"
+filter_group       = "waits on (group)"
+list_count         = "{{.unit}}s: {{.shown}} of {{.total}}"
+list_empty         = "Nothing here right now."
+countdown_title    = "sends at {{.time}}"
+countdown_sending  = "sending"
+countdown_seconds  = "in {{.s}} s"
+countdown_minutes  = "in {{.m}}m {{.s}}s"
+tip_named          = "{{.strip}} ({{.who}})"
+tip_kind           = "{{.tip}}: {{.kind}}"
+tip_why            = "{{.tip}}. {{.why}}"
+legend_title       = "The strip on the left of each row is the color of whom it waits on"
+sort_by            = "Sort by {{.label}}"
+col_unit           = "Item"
+col_who            = "Waiting on"
+col_age            = "For"
+col_why            = "Why"
+col_aside          = "Links"
+col_actions        = "Actions"
+stale              = "stale"
+stale_title        = "Its plugin is not reporting; this is its last report"
+briefing           = "briefing"
+briefing_title     = "intake {{.seq}} waits for the brief"
+briefing_attempt   = "attempt {{.n}}"
+briefing_error     = "last error: {{.error}}"
+questions          = "? {{.n}}"
+questions_title    = "{{.n}} open questions in the brief"
+changed            = "changed"
+starred            = "Starred"
+until              = "until {{.date}}"
+due                = "due {{.date}}"
+unread             = "unread {{.lag}}"
+unread_title       = "The oldest message on its links not yet read by the extraction"
+review_due         = "review due"
+no_next_action     = "no next action"
+open_children      = "{{.n}} open"
+sequential         = "sequential"
+every              = "every {{.every}}"
+reviewed           = "reviewed {{.date}}"
+
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind
 # (brief.*). A plugin's row facet of the same id must agree on group, sort,
 # rank, match and buckets; where rows and the task both have a value, merge
-# says which wins.
+# says which wins. show places a facet's values on a task's row, each a
+# button that filters by it; a facet without show is for the lens alone.
 [facets.source]
 fact  = "task.unit_providers"
 label = "Source"
 group = true
 sort  = "text"
+show  = "meta"
 
 [facets.source.values]
 github    = "GitHub"
@@ -47,6 +98,7 @@ fact  = "task.state"
 label = "State"
 group = true
 sort  = "rank"
+show  = "kind"
 
 [facets.category]
 fact  = "task.category"
@@ -61,20 +113,33 @@ group        = true
 sort         = "rank"
 empty        = "no context"
 label_prefix = "@"
+show         = "meta"
 
 [facets.waits-on]
-fact  = "task.owed_by"
-label = "Waits on (person)"
-group = true
-match = "team"
-merge = "rows-first"
-strip = true
+fact   = "task.owed_by"
+label  = "Waits on (person)"
+group  = true
+match  = "team"
+merge  = "rows-first"
+show   = "who"
+
+[facets.turn]
+fact    = "task.turn"
+merge   = "own"
+label   = "Whose turn"
+group   = true
+sort    = "rank"
+rank    = ["me", "others", "nobody"]
+values  = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
+strip   = true
+colors  = { me = "me", others = "author", nobody = "nobody" }
 
 [facets.asked-by]
 fact  = "task.asker_names"
 label = "Asked by"
 group = true
 sort  = "text"
+show  = "meta"
 
 [facets.placement]
 fact  = "task.placement"
@@ -84,12 +149,23 @@ sort  = "text"
 match = "suffix"
 empty = "no placement"
 
+# where is the unit's place, a repository or a channel, as its rows say it, else the task's placement; a
+# task's row shows it on its unit labels, each a button that filters by the where value it names.
+[facets.where]
+fact  = "task.placement"
+merge = "rows-first"
+label = "Where"
+group = true
+sort  = "text"
+match = "suffix"
+
 [facets.moved]
 fact  = "task.moved_at"
 label = "Moved"
 group = true
 sort  = "time"
 empty = "never moved"
+show  = "age"
 
 [facets.moved.buckets.1d]
 within = "24h"
@@ -132,6 +208,13 @@ label = "Kind"
 group = true
 sort  = "text"
 
+[facets."prop.area"]
+fact  = "task.prop.area"
+label = "Area"
+group = true
+sort  = "text"
+show  = "meta"
+
 [facets."prop.risk"]
 fact  = "task.prop.risk"
 label = "Task risk"
@@ -160,6 +243,7 @@ group = true
 sort  = "text"
 empty = "no brief"
 merge = "rows-first"
+show  = "meta"
 
 [facets.risk]
 fact  = "brief.risk"
@@ -169,6 +253,8 @@ sort  = "rank"
 rank  = ["high", "medium", "low"]
 empty = "no brief"
 merge = "rows-first"
+show  = "meta"
+label_prefix = "risk "
 
 [facets.size]
 fact  = "brief.size"
@@ -178,6 +264,7 @@ sort  = "rank"
 rank  = ["xs", "s", "m", "l", "xl"]
 empty = "no brief"
 merge = "rows-first"
+show  = "meta"
 
 [facets.size.values]
 xs = "XS"
@@ -191,6 +278,7 @@ fact  = "brief.tags"
 label = "Tag"
 match = "prefix"
 merge = "rows-first"
+show  = "meta"
 
 [views.inbox]
 label         = "Inbox"

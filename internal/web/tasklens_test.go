@@ -31,7 +31,7 @@ func servedViews(t *testing.T) api.ViewsCatalog {
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: api.LensWords(def.Lens)}
+	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: catalog.LensWords(def.Lens)}
 	for _, v := range def.Views {
 		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group})
 	}
@@ -80,20 +80,20 @@ func mixedTasks() []api.TaskView {
 	return []api.TaskView{
 		task("s-1", "next", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units, e.UnitLabels = "Answer the deploy question", "ready", []unit.Unit{slackUnit}, []string{"#general thread"}
-			e.Facets = map[string][]string{"source": {"slack"}, "where": {"general"}, "conversation": {"thread"}, "waits-on": {"me"}, "state": {"next"}, "category": {"ready"}}
+			e.Facets = map[string][]string{"source": {"slack"}, "where": {"general"}, "conversation": {"thread"}, "waits-on": {"me"}, "turn": {"me"}, "state": {"next"}, "category": {"ready"}}
 		}),
 		task("s-2", "next", func(e *api.TaskView) {
 			e.Title, e.Category = "Close the lunch poll", "ready"
-			e.Facets = map[string][]string{"source": {"slack"}, "where": {"random"}, "waits-on": {"me"}, "state": {"next"}, "category": {"ready"}}
+			e.Facets = map[string][]string{"source": {"slack"}, "where": {"random"}, "waits-on": {"me"}, "turn": {"me"}, "state": {"next"}, "category": {"ready"}}
 		}),
 		task("g-1", "doing", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units = "Fix the flaky upload test", "active", []unit.Unit{prUnit}
-			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/api"}, "ci": {"failure"}, "kind": {"checks"}, "wait": {"me"}, "waits-on": {"me"},
+			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/api"}, "ci": {"failure"}, "kind": {"checks"}, "wait": {"me"}, "waits-on": {"me"}, "turn": {"me"},
 				"state": {"doing"}, "category": {"active"}, "tag": {"lang:go"}}
 		}),
 		task("g-2", "doing", func(e *api.TaskView) {
 			e.Title, e.Category, e.Units = "Review the general settings page", "active", []unit.Unit{prUnit2}
-			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/web"}, "ci": {"success"}, "kind": {"review"}, "wait": {"reviewer"}, "waits-on": {"bia"},
+			e.Facets = map[string][]string{"source": {"github"}, "where": {"acme/web"}, "ci": {"success"}, "kind": {"review"}, "wait": {"reviewer"}, "waits-on": {"bia"}, "turn": {"others"},
 				"state": {"doing"}, "category": {"active"}}
 		}),
 	}
@@ -105,7 +105,7 @@ var taskLensFuncs = []string{"tokens", "unquote", "terms", "fieldById", "tagKeyF
 	"viewSource", "offeredFields", "viewGroupField", "defaultSortLabel", "lensOf", "lensPicks", "effectiveGroup", "cmp", "keyRank", "keyOrder", "compareItems",
 	"groupLabel", "groupItems", "pipelineOf", "groupedRows", "groupQualifier", "onlyThis", "multiCopy", "renderLens", "hideLens", "lensBar", "lensSelect",
 	"boardGroupField", "lensWords", "fillWord", "lane", "rowByKey",
-	"lensChips", "chip", "stripLegend", "waitField", "setGroup", "clearLens", "copyList", "lensResult", "sortLabel", "listYAML", "copyEntry", "yamlString", "inView"}
+	"lensChips", "chip", "stripLegend", "viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "setGroup", "clearLens", "copyList", "lensResult", "sortLabel", "listYAML", "copyEntry", "yamlString", "inView"}
 
 // taskLensJS declares the served GitHub catalog and the lens functions views.js calls, over a state with no rows.
 func taskLensJS(t *testing.T) string {
@@ -115,9 +115,13 @@ func taskLensJS(t *testing.T) string {
 	for _, c := range []string{"folded", "itemValuesCache", "NO_GROUP", "lensMemo", "labelOf", "unitKey"} {
 		b.WriteString(jsConst(t, src, c))
 	}
-	b.WriteString("const state = { rows: [], loaded: false, health: null };\n")
-	for _, f := range taskLensFuncs {
-		b.WriteString(jsFunction(t, src, f))
+	b.WriteString("const state = { rows: [], loaded: false, health: null, collapsed: new Set() };\n")
+	seen := map[string]bool{}
+	for _, f := range slices.Concat(taskLensFuncs, rowFuncs) {
+		if !seen[f] {
+			seen[f] = true
+			b.WriteString(jsFunction(t, src, f))
+		}
 	}
 	b.WriteString("const taskListNodes = (r, open) => { const p = viewPage(r, open); return [...p.head, ...(p.res ? lensBar(p.lens, p.res) : []), ...p.body]; };\n")
 	return b.String()
@@ -199,7 +203,7 @@ process.stdout.write(JSON.stringify({ Group: p.res.group, Groups: p.res.groups.f
 	if got.Group != "source" || len(got.Groups) != 1 || got.Groups[0].Key != "slack" || !slices.Equal(got.Groups[0].IDs, []string{"s-1"}) {
 		t.Fatalf("where:general grouped by source: %+v", got)
 	}
-	if !strings.Contains(got.Text, "Slack (1)") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
+	if !strings.Contains(got.Text, "▾ Slack1") || !strings.Contains(got.Text, "Answer the deploy question") || strings.Contains(got.Text, "general settings") {
 		t.Errorf("list %q", got.Text)
 	}
 	if got.Nested {
@@ -220,7 +224,10 @@ func TestATaskViewBoardHasALanePerGroup(t *testing.T) {
 const p = viewPage(route({ g: "source", layout: "board" }), "");
 const board = byClass(h("div", {}, ...p.body), "board")[0];
 process.stdout.write(JSON.stringify(byClass(board, "lane").map((l) => ({ Label: text(byClass(l, "lane-head")[0].children[0]),
-  Focus: all(l, (x) => x.tag === "li").map((x) => x.attrs["data-focus"]) }))));`, mixedInput(t, nil), &got)
+  Focus: all(l, (x) => x.tag === "li").map((x) => {
+    const open = all(x, (y) => y.attrs && y.attrs.class === "open")[0];
+    return open && open.attrs["data-focus"] === x.attrs["data-row"] ? x.attrs["data-row"] : "";
+  }) }))));`, mixedInput(t, nil), &got)
 	want := []lane{{"GitHub", []string{"task:g-1", "task:g-2"}}, {"Slack", []string{"task:s-1", "task:s-2"}}}
 	if !slices.EqualFunc(got, want, func(a, b lane) bool { return a.Label == b.Label && slices.Equal(a.Focus, b.Focus) }) {
 		t.Errorf("lanes %+v, want %+v", got, want)
@@ -330,8 +337,8 @@ const g = p.res.group, f = first(p);
 tasksState.tasks = input.tasks.map((e) => ({ ...e, facets: { source: e.facets.source } }));
 const bare = viewPage(route({ layout: "board" }), "");
 process.stdout.write(JSON.stringify({ Group: g, First: f, Bare: bare.res.group, BareFirst: first(bare) }));`, mixedInput(t, nil), &got)
-	if got.Group != "waits-on" || got.First != "Waits on (person) (board)" {
-		t.Errorf("Needs me's board groups by %q, menu %q; want the profile's strip facet waits-on", got.Group, got.First)
+	if got.Group != "turn" || got.First != "Whose turn (board)" {
+		t.Errorf("Needs me's board groups by %q, menu %q; want the profile's strip facet turn", got.Group, got.First)
 	}
 	if got.Bare != "" || got.BareFirst != "None" {
 		t.Errorf("tasks without the strip facet group by %q, menu %q; want no grouping", got.Bare, got.BareFirst)
@@ -359,7 +366,7 @@ func TestATaskInTwoGroupsHasTwoFocusSlotsAndTheKeysWalkBoth(t *testing.T) {
 	nodeRun(t, mixedPrelude(t), nil, `
 tasksState.tasks = input.tasks.map((e) => e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e);
 const p = viewPage(route({ g: "tag:lang" }), "");
-const focus = all(h("div", {}, ...p.body), (x) => x.tag === "li").map((x) => x.attrs["data-focus"]);
+const focus = all(h("div", {}, ...p.body), (x) => x.tag === "tr" && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
 const nodes = focus.map((f) => ({ dataset: { focus: f } }));
 const walk = [];
 let at = null;
@@ -421,7 +428,7 @@ process.stdout.write(JSON.stringify({ State: groups("state"), Contexts: groups("
 	if !slices.Equal(got.State, want) {
 		t.Errorf("states group as %v, want %v", got.State, want)
 	}
-	if want := []group{{"calls", "@calls"}, {"computer", "@computer"}, {"none", "no context"}}; !slices.Equal(got.Contexts, want) {
-		t.Errorf("contexts group as %v, want %v", got.Contexts, want)
+	if want := []group{{"calls", "calls"}, {"computer", "computer"}, {"none", "no context"}}; !slices.Equal(got.Contexts, want) {
+		t.Errorf("contexts group as %v, want %v: label_prefix shows on rows, never in a group's head", got.Contexts, want)
 	}
 }

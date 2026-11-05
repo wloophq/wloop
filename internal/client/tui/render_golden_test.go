@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +13,10 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -26,6 +31,7 @@ func goldenModel(t *testing.T, color bool) *Model {
 		p.Brief = &api.BriefSummary{Size: "m", Risk: "high", Goal: "Export the ledger in batches of a thousand rows so the nightly job stops timing out"}
 	})
 	setPR(&asked, func(p *prView) { p.Workspace = api.Workspace{DisplayName: "REVIEW batch-export", Status: "reviewing"} })
+	asked.Facets = servedFacets("", asked)
 
 	pending := row(3, "Retry webhooks with backoff", "round_pending", "needs-me")
 	pending.Summary.Reason = "new commits since the last review"
@@ -137,6 +143,69 @@ func TestRenderGolden(t *testing.T) {
 			}
 		}
 	}
+	for _, prefix := range []string{"render", "views-waiting"} {
+		renderGolden(t, prefix, models[prefix], false, [2]int{60, 20})
+	}
+	for _, size := range [][2]int{{120, 20}, {80, 20}, {60, 20}} {
+		renderGolden(t, "slack", slackGolden, false, size)
+	}
+}
+
+type bundledProvider = readmodel.Provider
+
+type bundled struct {
+	bundledProvider
+	psource.Catalog
+}
+
+// slackGolden is the Slack view: conversations placed by the Slack plugin's specs, a channel thread, a
+// DM and a stalled one.
+func slackGolden(t *testing.T, color bool) *Model {
+	shared := slackRowFacets(t)
+	conv := func(key, label, title, waits string, since time.Duration, stalled bool) api.Row {
+		kind := api.Kind("waits_on_viewer")
+		if waits != "me" {
+			kind = "waits_on_others"
+		}
+		facets := maps.Clone(shared.BySituation[string(kind)])
+		facets["waits-on"] = []string{waits}
+		facets[shared.Since] = []string{now.Add(-since).UTC().Format(time.RFC3339Nano)}
+		r := api.Row{Unit: unit.Unit{Provider: "slack", Key: key}, Label: label, Title: title, Kind: kind, Views: []string{"slack"},
+			Link: "https://chat.example/" + key, Summary: api.Summary{WaitsOn: waits, Since: now.Add(-since), Stalled: stalled}, Facets: facets}
+		if channel, ok := strings.CutPrefix(label, "#"); ok {
+			r.Facets[shared.Channel] = []string{channel}
+		}
+		return r
+	}
+	m := modelWith(t, conv("T1/C1/1.1", "#deploys", "Can we ship the export tonight?", "me", 2*time.Hour, false),
+		conv("T1/D1/2.2", "DM with Ana", "Lunch on Friday?", "Ana", 30*time.Minute, false),
+		conv("T1/C2/3.3", "#general", "Who owns the flaky upload test?", "me", 5*24*time.Hour, true))
+	c := servedCatalog(t)
+	c.Views = append(c.Views, api.ViewSpec{ID: "slack", Label: "Slack", Provider: "slack", Rows: true, Surfaces: []string{"tui"}, Unit: "Conversation"})
+	both := readmodel.BuildCatalog(bundled{Catalog: psource.BundledCatalog(string(unit.GitHub))}, bundled{Catalog: psource.BundledCatalog("slack")})
+	c.Facets, c.Situations = both.Facets, both.Situations
+	m.SetCatalog(c)
+	m.navigate("slack")
+	m.SetColor(color)
+	return m
+}
+
+// slackRowFacets reads the facets a Slack row holds from the file the Slack plugin's tests check against its
+// rows, since this package may not import the plugin.
+func slackRowFacets(t *testing.T) (out struct {
+	BySituation map[string]map[string][]string `json:"by_situation"`
+	Since       string                         `json:"since"`
+	Channel     string                         `json:"channel"`
+}) {
+	t.Helper()
+	raw, err := os.ReadFile("../../../plugins/slack/testdata/row-facets.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 func renderGolden(t *testing.T, prefix string, model func(*testing.T, bool) *Model, color bool, size [2]int) {
@@ -220,16 +289,17 @@ func TestACutDetailEndsInAnEllipsis(t *testing.T) {
 
 func TestAStalledAgeIsMarkedWithoutColor(t *testing.T) {
 	lines := goldenModel(t, false).Render(80, 30, now)
-	if !strings.HasPrefix(lines[4], "   !9d  acme/billing-service#1365") {
+	if !strings.HasPrefix(strings.TrimLeft(lines[4], " "), "!9d 0h  acme/billing-service#1365") {
 		t.Fatalf("%q", lines[4])
 	}
 }
 
-func TestTheWaitCellCutsTheNamesBeforeTheKind(t *testing.T) {
-	m := newModel(t)
-	r := row(1, "x", "checks")
-	r.Summary.WaitsOn = "gracehopper-acme, heidimueller"
-	if got := m.waitCell(r, 28); !strings.HasSuffix(got, " · checks failing") || termfmt.Cells(got) > 28 {
+func TestTheWhoCellCutsTheNamesBeforeTheKind(t *testing.T) {
+	l := listLine{parts: map[string][]lens.Piece{"who": {{Label: "gracehopper-acme"}, {Label: "heidimueller"}}, "kind": {{Label: "checks failing"}}}}
+	if got := whoCell(l, 28); !strings.HasSuffix(got, " · checks failing") || termfmt.Cells(got) > 28 {
 		t.Fatalf("%q", got)
+	}
+	if got := whoCell(listLine{parts: map[string][]lens.Piece{"kind": {{Label: "draft"}}}}, 28); got != "draft" {
+		t.Fatalf("a kind alone reads %q", got)
 	}
 }

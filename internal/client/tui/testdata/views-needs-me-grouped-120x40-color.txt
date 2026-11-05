@@ -1,13 +1,13 @@
 [7m[1m Needs me 5 [22m[27m   [2m│[22m    [2mNeeds me 0[22m    [2mMy PRs 0[22m    [2mIn loop 0[22m    [2mPlan 0[22m
 
  [1minbox[22m
-   [2m5h[22m  Deploy window tonight?
-   [2m5h[22m  Buy cables
+   [2m5h 0m[22m    Deploy window tonight?                       inbox
+   [2m5h 0m[22m    Buy cables                                   inbox
  [1mnext[22m
-[7m>  [2m5h[22m  Reply on the batch export review  [2m@computer[22m                                                                      [27m
-   [2m5h[22m  Call the bank                     [2m@calls[22m
+[7m>  [2m5h 0m[22m    Reply on the batch export review  [2m@computer[22m  next                                                           [27m
+   [2m5h 0m[22m    Call the bank                     [2m@calls[22m     next
  [1mwaiting[22m
-   [2m5h[22m  Contract signature
+   [2m5h 0m[22m    Contract signature                           bob · waiting
 
 
 

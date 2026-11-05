@@ -55,3 +55,33 @@ process.stdout.write(JSON.stringify(input.cases.map((c) => {
 		}
 	}
 }
+
+func TestTheCockpitPlacesPiecesAsTheGoLens(t *testing.T) {
+	var table struct {
+		Now   string `json:"now"`
+		Parts struct {
+			Words map[string]string `json:"words"`
+			Specs []map[string]any  `json:"specs"`
+			Cases []struct {
+				Item map[string]any `json:"item"`
+				Want map[string]any `json:"want"`
+			} `json:"cases"`
+		} `json:"parts"`
+	}
+	if err := json.Unmarshal(readFile(t, "../api/lens/testdata/cases.json"), &table); err != nil {
+		t.Fatal(err)
+	}
+	var got []map[string]any
+	nodeRun(t, "", []string{"fold", "fillWord", "goDuration", "bucketOf", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts"}, `
+const now = Date.parse(input.now);
+process.stdout.write(JSON.stringify(input.cases.map((c) => rowParts(c.item, input.specs, input.words, now))));`,
+		map[string]any{"now": table.Now, "words": table.Parts.Words, "specs": table.Parts.Specs, "cases": table.Parts.Cases}, &got)
+	if len(got) != len(table.Parts.Cases) {
+		t.Fatalf("%d results for %d cases", len(got), len(table.Parts.Cases))
+	}
+	for i, c := range table.Parts.Cases {
+		if !reflect.DeepEqual(got[i], c.Want) {
+			t.Errorf("case %d:\n got  %+v\n want %+v", i, got[i], c.Want)
+		}
+	}
+}

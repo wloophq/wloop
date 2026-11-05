@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 )
@@ -79,4 +80,25 @@ func (c CatalogResponse) ViewsOn(surface string) []ViewSpec {
 	}
 	slices.SortStableFunc(out, func(a, b ViewSpec) int { return a.Order - b.Order })
 	return out
+}
+
+// RowWordsOf are w with provider's own row words of c over them.
+func (c CatalogResponse) RowWordsOf(provider string, w LensWords) LensWords {
+	i := slices.IndexFunc(c.Lens, func(p ProviderWords) bool { return p.Provider == provider })
+	if i < 0 || len(c.Lens[i].Words) == 0 {
+		return w
+	}
+	raw, err := json.Marshal(w.RowWords)
+	if err != nil {
+		return w
+	}
+	all := map[string]string{}
+	if json.Unmarshal(raw, &all) != nil {
+		return w
+	}
+	maps.Copy(all, c.Lens[i].Words)
+	if raw, err = json.Marshal(all); err == nil {
+		_ = json.Unmarshal(raw, &w.RowWords)
+	}
+	return w
 }

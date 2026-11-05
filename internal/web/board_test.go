@@ -63,8 +63,12 @@ func nodeRun(t *testing.T, prelude string, funcs []string, main string, in, out 
 	src := cockpitJS(t)
 	var script strings.Builder
 	script.WriteString(prelude)
+	seen := map[string]bool{}
 	for _, f := range funcs {
-		script.WriteString(jsFunction(t, src, f))
+		if !seen[f] {
+			seen[f] = true
+			script.WriteString(jsFunction(t, src, f))
+		}
 	}
 	script.WriteString("\n")
 	script.WriteString(main)
@@ -86,7 +90,7 @@ func jsConst(t *testing.T, src, name string) string {
 func keyJS(t *testing.T) string {
 	src, routes := appJS(t), staticJS(t, "routes.js")
 	var b strings.Builder
-	for _, c := range []string{"refLabel", "unitKey", "unitOf", "keyOf", "labelOf", "labelTail"} {
+	for _, c := range []string{"refLabel", "unitKey", "unitOf", "keyOf", "labelOf"} {
 		b.WriteString(jsConst(t, src, c))
 	}
 	for _, c := range []string{"keyUnit", "unitPath"} {
@@ -540,9 +544,14 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 	}
 }
 
+// rowFuncs are app.js's row renderer and what it calls beyond the lens.
+var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
+	"columnSort", "sortPick", "rowHead", "rowTr", "rowMeta", "rowWho", "rowCard", "roveKey", "roveStop", "rowStops", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
+	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
+
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "isMine", "resolveWho", "waitingWho", "waitingLabel",
-	"waitCat", "waitClass", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
+	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "rowTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
 	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
 func lensPrelude(t *testing.T) string {
@@ -568,14 +577,15 @@ func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
 	for i, c := range cases {
 		g := got[i]
 		wait, _ := c["facets"].(map[string][]string)
-		want := "nobody"
+		want, class := "", ""
 		if len(wait["wait"]) > 0 {
 			want = wait["wait"][0]
+			class = "w-" + want
 		}
 		loop := c["kind"] == "loop_working" || c["kind"] == "loop_waiting"
 		says := slices.Contains(strings.Split(g.Label, ", "), "me")
 		switch {
-		case g.Cat != want || g.Class != "w-"+g.Cat:
+		case g.Cat != want || g.Class != class:
 			t.Errorf("%v: cat %s class %s, want %s", c, g.Cat, g.Class, want)
 		case !loop && (g.Cat == "me") != says:
 			t.Errorf("%v: %s while the label says %q", c, g.Cat, g.Label)
@@ -651,6 +661,7 @@ func TestPipelineFiltersSortsAndGroups(t *testing.T) {
 	}
 	var got []res
 	nodeRun(t, lensPrelude(t), lensFuncs, `const rows = `+mustJS(t, wireRows("me", time.Now(), lensRows()...))+`;
+catalog.views.push({ id: "needs-me", label: "Needs me", provider: "github", rows: true, surfaces: ["web"] });
 process.stdout.write(JSON.stringify(input.map((l) => {
   const lens = { view: l.view, q: l.q, ts: terms(l.q), quals: qualifiers(l.q), filters: filtersOf(qualifiers(l.q)), group: l.group || "", sort: l.sort || "", layout: l.layout || "" };
   const r = pipeline(rows, lens);
@@ -732,11 +743,6 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 		t.Skip("node is not on PATH")
 	}
 	src := appJS(t)
-	for _, want := range []string{`key === pr ? "sel" : ""`, `"aria-selected": key === pr`, `"aria-current": key === pr`} {
-		if !strings.Contains(src, want) {
-			t.Errorf("app.js lacks %s", want)
-		}
-	}
 	css, err := fs.ReadFile(files, "static/app.css")
 	if err != nil {
 		t.Fatal(err)
@@ -1038,7 +1044,8 @@ func TestTimelineSaysWhatTheAnswerChoseAndThatItIsQueued(t *testing.T) {
 }
 
 func TestCockpitShowsTheBriefingIntake(t *testing.T) {
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat() }; }` + "\n" + `function stamp(t) { return t; }`
+	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat() }; }` + "\n" + `function stamp(t) { return t; }` + "\n" +
+		`globalThis.tasksState = { catalog: { lens: ` + mustJS(t, servedViews(t).Lens) + ` } };` + "\n"
 	in := []any{
 		map[string]any{"payload": map[string]any{"intake": map[string]any{"seq": 42, "intent": "review", "state": "briefing", "attempt": 2, "last_error": "rate limited", "next": "14:05"}}},
 		map[string]any{"payload": map[string]any{"intake": map[string]any{"seq": 43, "intent": "review", "state": "starting"}}},
@@ -1049,8 +1056,8 @@ func TestCockpitShowsTheBriefingIntake(t *testing.T) {
 		Lines [][]string `json:"lines"`
 		Notes []string   `json:"notes"`
 	}
-	nodeRun(t, prelude, []string{"isSet", "pl", "intakeWaiting", "intakeChip", "intakeLines", "acceptedNote"}, `process.stdout.write(JSON.stringify({
-		chips: input.map((r) => intakeChip(r)),
+	nodeRun(t, prelude, []string{"isSet", "pl", "intakeWaiting", "intakeChip", "intakeLines", "acceptedNote", "lensWords", "fillWord"}, `process.stdout.write(JSON.stringify({
+		chips: input.map((r) => intakeChip(r, lensWords())),
 		lines: [intakeLines(input[0].payload.intake)],
 		notes: [acceptedNote("review", "acme/api#7", { seq: 42 }), acceptedNote("review", "acme/api#7", { seq: 42, joined: true, state: "briefing" }), acceptedNote("open", "acme/api#7", undefined)],
 	}));`, in, &got)
@@ -1194,7 +1201,7 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 `
 }
 
-var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote"}
+var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)
@@ -1613,7 +1620,7 @@ const getJSON = async (url) => {
 };
 const loadActivity = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {}, render = () => {};
 const loadDetail = async () => { state.detail = { row: row(detailVersion) }; };
-`, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "actionButtons", "load"}, `(async () => {
+`, []string{"specsStale", "loadSpecs", "refreshSpecs", "actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "load"}, `(async () => {
   const versions = [];
   await load(); versions.push(state.specs.version);
   listed = "v2"; detailVersion = "v2"; actionsFail = true;

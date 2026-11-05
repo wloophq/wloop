@@ -107,7 +107,10 @@ type Model struct {
 	// the kinds.
 	views   []View
 	catalog api.CatalogResponse
-	rows    []api.Row
+	// rowWords are the row words of each provider's rows, merged when first read after the catalog or the
+	// views catalog arrives.
+	rowWords map[string]api.LensWords
+	rows     []api.Row
 	// rowLens and taskItems are the lens items of rows and of each view's tasks, built when they arrive.
 	rowLens   []lens.Item
 	taskItems map[string][]lens.Item
@@ -235,7 +238,7 @@ func (m *Model) roundGate(r api.Row) (api.GateView, bool) {
 // served catalog, keeping the current view by id.
 func (m *Model) SetCatalog(c api.CatalogResponse) {
 	current := m.viewKey()
-	m.catalog, m.views = c, nil
+	m.catalog, m.views, m.rowWords = c, nil, nil
 	m.refreshFacets()
 	m.indexRows()
 	for _, v := range c.ViewsOn(surface) {
@@ -244,6 +247,19 @@ func (m *Model) SetCatalog(c api.CatalogResponse) {
 		}
 	}
 	m.goTo(current)
+}
+
+// rowWordsOf are the words of provider's rows: the profile's, the plugin's own over them.
+func (m *Model) rowWordsOf(provider string) api.LensWords {
+	if w, ok := m.rowWords[provider]; ok {
+		return w
+	}
+	if m.rowWords == nil {
+		m.rowWords = map[string]api.LensWords{}
+	}
+	w := m.catalog.RowWordsOf(provider, m.viewsCat.Lens)
+	m.rowWords[provider] = w
+	return w
 }
 
 // planView is the index of the Plan view, after the row views.

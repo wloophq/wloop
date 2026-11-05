@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -43,14 +44,11 @@ process.stdout.write(JSON.stringify({
 }
 
 func TestEachCopyOfARowHasItsOwnFocusSlots(t *testing.T) {
-	src := appJS(t)
-	prelude := lensPrelude(t) + jsConst(t, src, "FOCUS_PAIRS") + jsFunction(t, src, "focusSlot") + jsFunction(t, src, "waitField") + jsConst(t, src, "CARD_GROUPS") + jsConst(t, src, "TAG_CHIPS") +
-		`function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }
-const providerName = (id) => id;
+	prelude := cockpitScript(t) + `
 state.busy = new Set(); state.openSlot = "";
 state.specs = { version: "v", byId: Object.fromEntries(["open", "hold", "mute"].map((id) => [id, { id, label: id, group: "control", surfaces: ["row"] }])) };
-const CSS = { escape: (s) => s }; let asked = [];
-const document = { querySelector: (sel) => { asked.push(sel); return { scrollIntoView() {} }; } };
+let asked = [];
+document.querySelector = (sel) => { asked.push(sel); return { scrollIntoView() {} }; };
 function slots(n, out = []) {
   if (n && typeof n === "object") {
     if (n.attrs && n.attrs["data-focus"]) out.push(n.attrs["data-focus"]);
@@ -70,18 +68,23 @@ function slots(n, out = []) {
 	row := tagRows()[1]
 	row["workspace"] = map[string]any{"id": "w1", "status": "reviewing"}
 	row["actions"] = []map[string]any{{"id": "open", "enabled": true}, {"id": "hold", "enabled": true}, {"id": "mute", "enabled": true}}
-	nodeRun(t, prelude, append(slices.Clone(lensFuncs), "fieldById", "foldMap", "marked", "safeURL", "where", "facet", "whoFacets", "countdown", "age", "stamp",
-		"stripTitle", "mineMark", "tagChips", "briefTags", "intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons",
-		"copySlot", "multiCopy", "openRow", "openSlot", "rowTr", "card", "revealOpenRow"), `
-const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "tag:lang", sort: "", layout: "" };
-const copies = ["lang:go", "lang:sql"].map((c) => slots(rowTr(input, "", lens, c)));
-const plain = slots(rowTr(input, "", lens, ""));
-const cards = ["lang:go", "lang:sql"].map((c) => card(input, "", c).children[0].attrs["data-focus"]);
+	nodeRun(t, prelude, nil, `
+applyCatalog(input.catalog);
+tasksState.catalog = input.views;
+const r = input.row;
+state.rows = [r];
+const lens = { ...lensOf({ ...readHash(), view: "mine" }), group: "tag:lang" };
+const tr = (copy) => { const m = rowModel(r, "", lens, copy); return rowTr(m, lens, rowColumns([m])); };
+const copies = ["lang:go", "lang:sql"].map((c) => slots(tr(c)));
+const plain = slots(tr(""));
+const cards = ["lang:go", "lang:sql"].map((c) => rowCard(rowModel(r, "", lens, c, "card"), lens).children[0].children[0].attrs["data-focus"]);
 state.openSlot = copies[1][0];
 const open = [openSlot("github:acme/web#2"), openSlot("github:acme/web#20"), openSlot("github:acme/api#2")];
 state.revealed = "";
+asked = [];
 revealOpenRow("github:acme/web#2");
-process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("where")] }));`, wireRow("me", time.Now(), row), &got)
+process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: [multiCopy("tag:lang"), multiCopy("where")] }));`,
+		map[string]any{"row": wireRow("me", time.Now(), row), "catalog": json.RawMessage(servedCatalog(t)), "views": servedViews(t)}, &got)
 	if !slices.Equal(got.Multi, []bool{true, false}) {
 		t.Errorf("multi copy %v", got.Multi)
 	}
@@ -90,7 +93,7 @@ process.stdout.write(JSON.stringify({ copies, plain, cards, open, asked, multi: 
 	}
 	for i, c := range []string{"lang:go", "lang:sql"} {
 		for _, s := range got.Copies[i] {
-			if !strings.HasPrefix(s, "row:github:acme/web#2@"+c) {
+			if !strings.Contains(s, "row:github:acme/web#2@"+c) {
 				t.Errorf("copy %s has slot %s", c, s)
 			}
 			if slices.Contains(got.Copies[1-i], s) {

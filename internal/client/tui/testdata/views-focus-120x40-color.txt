@@ -1,6 +1,6 @@
 [7m[1m Focus 1 [22m[27m   [2mInbox 2[22m    [2mOutbox 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
 
-[7m>  [2m5h[22m  ★ Reply on the batch export review  [2m@computer acme/api#7[22m                                                         [27m
+[7m>  [2m5h 0m[22m  acme/api#7  ★ Reply on the batch export review  [2m@computer[22m  next                                               [27m
 
 
 

@@ -88,6 +88,58 @@ type LensWords struct {
 	Sorted        string `json:"sorted"`
 	Descending    string `json:"descending"`
 	NoLens        string `json:"no_lens"`
+	// RowWords are what a row says beside its facets.
+	RowWords
+}
+
+// RowWords are the words of a row: its age, its facet buttons' title and aria-label, its columns' heads and
+// the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
+type RowWords struct {
+	AgeNow           string `json:"age_now"`
+	AgeMinutes       string `json:"age_minutes"`
+	AgeHours         string `json:"age_hours"`
+	AgeDays          string `json:"age_days"`
+	FilterLabel      string `json:"filter_label"`
+	FilterTitle      string `json:"filter_title"`
+	FilterTitleGroup string `json:"filter_title_group"`
+	FilterGroup      string `json:"filter_group"`
+	ListCount        string `json:"list_count"`
+	ListEmpty        string `json:"list_empty"`
+	CountdownTitle   string `json:"countdown_title"`
+	CountdownSending string `json:"countdown_sending"`
+	CountdownSeconds string `json:"countdown_seconds"`
+	CountdownMinutes string `json:"countdown_minutes"`
+	TipNamed         string `json:"tip_named"`
+	TipKind          string `json:"tip_kind"`
+	TipWhy           string `json:"tip_why"`
+	LegendTitle      string `json:"legend_title"`
+	SortBy           string `json:"sort_by"`
+	ColUnit          string `json:"col_unit"`
+	ColWho           string `json:"col_who"`
+	ColAge           string `json:"col_age"`
+	ColWhy           string `json:"col_why"`
+	ColAside         string `json:"col_aside"`
+	ColActions       string `json:"col_actions"`
+	Stale            string `json:"stale"`
+	StaleTitle       string `json:"stale_title"`
+	Briefing         string `json:"briefing"`
+	BriefingTitle    string `json:"briefing_title"`
+	BriefingAttempt  string `json:"briefing_attempt"`
+	BriefingError    string `json:"briefing_error"`
+	Questions        string `json:"questions"`
+	QuestionsTitle   string `json:"questions_title"`
+	Changed          string `json:"changed"`
+	Starred          string `json:"starred"`
+	Until            string `json:"until"`
+	Due              string `json:"due"`
+	Unread           string `json:"unread"`
+	UnreadTitle      string `json:"unread_title"`
+	ReviewDue        string `json:"review_due"`
+	NoNextAction     string `json:"no_next_action"`
+	OpenChildren     string `json:"open_children"`
+	Sequential       string `json:"sequential"`
+	Every            string `json:"every"`
+	Reviewed         string `json:"reviewed"`
 }
 
 type ViewsCatalog struct {
@@ -212,6 +264,8 @@ type TaskView struct {
 	// Facets are the task's values of every facet, by facet id, from its facts, its brief and its units' rows,
 	// joined as the profile's facets say; Values[0] is the group and sort key.
 	Facets map[string][]string `json:"facets,omitempty"`
+	// Reason is why the task's primary unit waits, its row's summary reason; empty when it has no row.
+	Reason string `json:"reason,omitempty"`
 	// Asks are the items the task holds, detail only.
 	Asks  []AskView   `json:"asks,omitempty"`
 	Gates []GateView  `json:"gates,omitempty"` // the open ones

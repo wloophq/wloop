@@ -237,35 +237,49 @@ function starred(e) {
   return !!p && (p.values || []).length > 0 && (e.props || {})[p.name] === p.values[0];
 }
 
-function taskItem(e, open, copy) {
-  const go = () => writeHash({ task: e.id, pr: "" });
-  const owed = e.owed_by && e.owed_by !== "me" ? e.owed_by : "";
-  return h("li", {
-    class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
-    tabindex: 0,
-    "data-focus": taskSlot(e.id, copy),
-    "aria-selected": e.id === open ? "true" : "false",
-    onclick: go,
-    onkeydown: (ev) => {
-      if ((ev.key === "Enter" || ev.key === " ") && ev.target === ev.currentTarget) {
-        ev.preventDefault();
-        go();
-      }
-    },
-  },
-    h("div", { class: "task-line" },
-      starred(e) ? h("span", { class: "star", title: "Starred" }, "★") : null,
-      h("span", { class: "title" }, e.title || e.id),
-      e.changed ? h("span", { class: "flag" }, "changed") : null),
-    h("div", { class: "meta" },
-      ...(roleValue(e, "contexts") || []).map((c) => h("span", { class: "pill" }, c)),
-      roleValue(e, "area") ? h("span", { class: "pill area" }, roleValue(e, "area")) : null,
-      roleValue(e, "deadline") ? h("span", { class: "due" }, "due " + shortDate(roleValue(e, "deadline"))) : null,
-      e.wake && e.wake.until ? h("span", { class: "due" }, "until " + shortDate(e.wake.until)) : null,
-      owed ? h("span", { class: "who" }, "on " + owed) : null,
-      e.extraction_lag ? h("span", { class: "due", title: "The oldest message on its links not yet read by the extraction" }, "unread " + shortLag(e.extraction_lag)) : null,
-      ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
-    projectFacts(e));
+// taskModel is a task as the row renderer lays it out: its facets placed by the profile's task specs, then
+// what no facet carries. A draft's own task shows its draft under its title and opens from its title alone.
+function taskModel(e, open, copy, lens) {
+  const w = lens.words || {};
+  const item = { facets: e.facets || {} };
+  const parts = rowParts(item, lens.specs, w);
+  const strip = stripOf(item, lens.specs);
+  const draft = isDraftTask(e);
+  const due = roleValue(e, "deadline");
+  const scope = taskSlot(e.id, copy);
+  return {
+    key: e.id, scope, item, parts, words: w, selected: e.id === open,
+    open: draft ? null : () => writeHash({ task: e.id, pr: "" }),
+    href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
+    title: e.title || e.id,
+    pre: starred(e) ? h("span", { class: "star", title: w.starred }, "★ ") : null,
+    ref: (e.units || []).map((u, i) => whereRef((e.unit_labels || [])[i] || unitLabel(u), item, lens, scope, w)),
+    flags: [
+      e.changed ? h("span", { class: "flag" }, w.changed) : null,
+      due ? h("span", { class: "flag due" }, fillWord(w.due, { date: shortDate(due) })) : null,
+      e.wake && e.wake.until ? h("span", { class: "flag due" }, fillWord(w.until, { date: shortDate(e.wake.until) })) : null,
+      e.extraction_lag ? h("span", { class: "flag due", title: w.unread_title }, fillWord(w.unread, { lag: shortLag(e.extraction_lag) })) : null],
+    after: [projectFacts(e, w), draft ? draftCard(e, "outbox") : null],
+    lead: stripDot(strip, lens, scope, w),
+    why: e.reason || "",
+    cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
+  };
+}
+
+// whereRef is a unit's label on a task's row, a button that filters by the where value it names when the task
+// holds one: the longest the label ends with, or holds after its owner, as "#chan" or "owner/repo#7" do.
+function whereRef(label, item, lens, scope, w) {
+  const named = ((item.facets || {}).where || []).filter((v) => v && (label.endsWith(v) || label.includes(v + "#")))
+    .sort((a, b) => b.length - a.length)[0];
+  const text = h("span", { class: "unit" }, marked(label, lens.ts));
+  return named ? facet(lens, "where", named, text, `facet:${scope}:where:${named}`, { words: w, rove: true }) : text;
+}
+
+// taskTable is a table of the lens's groups of tasks, its columns those some task of all has a piece for.
+function taskTable(res, lens, open, all) {
+  const model = (it, copy) => taskModel(it.task, open, copy, lens);
+  const cols = rowColumns(all.map((it) => model(it, "")));
+  return h("table", { class: "task-table" }, rowHead(cols, lens, ""), ...rowTable(res, model, lens, cols));
 }
 
 // shortLag reads a Go duration as its largest unit: 2h, 12m, 30s.
@@ -285,17 +299,17 @@ function everyLabel(d) {
   return hours % 24 === 0 ? `${hours / 24}d` : `${hours}h`;
 }
 
-// projectFacts are a project's open children and review.
-function projectFacts(e) {
+// projectFacts are a project's open children and review, in the row words w.
+function projectFacts(e, w) {
   if ((e.props || {}).kind !== "project") return null;
   const open = (e.children || []).length;
   return h("div", { class: "meta project-facts" },
-    e.review_due ? h("span", { class: "flag" }, "review due") : null,
-    open ? null : h("span", { class: "pill" }, "no next action"),
-    h("span", { class: "pill" }, `${open} open`),
-    e.sequential ? h("span", { class: "pill" }, "sequential") : null,
-    e.review_every ? h("span", { class: "who" }, "every " + everyLabel(e.review_every)) : null,
-    e.reviewed_at ? h("span", { class: "who" }, "reviewed " + localDate(e.reviewed_at)) : null);
+    e.review_due ? h("span", { class: "flag" }, w.review_due) : null,
+    open ? null : h("span", { class: "pill" }, w.no_next_action),
+    h("span", { class: "pill" }, fillWord(w.open_children, { n: open })),
+    e.sequential ? h("span", { class: "pill" }, w.sequential) : null,
+    e.review_every ? h("span", { class: "who" }, fillWord(w.every, { every: everyLabel(e.review_every) })) : null,
+    e.reviewed_at ? h("span", { class: "who" }, fillWord(w.reviewed, { date: localDate(e.reviewed_at) })) : null);
 }
 
 // localDate is an instant's day where the browser is, unlike shortDate's UTC day for deadlines.
@@ -322,12 +336,6 @@ function isDraftTask(e) {
   return !!d && e.id === "draft:" + d.id;
 }
 
-// listItem is a task's row: a draft's own task shows the draft to approve. copy names the group of one of
-// the task's copies when a grouping shows it in several.
-function listItem(e, open, copy) {
-  return isDraftTask(e) ? outboxItem(e, open, copy) : taskItem(e, open, copy);
-}
-
 // taskSlot is the focus slot of a task's row, or of one of its copies.
 function taskSlot(id, copy) {
   return copy ? `task:${id}@${copy}` : `task:${id}`;
@@ -340,12 +348,6 @@ function nextTaskNode(nodes, active, openID, delta) {
   let at = nodes.indexOf(active);
   if (at < 0 && openID) at = nodes.findIndex((n) => n.dataset.focus === taskSlot(openID) || n.dataset.focus.startsWith(taskSlot(openID) + "@"));
   return nodes[Math.max(0, Math.min(nodes.length - 1, at < 0 ? 0 : at + delta))];
-}
-
-function outboxItem(e, open, copy) {
-  return h("li", { class: "task-row outbox" + (e.id === open ? " sel" : ""), "data-focus": taskSlot(e.id, copy), tabindex: 0 },
-    h("div", { class: "task-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
-    draftOf(e) ? draftCard(e, "outbox") : null);
 }
 
 function viewHash(change) {
@@ -442,22 +444,14 @@ function viewPage(route, open) {
     return page;
   }
   if (page.lens.layout === "board") body.push(taskBoard(page.res, page.lens, open));
-  else body.push(...taskGroups(page.res, page.lens, open).filter(Boolean));
+  else body.push(taskTable(page.res, page.lens, open, taskLensItems()));
   return page;
 }
 
-// taskGroups lists the lens's groups of tasks, each under its heading when the lens groups.
-function taskGroups(res, lens, open) {
-  const multi = multiCopy(res.group);
-  return res.groups.filter((g) => g.rows.length).flatMap((g) => [
-    res.group ? h("h3", { class: "plan-head" }, `${g.label} (${g.rows.length})`, onlyThis(g, lens)) : null,
-    h("ol", { class: "task-list" }, ...g.rows.map((it) => listItem(it.task, open, multi ? g.key : "")))]);
-}
-
-// taskBoard is a lane per group of the lens, each holding its tasks' rows.
+// taskBoard is a lane per group of the lens, each holding its tasks' cards.
 function taskBoard(res, lens, open) {
   return h("div", { class: "board task-board" }, ...res.groups.filter((g) => g.rows.length)
-    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => listItem(it.task, open, copy))));
+    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => rowCard(taskModel(it.task, open, copy, lens), lens))));
 }
 
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.

@@ -16,10 +16,12 @@ import (
 
 const none = "none"
 
-// Item is what the lens reads of one thing on a list: its facet values and the texts a free word searches.
+// Item is what the lens reads of one thing on a list: its facet values, the texts a free word searches and
+// the provider whose display keys place it on a row ("" for a task).
 type Item struct {
-	Facets map[string][]string `json:"facets"`
-	Texts  []string            `json:"texts"`
+	Facets   map[string][]string `json:"facets"`
+	Texts    []string            `json:"texts"`
+	Provider string              `json:"provider,omitempty"`
 }
 
 // Qualifier is a field:value term of a query. Value is folded.
