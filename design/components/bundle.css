@@ -387,7 +387,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 
 .toggle { display: inline-flex; gap: var(--space-4); }
 .toggle [aria-pressed="true"] { background: var(--sel); border-color: var(--me); }
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: var(--space-12); padding: var(--space-8) var(--space-16) var(--space-16); align-items: start; overflow-x: auto; }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: var(--space-12); padding: var(--space-8) var(--space-16) var(--space-16); align-items: start; overflow: auto; }
 .board[hidden] { display: none; }
 .lane, .card { min-width: 0; }
 .lane-head { display: flex; justify-content: space-between; gap: var(--space-6); margin: 0 0 var(--space-6); }
@@ -547,6 +547,13 @@ button.kpi:hover { border-color: var(--muted); }
 .task-row .project-facts .flag { color: var(--late); }
 .tasks > .tools { padding: 0 0 var(--space-8); }
 .task-board { padding: var(--space-8) 0 var(--space-16); }
+/* A board fills the list's height and scrolls on both axes, so its horizontal scrollbar stays in view. */
+#list:has(> #tasks:not([hidden]) .task-board), #tasks:has(.task-board), #tasks-body:has(> .task-board),
+#list:has(> #list-box[open]:not([hidden]) > #board:not([hidden])), #list-box[open]:has(> #board:not([hidden])) { display: flex; flex-direction: column; }
+#tasks:has(.task-board) { padding-bottom: 0; }
+#tasks:has(.task-board), #tasks-body:has(> .task-board), #list-box[open]:has(> #board:not([hidden])), .board { flex: 1; min-height: 0; }
+#list-box[open]:has(> #board:not([hidden]))::details-content { display: contents; }
+.board .lane-head { position: sticky; top: 0; z-index: 1; padding: var(--space-4) 0; background: var(--bg); }
 .task-board .task-row { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); overflow-wrap: anywhere; }
 .task-board .task-row:hover { background: var(--hover); }
 .review-steps { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0 0 var(--space-8); padding: 0; }
