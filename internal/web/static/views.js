@@ -551,5 +551,16 @@ function renderTasks(route) {
   head.replaceChildren(...page.head);
   if (page.res) renderLens(page.lens, page.res, tools);
   else hideLens(tools);
-  body.replaceChildren(...page.body);
+  replaceKeepingScroll(body, page.body, [route.view, route.q, route.g, route.s, route.layout].join("\n"));
+}
+
+// replaceKeepingScroll replaces body's children and, while the page is the same, keeps where its board was
+// scrolled: a refresh builds a new board, which would start at its origin.
+function replaceKeepingScroll(body, children, page) {
+  const old = body.querySelector(":scope > .board");
+  const at = old && body.dataset.page === page ? [old.scrollLeft, old.scrollTop] : null;
+  body.replaceChildren(...children);
+  body.dataset.page = page;
+  const board = body.querySelector(":scope > .board");
+  if (at && board) [board.scrollLeft, board.scrollTop] = at;
 }
