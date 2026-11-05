@@ -193,7 +193,7 @@ function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const route = readRoute(location.hash);
   const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
-  const out = {
+  return {
     view,
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
     task: route.task,
@@ -201,15 +201,16 @@ function readHash() {
     ctx: route.ctx,
     layout: p.get("layout") === "board" ? "board" : "",
     q: (p.get("q") || "").slice(0, QUERY_MAX),
+    g: (p.get("g") || "").slice(0, QUERY_MAX),
+    s: (p.get("s") || "").slice(0, QUERY_MAX),
     x: view === "explore" ? (p.get("x") || "").slice(0, 256) : "",
     tk: view === "dash" && /^[a-z-]+$/.test(p.get("tk") || "") ? p.get("tk") : "",
     done: view === "dash" && p.get("done") === "1",
   };
-  return { ...out, ...lensPicks(view, out, p.get("g") || "", p.get("s") || "") };
 }
 
-// lensPicks are the group and the sort a hash names that view offers; one it does not offer gives way to the
-// view's default.
+// lensPicks are the group and the sort of route that view offers; one it does not offer gives way to the
+// view's default, while the hash keeps it for the views that do.
 function lensPicks(view, route, g, s) {
   const fields = offeredFields(view, route);
   return {
@@ -685,32 +686,52 @@ function viewGroupField(view) {
 // defaultSortLabel is what the sort menu calls view's own order.
 function defaultSortLabel(view) {
   if (typeof isCoreView === "function" && isCoreView(view)) return (tasksState.catalog || {}).default_sort || "";
-  return (catalog.views.find((v) => v.id === view) || {}).default_sort || "";
+  return (catalog.views.find((v) => v.id === view) || {}).default_sort || (typeof tasksState === "object" && (tasksState.catalog || {}).default_sort) || "";
+}
+
+// boardGroupField is the field a board of view groups by when nothing is picked: the facet that colors the
+// strip (a task view's from its profile, a row view's from its plugins) when the view offers it; "" otherwise.
+function boardGroupField(view, offered) {
+  const core = typeof isCoreView === "function" && isCoreView(view);
+  const id = core ? (((tasksState.catalog || {}).facets || []).find((f) => f.strip) || {}).id : catalog.strip;
+  return id && offered.some((f) => f.id === id) ? id : "";
+}
+
+// lensWords are what the lens bar says, from the views catalog.
+function lensWords() {
+  return (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.lens) || {};
+}
+
+// fillWord fills a lens word's {{.name}} with vars.
+function fillWord(word, vars) {
+  return String(word || "").replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
 }
 
 // lensOf is the lens of route: its query read over the fields of its view, trimmed as the daemon counts it,
-// its picks and its view's defaults.
+// the picks its view offers and its view's defaults.
 function lensOf(route) {
   const { view, tk, done } = route;
   const q = route.q || "";
   const fields = lensFields(view);
+  const offered = offeredFields(view, route);
   const quals = qualifiers(q.trim(), fields);
-  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: route.g || "", sort: route.s || "", layout: route.layout || "", tk, done,
-    fields, offered: offeredFields(view, route), defaultGroup: viewGroupField(view), defaultSort: defaultSortLabel(view) };
+  const { g, s } = lensPicks(view, route, route.g || "", route.s || "");
+  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
+    fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view) };
 }
 
 function readLens() {
   return lensOf(readHash());
 }
 
-// effectiveGroup is the field a lens groups by: the user's pick, else its view's own, else, on a board, whom
-// an item waits on.
+// effectiveGroup is the field a lens groups by: the user's pick, else its view's own, else, on a board, the
+// field its strip is colored by.
 function effectiveGroup(lens) {
   if (lens.group === NO_GROUP) return "";
   if (lens.group) return lens.group;
   if (lens.defaultGroup) return lens.defaultGroup;
   if (lens.layout !== "board") return "";
-  return catalog.strip;
+  return lens.boardGroup === undefined ? catalog.strip : lens.boardGroup;
 }
 
 function cmp(a, b) {
@@ -879,6 +900,8 @@ function listYAML(meta, items) {
       ["ref", yamlString(c.ref)],
       ["url", c.url ? yamlString(c.url) : ""],
       ["title", yamlString(c.title)],
+      ["since", c.since ? yamlString(c.since) : ""],
+      ["reason", c.reason ? yamlString(c.reason) : ""],
       ["units", (c.units || []).length ? list(c.units) : ""],
       ...facets.map(([id, vs]) => [id, list(vs)]),
     ].filter(([, v]) => v);
@@ -887,11 +910,15 @@ function listYAML(meta, items) {
   return out.join("\n") + "\n";
 }
 
-// copyEntry is what Copy list says of an item: a task by its id and its units, a row by its label and link.
+// copyEntry is what Copy list says of an item: a task by its id, its first unit's link and its units, a row
+// by its label and link, with its summary's reason and since.
 function copyEntry(it) {
   const e = it.task;
-  if (e) return { ref: e.id, title: e.title, units: (e.units || []).map((u, i) => (e.unit_labels || [])[i] || `${u.provider}:${u.key}`), facets: e.facets };
-  return { ref: labelOf(it), url: it.link, title: it.title, facets: it.facets };
+  if (e) {
+    const linked = (e.units || []).map((u) => (rowByKey(unitKey(u)) || {}).link).find(Boolean);
+    return { ref: e.id, url: linked, title: e.title, units: (e.units || []).map((u, i) => (e.unit_labels || [])[i] || unitKey(u)), facets: e.facets };
+  }
+  return { ref: labelOf(it), url: it.link, title: it.title, since: isSet(sm(it).since) ? sm(it).since : "", reason: sm(it).reason, facets: it.facets };
 }
 
 function candidatesYAML(meta, cands) {
@@ -949,9 +976,10 @@ async function copyList(lens) {
   const res = lensResult(lens);
   const items = groupedRows(res.groups);
   const grouped = res.group ? groupField(res.group, lens.fields).label.toLowerCase() : "";
+  const w = lensWords();
   try {
     await navigator.clipboard.writeText(listYAML({ view: lens.view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort, lens.fields), at: new Date().toISOString() }, items));
-    setNotice(`Copied ${items.length} item${items.length === 1 ? "" : "s"} from ${lens.view}${grouped ? `, grouped by ${grouped}` : ""}, as YAML.`);
+    setNotice(fillWord(grouped ? w.copied_grouped : w.copied, { count: items.length, view: lens.view, group: grouped }));
   } catch (err) {
     setNotice(`Could not copy: ${err.message}`, true);
   }
@@ -1022,7 +1050,7 @@ function renderLens(lens, res, tools = document.getElementById("tools")) {
   tools.hidden = false;
   const offered = (lens.offered || catalog.fields).map((f) => f.id);
   const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.defaultSort]);
+    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
   const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, "Clear");
@@ -1044,10 +1072,11 @@ function lensBar(lens, res) {
   const groups = offered.filter((f) => f.group && f.menu !== false);
   if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
   const board = lens.layout === "board";
-  const own = lens.defaultGroup || (board ? catalog.strip : "");
+  const w = lensWords();
+  const own = lens.defaultGroup || (board ? lens.boardGroup : "");
   const ownField = own ? groupField(own, fields) : null;
   const { field, desc } = parseSort(lens.sort, fields);
-  const sortWord = lens.defaultSort || "Default order";
+  const sortWord = lens.defaultSort;
   const picked = lens.group && lens.group !== NO_GROUP ? groupField(lens.group, fields) : null;
   const toggle = (layout, label) => h("button", {
     type: "button", class: "act", "aria-pressed": String(board === (layout === "board")), "data-focus": `lens:${layout || "list"}`,
@@ -1055,8 +1084,8 @@ function lensBar(lens, res) {
   }, label);
   const items = [
     lensSelect("group", "Group", lens.group, [
-      ["", ownField ? `${ownField.label} (${lens.defaultGroup ? "default" : "board"})` : "None"],
-      ...(ownField ? [[NO_GROUP, "None"]] : []),
+      ["", ownField ? fillWord(lens.defaultGroup ? w.default_group : w.board_group, { label: ownField.label }) : w.no_group],
+      ...(ownField ? [[NO_GROUP, w.no_group]] : []),
       ...groups.map((f) => [f.id, f.label])], setGroup),
     lensSelect("sort", "Sort", field, [["", sortWord], ...offered.filter((f) => f.sort).map((f) => [f.id, f.label])],
       (v) => writeHash({ s: v })),
@@ -1259,7 +1288,7 @@ function copySlot(kind, key, copy) {
 
 // multiCopy is whether a grouping may show a pull request in several groups.
 function multiCopy(field) {
-  return !!(groupField(field) || {}).keys;
+  return !!field && !!(groupField(field) || {}).keys;
 }
 
 function openRow(scope, key) {
@@ -1322,6 +1351,7 @@ function rowTr(r, pr, lens, copy) {
 // "no lang" group is -tag:lang.
 function groupQualifier(g, fields = catalog.fields) {
   const f = groupField(g.field, fields);
+  if (!f) return null;
   if (f.tagKey) return g.key === "none" ? { field: "tag", raw: f.tagKey, neg: true } : { field: "tag", raw: g.raw, neg: false };
   return f.values ? { field: g.field, raw: g.raw, neg: false } : null;
 }
@@ -1470,11 +1500,19 @@ function emptyNote(view, q) {
   return [note, " ", h("button", { type: "button", class: "act", "data-focus": "empty:clear", onclick: () => clearLens() }, "Clear filters")];
 }
 
-function renderBoard(groups, pr, lens) {
-  document.getElementById("board").replaceChildren(...groups.map((g) => h("section", { class: "lane", "aria-label": g.label },
-    h("h2", { class: "lane-head" + (g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, g.label),
+// lane is a board's column for group g of lens, its items drawn by item; an ungrouped board's one lane is
+// titled title.
+function lane(g, lens, title, item) {
+  const label = g.label || title;
+  return h("section", { class: "lane", "aria-label": label },
+    h("h2", { class: "lane-head" + (g.field && g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, label),
       h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
-    h("ol", { class: "cards" }, g.rows.map((r) => card(r, pr, multiCopy(g.field) ? g.key : ""))))));
+    h("ol", { class: "cards" }, g.rows.map((it) => item(it, multiCopy(g.field) ? g.key : ""))));
+}
+
+function renderBoard(groups, pr, lens) {
+  const title = (catalog.views.find((v) => v.id === lens.view) || {}).label || lens.view;
+  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => card(r, pr, copy))));
 }
 
 function mineMark() {

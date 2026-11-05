@@ -265,6 +265,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `empty` (template): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
 - `default_sort` (string): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
+- `lens` (table): What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
+- `lens.default_group` (template): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
+- `lens.board_group` (template): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
+- `lens.no_group` (string): The group menu's entry that lists the view in one group.
+- `lens.copied` (template): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
+- `lens.copied_grouped` (template): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
 - `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets.
 - `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.

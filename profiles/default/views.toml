@@ -10,6 +10,14 @@ empty = "Nothing in {{.label}} right now."
 # What the sort menu calls a view's own order.
 default_sort = "View order"
 
+# What every list's lens bar says.
+[lens]
+default_group  = "{{.label}} (default)"
+board_group    = "{{.label}} (board)"
+no_group       = "None"
+copied         = "Copied {{.count}} from {{.view}} as YAML."
+copied_grouped = "Copied {{.count}} from {{.view}}, grouped by {{.group}}, as YAML."
+
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind
 # (brief.*). A plugin's row facet of the same id must agree on group, sort,
@@ -40,6 +48,7 @@ label = "Waits on (person)"
 group = true
 match = "team"
 merge = "rows-first"
+strip = true
 
 [facets.asked-by]
 fact  = "task.askers"

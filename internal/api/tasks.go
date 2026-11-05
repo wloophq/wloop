@@ -73,6 +73,16 @@ func TaskPath(id string, rest ...string) string {
 	return p
 }
 
+// LensWords are what a list's lens bar says, templates whose only actions are {{.name}} substitutions:
+// DefaultGroup and BoardGroup over label, Copied over count and view, CopiedGrouped over those and group.
+type LensWords struct {
+	DefaultGroup  string `json:"default_group"`
+	BoardGroup    string `json:"board_group"`
+	NoGroup       string `json:"no_group"`
+	Copied        string `json:"copied"`
+	CopiedGrouped string `json:"copied_grouped"`
+}
+
 type ViewsCatalog struct {
 	Views    []TaskViewSpec `json:"views"` // core views in spec 9.1 order, review only once registered
 	Areas    []string       `json:"areas"`
@@ -86,6 +96,7 @@ type ViewsCatalog struct {
 	// Facets are the profile's task facets, DefaultSort what clients call a view's own order.
 	Facets      []FacetSpec `json:"facets,omitempty"`
 	DefaultSort string      `json:"default_sort,omitempty"`
+	Lens        LensWords   `json:"lens"`
 	// Version changes whenever anything above does.
 	Version string `json:"version,omitempty"`
 }

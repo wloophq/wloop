@@ -4,6 +4,12 @@ package builtin
 var viewsGrammar = []Key{
 	{Path: "empty", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it."},
 	{Path: "default_sort", In: SurfaceViews, Kind: KindText, Required: true, Doc: "What clients call a view's own order in the sort menu, such as \"View order\". Required in the bundled profile; a user layer may replace it."},
+	{Path: "lens", In: SurfaceViews, Kind: KindTable, Doc: "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any."},
+	{Path: "lens.default_group", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`."},
+	{Path: "lens.board_group", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`."},
+	{Path: "lens.no_group", In: SurfaceViews, Kind: KindText, Required: true, Doc: "The group menu's entry that lists the view in one group."},
+	{Path: "lens.copied", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from."},
+	{Path: "lens.copied_grouped", In: SurfaceViews, Kind: KindTemplate, Required: true, Doc: "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label."},
 	{Path: "facets", In: SurfaceViews, Kind: KindMap, Doc: "The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets."},
 	{Path: "facets.*", In: SurfaceViews, Kind: KindTable, Doc: "A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
 	{Path: "facets.*.fact", In: SurfaceViews, Kind: KindFact, Required: true, Doc: "The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written <kind>.<field> (brief.risk). Required."},

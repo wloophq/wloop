@@ -152,7 +152,7 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
 	}
-	cat.Facets, cat.DefaultSort = catalog.TaskFacets(l.Views.Facets), l.Views.DefaultSort
+	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets), l.Views.DefaultSort, api.LensWords(l.Views.Lens)
 	cat.Version = api.VersionOf(cat)
 	return cat
 }

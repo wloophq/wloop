@@ -135,6 +135,40 @@
       "description": "The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, match and buckets.",
       "type": "object"
     },
+    "lens": {
+      "additionalProperties": false,
+      "description": "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
+      "properties": {
+        "board_group": {
+          "description": "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.",
+          "type": "string"
+        },
+        "copied": {
+          "description": "What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.",
+          "type": "string"
+        },
+        "copied_grouped": {
+          "description": "What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.",
+          "type": "string"
+        },
+        "default_group": {
+          "description": "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.",
+          "type": "string"
+        },
+        "no_group": {
+          "description": "The group menu's entry that lists the view in one group.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "board_group",
+        "copied",
+        "copied_grouped",
+        "default_group",
+        "no_group"
+      ],
+      "type": "object"
+    },
     "review": {
       "additionalProperties": {
         "additionalProperties": false,

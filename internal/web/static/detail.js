@@ -39,7 +39,7 @@ const detailEnv = {
   postJSON: (path, body) => taskPost(path, body),
   focused: () => {
     const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="task:"]');
-    return el ? el.dataset.focus.slice("task:".length) : "";
+    return el ? el.dataset.focus.slice("task:".length).replace(/@.*$/, "") : "";
   },
 };
 

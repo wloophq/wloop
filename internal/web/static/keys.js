@@ -441,10 +441,11 @@ function appEnv() {
     move: (delta) => {
       if (isCoreView(readHash().view)) {
         const nodes = taskNodes();
-        if (!nodes.length) return false;
+        const active = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="task:"]');
         const sel = detailPane.selected();
-        const at = sel ? nodes.findIndex((n) => n.dataset.focus === "task:" + sel.id) : -1;
-        nodes[Math.max(0, Math.min(nodes.length - 1, at < 0 ? 0 : at + delta))].focus();
+        const next = nextTaskNode(nodes, active, sel && sel.id, delta);
+        if (!next) return false;
+        next.focus();
         return true;
       }
       if (readHash().view === "plan") {

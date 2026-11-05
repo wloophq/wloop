@@ -435,15 +435,17 @@ func TestACopiedListIsYAMLAnAgentCanRead(t *testing.T) {
 		e.Facets = map[string][]string{"where": {"general"}, "source": {"slack"}, "asked-by": {}}
 	})}
 	var got string
-	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "carol" } };`
-	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry"},
+	in["linked"] = map[string]any{"unit": map[string]any{"provider": "slack", "key": "T1/C1/1"}, "link": "https://acme.slack.com/archives/C1/p1"}
+	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "carol" }, rows: [input.linked] };`
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry", "rowByKey", "isSet"},
 		`process.stdout.write(JSON.stringify(listYAML(input.meta, [...input.rows, input.task])));`, in, &got)
 	for _, want := range []string{
 		`view: "needs-me"`, `filter: "widgets \"x\""`, `copied_at: "2026-10-15T13:00:00Z"`, "count: 2", "items:",
 		`  - ref: "acme/widgets#4870"`, `    url: "https://github.com/acme/widgets/pull/4870"`,
 		`    title: "perf: one \"conn\"\nper batch"`, `    author: ["me", "carol"]`, `    kind: ["conflicts"]`, `    risk: ["high"]`,
 		`    size: ["m"]`, `    status: ["in-progress"]`, `    wait: ["me"]`,
-		`  - ref: "t-1"`, `    title: "Answer the deploy question"`, `    units: ["#general thread"]`, `    source: ["slack"]`, `    where: ["general"]`,
+		`    since: "2026-10-13T13:00:00Z"`, `    reason: "merge conflicts with develop"`,
+		`  - ref: "t-1"`, `    url: "https://acme.slack.com/archives/C1/p1"`, `    title: "Answer the deploy question"`, `    units: ["#general thread"]`, `    source: ["slack"]`, `    where: ["general"]`,
 	} {
 		if !strings.Contains(got, want+"\n") {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -714,7 +716,7 @@ func mustJS(t *testing.T, v any) string {
 func TestACopiedListSaysHowItWasGroupedAndSorted(t *testing.T) {
 	var got string
 	prelude := keyJS(t) + catalogPrelude(t) + `const state = { health: { viewer: "me" } };`
-	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry"},
+	nodeRun(t, prelude, []string{"yamlString", "listYAML", "copyEntry", "rowByKey", "isSet"},
 		`process.stdout.write(JSON.stringify(listYAML({ view: "needs-me", filter: "where:widgets", group_by: "where", sort: "risk descending", at: "x" }, [])));`, nil, &got)
 	for _, want := range []string{`filter: "where:widgets"`, `group_by: "where"`, `sort: "risk descending"`, "count: 0", "items:"} {
 		if !strings.Contains(got, want+"\n") {

@@ -489,3 +489,18 @@ func TestAFactNamedByAMetaKeyIsNoFact(t *testing.T) {
 		t.Errorf("problems: %s", problems.Error())
 	}
 }
+
+func TestTheLensWordsNameOnlyTheirVariables(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	w := views.Lens
+	if w.DefaultGroup == "" || w.BoardGroup == "" || w.NoGroup == "" || w.Copied == "" || w.CopiedGrouped == "" {
+		t.Fatalf("the bundled profile leaves lens words out: %+v", w)
+	}
+	_, problems = loadFacets(t, "[lens]\ncopied = \"Copied {{.count}} of {{.group}}\"\n")
+	if len(problems) != 1 || problems[0].Field != "lens.copied" {
+		t.Errorf("a copied word naming the group: %v", problems)
+	}
+}

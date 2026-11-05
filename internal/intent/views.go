@@ -36,6 +36,8 @@ type ViewsDef struct {
 	Empty *template.Template
 	// DefaultSort is what clients call a view's own order.
 	DefaultSort string
+	// Lens is what every list's lens bar says.
+	Lens LensWords
 	// Facets are the task facets in their declared order.
 	Facets []FacetDef
 }
@@ -129,9 +131,24 @@ func (d ViewsDef) IDs() []string {
 // Badged says whether the badge counts view id.
 func (d ViewsDef) Badged(id string) bool { return slices.Contains(d.Badge, id) }
 
+// LensWords are what a list's lens bar says, each a template whose only actions are the {{.name}} its key's
+// doc lists, which clients fill in.
+type LensWords struct {
+	DefaultGroup, BoardGroup, NoGroup, Copied, CopiedGrouped string
+}
+
+type mLens struct {
+	DefaultGroup  *string `toml:"default_group"`
+	BoardGroup    *string `toml:"board_group"`
+	NoGroup       *string `toml:"no_group"`
+	Copied        *string `toml:"copied"`
+	CopiedGrouped *string `toml:"copied_grouped"`
+}
+
 type mViews struct {
 	Empty       *string                `toml:"empty"`
 	DefaultSort *string                `toml:"default_sort"`
+	Lens        *mLens                 `toml:"lens"`
 	Facets      map[string]mFacet      `toml:"facets"`
 	Views       map[string]mView       `toml:"views"`
 	Review      map[string]mReviewStep `toml:"review"`
@@ -282,6 +299,13 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 		}
 	}
 	text(s, "default_sort", m.DefaultSort, &l.def.DefaultSort)
+	if w := m.Lens; w != nil {
+		word(s, "lens.default_group", w.DefaultGroup, &l.def.Lens.DefaultGroup, "label")
+		word(s, "lens.board_group", w.BoardGroup, &l.def.Lens.BoardGroup, "label")
+		word(s, "lens.no_group", w.NoGroup, &l.def.Lens.NoGroup)
+		word(s, "lens.copied", w.Copied, &l.def.Lens.Copied, "count", "view")
+		word(s, "lens.copied_grouped", w.CopiedGrouped, &l.def.Lens.CopiedGrouped, "count", "view", "group")
+	}
 	l.mergeFacets(s, m.Facets)
 	l.mergeViews(s, m.Views)
 	l.mergeReview(s, m.Review)
@@ -629,6 +653,26 @@ func (l *viewsLoad) sharedKeys() Problems {
 }
 
 // text lays v, the text at path, over dst: absent keeps it, blank is a problem.
+// word is a lens word: text whose template names only vars.
+func word(s *sheet, path string, v *string, dst *string, vars ...string) {
+	if v == nil {
+		return
+	}
+	data := map[string]any{}
+	for _, k := range vars {
+		data[k] = ""
+	}
+	t, err := template.New(path).Option("missingkey=error").Parse(*v)
+	if err == nil {
+		err = t.Execute(io.Discard, data)
+	}
+	if err != nil {
+		s.add(path, "%s", err)
+		return
+	}
+	text(s, path, v, dst)
+}
+
 func text(s *sheet, path string, v *string, dst *string) {
 	switch {
 	case v == nil:
