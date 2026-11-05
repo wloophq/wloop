@@ -903,3 +903,21 @@ func TestATaskPullNamesTheUnitsTheChangesNamed(t *testing.T) {
 		quit(t, term, done)
 	})
 }
+
+func TestAReconnectReadsTheTaskListWhole(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d, func(c *Config) { c.Reconnect = 10 * time.Millisecond })
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		d.endStream()
+		eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
+		eventually(t, "the pull after it", func() bool { return len(d.asks()) == 3 })
+		if got := d.asks()[2]; got.since != (api.Since{}) {
+			t.Fatalf("asked %+v after the reconnection, want the list whole", got)
+		}
+		quit(t, term, done)
+	})
+}

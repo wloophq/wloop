@@ -2710,7 +2710,10 @@ function connect() {
     retries = 0;
     state.conn = "open";
     state.authLost = false;
-    if (opened) scheduleLoad({ rows: true, health: true });
+    if (opened) {
+      forgetTasksPage();
+      scheduleLoad({ rows: true, health: true, tasks: true });
+    }
     opened = true;
   };
   es.onerror = () => {

@@ -165,18 +165,31 @@ func (s *Server) publishRows(ctx context.Context) {
 }
 
 // rowMoves gathers the units of the row changes published until the tasks
-// feed takes them; wake holds at most one pending wake.
+// feed takes them, once a tasks feed attached; wake holds at most one
+// pending wake.
 type rowMoves struct {
-	mu    sync.Mutex
-	units []unit.Unit
-	all   bool
-	wake  chan struct{}
+	mu       sync.Mutex
+	attached bool
+	units    []unit.Unit
+	all      bool
+	wake     chan struct{}
+}
+
+// attach makes m gather what add hands it, for the tasks feed to take.
+func (m *rowMoves) attach() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.attached = true
 }
 
 func newRowMoves() *rowMoves { return &rowMoves{wake: make(chan struct{}, 1)} }
 
 func (m *rowMoves) add(c api.Change) {
 	m.mu.Lock()
+	if !m.attached {
+		m.mu.Unlock()
+		return
+	}
 	m.all = m.all || c.All
 	m.units = append(m.units, c.Units...)
 	m.mu.Unlock()

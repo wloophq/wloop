@@ -408,6 +408,18 @@ type Server struct {
 		version string
 		out     intentload.Problems
 	}
+	// viewsBuilt is the views catalog of loaded; rowsBuilt the read model's catalog under loaded.
+	viewsBuilt struct {
+		sync.Mutex
+		loaded *intentload.Loaded
+		cat    api.ViewsCatalog
+	}
+	rowsBuilt struct {
+		sync.Mutex
+		model  *readmodel.Model
+		loaded *intentload.Loaded
+		cat    api.CatalogResponse
+	}
 	jobs     map[string]*job
 	token    string
 	warnings *warnings

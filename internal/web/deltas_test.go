@@ -347,3 +347,13 @@ async function getJSON(u) {
 		t.Errorf("asked %v, want %v", got.Asked, want)
 	}
 }
+
+func TestAReconnectReadsTheTasksWhole(t *testing.T) {
+	got := runTasksDelta(t, `
+  pages[since("e1", 1)] = { epoch: "e1", rev: 1, full: false, rows: [], removed: [] };
+  sources[0].onopen();
+  await flush();`)
+	if i := slices.Index(got, "forget"); i < 0 || i > slices.Index(got, "tasks ") {
+		t.Errorf("requests %v, want the tasks page forgotten, then the tasks read", got)
+	}
+}

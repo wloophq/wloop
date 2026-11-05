@@ -418,6 +418,7 @@ func (r *wants) takeMoved() (units []unit.Unit, all bool) {
 }
 
 func (r *wants) all() {
+	r.move(nil, true)
 	r.health.Store(true)
 	r.rows.Store(true)
 	r.plan.Store(true)

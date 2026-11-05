@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+	"unsafe"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/wake"
@@ -1264,5 +1266,101 @@ func TestPagesNameTheVersionsOfTheirSpecs(t *testing.T) {
 	var rows api.RowsPage
 	if code := get(t, r.s, api.Rows, &rows); code != 200 || rows.Catalog != cat.Version {
 		t.Errorf("the rows page names catalog %q, the catalog is at %q", rows.Catalog, cat.Version)
+	}
+}
+
+func (*liveRows) Views() []api.ViewSpec { return nil }
+
+func (*liveRows) Facets() []api.FacetSpec {
+	return []api.FacetSpec{{ID: "ci", Label: "CI", Provider: "fake"}}
+}
+
+func (*liveRows) Situations() []api.SituationSpec { return nil }
+
+func TestATaskLogTooLargeToListPublishesAll(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newTasksRig(t, nil)
+		r.withLiveRows(map[unit.Unit]liveRow{})
+		sub := r.follow(t)
+		r.log.NoteAll(port.TopicTasks)
+		c, ok := published(sub, syncQuiet)
+		if !ok || !c.All || c.Counters == nil || len(c.Units) != 0 {
+			t.Fatalf("an overflowed log published %+v (%v), want All with the counters", c, ok)
+		}
+	})
+}
+
+func TestRowMovesWaitOnlyForATasksFeed(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		u := agentRef.Unit()
+		p := &fakeRows{units: []unit.Unit{u}}
+		s, log, _ := fakeServer(t, p)
+		runFeeds(t, s)
+		p.set([]unit.Unit{u}, 1)
+		log.Note(port.TopicPRs, u)
+		time.Sleep(readmodel.PokeQuiet)
+		synctest.Wait()
+		if units, all := s.moved.take(); len(units) != 0 || all {
+			t.Fatalf("with no tasks feed the row moves kept %v (all %v)", units, all)
+		}
+	})
+}
+
+// failingTasks is a task store whose lists fail.
+type failingTasks struct{ *taskstest.Store }
+
+func (failingTasks) Tasks(context.Context, task.Query) ([]task.Task, error) {
+	return nil, errors.New("the store is gone")
+}
+
+func TestARowMoveNamesItsUnitWhenTheTasksCannotBeRead(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	s.deps.Tasks = coretasks.New(coretasks.Deps{Store: failingTasks{taskstest.New()}})
+	sub := s.hub.subscribe("test")
+	t.Cleanup(func() { s.hub.unsubscribe(sub) })
+	s.moved.attach()
+	s.moved.add(api.Change{Units: []unit.Unit{apiPR}})
+	s.publishTasks(context.Background(), port.Change{})
+	if c, ok := sub.take(); !ok || !slices.Equal(c.Units, []unit.Unit{apiPR}) {
+		t.Fatalf("published %+v (%v), want the moved unit", c, ok)
+	}
+}
+
+func TestPagesReuseOneBuildOfTheirSpecs(t *testing.T) {
+	t.Parallel()
+	loaded := bundledLoaded()
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return loaded } })
+	r.withLiveRows(map[unit.Unit]liveRow{})
+	first, again := r.s.viewsCatalog(), r.s.viewsCatalog()
+	if unsafe.SliceData(first.Views) != unsafe.SliceData(again.Views) {
+		t.Error("two tasks pages built the views catalog twice")
+	}
+	rows, rowsAgain := r.s.rowsCatalog(), r.s.rowsCatalog()
+	if len(rows.Facets) == 0 || unsafe.SliceData(rows.Facets) != unsafe.SliceData(rowsAgain.Facets) {
+		t.Error("two rows pages built the catalog twice")
+	}
+	loaded = draftReplies(t)()
+	if next := r.s.viewsCatalog(); unsafe.SliceData(next.Views) == unsafe.SliceData(first.Views) {
+		t.Error("a reloaded profile kept the views catalog built before it")
+	}
+	if next := r.s.rowsCatalog(); unsafe.SliceData(next.Facets) == unsafe.SliceData(rows.Facets) {
+		t.Error("a reloaded profile kept the catalog built before it")
+	}
+}
+
+func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
+	t.Parallel()
+	h := newHub()
+	sub := h.subscribe("test")
+	other := unit.Unit{Provider: unit.GitHub, Key: "acme/api#13"}
+	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{other}})
+	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{apiPR}, Counters: &api.Counters{Badge: 1}})
+	h.publish(api.Change{Type: "changed", Epoch: "e", Rev: 3, Units: []unit.Unit{apiPR}})
+	c, ok := sub.take()
+	if !ok || !slices.Equal(c.Units, []unit.Unit{apiPR, other}) || c.Counters == nil || c.Counters.Badge != 1 || c.Rev != 3 {
+		t.Fatalf("merged %+v (%v), want both units, the counters and rev 3", c, ok)
 	}
 }

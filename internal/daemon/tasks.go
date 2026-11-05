@@ -118,9 +118,19 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.viewsCatalog())
 }
 
-// viewsCatalog is what GET /api/views serves, with its version.
+// viewsCatalog is what GET /api/views serves, with its version, built once per loaded profile.
 func (s *Server) viewsCatalog() api.ViewsCatalog {
 	l := s.loaded()
+	b := &s.viewsBuilt
+	b.Lock()
+	defer b.Unlock()
+	if b.loaded != l {
+		b.loaded, b.cat = l, s.buildViewsCatalog(l)
+	}
+	return b.cat
+}
+
+func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(),
 		Review: []string{}, States: []api.StateSpec{}, Props: []api.PropSpec{}}
 	for _, st := range l.Views.Review {
@@ -1315,7 +1325,7 @@ func (s *Server) heldProblems(l *intentload.Loaded) intentload.Problems {
 
 // facetProblems are the facets of the profile and of the plugins that disagree on how to group, sort, match or bucket.
 func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
-	c := s.readModel().Catalog()
+	c := s.rowsCatalog()
 	k := &s.facetCheck
 	k.Lock()
 	defer k.Unlock()
@@ -1333,6 +1343,7 @@ func (s *Server) feedTasks(ctx context.Context) {
 	}
 	poke, cancel := change.Poke(s.deps.Changes, taskInputs)
 	defer cancel()
+	s.moved.attach()
 	from := s.deps.Changes.Gen()
 	var quiet <-chan time.Time
 	for {
@@ -1369,8 +1380,8 @@ func (s *Server) publishTasks(ctx context.Context, c port.Change) {
 		return
 	}
 	pos := s.hub.position()
-	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Counters: s.counters(ctx)}
-	if !c.All && !all {
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Counters: s.counters(ctx), All: c.All || all}
+	if !ch.All {
 		units := slices.Concat(c.Units, held)
 		slices.SortFunc(units, api.CompareUnits)
 		ch.Units = slices.Compact(units)

@@ -532,7 +532,7 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 	}
 	page.Counters = s.counters(r.Context())
 	page.Loading = s.loading()
-	page.Catalog = s.readModel().Catalog().Version
+	page.Catalog = s.rowsCatalog().Version
 	writeJSON(w, page)
 }
 
