@@ -437,7 +437,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
   #rail .views a.on { border-bottom-color: var(--me); }
   .views .count { margin-left: var(--space-6); }
   #detail-resize, body.has-detail #detail-resize { display: none; }
-  #detail { border-left: 0; border-top: 1px solid var(--rule); }
+  #detail { position: fixed; inset: 0; z-index: 10; border-left: 0; }
   .c-why, .c-where { display: none; }
   .c-pr { min-width: 0; }
   .search { flex-basis: 100%; }
