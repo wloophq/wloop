@@ -1413,9 +1413,9 @@ const SORT_COLUMNS = { "c-pr": "where", "c-for": "age", "c-why": "kind", "c-wher
 // provider, "Item" when its rows mix providers.
 function unitColumn(view) {
   const v = catalog.views.find((x) => x.id === view) || {};
-  const sort = "where";
-  const f = fieldById(sort);
-  return { title: v.unit || "Item", sort, sortTitle: "Sort by " + (f ? f.label.toLowerCase() : sort) };
+  const col = { title: v.unit || "Item", sort: "where" };
+  const f = fieldById(col.sort);
+  return { ...col, sortTitle: "Sort by " + (f ? f.label.toLowerCase() : col.sort) };
 }
 
 function renderUnitColumn(view) {

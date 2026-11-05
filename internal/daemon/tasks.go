@@ -1423,20 +1423,6 @@ func (s *Server) rowsRead(ctx context.Context, units []unit.Unit) (map[unit.Unit
 	return got, err
 }
 
-// unitLabels are units as a person reads them, in order: each row's label,
-// else the unit's own label.
-func (s *Server) unitLabels(units []unit.Unit) []string {
-	if len(units) == 0 {
-		return nil
-	}
-	known := s.presentations(units)
-	out := make([]string, len(units))
-	for i, u := range units {
-		out[i] = known[u].Label
-	}
-	return out
-}
-
 // presentations are units as their rows present them, from one snapshot;
 // a unit without a row has its own label alone.
 func (s *Server) presentations(units []unit.Unit) map[unit.Unit]readmodel.Presentation {
@@ -1450,7 +1436,8 @@ func (s *Server) presentations(units []unit.Unit) map[unit.Unit]readmodel.Presen
 	return out
 }
 
-func (s *Server) unitLabel(u unit.Unit) string { return s.unitLabels([]unit.Unit{u})[0] }
+// unitLabel is u as a person reads it outside a page: its row's label, else its own.
+func (s *Server) unitLabel(u unit.Unit) string { return s.presentations([]unit.Unit{u})[u].Label }
 
 // resolvesGate says whether verb resolves an open gate of e: its handler approves or answers, no handler of
 // e's kind takes it, and e has an open gate that takes its role.
