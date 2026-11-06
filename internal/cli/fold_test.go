@@ -261,7 +261,7 @@ func (r *foldRig) asking() {
 	if r.te.cfg.Workflows == nil {
 		r.te.cfg.Workflows = map[string]config.WorkflowConfig{}
 	}
-	r.te.cfg.Workflows["task-fold-linked"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.name == "merge"`, Mode: "wait"}}}}}
+	r.te.cfg.Workflows["task-fold-linked"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.kind == "proposal" && gate.name == "merge"`, Mode: "wait"}}}}}
 }
 
 // split splits r.ask back out of t-pr, as a person does.

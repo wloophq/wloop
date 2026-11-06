@@ -3,6 +3,8 @@ package tasks_test
 import (
 	"context"
 	"errors"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"slices"
 	"sync"
 	"testing"
@@ -197,18 +199,30 @@ func TestASetDuringARelateIsKept(t *testing.T) {
 	}
 }
 
-func TestAWorkflowCannotRelate(t *testing.T) {
+func TestAWorkflowsRelateOpensTheRelateGateAndItCannotUnrelate(t *testing.T) {
 	ctx := context.Background()
-	r := profileRig(t, tasksToml(t))
+	d := tasksToml(t)
+	r := newRig()
+	gs := gatestest.NewStore(func() time.Time { return t0 })
+	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"relate": {Name: "relate", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+		States: states, Authority: states.Authority})
 	r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	r.put(t, task.Task{ID: "t-2", State: "next", Origin: task.OriginUser})
-	for _, a := range []task.Actor{task.ActorWorkflow, task.ActorPlugin} {
-		if _, err := r.svc.Do(ctx, "t-1", relateReq(task.VerbRelate, a, "t-2")); !errors.Is(err, coretasks.ErrForbidden) {
-			t.Errorf("a %s's relate: %v", a, err)
-		}
+	if _, err := r.svc.Do(ctx, "t-1", relateReq(task.VerbRelate, task.ActorPlugin, "t-2")); !errors.Is(err, coretasks.ErrForbidden) {
+		t.Errorf("a plugin's relate: %v", err)
+	}
+	req := relateReq(task.VerbRelate, task.ActorWorkflow, "t-2")
+	req.Source = "tidy"
+	if _, err := r.svc.Do(ctx, "t-1", req); err != nil {
+		t.Fatal(err)
 	}
 	if got := r.related(t, "t-2"); len(got) != 0 {
-		t.Fatalf("t-2 related %v after refused relates", got)
+		t.Fatalf("t-2 related %v before the gate was decided", got)
+	}
+	open, _ := gs.OfTask(ctx, "t-1")
+	if len(open) != 1 || open[0].Name != "relate" || coretasks.ProposalFrom(open[0]) != "tidy" {
+		t.Fatalf("gates %+v, want the relate gate tidy asked for", open)
 	}
 	if _, err := r.svc.Do(ctx, "t-1", relateReq(task.VerbRelate, task.ActorPerson, "t-2")); err != nil {
 		t.Fatal(err)

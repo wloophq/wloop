@@ -12,5 +12,5 @@ task = "task.link_target_tasks"
 # A link to the pull request is enough: the merge runs at once, and Split
 # gives it back. A pair you took apart waits for you instead.
 [[gates.approval.rule]]
-when = 'gate.name == "merge"'
+when = 'gate.kind == "proposal" && gate.name == "merge"'
 mode = "run"
