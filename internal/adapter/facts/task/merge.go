@@ -2,8 +2,6 @@ package facttask
 
 import (
 	"context"
-	"slices"
-	"strings"
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -30,7 +28,7 @@ func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Fact
 	wanted := map[string]bool{}
 	for _, d := range builtin.Facts {
 		if d.Costly && d.Slot == builtin.TaskSlot {
-			if names(ctx, d.Name) {
+			if workflow.Names(ctx, d.Name) {
 				wanted[d.Name] = true
 			} else {
 				f[d.Name] = workflow.Unrequested{Fact: d.Name}
@@ -63,9 +61,4 @@ func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Fact
 		f[name] = v
 	}
 	return nil
-}
-
-// names says whether a read ctx carries names fact, as a fact name or inside a text such as a template.
-func names(ctx context.Context, fact string) bool {
-	return slices.ContainsFunc(workflow.ReadsOf(ctx), func(r string) bool { return strings.Contains(r, fact) })
 }

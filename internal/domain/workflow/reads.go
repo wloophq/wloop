@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 )
 
 type readsKey struct{}
@@ -34,6 +35,11 @@ func OnlyReads(ctx context.Context, names ...string) context.Context {
 func ReadsOf(ctx context.Context) []string {
 	names, _ := ctx.Value(readsKey{}).([]string)
 	return names
+}
+
+// Names says whether the reads ctx carries name fact, as a fact name or inside a text that mentions it.
+func Names(ctx context.Context, fact string) bool {
+	return slices.ContainsFunc(ReadsOf(ctx), func(r string) bool { return strings.Contains(r, fact) })
 }
 
 // Reads are the facts w reads: those of its when, withdraw and approval predicates, its key and marks, and
