@@ -78,6 +78,9 @@ func (a activation) ResolveName(name string) (any, bool) {
 	if v == nil {
 		return zero(typ), true
 	}
+	if _, ok := v.(workflow.Unrequested); ok {
+		return types.NewErr("fact %s is computed only for a reader that names it, and this one does not", name), true
+	}
 	if !goTypeFits(typ, v) {
 		return types.NewErr("fact %s has Go type %T, want %s", name, v, typ), true
 	}

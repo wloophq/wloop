@@ -2,10 +2,19 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 )
 
 type readsKey struct{}
+
+// Unrequested is the value of a costly fact whose reader did not name it (WithReads): evaluating it is an error,
+// so a reader that forgot to name it fails instead of reading an empty value, and it prints as not requested.
+type Unrequested struct{ Fact string }
+
+func (u Unrequested) String() string { return "not requested" }
+
+func (u Unrequested) MarshalJSON() ([]byte, error) { return json.Marshal(u.String()) }
 
 // WithReads is ctx carrying names besides the reads it already carries: the facts, or texts that may name
 // facts, its reader of facts reads. A costly fact is computed only for a reader that names it.

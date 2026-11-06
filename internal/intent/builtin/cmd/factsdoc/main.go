@@ -132,7 +132,7 @@ func costly(f builtin.Fact) string {
 	if !f.Costly {
 		return ""
 	}
-	return " **On demand**: computed only for a `when`, step argument, view or wake that names it; any other reader sees it empty."
+	return " **On demand**: computed only for a `when`, step argument, view or wake that names it; any other reader that evaluates it fails with an error naming it."
 }
 
 func approvalTable() string {

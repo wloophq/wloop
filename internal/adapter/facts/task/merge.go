@@ -23,16 +23,17 @@ func (p *Provider) mergeFacts(ctx context.Context, e task.Task, f workflow.Facts
 	return nil
 }
 
-// costlyFacts sets in f every task fact builtin.Facts marks costly to its zero value, but those a reader ctx
-// carries names, each computed once per pass for e as it is: task.refused_merges, and task.link_target_tasks
+// costlyFacts sets in f every task fact builtin.Facts marks costly to workflow.Unrequested, but those a reader
+// ctx carries names, each computed once per pass for e as it is: task.refused_merges, and task.link_target_tasks
 // and task.candidates without the refused ids.
 func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Facts) error {
 	wanted := map[string]bool{}
 	for _, d := range builtin.Facts {
 		if d.Costly && d.Slot == builtin.TaskSlot {
-			f[d.Name] = []string{}
 			if names(ctx, d.Name) {
 				wanted[d.Name] = true
+			} else {
+				f[d.Name] = workflow.Unrequested{Fact: d.Name}
 			}
 		}
 	}
