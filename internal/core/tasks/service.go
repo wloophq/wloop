@@ -53,6 +53,10 @@ type Deps struct {
 	// Activity is told each task Sync finds asleep with a person's activity on its unit since the user saw it,
 	// for a wake on activity; nil: none is told.
 	Activity func(ctx context.Context, id task.ID) error
+	// Survives picks the task a merge keeps, as the merge verb's survivor says; nil: the older stays.
+	Survives Survives
+	// GateText words the gate a gated verb opens; nil writes none.
+	GateText GateText
 }
 
 type handlerKey struct {
@@ -93,6 +97,7 @@ func New(d Deps) *Service {
 	if s.authority == nil {
 		s.authority = userOnly
 	}
+	s.serveMerges()
 	return s
 }
 

@@ -22,8 +22,9 @@ type Log interface {
 
 // Holdings are the units the tasks hold.
 type Holdings interface {
-	// UnitsOf are the units task id holds, in its order; empty for a task
-	// with none or no such task.
+	// UnitsOf are the units task id holds, in its order, then the own unit
+	// (task.UnitOf) of every task merged into id, transitively; empty for a
+	// task with none or no such task.
 	UnitsOf(ctx context.Context, id task.ID) ([]unit.Unit, error)
 }
 

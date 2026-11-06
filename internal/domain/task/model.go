@@ -119,7 +119,15 @@ const (
 	VerbEdit      Verb = "edit" // drafts only, registered by the outbox
 	VerbRetry     Verb = "retry"
 	VerbReply     Verb = "reply" // a draft the user writes on the task's unit, served by the daemon
+	VerbMerge     Verb = "merge"
+	VerbSplit     Verb = "split"
+	VerbRelate    Verb = "relate"
+	VerbUnrelate  Verb = "unrelate"
 )
+
+// ArgTask is the argument of a merge, split, relate or unrelate request that names the other task by id: the
+// task to merge with, the one merged in to split out, the one to relate or unrelate.
+const ArgTask = "task"
 
 // View is a view's id, as the profile's views.toml names it.
 type View string

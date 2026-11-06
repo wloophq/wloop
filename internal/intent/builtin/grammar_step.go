@@ -26,6 +26,7 @@ var stepGrammar = []Key{
 
 	stepKey(StepClassify, "prompt", KindFile, "prompt.md", "The classification's prompt, beside the manifest."),
 	stepKey(StepClassify, "schema", KindFile, "schema.json", "The JSON schema of its answer, beside the manifest."),
+	stepKey(StepClassify, "with", KindText, "", "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, and .Tasks, each with .ID, .Title, .Notes and .Items, a few of its items' summaries, every untrusted value inside the injection markers. The output is cached by the unit's fingerprint with those tasks' fingerprints, sorted. Empty runs nothing."),
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 
@@ -36,6 +37,7 @@ var stepGrammar = []Key{
 	stepKey(StepTaskVerb, "resurface", KindText, "", "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
 	stepKey(StepTaskVerb, "set", KindText, "", "With a verb whose handler is context, the contexts, comma-separated; with area, the area."),
 	stepKey(StepTaskVerb, "by", KindText, "", "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it."),
+	stepKey(StepTaskVerb, "task", KindText, "", "With a verb whose handler is merge, split, relate or unrelate, the fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks, or a classify output, such as classify.<workflow>.same_as, which no fact table declares before it runs; the step is refused while it names none."),
 
 	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
 

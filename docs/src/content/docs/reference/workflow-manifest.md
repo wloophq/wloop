@@ -116,6 +116,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `ended` | one of `hold`, `repeat` | `hold` | What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft. |
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
+| `classify` | `with` | string |  | A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, and .Tasks, each with .ID, .Title, .Notes and .Items, a few of its items' summaries, every untrusted value inside the injection markers. The output is cached by the unit's fingerprint with those tasks' fingerprints, sorted. Empty runs nothing. |
 | `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |
 | `task.verb` | `verb` | string |  | The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required. |
 | `task.verb` | `until` | string |  | With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD. |
@@ -124,6 +125,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `resurface` | string |  | With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
 | `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
 | `task.verb` | `by` | string |  | With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it. |
+| `task.verb` | `task` | string |  | With a verb whose handler is merge, split, relate or unrelate, the fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks, or a classify output, such as classify.&lt;workflow&gt;.same_as, which no fact table declares before it runs; the step is refused while it names none. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `items.resolve` | `resolution` | one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot` | `done` | How the items resolved. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |

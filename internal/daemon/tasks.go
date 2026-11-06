@@ -151,7 +151,8 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 	for _, v := range s.verbOrder() {
 		t, b := l.Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
-			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
+			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Pick: builtin.TaskPicks[l.Tasks.Handler(v)], Key: verbKey(task.Verb(v)), From: slices.Clone(t.From),
+			To: t.To})
 	}
 	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
 	cat.Version = api.VersionOf(cat)
@@ -900,6 +901,12 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Wake = &api.WakeView{Until: w.Until, When: w.When, Return: w.Return}
 	}
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.relatedOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.mergedFromOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	if err := ev.row(ctx, e, &v); err != nil {

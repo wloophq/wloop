@@ -24,7 +24,7 @@ when = 'session.managed'
 use = "session.close"
 `
 
-// withBundledTasks is fsys with the bundled tasks.toml at its root, so the
+// withBundledTasks is fsys with the bundled tasks.toml and gates.toml at its root, so the
 // plugins' task workflows read its properties, and the chat intent it names.
 func withBundledTasks(t *testing.T, fsys fs.FS) fs.FS {
 	t.Helper()
@@ -42,7 +42,7 @@ func withBundledTasks(t *testing.T, fsys fs.FS) fs.FS {
 			t.Fatal(err)
 		}
 	}
-	copyInto(bundledDefault(t), func(path string) bool { return path == TasksFile })
+	copyInto(bundledDefault(t), func(path string) bool { return path == TasksFile || path == GatesFile })
 	copyInto(fsys, func(string) bool { return true })
 	return withChat(t, m)
 }

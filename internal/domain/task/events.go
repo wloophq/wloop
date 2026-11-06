@@ -11,3 +11,10 @@ func VerbEventKinds(verbs []string) []string {
 	}
 	return out
 }
+
+// The events of a task's own unit the tasks service records: EventCreated when sync derives the task,
+// EventLinked when a link lands on an item the task holds.
+const (
+	EventCreated = "task_created"
+	EventLinked  = "task_linked"
+)

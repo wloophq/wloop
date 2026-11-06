@@ -66,7 +66,9 @@
               "contexts",
               "star",
               "deadline",
-              "promise"
+              "promise",
+              "related",
+              "merged"
             ],
             "type": "string"
           },
@@ -187,12 +189,16 @@
               "seen",
               "promise",
               "reviewed",
-              "sequential"
+              "sequential",
+              "merge",
+              "split",
+              "relate",
+              "unrelate"
             ],
             "type": "string"
           },
           "input": {
-            "description": "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).",
+            "description": "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise, merge, split, relate, unrelate); a verb that takes another task puts it over the list of tasks the person picks from.",
             "type": "string"
           },
           "keep_drafts": {
@@ -222,6 +228,10 @@
           },
           "summary": {
             "description": "One line, what pressing it does: its tooltip. Required.",
+            "type": "string"
+          },
+          "survivor": {
+            "description": "On a verb whose handler is merge: a predicate over each of the two tasks' facts; the task it holds on alone is the one that stays and takes the other in, and the older stays when it holds on both or neither.",
             "type": "string"
           },
           "to": {

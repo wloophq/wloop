@@ -93,6 +93,22 @@ status = "approved"
 label = "Reject"
 status = "rejected"
 
+# A merge a workflow proposes, such as an ask in a thread that links a
+# pull request with a task of its own; approving it runs the merge as
+# yours.
+[gates.merge]
+kind = "proposal"
+label = "Merge these tasks?"
+text = "Merge \"{{.proposal.fold}}\" into \"{{.proposal.keep}}\"? Its items, units, gates and drafts move over; Split gives it back."
+
+[gates.merge.intents.approve]
+label = "Merge"
+status = "approved"
+
+[gates.merge.intents.reject]
+label = "Keep apart"
+status = "rejected"
+
 # A round whose start the agent blocked on its question, such as trusting
 # its folder.
 [gates.trust]

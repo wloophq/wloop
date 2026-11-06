@@ -203,13 +203,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
 - `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
-- `verbs.<name>.input` (string): The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise).
+- `verbs.<name>.input` (string): The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise, merge, split, relate, unrelate); a verb that takes another task puts it over the list of tasks the person picks from.
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
-- `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `promise`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+- `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `promise`, `reviewed`, `sequential`, `merge`, `split`, `relate`, `unrelate`): What the verb runs besides its move, a handler of the loop's; none when absent.
   - `finish`: Moves the task to the verb's to; a project's dossier starts its lifecycle.
   - `drop`: Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused.
   - `focus`: Stars the task, or takes the star off: toggles the property of role star.
@@ -229,7 +229,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `promise`: Sets the property of role promise to the time its by names: HH:MM, today or tomorrow once that passed; YYYY-MM-DD, 18:00 that day; or an RFC 3339 time. An empty by clears it.
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
+  - `merge`: Folds the task and the other task its task argument names into one: the one the verb's survivor holds on alone stays, else the older; the other's items, units, gates, drafts and messages move to it, its id leads to it, and split gives it back.
+  - `split`: Gives back a task merged into this one, as it was before the merge: its items, units, gates, drafts and messages; what reached this task after the merge stays.
+  - `relate`: Links the task and the other task its task argument names as related, distinct work: nothing moves, and each lists the other in its property of role related.
+  - `unrelate`: Takes the link between the task and a related one off both.
 - `verbs.<name>.send` (one of `now`, `draft`, default `draft`): On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.
+- `verbs.<name>.survivor` (predicate): On a verb whose handler is merge: a predicate over each of the two tasks' facts; the task it holds on alone is the one that stays and takes the other in, and the older stays when it holds on both or neither.
 - `verbs.<name>.keep_drafts` (list of strings): The purposes of the held drafts a task keeps when the verb moves it from an open state to a done or dropped one; every other held draft of the task is withdrawn with the reason ended, and holds its workflow from proposing again on the unit while the task stays ended. Every held draft is withdrawn when absent.
 - `props` (table by name): The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.&lt;name&gt;, typed from its type.
 - `props.<name>` (table): A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
@@ -241,12 +246,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `agent`: An agent's turn; untrusted.
   - `plugin`: A source plugin; untrusted.
 - `props.<name>.doc` (string): What the property holds, for the facts' reference and the agents.
-- `props.<name>.role` (one of `area`, `contexts`, `star`, `deadline`, `promise`): The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.
+- `props.<name>.role` (one of `area`, `contexts`, `star`, `deadline`, `promise`, `related`, `merged`): The mechanism of the loop that acts on the property; at most one property takes each role. Go names the role, never the property.
   - `area`: A string: the area filter of the lists and the counters reads it, the area handler sets it, and a new parent takes it from the task it starts with.
   - `contexts`: A string[]: the contexts filter reads it, the context handler sets it, and a task takes it from the item or the request that opens it.
   - `star`: An enum: the star handler toggles it between its first value, starred, and its second.
   - `deadline`: A date: a task takes it from its items' deadline, and a draft's task from its gate's window.
   - `promise`: A date: the promise handler sets it to the time you promise the task by, and task.promised reads it.
+  - `related`: A string[] of task ids: the relate handler adds each of two tasks to the other's, unrelate takes it off both.
+  - `merged`: A string[] of task ids, in merge order: the merge handler adds the task it folds in, split takes it off; a task that holds one settles item by item.
 - `states` (table by name): The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.
 - `states.<name>` (table): A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it; required for a new state.
@@ -399,7 +406,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `trust`: A repository's first run: resolving it unblocks the run.
   - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
-- `gates.<name>.text` (template): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.
+- `gates.<name>.text` (template): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.
 - `gates.<name>.closes_with` (string): The intent, one that refuses the gate, the gate closes with when you end the task it is on. While the gate is open, nothing else ends the task: its items resolving leave it open, and a workflow's verb that would end it is refused, until you settle the gate. The task's unit ending (a pull request merged or closed) supersedes the gate as moot. Empty or left out, the gate neither holds its task nor closes with it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
@@ -477,9 +484,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
   - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts "task.promised"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) `repeat_after_sent` (the same after a sent one, or `forever`) and `ended` (`hold`, the default, holds proposals of no task or of the same task while a draft's task a verb ended stays ended; `repeat` holds them for `repeat_after`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
-  - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
+  - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). With `with`, a list fact of task ids, it reads those tasks too and its prompt is a template over them. Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
-  - `task.verb`: Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_&lt;verb&gt;` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`.
+  - `task.verb`: Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise, `task` for merge, split, relate and unrelate). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. It records the `verb_&lt;verb&gt;` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`.
   - `gate.open`: Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it.
   - `items.resolve`: Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing.
   - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
@@ -533,6 +540,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `classify`:
   - `prompt` (file, default `prompt.md`): The classification's prompt, beside the manifest.
   - `schema` (file, default `schema.json`): The JSON schema of its answer, beside the manifest.
+  - `with` (string): A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, and .Tasks, each with .ID, .Title, .Notes and .Items, a few of its items' summaries, every untrusted value inside the injection markers. The output is cached by the unit's fingerprint with those tasks' fingerprints, sorted. Empty runs nothing.
 - `notify.self`:
   - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
 - `task.verb`:
@@ -543,6 +551,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `resurface` (string): With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
   - `set` (string): With a verb whose handler is context, the contexts, comma-separated; with area, the area.
   - `by` (string): With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.
+  - `task` (string): With a verb whose handler is merge, split, relate or unrelate, the fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks, or a classify output, such as classify.&lt;workflow&gt;.same_as, which no fact table declares before it runs; the step is refused while it names none.
 - `gate.open`:
   - `name` (string): The gate, of gates.toml, the step opens. Required.
 - `items.resolve`:

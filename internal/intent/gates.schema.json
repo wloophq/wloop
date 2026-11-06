@@ -136,7 +136,7 @@
             "type": "string"
           },
           "text": {
-            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it.",
+            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.",
             "type": "string"
           }
         },

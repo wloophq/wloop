@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -243,7 +244,7 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.
 var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
-	EventRemoved, "status", gate.EventResolved}
+	EventRemoved, "status", gate.EventResolved, task.EventCreated, task.EventLinked, merge.RecordKind}
 
 // The loop's event kinds the host records itself.
 const (
