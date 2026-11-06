@@ -297,16 +297,20 @@ func (x *tomlIndex) outsideArrays(path []string) error {
 // Unset removes the key at path with the rest of its line, or the table at
 // path with its keys, the comments right above it and its sub-tables; a
 // document without it is left as written. A table the removal leaves with no
-// key, comment or sub-table goes too. A key written in an inline table or in
-// an array of tables is refused and changes nothing.
+// key, comment or sub-table goes too. A key written in an inline table, and a
+// path in or over an array of tables, is refused and changes nothing.
 func (d *Doc) Unset(path []string) error {
 	x, err := d.index()
 	if err != nil {
 		return err
 	}
 	for _, h := range x.tables[1:] {
-		if h.array && isPrefix(h.path, path) {
+		switch {
+		case !h.array:
+		case isPrefix(h.path, path):
 			return fmt.Errorf("%s is in the array of tables %s; edit it by hand", Key(path...), Key(h.path...))
+		case slices.Equal(h.path, path) || isPrefix(path, h.path):
+			return fmt.Errorf("%s holds the array of tables %s; edit the file to remove an element", Key(path...), Key(h.path...))
 		}
 	}
 	under := func(p []string) bool { return slices.Equal(p, path) || isPrefix(path, p) }

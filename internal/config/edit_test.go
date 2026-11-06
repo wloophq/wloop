@@ -141,6 +141,8 @@ func TestDocUnsetRefusesAKeyInAnInlineTableOrAnArrayOfTables(t *testing.T) {
 	}{
 		{"views = {orca = {columns = {needs-me = 'x'}}}\n", []string{"views", "orca", "columns", "needs-me"}},
 		{"[[projects]]\nmatch = 'acme/*'\n", []string{"projects", "match"}},
+		{"agent = 'claude'\n\n[[projects]]\nmatch = 'acme/*'\n\n[[projects]]\nmatch = 'beta/*'\n", []string{"projects"}},
+		{"[github]\nenabled = true\n\n[[github.scope]]\nrepos = ['acme/api']\n", []string{"github"}},
 	} {
 		d, err := ParseDoc([]byte(c.raw))
 		if err != nil {
@@ -229,7 +231,6 @@ func TestDocUnsetRemovesAWholeTable(t *testing.T) {
 			[]string{"workflows", "acme-sync"}, "[workflows]\nbeta-sync.enabled = true\n"},
 		{"[workflows]\nacme-sync.enabled = false\n", []string{"workflows", "acme-sync"}, ""},
 		{"sweep.fast = '2m'\nagent = 'claude'\n", []string{"sweep"}, "agent = 'claude'\n"},
-		{"agent = 'claude'\n\n[[projects]]\nmatch = 'acme/*'\n\n[[projects]]\nmatch = 'beta/*'\n", []string{"projects"}, "agent = 'claude'\n"},
 		{"[workflows.acme-sync]\nenabled = false\n", []string{"workflows", "beta-sync"}, "[workflows.acme-sync]\nenabled = false\n"},
 	} {
 		if got := unset(t, c.raw, c.path...); got != c.want {
