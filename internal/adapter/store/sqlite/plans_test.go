@@ -85,7 +85,7 @@ var hotPlans = []hotPlan{
 	{name: "tasks changed since", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + changedSince + taskOrder, args: 1, want: []string{"tasks_rev (rev>?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "tasks of a unit", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + ofUnit + taskOrder, args: 4,
 		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-	{name: "open work of a task's dossier", query: taskOpenSQL, args: 3, want: []string{"SEARCH tasks USING PRIMARY KEY (id=?)"}},
+	{name: "open work of a task's dossier", query: taskOpenSQL, args: 4, want: []string{"SEARCH tasks USING PRIMARY KEY (id=?)"}},
 	{name: "the task holding a unit's dossier", query: holderSQL, args: 4,
 		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "the current review run", query: currentRunSQL, want: []string{"review_runs_open (finished_at=?)"}},

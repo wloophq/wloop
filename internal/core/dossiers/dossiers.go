@@ -54,8 +54,8 @@ type Store interface {
 	// Get is o's row, with Path empty.
 	Get(ctx context.Context, o dossier.Owner) (dossier.Dossier, bool, error)
 	List(ctx context.Context) ([]dossier.Dossier, error)
-	// Open reports whether o still has work: a task, whether it is open; a unit, whether it has an open item
-	// or an open task; a merged dossier never has.
+	// Open reports whether o still has work: a task, whether it, or the task it was merged into, is open; a
+	// unit, whether it has an open item or an open task; a merged dossier never has.
 	Open(ctx context.Context, o dossier.Owner) (bool, error)
 	// Owner is whose dossier u's turns read: the task that holds u, an open one first, then the oldest; u
 	// itself when it is a task or no task holds it.
@@ -94,6 +94,41 @@ func (s *Service) Get(ctx context.Context, o dossier.Owner) (dossier.Dossier, bo
 	}
 	d, err = s.located(d)
 	return d, err == nil, err
+}
+
+// Merges is a Store that knows which tasks were merged into a task.
+type Merges interface {
+	// MergedOwners are the owners of the dossiers of the tasks merged into task u, transitively, in merge
+	// order; none when u is no task.
+	MergedOwners(ctx context.Context, u unit.Unit) ([]dossier.Owner, error)
+}
+
+// MergedOf are the dossiers, active or resolved, of the tasks merged into the task whose dossier u's turns
+// read; none when the store keeps no merges.
+func (s *Service) MergedOf(ctx context.Context, u unit.Unit) ([]dossier.Dossier, error) {
+	m, ok := s.Store.(Merges)
+	if !ok {
+		return nil, nil
+	}
+	o, err := s.Store.Owner(ctx, u)
+	if err != nil || o.Merged != "" {
+		return nil, err
+	}
+	owners, err := m.MergedOwners(ctx, o.Unit)
+	if err != nil {
+		return nil, err
+	}
+	var out []dossier.Dossier
+	for _, mo := range owners {
+		d, ok, err := s.Get(ctx, mo)
+		if err != nil {
+			return nil, err
+		}
+		if ok && (d.Status == dossier.Active || d.Status == dossier.Resolved) {
+			out = append(out, d)
+		}
+	}
+	return out, nil
 }
 
 // Of is the dossier u's turns read, whichever Store.Owner names, with whether it exists.
