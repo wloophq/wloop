@@ -2,7 +2,6 @@ package facttask
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -29,12 +28,6 @@ type RefusalDeps struct {
 
 const passRefused = "facts.refused_pairs"
 
-// refusal is a rejected gate that proposed merging a and b, closed at.
-type refusal struct {
-	a, b   task.ID
-	closed time.Time
-}
-
 // refusedPairs is task.refused_pairs of e: the tasks the user took apart from e, as undone lists them, while no
 // item either task holds was created or changed after they did, sorted. Updated is not read: seeing a task moves it.
 func (p *Provider) refusedPairs(ctx context.Context, e task.Task) ([]string, error) {
@@ -47,6 +40,12 @@ func (p *Provider) undone(ctx context.Context, e task.Task) ([]string, error) {
 	return p.apart(ctx, e, false)
 }
 
+// TakenApart says whether other is one of task.undone of e.
+func (p *Provider) TakenApart(ctx context.Context, e task.Task, other task.ID) (bool, error) {
+	undone, err := p.undone(ctx, e)
+	return slices.Contains(undone, string(other)), err
+}
+
 // apart are the tasks the refusals pair e with, as they read now, those whose items moved since dropped when
 // expire is set.
 func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]string, error) {
@@ -54,7 +53,7 @@ func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]strin
 	if p.d.Gates == nil || p.d.Refusals.Pairs == nil {
 		return out, nil
 	}
-	rs, err := coretasks.Once(ctx, passRefused, func() ([]refusal, error) { return p.refusals(ctx) })
+	rs, err := coretasks.Once(ctx, passRefused, func() ([]merge.Undone, error) { return p.refusals(ctx) })
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +77,7 @@ func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]strin
 			continue
 		}
 		if expire {
-			moved, err := p.itemsMovedAfter(ctx, r.closed, e, o)
+			moved, err := p.itemsMovedAfter(ctx, r.At, e, o)
 			if err != nil {
 				return nil, err
 			}
@@ -94,9 +93,9 @@ func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]strin
 
 // resolvePair is r's two tasks under the ids they read as now, a side merged away into its survivor; a side
 // that is gone reads as the zero task.
-func (p *Provider) resolvePair(ctx context.Context, r refusal) (task.Task, task.Task, error) {
+func (p *Provider) resolvePair(ctx context.Context, r merge.Undone) (task.Task, task.Task, error) {
 	var out [2]task.Task
-	for i, id := range []task.ID{r.a, r.b} {
+	for i, id := range []task.ID{r.A, r.B} {
 		o, err := p.passTask(ctx, id)
 		switch {
 		case errors.Is(err, coretasks.ErrNoTask):
@@ -109,118 +108,41 @@ func (p *Provider) resolvePair(ctx context.Context, r refusal) (task.Task, task.
 	return out[0], out[1], nil
 }
 
-// refusals are the rejected proposal gates that proposed a merge or a relation, the splits and the unrelations.
-func (p *Provider) refusals(ctx context.Context) ([]refusal, error) {
+// refusals are the pairs the rejected proposal gates that proposed a merge or a relation, the splits and the
+// unrelations took apart.
+func (p *Provider) refusals(ctx context.Context) ([]merge.Undone, error) {
 	gs, err := p.d.Gates.Where(ctx, gates.Query{Kind: gate.KindProposal, Statuses: []gate.Status{gate.Rejected}})
 	if err != nil {
 		return nil, err
 	}
-	var out []refusal
+	var rejected []merge.Undone
 	for _, g := range gs {
 		req, ok := coretasks.ProposedVerb(g)
 		other := task.ID(req.Args[task.ArgTask])
 		if !ok || g.Task == "" || other == "" || !p.d.Refusals.Pairs(req.Verb) {
 			continue
 		}
-		out = append(out, refusal{a: g.Task, b: other, closed: g.ClosedAt})
+		rejected = append(rejected, merge.Undone{A: g.Task, B: other, At: g.ClosedAt})
 	}
-	splits, err := p.splits(ctx)
+	if p.d.Refusals.Events == nil {
+		return rejected, nil
+	}
+	var splits, unrelates []string
+	if p.d.Refusals.Splits != nil {
+		splits = p.d.Refusals.Splits()
+	}
+	if p.d.Refusals.Unrelates != nil {
+		unrelates = p.d.Refusals.Unrelates()
+	}
+	kinds := merge.UndoneKinds(splits, unrelates)
+	if len(kinds) == 0 {
+		return rejected, nil
+	}
+	evs, err := p.d.Refusals.Events(ctx, kinds)
 	if err != nil {
 		return nil, err
 	}
-	unrelated, err := p.unrelations(ctx)
-	return append(append(out, splits...), unrelated...), err
-}
-
-// unrelations are the relations an unrelate verb took off, at when it did: its event on a task's own unit keys
-// the other task, as task.PairKey writes it.
-func (p *Provider) unrelations(ctx context.Context) ([]refusal, error) {
-	if p.d.Refusals.Unrelates == nil || p.d.Refusals.Events == nil {
-		return nil, nil
-	}
-	verbs := p.d.Refusals.Unrelates()
-	if len(verbs) == 0 {
-		return nil, nil
-	}
-	evs, err := p.d.Refusals.Events(ctx, task.VerbEventKinds(verbs))
-	if err != nil {
-		return nil, err
-	}
-	var out []refusal
-	for _, ev := range evs {
-		id, ok := task.IDOf(ev.Unit)
-		other, paired := task.PairOfKey(ev.Key)
-		if ok && paired {
-			out = append(out, refusal{a: id, b: other, closed: ev.At})
-		}
-	}
-	return out, nil
-}
-
-// splits are the merges a split gave back, closed when it did: each merge record on a task's own unit and the
-// first split event on that unit after it, which a split writes on both tasks' units.
-func (p *Provider) splits(ctx context.Context) ([]refusal, error) {
-	if p.d.Refusals.Splits == nil || p.d.Refusals.Events == nil {
-		return nil, nil
-	}
-	verbs := p.d.Refusals.Splits()
-	if len(verbs) == 0 {
-		return nil, nil
-	}
-	evs, err := p.d.Refusals.Events(ctx, append(task.VerbEventKinds(verbs), merge.RecordKind))
-	if err != nil {
-		return nil, err
-	}
-	merged := map[task.ID]task.ID{}
-	var out []refusal
-	for _, ev := range evs {
-		id, ok := task.IDOf(ev.Unit)
-		if !ok {
-			continue
-		}
-		if ev.Kind == merge.RecordKind {
-			var r struct{ From, Into task.ID }
-			if json.Unmarshal([]byte(ev.Data), &r) == nil && r.From == id && r.Into != "" {
-				merged[id] = r.Into
-			}
-			continue
-		}
-		if into, ok := merged[id]; ok {
-			for _, x := range append([]task.ID{id}, foldedInto(merged, id)...) {
-				for _, y := range append([]task.ID{into}, survivorsOf(merged, into)...) {
-					out = append(out, refusal{a: x, b: y, closed: ev.At})
-				}
-			}
-			delete(merged, id)
-		}
-	}
-	return out, nil
-}
-
-// foldedInto are the tasks merged, directly or through others, into id, which a split of id takes apart with it.
-func foldedInto(merged map[task.ID]task.ID, id task.ID) []task.ID {
-	var out []task.ID
-	for next := []task.ID{id}; len(next) > 0; {
-		cur := next[0]
-		next = next[1:]
-		for x, into := range merged {
-			if into == cur && x != id && !slices.Contains(out, x) {
-				out = append(out, x)
-				next = append(next, x)
-			}
-		}
-	}
-	slices.Sort(out)
-	return out
-}
-
-// survivorsOf are the tasks into is itself merged into, nearest first, which held id until a split of it.
-func survivorsOf(merged map[task.ID]task.ID, into task.ID) []task.ID {
-	var out []task.ID
-	for next, ok := merged[into]; ok && !slices.Contains(out, next) && next != into; next, ok = merged[next] {
-		out = append(out, next)
-	}
-	return out
+	return merge.UndonePairs(rejected, evs, splits, unrelates), nil
 }
 
 // itemsMovedAfter says whether one of the heldItems of es was created or changed after at.

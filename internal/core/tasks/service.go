@@ -58,6 +58,8 @@ type Deps struct {
 	Survives Survives
 	// GateText words the gate a gated verb opens; nil writes none.
 	GateText GateText
+	// TakenApart holds the pairs the user took apart; nil holds none.
+	TakenApart TakenApart
 }
 
 type handlerKey struct {
@@ -619,8 +621,8 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 		if err != nil || o.ID != other || req.Args[task.ArgTask] != string(other) {
 			return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair that changed since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
 		}
-		if h, ok := s.d.Gates.(PairHold); ok && req.Actor != task.ActorPerson {
-			apart, err := h.TakenApart(ctx, t, other)
+		if s.d.TakenApart != nil && req.Actor != task.ActorPerson {
+			apart, err := s.d.TakenApart(ctx, t, other)
 			if err != nil {
 				return false, err
 			}

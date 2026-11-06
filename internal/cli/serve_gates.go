@@ -196,19 +196,6 @@ func undoneOf(f workflow.Facts) []string {
 	return undone
 }
 
-// TakenApart says whether other is one of task.undone of t; true when t's facts cannot be read, so a pair a
-// workflow asked for waits for you rather than run unchecked.
-func (g serviceTaskGates) TakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error) {
-	if g.e.wakeFacts == nil {
-		return true, nil
-	}
-	f, err := g.e.wakeFacts(workflow.WithReads(ctx, factUndone), t)
-	if err != nil {
-		return false, err
-	}
-	return slices.Contains(undoneOf(f), string(other)), nil
-}
-
 func (g serviceTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {
 	g.e.newGates(g.db, nil)
 	return g.e.gateReader.Get(ctx, id)

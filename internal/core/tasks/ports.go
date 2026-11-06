@@ -90,6 +90,9 @@ type (
 	// GateText is the words of the gate verb opens on e with args, the gate's text of gates.toml over the
 	// proposal facts of a verb's gate; "" for a gate with none.
 	GateText func(ctx context.Context, g gate.Gate, verb string, e task.Task, args map[string]string) (string, error)
+	// TakenApart says whether the user took task t and other apart (task.undone), so a pair a workflow asked for
+	// runs only once they decide.
+	TakenApart func(ctx context.Context, t task.Task, other task.ID) (bool, error)
 )
 
 type Since struct {
@@ -180,12 +183,6 @@ type GateSweeper interface {
 	ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, error)
 	// Supersede resolves each open gate of ids as superseded; a gate no longer open is left as it is.
 	Supersede(ctx context.Context, ids ...int64) error
-}
-
-// PairHold is the Gates' capability that says whether the user took task t and other apart (task.undone), so a
-// pair a workflow asked for runs only once they decide; Gates without it hold no pair.
-type PairHold interface {
-	TakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error)
 }
 
 type Result struct {

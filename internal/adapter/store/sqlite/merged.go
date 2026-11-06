@@ -15,7 +15,7 @@ const maxMergeHops = 64
 // mergeAlias holds on an alias a whose old task's newest merge record names a's new task: an alias the v7
 // migration wrote carries no history, since the migration moved its rows.
 const mergeAlias = `json_extract((SELECT e.data FROM events e WHERE e.id = (SELECT max(rec.id) FROM events rec
-	WHERE rec.provider = 'task' AND rec.unit_key = a.old_id AND rec.kind = '` + merge.RecordKind + `')), '$.Into') = a.new_id`
+	WHERE rec.provider = 'task' AND rec.unit_key = a.old_id AND rec.kind = '` + merge.RecordKind + `')), '$.` + merge.IntoField + `') = a.new_id`
 
 // mergedIntoSQL walks the merge aliases back from a task, in the order of the tasks' newest merge records.
 const mergedIntoSQL = `WITH RECURSIVE m(id, hops) AS (

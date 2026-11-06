@@ -316,8 +316,8 @@ func latestMerge(ctx context.Context, q rowQuerier, id task.ID) (merge.Record, b
 	if err != nil {
 		return merge.Record{}, false, err
 	}
-	var r merge.Record
-	if err := json.Unmarshal([]byte(data), &r); err != nil {
+	r, err := merge.DecodeRecord(data)
+	if err != nil {
 		return merge.Record{}, false, fmt.Errorf("the merge record of %s: %w", id, err)
 	}
 	return r, true, nil

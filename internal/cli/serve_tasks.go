@@ -39,7 +39,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
-			}, Survives: holds, GateText: verbGateText(e.loadedIntents, db.Tasks(), holds)})
+			}, Survives: holds, GateText: verbGateText(e.loadedIntents, db.Tasks(), holds), TakenApart: e.pairTakenApart})
 	}
 	return e.tasks
 }
@@ -50,6 +50,15 @@ func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, err
 		return e.wakeFacts(ctx, t)
 	}
 	return catalog.TaskFacts(t, e.loadedIntents().Tasks), nil
+}
+
+// pairTakenApart says whether the user took t and other apart; true before serve wired the task subject, so a
+// pair a workflow asked for waits for you rather than run unchecked.
+func (e *Env) pairTakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error) {
+	if e.takenApart == nil {
+		return true, nil
+	}
+	return e.takenApart(ctx, t, other)
 }
 
 // taskEnding settles what a task that ended holds, while it stays ended: its held drafts, but those of the
