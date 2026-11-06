@@ -111,3 +111,21 @@ func TestACostlyFactIsComputedForAWorkflowThatNamesItAfterOneThatDoesNot(t *test
 		t.Fatalf("the second workflow read session.costly as %#v, want it computed: one read of a unit's facts serves every workflow", saw["b-costly"])
 	}
 }
+
+func TestAnEventWorkflowsCostlyFactIsNotComputedForASweepRead(t *testing.T) {
+	plain := sweepWF("a-plain", automationtest.MatchFunc(func(workflow.Vars) bool { return true }), "session.close")
+	onEvent := eventWF("b-event", unit.Session, "session", automationtest.MatchFunc(func(workflow.Vars) bool { return true }, "session.costly"), "session.some_event")
+	r := newRig(t, plain, onEvent)
+	ru := &readsUnits{Units: r.units}
+	r.e.Units = ru
+	r.put(s1, "a")
+	r.evaluate()
+	if len(ru.reads) == 0 {
+		t.Fatal("no facts read")
+	}
+	for _, got := range ru.reads {
+		if slices.Contains(got, "session.costly") {
+			t.Fatalf("a sweep read carried %v: an event workflow's costly fact is computed with no event", got)
+		}
+	}
+}

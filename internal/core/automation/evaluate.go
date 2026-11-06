@@ -69,11 +69,14 @@ type candidate struct {
 }
 
 type planner struct {
-	e       *Engine
-	ctx     context.Context
-	now     time.Time
-	pause   Pause
-	config  workflow.Facts
+	e      *Engine
+	ctx    context.Context
+	now    time.Time
+	pause  Pause
+	config workflow.Facts
+	// reads are what the sweep (false) and the event (true) workflows of the pass read: a unit's facts are read
+	// once for all the workflows of a kind.
+	reads   map[bool][]string
 	facts   map[factsRead]workflow.Facts
 	factErr map[factsRead]error
 	revs    map[unit.Unit]uint64
@@ -113,12 +116,12 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
 	byWorkflow, storedErr := e.storedItems(ctx, ws)
-	// A unit's facts are read once for every workflow of the pass, so they carry what any of them reads.
-	var reads []string
+	reads := map[bool][]string{}
 	for _, b := range batches {
-		reads = append(reads, workflow.Reads(b.w)...)
+		event := b.w.Trigger.Kind == workflow.TriggerEvent
+		reads[event] = append(reads[event], workflow.Reads(b.w)...)
 	}
-	p := &planner{e: e, ctx: workflow.WithReads(ctx, reads...), now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
+	p := &planner{e: e, ctx: ctx, reads: reads, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
 		factErr: map[factsRead]error{}, revs: map[unit.Unit]uint64{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
 	if e.Config != nil {
@@ -285,7 +288,7 @@ func (p *planner) unitFacts(w workflow.Workflow, u unit.Unit) (workflow.Facts, e
 		p.factErr[r] = err
 		return nil, err
 	}
-	f, err := p.e.reportedFacts(p.ctx, w, u)
+	f, err := p.e.reportedFacts(workflow.WithReads(p.ctx, p.reads[r.event]...), w, u)
 	if err != nil {
 		p.factErr[r] = err
 		return nil, err
