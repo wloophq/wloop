@@ -209,3 +209,56 @@ func TestConfigUnsetFixesAFileThatDoesNotLoadWhereSetRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestConfigUnsetRefusesToBreakAFileThatLoads(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	raw := "[plugins.github.gates.approval]\nmode = \"delay\"\nwindow = \"1h\"\n"
+	writeFile(t, te.ConfigPath, raw)
+	if code := te.run("config", "unset", "plugins.github.gates.approval.window"); code != 1 || !strings.Contains(te.err.String(), "window") {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if got := readFile(t, te.ConfigPath); got != raw || len(backups(t, te.ConfigPath)) != 0 {
+		t.Fatalf("the file changed:\n%s", got)
+	}
+}
+
+func TestConfigSetWritesThroughASymlinkAndKeepsTheFilesMode(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	target := filepath.Join(t.TempDir(), "dotfiles", "settings.toml")
+	writeFile(t, target, acmeConfig)
+	if err := os.Chmod(target, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, te.ConfigPath); err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("config", "set", "agent", "codex"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if link, err := os.Readlink(te.ConfigPath); err != nil || link != target {
+		t.Fatalf("link %q, %v", link, err)
+	}
+	if got := readFile(t, target); !strings.Contains(got, "agent = 'codex'") || !strings.Contains(got, "# acme's loop") {
+		t.Fatalf("target:\n%s", got)
+	}
+	fi, err := os.Stat(target)
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v, %v", fi.Mode(), err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(target), "*tmp*")); len(left) != 0 {
+		t.Fatalf("temp files left: %q", left)
+	}
+}
+
+func TestConfigSetWritesANewFileReadableByItsOwner(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("config", "set", "agent", "codex"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if fi, err := os.Stat(te.ConfigPath); err != nil || fi.Mode().Perm() != 0o644 {
+		t.Fatalf("mode %v, %v", fi.Mode(), err)
+	}
+}

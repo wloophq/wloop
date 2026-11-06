@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -520,15 +521,35 @@ func (w *initWizard) ensureDirs(a initAnswers) error {
 	return nil
 }
 
+// writeAtomic replaces file with raw by a rename; a symlinked file is
+// written at its target, and an existing file keeps its mode.
 func writeAtomic(file string, raw []byte) error {
+	mode := os.FileMode(0o644)
+	if real, err := filepath.EvalSymlinks(file); err == nil {
+		file = real
+		fi, err := os.Stat(file)
+		if err != nil {
+			return err
+		}
+		mode = fi.Mode().Perm()
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
-	tmp := file + ".init-tmp"
-	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".tmp-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, file)
+	_, err = tmp.Write(raw)
+	if err = errors.Join(err, tmp.Chmod(mode), tmp.Close()); err == nil {
+		err = os.Rename(tmp.Name(), file)
+	}
+	if err != nil {
+		_ = os.Remove(tmp.Name())
+	}
+	return err
 }
 
 // slack saves the Slack tokens at a terminal, or prints the commands that do.
