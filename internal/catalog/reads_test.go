@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -41,5 +42,40 @@ func TestAViewAndABaselineReadTheFactsTheyName(t *testing.T) {
 	}
 	if !slices.Equal(got, []string{"task.link_owes"}) {
 		t.Fatalf("the baseline read the facts with %v", got)
+	}
+}
+
+func TestASurvivorReadsTheFactsItNames(t *testing.T) {
+	ctx := context.Background()
+	l := new(intentload.Loaded)
+	*l = *bundled(t)
+	pred, err := expr.CompileWorkflow(`size(task.candidates) > 0`, intentload.SurvivorEnv(l.Tasks))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Tasks.Verbs = maps.Clone(l.Tasks.Verbs)
+	v := l.Tasks.Verbs["merge"]
+	v.Survivor = pred
+	l.Tasks.Verbs["merge"] = v
+	var got []string
+	facts := func(ctx context.Context, t task.Task) (workflow.Facts, error) {
+		got = workflow.ReadsOf(ctx)
+		if !slices.Contains(got, "task.candidates") {
+			return workflow.Facts{"task.candidates": workflow.Unrequested{Fact: "task.candidates"}}, nil
+		}
+		if t.ID == "t-1" {
+			return workflow.Facts{"task.candidates": []string{"t-2"}}, nil
+		}
+		return workflow.Facts{"task.candidates": []string{}}, nil
+	}
+	survives := Survives(func() *intentload.Loaded { return l }, facts)
+	if holds, err := survives(ctx, "merge", task.Task{ID: "t-1"}); err != nil || !holds {
+		t.Fatalf("survives t-1 = %v, %v; want true", holds, err)
+	}
+	if !slices.Contains(got, "task.candidates") {
+		t.Fatalf("the survivor's facts were read with %v, want its reads", got)
+	}
+	if holds, err := survives(ctx, "merge", task.Task{ID: "t-2"}); err != nil || holds {
+		t.Fatalf("survives t-2 = %v, %v; want false", holds, err)
 	}
 }
