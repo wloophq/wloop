@@ -579,7 +579,7 @@ func TestV7KindsMovesOpenDraftGatesOffClosedTasks(t *testing.T) {
 	}
 }
 
-func TestATaskIsFoundByAnOldIDThroughOneAlias(t *testing.T) {
+func TestATaskIsFoundByAnOldIDThroughItsAliases(t *testing.T) {
 	t.Parallel()
 	db, raw := migratedKinds(t)
 	ctx := context.Background()
@@ -593,7 +593,13 @@ func TestATaskIsFoundByAnOldIDThroughOneAlias(t *testing.T) {
 	if _, err := raw.Exec(`INSERT INTO task_aliases (old_id, new_id) VALUES ('t-00000000000000ff', ?)`, string(messageID)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Tasks().Task(ctx, "t-00000000000000ff"); !errors.Is(err, coretasks.ErrNoTask) {
-		t.Fatalf("an alias to a gone id reads %v, want no task: aliases are one hop", err)
+	if e, err := db.Tasks().Task(ctx, "t-00000000000000ff"); err != nil || e.ID != actionID {
+		t.Fatalf("an alias to an aliased id reads %s (%v), want %s", e.ID, err, actionID)
+	}
+	if _, err := raw.Exec(`INSERT INTO task_aliases (old_id, new_id) VALUES ('t-00000000000000fe', 't-00000000000000fd')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Tasks().Task(ctx, "t-00000000000000fe"); !errors.Is(err, coretasks.ErrNoTask) {
+		t.Fatalf("an alias to a gone id reads %v, want no task", err)
 	}
 }
