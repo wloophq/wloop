@@ -76,13 +76,24 @@ func RecordOf(ctx context.Context, r Records, kind string, id task.ID, held []un
 	return ev, ok, nil
 }
 
-// HeldOf are the units a record of task e is read from after its own: what h lists when r is also
-// Holdings, the units of the tasks merged into e included, else e's units.
+// HeldOf are the units a record of task e is read from after its own: e's units, then, when r is also
+// Holdings, the other units it lists, the newest merged task's first.
 func HeldOf(ctx context.Context, r Records, e task.Task) ([]unit.Unit, error) {
-	if h, ok := r.(Holdings); ok {
-		return h.UnitsOf(ctx, e.ID)
+	h, ok := r.(Holdings)
+	if !ok {
+		return e.Units, nil
 	}
-	return e.Units, nil
+	all, err := h.UnitsOf(ctx, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := slices.Clone(e.Units)
+	for _, u := range slices.Backward(all) {
+		if !slices.Contains(e.Units, u) {
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }
 
 // Pick is task id's record among recs, the records of its kind by unit, as

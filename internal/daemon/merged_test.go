@@ -97,3 +97,37 @@ func TestTheSurvivorsDetailReadsAMergedTasksBriefWhenItHasNone(t *testing.T) {
 		t.Fatalf("the survivor's own brief does not win: %+v", got.Brief)
 	}
 }
+
+func TestASurvivorsBriefFallsBackToTheNewestMergedTaskFirst(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.s.deps.TaskRecords = r.db
+	ctx := context.Background()
+	const first, middle, survivor = task.ID("t-3333333333333333"), task.ID("t-4444444444444444"), task.ID("t-5555555555555555")
+	r.put(t, task.Task{ID: survivor, State: "next", Category: task.CategoryReady, Title: "Ship the export"})
+	for _, m := range []struct {
+		from, into task.ID
+		goal       string
+	}{{first, middle, "Export March"}, {middle, survivor, "Export the quarter"}} {
+		if err := r.db.PutRecord(ctx, task.UnitOf(m.from), "brief", task.WriterPlugin, []byte(`{"goal":"`+m.goal+`"}`), tasksNow); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.db.Write(ctx, func(tx *sqlite.Tx) error {
+			_, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(m.from), string(m.into))
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(m.from), Kind: merge.RecordKind, Actor: "person",
+			Data: `{"Into":"` + string(m.into) + `"}`, At: tasksNow}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var got api.TaskView
+	if code := get(t, r.s, api.TaskPath(string(survivor)), &got); code != 200 {
+		t.Fatalf("GET the survivor: %d", code)
+	}
+	if got.Brief == nil || string(got.Brief.Data) != `{"goal":"Export the quarter"}` {
+		t.Fatalf("the survivor shows %+v, want the newest merged task's brief", got.Brief)
+	}
+}

@@ -35,7 +35,7 @@ func (c chatLog) SetMarks(ctx context.Context, u unit.Unit, marks map[string]str
 }
 
 func (c chatLog) Brief(ctx context.Context, e task.Task) (string, bool, error) {
-	held, err := c.db.UnitsOf(ctx, e.ID)
+	held, err := timeline.HeldOf(ctx, c.db, e)
 	if err != nil {
 		return "", false, err
 	}
