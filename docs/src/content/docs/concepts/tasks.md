@@ -100,6 +100,50 @@ The signals come from the thread, which anyone in it writes: with `run`, a check
 
 Resolving the items of a thread you started can make `slack-closure` propose its closure, a draft that waits for you like any other.
 
+## One piece of work in several tasks
+
+The same work can reach you from more than one source: a Slack ask to review a pull request, and the pull request's own task; a DM and the channel thread it continues. Three verbs deal with it. Each takes another task, picked from the open tasks in the cockpit's or the terminal's palette, narrowed by title.
+
+| Verb | Does |
+|---|---|
+| Merge | Folds one task into the other: the survivor takes the other's items, units, gates, held drafts, messages, wake and properties. |
+| Split | Gives a task merged into this one back, as it was before the merge. |
+| Relate / Unrelate | Links two tasks as distinct work. Nothing moves; each lists the other. |
+
+**Who runs them.** You, and a session you drive, run all four. A workflow can only propose a merge: its `merge` verb opens the merge gate, "Merge these tasks?", which says which task folds into which, and approving it runs the merge as yours. A plugin runs none. A merge takes two open tasks, never a project, a draft or a message.
+
+**The survivor.** The task you shaped by hand stays: one you clarified, moved, filed in a project or wrote properties on (`task.clarified`). When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
+
+**What a merge keeps.** Nothing of the folded task is lost or duplicated. Its items, resolved ones included, its units and its gates move over; open proposals that name it are superseded, since the pair they asked for is done. Its timeline, chat and live session are reachable from the survivor, and its dossier stays open with the survivor, read-only to the survivor's sessions. The survivor's page lists the tasks merged into it ("Merged from"), and the related ones.
+
+**Sync does not undo it.** A task that holds a merged task's items keeps them, and a unit that syncs again, reopens or gains a sibling item feeds the survivor, never a new task. A merged task's items settle unit by unit: the survivor resolves only when no item of any unit is open.
+
+**Split is by unit.** The units of the folded task go back with the items on them; items that arrived on the survivor after the merge stay where they are. With nothing changed since, the folded task comes back exactly as it was. A task merged into the folded one earlier comes back inside it.
+
+### Merges a workflow proposes
+
+Two bundled workflows propose merges. Both open the merge gate and nothing else, and both leave the decision to you:
+
+- `task-fold-linked` proposes folding a task into the task of a pull request that its items' review or merge links target: the Slack ask to review a pull request joins the pull request's task. It is a sweep, so it holds whichever task came first. It reads `task.link_target_tasks`.
+- `task-correlate` judges whether a task just created, or whose items just gained a link, is the same work as one of its **candidates**. When the judgment names one, `task-correlate-merge` proposes the merge.
+
+The candidates are the open tasks created within `tasks.candidate_window` (14 days) of the task, ranked by what they share, and cut to `tasks.candidate_cap` (5). A unit one task holds that the other's items link to scores most, then a link target in common, then each person in common (requester, assignees, whom it waits on). A task with no candidate costs no call. The judgment is a model call (`classify` step) that reads the candidates' titles, notes and a few item summaries as data and answers with the id of the same work, or none. A sub-step of a larger task is not the same work. What it reads is untrusted text: its answer only opens a gate, never settles one, and it must name one of the candidates.
+
+Limits keep it cheap and quiet:
+
+- one call per task and per set of candidates, never again for an unchanged pair;
+- the day's calls count against `classify.per_day` (50), shared with every classify workflow;
+- a merge you reject, or a split you run, is remembered: the pair is not proposed again until an item of either task changes;
+- an open merge gate ends with its tasks: when either closes, is merged elsewhere or is split.
+
+To turn the correlation off, which turns off both of its workflows:
+
+```
+{{command}} config set workflows.task-correlate.enabled false
+```
+
+Restart the daemon to apply it. `tasks.candidate_cap = 0` also stops it, and `task-fold-linked` turns off the same way, with `workflows.task-fold-linked.enabled`.
+
 ## The timeline and the records
 
 A task's timeline is its own events and those of the units it holds, every one kept forever, newest first: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
