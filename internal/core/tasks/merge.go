@@ -207,3 +207,13 @@ func (s *Service) survives(ctx context.Context, verb task.Verb, t task.Task) (bo
 	}
 	return s.d.Survives(ctx, string(verb), t)
 }
+
+// MergeOf is the record of the merge that took task id, as the store keeps it; false when id is stored, was
+// never merged, or the store keeps no merges.
+func (s *Service) MergeOf(ctx context.Context, id task.ID) (merge.Record, bool, error) {
+	m, ok := s.d.Store.(Merger)
+	if !ok {
+		return merge.Record{}, false, nil
+	}
+	return m.MergeOf(ctx, id)
+}
