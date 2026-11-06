@@ -236,3 +236,16 @@ func TestAWorkflowsRelateOpensTheRelateGateAndItCannotUnrelate(t *testing.T) {
 		t.Errorf("t-2 related %v after refused unrelates", got)
 	}
 }
+
+func TestOnlyAMergeAndARelationPairTwoTasks(t *testing.T) {
+	for _, h := range []string{coretasks.HandlerMerge, coretasks.HandlerRelate} {
+		if !coretasks.PairsTasks(h) {
+			t.Errorf("%s pairs no tasks", h)
+		}
+	}
+	for _, h := range []string{coretasks.HandlerSplit, coretasks.HandlerUnrelate, "finish", ""} {
+		if coretasks.PairsTasks(h) {
+			t.Errorf("%s pairs two tasks", h)
+		}
+	}
+}

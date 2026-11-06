@@ -22,6 +22,9 @@ const (
 	HandlerUnrelate = "unrelate"
 )
 
+// PairsTasks says whether a verb of handler pairs its task with the other one, merging or relating them.
+func PairsTasks(handler string) bool { return handler == HandlerMerge || handler == HandlerRelate }
+
 func (s *Service) serveMerges() {
 	s.Register(EveryKind, HandlerMerge, s.merge)
 	s.Register(EveryKind, HandlerSplit, s.split)

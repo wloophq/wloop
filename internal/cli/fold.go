@@ -35,7 +35,7 @@ func (e *Env) mootMerges(ctx context.Context, g *gates.Service, id task.ID) {
 	}
 	for _, o := range acting {
 		p, ok := coretasks.ProposedVerb(o)
-		if h := e.loadedIntents().Tasks.Handler(string(p.Verb)); !ok || h != coretasks.HandlerMerge && h != coretasks.HandlerRelate {
+		if !ok || !coretasks.PairsTasks(e.loadedIntents().Tasks.Handler(string(p.Verb))) {
 			continue
 		}
 		if err := g.Supersede(ctx, o.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {

@@ -164,7 +164,7 @@ func (s *Service) Rejected(ctx context.Context, g gate.Gate) {
 	if !ok || g.Status != gate.Rejected || g.Task == "" || other == "" {
 		return
 	}
-	if h := s.d.States.Handler(string(p.Verb)); h != HandlerMerge && h != HandlerRelate {
+	if !PairsTasks(s.d.States.Handler(string(p.Verb))) {
 		return
 	}
 	s.takeApart(ctx, g.Task, other)
