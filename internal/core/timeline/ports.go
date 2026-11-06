@@ -24,10 +24,11 @@ type Event struct {
 }
 
 // Filter narrows a timeline: Kinds keeps those event kinds (every kind when
-// empty), Before the events whose Seq is lower (all when 0), Limit at most
-// that many (all when 0).
+// empty), Except drops those, Before the events whose Seq is lower (all when
+// 0), Limit at most that many (all when 0).
 type Filter struct {
 	Kinds  []string
+	Except []string
 	Before int64
 	Limit  int
 }

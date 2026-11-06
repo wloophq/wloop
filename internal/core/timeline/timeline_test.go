@@ -22,7 +22,8 @@ func (l *log) add(u unit.Unit, kind string) {
 func (l *log) EventsOf(_ context.Context, units []unit.Unit, f timeline.Filter) ([]timeline.Event, error) {
 	var out []timeline.Event
 	for _, ev := range slices.Backward(l.rows) {
-		if !slices.Contains(units, ev.Unit) || len(f.Kinds) > 0 && !slices.Contains(f.Kinds, ev.Kind) || f.Before > 0 && ev.Seq >= f.Before {
+		if !slices.Contains(units, ev.Unit) || len(f.Kinds) > 0 && !slices.Contains(f.Kinds, ev.Kind) || slices.Contains(f.Except, ev.Kind) ||
+			f.Before > 0 && ev.Seq >= f.Before {
 			continue
 		}
 		if f.Limit > 0 && len(out) == f.Limit {

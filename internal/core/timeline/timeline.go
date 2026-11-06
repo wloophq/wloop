@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -29,7 +30,7 @@ type Holdings interface {
 }
 
 // Merged is the Reader over the event log: a task's timeline is its own
-// events and those of the units it holds.
+// events and those of the units it holds, without the merge records.
 type Merged struct {
 	Log      Log
 	Holdings Holdings
@@ -48,6 +49,7 @@ func (m Merged) Of(ctx context.Context, id task.ID, f Filter) ([]Event, error) {
 			units = append(units, u)
 		}
 	}
+	f.Except = append(slices.Clip(f.Except), merge.RecordKind)
 	evs, err := m.Log.EventsOf(ctx, units, f)
 	if evs == nil {
 		evs = []Event{}
