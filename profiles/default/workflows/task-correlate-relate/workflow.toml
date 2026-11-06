@@ -1,0 +1,19 @@
+summary = "Relate a task and the candidate the correlation judged related work"
+provider = "task"
+when = 'trigger.event.data == "task-correlate" && classify.task_correlate.verdict == "related" && classify.task_correlate.task in task.candidates && !(classify.task_correlate.task in task.link_target_tasks)'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["classified"]
+
+[[step]]
+use = "task.verb"
+verb = "relate"
+task = "classify.task_correlate.task"
+
+# A relation moves nothing, and Unrelate takes it off: it runs at once. A
+# pair you took apart waits for you instead. A pull request the task links
+# is left to task-fold-linked.
+[[gates.approval.rule]]
+when = 'gate.name == "relate"'
+mode = "run"

@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -49,8 +50,9 @@ type classifier struct {
 	inflight map[string]bool
 	// failed is the last call's failure by key, which the next run returns
 	// as a failed attempt instead of spending another call.
-	failed map[string]error
-	wg     sync.WaitGroup
+	failed  map[string]error
+	digests map[askedAt]string
+	wg      sync.WaitGroup
 }
 
 // wait waits for the calls in flight.
@@ -83,7 +85,7 @@ func (c *classifier) cached(ctx context.Context, sc stepCall) (json.RawMessage, 
 	if err != nil {
 		return nil, classified{}, false, err
 	}
-	k, err := c.key(ctx, sc.arg(withArg), sc.u, f)
+	k, err := c.key(ctx, sc, f)
 	if err != nil || k.empty(sc) {
 		return nil, k, false, err
 	}
@@ -107,10 +109,59 @@ const (
 // readingWith marks a context whose facts reads are those a with key takes, which add no with output.
 type readingWith struct{}
 
-// key is u's fingerprint; with a with fact, what the judgment reads instead: the contents of u's task, else u's
-// fingerprint, and of the tasks the fact lists, so a write that changes none of them, such as opening a task,
-// keeps the output.
-func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workflow.Facts) (classified, error) {
+// key is what the call reads: its prompt and schema, and u's fingerprint, or with a with fact the contents of
+// u's task, else u's fingerprint, and of the tasks the fact lists, so a write that changes none of them, such as
+// opening a task, keeps the output, and an edit of the prompt or the schema asks again.
+func (c *classifier) key(ctx context.Context, sc stepCall, f workflow.Facts) (classified, error) {
+	asked, err := c.asked(sc)
+	if err != nil {
+		return classified{}, err
+	}
+	k, err := c.read(ctx, sc.arg(withArg), sc.u, f)
+	if err != nil {
+		return k, err
+	}
+	k.fp += "@" + asked
+	return k, nil
+}
+
+// asked is a digest of the prompt and the schema sc's call asks with, read once per profile load.
+func (c *classifier) asked(sc stepCall) (string, error) {
+	at := askedAt{loaded: c.s.e.loadedIntents(), workflow: sc.why.Workflow, prompt: sc.arg("prompt"), schema: sc.arg("schema")}
+	c.mu.Lock()
+	d, ok := c.digests[at]
+	c.mu.Unlock()
+	if ok {
+		return d, nil
+	}
+	text, err := c.s.file(sc, "prompt")
+	if err != nil {
+		return "", err
+	}
+	schema, err := c.s.file(sc, "schema")
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256([]byte(text + "\x1e" + schema))
+	d = hex.EncodeToString(sum[:8])
+	c.mu.Lock()
+	if c.digests == nil || len(c.digests) > 256 {
+		c.digests = map[askedAt]string{}
+	}
+	c.digests[at] = d
+	c.mu.Unlock()
+	return d, nil
+}
+
+// askedAt is what a call's prompt and schema are read by: the profile as it loaded, the workflow and the step's
+// file arguments.
+type askedAt struct {
+	loaded                   *intentload.Loaded
+	workflow, prompt, schema string
+}
+
+// read is what a call reads of u: its fingerprint, or with a with fact, as key says.
+func (c *classifier) read(ctx context.Context, with string, u unit.Unit, f workflow.Facts) (classified, error) {
 	k := classified{fp: fingerprint(u, f)}
 	if with == "" {
 		return k, nil
@@ -370,24 +421,23 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 		if w.Provider != un.Provider || i < 0 {
 			continue
 		}
-		fp := factString(f, w.Slot+".fingerprint")
-		if with, _ := w.Steps[i].Args[withArg].(string); with != "" {
+		sc := stepCall{st: w.Steps[i], u: un, why: workflow.Why{Workflow: w.Name}}
+		if with := sc.arg(withArg); with != "" {
 			if ctx.Value(readingWith{}) != nil || !workflow.Names(ctx, builtin.ClassifyFact(w.Name, "")) {
 				continue
 			}
 			if _, err := u.c.s.tasks(); err != nil {
 				continue
 			}
-			k, err := u.c.key(ctx, with, un, f)
-			if err != nil {
-				return nil, err
-			}
-			if len(k.with) == 0 {
-				continue
-			}
-			fp = k.fp
 		}
-		raw, ok, err := store.Output(ctx, un, w.Name, fp)
+		k, err := u.c.key(ctx, sc, f)
+		if err != nil {
+			return nil, err
+		}
+		if k.empty(sc) {
+			continue
+		}
+		raw, ok, err := store.Output(ctx, un, w.Name, k.fp)
 		if err != nil {
 			return nil, err
 		}

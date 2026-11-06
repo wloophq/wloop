@@ -1,4 +1,4 @@
-summary = "Judge whether a new or newly linked task is the same work as one of its candidate tasks"
+summary = "Judge whether a new or newly linked task is the same work as one of its candidate tasks, related work, or neither"
 provider = "task"
 when = 'size(task.candidates) > 0'
 key = ["trigger.event.id"]

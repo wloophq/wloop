@@ -1,6 +1,6 @@
-summary = "Propose merging a task into the candidate the correlation judged the same work"
+summary = "Ask you to merge a task into the candidate the correlation judged the same work, when only a person ties them"
 provider = "task"
-when = 'trigger.event.data == "task-correlate" && classify.task_correlate.same_work && classify.task_correlate.same_as in task.candidates'
+when = 'trigger.event.data == "task-correlate" && classify.task_correlate.verdict == "same" && classify.task_correlate.task in task.candidates && !(classify.task_correlate.task in task.linked_candidates)'
 key = ["trigger.event.id"]
 
 [trigger]
@@ -9,4 +9,4 @@ on = ["classified"]
 [[step]]
 use = "task.verb"
 verb = "merge"
-task = "classify.task_correlate.same_as"
+task = "classify.task_correlate.task"

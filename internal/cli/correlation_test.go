@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -142,7 +143,10 @@ func (r *correlationRig) settle(n int) {
 }
 
 // merges are the merge gates either task holds, by status.
-func (r *correlationRig) merges() map[gate.Status][]gate.Gate {
+func (r *correlationRig) merges() map[gate.Status][]gate.Gate { return r.gatesNamed("merge") }
+
+// gatesNamed are the gates named name either task holds, by status.
+func (r *correlationRig) gatesNamed(name string) map[gate.Status][]gate.Gate {
 	r.t.Helper()
 	out := map[gate.Status][]gate.Gate{}
 	for _, id := range []task.ID{olderTask, newerTask} {
@@ -151,7 +155,7 @@ func (r *correlationRig) merges() map[gate.Status][]gate.Gate {
 			r.t.Fatal(err)
 		}
 		for _, g := range gs {
-			if g.Name == "merge" {
+			if g.Name == name {
 				out[g.Status] = append(out[g.Status], g)
 			}
 		}
@@ -166,7 +170,8 @@ func (r *correlationRig) resolve(g gate.Gate, intent string, status gate.Status)
 	}
 }
 
-// verbDecider runs an approved proposal gate's verb as a person, as the daemon's Decide does.
+// verbDecider runs an approved proposal gate's verb as the daemon's Decide does: as the person who approved it,
+// or as the workflow that asked for it when a rule released it.
 type verbDecider struct{ e *Env }
 
 func (verbDecider) Release(context.Context, gate.Gate) error { return nil }
@@ -178,7 +183,6 @@ func (d verbDecider) Decide(ctx context.Context, g gate.Gate) error {
 	if !ok || g.Status != gate.Approved {
 		return nil
 	}
-	req.Approved, req.Actor = g.ID, task.ActorPerson
 	_, err := d.e.tasks.Do(ctx, g.Task, req)
 	return err
 }
@@ -194,12 +198,36 @@ func (r *correlationRig) approve() {
 }
 
 func sameAs(id task.ID) string {
-	return `{"same_work":true,"same_as":"` + string(id) + `","reason":"the same export"}`
+	return `{"verdict":"same","task":"` + string(id) + `","reason":"the same export"}`
 }
 
-const differentWork = `{"same_work":false,"same_as":"","reason":"different systems"}`
+func relatedTo(id task.ID) string {
+	return `{"verdict":"related","task":"` + string(id) + `","reason":"a step of the export"}`
+}
 
-func TestASameWorkVerdictOpensAMergeGate(t *testing.T) {
+const differentWork = `{"verdict":"none","task":"","reason":"different systems"}`
+
+// cite links the newer task's item to the older task's unit, as an extraction that read a link to it does.
+func (r *correlationRig) cite() {
+	r.t.Helper()
+	l := link.Link{From: newerUnit, To: olderUnit, Kind: link.Mention, Item: "y1", Evidence: unit.Anchor{Unit: newerUnit, Ref: "c:y1"},
+		Origin: link.Extraction, At: testNow}
+	if err := r.db.Links().Put(context.Background(), l); err != nil {
+		r.t.Fatal(err)
+	}
+}
+
+// related are the tasks the older task's related property lists.
+func (r *correlationRig) related() []string {
+	r.t.Helper()
+	e, err := r.db.Tasks().Task(context.Background(), olderTask)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return e.Prop("related").List
+}
+
+func TestASameWorkVerdictOnPeopleAloneOpensAMergeGate(t *testing.T) {
 	t.Parallel()
 	r := newCorrelationRig(t, sameAs(olderTask))
 	r.happen(task.EventCreated)
@@ -250,11 +278,11 @@ func TestADifferentWorkVerdictOpensNothing(t *testing.T) {
 		t.Fatalf("merge gates %+v", gs)
 	}
 
-	unsure := newCorrelationRig(t, `{"same_work":false,"same_as":"`+string(olderTask)+`","reason":"alike, not the same"}`)
+	unsure := newCorrelationRig(t, `{"verdict":"none","task":"`+string(olderTask)+`","reason":"alike, not the same"}`)
 	unsure.happen(task.EventCreated)
 	unsure.settle(4)
 	if gs := unsure.merges(); len(gs) > 0 || len(unsure.asker.asked()) != 1 {
-		t.Fatalf("same_work false naming a candidate opened %+v", gs)
+		t.Fatalf("verdict none naming a candidate opened %+v", gs)
 	}
 }
 
@@ -440,7 +468,7 @@ func TestAMergeDoesNotRetriggerCorrelationOnTheSurvivor(t *testing.T) {
 	}
 }
 
-func TestTheJudgmentsOutputOnlyOpensAGate(t *testing.T) {
+func TestAJudgmentOnPeopleAloneOnlyOpensAGate(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newCorrelationRig(t, sameAs(olderTask))
@@ -487,7 +515,13 @@ func TestTheCorrelationWorkflowsTurnOffWithOneSwitch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	k, err := r.steps.classify.key(ctx, "task.candidates", task.UnitOf(newerTask), f)
+	var w workflow.Workflow
+	for _, l := range r.te.loadedIntents().Workflows {
+		if l.Name == "task-correlate" {
+			w = l
+		}
+	}
+	k, err := r.steps.classify.key(ctx, stepCall{st: w.Steps[0], u: task.UnitOf(newerTask), why: workflow.Why{Workflow: w.Name}}, f)
 	if err != nil || len(k.with) != 1 {
 		t.Fatalf("key %+v %v", k, err)
 	}
@@ -510,5 +544,83 @@ func TestTheCorrelationWorkflowsTurnOffWithOneSwitch(t *testing.T) {
 	r.settle(3)
 	if gs := r.merges(); len(gs[gate.Open]) != 1 {
 		t.Fatalf("switched on, the stored verdict opened %+v", gs)
+	}
+}
+
+func TestASameWorkVerdictALinkAlsoTiesMergesAtOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, sameAs(olderTask))
+	r.cite()
+	r.happen(task.EventCreated)
+	r.settle(4)
+	e, err := r.db.Tasks().Task(ctx, newerTask)
+	if err != nil || e.ID != olderTask {
+		t.Fatalf("the newer task reads as %s (%v), want merged into the older at once", e.ID, err)
+	}
+	gs := r.merges()[gate.Approved]
+	if len(gs) != 1 || gs[0].Rule != "workflows/task-correlate-merge-linked gates.approval rule 0" || gs[0].By != task.ActorWorkflow {
+		t.Fatalf("approved merge gates %+v, want the one task-correlate-merge-linked's rule released", gs)
+	}
+}
+
+func TestARelatedVerdictRelatesTheTasksAtOnce(t *testing.T) {
+	t.Parallel()
+	r := newCorrelationRig(t, relatedTo(olderTask))
+	r.happen(task.EventCreated)
+	r.settle(4)
+	if got := r.related(); len(got) != 1 || got[0] != string(newerTask) {
+		t.Fatalf("the older task relates %v, want the newer", got)
+	}
+	if gs := r.merges(); len(gs) != 0 {
+		t.Fatalf("a related verdict opened merge gates %+v", gs)
+	}
+	if gs := r.gatesNamed("relate")[gate.Approved]; len(gs) != 1 || gs[0].Rule != "workflows/task-correlate-relate gates.approval rule 0" {
+		t.Fatalf("approved relate gates %+v, want the one task-correlate-relate's rule released", r.gatesNamed("relate"))
+	}
+}
+
+func TestAPairYouUnrelatedIsNeverRelatedAgainOnItsOwn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, relatedTo(olderTask))
+	r.happen(task.EventCreated)
+	r.settle(4)
+	if len(r.related()) != 1 {
+		t.Fatalf("the older task relates %v", r.related())
+	}
+	r.advance(time.Minute)
+	if _, err := r.te.tasks.Do(ctx, olderTask, coretasks.Request{Verb: task.VerbUnrelate, Args: map[string]string{task.ArgTask: string(newerTask)},
+		Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	r.advance(time.Hour)
+	r.item(olderUnit, "x1", "github:dana", "ship the billing export, with the new columns")
+	r.happen(task.EventLinked)
+	r.settle(4)
+	if got := r.related(); len(got) != 0 {
+		t.Fatalf("a pair you unrelated was related again on its own: %v", got)
+	}
+	if gs := r.gatesNamed("relate")[gate.Open]; len(gs) != 1 {
+		t.Fatalf("relate gates %+v, want one waiting for you", r.gatesNamed("relate"))
+	}
+}
+
+func TestARelatedVerdictOnAPullRequestTheTaskLinksIsLeftToTheFold(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, relatedTo(olderTask))
+	l := link.Link{From: newerUnit, To: olderUnit, Kind: link.Review, Item: "y1", Evidence: unit.Anchor{Unit: newerUnit, Ref: "c:y1"},
+		Origin: link.Extraction, At: testNow}
+	if err := r.db.Links().Put(ctx, l); err != nil {
+		t.Fatal(err)
+	}
+	r.happen(task.EventCreated)
+	r.settle(4)
+	if got := r.related(); len(got) != 0 {
+		t.Fatalf("a related verdict on the pull request the task links related them: %v", got)
+	}
+	if e, err := r.db.Tasks().Task(ctx, newerTask); err != nil || e.ID != olderTask {
+		t.Fatalf("the newer task reads as %s (%v), want the fold to merge it", e.ID, err)
 	}
 }

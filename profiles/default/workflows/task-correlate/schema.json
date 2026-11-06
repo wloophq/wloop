@@ -1,16 +1,17 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["same_work", "same_as", "reason"],
+  "required": ["verdict", "task", "reason"],
   "properties": {
-    "same_work": {
-      "type": "boolean",
-      "description": "True when one candidate task is the same piece of work as this task; false when none is."
+    "verdict": {
+      "type": "string",
+      "enum": ["same", "related", "none"],
+      "description": "same when one candidate task is the same piece of work as this task; related when none is, but one is distinct work this task is part of or bears on; none otherwise."
     },
-    "same_as": {
+    "task": {
       "type": "string",
       "maxLength": 64,
-      "description": "With same_work, the id of that candidate, copied from the list; with same_work false, empty."
+      "description": "With verdict same or related, the id of that candidate, copied from the list; with none, empty."
     },
     "reason": {
       "type": "string",

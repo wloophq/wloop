@@ -93,9 +93,10 @@ status = "approved"
 label = "Reject"
 status = "rejected"
 
-# A merge a workflow proposes, such as an ask in a thread that links a
-# pull request with a task of its own; approving it runs the merge as
-# yours.
+# A merge a workflow asks for, such as an ask in a thread that links a
+# pull request with a task of its own. The asking workflow's approval
+# decides it: approving it by hand runs the merge as yours, a rule that
+# releases it runs it as the workflow.
 [gates.merge]
 kind = "proposal"
 label = "Merge these tasks?"
@@ -107,6 +108,21 @@ status = "approved"
 
 [gates.merge.intents.reject]
 label = "Keep apart"
+status = "rejected"
+
+# A relation a workflow asks for, between two tasks of distinct but related
+# work; decided as the merge gate is.
+[gates.relate]
+kind = "proposal"
+label = "Relate these tasks?"
+text = "Relate \"{{.proposal.task}}\" and \"{{.proposal.other}}\"? Each lists the other; Unrelate takes the link off."
+
+[gates.relate.intents.approve]
+label = "Relate"
+status = "approved"
+
+[gates.relate.intents.reject]
+label = "Keep unrelated"
 status = "rejected"
 
 # A round whose start the agent blocked on its question, such as trusting

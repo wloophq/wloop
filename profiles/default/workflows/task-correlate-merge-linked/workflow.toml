@@ -1,0 +1,18 @@
+summary = "Merge a task into the candidate the correlation judged the same work, when a link target or a cited unit also ties them"
+provider = "task"
+when = 'trigger.event.data == "task-correlate" && classify.task_correlate.verdict == "same" && classify.task_correlate.task in task.linked_candidates'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["classified"]
+
+[[step]]
+use = "task.verb"
+verb = "merge"
+task = "classify.task_correlate.task"
+
+# The judgment and a shared link agree: the merge runs at once, and Split
+# gives it back. A pair you took apart waits for you instead.
+[[gates.approval.rule]]
+when = 'gate.name == "merge"'
+mode = "run"

@@ -368,8 +368,9 @@ by      = { person = "true", agent = "true" }
 
 # One piece of work that reached you as several tasks: merge folds one
 # into the other, split gives it back, relate links distinct work. A
-# merge keeps the task you shaped by hand (survivor), else the older; a
-# workflow only proposes one, through the merge gate you approve.
+# merge keeps the task you shaped by hand (survivor), else the older. A
+# workflow asks through the verb's gate, which the asking workflow's
+# approval decides; a pair you took apart always waits for you.
 
 [verbs.merge]
 handler  = "merge"
@@ -393,7 +394,8 @@ handler = "relate"
 label   = "Relate"
 summary = "Link another task as related, distinct work: nothing moves, and each lists the other."
 input   = "Relate to which task"
-by      = { person = "true", agent = "true" }
+by      = { person = "true", agent = "true", workflow = "gate" }
+gate    = "relate"
 
 [verbs.unrelate]
 handler = "unrelate"
