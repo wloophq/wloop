@@ -10,14 +10,12 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/host"
 )
 
-// Markers Render writes around the context and a segment, and Prompt around the cited items.
+// Markers Render writes around the context and a segment.
 const (
 	ContextHeading = "-- context, read only: earlier messages to understand what follows; extract nothing from them --"
 	ContextEnds    = "-- end of context --"
 	SegmentStarts  = "-- segment starts: extract only from here --"
 	SegmentEnds    = "-- segment ends --"
-	CitedHeading   = "-- cited, read only: open items of other conversations this one links to --"
-	CitedEnds      = "-- end of cited --"
 )
 
 // Render is the conversation block; the eval uses it for every stage.
@@ -99,7 +97,7 @@ var (
 // renderMessage writes m with the dashes of any marker look-alike split, so no text a
 // message carries reads as a marker.
 func renderMessage(in Input, m slack.Message, label string, isNew bool, index map[string]string) string {
-	return markerLike.ReplaceAllString(renderRaw(in, m, label, isNew, index), "- -$1")
+	return in.Prompts.neutral(renderRaw(in, m, label, isNew, index))
 }
 
 func renderRaw(in Input, m slack.Message, label string, isNew bool, index map[string]string) string {
