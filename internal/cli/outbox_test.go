@@ -25,7 +25,7 @@ import (
 
 // outboxDaemon serves te's drafts, published by pub, on a socket of its own; interactive says whether the CLI
 // reads from a terminal.
-func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
+func outboxDaemon(t *testing.T, te *testEnv, interactive bool, edits ...func(*daemon.Deps)) *sqlite.DB {
 	t.Helper()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), nil)
 	if err != nil {
@@ -38,6 +38,9 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
 	}
 	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf, Intents: te.loadedIntents}, db, te.cfg, mods, t.Logf)
 	d = te.serveOutbox(d, db, te.cfg, mods, t.Logf)
+	for _, edit := range edits {
+		edit(&d)
+	}
 	h := daemon.New(d).Handler()
 	te.Socket = serveSocket(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -450,6 +453,45 @@ func TestAnAgentSessionsShellResolvesNoGate(t *testing.T) {
 	te.Getenv = func(string) string { return "" }
 	if code := te.run("outbox", "discard", "1"); code != 0 || te.draftState(t, db, held.ID).State != draft.Dropped {
 		t.Fatalf("a person's discard: exit %d: %s", code, te.err)
+	}
+}
+
+func TestAnAgentShellApprovesThroughASessionTheUserDrives(t *testing.T) {
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, false, func(d *daemon.Deps) { d.Turns = te.Turns })
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	worker, err := te.Turns.Resolve(ctx, "fake", "term_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.Typed(ctx, worker, "/review https://example.test/acme/api/pull/7"); err != nil {
+		t.Fatal(err)
+	}
+	shell := func(handle string) {
+		te.Getenv = func(k string) string {
+			switch k {
+			case fake.HandleVar:
+				return handle
+			case "CLAUDE_CODE_SESSION_ID":
+				return "agent-" + handle
+			}
+			return ""
+		}
+	}
+	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "on it", State: draft.Held})
+	shell("term_1")
+	if code := te.run("outbox", "approve", "1", "--yes"); code == 0 || te.draftState(t, db, held.ID).State != draft.Held {
+		t.Fatalf("a worker session's shell approved: exit %d: %s", code, te.err)
+	}
+	shell("term_2")
+	if code := te.run("outbox", "approve", "1", "--yes"); code != 0 {
+		t.Fatalf("the shell of a session the user drives: exit %d: %s", code, te.err)
+	}
+	d := te.draftState(t, db, held.ID)
+	g, ok, err := te.outbox.GateOf(ctx, d)
+	if err != nil || !ok || g.Status != gate.Approved || g.By != task.ActorAgent || g.BySession == "" || g.BySession == worker {
+		t.Fatalf("the gate %+v %v, want approved through the session the user drives", g, err)
 	}
 }
 

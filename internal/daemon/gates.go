@@ -1,12 +1,14 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -28,10 +31,14 @@ import (
 // gateTickEvery is the longest the gates' tick waits between two looks.
 const gateTickEvery = 30 * time.Second
 
-// tickGates resolves the gates whose window passed, after each gates note,
-// at the earliest open deadline and at least every gateTickEvery, until ctx
-// ends.
+// tickGates settles the tasks held by gates that closed before their
+// declaration ended them, then resolves the gates whose window passed, after
+// each gates note, at the earliest open deadline and at least every
+// gateTickEvery, until ctx ends.
 func (s *Server) tickGates(ctx context.Context) {
+	if err := s.deps.Gates.SettleEnded(ctx); err != nil && ctx.Err() == nil {
+		s.logf("gates: settling held tasks: %v", err)
+	}
 	var poke <-chan struct{}
 	if s.deps.Changes != nil {
 		p, cancel := change.Poke(s.deps.Changes, port.TopicGates)
@@ -92,7 +99,8 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGate resolves a gate with the intent its path names. A request
-// from a session resolves it as the agent, which the gates service refuses.
+// from a session resolves it as the agent through that session, which the
+// gates service accepts only from a session the user drives.
 func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 	rd, ok := s.gateReader(w)
 	if !ok {
@@ -108,7 +116,7 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	actor, ok := requestActor(w, r)
+	q, ok := s.requester(w, r)
 	if !ok {
 		return
 	}
@@ -120,14 +128,15 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 	}
 	intent := r.PathValue("intent")
 	if g.Kind == gate.KindDraft && s.deps.Outbox != nil {
-		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, actor)
+		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, q)
 	} else {
 		source := turn.Cockpit
-		if actor == task.ActorPerson {
+		if q.Actor == task.ActorPerson {
 			source, err = answerSource(req.Source)
 		}
 		if err == nil {
-			err = s.deps.Gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), id, gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: actor})
+			err = s.deps.Gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), id,
+				gates.Resolution{Intent: intent, Answer: req.Args["answer"], By: q.Actor, Session: q.Session})
 		}
 	}
 	if err != nil {
@@ -181,7 +190,7 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
 func (s *Server) draftGateView(g gate.Gate, dv api.Draft) api.GateView {
 	v := gateView(gate.Gate{ID: g.ID, Task: g.Task, Unit: g.Unit, Kind: g.Kind, Name: g.Name, Status: g.Status, Intents: g.Intents,
-		Deadline: g.Deadline, Default: g.Default}, s.loaded().Gates)
+		Deadline: g.Deadline, Default: g.Default, Text: g.Text}, s.loaded().Gates)
 	v.Subject, _ = json.Marshal(dv)
 	v.Delivery = dv.State
 	return v
@@ -195,7 +204,7 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 		v.Unit = g.Unit.String()
 	}
 	def, _ := d.Gate(g.Name)
-	v.Text = def.Label
+	v.Text = cmp.Or(g.Text, def.Label)
 	for _, name := range g.Intents {
 		iv := api.IntentView{ID: name, Label: name}
 		for _, in := range def.Intents {
@@ -215,13 +224,34 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 	return v
 }
 
+// openGatesOf are task id's open gates, the oldest first; in a pass, the open gates of every task are read
+// once for all of them.
+func (s *Server) openGatesOf(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	rd := s.deps.GateReader
+	if _, ok := coretasks.PassOf(ctx); ok {
+		open, err := coretasks.Once(ctx, passOpenGates, func() (map[task.ID][]gate.Gate, error) {
+			gs, err := rd.Where(ctx, gates.Query{Statuses: []gate.Status{gate.Open}})
+			out := map[task.ID][]gate.Gate{}
+			for _, g := range gs {
+				out[g.Task] = append(out[g.Task], g)
+			}
+			return out, err
+		})
+		return open[id], err
+	}
+	gs, err := rd.OfTask(ctx, id)
+	return slices.DeleteFunc(gs, func(g gate.Gate) bool { return g.Status != gate.Open }), err
+}
+
+const passOpenGates = "daemon.open_gates"
+
 // openGates sets v's open gates.
 func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskView) error {
 	rd := ev.s.deps.GateReader
 	if rd == nil {
 		return nil
 	}
-	gs, err := rd.OfTask(ctx, e.ID)
+	gs, err := ev.s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		return err
 	}
@@ -235,7 +265,7 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 
 // resolveDraftGateAt resolves draft gate g with intent as actor, under draftMu: an approval readies its draft at the
 // args' rev, the draft's own when absent, with the args' text when present, and is refused while its plugin is off.
-func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor task.Actor) error {
+func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor requester) error {
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	id, err := strconv.ParseInt(g.Subject, 10, 64)

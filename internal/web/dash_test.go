@@ -15,7 +15,7 @@ import (
 )
 
 var dashFuncs = append(slices.Clone(lensFuncs), "toggledQualifier", "qualifierToken", "tagKeys", "stamp",
-	"dashPalette", "dashSeries", "dashTheme", "dashMix", "dashDim", "dashItem", "dashTally", "dashRanked", "dashBase", "dashCountAxis", "dashBars",
+	"dashStrip", "dashPalette", "dashSeries", "dashTheme", "dashMix", "dashDim", "dashItem", "dashTally", "dashRanked", "dashBase", "dashCountAxis", "dashBars",
 	"dashKpis", "dashWaitOption", "dashPeopleOption", "dashAuthorsOption", "dashReposOption", "dashKindOption", "dashTagsOption",
 	"dashShapeOption", "dashWorkingMs", "dashDays", "dashQuantile", "dashRound", "dashAgingOption", "dashNextOption", "dashOpenedOption",
 	"dashCostOption", "dashCompact", "dashHas", "dashBlockersOption", "dashLift", "dashLiftOption", "dashAgeBoxOption", "dashClickQuery", "dashEsc")
@@ -117,18 +117,18 @@ func TestEachPanelCountsIgnoringItsOwnField(t *testing.T) {
 		Wait, Kind, Repo map[string]int
 		Authors          map[string]int
 	}
-	dashRun(t, "wait:me repo:acme/api", dashRows(now), now, `
+	dashRun(t, "wait:me where:acme/api", dashRows(now), now, `
 const repos = dashReposOption(rows, lens, pal).series[0].data.flatMap((o) => o.children.map((c) => [o.name + "/" + c.name, c.value]));
 process.stdout.write(JSON.stringify({ Wait: bars(dashWaitOption(rows, lens, pal)), Kind: bars(dashKindOption(rows, lens, pal)),
   Repo: Object.fromEntries(repos), Authors: bars(dashAuthorsOption(rows, lens, pal)) }));`, &got)
 	if want := map[string]int{"Waiting on me": 2}; !mapsEqual(got.Wait, want) {
-		t.Errorf("wait %v, want %v: the wait panel ignores wait:me but keeps repo:acme/api", got.Wait, want)
+		t.Errorf("wait %v, want %v: the wait panel ignores wait:me but keeps where:acme/api", got.Wait, want)
 	}
 	if want := map[string]int{"review": 1, "checks failing": 1}; !mapsEqual(got.Kind, want) {
 		t.Errorf("kind %v, want %v", got.Kind, want)
 	}
 	if want := map[string]int{"acme/api": 2, "acme/web": 1}; !mapsEqual(got.Repo, want) {
-		t.Errorf("repo %v, want %v: the repo panel ignores repo: but keeps wait:me", got.Repo, want)
+		t.Errorf("where %v, want %v: the where panel ignores where: but keeps wait:me", got.Repo, want)
 	}
 	if want := map[string]int{"ana": 1, "me": 1}; !mapsEqual(got.Authors, want) {
 		t.Errorf("authors %v, want %v", got.Authors, want)
@@ -445,7 +445,7 @@ func TestAClickWritesTheQuery(t *testing.T) {
 		{"fix", [][]string{{"waits-on", "team:acme/core"}}, false, "fix waits-on:team:acme/core"},
 		{"", [][]string{{"size", "s"}, {"risk", "low"}}, false, "size:s risk:low"},
 		{"size:s", [][]string{{"size", "s"}, {"risk", "low"}}, false, "size:s risk:low"},
-		{"size:s risk:low repo:x", [][]string{{"size", "s"}, {"risk", "low"}}, false, "repo:x"},
+		{"size:s risk:low where:x", [][]string{{"size", "s"}, {"risk", "low"}}, false, "where:x"},
 		{"", [][]string{{"tag", "area:auth"}, {"is", "stalled"}}, false, "tag:area:auth is:stalled"},
 		{"", [][]string{{"ci", "unit tests"}}, false, `ci:"unit tests"`},
 		{"", [][]string{{"opened", "2w"}}, true, "-opened:2w"},

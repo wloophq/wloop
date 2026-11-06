@@ -164,7 +164,7 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 	}
 	f := map[string][]string{"kind": {kind}, "wait": wait, "waits-on": who}
 	if repo := str(r["repo"]); repo != "" {
-		f["repo"] = []string{repo}
+		f["where"] = []string{repo}
 	}
 	if author != "" {
 		f["author"] = []string{author}
@@ -180,10 +180,10 @@ func facetsOf(viewer string, now time.Time, r map[string]any) map[string][]strin
 	mute := obj(r["mute"])
 	mutedUntil, _ := time.Parse(time.RFC3339, str(mute["until"]))
 	flags := map[string]bool{"stalled": slices.Contains(views, "stalled"), "needs-me": slices.Contains(views, "needs-me"), "in-loop": slices.Contains(views, "loop"),
-		"approved": r["approved"] == true, "hold": o["hold"] == true, "muted": mute["until_state_change"] == true || mutedUntil.After(now),
+		"approved": r["approved"] == true, "paused": o["hold"] == true, "muted": mute["until_state_change"] == true || mutedUntil.After(now),
 		"adopted": o["adopted"] == true, "tracked": o["tracked"] == true}
 	f["is"] = []string{}
-	for _, k := range []string{"stalled", "needs-me", "in-loop", "approved", "hold", "muted", "adopted", "tracked"} {
+	for _, k := range []string{"stalled", "needs-me", "in-loop", "approved", "paused", "muted", "adopted", "tracked"} {
 		if flags[k] {
 			f["is"] = append(f["is"], k)
 		}

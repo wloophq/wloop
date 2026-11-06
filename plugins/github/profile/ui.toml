@@ -1,19 +1,26 @@
 # The words of the views, facets, situations and menu bar sections the
-# GitHub plugin's manifest declares. A user profile's plugins/github/ui.toml
-# replaces the keys it sets.
+# GitHub plugin's manifest declares, and where each facet shows on a pull
+# request's row. A user profile's plugins/github/ui.toml replaces the keys
+# it sets.
+
+[lens]
+col_aside = "Workspace"
 
 [views.mine]
 label = "My PRs"
 unit = "Pull request"
+default_sort = "Waiting longest"
 
 [views.plan]
 label = "Plan"
 
 [views.dash]
 label = "Backlog"
+default_sort = "Waiting longest"
 
 [views.all]
 label = "All"
+default_sort = "Waiting longest"
 
 [views.explore]
 label = "Explore"
@@ -41,45 +48,61 @@ no_decision = "no review required"
 [views.recent]
 label = "Recent"
 
-[facets.repo]
-label = "Repo"
+[facets.where]
+label = "Where"
+show = "ref"
 
 [facets.author]
 label = "Author"
+show = "meta"
+show_values = "first"
+label_prefix = "by "
+row_class = { me = "mine" }
 
 [facets.wait]
 label = "Waits on (role)"
 values = { author = "Waiting on the author", loop = "In loop", me = "Waiting on me", nobody = "Waiting on nobody", reviewer = "Waiting on a reviewer" }
+colors = { author = "author", loop = "loop", me = "me", nobody = "nobody", reviewer = "reviewer" }
 
 [facets.waits-on]
 label = "Waits on (person)"
+show = "who"
 
 [facets.kind]
 label = "Situation"
-values = { blocked = "round blocked", changes = "changes asked", checks = "checks failing", conflicts = "merge conflicts", done = "closed", draft = "draft", held = "held (cap)", loop_stopped = "agent stopped", loop_waiting = "agent asks", loop_working = "agent working", merge = "can merge", muted = "muted", no_reviewer = "no reviewer", reply = "reply due", review = "review", reviewer_back = "reviewer due", round_pending = "round soon", to_address = "to address" }
+show = "kind"
 
 [facets.type]
 label = "Type"
 empty = "no brief"
+show = "meta"
 
 [facets.risk]
 label = "Risk"
 empty = "no brief"
+show = "meta"
+label_prefix = "risk "
 
 [facets.size]
 label = "Size"
 empty = "no brief"
 values = { l = "L", m = "M", s = "S", xl = "XL", xs = "XS" }
+show = "meta"
 
 [facets.status]
 label = "Workspace"
 empty = "no workspace"
+show = "aside"
 
 [facets.tag]
 label = "Tag"
+show = "meta"
 
 [facets.is]
 label = "Flags"
+values = { adopted = "adopted", approved = "approved", due = "due", in-loop = "in loop", muted = "muted", needs-me = "needs me", paused = "paused", stalled = "stalled", tracked = "tracked" }
+show = { flag = ["paused", "muted"] }
+row_class = { stalled = "late" }
 
 [facets.ci]
 label = "Checks"
@@ -97,6 +120,7 @@ label = "In scope as"
 [facets.age]
 label = "Waiting for"
 buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
+show = "age"
 
 [facets.lane]
 label = "Board lane"

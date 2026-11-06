@@ -1,0 +1,8 @@
+{
+  "by_situation": {
+    "waits_on_viewer": { "waits-on": ["me"], "turn": ["me"], "situation": ["waits_on_viewer"] },
+    "waits_on_others": { "waits-on": ["Ana"], "turn": ["others"], "situation": ["waits_on_others"] }
+  },
+  "since": "age",
+  "channel": "where"
+}

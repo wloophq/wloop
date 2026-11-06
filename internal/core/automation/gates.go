@@ -63,6 +63,7 @@ func (e *Engine) syncGates(ctx context.Context) error {
 		has[g.Subject] = true
 	}
 	now := e.now()
+	live := e.live()
 	waiting := map[string]bool{}
 	var errs []error
 	for _, it := range items {
@@ -73,7 +74,8 @@ func (e *Engine) syncGates(ctx context.Context) error {
 		if has[it.ID] {
 			continue
 		}
-		if _, err := e.Gates.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: it.Unit, Subject: it.ID}, decided(decisionOf(it, now))); err != nil {
+		g := gate.Gate{Kind: gate.KindPlan, Unit: it.Unit, Subject: it.ID, Text: e.asks(ctx, live[it.Workflow], it)}
+		if _, err := e.Gates.Open(ctx, g, decided(decisionOf(it, now))); err != nil {
 			errs = append(errs, fmt.Errorf("opening the gate of %s: %w", it.ID, err))
 		}
 	}
@@ -88,6 +90,24 @@ func (e *Engine) syncGates(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// asks is what it's plan gate asks: w's Ask over its unit's facts, else w's
+// summary when they cannot be read or the Ask fails on them.
+func (e *Engine) asks(ctx context.Context, w workflow.Workflow, it workflow.Item) string {
+	if w.Ask == nil {
+		return w.Summary
+	}
+	facts, err := e.factsFor(ctx, w, it.Unit)
+	if err != nil {
+		e.logf("%s: the words of its gate on %s: %v", w.Name, it.Unit, err)
+		return w.Summary
+	}
+	text, err := w.Asks(it.Unit.Label(), facts)
+	if err != nil {
+		e.logf("%s: the words of its gate on %s: %v", w.Name, it.Unit, err)
+	}
+	return text
+}
+
 // syncGatesOrLog is syncGates after a ledger write, which its failure does
 // not undo: the next write tries again.
 func (e *Engine) syncGatesOrLog(ctx context.Context) {
@@ -97,7 +117,8 @@ func (e *Engine) syncGatesOrLog(ctx context.Context) {
 }
 
 // Release is a resolved plan gate's consequence on the item it names; the
-// caller holds the loop lock. A person's approval runs the item by hand,
+// caller holds the loop lock. The user's approval, a person's or an agent's
+// through a session the user drives, runs the item by hand,
 // with the gate's answer as its guidance when it has one; an approval by
 // its window or a trusted rule runs it as an automatic run; a rejection
 // skips it and a dismissal dismisses it. An item that no longer waits is
@@ -115,7 +136,7 @@ func (e *Engine) Release(ctx context.Context, g gate.Gate) error {
 	switch g.Status {
 	case gate.Approved, gate.Answered:
 		switch {
-		case g.By != task.ActorPerson:
+		case !g.ByUser():
 			return e.runReleased(ctx, it)
 		case g.Answer != "":
 			_, err = e.Act(ctx, it.ID, workflow.ActionGuide, g.Answer)

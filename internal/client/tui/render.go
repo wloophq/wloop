@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
 var navHelp = []helpItem{{"↑↓", "move"}, {"g", "view"}, {"/", "filter"}, {"^K", "actions"}}
+
+// lensHelp are the keys of the lens, which follow the filter on the lists.
+var lensHelp = []helpItem{{"=", "group"}, {"-", "sort"}}
 
 var quitHelp = helpItem{"q", "quit"}
 
@@ -28,6 +32,7 @@ const factLabel = 9
 // views, the list of the current one, the selected pull request's detail,
 // a status line and the help or prompt line.
 func (m *Model) Render(width, height int, now time.Time) []string {
+	m.now = now
 	if width < 20 || height < 5 {
 		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
 	}
@@ -55,7 +60,7 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if l, ok := m.loadingLine(m.rowsLoading, width); ok {
 		lines, body = append(lines, l), body-1
 	}
-	rows := m.visible()
+	rows, heads := m.visibleRows()
 	cur := m.cursor(rows)
 	var detail []string
 	if r, ok := m.selected(); ok && width >= 40 && body >= 8 {
@@ -75,7 +80,7 @@ func (m *Model) Render(width, height int, now time.Time) []string {
 	if len(rows) == 0 {
 		lines = append(lines, "  "+m.t.Dim(termfmt.Cut(m.empty(), width-2)))
 	} else {
-		lines = append(lines, m.list(rows, cur, width, listHeight, now)...)
+		lines = append(lines, m.list(rows, heads, cur, width, listHeight, now)...)
 	}
 	if len(detail) > 0 {
 		lines = append(append(lines, ""), detail...)
@@ -118,7 +123,8 @@ func (m *Model) tabs(width int) string {
 		first = m.views[i].Provider
 	}
 	for i, v := range m.views {
-		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
+		shown, _ := m.in(v.ID)
+		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(shown)), i})
 	}
 	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
 	mine := 0
@@ -221,65 +227,13 @@ func around(g []tab, view, width int) []tab {
 	return g[lo:hi]
 }
 
-// list lays the view's rows out in aligned columns, as status does, and
-// shows the height of them around the cursor.
-func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []string {
-	t := m.t
-	cols := []termfmt.Column{{Right: true}, {}, {Flex: true}}
-	brief := width >= 100
-	if brief {
-		cols = append(cols, termfmt.Column{})
-	}
-	waitMax := 14
-	switch {
-	case width >= 120:
-		waitMax = 36
-	case width >= 100:
-		waitMax = 28
-	case width >= 80:
-		waitMax = 20
-	}
-	refMax := min(max((width-2)/3, 14), 40)
-	if width >= 60 {
-		cols = append(cols, termfmt.Column{Max: waitMax})
-	} else {
-		refMax = (width - 9) / 2
-	}
-	cells := make([][]termfmt.Cell, len(rows))
+// list lays the view's rows out as lines, as status does, and shows the height of them around the cursor.
+func (m *Model) list(rows []api.Row, heads []string, cur, width, height int, now time.Time) []string {
+	lines := make([]listLine, len(rows))
 	for i, r := range rows {
-		age, style := m.age(r, now)
-		url := r.Link
-		c := []termfmt.Cell{
-			{Text: age, Style: style},
-			{Text: shortRef(r.Label, refMax), Style: func(s string) string { return t.Link(url, s) }},
-			{Text: r.Title},
-		}
-		if r.Stale {
-			c[2] = termfmt.Cell{Text: staleMark + " " + r.Title}
-		}
-		if brief {
-			c = append(c, termfmt.Cell{Text: sizeRisk(r), Style: t.Dim})
-		}
-		cells[i] = append(c, termfmt.Cell{Text: m.waitCell(r, waitMax)})
+		lines[i] = m.rowLine(r, now)
 	}
-	laid := t.Columns(width-3, 2, cols, cells)
-	start := max(0, cur-height+1)
-	var out []string
-	for i := start; i < len(rows) && i < start+height; i++ {
-		mark := []byte("   ")
-		if i == cur {
-			mark[0] = '>'
-		}
-		if _, busy := m.busy[rows[i].Unit]; busy {
-			mark[1] = '*'
-		}
-		line := string(mark) + laid[i]
-		if i == cur && t.Color {
-			line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
-		}
-		out = append(out, line)
-	}
-	return out
+	return m.lineCells(lines, heads, cur, width, height)
 }
 
 // shortRef is a unit's label within w cells: a label of the form
@@ -302,16 +256,6 @@ func shortRef(label string, w int) string {
 	return termfmt.Cut(num, w)
 }
 
-// waitCell is who the row waits on and its kind within w cells, the names
-// cut before the kind.
-func (m *Model) waitCell(r api.Row, w int) string {
-	who, kind := oneLine(m.waiting(r)), m.kindLabel(r)
-	if room := w - termfmt.Cells(kind) - 3; termfmt.Cells(who) > room && room >= 2 {
-		who = termfmt.Cut(who, room)
-	}
-	return who + " · " + kind
-}
-
 // age is the row's age column and its color: a pending round's countdown,
 // else how long it waits, marked ! and red once stalled, yellow from two
 // days.
@@ -320,7 +264,7 @@ func (m *Model) age(r api.Row, now time.Time) (string, func(string) string) {
 	g, pending := m.roundGate(r)
 	switch {
 	case pending:
-		return fmt.Sprintf("%ds", max(0, int(g.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
+		return lens.Countdown(m.rowWordsOf(string(r.Unit.Provider)).RowWords, g.Deadline.Sub(now)), t.Cyan
 	case r.Summary.Since.IsZero():
 		return "-", t.Dim
 	case r.Summary.Stalled:
@@ -394,6 +338,10 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 // question adds the open question, the drafted verdict and the options.
 func (m *Model) question(q *api.QuestionView, fact func(label, text string, style func(string) string)) {
 	t := m.t
+	if q.Queued {
+		fact("answer", queuedAnswer, t.Dim)
+		return
+	}
 	text := cmp.Or(q.Text, q.LastMessage, "the agent stopped")
 	label := "asks"
 	if q.Text == "" {
@@ -506,17 +454,6 @@ func (m *Model) fill(lead string, items []helpItem, width int) string {
 	return line + strings.Join(styled, "  ")
 }
 
-var riskShort = map[string]string{"low": "lo", "medium": "md", "high": "hi"}
-
-// sizeRisk reads "M·hi" for a medium pull request of high risk.
-func sizeRisk(r api.Row) string {
-	b := prOf(r).Brief
-	if b == nil || b.Size == "" || riskShort[b.Risk] == "" {
-		return ""
-	}
-	return strings.ToUpper(b.Size) + "·" + riskShort[b.Risk]
-}
-
 // who names the author as the cockpit does: "me" when it is the viewer.
 func (m *Model) who(r api.Row) []string {
 	who := strings.Split(r.Summary.WaitsOn, ", ")
@@ -621,7 +558,7 @@ func (m *Model) helpItems() []helpItem {
 			verbs, _ := m.verbHelp(e)
 			items = append(items, verbs...)
 		}
-		return append(items, navHelp...)
+		return append(items, withLens(navHelp)...)
 	}
 	if m.view == m.planView() {
 		if it, ok := m.selectedItem(); ok {
@@ -636,7 +573,13 @@ func (m *Model) helpItems() []helpItem {
 			}
 		}
 	}
-	return append(items, navHelp...)
+	return append(items, withLens(navHelp)...)
+}
+
+// withLens is nav with the lens keys after the filter's.
+func withLens(nav []helpItem) []helpItem {
+	i := slices.IndexFunc(nav, func(h helpItem) bool { return h.key == "/" }) + 1
+	return slices.Concat(nav[:i], lensHelp, nav[i:])
 }
 
 // help is the help line unstyled and uncut.

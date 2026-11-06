@@ -4,7 +4,11 @@
 
 # The states a task takes, in the order clients list them. The category is
 # all the loop reads of a state: a task proposed in a category takes the
-# first state of it here.
+# first state of it here. The category is the commitment, a decision you
+# store; who has the ball now is what owed_by and the views derive. A task
+# in the ready category is committed, whoever does it next: you, an agent
+# or the person it waits on; Waiting is a ready state you set by hand to
+# mark it parked on someone.
 
 [states.inbox]
 category = "inbox"
@@ -15,7 +19,7 @@ category = "ready"
 label    = "Next"
 
 [states.waiting]
-category = "waiting"
+category = "ready"
 label    = "Waiting"
 
 [states.scheduled]
@@ -40,7 +44,9 @@ label    = "Trash"
 
 # The task properties, each the fact task.prop.<name>. Writers are who may
 # write one: a property an agent or a plugin writes is untrusted, so no
-# approval rule that releases a send or a run reads it. An int or a
+# approval rule that releases a send or a run reads it. An agent writes
+# only from a session you drive, so the properties you write an agent may
+# write for you. An int or a
 # duration of 0 means unset. A role names the loop's mechanism that acts
 # on the property: the area and contexts filters, the star, the deadline.
 
@@ -53,13 +59,13 @@ doc     = "How much the task matters next to the others."
 [props.due]
 type    = "date"
 role    = "deadline"
-writers = ["person", "plugin"]
+writers = ["person", "agent", "plugin"]
 doc     = "When the task is due: the date you set, or the deadline its source derives."
 
 [props.promised]
 type    = "date"
 role    = "promise"
-writers = ["person"]
+writers = ["person", "agent"]
 doc     = "The date you promised the task by, such as an answer by Friday."
 
 [props.size]
@@ -81,7 +87,7 @@ doc     = "How much could go wrong doing the task."
 
 [props.owner]
 type    = "actor"
-writers = ["person"]
+writers = ["person", "agent"]
 doc     = "Who owns the task."
 
 [props.asker]
@@ -98,20 +104,20 @@ doc     = "What the task is: new work, a capture, a project, or a kind a plugin 
 [props.area]
 type    = "string"
 role    = "area"
-writers = ["person"]
+writers = ["person", "agent"]
 doc     = "The area of your life or work the task belongs to; areas seeds the menu."
 
 [props.contexts]
 type    = "string[]"
 role    = "contexts"
-writers = ["person", "plugin"]
+writers = ["person", "agent", "plugin"]
 doc     = "The contexts the task is listed under, such as @calls or @repo-api; contexts seeds the menu."
 
 [props.focus]
 type    = "enum"
 values  = ["on", "off"]
 role    = "star"
-writers = ["person", "workflow"]
+writers = ["person", "agent", "workflow"]
 doc     = "Whether the task is starred in Focus."
 
 [props.autostar]
@@ -127,7 +133,7 @@ doc     = "When a workflow last nudged whoever the task waits on."
 
 [props.check_on]
 type    = "date"
-writers = ["person", "workflow"]
+writers = ["person", "agent", "workflow"]
 doc     = "When to check on the task while it waits."
 
 [props.unfollowed]
@@ -138,20 +144,21 @@ doc     = "When the task of a unit you stopped following was dropped; following 
 # Who owes a task's next step: an expression over the task's facts whose
 # value is me, a person's key, or empty when nobody does; it is the fact
 # task.owed_by. Here an open gate makes it yours, even on a closed task;
-# otherwise nobody owes a closed task; otherwise the owner a person handed
+# otherwise nobody owes a closed task; otherwise the owner you handed
 # it to; otherwise an item that waits on you; otherwise whoever its items
-# wait on; otherwise its owner; nobody when its units' open items wait on
-# no one, such as a quiet pull request; and you when it has none.
+# wait on; otherwise its owner; nobody while an agent works on it or when
+# its units' open items wait on no one, such as a quiet pull request; and
+# you when it has none.
 
 [owed_by]
 expr = '''
 task.gates_open > 0 ? "me" :
 task.category in ["done", "dropped"] ? "" :
-task.prop.owner != "" && task.prop_by.owner == "person" ? task.prop.owner :
+task.prop.owner != "" && task.prop_by.owner in ["person", "agent"] ? task.prop.owner :
 "me" in task.link_owes ? "me" :
 size(task.link_owes) > 0 ? task.link_owes[0] :
 task.prop.owner != "" ? task.prop.owner :
-task.items_open > 0 ? "" : "me"'''
+task.turns_running > 0 || task.items_open > 0 ? "" : "me"'''
 
 # The verbs. A verb's label is its button; its summary, one line on what
 # pressing it does, is the button's tooltip; input is the question a verb
@@ -160,7 +167,10 @@ task.items_open > 0 ? "" : "me"'''
 # handler what the loop runs besides the move. by says who may run it:
 # a condition over the task's facts per actor (person, workflow, agent,
 # plugin), or "gate", which opens the gate the verb's gate names for a
-# person to approve; an actor left out may not run it. A verb that ends a
+# person to approve; an actor left out may not run it. An agent's request
+# reaches by only from a session you drive: the daemon refuses one from a
+# session running a turn the loop sent, or one the loop typed into last,
+# so the bundled verbs give agent what they give person. A verb that ends a
 # task, moving it from an open state to a done or dropped one, withdraws
 # the held drafts the task carries, but those of the purposes its
 # keep_drafts lists: the bundled verbs keep none, so closing a task never
@@ -168,10 +178,10 @@ task.items_open > 0 ? "" : "me"'''
 
 [verbs.next]
 label   = "Next"
-summary = "Move it to Next: something you will do as soon as you can."
+summary = "Move it to Next: committed, you or an agent will do it."
 from    = ["inbox", "waiting", "scheduled", "someday", "reference"]
 to      = "next"
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.waiting]
 handler = "waiting"
@@ -180,7 +190,7 @@ summary = "Move it to Waiting on the people you name; it resurfaces on the date 
 input   = "Waiting on whom (optional)"
 from    = ["inbox", "next", "scheduled", "someday"]
 to      = "waiting"
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.schedule]
 handler = "schedule"
@@ -189,21 +199,21 @@ summary = "Hide it until a date or until its unit moves, then bring it back wher
 input   = "Until when: YYYY-MM-DD, an RFC 3339 time, or activity"
 from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "scheduled"
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.wake]
 handler = "wake"
 label   = "Wake"
 summary = "Bring it back from its snooze, where it was before."
 from    = ["scheduled", "someday"]
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.someday]
 label   = "Someday"
 summary = "Move it to Someday: not now, kept for a later look."
 from    = ["inbox", "next", "waiting", "scheduled"]
 to      = "someday"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.reference]
 handler = "finish"
@@ -211,14 +221,14 @@ label   = "Reference"
 summary = "Keep it as reference: nothing to do, worth finding again, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "done"]
 to      = "reference"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.focus]
 handler = "focus"
 label   = "Focus"
 summary = "Star it in Focus, or take the star off."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.project]
 handler = "project"
@@ -226,20 +236,20 @@ label   = "Project"
 summary = "Attach it to a project, or start a new project with it."
 input   = "Project title"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.approve]
 handler = "approve"
 label   = "Approve"
 summary = "Approve what it proposes: its draft, its recommended answer or its unit's action."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.delegate]
 handler = "delegate"
 label   = "Delegate"
 summary = "Hand it to an agent, which runs its unit's action."
 input   = "Guidance for the agent (optional)"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.done]
 handler = "finish"
@@ -247,7 +257,7 @@ label   = "Done"
 summary = "Mark it done: it leaves your lists for the Logbook, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
 to      = "done"
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.dismiss]
 handler = "drop"
@@ -255,13 +265,13 @@ label   = "Dismiss"
 summary = "Throw it away: it goes to the trash, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference", "done"]
 to      = "trash"
-by      = { person = "true", workflow = "true" }
+by      = { person = "true", agent = "true", workflow = "true" }
 
 [verbs.seen]
 handler = "seen"
 label   = "Seen"
 summary = "Mark what changed on it as read."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.context]
 handler = "context"
@@ -269,7 +279,7 @@ label   = "Context"
 summary = "Set the contexts it is listed under."
 input   = "Contexts, comma separated (empty clears)"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.area]
 handler = "area"
@@ -277,37 +287,37 @@ label   = "Area"
 summary = "Set the area it belongs to."
 input   = "Area (empty clears)"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.answer]
 handler = "answer"
 label   = "Answer"
 summary = "Answer the question it asks."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.edit]
 handler = "edit"
 label   = "Edit"
 summary = "Change its draft before it is sent."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.retry]
 handler = "retry"
 label   = "Retry"
 summary = "Send its failed draft again."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.reviewed]
 handler = "reviewed"
 label   = "Reviewed"
 summary = "Mark the project reviewed; the next review comes after its interval."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.sequential]
 handler = "sequential"
 label   = "Sequential"
 summary = "Take the project's actions one at a time, or all at once again."
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.reply]
 handler = "reply"
@@ -315,7 +325,7 @@ label   = "Reply"
 summary = "Write a reply on its unit; Send posts it now, Save as draft holds it for your approval."
 input   = "Your reply"
 send    = "now"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 # Triage: tell the asker you are on it, say it is not yours, or hand it to
 # someone. Each records its event, verb_<name>, on which the bundled
@@ -328,14 +338,14 @@ summary = "Tell the asker you are on it: a time proposes a \"looking, by then\" 
 input   = "By when: HH:MM, a date, or empty to just react"
 from    = ["inbox", "next"]
 to      = "next"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.not-mine]
 label   = "Not mine"
 summary = "Say it is not yours: it goes to the trash with the drafts it carries, and a reply pointing the asker elsewhere waits for your approval."
 from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "trash"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 [verbs.hand-to]
 handler = "waiting"
@@ -344,9 +354,14 @@ summary = "Hand it to someone: it waits on them, and Chase lists it once its che
 input   = "Hand to whom"
 from    = ["inbox", "next", "scheduled", "someday"]
 to      = "waiting"
-by      = { person = "true" }
+by      = { person = "true", agent = "true" }
 
 # What you write on a task's chat reaches its live session; with none, it
 # starts a turn of this intent, resuming the task's last session.
 [chat]
 intent = "chat"
+
+# How the task's page and its timeline name a change an agent made for
+# you through a session you drove; {session} is that session's id.
+[attribution]
+via_session = "you, via session {session}"

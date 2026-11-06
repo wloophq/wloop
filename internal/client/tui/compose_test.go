@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -172,7 +173,7 @@ func TestTheFilterReadsATasksWords(t *testing.T) {
 	e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Name: "Ana Lima"}}}}}
 	e = waitingOn(e, "Bruno")
 	for q, want := range map[string]bool{"#ops": true, "freeze dana": true, "ana": true, "bruno rollout": true, "zzz": false, "": true} {
-		if got := taskMatches(e, q); got != want {
+		if got := lens.Parse(q, nil).Match(taskItem(e), nil, now); got != want {
 			t.Errorf("%q: %v, want %v", q, got, want)
 		}
 	}

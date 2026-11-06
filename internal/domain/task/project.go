@@ -32,47 +32,6 @@ func (e Task) ReviewDue(now time.Time) bool {
 	return !since.Add(e.ReviewInterval()).After(now)
 }
 
-type ProjectStatus struct {
-	// Next is the project's next action: the open action with the lowest Position that is ready; of a sequential
-	// project, its first open action when that one is ready. "" none.
-	Next      ID
-	NextTitle string
-	Open      int // its open actions
-}
-
-// ProjectsOf is the status of each project in all over the actions in all.
-func ProjectsOf(all []Task) map[ID]ProjectStatus {
-	out := map[ID]ProjectStatus{}
-	seq := map[ID]bool{}
-	for _, e := range all {
-		if e.IsProject() {
-			out[e.ID] = ProjectStatus{}
-			seq[e.ID] = e.Sequential
-		}
-	}
-	acts := map[ID][]Task{}
-	for _, e := range all {
-		if _, ok := out[e.Parent]; ok && e.Open() {
-			acts[e.Parent] = append(acts[e.Parent], e)
-		}
-	}
-	for p, es := range acts {
-		sortByPosition(es)
-		st := ProjectStatus{Open: len(es)}
-		for _, e := range es {
-			if e.Category == CategoryReady {
-				st.Next, st.NextTitle = e.ID, e.Title
-				break
-			}
-			if seq[p] {
-				break
-			}
-		}
-		out[p] = st
-	}
-	return out
-}
-
 // Place puts e among its project's other actions at position pos (1 first; past the end, last) and numbers
 // them all from 1 in that order.
 func Place(others []Task, e Task, pos int) []Task {

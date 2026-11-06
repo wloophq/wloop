@@ -244,7 +244,7 @@ var writes = []writeCase{
 		call: func(ctx context.Context, s *Store) error {
 			return s.EndBriefRun(ctx, endOK(fullRun(), 1), dinv.BriefRecord{})
 		},
-		topics: port.TopicBriefs | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicBriefs | port.TopicLoopEvents | port.TopicRecords, refs: []github.Ref{ref},
 	},
 	{
 		method: "InterruptBriefRuns",
@@ -270,7 +270,7 @@ var writes = []writeCase{
 		method: "RefreshBrief",
 		seed:   seedBrief,
 		call:   func(ctx context.Context, s *Store) error { return s.RefreshBrief(ctx, ref) },
-		topics: port.TopicBriefs | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicBriefs | port.TopicLoopEvents | port.TopicRecords, refs: []github.Ref{ref},
 	},
 	{
 		method: "SetMetas",

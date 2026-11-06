@@ -1,6 +1,6 @@
 [
  {
-  "q": "repo:acme/api",
+  "q": "where:acme/api",
   "result": {
    "group": "",
    "total": 31,
@@ -46,7 +46,7 @@
   }
  },
  {
-  "q": "-repo:acme/api",
+  "q": "-where:acme/api",
   "result": {
    "group": "",
    "total": 31,
@@ -63,7 +63,7 @@
   }
  },
  {
-  "q": "repo:acme/web",
+  "q": "where:acme/web",
   "result": {
    "group": "",
    "total": 31,
@@ -80,7 +80,7 @@
   }
  },
  {
-  "q": "-repo:acme/web",
+  "q": "-where:acme/web",
   "result": {
    "group": "",
    "total": 31,
@@ -126,9 +126,9 @@
   }
  },
  {
-  "group": "repo",
+  "group": "where",
   "result": {
-   "group": "repo",
+   "group": "where",
    "total": 31,
    "shown": 31,
    "groups": [
@@ -179,7 +179,7 @@
   }
  },
  {
-  "sort": "repo",
+  "sort": "where",
   "result": {
    "group": "",
    "total": 31,
@@ -226,7 +226,7 @@
   }
  },
  {
-  "sort": "repo-desc",
+  "sort": "where-desc",
   "result": {
    "group": "",
    "total": 31,
@@ -7000,7 +7000,7 @@
   }
  },
  {
-  "q": "repo:api is:needs-me",
+  "q": "where:api is:needs-me",
   "group": "kind",
   "sort": "age-desc",
   "result": {

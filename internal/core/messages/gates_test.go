@@ -33,6 +33,7 @@ func TestAQuestionOpensAGateNotATask(t *testing.T) {
 	m := r.only(t)
 	open := r.openGates(t, gate.KindQuestion)
 	if len(open) != 1 || open[0].Subject != subject(m) || open[0].Task != held.ID || open[0].Unit != r7 || open[0].Name != "question" ||
+		m.Origin.Session == "" || open[0].Session != m.Origin.Session ||
 		!slices.Equal(open[0].Intents, []string{"answer", "continue", "dismiss"}) {
 		t.Fatalf("gates %+v", open)
 	}

@@ -226,6 +226,9 @@ func TestDMSegmentCard(t *testing.T) {
 	if h := c.LastHuman; h == nil || h.Who.Key != otherPerson.Key || h.What != "the release?" {
 		t.Errorf("last human %+v", h)
 	}
+	if r, _ := f.row(t, u); r.Facets[slackrows.FacetWhere] != nil {
+		t.Errorf("a DM lives nowhere: where = %v", r.Facets[slackrows.FacetWhere])
+	}
 	if r, _ := f.row(t, u); r.Label != "DM with Ana" || !slices.Equal(r.Facets[slackrows.FacetConversation], []string{"DM with Ana"}) {
 		t.Errorf("row %+v", r)
 	}
@@ -287,6 +290,15 @@ func TestSlackRowsAreGeneric(t *testing.T) {
 		s.Line != "waits on others · 1 open item" {
 		t.Errorf("summary %+v", s)
 	}
+	if got := []string{r.Facets[slackrows.FacetTurn][0], r.Facets[slackrows.FacetSituation][0], r.Facets[slackrows.FacetAge][0]}; !slices.Equal(got,
+		[]string{"others", "waits_on_others", tsAt(1).UTC().Format(time.RFC3339Nano)}) {
+		t.Errorf("turn, situation and age facets %q", got)
+	}
+	for _, id := range []string{slackrows.FacetTurn, slackrows.FacetSituation, slackrows.FacetAge} {
+		if !manifestFacet(t, id) {
+			t.Errorf("the manifest declares no facet %s", id)
+		}
+	}
 	if !slices.Equal(r.Views, []string{slackrows.ViewSlack}) || len(r.Items) != 1 || r.Items[0].ID != "e1" ||
 		!slices.Equal(r.Items[0].WaitingOn, []string{"Ana"}) {
 		t.Errorf("views %v items %+v", r.Views, r.Items)
@@ -312,8 +324,8 @@ func TestSlackRowsAreGeneric(t *testing.T) {
 	f.state(t, u, store.ExtractionState{Verdict: "resolved", At: f.now})
 	applyOps(t, f.ledger(), items.Extracted, items.Op{Op: items.OpResolve, Unit: u, Item: "e1", Resolution: items.Done,
 		Anchor: unit.Anchor{Unit: u, Ref: chan1 + "/" + ts(3), At: tsAt(3)}})
-	if r, _ := f.row(t, u); !r.Summary.Closed || r.Summary.WaitsOn != "nobody" {
-		t.Errorf("resolved row %+v", r.Summary)
+	if r, _ := f.row(t, u); !r.Summary.Closed || r.Summary.WaitsOn != "nobody" || r.Facets[slackrows.FacetTurn][0] != "nobody" {
+		t.Errorf("resolved row %+v, turn %v", r.Summary, r.Facets[slackrows.FacetTurn])
 	}
 	in, err := f.p.rowsSource().Load(context.Background(), []unit.Unit{u})
 	if err != nil {
@@ -347,7 +359,7 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	if got := r.Facets[slackrows.FacetWaitsOn]; !slices.Equal(got, []string{"@team-a", dslack.UnknownGroup}) {
 		t.Errorf("waits-on facet %v", got)
 	}
-	if got := r.Facets[slackrows.FacetChannel]; !slices.Equal(got, []string{"general"}) {
+	if got := r.Facets[slackrows.FacetWhere]; !slices.Equal(got, []string{"general"}) {
 		t.Errorf("channel facet %v", got)
 	}
 	in, err := f.p.rowsSource().Load(context.Background(), []unit.Unit{u})
@@ -358,7 +370,7 @@ func TestUserGroupsAreNamedNotShownByID(t *testing.T) {
 	if got := snap.FacetValues[slackrows.FacetWaitsOn]; !slices.Equal(got, []string{"@team-a", dslack.UnknownGroup}) {
 		t.Errorf("reported waits-on facet %v", got)
 	}
-	if got := snap.Facets[slackrows.FacetChannel]; got != "general" {
+	if got := snap.Facets[slackrows.FacetWhere]; got != "general" {
 		t.Errorf("reported channel facet %q", got)
 	}
 	c := f.card(t, u)
@@ -410,6 +422,42 @@ func manifestSituation(t testing.TB, kind string) bool {
 		t.Fatal(err)
 	}
 	return slices.ContainsFunc(s.Situations, func(sit manifest.Situation) bool { return sit.Name == kind })
+}
+
+func manifestFacet(t testing.TB, id string) bool {
+	t.Helper()
+	m, err := manifest.Load(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := m.Source()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return slices.ContainsFunc(s.UI.Facets, func(f manifest.UIFacet) bool { return f.ID == id })
+}
+
+func TestARowWaitingOnTheViewerIsItsTurn(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.people(t)
+	u := f.thread(t)
+	f.state(t, u, store.ExtractionState{Verdict: "waits_on_viewer", At: f.now})
+	applyOps(t, f.ledger(), items.Extracted, createOp(u, "e1", 1, otherPerson, mePerson))
+	if r, _ := f.row(t, u); r.Facets[slackrows.FacetTurn][0] != "me" || r.Facets[slackrows.FacetSituation][0] != "waits_on_viewer" {
+		t.Errorf("facets %v", r.Facets)
+	}
+}
+
+func TestAConversationTheViewerMustCloseIsTheirTurn(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.people(t)
+	u := f.thread(t)
+	f.state(t, u, store.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
+	if r, _ := f.row(t, u); r.Facets[slackrows.FacetTurn][0] != slackrows.TurnMe || r.Facets[slackrows.FacetSituation][0] != "needs_closure" {
+		t.Errorf("facets %v", r.Facets)
+	}
 }
 
 func TestSlackSnapshotsLeaveTheLoopActivityToTheHost(t *testing.T) {

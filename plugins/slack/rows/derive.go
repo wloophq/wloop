@@ -50,12 +50,28 @@ const ViewSlack = "slack"
 // FacetConversation groups rows by channel or DM.
 const FacetConversation = "conversation"
 
-// FacetChannel is a channel thread's channel name, without "#": the
-// qualifier channel:<name>.
-const FacetChannel = "channel"
+// FacetWhere is a channel thread's channel name, without "#": the
+// qualifier where:<name>. DMs have none.
+const FacetWhere = "where"
 
 // FacetWaitsOn is the core facet of whom a row waits on.
 const FacetWaitsOn = "waits-on"
+
+// FacetTurn is whose turn a row's next step is: TurnMe, TurnOthers or TurnNobody; the strip's facet.
+const FacetTurn = "turn"
+
+// The values of FacetTurn.
+const (
+	TurnMe     = "me"
+	TurnOthers = "others"
+	TurnNobody = "nobody"
+)
+
+// FacetSituation is a row's kind.
+const FacetSituation = "situation"
+
+// FacetAge is since when a row has waited, as an RFC 3339 instant.
+const FacetAge = "age"
 
 func derive(in *Input) Row {
 	in = withGroupNames(in)
@@ -90,10 +106,27 @@ func derive(in *Input) Row {
 		r.Facets[FacetWaitsOn] = w
 	}
 	if pl.Channel != "" {
-		r.Facets[FacetChannel] = []string{pl.Channel}
+		r.Facets[FacetWhere] = []string{pl.Channel}
+	}
+	r.Facets[FacetTurn] = []string{turn(kind, r.Summary.WaitsOn)}
+	r.Facets[FacetSituation] = []string{string(kind)}
+	if !r.Summary.Since.IsZero() {
+		r.Facets[FacetAge] = []string{r.Summary.Since.UTC().Format(time.RFC3339Nano)}
 	}
 	r.Payload, _ = json.Marshal(pl)
 	return r
+}
+
+// turn is whose turn a row of kind k that waits on summary is: the viewer's when the conversation waits on
+// them or on their closure.
+func turn(k Kind, summary string) string {
+	switch {
+	case k == KindWaitsOnViewer || k == KindNeedsClosure || summary == "me":
+		return TurnMe
+	case summary == "nobody" || summary == "":
+		return TurnNobody
+	}
+	return TurnOthers
 }
 
 // waitingWho are the people and groups a row waits on, as its summary names them.

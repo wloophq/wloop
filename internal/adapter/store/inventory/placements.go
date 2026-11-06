@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -48,6 +49,7 @@ func (s Placements) All(ctx context.Context) (map[unit.Unit]placement.Placement,
 func (s Placements) SetOverride(ctx context.Context, u unit.Unit, p placement.Placement) error {
 	p.Source = ""
 	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+		tx.Touch(port.TopicPlacements, u)
 		if p == (placement.Placement{}) {
 			_, err := tx.ExecContext(ctx, `DELETE FROM placements WHERE provider = ? AND unit_key = ?`, string(u.Provider), u.Key)
 			return err

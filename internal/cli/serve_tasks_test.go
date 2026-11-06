@@ -272,7 +272,7 @@ func TestSyncRunsUnderNoJobs(t *testing.T) {
 	if err != nil || res.Task.State != "next" {
 		t.Fatalf("%+v %v", res, err)
 	}
-	if counters, err := c.Counters(ctx, ""); err != nil || counters.Views["needs-me"] != 1 || counters.Views["inbox"] != 0 {
+	if counters, err := c.Counters(ctx, "", ""); err != nil || counters.Views["needs-me"] != 1 || counters.Views["inbox"] != 0 {
 		t.Fatalf("%+v %v", counters, err)
 	}
 	if cat, err := c.Views(ctx); err != nil || len(cat.Views) == 0 {

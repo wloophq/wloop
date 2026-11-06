@@ -58,6 +58,7 @@ func TestTheTurnDrivesTheSituation(t *testing.T) {
 		{"started on a permission prompt", Turn{Intent: "review", Role: "pr.review", State: "started", At: h(1)}, true, KindLoopWaiting, "waiting for a permission in the terminal"},
 		{"asked", Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "keep the old column?", At: h(2)}, false, KindLoopWaiting, "keep the old column?"},
 		{"asked and answered", Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "s", At: h(2), AnsweredAt: h(3)}, false, KindLoopWorking, "your answer was sent"},
+		{"asked with an answer queued", Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "s", At: h(2), QueuedAt: h(3)}, false, KindLoopWorking, "your answer is queued until the agent's session is free"},
 		{"failed", Turn{Intent: "review", Role: "pr.review", State: "failed", Summary: "gh api 502", At: h(2)}, false, KindLoopStopped, "gh api 502"},
 		{"unrecorded", Turn{Intent: "review", Role: "pr.review", State: "unrecorded", Summary: "Should I drop it?", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record: Should I drop it?"},
 		{"unrecorded with no message", Turn{Intent: "address", Role: "pr.address", State: "unrecorded", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record"},

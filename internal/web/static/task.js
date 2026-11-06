@@ -107,18 +107,18 @@ function taskBrief(e) {
 }
 
 // resolveGate resolves gate g of task e with intent id; an intent that takes
-// an answer sends the text typed in the gate.
-async function resolveGate(e, g, id) {
+// an answer sends the option picked, if any, then the text typed in the gate.
+async function resolveGate(e, g, id, option) {
   const intent = (g.intents || []).find((x) => x.id === id);
   if (!intent) return null;
   const args = {};
   if (intent.answer) {
     const text = (taskState.answers.get(g.id) || "").trim();
-    if (!text) {
+    if (!text && !option) {
       detailEnv.notice(`${intent.label}: write the answer first`, true);
       return null;
     }
-    args.guidance = text;
+    args.answer = [option, text].filter(Boolean).join("\n");
   }
   try {
     const out = await detailEnv.post("/api/gates/" + encodeURIComponent(g.id) + "/" + encodeURIComponent(id), verbBody(args));
@@ -143,12 +143,26 @@ function gateCard(e, g) {
     subject.text ? h("pre", { class: "draft-text" }, subject.text) : null,
     g.delivery ? h("p", { class: "meta" }, g.delivery) : null,
     g.deadline ? h("p", { class: "meta" }, deflt ? `${deflt.label} at ${stamp(g.deadline)} unless you pick another` : `Until ${stamp(g.deadline)}`) : null,
+    gateOptions(e, g, subject, intents),
     intents.some((x) => x.answer) ? h("textarea", { rows: 2, "aria-label": "Answer", "data-focus": `gate:${g.id}:text`,
       oninput: (ev) => { taskState.answers.set(g.id, ev.target.value); } }, taskState.answers.get(g.id) || "") : null,
     h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
       type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
       onclick: () => resolveGate(e, g, x.id),
     }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label))));
+}
+
+// gateOptions are the options of a question gate's message, the recommended first, each answering with
+// itself and the note typed below.
+function gateOptions(e, g, subject, intents) {
+  const answer = intents.find((x) => x.answer);
+  const opts = subject.options || [];
+  if (!answer || !opts.length) return null;
+  const ordered = [...opts.filter((o) => o.id === subject.recommend), ...opts.filter((o) => o.id !== subject.recommend)];
+  return h("div", { class: "q-options" }, ...ordered.map((o) => h("button", {
+    type: "button", class: "act" + (o.id === subject.recommend ? " primary" : ""), title: o.consequence || undefined,
+    "data-focus": `gate:${g.id}:option:${o.id}`, onclick: () => resolveGate(e, g, answer.id, o.id),
+  }, o.label, o.id === subject.recommend ? h("span", { class: "rec" }, " recommended") : null)));
 }
 
 function taskGates(e) {
@@ -245,8 +259,8 @@ function taskTimeline(e) {
     taskState.timelineError ? h("p", { class: "plan-error" }, taskState.timelineError) : null,
     !taskState.timeline && !taskState.timelineError ? h("p", { class: "empty" }, "Loading the timeline.") : null,
     taskState.timeline && !events.length ? h("p", { class: "empty" }, "Nothing here yet.") : null,
-    events.length ? h("ol", { class: "chat" }, ...[...events].reverse().map((ev) => h("li", { class: `msg ev-${ev.kind} by-${String(ev.actor || "").replace(/[^a-z0-9-]/gi, "")}`, "data-seq": String(ev.seq) },
-      h("div", { class: "meta" }, ev.actor ? h("strong", {}, ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
+    events.length ? h("ol", { class: "chat" }, ...events.map((ev) => h("li", { class: `msg ev-${ev.kind} by-${String(ev.actor || "").replace(/[^a-z0-9-]/gi, "")}`, "data-seq": String(ev.seq) },
+      h("div", { class: "meta" }, ev.by || ev.actor ? h("strong", { title: ev.actor || "" }, ev.by || ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
       eventText(ev) ? h("p", {}, eventText(ev)) : null))) : null);
 }
 

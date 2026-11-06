@@ -56,7 +56,7 @@ func TestBundledTasksDeclareTheEightStatesWithTheirCategories(t *testing.T) {
 	want := []StateDef{
 		{Name: "inbox", Category: task.CategoryInbox},
 		{Name: "next", Category: task.CategoryReady},
-		{Name: "waiting", Category: task.CategoryWaiting},
+		{Name: "waiting", Category: task.CategoryReady},
 		{Name: "scheduled", Category: task.CategoryDeferred},
 		{Name: "someday", Category: task.CategoryDeferred},
 		{Name: "done", Category: task.CategoryDone},
@@ -247,7 +247,8 @@ func TestAgentWritablePropIsUntrusted(t *testing.T) {
 	}
 	for prop, want := range map[string]bool{
 		"risk": true, "effort": true, "priority": true, "due": true, "asker": true, "kind": true,
-		"promised": false, "owner": false, "area": false, "focus": false, "last_nudge": false, "check_on": false,
+		"promised": true, "owner": true, "area": true, "focus": true, "check_on": true,
+		"last_nudge": false, "autostar": false,
 		"undeclared": true,
 	} {
 		if got := d.Untrusted(prop); got != want {
@@ -255,7 +256,7 @@ func TestAgentWritablePropIsUntrusted(t *testing.T) {
 		}
 	}
 	env := d.Facts()
-	if !env.Untrusted(builtin.PropPrefix+"risk") || env.Untrusted(builtin.PropPrefix+"promised") {
+	if !env.Untrusted(builtin.PropPrefix+"risk") || env.Untrusted(builtin.PropPrefix+"last_nudge") {
 		t.Error("the facts do not carry the properties' trust")
 	}
 }
@@ -355,10 +356,12 @@ func TestAnApprovalRuleReadsATrustedPropertyNeverAnAgentWrittenOne(t *testing.T)
 	t.Parallel()
 	bundled := fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}}
 	for when, refused := range map[string]bool{
-		`task.prop.promised > timestamp(0)`: false,
-		`task.prop.owner == "slack:U0AAA"`:  false,
-		`task.prop.risk == "high"`:          true,
-		`task.prop.due > timestamp(0)`:      true,
+		`task.prop.last_nudge > timestamp(0)`: false,
+		`task.prop.autostar == "on"`:          false,
+		`task.prop.owner == "slack:U0AAA"`:    true,
+		`task.prop.promised > timestamp(0)`:   true,
+		`task.prop.risk == "high"`:            true,
+		`task.prop.due > timestamp(0)`:        true,
 	} {
 		root := t.TempDir()
 		writeWorkflow(t, root, "focus", focusOnTask+"when = '"+when+"'\nmode = \"run\"\n")
@@ -424,8 +427,8 @@ func TestAnIntentRefuseReadsATaskProperty(t *testing.T) {
 }
 
 func TestAByPredicateNamesOnlyFactsTheAuthorityReads(t *testing.T) {
-	_, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.repo != \"acme/prod\"' }\n")
-	if !strings.Contains(problems, "verbs.done.by.agent") || !strings.Contains(problems, "task.repo") {
+	_, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.placement != \"acme/prod\"' }\n")
+	if !strings.Contains(problems, "verbs.done.by.agent") || !strings.Contains(problems, "task.placement") {
 		t.Errorf("a by naming a fact the authority does not read loads:\n%s", problems)
 	}
 	if _, problems := loadTasksWith(t, defaultTasks(t), "[verbs.done]\nby = { agent = 'task.prop.kind == \"capture\" && task.prop.risk == \"low\"' }\n"); problems != "" {

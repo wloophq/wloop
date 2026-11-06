@@ -48,7 +48,7 @@ func (c Catalog) Views() []api.ViewSpec {
 	for _, v := range c.ui().Views {
 		w := t.Views[v.ID]
 		out = append(out, api.ViewSpec{ID: v.ID, Label: cmp.Or(w.Label, v.ID), Provider: c.Source.Provider, Rows: v.Rows, Order: v.Order,
-			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, UnitSort: v.UnitSort, Search: searchOf(w.Search)})
+			Surfaces: slices.Clone(v.Surfaces), Unit: w.Unit, DefaultSort: w.DefaultSort, Search: searchOf(w.Search)})
 	}
 	return out
 }
@@ -59,9 +59,16 @@ func (c Catalog) Facets() []api.FacetSpec {
 	for _, f := range c.ui().Facets {
 		w := t.Facets[f.ID]
 		spec := api.FacetSpec{ID: f.ID, Label: cmp.Or(w.Label, f.ID), Provider: c.Source.Provider, Group: f.Group, Sort: f.Sort,
-			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip}
+			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
+			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass), Colors: maps.Clone(w.Colors)}
+		if w.LabelPrefix != nil {
+			spec.LabelPrefix = *w.LabelPrefix
+		}
+		if c.rankedBySituations(f.Rank) {
+			spec.Labels = maps.Clone(t.Situations)
+		}
 		if len(w.Values) > 0 {
-			spec.Labels = w.Values
+			spec.Labels = mergeLabels(spec.Labels, w.Values)
 		}
 		for _, b := range f.Buckets {
 			within := ""
@@ -73,6 +80,20 @@ func (c Catalog) Facets() []api.FacetSpec {
 		out = append(out, spec)
 	}
 	return out
+}
+
+// rankedBySituations says whether a facet's rank lists only the plugin's situation kinds: its values are
+// situations, and read as the situations do unless its own values word them.
+func (c Catalog) rankedBySituations(rank []string) bool {
+	if len(rank) == 0 {
+		return false
+	}
+	for _, v := range rank {
+		if !slices.ContainsFunc(c.Source.Situations, func(s manifest.Situation) bool { return s.Name == v }) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c Catalog) Situations() []api.SituationSpec {
@@ -89,6 +110,14 @@ func (c Catalog) Situations() []api.SituationSpec {
 		out = append(out, api.SituationSpec{Provider: c.Source.Provider, Kind: api.Kind(s.Name), Label: cmp.Or(t.Situations[s.Name], s.Name), Rank: rank})
 	}
 	return out
+}
+
+// Lens are the plugin's own row words, those its profile layers set.
+func (c Catalog) Lens() api.ProviderWords {
+	if c.Source == nil {
+		return api.ProviderWords{}
+	}
+	return api.ProviderWords{Provider: c.Source.Provider, Words: c.texts().Lens.Set()}
 }
 
 // Events are the words of the event kinds the manifest declares that its
@@ -194,3 +223,11 @@ var bundledTexts = sync.OnceValue(func() map[string]intentload.UITexts {
 	t, _ := intentload.BundledUI()
 	return t
 })
+
+func mergeLabels(into, over map[string]string) map[string]string {
+	if into == nil {
+		return over
+	}
+	maps.Copy(into, over)
+	return into
+}

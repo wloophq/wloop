@@ -30,9 +30,19 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
 			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db),
 			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e},
-			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}})
+			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}})
 	}
 	return e.gates
+}
+
+// drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.
+type drivenSessions struct{ e *Env }
+
+func (d drivenSessions) UserDriven(ctx context.Context, id string) (bool, error) {
+	if d.e.Turns == nil {
+		return false, nil
+	}
+	return d.e.Turns.UserDriven(ctx, id)
 }
 
 // outboxPublisher is the daemon's outbox as the consequence of a draft gate, read at each resolution: it is

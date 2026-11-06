@@ -130,6 +130,9 @@ type Answer struct {
 	// Posted says that Message is one the agent posted during its turn, not its turn's question; the store
 	// reads it from the message.
 	Posted bool
+	// BySession is the session an agent gave the answer through, which the gates service checked the user
+	// drives; "" for a person's answer.
+	BySession string
 	// NoticedAt is when the answer's session was told of it, zero until it is.
 	NoticedAt time.Time
 	// ReadAt is when the agent read the answer, zero until it does.

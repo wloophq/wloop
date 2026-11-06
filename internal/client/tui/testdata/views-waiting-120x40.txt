@@ -1,12 +1,12 @@
  Focus 1    Inbox 2    Outbox 1    Next 4   [Waiting 4]   Projects 0    Someday 0    Logbook 12
 
  ana
->  5h  Design review
-   5h  Laptop order
+>  5h 0m    Design review         ana · waiting
+   5h 0m    Laptop order          ana · waiting
  bob
-   5h  Contract signature
+   5h 0m    Contract signature    bob · waiting
  none
-   5h  Reimbursement
+   5h 0m    Reimbursement         waiting
 
 
 

@@ -18,15 +18,15 @@ var workflowTable = map[string]string{
 		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S " +
 		"slug:S base:S association:S cross_repository:B requested_teams:L labels:L review_requested_me:B nudge.who:L nudge.why:S " +
 		"last_review.exists:B last_review.verdict:S last_review.decision:S",
-	"session": "state:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
+	"session": "state:S name:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
 		"prompted_while_idle:B open_turn:S newest_state:S newest_age:D newest_intent:S closes_when_done:B idle_since:T " +
 		"idle_for:D unread_gates:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +
 		"unpushed:I newest_turn_state:S open_turn:B pendency:L sessions:I manager:S last_activity:T quiet_for:D fingerprint:S repo:S",
 	"task": "id:S state:S unit:S unit_provider:S units:L unit_providers:L link_ended:B turns:I captured_by_user:B " +
 		"link_started_by_me:B link_closure_posted:B items_open:I items_resolved:I settled_at:T fingerprint:S " +
-		"category:S owed_by:S owed_since:T since_movement:D check_on:T gates_open:I runs_live:I wake_until:T wake_when:S repo:S " +
-		"sequential_next:B review_due:B children_ready:B ask_age:D askers:L promised:T extraction_lag:D link_owes:L link_signals:L",
+		"category:S owed_by:S turn:S owed_since:T moved_at:T since_movement:D check_on:T gates_open:I turns_open_by_hand:I turn_by_hand_at:T turns_running:I wake_until:T wake_when:S placement:S " +
+		"sequential_next:B review_due:B children_ready:B children_mine:B ask_age:D askers:L asker_names:L promised:T extraction_lag:D link_owes:L link_signals:L",
 	"gate": "kind:S name:S status:S delivery:S",
 	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B items_open:I items_resolved:I items_unowned:I items_unowned_age_days:I " +
 		"ended:B settled_at:T fingerprint:S",

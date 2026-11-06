@@ -56,22 +56,36 @@ const (
 // to Default with the rule "window". Intent, By, Rule, Answer and ClosedAt are
 // zero while Open.
 type Gate struct {
-	ID       int64
-	Task     task.ID
-	Unit     unit.Unit
-	Kind     Kind
-	Name     string
-	Subject  string
-	Status   Status
-	Intents  []string
-	Intent   string
-	Answer   string
-	By       task.Actor
-	Rule     string
-	Deadline time.Time
-	Default  string
-	OpenedAt time.Time
-	ClosedAt time.Time
+	ID      int64
+	Task    task.ID
+	Unit    unit.Unit
+	Kind    Kind
+	Name    string
+	Subject string
+	Status  Status
+	Intents []string
+	Intent  string
+	Answer  string
+	By      task.Actor
+	// BySession is the session an agent resolved the gate through, which the gates service checked the user
+	// drives; "" for any other resolver.
+	BySession string
+	Rule      string
+	Deadline  time.Time
+	Default   string
+	OpenedAt  time.Time
+	ClosedAt  time.Time
+	// Session is the session whose turn produced the gate's subject, a draft or a message; "" when none did.
+	// That session never resolves the gate.
+	Session string
+	// Text is what the gate asks, in the words its opener rendered from the profile; "" leaves its
+	// declaration's label.
+	Text string
+}
+
+// ByUser says whether the user resolved g: a person, or an agent through a session the user drives.
+func (g Gate) ByUser() bool {
+	return g.Rule == "" && (g.By == task.ActorPerson || g.By == task.ActorAgent && g.BySession != "")
 }
 
 // ProposalSubject is the Subject of a gate on item proposal id when no

@@ -22,6 +22,9 @@ type UITexts struct {
 	Events     map[string]UIEvent `toml:"events"`
 	Menubar    map[string]string  `toml:"menubar"`
 	Detail     map[string]UIField `toml:"detail"`
+	LensRaw    map[string]string  `toml:"lens"`
+	// Lens are the plugin's own row words, those it leaves out empty.
+	Lens RowWords `toml:"-"`
 }
 
 // UIField is how a field of a unit's detail shows.
@@ -64,9 +67,10 @@ type UISearchSort struct {
 
 // UIView is a view's words.
 type UIView struct {
-	Label  string    `toml:"label"`
-	Unit   string    `toml:"unit"`
-	Search *UISearch `toml:"search"`
+	Label       string    `toml:"label"`
+	Unit        string    `toml:"unit"`
+	DefaultSort string    `toml:"default_sort"`
+	Search      *UISearch `toml:"search"`
 }
 
 // UIEvent is an event kind's words.
@@ -78,10 +82,17 @@ type UIEvent struct {
 
 // UIFacet is a facet's words.
 type UIFacet struct {
-	Label   string            `toml:"label"`
-	Empty   string            `toml:"empty"`
-	Values  map[string]string `toml:"values"`
-	Buckets map[string]string `toml:"buckets"`
+	Label       string            `toml:"label"`
+	Empty       string            `toml:"empty"`
+	Values      map[string]string `toml:"values"`
+	Buckets     map[string]string `toml:"buckets"`
+	ShowRaw     any               `toml:"show"`
+	ShowValues  *string           `toml:"show_values"`
+	LabelPrefix *string           `toml:"label_prefix"`
+	RowClass    map[string]string `toml:"row_class"`
+	Colors      map[string]string `toml:"colors"`
+	// Show is where the facet's values show on the plugin's rows, read from ShowRaw and ShowValues.
+	Show Show `toml:"-"`
 }
 
 // uiPlugin is the plugin whose words layer l holds: its own layer or the
@@ -122,6 +133,13 @@ func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
 		}
 		s := &sheet{file: r.Path, at: positions(r.Body)}
 		s.addGrammar(grammar(builtin.SurfaceUI, r.Body))
+		for id, f := range m.Facets {
+			if f.ShowRaw != nil || f.ShowValues != nil {
+				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
+				m.Facets[id] = f
+			}
+		}
+		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
 		if problems = append(problems, s.problems...); len(s.problems) > 0 {
 			continue
 		}
@@ -138,6 +156,9 @@ func mergeUI(into, over UITexts) UITexts {
 		if b.Unit != "" {
 			a.Unit = b.Unit
 		}
+		if b.DefaultSort != "" {
+			a.DefaultSort = b.DefaultSort
+		}
 		if b.Search != nil {
 			a.Search = b.Search
 		}
@@ -152,8 +173,20 @@ func mergeUI(into, over UITexts) UITexts {
 		}
 		a.Values = mergeMap(a.Values, b.Values, func(_, y string) string { return y })
 		a.Buckets = mergeMap(a.Buckets, b.Buckets, func(_, y string) string { return y })
+		a.RowClass = mergeMap(a.RowClass, b.RowClass, func(_, y string) string { return y })
+		a.Colors = mergeMap(a.Colors, b.Colors, func(_, y string) string { return y })
+		if b.ShowRaw != nil {
+			a.ShowRaw, a.Show.Part, a.Show.Only = b.ShowRaw, b.Show.Part, b.Show.Only
+		}
+		if b.ShowValues != nil {
+			a.ShowValues, a.Show.Values = b.ShowValues, b.Show.Values
+		}
+		if b.LabelPrefix != nil {
+			a.LabelPrefix = b.LabelPrefix
+		}
 		return a
 	})
+	into.Lens = into.Lens.Over(over.Lens)
 	into.Events = mergeMap(into.Events, over.Events, func(_, y UIEvent) UIEvent { return y })
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })

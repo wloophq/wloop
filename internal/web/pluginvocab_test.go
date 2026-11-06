@@ -18,9 +18,9 @@ import (
 // facet ids among them are custom views and lens fields not yet served. The
 // count only shrinks: a lower count fails until the entry is lowered.
 var appJSDebts = map[string]int{
-	"closed": 3, "draft": 2, "guidance": 7, "review": 1, "wait": 1,
-	"age": 4, "author": 8, "due": 6, "is": 7, "kind": 6, "lane": 2, "repo": 5, "risk": 3, "size": 4, "status": 4, "tag": 5, "type": 3, "waits-on": 7,
-	"all": 1, "dash": 7, "explore": 14, "mine": 3, "plan": 9, "recent": 8,
+	"closed": 3, "draft": 2, "guidance": 5, "review": 1, "wait": 1,
+	"age": 4, "author": 3, "due": 6, "is": 5, "kind": 5, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 2, "tag": 5, "type": 1, "waits-on": 5,
+	"all": 1, "dash": 7, "explore": 14, "mine": 0, "plan": 9, "recent": 8,
 }
 
 // githubVocabulary is every event kind, intent, view id and facet id the

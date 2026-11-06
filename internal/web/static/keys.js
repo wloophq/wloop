@@ -388,8 +388,8 @@ function createKeys(env) {
 function appEnv() {
   const rowOf = (u) => state.rows.find((r) => sameUnit(unitOf(r), u)) || (state.detail && sameUnit(unitOf(state.detail.row), u) ? state.detail.row : null);
   const focusedRow = () => {
-    const el = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="row:"], [data-focus^="card:"]');
-    const m = el && /^(?:row|card):(.+?)(?:@.*)?$/.exec(el.dataset.focus);
+    const el = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="row:"], [data-row^="card:"]');
+    const m = el && /^(?:row|card):(.+?)(?:@.*)?$/.exec(el.dataset.row);
     return m ? state.rows.find((r) => keyOf(r) === m[1]) || null : null;
   };
   const selectedRow = () => {
@@ -434,16 +434,19 @@ function appEnv() {
     questionAt: (el) => {
       if (readHash().task) return detailPane.gateAt(el);
       const d = state.detail;
-      if (!el || !el.closest || !el.closest(".d-question") || !d || !d.row.question || d.row.question.state !== "asked") return null;
-      return { row: d.row, question: d.row.question };
+      const q = answerableQuestion(d);
+      if (!el || !el.closest || !el.closest(".d-question") || !q) return null;
+      return { row: d.row, question: q };
     },
     move: (delta) => {
       if (isCoreView(readHash().view)) {
         const nodes = taskNodes();
-        if (!nodes.length) return false;
+        const row = document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="task:"]');
+        const active = row ? nodes.find((n) => n.dataset.focus === row.dataset.row) : null;
         const sel = detailPane.selected();
-        const at = sel ? nodes.findIndex((n) => n.dataset.focus === "task:" + sel.id) : -1;
-        nodes[Math.max(0, Math.min(nodes.length - 1, at < 0 ? 0 : at + delta))].focus();
+        const next = nextTaskNode(nodes, active, sel && sel.id, delta);
+        if (!next) return false;
+        next.focus();
         return true;
       }
       if (readHash().view === "plan") {

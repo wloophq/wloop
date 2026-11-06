@@ -160,7 +160,7 @@ func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.TaskPath("t-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"}, task.ActorPerson)
+	s.runBridge(rec, apiRequest("POST", api.TaskPath("t-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"}, personRequest)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}

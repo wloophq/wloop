@@ -9,9 +9,8 @@ import (
 	"unicode"
 )
 
-// CountersTerm is the query parameter of CountersPath, repeated, that counts only the tasks holding every
-// term, as TaskMatches reads them.
-const CountersTerm = "term"
+// CountersQuery is the query parameter of CountersPath that counts only the tasks a lens query keeps.
+const CountersQuery = "q"
 
 // accents folds the accents Portuguese and Spanish titles carry, without golang.org/x/text.
 var accents = strings.NewReplacer(
@@ -35,8 +34,8 @@ func Fold(s string) string {
 }
 
 // Texts are what a filter's free words search in a task: its title, notes, state, the text and the lists of
-// text of its properties, its units, who owes it, its asks, its cards' people, its draft and its message. The
-// cockpit's taskHaystack lists the same texts.
+// text of its properties, its units, who owes it, its asks, its cards' people, its draft, its message and its
+// facets' values, by facet id. The cockpit's taskHaystack lists the same texts.
 func (e TaskView) Texts() []string {
 	out := []string{e.Title, e.Notes, e.State}
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
@@ -72,23 +71,8 @@ func (e TaskView) Texts() []string {
 	if m, _, ok := e.MessageOf(); ok {
 		out = append(out, m.Text)
 	}
+	for _, id := range slices.Sorted(maps.Keys(e.Facets)) {
+		out = append(out, e.Facets[id]...)
+	}
 	return out
-}
-
-// TaskMatches says whether every term is in one of e's Texts, ignoring case and accents.
-func TaskMatches(e TaskView, terms []string) bool {
-	if len(terms) == 0 {
-		return true
-	}
-	texts := e.Texts()
-	for i, t := range texts {
-		texts[i] = Fold(t)
-	}
-	for _, t := range terms {
-		t = Fold(t)
-		if !slices.ContainsFunc(texts, func(s string) bool { return strings.Contains(s, t) }) {
-			return false
-		}
-	}
-	return true
 }

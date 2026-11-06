@@ -33,7 +33,19 @@ func viewsCatalog() api.ViewsCatalog {
 		{Verb: "sequential", Handler: "sequential", Label: "Sequential"}}
 	props := []api.PropSpec{{Name: "focus", Type: "enum", Values: []string{"on", "off"}, Role: "star"}, {Name: "contexts", Type: "string[]", Role: "contexts"},
 		{Name: "area", Type: "string", Role: "area"}, {Name: "due", Type: "date", Role: "deadline"}}
-	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props}
+	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs, Props: props, Facets: taskFacets(),
+		Lens: testLensWords, DefaultSort: "View order"}
+}
+
+func taskFacets() []api.FacetSpec {
+	return []api.FacetSpec{
+		{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Sort: "rank", Rank: []string{"inbox", "next", "waiting", "someday"}, Empty: "none", Show: "kind"},
+		{ID: "context", Fact: "task.prop.contexts", Label: "Context", Group: true, Menu: true, Sort: "text", Rank: []string{"computer", "calls"},
+			Labels: map[string]string{"computer": "@computer", "calls": "@calls"}, Empty: "none", Show: "meta"},
+		{ID: "waits-on", Fact: "task.owed_by", Label: "Waits on", Group: true, Menu: true, Sort: "text", Empty: "none", Show: "who"},
+		{ID: "moved", Fact: "task.moved_at", Label: "Moved", Group: true, Menu: true, Sort: "time", Empty: "never moved", Show: "age"},
+		{ID: "where", Label: "Where", Group: true, Menu: true, Sort: "text", Empty: "nowhere"},
+	}
 }
 
 var allVerbs = []string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss"}
@@ -60,13 +72,15 @@ func task(id, title, state string, contexts ...string) api.TaskView {
 		b, _ := json.Marshal(contexts)
 		props = map[string]json.RawMessage{"contexts": b}
 	}
-	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props,
+	facets := map[string][]string{"state": {state}, "context": contexts, "moved": {now.Add(-5 * time.Hour).UTC().Format(time.RFC3339)}}
+	return api.TaskView{ID: id, State: state, Category: categoryOf[state], Title: title, Props: props, Facets: facets,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
 func waitingOn(e api.TaskView, names ...string) api.TaskView {
 	if len(names) > 0 {
 		e.OwedBy = names[0]
+		e.Facets["waits-on"] = names[:1]
 	}
 	return e
 }
@@ -794,7 +808,7 @@ func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
 		d.mu.Lock()
 		asks := slices.Clone(d.counterAsks)
 		d.mu.Unlock()
-		if len(asks) == 0 || !slices.Equal(asks[len(asks)-1], []string{"computer"}) {
+		if len(asks) == 0 || asks[len(asks)-1] != "computer" {
 			t.Errorf("counter asks %v", asks)
 		}
 		term.press(Key{Name: KeyEsc})
@@ -819,4 +833,105 @@ const boardProvider unit.ProviderID = "fake"
 
 func boardPlugins(enabled bool) []api.Plugin {
 	return []api.Plugin{{ID: unit.GitHub, Enabled: true}, {ID: boardProvider, Enabled: enabled}}
+}
+
+func TestAViewsVersionChangeRereadsTheViewsCatalog(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		cat := viewsCatalog()
+		cat.Version = "v1"
+		d := &fakeDaemon{rows: oneRow(), viewsCat: &cat, tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		reads := func() int {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.viewsReads
+		}
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		if n := reads(); n != 1 {
+			t.Fatalf("the views read %d times at one version", n)
+		}
+		d.mu.Lock()
+		next := viewsCatalog()
+		next.Version = "v2"
+		next.Views[0].Label = "Today"
+		d.viewsCat = &next
+		d.mu.Unlock()
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the new views", func() bool { return strings.Contains(term.screen(), "Today") })
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "another delta", func() bool { return len(d.asks()) == 4 })
+		if n := reads(); n != 2 {
+			t.Fatalf("the views read %d times over two versions", n)
+		}
+		quit(t, term, done)
+	})
+}
+
+func TestARowsPageOfAnotherCatalogRereadsTheCatalog(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		reads := func() int {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.catalogReads
+		}
+		d.change(nil)
+		d.announce()
+		eventually(t, "a delta", func() bool { return len(d.times(&d.rowsAt)) == 2 })
+		if n := reads(); n != 1 {
+			t.Fatalf("the catalog read %d times at one version", n)
+		}
+		d.mu.Lock()
+		d.catalog = "c2"
+		d.mu.Unlock()
+		d.change(nil)
+		d.announce()
+		eventually(t, "the new catalog", func() bool { return reads() == 2 })
+		quit(t, term, done)
+	})
+}
+
+func TestATaskPullNamesTheUnitsTheChangesNamed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
+		d.changeTasks("focus", nil, viewCounters(), pr)
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		if got := d.asks()[1]; got.since == (api.Since{}) || !slices.Equal(got.units, []unit.Unit{pr}) {
+			t.Fatalf("asked %+v, want the page since naming %v", got, pr)
+		}
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "another delta", func() bool { return len(d.asks()) == 3 })
+		if got := d.asks()[2]; len(got.units) != 0 {
+			t.Fatalf("asked %+v, want no unit once the page holding them was read", got)
+		}
+		quit(t, term, done)
+	})
+}
+
+func TestAReconnectReadsTheTaskListWhole(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
+		term, done := start(t, d, func(c *Config) { c.Reconnect = 10 * time.Millisecond })
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		d.changeTasks("focus", nil, viewCounters())
+		eventually(t, "the delta", func() bool { return len(d.asks()) == 2 })
+		d.endStream()
+		eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
+		eventually(t, "the pull after it", func() bool { return len(d.asks()) == 3 })
+		if got := d.asks()[2]; got.since != (api.Since{}) {
+			t.Fatalf("asked %+v after the reconnection, want the list whole", got)
+		}
+		quit(t, term, done)
+	})
 }

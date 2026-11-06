@@ -290,7 +290,7 @@ func newServerLogged(t *testing.T, log *change.Log, change func(*Deps)) *Server 
 }
 
 // newServerOn is newServerLogged on the store stDB.
-func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*Deps)) *Server {
+func newServerOn(t testing.TB, stDB *sqlite.DB, log *change.Log, change func(*Deps)) *Server {
 	t.Helper()
 	st := inventory.New(stDB)
 	ctx := context.Background()

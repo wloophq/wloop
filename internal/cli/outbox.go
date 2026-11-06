@@ -243,11 +243,16 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	}
 }
 
-// userAtTerminal refuses to post from a shell an agent session runs, or one with no terminal to ask in: what
-// posts is approved by the user, who reads it whole first.
-func (e *Env) userAtTerminal(verb string) error {
-	if err := e.notAnAgent(verb); err != nil {
+// userAtTerminal refuses to post from a shell of an agent session the daemon cannot tell, or one with no terminal
+// to ask in: what posts is approved by the user, who reads it whole first. A session's shell that names its handle
+// and says yes asks nothing here: the daemon takes it only from a session the user drives, whose agent asks them
+// in the conversation.
+func (e *Env) userAtTerminal(verb string, yes bool) error {
+	if err := e.namedAgent(verb); err != nil {
 		return err
+	}
+	if yes && e.sessionHandle() != "" {
+		return nil
 	}
 	if !outboxInteractive(e) {
 		return fmt.Errorf("outbox %s posts as you, so it shows the draft and asks at a terminal, and standard input is not one: approve the draft in the cockpit or the terminal UI", verb)
@@ -255,15 +260,20 @@ func (e *Env) userAtTerminal(verb string) error {
 	return nil
 }
 
-// notAnAgent refuses outbox verb from a shell an agent session runs: it posts as the user.
-func (e *Env) notAnAgent(verb string) error {
+// namedAgent refuses outbox verb from a shell an agent session runs that names no session handle: the daemon
+// takes a session's request for yours only when the user drives that session, so a shell that names none
+// would pass for you.
+func (e *Env) namedAgent(verb string) error {
 	getenv := e.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
 	}
+	if e.sessionHandle() != "" {
+		return nil
+	}
 	for _, kind := range slices.Sorted(maps.Keys(e.Harness.Agents)) {
 		if e.Harness.Agents[kind].SessionID(getenv) != "" {
-			return fmt.Errorf("outbox %s posts as you, and this shell belongs to a %s agent session: approve the draft in the cockpit or the terminal UI, or run this in a terminal of your own", verb, kind)
+			return fmt.Errorf("outbox %s posts as you, and this shell belongs to a %s agent session that names no workspace manager's handle: approve the draft in the cockpit or the terminal UI, or run this in a terminal of your own", verb, kind)
 		}
 	}
 	return nil
@@ -293,7 +303,7 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	if err != nil {
 		return err
 	}
-	if err := e.userAtTerminal("approve"); err != nil {
+	if err := e.userAtTerminal("approve", *yes); err != nil {
 		return err
 	}
 	d, err := c.Draft(ctx, id)
@@ -361,10 +371,10 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		fmt.Fprintf(e.Out, "draft %d saved to the Outbox for your approval: %s\n", d.ID, draftLabel(d))
 		return nil
 	}
-	if err := e.notAnAgent("new --send"); err != nil {
+	if err := e.namedAgent("new --send"); err != nil {
 		return err
 	}
-	return e.sendUserDraft(ctx, c, cr, *yes, func() error { return e.userAtTerminal("new --send") }, true)
+	return e.sendUserDraft(ctx, c, cr, *yes, func() error { return e.userAtTerminal("new --send", *yes) }, true)
 }
 
 // sendUserDraft creates cr and approves it: at once with yes, else once ready says the user is at a
@@ -454,7 +464,7 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 	if err != nil {
 		return err
 	}
-	if err := e.userAtTerminal("retry"); err != nil {
+	if err := e.userAtTerminal("retry", *yes); err != nil {
 		return err
 	}
 	d, err := c.Draft(ctx, id)

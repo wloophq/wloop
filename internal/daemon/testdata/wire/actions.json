@@ -37,9 +37,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -60,6 +57,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -131,7 +131,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -237,9 +237,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -260,6 +257,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -331,7 +331,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -418,9 +418,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -441,6 +438,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -499,7 +499,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -576,9 +576,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -599,6 +596,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -668,7 +668,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -746,9 +746,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -769,6 +766,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -827,7 +827,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -904,9 +904,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -927,6 +924,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -996,7 +996,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1074,9 +1074,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1097,6 +1094,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1156,7 +1156,7 @@
         "refusal": "brief_refresh.why"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1237,9 +1237,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1257,6 +1254,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1274,7 +1274,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1352,9 +1352,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1372,6 +1369,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1390,7 +1390,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1421,7 +1421,10 @@
         }
       },
       "viewer": "me"
-    }
+    },
+    "search": [
+      "feat-done"
+    ]
   },
   "explore_candidate_mine": {
     "unit": {
@@ -1456,9 +1459,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/web"
-      ],
       "risk": [
         "none"
       ],
@@ -1473,6 +1473,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/web"
       ]
     },
     "actions": [
@@ -1511,7 +1514,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1570,9 +1573,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1593,6 +1593,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1662,7 +1665,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1699,7 +1702,10 @@
         "at": "2026-10-06T08:00:00Z",
         "link": "https://github.com/acme/api/pull/7"
       }
-    }
+    },
+    "search": [
+      "REVIEW batch"
+    ]
   },
   "gate_off": {
     "unit": {
@@ -1740,9 +1746,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1763,6 +1766,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1816,7 +1822,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1893,9 +1899,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -1916,6 +1919,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -1982,7 +1988,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2060,9 +2066,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2083,6 +2086,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2149,7 +2155,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2236,9 +2242,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2259,6 +2262,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2327,7 +2333,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2416,9 +2422,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2439,6 +2442,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2495,7 +2501,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2566,9 +2572,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2589,6 +2592,9 @@
       ],
       "waits-on": [
         "ana"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2647,7 +2653,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2728,9 +2734,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2751,6 +2754,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2801,7 +2807,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2885,9 +2891,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -2908,6 +2911,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -2966,7 +2972,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3046,9 +3052,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3069,6 +3072,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3136,7 +3142,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3223,9 +3229,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3243,6 +3246,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3310,7 +3316,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3403,9 +3409,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3426,6 +3429,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3497,7 +3503,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3583,9 +3589,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3606,6 +3609,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3677,7 +3683,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -3765,9 +3771,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -3789,6 +3792,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -3847,7 +3853,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3925,9 +3931,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/web"
-      ],
       "risk": [
         "none"
       ],
@@ -3942,6 +3945,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/web"
       ]
     },
     "actions": [
@@ -3982,7 +3988,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4041,9 +4047,6 @@
       "lane": [
         "me"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -4064,6 +4067,9 @@
       ],
       "waits-on": [
         "me"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "actions": [
@@ -4122,7 +4128,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "payload": {
       "author": "ana",
       "repo": "acme/api",

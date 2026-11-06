@@ -1,0 +1,11 @@
+summary = "Commit a task you started work on by hand: it leaves the Inbox, or wakes from Scheduled or Someday, into Next; a chat about it is not starting work"
+provider = "task"
+when = 'task.turns_open_by_hand > 0 && task.category in ["inbox", "deferred"] && !handled("task-commit-on-start/started", task.turn_by_hand_at)'
+order = 51
+
+[marks]
+started = "task.turn_by_hand_at"
+
+[[step]]
+use = "task.verb"
+verb = "next"

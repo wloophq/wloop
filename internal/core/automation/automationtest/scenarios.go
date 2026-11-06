@@ -20,7 +20,7 @@ var at0 = time.Date(2026, 10, 21, 13, 0, 0, 0, time.UTC)
 
 // RunUnits checks a facts provider holding at least one unit of p: every
 // listed unit is of p, listed once and in order, and has facts in a single
-// slot, of the fact types, with a fingerprint and a repo; an unknown unit's
+// slot, of the fact types, with a fingerprint and one of automation.RepoFacts; an unknown unit's
 // facts are automation.ErrUnitGone.
 func RunUnits(t *testing.T, p unit.ProviderID, mk func(*testing.T) automation.Units) {
 	ctx := context.Background()
@@ -77,8 +77,8 @@ func checkFacts(t *testing.T, u unit.Unit, facts workflow.Facts) {
 	if _, ok := facts[slot+".fingerprint"].(string); !ok {
 		t.Errorf("%s: no %s.fingerprint string", u, slot)
 	}
-	if _, ok := facts[slot+".repo"].(string); !ok {
-		t.Errorf("%s: no %s.repo string", u, slot)
+	if !slices.ContainsFunc(automation.RepoFacts, func(name string) bool { _, ok := facts[slot+name].(string); return ok }) {
+		t.Errorf("%s: no string of %s's %v", u, slot, automation.RepoFacts)
 	}
 }
 

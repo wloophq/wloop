@@ -195,8 +195,8 @@ func TestAQuietPRIsOwedByNobody(t *testing.T) {
 	p := newPRTaskRig(t)
 	quiet := p.item(t, ptPR1, "gh:follow", "", items.Person{})
 	p.pass(t)
-	if e := p.r.taskOf(quiet.ID); e.Category != task.CategoryWaiting || p.owedBy(t, quiet.ID) != "" {
-		t.Fatalf("a followed pull request that waits on no one: %s owed by %q, want waiting and owed by nobody", e.Category, p.owedBy(t, quiet.ID))
+	if e := p.r.taskOf(quiet.ID); e.Category != task.CategoryReady || p.owedBy(t, quiet.ID) != "" {
+		t.Fatalf("a followed pull request that waits on no one: %s owed by %q, want ready and owed by nobody", e.Category, p.owedBy(t, quiet.ID))
 	}
 }
 

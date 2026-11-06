@@ -56,7 +56,7 @@ func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, err
 // ended.
 type taskEnding struct{ e *Env }
 
-func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task.Actor) {
+func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task.Actor, session string) {
 	if cur, err := d.e.tasks.Task(ctx, t.ID); err == nil && cur.Open() {
 		return
 	}
@@ -70,7 +70,7 @@ func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task
 		if at.IsZero() {
 			at = d.e.Now()
 		}
-		_ = g.TaskEnded(ctx, t.ID, by, at)
+		_ = g.TaskEnded(ctx, t.ID, by, session, at)
 	}
 }
 

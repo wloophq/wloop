@@ -1,12 +1,12 @@
  Focus 1    Inbox 2    Outbox 1   [Next 4]   Waiting 4    Projects 0    Someday 0    Logbook 12
 
  @computer
->* 5h  Rename the export flag  @computer
-   5h  Write the runbook       @computer
+>* 5h 0m    Rename the export flag  @computer  next
+   5h 0m    Write the runbook       @computer  next
  @calls
-   5h  Call the bank           @calls
+   5h 0m    Call the bank           @calls     next
  none
-   5h  Sort the receipts
+   5h 0m    Sort the receipts                  next
 
 
 

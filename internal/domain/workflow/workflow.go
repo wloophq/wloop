@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -152,7 +153,17 @@ type Vars struct {
 	Trigger Facts             // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
 	Config  Facts             // "config.cleanup.idle", ...
 	Marks   map[string]string // the unit's handled marks by name, which handled() reads
-	Now     time.Time
+	// LoadMarks reads Marks when Marks is nil, only once a predicate reaches a handled(); nil reads none.
+	LoadMarks func() (map[string]string, error)
+	Now       time.Time
+}
+
+// UnitMarks are v's marks: Marks, else what LoadMarks reads; nil for none.
+func (v Vars) UnitMarks() (map[string]string, error) {
+	if v.Marks != nil || v.LoadMarks == nil {
+		return v.Marks, nil
+	}
+	return v.LoadMarks()
 }
 
 // Facts are a unit's facts by dotted name; values are bool, int, string,
@@ -279,6 +290,28 @@ type Workflow struct {
 	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
 	// or moot.
 	WithdrawReason string
+	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
+	Ask *template.Template
+}
+
+// AskData is what a workflow's Ask renders: its unit as people read it and
+// the unit's facts, by name.
+type AskData struct {
+	Unit  string
+	Facts Facts
+}
+
+// Asks is what the plan gate of w's run on the unit labelled label asks over
+// its facts: its Ask, else its Summary.
+func (w Workflow) Asks(label string, facts Facts) (string, error) {
+	if w.Ask == nil {
+		return w.Summary, nil
+	}
+	var b strings.Builder
+	if err := w.Ask.Execute(&b, AskData{Unit: label, Facts: facts}); err != nil {
+		return w.Summary, err
+	}
+	return strings.TrimSpace(b.String()), nil
 }
 
 // Visible says whether a step of the workflow acts in the user's name where others see it.

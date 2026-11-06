@@ -28,8 +28,8 @@ var gateStatusWrite = regexp.MustCompile(`(?is)\b(update|into)\s+gates\b.*\bstat
 // TestOnlyTheGatesServiceResolvesAGate checks that outside the gates
 // service, the sqlite gates store and the version 7 migration no code calls
 // Resolve on a gates.Store or writes gates.status in SQL: every decision is
-// closed by the service, which accepts only a person, a trusted policy rule
-// or a passed window.
+// closed by the service, which accepts only a person, an agent through a
+// session the user drives, a trusted policy rule or a passed window.
 func TestOnlyTheGatesServiceResolvesAGate(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)

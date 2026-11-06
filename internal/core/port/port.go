@@ -15,8 +15,10 @@ type Event struct {
 	Unit      unit.Unit
 	Kind, Key string
 	Actor     string
-	Data      string
-	At        time.Time
+	// Session is the session an agent acted through, "" for any other actor.
+	Session string
+	Data    string
+	At      time.Time
 	// Anchor is the point of the unit the event happened at, such as a
 	// review comment; zero for none.
 	Anchor unit.Anchor

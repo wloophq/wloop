@@ -3,8 +3,10 @@ package api
 import (
 	"cmp"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -14,8 +16,8 @@ import (
 )
 
 // The tasks' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
-// context as "a,b" and since, a Since's String) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
-// serves the counters of the query parameter area (narrowed to the tasks holding each CountersTerm), DigestPath the daily digest of the query parameter day
+// context as "a,b", since, a Since's String, and TasksUnits) and takes a TaskCreate, TaskVerb runs a verb, CountersPath
+// serves the counters of the query parameter area (narrowed to the tasks the lens query CountersQuery keeps), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
 	ViewsPath    = "/api/views"
@@ -45,6 +47,23 @@ const (
 	RunTranscript = "/api/runs/{seq}/transcript"
 )
 
+// TasksUnits is the query parameter of TasksPath, repeated, that names a unit as its String does: a page
+// since a position also holds the tasks holding it, as a change named it.
+const TasksUnits = "units"
+
+// ParseUnits reads the TasksUnits of a request.
+func ParseUnits(raw []string) ([]unit.Unit, error) {
+	out := make([]unit.Unit, 0, len(raw))
+	for _, r := range raw {
+		provider, key, ok := strings.Cut(r, ":")
+		if !ok || provider == "" || key == "" {
+			return nil, fmt.Errorf("unit %q is not <provider>:<key>", r)
+		}
+		out = append(out, unit.Unit{Provider: unit.ProviderID(provider), Key: key})
+	}
+	return out, nil
+}
+
 // TaskPath is the path of task id, followed by the segments of rest.
 func TaskPath(id string, rest ...string) string {
 	p := TasksPath + "/" + url.PathEscape(id)
@@ -52,6 +71,75 @@ func TaskPath(id string, rest ...string) string {
 		p += "/" + url.PathEscape(r)
 	}
 	return p
+}
+
+// LensWords are what a list's lens bar says, templates whose only actions are {{.name}} substitutions:
+// DefaultGroup and BoardGroup over label, Copied over count and view, CopiedGrouped over those and group, TagKey
+// over the tag facet's label and key, TagKeyEmpty over key, Grouped, Sorted and Descending over label.
+type LensWords struct {
+	DefaultGroup  string `json:"default_group"`
+	BoardGroup    string `json:"board_group"`
+	NoGroup       string `json:"no_group"`
+	Copied        string `json:"copied"`
+	CopiedGrouped string `json:"copied_grouped"`
+	TagKey        string `json:"tag_key"`
+	TagKeyEmpty   string `json:"tag_key_empty"`
+	Grouped       string `json:"grouped"`
+	Sorted        string `json:"sorted"`
+	Descending    string `json:"descending"`
+	NoLens        string `json:"no_lens"`
+	// RowWords are what a row says beside its facets.
+	RowWords
+}
+
+// RowWords are the words of a row: its age, its facet buttons' title and aria-label, its columns' heads and
+// the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
+type RowWords struct {
+	AgeNow           string `json:"age_now"`
+	AgeMinutes       string `json:"age_minutes"`
+	AgeHours         string `json:"age_hours"`
+	AgeDays          string `json:"age_days"`
+	FilterLabel      string `json:"filter_label"`
+	FilterTitle      string `json:"filter_title"`
+	FilterTitleGroup string `json:"filter_title_group"`
+	FilterGroup      string `json:"filter_group"`
+	ListCount        string `json:"list_count"`
+	ListEmpty        string `json:"list_empty"`
+	CountdownTitle   string `json:"countdown_title"`
+	CountdownSending string `json:"countdown_sending"`
+	CountdownSeconds string `json:"countdown_seconds"`
+	CountdownMinutes string `json:"countdown_minutes"`
+	TipNamed         string `json:"tip_named"`
+	TipKind          string `json:"tip_kind"`
+	TipWhy           string `json:"tip_why"`
+	LegendTitle      string `json:"legend_title"`
+	SortBy           string `json:"sort_by"`
+	ColUnit          string `json:"col_unit"`
+	ColWho           string `json:"col_who"`
+	ColAge           string `json:"col_age"`
+	ColWhy           string `json:"col_why"`
+	ColAside         string `json:"col_aside"`
+	ColActions       string `json:"col_actions"`
+	Stale            string `json:"stale"`
+	StaleTitle       string `json:"stale_title"`
+	Briefing         string `json:"briefing"`
+	BriefingTitle    string `json:"briefing_title"`
+	BriefingAttempt  string `json:"briefing_attempt"`
+	BriefingError    string `json:"briefing_error"`
+	Questions        string `json:"questions"`
+	QuestionsTitle   string `json:"questions_title"`
+	Changed          string `json:"changed"`
+	Starred          string `json:"starred"`
+	Until            string `json:"until"`
+	Due              string `json:"due"`
+	Unread           string `json:"unread"`
+	UnreadTitle      string `json:"unread_title"`
+	ReviewDue        string `json:"review_due"`
+	NoNextAction     string `json:"no_next_action"`
+	OpenChildren     string `json:"open_children"`
+	Sequential       string `json:"sequential"`
+	Every            string `json:"every"`
+	Reviewed         string `json:"reviewed"`
 }
 
 type ViewsCatalog struct {
@@ -64,6 +152,12 @@ type ViewsCatalog struct {
 	// States are the profile's states in their declared order; Props its task properties.
 	States []StateSpec `json:"states,omitempty"`
 	Props  []PropSpec  `json:"props,omitempty"`
+	// Facets are the profile's task facets, DefaultSort what clients call a view's own order.
+	Facets      []FacetSpec `json:"facets,omitempty"`
+	DefaultSort string      `json:"default_sort,omitempty"`
+	Lens        LensWords   `json:"lens"`
+	// Version changes whenever anything above does.
+	Version string `json:"version,omitempty"`
 }
 
 // TaskViewSpec is a view of views.toml: Summary is one line on what it lists, Empty what it shows when it lists
@@ -167,6 +261,11 @@ type TaskView struct {
 	// ExtractionLag is how long the oldest message of its links has waited to be extracted, a Go duration;
 	// empty when none waits.
 	ExtractionLag string `json:"extraction_lag,omitempty"`
+	// Facets are the task's values of every facet, by facet id, from its facts, its brief and its units' rows,
+	// joined as the profile's facets say; Values[0] is the group and sort key.
+	Facets map[string][]string `json:"facets,omitempty"`
+	// Reason is why the task's primary unit waits, its row's summary reason; empty when it has no row.
+	Reason string `json:"reason,omitempty"`
 	// Asks are the items the task holds, detail only.
 	Asks  []AskView   `json:"asks,omitempty"`
 	Gates []GateView  `json:"gates,omitempty"` // the open ones
@@ -262,13 +361,16 @@ type RecordView struct {
 // TimelineEvent is one event of a task's timeline: Seq its stable position, which pages it, and Unit the unit it
 // happened on, "" for the task itself.
 type TimelineEvent struct {
-	Seq   int64           `json:"seq"`
-	Kind  string          `json:"kind"`
-	Sub   string          `json:"sub,omitempty"`
-	Actor string          `json:"actor,omitempty"`
-	At    time.Time       `json:"at"`
-	Unit  string          `json:"unit,omitempty"`
-	Data  json.RawMessage `json:"data,omitempty"`
+	Seq   int64  `json:"seq"`
+	Kind  string `json:"kind"`
+	Sub   string `json:"sub,omitempty"`
+	Actor string `json:"actor,omitempty"`
+	// Session is the session an agent acted through, and By how the profile names a change made through one.
+	Session string          `json:"session,omitempty"`
+	By      string          `json:"by,omitempty"`
+	At      time.Time       `json:"at"`
+	Unit    string          `json:"unit,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 // ChatRequest is a message to a task's agent; Intent picks the intent of the turn it starts when no session
@@ -322,6 +424,8 @@ type TasksPage struct {
 	Counters Counters   `json:"counters"`
 	// Loading are the plugins whose units are not all reported yet.
 	Loading []Loading `json:"loading,omitempty"`
+	// Specs is the version of GET /api/views; a client holding another reads them again.
+	Specs string `json:"specs,omitempty"`
 }
 
 // TaskCreate creates a task: a Title alone captures it. Brief is its brief's markdown, Props its properties

@@ -164,7 +164,6 @@ doc = "The conversation's asks resolved, and an item is still open."
 id = "slack"
 rows = true
 surfaces = ["web", "tui"]
-unit_sort = "channel"
 
 [[source.ui.facets]]
 id = "conversation"
@@ -173,10 +172,60 @@ sort = "text"
 menu = true
 
 [[source.ui.facets]]
-id = "channel"
+id = "where"
+match = "suffix"
 group = true
 sort = "text"
 menu = true
+
+[[source.ui.facets]]
+id = "waits-on"
+match = "team"
+group = true
+menu = true
+
+[[source.ui.facets]]
+id = "turn"
+group = true
+sort = "rank"
+rank = ["me", "others", "nobody"]
+menu = true
+strip = true
+
+[[source.ui.facets]]
+id = "situation"
+group = true
+sort = "rank"
+rank = ["waits_on_viewer", "needs_closure", "new", "waits_on_others", "fyi", "resolved"]
+menu = true
+
+[[source.ui.facets]]
+id = "age"
+sort = "time"
+menu = true
+
+[[source.ui.facets.buckets]]
+id = "1d"
+within = "24h"
+
+[[source.ui.facets.buckets]]
+id = "3d"
+within = "72h"
+
+[[source.ui.facets.buckets]]
+id = "7d"
+within = "168h"
+
+[[source.ui.facets.buckets]]
+id = "2w"
+within = "336h"
+
+[[source.ui.facets.buckets]]
+id = "4w"
+within = "672h"
+
+[[source.ui.facets.buckets]]
+id = "older"
 
 [[source.commands]]
 name = "login"

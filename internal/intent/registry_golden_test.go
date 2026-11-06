@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
@@ -75,6 +76,9 @@ func flatten(prefix string, v reflect.Value) []string {
 		if v.CanInterface() {
 			if s, ok := v.Interface().(interface{ Source() string }); ok {
 				return []string{prefix + " = " + quote(s.Source())}
+			}
+			if t, ok := v.Interface().(*template.Template); ok && t.Tree != nil {
+				return []string{prefix + " = " + quote(t.Root.String())}
 			}
 		}
 		return flatten(prefix, v.Elem())

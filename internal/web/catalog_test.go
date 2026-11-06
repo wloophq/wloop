@@ -36,9 +36,9 @@ func TestTimeFacetsBucketOnTheClient(t *testing.T) {
 		"facets": map[string][]string{"opened": {iso(t0.Add(-20 * time.Hour))}, "age": {iso(t0.Add(-2 * time.Hour))},
 			"due": {iso(t0.Add(30 * time.Hour))}, "is": {"needs-me"}}}
 	var got []map[string][]string
-	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "rowValuesCache"), []string{"fold", "fieldById", "rowValues", "rowKey"}, `
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "itemValuesCache"), []string{"fold", "fieldById", "itemValues", "itemKey"}, `
 const r = input.row;
-const at = (ms) => { Date.now = () => ms; return Object.fromEntries(["opened", "age", "due", "is"].map((id) => [id, rowValues(fieldById(id), r)])); };
+const at = (ms) => { Date.now = () => ms; return Object.fromEntries(["opened", "age", "due", "is"].map((id) => [id, itemValues(fieldById(id), r)])); };
 process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 2 * 86400000)]));`,
 		map[string]any{"row": row, "t0": t0.UnixMilli()}, &got)
 	want := []map[string][]string{
@@ -50,9 +50,9 @@ process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 2 * 86400000)])
 	}
 	row["facets"].(map[string][]string)["due"] = []string{iso(t0.Add(day + 6*time.Hour))}
 	got = nil
-	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "rowValuesCache"), []string{"fold", "fieldById", "rowValues", "rowKey"}, `
+	nodeRun(t, keyJS(t)+catalogPrelude(t)+jsConst(t, appJS(t), "itemValuesCache"), []string{"fold", "fieldById", "itemValues", "itemKey"}, `
 const r = input.row;
-const at = (ms) => { Date.now = () => ms; return { due: rowValues(fieldById("due"), r), is: rowValues(fieldById("is"), r) }; };
+const at = (ms) => { Date.now = () => ms; return { due: itemValues(fieldById("due"), r), is: itemValues(fieldById("is"), r) }; };
 process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 86400000)]));`,
 		map[string]any{"row": row, "t0": t0.UnixMilli()}, &got)
 	want = []map[string][]string{{"due": {"later"}, "is": {"needs-me"}}, {"due": {"due"}, "is": {"needs-me", "due"}}}
@@ -122,31 +122,46 @@ func TestThreadRowRendersInTheCockpit(t *testing.T) {
 		t.Fatal(err)
 	}
 	catalog["situations"] = append(catalog["situations"].([]any), map[string]any{"provider": "thread", "kind": "waiting", "label": "waits for a reply", "rank": 0})
+	catalog["facets"] = append(catalog["facets"].([]any), map[string]any{"id": "waits-on", "label": "Waits on", "provider": "thread", "show": "who"})
 	row := map[string]any{"unit": map[string]any{"provider": "thread", "key": "c1"}, "link": "https://chat.example/c1", "label": "#general c1", "title": "Deploy question",
 		"kind": "waiting", "summary": map[string]any{"waits_on": "ana", "since": iso(now.Add(-3 * time.Hour)), "stalled": false, "closed": false,
 			"reason": "asked about the deploy", "line": "ana asked about the deploy"},
-		"views": []string{"needs-me"}, "facets": map[string][]string{}, "actions": []any{}, "specs_version": ""}
+		"views": []string{"mine"}, "facets": map[string][]string{"waits-on": {"ana"}}, "actions": []any{}, "specs_version": ""}
 	var got map[string]string
 	nodeRun(t, cockpitScript(t), nil, `
 Date.now = () => input.now;
 applyCatalog(input.catalog);
+tasksState.catalog = input.views;
 state.health = { viewer: "me" };
 const r = input.row;
 state.rows = [r];
-const lens = { view: "needs-me", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "" };
-const tr = rowTr(r, "", lens);
-const c = card(r, "");
-location.hash = "#" + routeHash("needs-me", keyOf(r));
+const lens = lensOf({ ...readHash(), view: "mine" });
+const m = rowModel(r, "", lens, "");
+const tr = rowTr(m, lens, rowColumns([m]));
+const c = rowCard(rowModel(r, "", lens, "", "card"), lens);
+location.hash = "#" + routeHash("mine", keyOf(r));
 state.detail = { row: r, events: [] };
 renderDetail();
 const shown = pipeline(state.rows, lens).shown;
 process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, detail: document.getElementById("detail").textContent, shown: String(shown) }));`,
-		map[string]any{"row": row, "catalog": catalog, "now": now.UnixMilli()}, &got)
+		map[string]any{"row": row, "catalog": catalog, "views": servedViews(t), "now": now.UnixMilli()}, &got)
 	for _, part := range []string{"row", "card", "detail"} {
-		for _, want := range []string{"Deploy question", "#general c1", "waits for a reply", "ana", "3h 0m"} {
+		for _, want := range []string{"Deploy question", "#general c1", "ana"} {
 			if !strings.Contains(got[part], want) {
 				t.Errorf("%s lacks %q: %s", part, want, got[part])
 			}
+		}
+	}
+	for _, part := range []string{"detail"} {
+		for _, want := range []string{"waits for a reply", "3h 0m"} {
+			if !strings.Contains(got[part], want) {
+				t.Errorf("%s lacks %q: %s", part, want, got[part])
+			}
+		}
+	}
+	for _, part := range []string{"row", "card"} {
+		if strings.Contains(got[part], "waits for a reply") {
+			t.Errorf("the %s shows a situation its plugin places nowhere: %s", part, got[part])
 		}
 	}
 	for _, part := range []string{"row", "detail"} {
@@ -158,7 +173,49 @@ process.stdout.write(JSON.stringify({ row: tr.textContent, card: c.textContent, 
 		t.Errorf("detail lacks the summary line or since: %s", got["detail"])
 	}
 	if got["shown"] != "1" {
-		t.Errorf("the needs-me list shows %s rows", got["shown"])
+		t.Errorf("the mine list shows %s rows", got["shown"])
+	}
+}
+
+// A row offers a facet button only for a value it holds, so clicking it keeps the row in the list: a thread
+// row, whose provider has no strip facet, shows no dot even holding another provider's strip facet, and another
+// provider's kind facet places nothing on it.
+func TestARowFiltersOnlyByTheFacetsItHolds(t *testing.T) {
+	var catalog map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	catalog["situations"] = append(catalog["situations"].([]any), map[string]any{"provider": "thread", "kind": "waiting", "label": "waits for a reply", "rank": 0})
+	catalog["facets"] = append(catalog["facets"].([]any), map[string]any{"id": "waits-on", "label": "Waits on", "provider": "thread", "show": "who"})
+	row := func(facets map[string][]string) map[string]any {
+		return map[string]any{"unit": map[string]any{"provider": "thread", "key": "c1"}, "link": "https://chat.example/c1", "label": "#general c1", "title": "Deploy question",
+			"kind": "waiting", "summary": map[string]any{"waits_on": "ana", "since": "2026-10-14T12:00:00Z"},
+			"views": []string{"mine"}, "facets": facets, "actions": []any{}, "specs_version": ""}
+	}
+	var got [][]string
+	nodeRun(t, cockpitScript(t), nil, `
+applyCatalog(input.catalog);
+tasksState.catalog = input.views;
+state.health = { viewer: "me" };
+const lens = lensOf({ ...readHash(), view: "mine" });
+const filters = (el, out = []) => {
+  if (el && el.tag === "button" && el.attrs.class === "facet") out.push(el.attrs["aria-label"]);
+  for (const c of (el && el.children) || []) filters(c, out);
+  return out;
+};
+const tr = (r) => { const m = rowModel(r, "", lens, ""); return rowTr(m, lens, rowColumns([m])); };
+process.stdout.write(JSON.stringify(input.rows.map((r) => filters(tr(r)))));`,
+		map[string]any{"catalog": catalog, "views": servedViews(t), "rows": []any{
+			row(map[string][]string{"waits-on": {"ana"}}),
+			row(map[string][]string{"waits-on": {"ana"}, "wait": {"reviewer"}, "kind": {"waiting"}}),
+		}}, &got)
+	for _, label := range got[0] {
+		if strings.Contains(label, "situation") || strings.Contains(label, "nobody") || !strings.Contains(label, "ana") {
+			t.Errorf("a thread row filters by a facet it lacks: %q in %q", label, got[0])
+		}
+	}
+	if len(got[1]) != 1 || strings.Contains(strings.Join(got[1], " "), "situation") {
+		t.Errorf("a row holding GitHub's strip and kind facets offers %q, want its waits-on alone", got[1])
 	}
 }
 
@@ -227,7 +284,7 @@ func jsonEqual(t *testing.T, a, b []byte) bool {
 func TestDeepLinkViewSurvivesBeforeTheCatalog(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "catalog") + jsConst(t, src, "UNIT_KEY") + jsConst(t, src, "QUERY_MAX") +
-		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + viewsScripts(t)
+		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\n" + viewsScripts(t)
 	var got struct{ Before, Unknown, After, Missing string }
 	nodeRun(t, prelude, []string{"readHash"}, `
 const before = readHash().view;

@@ -67,6 +67,24 @@ func enum(f Fact, values map[unit.ProviderID][]string) Fact {
 // anyProvider keys an enum that holds for every provider.
 const anyProvider unit.ProviderID = ""
 
+// The values of task.turn.
+const (
+	TurnMe     = "me"
+	TurnOthers = "others"
+	TurnNobody = "nobody"
+)
+
+// TurnOf is task.turn of a task.owed_by.
+func TurnOf(owedBy string) string {
+	switch owedBy {
+	case "me":
+		return TurnMe
+	case "":
+		return TurnNobody
+	}
+	return TurnOthers
+}
+
 // enumOf is an enum of values that holds for every provider.
 func enumOf(values ...string) map[unit.ProviderID][]string {
 	return map[unit.ProviderID][]string{anyProvider: values}
@@ -154,6 +172,7 @@ var otherFacts = []Fact{
 	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager."),
 	untrusted(wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence.")),
 	wf("session", "repo", expr.String, "owner/repo of the book's pull request; empty when none."),
+	wf("session", "name", expr.String, "What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id."),
 	enum(wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."), enumOf("author", "review", "none")),
 	wf("workspace", "main", expr.Bool, "The workspace is the repository's main checkout."),
 	wf("workspace", "pr", expr.String, "The linked pull request, owner/repo#number; empty when none."),
@@ -191,19 +210,25 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	untrusted(enum(wf("task", "category", expr.String, "The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped."), enumOf(categoryNames()...))),
 	untrusted(wf("task", "owed_by", expr.String, "Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does.")),
+	untrusted(enum(wf("task", "turn", expr.String, "Whose turn the task's next step is, from task.owed_by: me, others (a person's), or nobody."), enumOf(TurnMe, TurnOthers, TurnNobody))),
 	timeVarying(untrusted(wf("task", "owed_since", expr.Time, "Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`."))),
+	wf("task", "moved_at", expr.Time, "When the task, or a unit linked to it, last moved; zero when never. Test with `> timestamp(0)`."),
 	timeVarying(wf("task", "since_movement", expr.Duration, "Time since the task, or a unit linked to it, last moved: a state change, a source event, a run.")),
 	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`."))),
 	wf("task", "gates_open", expr.Int, "The task's open gates."),
-	wf("task", "runs_live", expr.Int, "The task's runs whose session is live."),
+	wf("task", "turns_open_by_hand", expr.Int, "The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names."),
+	wf("task", "turn_by_hand_at", expr.Time, "When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`."),
+	wf("task", "turns_running", expr.Int, "The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended."),
 	untrusted(wf("task", "wake_until", expr.Time, "When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`.")),
 	untrusted(wf("task", "wake_when", expr.String, "The condition the task's wake waits on; empty when none.")),
-	wf("task", "repo", expr.String, "owner/repo of the task's work: its placement, else its pull request's; empty when unknown."),
+	wf("task", "placement", expr.String, "owner/repo of the repository the task's work runs in: its placement, else its units' plugin's; empty when unknown."),
 	untrusted(wf("task", "sequential_next", expr.Bool, "The task is the first open child of a sequential parent.")),
 	timeVarying(untrusted(wf("task", "review_due", expr.Bool, "The task is a parent whose review is due."))),
 	untrusted(wf("task", "children_ready", expr.Bool, "The task has a child in the ready category.")),
+	untrusted(wf("task", "children_mine", expr.Bool, "The task has a child in the ready category whose next step is yours: its task.owed_by is me.")),
 	timeVarying(untrusted(wf("task", "ask_age", expr.Duration, "The age of the task's oldest unanswered ask: the oldest open item it holds that waits on you; zero when none does."))),
 	untrusted(wf("task", "askers", expr.List, "Who waits on you through the task: the requesters of the open items it holds that wait on you, each once, by key such as slack:U0123.")),
+	untrusted(wf("task", "asker_names", expr.List, "The names of task.askers, as their items name them, each once; a requester with no name is its key.")),
 	untrusted(wf("task", "promised", expr.Time, "When you promised the task by: the property of role promise, which acknowledge sets; zero when unset. Untrusted, since a profile may let an agent write that property. Test with `> timestamp(0)`.")),
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted, as its plugin's extraction health says; zero when none waits."))),
 	untrusted(wf("task", "link_signals", expr.List, "The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals.")),

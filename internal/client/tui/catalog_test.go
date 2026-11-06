@@ -76,9 +76,10 @@ func modelWith(t testing.TB, rows ...api.Row) *Model {
 	t.Helper()
 	m := NewModel()
 	m.SetCatalog(servedCatalog(t))
+	m.SetViews(api.ViewsCatalog{Lens: testLensWords})
 	m.SetSpecs(servedSpecs(t).Specs)
 	m.SetKeys(servedKeys(servedSpecs(t)))
-	m.SetData(rows, api.Health{})
+	m.SetData(withServedFacets("", rows), api.Health{})
 	return m
 }
 
@@ -86,6 +87,7 @@ func newModel(t testing.TB) *Model {
 	t.Helper()
 	m := NewModel()
 	m.SetCatalog(servedCatalog(t))
+	m.SetViews(api.ViewsCatalog{Lens: testLensWords})
 	m.SetSpecs(servedSpecs(t).Specs)
 	m.SetKeys(servedKeys(servedSpecs(t)))
 	return m
@@ -104,8 +106,8 @@ func servedCatalog(t testing.TB) api.CatalogResponse {
 		t.Fatal(err)
 	}
 	tui := []string{"tui"}
-	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"},
-		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request", UnitSort: "repo"}}, c.Views...)
+	c.Views = append([]api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Surfaces: tui, Unit: "Pull request"},
+		{ID: "loop", Label: "In loop", Provider: "github", Rows: true, Order: 3, Surfaces: tui, Unit: "Pull request"}}, c.Views...)
 	slices.SortStableFunc(c.Views, func(a, b api.ViewSpec) int { return a.Order - b.Order })
 	return c
 }

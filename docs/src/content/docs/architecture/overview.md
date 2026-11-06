@@ -54,5 +54,5 @@ Four properties hold across them:
 
 - **The store is the truth.** Tasks, gates, turn state, answers and history live only in the store. Orca's board is a view sink: it receives the same projection as every other view, fails alone and is reconciled on start. Any workspace or session can be recreated from stored context, in any manager that hosts its agent.
 - **Every change leaves a trail.** Each command writes its domain events in the same transaction as its state change, so a turn's timeline can be read from events alone.
-- **Authority comes from you.** Agents report facts; only you, through your surfaces or an approval rule of yours, resolve a gate, endorse a verdict, take over or remove a workspace.
+- **Authority comes from you.** Unattended agents report facts; only you, through your surfaces, an agent session you drive or an approval rule of yours, resolve a gate, endorse a verdict, take over or remove a workspace. A session you drive is one the loop never typed into, or you prompted since it last did, with no turn the loop sent running in it.
 - **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients.

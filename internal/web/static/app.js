@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], fields: [], strip: "", kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -33,11 +33,12 @@ function applyCatalog(c) {
   const sits = [...(c.situations || [])].sort((a, b) => a.rank - b.rank);
   catalog.kinds = new Map(sits.map((x) => [`${x.provider}:${x.kind}`, x.label]));
   catalog.kindOrder = [...new Set(sits.map((x) => x.kind))];
-  catalog.fields = (c.facets || []).map(fieldOf);
+  catalog.specs = c.facets || [];
+  catalog.fields = catalog.specs.map(fieldOf);
+  catalog.lens = c.lens || [];
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
   catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
-  catalog.strip = ((c.facets || []).find((f) => f.strip) || {}).id || "";
   catalog.details = c.details || [];
   catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
 }
@@ -78,10 +79,13 @@ function rowKindLabel(r) {
 // which may be several, and groups and sorts by its first value, so a row
 // sits in one group. A time facet's values are its buckets now.
 function fieldOf(spec) {
-  const f = { id: spec.id, label: spec.label, provider: spec.provider || "", group: !!spec.group, sort: !!spec.sort && spec.menu !== false,
-    menu: spec.menu !== false, rank: spec.rank, empty: spec.empty, match: MATCH[spec.match], buckets: spec.buckets || null };
+  const f = { id: spec.id, label: spec.label, provider: spec.provider || "", fact: spec.fact || "", group: !!spec.group, sort: !!spec.sort && spec.menu !== false,
+    menu: spec.menu !== false, rank: spec.rank, empty: spec.empty, match: MATCH[spec.match], buckets: spec.buckets && spec.buckets.length ? spec.buckets : null };
   if (spec.labels) f.show = (k) => spec.labels[k] || k;
-  if (spec.match === "prefix") f.groupBy = (raw) => "tag:" + raw.split(":")[0];
+  if (spec.match === "prefix") {
+    f.groupBy = (raw) => "tag:" + raw.split(":")[0];
+    f.keys = (it) => facetValues(it, spec.id);
+  }
   if (spec.sort === "time") f.sortValue = (r) => facetTime(r, spec.id);
   f.values = f.buckets ? (r) => bucketsOf(f, r) : (r) => facetValues(r, spec.id);
   if (spec.id === "is") f.values = (r) => (dueNow(r) ? [...facetValues(r, "is"), "due"] : facetValues(r, "is"));
@@ -163,7 +167,7 @@ const ARTIFACT_LINES = 40;
 const PR_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]\S*)?$/;
 const folded = new WeakMap();
 
-const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
+const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), answered: new Map(), guidance: {}, conn: "connecting", authLost: false,
   explore: { result: null, busy: false, error: "", recent: [], sel: "", status: {} } };
 let lastFocus = null;
 
@@ -190,7 +194,6 @@ function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const route = readRoute(location.hash);
   const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
-  const g = p.get("g") || "";
   return {
     view,
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
@@ -199,11 +202,21 @@ function readHash() {
     ctx: route.ctx,
     layout: p.get("layout") === "board" ? "board" : "",
     q: (p.get("q") || "").slice(0, QUERY_MAX),
-    g: (groupField(g) || {}).group ? g : "",
-    s: parseSort(p.get("s")).field ? p.get("s") : "",
+    g: (p.get("g") || "").slice(0, QUERY_MAX),
+    s: (p.get("s") || "").slice(0, QUERY_MAX),
     x: view === "explore" ? (p.get("x") || "").slice(0, 256) : "",
     tk: view === "dash" && /^[a-z-]+$/.test(p.get("tk") || "") ? p.get("tk") : "",
     done: view === "dash" && p.get("done") === "1",
+  };
+}
+
+// lensPicks are the group and the sort of route that view offers; one it does not offer gives way to the
+// view's default, while the hash keeps it for the views that do.
+function lensPicks(view, route, g, s) {
+  const fields = offeredFields(view, route);
+  return {
+    g: g === NO_GROUP || (groupField(g, fields) || {}).group ? g : "",
+    s: parseSort(s, fields).field ? s : "",
   };
 }
 
@@ -236,12 +249,13 @@ const unitKey = (u) => `${u.provider}:${u.key}`;
 const unitOf = (x) => x.unit;
 const keyOf = (x) => unitKey(unitOf(x));
 const labelOf = (x) => x.label || "";
-const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
 const eventRef = (it) => it.label || "";
 
+// fold lowers s and drops its accents as api.Fold does, so the lens, the daemon's counts and the terminal
+// compare text the same way.
 function fold(s) {
-  return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => c.normalize("NFD")[0]).replace(/\p{Mn}/gu, "");
 }
 
 // tokens splits a query on spaces, keeping a "quoted value" whole.
@@ -253,55 +267,62 @@ function unquote(s) {
   return s.replace(/^"|"$/g, "");
 }
 
-// terms are the free words of a query, the text every field is searched for.
-function terms(q) {
-  return tokens(q).filter((t) => !qualifierOf(t)).map((t) => fold(unquote(t))).filter(Boolean);
+// terms are the free words of a query over fields, the text every field is searched for.
+function terms(q, fields = catalog.fields) {
+  return tokens(q).filter((t) => !qualifierOf(t, fields)).map((t) => fold(unquote(t))).filter(Boolean);
 }
 
-function fieldById(id) {
-  return catalog.fields.find((f) => f.id === id);
+function fieldById(id, fields = catalog.fields) {
+  return fields.find((f) => f.id === id);
 }
 
 // tagKeyField groups by one brief tag key, "tag:lang": a row sits under each
 // of its tags of that key, or under "no lang" with none. Its group keys are
 // whole tags, so no value, "none" included, reads as the empty group.
-function tagKeyField(id) {
+function tagKeyField(id, fields = catalog.fields) {
   const m = /^tag:([a-z-]+)$/.exec(id || "");
-  if (!m) return null;
+  const tag = fieldById("tag", fields);
+  if (!m || !tag || tag.match !== MATCH.prefix) return null;
   const key = m[1];
+  const w = lensWords();
   return {
-    id, label: `Tag ${key}`, empty: `no ${key}`, group: true, tagKey: key,
-    keys: (r) => facetValues(r, "tag").filter((t) => t.startsWith(key + ":")),
+    id, label: fillWord(w.tag_key, { label: tag.label, key }), empty: fillWord(w.tag_key_empty, { key }), group: true, tagKey: key,
+    keys: (r) => facetValues(r, tag.id).filter((t) => t.startsWith(key + ":")),
   };
 }
 
-function groupField(id) {
-  return fieldById(id) || tagKeyField(id);
+function groupField(id, fields = catalog.fields) {
+  return fieldById(id, fields) || tagKeyField(id, fields);
 }
 
 function tagKeys(rows) {
   const keys = new Set();
-  for (const r of rows) for (const t of facetValues(r, "tag")) keys.add(t.split(":")[0]);
+  for (const r of rows) {
+    for (const t of facetValues(r, "tag")) {
+      const at = t.indexOf(":");
+      if (at > 0) keys.add(t.slice(0, at));
+    }
+  }
   return [...keys].filter((k) => /^[a-z-]+$/.test(k)).sort();
 }
 
 function normValue(field, raw) {
   const v = fold(unquote(String(raw || "")));
-  return (field === "author" || field === "waits-on") && v === "@me" ? "me" : v;
+  return v === "@me" ? "me" : v;
 }
 
 // qualifierOf reads a field:value term of a field that filters; anything else
 // is free text, so "fix:" or a URL stays a word.
-function qualifierOf(token) {
-  const m = /^(-?)([a-z][a-z-]*):(.+)$/i.exec(token);
-  const f = m && fieldById(m[2].toLowerCase());
+function qualifierOf(token, fields = catalog.fields) {
+  const m = /^(-?)([a-zA-Z][a-zA-Z.-]*):(.+)$/.exec(token);
+  const f = m && fieldById(m[2].toLowerCase(), fields);
   if (!f || !f.values) return null;
   const value = normValue(f.id, m[3]);
   return value ? { field: f.id, value, raw: unquote(m[3]), neg: m[1] === "-" } : null;
 }
 
-function qualifiers(q) {
-  return tokens(q).map(qualifierOf).filter(Boolean);
+function qualifiers(q, fields = catalog.fields) {
+  return tokens(q).map((t) => qualifierOf(t, fields)).filter(Boolean);
 }
 
 function qualifierToken(field, raw, neg) {
@@ -310,11 +331,11 @@ function qualifierToken(field, raw, neg) {
 
 // toggledQualifier adds field:value, or -field:value when neg, or takes it
 // out when the query holds it already; the opposite sign gives way.
-function toggledQualifier(q, field, raw, neg) {
+function toggledQualifier(q, field, raw, neg, fields = catalog.fields) {
   const v = normValue(field, raw);
   let on = false;
   const kept = tokens(q).filter((t) => {
-    const x = qualifierOf(t);
+    const x = qualifierOf(t, fields);
     if (!x || x.field !== field || x.value !== v) return true;
     if (x.neg === !!neg) on = true;
     return false;
@@ -322,27 +343,31 @@ function toggledQualifier(q, field, raw, neg) {
   return (on ? kept : [...kept, qualifierToken(field, raw, neg)]).join(" ");
 }
 
-function withoutQualifiers(q, field, neg) {
+function withoutQualifiers(q, field, neg, fields = catalog.fields) {
   return tokens(q).filter((t) => {
-    const x = qualifierOf(t);
+    const x = qualifierOf(t, fields);
     return !x || x.field !== field || x.neg !== neg;
   }).join(" ");
 }
 
-function haystack(r) {
-  let f = folded.get(r);
+// rowTexts are the texts a free word searches in a row.
+function rowTexts(r) {
+  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line,
+    ...(r.search || []), ...Object.values(r.facets || {}).flat()];
+}
+
+// haystack is an item's folded texts: its own, or a row's.
+function haystack(it) {
+  let f = folded.get(it);
   if (!f) {
-    const p = pl(r);
-    const ws = p.workspace || {};
-    f = [r.title, labelOf(r), p.repo, p.author, p.head, sm(r).waits_on, r.kind, rowKindLabel(r), sm(r).reason, sm(r).line,
-      ws.display_name, ws.status, ws.comment, (p.brief || {}).goal, ...((p.brief || {}).tags || [])].map(fold);
-    folded.set(r, f);
+    f = (it.texts || rowTexts(it)).map(fold);
+    folded.set(it, f);
   }
   return f;
 }
 
-function matches(r, ts) {
-  return ts.every((t) => haystack(r).some((f) => f.includes(t)));
+function matches(it, ts) {
+  return ts.every((t) => haystack(it).some((f) => f.includes(t)));
 }
 
 function matchesActivity(it, ts) {
@@ -353,11 +378,11 @@ function matchesActivity(it, ts) {
 
 // Recent applies the filters an event can answer: its repository and the
 // author of its pull request.
-const ACTIVITY_FIELDS = ["repo", "author"];
+const ACTIVITY_FIELDS = ["where", "author"];
 
 function activityPasses(it, lens) {
   const filters = new Map([...lens.filters].filter(([id]) => ACTIVITY_FIELDS.includes(id)));
-  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: activityRepos(it), author: [it.author || ""] } }, filters);
+  return matchesActivity(it, lens.ts) && passesFilters({ facets: { where: activityRepos(it), author: [it.author || ""] } }, filters);
 }
 
 function activityRepos(it) {
@@ -440,11 +465,12 @@ function age(since, now = Date.now()) {
   return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
-function left(deadline, now = Date.now()) {
+// left is a pending round's countdown to deadline in the row words w.
+function left(deadline, w, now = Date.now()) {
   const s = Math.ceil((Date.parse(deadline) - now) / 1000);
-  if (s <= 0) return "sending";
-  if (s <= 99) return `in ${s} s`;
-  return `in ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  if (s <= 0) return w.countdown_sending || "";
+  if (s <= 99) return fillWord(w.countdown_seconds, { s });
+  return fillWord(w.countdown_minutes, { m: Math.floor(s / 60), s: String(s % 60).padStart(2, "0") });
 }
 
 // roundGate is the open plan gate an automatic round of the row waits on, until its deadline.
@@ -454,11 +480,13 @@ function roundGate(row) {
 
 function countdown(row) {
   const deadline = roundGate(row).deadline;
-  return h("span", { class: "age countdown", "data-deadline": deadline, title: `sends at ${stamp(deadline)}` }, left(deadline));
+  const provider = unitOf(row).provider;
+  const w = rowWords(provider);
+  return h("span", { class: "age countdown", "data-deadline": deadline, "data-provider": provider, title: fillWord(w.countdown_title, { time: stamp(deadline) }) }, left(deadline, w));
 }
 
 function tickCountdowns() {
-  for (const el of document.querySelectorAll(".countdown[data-deadline]")) el.textContent = left(el.dataset.deadline);
+  for (const el of document.querySelectorAll(".countdown[data-deadline]")) el.textContent = left(el.dataset.deadline, rowWords(el.dataset.provider));
   for (const el of document.querySelectorAll(".plan-left[data-deadline]")) el.textContent = planWhen({ decision: "pending", default: "run", deadline: el.dataset.deadline });
 }
 
@@ -483,32 +511,62 @@ function waitingLabel(row) {
   return (sm(row).waits_on || "").split(", ").map((w) => resolveWho(row, w)).join(", ");
 }
 
-// waitField is the served facet whose value colors a row's strip.
-function waitField() {
-  return catalog.fields.find((f) => f.id === catalog.strip);
+// stripSpec is the facet that colors the strip of provider's items among specs ("" for a task's), as that
+// provider shows it; null when the provider has none.
+function stripSpec(specs, provider) {
+  for (const s of specs || []) {
+    if (s.provider ? s.provider !== provider : s.displays && !(provider in s.displays)) continue;
+    const spec = specFor(s, provider);
+    if (spec.strip) return spec;
+  }
+  return null;
 }
 
-// waitCat is the class of whom a row waits on its strip shows: me, the
-// loop, a reviewer, the author, or nobody.
+// stripColor is the hue a strip facet's value colors a strip with, its colors' keys matched folded as group
+// keys are.
+function stripColor(spec, value) {
+  const v = fold(value);
+  const hit = Object.entries((spec && spec.colors) || {}).find(([k]) => fold(k) === v);
+  return hit ? hit[1] : "nobody";
+}
+
+// stripOf is an item's strip: its provider's strip facet, the item's first value of it, that value's hue and
+// label; null when the provider has no strip or the item no value of it.
+function stripOf(it, specs) {
+  const spec = stripSpec(specs, it.provider || "");
+  const value = spec ? ((it.facets || {})[spec.id] || []).find((v) => v && fold(v) !== "none") : "";
+  return value ? { spec, value, color: stripColor(spec, value), label: (spec.labels || {})[value] || value } : null;
+}
+
+function rowStrip(row) {
+  return stripOf({ facets: row.facets || {}, provider: unitOf(row).provider }, catalog.specs);
+}
+
+// waitCat is the value of a row's strip facet, "" when it has no strip.
 function waitCat(row) {
-  return facetValues(row, catalog.strip)[0] || "nobody";
+  const s = rowStrip(row);
+  return s ? s.value : "";
+}
+
+// waitColor is the hue of a row's strip.
+function waitColor(row) {
+  const s = rowStrip(row);
+  return s ? s.color : "nobody";
 }
 
 function waitClass(row) {
-  return "w-" + waitCat(row);
+  const s = rowStrip(row);
+  return s ? "w-" + s.color : "";
 }
 
-function isMine(author) {
-  const viewer = state.health && state.health.viewer;
-  return !!viewer && (author || "").toLowerCase() === viewer.toLowerCase();
-}
-
-// stripTitle names whom the row's strip says it waits on, and why.
-function stripTitle(row) {
-  const cat = waitCat(row);
-  const who = cat === "author" || cat === "reviewer" ? ` (${waitingLabel(row)})` : "";
-  const f = waitField();
-  return [`${f && f.show ? f.show(cat) : cat}${who}: ${rowKindLabel(row)}`, sm(row).reason].filter(Boolean).join(". ");
+// rowTip is a row's tooltip in the row words w: its strip value's label, whom it waits on unless that is you
+// or nobody, its kind, then why.
+function rowTip(strip, who, kind, why, w) {
+  let tip = strip ? strip.label : "";
+  if (tip && who && who !== "me" && who !== "nobody") tip = fillWord(w.tip_named, { strip: tip, who });
+  if (kind) tip = tip ? fillWord(w.tip_kind, { tip, kind }) : kind;
+  if (why) tip = tip ? fillWord(w.tip_why, { tip, why }) : why;
+  return tip;
 }
 
 function isMuted(p) {
@@ -556,29 +614,29 @@ function fieldShow(id, k) {
   return f && f.show ? f.show(k) : k;
 }
 
-// rowValuesCache holds the values of the current minute: a time facet's
+// itemValuesCache holds the values of the current minute: a time facet's
 // buckets move with the clock.
-const rowValuesCache = { minute: -1, rows: new WeakMap() };
+const itemValuesCache = { minute: -1, items: new WeakMap() };
 
-// rowValues are a row's values of a field, folded, the way filters compare.
-function rowValues(f, r) {
+// itemValues are an item's values of a field, folded, the way filters compare.
+function itemValues(f, it) {
   const minute = Math.floor(Date.now() / 60000);
-  if (rowValuesCache.minute !== minute) Object.assign(rowValuesCache, { minute, rows: new WeakMap() });
-  const cache = rowValuesCache.rows;
-  let m = cache.get(r);
-  if (!m) cache.set(r, (m = new Map()));
-  if (!m.has(f.id)) m.set(f.id, (f.values ? f.values(r) : []).filter(Boolean).map((v) => fold(v)));
+  if (itemValuesCache.minute !== minute) Object.assign(itemValuesCache, { minute, items: new WeakMap() });
+  const cache = itemValuesCache.items;
+  let m = cache.get(it);
+  if (!m) cache.set(it, (m = new Map()));
+  if (!m.has(f.id)) m.set(f.id, (f.values ? f.values(it) : []).filter(Boolean).map((v) => fold(v)));
   return m.get(f.id);
 }
 
-function rowKey(f, r) {
-  return (f.key ? f.key(r) : (f.values(r) || [])[0]) || "none";
+function itemKey(f, it) {
+  return (f.key ? f.key(it) : (f.values(it) || [])[0]) || "none";
 }
 
-function filtersOf(quals) {
+function filtersOf(quals, fields = catalog.fields) {
   const out = new Map();
   for (const x of quals) {
-    if (!out.has(x.field)) out.set(x.field, { inc: [], exc: [] });
+    if (!out.has(x.field)) out.set(x.field, { f: fieldById(x.field, fields), inc: [], exc: [] });
     out.get(x.field)[x.neg ? "exc" : "inc"].push(x.value);
   }
   return out;
@@ -586,11 +644,11 @@ function filtersOf(quals) {
 
 // passesFilters ORs the values of one field and ANDs the fields; except
 // leaves one field out, to count what picking another of its values shows.
-function passesFilters(r, filters, except) {
-  for (const [id, { inc, exc }] of filters) {
+function passesFilters(it, filters, except) {
+  for (const [id, { f: own, inc, exc }] of filters) {
     if (id === except || (Array.isArray(except) && except.includes(id))) continue;
-    const f = fieldById(id);
-    const vs = rowValues(f, r);
+    const f = own || fieldById(id);
+    const vs = itemValues(f, it);
     const hit = (q) => vs.some((v) => (f.match ? f.match(v, q) : v === q));
     if ((inc.length && !inc.some(hit)) || exc.some(hit)) return false;
   }
@@ -601,23 +659,137 @@ function passes(r, view, lens, except) {
   return inView(r, view, lens.done) && matches(r, lens.ts) && passesFilters(r, lens.filters, except);
 }
 
-function parseSort(s) {
-  const m = /^([a-z]+)(-desc)?$/.exec(s || "");
-  const f = m && fieldById(m[1]);
+function parseSort(s, fields = catalog.fields) {
+  const m = /^([a-z][a-z.-]*?)(-desc)?$/.exec(s || "");
+  const f = m && fieldById(m[1], fields);
   return f && f.sort ? { field: f.id, desc: !!m[2] } : { field: "", desc: false };
 }
 
-function readLens() {
-  const { view, q, g, s, layout, tk, done } = readHash();
-  const quals = qualifiers(q);
-  return { view, q, ts: terms(q), quals, filters: filtersOf(quals), group: g, sort: s, layout, tk, done };
+// NO_GROUP is the pick that lists a view whose lens groups by default in one list.
+const NO_GROUP = "none";
+
+const lensMemo = { tasks: null, fields: null, viewsCat: null, offered: null };
+
+// lensFields are the fields a query over view names: a task view's are the profile's task facets and the
+// plugins' facets, one by id as the daemon counts with them; a row view's are the plugins'.
+function lensFields(view) {
+  if (typeof isCoreView !== "function" || !isCoreView(view)) return catalog.fields;
+  const cat = tasksState.catalog;
+  if (lensMemo.fields !== catalog.fields || lensMemo.viewsCat !== cat) {
+    const byId = new Map(catalog.fields.map((f) => [f.id, f]));
+    for (const spec of (cat && cat.facets) || []) byId.set(spec.id, fieldOf(spec));
+    Object.assign(lensMemo, { fields: catalog.fields, viewsCat: cat, tasks: [...byId.values()], offered: null });
+  }
+  return lensMemo.tasks;
 }
 
-// A board needs groups: by whom a row waits on.
+// fieldsFor are the fields of view's lens that some of its items has a value of, and a field per brief tag key
+// they hold.
+function fieldsFor(view, items) {
+  const has = new Set();
+  for (const it of items) for (const [id, vs] of Object.entries(it.facets || {})) if ((vs || []).some(Boolean)) has.add(id);
+  return [...lensFields(view).filter((f) => has.has(f.id)), ...tagKeys(items).map((k) => tagKeyField("tag:" + k, lensFields(view))).filter(Boolean)];
+}
+
+// viewSource is what view lists before the lens, as loaded: a task view's tasks, a row view's rows, which
+// items keeps to the view; null until they are loaded, or for a view the lens does not list.
+function viewSource(view, route) {
+  if (typeof isCoreView === "function" && isCoreView(view)) {
+    const loaded = view !== REVIEW && tasksState.key === viewQueryKey(view, route.area, route.ctx);
+    return loaded ? { all: tasksState.tasks, items: () => tasksState.tasks } : null;
+  }
+  if (!catalog.views.some((v) => v.id === view) || !state.loaded) return null;
+  return { all: state.rows, items: () => state.rows.filter((r) => inView(r, view, route.done)) };
+}
+
+// offeredFields are what the menus of view's lens offer: the fields its items have, every field of its lens
+// until they are loaded.
+function offeredFields(view, route) {
+  const src = viewSource(view, route);
+  if (!src) return lensFields(view);
+  const key = [view, route.done, src.all, lensFields(view)];
+  const m = lensMemo.offered;
+  if (m && m.key.every((k, i) => k === key[i])) return m.fields;
+  const fields = fieldsFor(view, src.items());
+  lensMemo.offered = { key, fields };
+  return fields;
+}
+
+// viewGroupField is the field a task view groups by unless the user picks another: the facet reading its
+// group fact.
+function viewGroupField(view) {
+  const spec = typeof viewSpec === "function" ? viewSpec(view) : null;
+  if (!spec || !spec.group) return "";
+  return (lensFields(view).find((f) => f.fact === spec.group) || {}).id || "";
+}
+
+// defaultSortLabel is what the sort menu calls view's own order.
+function defaultSortLabel(view) {
+  if (typeof isCoreView === "function" && isCoreView(view)) return (tasksState.catalog || {}).default_sort || "";
+  return (catalog.views.find((v) => v.id === view) || {}).default_sort || (typeof tasksState === "object" && (tasksState.catalog || {}).default_sort) || "";
+}
+
+// viewStrip is the facet that colors the strip of view's items: a task view's from its profile, a row view's
+// from its provider; null for a view of mixed rows, whose rows each take their own.
+function viewStrip(view) {
+  if (typeof isCoreView === "function" && isCoreView(view)) return stripSpec(((typeof tasksState === "object" && tasksState.catalog) || {}).facets, "");
+  const provider = (catalog.views.find((v) => v.id === view) || {}).provider || "";
+  return provider ? stripSpec(catalog.specs, provider) : null;
+}
+
+// boardGroupField is the field a board of view groups by when nothing is picked: the facet that colors its
+// strip when the view offers it; "" otherwise.
+function boardGroupField(view, offered) {
+  const s = viewStrip(view);
+  return s && offered.some((f) => f.id === s.id) ? s.id : "";
+}
+
+// lensWords are what the lens bar says, from the views catalog.
+function lensWords() {
+  return (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.lens) || {};
+}
+
+// fillWord fills a lens word's {{.name}} with vars.
+function fillWord(word, vars) {
+  return String(word || "").replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
+}
+
+// lensOf is the lens of route: its query read over the fields of its view, trimmed as the daemon counts it,
+// the picks its view offers and its view's defaults.
+function lensOf(route) {
+  const { view, tk, done } = route;
+  const q = route.q || "";
+  const fields = lensFields(view);
+  const offered = offeredFields(view, route);
+  const quals = qualifiers(q.trim(), fields);
+  const { g, s } = lensPicks(view, route, route.g || "", route.s || "");
+  const core = typeof isCoreView === "function" && isCoreView(view);
+  const provider = core ? "" : (catalog.views.find((v) => v.id === view) || {}).provider || "";
+  const specs = core ? ((typeof tasksState === "object" && tasksState.catalog) || {}).facets || [] : catalog.specs;
+  const strip = viewStrip(view);
+  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
+    fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view),
+    specs, provider, words: rowWords(provider), strip: (strip || {}).id || "", stripSpec: strip };
+}
+
+// rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
+function rowWords(provider) {
+  const own = provider ? ((catalog.lens || []).find((w) => w.provider === provider) || {}).words : null;
+  return own ? { ...lensWords(), ...own } : lensWords();
+}
+
+function readLens() {
+  return lensOf(readHash());
+}
+
+// effectiveGroup is the field a lens groups by: the user's pick, else its view's own, else, on a board, the
+// field its strip is colored by.
 function effectiveGroup(lens) {
+  if (lens.group === NO_GROUP) return "";
   if (lens.group) return lens.group;
+  if (lens.defaultGroup) return lens.defaultGroup;
   if (lens.layout !== "board") return "";
-  return catalog.strip;
+  return lens.boardGroup === undefined ? (viewStrip(lens.view) || {}).id || "" : lens.boardGroup;
 }
 
 function cmp(a, b) {
@@ -646,10 +818,12 @@ function keyOrder(f, a, b, desc) {
   return desc ? cmp(sb, sa) : cmp(sa, sb);
 }
 
-function compareRows(f, desc) {
+// compareItems orders by f, ties by byDefault when there is one; the sort is stable, so the rest keep their
+// order.
+function compareItems(f, desc, byDefault) {
   return (a, b) => {
-    const c = f.sortValue ? (desc ? cmp(f.sortValue(b), f.sortValue(a)) : cmp(f.sortValue(a), f.sortValue(b))) : keyOrder(f, rowKey(f, a), rowKey(f, b), desc);
-    return c || byDefault(a, b);
+    const c = f.sortValue ? (desc ? cmp(f.sortValue(b), f.sortValue(a)) : cmp(f.sortValue(a), f.sortValue(b))) : keyOrder(f, itemKey(f, a), itemKey(f, b), desc);
+    return c || (byDefault ? byDefault(a, b) : 0);
   };
 }
 
@@ -657,31 +831,39 @@ function groupLabel(f, raw) {
   return !raw || raw === "none" ? f.empty || "none" : f.show ? f.show(raw) : raw;
 }
 
-function groupRows(f, rows) {
+function groupItems(f, items) {
   const buckets = new Map();
   const add = (raw) => {
     const k = fold(raw);
     if (!buckets.has(k)) buckets.set(k, { field: f.id, key: k, raw, label: groupLabel(f, raw), rows: [] });
     return buckets.get(k);
   };
-  for (const r of rows) {
-    const ks = f.keys ? f.keys(r) : [rowKey(f, r)];
-    for (const k of ks.length ? ks : ["none"]) add(k).rows.push(r);
+  for (const it of items) {
+    const ks = f.keys ? f.keys(it) : [itemKey(f, it)];
+    const seen = new Set();
+    for (const k of ks.length ? ks : ["none"]) {
+      if (!seen.has(fold(k))) add(k).rows.push(it);
+      seen.add(fold(k));
+    }
   }
   if (f.id === "lane") for (const id of f.rank || []) add(id);
   return [...buckets.values()].sort((a, b) => keyOrder(f, a.key, b.key, false));
 }
 
-// pipeline is every list view's one path: filter, then sort, then group,
-// rows keeping the sort inside their group.
+// pipelineOf is every list's one path: filter, then sort, then group, items
+// keeping the sort inside their group. An item is { facets, texts }.
+function pipelineOf(items, lens, byDefault) {
+  const fields = lens.fields || catalog.fields;
+  const shown = items.filter((it) => matches(it, lens.ts) && passesFilters(it, lens.filters));
+  const { field, desc } = parseSort(lens.sort, fields);
+  shown.sort(field ? compareItems(fieldById(field, fields), desc, byDefault) : byDefault || (() => 0));
+  const g = groupField(effectiveGroup(lens), fields);
+  const groups = g ? groupItems(g, shown) : [{ field: "", key: "", raw: "", label: "", rows: shown }];
+  return { groups, group: g ? g.id : "", total: items.length, shown: shown.length };
+}
+
 function pipeline(rows, lens) {
-  const all = rows.filter((r) => inView(r, lens.view, lens.done));
-  const shown = all.filter((r) => matches(r, lens.ts) && passesFilters(r, lens.filters));
-  const { field, desc } = parseSort(lens.sort);
-  shown.sort(field ? compareRows(fieldById(field), desc) : byDefault);
-  const g = groupField(effectiveGroup(lens));
-  const groups = g ? groupRows(g, shown) : [{ field: "", key: "", raw: "", label: "", rows: shown }];
-  return { groups, group: g ? g.id : "", total: all.length, shown: shown.length };
+  return pipelineOf(rows.filter((r) => inView(r, lens.view, lens.done)), lens, byDefault);
 }
 
 // groupedRows lists each row once, though grouping by a tag key may put it
@@ -760,40 +942,41 @@ function yamlString(v) {
   return JSON.stringify(String(v ?? ""));
 }
 
-// listYAML writes the rows a view shows as YAML whose scalars are JSON
-// strings, so an agent reads it without quoting surprises.
-function listYAML(meta, rows) {
+// listYAML writes the items a view shows as YAML whose scalars are JSON strings, so an agent reads it without
+// quoting surprises: each item's reference, link, title and units, then its facets by id.
+function listYAML(meta, items) {
   const out = [`view: ${yamlString(meta.view)}`];
   if (meta.filter) out.push(`filter: ${yamlString(meta.filter)}`);
   if (meta.group_by) out.push(`group_by: ${yamlString(meta.group_by)}`);
   if (meta.sort) out.push(`sort: ${yamlString(meta.sort)}`);
-  out.push(`copied_at: ${yamlString(meta.at)}`, `count: ${rows.length}`, "pull_requests:");
-  for (const r of rows) {
-    const p = pl(r);
-    const o = p.override || {};
-    const flags = [o.hold && "paused", isMuted(p) && "muted", o.adopted && "adopted", o.tracked && "tracked"].filter(Boolean);
-    const b = p.brief;
-    const ws = p.workspace;
+  out.push(`copied_at: ${yamlString(meta.at)}`, `count: ${items.length}`, "items:");
+  const list = (vs) => `[${vs.map(yamlString).join(", ")}]`;
+  for (const it of items) {
+    const c = copyEntry(it);
+    const facets = Object.keys(c.facets || {}).sort().map((id) => [id, (c.facets[id] || []).filter(Boolean)]).filter(([, vs]) => vs.length);
     const fields = [
-      ["ref", yamlString(labelOf(r))],
-      ["url", yamlString(r.link)],
-      ["title", yamlString(r.title)],
-      ["author", p.author ? yamlString(p.author) : ""],
-      ["situation", yamlString(rowKindLabel(r))],
-      ["waiting_on", yamlString(waitingLabel(r))],
-      ["since", isSet(sm(r).since) ? yamlString(sm(r).since) : ""],
-      ["stalled", sm(r).stalled ? "true" : ""],
-      ["reason", sm(r).reason ? yamlString(sm(r).reason) : ""],
-      ["head", p.head ? yamlString(p.head) : ""],
-      ["workspace", ws ? yamlString([ws.display_name, ws.status ? `(${ws.status})` : ""].filter(Boolean).join(" ")) : ""],
-      ["in_scope_as", (p.reasons || []).length ? `[${p.reasons.map(yamlString).join(", ")}]` : ""],
-      ["brief", b ? `{size: ${yamlString(b.size)}, risk: ${yamlString(b.risk)}, open_questions: ${Number(b.open_questions) || 0}, goal: ${yamlString(b.goal)}}` : ""],
-      ["tags", b && (b.tags || []).length ? `[${b.tags.map(yamlString).join(", ")}]` : ""],
-      ["flags", flags.length ? `[${flags.map(yamlString).join(", ")}]` : ""],
+      ["ref", yamlString(c.ref)],
+      ["url", c.url ? yamlString(c.url) : ""],
+      ["title", yamlString(c.title)],
+      ["since", c.since ? yamlString(c.since) : ""],
+      ["reason", c.reason ? yamlString(c.reason) : ""],
+      ["units", (c.units || []).length ? list(c.units) : ""],
+      ...facets.map(([id, vs]) => [id, list(vs)]),
     ].filter(([, v]) => v);
     fields.forEach(([k, v], i) => out.push(`${i ? "    " : "  - "}${k}: ${v}`));
   }
   return out.join("\n") + "\n";
+}
+
+// copyEntry is what Copy list says of an item: a task by its id, its first unit's link and its units, a row
+// by its label and link, with its summary's reason and since.
+function copyEntry(it) {
+  const e = it.task;
+  if (e) {
+    const linked = (e.units || []).map((u) => (rowByKey(unitKey(u)) || {}).link).find(Boolean);
+    return { ref: e.id, url: linked, title: e.title, units: (e.units || []).map((u, i) => (e.unit_labels || [])[i] || unitKey(u)), facets: e.facets };
+  }
+  return { ref: labelOf(it), url: it.link, title: it.title, since: isSet(sm(it).since) ? sm(it).since : "", reason: sm(it).reason, facets: it.facets };
 }
 
 function candidatesYAML(meta, cands) {
@@ -836,19 +1019,25 @@ async function copyCandidates() {
   }
 }
 
-function sortLabel(sort) {
-  const { field, desc } = parseSort(sort);
-  return field ? `${fieldById(field).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
+function sortLabel(sort, fields = catalog.fields) {
+  const { field, desc } = parseSort(sort, fields);
+  return field ? `${fieldById(field, fields).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
 }
 
-async function copyList(view) {
-  const lens = readLens();
-  const res = pipeline(state.rows, lens);
-  const rows = groupedRows(res.groups);
-  const grouped = res.group ? groupField(res.group).label.toLowerCase() : "";
+// lensResult is what lens shows of its view: a task view's tasks in the daemon's order, a row view's rows.
+function lensResult(lens) {
+  if (typeof isCoreView === "function" && isCoreView(lens.view)) return pipelineOf(taskLensItems(), lens, null);
+  return pipeline(state.rows, lens);
+}
+
+async function copyList(lens) {
+  const res = lensResult(lens);
+  const items = groupedRows(res.groups);
+  const grouped = res.group ? groupField(res.group, lens.fields).label.toLowerCase() : "";
+  const w = lensWords();
   try {
-    await navigator.clipboard.writeText(listYAML({ view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort), at: new Date().toISOString() }, rows));
-    setNotice(`Copied ${rows.length} pull request${rows.length === 1 ? "" : "s"} from ${view}${grouped ? `, grouped by ${grouped}` : ""}, as YAML.`);
+    await navigator.clipboard.writeText(listYAML({ view: lens.view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort, lens.fields), at: new Date().toISOString() }, items));
+    setNotice(fillWord(grouped ? w.copied_grouped : w.copied, { count: items.length, view: lens.view, group: grouped }));
   } catch (err) {
     setNotice(`Could not copy: ${err.message}`, true);
   }
@@ -860,9 +1049,9 @@ function chip(attrs, label) {
 
 function setGroup(g) {
   const lens = { ...readLens(), group: g };
-  const res = pipeline(state.rows, lens);
+  const res = lensResult(lens);
   writeHash({ g });
-  if (res.group) setNotice(`Grouped by ${groupField(res.group).label.toLowerCase()}: ${res.groups.filter((x) => x.rows.length).length} groups`);
+  if (res.group) setNotice(`Grouped by ${groupField(res.group, lens.fields).label.toLowerCase()}: ${res.groups.filter((x) => x.rows.length).length} groups`);
 }
 
 function clearLens() {
@@ -880,7 +1069,7 @@ function lensChips(lens, applied) {
   }
   const list = [...by.values()];
   return list.map((c, i) => {
-    const f = fieldById(c.field);
+    const f = fieldById(c.field, lens.fields);
     const off = applied && !applied.includes(c.field);
     const next = list[i + 1] || list[i - 1];
     return chip({
@@ -888,18 +1077,19 @@ function lensChips(lens, applied) {
       title: off ? "Not applied in Recent" : `Remove this filter (${c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ")})`,
       onclick: () => {
         lastFocus = next ? `lens:chip:${next.field}:${next.neg ? "-" : ""}` : "lens:group";
-        writeHash({ q: withoutQualifiers(lens.q, c.field, c.neg) });
+        writeHash({ q: withoutQualifiers(lens.q, c.field, c.neg, lens.fields) });
       },
     }, `${f.label}: ${c.neg ? "not " : ""}${c.values.join(" or ")} ×`);
   });
 }
 
-function stripLegend() {
-  const f = waitField();
-  if (!f || !f.rank) return null;
-  return h("span", { class: "legend", title: "The strip on the left of each row is the color of whom it waits on" },
-    h("span", { class: "lens-label" }, `${f.label}:`),
-    f.rank.map((cat) => h("span", { class: "lg w-" + cat }, h("span", { class: "sw", "aria-hidden": "true" }), f.show ? f.show(cat) : cat)));
+// stripLegend is the hues of lens's strip facet, in its rank, when fields offer it.
+function stripLegend(lens, fields) {
+  const s = lens.stripSpec;
+  if (!s || !s.rank || (fields && !fields.some((x) => x.id === s.id))) return null;
+  return h("span", { class: "legend", title: (lens.words || lensWords()).legend_title || undefined },
+    h("span", { class: "lens-label" }, `${s.label}:`),
+    s.rank.map((v) => h("span", { class: "lg w-" + stripColor(s, v) }, h("span", { class: "sw", "aria-hidden": "true" }), (s.labels || {})[v] || v)));
 }
 
 function lensSelect(id, label, value, options, onchange) {
@@ -908,40 +1098,55 @@ function lensSelect(id, label, value, options, onchange) {
       options.map(([v, text]) => h("option", { value: v, selected: v === value }, text))));
 }
 
-// renderLens draws the bar of filters, grouping and order. It rebuilds only
-// when what it shows changed, so an open select survives live updates.
-function renderLens(lens, res) {
-  const tools = document.getElementById("tools");
+// renderLens draws the bar of filters, grouping and order in tools, #tools by default. It rebuilds only when
+// what it shows changed, so an open select survives live updates.
+function renderLens(lens, res, tools = document.getElementById("tools")) {
   const recent = lens.view === "recent";
-  tools.hidden = lens.view === "explore" || (recent && !lens.quals.length);
-  if (tools.hidden) {
-    tools.replaceChildren();
-    tools.dataset.sig = "";
+  if (lens.view === "explore" || (recent && !lens.quals.length)) {
+    hideLens(tools);
     return;
   }
-  const keys = tagKeys(state.rows);
-  const current = tagKeyField(lens.group);
-  if (current && !keys.includes(current.tagKey)) keys.push(current.tagKey);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, keys]);
+  tools.hidden = false;
+  const offered = (lens.offered || catalog.fields).map((f) => f.id);
+  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
+    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
-  const filtered = !!lens.q.trim();
   const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, "Clear");
-  if (recent) {
-    tools.replaceChildren(...lensChips(lens, ACTIVITY_FIELDS), clear);
-    return;
-  }
+  tools.replaceChildren(...(recent ? [...lensChips(lens, ACTIVITY_FIELDS), clear] : lensBar(lens, res)));
+}
+
+function hideLens(tools) {
+  tools.hidden = true;
+  tools.replaceChildren();
+  tools.dataset.sig = "";
+}
+
+// lensBar is the bar's controls: the group and sort menus over the fields lens offers, the layout, the chips of
+// what it filters by, the count and Copy list.
+function lensBar(lens, res) {
+  const offered = lens.offered || catalog.fields;
+  const fields = lens.fields || catalog.fields;
+  const current = tagKeyField(lens.group, fields);
+  const groups = offered.filter((f) => f.group && f.menu !== false);
+  if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
   const board = lens.layout === "board";
-  const { field, desc } = parseSort(lens.sort);
+  const w = lensWords();
+  const own = lens.defaultGroup || (board ? lens.boardGroup : "");
+  const ownField = own ? groupField(own, fields) : null;
+  const { field, desc } = parseSort(lens.sort, fields);
+  const sortWord = lens.defaultSort;
+  const picked = lens.group && lens.group !== NO_GROUP ? groupField(lens.group, fields) : null;
   const toggle = (layout, label) => h("button", {
     type: "button", class: "act", "aria-pressed": String(board === (layout === "board")), "data-focus": `lens:${layout || "list"}`,
     onclick: () => writeHash({ layout }),
   }, label);
   const items = [
-    lensSelect("group", "Group", lens.group, [["", board ? "Waiting on (board)" : "None"],
-      ...catalog.fields.filter((f) => f.group && f.menu).map((f) => [f.id, f.label]),
-      ...keys.map((k) => [`tag:${k}`, `Tag ${k}`])], setGroup),
-    lensSelect("sort", "Sort", field, [["", "Waiting longest"], ...catalog.fields.filter((f) => f.sort).map((f) => [f.id, f.label])],
+    lensSelect("group", "Group", lens.group, [
+      ["", ownField ? fillWord(lens.defaultGroup ? w.default_group : w.board_group, { label: ownField.label }) : w.no_group],
+      ...(ownField ? [[NO_GROUP, w.no_group]] : []),
+      ...groups.map((f) => [f.id, f.label])], setGroup),
+    lensSelect("sort", "Sort", field, [["", sortWord], ...offered.filter((f) => f.sort).map((f) => [f.id, f.label])],
       (v) => writeHash({ s: v })),
     h("button", {
       type: "button", class: "act", "data-focus": "lens:dir", disabled: !field, "aria-label": desc ? "Descending" : "Ascending",
@@ -949,20 +1154,20 @@ function renderLens(lens, res) {
       onclick: () => writeHash({ s: field + (desc ? "" : "-desc") }),
     }, desc ? "↓" : "↑"),
     h("div", { class: "toggle", role: "group", "aria-label": "Layout" }, toggle("", "List"), toggle("board", "Board")),
-    stripLegend(),
+    stripLegend(lens, offered),
     ...lensChips(lens),
-    lens.group ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: "Stop grouping", onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
-      `Grouped by ${groupField(lens.group).label.toLowerCase()} ×`) : null,
-    field ? chip({ class: "chip on", "data-focus": "lens:chip:sort", title: "Back to waiting longest", onclick: () => { lastFocus = "lens:sort"; writeHash({ s: "" }); } },
-      `Sorted by ${fieldById(field).label.toLowerCase()} ${desc ? "↓" : "↑"} ×`) : null,
+    picked ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: "Stop grouping", onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
+      `Grouped by ${picked.label.toLowerCase()} ×`) : null,
+    field ? chip({ class: "chip on", "data-focus": "lens:chip:sort", title: `Back to ${sortWord.toLowerCase()}`, onclick: () => { lastFocus = "lens:sort"; writeHash({ s: "" }); } },
+      `Sorted by ${fieldById(field, fields).label.toLowerCase()} ${desc ? "↓" : "↑"} ×`) : null,
     h("span", { class: "lens-count" }, res ? `${res.shown} of ${res.total}` : ""),
-    filtered || lens.group || field ? clear : null,
+    lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, "Clear") : null,
     h("button", {
-      type: "button", class: "act", "data-focus": "lens:copy-list", title: "Copy the pull requests shown here, in this order, as YAML, to paste for an agent",
-      onclick: () => copyList(lens.view),
+      type: "button", class: "act", "data-focus": "lens:copy-list", title: "Copy the items shown here, in this order, as YAML, to paste for an agent",
+      onclick: () => copyList(lens),
     }, "Copy list"),
   ];
-  tools.replaceChildren(...items.filter(Boolean));
+  return items.filter(Boolean);
 }
 
 async function setPaused(paused) {
@@ -1075,7 +1280,7 @@ function actionButton(subject, st, sp, opts) {
     type: "button",
     class: ["act", st.enabled && st.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
     title: actionTitle(st, sp),
-    "data-focus": `${opts.scope || "row:" + key}:${focusSlot(st.id)}`,
+    "data-focus": `${opts.scope || "row:" + key}:${focusSlot(st.id)}`, ...roveStop(opts.rove),
     disabled: state.busy.has(key) || !st.enabled,
     onclick: (e) => { e.stopPropagation(); return run(st.id); },
   }, st.label || sp.label);
@@ -1091,22 +1296,29 @@ function actionNotes(subject, surface) {
 }
 
 // facet is a value on screen that filters by itself: a click filters by it,
-// Shift groups by its field and Alt leaves it out.
-function facet(lens, field, raw, content, slot, noun) {
-  const f = fieldById(field);
+// Shift groups by its field and Alt leaves it out. A field the lens does not
+// know, or a lens that does not filter, shows its content alone. opts may
+// give the words to say it in, the noun that names the field, and rove for
+// a stop of a row's roving focus.
+function facet(lens, field, raw, content, slot, opts = {}) {
+  const fields = lens.fields || catalog.fields;
+  const f = fieldById(field, fields);
+  if (!f || lens.static) return content;
   const v = normValue(field, raw);
-  const name = noun || f.label.toLowerCase();
+  const w = opts.words || lens.words || lensWords();
   const by = f.groupBy ? f.groupBy(raw) : f.group ? field : "";
+  const group = by ? groupField(by, fields) : null;
+  const vars = { label: opts.noun || f.label.toLowerCase(), value: raw, group: group ? group.label.toLowerCase() : "" };
   const pick = (e) => {
     e.stopPropagation();
     if (e.shiftKey && by) return setGroup(by);
-    writeHash({ q: toggledQualifier(readHash().q, field, raw, e.altKey) });
+    writeHash({ q: toggledQualifier(readHash().q, field, raw, e.altKey, fields) });
   };
   return h("button", {
-    type: "button", class: "facet", "data-focus": slot,
+    type: "button", class: "facet", "data-focus": slot, ...roveStop(opts.rove),
     "aria-pressed": String(lens.quals.some((x) => x.field === field && x.value === v && !x.neg)),
-    "aria-label": `Filter by ${name} ${raw}`,
-    title: `Filter by ${name} ${raw}${by ? ` · Shift+click groups by ${groupField(by).label.toLowerCase()}` : ""} · Alt+click leaves it out`,
+    "aria-label": fillWord(w.filter_label, vars),
+    title: fillWord(group ? w.filter_title_group : w.filter_title, vars),
     onclick: pick,
     onkeydown: (e) => {
       if (e.key === "Enter" && (e.shiftKey || e.altKey)) {
@@ -1117,21 +1329,54 @@ function facet(lens, field, raw, content, slot, noun) {
   }, content);
 }
 
-function whoFacets(r, lens, slot) {
-  const groups = new Set((pl(r).waits_on || []).filter((p) => String(p.key || "").startsWith("group:")).map((p) => p.name));
-  return (sm(r).waits_on || "").split(", ").map((w) => resolveWho(r, w)).flatMap((w, i) => [i ? ", " : null,
-    w && w !== "nobody" ? facet(lens, "waits-on", w, w, `${slot}waits-on:${w}`, groups.has(w) ? "waits on (group)" : "") : w]);
-}
-
-function where(row, scope, lens) {
+// where is a row's workspace, its column and agents, and its link, as the detail shows them.
+function where(row, scope) {
   const ws = pl(row).workspace || {};
   const bits = [];
   if (ws.display_name) bits.push(h("span", { class: "ws" }, ws.display_name));
-  if (ws.status) bits.push(h("span", { class: "col" }, lens ? facet(lens, "status", ws.status, ws.status, `${scope}:facet:status`) : ws.status));
+  if (ws.status) bits.push(h("span", { class: "col" }, ws.status));
   if ((ws.agent_states || []).length) bits.push(h("span", { class: "agent" }, ws.agent_states.join(", ")));
-  const url = safeURL(row.link);
-  bits.push(h("a", { href: url, target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": `${scope}:link`, onclick: (e) => e.stopPropagation() }, providerName(unitOf(row).provider)));
+  bits.push(rowLink(row, scope));
   return bits;
+}
+
+function rowLink(row, scope, rove) {
+  return h("a", { href: safeURL(row.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": `${scope}:link`, ...roveStop(rove), onclick: (e) => e.stopPropagation() }, providerName(unitOf(row).provider));
+}
+
+// roveStop marks a control of a row as a stop of its roving focus: out of the Tab order, reached with the
+// arrows from the row.
+function roveStop(on) {
+  return on ? { tabindex: -1, "data-rove": "" } : {};
+}
+
+// rowStops are the stops of a row's roving focus in their order: the row itself when it takes the focus, then
+// its controls that are shown and enabled.
+function rowStops(row) {
+  const out = [];
+  const walk = (n) => {
+    if (!n || !n.getAttribute || n.hidden || n.getAttribute("disabled") != null) return;
+    if (n.getAttribute("data-rove") != null) out.push(n);
+    for (const c of n.children || []) walk(c);
+  };
+  walk(row);
+  return out;
+}
+
+// ROVE_KEYS are how far each key moves a row's roving focus.
+const ROVE_KEYS = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity };
+
+// roveKey moves the focus among a row's stops with the arrows, Home and End; true when it took the key.
+function roveKey(e) {
+  const step = ROVE_KEYS[e.key];
+  if (!step || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
+  const stops = rowStops(e.currentTarget);
+  const at = stops.indexOf(e.target);
+  if (at < 0) return false;
+  e.preventDefault();
+  const next = stops[Math.max(0, Math.min(stops.length - 1, at + step))];
+  if (next !== e.target) next.focus();
+  return true;
 }
 
 // copySlot is the focus slot of one copy of a row or card: grouping by a tag
@@ -1142,7 +1387,7 @@ function copySlot(kind, key, copy) {
 
 // multiCopy is whether a grouping may show a pull request in several groups.
 function multiCopy(field) {
-  return !!(groupField(field) || {}).keys;
+  return !!field && !!(groupField(field) || {}).keys;
 }
 
 function openRow(scope, key) {
@@ -1157,67 +1402,284 @@ function openSlot(pr) {
   return pr && ["row", "card"].some((k) => s === `${k}:${pr}` || s.startsWith(`${k}:${pr}@`)) ? s : "";
 }
 
-function rowTr(r, pr, lens, copy) {
-  const key = keyOf(r);
-  const p = pl(r);
-  const o = p.override || {};
-  const ts = lens.ts;
-  const scope = copySlot("row", key, copy);
-  const slot = `${scope}:facet:`;
-  const mine = isMine(p.author);
+// specFor mirrors api.FacetSpec.For: a merged spec with provider's display keys.
+function specFor(spec, provider) {
+  const d = (spec.displays || {})[provider];
+  if (!d) return spec;
+  return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
+    strip: !!d.strip, colors: d.colors,
+    buckets: d.bucket_labels ? (spec.buckets || []).map((b) => (b.id in d.bucket_labels ? { ...b, label: d.bucket_labels[b.id] } : b)) : spec.buckets,
+    labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
+}
+
+// ageText mirrors lens.Age: ms in the row words.
+function ageText(w, ms) {
+  const mins = Math.floor(Math.max(ms, 0) / 60000);
+  if (mins < 1) return w.age_now || "";
+  if (mins < 60) return fillWord(w.age_minutes, { m: mins });
+  if (mins < 1440) return fillWord(w.age_hours, { h: Math.floor(mins / 60), m: mins % 60 });
+  return fillWord(w.age_days, { d: Math.floor(mins / 1440), h: Math.floor(mins / 60) % 24 });
+}
+
+function partPiece(spec, raw, words, now) {
+  if (!raw || fold(raw) === "none") return null;
+  const p = { field: spec.id, value: raw, raw, label: (spec.labels || {})[raw] || raw };
+  if (spec.sort === "time" || (spec.buckets || []).length) {
+    const at = rfc3339(raw) ? Date.parse(raw) : NaN;
+    if (Number.isNaN(at)) return null;
+    if ((spec.buckets || []).length) {
+      p.value = bucketOf(spec.buckets, raw, now);
+      if (!p.value) return null;
+      const b = spec.buckets.find((x) => x.id === p.value);
+      if (b) p.label = b.label || p.value;
+    }
+    if (agePart(spec.show)) p.label = ageText(words, now - at);
+  }
+  if (spec.label_prefix && !p.label.startsWith(spec.label_prefix)) p.label = spec.label_prefix + p.label;
+  return p;
+}
+
+// rfc3339 says whether s is an RFC 3339 instant, as Go's lens parses them.
+function rfc3339(s) {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(String(s));
+}
+
+// agePart says whether a part shows one time of one facet, as its age.
+function agePart(part) {
+  return part === "age";
+}
+
+// rowParts mirrors lens.Parts: the pieces of item it each part of a row shows, by part, from the specs
+// that show in one, in their order, none from another provider's spec.
+function rowParts(it, specs, words, now = Date.now()) {
+  const out = {};
+  for (const s of specs || []) {
+    if (s.provider && it.provider && s.provider !== it.provider) continue;
+    const spec = specFor(s, it.provider || "");
+    if (!spec.show || (agePart(spec.show) && out[spec.show])) continue;
+    const pieces = [];
+    for (const raw of (it.facets || {})[spec.id] || []) {
+      const p = partPiece(spec, raw, words, now);
+      if (!p || ((spec.show_only || []).length && !spec.show_only.some((v) => fold(v) === fold(raw)))) continue;
+      pieces.push(p);
+      if (spec.show_values === "first" || agePart(spec.show)) break;
+    }
+    if (pieces.length) out[spec.show] = [...(out[spec.show] || []), ...pieces];
+  }
+  return out;
+}
+
+// rowClasses are the classes the specs' row_class give the values an item holds.
+function rowClasses(it, specs) {
+  const out = [];
+  for (const s of specs || []) {
+    if (s.provider && it.provider && s.provider !== it.provider) continue;
+    const spec = specFor(s, it.provider || "");
+    for (const v of (it.facets || {})[spec.id] || []) if ((spec.row_class || {})[v]) out.push(spec.row_class[v]);
+  }
+  return [...new Set(out)];
+}
+
+// partClass is the class a part's pieces read in.
+function partClass(part) {
+  return { meta: "pill", flag: "flag", kind: "pill", aside: "col" }[part] || part;
+}
+
+// pieceButtons are a part's pieces, each a facet button whose label marks the search's hits.
+function pieceButtons(m, lens, part) {
+  return (m.parts[part] || []).map((p) => facet(lens, p.field, p.value,
+    h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value, title: agePart(part) ? stamp(p.raw) : undefined }, marked(p.label, lens.ts)),
+    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true }));
+}
+
+// rowColumnDefs are a row's columns: the parts each shows, and whether a row has anything for it.
+function rowColumnDefs() {
+  return [
+    { id: "unit", cls: "c-pr", parts: ["ref"], has: () => true },
+    { id: "who", cls: "c-wait", parts: ["strip", "who", "kind"], has: (m) => !!(m.parts.who || m.parts.kind || m.lead) },
+    { id: "since", cls: "c-for", parts: ["age"], has: (m) => !!(m.parts.age || m.age) },
+    { id: "why", cls: "c-why", parts: [], has: (m) => !!m.why },
+    { id: "aside", cls: "c-where", parts: ["aside"], has: (m) => !!(m.parts.aside || (m.aside || []).some(Boolean)) },
+    { id: "actions", cls: "c-act", parts: [], has: (m) => (m.actions || []).some(Boolean) },
+  ];
+}
+
+// rowColumns are the columns some of the models has a piece for.
+function rowColumns(models) {
+  return rowColumnDefs().filter((c) => models.some((m) => c.has(m)));
+}
+
+// columnSort is the field a column's head sorts by: the first sortable facet of its parts, the strip's the
+// view's strip facet.
+function columnSort(col, lens) {
+  for (const part of col.parts) {
+    if (part === "strip") {
+      const f = lens.strip ? fieldById(lens.strip, lens.fields) : null;
+      if (f && f.sort) return f;
+      continue;
+    }
+    for (const s of lens.specs || []) {
+      const f = fieldById(s.id, lens.fields);
+      if (f && f.sort && specFor(s, lens.provider || "").show === part) return f;
+    }
+  }
+  return null;
+}
+
+// sortPick cycles a column head's sort: ascending, descending, then the default.
+function sortPick(id) {
+  const { field, desc } = parseSort(readHash().s, readLens().fields);
+  writeHash({ s: field !== id ? id : desc ? "" : id + "-desc" });
+}
+
+// rowHead is the head of a table of rows: one cell per column, each that sorts a button.
+function rowHead(cols, lens, unit) {
+  const w = lens.words || {};
+  const { field, desc } = parseSort(lens.sort, lens.fields);
+  const heads = { unit: unit || w.col_unit, who: w.col_who, since: w.col_age, why: w.col_why, aside: w.col_aside };
+  return h("thead", {}, h("tr", {}, cols.map((c) => {
+    if (c.id === "actions") return h("th", { scope: "col", class: c.cls }, h("span", { class: "sr" }, w.col_actions));
+    const f = lens.static ? null : columnSort(c, lens);
+    if (!f) return h("th", { scope: "col", class: c.cls }, heads[c.id]);
+    return h("th", { scope: "col", class: c.cls, "aria-sort": f.id === field ? (desc ? "descending" : "ascending") : "none" },
+      h("button", { type: "button", class: "th-sort", "data-sort": f.id, "data-focus": "th:" + f.id, title: fillWord(w.sort_by, { label: f.label.toLowerCase() }), onclick: () => sortPick(f.id) }, heads[c.id]));
+  })));
+}
+
+// rowTr is one table row of a model, its cells those of cols: the title with its ref, meta and flags; who it
+// waits on with its kind; its age; why; its aside; its actions.
+function rowTr(m, lens, cols) {
+  const open = m.open;
+  const cells = {
+    unit: () => [
+      h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null,
+        m.href ? h("a", { href: m.href, "data-focus": m.scope + ":title", ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
+      rowMeta(m, lens),
+      m.after || null],
+    who: () => rowWho(m, lens),
+    since: (c) => m.age || pieceButtons(m, lens, c.parts[0]),
+    why: () => m.why || "",
+    aside: () => [m.asideLead || null, pieceButtons(m, lens, "aside"), m.aside || null],
+    actions: () => m.actions || null,
+  };
   return h("tr", {
-    class: [waitClass(r), mine ? "mine" : "", sm(r).stalled ? "late" : "", key === pr ? "sel" : ""].join(" "),
-    title: stripTitle(r),
+    class: [...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
+    title: m.tip || undefined,
     tabindex: 0,
-    "aria-selected": key === pr ? "true" : "false",
-    "data-focus": scope,
-    onclick: () => openRow(scope, key),
+    "aria-selected": m.selected ? "true" : "false",
+    "data-focus": m.scope,
+    "data-row": m.scope,
+    "data-rove": "",
+    onclick: open || undefined,
     onkeydown: (e) => {
+      if (roveKey(e) || !open) return;
       if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
         e.preventDefault();
-        openRow(scope, key);
+        open();
       }
     },
+  }, cols.map((c) => h("td", { class: c.cls }, cells[c.id](c))));
+}
+
+// rowMeta is a model's ref, meta and flag parts, with what no facet carries after each.
+function rowMeta(m, lens) {
+  return h("div", { class: "meta" },
+    h("span", { class: "ref" }, pieceButtons(m, lens, "ref"), (m.ref || []).map((x) => typeof x === "string" ? marked(x, lens.ts) : x)),
+    pieceButtons(m, lens, "meta"), m.meta || null,
+    pieceButtons(m, lens, "flag"), m.flags || null);
+}
+
+// rowWho is whom a model waits on: its strip's dot and its who pieces, then its kind.
+function rowWho(m, lens) {
+  return [h("div", { class: "who" }, m.lead || null, m.lead ? " " : null, joined(pieceButtons(m, lens, "who"))), pieceButtons(m, lens, "kind")];
+}
+
+// rowCard is a model as a board's card: an li whose title is the control that opens it, stretched over the
+// card, with the pieces its row shows as siblings, the arrows moving between them.
+function rowCard(m, lens) {
+  const label = h("span", { title: m.titleTip || undefined }, marked(m.title, lens.ts));
+  const at = { class: "open", "data-focus": m.scope, "data-rove": "", title: m.tip || undefined, "aria-current": m.selected ? "true" : undefined };
+  const title = m.open ? h("button", { type: "button", ...at, onclick: m.open }, label) : m.href ? h("a", { ...at, href: m.href }, label) : label;
+  return h("li", {
+    class: ["card", ...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
+    "data-row": m.scope,
+    onkeydown: roveKey,
   },
-    h("td", { class: "c-pr" },
-      h("div", { class: "title", title: (p.brief || {}).goal }, marked(r.title || labelOf(r), ts)),
-      h("div", { class: "meta" },
-        h("span", { class: "ref" }, p.repo ? facet(lens, "repo", p.repo, marked(p.repo, ts), slot + "repo") : null, marked(labelTail(r), ts)),
-        p.author ? [" by ", facet(lens, "author", mine ? "me" : p.author, h("span", { class: "who" }, marked(p.author, ts)), slot + "author")] : null,
-        mine ? mineMark() : null,
-        briefTags(p.brief, lens, slot),
-        p.head && ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, ts)) : null,
-        o.hold ? facet(lens, "is", "paused", h("span", { class: "flag" }, "paused"), slot + "is:paused") : null,
-        isMuted(p) ? facet(lens, "is", "muted", h("span", { class: "flag" }, "muted"), slot + "is:muted") : null,
-        r.stale ? h("span", { class: "flag stale", title: "Its plugin is not reporting; this is its last report" }, "stale") : null,
-        intakeChip(r))),
-    h("td", { class: "c-wait" },
-      h("div", { class: "who" },
-        facet(lens, catalog.strip, waitCat(r), h("span", { class: "dot", "aria-hidden": "true" }, "●"), slot + catalog.strip), " ", whoFacets(r, lens, slot)),
-      facet(lens, "kind", r.kind, h("span", { class: "pill" }, rowKindLabel(r)), slot + "kind")),
-    h("td", { class: "c-for" }, roundGate(r) ? countdown(r) : h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))),
-    h("td", { class: "c-why" }, sm(r).reason),
-    h("td", { class: "c-where" }, where(r, scope, lens)),
-    h("td", { class: "c-act" }, actionButtons(r, "row", { scope })));
+    h("div", { class: "title" }, m.pre || null, title),
+    rowMeta(m, lens),
+    h("div", { class: "card-who" }, rowWho(m, lens), m.age || pieceButtons(m, lens, "age")),
+    m.after || null);
+}
+
+function joined(nodes) {
+  return nodes.flatMap((n, i) => (i ? [", ", n] : [n]));
+}
+
+// refTail is a unit's label after the first ref piece's label, when the label starts with it.
+function refTail(label, ref) {
+  const lead = ref && ref[0] ? ref[0].label : "";
+  return lead && label.startsWith(lead) ? label.slice(lead.length) : label;
+}
+
+// rowModel is a plugin row as the row renderer lays it out, in a list or as a board's card (kind "card"): its
+// facets placed by its provider's specs, then what no facet carries.
+function rowModel(r, pr, lens, copy, kind = "row") {
+  const key = keyOf(r);
+  const p = pl(r);
+  const w = rowWords(unitOf(r).provider);
+  const item = { facets: r.facets || {}, provider: unitOf(r).provider };
+  const parts = rowParts(item, lens.specs, w);
+  const scope = copySlot(kind, key, copy);
+  const n = Number.isInteger((p.brief || {}).open_questions) ? p.brief.open_questions : 0;
+  const ws = p.workspace || {};
+  const strip = stripOf(item, lens.specs);
+  const why = sm(r).reason || "";
+  const groups = new Set((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => fold(x.name || "")));
+  const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
+  return {
+    key, scope, item, parts, words: w, nouns, selected: key === pr, open: () => openRow(scope, key),
+    title: r.title || labelOf(r), titleTip: (p.brief || {}).goal,
+    ref: [refTail(labelOf(r), parts.ref)],
+    meta: [
+      p.head && lens.ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, lens.ts)) : null,
+      n > 0 ? h("span", { class: "pill qs", title: fillWord(w.questions_title, { n }) }, fillWord(w.questions, { n })) : null],
+    flags: [r.stale ? h("span", { class: "flag stale", title: w.stale_title }, w.stale) : null, intakeChip(r, w)],
+    lead: stripDot(strip, lens, scope, w),
+    age: roundGate(r) ? countdown(r) : null,
+    why,
+    asideLead: ws.display_name ? h("span", { class: "ws" }, ws.display_name) : null,
+    aside: [(ws.agent_states || []).length ? h("span", { class: "agent" }, ws.agent_states.join(", ")) : null, rowLink(r, scope, true)],
+    actions: actionButtons(r, "row", { scope, rove: true }),
+    cls: [strip ? "w-" + strip.color : "", ...rowClasses(item, lens.specs)],
+    tip: rowTip(strip, waitingLabel(r), (parts.kind || []).map((x) => x.label).join(", "), why, w),
+  };
+}
+
+// stripDot is the dot of an item's strip, a facet button that filters by its value; null without a strip.
+function stripDot(strip, lens, scope, words) {
+  if (!strip) return null;
+  const id = strip.spec.id;
+  return facet(lens, id, strip.value, h("span", { class: "dot", "aria-hidden": "true", "data-field": id, "data-value": strip.value }, "●"), `facet:${scope}:${id}`, { words, rove: true });
 }
 
 // groupQualifier is the filter that keeps only a group's rows: a tag key's
 // "no lang" group is -tag:lang.
-function groupQualifier(g) {
-  const f = groupField(g.field);
+function groupQualifier(g, fields = catalog.fields) {
+  const f = groupField(g.field, fields);
+  if (!f) return null;
   if (f.tagKey) return g.key === "none" ? { field: "tag", raw: f.tagKey, neg: true } : { field: "tag", raw: g.raw, neg: false };
   return f.values ? { field: g.field, raw: g.raw, neg: false } : null;
 }
 
 function onlyThis(g, lens) {
-  const q = groupQualifier(g);
+  const q = groupQualifier(g, lens.fields);
   if (!q) return null;
   const v = normValue(q.field, q.raw);
   const on = lens.quals.some((x) => x.field === q.field && x.value === v && x.neg === q.neg);
   return h("button", {
     type: "button", class: "facet only", "aria-pressed": String(on), "data-focus": `group:${g.field}:${g.key}:only`,
     "aria-label": on ? `Show all, not only ${g.label}` : `Only ${g.label}`,
-    onclick: (e) => { e.stopPropagation(); writeHash({ q: toggledQualifier(lens.q, q.field, q.raw, q.neg) }); },
+    onclick: (e) => { e.stopPropagation(); writeHash({ q: toggledQualifier(lens.q, q.field, q.raw, q.neg, lens.fields) }); },
   }, on ? "show all" : "only this");
 }
 
@@ -1228,60 +1690,52 @@ function toggleCollapsed(key) {
   render();
 }
 
-function renderTable(res, pr, lens) {
-  const table = document.getElementById("table");
+// rowTable is the body of a table of models: a tbody per group of res, each under its head when the lens
+// groups, the head a collapse toggle with an "only this" filter.
+function rowTable(res, model, lens, cols) {
   const grouped = !!res.group;
   const multi = grouped && multiCopy(res.group);
-  table.replaceChildren(table.tHead, ...res.groups.filter((g) => g.rows.length).map((g, i) => {
+  return res.groups.filter((g) => g.rows.length).map((g, i) => {
     const key = `${g.field}:${g.key}`;
     const collapsed = grouped && state.collapsed.has(key);
-    const rows = g.rows.map((r) => {
-      const tr = rowTr(r, pr, lens, multi ? g.key : "");
+    const rows = g.rows.map((it) => {
+      const tr = rowTr(model(it, multi ? g.key : ""), lens, cols);
       tr.hidden = collapsed;
       return tr;
     });
     if (!grouped) return h("tbody", {}, rows);
-    const id = `g-${i}`;
+    const id = `g-${lens.view}-${i}`;
     return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field === catalog.strip ? " w-" + g.key : "") },
-        h("th", { scope: "rowgroup", colspan: 6 },
+      h("tr", { class: "g-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") },
+        h("th", { scope: "rowgroup", colspan: cols.length },
           h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
             `${collapsed ? "▸" : "▾"} ${g.label}`),
           h("span", { class: "count" }, g.rows.length),
           onlyThis(g, lens))),
       rows);
-  }));
+  });
 }
 
-const SORT_COLUMNS = { "c-pr": "repo", "c-for": "age", "c-why": "kind", "c-where": "status" };
-
-// unitColumn is how the list names its unit column in view: by the view's
-// provider, "Item" when its rows mix providers.
-function unitColumn(view) {
-  const v = catalog.views.find((x) => x.id === view) || {};
-  const sort = v.unit_sort || "repo";
-  const f = fieldById(sort);
-  return { title: v.unit || "Item", sort, sortTitle: "Sort by " + (f ? f.label.toLowerCase() : sort) };
+// unitTitle names a row view's unit column: the view's unit, else the lens's word for a mixed view.
+function unitTitle(view, lens) {
+  return (catalog.views.find((x) => x.id === view) || {}).unit || (lens.words || {}).col_unit || "";
 }
 
-function renderUnitColumn(view) {
-  const col = unitColumn(view);
-  const b = document.querySelector("#table thead th.c-pr button");
-  if (!b) return col;
-  b.textContent = col.title;
-  b.dataset.sort = col.sort;
-  b.dataset.focus = "th:" + col.sort;
-  b.title = col.sortTitle;
-  return col;
+function renderTable(res, pr, lens) {
+  const table = document.getElementById("table");
+  const inView = state.rows.filter((r) => inViewOf(r, lens));
+  const models = new Map();
+  const model = (r, copy) => {
+    const k = copy ? `${keyOf(r)}@${copy}` : keyOf(r);
+    if (!models.has(k)) models.set(k, rowModel(r, pr, lens, copy));
+    return models.get(k);
+  };
+  const cols = rowColumns(inView.map((r) => model(r, "")));
+  table.replaceChildren(rowHead(cols, lens, unitTitle(lens.view, lens)), ...rowTable(res, model, lens, cols));
 }
 
-function renderSortHeaders(lens) {
-  const { field, desc } = parseSort(lens.sort);
-  const unitSort = unitColumn(lens.view).sort;
-  for (const th of document.querySelectorAll("#table thead th")) {
-    const id = th.className === "c-pr" ? unitSort : th.className === "c-wait" ? catalog.strip : SORT_COLUMNS[th.className];
-    if (id) th.setAttribute("aria-sort", id === field ? (desc ? "descending" : "ascending") : "none");
-  }
+function inViewOf(r, lens) {
+  return inView(r, lens.view, lens.done);
 }
 
 function renderRows() {
@@ -1298,16 +1752,17 @@ function renderRows() {
   listBox.hidden = view === "plan" || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
-    renderLens(lens, null);
+    if (isCoreView(view)) hideLens(document.getElementById("tools"));
+    else renderLens(lens, null);
     table.hidden = true;
-    table.replaceChildren(table.tHead);
+    table.replaceChildren();
     boardBox.hidden = true;
     boardBox.replaceChildren();
     empty.hidden = true;
     return;
   }
   const res = pipeline(state.rows, lens);
-  document.getElementById("list-sum").textContent = `${renderUnitColumn(view).title}s: ${res.shown} of ${res.total}`;
+  document.getElementById("list-sum").textContent = fillWord((lens.words || {}).list_count, { unit: unitTitle(view, lens), shown: res.shown, total: res.total });
   if (state.collapsedFor !== res.group) {
     state.collapsed.clear();
     state.collapsedFor = res.group;
@@ -1317,12 +1772,11 @@ function renderRows() {
   table.hidden = board;
   boardBox.hidden = !board || !res.shown;
   if (board) {
-    table.replaceChildren(table.tHead);
+    table.replaceChildren();
     if (res.shown) renderBoard(res.groups, pr, lens);
   } else {
     boardBox.replaceChildren();
     renderTable(res, pr, lens);
-    renderSortHeaders(lens);
   }
   empty.hidden = res.shown > 0;
   if (!res.shown) empty.replaceChildren(...emptyNote(view, lens.q));
@@ -1352,31 +1806,19 @@ function emptyNote(view, q) {
   return [note, " ", h("button", { type: "button", class: "act", "data-focus": "empty:clear", onclick: () => clearLens() }, "Clear filters")];
 }
 
-function renderBoard(groups, pr, lens) {
-  document.getElementById("board").replaceChildren(...groups.map((g) => h("section", { class: "lane", "aria-label": g.label },
-    h("h2", { class: "lane-head" + (g.field === catalog.strip ? " w-" + g.key : "") }, h("span", {}, g.label),
+// lane is a board's column for group g of lens, its items drawn by item; an ungrouped board's one lane is
+// titled title.
+function lane(g, lens, title, item) {
+  const label = g.label || title;
+  return h("section", { class: "lane", "aria-label": label },
+    h("h2", { class: "lane-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") }, h("span", {}, label),
       h("span", { class: "lane-tools" }, onlyThis(g, lens), h("span", { class: "count" }, g.rows.length))),
-    h("ol", { class: "cards" }, g.rows.map((r) => card(r, pr, multiCopy(g.field) ? g.key : ""))))));
+    h("ol", { class: "cards" }, g.rows.map((it) => item(it, multiCopy(g.field) ? g.key : ""))));
 }
 
-function mineMark() {
-  return h("span", { class: "flag mine-mark", title: "You opened this pull request" }, "mine");
-}
-
-function card(r, pr, copy) {
-  const key = keyOf(r);
-  const p = pl(r);
-  const mine = isMine(p.author);
-  const scope = copySlot("card", key, copy);
-  return h("li", {},
-    h("button", {
-      type: "button", class: ["card", waitClass(r), mine ? "mine" : "", key === pr ? "sel" : ""].join(" "), "data-focus": scope, title: stripTitle(r),
-      "aria-current": key === pr ? "true" : undefined, onclick: () => openRow(scope, key),
-    },
-      h("span", { class: "title", title: (p.brief || {}).goal }, r.title || labelOf(r)),
-      h("span", { class: "meta" }, `${labelOf(r)} · ${waitingLabel(r)} · ${rowKindLabel(r)}`,
-        mine ? mineMark() : null, (p.override || {}).hold ? h("span", { class: "flag" }, "paused") : null, intakeChip(r), briefTags(p.brief)),
-      h("span", { class: "age", title: stamp(sm(r).since) }, age(sm(r).since))));
+function renderBoard(groups, pr, lens) {
+  const title = (catalog.views.find((v) => v.id === lens.view) || {}).label || lens.view;
+  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowCard(rowModel(r, pr, lens, copy, "card"), lens))));
 }
 
 function loopOnly() {
@@ -1501,6 +1943,7 @@ function activityEmptyNote(q) {
 }
 
 function guidanceLabel(r) {
+  if (r.question && r.question.queued) return "Replace the queued answer";
   if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
   const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
   if (!roundGate(r)) return "Guidance for the next round (optional)";
@@ -1519,7 +1962,7 @@ function guidanceBox(key, placeholder) {
     oninput: (e) => {
       state.guidance[key] = e.target.value;
       const answer = document.querySelector('[data-focus="detail:answer"]');
-      if (answer) answer.disabled = state.busy.has(key) || !e.target.value.trim();
+      if (answer) answer.disabled = state.busy.has(key) || state.answered.has(key) || !e.target.value.trim();
     },
   });
   box.value = state.guidance[key] || "";
@@ -1546,9 +1989,8 @@ function tagChips(tags, lens, slot, all) {
   ];
 }
 
-// briefTags takes a row's brief summary; open_questions is a count. With a
-// lens, size, risk and tags are facets.
-function briefTags(b, lens, slot) {
+// briefTags are the pills of an Explore candidate's brief summary; open_questions is a count.
+function briefTags(b) {
   if (!b) return null;
   const size = SIZES.includes(b.size) ? b.size : "";
   const risk = RISKS.includes(b.risk) ? b.risk : "";
@@ -1556,15 +1998,12 @@ function briefTags(b, lens, slot) {
   const tags = Array.isArray(b.tags) ? b.tags : [];
   const type = b.kind || "";
   if (!type && !size && !risk && !n && !tags.length) return null;
-  const typePill = type ? h("span", { class: "pill", title: `type ${type}` }, type) : null;
-  const sizePill = size ? h("span", { class: "pill", title: `size ${size}` }, size.toUpperCase()) : null;
-  const riskPill = risk ? h("span", { class: `pill risk-${risk}` }, `risk ${risk}`) : null;
   return h("span", { class: "btags" },
-    typePill && lens ? facet(lens, "type", type, typePill, slot + "type") : typePill,
-    sizePill && lens ? facet(lens, "size", size, sizePill, slot + "size") : sizePill,
-    riskPill && lens ? facet(lens, "risk", risk, riskPill, slot + "risk") : riskPill,
+    type ? h("span", { class: "pill", title: `type ${type}` }, type) : null,
+    size ? h("span", { class: "pill", title: `size ${size}` }, size.toUpperCase()) : null,
+    risk ? h("span", { class: `pill risk-${risk}` }, `risk ${risk}`) : null,
     n ? h("span", { class: "pill qs", title: `${n} open question${n === 1 ? "" : "s"} in the brief` }, `? ${n}`) : null,
-    tagChips(tags, lens, slot));
+    tagChips(tags));
 }
 
 function refreshBriefButton(r) {
@@ -1615,11 +2054,12 @@ function intakeWaiting(r) {
   return !!i && (i.state === "accepted" || i.state === "briefing");
 }
 
-function intakeChip(r) {
+function intakeChip(r, w) {
   if (!intakeWaiting(r)) return null;
   const i = pl(r).intake;
-  const title = [`intake ${i.seq} waits for the brief`, i.attempt ? `attempt ${i.attempt}` : "", i.last_error ? `last error: ${i.last_error}` : ""].filter(Boolean).join(", ");
-  return h("span", { class: "flag briefing", title }, "briefing");
+  const title = [fillWord(w.briefing_title, { seq: i.seq }), i.attempt ? fillWord(w.briefing_attempt, { n: i.attempt }) : "",
+    i.last_error ? fillWord(w.briefing_error, { error: i.last_error }) : ""].filter(Boolean).join(", ");
+  return h("span", { class: "flag briefing", title }, w.briefing);
 }
 
 // intakeLines say what a waiting intake waits on: the attempt, the last
@@ -1714,14 +2154,30 @@ function answerNote(r) {
 function turnButton(r, slot, label, name, extra, attrs = {}) {
   const st = (r.actions || []).find((a) => a.id === name);
   if (!st) return null;
+  const sent = answerSent(r);
   return h("button", {
     type: "button",
     class: ["act", st.enabled && attrs.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
     title: st.enabled && !st.note && attrs.title ? attrs.title : actionTitle(st, state.specs.byId[name]),
-    disabled: state.busy.has(keyOf(r)) || !st.enabled || !!attrs.disabled,
+    disabled: state.busy.has(keyOf(r)) || sent || !st.enabled || !!attrs.disabled,
     "data-focus": `detail:${slot}`,
     onclick: () => act(r, name, name === "answer" && answerNote(r) ? { ...extra, guidance: answerNote(r) } : extra),
   }, st.label || label);
+}
+
+function questionShown(r) {
+  const q = r.question;
+  return q ? `${q.record_id || ""}:${q.state}:${!!q.queued}` : "";
+}
+
+// answerSent says that an answer to the question r shows was accepted, so its controls stay off until the
+// row shows the question it left behind.
+function answerSent(r) {
+  const key = keyOf(r);
+  if (!state.answered.has(key)) return false;
+  if (state.answered.get(key) === questionShown(r)) return true;
+  state.answered.delete(key);
+  return false;
 }
 
 // answerBlock is the card's free answer: the box and the button that sends
@@ -1772,23 +2228,31 @@ function artifactBlock(a) {
   return h("details", { class: "d-artifact" }, h("summary", { class: "d-sub" }, `${kind}, ${lines} lines`), body);
 }
 
+// answerableQuestion is the detail's question whose options the keys pick:
+// asked, its answer not queued.
+function answerableQuestion(d) {
+  const q = d && d.row.question;
+  return q && q.state === "asked" && !q.queued ? q : null;
+}
+
 // questionBlock is the turn that waits on the user: the agent's question
-// with its options, or its stop with the last message.
+// with its options, its stop with the last message, or its queued answer.
 function questionBlock(d) {
   const r = d.row;
   const q = r.question;
   if (!q) return null;
   const rec = questionRecord(d);
-  const asked = q.state === "asked";
-  const head = asked ? "Agent asks" : "Agent stopped";
+  const asked = q.state === "asked" && !q.queued;
+  const head = q.queued ? "Your answer is queued" : asked ? "Agent asks" : "Agent stopped";
   const last = q.last_message || (d.turn && d.turn.last_message) || "";
   const choices = asked ? questionChoices(r, q) : [];
   return h("section", { class: "d-question", "aria-label": head },
     h("h2", { class: "d-sub" }, head),
+    q.queued ? h("p", { class: "muted small" }, "The agent gets it once its session is free. An answer sent now replaces it.") : null,
     rec.summary ? h("p", { class: "summary" }, rec.summary) : null,
     q.verdict ? h("p", { class: "verdict" }, `drafted ${q.verdict}, ${q.blocking} blocking, ${q.non_blocking} non-blocking`) : null,
     asked && q.text ? h("pre", { class: "q-text" }, q.text) : null,
-    !asked && last ? [h("div", { class: "muted small" }, "Last message"), h("pre", { class: "q-text" }, last)] : null,
+    !asked && !q.queued && last ? [h("div", { class: "muted small" }, "Last message"), h("pre", { class: "q-text" }, last)] : null,
     asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, `Agent recommends: ${q.recommend}`) : null,
     choices.length ? h("div", { class: "q-options" }, choices) : null,
     answerBlock(r, choices.length > 0),
@@ -1925,8 +2389,6 @@ function renderDetail() {
   const key = keyOf(r);
   const opening = box.hidden || box.dataset.key !== key;
   const inCard = !!r.question;
-  const old = document.getElementById("guidance");
-  const caret = old && document.activeElement === old ? [old.selectionStart, old.selectionEnd] : null;
   const guidance = inCard ? null : guidanceBox(key, guidanceLabel(r));
   const muteState = (p.mute || {}).until_state_change ? "muted until who it waits on changes"
     : isMuted(p) ? `muted until ${stamp(p.mute.until)}` : "";
@@ -1968,24 +2430,34 @@ function renderDetail() {
       h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
       e.data ? h("span", { class: "data" }, e.data) : null))));
 
-  if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
-    box.querySelector(".d-top").replaceWith(top);
-    box.querySelector(".d-acts").replaceWith(acts);
-    box.querySelector(".d-log").replaceWith(log);
-  } else {
-    box.replaceChildren(...[top, guidance, acts, log].filter(Boolean));
-  }
-  // The card is rebuilt on every render and takes the box along, which drops
-  // its focus and caret.
-  const now = document.getElementById("guidance");
-  if (caret && now && document.activeElement !== now) {
-    now.focus({ preventScroll: true });
-    now.setSelectionRange(...caret);
-  }
+  keepFocusIn(box, () => {
+    if (box.querySelector(".d-acts") && (!guidance || guidance.parentNode === box)) {
+      box.querySelector(".d-top").replaceWith(top);
+      box.querySelector(".d-acts").replaceWith(acts);
+      box.querySelector(".d-log").replaceWith(log);
+    } else {
+      box.replaceChildren(...[top, guidance, acts, log].filter(Boolean));
+    }
+  });
   box.dataset.key = key;
   box.hidden = false;
   document.body.classList.add("has-detail");
   if (opening && matchMedia("(max-width: 900px)").matches) box.scrollIntoView({ block: "start" });
+}
+
+// keepFocusIn runs redraw, which rebuilds the controls inside box, and gives the focus, the caret and the
+// scroll back to the rebuilt control of the slot that had them, so a sync does not interrupt typing.
+function keepFocusIn(box, redraw) {
+  const was = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
+  const slot = was && was.dataset && was.dataset.focus;
+  const caret = slot && typeof was.selectionStart === "number" ? [was.selectionStart, was.selectionEnd, was.selectionDirection] : null;
+  const scroll = was ? was.scrollTop : 0;
+  redraw();
+  const now = slot && box.querySelector(`[data-focus="${CSS.escape(slot)}"]`);
+  if (!now || now === was) return;
+  now.focus({ preventScroll: true });
+  if (caret && now.setSelectionRange) now.setSelectionRange(...caret);
+  now.scrollTop = scroll;
 }
 
 function revealOpenRow(pr) {
@@ -2396,8 +2868,17 @@ function restoreFocus() {
   if (!lastFocus) return;
   const active = document.activeElement;
   if (active && active !== document.body && active.isConnected) return;
-  const el = document.querySelector(`[data-focus="${CSS.escape(lastFocus)}"]`);
+  const el = document.querySelector(`[data-focus="${CSS.escape(lastFocus)}"]`) || rowHomeOf(lastFocus);
   if (el && !el.disabled) el.focus({ preventScroll: true });
+}
+
+// rowHomeOf is the element that holds the focus of the row a vanished slot was a control of: a facet whose
+// value changed, an action no longer served.
+function rowHomeOf(slot) {
+  const row = [...document.querySelectorAll("[data-row]")].map((r) => r.getAttribute("data-row"))
+    .filter((r) => slot.startsWith(r + ":") || slot.startsWith(`facet:${r}:`))
+    .sort((a, b) => b.length - a.length)[0];
+  return row ? document.querySelector(`[data-focus="${CSS.escape(row)}"]`) : null;
 }
 
 function renderSearch() {
@@ -2441,8 +2922,14 @@ async function getJSON(url) {
   const res = await fetch(url, { headers: { Accept: "application/json", "X-Loop-API": API_VERSION }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (res.status === 401) state.authLost = true;
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(apiError(body, `${url}: HTTP ${res.status}`, res.status));
+  if (!res.ok) throw Object.assign(new Error(apiError(body, `${url}: HTTP ${res.status}`, res.status)), { status: res.status });
   return body;
+}
+
+// unitFallback is the route a unit with no detail opens instead: the first
+// open task that holds it; "" when none does or the read failed otherwise.
+function unitFallback(err, tasks) {
+  return err && err.status === 404 && tasks && tasks.length ? "#" + viewHash({ task: tasks[0].id, pr: "" }) : "";
 }
 
 async function loadActivity() {
@@ -2477,7 +2964,9 @@ async function loadDetail() {
   } catch (err) {
     if (readHash().pr !== pr) return;
     state.detail = null;
-    state.detailError = err.message;
+    const instead = unitFallback(err, detailState.unitTasks);
+    state.detailError = instead ? "" : err.message;
+    if (instead) location.replace(instead);
   }
 }
 
@@ -2524,6 +3013,7 @@ async function load() {
     state.error = "";
     state.authLost = false;
   }
+  forgetTasksPage();
   await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2571,6 +3061,7 @@ async function act(row, name, extra = {}) {
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
     setNotice(acceptedNote(name, labelOf(row), out.intake) || `${name} done: ${labelOf(row)}${out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
     ok = true;
+    if (name === "answer" && row.question) state.answered.set(key, questionShown(row));
     if (body.guidance) {
       delete state.guidance[key];
       for (const id of ["guidance", "explore-guidance"]) {
@@ -2621,6 +3112,7 @@ async function applyChange(c) {
     if (c.rows || c.units.length) {
       const page = await getJSON(`/api/rows?since=${encodeURIComponent(`${state.epoch}:${state.rev}`)}`);
       if (!mergeRows(page)) return load();
+      if (page.catalog && page.catalog !== catalog.version) applyCatalog(await getJSON("/api/catalog"));
     }
     if (c.health) {
       state.health = await getJSON("/api/health");
@@ -2638,7 +3130,7 @@ async function applyChange(c) {
     (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
     loadPlan(),
     loadRoundGates(),
-    c.tasks ? loadTasks(route) : null,
+    c.tasks ? loadTasks(route, c.units) : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2681,7 +3173,10 @@ function connect() {
     retries = 0;
     state.conn = "open";
     state.authLost = false;
-    if (opened) scheduleLoad({ rows: true, health: true });
+    if (opened) {
+      forgetTasksPage();
+      scheduleLoad({ rows: true, health: true, tasks: true });
+    }
     opened = true;
   };
   es.onerror = () => {
@@ -2751,15 +3246,6 @@ document.getElementById("explore-form").addEventListener("submit", (e) => {
 });
 document.getElementById("explore-q").addEventListener("input", (e) => writeHash({ x: e.target.value.slice(0, 256) }, true));
 document.getElementById("explore-guidance").addEventListener("input", (e) => { state.guidance[e.target.dataset.key] = e.target.value; });
-
-// A column header cycles its sort: ascending, descending, then the default.
-document.querySelector("#table thead").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-sort]");
-  if (!b) return;
-  const { field, desc } = parseSort(readHash().s);
-  const id = b.dataset.sort;
-  writeHash({ s: field !== id ? id : desc ? "" : id + "-desc" });
-});
 
 setupDetailResize();
 setInterval(render, 60000);

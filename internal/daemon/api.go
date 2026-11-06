@@ -34,7 +34,7 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
 	})
 	mux.Handle("GET /", web.Handler(s.deps.Version))
-	return s.versioned(s.afterReconcile(s.slowLogged(mux)))
+	return s.versioned(s.afterReconcile(s.slowLogged(withCaller(mux))))
 }
 
 // SocketHandler is Handler with the runtime's profiles under /debug/pprof/, for the socket alone: the person
@@ -283,7 +283,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	h.Warnings = append(h.Warnings, s.reconcileWarnings()...)
 	h.Warnings = append(h.Warnings, s.homeWarnings()...)
 	l := s.loaded()
-	if w := profileWarning(l, s.heldProblems(l)); w != "" {
+	if w := profileWarning(l, append(s.heldProblems(l), s.facetProblems(l)...)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
 	for _, src := range s.sourceHealth(r.Context()) {
@@ -356,7 +356,7 @@ func (s *Server) handleRemoveClean(w http.ResponseWriter, r *http.Request) {
 			}
 			done[u] = true
 			var out bytes.Buffer
-			if err := s.act(ctx, actionRemove, u, api.ActionRequest{}, &out); err != nil {
+			if err := s.act(ctx, actionRemove, u, api.ActionRequest{}, personRequest, &out); err != nil {
 				kept := api.Kept{Named: named(u), Reason: err.Error()}
 				var refused Refusal
 				if errors.As(err, &refused) {
@@ -532,6 +532,7 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 	}
 	page.Counters = s.counters(r.Context())
 	page.Loading = s.loading()
+	page.Catalog = s.rowsCatalog().Version
 	writeJSON(w, page)
 }
 

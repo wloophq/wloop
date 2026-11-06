@@ -255,6 +255,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `owed_by.expr` (string): An expression over the task's facts whose value, me or a person's key, is task.owed_by.
 - `chat` (table): The chat on a task.
 - `chat.intent` (string): The intent of the turn a message starts on a task with no live session.
+- `attribution` (table): How the task's page names who made a change.
+- `attribution.via_session` (string): The name of a change an agent made for you through a session you drove; {session} is the session's id.
 - `areas` (list of strings): The areas a task may be in, the values of the area property.
 - `contexts` (list of strings): The contexts the menu offers; a task may hold others.
 - `stale_waiting_days` (integer): Working days a task waits before it is stale.
@@ -262,6 +264,58 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ## Views and the review (`views.toml`)
 
 - `empty` (template): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
+- `default_sort` (string): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
+- `lens` (table): What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
+- `lens.default_group` (template): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
+- `lens.board_group` (template): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
+- `lens.no_group` (string): The group menu's entry that lists the view in one group.
+- `lens.copied` (template): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
+- `lens.copied_grouped` (template): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
+- `lens.tag_key` (template): The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.
+- `lens.tag_key_empty` (template): The group of the items with no tag of that key, over the `{{.key}}`.
+- `lens.grouped` (template): What the terminal says after a group pick, over the picked entry's `{{.label}}`.
+- `lens.sorted` (template): What the terminal says after a sort pick, over the picked entry's `{{.label}}`.
+- `lens.descending` (template): The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.
+- `lens.no_lens` (string): What the terminal says when a group or sort pick is asked where no list is on screen.
+- `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets.
+- `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.
+- `facets.<name>.label` (string): The name people read. Required.
+- `facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
+- `facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
+- `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
+- `facets.<name>.values` (table by name): The text people read for a value, by value.
+- `facets.<name>.values.<name>` (string): The text of one value.
+- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
+- `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
+  - `ref`: Beside the title, before the unit's own label: where it lives.
+  - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
+  - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
+  - `who`: Whom it waits on.
+  - `kind`: Its situation or state, the pill under whom it waits on.
+  - `age`: How long since the facet's instant, for a facet that sorts by time; only the first such facet shows.
+  - `aside`: Beside the reason: its workspace and links.
+- `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
+  - `all`: Every value, in the item's order.
+  - `first`: The first value alone.
+- `facets.<name>.empty` (string): What a group of tasks with no value shows.
+- `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
+- `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
+- `facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
+- `facets.<name>.colors` (table by name): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
+- `facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
+- `facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
+- `facets.<name>.buckets.<name>` (table): A bucket, by its id.
+- `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
+- `facets.<name>.buckets.<name>.label` (string): The text people read; the id when absent.
+- `facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.
+- `facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
@@ -279,6 +333,58 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string): What the step asks of you, as the review lists it. Required.
+- `lens.age_now` (template): A row's age under a minute.
+- `lens.age_minutes` (template): A row's age under an hour, over its minutes as `{{.m}}`.
+- `lens.age_hours` (template): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
+- `lens.age_days` (template): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
+- `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
+- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
+- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
+- `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
+- `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
+- `lens.col_age` (template): The head of the column of a row's age.
+- `lens.col_why` (template): The head of the column of why a row waits.
+- `lens.col_aside` (template): The head of the column of a row's workspace and links.
+- `lens.col_actions` (template): The head of the column of a row's actions, read only by a screen reader.
+- `lens.stale` (template): The flag of a row whose plugin is not reporting.
+- `lens.stale_title` (template): The stale flag's tooltip.
+- `lens.briefing` (template): The flag of a row whose intake waits for its brief.
+- `lens.briefing_title` (template): The briefing flag's tooltip, over the intake's `{{.seq}}`.
+- `lens.briefing_attempt` (template): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
+- `lens.briefing_error` (template): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
+- `lens.questions` (template): The pill of a brief's open questions, over their number `{{.n}}`.
+- `lens.questions_title` (template): That pill's tooltip, over `{{.n}}`.
+- `lens.changed` (template): The flag of a task that changed since you last opened it.
+- `lens.starred` (template): The tooltip of a starred task's star.
+- `lens.until` (template): The flag of a task asleep until a date, over the `{{.date}}`.
+- `lens.due` (template): The flag of a task's deadline, over the `{{.date}}`.
+- `lens.unread` (template): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
+- `lens.unread_title` (template): The unread flag's tooltip.
+- `lens.review_due` (template): The flag of a project past its review.
+- `lens.no_next_action` (template): The flag of a project with no open child.
+- `lens.open_children` (template): A project's open children, over their number `{{.n}}`.
+- `lens.sequential` (template): The flag of a project that takes its children one at a time.
+- `lens.every` (template): How often a project is reviewed, over the `{{.every}}`.
+- `lens.reviewed` (template): When a project was last reviewed, over the `{{.date}}`.
+- `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
+- `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
+- `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
+- `facets.<name>.show.who` (list of strings): The values the facet shows in the who part.
+- `facets.<name>.show.kind` (list of strings): The values the facet shows in the kind part.
+- `facets.<name>.show.age` (list of strings): The values the facet shows in the age part.
+- `facets.<name>.show.aside` (list of strings): The values the facet shows in the aside part.
 
 ## Gates (`gates.toml`)
 
@@ -381,6 +487,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Gate approval
 
+- `ask` (string): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
 - `gates` (table): The gates its runs and drafts open.
 - `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
@@ -637,6 +744,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `notify_draft_failed`: The title of the notification of a draft whose delivery failed.
   - `notify_open`: The button that opens the notification's task in the cockpit.
   - `notify_discard`: The button that discards a draft from its notification.
+  - `verb_for_you`: Why a task's page, read from a session the user does not drive, offers Verb disabled: a verb acts for the user, so only the user runs it, or a session they drive.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
@@ -673,6 +781,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `notify_draft_failed`
   - `notify_open`
   - `notify_discard`
+  - `verb_for_you` (`Verb`)
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 
@@ -682,6 +791,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `views.<name>` (table): One view's words.
 - `views.<name>.label` (string): The view's name, as navigation lists it. Required.
 - `views.<name>.unit` (string): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
+- `views.<name>.default_sort` (string): What the sort menu calls a row view's own order, such as "Waiting longest".
 - `views.<name>.search` (table): A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers.
 - `views.<name>.search.default_sort` (string): The order a query with none is read in.
 - `views.<name>.search.presets[]` (table): A query run at a press.
@@ -701,11 +811,34 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets` (table): The words of the plugin's facets, by facet id.
 - `facets.<name>` (table): One facet's words.
 - `facets.<name>.label` (string): The facet's name, as the filter menu and the groups show it. Required.
+- `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
+  - `ref`: Beside the title, before the unit's own label: where it lives.
+  - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
+  - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
+  - `who`: Whom it waits on.
+  - `kind`: Its situation or state, the pill under whom it waits on.
+  - `age`: How long since the facet's instant, for a facet that sorts by time; only the first such facet shows.
+  - `aside`: Beside the reason: its workspace and links.
+- `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
+  - `all`: Every value, in the item's order.
+  - `first`: The first value alone.
+- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it.
+- `facets.<name>.row_class` (table): The class of a row that holds a value, by value, such as `{ me = "mine" }`, which the cockpit's stylesheet colors.
+- `facets.<name>.row_class.<name>` (string): One value's class.
+- `facets.<name>.colors` (table): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
+- `facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
 - `facets.<name>.empty` (string): What a row with no value shows.
 - `facets.<name>.values` (table): How each value shows, by value; a value it does not name shows as itself.
 - `facets.<name>.values.<name>` (string): One value's text.
 - `facets.<name>.buckets` (table): How each age bucket of a time facet shows, by bucket id.
 - `facets.<name>.buckets.<name>` (string): One bucket's text.
+- `lens` (table): The plugin's own words of its rows, replacing the row words of views.toml's [lens] by the same keys.
 - `situations` (table): How each situation the plugin derives shows, by kind, in a few words.
 - `situations.<name>` (string): One situation's words.
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
@@ -724,6 +857,58 @@ The fields each notice reads besides `Name` and `Command`:
 - `detail.<name>.title` (string): What the field means, as its tooltip shows it.
 - `menubar` (table): The heading of each menu bar section, by section id.
 - `menubar.<name>` (string): One section's heading.
+- `lens.age_now` (template): A row's age under a minute.
+- `lens.age_minutes` (template): A row's age under an hour, over its minutes as `{{.m}}`.
+- `lens.age_hours` (template): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
+- `lens.age_days` (template): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
+- `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
+- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
+- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
+- `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
+- `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
+- `lens.col_age` (template): The head of the column of a row's age.
+- `lens.col_why` (template): The head of the column of why a row waits.
+- `lens.col_aside` (template): The head of the column of a row's workspace and links.
+- `lens.col_actions` (template): The head of the column of a row's actions, read only by a screen reader.
+- `lens.stale` (template): The flag of a row whose plugin is not reporting.
+- `lens.stale_title` (template): The stale flag's tooltip.
+- `lens.briefing` (template): The flag of a row whose intake waits for its brief.
+- `lens.briefing_title` (template): The briefing flag's tooltip, over the intake's `{{.seq}}`.
+- `lens.briefing_attempt` (template): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
+- `lens.briefing_error` (template): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
+- `lens.questions` (template): The pill of a brief's open questions, over their number `{{.n}}`.
+- `lens.questions_title` (template): That pill's tooltip, over `{{.n}}`.
+- `lens.changed` (template): The flag of a task that changed since you last opened it.
+- `lens.starred` (template): The tooltip of a starred task's star.
+- `lens.until` (template): The flag of a task asleep until a date, over the `{{.date}}`.
+- `lens.due` (template): The flag of a task's deadline, over the `{{.date}}`.
+- `lens.unread` (template): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
+- `lens.unread_title` (template): The unread flag's tooltip.
+- `lens.review_due` (template): The flag of a project past its review.
+- `lens.no_next_action` (template): The flag of a project with no open child.
+- `lens.open_children` (template): A project's open children, over their number `{{.n}}`.
+- `lens.sequential` (template): The flag of a project that takes its children one at a time.
+- `lens.every` (template): How often a project is reviewed, over the `{{.every}}`.
+- `lens.reviewed` (template): When a project was last reviewed, over the `{{.date}}`.
+- `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
+- `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
+- `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
+- `facets.<name>.show.who` (list of strings): The values the facet shows in the who part.
+- `facets.<name>.show.kind` (list of strings): The values the facet shows in the kind part.
+- `facets.<name>.show.age` (list of strings): The values the facet shows in the age part.
+- `facets.<name>.show.aside` (list of strings): The values the facet shows in the aside part.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

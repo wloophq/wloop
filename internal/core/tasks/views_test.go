@@ -10,6 +10,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func pageIDs(es []task.Task) []task.ID {
@@ -30,11 +31,11 @@ func TestTasksSincePagesAView(t *testing.T) {
 	r.put(t, task.Task{ID: "a", State: "inbox", Category: task.CategoryInbox})
 	r.put(t, task.Task{ID: "b", State: "inbox", Category: task.CategoryInbox, Created: t0.Add(time.Second), Updated: t0})
 	r.put(t, task.Task{ID: "c", State: "next", Category: task.CategoryReady})
-	first, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{})
+	first, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{}, nil)
 	if err != nil || !first.Full || !slices.Equal(pageIDs(first.Tasks), []task.ID{"a", "b"}) || first.Counters.Views["inbox"] != 2 {
 		t.Fatalf("first page %+v %v", first, err)
 	}
-	owed, err := r.svc.TasksSince(ctx, task.Query{View: "owed"}, coretasks.Since{})
+	owed, err := r.svc.TasksSince(ctx, task.Query{View: "owed"}, coretasks.Since{}, nil)
 	if err != nil || !slices.Equal(pageIDs(owed.Tasks), []task.ID{"c"}) {
 		t.Fatalf("owed %+v %v", owed, err)
 	}
@@ -46,17 +47,80 @@ func TestTasksSincePagesAView(t *testing.T) {
 	if err := r.store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: a}}); err != nil {
 		t.Fatal(err)
 	}
-	page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
+	page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev}, nil)
 	if err != nil || page.Full || !slices.Equal(pageIDs(page.Tasks), []task.ID{"a"}) || page.Tasks[0].Title != "a2" ||
 		!slices.Equal(page.Removed, []task.ID{"b"}) || page.Rev <= first.Rev || page.Counters.Views["inbox"] != 1 {
 		t.Fatalf("inbox since %+v %v", page, err)
 	}
-	again, err := r.svc.TasksSince(ctx, task.Query{View: "owed"}, coretasks.Since{Epoch: owed.Epoch, Rev: owed.Rev})
+	again, err := r.svc.TasksSince(ctx, task.Query{View: "owed"}, coretasks.Since{Epoch: owed.Epoch, Rev: owed.Rev}, nil)
 	if err != nil || !again.Full || !slices.Equal(pageIDs(again.Tasks), []task.ID{"c", "b"}) {
 		t.Fatalf("a view served whole: %+v %v", again, err)
 	}
-	if p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{Epoch: "other", Rev: page.Rev}); err != nil || !p.Full || !slices.Equal(pageIDs(p.Tasks), []task.ID{"a"}) {
+	if p, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{Epoch: "other", Rev: page.Rev}, nil); err != nil || !p.Full || !slices.Equal(pageIDs(p.Tasks), []task.ID{"a"}) {
 		t.Fatalf("another epoch %+v %v", p, err)
+	}
+}
+
+// TestTasksSinceResendsTheTasksHoldingAMovedUnit checks that a paged view's page since a position also lists
+// the tasks holding a unit the caller names, as their own or an item's, and removes those out of the view.
+func TestTasksSinceResendsTheTasksHoldingAMovedUnit(t *testing.T) {
+	ctx := context.Background()
+	r := newRig()
+	pr, thread := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, unit.Unit{Provider: "slack", Key: "T1/C1/1"}
+	r.put(t, task.Task{ID: "a", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{pr}})
+	r.put(t, task.Task{ID: "b", State: "inbox", Category: task.CategoryInbox, Items: []task.ItemRef{{Unit: thread, Item: "i1"}}})
+	r.put(t, task.Task{ID: "c", State: "next", Category: task.CategoryReady, Units: []unit.Unit{pr}})
+	r.put(t, task.Task{ID: "d", State: "inbox", Category: task.CategoryInbox})
+	first, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, coretasks.Since{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	since := coretasks.Since{Epoch: first.Epoch, Rev: first.Rev}
+	page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, []unit.Unit{pr, thread, task.UnitOf("d")})
+	if err != nil || page.Full || !slices.Equal(pageIDs(page.Tasks), []task.ID{"a", "b", "d"}) || !slices.Equal(page.Removed, []task.ID{"c"}) {
+		t.Fatalf("the page since naming the units: %+v %v", page, err)
+	}
+	if page, err := r.svc.TasksSince(ctx, task.Query{View: "inbox"}, since, nil); err != nil || len(page.Tasks) != 0 || len(page.Removed) != 0 {
+		t.Fatalf("the page since naming none: %+v %v", page, err)
+	}
+}
+
+// readCounted counts the reads of the stored tasks.
+type readCounted struct {
+	coretasks.Store
+	reads int
+}
+
+func (s *readCounted) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	s.reads++
+	return s.Store.Tasks(ctx, q)
+}
+
+// TestASnapshotHoldsAndCountsFromOneRead checks that the units the stored tasks hold and the counters over
+// them come from one read of the store.
+func TestASnapshotHoldsAndCountsFromOneRead(t *testing.T) {
+	ctx := context.Background()
+	r := newRig()
+	pr, thread := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, unit.Unit{Provider: "slack", Key: "T1/C1/1"}
+	r.put(t, task.Task{ID: "a", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{pr}})
+	r.put(t, task.Task{ID: "b", State: "inbox", Category: task.CategoryInbox, Items: []task.ItemRef{{Unit: thread, Item: "i1"}}})
+	r.put(t, task.Task{ID: "c", State: "next", Category: task.CategoryReady})
+	store := &readCounted{Store: r.store}
+	svc := coretasks.New(coretasks.Deps{Store: store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Views: r.lens.Views, ViewEval: r.lens.Eval})
+	snap, err := svc.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held := snap.Held([]unit.Unit{thread, {Provider: "slack", Key: "T1/C1/2"}, pr}); !slices.Equal(held, []unit.Unit{thread, pr}) {
+		t.Fatalf("held %v", held)
+	}
+	c, err := snap.Counts(ctx, "")
+	if err != nil || c.Views["inbox"] != 2 {
+		t.Fatalf("counters %+v %v", c, err)
+	}
+	if store.reads != 1 {
+		t.Fatalf("%d reads of the stored tasks, want 1", store.reads)
 	}
 }
 
@@ -75,13 +139,13 @@ func TestATimeVaryingViewRepagesWhenTheClockMovesATask(t *testing.T) {
 		if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 			t.Fatal(err)
 		}
-		first, err := svc.TasksSince(ctx, task.Query{View: "overdue"}, coretasks.Since{})
+		first, err := svc.TasksSince(ctx, task.Query{View: "overdue"}, coretasks.Since{}, nil)
 		if err != nil || len(first.Tasks) != 0 {
 			t.Fatalf("first page %+v %v", first, err)
 		}
 		time.Sleep(time.Hour + time.Second)
 		synctest.Wait()
-		page, err := svc.TasksSince(ctx, task.Query{View: "overdue"}, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev})
+		page, err := svc.TasksSince(ctx, task.Query{View: "overdue"}, coretasks.Since{Epoch: first.Epoch, Rev: first.Rev}, nil)
 		if err != nil || page.Rev != first.Rev || !page.Full || !slices.Equal(pageIDs(page.Tasks), []task.ID{"t-late"}) || page.Counters.Views["overdue"] != 1 {
 			t.Fatalf("after an hour with no write: %+v %v", page, err)
 		}

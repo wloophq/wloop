@@ -20,6 +20,7 @@ import (
 	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/turn"
@@ -669,6 +670,12 @@ func (r lateReports) Reported(ctx context.Context, units []unit.Unit) (map[unit.
 		return nil, nil
 	}
 	return r.e.pluginKind.Snapshots.Reported(ctx, units)
+}
+
+// githubCheckRows are the GitHub plugin's rows as a check that reads no store sees them: none, with the facets
+// of cat and of the brief intent's enum extras l declares.
+func githubCheckRows(cat readmodel.Presenter, l *intentload.Loaded) readmodel.Provider {
+	return prrow.New(prrow.Source{Catalog: cat, RowDeps: readmodel.RowDeps{Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Loaded: l} }}})
 }
 
 // githubHostModule is the GitHub source as it runs in the host's process: the pull

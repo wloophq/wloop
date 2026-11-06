@@ -34,7 +34,7 @@
       "context": "list",
       "owner": "core",
       "help": "to Next",
-      "summary": "Move it to Next: something you will do as soon as you can."
+      "summary": "Move it to Next: committed, you or an agent will do it."
     },
     {
       "key": "w",
@@ -470,7 +470,7 @@
       "context": "list",
       "owner": "core",
       "help": "Run now",
-      "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
+      "summary": "Run what waits now, without waiting for its delay or the daily budget. Skip drops it instead."
     },
     {
       "key": "S",
@@ -478,7 +478,7 @@
       "context": "list",
       "owner": "core",
       "help": "Skip",
-      "summary": "Drop the round waiting on this pull request without running it. Run now starts it instead."
+      "summary": "Drop what waits without running it. Run now runs it instead."
     },
     {
       "key": "G",
@@ -486,7 +486,7 @@
       "context": "list",
       "owner": "core",
       "help": "Guide",
-      "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+      "summary": "Tell the agent what to look at; your text goes with what waits now, or with the next run when nothing waits."
     },
     {
       "key": "T",

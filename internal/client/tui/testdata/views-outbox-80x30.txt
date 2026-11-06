@@ -1,6 +1,6 @@
  Focus 1    Inbox 2   [Outbox 1]   Next 4    Waiting 4    Projects 0
 
->  5h  #releases thread  Ship it tonight. Rollback plan in the doc.  pending
+>  5h 0m  #releases thread  Ship it tonight. Rollback plan in the doc.  pending
 
 Reply in the release thread
   state      outbox
@@ -27,4 +27,4 @@ Reply in the release thread
 
 
 warning: app: notifications are off
-a approve  Backspace dismiss  ↑↓ move  g view  / filter  ? keys  q quit
+a approve  Backspace dismiss  ↑↓ move  g view  / filter  = group  ? keys  q quit

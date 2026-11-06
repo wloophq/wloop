@@ -1,5 +1,5 @@
 {
-  "version": "d989fdf6b655",
+  "version": "9373394a48af",
   "specs": [
     {
       "id": "answer",
@@ -53,7 +53,7 @@
     {
       "id": "run_now",
       "label": "Run now",
-      "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead.",
+      "summary": "Run what waits now, without waiting for its delay or the daily budget. Skip drops it instead.",
       "group": "start",
       "key": "R",
       "surfaces": [
@@ -72,7 +72,7 @@
     {
       "id": "skip",
       "label": "Skip",
-      "summary": "Drop the round waiting on this pull request without running it. Run now starts it instead.",
+      "summary": "Drop what waits without running it. Run now runs it instead.",
       "group": "start",
       "key": "S",
       "surfaces": [
@@ -90,7 +90,7 @@
     {
       "id": "guide",
       "label": "Guide",
-      "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits.",
+      "summary": "Tell the agent what to look at; your text goes with what waits now, or with the next run when nothing waits.",
       "group": "start",
       "key": "G",
       "surfaces": [

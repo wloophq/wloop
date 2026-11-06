@@ -1,12 +1,14 @@
 package intent
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -27,19 +29,20 @@ func defaultLists() []byte {
 }
 
 // splitLists is src, the tables of tasks.toml and views.toml together,
-// as the two files: [verbs.*], [states.*], [props.*], [owed_by] and [chat]
-// tables in tasks.toml, the rest in views.toml.
+// as the two files: [verbs.*], [states.*], [props.*], [owed_by], [chat] and
+// [attribution] tables in tasks.toml, the rest in views.toml.
 func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
 	for _, line := range strings.SplitAfter(src, "\n") {
-		if strings.HasPrefix(line, "empty =") {
+		if strings.HasPrefix(line, "empty =") || strings.HasPrefix(line, "default_sort =") {
 			out[ViewsFile] += line
 			continue
 		}
 		if strings.HasPrefix(line, "[") {
 			file = ViewsFile
-			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") || strings.HasPrefix(line, "[chat]") {
+			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") || strings.HasPrefix(line, "[chat]") ||
+				strings.HasPrefix(line, "[attribution]") {
 				file = TasksFile
 			}
 		}
@@ -356,5 +359,270 @@ func TestAViewsKeyComesFromTheProfile(t *testing.T) {
 		if !strings.Contains(problems, want) {
 			t.Errorf("no %q in:\n%s", want, problems)
 		}
+	}
+}
+
+func loadFacets(t *testing.T, userViews string) (ViewsDef, Problems) {
+	t.Helper()
+	var layers []profile.Layer
+	if userViews != "" {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, ViewsFile), []byte(userViews), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		layers = []profile.Layer{{Name: "user", Dir: dir}}
+	}
+	bundled := os.DirFS("../../profiles/default")
+	views, tasks, problems := loadViews(layers, bundled, nil)
+	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	problems = append(problems, recordProblems...)
+	return views, append(problems, views.checkFacets(tasks, records)...)
+}
+
+func facetOf(d ViewsDef, id string) (FacetDef, bool) {
+	i := slices.IndexFunc(d.Facets, func(f FacetDef) bool { return f.ID == id })
+	if i < 0 {
+		return FacetDef{}, false
+	}
+	return d.Facets[i], true
+}
+
+func TestTaskFacetsLoadFromViews(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	var ids []string
+	for _, f := range views.Facets {
+		ids = append(ids, f.ID)
+	}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "where", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("facets %v, want %v", ids, want)
+	}
+	if f, _ := facetOf(views, "waits-on"); f.Fact != "task.owed_by" || f.Merge != "rows-first" || f.Match != "team" || f.Units != "all" || !f.Menu {
+		t.Errorf("waits-on: %+v", f)
+	}
+	if f, _ := facetOf(views, "tag"); f.Fact != "brief.tags" || f.Match != "prefix" {
+		t.Errorf("tag: %+v", f)
+	}
+	moved, _ := facetOf(views, "moved")
+	if moved.Sort != "time" || len(moved.Buckets) != 6 || moved.Buckets[0] != (FacetBucket{ID: "1d", Label: "0-1 days", Within: 24 * time.Hour}) || moved.Buckets[5].Within != 0 {
+		t.Errorf("moved: %+v", moved)
+	}
+	if views.DefaultSort == "" {
+		t.Error("no default_sort")
+	}
+}
+
+func TestAFacetNamingNoFactIsAProblem(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.mine]\nfact = \"task.nope\"\nlabel = \"Mine\"\n\n[facets.owed]\nfact = \"task.owed_bi\"\nlabel = \"Owed\"\n\n[facets.when]\nfact = \"task.state\"\nlabel = \"When\"\nsort = \"time\"\n\n[facets.field]\nfact = \"brief.nope\"\nlabel = \"Field\"\n")
+	got := problems.Error()
+	for _, want := range []string{"facets.mine.fact", "task.nope", "facets.owed.fact: task.owed_bi", `did you mean "task.owed_by"?`, "facets.when.sort", "facets.field.fact"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("problems lack %q:\n%s", want, got)
+		}
+	}
+	for _, id := range []string{"mine", "owed", "when", "field"} {
+		if _, ok := facetOf(views, id); ok {
+			t.Errorf("facet %s with a problem is served", id)
+		}
+	}
+}
+
+func TestAUserLayerReplacesOnlyTheFacetKeysItSets(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nlabel = \"Danger\"\n\n[facets.placement.values]\n\"acme/api\" = \"API\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	risk, _ := facetOf(views, "risk")
+	if risk.Label != "Danger" || risk.Fact != "brief.risk" || risk.Sort != "rank" || !slices.Equal(risk.Rank, []string{"high", "medium", "low"}) {
+		t.Errorf("risk: %+v", risk)
+	}
+	if p, _ := facetOf(views, "placement"); p.Values["acme/api"] != "API" {
+		t.Errorf("placement: %+v", p)
+	}
+	_, problems = loadFacets(t, "[facets.fresh]\nlabel = \"Fresh\"\n")
+	if !strings.Contains(problems.Error(), "facets.fresh.fact: is required") {
+		t.Errorf("a new facet without a fact: %s", problems.Error())
+	}
+}
+
+func TestAViewGroupNeedsAFacet(t *testing.T) {
+	views, problems := loadFacets(t, "[views.waiting]\ngroup = \"task.since_movement\"\n")
+	if got := problems.Error(); !strings.Contains(got, "views.waiting.group") || !strings.Contains(got, "no facet") {
+		t.Fatalf("problems: %s", got)
+	}
+	if v, _ := views.View("waiting"); v.Group != "" {
+		t.Errorf("group %q kept", v.Group)
+	}
+	views, problems = loadFacets(t, "")
+	if v, _ := views.View("waiting"); len(problems) > 0 || v.Group != "task.owed_by" {
+		t.Errorf("bundled group %q, problems %s", v.Group, problems.Error())
+	}
+}
+
+func TestAViewGroupProblemPointsAtTheLayerThatSetIt(t *testing.T) {
+	_, problems := loadFacets(t, "[views.waiting]\ngroup = \"task.since_movement\"\n")
+	i := slices.IndexFunc(problems, func(p Problem) bool { return p.Field == "views.waiting.group" })
+	if i < 0 || problems[i].Line != 2 || !strings.HasSuffix(problems[i].File, ViewsFile) || problems[i].File == ViewsFile {
+		t.Fatalf("problems: %+v", problems)
+	}
+}
+
+func TestABadFacetOverrideKeepsWhatItWouldReplace(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nsort = \"bogus\"\n\n[facets.moved.buckets.1d]\nwithin = \"soon\"\n")
+	for _, f := range []string{"facets.risk.sort", "facets.moved.buckets.1d.within"} {
+		if !strings.Contains(problems.Error(), f) {
+			t.Errorf("no problem for %s: %s", f, problems.Error())
+		}
+	}
+	risk, _ := facetOf(views, "risk")
+	moved, _ := facetOf(views, "moved")
+	if risk.Sort != "rank" || len(risk.Rank) != 3 || len(moved.Buckets) != 6 || moved.Buckets[0].Within != 24*time.Hour {
+		t.Errorf("risk %+v, moved %+v", risk, moved)
+	}
+}
+
+func TestAFactNamedByAMetaKeyIsNoFact(t *testing.T) {
+	_, problems := loadFacets(t, "[facets.meta]\nfact = \"\\u0000now\"\nlabel = \"Meta\"\n")
+	if !strings.Contains(problems.Error(), "facets.meta.fact") {
+		t.Errorf("problems: %s", problems.Error())
+	}
+}
+
+func TestTheLensWordsNameOnlyTheirVariables(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	w := views.Lens
+	if w.DefaultGroup == "" || w.BoardGroup == "" || w.NoGroup == "" || w.Copied == "" || w.CopiedGrouped == "" {
+		t.Fatalf("the bundled profile leaves lens words out: %+v", w)
+	}
+	_, problems = loadFacets(t, "[lens]\ncopied = \"Copied {{.count}} of {{.group}}\"\n")
+	if len(problems) != 1 || problems[0].Field != "lens.copied" {
+		t.Errorf("a copied word naming the group: %v", problems)
+	}
+}
+
+func TestAFacetsShowNamesAPartOrAPartsValues(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.risk]\nshow = { flag = [\"high\"] }\nshow_values = \"first\"\n\n[facets.size]\nshow = \"aside\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if risk, _ := facetOf(views, "risk"); risk.Show.Part != "flag" || !slices.Equal(risk.Show.Only, []string{"high"}) || risk.Show.Values != "first" {
+		t.Errorf("risk shows %+v", risk.Show)
+	}
+	if size, _ := facetOf(views, "size"); size.Show.Part != "aside" || size.Show.Only != nil {
+		t.Errorf("size shows %+v", size.Show)
+	}
+	if moved, _ := facetOf(views, "moved"); moved.Show.Part != "age" {
+		t.Errorf("the bundled moved shows %+v", moved.Show)
+	}
+	views, problems = loadFacets(t, "[facets.moved]\nshow = \"\"\n")
+	if moved, _ := facetOf(views, "moved"); len(problems) > 0 || moved.Show.Part != "" {
+		t.Errorf("show = \"\" leaves moved %+v, problems %v", moved.Show, problems)
+	}
+	views, problems = loadFacets(t, "[facets.risk]\nshow = { \"\" = [\"high\"] }\n")
+	if risk, _ := facetOf(views, "risk"); risk.Show.Only != nil || !strings.Contains(problems.Error(), "names no part") {
+		t.Errorf("a table of no part leaves risk %+v, problems %v", risk.Show, problems)
+	}
+	for _, bad := range []string{"show = \"corner\"", "show = { corner = [\"high\"] }", "show = { flag = \"high\" }", "show_values = \"some\""} {
+		_, problems := loadFacets(t, "[facets.risk]\n"+bad+"\n")
+		if !strings.Contains(problems.Error(), "facets.risk.show") {
+			t.Errorf("%s: %v", bad, problems)
+		}
+	}
+}
+
+func TestTheRowWordsAreSetAndNameOnlyTheirVariables(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	if set := views.Lens.Row.Set(); len(set) != len(builtin.RowWords) {
+		t.Fatalf("the bundled profile sets %d of %d row words: %v", len(set), len(builtin.RowWords), set)
+	}
+	_, problems = loadFacets(t, "[lens]\nage_days = \"{{.d}} days {{.m}}\"\n")
+	if len(problems) != 1 || problems[0].Field != "lens.age_days" {
+		t.Errorf("an age naming the minutes: %v", problems)
+	}
+}
+
+func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
+	plugin, user := t.TempDir(), t.TempDir()
+	write := func(dir, body string) {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(plugin, "[lens]\ncol_aside = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
+	write(user, "[facets.author]\nshow = \"who\"\n")
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	a := texts["acme"].Facets["author"]
+	if a.Show.Part != "who" || a.Show.Values != "first" || a.LabelPrefix == nil || *a.LabelPrefix != "by " || a.RowClass["me"] != "mine" {
+		t.Errorf("author: %+v", a)
+	}
+	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"col_aside": "Workspace"}) {
+		t.Errorf("row words %v", got)
+	}
+	write(user, "[facets.author]\nshow = \"\"\n")
+	texts, problems = loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if a := texts["acme"].Facets["author"]; len(problems) > 0 || a.Show.Part != "" || a.Show.Values != "first" {
+		t.Errorf("show = \"\" over a placed facet: %+v, problems %v", a.Show, problems)
+	}
+	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
+	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}})
+	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
+		t.Errorf("problems: %s", got)
+	}
+}
+
+func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"me\", ana = \"author\" }\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if w, _ := facetOf(views, "waits-on"); !maps.Equal(w.Colors, map[string]string{"me": "me", "ana": "author"}) {
+		t.Errorf("waits-on colors %v", w.Colors)
+	}
+	if _, problems := loadFacets(t, "[facets.waits-on]\ncolors = { me = \"pink\" }\n"); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.waits-on.colors.me") {
+		t.Errorf("an unknown hue: %v", problems)
+	}
+	plugin, user := t.TempDir(), t.TempDir()
+	for dir, body := range map[string]string{plugin: "[facets.turn]\nlabel = \"Turn\"\ncolors = { me = \"me\", others = \"author\" }\n", user: "[facets.turn]\ncolors = { others = \"reviewer\" }\n"} {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got := texts["acme"].Facets["turn"].Colors; !maps.Equal(got, map[string]string{"me": "me", "others": "reviewer"}) {
+		t.Errorf("turn colors %v", got)
+	}
+	if err := os.WriteFile(filepath.Join(user, UIFile), []byte("[facets.turn]\ncolors = { others = \"pink\" }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.colors.others") {
+		t.Errorf("an unknown hue in ui.toml, once: %v", problems)
+	}
+}
+
+func TestTheTaskStripIsTheTasksOwnTurn(t *testing.T) {
+	views, problems := loadFacets(t, "")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if f, _ := facetOf(views, "turn"); f.Fact != "task.turn" || f.Merge != "own" || !f.Strip {
+		t.Errorf("the bundled turn reads %q merged %q, strip %v", f.Fact, f.Merge, f.Strip)
+	}
+	if _, problems := loadFacets(t, "[facets.turn]\nturn_of = \"waits-on\"\n"); len(problems) != 1 {
+		t.Errorf("turn_of is no key: %v", problems)
 	}
 }

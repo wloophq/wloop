@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -33,10 +34,12 @@ type AnswerRequest struct {
 	Posted        bool
 	// Gate is the gate whose resolution the answer is.
 	Gate int64
+	// BySession is the session an agent answered through, "" for a person.
+	BySession string
 }
 
 func (r AnswerRequest) answer(seq int64) turn.Answer {
-	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message, Gate: r.Gate}
+	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message, Gate: r.Gate, BySession: r.BySession}
 }
 
 type AnswerResult struct {
@@ -228,7 +231,7 @@ func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResu
 	a := r.answer(q.Seq)
 	a.At, a.Posted = s.now(), true
 	b.Answer(a)
-	evs := []port.Event{s.event(r.Unit, KindAnswered, "", oneLine(b.Said(a), answeredMax))}
+	evs := []port.Event{s.answered(r.Unit, a, b.Said(a))}
 	saved, err := s.Store.Save(ctx, b, evs...)
 	s.mu.Unlock()
 	if err != nil {
@@ -298,7 +301,7 @@ func (s *Service) storeAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, 
 	a.At = s.now()
 	said := b.Said(a)
 	b.Answer(a)
-	evs = append(evs, s.event(r.Unit, KindAnswered, "", oneLine(said, answeredMax)))
+	evs = append(evs, s.answered(r.Unit, a, said))
 	saved, err := s.Store.Save(ctx, b, evs...)
 	if err != nil {
 		return turn.Turn{}, turn.Answer{}, "", nil, err
@@ -683,6 +686,7 @@ func (s *Service) runHeadless(ctx context.Context, q turn.Turn, said string) Ans
 }
 
 // MarkRead notes that the agent read the answers ids of the unit, now; one read before keeps its time.
+// A refused answer the agent reads reached it after all: it turns typed, so its question no longer asks.
 func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
@@ -699,6 +703,10 @@ func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error 
 		if a := &b.Answers[i]; a.ReadAt.IsZero() && slices.Contains(ids, a.ID) {
 			a.ReadAt = now
 			evs = append(evs, s.event(u, KindAnswerRead, strconv.FormatInt(a.ID, 10)+":"+now.Format(time.RFC3339Nano), ""))
+			if a.Route == turn.Refused {
+				a.Route, a.NoticedAt = turn.Typed, now
+				evs = append(evs, s.routed(u, a.ID, AnswerResult{Route: turn.Typed, Handle: a.Session, Note: "the agent read it"}))
+			}
 		}
 	}
 	if len(evs) == 0 {
@@ -713,4 +721,13 @@ func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error 
 	s.publish(evs...)
 	s.changed(ctx, u)
 	return nil
+}
+
+// answered is the event of answer a on u, saying said; one given through a session names it, as an agent's.
+func (s *Service) answered(u unit.Unit, a turn.Answer, said string) port.Event {
+	ev := s.event(u, KindAnswered, "", oneLine(said, answeredMax))
+	if a.BySession != "" {
+		ev.Actor, ev.Session = string(task.ActorAgent), a.BySession
+	}
+	return ev
 }

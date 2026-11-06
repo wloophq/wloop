@@ -244,7 +244,6 @@ tr.late .age, .d-sit.late .age {
 .legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-8); font-size: var(--text-meta); color: var(--muted); }
 .legend .lg { display: inline-flex; align-items: center; gap: var(--space-4); }
 .legend .sw { display: inline-block; width: var(--strip-row); height: 14px; border-radius: var(--radius-xs); background: var(--strip); }
-.mine-mark { color: var(--mine-text); border-color: currentColor; }
 .pill.tag { font: var(--text-meta)/1.4 var(--mono); }
 
 .facet { padding: 0; font: inherit; color: inherit; text-align: inherit; background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer; }
@@ -257,6 +256,12 @@ tr.late .age, .d-sit.late .age {
 }
 .meta .facet .flag { margin-left: 0; }
 .meta > .facet:has(.flag) { margin-left: var(--space-6); }
+.c-pr .meta > .facet:has(.pill), .c-pr .meta > .pill, .c-pr .meta > .head, .task-board .meta > * { margin-left: var(--space-6); }
+.ref .facet + .unit, .ref .unit + .unit { margin-left: var(--space-6); }
+.pill[data-field="risk"][data-value="high"] { color: var(--err); background: var(--err-bg); }
+.pill[data-field="risk"][data-value="medium"] { color: var(--late); background: var(--late-bg); }
+.c-wait .facet:has(.pill) { display: block; margin-top: var(--space-2); }
+.task-table .project-facts { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); margin-top: var(--space-2); }
 .dot { font-size: var(--text-meta); color: var(--strip); vertical-align: middle; }
 .only { margin-left: var(--space-8); font: var(--text-meta)/1.4 var(--sans); color: var(--muted); }
 
@@ -387,14 +392,20 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 
 .toggle { display: inline-flex; gap: var(--space-4); }
 .toggle [aria-pressed="true"] { background: var(--sel); border-color: var(--me); }
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: var(--space-12); padding: var(--space-8) var(--space-16) var(--space-16); align-items: start; overflow-x: auto; }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: var(--space-12); padding: var(--space-8) var(--space-16) var(--space-16); align-items: start; overflow: auto; }
 .board[hidden] { display: none; }
 .lane, .card { min-width: 0; }
 .lane-head { display: flex; justify-content: space-between; gap: var(--space-6); margin: 0 0 var(--space-6); }
 .lane-tools { display: inline-flex; align-items: baseline; gap: var(--space-6); }
 .lane-tools .only { margin-left: 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6); }
-.card { display: grid; gap: var(--space-2); width: 100%; padding: var(--space-8); text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--rule); border-left: var(--strip-card) solid var(--none); border-radius: var(--radius-md); cursor: pointer; }
+.card { position: relative; isolation: isolate; display: grid; gap: var(--space-2); padding: var(--space-8); background: var(--panel); border: 1px solid var(--rule); border-left: var(--strip-card) solid var(--none); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+/* The title's control covers the card, so a click anywhere opens it; the card's other controls sit above it. */
+.card .open { padding: 0; font: inherit; font-weight: 600; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; text-decoration: none; }
+.card .open::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.card .open:focus-visible { outline: none; }
+.card:has(.open:focus-visible) { outline: 2px solid var(--me); outline-offset: 1px; }
+.card .facet, .card a:not(.open), .card button:not(.open), .card .d-draft, .card .project-facts, .card .meta [title] { position: relative; z-index: 1; }
 .card.mine { background: var(--mine-bg); }
 .card:hover { background: var(--hover); }
 .card.w-me { border-left-color: var(--me); }
@@ -402,7 +413,8 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 .card.w-reviewer { border-left-color: var(--reviewer); }
 .card.w-loop { border-left-color: var(--loop); }
 .card .title { font-weight: 600; overflow-wrap: anywhere; }
-.card .meta, .card .age { font-size: var(--text-meta); color: var(--muted); }
+.card .meta, .card .card-who { font-size: var(--text-meta); color: var(--muted); }
+.card .card-who { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: baseline; }
 .card .meta { overflow-wrap: anywhere; }
 
 .explore { display: grid; gap: var(--space-8); padding: var(--space-8) var(--space-16) 0; }
@@ -437,8 +449,8 @@ label.d-sub { display: block; margin-top: var(--space-12); }
   #rail .views a.on { border-bottom-color: var(--me); }
   .views .count { margin-left: var(--space-6); }
   #detail-resize, body.has-detail #detail-resize { display: none; }
-  #detail { border-left: 0; border-top: 1px solid var(--rule); }
-  .c-why, .c-where { display: none; }
+  #detail { position: fixed; inset: 0; z-index: 10; border-left: 0; }
+  .c-wait, .c-why, .c-where { display: none; }
   .c-pr { min-width: 0; }
   .search { flex-basis: 100%; }
   .lens-count { margin-left: 0; }
@@ -452,10 +464,9 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 .d-brief .muted, .d-brief.muted { color: var(--muted); }
 .d-brief .small { font-size: var(--text-meta); }
 .btags { display: inline-flex; gap: var(--space-4); margin-left: var(--space-6); vertical-align: baseline; }
-.card .btags { display: flex; flex-wrap: wrap; margin: var(--space-2) 0 0; }
 .brief-line .btags { margin-left: 0; }
 @media (max-width: 600px) {
-  .meta .btags { display: none; }
+  .meta .btags, .c-pr .meta > .facet:has(.pill) { display: none; }
 }
 .risk-high { color: var(--err); background: var(--err-bg); }
 .risk-medium { color: var(--late); background: var(--late-bg); }
@@ -536,15 +547,21 @@ button.kpi:hover { border-color: var(--muted); }
 .view-rule dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-8); margin: var(--space-4) 0 0; }
 .view-rule dd { margin: 0; }
 .view-rule code { font: var(--text-meta)/1.4 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
-.task-list { list-style: none; margin: 0; padding: 0; }
-.task-row { padding: var(--space-8) var(--space-10); border-bottom: 1px solid var(--rule); cursor: pointer; }
-.task-row:hover { background: var(--hover); }
+tr.task-row { cursor: pointer; }
 .task-row.changed .title { color: var(--me-text); }
-.task-row .task-line { display: flex; gap: var(--space-6); align-items: baseline; }
-.task-row .meta { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); margin-top: var(--space-2); }
+tr.task-row .meta { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); margin-top: var(--space-2); }
 .task-row .star, #detail h1 .star { color: var(--late); }
-.task-row.outbox { cursor: default; }
+tr.task-row.outbox { cursor: default; }
 .task-row .project-facts .flag { color: var(--late); }
+.tasks > .tools { padding: 0 0 var(--space-8); }
+.task-board { padding: var(--space-8) 0 var(--space-16); }
+/* A board fills the list's height and scrolls on both axes, so its horizontal scrollbar stays in view. */
+#list:has(> #tasks:not([hidden]) .task-board), #tasks:has(.task-board), #tasks-body:has(> .task-board),
+#list:has(> #list-box[open]:not([hidden]) > #board:not([hidden])), #list-box[open]:has(> #board:not([hidden])) { display: flex; flex-direction: column; }
+#tasks:has(.task-board) { padding-bottom: 0; }
+#tasks:has(.task-board), #tasks-body:has(> .task-board), #list-box[open]:has(> #board:not([hidden])), .board { flex: 1; min-height: 0; }
+#list-box[open]:has(> #board:not([hidden]))::details-content { display: contents; }
+.board .lane-head { position: sticky; top: 0; z-index: 1; padding: var(--space-4) 0; background: var(--bg); }
 .review-steps { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0 0 var(--space-8); padding: 0; }
 .review-pick { display: inline-flex; gap: var(--space-6); align-items: baseline; padding: var(--space-4) var(--space-10); border: 1px solid var(--rule); border-radius: var(--radius-pill); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
 .review-step.done .review-pick { color: var(--muted); }

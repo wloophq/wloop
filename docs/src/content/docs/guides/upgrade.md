@@ -67,6 +67,8 @@ The lists are the views of `views.toml`, each with its own condition (`when`). N
 
 A task in Reference is closed now, since its category is `done`: it leaves Focus and Projects, and workflows over tasks no longer see it.
 
+The bundled Waiting state is in the `ready` category: a task in it is committed, and the daemon moves the stored waiting tasks there when it loads the profile. A task derived from an item that waits on someone else starts in Next, and the Waiting view lists it by who owes it. A predicate that read the `waiting` category of a bundled state reads `task.owed_by` now. The fact `task.runs_live` is gone: `task.turns_running` counts the turns an agent works on, which In loop lists, and a view or workflow of your own naming `task.runs_live` fails at load.
+
 A task is `task:<id>`, its id `t-` and 16 hex digits, where an entry's was `e-`; a migrated task keeps its hex, so `e-3f9a2c4b5d6e7f80` is `t-3f9a2c4b5d6e7f80`. A target `entry:<id>` on the command line, such as `{{command}} start entry:<id>`, is refused naming its `task:<id>` form. A task's dossier is under `dossiers/task/<id>#/`, where an entry's was under `dossiers/entry/`: the daemon moves the directories at its start, retries at every start when a move fails, and `doctor` names a directory left behind.
 
 Links and notifications from before the upgrade:

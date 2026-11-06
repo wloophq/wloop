@@ -1,5 +1,5 @@
 {
-  "version": "14972f3ff107",
+  "version": "b83eea507395",
   "views": [
     {
       "id": "mine",
@@ -12,7 +12,7 @@
         "tui"
       ],
       "unit": "Pull request",
-      "unit_sort": "repo"
+      "default_sort": "Waiting longest"
     },
     {
       "id": "plan",
@@ -33,7 +33,8 @@
       "order": 6,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "all",
@@ -43,7 +44,8 @@
       "order": 8,
       "surfaces": [
         "web"
-      ]
+      ],
+      "default_sort": "Waiting longest"
     },
     {
       "id": "explore",
@@ -122,13 +124,14 @@
   ],
   "facets": [
     {
-      "id": "repo",
-      "label": "Repo",
+      "id": "where",
+      "label": "Where",
       "provider": "github",
       "group": true,
       "sort": "text",
       "match": "suffix",
-      "menu": true
+      "menu": true,
+      "show": "ref"
     },
     {
       "id": "author",
@@ -139,7 +142,13 @@
       "rank": [
         "me"
       ],
-      "menu": true
+      "menu": true,
+      "show": "meta",
+      "show_values": "first",
+      "label_prefix": "by ",
+      "row_class": {
+        "me": "mine"
+      }
     },
     {
       "id": "wait",
@@ -162,15 +171,23 @@
         "reviewer": "Waiting on a reviewer"
       },
       "menu": true,
-      "strip": true
+      "strip": true,
+      "colors": {
+        "author": "author",
+        "loop": "loop",
+        "me": "me",
+        "nobody": "nobody",
+        "reviewer": "reviewer"
+      }
     },
     {
       "id": "waits-on",
       "label": "Waits on (person)",
       "provider": "github",
-      "group": false,
+      "group": true,
       "match": "team",
-      "menu": true
+      "menu": true,
+      "show": "who"
     },
     {
       "id": "kind",
@@ -218,7 +235,8 @@
         "round_pending": "round soon",
         "to_address": "to address"
       },
-      "menu": true
+      "menu": true,
+      "show": "kind"
     },
     {
       "id": "type",
@@ -227,7 +245,8 @@
       "group": true,
       "sort": "text",
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "risk",
@@ -241,7 +260,9 @@
         "low"
       ],
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta",
+      "label_prefix": "risk "
     },
     {
       "id": "size",
@@ -264,7 +285,8 @@
         "xs": "XS"
       },
       "empty": "no brief",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "status",
@@ -273,7 +295,8 @@
       "group": true,
       "sort": "text",
       "empty": "no workspace",
-      "menu": true
+      "menu": true,
+      "show": "aside"
     },
     {
       "id": "tag",
@@ -281,14 +304,34 @@
       "provider": "github",
       "group": false,
       "match": "prefix",
-      "menu": true
+      "menu": true,
+      "show": "meta"
     },
     {
       "id": "is",
       "label": "Flags",
       "provider": "github",
       "group": false,
-      "menu": true
+      "labels": {
+        "adopted": "adopted",
+        "approved": "approved",
+        "due": "due",
+        "in-loop": "in loop",
+        "muted": "muted",
+        "needs-me": "needs me",
+        "paused": "paused",
+        "stalled": "stalled",
+        "tracked": "tracked"
+      },
+      "menu": true,
+      "show": "flag",
+      "show_only": [
+        "paused",
+        "muted"
+      ],
+      "row_class": {
+        "stalled": "late"
+      }
     },
     {
       "id": "ci",
@@ -405,7 +448,8 @@
           "label": "over 4 weeks",
           "within": ""
         }
-      ]
+      ],
+      "show": "age"
     },
     {
       "id": "lane",
@@ -679,6 +723,14 @@
       "field": "profile_chain",
       "label": "Review profile",
       "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+    }
+  ],
+  "lens": [
+    {
+      "provider": "github",
+      "words": {
+        "col_aside": "Workspace"
+      }
     }
   ]
 }

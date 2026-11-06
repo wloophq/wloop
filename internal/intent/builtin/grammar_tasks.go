@@ -33,6 +33,8 @@ var tasksGrammar = []Key{
 	{Path: "owed_by.expr", In: SurfaceTasks, Kind: KindText, Doc: "An expression over the task's facts whose value, me or a person's key, is task.owed_by."},
 	{Path: "chat", In: SurfaceTasks, Kind: KindTable, Doc: "The chat on a task."},
 	{Path: "chat.intent", In: SurfaceTasks, Kind: KindText, Doc: "The intent of the turn a message starts on a task with no live session."},
+	{Path: "attribution", In: SurfaceTasks, Kind: KindTable, Doc: "How the task's page names who made a change."},
+	{Path: "attribution.via_session", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change an agent made for you through a session you drove; {session} is the session's id."},
 	{Path: "areas", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The areas a task may be in, the values of the area property."},
 	{Path: "contexts", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The contexts the menu offers; a task may hold others."},
 	{Path: "stale_waiting_days", In: SurfaceTasks, Kind: KindInt, Doc: "Working days a task waits before it is stale."},

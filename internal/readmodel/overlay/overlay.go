@@ -46,8 +46,9 @@ type Turn struct {
 	Role           string
 	State, Summary string
 	// At is when the turn reached its state; AnsweredAt is when an answer
-	// was typed or resumed after its last record, zero without one.
-	At, AnsweredAt time.Time
+	// was typed or resumed after its last record, and QueuedAt when one was
+	// queued for its busy session; zero without one.
+	At, AnsweredAt, QueuedAt time.Time
 }
 
 // Situation is the situation t decides while its session waits or not;
@@ -64,6 +65,9 @@ func (t Turn) Situation(sessionWaiting bool) (Situation, bool) {
 	case "asked":
 		if t.AnsweredAt.After(t.At) {
 			return at(KindLoopWorking, "your answer was sent")
+		}
+		if t.QueuedAt.After(t.At) {
+			return at(KindLoopWorking, "your answer is queued until the agent's session is free")
 		}
 		return at(KindLoopWaiting, t.Summary)
 	case "failed":

@@ -4,7 +4,7 @@
 // views; REVIEW_TITLE is its title.
 const REVIEW = "review";
 const REVIEW_TITLE = "Review";
-const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
+const tasksState = { catalog: null, catalogError: "", key: "", page: null, units: [], tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
   return (cat && cat.views) || [];
@@ -60,49 +60,56 @@ function railSections(nav, name) {
   return out.filter((sec) => sec.views.length);
 }
 
-// tasksURL lists view, narrowed to area.
-function tasksURL(view, area, ctx, since) {
+// tasksURL lists view, narrowed to area; a page since a position also
+// holds the tasks of units, as provider:key.
+function tasksURL(view, area, ctx, since, units) {
   const p = new URLSearchParams({ view });
   if (area) p.set("area", area);
   if (ctx && ctx.length) p.set("context", ctx.join(","));
   if (since) p.set("since", since);
+  for (const u of (since && units) || []) p.append("units", u);
   return "/api/tasks?" + p.toString();
 }
 
 // FILTER_COUNT_DELAY_MS lets a burst of keystrokes ask for the counts once.
 const FILTER_COUNT_DELAY_MS = 250;
 
-// countersURL counts area, every area when "", narrowed to the tasks
-// holding each of ts.
-function countersURL(area, ts) {
+// countersURL counts area, every area when "", narrowed to the tasks the
+// lens query q keeps.
+function countersURL(area, q) {
   const p = new URLSearchParams();
   if (area) p.set("area", area);
-  for (const t of ts || []) p.append("term", t);
-  const q = p.toString();
-  return "/api/counters" + (q ? "?" + q : "");
+  if (q) p.set("q", q);
+  const query = p.toString();
+  return "/api/counters" + (query ? "?" + query : "");
+}
+
+// filterQuery is the filter as the daemon reads it, qualifiers and all.
+function filterQuery(route) {
+  return String(route.q || "").trim();
 }
 
 // viewCounters are the counts the rail, the area picker and the context
-// chips show: with free words in the filter, those of the tasks it keeps,
+// chips show: with a filter, those of the tasks it keeps,
 // the last read while a newer one is on its way; null before the first.
 function viewCounters(route) {
-  if (!filterTerms(route.q).length) return tasksState.counters;
+  if (!filterQuery(route)) return tasksState.counters;
   const f = tasksState.filtered;
   return f && f.area === (route.area || "") ? f.counters : null;
 }
 
-// filteredKey names the counts of the free words of route in its area.
+// filteredKey names the counts of the filter of route in its area.
 function filteredKey(route) {
-  return [route.area || "", ...filterTerms(route.q)].join("\u0000");
+  return [route.area || "", filterQuery(route)].join("\u0000");
 }
 
-// loadFiltered reads the counters the filter's free words narrow, once
-// the words stop changing for FILTER_COUNT_DELAY_MS; only the latest read
+// loadFiltered reads the counters the filter narrows, once
+// the query stops changing for FILTER_COUNT_DELAY_MS; only the latest read
 // is kept, and a failed one leaves the rail without counts.
 async function loadFiltered(route) {
-  const ts = filterTerms(route.q);
+  const q = filterQuery(route);
   const seq = ++tasksState.filterSeq;
-  if (!ts.length) {
+  if (!q) {
     tasksState.filtered = null;
     return;
   }
@@ -110,7 +117,7 @@ async function loadFiltered(route) {
   if (!tasksState.filtered || tasksState.filtered.key !== key) await new Promise((done) => setTimeout(done, FILTER_COUNT_DELAY_MS));
   if (seq !== tasksState.filterSeq) return;
   try {
-    const c = await getJSON(countersURL(route.area, ts));
+    const c = await getJSON(countersURL(route.area, q));
     if (seq === tasksState.filterSeq) tasksState.filtered = { key, area: route.area || "", counters: c };
   } catch {
     if (seq === tasksState.filterSeq) tasksState.filtered = null;
@@ -151,18 +158,30 @@ function applyTasksPage(key, page) {
 // loadTasks loads the catalog once, then the list of route (the hash's when
 // not given, read once the catalog can resolve it) with its counters, or the
 // counters alone on a plugin view, and the counters the filter narrows.
-async function loadTasks(given) {
-  if (!tasksState.catalog) {
-    try {
-      tasksState.catalog = await getJSON("/api/views");
-      tasksState.catalogError = "";
-    } catch (err) {
-      tasksState.catalogError = err.message;
-      return;
-    }
-  }
+// units are those a change named, whose tasks the next page since the list's
+// position holds.
+async function loadTasks(given, units) {
+  if (units) tasksState.units = [...new Set([...tasksState.units, ...units])];
+  if (!tasksState.catalog && !(await readViews())) return;
   const route = given || readHash();
   await Promise.all([loadTaskList(route), loadFiltered(route)]);
+}
+
+// readViews reads the catalog of the task views; false when it failed.
+async function readViews() {
+  try {
+    tasksState.catalog = await getJSON("/api/views");
+    tasksState.catalogError = "";
+    return true;
+  } catch (err) {
+    tasksState.catalogError = err.message;
+    return false;
+  }
+}
+
+// forgetTasksPage makes the next list read whole.
+function forgetTasksPage() {
+  tasksState.page = null;
 }
 
 async function loadTaskList(route) {
@@ -178,48 +197,18 @@ async function loadTaskList(route) {
   const key = viewQueryKey(route.view, route.area, route.ctx);
   const cur = tasksState.page;
   const since = tasksState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
+  const units = tasksState.units;
+  let page;
   try {
-    applyTasksPage(key, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
+    page = await getJSON(tasksURL(route.view, route.area, route.ctx, since, units));
+    applyTasksPage(key, page);
+    tasksState.units = tasksState.units.filter((u) => !units.includes(u));
     tasksState.error = "";
   } catch (err) {
     tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
+    return;
   }
-}
-
-
-
-// groupValue reads fact, a task fact such as task.category or task.prop.size, from a task as the wire serves it:
-// its first value when it holds several.
-function groupValue(fact, e) {
-  const name = String(fact || "").replace(/^task\./, "");
-  let v;
-  if (name.startsWith("prop.")) v = (e.props || {})[name.slice(5)];
-  else v = e[name];
-  if (Array.isArray(v)) v = v[0];
-  if (v && typeof v === "object") v = v.name || v.key;
-  return v === undefined || v === null ? "" : String(v);
-}
-
-// viewGroups splits a view's list by the fact its spec groups by; a view
-// that names none is one group. Groups of a state or a category follow the
-// catalog's states, with their labels; others sort by value. The empty
-// value comes last.
-function viewGroups(spec, tasks, cat = tasksState.catalog) {
-  const fact = (spec && spec.group) || "";
-  if (!fact) return [{ key: "", label: "", tasks }];
-  const states = (cat && cat.states) || [];
-  const name = fact.replace(/^task\./, "");
-  const order = name === "state" ? states.map((s) => s.name) : name === "category" ? [...new Set(states.map((s) => s.category))] : [];
-  const label = (k) => (!k ? "None" : name === "state" ? stateLabel(k) : k);
-  const groups = new Map();
-  for (const e of tasks) {
-    const k = groupValue(fact, e);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(e);
-  }
-  const rank = (k) => (order.includes(k) ? order.indexOf(k) : order.length);
-  return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || rank(a) - rank(b) || a.localeCompare(b))
-    .map((k) => ({ key: k, label: label(k), tasks: groups.get(k) }));
+  if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
 function unitLabel(u) {
@@ -248,35 +237,49 @@ function starred(e) {
   return !!p && (p.values || []).length > 0 && (e.props || {})[p.name] === p.values[0];
 }
 
-function taskItem(e, open) {
-  const go = () => writeHash({ task: e.id, pr: "" });
-  const owed = e.owed_by && e.owed_by !== "me" ? e.owed_by : "";
-  return h("li", {
-    class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
-    tabindex: 0,
-    "data-focus": "task:" + e.id,
-    "aria-selected": e.id === open ? "true" : "false",
-    onclick: go,
-    onkeydown: (ev) => {
-      if ((ev.key === "Enter" || ev.key === " ") && ev.target === ev.currentTarget) {
-        ev.preventDefault();
-        go();
-      }
-    },
-  },
-    h("div", { class: "task-line" },
-      starred(e) ? h("span", { class: "star", title: "Starred" }, "★") : null,
-      h("span", { class: "title" }, e.title || e.id),
-      e.changed ? h("span", { class: "flag" }, "changed") : null),
-    h("div", { class: "meta" },
-      ...(roleValue(e, "contexts") || []).map((c) => h("span", { class: "pill" }, c)),
-      roleValue(e, "area") ? h("span", { class: "pill area" }, roleValue(e, "area")) : null,
-      roleValue(e, "deadline") ? h("span", { class: "due" }, "due " + shortDate(roleValue(e, "deadline"))) : null,
-      e.wake && e.wake.until ? h("span", { class: "due" }, "until " + shortDate(e.wake.until)) : null,
-      owed ? h("span", { class: "who" }, "on " + owed) : null,
-      e.extraction_lag ? h("span", { class: "due", title: "The oldest message on its links not yet read by the extraction" }, "unread " + shortLag(e.extraction_lag)) : null,
-      ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
-    projectFacts(e));
+// taskModel is a task as the row renderer lays it out: its facets placed by the profile's task specs, then
+// what no facet carries. A draft's own task shows its draft under its title and opens from its title alone.
+function taskModel(e, open, copy, lens) {
+  const w = lens.words || {};
+  const item = { facets: e.facets || {} };
+  const parts = rowParts(item, lens.specs, w);
+  const strip = stripOf(item, lens.specs);
+  const draft = isDraftTask(e);
+  const due = roleValue(e, "deadline");
+  const scope = taskSlot(e.id, copy);
+  return {
+    key: e.id, scope, item, parts, words: w, selected: e.id === open,
+    open: draft ? null : () => writeHash({ task: e.id, pr: "" }),
+    href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
+    title: e.title || e.id,
+    pre: starred(e) ? h("span", { class: "star", title: w.starred }, "★ ") : null,
+    ref: (e.units || []).map((u, i) => whereRef((e.unit_labels || [])[i] || unitLabel(u), item, lens, scope, w)),
+    flags: [
+      e.changed ? h("span", { class: "flag" }, w.changed) : null,
+      due ? h("span", { class: "flag due" }, fillWord(w.due, { date: shortDate(due) })) : null,
+      e.wake && e.wake.until ? h("span", { class: "flag due" }, fillWord(w.until, { date: shortDate(e.wake.until) })) : null,
+      e.extraction_lag ? h("span", { class: "flag due", title: w.unread_title }, fillWord(w.unread, { lag: shortLag(e.extraction_lag) })) : null],
+    after: [projectFacts(e, w), draft ? draftCard(e, "outbox") : null],
+    lead: stripDot(strip, lens, scope, w),
+    why: e.reason || "",
+    cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
+  };
+}
+
+// whereRef is a unit's label on a task's row, a button that filters by the where value it names when the task
+// holds one: the longest the label ends with, or holds after its owner, as "#chan" or "owner/repo#7" do.
+function whereRef(label, item, lens, scope, w) {
+  const named = ((item.facets || {}).where || []).filter((v) => v && (label.endsWith(v) || label.includes(v + "#")))
+    .sort((a, b) => b.length - a.length)[0];
+  const text = h("span", { class: "unit" }, marked(label, lens.ts));
+  return named ? facet(lens, "where", named, text, `facet:${scope}:where:${named}`, { words: w, rove: true }) : text;
+}
+
+// taskTable is a table of the lens's groups of tasks, its columns those some task of all has a piece for.
+function taskTable(res, lens, open, all) {
+  const model = (it, copy) => taskModel(it.task, open, copy, lens);
+  const cols = rowColumns(all.map((it) => model(it, "")));
+  return h("table", { class: "task-table" }, rowHead(cols, lens, ""), ...rowTable(res, model, lens, cols));
 }
 
 // shortLag reads a Go duration as its largest unit: 2h, 12m, 30s.
@@ -296,17 +299,17 @@ function everyLabel(d) {
   return hours % 24 === 0 ? `${hours / 24}d` : `${hours}h`;
 }
 
-// projectFacts are a project's open children and review.
-function projectFacts(e) {
+// projectFacts are a project's open children and review, in the row words w.
+function projectFacts(e, w) {
   if ((e.props || {}).kind !== "project") return null;
   const open = (e.children || []).length;
   return h("div", { class: "meta project-facts" },
-    e.review_due ? h("span", { class: "flag" }, "review due") : null,
-    open ? null : h("span", { class: "pill" }, "no next action"),
-    h("span", { class: "pill" }, `${open} open`),
-    e.sequential ? h("span", { class: "pill" }, "sequential") : null,
-    e.review_every ? h("span", { class: "who" }, "every " + everyLabel(e.review_every)) : null,
-    e.reviewed_at ? h("span", { class: "who" }, "reviewed " + localDate(e.reviewed_at)) : null);
+    e.review_due ? h("span", { class: "flag" }, w.review_due) : null,
+    open ? null : h("span", { class: "pill" }, w.no_next_action),
+    h("span", { class: "pill" }, fillWord(w.open_children, { n: open })),
+    e.sequential ? h("span", { class: "pill" }, w.sequential) : null,
+    e.review_every ? h("span", { class: "who" }, fillWord(w.every, { every: everyLabel(e.review_every) })) : null,
+    e.reviewed_at ? h("span", { class: "who" }, fillWord(w.reviewed, { date: localDate(e.reviewed_at) })) : null);
 }
 
 // localDate is an instant's day where the browser is, unlike shortDate's UTC day for deadlines.
@@ -333,15 +336,18 @@ function isDraftTask(e) {
   return !!d && e.id === "draft:" + d.id;
 }
 
-// listItem is a task's row: a draft's own task shows the draft to approve.
-function listItem(e, open) {
-  return isDraftTask(e) ? outboxItem(e, open) : taskItem(e, open);
+// taskSlot is the focus slot of a task's row, or of one of its copies.
+function taskSlot(id, copy) {
+  return copy ? `task:${id}@${copy}` : `task:${id}`;
 }
 
-function outboxItem(e, open) {
-  return h("li", { class: "task-row outbox" + (e.id === open ? " sel" : ""), "data-focus": "task:" + e.id, tabindex: 0 },
-    h("div", { class: "task-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
-    draftOf(e) ? draftCard(e, "outbox") : null);
+// nextTaskNode is the task row delta rows from the focused one among nodes, else from the open task's first
+// copy, else the first.
+function nextTaskNode(nodes, active, openID, delta) {
+  if (!nodes.length) return null;
+  let at = nodes.indexOf(active);
+  if (at < 0 && openID) at = nodes.findIndex((n) => n.dataset.focus === taskSlot(openID) || n.dataset.focus.startsWith(taskSlot(openID) + "@"));
+  return nodes[Math.max(0, Math.min(nodes.length - 1, at < 0 ? 0 : at + delta))];
 }
 
 function viewHash(change) {
@@ -374,7 +380,7 @@ function contextChips(route) {
 
 // taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
 // (api.TaskView.Texts): its title, notes, state, the text and the lists of text of its properties, its units,
-// who owes it, its asks, its cards' people, its draft and its message.
+// who owes it, its asks, its cards' people, its draft, its message and its facets' values, by facet id.
 function taskHaystack(e) {
   const d = draftOf(e) || {};
   const m = messageOf(e) || {};
@@ -384,74 +390,68 @@ function taskHaystack(e) {
     e.owed_by || "",
     ...(e.asks || []).flatMap((a) => [a.summary, a.asker]),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
-    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => foldText(x));
+    d.target, d.where, d.text, d.reaction, d.unit, m.text,
+    ...Object.keys(e.facets || {}).sort().flatMap((id) => e.facets[id])].map((x) => fold(x));
 }
 
-// FOLD_ACCENTS are the accents api.Fold folds; foldText folds as api.Fold does, so the daemon's counts
-// match what the list shows.
-const FOLD_ACCENTS = {
-  á: "a", à: "a", â: "a", ã: "a", ä: "a", é: "e", è: "e", ê: "e", ë: "e", í: "i", ì: "i", î: "i", ï: "i",
-  ó: "o", ò: "o", ô: "o", õ: "o", ö: "o", ú: "u", ù: "u", û: "u", ü: "u", ç: "c", ñ: "n",
-};
+const taskItems = new WeakMap();
 
-function foldText(s) {
-  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => FOLD_ACCENTS[c]).replace(/\p{Mn}/gu, "");
+// taskItemOf is e as the lens reads an item: its facets and the texts the daemon's counters search.
+function taskItemOf(e) {
+  let it = taskItems.get(e);
+  if (!it) taskItems.set(e, (it = { task: e, facets: e.facets || {}, texts: taskHaystack(e) }));
+  return it;
 }
 
-// filterTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
-// daemon reads them.
-function filterTerms(q) {
-  const qualifier = typeof qualifierOf === "function" ? qualifierOf : () => null;
-  return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).filter((t) => !qualifier(t))
-    .map((t) => foldText(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
+// taskLensItems are the loaded tasks as the lens's items, in the daemon's order.
+function taskLensItems() {
+  return tasksState.tasks.map(taskItemOf);
 }
 
-// taskMatches says whether every free word of ts is in e.
-function taskMatches(e, ts) {
-  if (!ts.length) return true;
-  const hay = taskHaystack(e);
-  return ts.every((t) => hay.some((f) => f.includes(t)));
-}
-
-// taskList is the list of a core view; its heading counts what the filter
-// shows of the view, as a pull request list's bar does.
-function taskList(route, open) {
+// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads
+// or for a list of gates), and its body. The lens counts what the filter shows of the view, as a pull
+// request list's bar does.
+function viewPage(route, open) {
   const label = viewLabel(route.view);
   const loaded = tasksState.key === viewQueryKey(route.view, route.area, route.ctx);
-  const ts = filterTerms(route.q);
-  const shown = loaded ? tasksState.tasks.filter((e) => taskMatches(e, ts)) : [];
   const spec = viewSpec(route.view);
   const n = loaded ? tasksState.tasks.length : 0;
-  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
-    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null,
+  const head = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     spec && spec.remove_clean ? h("button", {
       type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
       title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
       onclick: () => removeAllClean(n, route.view),
     }, "Remove all clean") : null), viewIntro(spec)];
-  if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
-  if (loaded) parts.push(...loadingNotes(tasksState.loading));
+  const page = { head, lens: lensOf(route), res: null, body: [] };
+  const body = page.body;
+  if (tasksState.error) body.push(h("p", { class: "plan-error" }, tasksState.error));
+  if (loaded) body.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
-    parts.push(h("p", { class: "empty" }, "Loading."));
-    return parts;
+    body.push(h("p", { class: "empty" }, "Loading."));
+    return page;
   }
   if (spec && spec.over === "gates") {
-    parts.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, spec.empty));
-    return parts;
+    body.push(tasksState.gates.length ? h("div", { class: "gate-list" }, ...tasksState.gates.map((g) => gateCard(taskById(g.task), g))) : h("p", { class: "empty" }, spec.empty));
+    return page;
   }
+  page.res = pipelineOf(taskLensItems(), page.lens, null);
   if (!tasksState.tasks.length) {
-    parts.push(h("p", { class: "empty" }, spec && spec.empty));
-    return parts;
+    body.push(h("p", { class: "empty" }, spec && spec.empty));
+    return page;
   }
-  if (!shown.length) {
-    parts.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
-    return parts;
+  if (!page.res.shown) {
+    body.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
+    return page;
   }
-  for (const g of viewGroups(spec, shown)) {
-    if (g.label) parts.push(h("h3", { class: "plan-head" }, `${g.label} (${g.tasks.length})`));
-    parts.push(h("ol", { class: "task-list" }, ...g.tasks.map((e) => listItem(e, open))));
-  }
-  return parts;
+  if (page.lens.layout === "board") body.push(taskBoard(page.res, page.lens, open));
+  else body.push(taskTable(page.res, page.lens, open, taskLensItems()));
+  return page;
+}
+
+// taskBoard is a lane per group of the lens, each holding its tasks' cards.
+function taskBoard(res, lens, open) {
+  return h("div", { class: "board task-board" }, ...res.groups.filter((g) => g.rows.length)
+    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => rowCard(taskModel(it.task, open, copy, lens), lens))));
 }
 
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.
@@ -527,13 +527,34 @@ async function removeAllClean(n, view) {
 
 function renderTasks(route) {
   const box = document.getElementById("tasks");
+  const head = document.getElementById("tasks-head");
+  const tools = document.getElementById("task-tools");
+  const body = document.getElementById("tasks-body");
   const on = isCoreView(route.view);
   box.hidden = !on;
   if (route.view !== REVIEW) reviewState.step = "";
-  if (!on) {
-    box.replaceChildren();
+  if (!on || route.view === REVIEW) {
+    head.replaceChildren();
+    hideLens(tools);
+    body.replaceChildren(...(on ? reviewPanel(route.task) : []));
+    if (on) box.setAttribute("aria-label", REVIEW_TITLE);
     return;
   }
-  box.setAttribute("aria-label", route.view === REVIEW ? REVIEW_TITLE : viewLabel(route.view));
-  box.replaceChildren(...(route.view === REVIEW ? reviewPanel(route.task) : taskList(route, route.task)));
+  box.setAttribute("aria-label", viewLabel(route.view));
+  const page = viewPage(route, route.task);
+  head.replaceChildren(...page.head);
+  if (page.res) renderLens(page.lens, page.res, tools);
+  else hideLens(tools);
+  replaceKeepingScroll(body, page.body, [route.view, route.q, route.g, route.s, route.layout].join("\n"));
+}
+
+// replaceKeepingScroll replaces body's children and, while the page is the same, keeps where its board was
+// scrolled: a refresh builds a new board, which would start at its origin.
+function replaceKeepingScroll(body, children, page) {
+  const old = body.querySelector(":scope > .board");
+  const at = old && body.dataset.page === page ? [old.scrollLeft, old.scrollTop] : null;
+  body.replaceChildren(...children);
+  body.dataset.page = page;
+  const board = body.querySelector(":scope > .board");
+  if (at && board) [board.scrollLeft, board.scrollTop] = at;
 }

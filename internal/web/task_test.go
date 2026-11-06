@@ -221,7 +221,7 @@ done({
 	if !slices.Equal(got.Keyed, []string{"/api/gates/7/skip"}) || !strings.HasPrefix(got.Empty, "! Answer") {
 		t.Errorf("digits posted %v, then said %q", got.Keyed, got.Empty)
 	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"guidance": "Take the timeout case first"}}}}
+	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "Take the timeout case first"}}}}
 	if mustJS(t, got.Clicked) != mustJS(t, want) {
 		t.Errorf("answering posted %v, want %v", got.Clicked, want)
 	}
@@ -281,8 +281,8 @@ const chips = walk(cls(box, "kinds")[0], (x) => x.tag === "button").map((b) => b
 await focus(box, "timeline:kind:message").on.click();
 box = await page("t-0123456789abcdef");
 done({ Before: before, After: said(box), Chips: chips, Asked: asked.slice(-1)[0] });`, answers, &got)
-	if len(got.Before) != 3 || !strings.Contains(got.Before[0], "Take the timeout case first.") || !strings.Contains(got.Before[2], "ready for review") {
-		t.Errorf("the chat, oldest first: %q", got.Before)
+	if len(got.Before) != 3 || !strings.Contains(got.Before[0], "ready for review") || !strings.Contains(got.Before[2], "Take the timeout case first.") {
+		t.Errorf("the timeline, newest first: %q", got.Before)
 	}
 	if !slices.Equal(got.Chips, []string{"all", "message", "verb"}) {
 		t.Errorf("kind chips %v", got.Chips)
@@ -332,39 +332,7 @@ done({
 // bundledViewIDs are the bundled profile's view ids, which no client logic may name.
 var bundledViewIDs = []string{"inbox", "needs-me", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
 
-func TestGroupingReadsCategoryNotStateNames(t *testing.T) {
-	tasks := []api.TaskView{
-		task("t-1", "shipped", func(e *api.TaskView) { e.Category = "done" }),
-		task("t-2", "later", func(e *api.TaskView) { e.Category = "deferred" }),
-		task("t-3", "doing", func(e *api.TaskView) { e.Category = "active" }),
-		task("t-4", "parked", func(e *api.TaskView) { e.Category = "deferred" }),
-		task("t-5", "triage", func(e *api.TaskView) { e.Category = "inbox" }),
-		task("t-6", "doing", func(e *api.TaskView) {
-			e.Category = "active"
-			e.Props = map[string]json.RawMessage{"size": json.RawMessage(`"l"`)}
-		}),
-	}
-	type group struct {
-		Label string   `json:"label"`
-		IDs   []string `json:"ids"`
-	}
-	var got map[string][]group
-	answers := map[string]any{"tasks": tasks}
-	nodeRun(t, cockpitScript(t)+taskPageHarness, nil, `
-const g = (group) => viewGroups({ id: "any", group }, input.answers.tasks).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
-done({ category: g("task.category"), state: g("task.state"), size: g("task.prop.size"), none: g("") });`,
-		map[string]any{"catalog": taskCatalog(), "answers": answers}, &got)
-	want := map[string][]group{
-		"category": {{"inbox", []string{"t-5"}}, {"active", []string{"t-3", "t-6"}}, {"deferred", []string{"t-2", "t-4"}}, {"done", []string{"t-1"}}},
-		"state":    {{"To sort", []string{"t-5"}}, {"Doing", []string{"t-3", "t-6"}}, {"Parked", []string{"t-4"}}, {"Later", []string{"t-2"}}, {"Shipped", []string{"t-1"}}},
-		"size":     {{"l", []string{"t-6"}}, {"None", []string{"t-1", "t-2", "t-3", "t-4", "t-5"}}},
-		"none":     {{"", []string{"t-1", "t-2", "t-3", "t-4", "t-5", "t-6"}}},
-	}
-	for k, w := range want {
-		if !slices.EqualFunc(got[k], w, func(a, b group) bool { return a.Label == b.Label && slices.Equal(a.IDs, b.IDs) }) {
-			t.Errorf("by %s: %+v, want %+v", k, got[k], w)
-		}
-	}
+func TestTaskScriptsNameNoViewAsLogic(t *testing.T) {
 	ids := strings.Join(bundledViewIDs, "|")
 	logic := regexp.MustCompile(`[!=]==?\s*"(` + ids + `)"|"(` + ids + `)"\s*[!=]==?|\(\s*"(` + ids + `)"\s*[,)]|[\[,]\s*"(` + ids + `)"\s*[,\]]|case\s+"(` + ids + `)"`)
 	for _, f := range []string{"views.js", "review.js", "keys.js", "task.js"} {
@@ -395,8 +363,8 @@ reviewEnv.notice = () => {}; reviewEnv.render = () => {}; reviewEnv.focusStep = 
   const route = { view: REVIEW, area: "", ctx: [], q: "", task: "" };
   await loadTasks(route);
   renderTasks(route);
-  const panel = document.getElementById("tasks");
-  if (panel.hidden) throw new Error("the review mode is hidden");
+  if (document.getElementById("tasks").hidden) throw new Error("the review mode is hidden");
+  const panel = document.getElementById("tasks-body");
   await reviewKey("done");
   done({ Head: cls(panel, "tasks-head")[0].textContent, Steps: cls(panel, "review-label").map((x) => x.textContent), Gets: gets, Posts: sent,
     Tasks: tasksState.tasks.map((e) => e.id) });
@@ -461,5 +429,32 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 		if mustJS(t, got.Posts) != mustJS(t, want) {
 			t.Errorf("send %s: posts %v, want %v", send, got.Posts, want)
 		}
+	}
+}
+
+// TestAQuestionGateOffersItsOptions checks that a question gate whose message offers options shows one button
+// per option, the recommended first, and that picking one answers with the option and the note typed beside it.
+func TestAQuestionGateOffersItsOptions(t *testing.T) {
+	var got struct {
+		Buttons []string
+		Clicked []any
+	}
+	in := pageAnswers(t)
+	e := pageTask(t)
+	e.Gates[1].Subject = json.RawMessage(`{"kind": "question", "text": "Approve it?", "recommend": "approve",
+		"options": [{"id": "threads", "label": "Resolve the threads"}, {"id": "approve", "label": "Approve", "consequence": "Publishes APPROVE"}]}`)
+	in["/api/tasks/"+e.ID] = e
+	runTaskPage(t, `
+const box = await page("t-0123456789abcdef");
+const gate = cls(box, "d-gate")[1];
+focus(box, "gate:9:text").on.input({ target: { value: "ship it" } });
+await focus(box, "gate:9:option:approve").on.click();
+done({ Buttons: walk(gate, (x) => x.tag === "button").map((b) => b.textContent), Clicked: posts });`, in, &got)
+	if want := []string{"Approve recommended", "Resolve the threads", "1 Answer", "2 Dismiss"}; !slices.Equal(got.Buttons, want) {
+		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
+	}
+	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "approve\nship it"}}}}
+	if mustJS(t, got.Clicked) != mustJS(t, want) {
+		t.Errorf("picking an option posted %v, want %v", got.Clicked, want)
 	}
 }

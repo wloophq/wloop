@@ -91,13 +91,15 @@ type Service struct {
 func New(d Deps) *Service {
 	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[string]viewSource{}, authority: d.Authority}
 	if s.authority == nil {
-		s.authority = personOnly
+		s.authority = userOnly
 	}
 	return s
 }
 
-func personOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, bool, error) {
-	return a == task.ActorPerson, false, nil
+// userOnly lets the user run every verb: a person, or an agent, which reaches the service only through a session
+// the user drives.
+func userOnly(_ context.Context, _ string, a task.Actor, _ task.Task) (bool, bool, error) {
+	return a == task.ActorPerson || a == task.ActorAgent, false, nil
 }
 
 func (s *Service) now() time.Time { return s.d.Clock.Now() }
@@ -142,19 +144,19 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 			return r, nil
 		}
 	}
-	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor)
+	s.settle(ctx, []task.Task{next}, req.Verb, req.Actor, req.Session)
 	return r, nil
 }
 
 // settle hands Ending each of es that ended, by verb v of by, or by no verb when v is empty; it runs with the
 // lock released, since settling a draft or a gate can reach back into the service.
-func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor) {
+func (s *Service) settle(ctx context.Context, es []task.Task, v task.Verb, by task.Actor, session string) {
 	if s.d.Ending == nil {
 		return
 	}
 	for _, e := range es {
 		if !e.Open() {
-			s.d.Ending.Ended(ctx, e, v, by)
+			s.d.Ending.Ended(ctx, e, v, by, session)
 		}
 	}
 }
@@ -465,19 +467,20 @@ func (s *Service) RecordVerb(ctx context.Context, e task.Task, req Request) erro
 	return s.d.Store.Apply(ctx, nil, evs...)
 }
 
-// verbEvents are the event of req's verb on e: its actor as "<actor>:<source>", and as data the state it left
-// with req's chain. None for a verb whose handler is seen, which clients send on their own.
+// verbEvents are the event of req's verb on e: its actor as "<actor>:<source>" and the session an agent ran it
+// through, and as data the state it left with req's chain. None for a verb whose handler is seen, which clients send on their own.
 func (s *Service) verbEvents(e task.Task, req Request, now time.Time) []port.Event {
 	if s.d.States.Handler(string(req.Verb)) == handlerSeen {
 		return nil
 	}
 	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: task.VerbEventKind(req.Verb), Actor: string(req.Actor) + ":" + req.Source,
-		Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
+		Session: req.Session, Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
 }
 
-// heldOpen refuses, with ErrVerb, a verb anyone but a person runs that would end e while a gate holds it.
+// heldOpen refuses, with ErrVerb, a verb anyone but the user, a person or an agent through a session they drive,
+// runs that would end e while a gate holds it.
 func (s *Service) heldOpen(ctx context.Context, e task.Task, req Request) error {
-	if req.Actor == task.ActorPerson || !e.Open() || !s.ends(req.Verb) {
+	if req.Actor == task.ActorPerson || req.Actor == task.ActorAgent && req.Session != "" || !e.Open() || !s.ends(req.Verb) {
 		return nil
 	}
 	if held, err := s.holds(ctx, e.ID); err != nil || !held {
@@ -750,7 +753,7 @@ func (p *pending) changes() []task.Change {
 // keeps its tasks as they are.
 func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	ended, err := s.sync(ctx, units)
-	s.settle(ctx, ended, "", task.ActorPlugin)
+	s.settle(ctx, ended, "", task.ActorPlugin, "")
 	return err
 }
 
@@ -799,7 +802,7 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 				roused = append(roused, e.ID)
 			}
 		}
-		for _, c := range task.Activity(f, p.of(have, u), now) {
+		for _, c := range task.Activity(f, its, s.d.Me, p.of(have, u), now) {
 			p.put(c)
 		}
 	}
@@ -959,7 +962,7 @@ func (s *Service) UnitClosed(ctx context.Context, u unit.Unit) error {
 	if err != nil {
 		return err
 	}
-	s.settle(ctx, ended, "", task.ActorPlugin)
+	s.settle(ctx, ended, "", task.ActorPlugin, "")
 	return nil
 }
 

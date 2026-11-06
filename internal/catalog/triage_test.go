@@ -102,7 +102,7 @@ func TestBlockedByMeGroupsByWhoAsked(t *testing.T) {
 			t.Errorf("%s: in blocked-by-me %v, want %v", name, got, c.want)
 		}
 	}
-	if g := viewDef(t, l, "blocked-by-me").Group; g != "task.askers" {
+	if g := viewDef(t, l, "blocked-by-me").Group; g != "task.asker_names" {
 		t.Errorf("blocked-by-me groups by %q, want by who asked", g)
 	}
 }

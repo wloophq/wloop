@@ -94,9 +94,6 @@
       "lane": [
         "loop"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "low"
       ],
@@ -115,6 +112,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "muted",
@@ -185,7 +185,13 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "d989fdf6b655",
+    "search": [
+      "REVIEW batch",
+      "reviewing",
+      "r2 held",
+      "Export in batches"
+    ],
+    "specs_version": "9373394a48af",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -231,9 +237,6 @@
       "lane": [
         "author"
       ],
-      "repo": [
-        "acme/api"
-      ],
       "risk": [
         "none"
       ],
@@ -251,6 +254,9 @@
       ],
       "wait": [
         "nobody"
+      ],
+      "where": [
+        "acme/api"
       ]
     },
     "kind": "done",
@@ -287,7 +293,7 @@
         "status": ""
       }
     },
-    "specs_version": "d989fdf6b655",
+    "specs_version": "9373394a48af",
     "summary": {
       "closed": true,
       "line": "merged",

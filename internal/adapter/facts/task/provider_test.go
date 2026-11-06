@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -50,16 +51,16 @@ type clock struct{ now time.Time }
 func (c *clock) Now() time.Time { return c.now }
 
 type env struct {
-	t        *testing.T
-	db       *sqlite.DB
-	clock    *clock
-	p        *facttask.Provider
-	s        facttask.Settings
-	ended    map[unit.Unit]bool
-	turns    map[unit.Unit]int
-	repos    map[unit.Unit]string
-	sessions []turn.Session
-	links    map[unit.Unit]facttask.Link
+	t     *testing.T
+	db    *sqlite.DB
+	clock *clock
+	p     *facttask.Provider
+	s     facttask.Settings
+	ended map[unit.Unit]bool
+	turns map[unit.Unit]int
+	repos map[unit.Unit]string
+	open  map[unit.Unit][]turn.Turn
+	links map[unit.Unit]facttask.Link
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -156,14 +157,18 @@ func newEnv(t *testing.T) *env {
 			}
 			return out, nil
 		},
-		Repo:     func(_ context.Context, u unit.Unit) (string, error) { return e.repos[u], nil },
-		Gates:    countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
-		Sessions: func(context.Context) ([]turn.Session, error) { e.reads["sessions"]++; return e.sessions, nil },
-		Clock:    e.clock,
-		Props:    func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
-		Me:       func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
-		OwedBy:   catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
-		Wakes:    countingWakes{db.Wakes(), e},
+		Placement: func(_ context.Context, u unit.Unit) (string, error) {
+			e.reads["repo of "+u.String()]++
+			return e.repos[u], nil
+		},
+		Gates:     countingGates{db.Gates(func() time.Time { return e.clock.now }), e},
+		OpenTurns: func(context.Context) (map[unit.Unit][]turn.Turn, error) { e.reads["open turns"]++; return e.open, nil },
+		Chat:      func() turn.Intent { return "chat" },
+		Clock:     e.clock,
+		Props:     func(t task.Task) workflow.Facts { return catalog.PropFacts(t, bundledTasks) },
+		Me:        func() task.Me { return task.Me{Keys: []string{"chat:ME"}} },
+		OwedBy:    catalog.OwedByOf(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }),
+		Wakes:     countingWakes{db.Wakes(), e},
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
 		},
@@ -217,7 +222,7 @@ func (e *env) task(en task.Task) task.Task {
 func (e *env) item(u unit.Unit, id string, s items.State, created time.Time, waitingOn ...items.Person) items.Item {
 	e.t.Helper()
 	it := items.Item{ID: id, Unit: u, Kind: items.Request, Summary: "s " + id, Origin: unit.Anchor{Unit: u, Ref: "m:" + id},
-		Requester: items.Person{Key: "chat:U9"}, Basis: items.NoBasis, State: s, Confidence: items.High,
+		Requester: items.Person{Key: "chat:U9", Name: "Uma Nove"}, Basis: items.NoBasis, State: s, Confidence: items.High,
 		Provenance: items.Extracted, WaitingOn: waitingOn, CreatedAt: created, UpdatedAt: created}
 	if s == items.Resolved {
 		it.Resolution = items.Done
@@ -269,6 +274,15 @@ func TestTaskListsTheOpenTasksOfEnabledPlugins(t *testing.T) {
 			t.Errorf("facts of %s: %v, want ErrUnitGone", id, err)
 		}
 	}
+}
+
+func TestTaskFactsFollowTheUnitsContract(t *testing.T) {
+	t.Parallel()
+	automationtest.RunUnits(t, unit.Task, func(t *testing.T) automation.Units {
+		e := newEnv(t)
+		e.task(waiting("t-01", chatA, monday))
+		return e.p
+	})
 }
 
 func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
@@ -372,6 +386,9 @@ func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
 	theirs := e.item(chatA, "i1", items.Open, friday, items.Person{Key: "chat:U1"})
 	e.task(waiting("t-01", chatA, monday, theirs))
 	f := e.facts("t-01")
+	if f["task.turn"] != "others" {
+		t.Errorf("a task another person owes is %v's turn, want others", f["task.turn"])
+	}
 	if f["task.owed_by"] != "chat:U1" || !equal(f["task.owed_since"], friday) || !equal(f["task.check_on"], time.Date(2026, 3, 3, 9, 0, 0, 0, brt)) {
 		t.Errorf("owed by %v since %v, check on %v; want chat:U1 since friday, check on tuesday", f["task.owed_by"], f["task.owed_since"], f["task.check_on"])
 	}
@@ -390,8 +407,13 @@ func TestTheOwedFactsFollowWhoOwesTheTask(t *testing.T) {
 	}
 	mine := e.item(chatB, "i2", items.Open, friday, items.Person{Key: "chat:ME"})
 	e.task(task.Task{ID: "t-03", State: "next", Category: task.CategoryReady, Title: "m", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: mine.ID}}})
-	if f := e.facts("t-03"); f["task.owed_by"] != "me" || !equal(f["task.check_on"], time.Time{}) {
+	if f := e.facts("t-03"); f["task.owed_by"] != "me" || f["task.turn"] != "me" || !equal(f["task.check_on"], time.Time{}) {
 		t.Errorf("my task: by %v, check on %v", f["task.owed_by"], f["task.check_on"])
+	}
+	quiet := e.item(chatB, "i3", items.Open, friday)
+	e.task(task.Task{ID: "t-04", State: "next", Category: task.CategoryReady, Title: "q", Units: []unit.Unit{chatB}, Items: []task.ItemRef{{Unit: chatB, Item: quiet.ID}}})
+	if f := e.facts("t-04"); f["task.owed_by"] != "" || f["task.turn"] != "nobody" {
+		t.Errorf("a task whose items wait on no one: by %v, turn %v; want nobody's", f["task.owed_by"], f["task.turn"])
 	}
 }
 
@@ -558,21 +580,56 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	}
 }
 
-func TestTaskRepoIsTheFirstRepositoryOfItsUnits(t *testing.T) {
+func TestTaskPlacementIsTheFirstRepositoryOfItsUnits(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	e.task(task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "none"})
 	e.task(task.Task{ID: "t-02", State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
 	e.repos[chatB] = "acme/api"
-	if f := e.facts("t-01"); f["task.repo"] != "" {
-		t.Errorf("a task with no unit is of %q", f["task.repo"])
+	if f := e.facts("t-01"); f["task.placement"] != "" {
+		t.Errorf("a task with no unit is of %q", f["task.placement"])
 	}
-	if f := e.facts("t-02"); f["task.repo"] != "acme/api" {
-		t.Errorf("task.repo %q, want its second unit's, the first that has one", f["task.repo"])
+	if f := e.facts("t-02"); f["task.placement"] != "acme/api" {
+		t.Errorf("task.placement %q, want its second unit's, the first that has one", f["task.placement"])
 	}
 	e.repos[chatA] = "acme/web"
-	if f := e.facts("t-02"); f["task.repo"] != "acme/web" {
-		t.Errorf("task.repo %q, want its first unit's", f["task.repo"])
+	if f := e.facts("t-02"); f["task.placement"] != "acme/web" {
+		t.Errorf("task.placement %q, want its first unit's", f["task.placement"])
+	}
+}
+
+func TestTaskPlacementIsItsOwnUnitsFirst(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "own"})
+	e.repos[task.UnitOf("t-01")] = "acme/api"
+	if f := e.facts("t-01"); f["task.placement"] != "acme/api" {
+		t.Errorf("task.placement %q, want its own unit's placement", f["task.placement"])
+	}
+	e.task(task.Task{ID: "t-02", State: "next", Category: task.CategoryReady, Title: "both", Units: []unit.Unit{chatA}})
+	e.repos[task.UnitOf("t-02")] = "acme/web"
+	e.repos[chatA] = "acme/api"
+	if f := e.facts("t-02"); f["task.placement"] != "acme/web" {
+		t.Errorf("task.placement %q, want its own unit's before its units'", f["task.placement"])
+	}
+}
+
+func TestMovedAtIsTheLatestMove(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	at := monday.Add(-3 * time.Hour)
+	e.task(task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "m", Units: []unit.Unit{chatA}, Created: at, Updated: at})
+	if f := e.facts("t-01"); !at.Equal(f["task.moved_at"].(time.Time)) {
+		t.Errorf("task.moved_at %v, want the task's update %v", f["task.moved_at"], at)
+	}
+	later := at.Add(time.Hour)
+	e.links[chatA] = facttask.Link{Moved: later}
+	f := e.facts("t-01")
+	if !later.Equal(f["task.moved_at"].(time.Time)) {
+		t.Errorf("task.moved_at %v, want the unit's move %v", f["task.moved_at"], later)
+	}
+	if want := e.clock.now.Sub(later); f["task.since_movement"] != want {
+		t.Errorf("task.since_movement %v, want %v", f["task.since_movement"], want)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -31,6 +32,7 @@ var (
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.
 type wManifest struct {
 	Summary  *string           `toml:"summary"`
+	Ask      *string           `toml:"ask"`
 	Provider *string           `toml:"provider"`
 	Trigger  *wTrigger         `toml:"trigger"`
 	When     *string           `toml:"when"`
@@ -290,6 +292,13 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 		s.add("summary", "is required: one line saying what the workflow does")
 	} else {
 		w.Summary = *m.Summary
+	}
+	if m.Ask != nil && strings.TrimSpace(*m.Ask) != "" {
+		t, err := template.New("ask").Parse(*m.Ask)
+		if err != nil {
+			s.add("ask", "%v", err)
+		}
+		w.Ask = t
 	}
 	slot := ""
 	switch m.Provider {

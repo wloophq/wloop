@@ -45,3 +45,16 @@ func TestDeriverAtStampsTheServedSpecsVersion(t *testing.T) {
 		t.Fatalf("with no served version, stamps %q", d.SpecsVersion)
 	}
 }
+
+func TestASealedRowSearchesItsPayloadsTexts(t *testing.T) {
+	r := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
+	d := Deriver{Now: time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC), Loaded: bundled(t)}
+	row, pl := d.Parts(reportOf(t, ghreporttest.Input{PR: dinv.PR{Ref: r, State: "OPEN", Reasons: []string{"involved"}}}), nil, dinv.Override{PR: r})
+	pl.Head = "carol/cache-warmup"
+	pl.Workspace = api.Workspace{DisplayName: "batch-ledger", Status: "dirty", Comment: "waiting on infra"}
+	pl.Brief = &api.BriefSummary{Goal: "Retry the webhook delivery"}
+	want := []string{"carol/cache-warmup", "batch-ledger", "dirty", "waiting on infra", "Retry the webhook delivery"}
+	if got := d.Seal(row, pl).Search; !slices.Equal(got, want) {
+		t.Fatalf("search %q, want %q", got, want)
+	}
+}

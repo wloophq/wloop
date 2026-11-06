@@ -190,6 +190,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	views, tasks, listProblems := loadViews(layers, bundled, &gates)
 	records, recordProblems := loadRecords(layers, bundled, &tasks)
 	listProblems = append(listProblems, recordProblems...)
+	listProblems = append(listProblems, views.checkFacets(tasks, records)...)
 	for {
 		set, problems := withPartials(base, layers, partials)
 		l, broken := load(layers, bundled, set, check, reverted, declarations{tasks, gates, records})

@@ -536,11 +536,8 @@ func TestSlashFiltersTheViewAcrossFields(t *testing.T) {
 	m := newModel(t)
 	rs := rows()
 	rs[0].Title = "Résumé export in batches"
-	setPR(&rs[1], func(p *prView) {
-		p.Head = "carol/cache-warmup"
-		p.Brief = &api.BriefSummary{Size: "s", Risk: "low", Goal: "Retry the webhook delivery"}
-	})
-	setPR(&rs[0], func(p *prView) { p.Workspace = api.Workspace{DisplayName: "batch-ledger", Comment: "waiting on infra"} })
+	rs[1].Search = []string{"carol/cache-warmup", "Retry the webhook delivery"}
+	rs[0].Search = []string{"batch-ledger", "waiting on infra"}
 	m.SetData(rs, api.Health{})
 	for text, want := range map[string]int{"webhook": 8, "carol": 8, "resume export": 7, "acme/api#8": 8, "RÉSUMÉ": 7, "batch-ledger": 7, "infra": 7} {
 		filterBy(m, text)
@@ -664,5 +661,25 @@ func TestSelectionKeysRowsByTheWholeUnit(t *testing.T) {
 	m.SetData([]api.Row{a, b}, api.Health{})
 	if r, _ := m.selected(); r.Unit != b.Unit {
 		t.Fatalf("selection fell back to %v", r.Unit)
+	}
+}
+
+func TestAQueuedAnswerTakesOnlyAFreeAnswer(t *testing.T) {
+	m := newModel(t)
+	m.SetData([]api.Row{asking(api.QuestionView{State: "asked", Kind: "choice", Text: "Which fix?", Queued: true,
+		Options: []record.Option{{ID: "a", Label: "Patch"}, {ID: "b", Label: "Revert"}}})}, api.Health{})
+	if screen := screenOf(m, 120, 40); strings.Contains(screen, "Patch") || !strings.Contains(screen, "queued") {
+		t.Fatalf("a queued answer's row shows its options:\n%s", screen)
+	}
+	press(m, Key{Rune: 'W'})
+	if m.prompt == nil || strings.Contains(m.prompt.label, "Patch") || !strings.Contains(m.prompt.label, "queued") {
+		t.Fatalf("label %+v", m.prompt)
+	}
+	c, ok := press(m, append(typed("2"), Key{Name: KeyEnter})...)
+	if want := (api.ActionRequest{Guidance: "2", Source: "tui"}); !ok || !reflect.DeepEqual(c.Req, want) {
+		t.Fatalf("a number picked an option of a queued answer: %+v", c)
+	}
+	if c, ok := press(m, Key{Rune: '1'}); ok || (m.prompt != nil && m.prompt.confirm) {
+		t.Fatalf("a digit answered a queued question: %+v, prompt %+v", c, m.prompt)
 	}
 }

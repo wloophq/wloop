@@ -18,7 +18,7 @@ var states = []struct {
 	name string
 	c    task.Category
 }{
-	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryWaiting},
+	{"inbox", task.CategoryInbox}, {"next", task.CategoryReady}, {"waiting", task.CategoryReady},
 	{"scheduled", task.CategoryDeferred}, {"someday", task.CategoryDeferred}, {"done", task.CategoryDone},
 	{"reference", task.CategoryDone}, {"trash", task.CategoryDropped},
 }
@@ -126,11 +126,11 @@ func (bundledStates) PropOf(r task.Role) (string, []string) {
 
 func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false }
 
-// Authority is the bundled profile's by, a coretasks.Authority: a person runs every bundled verb, a workflow those
-// whose by.workflow is true.
+// Authority is the bundled profile's by, a coretasks.Authority: a person and an agent run every bundled verb, a
+// workflow those whose by.workflow is true.
 func (bundledStates) Authority(_ context.Context, verb string, a task.Actor, _ task.Task) (bool, bool, error) {
 	switch a {
-	case task.ActorPerson:
+	case task.ActorPerson, task.ActorAgent:
 		return slices.Contains(verbs, task.Verb(verb)), false, nil
 	case task.ActorWorkflow:
 		return slices.Contains(byWorkflow, task.Verb(verb)), false, nil

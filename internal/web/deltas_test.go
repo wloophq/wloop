@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const deltaPrelude = `const state = { specs: { version: "", byId: {} }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), conn: "" };
+const deltaPrelude = `const state = { specs: { version: "", byId: {} }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), answered: new Map(), conn: "" };
 const API_VERSION = "1";
 const requests = [], timers = [], sources = [];
 let pending, queued = null, chain = Promise.resolve(), retries = 0, opened = false, hash = { view: "needs-me", pr: "" };
@@ -14,7 +14,8 @@ const setTimeout = (f) => timers.push(f);
 const clearTimeout = () => {};
 const readHash = () => hash;
 const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {};
-const applyCatalog = () => {};
+const catalog = { version: "" };
+const applyCatalog = (c) => { catalog.version = c.version || ""; };
 const loadActivity = async () => { requests.push("activity"); };
 const loadDetail = async () => { requests.push("detail"); };
 class EventSource { constructor() { sources.push(this); } }
@@ -232,5 +233,127 @@ const fetch = (url, opts) => new Promise((_, reject) => opts.signal.addEventList
 `, []string{"getJSON"}, `setTimeout(() => {}, 500); getJSON("/x").then(() => process.stdout.write('{"timeout":false}'), () => process.stdout.write('{"timeout":true}'));`, nil, &got)
 	if !got.Timeout {
 		t.Error("a hung request was not aborted")
+	}
+}
+
+// runTasksDelta is runDelta with a loadTasks that records the units each call names, and a forgetTasksPage
+// that records its call.
+func runTasksDelta(t *testing.T, main string) []string {
+	t.Helper()
+	prelude := strings.Replace(deltaPrelude, noViews, `const loadTasks = async (route, units) => { requests.push("tasks " + (units || []).join(",")); };
+const forgetTasksPage = () => { requests.push("forget"); };
+`, 1)
+	if prelude == deltaPrelude {
+		t.Fatal("the delta prelude has no loadTasks to replace")
+	}
+	var out struct {
+		Requests []string `json:"requests"`
+	}
+	nodeRun(t, prelude+keyJS(t), deltaFuncs, `(async () => {
+  pages["/api/rows"] = full;
+  await load();
+  connect();
+  sources[0].onopen();
+  requests.length = 0;
+`+main+`
+  process.stdout.write(JSON.stringify({ requests }));
+})();`, nil, &out)
+	return out.Requests
+}
+
+func TestAChangeWithCountersRefetchesTheTasksOfItsUnits(t *testing.T) {
+	got := runTasksDelta(t, `
+  pages[since("e1", 1)] = { epoch: "e1", rev: 2, full: false, rows: [row("a/b#1", "one")], removed: [] };
+  message({ rev: 2, units: [unit("a/b#1")], counters: { views: {} } });
+  await flush();`)
+	if !slices.Contains(got, "tasks github:a/b#1") {
+		t.Errorf("requests %v, want the tasks of github:a/b#1", got)
+	}
+}
+
+func TestAnAllChangeReadsTheTasksWhole(t *testing.T) {
+	got := runTasksDelta(t, `
+  message({ rev: 2, all: true, counters: { views: {} } });
+  await flush();`)
+	if i := slices.Index(got, "forget"); i < 0 || i > slices.Index(got, "tasks ") {
+		t.Errorf("requests %v, want the tasks page forgotten before the tasks load", got)
+	}
+}
+
+func TestARowsPageOfAnotherCatalogRereadsTheCatalog(t *testing.T) {
+	got := runDelta(t, `
+  pages[since("e1", 1)] = { epoch: "e1", rev: 2, full: false, rows: [], removed: [], catalog: "c1" };
+  message({ rev: 2, units: [unit("a/b#1")] });
+  await flush();
+  pages[since("e1", 2)] = { epoch: "e1", rev: 3, full: false, rows: [], removed: [], catalog: "c2" };
+  message({ rev: 3, units: [unit("a/b#1")] });
+  await flush();`)
+	want := []string{"/api/rows?since=e1%3A1", "/api/rows?since=e1%3A2", "/api/catalog"}
+	if !slices.Equal(got.Requests, want) {
+		t.Errorf("requests %v, want %v", got.Requests, want)
+	}
+}
+
+func TestAViewsVersionChangeRereadsTheViewsCatalog(t *testing.T) {
+	var got struct {
+		Asked []string `json:"asked"`
+	}
+	nodeRun(t, viewsPrelude(t), nil, `
+const asked = [];
+const page = (rev, specs) => ({ epoch: "ep", rev, full: rev === 1, tasks: [], removed: [], counters: { views: {} }, specs });
+const pages = [page(1, "v1"), page(2, "v2"), page(3, "v2")];
+const cats = [{ ...input.cat, version: "v1" }, { ...input.cat, version: "v2" }];
+async function getJSON(u) { asked.push(u); return u === "/api/views" ? cats.shift() : pages.shift(); }
+(async () => {
+  const route = { view: "inbox", area: "", ctx: [] };
+  await loadTasks(route);
+  await loadTasks(route);
+  await loadTasks(route);
+  asked.push(tasksState.catalog.version);
+  process.stdout.write(JSON.stringify({ asked }));
+})();`, map[string]any{"cat": viewsCatalog()}, &got)
+	want := []string{"/api/views", "/api/tasks?view=inbox", "/api/tasks?view=inbox&since=ep%3A1", "/api/views", "/api/tasks?view=inbox&since=ep%3A2", "v2"}
+	if !slices.Equal(got.Asked, want) {
+		t.Errorf("asked %v, want %v", got.Asked, want)
+	}
+}
+
+func TestATasksPageSinceNamesTheUnitsUntilItIsRead(t *testing.T) {
+	var got struct {
+		Asked []string `json:"asked"`
+	}
+	nodeRun(t, viewsPrelude(t), nil, `
+const asked = [];
+let fail = false;
+async function getJSON(u) {
+  asked.push(u);
+  if (u === "/api/views") return input.cat;
+  if (fail) throw new Error("down");
+  return { epoch: "ep", rev: 1, full: !u.includes("since"), tasks: [], removed: [], counters: { views: {} } };
+}
+(async () => {
+  const route = { view: "inbox", area: "", ctx: [] };
+  await loadTasks(route);
+  fail = true;
+  await loadTasks(route, ["github:a/b#1"]);
+  fail = false;
+  await loadTasks(route, ["slack:T1/C1/1"]);
+  await loadTasks(route);
+  process.stdout.write(JSON.stringify({ asked }));
+})();`, map[string]any{"cat": viewsCatalog()}, &got)
+	held := "/api/tasks?view=inbox&since=ep%3A1&units=github%3Aa%2Fb%231&units=slack%3AT1%2FC1%2F1"
+	want := []string{"/api/views", "/api/tasks?view=inbox", "/api/tasks?view=inbox&since=ep%3A1&units=github%3Aa%2Fb%231", held, "/api/tasks?view=inbox&since=ep%3A1"}
+	if !slices.Equal(got.Asked, want) {
+		t.Errorf("asked %v, want %v", got.Asked, want)
+	}
+}
+
+func TestAReconnectReadsTheTasksWhole(t *testing.T) {
+	got := runTasksDelta(t, `
+  pages[since("e1", 1)] = { epoch: "e1", rev: 1, full: false, rows: [], removed: [] };
+  sources[0].onopen();
+  await flush();`)
+	if i := slices.Index(got, "forget"); i < 0 || i > slices.Index(got, "tasks ") {
+		t.Errorf("requests %v, want the tasks page forgotten, then the tasks read", got)
 	}
 }

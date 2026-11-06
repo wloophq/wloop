@@ -36,6 +36,9 @@ type Row struct {
 	Question *QuestionView   `json:"question,omitempty"`
 	Items    []RowItem       `json:"items,omitempty"`
 	Payload  json.RawMessage `json:"payload,omitempty"`
+	// Search are the row's texts a filter's free words search beyond its title, label, link, kind, summary
+	// and facet values, such as what its payload holds.
+	Search []string `json:"search,omitempty"`
 	// Stale says the row is its plugin's last report, which the plugin no
 	// longer stands behind: it is down.
 	Stale bool `json:"stale,omitempty"`
@@ -84,6 +87,8 @@ type RowsPage struct {
 	Counters *Counters   `json:"counters,omitempty"`
 	// Loading are the plugins whose rows are not all here yet.
 	Loading []Loading `json:"loading,omitempty"`
+	// Catalog is the version of GET /api/catalog; a client holding another reads it again.
+	Catalog string `json:"catalog,omitempty"`
 }
 
 // Loading is a plugin that has not yet imported its data and reported every
@@ -145,7 +150,12 @@ type QuestionView struct {
 	Blocking    int             `json:"blocking"`
 	NonBlocking int             `json:"non_blocking"`
 	LastMessage string          `json:"last_message,omitempty"`
+	// Queued says the user's answer waits for the agent's busy session.
+	Queued bool `json:"queued,omitempty"`
 }
+
+// Open says whether q still takes an answer from its options.
+func (q *QuestionView) Open() bool { return q != nil && !q.Queued }
 
 // AttentionAction ids are catalog ids, task:<verb> (task:<verb>:<mode> with
 // the delegate's mode) for a task's verb, answer:option:<id>, answer:yes,
@@ -243,6 +253,8 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
+	// BySession is the session an agent answered through for you, absent for your own answer.
+	BySession string `json:"by_session,omitempty"`
 	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it. Gate is the gate the
 	// answer resolved, 0 for one given with no gate open.
 	Message int64 `json:"message_id,omitempty"`

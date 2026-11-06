@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -168,7 +169,7 @@ func (s *Server) resolveTaskGate(ctx context.Context, e task.Task, role builtin.
 			return true, err
 		}
 	}
-	r.By = req.Actor
+	r.By, r.Session = req.Actor, req.Session
 	return true, s.resolveGate(ctx, g, r, ar.Source, out)
 }
 
@@ -177,7 +178,7 @@ func (s *Server) taskGate(ctx context.Context, e task.Task, role builtin.GateRol
 	if s.deps.GateReader == nil || s.deps.Gates == nil {
 		return gate.Gate{}, gates.Resolution{}, false, nil
 	}
-	all, err := s.deps.GateReader.OfTask(ctx, e.ID)
+	all, err := s.openGatesOf(ctx, e.ID)
 	if err != nil {
 		return gate.Gate{}, gates.Resolution{}, false, err
 	}
@@ -285,10 +286,10 @@ func writeRoute(out io.Writer, route turn.Route, note string) {
 	}
 }
 
-// gateWords is how gates.toml names g.
+// gateWords is what g asks, as its opener worded it, else how gates.toml names it.
 func (s *Server) gateWords(g gate.Gate) string {
 	def, _ := s.loaded().Gates.Gate(g.Name)
-	return cmpOr(def.Label, g.Name)
+	return cmp.Or(g.Text, def.Label, g.Name)
 }
 
 // messageOf is the message question, post or proposal gate g is the gate of.

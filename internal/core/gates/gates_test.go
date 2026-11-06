@@ -58,9 +58,21 @@ type policy struct {
 func (p policy) Decide(context.Context, gate.Gate) (gates.Decision, error) { return p.dec, p.err }
 
 type fixture struct {
-	svc   *gates.Service
-	store *gatestest.Store
-	cons  *gatestest.Consequences
+	svc      *gates.Service
+	store    *gatestest.Store
+	cons     *gatestest.Consequences
+	sessions drivenSessions
+}
+
+// drivenSessions are the sessions the user drives.
+type drivenSessions map[string]bool
+
+func (d drivenSessions) UserDriven(_ context.Context, id string) (bool, error) { return d[id], nil }
+
+func (f fixture) drive(ids ...string) {
+	for _, id := range ids {
+		f.sessions[id] = true
+	}
 }
 
 var opened = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
@@ -76,11 +88,12 @@ func newFixtureAt(t *testing.T, p gates.Policy, prof profile, now func() time.Ti
 	t.Helper()
 	store := gatestest.NewStore(now)
 	cons := &gatestest.Consequences{}
+	sessions := drivenSessions{}
 	svc := gates.New(gates.Deps{
 		Store: store, Reader: store, Profile: prof, Policy: p, Clock: clock{now},
-		Publisher: cons, Releaser: cons, Deliverer: cons, Decider: cons, Unblocker: cons,
+		Publisher: cons, Releaser: cons, Deliverer: cons, Decider: cons, Unblocker: cons, Sessions: sessions,
 	})
-	return fixture{svc: svc, store: store, cons: cons}
+	return fixture{svc: svc, store: store, cons: cons, sessions: sessions}
 }
 
 var acme = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
@@ -106,12 +119,16 @@ func (f fixture) get(t *testing.T, id int64) gate.Gate {
 	return g
 }
 
-func TestNoAgentResolvesAGate(t *testing.T) {
+func TestNoUnattendedAgentResolvesAGate(t *testing.T) {
 	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeSend, Rule: "rule[0]"}}, bundled)
-	g := f.open(t, gate.Gate{Kind: gate.KindQuestion}, policy{dec: gates.Decision{Mode: gate.ModeWait}})
+	f.drive("s-user")
+	g := f.open(t, gate.Gate{Kind: gate.KindQuestion, Session: "s-user"}, policy{dec: gates.Decision{Mode: gate.ModeWait}})
 	ctx := context.Background()
 	for _, r := range []gates.Resolution{
 		{Intent: "answer", Answer: "yes", By: task.ActorAgent},
+		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-worker"},
+		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-user"},
+		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-user", Rule: "rule[0]"},
 		{Intent: "dismiss", By: task.ActorPlugin},
 		{Intent: "dismiss"},
 		{Intent: "dismiss", By: task.ActorWorkflow},
@@ -134,6 +151,40 @@ func TestNoAgentResolvesAGate(t *testing.T) {
 	}
 	if got := f.get(t, g.ID); got.Status != gate.Answered || got.By != task.ActorPerson || got.Answer != "yes" {
 		t.Fatalf("gate = %+v, want answered by a person", got)
+	}
+}
+
+// Authority comes from the user: through a session they drive an agent resolves a gate of every kind, but not
+// one its own turn produced; an unattended session resolves none.
+func TestOnlyAUserDrivenSessionResolvesAGateOfEveryKind(t *testing.T) {
+	ctx := context.Background()
+	var prof profile
+	for _, k := range gate.Kinds {
+		prof = append(prof, gates.Def{Name: string(k), Kind: k, Label: string(k), Intents: []gates.Intent{{Name: "yes", Status: gate.Approved}}})
+	}
+	for _, k := range gate.Kinds {
+		t.Run(string(k), func(t *testing.T) {
+			f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, prof)
+			f.drive("s-user")
+			for _, c := range []struct {
+				name, origin, session string
+				want                  bool
+			}{
+				{"a worker session", "", "s-worker", false},
+				{"a user-driven session on its own turn's subject", "s-user", "s-user", false},
+				{"a user-driven session", "s-worker", "s-user", true},
+			} {
+				g := f.open(t, gate.Gate{Kind: k, Session: c.origin}, nil)
+				err := f.svc.Resolve(ctx, g.ID, gates.Resolution{Intent: "yes", By: task.ActorAgent, Session: c.session})
+				got := f.get(t, g.ID)
+				switch {
+				case c.want && (err != nil || got.Status != gate.Approved || got.By != task.ActorAgent || got.BySession != c.session || !got.ByUser()):
+					t.Errorf("%s: %v, gate %+v", c.name, err, got)
+				case !c.want && (!errors.Is(err, gates.ErrRefused) || got.Status != gate.Open):
+					t.Errorf("%s: %v, gate %+v, want refused", c.name, err, got)
+				}
+			}
+		})
 	}
 }
 
@@ -304,6 +355,20 @@ func TestOpenGivesAGateTheTaskOfItsUnitOrACaptureTask(t *testing.T) {
 	}
 }
 
+func TestACaptureTaskReadsTheWordsTheGateWasOpenedWith(t *testing.T) {
+	store := gatestest.NewStore(fixedNow)
+	tk := &tasksFake{}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Tasks: tk, Clock: clock{fixedNow}})
+	session := unit.Unit{Provider: "session", Key: "0b9c7d1e"}
+	g, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindPlan, Unit: session, Text: "Close the quiet session demo?"}, nil)
+	if err != nil || g.Text != "Close the quiet session demo?" {
+		t.Fatalf("open = %+v, %v", g, err)
+	}
+	if len(tk.opened) != 1 || tk.opened[0].Title != "Close the quiet session demo?" {
+		t.Fatalf("capture = %+v, want it titled by the gate's words", tk.opened)
+	}
+}
+
 func TestAGateSkipsTheClosedTasksOfItsUnit(t *testing.T) {
 	store := gatestest.NewStore(fixedNow)
 	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.2"}
@@ -382,7 +447,7 @@ func TestAnEndedTasksGatesCloseAsWhoEndedItSays(t *testing.T) {
 			question := f.open(t, gate.Gate{Task: id, Kind: gate.KindQuestion}, nil)
 			plan := f.open(t, gate.Gate{Task: id, Kind: gate.KindPlan}, nil)
 			other := f.open(t, gate.Gate{Task: "t-0000000000000002", Unit: task.UnitOf("t-0000000000000002"), Kind: gate.KindQuestion}, nil)
-			if err := f.svc.TaskEnded(ctx, id, c.by, fixedNow()); err != nil {
+			if err := f.svc.TaskEnded(ctx, id, c.by, "", fixedNow()); err != nil {
 				t.Fatal(err)
 			}
 			if got := f.get(t, question.ID); got.Status != c.status || got.Intent != c.intent || got.By != c.by {
@@ -400,7 +465,7 @@ func TestAnEndedTasksGatesCloseAsWhoEndedItSays(t *testing.T) {
 func TestAGateOpenedAfterItsTaskEndedStaysOpen(t *testing.T) {
 	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
 	g := f.open(t, gate.Gate{Task: "t-0000000000000001", Kind: gate.KindQuestion}, nil)
-	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorPerson, fixedNow().Add(-time.Second)); err != nil {
+	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorPerson, "", fixedNow().Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.get(t, g.ID); got.Status != gate.Open {
@@ -427,13 +492,33 @@ func TestAQuestionHoldsItsTaskAndAPlanDoesNot(t *testing.T) {
 	}
 }
 
-func TestNoAgentEndsAGate(t *testing.T) {
+func TestNoUnattendedAgentEndsAGate(t *testing.T) {
 	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+	f.drive("s-user")
 	g := f.open(t, gate.Gate{Task: "t-0000000000000001", Kind: gate.KindQuestion}, nil)
-	if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorAgent, fixedNow()); !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("an agent ending a task: %v, want ErrRefused", err)
+	for _, session := range []string{"", "s-worker"} {
+		if err := f.svc.TaskEnded(context.Background(), "t-0000000000000001", task.ActorAgent, session, fixedNow()); !errors.Is(err, gates.ErrRefused) {
+			t.Fatalf("an agent ending a task through %q: %v, want ErrRefused", session, err)
+		}
 	}
 	if got := f.get(t, g.ID); got.Status != gate.Open {
 		t.Fatalf("the question = %+v, want open", got)
+	}
+}
+
+func TestAUserDrivenSessionEndsATasksGatesAsThePerson(t *testing.T) {
+	f := newFixture(t, policy{dec: gates.Decision{Mode: gate.ModeWait}}, bundled)
+	f.drive("s-user")
+	id := task.ID("t-0000000000000001")
+	other := f.open(t, gate.Gate{Task: id, Kind: gate.KindQuestion}, nil)
+	own := f.open(t, gate.Gate{Task: id, Kind: gate.KindQuestion, Session: "s-user"}, nil)
+	if err := f.svc.TaskEnded(context.Background(), id, task.ActorAgent, "s-user", fixedNow()); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.get(t, other.ID); got.Status != gate.Dismissed || got.By != task.ActorAgent || got.BySession != "s-user" {
+		t.Fatalf("another session's question = %+v, want dismissed through s-user", got)
+	}
+	if got := f.get(t, own.ID); got.Status != gate.Superseded || len(f.cons.Calls) != 1 {
+		t.Fatalf("its own question = %+v, consequences %v: want superseded with none", got, f.cons.Calls)
 	}
 }

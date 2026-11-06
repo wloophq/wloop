@@ -88,7 +88,7 @@ func TestANewBuildReloadsOrOffersTo(t *testing.T) {
 		{"no build named", "", "", outcome{}},
 		{"a new build and nothing held", "b2", "", outcome{Reloads: 1, Stored: "b2"}},
 		{"text in a composer", "b2", `fields.push({ id: "", value: "half a reply" });`, outcome{Banner: true}},
-		{"text in the filter only", "b2", `fields.push({ id: "search", value: "repo:acme" });`, outcome{Reloads: 1, Stored: "b2"}},
+		{"text in the filter only", "b2", `fields.push({ id: "search", value: "where:acme" });`, outcome{Reloads: 1, Stored: "b2"}},
 		{"an open dialog", "b2", `dialogOpen = true;`, outcome{Banner: true}},
 		{"guidance kept for a closed detail", "b2", `state.guidance["github:acme/api#1"] = "rebase first";`, outcome{Banner: true}},
 		{"a draft being edited", "b2", `detailState.editing.set("draft:7", "Deployed");`, outcome{Banner: true}},
@@ -106,7 +106,7 @@ let stored = "";
 let reloads = 0;
 const banner = { hidden: true };
 const reload = { onclick: null };
-const state = { guidance: {}, busy: new Set() };
+const state = { guidance: {}, busy: new Set(), answered: new Map() };
 const detailState = { answer: "", guidance: "", compose: { key: "", text: "", reaction: "" }, editing: new Map() };
 const document = {
   querySelector: (sel) => sel.startsWith("meta") ? { getAttribute: () => "b1" } : dialogOpen ? {} : null,

@@ -30,7 +30,7 @@ type Daemon interface {
 	ActOnPlan(ctx context.Context, req api.PlanActRequest) (api.PlanResponse, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
 	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
-	Counters(ctx context.Context, area string, terms ...string) (api.Counters, error)
+	Counters(ctx context.Context, area, query string) (api.Counters, error)
 	Task(ctx context.Context, id string) (api.TaskView, error)
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
@@ -119,6 +119,8 @@ type tasksRead struct {
 	tasks    []api.TaskView
 	counters api.Counters
 	loading  []api.Loading
+	// specs is the version of the task views the page names.
+	specs string
 }
 
 // filteredRead are the counters of area narrowed to the tasks the
@@ -196,7 +198,7 @@ func Run(ctx context.Context, cfg Config) error {
 	// and asks again for an open detail a page changed.
 	track := func() {
 		view, area, ok := m.TaskQuery()
-		if (shown.set(view, area, ok) && ok) || shown.setReview(m.inReview()) || shown.setFilter(m.area, m.FilterTerms()) {
+		if (shown.set(view, area, ok) && ok) || shown.setReview(m.inReview()) || shown.setFilter(m.area, m.FilterQuery()) {
 			kick()
 		}
 		if c, ok := m.Refetch(); ok {
@@ -391,13 +393,32 @@ func (c *cursor) set(s api.Since) {
 }
 
 // wants are what the next load asks the daemon for; counters are the
-// counts the last change carried.
+// counts the last change carried, moved the units the changes with counters
+// named since the last task pull, or all of them.
 type wants struct {
 	health, rows, plan, tasks, filtered atomic.Bool
 	counters                            atomic.Pointer[api.Counters]
+	movedMu                             sync.Mutex
+	moved                               []unit.Unit
+	movedAll                            bool
+}
+
+func (r *wants) move(units []unit.Unit, all bool) {
+	r.movedMu.Lock()
+	defer r.movedMu.Unlock()
+	r.moved, r.movedAll = append(r.moved, units...), r.movedAll || all
+}
+
+func (r *wants) takeMoved() (units []unit.Unit, all bool) {
+	r.movedMu.Lock()
+	defer r.movedMu.Unlock()
+	units, all = r.moved, r.movedAll
+	r.moved, r.movedAll = nil, false
+	return units, all
 }
 
 func (r *wants) all() {
+	r.move(nil, true)
 	r.health.Store(true)
 	r.rows.Store(true)
 	r.plan.Store(true)
@@ -412,26 +433,26 @@ type query struct {
 	view, area string
 	ok         bool
 	review     bool
-	// filterArea and terms are the area the tabs count and the filter's
-	// words, which narrow the counts.
+	// filterArea and text are the area the tabs count and the filter's
+	// lens query, which narrows the counts.
 	filterArea string
-	terms      []string
+	text       string
 }
 
-// setFilter records the filter's words and the area the tabs count,
-// reporting a change while the filter has words.
-func (q *query) setFilter(area string, terms []string) bool {
+// setFilter records the filter's query and the area the tabs count,
+// reporting a change while the filter has a query.
+func (q *query) setFilter(area, text string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	changed := q.filterArea != area || !slices.Equal(q.terms, terms)
-	q.filterArea, q.terms = area, terms
-	return changed && len(terms) > 0
+	changed := q.filterArea != area || q.text != text
+	q.filterArea, q.text = area, text
+	return changed && text != ""
 }
 
-func (q *query) filter() (string, []string) {
+func (q *query) filter() (string, string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return q.filterArea, q.terms
+	return q.filterArea, q.text
 }
 
 // setReview records whether the screen shows the Review, reporting a change to showing it.
@@ -465,43 +486,46 @@ func (q *query) get() (client.TaskQuery, bool) {
 }
 
 // pull brings the set up to the daemon: a delta from where it stands, or
-// every row when the daemon cannot give one; loading are the plugins the
-// page says are loading.
-func pull(ctx context.Context, d Daemon, set *rowset.Set) (loading []api.Loading, err error) {
+// every row when the daemon cannot give one; the page is the one it took.
+func pull(ctx context.Context, d Daemon, set *rowset.Set) (api.RowsPage, error) {
 	page, err := d.RowsSince(ctx, set.Since())
 	if err != nil {
-		return nil, err
+		return api.RowsPage{}, err
 	}
 	if set.Apply(page) {
-		return page.Loading, nil
+		return page, nil
 	}
 	if page, err = d.RowsSince(ctx, api.Since{}); err != nil {
-		return nil, err
+		return api.RowsPage{}, err
 	}
 	set.Apply(page)
-	return page.Loading, nil
+	return page, nil
 }
 
-// pullTasks brings the tasks of q up to the daemon as pull does rows.
+// pullTasks brings the tasks of q up to the daemon as pull does rows, naming
+// the units set holds as moved.
 func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) (api.TasksPage, error) {
+	q.Units = set.moved
 	page, err := d.TasksSince(ctx, q, set.since)
 	if err != nil {
 		return api.TasksPage{}, err
 	}
-	if set.apply(page) {
-		return page, nil
+	if !set.apply(page) {
+		q.Units = nil
+		if page, err = d.TasksSince(ctx, q, api.Since{}); err != nil {
+			return api.TasksPage{}, err
+		}
+		set.apply(page)
 	}
-	if page, err = d.TasksSince(ctx, q, api.Since{}); err != nil {
-		return api.TasksPage{}, err
-	}
-	set.apply(page)
+	set.moved = nil
 	return page, nil
 }
 
-// onceReads are the reads a load makes once, and again only after a failure.
+// onceReads are the reads a load makes once, and again only after a failure
+// or, for the catalog and the task views, when their version changed.
 type onceReads struct {
 	catalog, plugins, viewsCat, keys bool
-	specs                            string
+	specs, catalogAt, viewsAt        string
 }
 
 func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loaded, answering *atomic.Bool, at *cursor, due *wants, shown *query) {
@@ -523,9 +547,12 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 		needRows = due.rows.Swap(false) || needRows
 		err = nil
 		if needRows {
-			var ls []api.Loading
-			if ls, err = pull(ctx, d, &set); err == nil {
-				rowsLoading = ls
+			var page api.RowsPage
+			if page, err = pull(ctx, d, &set); err == nil {
+				rowsLoading = page.Loading
+				if page.Catalog != "" && page.Catalog != have.catalogAt {
+					have.catalog = false
+				}
 			}
 			at.set(set.Since())
 			needRows = err != nil
@@ -563,6 +590,10 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 				}
 			}
 			r.tasks, r.tasksErr = readTasks(ctx, d, have.viewsCat, due, shown, sets, &pulled)
+			if r.tasks != nil && r.tasks.specs != "" && r.tasks.specs != have.viewsAt {
+				have.viewsCat = false
+				have.readViews(ctx, d, &r)
+			}
 			r.counters = due.counters.Swap(nil)
 			r.filtered, r.filteredErr = readFiltered(ctx, d, have.viewsCat, due, shown, &counted)
 		}
@@ -598,7 +629,7 @@ func (have *onceReads) read(ctx context.Context, d Daemon, rows []api.Row, plann
 		if res, e := d.Catalog(ctx); e != nil {
 			failed = cmp.Or(failed, e)
 		} else {
-			r.catalog, have.catalog = &res, true
+			r.catalog, have.catalog, have.catalogAt = &res, true, res.Version
 		}
 	}
 	if !have.plugins {
@@ -608,12 +639,19 @@ func (have *onceReads) read(ctx context.Context, d Daemon, rows []api.Row, plann
 			r.plugins, have.plugins = nonNilPlugins(res), true
 		}
 	}
-	if !have.viewsCat {
-		if res, e := d.Views(ctx); e == nil {
-			r.viewsCat, have.viewsCat = &res, true
-		}
-	}
+	have.readViews(ctx, d, r)
 	return failed
+}
+
+// readViews fills r with the task views until they were read once; a failure
+// leaves them for the next load.
+func (have *onceReads) readViews(ctx context.Context, d Daemon, r *loaded) {
+	if have.viewsCat {
+		return
+	}
+	if res, e := d.Views(ctx); e == nil {
+		r.viewsCat, have.viewsCat, have.viewsAt = &res, true, res.Version
+	}
 }
 
 func nonNilPlugins(ps []api.Plugin) []api.Plugin {
@@ -626,6 +664,13 @@ func nonNilPlugins(ps []api.Plugin) []api.Plugin {
 // readTasks pulls the page of the task view on screen when a change named
 // tasks or the screen moved to another view or area since the last pull.
 func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, sets map[string]*taskSet, pulled *string) (*tasksRead, error) {
+	moved, all := due.takeMoved()
+	if all {
+		clear(sets)
+	}
+	for _, set := range sets {
+		set.move(moved)
+	}
 	q, ok := shown.get()
 	named := due.tasks.Swap(false)
 	if !onViews || !ok {
@@ -649,23 +694,23 @@ func readTasks(ctx context.Context, d Daemon, onViews bool, due *wants, shown *q
 		return nil, err
 	}
 	*pulled = key
-	return &tasksRead{view: q.View, tasks: set.list(), counters: p.Counters, loading: p.Loading}, nil
+	return &tasksRead{view: q.View, tasks: set.list(), counters: p.Counters, loading: p.Loading, specs: p.Specs}, nil
 }
 
 // readFiltered reads the counters the filter narrows when the filter has
-// words and they, the area or the tasks changed since the last read.
+// a query and it, the area or the tasks changed since the last read.
 func readFiltered(ctx context.Context, d Daemon, onViews bool, due *wants, shown *query, counted *string) (*filteredRead, error) {
-	area, terms := shown.filter()
+	area, text := shown.filter()
 	named := due.filtered.Swap(false)
-	if !onViews || len(terms) == 0 {
+	if !onViews || text == "" {
 		*counted = ""
 		return nil, nil
 	}
-	key := area + "\x00" + strings.Join(terms, "\x00")
+	key := area + "\x00" + text
 	if !named && key == *counted {
 		return nil, nil
 	}
-	c, err := d.Counters(ctx, area, terms...)
+	c, err := d.Counters(ctx, area, text)
 	if err != nil {
 		due.filtered.Store(true)
 		return nil, err
@@ -715,6 +760,7 @@ func listen(ctx context.Context, events <-chan api.Change, at *cursor, due *want
 				due.health.Store(true)
 			}
 			if c.Counters != nil || c.All {
+				due.move(c.Units, c.All)
 				due.tasks.Store(true)
 				due.filtered.Store(true)
 			}

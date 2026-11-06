@@ -111,6 +111,9 @@ func gateText(g api.GateView) string {
 
 func rowCard(r api.Row) askCard {
 	q := r.Question
+	if q.Queued {
+		return askCard{text: queuedAnswer, row: &r}
+	}
 	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r}
 }
 

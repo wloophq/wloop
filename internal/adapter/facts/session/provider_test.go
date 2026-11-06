@@ -627,3 +627,16 @@ func TestUnreadAnswersAreTheDeliveredAnswersTheAgentHasNotRead(t *testing.T) {
 		t.Fatalf("a session with no answers: %v %v", f["session.unread_gates"], f["session.unread_for"])
 	}
 }
+
+func TestASessionIsNamedByItsWorkspaceElseItsFolderElseItsTerminal(t *testing.T) {
+	w := newWorld(t)
+	w.snap.s.Workspaces = append(w.snap.s.Workspaces, wsdomain.Workspace{ID: "repo::/wt/named", Path: "/wt/named", DisplayName: "Fix the login form", HostID: wsdomain.LocalHost})
+	w.session("term_1", func(s *turn.Session) { s.WorkspaceID, s.Worktree = "repo::/wt/named", "/wt/named" })
+	w.session("term_2", nil)
+	w.session("term_3", func(s *turn.Session) { s.Worktree, s.WorkspaceID = "", "elsewhere" })
+	for h, want := range map[string]string{"term_1": "Fix the login form", "term_2": "acme-api-7", "term_3": "review 20/10 10:00"} {
+		if got := w.facts(t, h)["session.name"]; got != want {
+			t.Errorf("%s is named %q, want %q", h, got, want)
+		}
+	}
+}

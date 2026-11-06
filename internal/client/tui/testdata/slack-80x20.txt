@@ -1,0 +1,20 @@
+ Needs me 0    My PRs 0    In loop 0    Plan 0    │   [Slack 3]
+
+>   2h 0m  #deploys     Can we ship the export tonight?  me · waits on you
+      30m  DM with Ana  Lunch on Friday?                 A… · waits on others
+   !5d 0h  #general     Who owns the flaky upload test?  me · waits on you
+
+#deploys  Can we ship the export tonight?
+  waiting    me · waits on you · 2h
+
+
+
+
+
+
+
+
+
+
+
+↑↓ move  g view  / filter  = group  - sort  ^K actions  ? keys  q quit

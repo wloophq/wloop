@@ -37,7 +37,7 @@ var groups = map[builtin.Surface][]group{
 		{"What it matches", []string{"summary", "provider", "when", "order", "key", "marks"}},
 		{"When it is planned", []string{"trigger", "observe", "limits"}},
 		{"Steps", []string{"step"}},
-		{"Gate approval", []string{"gates"}},
+		{"Gate approval", []string{"ask", "gates"}},
 		{"Drafts", []string{"drafts"}},
 	},
 	builtin.SurfaceConfig: {

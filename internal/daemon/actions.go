@@ -19,7 +19,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -258,13 +257,9 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("action")
 	l := s.loaded()
-	actor := task.ActorPerson
+	actor := personRequest
 	if _, ok := catalog.RowGateIntent(l, name); ok {
-		if actor, ok = requestActor(w, r); !ok {
-			return
-		}
-		if actor != task.ActorPerson {
-			writeError(w, http.StatusForbidden, name+" resolves a gate as a person; an agent's session does not")
+		if actor, ok = s.forUser(w, r, name+" resolves a gate: it"); !ok {
 			return
 		}
 	}
@@ -348,7 +343,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var out bytes.Buffer
-	err := s.act(ctx, name, u, req, &out)
+	err := s.act(ctx, name, u, req, actor, &out)
 	var refused Refusal
 	if errors.As(err, &refused) {
 		s.logDetail(name, u, refused)
@@ -537,7 +532,7 @@ func (s *Server) checkActionInputs(l *intentload.Loaded, name string, req *api.A
 	return err
 }
 
-func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, out io.Writer) error {
+func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, by requester, out io.Writer) error {
 	l := s.loaded()
 	_, isDelegated := delegatedActions[name]
 	if !isBuiltin(l, name) {
@@ -556,7 +551,7 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 			}
 			return s.delegate(ctx, runHeld, u, Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out})
 		}
-		return s.actOnGate(ctx, g, u, req, task.ActorPerson, out)
+		return s.actOnGate(ctx, g, u, req, by, out)
 	}
 	if followActions[name] {
 		if !sourceFollowed(name, u, s.deps.Follows) {

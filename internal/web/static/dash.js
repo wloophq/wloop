@@ -128,9 +128,15 @@ function dashKpis(rows, lens) {
   return DASH_KPIS.map((k) => ({ ...k, n: k.flag ? flagged.filter((fs) => fs.includes(k.flag)).length : all, on: !!k.flag && on.includes(k.flag) }));
 }
 
+// dashStrip is the facet that colors the backlog's strip, its plugin's.
+function dashStrip() {
+  return viewStrip("dash") || { id: "" };
+}
+
 function dashWaitOption(rows, lens, pal) {
-  const counts = dashTally(rows, lens, catalog.strip);
-  return dashBars(fieldRank(catalog.strip).filter((k) => counts.get(k)).map((k) => dashItem(lens, catalog.strip, k, counts.get(k), pal[k], fieldShow(catalog.strip, k))), pal);
+  const s = dashStrip();
+  const counts = dashTally(rows, lens, s.id);
+  return dashBars(fieldRank(s.id).filter((k) => counts.get(k)).map((k) => dashItem(lens, s.id, k, counts.get(k), pal[stripColor(s, k)], fieldShow(s.id, k))), pal);
 }
 
 function dashPeopleOption(rows, lens, pal) {
@@ -146,15 +152,15 @@ function dashPeopleOption(rows, lens, pal) {
 
 function dashAuthorsOption(rows, lens, pal) {
   const f = fieldById("author");
-  const counts = dashTally(rows, lens, "author", (r) => [rowKey(f, r)]);
+  const counts = dashTally(rows, lens, "author", (r) => [itemKey(f, r)]);
   return dashBars(dashRanked(counts, DASH_TOP).map(([a, n]) => dashItem(lens, "author", a, n, a === "me" ? pal.me : pal.author)), pal);
 }
 
 function dashReposOption(rows, lens, pal) {
   const orgs = new Map();
   for (const r of rows) {
-    if (!passesFilters(r, lens.filters, "repo")) continue;
-    const repo = facetValues(r, "repo")[0];
+    if (!passesFilters(r, lens.filters, "where")) continue;
+    const repo = facetValues(r, "where")[0];
     if (!repo) continue;
     const org = repo.split("/")[0];
     if (!orgs.has(org)) orgs.set(org, new Map());
@@ -168,7 +174,7 @@ function dashReposOption(rows, lens, pal) {
   const data = [...orgs.entries()].sort(cmp).map(([org, repos]) => ({
     name: org,
     children: [...repos.entries()].sort(cmp).map(([repo, c]) => ({
-      ...dashItem(lens, "repo", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
+      ...dashItem(lens, "where", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
       tooltip: { formatter: `${dashEsc(repo)}: ${c.n} pending, ${c.stalled} stalled` },
     })),
   }));
@@ -301,7 +307,7 @@ function dashAgingOption(rows, lens, pal, now, stalledHours) {
     return {
       value: [kinds.indexOf(r.kind) + (((n * 0.618034) % 1) - 0.5) * 0.6, dashRound(days)],
       pr: keyOf(r), name: labelOf(r),
-      itemStyle: { color: pal[waitCat(r)] },
+      itemStyle: { color: pal[waitColor(r)] },
       tooltip: { formatter: `${dashEsc(labelOf(r))} ${dashEsc(r.title || "")}: waits ${days < 1 ? Math.round(days * 24) + " working hours" : dashRound(days) + " working days"} on ${waitCat(r)}` },
     };
   });
@@ -336,7 +342,7 @@ function dashNextOption(rows, lens, pal, now, health) {
     for (const e of upcoming(r)) {
       const t = within(e.at);
       if (t === null || !lanes.includes(e.what)) continue;
-      data.push({ value: [t, lanes.indexOf(e.what)], pr: keyOf(r), name: labelOf(r), itemStyle: { color: pal[waitCat(r)] }, tooltip: { formatter: `${dashEsc(labelOf(r))}: ${DASH_NEXT[lanes.indexOf(e.what)][1].toLowerCase()} at ${stamp(new Date(t).toISOString())}` } });
+      data.push({ value: [t, lanes.indexOf(e.what)], pr: keyOf(r), name: labelOf(r), itemStyle: { color: pal[waitColor(r)] }, tooltip: { formatter: `${dashEsc(labelOf(r))}: ${DASH_NEXT[lanes.indexOf(e.what)][1].toLowerCase()} at ${stamp(new Date(t).toISOString())}` } });
     }
   }
   const quota = health && health.brief && within(health.brief.paused_until);
@@ -365,11 +371,12 @@ function dashOpenedOption(rows, lens, pal) {
 }
 
 function dashCostOption(rows, lens, pal) {
+  const s = dashStrip();
   const files = new Map();
   for (const r of rows) {
     const n = Number(((pl(r).facts || {}).changed_files)) || 0;
-    if (!n || !passesFilters(r, lens.filters, catalog.strip)) continue;
-    for (const c of facetValues(r, catalog.strip)) files.set(c, (files.get(c) || 0) + n);
+    if (!n || !passesFilters(r, lens.filters, s.id)) continue;
+    for (const c of facetValues(r, s.id)) files.set(c, (files.get(c) || 0) + n);
   }
   const turns = (r) => ((pl(r).facts || {}).turns || {});
   const shown = rows.filter((r) => passesFilters(r, lens.filters));
@@ -377,10 +384,10 @@ function dashCostOption(rows, lens, pal) {
   const spend = shown.filter((r) => (turns(r)[metric] || 0) > 0)
     .sort((a, b) => turns(b)[metric] - turns(a)[metric] || cmp(labelOf(a), labelOf(b))).slice(0, DASH_TOP);
   if (!files.size && !spend.length) return null;
-  const load = fieldRank(catalog.strip).filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, catalog.strip, k, files.get(k), pal[k], fieldShow(catalog.strip, k)), tooltip: { formatter: `${fieldShow(catalog.strip, k)}: ${files.get(k)} changed files` } }));
+  const load = fieldRank(s.id).filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, s.id, k, files.get(k), pal[stripColor(s, k)], fieldShow(s.id, k)), tooltip: { formatter: `${fieldShow(s.id, k)}: ${files.get(k)} changed files` } }));
   const cost = spend.map((r) => {
     const t = turns(r);
-    return { name: labelOf(r), value: metric === "cost_usd" ? dashRound(t.cost_usd) : t.tokens, pr: keyOf(r), itemStyle: { color: pal[waitCat(r)] },
+    return { name: labelOf(r), value: metric === "cost_usd" ? dashRound(t.cost_usd) : t.tokens, pr: keyOf(r), itemStyle: { color: pal[waitColor(r)] },
       tooltip: { formatter: `${dashEsc(labelOf(r))}: ${metric === "cost_usd" ? `US$ ${t.cost_usd.toFixed(2)}, ` : ""}${t.tokens || 0} tokens over ${t.count || 0} turns` } };
   });
   const spendTitle = metric === "cost_usd" ? "US$ spent per pull request" : "Tokens per pull request\nno US$ cost recorded";
@@ -408,7 +415,7 @@ function dashCompact(n) {
 
 function dashHas(f, r, value) {
   const v = fold(value);
-  return rowValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
+  return itemValues(f, r).some((x) => (f.match ? f.match(x, v) : x === v));
 }
 
 function dashBlockersOption(rows, lens, pal) {

@@ -30,7 +30,7 @@ func chainRig(t *testing.T, moves map[string]string, wfs ...workflow.Workflow) *
 	t.Helper()
 	r := newRig(t, wfs...)
 	for _, u := range []unit.Unit{ta, tb} {
-		r.units.Put(u, workflow.Facts{"task.fingerprint": u.Key, "task.repo": ""})
+		r.units.Put(u, workflow.Facts{"task.fingerprint": u.Key, "task.placement": ""})
 	}
 	r.steps.OnRun("classify", func(u unit.Unit) {
 		calls := r.steps.Ran()
@@ -134,8 +134,8 @@ func TestARepoPauseHoldsTaskWorkflows(t *testing.T) {
 	w := sweepWF("tidy", always, "classify")
 	w.Provider, w.Slot = unit.Task, "task"
 	r := newRig(t, w)
-	r.units.Put(ta, workflow.Facts{"task.fingerprint": "a", "task.repo": "acme/api"})
-	r.units.Put(tb, workflow.Facts{"task.fingerprint": "b", "task.repo": "acme/web"})
+	r.units.Put(ta, workflow.Facts{"task.fingerprint": "a", "task.placement": "acme/api"})
+	r.units.Put(tb, workflow.Facts{"task.fingerprint": "b", "task.placement": "acme/web"})
 	r.pause = automation.Pause{Repos: []string{"Acme/API"}}
 	r.sweep()
 	if got := r.ran("classify"); !slices.Equal(got, []unit.Unit{tb}) {

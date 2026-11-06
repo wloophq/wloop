@@ -1,0 +1,1746 @@
+{
+ "now": "2026-11-04T12:00:00Z",
+ "words": {
+  "tag_key": "{{.label}} with {{.key}}",
+  "tag_key_empty": "without {{.key}}"
+ },
+ "specs": [
+  {
+   "id": "where",
+   "label": "Where",
+   "group": true,
+   "sort": "text",
+   "match": "suffix",
+   "empty": "no place"
+  },
+  {
+   "id": "author",
+   "label": "Author",
+   "group": true
+  },
+  {
+   "id": "waits-on",
+   "label": "Waits on",
+   "match": "team"
+  },
+  {
+   "id": "tag",
+   "label": "Tag",
+   "group": true,
+   "match": "prefix",
+   "empty": "no tag"
+  },
+  {
+   "id": "status",
+   "label": "Status",
+   "group": true,
+   "empty": "no status",
+   "rank": [
+    "needs-me",
+    "waiting",
+    "done"
+   ],
+   "labels": {
+    "needs-me": "Needs me",
+    "waiting": "Waiting",
+    "done": "Done"
+   }
+  },
+  {
+   "id": "opened",
+   "label": "Opened",
+   "group": true,
+   "sort": "time",
+   "rank": [
+    "today",
+    "week",
+    "older"
+   ],
+   "buckets": [
+    {
+     "id": "today",
+     "label": "Today",
+     "within": "24h"
+    },
+    {
+     "id": "week",
+     "label": "This week",
+     "within": "168h"
+    },
+    {
+     "id": "older",
+     "label": "Older",
+     "within": ""
+    }
+   ]
+  },
+  {
+   "id": "risk",
+   "label": "Risk",
+   "group": true,
+   "sort": "rank",
+   "rank": [
+    "low",
+    "medium",
+    "high"
+   ],
+   "empty": "no risk"
+  },
+  {
+   "id": "prop.risk",
+   "label": "Risk",
+   "group": true,
+   "empty": "no risk"
+  }
+ ],
+ "items": [
+  {
+   "facets": {
+    "where": [
+     "acme/widgets"
+    ],
+    "author": [
+     "ana"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "tag": [
+     "area:billing",
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-04T10:00:00Z"
+    ],
+    "risk": [
+     "low"
+    ]
+   },
+   "texts": [
+    "Exportação de dados",
+    "acme/widgets#1"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/api"
+    ],
+    "author": [
+     "bia"
+    ],
+    "waits-on": [
+     "team:acme/web"
+    ],
+    "tag": [
+     "area:search"
+    ],
+    "status": [
+     "waiting"
+    ],
+    "opened": [
+     "2026-11-01T12:00:00Z"
+    ],
+    "risk": [
+     "high"
+    ],
+    "prop.risk": [
+     "high"
+    ]
+   },
+   "texts": [
+    "Fix 日本語 parser",
+    "acme/api#2"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/widgets"
+    ],
+    "author": [
+     "ana"
+    ],
+    "waits-on": [
+     "acme/web"
+    ],
+    "tag": [
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-10-01T12:00:00Z"
+    ],
+    "risk": [
+     "medium"
+    ]
+   },
+   "texts": [
+    "Refactor widgets cache"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/docs"
+    ],
+    "author": [
+     "me"
+    ],
+    "waits-on": [],
+    "tag": [],
+    "status": [
+     "done"
+    ],
+    "opened": [],
+    "risk": [],
+    "prop.risk": [
+     "low"
+    ]
+   },
+   "texts": [
+    "Écrire la documentation",
+    "acme/docs#4"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/api"
+    ],
+    "author": [
+     "bia"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "tag": [
+     "area:billing"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-04T11:30:00Z"
+    ],
+    "risk": [
+     "high"
+    ]
+   },
+   "texts": [
+    "Say \"hello world\" in the logs"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/web"
+    ],
+    "author": [
+     "cris"
+    ],
+    "waits-on": [
+     "bia"
+    ],
+    "tag": [
+     "lang:rust",
+     "lang:go"
+    ],
+    "status": [
+     "waiting"
+    ],
+    "opened": [
+     "2026-10-28T12:00:00Z"
+    ],
+    "risk": [
+     "low"
+    ]
+   },
+   "texts": [
+    "fix: unknown:x notes"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/zeta"
+    ],
+    "author": [
+     "dan"
+    ],
+    "waits-on": [],
+    "tag": [
+     "Lang:Go",
+     "lang:go"
+    ],
+    "status": [
+     "needs-me"
+    ],
+    "opened": [
+     "2026-11-03T12:00:00Z"
+    ],
+    "risk": []
+   },
+   "texts": [
+    "Café deploy"
+   ]
+  },
+  {
+   "facets": {
+    "where": [
+     "acme/my repo"
+    ],
+    "author": [
+     "dan"
+    ],
+    "waits-on": [],
+    "tag": [],
+    "status": [],
+    "opened": [],
+    "risk": [
+     "medium"
+    ]
+   },
+   "texts": [
+    "Spaced repo"
+   ]
+  }
+ ],
+ "cases": [
+  {
+   "q": "",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "q": "exportacao",
+   "want": {
+    "shown": [
+     0
+    ]
+   }
+  },
+  {
+   "q": "EXPORTAÇÃO",
+   "want": {
+    "shown": [
+     0
+    ]
+   }
+  },
+  {
+   "q": "日本語",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "documentation ECRIRE",
+   "want": {
+    "shown": [
+     3
+    ]
+   }
+  },
+  {
+   "q": "\"hello world\"",
+   "want": {
+    "shown": [
+     4
+    ]
+   }
+  },
+  {
+   "q": "hello world",
+   "want": {
+    "shown": [
+     4
+    ]
+   }
+  },
+  {
+   "q": "\"world hello\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "cafe",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
+   "q": "café",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
+   "q": "where:widgets",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "where:acme/widgets",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "where:widget",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "where:\"my repo\"",
+   "want": {
+    "shown": [
+     7
+    ]
+   }
+  },
+  {
+   "q": "-where:\"my repo\" author:dan",
+   "want": {
+    "shown": [
+     6
+    ]
+   }
+  },
+  {
+   "q": "-where:widgets",
+   "want": {
+    "shown": [
+     1,
+     3,
+     4,
+     5,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "q": "author:ana author:bia",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:ana　author:bia",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     4
+    ]
+   }
+  },
+  {
+   "q": "where:acme/api author:bia",
+   "want": {
+    "shown": [
+     1,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:bia where:api",
+   "want": {
+    "shown": [
+     1,
+     4
+    ]
+   }
+  },
+  {
+   "q": "AUTHOR:Ana",
+   "want": {
+    "shown": [
+     0,
+     2
+    ]
+   }
+  },
+  {
+   "q": "risK:high",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "-where:\"a\nb\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "-where:\"a\rb\"",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "tag:area",
+   "want": {
+    "shown": [
+     0,
+     1,
+     4
+    ]
+   }
+  },
+  {
+   "q": "tag:lang:go",
+   "want": {
+    "shown": [
+     0,
+     2,
+     5,
+     6
+    ]
+   }
+  },
+  {
+   "q": "tag:lang -tag:area",
+   "want": {
+    "shown": [
+     2,
+     5,
+     6
+    ]
+   }
+  },
+  {
+   "q": "tag:ar",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "waits-on:acme/web",
+   "want": {
+    "shown": [
+     1,
+     2
+    ]
+   }
+  },
+  {
+   "q": "waits-on:team:acme/web",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "waits-on:me",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "waits-on:@me",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "author:@me",
+   "want": {
+    "shown": [
+     3
+    ]
+   }
+  },
+  {
+   "q": "opened:today",
+   "want": {
+    "shown": [
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "opened:week",
+   "want": {
+    "shown": [
+     1,
+     6
+    ]
+   }
+  },
+  {
+   "q": "opened:older",
+   "want": {
+    "shown": [
+     2,
+     5
+    ]
+   }
+  },
+  {
+   "q": "opened:none",
+   "want": {
+    "shown": [
+     3,
+     7
+    ]
+   }
+  },
+  {
+   "q": "-opened:today",
+   "want": {
+    "shown": [
+     1,
+     2,
+     3,
+     5,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "q": "unknown:x",
+   "want": {
+    "shown": [
+     5
+    ]
+   }
+  },
+  {
+   "q": "fix:",
+   "want": {
+    "shown": [
+     5
+    ]
+   }
+  },
+  {
+   "q": "author:",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "status:\"needs-me\"",
+   "want": {
+    "shown": [
+     0,
+     2,
+     4,
+     6
+    ]
+   }
+  },
+  {
+   "q": "cache author:ana",
+   "want": {
+    "shown": [
+     2
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "status",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "needs-me",
+      "label": "Needs me",
+      "items": [
+       0,
+       2,
+       4,
+       6
+      ]
+     },
+     {
+      "key": "waiting",
+      "label": "Waiting",
+      "items": [
+       1,
+       5
+      ]
+     },
+     {
+      "key": "done",
+      "label": "Done",
+      "items": [
+       3
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no status",
+      "items": [
+       7
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "risk",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "low",
+      "label": "low",
+      "items": [
+       0,
+       5
+      ]
+     },
+     {
+      "key": "medium",
+      "label": "medium",
+      "items": [
+       2,
+       7
+      ]
+     },
+     {
+      "key": "high",
+      "label": "high",
+      "items": [
+       1,
+       4
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no risk",
+      "items": [
+       3,
+       6
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "tag",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "area:billing",
+      "label": "area:billing",
+      "items": [
+       0,
+       4
+      ]
+     },
+     {
+      "key": "area:search",
+      "label": "area:search",
+      "items": [
+       1
+      ]
+     },
+     {
+      "key": "lang:go",
+      "label": "lang:go",
+      "items": [
+       0,
+       2,
+       5,
+       6
+      ]
+     },
+     {
+      "key": "lang:rust",
+      "label": "lang:rust",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no tag",
+      "items": [
+       3,
+       7
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "tag:lang",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "lang:go",
+      "label": "lang:go",
+      "items": [
+       0,
+       2,
+       5,
+       6
+      ]
+     },
+     {
+      "key": "lang:rust",
+      "label": "lang:rust",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "none",
+      "label": "without lang",
+      "items": [
+       1,
+       3,
+       4,
+       7
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "where",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "acme/api",
+      "label": "acme/api",
+      "items": [
+       1,
+       4
+      ]
+     },
+     {
+      "key": "acme/docs",
+      "label": "acme/docs",
+      "items": [
+       3
+      ]
+     },
+     {
+      "key": "acme/my repo",
+      "label": "acme/my repo",
+      "items": [
+       7
+      ]
+     },
+     {
+      "key": "acme/web",
+      "label": "acme/web",
+      "items": [
+       5
+      ]
+     },
+     {
+      "key": "acme/widgets",
+      "label": "acme/widgets",
+      "items": [
+       0,
+       2
+      ]
+     },
+     {
+      "key": "acme/zeta",
+      "label": "acme/zeta",
+      "items": [
+       6
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "group": "opened",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "today",
+      "label": "today",
+      "items": [
+       0,
+       4
+      ]
+     },
+     {
+      "key": "week",
+      "label": "week",
+      "items": [
+       1,
+       6
+      ]
+     },
+     {
+      "key": "older",
+      "label": "older",
+      "items": [
+       2,
+       5
+      ]
+     },
+     {
+      "key": "none",
+      "label": "none",
+      "items": [
+       3,
+       7
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "risk",
+   "want": {
+    "shown": [
+     0,
+     5,
+     2,
+     7,
+     1,
+     4,
+     3,
+     6
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "risk",
+   "desc": true,
+   "want": {
+    "shown": [
+     1,
+     4,
+     2,
+     7,
+     0,
+     5,
+     3,
+     6
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "opened",
+   "want": {
+    "shown": [
+     3,
+     7,
+     2,
+     5,
+     1,
+     6,
+     0,
+     4
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "opened",
+   "desc": true,
+   "want": {
+    "shown": [
+     4,
+     0,
+     6,
+     1,
+     5,
+     2,
+     3,
+     7
+    ]
+   }
+  },
+  {
+   "q": "",
+   "sort": "where",
+   "want": {
+    "shown": [
+     1,
+     4,
+     3,
+     7,
+     5,
+     0,
+     2,
+     6
+    ]
+   }
+  },
+  {
+   "q": "author:ana",
+   "group": "risk",
+   "sort": "opened",
+   "desc": true,
+   "want": {
+    "shown": [
+     0,
+     2
+    ],
+    "groups": [
+     {
+      "key": "low",
+      "label": "low",
+      "items": [
+       0
+      ]
+     },
+     {
+      "key": "medium",
+      "label": "medium",
+      "items": [
+       2
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "q": "prop.risk:high",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "PROP.Risk:HIGH",
+   "want": {
+    "shown": [
+     1
+    ]
+   }
+  },
+  {
+   "q": "-prop.risk:high",
+   "want": {
+    "shown": [
+     0,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ]
+   }
+  },
+  {
+   "q": "prop.risk:high prop.risk:low",
+   "want": {
+    "shown": [
+     1,
+     3
+    ]
+   }
+  },
+  {
+   "q": ".risk:high",
+   "want": {
+    "shown": []
+   }
+  },
+  {
+   "q": "",
+   "group": "prop.risk",
+   "want": {
+    "shown": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7
+    ],
+    "groups": [
+     {
+      "key": "high",
+      "label": "high",
+      "items": [
+       1
+      ]
+     },
+     {
+      "key": "low",
+      "label": "low",
+      "items": [
+       3
+      ]
+     },
+     {
+      "key": "none",
+      "label": "no risk",
+      "items": [
+       0,
+       2,
+       4,
+       5,
+       6,
+       7
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "parts": {
+  "words": {
+   "age_now": "now",
+   "age_minutes": "{{.m}}m",
+   "age_hours": "{{.h}}h {{.m}}m",
+   "age_days": "{{.d}}d {{.h}}h"
+  },
+  "specs": [
+   {
+    "id": "where",
+    "label": "Where",
+    "show": "ref"
+   },
+   {
+    "id": "author",
+    "label": "Author",
+    "show": "meta",
+    "show_values": "first",
+    "label_prefix": "by "
+   },
+   {
+    "id": "is",
+    "label": "Flags",
+    "show": "flag",
+    "show_only": [
+     "paused",
+     "muted"
+    ]
+   },
+   {
+    "id": "waits-on",
+    "label": "Waits on",
+    "show": "who",
+    "match": "team"
+   },
+   {
+    "id": "kind",
+    "label": "Situation",
+    "show": "kind",
+    "labels": {
+     "review": "Review"
+    }
+   },
+   {
+    "id": "age",
+    "label": "Waiting for",
+    "sort": "time",
+    "show": "age",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ]
+   },
+   {
+    "id": "moved",
+    "label": "Moved",
+    "sort": "time",
+    "show": "age"
+   },
+   {
+    "id": "status",
+    "label": "Workspace",
+    "show": "aside"
+   },
+   {
+    "id": "tag",
+    "label": "Tag",
+    "show": "meta",
+    "match": "prefix"
+   },
+   {
+    "id": "size",
+    "label": "Size",
+    "show": "meta",
+    "labels": {
+     "s": "S"
+    }
+   },
+   {
+    "id": "ci",
+    "label": "Checks"
+   },
+   {
+    "id": "conv",
+    "label": "Conversation",
+    "show": "ref",
+    "displays": {
+     "slack": {
+      "show": "meta",
+      "label_prefix": "#"
+     }
+    }
+   },
+   {
+    "id": "lane",
+    "label": "Lane",
+    "provider": "github",
+    "show": "flag"
+   },
+   {
+    "id": "st",
+    "label": "State",
+    "show": "kind",
+    "labels": {
+     "a": "Shared A"
+    },
+    "displays": {
+     "github": {
+      "show": "kind",
+      "labels": {
+       "a": "GitHub A"
+      }
+     }
+    }
+   },
+   {
+    "id": "fl",
+    "label": "Flags",
+    "displays": {
+     "slack": {
+      "show": "flag",
+      "show_only": [
+       "x"
+      ]
+     }
+    }
+   },
+   {
+    "id": "opened",
+    "label": "Opened",
+    "sort": "time",
+    "show": "meta",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ]
+   },
+   {
+    "id": "seen",
+    "label": "Seen",
+    "sort": "time",
+    "show": "meta",
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "older",
+      "label": "older",
+      "within": ""
+     }
+    ],
+    "displays": {
+     "slack": {
+      "show": "meta",
+      "bucket_labels": {
+       "1d": "today",
+       "older": "before"
+      }
+     }
+    }
+   }
+  ],
+  "cases": [
+   {
+    "item": {
+     "provider": "github",
+     "facets": {
+      "where": [
+       "acme/web"
+      ],
+      "author": [
+       "me",
+       "ana"
+      ],
+      "is": [
+       "stalled",
+       "paused",
+       "muted"
+      ],
+      "waits-on": [
+       "me",
+       "bia"
+      ],
+      "kind": [
+       "review"
+      ],
+      "age": [
+       "2026-11-04T09:30:00Z"
+      ],
+      "moved": [
+       "2026-11-01T12:00:00Z"
+      ],
+      "status": [
+       "none"
+      ],
+      "tag": [
+       "lang:go"
+      ],
+      "size": [
+       "s"
+      ],
+      "ci": [
+       "failure"
+      ],
+      "lane": [
+       "me"
+      ],
+      "st": [
+       "a"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "ref": [
+      {
+       "field": "where",
+       "value": "acme/web",
+       "raw": "acme/web",
+       "label": "acme/web"
+      }
+     ],
+     "meta": [
+      {
+       "field": "author",
+       "value": "me",
+       "raw": "me",
+       "label": "by me"
+      },
+      {
+       "field": "tag",
+       "value": "lang:go",
+       "raw": "lang:go",
+       "label": "lang:go"
+      },
+      {
+       "field": "size",
+       "value": "s",
+       "raw": "s",
+       "label": "S"
+      }
+     ],
+     "flag": [
+      {
+       "field": "is",
+       "value": "paused",
+       "raw": "paused",
+       "label": "paused"
+      },
+      {
+       "field": "is",
+       "value": "muted",
+       "raw": "muted",
+       "label": "muted"
+      },
+      {
+       "field": "lane",
+       "value": "me",
+       "raw": "me",
+       "label": "me"
+      }
+     ],
+     "who": [
+      {
+       "field": "waits-on",
+       "value": "me",
+       "raw": "me",
+       "label": "me"
+      },
+      {
+       "field": "waits-on",
+       "value": "bia",
+       "raw": "bia",
+       "label": "bia"
+      }
+     ],
+     "kind": [
+      {
+       "field": "kind",
+       "value": "review",
+       "raw": "review",
+       "label": "Review"
+      },
+      {
+       "field": "st",
+       "value": "a",
+       "raw": "a",
+       "label": "GitHub A"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T09:30:00Z",
+       "label": "2h 30m"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "provider": "slack",
+     "facets": {
+      "author": [
+       "ana"
+      ],
+      "age": [
+       "not a time"
+      ],
+      "moved": [
+       "2026-11-01T12:00:00Z"
+      ],
+      "status": [
+       "ws-1"
+      ],
+      "conv": [
+       "general",
+       "#random"
+      ],
+      "lane": [
+       "me"
+      ],
+      "fl": [
+       "x",
+       "y"
+      ],
+      "opened": [
+       "2026-11-04T10:00:00Z"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "author",
+       "value": "ana",
+       "raw": "ana",
+       "label": "by ana"
+      },
+      {
+       "field": "conv",
+       "value": "general",
+       "raw": "general",
+       "label": "#general"
+      },
+      {
+       "field": "conv",
+       "value": "#random",
+       "raw": "#random",
+       "label": "#random"
+      },
+      {
+       "field": "opened",
+       "value": "1d",
+       "raw": "2026-11-04T10:00:00Z",
+       "label": "0-1 days"
+      }
+     ],
+     "age": [
+      {
+       "field": "moved",
+       "value": "2026-11-01T12:00:00Z",
+       "raw": "2026-11-01T12:00:00Z",
+       "label": "3d 0h"
+      }
+     ],
+     "aside": [
+      {
+       "field": "status",
+       "value": "ws-1",
+       "raw": "ws-1",
+       "label": "ws-1"
+      }
+     ],
+     "flag": [
+      {
+       "field": "fl",
+       "value": "x",
+       "raw": "x",
+       "label": "x"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "conv": [
+       "x"
+      ],
+      "age": [
+       "2026-11-04T11:50:00Z"
+      ],
+      "kind": [
+       "none"
+      ],
+      "lane": [
+       "loop"
+      ],
+      "st": [
+       "a"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "ref": [
+      {
+       "field": "conv",
+       "value": "x",
+       "raw": "x",
+       "label": "x"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T11:50:00Z",
+       "label": "10m"
+      }
+     ],
+     "flag": [
+      {
+       "field": "lane",
+       "value": "loop",
+       "raw": "loop",
+       "label": "loop"
+      }
+     ],
+     "kind": [
+      {
+       "field": "st",
+       "value": "a",
+       "raw": "a",
+       "label": "Shared A"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "age": [
+       "2026-11-04T11:59:30Z"
+      ],
+      "author": [
+       "none",
+       "bob"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "author",
+       "value": "bob",
+       "raw": "bob",
+       "label": "by bob"
+      }
+     ],
+     "age": [
+      {
+       "field": "age",
+       "value": "1d",
+       "raw": "2026-11-04T11:59:30Z",
+       "label": "now"
+      }
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "ci": [
+       "failure"
+      ]
+     },
+     "texts": []
+    },
+    "want": {}
+   },
+   {
+    "item": {
+     "facets": {
+      "moved": [
+       "2026-11-04"
+      ],
+      "opened": [
+       "2026-11-04"
+      ]
+     },
+     "texts": []
+    },
+    "want": {}
+   },
+   {
+    "item": {
+     "provider": "slack",
+     "facets": {
+      "seen": [
+       "2026-11-04T11:00:00Z"
+      ]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {
+       "field": "seen",
+       "value": "1d",
+       "raw": "2026-11-04T11:00:00Z",
+       "label": "today"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

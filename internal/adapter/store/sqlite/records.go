@@ -37,7 +37,7 @@ func (db *DB) EventsOf(ctx context.Context, units []unit.Unit, f timeline.Filter
 	if len(units) == 0 {
 		return []timeline.Event{}, nil
 	}
-	q := `SELECT id, provider, unit_key, kind, key, actor, at, data FROM events WHERE ` + unitsIn(len(units))
+	q := `SELECT id, provider, unit_key, kind, key, actor, at, data, session FROM events WHERE ` + unitsIn(len(units))
 	args := unitArgs(units)
 	if len(f.Kinds) > 0 {
 		q += ` AND kind IN (?` + strings.Repeat(", ?", len(f.Kinds)-1) + `)`
@@ -58,7 +58,7 @@ func (db *DB) EventsOf(ctx context.Context, units []unit.Unit, f timeline.Filter
 	err := eachRow(ctx, db.R(), q, args, func(rows *sql.Rows) error {
 		var ev timeline.Event
 		var provider, at string
-		if err := rows.Scan(&ev.Seq, &provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Actor, &at, &ev.Data); err != nil {
+		if err := rows.Scan(&ev.Seq, &provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Actor, &at, &ev.Data, &ev.Session); err != nil {
 			return err
 		}
 		ev.Unit.Provider = unit.ProviderID(provider)
@@ -126,7 +126,7 @@ func (tx *Tx) PutRecord(ctx context.Context, u unit.Unit, kind, actor, data stri
 		string(u.Provider), u.Key, timeline.KindRecord, kind, actor, at.UTC().Format(event.TimeLayout), data); err != nil {
 		return err
 	}
-	tx.Touch(port.TopicLoopEvents, u)
+	tx.Touch(port.TopicLoopEvents|port.TopicRecords, u)
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (tx *Tx) DropRecord(ctx context.Context, u unit.Unit, kind string) (dropped
 	if err != nil || n == 0 {
 		return false, err
 	}
-	tx.Touch(port.TopicLoopEvents, u)
+	tx.Touch(port.TopicLoopEvents|port.TopicRecords, u)
 	return true, nil
 }
 

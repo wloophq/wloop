@@ -25,6 +25,8 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `e` | done |
 | `Backspace` | dismiss |
 | `o` | open the source |
+| `=` | group by the next field the view offers (terminal): the view's own, each other field, then none |
+| `-` | sort by the next field the view offers (terminal): the view's own order, then each field ascending and descending |
 | `n` | capture |
 | `1`-`9` | the gate's intent of that number, in the order the gate lists them, while a gate is focused; in the terminal, pick a draft the open detail lists when it asks no question |
 
@@ -63,5 +65,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `N` | nudge |
 
 An intent of yours adds its own uppercase `key`.
+
+In the cockpit, Tab moves from row to row, and on a board from card to card; a row's controls (its facet buttons, links and actions) are out of the Tab order, and Left and Right move between them and the row, Home and End to the first and the last. `j` and `k` move the selection from any of them. A draft's buttons in the Outbox keep their place in the Tab order.
 
 In the terminal, actions that take text ask on the bottom line: Enter sends, Esc cancels. In the reply, edit and delegate prompts, Ctrl+E opens the text in `$VISUAL` or `$EDITOR`, and a draft of several lines opens there directly. Take over, run, nudge, and approving, retrying or discarding a draft ask for a `y` naming what they act on; a `y` typed in the same burst as the key before it does not count. `q` waits for running actions to finish (a second `q` leaves anyway).

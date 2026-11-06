@@ -45,7 +45,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheCatalogBuildsActions` | Only the catalog builds action specs. |
 | `TestOnlyTheCatalogEvaluatesIntentPredicates` | Only the loader and the catalog read an intent's predicates. |
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
-| `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, a trusted policy rule or a passed window. |
+| `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, an agent through a session the user drives, a trusted policy rule or a passed window. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestPluginsImportOnlyTheSDK` | No package under `plugins/`, nor the stand-in plugin's, imports a package under `internal/` or a package of another plugin, tests included: every plugin builds against the SDK and its own packages alone. |

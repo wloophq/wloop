@@ -10,6 +10,17 @@
       },
       "type": "array"
     },
+    "attribution": {
+      "additionalProperties": false,
+      "description": "How the task's page names who made a change.",
+      "properties": {
+        "via_session": {
+          "description": "The name of a change an agent made for you through a session you drove; {session} is the session's id.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "chat": {
       "additionalProperties": false,
       "description": "The chat on a task.",
