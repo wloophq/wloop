@@ -51,13 +51,14 @@ var moves = map[task.Verb]struct {
 	"acknowledge":      {[]string{"inbox", "next"}, "next"},
 	"not-mine":         {todo, "trash"},
 	"hand-to":          {without(todo, "waiting"), "waiting"},
+	task.VerbMerge:     {todo, ""},
 }
 
 // verbs are the bundled verbs, in the bundled file's order.
 var verbs = []task.Verb{task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbSomeday, task.VerbReference,
 	task.VerbFocus, task.VerbProject, task.VerbApprove, task.VerbDelegate, task.VerbDone, task.VerbDismiss, task.VerbSeen,
 	task.VerbContext, task.VerbArea, task.VerbAnswer, task.VerbEdit, task.VerbRetry, task.VerbReviewed, task.VerbSequential,
-	task.VerbReply, "acknowledge", "not-mine", "hand-to"}
+	task.VerbReply, "acknowledge", "not-mine", "hand-to", task.VerbMerge, task.VerbSplit, task.VerbRelate, task.VerbUnrelate}
 
 // InState is the bundled state named s, for fixtures.
 func InState(s string) task.State { return task.State(s) }
@@ -90,7 +91,7 @@ func (bundledStates) Move(verb string) ([]string, string, bool) {
 // handlers are the bundled verbs that name a handler, each the one named as the verb.
 var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus, task.VerbProject, task.VerbApprove,
 	task.VerbDelegate, task.VerbSeen, task.VerbContext, task.VerbArea, task.VerbAnswer, task.VerbEdit, task.VerbRetry,
-	task.VerbReviewed, task.VerbSequential, task.VerbReply}
+	task.VerbReviewed, task.VerbSequential, task.VerbReply, task.VerbMerge, task.VerbSplit, task.VerbRelate, task.VerbUnrelate}
 
 // byWorkflow are the bundled verbs a workflow may run; a person may run every verb.
 var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbWake, task.VerbFocus}
@@ -120,20 +121,32 @@ func (bundledStates) PropOf(r task.Role) (string, []string) {
 		return "due", nil
 	case task.RolePromise:
 		return "promised", nil
+	case task.RoleRelated:
+		return "related", nil
+	case task.RoleMerged:
+		return "merged", nil
 	}
 	return "", nil
 }
 
-func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false }
+// byWorkflowGate are the bundled verbs a workflow runs only through their gate, each the gate named as the verb.
+var byWorkflowGate = []task.Verb{task.VerbMerge}
+
+func (bundledStates) Gate(verb string) (gate.Gate, bool) {
+	if !slices.Contains(byWorkflowGate, task.Verb(verb)) {
+		return gate.Gate{}, false
+	}
+	return gate.Gate{Name: verb, Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}, true
+}
 
 // Authority is the bundled profile's by, a coretasks.Authority: a person and an agent run every bundled verb, a
-// workflow those whose by.workflow is true.
+// workflow those whose by.workflow is true and opens the gate of those whose by.workflow is "gate".
 func (bundledStates) Authority(_ context.Context, verb string, a task.Actor, _ task.Task) (bool, bool, error) {
 	switch a {
 	case task.ActorPerson, task.ActorAgent:
 		return slices.Contains(verbs, task.Verb(verb)), false, nil
 	case task.ActorWorkflow:
-		return slices.Contains(byWorkflow, task.Verb(verb)), false, nil
+		return slices.Contains(byWorkflow, task.Verb(verb)), slices.Contains(byWorkflowGate, task.Verb(verb)), nil
 	}
 	return false, false, nil
 }

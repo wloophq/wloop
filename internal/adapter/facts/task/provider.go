@@ -304,6 +304,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
 		"task.link_signals":        []string{},
+		"task.clarified":           false,
+		"task.candidates":          []string{},
+		"task.link_target_tasks":   []string{},
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false

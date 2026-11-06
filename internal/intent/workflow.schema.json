@@ -548,6 +548,10 @@
                   "description": "With a verb whose handler is context, the contexts, comma-separated; with area, the area.",
                   "type": "string"
                 },
+                "task": {
+                  "description": "With a verb whose handler is merge, split, relate or unrelate, the task fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks; the step is refused while it names none.",
+                  "type": "string"
+                },
                 "until": {
                   "description": "With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.",
                   "type": "string"

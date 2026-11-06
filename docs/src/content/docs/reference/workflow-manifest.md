@@ -124,6 +124,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `resurface` | string |  | With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD. |
 | `task.verb` | `set` | string |  | With a verb whose handler is context, the contexts, comma-separated; with area, the area. |
 | `task.verb` | `by` | string |  | With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it. |
+| `task.verb` | `task` | string |  | With a verb whose handler is merge, split, relate or unrelate, the task fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks; the step is refused while it names none. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `items.resolve` | `resolution` | one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot` | `done` | How the items resolved. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |

@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
@@ -24,7 +25,10 @@ type Reader interface {
 	// ahead of the store; else the tasks written after since's Rev, whatever their category. Removed is empty
 	// and Counters zero: the service fills them.
 	TasksSince(ctx context.Context, q task.Query, since Since) (Page, error)
-	Task(ctx context.Context, id task.ID) (task.Task, error) // ErrNoTask; ErrVerb is a verb the task's state refuses, naming both
+	// Task reads task id, else follows the aliases of id, hop by hop, an open task first at each, to the
+	// stored task they lead to: a task merged into one merged in turn reads as the last. ErrNoTask when none
+	// leads to a stored task, a cycle included.
+	Task(ctx context.Context, id task.ID) (task.Task, error)
 	TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 }
 
@@ -33,6 +37,21 @@ type Store interface {
 	// Apply writes cs and evs in one transaction, bumps Rev and notes port.TopicTasks; when cs change
 	// nothing it writes and notes nothing, and with no cs it writes evs alone.
 	Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error
+}
+
+// Merger is a Store that folds one task into another and gives it back, each in one transaction; a Store
+// without it serves no merge and no split.
+type Merger interface {
+	// Merge writes into as r's fold left it, drops task r.From and aliases it to r.Into, points the gates,
+	// drafts and messages that name r.From at r.Into, and keeps r, completed with their ids, r.From's wake and
+	// its unit's marks, as r.From's merge record; evs are written with it. ErrNoTask when either is not stored.
+	Merge(ctx context.Context, r merge.Record, into task.Task, evs ...port.Event) error
+	// Split undoes the merge r records: writes r.Task back with r's wake and marks, points r's gates, drafts
+	// and messages back at r.From, drops the alias, and writes into as the unfold left it, with evs. ErrVerb
+	// when r.From is stored or r.Into is not.
+	Split(ctx context.Context, r merge.Record, into task.Task, evs ...port.Event) error
+	// MergeOf is the record of the merge that took task id; false when id is stored or was never merged.
+	MergeOf(ctx context.Context, id task.ID) (merge.Record, bool, error)
 }
 
 // PropStore keeps the tasks' properties. SetProp replaces the property's
@@ -58,6 +77,9 @@ type (
 	// OwedBy is who owes task t's next step, as tasks.toml's owed_by says: "me",
 	// a person's key, or "" when nobody does.
 	OwedBy func(ctx context.Context, t task.Task) (string, error)
+	// Survives says whether the predicate verb's survivor names (tasks.toml) holds on task t, over its facts:
+	// the task it holds on alone is the one a merge keeps.
+	Survives func(ctx context.Context, verb string, t task.Task) (bool, error)
 )
 
 type Since struct {

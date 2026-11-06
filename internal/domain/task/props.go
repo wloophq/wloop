@@ -69,13 +69,21 @@ const (
 	// RolePromise is the property the promise handler sets from the time you promise an answer by, which the
 	// fact task.promised reads: a date.
 	RolePromise Role = "promise"
+	// RoleRelated is the property that lists, by id, the tasks the relate handler linked to the task, which
+	// relate and unrelate keep the same on both: a string[].
+	RoleRelated Role = "related"
+	// RoleMerged is the property that lists, by id in merge order, the tasks the merge handler folded into the
+	// task, each one split can give back: a string[]. A task that holds one settles item by item, so the items
+	// of one unit no longer calling for it never close or drop it while another of its units' items does.
+	RoleMerged Role = "merged"
 )
 
 // Roles are every role.
-var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise}
+var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise, RoleRelated, RoleMerged}
 
 // RoleTypes are the type of the property each role acts on.
-var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate}
+var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate,
+	RoleRelated: PropStrings, RoleMerged: PropStrings}
 
 // Profile is the profile as the rules read it: its states, and the property each role acts on with its
 // values, "" for a role no property takes.
