@@ -443,7 +443,7 @@ var writes = []writeCase{
 			if err != nil {
 				return err
 			}
-			sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, taskstest.BundledStates, noteAt)
+			sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, nil, taskstest.BundledStates, noteAt)
 			if err != nil {
 				return err
 			}

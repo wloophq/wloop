@@ -1051,3 +1051,91 @@ func TestAGateHoldingSurvivorStaysOpenWithTheMergedTasksItemsWhenItsGatesClose(t
 		t.Fatalf("survivor %s %v: its last gate closing ended it with the merged task's open items", y.Category, y.Items)
 	}
 }
+
+// seedRelated is seed with a third task, the other pull request's, related to the ask.
+func (r *mrig) seedRelated(t *testing.T) (pr, ask, web task.Task) {
+	t.Helper()
+	pr, ask = r.seed(t)
+	r.items.byUnit[otherPR] = []items.Item{webItem()}
+	r.clock.t = t0.Add(2 * time.Minute)
+	r.sync(t, otherPR)
+	r.do(t, ask.ID, relateReq(task.VerbRelate, task.ActorPerson, webTaskID))
+	return r.task(t, pr.ID), r.task(t, ask.ID), r.task(t, webTaskID)
+}
+
+func (r *mrig) do(t *testing.T, id task.ID, req coretasks.Request) {
+	t.Helper()
+	if _, err := r.svc.Do(context.Background(), id, req); err != nil {
+		t.Fatalf("%s on %s: %v", req.Verb, id, err)
+	}
+}
+
+// relations are the pairs of ids each task's property of role related lists, as stored, as "a>b".
+func (r *mrig) relations(t *testing.T, ids ...task.ID) []string {
+	t.Helper()
+	var out []string
+	for _, id := range ids {
+		for _, o := range r.task(t, id).Prop("related").List {
+			out = append(out, string(id)+">"+o)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestSplitAfterAnUnrelateOfTheSurvivorLeavesNoOneSidedRelation(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbUnrelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); len(got) != 0 {
+		t.Errorf("relations after the split %v, want none: the person unrelated them while merged", got)
+	}
+}
+
+func TestSplitKeepsARelateOfTheSurvivorWithATaskThatCameThroughTheMergedOne(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbRelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{string(ask.ID) + ">" + string(web.ID), string(pr.ID) + ">" + string(web.ID), string(web.ID) + ">" + string(ask.ID), string(web.ID) + ">" + string(pr.ID)}
+	slices.Sort(want)
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, want) {
+		t.Errorf("relations after the split %v, want %v", got, want)
+	}
+}
+
+func TestSplitOfAnUntouchedRelatedTaskGivesItsRelationBack(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	before := r.relations(t, pr.ID, ask.ID, web.ID)
+	r.merge(t, ask.ID, pr.ID)
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, before) {
+		t.Errorf("relations after the split %v, before the merge %v", got, before)
+	}
+}
+
+func TestSplitAfterAnUnrelateAndARelateAgainKeepsTheSurvivorsLink(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbUnrelate, task.ActorPerson, web.ID))
+	r.do(t, pr.ID, relateReq(task.VerbRelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{string(pr.ID) + ">" + string(web.ID), string(web.ID) + ">" + string(pr.ID)}
+	slices.Sort(want)
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, want) {
+		t.Errorf("relations after the split %v, want %v", got, want)
+	}
+}

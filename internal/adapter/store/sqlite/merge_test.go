@@ -115,7 +115,7 @@ func (ms mergeStore) merge(t *testing.T, from, into task.Task, at time.Time) mer
 func (ms mergeStore) split(t *testing.T, r merge.Record, at time.Time) error {
 	t.Helper()
 	into := ms.read(t, r.Into)
-	sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, taskstest.BundledStates, at)
+	sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, nil, taskstest.BundledStates, at)
 	if err != nil {
 		return err
 	}
@@ -311,7 +311,7 @@ func TestSplitRefusesATaskStoredAgain(t *testing.T) {
 	if _, ok, err := ms.m.MergeOf(context.Background(), xID); ok || err != nil {
 		t.Fatalf("a stored task has a merge record: %v", err)
 	}
-	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, taskstest.BundledStates, mergeAt)
+	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, nil, taskstest.BundledStates, mergeAt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +325,7 @@ func TestSplitRefusesAPairTheRecordDoesNotName(t *testing.T) {
 	ms := openMerge(t)
 	x, y := ms.seed(t)
 	r := ms.merge(t, x, y, mergeAt)
-	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, taskstest.BundledStates, mergeAt)
+	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, nil, taskstest.BundledStates, mergeAt)
 	from, rest := sp.From, sp.Rest
 	if err != nil {
 		t.Fatal(err)
@@ -484,7 +484,7 @@ func TestSplitLeavesTheRowsAnotherMergedTasksRecordListsOnAUnitTheSplitTaskBroug
 	if !slices.Equal(rw.Drafts, []int64{31}) {
 		t.Fatalf("W's record drafts %v", rw.Drafts)
 	}
-	sp, err := merge.Unfold(ms.read(t, yID), rx, []merge.Record{rw}, nil, merge.Project{}, taskstest.BundledStates, mergeAt.Add(time.Hour))
+	sp, err := merge.Unfold(ms.read(t, yID), rx, []merge.Record{rw}, nil, merge.Project{}, nil, taskstest.BundledStates, mergeAt.Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
