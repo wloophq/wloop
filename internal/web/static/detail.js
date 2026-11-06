@@ -208,6 +208,7 @@ function verbButton(e, verb, label, run, extra = {}) {
     disabled: !st.enabled,
     title: [verbTask(verb).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n") || undefined,
     "data-focus": `${extra.scope || "detail"}:${verb}:${e.id}`,
+    "aria-label": extra.name,
     onclick: run,
   }, label);
 }
@@ -299,7 +300,7 @@ function refRow(e, r, verb, scope) {
   return [
     h("a", { href: "#" + viewHash({ task: r.id, pr: "" }), "data-focus": `${scope}:${r.id}` }, title),
     state ? [" ", h("span", { class: "pill" }, stateLabel(state))] : null,
-    verb ? [" ", verbButton(e, verb, verbLabel(verb), () => taskAct(e, verb, { [PICK_ARG]: r.id }), { scope: `${scope}:${r.id}` })] : null,
+    verb ? [" ", verbButton(e, verb, verbLabel(verb), () => taskAct(e, verb, { [PICK_ARG]: r.id }), { scope: `${scope}:${r.id}`, name: `${verbLabel(verb)} ${title}` })] : null,
   ];
 }
 

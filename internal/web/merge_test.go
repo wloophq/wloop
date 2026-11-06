@@ -45,7 +45,7 @@ func TestTheCockpitPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 		e["verbs"] = append(e["verbs"].([]map[string]any), map[string]any{"verb": v, "enabled": true})
 	}
 	keysRun(t, openTasks, `
-const strip = (xs) => xs.map(({ label, key }) => ({ label, key }));
+const strip = (xs) => xs.map(({ label, meta }) => ({ label, key: meta }));
 const k = harness({ selected: input, get: matching });
 await k.press("k", { meta: true });
 const labels = k.log.palette.items.map((i) => i.label);
@@ -128,6 +128,7 @@ func TestTheCockpitTaskPageShowsRelatedTasksAndAMergedFromTraceWithSplit(t *test
 		Related  []string
 		Merged   []string
 		Buttons  []string
+		Names    []string
 		Picker   struct {
 			Title string
 			Items []string
@@ -156,7 +157,8 @@ done({
   Props: walk(head, (x) => x.tag === "dt").map(text),
   Related: lis(related), Merged: lis(merged),
   Buttons: walk(box, (x) => x.tag === "button" && ["Split", "Unrelate"].includes(x.textContent)).map((b) => b.attrs["data-focus"]),
-  Picker: { Title: picker.title, Items: picker.items.map((i) => i.label + " " + i.key) },
+  Names: walk(box, (x) => x.tag === "button" && ["Split", "Unrelate"].includes(x.textContent)).map((b) => b.attrs["aria-label"]),
+  Picker: { Title: picker.title, Items: picker.items.map((i) => i.label + " " + i.meta) },
   Posts: posts,
 });`+"\n})().catch((e) => { console.error(e); process.exit(1); });", map[string]any{"catalog": cat, "answers": answers}, &got)
 
@@ -178,6 +180,9 @@ done({
 	if want := []string{"related:t-2:unrelate:t-0123456789abcdef", "related:t-4:unrelate:t-0123456789abcdef", "merged:t-9:split:t-0123456789abcdef"}; !reflect.DeepEqual(got.Buttons, want) {
 		t.Errorf("row buttons %v, want %v", got.Buttons, want)
 	}
+	if want := []string{"Unrelate Book the launch hall", "Unrelate Order the badges", "Split Ship the retry fix"}; !reflect.DeepEqual(got.Names, want) {
+		t.Errorf("row buttons are named %q, want %q", got.Names, want)
+	}
 	if got.Picker.Title != "Merge with which task" || !reflect.DeepEqual(got.Picker.Items, []string{"Write the runbook Parked"}) {
 		t.Errorf("the Merge picker %+v", got.Picker)
 	}
@@ -192,5 +197,85 @@ done({
 		!reflect.DeepEqual(args, []any{wantArgs("t-5"), wantArgs("t-2"), wantArgs("t-9")}) {
 		raw, _ := json.Marshal(got.Posts)
 		t.Errorf("posted %s", raw)
+	}
+}
+
+// paletteShim is domShim with a head, and walk over its tree.
+const paletteShim = `
+document.head = new El("head");
+El.prototype.remove = function () {};
+El.prototype.removeAttribute = function (k) { delete this.attrs[k]; };
+function walk(n, pred, out = []) {
+  if (n && Array.isArray(n.children)) { if (pred(n)) out.push(n); n.children.forEach((c) => walk(c, pred, out)); }
+  return out;
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const key = (k) => ({ key: k, preventDefault() {} });
+// opened shows a palette over source, whose answers wait for answer(text), and returns its parts.
+function opened(o) {
+  const pending = {};
+  const source = (q) => new Promise((res) => { pending[q] = res; });
+  showPalette({ ...o, source });
+  const shade = document.body.children[document.body.children.length - 1];
+  const input = walk(shade, (x) => x.tag === "input")[0];
+  const list = walk(shade, (x) => x.tag === "ol")[0];
+  const type = (text) => { input.value = text; input.on.input(); };
+  const answer = async (q, items) => { pending[q](items); await tick(); await tick(); };
+  const shown = () => walk(list, (x) => x.tag === "li").map((li) => li.textContent);
+  const empty = walk(shade, (x) => String(x.attrs.class || "").includes("pal-empty"))[0];
+  return { input, list, type, answer, shown, empty };
+}
+`
+
+func TestThePaletteShowsTheLatestTextsAnswerAndEnterWaitsForIt(t *testing.T) {
+	var got struct {
+		Role, Controls, ListID, Active, FirstID string
+		Pill, Kbd                               []string
+		Latest                                  []string
+		BeforeAnswer, Runs                      []string
+		Empty                                   string
+		EmptyLive                               string
+	}
+	main := `(async () => {
+const runs = [];
+const item = (label, meta) => ({ label, meta, run: () => runs.push(label) });
+const a = opened({ title: "Merge with which task", items: [item("Write the runbook", "Next")], empty: "No task holds the text" });
+const first = walk(a.list, (x) => x.tag === "li")[0];
+const facts = { Role: a.input.attrs.role, Controls: a.input.attrs["aria-controls"], ListID: a.list.attrs.id, Active: a.input.attrs["aria-activedescendant"], FirstID: first.attrs.id,
+  Pill: walk(a.list, (x) => String(x.attrs.class || "").includes("pill")).map((x) => x.textContent), Kbd: walk(a.list, (x) => x.tag === "kbd").map((x) => x.textContent) };
+a.type("la");
+a.type("launch hall");
+await a.answer("launch hall", [item("Book the launch hall", "Inbox")]);
+await a.answer("la", [item("Book the launch venue", "Inbox")]);
+const latest = a.shown();
+
+const b = opened({ title: "Merge with which task", items: [item("Book the launch venue", "Inbox")], empty: "No task holds the text" });
+b.type("launch hall");
+b.input.on.keydown(key("Enter"));
+await tick();
+const before = runs.slice();
+await b.answer("launch hall", [item("Book the launch hall", "Inbox")]);
+
+const c = opened({ title: "Merge with which task", items: [item("Write the runbook", "Next")], empty: "No task holds the text" });
+c.type("zz");
+await c.answer("zz", []);
+process.stdout.write(JSON.stringify({ ...facts, Latest: latest, BeforeAnswer: before, Runs: runs, Empty: c.empty.textContent, EmptyLive: c.empty.attrs["aria-live"] }));
+})().catch((e) => { console.error(e); process.exit(1); });`
+	nodeScript(t, domShim+strings.Replace(staticJS(t, "palette.js"), `"use strict";`, "", 1)+paletteShim+main, nil, &got)
+
+	if got.Role != "combobox" || got.Controls == "" || got.Controls != got.ListID || got.Active == "" || got.Active != got.FirstID {
+		t.Errorf("the input is not a combobox over its list: role %q controls %q list %q active %q first %q", got.Role, got.Controls, got.ListID, got.Active, got.FirstID)
+	}
+	if !reflect.DeepEqual(got.Pill, []string{"Next"}) || len(got.Kbd) != 0 {
+		t.Errorf("an item's meta shows as pills %v and keys %v, want a pill alone", got.Pill, got.Kbd)
+	}
+	if len(got.Latest) != 1 || !strings.HasPrefix(got.Latest[0], "Book the launch hall") {
+		t.Errorf("a late answer for an older text replaced the list: %v", got.Latest)
+	}
+	if len(got.BeforeAnswer) != 0 || !reflect.DeepEqual(got.Runs, []string{"Book the launch hall"}) {
+		t.Errorf("Enter before the answer ran %v, then %v: want nothing, then the typed text's task", got.BeforeAnswer, got.Runs)
+	}
+	if got.Empty != "No task holds the text" || got.EmptyLive != "polite" {
+		t.Errorf("an empty answer says %q (aria-live %q)", got.Empty, got.EmptyLive)
 	}
 }

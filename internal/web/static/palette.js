@@ -9,6 +9,9 @@ const PALETTE_CSS = `
 .pal li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.3rem 0.75rem; cursor: pointer; }
 .pal li[aria-selected="true"] { background: var(--sel); }
 .pal kbd { font: 12px var(--mono); color: var(--muted); }
+.pal li .pill { margin-left: auto; }
+.pal-empty { margin: 0; padding: 0 0.75rem 0.5rem; color: var(--muted); }
+.pal-empty:empty { display: none; }
 .pal dt { padding: 0.5rem 0.75rem 0.2rem; color: var(--muted); font-weight: 600; }
 .pal dd { margin: 0; display: flex; justify-content: space-between; gap: 1rem; padding: 0.15rem 0.75rem; }
 `;
@@ -50,37 +53,62 @@ function palOverlay(box) {
   return close;
 }
 
-// showPalette lists items with their keys; typing narrows them, or asks
-// source for the items of the text typed, Enter runs the highlighted one,
-// Esc closes.
-function showPalette({ title, items, source }) {
-  const input = palEl("input", { type: "text", "aria-label": title, placeholder: `${title}: type to narrow`, autocomplete: "off", spellcheck: "false" });
-  const list = palEl("ol", { role: "listbox", "aria-label": title });
-  const box = palEl("div", { class: "pal", role: "dialog", "aria-label": title }, palEl("div", { class: "pal-head" }, title), input, list);
+// showPalette lists items with their keys and meta; typing narrows them, or
+// asks source for the items of the text typed, the latest text's answer
+// winning; Enter runs the highlighted item of the text typed, once its
+// answer is in; Esc closes. empty is what an empty list says.
+function showPalette({ title, items, source, empty }) {
+  const input = palEl("input", { type: "text", role: "combobox", "aria-label": title, "aria-controls": "pal-list", "aria-expanded": "true", "aria-autocomplete": "list",
+    placeholder: `${title}: type to narrow`, autocomplete: "off", spellcheck: "false" });
+  const list = palEl("ol", { id: "pal-list", role: "listbox", "aria-label": title });
+  const none = palEl("p", { class: "pal-empty", "aria-live": "polite" });
+  const box = palEl("div", { class: "pal", role: "dialog", "aria-label": title }, palEl("div", { class: "pal-head" }, title), input, list, none);
   const close = palOverlay(box);
   let shown = items;
   let at = 0;
+  let done = false;
   const pick = (it) => {
+    if (done) return;
+    done = true;
     close();
     if (it) it.run();
   };
   const draw = () => {
-    list.replaceChildren(...shown.map((it, i) => palEl("li", { role: "option", "aria-selected": String(i === at), onmousedown: (e) => { e.preventDefault(); pick(it); } },
-      palEl("span", {}, it.label), it.key ? palEl("kbd", {}, it.key) : null)));
+    list.replaceChildren(...shown.map((it, i) => palEl("li", { id: `pal-opt-${i}`, role: "option", "aria-selected": String(i === at), onmousedown: (e) => { e.preventDefault(); pick(it); } },
+      palEl("span", {}, it.label), it.meta ? palEl("span", { class: "pill" }, it.meta) : null, it.key ? palEl("kbd", {}, it.key) : null)));
+    if (shown.length) input.setAttribute("aria-activedescendant", `pal-opt-${at}`);
+    else input.removeAttribute("aria-activedescendant");
+    none.textContent = shown.length ? "" : empty || "Nothing matches";
   };
   let asked = 0;
-  input.addEventListener("input", async () => {
+  let pending = null;
+  input.addEventListener("input", () => {
     const n = ++asked;
-    const next = source ? await source(input.value) : paletteMatch(items, input.value);
-    if (n !== asked) return;
-    shown = next;
-    at = 0;
-    draw();
+    if (!source) {
+      shown = paletteMatch(items, input.value);
+      at = 0;
+      draw();
+      return;
+    }
+    pending = Promise.resolve(source(input.value)).then((next) => {
+      if (n !== asked) return;
+      pending = null;
+      shown = next || [];
+      at = 0;
+      draw();
+    });
   });
+  const enter = async () => {
+    while (pending) await pending;
+    pick(shown[at]);
+  };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") close();
-    else if (e.key === "Enter") pick(shown[at]);
-    else if (e.key === "ArrowDown") at = Math.min(shown.length - 1, at + 1);
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      enter();
+      return;
+    } else if (e.key === "ArrowDown") at = Math.max(0, Math.min(shown.length - 1, at + 1));
     else if (e.key === "ArrowUp") at = Math.max(0, at - 1);
     else return;
     e.preventDefault();
@@ -107,9 +135,9 @@ async function pickRefs(pick, task, q, match) {
 // taskPicker opens the palette, titled with the verb's question, over the
 // tasks ask.pick offers on task; run takes the id picked.
 async function taskPicker({ task, ask, match, palette, stateLabel, run }) {
-  const items = (refs) => refs.map((r) => ({ label: r.title || r.id, key: stateLabel ? stateLabel(r.state) : r.state || "", run: () => run(r.id) }));
+  const items = (refs) => refs.map((r) => ({ label: r.title || r.id, meta: stateLabel ? stateLabel(r.state) : r.state || "", run: () => run(r.id) }));
   const source = async (q) => items(await pickRefs(ask.pick, task, q, match));
-  palette({ title: ask.label, items: await source(""), source });
+  palette({ title: ask.label, items: await source(""), source, empty: "No task holds the text" });
 }
 
 // showHelp lists every binding by context.
