@@ -23,7 +23,7 @@ func (p *Provider) mergeFacts(ctx context.Context, e task.Task, f workflow.Facts
 
 // costlyFacts sets in f every task fact builtin.Facts marks costly to workflow.Unrequested, but those a reader
 // ctx carries names, each computed once per pass for e as it is: task.refused_pairs, task.undone, and
-// task.link_target_tasks and task.candidates without the refused ids.
+// task.link_target_tasks, task.candidates and task.linked_candidates without the refused ids.
 func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Facts) error {
 	wanted := map[string]bool{}
 	for _, d := range builtin.Facts {
@@ -45,11 +45,15 @@ func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Fact
 	if err != nil {
 		return err
 	}
+	rank := func() (ranked, error) {
+		return coretasks.Once(ctx, passCostly+"candidates."+fingerprint(e), func() (ranked, error) { return p.candidates(ctx, e, refused) })
+	}
 	reads := map[string]func() ([]string, error){
 		"task.refused_pairs":     func() ([]string, error) { return refused, nil },
 		"task.undone":            func() ([]string, error) { return p.undone(ctx, e) },
 		"task.link_target_tasks": func() ([]string, error) { return p.linkTargetTasks(ctx, e, refused) },
-		"task.candidates":        func() ([]string, error) { return p.candidates(ctx, e, refused) },
+		"task.candidates":        func() ([]string, error) { r, err := rank(); return r.all, err },
+		"task.linked_candidates": func() ([]string, error) { r, err := rank(); return r.linked, err },
 	}
 	for name, read := range reads {
 		if !wanted[name] {

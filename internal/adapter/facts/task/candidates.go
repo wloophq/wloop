@@ -55,11 +55,15 @@ type pool struct {
 // graph is the links from and to the units of a pass's tasks.
 type graph struct{ from, to map[unit.Unit][]link.Link }
 
+// ranked is task.candidates of e, and those of them a link ties to e, task.linked_candidates.
+type ranked struct{ all, linked []string }
+
 // candidates is task.candidates of e, without refused and the tasks related to e: the open tasks that share
 // with e a person their items name, a unit their links target, or a unit one of them holds and the other's
-// links target, created within the window of e, the most shared first, then the closest in time, at most Cap.
-func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string) ([]string, error) {
-	out := []string{}
+// links target, created within the window of e, the most shared first, then the closest in time, at most Cap;
+// linked are those of them that share a link target or a cited unit with e, in the same order.
+func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string) (ranked, error) {
+	out := ranked{all: []string{}, linked: []string{}}
 	if p.d.Candidates.Settings == nil {
 		return out, nil
 	}
@@ -70,17 +74,18 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 	refused = append(slices.Clone(refused), p.related(e)...)
 	pl, err := p.candidatePool(ctx, e, s.Window)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
-	score := make([]int, len(pl.tasks))
+	score, linkedBy := make([]int, len(pl.tasks)), make([]bool, len(pl.tasks))
 	add := func(is []int, w int) {
 		for _, i := range is {
 			score[i] += w
+			linkedBy[i] = linkedBy[i] || w != weightPerson
 		}
 	}
 	people, err := p.people(ctx, e, pl)
 	if err != nil {
-		return nil, err
+		return ranked{}, err
 	}
 	for _, keys := range people {
 		var is []int
@@ -92,7 +97,7 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 	}
 	if p.d.Candidates.From != nil && p.d.Candidates.To != nil {
 		if err := p.linked(ctx, e, pl, add); err != nil {
-			return nil, err
+			return ranked{}, err
 		}
 	}
 	before := func(a, b int) bool {
@@ -113,7 +118,10 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 		top = slices.Insert(top, at, i)[:min(len(top)+1, s.Cap)]
 	}
 	for _, i := range top {
-		out = append(out, string(pl.tasks[i].ID))
+		out.all = append(out.all, string(pl.tasks[i].ID))
+		if linkedBy[i] {
+			out.linked = append(out.linked, string(pl.tasks[i].ID))
+		}
 	}
 	return out, nil
 }

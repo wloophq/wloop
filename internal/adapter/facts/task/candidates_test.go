@@ -197,6 +197,12 @@ func TestCandidatesShareAPersonALinkTargetOrACitedUnit(t *testing.T) {
 			t.Errorf("candidates of %s %v, want %v", id, got, want)
 		}
 	}
+	if got, want := c.list(context.Background(), "t-a", "task.linked_candidates"), []string{"t-pr", "t-cites", "t-target"}; !slices.Equal(got, want) {
+		t.Errorf("linked candidates of t-a %v, want %v: t-person shares only a person", got, want)
+	}
+	if got := c.list(context.Background(), "t-person", "task.linked_candidates"); len(got) != 0 {
+		t.Errorf("linked candidates of t-person %v, want none", got)
+	}
 }
 
 func TestCandidatesStayWithinTheWindowAndTheCap(t *testing.T) {
