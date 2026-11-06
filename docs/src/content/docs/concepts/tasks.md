@@ -110,7 +110,7 @@ The same work can reach you from more than one source: a Slack ask to review a p
 | Split | Gives a task merged into this one back, as it was before the merge. |
 | Relate / Unrelate | Links two tasks as distinct work. Nothing moves; each lists the other. |
 
-**Who runs them.** You, and a session you drive, run all four. A workflow can only propose a merge: its `merge` verb opens the merge gate, "Merge these tasks?", which says which task folds into which, and approving it runs the merge as yours. A plugin runs none. A merge takes two open tasks, never a project, a draft or a message.
+**Who runs them.** You, and a session you drive, run all four. A workflow asks for a merge or a relation through the verb's gate, "Merge these tasks?" or "Relate these tasks?", which says which task folds into which; the asking workflow's approval decides it, as every gate's is decided ([What waits for you](/concepts/approval/#gates)). Approved by you, the verb runs as yours; released by the workflow's rule, it runs as the workflow, and the timeline names it "the loop, by workflow <name>" (`attribution.via_workflow` in `tasks.toml`). A pair you took apart, by rejecting its gate, splitting it or unrelating it, waits for you whatever the workflow's approval says (`task.undone`). A workflow never splits or unrelates, and a plugin runs none of the four. A merge takes two open tasks, never a project, a draft or a message.
 
 **The survivor.** The task you shaped by hand stays: one you clarified, moved or filed in a project, yourself or through a session you drive, or whose properties you wrote (`task.clarified`); an agent's property write, such as a brief's, does not count. When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
 
@@ -120,23 +120,37 @@ The same work can reach you from more than one source: a Slack ask to review a p
 
 **Split is by unit.** The units of the folded task go back with the items on them; items that arrived on the survivor after the merge stay where they are. With nothing changed since, the folded task comes back exactly as it was. A task merged into the folded one earlier comes back inside it.
 
-### Merges a workflow proposes
+### Merges and relations a workflow asks for
 
-Two bundled workflows propose merges. Both open the merge gate and nothing else, and both leave the decision to you:
+Four bundled workflows ask for merges and relations. Each opens the verb's gate and nothing else, and its `[gates.approval]` says which run at once:
 
-- `task-fold-linked` proposes folding a task into the task of a pull request that its items' review or merge links target: the Slack ask to review a pull request joins the pull request's task. It is a sweep, so it holds whichever task came first. It reads `task.link_target_tasks`.
-- `task-correlate` judges whether a task just created, or whose items just gained a link, is the same work as one of its **candidates**. When the judgment names one, `task-correlate-merge` proposes the merge.
+| Workflow | When | Asks for | Its approval |
+|---|---|---|---|
+| `task-fold-linked` | a task's items' review or merge links target the task of a pull request (`task.link_target_tasks`); a sweep, so it holds whichever task came first | merge with that task | released at once |
+| `task-correlate-merge-linked` | the judgment says same work, and a link target or a cited unit also ties the pair (`task.linked_candidates`) | merge with that candidate | released at once |
+| `task-correlate-merge` | the judgment says same work, and only a person ties the pair | merge with that candidate | waits for you |
+| `task-correlate-relate` | the judgment says related work, and the task does not link the candidate's pull request, which `task-fold-linked` handles | relate with that candidate | released at once |
 
-The candidates are the open tasks created within `tasks.candidate_window` (14 days) of the task, ranked by what they share, and cut to `tasks.candidate_cap` (5). A unit one task holds that the other's items link to scores most, then a link target in common, then each person in common (requester, assignees, whom it waits on). A task with no candidate costs no call. The judgment is a model call (`classify` step) that reads the candidates' titles, notes and a few item summaries as data and answers with the id of the same work, or none. A sub-step of a larger task is not the same work. What it reads is untrusted text: its answer only opens a gate, never settles one, and it must name one of the candidates.
+`task-correlate` judges whether a task just created, or whose items just gained a link, is the same work as one of its **candidates**, related work, or neither. The candidates are the open tasks created within `tasks.candidate_window` (14 days) of the task, ranked by what they share, and cut to `tasks.candidate_cap` (5). A unit one task holds that the other's items link to scores most, then a link target in common, then each person in common (requester, assignees, whom it waits on). A task with no candidate costs no call. The judgment is a model call (`classify` step) that reads the candidates' titles, notes and a few item summaries as data and answers `same`, `related` or `none`, with the candidate's id. A sub-step of a larger task, a follow-up of the same change or another deliverable of the same launch is related work; the same person, week or words about another system is neither. What it reads is untrusted text: it only picks which workflow asks, and must name one of the candidates; the rule that releases a gate reads the gate alone.
+
+To have every merge wait for you, pin a rule to merge gates in the configuration:
+
+```
+[[workflows.task-fold-linked.gates.approval.rule]]
+when = 'gate.kind == "proposal" && gate.name == "merge"'
+mode = "wait"
+```
+
+and the same for `task-correlate-merge-linked`, or `task-correlate-relate` with `gate.name == "relate"`.
 
 Limits keep it cheap and quiet:
 
-- one call per task and per set of candidates, never again while the titles, notes and item summaries it read stay the same: opening or moving a task does not call again;
+- one call per task and per set of candidates, never again while the titles, notes and item summaries it read, the prompt and the schema stay the same: opening or moving a task does not call again;
 - the day's calls count against `classify.per_day` (50), shared with every classify workflow;
-- a merge you reject, or a split you run, is remembered: the pair is not proposed again until an item of either task changes;
+- a gate you reject, a split or an unrelate you run is remembered: the pair is not asked for again until an item of either task changes (`task.refused_pairs`), and from then on it waits for you (`task.undone`);
 - an open merge gate ends with its tasks: when either closes, is merged elsewhere or is split.
 
-To turn the correlation off, which turns off both of its workflows:
+To turn the correlation off, which turns off the three workflows acting on it:
 
 ```
 {{command}} config set workflows.task-correlate.enabled false
