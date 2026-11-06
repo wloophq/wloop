@@ -1026,3 +1026,137 @@ func TestASplitSentToAMergedIDThatNamesAnotherTaskIsRefused(t *testing.T) {
 		t.Fatalf("a split on the merged id naming itself: %v", err)
 	}
 }
+
+func TestAGateHoldingSurvivorStaysOpenWithTheMergedTasksItemsWhenItsGatesClose(t *testing.T) {
+	r := newMergeRig(t)
+	gateUnit := unit.Unit{Provider: "slack", Key: "T1/C9/9.9"}
+	r.clock.t = t0.Add(-time.Hour)
+	held, err := r.svc.Open(context.Background(), coretasks.OpenRequest{Title: "Send this draft?", Unit: &gateUnit, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.clock.t = t0
+	_, ask := r.seed(t)
+	if got := r.merge(t, ask.ID, held.ID); got.ID != held.ID {
+		t.Fatalf("kept %s, want the older %s", got.ID, held.ID)
+	}
+	open, err := r.svc.HeldOpen(context.Background())
+	if err != nil || slices.Contains(open, held.ID) {
+		t.Fatalf("held open %v, %v: a task holding a merged task's items is not held only for gates", open, err)
+	}
+	if err := r.svc.EndHeld(context.Background(), held.ID, task.CategoryDropped); err != nil {
+		t.Fatal(err)
+	}
+	if y := r.task(t, held.ID); !y.Open() || !slices.Contains(y.Items, task.ItemRef{Unit: askThread, Item: "s:ask"}) {
+		t.Fatalf("survivor %s %v: its last gate closing ended it with the merged task's open items", y.Category, y.Items)
+	}
+}
+
+// seedRelated is seed with a third task, the other pull request's, related to the ask.
+func (r *mrig) seedRelated(t *testing.T) (pr, ask, web task.Task) {
+	t.Helper()
+	pr, ask = r.seed(t)
+	r.items.byUnit[otherPR] = []items.Item{webItem()}
+	r.clock.t = t0.Add(2 * time.Minute)
+	r.sync(t, otherPR)
+	r.do(t, ask.ID, relateReq(task.VerbRelate, task.ActorPerson, webTaskID))
+	return r.task(t, pr.ID), r.task(t, ask.ID), r.task(t, webTaskID)
+}
+
+func (r *mrig) do(t *testing.T, id task.ID, req coretasks.Request) {
+	t.Helper()
+	if _, err := r.svc.Do(context.Background(), id, req); err != nil {
+		t.Fatalf("%s on %s: %v", req.Verb, id, err)
+	}
+}
+
+// relations are the pairs of ids each task's property of role related lists, as stored, as "a>b".
+func (r *mrig) relations(t *testing.T, ids ...task.ID) []string {
+	t.Helper()
+	var out []string
+	for _, id := range ids {
+		for _, o := range r.task(t, id).Prop("related").List {
+			out = append(out, string(id)+">"+o)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestSplitAfterAnUnrelateOfTheSurvivorLeavesNoOneSidedRelation(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbUnrelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); len(got) != 0 {
+		t.Errorf("relations after the split %v, want none: the person unrelated them while merged", got)
+	}
+}
+
+func TestSplitKeepsARelateOfTheSurvivorWithATaskThatCameThroughTheMergedOne(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbRelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{string(ask.ID) + ">" + string(web.ID), string(pr.ID) + ">" + string(web.ID), string(web.ID) + ">" + string(ask.ID), string(web.ID) + ">" + string(pr.ID)}
+	slices.Sort(want)
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, want) {
+		t.Errorf("relations after the split %v, want %v", got, want)
+	}
+}
+
+func TestSplitOfAnUntouchedRelatedTaskGivesItsRelationBack(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	before := r.relations(t, pr.ID, ask.ID, web.ID)
+	r.merge(t, ask.ID, pr.ID)
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, before) {
+		t.Errorf("relations after the split %v, before the merge %v", got, before)
+	}
+}
+
+func TestSplitAfterAnUnrelateAndARelateAgainKeepsTheSurvivorsLink(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask, web := r.seedRelated(t)
+	r.merge(t, ask.ID, pr.ID)
+	r.do(t, pr.ID, relateReq(task.VerbUnrelate, task.ActorPerson, web.ID))
+	r.do(t, pr.ID, relateReq(task.VerbRelate, task.ActorPerson, web.ID))
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{string(pr.ID) + ">" + string(web.ID), string(web.ID) + ">" + string(pr.ID)}
+	slices.Sort(want)
+	if got := r.relations(t, pr.ID, ask.ID, web.ID); !slices.Equal(got, want) {
+		t.Errorf("relations after the split %v, want %v", got, want)
+	}
+}
+
+func TestAGateHoldingSurvivorEndsOnceTheMergedTasksItemsResolve(t *testing.T) {
+	r := newMergeRig(t)
+	gateUnit := unit.Unit{Provider: "slack", Key: "T1/C9/9.9"}
+	r.clock.t = t0.Add(-time.Hour)
+	held, err := r.svc.Open(context.Background(), coretasks.OpenRequest{Title: "Send this draft?", Unit: &gateUnit, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.clock.t = t0
+	_, ask := r.seed(t)
+	r.merge(t, ask.ID, held.ID)
+	it := owed(askThread, "s:ask")
+	settled(&it)
+	r.items.byUnit[askThread] = []items.Item{it}
+	r.clock.t = t0.Add(2 * time.Hour)
+	r.sync(t, askThread)
+	if y := r.task(t, held.ID); y.Open() || len(y.Items) != 0 {
+		t.Fatalf("survivor %s %v: a gate task holding only resolved items of a merged task stays open", y.Category, y.Items)
+	}
+}

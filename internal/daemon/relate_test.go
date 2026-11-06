@@ -179,3 +179,24 @@ func TestARelatedRefShowsItsTaskAsADeltaLeavesIt(t *testing.T) {
 		t.Errorf("t-1's detail, read fresh, lists %+v", got)
 	}
 }
+
+func TestSplitAndUnrelateAreOfferedDisabledOnATaskWithNoTaskToPick(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-1", Title: "Draft the launch post", State: "next", Category: task.CategoryReady},
+		task.Task{ID: "t-2", Title: "Book the launch venue", State: "inbox", Category: task.CategoryInbox,
+			Props: task.Props{"related": {List: []string{"t-3"}}, "merged": {List: []string{"t-9"}}}},
+		task.Task{ID: "t-3", Title: "Order the badges", State: "next", Category: task.CategoryReady, Props: task.Props{"related": {List: []string{"t-2"}}}})
+	bare := r.view(t, "t-1")
+	for _, verb := range []string{"split", "unrelate"} {
+		if st := verbState(bare, verb); st.Verb != verb || st.Enabled || st.Reason == "" {
+			t.Errorf("%s on a task with nothing to pick: %+v, want it offered disabled with a reason", verb, st)
+		}
+		if st := verbState(r.view(t, "t-2"), verb); !st.Enabled {
+			t.Errorf("%s on a task with one to pick: %+v", verb, st)
+		}
+	}
+	if st := verbState(bare, "relate"); !st.Enabled {
+		t.Errorf("relate picks from the open tasks: %+v", st)
+	}
+}

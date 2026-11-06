@@ -140,8 +140,12 @@ func (s *Service) unfold(ctx context.Context, m Merger, sw GateSweeper, e task.T
 	if err != nil {
 		return from, rest, err
 	}
+	peers, err := s.peers(ctx, cur, r)
+	if err != nil {
+		return from, rest, err
+	}
 	now := s.now()
-	sp, err := merge.Unfold(cur, r, others, owners, p, s.d.States, now)
+	sp, err := merge.Unfold(cur, r, others, owners, p, peers, s.d.States, now)
 	if err != nil {
 		return from, rest, fmt.Errorf("%w: %v", ErrVerb, err)
 	}
@@ -173,6 +177,40 @@ func (s *Service) othersMerged(ctx context.Context, m Merger, cur task.Task, r m
 		}
 	}
 	return out, nil
+}
+
+// peers are the lists of role related, as each task reads now, of the tasks r.Task lists there and of
+// r.Related, by the id listed; an id that names no stored task, or reads as cur or r.From, is left out.
+func (s *Service) peers(ctx context.Context, cur task.Task, r merge.Record) (map[task.ID][]string, error) {
+	name, _ := s.d.States.PropOf(task.RoleRelated)
+	if name == "" {
+		return nil, nil
+	}
+	out := map[task.ID][]string{}
+	for _, id := range slices.Concat(r.Task.Prop(name).List, toStrings(r.Related)) {
+		if _, ok := out[task.ID(id)]; ok {
+			continue
+		}
+		e, err := s.d.Store.Task(ctx, task.ID(id))
+		if errors.Is(err, ErrNoTask) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if e.ID != cur.ID && e.ID != r.From {
+			out[task.ID(id)] = e.Prop(name).List
+		}
+	}
+	return out, nil
+}
+
+func toStrings(ids []task.ID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = string(id)
+	}
+	return out
 }
 
 // owners are the task each ref cur holds derives from its item, as the ledger keeps the item now.

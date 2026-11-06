@@ -81,7 +81,9 @@ func (s *Service) relation(ctx context.Context, e task.Task, req Request, link b
 	return Result{Task: ne}, nil
 }
 
-// relink adds to t's property name, or takes it off, as an entry names it (relisted).
+// relink adds to t's property name, or takes it off, as an entry names it (relisted). A link does not count
+// an entry of a task merged into to that a split can give back, so to gets its own entry, which outlives that
+// split.
 func (s *Service) relink(ctx context.Context, t task.Task, name string, to, as task.ID, link bool, now time.Time) (task.Task, bool, error) {
 	list := t.Prop(name).List
 	var keep []string
@@ -91,7 +93,11 @@ func (s *Service) relink(ctx context.Context, t task.Task, name string, to, as t
 			return t, false, err
 		}
 		if named && link {
-			return t, false, nil
+			splittable, err := s.splittable(ctx, task.ID(id), to, as)
+			if err != nil || !splittable {
+				return t, false, err
+			}
+			continue
 		}
 		if !named {
 			keep = append(keep, id)
@@ -117,4 +123,14 @@ func (s *Service) relisted(ctx context.Context, id, to, as task.ID) (bool, error
 		return false, nil
 	}
 	return err == nil && got.ID == to, err
+}
+
+// splittable says whether the listed id, which reads as to, is a task a split can take back out of it.
+func (s *Service) splittable(ctx context.Context, id, to, as task.ID) (bool, error) {
+	m, ok := s.d.Store.(Merger)
+	if !ok || id == to || id == as {
+		return false, nil
+	}
+	_, merged, err := m.MergeOf(ctx, id)
+	return merged, err
 }

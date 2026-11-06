@@ -118,6 +118,11 @@ function showPalette({ title, items, source, empty }) {
   input.focus();
 }
 
+// matchPath asks the daemon for the open tasks but except whose title holds q.
+function matchPath(q, except) {
+  return "/api/tasks?match=" + encodeURIComponent(q) + "&except=" + encodeURIComponent(except || "");
+}
+
 // PICK_ARG is the argument a verb that takes another task sends the pick in, task.ArgTask.
 const PICK_ARG = "task";
 
@@ -126,7 +131,7 @@ const PICK_ARG = "task";
 // daemon, else the tasks merged into task or related to it whose title
 // holds q.
 async function pickRefs(pick, task, q, match) {
-  if (pick === "open") return ((await match(q)) || []).filter((e) => e.id !== task.id);
+  if (pick === "open") return (await match(q, task.id)) || [];
   const refs = pick === "merged" ? task.merged_from : pick === "related" ? task.related : [];
   const want = String(q || "").trim().toLowerCase();
   return (refs || []).filter((r) => String(r.title || r.id).toLowerCase().includes(want));

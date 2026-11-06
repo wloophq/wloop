@@ -174,9 +174,9 @@ func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
 	return api.TaskView{}, errors.New("no task " + id)
 }
 
-// MatchTasks are the fake's tasks of every view whose title holds text, case and spaces around it aside,
-// each once.
-func (f *fakeDaemon) MatchTasks(_ context.Context, text string) ([]api.TaskView, error) {
+// MatchTasks are the fake's tasks of every view but except whose title holds text, case and spaces around it
+// aside, each once.
+func (f *fakeDaemon) MatchTasks(_ context.Context, text, except string) ([]api.TaskView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.matches = append(f.matches, text)
@@ -184,7 +184,7 @@ func (f *fakeDaemon) MatchTasks(_ context.Context, text string) ([]api.TaskView,
 	var out []api.TaskView
 	for _, v := range slices.Sorted(maps.Keys(f.tasks)) {
 		for _, e := range f.tasks[v] {
-			if strings.Contains(strings.ToLower(e.Title), want) && !slices.ContainsFunc(out, func(o api.TaskView) bool { return o.ID == e.ID }) {
+			if e.ID != except && strings.Contains(strings.ToLower(e.Title), want) && !slices.ContainsFunc(out, func(o api.TaskView) bool { return o.ID == e.ID }) {
 				out = append(out, e)
 			}
 		}

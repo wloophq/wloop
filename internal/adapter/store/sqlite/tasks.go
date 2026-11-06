@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/gate"
-	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -260,10 +259,14 @@ func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	for cur := id; err == nil && len(es) == 0; {
 		var next string
 		var stored bool
+		var into task.ID
+		if into, err = mergedTo(ctx, s.db.R(), cur); err != nil {
+			break
+		}
 		err = s.db.R().QueryRowContext(ctx, `SELECT a.new_id, t.id IS NOT NULL FROM task_aliases a LEFT JOIN tasks t ON t.id = a.new_id
 			WHERE a.old_id = ?1 AND (a.new_id = ?4 OR ?4 = '')
 			ORDER BY t.id IS NOT NULL DESC, t.category NOT IN (?2, ?3) DESC, t.created, a.new_id LIMIT 1`,
-			string(cur), string(task.CategoryDone), string(task.CategoryDropped), string(mergedTo(ctx, s.db.R(), cur))).Scan(&next, &stored)
+			string(cur), string(task.CategoryDone), string(task.CategoryDropped), string(into)).Scan(&next, &stored)
 		if errors.Is(err, sql.ErrNoRows) || err == nil && !stored && seen[task.ID(next)] {
 			return task.Task{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
 		}
@@ -289,7 +292,10 @@ func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 // it was merged into instead. A create of an id an older alias names re-derives it, as the v7 aliases expect.
 func refuseMerged(ctx context.Context, tx *Tx, c task.Change) error {
 	id := c.Task.ID
-	into := mergedTo(ctx, tx, id)
+	into, err := mergedTo(ctx, tx, id)
+	if err != nil {
+		return err
+	}
 	var aliased int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases WHERE old_id = ? AND (new_id = ? OR ? = '')`,
 		string(id), string(into), string(into)).Scan(&aliased); err != nil {
@@ -306,20 +312,10 @@ func refuseMerged(ctx context.Context, tx *Tx, c task.Change) error {
 	return nil
 }
 
-// mergedTo is the task the latest merge of id took it into, "" when it was never merged; a read that fails
-// reads as never merged, and the alias walk then takes the best alias.
-func mergedTo(ctx context.Context, q rowQuerier, id task.ID) task.ID {
-	u := task.UnitOf(id)
-	var data string
-	if err := q.QueryRowContext(ctx, `SELECT data FROM events WHERE provider = ? AND unit_key = ? AND kind = ? ORDER BY id DESC LIMIT 1`,
-		string(u.Provider), u.Key, merge.RecordKind).Scan(&data); err != nil {
-		return ""
-	}
-	var r struct{ Into task.ID }
-	if json.Unmarshal([]byte(data), &r) != nil {
-		return ""
-	}
-	return r.Into
+// mergedTo is the task the latest merge of id took it into, "" when it was never merged.
+func mergedTo(ctx context.Context, q rowQuerier, id task.ID) (task.ID, error) {
+	r, _, err := latestMerge(ctx, q, id)
+	return r.Into, err
 }
 
 func (s taskStore) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {

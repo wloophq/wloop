@@ -140,6 +140,10 @@ const (
 // from; the pick is sent as the argument task.ArgTask.
 var TaskPicks = map[string]string{"merge": PickOpen, "relate": PickOpen, "split": PickMerged, "unrelate": PickRelated}
 
+// PickRoles are the picks that offer the tasks a property of the task lists, by the role of that property; a
+// verb of such a pick is offered disabled while that list is empty.
+var PickRoles = map[string]task.Role{PickMerged: task.RoleMerged, PickRelated: task.RoleRelated}
+
 func verbHandlerValues() []Value {
 	out := make([]Value, len(VerbHandlers))
 	for i, h := range VerbHandlers {

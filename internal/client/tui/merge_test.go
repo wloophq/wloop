@@ -21,7 +21,11 @@ var pickVerbs = []api.VerbSpec{
 	{Verb: "unrelate", Handler: "unrelate", Label: "Unrelate", Input: "Unrelate which task", Pick: builtin.PickRelated},
 }
 
+// nothingToPick is the reason the fake daemon offers a verb that picks from a task's own list disabled.
+const nothingToPick = "No task to pick on this one."
+
 // pickModel is viewsModel whose catalog serves the verbs that pick another task, every task offering them,
+// those that pick from its own lists disabled, as the daemon serves a task with nothing merged or related,
 // with e1 edited by edit.
 func pickModel(t *testing.T, edit func(*api.TaskView)) (*Model, map[string][]api.TaskView) {
 	t.Helper()
@@ -36,7 +40,11 @@ func pickModel(t *testing.T, edit func(*api.TaskView)) (*Model, map[string][]api
 	for v, es := range tasks {
 		for i := range es {
 			for _, p := range pickVerbs {
-				es[i].Verbs = append(es[i].Verbs, api.VerbState{Verb: p.Verb, Enabled: true})
+				st := api.VerbState{Verb: p.Verb, Enabled: p.Pick == builtin.PickOpen}
+				if !st.Enabled {
+					st.Reason = nothingToPick
+				}
+				es[i].Verbs = append(es[i].Verbs, st)
 			}
 			if es[i].ID == "e1" && edit != nil {
 				edit(&es[i])
@@ -80,7 +88,7 @@ func TestTheTUIPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 		t.Fatalf("the palette of a task with nothing merged or related: %v", got)
 	}
 	press(m, Key{Name: KeyEsc})
-	if _, ok := m.taskVerb("split", 0); ok || !strings.HasPrefix(m.status, "Split: no task to pick") {
+	if _, ok := m.taskVerb("split", 0); ok || m.status != "split: "+nothingToPick {
 		t.Errorf("Split with nothing merged: status %q", m.status)
 	}
 
@@ -154,6 +162,9 @@ func TestTheTUIDetailShowsRelatedTasksAndAMergedFromTraceWithSplit(t *testing.T)
 		e.Props["absorbed"] = json.RawMessage(`["t-9"]`)
 		e.Related = []api.TaskRef{{ID: "e4", Title: "Call the bank first", State: "inbox"}, {ID: "t-40", Title: "Old badge order", State: "next", Merged: true}}
 		e.MergedFrom = []api.TaskRef{{ID: "t-9", Title: "Batch export follow-up", State: "inbox", Within: []api.TaskRef{{ID: "t-8", Title: "Export retry", State: "waiting"}}}}
+		for i := range e.Verbs {
+			e.Verbs[i].Enabled, e.Verbs[i].Reason = true, ""
+		}
 	})
 	e, _ := m.selectedTask()
 	m.openTask(e, 0)

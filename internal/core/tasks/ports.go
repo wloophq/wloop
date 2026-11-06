@@ -25,9 +25,11 @@ type Reader interface {
 	// ahead of the store; else the tasks written after since's Rev, whatever their category. Removed is empty
 	// and Counters zero: the service fills them.
 	TasksSince(ctx context.Context, q task.Query, since Since) (Page, error)
-	// Task reads task id, else follows the aliases of id, hop by hop, an open task first at each, to the
-	// stored task they lead to: a task merged into one merged in turn reads as the last. ErrNoTask when none
-	// leads to a stored task, a cycle included.
+	// Task reads task id, else follows the aliases of id, hop by hop, to the stored task they lead to: at each
+	// hop, the alias to the task the hop's latest merge record (merge.RecordKind) names when it has one, else a
+	// stored task first, an open one before a closed one, then the oldest. A task merged into one merged in
+	// turn reads as the last. ErrNoTask when none leads to a stored task, a cycle included; a merge record it
+	// cannot read fails the read.
 	Task(ctx context.Context, id task.ID) (task.Task, error)
 	TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 }

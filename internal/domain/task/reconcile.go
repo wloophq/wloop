@@ -115,7 +115,7 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 				op, why = OpResolve, "its unit asks nothing more"
 				err = e.MoveTo(CategoryDone, st)
 			}
-		case old.Origin == OriginDerived && slices.Contains(old.Units, f.Unit) && merged(old, st):
+		case (old.Origin == OriginDerived || old.Origin == OriginGate) && slices.Contains(old.Units, f.Unit) && merged(old, st):
 			e.Items, e.Resolved = unheld(old, f.Unit)
 			why = "no item of " + f.Unit.String() + " calls for it"
 			if old.Open() && len(e.Items) == 0 && len(old.Items)+len(old.Resolved) > 0 {

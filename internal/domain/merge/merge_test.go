@@ -75,7 +75,7 @@ func fold(t *testing.T, from, into task.Task) (task.Task, merge.Record) {
 }
 
 func unfold(into task.Task, r merge.Record, p merge.Project, at time.Time) (from, rest task.Task, err error) {
-	s, err := merge.Unfold(into, r, nil, nil, p, st, at)
+	s, err := merge.Unfold(into, r, nil, nil, p, nil, st, at)
 	return s.From, s.Rest, err
 }
 
@@ -299,7 +299,7 @@ func TestUnfoldLeavesWhatAnotherMergedTaskHoldsOnASharedUnit(t *testing.T) {
 	y, rx, rw := sharedThread(t)
 	y.Items = append(y.Items, ref(thread, "s:w2"), ref(thread, "s:x2"), ref(thread, "s:new"))
 	owners := map[task.ItemRef]task.ID{ref(thread, "s:w2"): rw.From, ref(thread, "s:x2"): rx.From, ref(thread, "s:new"): "t-00000000000000e9"}
-	s, err := merge.Unfold(y, rx, []merge.Record{rw}, owners, openProject(), st, later)
+	s, err := merge.Unfold(y, rx, []merge.Record{rw}, owners, openProject(), nil, st, later)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestUnfoldLeavesWhatAnotherMergedTaskHoldsOnASharedUnit(t *testing.T) {
 	if !slices.Equal(s.Rest.Prop("merged").List, []string{string(rw.From)}) {
 		t.Fatalf("Y still lists %v", s.Rest.Prop("merged").List)
 	}
-	s2, err := merge.Unfold(s.Rest, s.Heirs[0], nil, owners, openProject(), st, later)
+	s2, err := merge.Unfold(s.Rest, s.Heirs[0], nil, owners, openProject(), nil, st, later)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestUnfoldGivesBackAnArrivalThatDerivesTheMergedTaskOnASharedUnit(t *testin
 		Units: []unit.Unit{thread}, Origin: task.OriginDerived, Created: t0.Add(time.Hour)}
 	y, rw := fold(t, w, x)
 	y.Items = append(y.Items, ref(thread, "s:w2"))
-	s, err := merge.Unfold(y, rw, nil, map[task.ItemRef]task.ID{ref(thread, "s:w2"): w.ID}, merge.Project{}, st, later)
+	s, err := merge.Unfold(y, rw, nil, map[task.ItemRef]task.ID{ref(thread, "s:w2"): w.ID}, merge.Project{}, nil, st, later)
 	if err != nil {
 		t.Fatal(err)
 	}
