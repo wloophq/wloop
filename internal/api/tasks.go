@@ -52,7 +52,8 @@ const (
 const TasksUnits = "units"
 
 // TasksMatch is the query parameter of TasksPath that lists every open task whose title holds it, case
-// aside, whatever the view, for a picker of another task; both clients read the same list.
+// aside, whatever the view, for a picker of another task; both clients read the same list. The page is Full
+// and its views hold only the id, title, state, category and units of each task, the newest change first.
 const TasksMatch = "match"
 
 // ParseUnits reads the TasksUnits of a request.
