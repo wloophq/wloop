@@ -18,10 +18,8 @@ const mergedIntoSQL = `WITH RECURSIVE m(id, hops) AS (
 		SELECT old_id, 1 FROM task_aliases WHERE new_id = ?1 AND old_id NOT IN (SELECT id FROM tasks)
 		UNION SELECT a.old_id, m.hops + 1 FROM task_aliases a JOIN m ON a.new_id = m.id
 			WHERE m.hops < ?2 AND a.old_id NOT IN (SELECT id FROM tasks))
-	SELECT m.id FROM m LEFT JOIN (SELECT unit_key, max(id) AS seq FROM events WHERE provider = 'task' AND kind = ?3 GROUP BY unit_key) r
-		ON r.unit_key = m.id
-	WHERE m.id != ?1
-	GROUP BY m.id ORDER BY max(r.seq), m.id`
+	SELECT x.id FROM (SELECT DISTINCT id FROM m WHERE id != ?1) x
+	ORDER BY (SELECT max(e.id) FROM events e WHERE e.provider = 'task' AND e.unit_key = x.id AND e.kind = ?3), x.id`
 
 // MergedInto are the tasks merged into task id, transitively, in merge order: the old ids of the aliases
 // that lead to id, hop by hop, that no stored task holds.
