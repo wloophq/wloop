@@ -102,7 +102,7 @@ Resolving the items of a thread you started can make `slack-closure` propose its
 
 ## One piece of work in several tasks
 
-The same work can reach you from more than one source: a Slack ask to review a pull request, and the pull request's own task; a DM and the channel thread it continues. Three verbs deal with it. Each takes another task, picked from the open tasks in the cockpit's or the terminal's palette, narrowed by title.
+The same work can reach you from more than one source: a Slack ask to review a pull request, and the pull request's own task; a DM and the channel thread it continues. Four verbs deal with it, each with another task. Merge and Relate pick it from the open tasks in the cockpit's or the terminal's palette, narrowed by title; Split and Unrelate act on one of the tasks the task's page lists under Merged from or Related.
 
 | Verb | Does |
 |---|---|
