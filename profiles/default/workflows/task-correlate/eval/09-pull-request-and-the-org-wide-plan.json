@@ -1,8 +1,8 @@
 {
- "id": "09-same-words-different-repository",
- "kind": "look-alike",
- "act": "",
- "on": "",
+ "id": "09-pull-request-and-the-org-wide-plan",
+ "kind": "sub-step",
+ "act": "relate",
+ "on": "t-0000000000009003",
  "task": {
   "id": "t-0000000000009001",
   "title": "acme/api#120: Upgrade the logging library",

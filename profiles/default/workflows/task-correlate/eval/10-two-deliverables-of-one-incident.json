@@ -1,8 +1,8 @@
 {
- "id": "10-same-requester-different-deliverable",
- "kind": "look-alike",
- "act": "",
- "on": "",
+ "id": "10-two-deliverables-of-one-incident",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-000000000000a002",
  "task": {
   "id": "t-000000000000a001",
   "title": "Write the incident report for Tuesday's outage",

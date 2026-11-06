@@ -1,0 +1,24 @@
+{
+ "id": "22-same-word-different-bug",
+ "kind": "look-alike",
+ "act": "",
+ "on": "",
+ "task": {
+  "id": "t-0000000000016001",
+  "title": "Fix the login timeout on the mobile app",
+  "notes": "#mobile",
+  "items": [
+   "Lea asks you to fix the login timeout users hit on the mobile app"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000016002",
+   "title": "Fix the timeout of the CSV export",
+   "notes": "#data",
+   "items": [
+    "Lea asks you to fix the CSV export that times out on large workspaces"
+   ]
+  }
+ ]
+}

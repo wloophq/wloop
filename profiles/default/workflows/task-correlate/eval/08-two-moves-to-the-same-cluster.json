@@ -1,8 +1,8 @@
 {
- "id": "08-same-person-same-week-different-system",
- "kind": "look-alike",
- "act": "",
- "on": "",
+ "id": "08-two-moves-to-the-same-cluster",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-0000000000008002",
  "task": {
   "id": "t-0000000000008001",
   "title": "Migrate the billing database to the new cluster",
