@@ -72,7 +72,9 @@ type TasksDef struct {
 	ChatAt dintent.Pos
 	// ViaSession names a change an agent made for the user through a session they drove; {session} is the
 	// session's id.
-	ViaSession       string
+	ViaSession string
+	// ViaWorkflow names a change a workflow made; {workflow} is the workflow's name.
+	ViaWorkflow      string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -381,7 +383,8 @@ type mChat struct {
 }
 
 type mAttribution struct {
-	ViaSession *string `toml:"via_session"`
+	ViaSession  *string `toml:"via_session"`
+	ViaWorkflow *string `toml:"via_workflow"`
 }
 
 // ref is a name a file's key holds, checked once every layer is read.
@@ -462,6 +465,7 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	}
 	if m.Attribution != nil {
 		text(s, "attribution.via_session", m.Attribution.ViaSession, &l.def.ViaSession)
+		text(s, "attribution.via_workflow", m.Attribution.ViaWorkflow, &l.def.ViaWorkflow)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)

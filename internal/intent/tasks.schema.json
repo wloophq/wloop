@@ -17,6 +17,10 @@
         "via_session": {
           "description": "The name of a change an agent made for you through a session you drove; {session} is the session's id.",
           "type": "string"
+        },
+        "via_workflow": {
+          "description": "The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name.",
+          "type": "string"
         }
       },
       "type": "object"

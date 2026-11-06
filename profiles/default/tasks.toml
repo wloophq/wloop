@@ -410,6 +410,8 @@ by      = { person = "true", agent = "true" }
 intent = "chat"
 
 # How the task's page and its timeline name a change an agent made for
-# you through a session you drove; {session} is that session's id.
+# you through a session you drove, {session} that session's id, and one a
+# workflow made, {workflow} its name.
 [attribution]
 via_session = "you, via session {session}"
+via_workflow = "the loop, by workflow {workflow}"

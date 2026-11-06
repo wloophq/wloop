@@ -36,6 +36,7 @@ var tasksGrammar = []Key{
 	{Path: "chat.intent", In: SurfaceTasks, Kind: KindText, Doc: "The intent of the turn a message starts on a task with no live session."},
 	{Path: "attribution", In: SurfaceTasks, Kind: KindTable, Doc: "How the task's page names who made a change."},
 	{Path: "attribution.via_session", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change an agent made for you through a session you drove; {session} is the session's id."},
+	{Path: "attribution.via_workflow", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name."},
 	{Path: "areas", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The areas a task may be in, the values of the area property."},
 	{Path: "contexts", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The contexts the menu offers; a task may hold others."},
 	{Path: "stale_waiting_days", In: SurfaceTasks, Kind: KindInt, Doc: "Working days a task waits before it is stale."},

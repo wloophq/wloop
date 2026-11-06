@@ -264,6 +264,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `chat.intent` (string): The intent of the turn a message starts on a task with no live session.
 - `attribution` (table): How the task's page names who made a change.
 - `attribution.via_session` (string): The name of a change an agent made for you through a session you drove; {session} is the session's id.
+- `attribution.via_workflow` (string): The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name.
 - `areas` (list of strings): The areas a task may be in, the values of the area property.
 - `contexts` (list of strings): The contexts the menu offers; a task may hold others.
 - `stale_waiting_days` (integer): Working days a task waits before it is stale.
