@@ -25,7 +25,7 @@ const MaxPromptWords = 5500
 const OptimizeCallUSD = 5.0
 
 // Placeholders are the extractor template's, each exactly once.
-var Placeholders = []string{"{{VIEWER_ID}}", "{{VIEWER_NAME}}", "{{NOW}}", "{{LANGUAGE}}", "{{LEDGER}}", "{{CONTEXTS}}", "{{CONVERSATION}}"}
+var Placeholders = []string{"{{VIEWER_ID}}", "{{VIEWER_NAME}}", "{{NOW}}", "{{LANGUAGE}}", "{{LEDGER}}", "{{CITED}}", "{{CONTEXTS}}", "{{CONVERSATION}}"}
 
 const optimizeSchema = `{"type": "object", "additionalProperties": false, "required": ["prompt", "changelog"],
  "properties": {"prompt": {"type": "string"}, "changelog": {"type": "array", "items": {"type": "string"}}}}`

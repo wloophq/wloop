@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	slack "github.com/wloophq/wloop/plugins/slack/domain"
+	"github.com/wloophq/wloop/plugins/slack/items"
+	"github.com/wloophq/wloop/plugins/slack/unit"
 )
 
 // BenchmarkScanQuietPass is a pass over 5,000 new changes in 500 units, none due yet.
@@ -47,5 +51,33 @@ func BenchmarkExtractPass(b *testing.B) {
 		}
 		b.ReportMetric(float64(time.Since(start).Microseconds()), "idle-pass-us")
 		b.StartTimer()
+	}
+}
+
+// BenchmarkCited reads the cited units of a 200-message window that links 200 threads of a
+// ledger of 2,000 units and 20,000 items.
+func BenchmarkCited(b *testing.B) {
+	r := newRig(b)
+	r.facts.convs[jOtherChan] = slack.Conversation{ID: jOtherChan, Kind: slack.KindChannel}
+	var ops []items.Op
+	for u := range 2000 {
+		cu := slack.ThreadUnit(jTeam, jOtherChan, ts(u+1))
+		for i := range 10 {
+			ops = append(ops, items.Op{Op: items.OpCreate, Unit: cu, Item: fmt.Sprintf("e%d-%d", u, i),
+				Anchor: unit.Anchor{Unit: cu, Ref: jOtherChan + "/" + ts(u+1)}, Fields: &items.Fields{Kind: ptr(items.Todo), Summary: ptr("work")}})
+		}
+	}
+	if err := r.ledger.host.Apply(items.Extracted, ops...); err != nil {
+		b.Fatal(err)
+	}
+	in := Input{Unit: thread(ts(90000))}
+	for i := range 200 {
+		in.Messages = append(in.Messages, slack.Message{TS: ts(90000 + i), Links: []string{permalinkOf(jOtherChan, ts(i*10+1)), "https://example.test/doc"}})
+	}
+	for b.Loop() {
+		got, err := r.job.cited(context.Background(), jTeam, in, []unit.Unit{in.Unit})
+		if err != nil || len(got) != maxCitedItems {
+			b.Fatalf("%d cited, %v", len(got), err)
+		}
 	}
 }

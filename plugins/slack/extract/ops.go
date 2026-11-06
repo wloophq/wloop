@@ -33,24 +33,33 @@ func itemIDs(in Input, r Result) map[string]string {
 // Slack user ("slack:<id>", with an "email:<addr>" alias when the cache has one), a user group
 // ("group:<id>") or a team named in the conversation ("group:<name>"); any other key is refused.
 // A new item's id is "e<origin ts without its dot>", suffixed ".2", ".3"... while taken, so a
-// retried run creates it once. An item the result omits gets no op.
+// retried run creates it once. An item the result omits gets no op. A cited item gets only an
+// assign or a resolve, on its own unit; a link naming it is dropped.
 func Ops(in Input, r Result, team string, parse ParseTarget) (ops []items.Op, dropped int, err error) {
 	b := opBuilder{in: in, ledger: map[string]items.Item{}, ids: map[string]string{}}
 	for _, it := range in.Ledger {
 		b.ledger[it.ID] = it
 	}
+	cited := map[string]items.Item{}
+	for _, it := range in.Cited {
+		cited[it.ID] = it
+	}
 	for _, out := range r.Items {
+		_, held := b.ledger[out.Ref]
+		_, isCited := cited[out.Ref]
 		if isNewRef(out.Ref) {
 			b.ids[out.Ref] = b.mint(out.OriginTS)
-		} else if _, ok := b.ledger[out.Ref]; !ok {
+		} else if !held && !isCited {
 			return nil, 0, fmt.Errorf("extract: item %q is not in the ledger", out.Ref)
 		}
 	}
 	for _, out := range r.Items {
 		if id, ok := b.ids[out.Ref]; ok {
 			ops = append(ops, b.create(id, out)...)
+		} else if cur, ok := b.ledger[out.Ref]; ok {
+			ops = append(ops, b.change(cur, out)...)
 		} else {
-			ops = append(ops, b.change(b.ledger[out.Ref], out)...)
+			ops = append(ops, b.cite(cited[out.Ref], out)...)
 		}
 	}
 	for _, l := range r.Links {
@@ -164,6 +173,22 @@ func (b *opBuilder) change(cur items.Item, out ItemOut) []items.Op {
 		ops = append(ops, b.resolve(cur.ID, out))
 	case out.State == "open" && cur.State == "resolved":
 		ops = append(ops, items.Op{Op: "reopen", Unit: b.in.Unit, Item: cur.ID, Anchor: b.anchor("")})
+	}
+	return ops
+}
+
+// cite is the ops of out on cited, an item of another unit the answer saw only in part: its
+// fields stay as they are.
+func (b *opBuilder) cite(cited items.Item, out ItemOut) []items.Op {
+	var ops []items.Op
+	if len(out.Assignees) > 0 && !slices.Equal(keys(cited.Assignees), keys(b.people(out.Assignees))) {
+		ops = append(ops, b.assign(cited.ID, out))
+	}
+	if out.State == "resolved" {
+		ops = append(ops, b.resolve(cited.ID, out))
+	}
+	for i := range ops {
+		ops[i].Unit = cited.Unit
 	}
 	return ops
 }

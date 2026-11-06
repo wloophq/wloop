@@ -99,7 +99,7 @@ func extractScripted(t *testing.T, in Input, name string) Result {
 	return r
 }
 
-var placeholders = []string{"{{VIEWER_ID}}", "{{VIEWER_NAME}}", "{{NOW}}", "{{LANGUAGE}}", "{{LEDGER}}", "{{CONTEXTS}}", "{{CONVERSATION}}"}
+var placeholders = []string{"{{VIEWER_ID}}", "{{VIEWER_NAME}}", "{{NOW}}", "{{LANGUAGE}}", "{{LEDGER}}", "{{CITED}}", "{{CONTEXTS}}", "{{CONVERSATION}}"}
 
 func TestPromptPlaceholders(t *testing.T) {
 	for _, p := range placeholders {
