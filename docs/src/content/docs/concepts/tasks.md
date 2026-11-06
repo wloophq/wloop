@@ -110,7 +110,7 @@ The same work can reach you from more than one source: a Slack ask to review a p
 | Split | Gives a task merged into this one back, as it was before the merge. |
 | Relate / Unrelate | Links two tasks as distinct work. Nothing moves; each lists the other. |
 
-**Who runs them.** You, and a session you drive, run all four. A workflow asks for a merge or a relation through the verb's gate, "Merge these tasks?" or "Relate these tasks?", which says which task folds into which; the asking workflow's approval decides it, as every gate's is decided ([What waits for you](/concepts/approval/#gates)). Approved by you, the verb runs as yours; released by the workflow's rule, it runs as the workflow, and the timeline names it "the loop, by workflow <name>" (`attribution.via_workflow` in `tasks.toml`). A pair you took apart, by rejecting its gate, splitting it or unrelating it, waits for you whatever the workflow's approval says (`task.undone`). A workflow never splits or unrelates, and a plugin runs none of the four. A merge takes two open tasks, never a project, a draft or a message.
+**Who runs them.** You, and a session you drive, run all four. A workflow asks for a merge or a relation through the verb's gate, "Merge these tasks?" or "Relate these tasks?", which says which task folds into which; the asking workflow's approval decides it, as every gate's is decided ([What waits for you](/concepts/approval/#gates)). Approved by you, the verb runs as yours; released by the workflow's rule, it runs as the workflow, and the timeline names it "the loop, by workflow <name>" (`attribution.via_workflow` in `tasks.toml`). A pair you took apart, by rejecting its gate, splitting it or unrelating it, waits for you whatever the workflow's approval says (`task.undone`), also once either task is merged into another; taking a pair apart supersedes its open merge and relate gates, and one a rule or a window releases later runs nothing. A workflow never splits or unrelates, and a plugin runs none of the four. A merge takes two open tasks, never a project, a draft or a message.
 
 **The survivor.** The task you shaped by hand stays: one you clarified, moved or filed in a project, yourself or through a session you drive, or whose properties you wrote (`task.clarified`); an agent's property write, such as a brief's, does not count. When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
 
@@ -122,12 +122,12 @@ The same work can reach you from more than one source: a Slack ask to review a p
 
 ### Merges and relations a workflow asks for
 
-Four bundled workflows ask for merges and relations. Each opens the verb's gate and nothing else, and its `[gates.approval]` says which run at once:
+Five bundled workflows ask for merges and relations. Each opens the verb's gate and nothing else, and its `[gates.approval]` says which run at once:
 
 | Workflow | When | Asks for | Its approval |
 |---|---|---|---|
 | `task-fold-linked` | a task that holds no pull request (`task.unit_kinds`) and whose items' review or merge links target exactly one unit (`task.link_target_units`), held by exactly one task (`task.link_target_tasks`); a sweep, so it holds whichever task came first | merge with that task | released at once |
-| `task-relate-linked` | a task's items link the task of a pull request, and it is not the fold's case: an ask about several pull requests, or a task that holds a pull request of its own; one task each sweep | relate with that task | released at once |
+| `task-relate-linked` | a task's items link the task of a pull request, and it is not the fold's case: an ask about several pull requests, or a task that holds a pull request of its own | relate with each of those tasks, in one pass (`each`) | released at once |
 | `task-correlate-merge-linked` | the judgment says same work, a link target or a cited unit also ties the pair (`task.linked_candidates`), the task holds no pull request and does not link the candidate's | merge with that candidate | released at once |
 | `task-correlate-merge` | the judgment says same work, the task does not link the candidate's pull request, and only a person ties the pair or the task holds a pull request of its own | merge with that candidate | waits for you |
 | `task-correlate-relate` | the judgment says related work, and the task does not link the candidate's pull request, which `task-fold-linked` and `task-relate-linked` handle | relate with that candidate | released at once |

@@ -536,6 +536,10 @@
                   "description": "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it.",
                   "type": "string"
                 },
+                "each": {
+                  "description": "With `task` naming a list fact, `true` runs the verb with every task the list names, in order, each opening its own gate where the verb is gated, so one that waits for you does not hold back the rest; else the verb runs with the first.",
+                  "type": "string"
+                },
                 "on": {
                   "description": "With a verb whose handler is waiting, the people the task waits on, comma-separated.",
                   "type": "string"
