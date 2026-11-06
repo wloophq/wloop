@@ -233,6 +233,8 @@ type Dossier struct {
 	Path string
 	// Granted says the session was launched with the dossier in its policy.
 	Granted bool
+	// Merged are the paths of the dossiers of the tasks merged into the unit's task, which the session reads.
+	Merged []string
 }
 
 // Why is what made a workflow start the turn, as the instructions render it.

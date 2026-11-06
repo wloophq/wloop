@@ -31,7 +31,11 @@ const (
 		OR EXISTS (SELECT 1 FROM tasks e WHERE e.category NOT IN (?3, ?4) AND (
 			e.id IN (SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2) OR
 			e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2)))`
-	taskOpenSQL = `SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1 AND category NOT IN (?2, ?3))`
+	// taskOpenSQL follows the merge aliases of a task no longer stored to the task it was merged into.
+	taskOpenSQL = `WITH RECURSIVE r(id, hops) AS (SELECT ?1, 0
+			UNION SELECT a.new_id, r.hops + 1 FROM task_aliases a JOIN r ON a.old_id = r.id
+				WHERE r.hops < ?4 AND r.id NOT IN (SELECT id FROM tasks) AND ` + mergeAlias + `)
+		SELECT EXISTS (SELECT 1 FROM tasks WHERE id IN (SELECT id FROM r) AND category NOT IN (?2, ?3))`
 	// holderSQL is the task that holds a unit: an open one first, then the oldest.
 	holderSQL = `SELECT e.id FROM tasks e WHERE e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2
 		UNION SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2)
@@ -81,7 +85,7 @@ func (s dossierStore) Open(ctx context.Context, o dossier.Owner) (bool, error) {
 		return false, nil
 	}
 	if id, ok := task.IDOf(o.Unit); ok {
-		err := s.db.R().QueryRowContext(ctx, taskOpenSQL, append([]any{string(id)}, openArgs()...)...).Scan(&open)
+		err := s.db.R().QueryRowContext(ctx, taskOpenSQL, append([]any{string(id)}, append(openArgs(), maxMergeHops)...)...).Scan(&open)
 		return open, err
 	}
 	err := s.db.R().QueryRowContext(ctx, unitOpenSQL, append([]any{string(o.Unit.Provider), o.Unit.Key}, openArgs()...)...).Scan(&open)
@@ -101,6 +105,21 @@ func (s dossierStore) Owner(ctx context.Context, u unit.Unit) (dossier.Owner, er
 		return dossier.Owner{}, err
 	}
 	return dossier.Owner{Unit: task.UnitOf(task.ID(id))}, nil
+}
+
+var _ dossiers.Merges = dossierStore{}
+
+func (s dossierStore) MergedOwners(ctx context.Context, u unit.Unit) ([]dossier.Owner, error) {
+	id, ok := task.IDOf(u)
+	if !ok {
+		return nil, nil
+	}
+	merged, err := s.db.MergedInto(ctx, id)
+	var out []dossier.Owner
+	for _, m := range merged {
+		out = append(out, dossier.Owner{Unit: task.UnitOf(m)})
+	}
+	return out, err
 }
 
 func scanDossier(row scanner) (dossier.Dossier, error) {

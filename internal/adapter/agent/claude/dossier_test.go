@@ -143,3 +143,24 @@ func TestPolicyWithoutDossierUnchanged(t *testing.T) {
 		}
 	}
 }
+
+func TestADirWithNoWriteDeniesEveryEdit(t *testing.T) {
+	const merged = "/state/dossiers/task/t-merged#"
+	p := dossierPolicy(dossierPath)
+	p.Dirs = append(p.Dirs, turns.Dir{Path: merged})
+	var s struct {
+		Permissions struct {
+			Allow, Deny           []string
+			AdditionalDirectories []string `json:"additionalDirectories"`
+		} `json:"permissions"`
+	}
+	if err := json.Unmarshal([]byte(Agent{}.Settings(p)), &s); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(s.Permissions.Deny, "Edit(/"+merged+"/**)") || !slices.Contains(s.Permissions.AdditionalDirectories, merged) {
+		t.Fatalf("a read-only dir is not read only: %+v", s.Permissions)
+	}
+	if slices.Contains(s.Permissions.Deny, "Edit(/"+dossierPath+"/**)") {
+		t.Fatalf("a writable dir is denied every edit: %+v", s.Permissions.Deny)
+	}
+}

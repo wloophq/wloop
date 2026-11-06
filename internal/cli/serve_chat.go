@@ -35,7 +35,11 @@ func (c chatLog) SetMarks(ctx context.Context, u unit.Unit, marks map[string]str
 }
 
 func (c chatLog) Brief(ctx context.Context, e task.Task) (string, bool, error) {
-	rec, ok, err := timeline.RecordOf(ctx, c.db, builtin.BuildsBrief, e.ID, e.Units)
+	held, err := timeline.HeldOf(ctx, c.db, e)
+	if err != nil {
+		return "", false, err
+	}
+	rec, ok, err := timeline.RecordOf(ctx, c.db, builtin.BuildsBrief, e.ID, held)
 	return rec.Data, ok, err
 }
 
