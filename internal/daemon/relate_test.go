@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"reflect"
 	"slices"
 	"testing"
@@ -159,7 +160,22 @@ func TestARelatedListNamesEachTaskOnceAndNeverItself(t *testing.T) {
 	}
 }
 
+// A delta page resends a retitled task, not the tasks whose related lists name it, so a client shows a
+// related task by its own copy of it, by id, and falls back to the ref.
 func TestARelatedRefShowsItsTaskAsADeltaLeavesIt(t *testing.T) {
-	// A related task's title or state change does not reach the row that lists it on a delta page.
-	t.Skip("T3 C7")
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-1", Title: "Draft the launch post", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"related": {List: []string{"t-2"}}}},
+		task.Task{ID: "t-2", Title: "Book the launch venue", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"related": {List: []string{"t-1"}}}})
+	full := r.page(t, "view=inbox")
+	if err := r.g.Retitle(context.Background(), "t-2", "Book the launch hall"); err != nil {
+		t.Fatal(err)
+	}
+	delta := r.page(t, "view=inbox&since="+url.QueryEscape(api.Since{Epoch: full.Epoch, Rev: full.Rev}.String()))
+	if delta.Full || !slices.Equal(taskIDs(delta.Tasks), []string{"t-2"}) || delta.Tasks[0].Title != "Book the launch hall" {
+		t.Fatalf("the delta after the retitle: full %v %+v", delta.Full, delta.Tasks)
+	}
+	if got := r.view(t, "t-1").Related; !reflect.DeepEqual(got, []api.TaskRef{{ID: "t-2", Title: "Book the launch hall", State: "inbox"}}) {
+		t.Errorf("t-1's detail, read fresh, lists %+v", got)
+	}
 }
