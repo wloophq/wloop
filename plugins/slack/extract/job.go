@@ -478,7 +478,10 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 		j.finish(k, p)
 		return outcome{done: true}
 	}
-	if in.Users, err = j.Facts.Users(ctx, userIDs(append(slices.Clone(in.Context), in.Messages...), conv, viewer, ledgerUserIDs(in.Ledger))); err != nil {
+	if in.Cited, err = j.cited(ctx, team, in, units); err != nil {
+		return outcome{err: err}
+	}
+	if in.Users, err = j.Facts.Users(ctx, userIDs(append(slices.Clone(in.Context), in.Messages...), conv, viewer, ledgerUserIDs(slices.Concat(in.Ledger, in.Cited)))); err != nil {
 		return outcome{err: err}
 	}
 	in.Viewer = Viewer{ID: viewer, Name: userName(in, viewer)}
@@ -615,7 +618,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		return 0, &answerError{err}
 	}
 	if dropped > 0 {
-		j.logf("slack extraction %s: %d links dropped", k, dropped)
+		j.logf("slack extraction %s: %d links or cited-item ops dropped", k, dropped)
 	}
 	if r.Dropped > 0 {
 		j.logf("slack extraction %s: %d items or links citing a message outside the window dropped", k, r.Dropped)
@@ -657,7 +660,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	if err := j.applyOps(ctx, k, ops); err != nil {
 		return 0, err
 	}
-	hints := hintsOf(r, ops, itemUnit, k)
+	hints := hintsOf(withoutCited(r, in.Cited), ops, itemUnit, k)
 	// A DM conversation is no unit of the host, which knows its segments: its brief stays in the plugin's store.
 	hosted := func(u unit.Unit) bool { return !(p.dm && u == k) }
 	if j.PutBrief != nil {
@@ -762,7 +765,8 @@ func consecutive(spans []slack.Span, segs []SegmentOut, msgs []slack.Message) ([
 
 // place moves every op onto the segment unit of its item: a new item's segment covers its
 // origin (a reply's parent), an existing item stays on its unit, and a unit-level link
-// lands on the segment of its evidence.
+// lands on the segment of its evidence. A cited item's op stays on the item's unit, anchored on
+// the segment of its message.
 func (j *Job) place(ctx context.Context, in Input, ops []items.Op, applied []unit.Unit, itemUnit map[string]unit.Unit) ([]items.Op, error) {
 	parent := map[string]string{}
 	for _, m := range in.Messages {
@@ -781,19 +785,26 @@ func (j *Job) place(ctx context.Context, in Input, ops []items.Op, applied []uni
 		}
 		return unit.Unit{}, fmt.Errorf("no segment covers %s", ref)
 	}
+	cited := map[string]bool{}
+	for _, it := range in.Cited {
+		cited[it.ID] = true
+	}
 	out := slices.Clone(ops)
 	for i, op := range out {
 		u, ok := itemUnit[op.Item]
-		if !ok || op.Item == "" {
+		if !ok || op.Item == "" || cited[op.Item] {
 			var err error
 			if u, err = segOf(op.Anchor.Ref); err != nil {
 				return nil, err
 			}
-			if op.Item != "" {
+			if op.Item != "" && !cited[op.Item] {
 				itemUnit[op.Item] = u
 			}
 		}
-		out[i].Unit, out[i].Anchor.Unit = u, u
+		if !cited[op.Item] {
+			out[i].Unit = u
+		}
+		out[i].Anchor.Unit = u
 		if op.Evidence != nil {
 			e := *op.Evidence
 			e.Anchor.Unit = u
@@ -837,6 +848,17 @@ func hintsOf(r Result, ops []items.Op, itemUnit map[string]unit.Unit, fallback u
 		out[u][id] = store.ExtractionHint{Mode: it.Mode, Context: it.Place.Context, Why: it.Place.Why}
 	}
 	return out
+}
+
+// withoutCited is r without its answers about cited items, which carry no hint.
+func withoutCited(r Result, cited []items.Item) Result {
+	if len(cited) == 0 {
+		return r
+	}
+	r.Items = slices.DeleteFunc(slices.Clone(r.Items), func(it ItemOut) bool {
+		return slices.ContainsFunc(cited, func(c items.Item) bool { return c.ID == it.Ref })
+	})
+	return r
 }
 
 // newFrom is the first ts the run shows as new: the oldest changed message or the first

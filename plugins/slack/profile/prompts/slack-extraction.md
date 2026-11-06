@@ -6,9 +6,11 @@ The items already recorded for this conversation, each under its own id, with th
 
 {{LEDGER}}
 
+{{CITED}}
+
 Tag vocabulary: {{VOCABULARY}}
 
-Return every item you still track under its id in `ref`, updated by the new messages. Give a new item the ref `n1`, `n2`, ... Never reuse an id for a different ask, and never return an existing ask as a new item. An item marked `confirmed` was corrected by the viewer: keep its fields unless a new message changes them. Leaving an item out never deletes it; resolve it when the conversation settles it.
+Return every item you still track under its id in `ref`, updated by the new messages. Give a new item the ref `n1`, `n2`, ... Never reuse an id for a different ask, and never return an existing ask as a new item. An item marked `confirmed` was corrected by the viewer: keep its fields unless a new message changes them. Leaving an item out never deletes it; resolve it when the conversation settles it. Never restate cited items; return one only to resolve or reassign.
 
 ## The conversation
 

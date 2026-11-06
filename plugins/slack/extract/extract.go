@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,9 @@ type Input struct {
 	Extra        *Extra       // the brief intent's extra fields every brief carries; nil asks none
 	Contexts     []string     // placement contexts offered (context map keys)
 	Segments     []slack.Span // a DM's current spans, ascending, rendered s1, s2...
+	// Cited are the open items of other Slack units the window links to, by their own Item.ID,
+	// none of which Ledger holds; an answer may only resolve or reassign them.
+	Cited []items.Item
 	// SegmentBriefs are the briefs in use of Segments, as stored, by index.
 	SegmentBriefs []string
 	WindowChars   int // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
@@ -228,7 +232,7 @@ func decode(raw []byte, in Input) (Result, error) {
 		r.ExtrasDropped++
 	}
 	known := map[string]bool{}
-	for _, it := range in.Ledger {
+	for _, it := range slices.Concat(in.Ledger, in.Cited) {
 		known[it.ID] = true
 	}
 	refs := map[string]bool{}

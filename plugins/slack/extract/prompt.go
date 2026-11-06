@@ -14,6 +14,9 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/jsonschema"
 )
 
+// MaxPromptWords caps the extraction prompt's template, counted as space-separated words.
+const MaxPromptWords = 5600
+
 // PromptFile and BriefSchemaFile are the extraction's prompt and its
 // brief's schema in the plugin's profile layer.
 const (
@@ -87,6 +90,7 @@ func Prompt(in Input) (string, error) {
 		"{{NOW}}", in.Now.In(zone(in)).Format("2006-01-02 15:04 MST (Monday)"),
 		"{{LANGUAGE}}", lang,
 		"{{LEDGER}}", renderLedger(in),
+		"{{CITED}}", renderCited(in.Cited),
 		"{{CONTEXTS}}", renderContexts(in.Contexts),
 		"{{VOCABULARY}}", VocabularyOf(in.Vocabulary),
 		"{{CONVERSATION}}", Render(in),
@@ -151,6 +155,21 @@ func renderLedger(in Input) string {
 		}
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func renderCited(cited []items.Item) string {
+	if len(cited) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(CitedHeading + "\n")
+	for _, it := range cited {
+		fmt.Fprintf(&b, "%s (%s, %s) %s\n", it.ID, it.State, it.Kind, markerLike.ReplaceAllString(oneLine(it.Summary), "- -$1"))
+		fmt.Fprintf(&b, "  conversation: %s; requester: %s; assignees: %s\n",
+			cmp.Or(it.Origin.Permalink, it.Origin.Ref), person(it.Requester), people(it.Assignees))
+	}
+	b.WriteString(CitedEnds)
+	return b.String()
 }
 
 // person renders p as the conversation renders them: a user as a mention, a user group as
