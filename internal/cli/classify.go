@@ -372,7 +372,7 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 		}
 		fp := factString(f, w.Slot+".fingerprint")
 		if with, _ := w.Steps[i].Args[withArg].(string); with != "" {
-			if ctx.Value(readingWith{}) != nil || !names(ctx, builtin.ClassifyFact(w.Name, "")) {
+			if ctx.Value(readingWith{}) != nil || !workflow.Names(ctx, builtin.ClassifyFact(w.Name, "")) {
 				continue
 			}
 			if _, err := u.c.s.tasks(); err != nil {
@@ -406,11 +406,6 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 		}
 	}
 	return out, nil
-}
-
-// names says whether a read ctx carries names a fact that starts with prefix.
-func names(ctx context.Context, prefix string) bool {
-	return slices.ContainsFunc(workflow.ReadsOf(ctx), func(r string) bool { return strings.Contains(r, prefix) })
 }
 
 // factValue is a JSON value as a fact: a whole number an int, a list of

@@ -7,14 +7,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/pkg/plugin/evalout"
 )
 
@@ -38,21 +41,21 @@ type caseTask struct {
 	Items []string `json:"items"`
 }
 
-// correlationResult is one case's verdict. Proposed is what the runtime acts on: same_work, with same_as one of
-// the case's candidates; Stray is any other non-empty same_as.
+// correlationResult is one case's verdict. Answer is the judgment's output as its schema names its fields;
+// Proposed is what the workflow acting on it would do, as its when says over that output, and Got the task it
+// would act on; Stray is an answer naming a task the runtime does not act on.
 type correlationResult struct {
-	ID       string   `json:"id"`
-	Kind     string   `json:"kind"`
-	Want     string   `json:"want"`
-	SameWork bool     `json:"same_work"`
-	Got      string   `json:"got"`
-	Proposed bool     `json:"proposed"`
-	Stray    bool     `json:"stray"`
-	Reason   string   `json:"reason"`
-	Correct  bool     `json:"correct"`
-	Model    string   `json:"model,omitempty"`
-	CostUSD  *float64 `json:"cost_usd,omitempty"`
-	Error    string   `json:"error,omitempty"`
+	ID       string         `json:"id"`
+	Kind     string         `json:"kind"`
+	Want     string         `json:"want"`
+	Answer   map[string]any `json:"answer,omitempty"`
+	Got      string         `json:"got"`
+	Proposed bool           `json:"proposed"`
+	Stray    bool           `json:"stray"`
+	Correct  bool           `json:"correct"`
+	Model    string         `json:"model,omitempty"`
+	CostUSD  *float64       `json:"cost_usd,omitempty"`
+	Error    string         `json:"error,omitempty"`
 }
 
 // correlationScore counts the proposals the runtime would open, "same work" being the positive class: a
@@ -66,13 +69,44 @@ type correlationScore struct {
 }
 
 type correlationEvalOptions struct {
-	Asker   turns.Asker
-	Cases   []correlationCase
-	Prompt  string
-	Schema  string
-	MaxUSD  float64
-	CallUSD float64
-	Log     io.Writer
+	Asker    turns.Asker
+	Cases    []correlationCase
+	Judgment judgment
+	MaxUSD   float64
+	CallUSD  float64
+	Log      io.Writer
+}
+
+// judgment is a classify step with a with, as the profile loads it, and the workflow that acts on its output.
+type judgment struct {
+	// Name is the judging workflow's; With the fact its step lists the tasks of.
+	Name, With     string
+	Prompt, Schema string
+	// Acts is the workflow whose when reads the judgment's output; Target the fact of that output its steps
+	// name as the task they act on.
+	Acts   workflow.Workflow
+	Target string
+}
+
+// proposes says what j.Acts would do with the output fields of a judgment over c: whether its when holds, and
+// the task its steps would act on.
+func (j judgment) proposes(c correlationCase, fields map[string]any) (bool, string, error) {
+	f := maps.Clone(c.Facts)
+	if f == nil {
+		f = workflow.Facts{}
+	}
+	ids := []string{}
+	for _, t := range c.Candidates {
+		ids = append(ids, t.ID)
+	}
+	f[j.With] = ids
+	for k, v := range fields {
+		f[builtin.ClassifyFact(j.Name, k)] = factValue(v)
+	}
+	got, _ := f[j.Target].(string)
+	trigger := workflow.Facts{"trigger.kind": string(workflow.TriggerEvent), "trigger.event.kind": builtin.EventClassified, "trigger.event.data": j.Name}
+	ok, err := j.Acts.When.Match(workflow.Vars{Facts: f, Trigger: trigger})
+	return ok, got, err
 }
 
 // loadCorrelationCases reads every .json case of dir, sorted by name.
@@ -127,11 +161,11 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 			break
 		}
 		r := correlationResult{ID: c.ID, Kind: c.Kind, Want: c.SameAs}
-		prompt, err := casePrompt(o.Prompt, c)
+		prompt, err := casePrompt(o.Judgment.Prompt, c)
 		if err != nil {
 			return out, s, fmt.Errorf("%s: %w", c.ID, err)
 		}
-		ans, err := o.Asker.Ask(ctx, turns.Ask{Tier: turns.TierFast, Prompt: prompt, Schema: o.Schema, MaxCostUSD: o.CallUSD})
+		ans, err := o.Asker.Ask(ctx, turns.Ask{Tier: turns.TierFast, Prompt: prompt, Schema: o.Judgment.Schema, MaxCostUSD: o.CallUSD})
 		spent := o.CallUSD
 		if ans.CostUSD != nil {
 			spent = *ans.CostUSD
@@ -139,31 +173,28 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 		}
 		s.SpentUSD += spent
 		if err == nil {
-			err = validAnswer(o.Schema, ans.JSON)
-		}
-		var v struct {
-			SameWork bool   `json:"same_work"`
-			SameAs   string `json:"same_as"`
-			Reason   string `json:"reason"`
+			err = validAnswer(o.Judgment.Schema, ans.JSON)
 		}
 		if err == nil {
-			err = json.Unmarshal(ans.JSON, &v)
+			err = json.Unmarshal(ans.JSON, &r.Answer)
+		}
+		if err == nil {
+			r.Proposed, r.Got, err = o.Judgment.proposes(c, r.Answer)
 		}
 		if err != nil {
-			r.Error = err.Error()
+			r.Proposed, r.Error = false, err.Error()
 		} else {
 			s.Answered++
 		}
-		r.SameWork, r.Got, r.Reason, r.Model = v.SameWork, v.SameAs, v.Reason, ans.Model
-		r.Proposed = err == nil && v.SameWork && slices.ContainsFunc(c.Candidates, func(t caseTask) bool { return t.ID == v.SameAs })
-		r.Stray = err == nil && !r.Proposed && v.SameAs != ""
-		r.Correct = err == nil && (r.Proposed && v.SameAs == c.SameAs || !r.Proposed && c.SameAs == "")
+		r.Model = ans.Model
+		r.Stray = err == nil && !r.Proposed && r.Got != ""
+		r.Correct = err == nil && (r.Proposed && r.Got == c.SameAs || !r.Proposed && c.SameAs == "")
 		if r.Stray {
 			s.Stray++
 		}
 		s.Model = cmp.Or(s.Model, ans.Model)
 		switch {
-		case r.Proposed && v.SameAs == c.SameAs:
+		case r.Proposed && r.Got == c.SameAs:
 			s.TP++
 		case r.Proposed:
 			s.FP++
@@ -176,7 +207,7 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 			s.TN++
 		}
 		if o.Log != nil {
-			fmt.Fprintf(o.Log, "%s: want %q, same_work %v same_as %q, proposed %v\n", c.ID, c.SameAs, v.SameWork, v.SameAs, r.Proposed)
+			fmt.Fprintf(o.Log, "%s: want %q, answer %s, proposed %v %q\n", c.ID, c.SameAs, ans.JSON, r.Proposed, r.Got)
 		}
 		out = append(out, r)
 	}
@@ -220,7 +251,7 @@ func runEvalCorrelation(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	prompt, schema, err := e.judgmentFiles(*name)
+	j, err := e.judgment(*name)
 	if err != nil {
 		return err
 	}
@@ -229,7 +260,7 @@ func runEvalCorrelation(ctx context.Context, e *Env, args []string) error {
 		if err != nil {
 			return err
 		}
-		prompt = string(b)
+		j.Prompt = string(b)
 	}
 	dir, err := os.MkdirTemp("", brand.Name+"-eval-correlation-")
 	if err != nil {
@@ -240,7 +271,7 @@ func runEvalCorrelation(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	results, score, runErr := runCorrelationEval(ctx, correlationEvalOptions{Asker: asker, Cases: set, Prompt: prompt, Schema: schema,
+	results, score, runErr := runCorrelationEval(ctx, correlationEvalOptions{Asker: asker, Cases: set, Judgment: j,
 		MaxUSD: *maxUSD, CallUSD: *callUSD, Log: e.Err})
 	if err := writeCorrelationEval(*out, results, score); err != nil {
 		return err
@@ -266,21 +297,43 @@ func writeCorrelationEval(dir string, results []correlationResult, s correlation
 	return os.WriteFile(filepath.Join(dir, "score.txt"), []byte(s.String()+"\n"), 0o644)
 }
 
-// judgmentFiles are the prompt and the schema the classify step of workflow names, which must read a with.
-func (e *Env) judgmentFiles(name string) (prompt, schema string, err error) {
+// judgment is the classify step of workflow name, which must read a with, its prompt and schema, and the
+// loaded workflow whose when reads its output.
+func (e *Env) judgment(name string) (judgment, error) {
 	ws := e.loadedIntents().Workflows
 	i := slices.IndexFunc(ws, func(w workflow.Workflow) bool { return w.Name == name })
 	if i < 0 {
-		return "", "", fmt.Errorf("no workflow %s is loaded", name)
+		return judgment{}, fmt.Errorf("no workflow %s is loaded", name)
 	}
 	j := slices.IndexFunc(ws[i].Steps, func(st workflow.Step) bool { return st.Use == stepClassify })
-	if j < 0 || ws[i].Steps[j].Args[withArg] == nil {
-		return "", "", fmt.Errorf("%s has no classify step with a with to judge", name)
+	var with string
+	if j >= 0 {
+		with, _ = ws[i].Steps[j].Args[withArg].(string)
 	}
+	if with == "" {
+		return judgment{}, fmt.Errorf("%s has no classify step with a with to judge", name)
+	}
+	out := judgment{Name: name, With: with}
 	c := stepCall{st: ws[i].Steps[j], why: workflow.Why{Workflow: name}}
-	if prompt, err = stepFile(e, c, "prompt"); err != nil {
-		return "", "", err
+	var err error
+	if out.Prompt, err = stepFile(e, c, "prompt"); err != nil {
+		return judgment{}, err
 	}
-	schema, err = stepFile(e, c, "schema")
-	return prompt, schema, err
+	if out.Schema, err = stepFile(e, c, "schema"); err != nil {
+		return judgment{}, err
+	}
+	prefix := builtin.ClassifyFact(name, "")
+	for _, w := range ws {
+		if w.Name == name || w.When == nil || !slices.ContainsFunc(w.When.Reads(), func(r string) bool { return strings.HasPrefix(r, prefix) }) {
+			continue
+		}
+		reads := workflow.StepReads(w.Steps)
+		k := slices.IndexFunc(reads, func(r string) bool { return strings.HasPrefix(r, prefix) })
+		if k < 0 {
+			continue
+		}
+		out.Acts, out.Target = w, reads[k]
+		return out, nil
+	}
+	return judgment{}, fmt.Errorf("no loaded workflow acts on %s's judgment: none whose when reads %s* names one of those facts as the task its steps act on", name, prefix)
 }

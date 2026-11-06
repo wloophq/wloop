@@ -317,7 +317,7 @@ var apiMethods = []string{"conversations.replies", "conversations.history", "con
 func profilePrompts(t testing.TB) map[string][]byte {
 	t.Helper()
 	out := map[string][]byte{}
-	for _, f := range []string{extract.PromptFile, extract.BriefSchemaFile} {
+	for _, f := range []string{extract.PromptFile, extract.BriefSchemaFile, extract.CitedFile} {
 		b, err := os.ReadFile(filepath.Join("profile", f))
 		if err != nil {
 			t.Fatal(err)

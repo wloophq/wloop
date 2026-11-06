@@ -82,7 +82,12 @@ func (e MissingError) Error() string {
 // the user's profile when one is set, then the user's plugins/<id>/ of each
 // enabled plugin. A plugin's layer is its directory's profile/, else the
 // one the binary bundles for it. A disabled plugin's layers are left out.
-func Chain(cfg config.Config) []Layer {
+func Chain(cfg config.Config) []Layer { return chain(cfg, cfg.PluginEnabled) }
+
+// EveryPlugin is Chain with every installed and bundled plugin's layers, enabled or not.
+func EveryPlugin(cfg config.Config) []Layer { return chain(cfg, func(string) bool { return true }) }
+
+func chain(cfg config.Config, enabled func(id string) bool) []Layer {
 	out := []Layer{{Name: "bundled", Source: "embedded"}}
 	var found []PluginDir
 	if ps := plugins.Load(); ps != nil {
@@ -95,7 +100,7 @@ func Chain(cfg config.Config) []Layer {
 	var on []string
 	layers := map[string]Layer{}
 	for _, p := range found {
-		if !cfg.PluginEnabled(p.ID) || slices.Contains(on, p.ID) {
+		if !enabled(p.ID) || slices.Contains(on, p.ID) {
 			continue
 		}
 		on = append(on, p.ID)
@@ -104,7 +109,7 @@ func Chain(cfg config.Config) []Layer {
 		}
 	}
 	for _, b := range bundled {
-		if !cfg.PluginEnabled(b.ID) {
+		if !enabled(b.ID) {
 			continue
 		}
 		if !slices.Contains(on, b.ID) {

@@ -78,11 +78,8 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 			t.Errorf("no %s case", k)
 		}
 	}
-	prompt, err := os.ReadFile("../../profiles/default/workflows/task-correlate/prompt.md.tmpl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	schema, err := os.ReadFile("../../profiles/default/workflows/task-correlate/schema.json")
+	te := newTestEnv(t, nil)
+	j, err := te.judgment("task-correlate")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +101,7 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 			strays, judge.unsure[c.Task.ID] = append(strays, c.ID), c.Candidates[0].ID
 		}
 	}
-	o := correlationEvalOptions{Asker: judge, Cases: cases, Prompt: string(prompt), Schema: string(schema), MaxUSD: 2, CallUSD: 0.05}
+	o := correlationEvalOptions{Asker: judge, Cases: cases, Judgment: j, MaxUSD: 2, CallUSD: 0.05}
 	results, score, err := runCorrelationEval(context.Background(), o)
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +139,6 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(out, "score.txt")); err != nil || !strings.Contains(string(b), "precision") {
 		t.Fatalf("score.txt %q %v", b, err)
 	}
-	te := newTestEnv(t, nil)
 	err = runEvalCorrelation(context.Background(), te.Env, []string{"--cases", correlationCases, "--out", "results"})
 	if err == nil || !strings.Contains(err.Error(), "inside the git checkout") {
 		t.Fatalf("an --out inside the checkout: %v", err)
@@ -185,14 +181,76 @@ func TestTheCorrelationEvalJudgesWithTheFilesTheWorkflowsStepNames(t *testing.T)
 	if p := te.loadedIntents().Problems; len(p) > 0 {
 		t.Fatal(p.Error())
 	}
-	prompt, schema, err := te.judgmentFiles("my-judge")
-	if err != nil || prompt != "my prompt" || schema != sameAsSchema {
-		t.Fatalf("%q %q %v", prompt, schema, err)
+	if _, err := te.judgment("my-judge"); err == nil || !strings.Contains(err.Error(), "no loaded workflow acts on my-judge's judgment") {
+		t.Fatalf("a judgment no workflow acts on: %v", err)
 	}
-	if _, _, err := te.judgmentFiles("my-plain"); err == nil || !strings.Contains(err.Error(), "no classify step with a with") {
+	if _, err := te.judgment("my-plain"); err == nil || !strings.Contains(err.Error(), "no classify step with a with") {
 		t.Fatalf("a classify with no with: %v", err)
 	}
-	if _, _, err := te.judgmentFiles("task-correlate"); err != nil {
-		t.Fatalf("the bundled correlation: %v", err)
+	j, err := te.judgment("task-correlate")
+	if err != nil || j.Acts.Name != "task-correlate-merge" || j.Target != "classify.task_correlate.same_as" || j.With != "task.candidates" {
+		t.Fatalf("the bundled correlation: %+v %v", j, err)
+	}
+}
+
+// fieldJudge answers each case with its fields under the names the profile's schema gives them.
+type fieldJudge struct{ answers map[string]map[string]any }
+
+func (j fieldJudge) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
+	m := selfID.FindStringSubmatch(q.Prompt)
+	if m == nil {
+		return turns.Answer{}, os.ErrInvalid
+	}
+	b, _ := json.Marshal(j.answers[m[1]])
+	return turns.Answer{JSON: b}, nil
+}
+
+func TestTheCorrelationEvalScoresWhatTheWorkflowActingOnTheJudgmentProposes(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, nil)
+	judge := "summary = \"Judge\"\nprovider = \"task\"\nwhen = 'size(task.candidates) > 0'\n\n[trigger]\non = [\"task_created\"]\n\n[[step]]\nuse = \"classify\"\nwith = \"task.candidates\"\nprompt = \"judge.md.tmpl\"\nschema = \"answer.json\"\n"
+	acts := "summary = \"Merge\"\nprovider = \"task\"\nwhen = 'trigger.event.data == \"my-judge\" && classify.my_judge.match && classify.my_judge.sure && classify.my_judge.target in task.candidates'\n\n[trigger]\non = [\"classified\"]\n\n[[step]]\nuse = \"task.verb\"\nverb = \"merge\"\ntask = \"classify.my_judge.target\"\n"
+	schema := `{"type":"object","required":["match","sure","target"],"properties":{"match":{"type":"boolean"},"sure":{"type":"boolean"},"target":{"type":"string"}}}`
+	prompt, err := os.ReadFile("../../profiles/default/workflows/task-correlate/prompt.md.tmpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userProfile(t, te, map[string]string{
+		"workflows/my-judge/workflow.toml": judge, "workflows/my-judge/judge.md.tmpl": string(prompt), "workflows/my-judge/answer.json": schema,
+		"workflows/my-judge-merge/workflow.toml": acts,
+	})
+	if p := te.loadedIntents().Problems; len(p) > 0 {
+		t.Fatal(p.Error())
+	}
+	j, err := te.judgment("my-judge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := func(id, want string, cands ...string) correlationCase {
+		cc := correlationCase{ID: id, SameAs: want, Task: caseTask{ID: id, Title: id}}
+		for _, x := range cands {
+			cc.Candidates = append(cc.Candidates, caseTask{ID: x, Title: x})
+		}
+		return cc
+	}
+	cases := []correlationCase{
+		c("t-0000000000000001", "t-00000000000000a1", "t-00000000000000a1"),
+		c("t-0000000000000002", "t-00000000000000a2", "t-00000000000000a2"),
+		c("t-0000000000000003", "", "t-00000000000000a3"),
+	}
+	answers := fieldJudge{answers: map[string]map[string]any{
+		"t-0000000000000001": {"match": true, "sure": true, "target": "t-00000000000000a1"},
+		"t-0000000000000002": {"match": true, "sure": false, "target": "t-00000000000000a2"},
+		"t-0000000000000003": {"match": false, "sure": true, "target": ""},
+	}}
+	results, score, err := runCorrelationEval(context.Background(), correlationEvalOptions{Asker: answers, Cases: cases, Judgment: j, MaxUSD: 1, CallUSD: 0.01})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if score.TP != 1 || score.FN != 1 || score.TN != 1 || score.FP != 0 || score.Stray != 1 {
+		t.Fatalf("score %+v, want only the sure match proposed: %+v", score, results)
+	}
+	if !results[0].Proposed || results[0].Got != "t-00000000000000a1" || results[1].Proposed {
+		t.Fatalf("results %+v", results)
 	}
 }

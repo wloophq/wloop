@@ -301,7 +301,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
-		Timeline: timeline.Merged{Log: db, Holdings: db},
+		Timeline: taskTimeline(db),
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,
@@ -1280,4 +1280,9 @@ func mcpTexts(tools map[string]intentload.ToolText) map[string]mcp.ToolText {
 		out[name] = mcp.ToolText{Description: t.Description, Params: t.Params, Answers: t.Answers}
 	}
 	return out
+}
+
+// taskTimeline is a task's timeline over the store, as the daemon serves it.
+func taskTimeline(db *sqlite.DB) timeline.Merged {
+	return timeline.Merged{Log: db, Holdings: db, Except: builtin.Bookkeeping}
 }

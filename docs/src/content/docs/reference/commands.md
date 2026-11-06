@@ -932,7 +932,7 @@ Write a configuration value.
 {{command}} config set <key> <value>
 ```
 
-Write one key of the config file, keeping its comments and layout. The value is read as TOML (true, 5, ["a", "b"], "quoted") and as a string when it is not TOML. A key no setting reads, or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. The daemon applies profile live; any other key after a restart.
+Write one key of the config file, keeping its comments and layout. The value is read as TOML (true, 5, ["a", "b"], "quoted") and as a string when it is not TOML. A key no setting reads, a workflows.&lt;name&gt; key whose name is none of the profile's workflows (doctor lists them) nor a disabled plugin's, or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. The daemon applies profile live; any other key after a restart.
 
 Examples:
 

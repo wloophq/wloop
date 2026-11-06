@@ -16,7 +16,7 @@ func Survives(loaded func() *intentload.Loaded, facts func(ctx context.Context, 
 		if pred == nil {
 			return false, nil
 		}
-		f, err := facts(ctx, t)
+		f, err := facts(workflow.WithReads(ctx, pred.Reads()...), t)
 		if err != nil {
 			return false, err
 		}

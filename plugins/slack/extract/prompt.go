@@ -17,12 +17,16 @@ import (
 // MaxPromptWords caps the extraction prompt's template, counted as space-separated words.
 const MaxPromptWords = 5600
 
-// PromptFile and BriefSchemaFile are the extraction's prompt and its
-// brief's schema in the plugin's profile layer.
+// PromptFile, BriefSchemaFile and CitedFile are the extraction's prompt, its brief's schema and the block
+// that holds the cited items, {{ITEMS}}, in the plugin's profile layer. Untrusted text is defused only of the
+// block's lines that start with --, as written.
 const (
 	PromptFile      = "prompts/slack-extraction.md"
 	BriefSchemaFile = "prompts/slack-brief.schema.json"
+	CitedFile       = "prompts/slack-cited.md"
 )
+
+const citedItems = "{{ITEMS}}"
 
 //go:embed schema.json
 var answerSchemaJSON string
@@ -32,20 +36,45 @@ var answerSchemaJSON string
 // under the conversation's brief and each segment's.
 type Prompts struct {
 	template, brief string
-	schemaJSON      string
-	schema          *jsonschema.Schema
+	cited           string
+	// citedMarkers are the lines of cited that start with dashes, which no untrusted text may repeat.
+	citedMarkers []string
+	schemaJSON   string
+	schema       *jsonschema.Schema
 
 	mu       sync.Mutex
 	composed map[string]composedSchema
 }
 
-// NewPrompts are the prompts of template and briefSchema.
-func NewPrompts(template, briefSchema string) (*Prompts, error) {
+// NewPrompts are the prompts of template, briefSchema and cited, the block of the cited items, which holds
+// {{ITEMS}} once.
+func NewPrompts(template, briefSchema, cited string) (*Prompts, error) {
+	if strings.Count(cited, citedItems) != 1 {
+		return nil, fmt.Errorf("extract: %s must hold %s once", CitedFile, citedItems)
+	}
 	out, s, err := compose(answerSchemaJSON, briefSchema)
 	if err != nil {
 		return nil, err
 	}
-	return &Prompts{template: template, brief: briefSchema, schemaJSON: out, schema: s, composed: map[string]composedSchema{}}, nil
+	p := &Prompts{template: template, brief: briefSchema, cited: strings.TrimRight(cited, "\n"), schemaJSON: out, schema: s, composed: map[string]composedSchema{}}
+	for line := range strings.SplitSeq(cited, "\n") {
+		if line = strings.TrimSpace(line); strings.HasPrefix(line, "--") {
+			p.citedMarkers = append(p.citedMarkers, line)
+		}
+	}
+	return p, nil
+}
+
+// neutral is untrusted text s with the dashes of any marker look-alike split, the cited block's own markers
+// included, so it reads as no marker.
+func (p *Prompts) neutral(s string) string {
+	s = markerLike.ReplaceAllString(s, "- -$1")
+	if p != nil {
+		for _, m := range p.citedMarkers {
+			s = strings.ReplaceAll(s, m, "- -"+strings.TrimLeft(m, "-"))
+		}
+	}
+	return s
 }
 
 // LoadPrompts reads the prompts through read, the plugin's profile layer.
@@ -58,7 +87,11 @@ func LoadPrompts(ctx context.Context, read func(ctx context.Context, path string
 	if err != nil {
 		return nil, fmt.Errorf("extract: %s: %w", BriefSchemaFile, err)
 	}
-	return NewPrompts(string(tmpl), string(brief))
+	cited, err := read(ctx, CitedFile)
+	if err != nil {
+		return nil, fmt.Errorf("extract: %s: %w", CitedFile, err)
+	}
+	return NewPrompts(string(tmpl), string(brief), string(cited))
 }
 
 // Schema is the schema an extraction answers to, without the brief
@@ -90,7 +123,7 @@ func Prompt(in Input) (string, error) {
 		"{{NOW}}", in.Now.In(zone(in)).Format("2006-01-02 15:04 MST (Monday)"),
 		"{{LANGUAGE}}", lang,
 		"{{LEDGER}}", renderLedger(in),
-		"{{CITED}}", renderCited(in.Cited),
+		"{{CITED}}", in.Prompts.renderCited(in.Cited),
 		"{{CONTEXTS}}", renderContexts(in.Contexts),
 		"{{VOCABULARY}}", VocabularyOf(in.Vocabulary),
 		"{{CONVERSATION}}", Render(in),
@@ -157,19 +190,18 @@ func renderLedger(in Input) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func renderCited(cited []items.Item) string {
+func (p *Prompts) renderCited(cited []items.Item) string {
 	if len(cited) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(CitedHeading + "\n")
 	for _, it := range cited {
-		fmt.Fprintf(&b, "%s (%s, %s) %s\n", it.ID, it.State, it.Kind, markerLike.ReplaceAllString(oneLine(it.Summary), "- -$1"))
-		fmt.Fprintf(&b, "  conversation: %s; requester: %s; assignees: %s\n",
-			cmp.Or(it.Origin.Permalink, it.Origin.Ref), person(it.Requester), people(it.Assignees))
+		line := fmt.Sprintf("%s (%s, %s) %s\n  conversation: %s; requester: %s; assignees: %s\n",
+			it.ID, it.State, it.Kind, oneLine(it.Summary), oneLine(cmp.Or(it.Origin.Permalink, it.Origin.Ref)),
+			oneLine(person(it.Requester)), oneLine(people(it.Assignees)))
+		b.WriteString(p.neutral(line))
 	}
-	b.WriteString(CitedEnds)
-	return b.String()
+	return strings.Replace(p.cited, citedItems, strings.TrimRight(b.String(), "\n"), 1)
 }
 
 // person renders p as the conversation renders them: a user as a mention, a user group as

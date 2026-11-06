@@ -249,6 +249,9 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
 	EventRemoved, "status", gate.EventResolved, task.EventCreated, task.EventLinked, merge.RecordKind, EventClassified}
 
+// Bookkeeping are the loop's event kinds that only trigger workflows, which no task's timeline shows.
+var Bookkeeping = []string{task.EventCreated, task.EventLinked, EventClassified}
+
 // The loop's event kinds the host records itself.
 const (
 	EventMuted     = "muted"
