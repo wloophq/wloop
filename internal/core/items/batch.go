@@ -50,6 +50,7 @@ type batch struct {
 	// linked are the items whose links this batch stored, settled once it applied every op, with
 	// the index of the last such op.
 	linked []linkedItem
+	stored []link.Link
 	res    Result
 	err    error
 }
@@ -318,6 +319,7 @@ func (b *batch) link(ctx context.Context, i int, o items.Op, prov items.Provenan
 		return
 	}
 	b.links[o.Unit] = append(have, l)
+	b.stored = append(b.stored, l)
 	b.res.Applied = append(b.res.Applied, Applied{Op: o, Item: it, Changed: true})
 	b.log = append(b.log, LogEntry{Unit: o.Unit, Item: o.Item, Op: o, Provenance: prov, Outcome: OutcomeApplied, Reason: o.Reason, At: b.now})
 	if o.Item == "" {

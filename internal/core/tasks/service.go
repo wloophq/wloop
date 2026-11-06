@@ -818,7 +818,7 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 			return nil, err
 		}
 		if len(cs) > 0 {
-			if err := s.d.Store.Apply(ctx, cs); err != nil {
+			if err := s.d.Store.Apply(ctx, cs, createdEvents(cs, now)...); err != nil {
 				return nil, err
 			}
 		}
