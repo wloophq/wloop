@@ -443,3 +443,19 @@ func TestMergeAndSplitStartANewPositionEpoch(t *testing.T) {
 }
 
 var _ = port.Event{}
+
+func TestAMergedTaskFollowsItsMergeNotAnOlderAlias(t *testing.T) {
+	t.Parallel()
+	ms := openMerge(t)
+	x, y := ms.seed(t)
+	older := capture(zID, "next", -600)
+	applyTasks(t, ms.s, older)
+	sqlitetest.Exec(t, ms.db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(xID), string(zID))
+	if got := ms.read(t, xID); got.ID != xID {
+		t.Fatalf("a stored task with an alias reads as %s", got.ID)
+	}
+	ms.merge(t, x, y, mergeAt)
+	if got := ms.read(t, xID); got.ID != yID {
+		t.Fatalf("the merged task reads as %s, not the task it was merged into", got.ID)
+	}
+}
