@@ -763,7 +763,7 @@ func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *test
 		t.Fatalf("records %+v", ds)
 	}
 	if d := ds[0]; d.State != draft.Sent || d.Kind != draft.Delete || d.Purpose != "delete" || d.Text != "posted twice" ||
-		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.Origin != origin || d.Evidence.Ref != ref {
+		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || noSession(d.Origin) != origin || d.Evidence.Ref != ref {
 		t.Fatalf("delete record %+v", d)
 	}
 }
