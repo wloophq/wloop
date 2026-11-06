@@ -1026,3 +1026,28 @@ func TestASplitSentToAMergedIDThatNamesAnotherTaskIsRefused(t *testing.T) {
 		t.Fatalf("a split on the merged id naming itself: %v", err)
 	}
 }
+
+func TestAGateHoldingSurvivorStaysOpenWithTheMergedTasksItemsWhenItsGatesClose(t *testing.T) {
+	r := newMergeRig(t)
+	gateUnit := unit.Unit{Provider: "slack", Key: "T1/C9/9.9"}
+	r.clock.t = t0.Add(-time.Hour)
+	held, err := r.svc.Open(context.Background(), coretasks.OpenRequest{Title: "Send this draft?", Unit: &gateUnit, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.clock.t = t0
+	_, ask := r.seed(t)
+	if got := r.merge(t, ask.ID, held.ID); got.ID != held.ID {
+		t.Fatalf("kept %s, want the older %s", got.ID, held.ID)
+	}
+	open, err := r.svc.HeldOpen(context.Background())
+	if err != nil || slices.Contains(open, held.ID) {
+		t.Fatalf("held open %v, %v: a task holding a merged task's items is not held only for gates", open, err)
+	}
+	if err := r.svc.EndHeld(context.Background(), held.ID, task.CategoryDropped); err != nil {
+		t.Fatal(err)
+	}
+	if y := r.task(t, held.ID); !y.Open() || !slices.Contains(y.Items, task.ItemRef{Unit: askThread, Item: "s:ask"}) {
+		t.Fatalf("survivor %s %v: its last gate closing ended it with the merged task's open items", y.Category, y.Items)
+	}
+}

@@ -1008,7 +1008,7 @@ func Ended(e task.Task, err error) (bool, error) {
 	return err == nil && !e.Open(), err
 }
 
-// HeldOpen are the open tasks opened only to hold gates.
+// HeldOpen are the open tasks held only for gates (heldOnly).
 func (s *Service) HeldOpen(ctx context.Context) ([]task.ID, error) {
 	es, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
@@ -1016,17 +1016,22 @@ func (s *Service) HeldOpen(ctx context.Context) ([]task.ID, error) {
 	}
 	var out []task.ID
 	for _, e := range es {
-		if e.Origin == task.OriginGate && e.Open() {
+		if s.heldOnly(e) {
 			out = append(out, e.ID)
 		}
 	}
 	return out, nil
 }
 
-// EndHeld closes task id, opened only to hold gates, into category c; a task of another origin, or one closed
-// already, is left as it is.
+// EndHeld closes task id, held only for gates (heldOnly), into category c; any other task is left as it is.
 func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
-	return s.close(ctx, id, c, func(e task.Task) bool { return e.Origin == task.OriginGate && e.Open() })
+	return s.close(ctx, id, c, s.heldOnly)
+}
+
+// heldOnly says whether e is open and held only for gates: opened to hold one, with no open item and no task
+// merged into it.
+func (s *Service) heldOnly(e task.Task) bool {
+	return e.Origin == task.OriginGate && e.Open() && len(e.Items) == 0 && len(e.Role(s.d.States, task.RoleMerged).List) == 0
 }
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.
