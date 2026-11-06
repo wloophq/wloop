@@ -212,6 +212,7 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "link_closure_posted", expr.Bool, "A closure was posted on task.unit, from the facts the tasks receive.")),
 	untrusted(wf("task", "items_open", expr.Int, "Open items of the task's units.")),
 	untrusted(wf("task", "items_resolved", expr.Int, "Resolved items of the task's units.")),
+	untrusted(wf("task", "items_changed_at", expr.Time, "When an item the task holds, open or resolved, or any item of a unit it holds none of, was last created or changed; zero when none. Test with `> timestamp(0)`.")),
 	wf("task", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`."),
 	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	untrusted(enum(wf("task", "category", expr.String, "The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped."), enumOf(categoryNames()...))),

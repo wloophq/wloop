@@ -203,6 +203,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.items_changed_at` | timestamp | When an item the task holds, open or resolved, or any item of a unit it holds none of, was last created or changed; zero when none. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
 | `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.category` | string | The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |

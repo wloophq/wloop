@@ -286,6 +286,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.link_closure_posted": false,
 		"task.items_open":          0,
 		"task.items_resolved":      0,
+		"task.items_changed_at":    time.Time{},
 		"task.settled_at":          time.Time{},
 		"task.fingerprint":         fingerprint(e),
 		"task.category":            string(e.Category),
@@ -412,6 +413,15 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		}
 	}
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
+	var changed time.Time
+	for _, it := range heldItems(e, got) {
+		for _, at := range []time.Time{it.CreatedAt, it.UpdatedAt} {
+			if at.After(changed) {
+				changed = at
+			}
+		}
+	}
+	f["task.items_changed_at"] = changed
 	f["task.link_owes"] = p.linkOwes(e, us, got)
 	f["task.ask_age"], f["task.askers"], f["task.asker_names"] = p.asks(e, us, got)
 	if p.d.Extraction != nil {
