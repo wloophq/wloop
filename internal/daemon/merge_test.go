@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -21,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // sweepingGates are the gates service as the tasks service reads it, with what a merge supersedes.
@@ -72,7 +75,8 @@ func newMergeRig(t *testing.T) *tasksRig {
 	r.s.deps.Gates, r.s.deps.GateReader = svc, st
 	r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, bundledLoaded}, Authority: taskstest.BundledStates.Authority,
 		Store: r.db.Tasks(), Items: r.ledger, Facts: coretasks.CardFacts{Cards: r.db.Cards(), Me: func() task.Me { return meID }},
-		Me: meID, Clock: fixedClock(tasksNow), Wakes: r.db.Wakes(), Gates: sweepingGates{svc, st}}, bundledLoaded, r.facts))
+		Me: meID, Clock: fixedClock(tasksNow), Wakes: r.db.Wakes(), Gates: sweepingGates{svc, st}, Survives: catalog.Survives(bundledLoaded, r.facts)},
+		bundledLoaded, r.facts))
 	r.s.deps.Tasks = r.g
 	return r
 }
@@ -84,7 +88,6 @@ func (r *tasksRig) seedMerge(t *testing.T) (x, y task.Task) {
 	ctx := context.Background()
 	x = task.Task{ID: mergeX, Title: "Review acme/api#7", State: "next", Category: task.CategoryReady, Units: []unit.Unit{mergePR},
 		Items: []task.ItemRef{{Unit: mergePR, Item: "gh:review"}}, Origin: task.OriginDerived, Created: tasksNow.Add(-time.Hour), Updated: tasksNow.Add(-time.Hour)}
-	x.SetProp("area", task.Value{Text: "OSS"}, task.WriterPerson, tasksNow.Add(-time.Hour))
 	y = task.Task{ID: mergeY, Title: "Finish acme/api#7", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{mergeThread},
 		Items: []task.ItemRef{{Unit: mergeThread, Item: "s:ask"}}, Origin: task.OriginDerived, Created: tasksNow.Add(-2 * time.Hour), Updated: tasksNow.Add(-2 * time.Hour)}
 	r.put(t, x, y)
@@ -137,7 +140,7 @@ func TestMergeThroughTheRouteServesTheSurvivorUnderBothIDs(t *testing.T) {
 		}
 	}
 	y := r.stored(t, mergeY)
-	if !slices.Equal(y.Units, []unit.Unit{mergeThread, mergePR}) || len(y.Items) != 2 || y.Prop("area").Text != "" {
+	if !slices.Equal(y.Units, []unit.Unit{mergeThread, mergePR}) || len(y.Items) != 2 {
 		t.Fatalf("survivor %+v", y)
 	}
 	for range 3 {
@@ -247,5 +250,49 @@ func TestAMergeRemovesTheMergedTaskFromAPagedView(t *testing.T) {
 	got := r.page(t, "view=inbox&since="+url.QueryEscape(since))
 	if !got.Full || slices.Contains(taskIDs(got.Tasks), string(mergeX)) || !slices.Contains(taskIDs(got.Tasks), string(mergeY)) {
 		t.Fatalf("after the merge: full %v, tasks %v", got.Full, taskIDs(got.Tasks))
+	}
+}
+
+func TestTheMergeKeepsTheTaskAPersonShapedWhateverTheRouteItIsSentTo(t *testing.T) {
+	t.Parallel()
+	for _, on := range []task.ID{mergeX, mergeY} {
+		r := newMergeRig(t)
+		x, _ := r.seedMerge(t)
+		x.Become("inbox", taskstest.BundledStates)
+		if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpUpdate, Task: x}}); err != nil {
+			t.Fatal(err)
+		}
+		if rec := post(t, r.s, api.TaskPath(string(mergeX), "next"), `{"source":"cockpit"}`); rec.Code != 200 {
+			t.Fatalf("next: %d %s", rec.Code, rec.Body)
+		}
+		other := mergeY
+		if on == mergeY {
+			other = mergeX
+		}
+		r.mergeRoute(t, on, other)
+		if v := r.view(t, string(mergeY)); v.ID != string(mergeX) {
+			t.Fatalf("merge sent to %s kept %s, want %s, the task a person moved, though it is the newer", on, v.ID, mergeX)
+		}
+	}
+}
+
+func TestAVerbSentToAMergedTaskIsRefusedButSplitTakesItBackOut(t *testing.T) {
+	t.Parallel()
+	r := newMergeRig(t)
+	r.seedMerge(t)
+	r.mergeRoute(t, mergeX, mergeY)
+	rec := post(t, r.s, api.TaskPath(string(mergeX), "done"), `{"source":"cockpit"}`)
+	want := r.s.notice(builtin.NoticeTaskMerged, map[string]any{"Task": string(mergeX), "Into": string(mergeY), "Verb": "done"})
+	if rec.Code != 409 || !strings.Contains(rec.Body.String(), want) || want == "" {
+		t.Fatalf("done on the merged id: %d %s", rec.Code, rec.Body)
+	}
+	if y := r.stored(t, mergeY); !y.Open() {
+		t.Fatal("a verb sent to the merged id closed the survivor")
+	}
+	if rec := post(t, r.s, api.TaskPath(string(mergeX), "split"), `{"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("split on the merged id: %d %s", rec.Code, rec.Body)
+	}
+	if x := r.stored(t, mergeX); x.ID != mergeX {
+		t.Fatalf("the merged id still reads as %s", x.ID)
 	}
 }

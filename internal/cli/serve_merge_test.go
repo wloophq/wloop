@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/catalog"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -29,7 +30,7 @@ func TestTheMergeGateWordsNameTheTaskTheSurvivorKeepsAndTheOneItFolds(t *testing
 	older := task.Task{ID: "t-00000000000000a1", Title: "Review acme/api#7", Created: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)}
 	newer := task.Task{ID: "t-00000000000000b2", Title: "Finish the export", Created: older.Created.Add(time.Hour)}
 	clarified := map[task.ID]bool{}
-	holds := survives(loaded, func(_ context.Context, e task.Task) (workflow.Facts, error) {
+	holds := catalog.Survives(loaded, func(_ context.Context, e task.Task) (workflow.Facts, error) {
 		return workflow.Facts{"task.clarified": clarified[e.ID]}, nil
 	})
 	text := verbGateText(loaded, titledTasks{older.ID: older, newer.ID: newer}, holds)
