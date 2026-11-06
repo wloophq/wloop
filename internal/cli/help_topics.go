@@ -462,7 +462,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Write a configuration value",
 				Usage:   []string{"config set <key> <value>"},
 				About: "Write one key of the config file, keeping its comments and layout. The value is read as TOML (true, 5, [\"a\", \"b\"], \"quoted\") and as a string when it is not TOML. " +
-					"A key no setting reads, a workflows.<name> key whose name is none of the profile's workflows (doctor lists them), or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. " +
+					"A key no setting reads, a workflows.<name> key whose name is none of the profile's workflows (doctor lists them) nor a disabled plugin's, or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. " +
 					"The daemon applies profile live; any other key after a restart.",
 				Examples: []string{"config set workflows.task-check-on.enabled false", "config set sweep.fast 5m", `config set plugins.github.automated_reviewers '["acme-bot"]'`},
 				Docs:     "reference/configuration",

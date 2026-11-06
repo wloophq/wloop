@@ -10,6 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -295,6 +296,22 @@ func TestConfigUnsetRemovesAWorkflowTheProfileDoesNotHave(t *testing.T) {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 	if got := readFile(t, te.ConfigPath); strings.Contains(got, "enabled") || strings.Contains(te.out.String(), "default") {
+		t.Fatalf("got:\n%s", got)
+	}
+}
+
+func TestConfigSetTakesTheWorkflowOfADisabledPlugin(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeFile(t, te.ConfigPath, acmeConfig+"\n[plugins.slack]\nenabled = false\n")
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
+	if slices.ContainsFunc(te.loadedIntents().Workflows, func(w workflow.Workflow) bool { return w.Name == "slack-closure" }) {
+		t.Fatal("the disabled plugin's workflow is loaded")
+	}
+	if code := te.run("config", "set", "workflows.slack-closure.enabled", "false"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if got := readFile(t, te.ConfigPath); !strings.Contains(got, "[workflows.slack-closure]\nenabled = false") {
 		t.Fatalf("got:\n%s", got)
 	}
 }

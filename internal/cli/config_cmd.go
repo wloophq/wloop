@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/frontmatter"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/internal/profile"
 )
 
 var configUsage = "usage: " + brand.Command + " config get <key>\n" +
@@ -39,8 +40,8 @@ func runConfig(e *Env, args []string) error {
 	return errors.New(configUsage)
 }
 
-// knownWorkflow refuses a workflows.<name> key whose name is none of the loaded profile's workflows, which
-// no setting would read.
+// knownWorkflow refuses a workflows.<name> key whose name is none of the loaded profile's workflows, nor one
+// of a disabled plugin's layer, which no setting would read.
 func (e *Env) knownWorkflow(path []string) error {
 	if len(path) < 2 || path[0] != config.KeyOf("Workflows") {
 		return nil
@@ -51,6 +52,14 @@ func (e *Env) knownWorkflow(path []string) error {
 		names = append(names, w.Name)
 	}
 	names = append(names, slices.Collect(maps.Keys(l.BrokenWorkflows))...)
+	for _, layer := range profile.EveryPlugin(e.currentConfig()) {
+		entries, _ := profile.ReadDir(layer, "workflows")
+		for _, d := range entries {
+			if d.IsDir() {
+				names = append(names, d.Name())
+			}
+		}
+	}
 	if slices.Contains(names, path[1]) {
 		return nil
 	}
