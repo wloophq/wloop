@@ -48,6 +48,8 @@ type tomlTable struct {
 	path  []string
 	array bool
 	start int // where its header's line, or the comments right above it, start
+	line  int // where its header's line starts
+	key   int // where its header's key ends
 	end   int // where a key added to it goes: the end of the line of its last key, or of its header
 	keys  int
 }
@@ -85,8 +87,9 @@ func (d *Doc) index() (*tomlIndex, error) {
 			path, end := keyPath(n)
 			first := n.Key()
 			first.Next()
+			line := d.lineStart(int(first.Node().Raw.Offset))
 			x.tables = append(x.tables, tomlTable{path: path, array: n.Kind == unstable.ArrayTable,
-				start: d.commentsAbove(d.lineStart(int(first.Node().Raw.Offset))), end: d.lineEnd(end)})
+				start: d.commentsAbove(line), line: line, key: end, end: d.lineEnd(end)})
 			cur = len(x.tables) - 1
 		case unstable.KeyValue:
 			path, keyEnd := keyPath(n)
@@ -291,43 +294,156 @@ func (x *tomlIndex) outsideArrays(path []string) error {
 	return nil
 }
 
-// Unset removes the key at path with the rest of its line; a document
-// without it is left as written. A table, or a key written in an inline
-// table or in an array of tables, is refused and changes nothing.
+// Unset removes the key at path with the rest of its line, or the table at
+// path with its keys, the comments right above it and its sub-tables; a
+// document without it is left as written. A table the removal leaves with no
+// key, comment or sub-table goes too. A key written in an inline table, and a
+// path in or over an array of tables, is refused and changes nothing.
 func (d *Doc) Unset(path []string) error {
 	x, err := d.index()
 	if err != nil {
 		return err
 	}
-	if err := x.outsideArrays(path); err != nil {
-		return err
-	}
 	for _, h := range x.tables[1:] {
-		if isPrefix(path, h.path) || slices.Equal(h.path, path) {
-			return fmt.Errorf("%s is a table; unset its keys one by one", Key(path...))
+		switch {
+		case !h.array:
+		case isPrefix(h.path, path):
+			return fmt.Errorf("%s is in the array of tables %s; edit it by hand", Key(path...), Key(h.path...))
+		case slices.Equal(h.path, path) || isPrefix(path, h.path):
+			return fmt.Errorf("%s holds the array of tables %s; edit the file to remove an element", Key(path...), Key(h.path...))
 		}
 	}
+	under := func(p []string) bool { return slices.Equal(p, path) || isPrefix(path, p) }
+	var cuts []cut
+	gone := make([]bool, len(x.tables))
+	for i, h := range x.tables[1:] {
+		if under(h.path) {
+			gone[i+1] = true
+			cuts = append(cuts, d.tableCut(x, i+1))
+		}
+	}
+	lost := make([]int, len(x.tables))
+	var keyCuts []cut
 	for _, k := range x.keys {
 		switch {
-		case slices.Equal(k.path, path):
-			before := d.src
-			to := d.lineEnd(k.end)
-			if to < len(d.src) {
-				to++
-			}
-			d.splice(d.lineStart(k.start), to, "")
-			if _, err := d.index(); err != nil {
-				d.src, d.idx = before, nil
-				return fmt.Errorf("unsetting %s would leave the file invalid: %w", Key(path...), err)
-			}
-			return nil
+		case gone[k.table]:
+		case under(k.path):
+			keyCuts = append(keyCuts, d.keyLines(k))
+			lost[k.table]++
 		case isPrefix(k.path, path):
 			return fmt.Errorf("%s is written inline; unset %s in it by hand", Key(k.path...), Key(path...))
-		case isPrefix(path, k.path):
-			return fmt.Errorf("%s is a table; unset its keys one by one", Key(path...))
 		}
 	}
+	cuts = append(cuts, keyCuts...)
+	for i := 1; i < len(x.tables); i++ {
+		if !gone[i] && lost[i] > 0 && lost[i] == x.tables[i].keys && d.bare(x, i, gone, keyCuts) {
+			cuts = append(cuts, d.tableCut(x, i))
+		}
+	}
+	if len(cuts) == 0 {
+		return nil
+	}
+	before := d.src
+	d.remove(cuts)
+	if _, err := d.index(); err != nil {
+		d.src, d.idx = before, nil
+		return fmt.Errorf("unsetting %s would leave the file invalid: %w", Key(path...), err)
+	}
 	return nil
+}
+
+// cut is a span of the document Unset removes; a table's also takes the
+// blank lines above it when nothing follows it.
+type cut struct {
+	from, to int
+	table    bool
+}
+
+// next is where the table after table i starts, or n after the last.
+func (x *tomlIndex) next(i, n int) int {
+	if i+1 < len(x.tables) {
+		return x.tables[i+1].start
+	}
+	return n
+}
+
+// tableCut is table i up to its last line, the comment lines right under it
+// and the blank lines after them; a comment after a blank line stays.
+func (d *Doc) tableCut(x *tomlIndex, i int) cut {
+	next := x.next(i, len(d.src))
+	at := min(d.lineEnd(x.tables[i].end)+1, next)
+	blank := false
+	for at < next {
+		line := bytes.TrimSpace(d.src[at:min(d.lineEnd(at)+1, next)])
+		if len(line) > 0 && blank {
+			break
+		}
+		blank = blank || len(line) == 0
+		at = min(d.lineEnd(at)+1, next)
+	}
+	return cut{x.tables[i].start, at, true}
+}
+
+// keyLines is the span of k's lines, the last newline included.
+func (d *Doc) keyLines(k tomlKey) cut {
+	to := d.lineEnd(k.end)
+	if to < len(d.src) {
+		to++
+	}
+	return cut{from: d.lineStart(k.start), to: to}
+}
+
+// bare says whether table i is only its header once keyCuts are removed: no
+// comment above, beside or below it, and no sub-table left.
+func (d *Doc) bare(x *tomlIndex, i int, gone []bool, keyCuts []cut) bool {
+	t := x.tables[i]
+	if t.start != t.line || len(bytes.Trim(d.src[t.key:d.lineEnd(t.key)], " \t]")) > 0 {
+		return false
+	}
+	for j, h := range x.tables {
+		if !gone[j] && isPrefix(t.path, h.path) {
+			return false
+		}
+	}
+	at := d.lineEnd(t.key)
+	for _, c := range keyCuts {
+		if c.from >= at && c.to <= x.next(i, len(d.src)) {
+			if len(bytes.TrimSpace(d.src[at:c.from])) > 0 {
+				return false
+			}
+			at = c.to
+		}
+	}
+	return len(bytes.TrimSpace(d.src[at:x.next(i, len(d.src))])) == 0
+}
+
+func (d *Doc) remove(cuts []cut) {
+	slices.SortFunc(cuts, func(a, b cut) int { return a.from - b.from })
+	var merged []cut
+	for _, c := range cuts {
+		if n := len(merged); n > 0 && c.from <= merged[n-1].to {
+			merged[n-1].to = max(merged[n-1].to, c.to)
+			merged[n-1].table = merged[n-1].table || c.table
+			continue
+		}
+		merged = append(merged, c)
+	}
+	if last := &merged[len(merged)-1]; last.table && last.to == len(d.src) {
+		floor := 0
+		if len(merged) > 1 {
+			floor = merged[len(merged)-2].to
+		}
+		for last.from > floor && len(bytes.TrimSpace(d.src[d.lineStart(last.from-1):last.from])) == 0 {
+			last.from = d.lineStart(last.from - 1)
+		}
+	}
+	var out []byte
+	at := 0
+	for _, c := range merged {
+		out = append(out, d.src[at:c.from]...)
+		at = c.to
+	}
+	d.src, d.idx = append(out, d.src[at:]...), nil
 }
 
 // ParseKey is s, a dotted TOML key such as workflows."a.b".enabled, as
