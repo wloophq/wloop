@@ -18,7 +18,8 @@ import (
 const MaxPromptWords = 5600
 
 // PromptFile, BriefSchemaFile and CitedFile are the extraction's prompt, its brief's schema and the block
-// that holds the cited items, {{ITEMS}}, in the plugin's profile layer.
+// that holds the cited items, {{ITEMS}}, in the plugin's profile layer. Untrusted text is defused only of the
+// block's lines that start with --, as written.
 const (
 	PromptFile      = "prompts/slack-extraction.md"
 	BriefSchemaFile = "prompts/slack-brief.schema.json"
