@@ -319,7 +319,7 @@ func (d *Doc) Unset(path []string) error {
 	for i, h := range x.tables[1:] {
 		if under(h.path) {
 			gone[i+1] = true
-			cuts = append(cuts, cut{x.tables[i+1].start, x.next(i+1, len(d.src)), true})
+			cuts = append(cuts, d.tableCut(x, i+1))
 		}
 	}
 	lost := make([]int, len(x.tables))
@@ -337,7 +337,7 @@ func (d *Doc) Unset(path []string) error {
 	cuts = append(cuts, keyCuts...)
 	for i := 1; i < len(x.tables); i++ {
 		if !gone[i] && lost[i] > 0 && lost[i] == x.tables[i].keys && d.bare(x, i, gone, keyCuts) {
-			cuts = append(cuts, cut{x.tables[i].start, x.next(i, len(d.src)), true})
+			cuts = append(cuts, d.tableCut(x, i))
 		}
 	}
 	if len(cuts) == 0 {
@@ -365,6 +365,23 @@ func (x *tomlIndex) next(i, n int) int {
 		return x.tables[i+1].start
 	}
 	return n
+}
+
+// tableCut is table i up to its last line, the comment lines right under it
+// and the blank lines after them; a comment after a blank line stays.
+func (d *Doc) tableCut(x *tomlIndex, i int) cut {
+	next := x.next(i, len(d.src))
+	at := min(d.lineEnd(x.tables[i].end)+1, next)
+	blank := false
+	for at < next {
+		line := bytes.TrimSpace(d.src[at:min(d.lineEnd(at)+1, next)])
+		if len(line) > 0 && blank {
+			break
+		}
+		blank = blank || len(line) == 0
+		at = min(d.lineEnd(at)+1, next)
+	}
+	return cut{x.tables[i].start, at, true}
 }
 
 // keyLines is the span of k's lines, the last newline included.

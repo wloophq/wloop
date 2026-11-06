@@ -230,6 +230,10 @@ func TestDocUnsetRemovesAWholeTable(t *testing.T) {
 		{"[workflows]\nacme-sync.enabled = false\nbeta-sync.enabled = true\n",
 			[]string{"workflows", "acme-sync"}, "[workflows]\nbeta-sync.enabled = true\n"},
 		{"[workflows]\nacme-sync.enabled = false\n", []string{"workflows", "acme-sync"}, ""},
+		{"[sweep]\nfast = '2m'\n\n# ===== per project =====\n\n# acme\n[[projects]]\nmatch = 'acme/*'\n",
+			[]string{"sweep"}, "# ===== per project =====\n\n# acme\n[[projects]]\nmatch = 'acme/*'\n"},
+		{"[sweep]\nfast = '2m'\n# keep me\n\n[mcp]\nport = 1\n\n# the end\n", []string{"sweep"}, "[mcp]\nport = 1\n\n# the end\n"},
+		{"agent = 'claude'\n\n[sweep]\nfast = '2m'\n\n# the end\n", []string{"sweep"}, "agent = 'claude'\n\n# the end\n"},
 		{"sweep.fast = '2m'\nagent = 'claude'\n", []string{"sweep"}, "agent = 'claude'\n"},
 		{"[workflows.acme-sync]\nenabled = false\n", []string{"workflows", "beta-sync"}, "[workflows.acme-sync]\nenabled = false\n"},
 	} {
