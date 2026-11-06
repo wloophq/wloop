@@ -72,6 +72,9 @@ func (s *Service) relation(ctx context.Context, e task.Task, req Request, link b
 	if len(cs) == 0 {
 		return Result{Task: e}, nil
 	}
+	if s.beforeApply != nil {
+		s.beforeApply()
+	}
 	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
