@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/core/proposals"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/codec"
@@ -28,8 +30,9 @@ import (
 // whose Proposals are its proposals.
 type posting struct {
 	*sourcetest.Stub
-	started   chan struct{}
-	proposals []src.Draft
+	started     chan struct{}
+	proposals   []src.Draft
+	withdrawals []src.Withdrawal
 }
 
 func (p posting) Validate(context.Context, src.Draft) error        { return nil }
@@ -61,7 +64,9 @@ func (p posting) Payload(context.Context, src.PayloadRequest) (src.PayloadResult
 
 func (p posting) ApplyEffect(context.Context, src.EffectRequest) error { return src.ErrUnsupported }
 
-func (p posting) Proposals(context.Context, time.Time) ([]src.Draft, error) { return p.proposals, nil }
+func (p posting) Proposals(context.Context, time.Time) (src.Proposed, error) {
+	return src.Proposed{Drafts: p.proposals, Withdrawals: p.withdrawals}, nil
+}
 
 func (p posting) Placement(context.Context, plugin.Unit, string) (src.Placements, error) {
 	return src.Placements{}, src.ErrUnsupported
@@ -135,10 +140,13 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 		{Unit: own, Purpose: "nudge", Text: "as a session", Origin: src.DraftOrigin{Kind: "session"}},
 		{Unit: own, Purpose: "nudge", Text: "no rule", Origin: src.DraftOrigin{Kind: "auto"}},
 		{Unit: own, Purpose: "nudge", Text: "bad task", Task: "not a task", Origin: rule},
-	}}
+	}, withdrawals: []src.Withdrawal{{Unit: own, Rule: "acme-nudge"}, {Unit: plugin.Unit{Provider: "slack", Key: "C1/1.2"}, Rule: "acme-nudge"}}}
 	pub, units := postingKind(t, p)
 	got, err := psource.Proposals{ID: "acme", Units: units, Kind: pub.Kind}.Proposals(context.Background(), time.Time{})
-	if err == nil || len(got) != 1 {
+	if want := []proposals.Withdrawal{{Unit: unit.Unit{Provider: "acme", Key: "t1"}, Rule: "acme-nudge"}}; !slices.Equal(got.Withdrawals, want) {
+		t.Errorf("withdrawals %+v, want only the one on the plugin's own unit %+v", got.Withdrawals, want)
+	}
+	if err == nil || len(got.Proposals) != 1 {
 		t.Fatalf("proposals %+v, err %v: want the one draft of the plugin's own rule, and the rest refused", got, err)
 	}
 	for _, want := range []string{"slack", "auto origin", "invalid"} {
@@ -146,7 +154,7 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 			t.Errorf("refusals %q name no %q", err, want)
 		}
 	}
-	prop := got[0]
+	prop := got.Proposals[0]
 	if prop.Delivery != "" || prop.Purpose != "nudge" || prop.Origin != (draft.Origin{Kind: draft.OriginAuto, Rule: "acme-nudge", Key: "k"}) {
 		t.Fatalf("proposal %+v", prop)
 	}

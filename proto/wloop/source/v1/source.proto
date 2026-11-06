@@ -778,6 +778,14 @@ message ProposalsRequest {
 
 message ProposalsResponse {
   repeated Draft drafts = 1;
+  // withdrawals are the plugin's rules that no longer call for a draft on a
+  // unit: the host withdraws, as moot, the rule's held draft there.
+  repeated Withdrawal withdrawals = 2;
+}
+
+message Withdrawal {
+  wloop.plugin.v1.Unit unit = 1;
+  string rule = 2;
 }
 
 message PlacementRequest {

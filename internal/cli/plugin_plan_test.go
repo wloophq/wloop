@@ -70,7 +70,11 @@ func (p *stubPlanner) ApplyEffect(_ context.Context, req src.EffectRequest) erro
 	return p.fail
 }
 
-func (p *stubPlanner) Proposals(context.Context, time.Time) ([]src.Draft, error) { return nil, nil }
+func (p *stubPlanner) Proposals(context.Context, time.Time) (src.Proposed, error) {
+	return src.Proposed{}, nil
+}
+
+var _ src.Planner = (*stubPlanner)(nil)
 
 func (p *stubPlanner) Placement(context.Context, plugin.Unit, string) (src.Placements, error) {
 	return src.Placements{}, nil

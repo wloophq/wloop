@@ -227,6 +227,20 @@ type ItemQuery struct {
 	OpenOnly bool
 }
 
+// Proposed is what a Planner's rules call for now: the drafts to propose,
+// and the rules that no longer call for a draft on a unit, whose held draft
+// there the host withdraws as moot.
+type Proposed struct {
+	Drafts      []Draft
+	Withdrawals []Withdrawal
+}
+
+// Withdrawal says the plugin's rule Rule no longer calls for a draft on Unit.
+type Withdrawal struct {
+	Unit plugin.Unit
+	Rule string
+}
+
 // Draft is a post the loop proposes or sent; ID is zero for one not stored.
 type Draft struct {
 	ID       int64

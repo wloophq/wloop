@@ -274,8 +274,8 @@ func (s *server) ApplyEffect(ctx context.Context, r *pb.ApplyEffectRequest) (*pb
 
 func (s *server) Proposals(ctx context.Context, r *pb.ProposalsRequest) (*pb.ProposalsResponse, error) {
 	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.ProposalsResponse, error) {
-		ds, err := c.Proposals(ctx, tm(r.GetNow()))
-		return &pb.ProposalsResponse{Drafts: mapSlice(ds, draftPB)}, err
+		p, err := c.Proposals(ctx, tm(r.GetNow()))
+		return &pb.ProposalsResponse{Drafts: mapSlice(p.Drafts, draftPB), Withdrawals: mapSlice(p.Withdrawals, withdrawalPB)}, err
 	})
 }
 

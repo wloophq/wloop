@@ -288,6 +288,14 @@ func draftEvidenceGo(e *pb.DraftEvidence) Evidence {
 	return Evidence{Ref: e.GetRef(), Permalink: e.GetPermalink(), At: tm(e.GetAt())}
 }
 
+func withdrawalPB(w Withdrawal) *pb.Withdrawal {
+	return &pb.Withdrawal{Unit: unitPB(w.Unit), Rule: w.Rule}
+}
+
+func withdrawalGo(w *pb.Withdrawal) Withdrawal {
+	return Withdrawal{Unit: unitGo(w.GetUnit()), Rule: w.GetRule()}
+}
+
 func draftPB(d Draft) *pb.Draft {
 	o := d.Origin
 	return &pb.Draft{
