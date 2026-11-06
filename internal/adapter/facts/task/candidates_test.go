@@ -92,7 +92,7 @@ func newCandidateEnv(t *testing.T) *candidateEnv {
 		},
 		Refusals: facttask.RefusalDeps{Pairs: func(v task.Verb) bool { return v == task.VerbMerge || v == task.VerbRelate },
 			Unrelates: func() []string { return []string{string(task.VerbUnrelate)} },
-			Splits: func() []string { return []string{string(task.VerbSplit)} }, Events: c.db.EventsOfKinds},
+			Splits:    func() []string { return []string{string(task.VerbSplit)} }, Events: c.db.EventsOfKinds},
 		RoleProp: func(r task.Role) string {
 			name, _ := bundledTasks.PropOf(r)
 			return name
