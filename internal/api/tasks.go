@@ -56,6 +56,10 @@ const TasksUnits = "units"
 // and its views hold only the id, title, state, category and units of each task, the newest change first.
 const TasksMatch = "match"
 
+// TasksExcept is the query parameter of a TasksMatch request that names the task the picker picks for, which
+// the list leaves out, as its id reads.
+const TasksExcept = "except"
+
 // ParseUnits reads the TasksUnits of a request.
 func ParseUnits(raw []string) ([]unit.Unit, error) {
 	out := make([]unit.Unit, 0, len(raw))
@@ -229,7 +233,7 @@ type VerbSpec struct {
 	// for approval; every client's reply composer starts on it.
 	Send string `json:"send,omitempty"`
 	// Pick is, on a verb that takes another task, the tasks a person picks it from: open (the open tasks but
-	// this one, as TasksPath lists them with TasksMatch), merged (TaskView.MergedFrom) or related
+	// this one, as TasksPath lists them with TasksMatch and TasksExcept), merged (TaskView.MergedFrom) or related
 	// (TaskView.Related); the pick goes in the argument task.ArgTask. Empty for a verb that takes none.
 	Pick string   `json:"pick,omitempty"`
 	Key  string   `json:"key"`

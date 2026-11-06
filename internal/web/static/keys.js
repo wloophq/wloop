@@ -126,10 +126,10 @@ function createKeys(env) {
 
   const say = (text, err) => env.notice && env.notice(text, err);
 
-  // match are the open tasks whose title holds q, as the daemon lists them.
-  async function match(q) {
+  // match are the open tasks but except whose title holds q, as the daemon lists them.
+  async function match(q, except) {
     try {
-      const res = await env.fetch(`/api/tasks?match=${encodeURIComponent(q)}`, { headers: { Accept: "application/json", "X-Loop-API": API_VERSION } });
+      const res = await env.fetch(matchPath(q, except), { headers: { Accept: "application/json", "X-Loop-API": API_VERSION } });
       const out = await res.json().catch(() => ({}));
       if (!res.ok || out.error) throw new Error(out.error || `HTTP ${res.status}`);
       return out.tasks || [];
@@ -287,8 +287,7 @@ function createKeys(env) {
     const listBinding = (action, served) => bindings.find((b) => b.action === action && b.context === "list" && servedAction(b) === served);
     if (isTask(sel)) {
       const specs = env.verbSpecs ? env.verbSpecs() : [];
-      const offers = (ask) => !ask || !ask.pick || ask.pick === "open" || ({ merged: sel.merged_from, related: sel.related }[ask.pick] || []).length > 0;
-      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || servedAsk(x.verb, specs)) && offers(servedAsk(x.verb, specs)))) {
+      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || servedAsk(x.verb, specs)))) {
         const b = listBinding(v.verb, false) || { key: "", action: v.verb, context: "list" };
         const spec = specs.find((x) => x.verb === v.verb);
         items.push(item(b, b.help || (spec && spec.label) || v.verb));

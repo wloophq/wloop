@@ -5,13 +5,14 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// handleMatch serves the open tasks whose title holds text, each with only what a picker reads: its id,
-// title, state, category and units.
-func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request, g *coretasks.Service, text string) {
-	es, err := g.Match(r.Context(), text)
+// handleMatch serves the open tasks whose title holds text but except, each with only what a picker reads: its
+// id, title, state, category and units.
+func (s *Server) handleMatch(w http.ResponseWriter, r *http.Request, g *coretasks.Service, text string, except task.ID) {
+	es, err := g.Match(r.Context(), text, except)
 	if err != nil {
 		writeTasksError(w, err)
 		return

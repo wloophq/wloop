@@ -272,7 +272,7 @@ function pickTask(e, verb) {
     ask: { label: spec.input || spec.label || verb, pick: spec.pick },
     match: async (q) => {
       try {
-        return (await detailEnv.getJSON("/api/tasks?match=" + encodeURIComponent(q))).tasks || [];
+        return (await detailEnv.getJSON(matchPath(q, e.id))).tasks || [];
       } catch (err) {
         detailEnv.notice(`Could not list the tasks: ${err.message}`, true);
         return [];

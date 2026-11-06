@@ -544,7 +544,7 @@ func (m *Model) paletteItems() []paletteItem {
 				switch {
 				case v.Enabled && ok:
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(v.Verb), b.Help), key: b.Key, about: b.Summary, run: runKey(b)})
-				case v.Enabled && m.verbPick(v.Verb) != "" && offersPick(m.shownDetail(e), m.verbPick(v.Verb)):
+				case v.Enabled && m.verbPick(v.Verb) != "":
 					verb := v.Verb
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), about: m.verbSummary(verb), run: func(read uint64) (Command, bool) { return m.taskVerb(verb, read) }})
 				case v.Enabled && slices.Contains(projectHandlers, m.viewsCat.HandlerOf(v.Verb)):

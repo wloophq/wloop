@@ -32,7 +32,7 @@ type Daemon interface {
 	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
 	Counters(ctx context.Context, area, query string) (api.Counters, error)
 	Task(ctx context.Context, id string) (api.TaskView, error)
-	MatchTasks(ctx context.Context, text string) ([]api.TaskView, error)
+	MatchTasks(ctx context.Context, text, except string) ([]api.TaskView, error)
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
 	ResolveGate(ctx context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error)
@@ -818,7 +818,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		ds, err := d.TaskDrafts(ctx, c.task)
 		return carried{task: e, drafts: ds}, err
 	case c.matching:
-		es, err := d.MatchTasks(ctx, c.match)
+		es, err := d.MatchTasks(ctx, c.match, c.task)
 		return carried{matched: es}, err
 	case c.capture != "":
 		e, err := d.CreateTask(ctx, api.TaskCreate{Title: c.capture})

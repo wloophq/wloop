@@ -177,7 +177,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	if q.Has(api.TasksMatch) {
-		s.handleMatch(w, r, g, q.Get(api.TasksMatch))
+		s.handleMatch(w, r, g, q.Get(api.TasksMatch), task.ID(q.Get(api.TasksExcept)))
 		return
 	}
 	view := task.View(q.Get("view"))
@@ -1235,11 +1235,14 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 			continue
 		}
 		st := api.VerbState{Verb: name}
+		none := ev.nothingToPick(e, verb)
 		switch {
 		case off != "" && ev.s.handlerOf(verb) != handlerDrop:
 			st.Reason = off
 		case ev.resolvesGate(ctx, e, verb):
 			st.Enabled = true
+		case none != "":
+			st.Reason = none
 		case ev.g.Handles(e, verb):
 			st.Enabled = true
 		case ev.s.replies(verb):
@@ -1265,6 +1268,18 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		out = append(out, st)
 	}
 	return out
+}
+
+// nothingToPick is why verb, picking from a list of e's (builtin.PickRoles), has no task to pick on e; "" when
+// it has one or picks from elsewhere.
+func (ev *taskViewer) nothingToPick(e task.Task, verb task.Verb) string {
+	tasks := ev.s.loaded().Tasks
+	pick := builtin.TaskPicks[tasks.Handler(string(verb))]
+	role, ok := builtin.PickRoles[pick]
+	if !ok || len(e.Role(tasks, role).List) > 0 {
+		return ""
+	}
+	return ev.s.notice(builtin.NoticeNothingToPick, map[string]any{"Verb": string(verb), "Pick": pick})
 }
 
 // syncTasks runs Sync once per burst of item, source-event, card and gate notes, on its own goroutine, until ctx

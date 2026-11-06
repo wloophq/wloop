@@ -48,3 +48,13 @@ func picked(vs []api.TaskView) []api.TaskView {
 	}
 	return out
 }
+
+func TestTasksMatchLeavesOutTheTaskThePickIsFor(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-1", Title: "Draft the launch post", State: "next", Category: task.CategoryReady},
+		task.Task{ID: "t-2", Title: "Book the launch venue", State: "inbox", Category: task.CategoryInbox})
+	if got := taskIDs(r.page(t, api.TasksMatch+"=launch&"+api.TasksExcept+"=t-1").Tasks); !reflect.DeepEqual(got, []string{"t-2"}) {
+		t.Errorf("a match for t-1's pick lists %v, want t-2 alone", got)
+	}
+}

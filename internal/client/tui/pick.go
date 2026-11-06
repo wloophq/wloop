@@ -48,18 +48,9 @@ func pickedRefs(e api.TaskView, pick string) []api.TaskRef {
 	return nil
 }
 
-// offersPick says whether a verb of pick has a task to pick on e.
-func offersPick(e api.TaskView, pick string) bool {
-	return pick == pickOpen || len(pickedRefs(e, pick)) > 0
-}
-
 // openPick opens the picker of verb on e; for the open tasks, the command asks the daemon for them.
 func (m *Model) openPick(e api.TaskView, verb, pick string) (Command, bool) {
 	e = m.shownDetail(e)
-	if !offersPick(e, pick) {
-		m.status = cmp.Or(m.verbLabel(verb), verb) + ": no task to pick on " + taskLabel(e)
-		return Command{}, false
-	}
 	m.overlay = &overlay{title: m.verbQuestion(verb) + " for " + taskLabel(e), pick: &taskPick{task: e, verb: verb, pick: pick}}
 	return m.repick()
 }
@@ -70,7 +61,7 @@ func (m *Model) repick() (Command, bool) {
 	m.overlay.at = 0
 	if p.pick == pickOpen {
 		p.pending = true
-		return Command{Action: "match", match: string(p.query), matching: true}, true
+		return Command{Action: "match", match: string(p.query), matching: true, task: p.task.ID}, true
 	}
 	want := strings.ToLower(strings.TrimSpace(string(p.query)))
 	var items []paletteItem
@@ -97,9 +88,7 @@ func (m *Model) SetMatches(text string, tasks []api.TaskView, err error) {
 	}
 	var items []paletteItem
 	for _, e := range tasks {
-		if e.ID != p.task.ID {
-			items = append(items, m.pickItem(p, e.ID, e.Title, e.State))
-		}
+		items = append(items, m.pickItem(p, e.ID, e.Title, e.State))
 	}
 	m.overlay.items, m.overlay.at = items, 0
 }

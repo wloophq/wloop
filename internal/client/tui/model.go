@@ -56,7 +56,7 @@ type Command struct {
 	// gate is a gate of task to resolve with intent, args carrying its answer.
 	gate   int64
 	intent string
-	// matching asks for the open tasks whose title holds match, for a picker.
+	// matching asks for the open tasks whose title holds match, for a picker of another task than task.
 	match    string
 	matching bool
 }

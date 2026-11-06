@@ -11,8 +11,8 @@ import (
 	dtask "github.com/wloophq/wloop/internal/domain/task"
 )
 
-// openTasks answer GET /api/tasks?match=, by the daemon's rule: the open tasks whose title holds the text,
-// case and spaces around it aside.
+// openTasks answer GET /api/tasks?match=, by the daemon's rule: the open tasks but except whose title holds the
+// text, case and spaces around it aside.
 const openTasks = `
 const openTasks = [
   { id: "e-1", title: "Reply to the review", state: "inbox" },
@@ -20,8 +20,9 @@ const openTasks = [
   { id: "t-3", title: "Order the badges", state: "someday" },
 ];
 const matching = (url) => {
-  const q = decodeURIComponent(url.split("match=")[1] || "").trim().toLowerCase();
-  return { tasks: openTasks.filter((e) => e.title.toLowerCase().includes(q)) };
+  const p = new URLSearchParams(url.split("?")[1] || "");
+  const q = (p.get("match") || "").trim().toLowerCase();
+  return { tasks: openTasks.filter((e) => e.id !== p.get("except") && e.title.toLowerCase().includes(q)) };
 };
 `
 
@@ -41,8 +42,11 @@ func TestTheCockpitPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 		Labels2  []string `json:"labels2"`
 	}
 	e := taskFixture()
-	for _, v := range []string{"merge", "relate", "split", "unrelate"} {
+	for _, v := range []string{"merge", "relate"} {
 		e["verbs"] = append(e["verbs"].([]map[string]any), map[string]any{"verb": v, "enabled": true})
+	}
+	for _, v := range []string{"split", "unrelate"} {
+		e["verbs"] = append(e["verbs"].([]map[string]any), map[string]any{"verb": v, "enabled": false, "reason": "No task to pick on this one."})
 	}
 	keysRun(t, openTasks, `
 const strip = (xs) => xs.map(({ label, meta }) => ({ label, key: meta }));
@@ -53,7 +57,8 @@ await k.log.palette.items.find((i) => i.label === "Merge").run();
 const pal = k.log.palette;
 const narrowed = await pal.source(" VENUE");
 await narrowed[0].run();
-const merged = { ...input, merged_from: [{ id: "t-9", title: "Reply to the review, again", state: "inbox" }] };
+const merged = { ...input, merged_from: [{ id: "t-9", title: "Reply to the review, again", state: "inbox" }],
+  verbs: input.verbs.map((v) => (v.verb === "split" ? { verb: "split", enabled: true } : v)) };
 const k2 = harness({ selected: merged, get: matching });
 await k2.press("k", { meta: true });
 const labels2 = k2.log.palette.items.map((i) => i.label);
@@ -78,7 +83,7 @@ return { labels, title: pal.title, first: strip(pal.items), narrowed: narrowed.m
 	if !reflect.DeepEqual(got.Narrowed, []string{"Book the launch venue"}) {
 		t.Errorf("typing venue narrows to %v", got.Narrowed)
 	}
-	if want := []string{"/api/tasks?" + api.TasksMatch + "=", "/api/tasks?" + api.TasksMatch + "=%20VENUE"}; !reflect.DeepEqual(got.Gets, want) {
+	if want := []string{"/api/tasks?" + api.TasksMatch + "=&" + api.TasksExcept + "=e-1", "/api/tasks?" + api.TasksMatch + "=%20VENUE&" + api.TasksExcept + "=e-1"}; !reflect.DeepEqual(got.Gets, want) {
 		t.Errorf("the picker read %v, want the daemon's match of each text %v", got.Gets, want)
 	}
 	if !slices.Contains(got.Labels2, "Split") {
@@ -120,7 +125,7 @@ func TestTheCockpitTaskPageShowsRelatedTasksAndAMergedFromTraceWithSplit(t *test
 	e.MergedFrom = []api.TaskRef{{ID: "t-9", Title: "Ship the retry fix", State: "triage", Within: []api.TaskRef{{ID: "t-8", Title: "Retry the uploads", State: "triage"}}}}
 	answers := pageAnswers(t)
 	answers["/api/tasks/"+e.ID] = e
-	answers["/api/tasks?"+api.TasksMatch+"="] = map[string]any{"tasks": []map[string]string{{"id": e.ID, "title": e.Title, "state": "doing"}, {"id": "t-5", "title": "Write the runbook", "state": "parked"}}}
+	answers["/api/tasks?"+api.TasksMatch+"=&"+api.TasksExcept+"="+e.ID] = map[string]any{"tasks": []map[string]string{{"id": "t-5", "title": "Write the runbook", "state": "parked"}}}
 	var got struct {
 		Sections []string
 		Head     []string
