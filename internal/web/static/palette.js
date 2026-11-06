@@ -37,9 +37,9 @@ function palEl(tag, attrs, ...children) {
   return node;
 }
 
-// palOverlay shows box over the page; the returned close removes it and
-// gives the focus back.
-function palOverlay(box) {
+// palOverlay shows box over the page; the returned close removes it, gives
+// the focus back and calls closed, as a click on the backdrop does.
+function palOverlay(box, closed) {
   if (!document.getElementById("pal-css")) document.head.append(palEl("style", { id: "pal-css" }, PALETTE_CSS));
   for (const old of document.querySelectorAll(".pal-back")) old.remove();
   const back = document.activeElement;
@@ -47,6 +47,7 @@ function palOverlay(box) {
   const close = () => {
     shade.remove();
     if (back && back.isConnected && back.focus) back.focus();
+    if (closed) closed();
   };
   shade.addEventListener("mousedown", (e) => { if (e.target === shade) close(); });
   document.body.append(shade);
@@ -63,13 +64,12 @@ function showPalette({ title, items, source, empty }) {
   const list = palEl("ol", { id: "pal-list", role: "listbox", "aria-label": title });
   const none = palEl("p", { class: "pal-empty", "aria-live": "polite" });
   const box = palEl("div", { class: "pal", role: "dialog", "aria-label": title }, palEl("div", { class: "pal-head" }, title), input, list, none);
-  const close = palOverlay(box);
+  let done = false;
+  const close = palOverlay(box, () => { done = true; });
   let shown = items;
   let at = 0;
-  let done = false;
   const pick = (it) => {
     if (done) return;
-    done = true;
     close();
     if (it) it.run();
   };

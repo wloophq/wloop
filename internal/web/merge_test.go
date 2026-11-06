@@ -223,7 +223,7 @@ function opened(o) {
   const answer = async (q, items) => { pending[q](items); await tick(); await tick(); };
   const shown = () => walk(list, (x) => x.tag === "li").map((li) => li.textContent);
   const empty = walk(shade, (x) => String(x.attrs.class || "").includes("pal-empty"))[0];
-  return { input, list, type, answer, shown, empty };
+  return { shade, input, list, type, answer, shown, empty };
 }
 `
 
@@ -256,6 +256,17 @@ await tick();
 const before = runs.slice();
 await b.answer("launch hall", [item("Book the launch hall", "Inbox")]);
 
+const d = opened({ title: "Merge with which task", items: [item("Book the launch venue", "Inbox")], empty: "No task holds the text" });
+d.type("launch hall");
+d.input.on.keydown(key("Enter"));
+d.input.on.keydown(key("Escape"));
+await d.answer("launch hall", [item("Book the launch hall again", "Inbox")]);
+const e = opened({ title: "Merge with which task", items: [item("Book the launch venue", "Inbox")], empty: "No task holds the text" });
+e.type("launch hall");
+e.input.on.keydown(key("Enter"));
+e.shade.on.mousedown({ target: e.shade });
+await e.answer("launch hall", [item("Book the launch hall from the backdrop", "Inbox")]);
+
 const c = opened({ title: "Merge with which task", items: [item("Write the runbook", "Next")], empty: "No task holds the text" });
 c.type("zz");
 await c.answer("zz", []);
@@ -273,7 +284,7 @@ process.stdout.write(JSON.stringify({ ...facts, Latest: latest, BeforeAnswer: be
 		t.Errorf("a late answer for an older text replaced the list: %v", got.Latest)
 	}
 	if len(got.BeforeAnswer) != 0 || !reflect.DeepEqual(got.Runs, []string{"Book the launch hall"}) {
-		t.Errorf("Enter before the answer ran %v, then %v: want nothing, then the typed text's task", got.BeforeAnswer, got.Runs)
+		t.Errorf("Enter before the answer ran %v, then %v: want nothing, then the typed text's task, and nothing after Esc or a backdrop click", got.BeforeAnswer, got.Runs)
 	}
 	if got.Empty != "No task holds the text" || got.EmptyLive != "polite" {
 		t.Errorf("an empty answer says %q (aria-live %q)", got.Empty, got.EmptyLive)
