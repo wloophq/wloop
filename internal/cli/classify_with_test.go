@@ -174,7 +174,7 @@ func TestClassifyWithMarksEveryUntrustedValue(t *testing.T) {
 	}
 }
 
-func TestClassifyWithCachesByTheUnitAndTheListedTasksFingerprints(t *testing.T) {
+func TestClassifyWithCachesByWhatTheJudgmentReadsOfTheTasks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newWithRig(t, 5)
@@ -194,22 +194,27 @@ func TestClassifyWithCachesByTheUnitAndTheListedTasksFingerprints(t *testing.T) 
 		t.Fatalf("a reader that does not name the output read it: %v", f)
 	}
 	r.units.Set(task.UnitOf("t-b"), "task.fingerprint", "b-2")
+	r.units.Set(r.self, "task.fingerprint", "self-2")
+	if f, _ := units.Facts(named, r.self); f[sameAs] != "t-a" {
+		t.Fatalf("a write that changes nothing the judgment reads, as opening a task, dropped the output: %v", f)
+	}
+	r.retitle(t, "t-b", "Rotate the search and billing keys")
 	if f, _ := units.Facts(named, r.self); f[sameAs] != nil {
-		t.Fatalf("a listed task changed and the old output still reads: %v", f)
+		t.Fatalf("a listed task's title changed and the old output still reads: %v", f)
 	}
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
 		t.Fatalf("a listed task changed: %v", err)
 	}
-	r.units.Set(task.UnitOf("t-b"), "task.fingerprint", "b-1")
+	r.retitle(t, "t-b", "Rotate the search keys")
 	if _, err := r.run(t); err != nil {
-		t.Fatalf("back to the first fingerprints: %v", err)
+		t.Fatalf("back to the first contents: %v", err)
 	}
 	r.units.Set(r.self, "task.candidates", []string{"t-b", "t-a"})
 	if _, err := r.run(t); err != nil {
 		t.Fatalf("the same tasks in another order: %v", err)
 	}
 	if n := len(r.asker.asked()); n != 2 {
-		t.Fatalf("asked %d times, want once per set of fingerprints", n)
+		t.Fatalf("asked %d times, want once per set of contents", n)
 	}
 	if spent, _ := r.db.Classifications().Spent(ctx, testNow); spent != 2 {
 		t.Fatalf("spent %d", spent)
@@ -236,5 +241,39 @@ func TestClassifyWithRunsNothingForAnEmptyList(t *testing.T) {
 	sameAs := builtin.ClassifyFact("same-work", "same_as")
 	if f, _ := r.classified().Facts(workflow.WithReads(ctx, sameAs), r.self); f[sameAs] != nil {
 		t.Fatalf("an empty list reads an output: %v", f)
+	}
+}
+
+func (r *withRig) retitle(t *testing.T, id task.ID, title string) {
+	t.Helper()
+	ctx := context.Background()
+	e, err := r.db.Tasks().Task(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Title = title
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClassifyWithOnAUnitThatIsNoTaskKeysOnTheUnitsFingerprint(t *testing.T) {
+	t.Parallel()
+	r := newWithRig(t, 5)
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	r.units.Put(pr, workflow.Facts{"pr.fingerprint": "head-1", "pr.tasks": []string{"t-a", "t-b"}})
+	r.self, r.st = pr, wfStep("classify", "with", "pr.tasks", "prompt", "prompt.md.tmpl")
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	if _, err := r.run(t); err != nil {
+		t.Fatalf("once classified: %v", err)
+	}
+	r.units.Set(pr, "pr.fingerprint", "head-2")
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("the unit changed and the old output still served: %v", err)
+	}
+	if n := len(r.asker.asked()); n != 2 {
+		t.Fatalf("asked %d times, want once per unit fingerprint", n)
 	}
 }

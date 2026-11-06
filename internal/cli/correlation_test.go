@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -296,6 +297,56 @@ func TestARefusedPairIsNotProposedAgainUntilOneOfThemChanges(t *testing.T) {
 	r.settle(4)
 	if gs := r.merges(); len(gs[gate.Open]) != 1 {
 		t.Fatalf("after the older task changed: %+v", gs)
+	}
+}
+
+func TestAStoredJudgmentProposesOnItsRetryAfterBothTasksWereSeenWithTheDayCapSpent(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, sameAs(olderTask))
+	r.te.cfg.Classify.PerDay = 1
+	r.happen(task.EventCreated)
+	if _, _, err := r.eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+		t.Fatal(err)
+	}
+	r.steps.classify.wait()
+	if spent, _ := r.db.Classifications().Spent(ctx, r.clock()); spent != 1 {
+		t.Fatalf("spent %d, want the one call that stored the verdict", spent)
+	}
+	its, err := r.eng.Ledger.Items(ctx, automation.Filter{Workflow: "task-correlate"})
+	if err != nil || len(its) != 1 || its[0].Decision != workflow.DecisionDeferred {
+		t.Fatalf("before the retry: %+v %v", its, err)
+	}
+	r.advance(time.Second)
+	for _, id := range []task.ID{olderTask, newerTask} {
+		before, _ := r.eng.Units.Facts(ctx, task.UnitOf(id))
+		if _, err := r.te.tasks.Do(ctx, id, coretasks.Request{Verb: "seen", Actor: task.ActorPerson}); err != nil {
+			t.Fatal(err)
+		}
+		if after, _ := r.eng.Units.Facts(ctx, task.UnitOf(id)); after["task.fingerprint"] == before["task.fingerprint"] {
+			t.Fatalf("seeing %s left its fingerprint %v", id, after["task.fingerprint"])
+		}
+	}
+	r.advance(automation.DefaultRetryBase)
+	r.settle(3)
+	evs, err := r.db.EventsOf(ctx, []unit.Unit{task.UnitOf(newerTask)}, timeline.Filter{Kinds: []string{builtin.EventClassified}})
+	if err != nil || len(evs) != 1 {
+		t.Fatalf("classified events %+v %v, want the retry's", evs, err)
+	}
+	if gs := r.merges(); len(gs[gate.Open]) != 1 {
+		t.Fatalf("merge gates %+v", gs)
+	}
+	if n := len(r.asker.asked()); n != 1 {
+		t.Fatalf("asked %d times", n)
+	}
+	refused, err := r.eng.Ledger.Items(ctx, automation.Filter{Workflow: "task-correlate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range refused {
+		if strings.Contains(it.Reason, "cap") {
+			t.Fatalf("the retry that found the stored verdict was held by the cap: %+v", it)
+		}
 	}
 }
 
