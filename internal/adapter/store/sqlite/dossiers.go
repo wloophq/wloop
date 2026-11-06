@@ -31,10 +31,10 @@ const (
 		OR EXISTS (SELECT 1 FROM tasks e WHERE e.category NOT IN (?3, ?4) AND (
 			e.id IN (SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2) OR
 			e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2)))`
-	// taskOpenSQL follows the aliases of a task no longer stored to the tasks it was merged into.
+	// taskOpenSQL follows the merge aliases of a task no longer stored to the task it was merged into.
 	taskOpenSQL = `WITH RECURSIVE r(id, hops) AS (SELECT ?1, 0
 			UNION SELECT a.new_id, r.hops + 1 FROM task_aliases a JOIN r ON a.old_id = r.id
-				WHERE r.hops < ?4 AND r.id NOT IN (SELECT id FROM tasks))
+				WHERE r.hops < ?4 AND r.id NOT IN (SELECT id FROM tasks) AND ` + mergeAlias + `)
 		SELECT EXISTS (SELECT 1 FROM tasks WHERE id IN (SELECT id FROM r) AND category NOT IN (?2, ?3))`
 	// holderSQL is the task that holds a unit: an open one first, then the oldest.
 	holderSQL = `SELECT e.id FROM tasks e WHERE e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2

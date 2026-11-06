@@ -8,8 +8,10 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/event"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/turn"
@@ -37,7 +39,11 @@ func TestTheSurvivorsDossierIncludesTheMergedTasks(t *testing.T) {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, string(merged.ID)); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(merged.ID), string(survivor.ID))
+		if _, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(merged.ID), string(survivor.ID)); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('task', ?, ?, '', 'person', ?, ?)`,
+			string(merged.ID), merge.RecordKind, testNow.Format(event.TimeLayout), `{"Into":"`+string(survivor.ID)+`"}`)
 		return err
 	}); err != nil {
 		t.Fatal(err)

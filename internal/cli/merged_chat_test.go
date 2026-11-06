@@ -10,6 +10,8 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -29,7 +31,11 @@ func TestTheSurvivorsChatReachesTheMergedTasksLiveSession(t *testing.T) {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE id = ?`, string(attachTask)); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(attachTask), string(survivor))
+		if _, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(attachTask), string(survivor)); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('task', ?, ?, '', 'person', ?, ?)`,
+			string(attachTask), merge.RecordKind, testNow.Format(event.TimeLayout), `{"Into":"`+string(survivor)+`"}`)
 		return err
 	}); err != nil {
 		t.Fatal(err)

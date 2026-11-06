@@ -42,7 +42,7 @@ func TestTheSurvivorsTimelineRouteServesTheMergedTasksHistory(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: own, Kind: merge.RecordKind, Actor: "person", Data: `{}`, At: at(4)}); err != nil {
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: own, Kind: merge.RecordKind, Actor: "person", Data: `{"Into":"` + string(survivor) + `"}`, At: at(4)}); err != nil {
 		t.Fatal(err)
 	}
 

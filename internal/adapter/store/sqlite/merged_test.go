@@ -7,19 +7,26 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/timeline"
+	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// mergedAway leaves task from as a merge leaves it: no row, an alias to into, and its merge record on its own
-// unit at when.
+// mergedAway leaves task from as a merge leaves it: no row, an alias to into, and its merge record, naming
+// into, on its own unit at when.
 func mergedAway(t *testing.T, db *DB, from, into task.ID, when time.Time) {
 	t.Helper()
 	exec(t, db, `DELETE FROM tasks WHERE id = ?`, string(from))
 	exec(t, db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(from), string(into))
-	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('task', ?, ?, '', 'person', ?, '{}')`,
-		string(from), merge.RecordKind, at(when))
+	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES ('task', ?, ?, '', 'person', ?, ?)`,
+		string(from), merge.RecordKind, at(when), `{"From":"`+string(from)+`","Into":"`+string(into)+`"}`)
+}
+
+// v7Alias is an alias the v7 migration wrote: no merge record names it.
+func v7Alias(t *testing.T, db *DB, from, to task.ID) {
+	t.Helper()
+	exec(t, db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(from), string(to))
 }
 
 func mergedIDs(t *testing.T, db *DB, id task.ID) []task.ID {
@@ -34,24 +41,65 @@ func mergedIDs(t *testing.T, db *DB, id task.ID) []task.ID {
 func TestMergedIntoWalksTheAliasesTransitively(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	const survivor, middle, first, beside, split, stale = "t-survivor", "t-middle", "t-first", "t-beside", "t-split", "t-stale"
-	for _, id := range []task.ID{survivor, middle, first, beside, split, stale} {
+	const survivor, middle, first, beside, split = "t-survivor", "t-middle", "t-first", "t-beside", "t-split"
+	for _, id := range []task.ID{survivor, middle, first, beside, split} {
 		putTask(t, db, id)
 	}
 	day := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
-	mergedAway(t, db, first, middle, day)
-	mergedAway(t, db, middle, survivor, day.Add(time.Hour))
-	mergedAway(t, db, beside, survivor, day.Add(2*time.Hour))
-	exec(t, db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, split, survivor)
-	exec(t, db, `DELETE FROM tasks WHERE id = ?`, stale)
-	exec(t, db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, stale, first)
-	exec(t, db, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, middle, stale)
+	mergedAway(t, db, beside, survivor, day)
+	mergedAway(t, db, first, middle, day.Add(time.Hour))
+	mergedAway(t, db, middle, survivor, day.Add(2*time.Hour))
+	mergedAway(t, db, split, survivor, day.Add(3*time.Hour))
+	putTask(t, db, split)
+	exec(t, db, `DELETE FROM task_aliases WHERE old_id = ?`, split)
 
-	if got, want := mergedIDs(t, db, survivor), []task.ID{stale, first, middle, beside}; !slices.Equal(got, want) {
-		t.Fatalf("merged into the survivor %q, want %q: transitive, in merge order, without the stored task", got, want)
+	if got, want := mergedIDs(t, db, survivor), []task.ID{beside, first, middle}; !slices.Equal(got, want) {
+		t.Fatalf("merged into the survivor %q, want %q: transitive, in merge order, without the task split back", got, want)
 	}
 	if got := mergedIDs(t, db, split); len(got) != 0 {
 		t.Fatalf("merged into a task none merged into %q", got)
+	}
+}
+
+func TestMergedIntoFollowsOnlyTheAliasTheMergeRecordNames(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	ctx := context.Background()
+	const part, merged, survivor, gone = "t-part", "t-merged", "t-survivor", "t-gone"
+	for _, id := range []task.ID{part, merged, survivor} {
+		putTask(t, db, id)
+	}
+	v7Alias(t, db, merged, part)
+	v7Alias(t, db, gone, part)
+	mergedAway(t, db, merged, survivor, time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC))
+	exec(t, db, `UPDATE tasks SET category = ? WHERE id = ?`, string(task.CategoryDone), survivor)
+
+	if got := mergedIDs(t, db, part); len(got) != 0 {
+		t.Fatalf("merged into the v7 split part %q, want none: a v7 alias carries no history", got)
+	}
+	if got := mergedIDs(t, db, survivor); !slices.Equal(got, []task.ID{merged}) {
+		t.Fatalf("merged into the survivor %q", got)
+	}
+	open, err := db.Dossiers().Open(ctx, dossier.Owner{Unit: task.UnitOf(merged)})
+	if err != nil || open {
+		t.Fatalf("the merged task's dossier reads as open through the v7 alias to an open part: %v %v", open, err)
+	}
+}
+
+func TestAMergedIDReadsTheTaskItsMergeRecordNames_T10C1(t *testing.T) {
+	t.Skip("T1 C1")
+	t.Parallel()
+	db, _ := openTemp(t)
+	const part, merged, survivor = "t-part", "t-merged", "t-survivor"
+	for _, id := range []task.ID{part, merged, survivor} {
+		putTask(t, db, id)
+	}
+	exec(t, db, `UPDATE tasks SET category = ? WHERE id = ?`, string(task.CategoryInbox), part)
+	v7Alias(t, db, merged, part)
+	mergedAway(t, db, merged, survivor, time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC))
+	got, err := db.Tasks().Task(context.Background(), merged)
+	if err != nil || got.ID != survivor {
+		t.Fatalf("the merged id reads %q %v, want the task its merge record names", got.ID, err)
 	}
 }
 
