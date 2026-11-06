@@ -159,6 +159,10 @@ func (Agent) Settings(p turns.Policy) string {
 		settings.Permissions.AdditionalDirectories = append(settings.Permissions.AdditionalDirectories, d.Path)
 	}
 	for _, d := range p.Dirs {
+		if len(d.Write) == 0 {
+			settings.Permissions.Deny = append(settings.Permissions.Deny, "Edit(/"+d.Path+"/**)")
+			continue
+		}
 		settings.Permissions.Deny = append(settings.Permissions.Deny, "Edit(/"+d.Path+"/.git/**)")
 	}
 	for _, d := range p.DenyPaths {

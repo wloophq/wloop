@@ -52,7 +52,8 @@ func (p Policy) Denied(c Control) Policy {
 	return p
 }
 
-// Dir is an absolute path and the subpaths the agent may write, e.g. log, sources, drafts.
+// Dir is an absolute path and the subpaths the agent may write, e.g. log, sources, drafts; with none, the
+// directory is read only and every edit in it is denied.
 type Dir struct {
 	Path  string
 	Write []string
