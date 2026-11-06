@@ -17,16 +17,30 @@ type Chats interface {
 }
 
 // LiveOn is the newest started session with a live process whose unit is
-// one of units; false when none is.
+// one of units and that holds a turn on one of them; false when none is. A
+// session with no turn there, as a start left waiting on the agent's trust
+// dialog, cannot read the task's chat, so it is not the task's agent.
 func (s *Service) LiveOn(ctx context.Context, units ...unit.Unit) (turn.Session, bool, error) {
 	all, err := s.Registry.Sessions(ctx)
 	if err != nil {
 		return turn.Session{}, false, err
 	}
+	books, err := s.Store.Books(ctx, units...)
+	if err != nil {
+		return turn.Session{}, false, err
+	}
+	holdsTurn := func(id string) bool {
+		for _, b := range books {
+			if slices.ContainsFunc(b.Turns, func(t turn.Turn) bool { return t.Session == id || t.SentTo == id }) {
+				return true
+			}
+		}
+		return false
+	}
 	var out turn.Session
 	found := false
 	for _, sess := range all {
-		if sess.State() != turn.SessionActive || !slices.Contains(units, sess.Unit) {
+		if sess.State() != turn.SessionActive || !slices.Contains(units, sess.Unit) || !holdsTurn(sess.ID) {
 			continue
 		}
 		if !found || sess.StartedAt.After(out.StartedAt) {
