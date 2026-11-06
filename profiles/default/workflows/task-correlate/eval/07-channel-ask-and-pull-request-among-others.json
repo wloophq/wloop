@@ -1,0 +1,39 @@
+{
+ "id": "07-channel-ask-and-pull-request-among-others",
+ "kind": "slack-pr",
+ "same_as": "t-00000000000074f7",
+ "task": {
+  "id": "t-0000000000007001",
+  "title": "Ship the dark mode toggle for settings",
+  "notes": "#web-team",
+  "items": [
+   "Ken asks when the dark mode toggle on the settings page lands"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-00000000000074f7",
+   "title": "acme/web#301: Settings dark mode toggle",
+   "notes": "Your pull request",
+   "items": [
+    "Waiting for review from Liam"
+   ]
+  },
+  {
+   "id": "t-0000000000007003",
+   "title": "acme/web#299: Dark mode for the dashboard charts",
+   "notes": "Mia's pull request",
+   "items": [
+    "Mia asks for your review of the dashboard chart colors"
+   ]
+  },
+  {
+   "id": "t-0000000000007004",
+   "title": "Settings page copy review",
+   "notes": "#web-team",
+   "items": [
+    "Ken asks to review the new settings page copy"
+   ]
+  }
+ ]
+}

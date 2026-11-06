@@ -74,7 +74,7 @@ func BoardOf(workspace string) string {
 // ReservedNames are names a user intent may not take: CLI commands, built-in action ids, profile words, dimensions.
 // The loader checks them against user layers only.
 var ReservedNames = []string{
-	"app", "brief", "config", "doctor", "eval-instructions", "explore", "help", "hook", "init", "install",
+	"app", "brief", "config", "doctor", "eval-correlation", "eval-instructions", "explore", "help", "hook", "init", "install",
 	"instructions", "intake", "mute", "open", "outbox", "pause", "plan", "profile", "remove", "resume",
 	"serve", "slack", "status", "store", "take-over", "task", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
 	"version", "workflows",
@@ -247,7 +247,7 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.
 var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
-	EventRemoved, "status", gate.EventResolved, task.EventCreated, task.EventLinked, merge.RecordKind}
+	EventRemoved, "status", gate.EventResolved, task.EventCreated, task.EventLinked, merge.RecordKind, EventClassified}
 
 // The loop's event kinds the host records itself.
 const (
@@ -259,6 +259,9 @@ const (
 	EventTracked   = "tracked"
 	EventUntracked = "untracked"
 	EventRemoved   = "removed"
+	// EventClassified is recorded on a unit each time a classify step runs with an output stored for it; its
+	// data is the workflow's name.
+	EventClassified = "classified"
 	// EventRoundSent and EventRoundUnblocked are a round's, which the
 	// host records when a person sends or unblocks it.
 	EventRoundSent      = "round_sent"

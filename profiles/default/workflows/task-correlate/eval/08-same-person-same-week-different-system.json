@@ -1,0 +1,23 @@
+{
+ "id": "08-same-person-same-week-different-system",
+ "kind": "look-alike",
+ "same_as": "",
+ "task": {
+  "id": "t-0000000000008001",
+  "title": "Migrate the billing database to the new cluster",
+  "notes": "DM with Nina",
+  "items": [
+   "Nina asks you to plan the billing database migration this week"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000008002",
+   "title": "Migrate the search index to the new cluster",
+   "notes": "#infra",
+   "items": [
+    "Nina asks you to move the search index to the new cluster this week"
+   ]
+  }
+ ]
+}

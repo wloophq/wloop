@@ -1,0 +1,32 @@
+{
+ "id": "02-dm-and-channel-release-notes",
+ "kind": "dm-channel",
+ "same_as": "t-0000000000002a41",
+ "task": {
+  "id": "t-0000000000002001",
+  "title": "Draft the 4.2 release notes",
+  "notes": "DM with Erin",
+  "items": [
+   "Erin asks you to draft the release notes for version 4.2 by Thursday"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000002003",
+   "title": "Release notes for 4.1.3",
+   "notes": "#releases",
+   "items": [
+    "Erin asks who wrote the 4.1.3 release notes"
+   ]
+  },
+  {
+   "id": "t-0000000000002a41",
+   "title": "Release notes for 4.2",
+   "notes": "#releases thread",
+   "items": [
+    "Erin reminds the channel that the 4.2 release notes are on you",
+    "Frank adds the list of merged changes for 4.2"
+   ]
+  }
+ ]
+}

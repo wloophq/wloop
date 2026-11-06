@@ -579,11 +579,11 @@ func TestClassifyCachesByFingerprint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if facts["classify.triage-bugs.kind"] != "bug" || facts["classify.triage-bugs.urgent"] != true {
+	if facts["classify.triage_bugs.kind"] != "bug" || facts["classify.triage_bugs.urgent"] != true {
 		t.Fatalf("facts %v", facts)
 	}
 	r.units.Set(r.u, "pr.fingerprint", "fp2")
-	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage-bugs.kind"] != nil {
+	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage_bugs.kind"] != nil {
 		t.Fatalf("another fingerprint read the old output: %v", facts)
 	}
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
@@ -674,7 +674,7 @@ func TestAClassifyAnswerOutsideItsSchemaIsRefused(t *testing.T) {
 	units := classifiedUnits{Units: r.units, c: r.s.classify, workflows: func() []workflow.Workflow {
 		return []workflow.Workflow{{Name: "triage-bugs", Provider: unit.GitHub, Slot: "pr", Steps: []workflow.Step{r.st}}}
 	}}
-	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage-bugs.kind"] != nil {
+	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage_bugs.kind"] != nil {
 		t.Fatalf("the refused answer became facts: %v", facts)
 	}
 }

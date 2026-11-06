@@ -26,7 +26,7 @@ var stepGrammar = []Key{
 
 	stepKey(StepClassify, "prompt", KindFile, "prompt.md", "The classification's prompt, beside the manifest."),
 	stepKey(StepClassify, "schema", KindFile, "schema.json", "The JSON schema of its answer, beside the manifest."),
-	stepKey(StepClassify, "with", KindText, "", "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, and .Tasks, each with .ID, .Title, .Notes and .Items, a few of its items' summaries, every untrusted value inside the injection markers. The output is cached by the unit's fingerprint with those tasks' fingerprints, sorted. Empty runs nothing."),
+	stepKey(StepClassify, "with", KindText, "", "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, .Task, the unit's own task when it is one, and .Tasks, the listed tasks in order, each with .ID, .Title, .Notes and .Items, a few of its items' summaries. Every untrusted value is inside this call's markers, .Begin and .End, which carry the code .Nonce. The output is cached by the unit's fingerprint with those tasks' fingerprints, sorted, and only a reader that names it reads it. An empty list runs nothing."),
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 

@@ -1,0 +1,23 @@
+{
+ "id": "11-same-week-different-customers",
+ "kind": "look-alike",
+ "same_as": "",
+ "task": {
+  "id": "t-000000000000b001",
+  "title": "Export data for Northwind's audit",
+  "notes": "#support-escalations",
+  "items": [
+   "Quinn asks for a full data export for the Northwind audit by Wednesday"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000b002",
+   "title": "Export data for Contoso's audit",
+   "notes": "#support-escalations",
+   "items": [
+    "Quinn asks for a full data export for the Contoso audit by Wednesday"
+   ]
+  }
+ ]
+}

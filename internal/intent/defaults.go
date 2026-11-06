@@ -33,6 +33,8 @@ type sheet struct {
 	// extras are the brief.extra.* facts of a provider's brief intent, which
 	// a workflow's predicates over a briefed subject read; nil reads none.
 	extras func(dunit.ProviderID) expr.Env
+	// classify are the classify outputs of the workflows as facts, by provider.
+	classify map[dunit.ProviderID]expr.Env
 	// defaults are the profile's defaults.toml.
 	defaults manifestDefaults
 	// taskFacts are the task.prop.* facts of tasks.toml, which a predicate

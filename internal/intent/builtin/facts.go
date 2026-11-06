@@ -464,6 +464,12 @@ func ExtraFacts(props []jsonschema.Property) expr.Env {
 // ClassifyPrefix names a classify step's output as a fact.
 const ClassifyPrefix = "classify."
 
+// ClassifyFact names field of workflow's classify output as a fact: classify.<workflow>.<field>, each - of
+// the workflow's name an _, so a predicate can name it.
+func ClassifyFact(workflow, field string) string {
+	return ClassifyPrefix + strings.ReplaceAll(workflow, "-", "_") + "." + field
+}
+
 // IsUntrusted says whether a rule may not trust the fact name: an agent or a
 // third party sets its value. A brief's extra fields and a classification's
 // output are untrusted whatever their name.

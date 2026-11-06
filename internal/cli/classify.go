@@ -2,19 +2,24 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -62,19 +67,80 @@ func fingerprint(u unit.Unit, f workflow.Facts) string {
 	return factString(f, slot+".fingerprint")
 }
 
+// classified is what keys one classify call: the fingerprint its output is stored by, and the tasks its with
+// lists, in the list's order.
+type classified struct {
+	fp   string
+	with []task.ID
+}
+
+// empty says the call lists tasks with with, and none.
+func (k classified) empty(sc stepCall) bool { return sc.arg(withArg) != "" && len(k.with) == 0 }
+
 // cached is the output stored for the unit's current fingerprint.
-func (c *classifier) cached(ctx context.Context, sc stepCall) (json.RawMessage, string, bool, error) {
+func (c *classifier) cached(ctx context.Context, sc stepCall) (json.RawMessage, classified, bool, error) {
 	f, err := c.s.facts(ctx, sc.u)
 	if err != nil {
-		return nil, "", false, err
+		return nil, classified{}, false, err
 	}
-	fp := fingerprint(sc.u, f)
+	k, err := c.key(ctx, sc.arg(withArg), sc.u, f)
+	if err != nil || k.empty(sc) {
+		return nil, k, false, err
+	}
 	store := c.deps().Store
 	if store == nil {
-		return nil, fp, false, nil
+		return nil, k, false, nil
 	}
-	out, ok, err := store.Output(ctx, sc.u, sc.why.Workflow, fp)
-	return out, fp, ok, err
+	out, ok, err := store.Output(ctx, sc.u, sc.why.Workflow, k.fp)
+	return out, k, ok, err
+}
+
+// withArg is classify's argument naming a list fact of task ids.
+const withArg = "with"
+
+// The most of a listed task the prompt reads.
+const (
+	withItems      = 5
+	withNotesRunes = 1000
+)
+
+// readingWith marks a context whose facts reads are those a with key takes, which add no with output.
+type readingWith struct{}
+
+// key is u's fingerprint, and with a with fact the fingerprints of the tasks it lists, sorted.
+func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workflow.Facts) (classified, error) {
+	k := classified{fp: fingerprint(u, f)}
+	if with == "" {
+		return k, nil
+	}
+	inner := context.WithValue(workflow.WithReads(ctx, with), readingWith{}, true)
+	v, ok := f[with]
+	if _, unrequested := v.(workflow.Unrequested); unrequested || !ok {
+		g, err := c.s.facts(inner, u)
+		if err != nil {
+			return k, err
+		}
+		v = g[with]
+	}
+	ids, ok := v.([]string)
+	if !ok && v != nil {
+		return k, fmt.Errorf("classify: with %s is %v, not a list of task ids", with, v)
+	}
+	fps := make([]string, 0, len(ids))
+	listed := workflow.OnlyReads(inner)
+	for _, id := range ids {
+		tu := task.UnitOf(task.ID(id))
+		tf, err := c.s.facts(listed, tu)
+		if err != nil {
+			return k, fmt.Errorf("classify: the facts of %s: %w", id, err)
+		}
+		fps = append(fps, fingerprint(tu, tf))
+		k.with = append(k.with, task.ID(id))
+	}
+	slices.Sort(fps)
+	sum := sha256.Sum256([]byte(strings.Join(fps, "\n")))
+	k.fp += "+" + hex.EncodeToString(sum[:8])
+	return k, nil
 }
 
 // refusal is why no call may start now: no store or agent, the day's cap
@@ -105,11 +171,11 @@ func (c *classifier) refusal(ctx context.Context) (string, int, error) {
 func capReached(limit int) string { return fmt.Sprintf("daily classify cap %d reached", limit) }
 
 func (s *stepSet) classifyCheck(ctx context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
-	_, _, ok, err := s.classify.cached(ctx, c)
-	if err != nil || ok {
+	_, k, ok, err := s.classify.cached(ctx, c)
+	if err != nil || ok || k.empty(c) {
 		return "", err
 	}
-	if s.classify.busy(ctx, c) {
+	if s.classify.busy(c, k.fp) {
 		return "", nil
 	}
 	why, _, err := s.classify.refusal(ctx)
@@ -120,31 +186,28 @@ func classifyKey(c stepCall, fp string) string {
 	return c.why.Workflow + "\n" + c.u.String() + "\n" + fp
 }
 
-func (c *classifier) busy(ctx context.Context, sc stepCall) bool {
-	f, err := c.s.facts(ctx, sc.u)
-	if err != nil {
-		return false
-	}
+func (c *classifier) busy(sc stepCall, fp string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.inflight[classifyKey(sc, fingerprint(sc.u, f))]
+	return c.inflight[classifyKey(sc, fp)]
 }
 
 // classifyRun returns the output stored for the unit's fingerprint, or
 // starts the call on a worker, spending one of the day's calls, and
 // returns Deferred: the item stays pending until a later run finds it.
 func (s *stepSet) classifyRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
-	out, fp, ok, err := s.classify.cached(ctx, c)
-	if err != nil {
+	out, k, ok, err := s.classify.cached(ctx, c)
+	if err != nil || k.empty(c) {
 		return "", err
 	}
 	if ok {
+		s.classify.told(c, k.fp)
 		return string(out), nil
 	}
-	if err := s.classify.takeFailure(c, fp); err != nil {
+	if err := s.classify.takeFailure(c, k.fp); err != nil {
 		return "", err
 	}
-	return "", s.classify.start(ctx, c, fp)
+	return "", s.classify.start(ctx, c, k)
 }
 
 func (c *classifier) takeFailure(sc stepCall, fp string) error {
@@ -156,7 +219,8 @@ func (c *classifier) takeFailure(sc stepCall, fp string) error {
 	return err
 }
 
-func (c *classifier) start(ctx context.Context, sc stepCall, fp string) error {
+func (c *classifier) start(ctx context.Context, sc stepCall, k classified) error {
+	fp := k.fp
 	key := classifyKey(sc, fp)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -190,7 +254,12 @@ func (c *classifier) start(ctx context.Context, sc stepCall, fp string) error {
 	if err != nil {
 		return err
 	}
-	prompt, err := classifyPrompt(text, sc, facts)
+	var prompt string
+	if sc.arg(withArg) == "" {
+		prompt, err = classifyPrompt(text, sc, facts)
+	} else {
+		prompt, err = c.withPrompt(ctx, text, sc.u, facts, k.with)
+	}
 	if err != nil {
 		return err
 	}
@@ -223,6 +292,22 @@ func (c *classifier) start(ctx context.Context, sc stepCall, fp string) error {
 		}
 	})
 	return automation.Deferred{Reason: "classifying"}
+}
+
+// told records that sc ran with the output stored for fp, once per event that planned it, chained after it.
+func (c *classifier) told(sc stepCall, fp string) {
+	if c.s.d.Pub == nil {
+		return
+	}
+	var chain workflow.Chain
+	key := sc.why.Workflow + "\n" + fp
+	if ev := sc.why.Event; ev != nil {
+		chain = ev.Chain
+		key += "\n" + strconv.FormatInt(ev.ID, 10)
+	}
+	c.s.d.Pub.Publish(port.Event{Unit: sc.u, Kind: builtin.EventClassified, Key: key,
+		Actor: string(task.ActorWorkflow) + ":" + sc.why.Workflow, Data: workflow.ChainData(sc.why.Workflow, chain.Then(sc.why.Workflow)),
+		At: c.s.e.Now()})
 }
 
 // validAnswer refuses an answer outside the schema that asked for it; the
@@ -272,10 +357,25 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 	}
 	out, cloned := f, false
 	for _, w := range u.workflows() {
-		if w.Provider != un.Provider || !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == stepClassify }) {
+		i := slices.IndexFunc(w.Steps, func(st workflow.Step) bool { return st.Use == stepClassify })
+		if w.Provider != un.Provider || i < 0 {
 			continue
 		}
-		raw, ok, err := store.Output(ctx, un, w.Name, factString(f, w.Slot+".fingerprint"))
+		fp := factString(f, w.Slot+".fingerprint")
+		if with, _ := w.Steps[i].Args[withArg].(string); with != "" {
+			if ctx.Value(readingWith{}) != nil || !names(ctx, builtin.ClassifyFact(w.Name, "")) {
+				continue
+			}
+			k, err := u.c.key(ctx, with, un, f)
+			if err != nil {
+				return nil, err
+			}
+			if len(k.with) == 0 {
+				continue
+			}
+			fp = k.fp
+		}
+		raw, ok, err := store.Output(ctx, un, w.Name, fp)
 		if err != nil {
 			return nil, err
 		}
@@ -290,10 +390,15 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 			out, cloned = maps.Clone(f), true
 		}
 		for k, v := range fields {
-			out["classify."+w.Name+"."+k] = factValue(v)
+			out[builtin.ClassifyFact(w.Name, k)] = factValue(v)
 		}
 	}
 	return out, nil
+}
+
+// names says whether a read ctx carries names a fact that starts with prefix.
+func names(ctx context.Context, prefix string) bool {
+	return slices.ContainsFunc(workflow.ReadsOf(ctx), func(r string) bool { return strings.Contains(r, prefix) })
 }
 
 // factValue is a JSON value as a fact: a whole number an int, a list of
