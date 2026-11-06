@@ -36,7 +36,7 @@ func Holds(loaded func() *intentload.Loaded, facts func(ctx context.Context, t t
 			compiled[w.When] = pred
 		}
 		mu.Unlock()
-		f, err := facts(ctx, t)
+		f, err := facts(workflow.WithReads(ctx, pred.Reads()...), t)
 		if err != nil {
 			return false, err
 		}
@@ -61,7 +61,7 @@ func Baseline(loaded func() *intentload.Loaded, facts func(ctx context.Context, 
 				return when, nil
 			}
 		}
-		f, err := facts(ctx, t)
+		f, err := facts(workflow.WithReads(ctx, names...), t)
 		if err != nil {
 			return "", err
 		}

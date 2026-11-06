@@ -7,13 +7,19 @@ import (
 	"time"
 
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/wake"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 const day = 24 * time.Hour
@@ -27,22 +33,65 @@ var (
 	teamP = items.Person{Key: "group:backend", Name: "backend"}
 )
 
+// whereCounting counts the gate queries over every task.
+type whereCounting struct {
+	sqlite.GateStore
+	e *env
+}
+
+func (c whereCounting) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	c.e.reads["gates where"]++
+	return c.GateStore.Where(ctx, q)
+}
+
 // candidateEnv is env with a provider that reads the candidates and the refused merges.
 type candidateEnv struct {
 	*env
 	p *facttask.Provider
 	s facttask.CandidateSettings
+	// aliases are the ids that read as another task's, as a merge leaves them.
+	aliases map[task.ID]task.ID
+}
+
+type aliasedTasks struct {
+	store   facttask.Tasks
+	aliases map[task.ID]task.ID
+}
+
+func (a aliasedTasks) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	return a.store.Tasks(ctx, q)
+}
+
+func (a aliasedTasks) Task(ctx context.Context, id task.ID) (task.Task, error) {
+	if to, ok := a.aliases[id]; ok {
+		id = to
+	}
+	return a.store.Task(ctx, id)
 }
 
 func newCandidateEnv(t *testing.T) *candidateEnv {
 	t.Helper()
-	c := &candidateEnv{env: newEnv(t), s: facttask.CandidateSettings{Window: 14 * day, Cap: 5}}
+	c := &candidateEnv{env: newEnv(t), s: facttask.CandidateSettings{Window: 14 * day, Cap: 5}, aliases: map[task.ID]task.ID{}}
 	c.p = facttask.New(facttask.Deps{
-		Tasks: c.db.Tasks(), Items: c.db.Items(), Clock: c.clock,
-		Me:         func() task.Me { return task.Me{Keys: []string{meP.Key}} },
-		Gates:      c.db.Gates(func() time.Time { return c.clock.now }),
-		Candidates: facttask.CandidateDeps{From: c.db.LinksFrom, To: c.db.Links().To, Settings: func() facttask.CandidateSettings { return c.s }},
-		Refusals:   facttask.RefusalDeps{Merges: func(v task.Verb) bool { return v == task.VerbMerge }},
+		Tasks: aliasedTasks{c.db.Tasks(), c.aliases}, Items: c.db.Items(), Clock: c.clock,
+		Me:    func() task.Me { return task.Me{Keys: []string{meP.Key}} },
+		Gates: whereCounting{c.db.Gates(func() time.Time { return c.clock.now }), c.env},
+		Candidates: facttask.CandidateDeps{
+			From: func(ctx context.Context, us []unit.Unit) ([]link.Link, error) {
+				c.reads["links"]++
+				return c.db.LinksFrom(ctx, us)
+			},
+			To: func(ctx context.Context, us []unit.Unit) ([]link.Link, error) {
+				c.reads["links"]++
+				return c.db.Links().To(ctx, us)
+			},
+			Settings: func() facttask.CandidateSettings { return c.s },
+		},
+		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool { return v == task.VerbMerge }},
+		RoleProp: func(r task.Role) string {
+			name, _ := bundledTasks.PropOf(r)
+			return name
+		},
 	})
 	return c
 }
@@ -80,7 +129,7 @@ func (c *candidateEnv) link(from unit.Unit, item string, to unit.Unit, kind link
 
 func (c *candidateEnv) list(ctx context.Context, id task.ID, fact string) []string {
 	c.t.Helper()
-	f, err := c.p.Facts(ctx, task.UnitOf(id))
+	f, err := c.p.Facts(workflow.WithReads(ctx, fact), task.UnitOf(id))
 	if err != nil {
 		c.t.Fatalf("facts of %s: %v", id, err)
 	}
@@ -216,5 +265,81 @@ func TestCandidatesLeaveARefusedPairOut(t *testing.T) {
 	}
 	if got, want := c.candidates("t-b"), []string{"t-c"}; !slices.Equal(got, want) {
 		t.Errorf("candidates of t-b %v, want %v without the refused t-a", got, want)
+	}
+}
+
+func TestACostlyFactIsReadOnlyForAReaderThatNamesIt(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	a := c.ask(chat("T1/C1/1.1"), "a1", uma, meP)
+	c.link(a.Unit, "a1", unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, link.Review)
+	c.open("t-a", a.Unit, monday, a)
+	c.open("t-b", chat("T1/C2/2.2"), monday, c.ask(chat("T1/C2/2.2"), "b1", uma, meP))
+	c.reject("t-b", "t-x", task.VerbMerge)
+	holds := catalog.Holds(func() *intentload.Loaded { return &intentload.Loaded{Tasks: bundledTasks} }, c.p.TaskFacts)
+	e, err := c.db.Tasks().Task(context.Background(), "t-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	clear(c.reads)
+	if ok, err := holds(context.Background(), wake.Wake{Task: "t-a", When: `task.state == "next"`}, e); err != nil || !ok {
+		t.Fatalf("the wake's when: %v %v", ok, err)
+	}
+	if c.reads["links"] != 0 || c.reads["gates where"] != 0 {
+		t.Fatalf("a wake reading task.state read %v, want no links and no gate query", c.reads)
+	}
+	f, err := c.p.Facts(context.Background(), task.UnitOf("t-a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"task.candidates", "task.refused_merges", "task.link_target_tasks"} {
+		if got, ok := f[name].([]string); !ok || got == nil || len(got) != 0 {
+			t.Errorf("%s read by no one = %#v, want the empty list", name, f[name])
+		}
+	}
+	if ok, err := holds(context.Background(), wake.Wake{Task: "t-a", When: `"t-b" in task.candidates`}, e); err != nil || !ok {
+		t.Fatalf("a wake naming task.candidates: %v %v, want it computed", ok, err)
+	}
+	ctx := workflow.WithReads(context.Background(), `{{index .task.candidates 0}}`)
+	if f, err := c.p.Facts(ctx, task.UnitOf("t-a")); err != nil || !slices.Equal(f["task.candidates"].([]string), []string{"t-b"}) {
+		t.Fatalf("a template naming task.candidates read %v %v", f["task.candidates"], err)
+	}
+}
+
+func TestCandidatesLeaveARelatedTaskOut(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	related, _ := bundledTasks.PropOf(task.RoleRelated)
+	for _, id := range []task.ID{"t-a", "t-b", "t-c"} {
+		u := chat("T1/C1/" + string(id))
+		c.open(id, u, monday, c.ask(u, "i1", uma, meP))
+	}
+	for id, other := range map[task.ID]string{"t-a": "t-b", "t-b": "t-a"} {
+		e, err := c.db.Tasks().Task(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.Props = task.Props{related: {List: []string{other}}}
+		c.task(e)
+	}
+	for id, want := range map[task.ID][]string{"t-a": {"t-c"}, "t-b": {"t-c"}} {
+		if got := c.candidates(id); !slices.Equal(got, want) {
+			t.Errorf("candidates of %s %v, want %v without the related task", id, got, want)
+		}
+	}
+}
+
+func TestOneSharedPersonWithAliasesWeighsBelowACitedUnit(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	vera := items.Person{Key: "chat:U7", Name: "Vera Sete", Aliases: []string{"email:vera@example.test", "gh:vera"}}
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
+	a := c.ask(chat("T1/C1/1.1"), "a1", vera, meP)
+	c.link(a.Unit, "a1", pr, link.Review)
+	c.open("t-a", a.Unit, monday, a)
+	c.open("t-vera", chat("T1/C2/2.2"), monday, c.ask(chat("T1/C2/2.2"), "b1", vera, meP))
+	c.open("t-pr", pr, monday.Add(-3*day))
+	if got, want := c.candidates("t-a"), []string{"t-pr", "t-vera"}; !slices.Equal(got, want) {
+		t.Errorf("candidates of t-a %v, want %v: one person counts once whatever their aliases", got, want)
 	}
 }

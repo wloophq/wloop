@@ -47,7 +47,7 @@ const (
 type pool struct {
 	tasks    []task.Task
 	at       map[task.ID]int
-	people   [][]string
+	people   [][][]string
 	byUnit   map[unit.Unit][]int
 	byPerson map[string][]int
 }
@@ -55,9 +55,9 @@ type pool struct {
 // graph is the links from and to the units of a pass's tasks.
 type graph struct{ from, to map[unit.Unit][]link.Link }
 
-// candidates is task.candidates of e, without refused: the open tasks that share with e a person their items
-// name, a unit their links target, or a unit one of them holds and the other's links target, created within
-// the window of e, the most shared first, then the closest in time, at most Cap.
+// candidates is task.candidates of e, without refused and the tasks related to e: the open tasks that share
+// with e a person their items name, a unit their links target, or a unit one of them holds and the other's
+// links target, created within the window of e, the most shared first, then the closest in time, at most Cap.
 func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string) ([]string, error) {
 	out := []string{}
 	if p.d.Candidates.Settings == nil {
@@ -67,6 +67,7 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 	if s.Cap <= 0 || !p.mergeable(e) {
 		return out, nil
 	}
+	refused = append(slices.Clone(refused), p.related(e)...)
 	pl, err := p.candidatePool(ctx, e, s.Window)
 	if err != nil {
 		return nil, err
@@ -81,8 +82,13 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 	if err != nil {
 		return nil, err
 	}
-	for _, k := range people {
-		add(pl.byPerson[k], weightPerson)
+	for _, keys := range people {
+		var is []int
+		for _, k := range keys {
+			is = append(is, pl.byPerson[k]...)
+		}
+		slices.Sort(is)
+		add(slices.Compact(is), weightPerson)
 	}
 	if p.d.Candidates.From != nil && p.d.Candidates.To != nil {
 		if err := p.linked(ctx, e, pl, add); err != nil {
@@ -230,21 +236,23 @@ func (p *Provider) newPool(ctx context.Context, es []task.Task) (pool, error) {
 		return pool{}, err
 	}
 	me := p.me()
-	pl.people = make([][]string, len(pl.tasks))
+	pl.people = make([][][]string, len(pl.tasks))
 	for i, o := range pl.tasks {
 		for _, u := range unitsOf(o) {
 			pl.byUnit[u] = append(pl.byUnit[u], i)
 		}
 		pl.people[i] = peopleOf(o, got, me)
-		for _, k := range pl.people[i] {
-			pl.byPerson[k] = append(pl.byPerson[k], i)
+		for _, keys := range pl.people[i] {
+			for _, k := range keys {
+				pl.byPerson[k] = append(pl.byPerson[k], i)
+			}
 		}
 	}
 	return pl, nil
 }
 
-// people are the keys of the people e's items name, as peopleOf says; pl's when it holds e as it is.
-func (p *Provider) people(ctx context.Context, e task.Task, pl pool) ([]string, error) {
+// people are the people e's items name, as peopleOf says; pl's when it holds e as it is.
+func (p *Provider) people(ctx context.Context, e task.Task, pl pool) ([][]string, error) {
 	if i, ok := pl.at[e.ID]; ok && pl.tasks[i].Updated.Equal(e.Updated) {
 		return pl.people[i], nil
 	}
@@ -255,19 +263,28 @@ func (p *Provider) people(ctx context.Context, e task.Task, pl pool) ([]string, 
 	return peopleOf(e, got, p.me()), nil
 }
 
-// peopleOf are the keys and aliases, each once, of the requesters, assignees and waited-on of e's heldItems;
-// never the user, a group or the loop.
-func peopleOf(e task.Task, got map[unit.Unit][]items.Item, me task.Me) []string {
-	var out []string
+// peopleOf are the people the requesters, assignees and waited-on of e's heldItems are, each as its keys and
+// aliases, a key or alias two of them share making them one; never the user, a group or the loop.
+func peopleOf(e task.Task, got map[unit.Unit][]items.Item, me task.Me) [][]string {
+	var out [][]string
 	addPerson := func(who items.Person) {
 		if who.Key == "" || who.Is(me) || strings.HasPrefix(who.Key, "group:") || strings.HasPrefix(who.Key, "system:") {
 			return
 		}
-		for _, k := range append([]string{who.Key}, who.Aliases...) {
-			if !slices.Contains(out, k) {
-				out = append(out, k)
-			}
+		keys := append([]string{who.Key}, who.Aliases...)
+		shares := func(g []string) bool {
+			return slices.ContainsFunc(g, func(k string) bool { return slices.Contains(keys, k) })
 		}
+		for i := 0; i < len(out); {
+			if !shares(out[i]) {
+				i++
+				continue
+			}
+			keys = append(keys, out[i]...)
+			out = slices.Delete(out, i, i+1)
+		}
+		slices.Sort(keys)
+		out = append(out, slices.Compact(keys))
 	}
 	for _, it := range heldItems(e, got) {
 		addPerson(it.Requester)
@@ -300,6 +317,18 @@ func heldItems(e task.Task, got map[unit.Unit][]items.Item) []items.Item {
 // nor a draft's or a message's.
 func (p *Provider) mergeable(e task.Task) bool {
 	return p.listed(e) && !e.IsProject() && e.Origin != task.OriginDraft && e.Origin != task.OriginMessage
+}
+
+// related are the ids e's property of role related lists.
+func (p *Provider) related(e task.Task) []string {
+	if p.d.RoleProp == nil {
+		return nil
+	}
+	name := p.d.RoleProp(task.RoleRelated)
+	if name == "" {
+		return nil
+	}
+	return e.Prop(name).List
 }
 
 func (p *Provider) me() task.Me {

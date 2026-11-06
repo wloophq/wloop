@@ -54,7 +54,7 @@ func (p *Provider) refusedMerges(ctx context.Context, e task.Task) ([]string, er
 		case err != nil:
 			return nil, err
 		}
-		if o.ID == e.ID || slices.Contains(out, string(o.ID)) {
+		if o.ID != other || slices.Contains(out, string(o.ID)) {
 			continue
 		}
 		moved, err := p.itemsMovedAfter(ctx, r.closed, e, o)

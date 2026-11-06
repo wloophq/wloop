@@ -38,9 +38,9 @@ func (p *meteredProposer) pass(context.Context) error {
 // heaviest runs items, whose steps read and write on their own.
 const (
 	sweepStatementsMedian = 105
-	sweepStatementsMax    = 860
+	sweepStatementsMax    = 800
 	sweepReadTxsMedian    = 5
-	sweepReadTxsMax       = 60
+	sweepReadTxsMax       = 55
 )
 
 func TestASweepOverTheReplayStaysWithinItsStoreBudget(t *testing.T) {

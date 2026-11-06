@@ -63,3 +63,24 @@ func TestRefusedMergesListsARejectedPairUntilEitherTaskChanges(t *testing.T) {
 		t.Fatalf("refused merges of the changed t-b %v, want none", got)
 	}
 }
+
+func TestARefusalOfATaskMergedAwayHoldsNeitherWay(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	for _, id := range []task.ID{"t-z", "t-y"} {
+		c.open(id, chat("T1/C1/"+string(id)), monday.Add(-time.Hour))
+	}
+	c.reject("t-z", "t-x", task.VerbMerge)
+	c.aliases["t-x"] = "t-y"
+	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_merges") }
+	if got := refused("t-z"); len(got) != 0 {
+		t.Errorf("refused merges of t-z %v, want none once t-x merged into t-y", got)
+	}
+	if got := refused("t-y"); len(got) != 0 {
+		t.Errorf("refused merges of t-y %v, want none", got)
+	}
+}
+
+func TestASplitPairIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
+	t.Skip("T4 split counts as refusal")
+}

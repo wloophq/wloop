@@ -112,7 +112,7 @@ func workflowTable(slot string) string {
 	fmt.Fprintf(&b, "| `%s` fact%s | Type | Meaning |\n|---|---|---|\n", slot, provider(slot))
 	for _, f := range builtin.Facts {
 		if f.Slot == slot {
-			fmt.Fprintf(&b, "| `%s` | %s | %s%s |\n", f.Name, f.Type, cell(f.Doc), untrusted(f))
+			fmt.Fprintf(&b, "| `%s` | %s | %s%s |\n", f.Name, f.Type, cell(f.Doc), untrusted(f)+costly(f))
 		}
 	}
 	return b.String()
@@ -125,6 +125,14 @@ func untrusted(f builtin.Fact) string {
 		return ""
 	}
 	return " **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it."
+}
+
+// costly marks a fact computed only for a reader that names it.
+func costly(f builtin.Fact) string {
+	if !f.Costly {
+		return ""
+	}
+	return " **On demand**: computed only for a `when`, step argument, view or wake that names it; any other reader sees it empty."
 }
 
 func approvalTable() string {
