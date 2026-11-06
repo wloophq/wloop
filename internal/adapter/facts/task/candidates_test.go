@@ -72,11 +72,24 @@ func (a aliasedTasks) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	return a.store.Task(ctx, id)
 }
 
+// unitsCounting counts each load of items by the units it loads.
+type unitsCounting struct {
+	facttask.Items
+	e *env
+}
+
+func (c unitsCounting) Load(ctx context.Context, us []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	for _, u := range us {
+		c.e.reads["items of "+u.String()]++
+	}
+	return c.Items.Load(ctx, us)
+}
+
 func newCandidateEnv(t *testing.T) *candidateEnv {
 	t.Helper()
 	c := &candidateEnv{env: newEnv(t), s: facttask.CandidateSettings{Window: 14 * day, Cap: 5}, aliases: map[task.ID]task.ID{}}
 	c.p = facttask.New(facttask.Deps{
-		Tasks: aliasedTasks{c.db.Tasks(), c.aliases}, Items: c.db.Items(), Clock: c.clock,
+		Tasks: aliasedTasks{c.db.Tasks(), c.aliases}, Items: unitsCounting{c.db.Items(), c.env}, Clock: c.clock,
 		Me:    func() task.Me { return task.Me{Keys: []string{meP.Key}} },
 		Gates: whereCounting{c.db.Gates(func() time.Time { return c.clock.now }), c.env},
 		Candidates: facttask.CandidateDeps{

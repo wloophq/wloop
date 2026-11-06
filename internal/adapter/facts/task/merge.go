@@ -41,17 +41,28 @@ func (p *Provider) costlyFacts(ctx context.Context, e task.Task, f workflow.Fact
 	once := func(name string, read func() ([]string, error)) ([]string, error) {
 		return coretasks.Once(ctx, passCostly+name+"."+fingerprint(e), read)
 	}
-	refused, err := once("task.refused_pairs", func() ([]string, error) { return p.refusedPairs(ctx, e) })
-	if err != nil {
-		return err
+	refused := func() ([]string, error) {
+		return once("task.refused_pairs", func() ([]string, error) { return p.refusedPairs(ctx, e) })
 	}
 	rank := func() (ranked, error) {
-		return coretasks.Once(ctx, passCostly+"candidates."+fingerprint(e), func() (ranked, error) { return p.candidates(ctx, e, refused) })
+		return coretasks.Once(ctx, passCostly+"candidates."+fingerprint(e), func() (ranked, error) {
+			r, err := refused()
+			if err != nil {
+				return ranked{}, err
+			}
+			return p.candidates(ctx, e, r)
+		})
 	}
 	reads := map[string]func() ([]string, error){
-		"task.refused_pairs":     func() ([]string, error) { return refused, nil },
-		"task.undone":            func() ([]string, error) { return p.undone(ctx, e) },
-		"task.link_target_tasks": func() ([]string, error) { return p.linkTargetTasks(ctx, e, refused) },
+		"task.refused_pairs": refused,
+		"task.undone":        func() ([]string, error) { return p.undone(ctx, e) },
+		"task.link_target_tasks": func() ([]string, error) {
+			r, err := refused()
+			if err != nil {
+				return nil, err
+			}
+			return p.linkTargetTasks(ctx, e, r)
+		},
 		"task.link_target_units": func() ([]string, error) { return p.linkTargetUnits(ctx, e) },
 		"task.candidates":        func() ([]string, error) { r, err := rank(); return r.all, err },
 		"task.linked_candidates": func() ([]string, error) { r, err := rank(); return r.linked, err },

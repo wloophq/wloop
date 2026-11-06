@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func gatesResolution(s gate.Status) gates.Resolution {
@@ -239,5 +240,25 @@ func TestAnUnrelatedPairIsRefusedUntilEitherTaskChangesAndUndoneForGood(t *testi
 	}
 	if got, want := c.list(context.Background(), "t-p", "task.undone"), []string{"t-q"}; !slices.Equal(got, want) {
 		t.Fatalf("undone of t-p once t-q changed %v, want %v", got, want)
+	}
+}
+
+func TestReadingUndoneAloneReadsNoItemsOfThePairsOtherTask(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	other := chat("T1/C1/t-b")
+	for id, u := range map[task.ID]unit.Unit{"t-a": chat("T1/C1/t-a"), "t-b": other} {
+		c.open(id, u, monday.Add(-time.Hour), c.ask(u, "i1", uma, meP))
+	}
+	c.reject("t-a", "t-b", task.VerbMerge)
+	if got, want := c.list(context.Background(), "t-a", "task.undone"), []string{"t-b"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-a %v, want %v", got, want)
+	}
+	if n := c.reads["items of "+other.String()]; n != 0 {
+		t.Fatalf("reading task.undone loaded t-b's items %d times, as task.refused_pairs's expiry does", n)
+	}
+	c.list(context.Background(), "t-a", "task.refused_pairs")
+	if n := c.reads["items of "+other.String()]; n == 0 {
+		t.Fatal("task.refused_pairs read none of t-b's items, so this test measures nothing")
 	}
 }
