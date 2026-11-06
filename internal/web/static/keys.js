@@ -20,9 +20,11 @@ const VERB_ASKS = {
 };
 
 // servedAsk is how the served verb named verb, among specs, asks for its
-// value: its input and its handler's args; null for a verb that asks none.
+// value: its input and its handler's args, or, for a verb that takes another
+// task, its input and the tasks it picks from; null for a verb that asks none.
 function servedAsk(verb, specs) {
   const spec = (specs || []).find((v) => v.verb === verb);
+  if (spec && spec.pick) return { label: spec.input || spec.label || verb, pick: spec.pick };
   const ask = spec && spec.input ? VERB_ASKS[spec.handler] : null;
   return ask ? { label: spec.input, args: ask.args } : null;
 }
@@ -124,6 +126,19 @@ function createKeys(env) {
 
   const say = (text, err) => env.notice && env.notice(text, err);
 
+  // match are the open tasks whose title holds q, as the daemon lists them.
+  async function match(q) {
+    try {
+      const res = await env.fetch(`/api/tasks?match=${encodeURIComponent(q)}`, { headers: { Accept: "application/json", "X-Loop-API": API_VERSION } });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.error) throw new Error(out.error || `HTTP ${res.status}`);
+      return out.tasks || [];
+    } catch (err) {
+      say(`Could not list the tasks: ${err.message}`, true);
+      return [];
+    }
+  }
+
   async function taskVerb(task, verb, args) {
     if (env.act) return env.act(verb, args, task);
     const body = { source: "cockpit" };
@@ -148,6 +163,10 @@ function createKeys(env) {
     }
     let args = {};
     const ask = servedAsk(name, env.verbSpecs ? env.verbSpecs() : []);
+    if (ask && ask.pick) {
+      await taskPicker({ task, ask, match, palette: env.palette, stateLabel: env.stateLabel, run: (id) => taskVerb(task, name, { [PICK_ARG]: id }) });
+      return true;
+    }
     if (ask) {
       const v = await env.ask({ label: ask.label });
       if (v === null || v === undefined) return true;
@@ -267,9 +286,12 @@ function createKeys(env) {
     const item = (b, label) => ({ label: label || b.help || b.action, key: b.key || "", run: () => run(b, {}) });
     const listBinding = (action, served) => bindings.find((b) => b.action === action && b.context === "list" && servedAction(b) === served);
     if (isTask(sel)) {
-      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || servedAsk(x.verb, env.verbSpecs ? env.verbSpecs() : [])))) {
+      const specs = env.verbSpecs ? env.verbSpecs() : [];
+      const offers = (ask) => !ask || !ask.pick || ask.pick === "open" || ({ merged: sel.merged_from, related: sel.related }[ask.pick] || []).length > 0;
+      for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb) && (listBinding(x.verb, false) || servedAsk(x.verb, specs)) && offers(servedAsk(x.verb, specs)))) {
         const b = listBinding(v.verb, false) || { key: "", action: v.verb, context: "list" };
-        items.push(item(b, b.help || v.verb));
+        const spec = specs.find((x) => x.verb === v.verb);
+        items.push(item(b, b.help || (spec && spec.label) || v.verb));
       }
     }
     for (const row of unitRows(sel)) {
@@ -502,6 +524,7 @@ function appEnv() {
     leave: (el) => el.blur(),
     ask: (o) => askInput(o),
     palette: (o) => showPalette(o),
+    stateLabel: (name) => stateLabel(name),
     help: (groups) => showHelp(groups),
     notice: (text, err) => setNotice(text, err),
     hint: (text) => setNotice(text),

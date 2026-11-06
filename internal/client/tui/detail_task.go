@@ -274,14 +274,17 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		state = append(state, "until "+w.When)
 	}
 	fact("state", strings.Join(state, " · "), plain)
+	related, _ := m.viewsCat.PropOf(string(dtask.RoleRelated))
+	merged, _ := m.viewsCat.PropOf(string(dtask.RoleMerged))
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
-		if text := propText(e, name, now); text != "" && name != star.Name {
+		if text := propText(e, name, now); text != "" && name != star.Name && name != related.Name && name != merged.Name {
 			fact(name, text, plain)
 		}
 	}
 	if e.Parent != "" {
 		fact("parent", e.Parent, plain)
 	}
+	m.refFacts(e, related.Name, merged.Name, fact)
 	if e.OwedBy != "" {
 		fact("owed by", e.OwedBy, plain)
 	}
@@ -480,6 +483,15 @@ func (m *Model) verbSend(verb string) string {
 	return ""
 }
 
+func (m *Model) verbSummary(verb string) string {
+	for _, v := range m.viewsCat.Verbs {
+		if v.Verb == verb {
+			return v.Summary
+		}
+	}
+	return ""
+}
+
 func (m *Model) verbLabel(verb string) string {
 	for _, v := range m.viewsCat.Verbs {
 		if v.Verb == verb {
@@ -498,4 +510,31 @@ func propText(e api.TaskView, name string, now time.Time) string {
 		return strings.Join(l, " ")
 	}
 	return e.PropText(name)
+}
+
+// refFacts are the tasks related to e and its merged-from trace, each under it the tasks merged into it
+// before, which come back with it.
+func (m *Model) refFacts(e api.TaskView, relatedName, mergedName string, fact func(label, text string, style func(string) string)) {
+	line := func(r api.TaskRef, depth int) string {
+		title, state := m.refShown(r)
+		return strings.Repeat("↳ ", depth) + oneLine(cmp.Or(title, r.ID)) + " · " + m.stateLabel(state)
+	}
+	label := relatedName
+	for _, r := range e.Related {
+		fact(label, line(r, 0), plain)
+		label = ""
+	}
+	var within func(rs []api.TaskRef, depth int)
+	within = func(rs []api.TaskRef, depth int) {
+		for _, r := range rs {
+			fact("", line(r, depth), m.t.Dim)
+			within(r.Within, depth+1)
+		}
+	}
+	label = mergedName
+	for _, r := range e.MergedFrom {
+		fact(label, line(r, 0), plain)
+		label = ""
+		within(r.Within, 1)
+	}
 }

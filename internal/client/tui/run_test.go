@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -75,6 +76,7 @@ type fakeDaemon struct {
 	doLag        time.Duration
 	captures     []string
 	taskReads    []string
+	matches      []string
 	keysFetched  int
 	catalogReads int
 	pluginReads  int
@@ -170,6 +172,24 @@ func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
 		}
 	}
 	return api.TaskView{}, errors.New("no task " + id)
+}
+
+// MatchTasks are the fake's tasks of every view whose title holds text, case and spaces around it aside,
+// each once.
+func (f *fakeDaemon) MatchTasks(_ context.Context, text string) ([]api.TaskView, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.matches = append(f.matches, text)
+	want := strings.ToLower(strings.TrimSpace(text))
+	var out []api.TaskView
+	for _, v := range slices.Sorted(maps.Keys(f.tasks)) {
+		for _, e := range f.tasks[v] {
+			if strings.Contains(strings.ToLower(e.Title), want) && !slices.ContainsFunc(out, func(o api.TaskView) bool { return o.ID == e.ID }) {
+				out = append(out, e)
+			}
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {

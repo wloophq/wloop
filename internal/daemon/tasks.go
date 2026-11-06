@@ -176,6 +176,10 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	if q.Has(api.TasksMatch) {
+		s.handleMatch(w, r, g, q.Get(api.TasksMatch))
+		return
+	}
 	view := task.View(q.Get("view"))
 	since, err := api.ParseSince(q.Get("since"))
 	if err != nil {

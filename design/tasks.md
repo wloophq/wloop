@@ -85,8 +85,12 @@ The task's detail is its page, in one column (the Inspector component):
 6. **Timeline** as a chat (TimelineRow), oldest first, narrowed by kind.
 7. **Composer**: Send to the task's agent (`primary`), Save as draft beside it.
 8. **Children**.
+9. **Related**: each related task with its state pill and the verb that takes the link off.
+10. **Merged from**: each task merged into this one with the verb that splits it back; a task merged into that one before reads under it, without one, as it comes back with it.
 
-Actions are placed by slot, never by name: verbs in the header, a gate's intents on its card, a run's actions on its card.
+Actions are placed by slot, never by name: verbs in the header, a gate's intents on its card, a run's actions on its card, a verb that picks from the merged or related tasks on each of their rows. A related or merged task shows as the client's own copy of it reads when it holds one, so a later page keeps its title and state fresh.
+
+A verb that takes another task (merge, relate) opens the palette, titled with the verb's input, over the open tasks but this one, each with its state; typing narrows them by title, through the daemon's match, so both clients list the same tasks.
 
 ## Keys
 
