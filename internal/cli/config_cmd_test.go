@@ -86,9 +86,9 @@ func TestConfigSetWritesTheValueKeepingTheFileAndABackup(t *testing.T) {
 			}},
 		{[]string{"plugins.slack.client_id", `"1234.5678"`}, acmeConfig + "\n[plugins.slack]\nclient_id = '1234.5678'\n", func(c config.Config) bool { return c.Slack.ClientID == "1234.5678" }},
 		{[]string{"plugins.slack.client_id", "12\nmcp.port = 2"}, acmeConfig + "\n[plugins.slack]\nclient_id = \"12\\nmcp.port = 2\"\n", func(c config.Config) bool { return c.Slack.ClientID == "12\nmcp.port = 2" }},
-		{[]string{"workflows.acme-sync.enabled", "false"}, acmeConfig + "\n[workflows.acme-sync]\nenabled = false\n",
+		{[]string{"workflows.task-check-on.enabled", "false"}, acmeConfig + "\n[workflows.task-check-on]\nenabled = false\n",
 			func(c config.Config) bool {
-				w, ok := c.Workflows["acme-sync"]
+				w, ok := c.Workflows["task-check-on"]
 				return ok && w.Enabled != nil && !*w.Enabled
 			}},
 	} {
@@ -199,7 +199,7 @@ func TestConfigUnsetFixesAFileThatDoesNotLoadWhereSetRefuses(t *testing.T) {
 	if code := te.run("config", "set", "sweep.slow", "2h"); code != 1 || readFile(t, te.ConfigPath) != broken {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if code := te.run("config", "unset", "sweep.fsat"); code != 0 || !strings.Contains(te.out.String(), "slwo") {
+	if code := te.run("config", "unset", "sweep.fsat"); code != 0 || !strings.Contains(te.out.String(), "slwo") || strings.Contains(te.out.String(), "default") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 	if code := te.run("config", "unset", "sweep.slwo"); code != 0 {
@@ -260,5 +260,41 @@ func TestConfigSetWritesANewFileReadableByItsOwner(t *testing.T) {
 	}
 	if fi, err := os.Stat(te.ConfigPath); err != nil || fi.Mode().Perm() != 0o644 {
 		t.Fatalf("mode %v, %v", fi.Mode(), err)
+	}
+}
+
+func TestConfigSetRefusesAWorkflowTheProfileDoesNotHave(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"workflows.task-corelate.enabled", "false"},
+		{"workflows.task-corelate.observe", "true"},
+	} {
+		t.Run(strings.Join(args, "="), func(t *testing.T) {
+			te := newTestEnv(t, &fake.Manager{})
+			writeFile(t, te.ConfigPath, acmeConfig)
+			code := te.run(append([]string{"config", "set"}, args...)...)
+			if msg := te.err.String(); code != 1 || !strings.Contains(msg, `"task-corelate"`) || !strings.Contains(msg, `did you mean "task-correlate"`) || !strings.Contains(msg, brand.Command+" doctor") {
+				t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+			}
+			if got := readFile(t, te.ConfigPath); got != acmeConfig || len(backups(t, te.ConfigPath)) != 0 {
+				t.Fatalf("the file changed:\n%s", got)
+			}
+		})
+	}
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("config", "set", "workflows.task-correlate.enabled", "false"); code != 0 {
+		t.Fatalf("a workflow the profile has: exit %d: %s%s", code, te.out, te.err)
+	}
+}
+
+func TestConfigUnsetRemovesAWorkflowTheProfileDoesNotHave(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeFile(t, te.ConfigPath, acmeConfig+"\n[workflows.task-corelate]\nenabled = false\n")
+	if code := te.run("config", "unset", "workflows.task-corelate.enabled"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if got := readFile(t, te.ConfigPath); strings.Contains(got, "enabled") || strings.Contains(te.out.String(), "default") {
+		t.Fatalf("got:\n%s", got)
 	}
 }

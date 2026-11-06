@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/backup"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 var configUsage = "usage: " + brand.Command + " config get <key>\n" +
@@ -24,11 +27,42 @@ func runConfig(e *Env, args []string) error {
 	case len(args) == 2 && args[0] == "get":
 		return runConfigGet(e, args[1])
 	case len(args) == 3 && args[0] == "set":
-		return runConfigEdit(e, args[1], func(d *config.Doc, path []string) error { return d.Put(path, config.ParseValue(args[2])) })
+		return runConfigEdit(e, args[1], func(d *config.Doc, path []string) error {
+			if err := e.knownWorkflow(path); err != nil {
+				return err
+			}
+			return d.Put(path, config.ParseValue(args[2]))
+		})
 	case len(args) == 2 && args[0] == "unset":
 		return runConfigEdit(e, args[1], (*config.Doc).Unset)
 	}
 	return errors.New(configUsage)
+}
+
+// knownWorkflow refuses a workflows.<name> key whose name is none of the loaded profile's workflows, which
+// no setting would read.
+func (e *Env) knownWorkflow(path []string) error {
+	if len(path) < 2 || path[0] != config.KeyOf("Workflows") {
+		return nil
+	}
+	l := e.loadedIntents()
+	var names []string
+	for _, w := range l.Workflows {
+		names = append(names, w.Name)
+	}
+	names = append(names, slices.Collect(maps.Keys(l.BrokenWorkflows))...)
+	if slices.Contains(names, path[1]) {
+		return nil
+	}
+	return fmt.Errorf("%s: the profile has no workflow %q%s; %s doctor lists its workflows",
+		config.Key(path...), path[1], expr.DidYouMean(path[1], names), brand.Command)
+}
+
+// readsNothing says whether path is one of the keys of the config file raw that no setting reads.
+func readsNothing(raw []byte, path []string) bool {
+	var unknown *config.UnknownKeysError
+	_, err := config.LoadBytes("", raw, Defaults())
+	return errors.As(err, &unknown) && slices.Contains(unknown.Keys, config.Key(path...))
 }
 
 // runConfigGet prints a key of the effective configuration, so skills read
@@ -122,6 +156,8 @@ func runConfigEdit(e *Env, key string, edit func(*config.Doc, []string) error) e
 	if v := d.Get(path...); v != nil {
 		enc, _ := frontmatter.Value(v)
 		fmt.Fprintf(e.Out, "Set %s = %s in %s.\n", key, enc, file)
+	} else if readsNothing(raw, path) || e.knownWorkflow(path) != nil {
+		fmt.Fprintf(e.Out, "Removed %s from %s.\n", key, file)
 	} else {
 		fmt.Fprintf(e.Out, "Removed %s from %s; its default applies.\n", key, file)
 	}
