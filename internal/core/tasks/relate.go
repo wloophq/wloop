@@ -75,7 +75,11 @@ func (s *Service) relation(ctx context.Context, e task.Task, req Request, link b
 	if s.beforeApply != nil {
 		s.beforeApply()
 	}
-	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
+	evs := s.verbEvents(e, req, now)
+	for i := range evs {
+		evs[i].Key = task.PairKey(o.ID, now)
+	}
+	if err := s.d.Store.Apply(ctx, cs, evs...); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: ne}, nil

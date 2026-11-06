@@ -93,6 +93,11 @@ func TestUnrelateTakesTheLinkOffBoth(t *testing.T) {
 	if r.store.Applies != applies+1 || len(r.store.Events) != events+1 {
 		t.Errorf("unrelate wrote %d applies and %d events, want both sides and its event in one", r.store.Applies-applies, len(r.store.Events)-events)
 	}
+	if ev := r.store.Events[len(r.store.Events)-1]; ev.Unit != task.UnitOf("t-2") {
+		t.Errorf("the unrelate's event %+v, want it on t-2", ev)
+	} else if other, ok := task.PairOfKey(ev.Key); !ok || other != "t-1" {
+		t.Errorf("the unrelate's event keys %q, want the other task t-1", ev.Key)
+	}
 	if res.Task.ID != "t-2" || len(res.Task.Prop("related").List) != 0 {
 		t.Errorf("the result %s related %v", res.Task.ID, res.Task.Prop("related").List)
 	}

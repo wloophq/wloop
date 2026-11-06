@@ -90,7 +90,8 @@ func newCandidateEnv(t *testing.T) *candidateEnv {
 			},
 			Settings: func() facttask.CandidateSettings { return c.s },
 		},
-		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool { return v == task.VerbMerge },
+		Refusals: facttask.RefusalDeps{Pairs: func(v task.Verb) bool { return v == task.VerbMerge || v == task.VerbRelate },
+			Unrelates: func() []string { return []string{string(task.VerbUnrelate)} },
 			Splits: func() []string { return []string{string(task.VerbSplit)} }, Events: c.db.EventsOfKinds},
 		RoleProp: func(r task.Role) string {
 			name, _ := bundledTasks.PropOf(r)
@@ -296,17 +297,17 @@ func TestACostlyFactIsReadOnlyForAReaderThatNamesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"task.candidates", "task.refused_merges", "task.link_target_tasks"} {
+	for _, name := range []string{"task.candidates", "task.refused_pairs", "task.link_target_tasks"} {
 		if got, ok := f[name].(workflow.Unrequested); !ok || got.Fact != name {
 			t.Errorf("%s read by no one = %#v, want it unrequested", name, f[name])
 		}
 	}
-	refusedNone, err := expr.CompileWorkflow(`size(task.refused_merges) == 0`, builtin.WorkflowEnv(builtin.TaskSlot))
+	refusedNone, err := expr.CompileWorkflow(`size(task.refused_pairs) == 0`, builtin.WorkflowEnv(builtin.TaskSlot))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := refusedNone.Match(workflow.Vars{Facts: f}); err == nil || !strings.Contains(err.Error(), "task.refused_merges is computed only for a reader that names it") {
-		t.Fatalf("a predicate on task.refused_merges over facts read without naming it: %v %v, want an error naming it", ok, err)
+	if ok, err := refusedNone.Match(workflow.Vars{Facts: f}); err == nil || !strings.Contains(err.Error(), "task.refused_pairs is computed only for a reader that names it") {
+		t.Fatalf("a predicate on task.refused_pairs over facts read without naming it: %v %v, want an error naming it", ok, err)
 	}
 	if ok, err := holds(context.Background(), wake.Wake{Task: "t-a", When: `"t-b" in task.candidates`}, e); err != nil || !ok {
 		t.Fatalf("a wake naming task.candidates: %v %v, want it computed", ok, err)

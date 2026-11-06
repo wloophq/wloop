@@ -101,7 +101,7 @@ type Deps struct {
 	// RoleProp is the property role r acts on, "" for none; nil: none.
 	RoleProp func(r task.Role) string
 	// Clarity, Candidates and Refusals are what task.clarified, task.candidates and task.link_target_tasks,
-	// and task.refused_merges read.
+	// and task.refused_pairs and task.undone read.
 	Clarity    ClarityDeps
 	Candidates CandidateDeps
 	Refusals   RefusalDeps

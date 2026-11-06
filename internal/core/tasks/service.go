@@ -546,7 +546,11 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 		return Result{}, fmt.Errorf("%w: %s opens a gate, and no gates are served", ErrVerb, req.Verb)
 	}
 	g, _ := s.d.States.Gate(string(req.Verb))
-	subject, err := json.Marshal(proposal{Verb: req.Verb, Args: req.Args})
+	p := proposal{Verb: req.Verb, Args: req.Args}
+	if req.Actor == task.ActorWorkflow {
+		p.From = req.Source
+	}
+	subject, err := json.Marshal(p)
 	if err != nil {
 		return Result{}, err
 	}
@@ -555,7 +559,7 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 	if err != nil {
 		return Result{}, err
 	}
-	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && o.Subject == g.Subject }) {
+	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && sameProposal(o, p) }) {
 		return Result{Task: e}, nil
 	}
 	if other := task.ID(req.Args[task.ArgTask]); other != "" {
@@ -622,20 +626,47 @@ func proposes(g gate.Gate, verb task.Verb, id task.ID) bool {
 	return ok && p.Verb == verb && p.Args[task.ArgTask] == string(id)
 }
 
-// proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it.
+// sameProposal says whether gate g proposes p's verb with p's arguments, whoever asked for it.
+func sameProposal(g gate.Gate, p proposal) bool {
+	o, ok := proposalOf(g)
+	return ok && o.Verb == p.Verb && maps.Equal(o.Args, p.Args)
+}
+
+// proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it, and the workflow that
+// asked for it, "" for a person or an agent.
 type proposal struct {
 	Verb task.Verb         `json:"verb"`
 	Args map[string]string `json:"args,omitempty"`
+	From string            `json:"from,omitempty"`
 }
 
-// ProposedVerb is the request a gate a gated verb opened proposes, run as the person who approved it: Do runs
-// it once the gate is approved, without the verb's by; false for a gate no verb opened.
-func ProposedVerb(g gate.Gate) (Request, bool) {
+func proposalOf(g gate.Gate) (proposal, bool) {
 	var p proposal
 	if json.Unmarshal([]byte(g.Subject), &p) != nil || p.Verb == "" {
+		return proposal{}, false
+	}
+	return p, true
+}
+
+// ProposedVerb is the request a gate a gated verb opened proposes: Do runs it once the gate is approved,
+// without the verb's by, as the person who approved it, or as the workflow that asked for it when a rule
+// or a window released the gate; false for a gate no verb opened.
+func ProposedVerb(g gate.Gate) (Request, bool) {
+	p, ok := proposalOf(g)
+	if !ok {
 		return Request{}, false
 	}
+	if g.Rule != "" && p.From != "" {
+		return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorWorkflow, Source: p.From, Approved: g.ID}, true
+	}
 	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate", Approved: g.ID}, true
+}
+
+// ProposalFrom is the workflow that asked for the verb gate g proposes, "" when a person or an agent did or
+// no verb opened g.
+func ProposalFrom(g gate.Gate) string {
+	p, _ := proposalOf(g)
+	return p.From
 }
 
 // writable refuses a task with a unit whose plugin is disabled; ok caches the answers per unit.

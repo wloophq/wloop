@@ -38,9 +38,9 @@ func TestRefusedMergesListsARejectedPairUntilEitherTaskChanges(t *testing.T) {
 	c.reject("t-e", "t-a", task.VerbMerge)
 	c.resolve("t-a", "t-c", task.VerbMerge, gate.Approved)
 	c.reject("t-a", "t-d", task.VerbRelate)
-	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_merges") }
-	if got, want := refused("t-a"), []string{"t-b", "t-e"}; !slices.Equal(got, want) {
-		t.Fatalf("refused merges of t-a %v, want %v", got, want)
+	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_pairs") }
+	if got, want := refused("t-a"), []string{"t-b", "t-d", "t-e"}; !slices.Equal(got, want) {
+		t.Fatalf("refused pairs of t-a %v, want %v: a rejected relation counts as a rejected merge does", got, want)
 	}
 	if got, want := refused("t-b"), []string{"t-a"}; !slices.Equal(got, want) {
 		t.Fatalf("refused merges of t-b %v, want %v", got, want)
@@ -60,8 +60,11 @@ func TestRefusedMergesListsARejectedPairUntilEitherTaskChanges(t *testing.T) {
 	if err := c.db.Items().Commit(context.Background(), coreitems.Commit{Items: []items.Item{it}}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := refused("t-a"), []string{"t-e"}; !slices.Equal(got, want) {
-		t.Fatalf("refused merges of t-a once t-b's item changed %v, want %v", got, want)
+	if got, want := refused("t-a"), []string{"t-d", "t-e"}; !slices.Equal(got, want) {
+		t.Fatalf("refused pairs of t-a once t-b's item changed %v, want %v", got, want)
+	}
+	if got, want := c.list(context.Background(), "t-a", "task.undone"), []string{"t-b", "t-d", "t-e"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-a once t-b's item changed %v, want %v: what you took apart stays undone", got, want)
 	}
 	if got := refused("t-b"); len(got) != 0 {
 		t.Fatalf("refused merges of the changed t-b %v, want none", got)
@@ -76,7 +79,7 @@ func TestARefusalOfATaskMergedAwayHoldsNeitherWay(t *testing.T) {
 	}
 	c.reject("t-z", "t-x", task.VerbMerge)
 	c.aliases["t-x"] = "t-y"
-	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_merges") }
+	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_pairs") }
 	if got := refused("t-z"); len(got) != 0 {
 		t.Errorf("refused merges of t-z %v, want none once t-x merged into t-y", got)
 	}
@@ -124,7 +127,7 @@ func TestASplitPairIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
 	c.merged("t-x", "t-y", monday.Add(time.Hour))
 	c.merged("t-w", "t-y", monday.Add(time.Hour+time.Minute))
 	c.split("t-x", "t-y", monday.Add(2*time.Hour))
-	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_merges") }
+	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_pairs") }
 	if got, want := refused("t-x"), []string{"t-y"}; !slices.Equal(got, want) {
 		t.Fatalf("refused merges of the split t-x %v, want %v", got, want)
 	}
@@ -148,5 +151,40 @@ func TestASplitPairIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
 	}
 	if got := refused("t-x"); len(got) != 0 {
 		t.Fatalf("refused merges of t-x once its item changed %v, want none", got)
+	}
+}
+
+// unrelated records, as an unrelate does, the verb_unrelate event of a's unit keying b at.
+func (c *candidateEnv) unrelated(a, b task.ID, at time.Time) {
+	c.t.Helper()
+	c.events(port.Event{Unit: task.UnitOf(a), Kind: task.VerbEventKind(task.VerbUnrelate), Key: task.PairKey(b, at), Actor: "person:cockpit", At: at})
+}
+
+func TestAnUnrelatedPairIsRefusedUntilEitherTaskChangesAndUndoneForGood(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	held := map[task.ID]items.Item{}
+	for _, id := range []task.ID{"t-p", "t-q"} {
+		u := chat("T1/C1/" + string(id))
+		held[id] = c.ask(u, "i1", uma, meP)
+		c.open(id, u, monday.Add(-time.Hour), held[id])
+	}
+	c.unrelated("t-p", "t-q", monday.Add(10*time.Minute))
+	for _, fact := range []string{"task.refused_pairs", "task.undone"} {
+		if got, want := c.list(context.Background(), "t-q", fact), []string{"t-p"}; !slices.Equal(got, want) {
+			t.Fatalf("%s of t-q %v, want %v", fact, got, want)
+		}
+	}
+	c.clock.now = monday.Add(time.Hour)
+	it := held["t-q"]
+	it.Summary, it.UpdatedAt = "s i1, moved", c.clock.now
+	if err := c.db.Items().Commit(context.Background(), coreitems.Commit{Items: []items.Item{it}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.list(context.Background(), "t-p", "task.refused_pairs"); len(got) != 0 {
+		t.Fatalf("refused pairs of t-p once t-q changed %v, want none", got)
+	}
+	if got, want := c.list(context.Background(), "t-p", "task.undone"), []string{"t-q"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-p once t-q changed %v, want %v", got, want)
 	}
 }
