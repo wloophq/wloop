@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["same_as", "reason"],
+  "properties": {
+    "same_as": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "The id of the one candidate task that is the same piece of work as this task; empty when none is."
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One sentence on why, naming what the two have in common or what sets them apart."
+    }
+  }
+}

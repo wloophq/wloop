@@ -1,0 +1,12 @@
+summary = "Judge whether a new or newly linked task is the same work as one of its candidate tasks"
+provider = "task"
+when = 'size(task.candidates) > 0'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["task_created", "task_linked"]
+
+[[step]]
+use = "classify"
+with = "task.candidates"
+prompt = "prompt.md.tmpl"
