@@ -32,12 +32,31 @@ type CandidateSettings struct {
 	Cap int
 }
 
-// The weight of each signal two tasks share in a candidate's rank.
+// signal is what two tasks share that makes one the other's candidate.
+type signal int
+
 const (
-	weightCited  = 3
-	weightTarget = 2
-	weightPerson = 1
+	// sharedPerson is a person both tasks' items name.
+	sharedPerson signal = iota
+	// citedUnit is a unit one task holds and the other's links target.
+	citedUnit
+	// sharedTarget is a unit both tasks' links target.
+	sharedTarget
 )
+
+// weight is s's weight in a candidate's rank.
+func (s signal) weight() int {
+	switch s {
+	case citedUnit:
+		return 3
+	case sharedTarget:
+		return 2
+	}
+	return 1
+}
+
+// links says whether s ties the two tasks by a link, which lists a candidate in task.linked_candidates.
+func (s signal) links() bool { return s == citedUnit || s == sharedTarget }
 
 const (
 	passCandidates = "facts.candidates"
@@ -83,10 +102,10 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 		return out, err
 	}
 	score, linkedBy := make([]int, len(pl.tasks)), make([]bool, len(pl.tasks))
-	add := func(is []int, w int) {
+	add := func(is []int, sig signal) {
 		for _, i := range is {
-			score[i] += w
-			linkedBy[i] = linkedBy[i] || w != weightPerson
+			score[i] += sig.weight()
+			linkedBy[i] = linkedBy[i] || sig.links()
 		}
 	}
 	people, err := p.people(ctx, e, pl)
@@ -99,7 +118,7 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 			is = append(is, pl.byPerson[k]...)
 		}
 		slices.Sort(is)
-		add(slices.Compact(is), weightPerson)
+		add(slices.Compact(is), sharedPerson)
 	}
 	if p.d.Candidates.From != nil && p.d.Candidates.To != nil {
 		if err := p.linked(ctx, e, pl, add); err != nil {
@@ -134,7 +153,7 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 
 // linked adds to the tasks of pl the weight of the links e shares with them: a unit e's links target that a task
 // holds or also links, and a unit of e another task's links target.
-func (p *Provider) linked(ctx context.Context, e task.Task, pl pool, add func([]int, int)) error {
+func (p *Provider) linked(ctx context.Context, e task.Task, pl pool, add func([]int, signal)) error {
 	own := unitsOf(e)
 	var targets []unit.Unit
 	err := p.eachLink(ctx, own, true, func(l link.Link) {
@@ -146,7 +165,7 @@ func (p *Provider) linked(ctx context.Context, e task.Task, pl pool, add func([]
 		return err
 	}
 	for _, t := range targets {
-		add(pl.byUnit[t], weightCited)
+		add(pl.byUnit[t], citedUnit)
 	}
 	seen := map[[2]unit.Unit]bool{}
 	return p.eachLink(ctx, append(slices.Clone(targets), own...), false, func(l link.Link) {
@@ -155,9 +174,9 @@ func (p *Provider) linked(ctx context.Context, e task.Task, pl pool, add func([]
 		}
 		seen[[2]unit.Unit{l.From, l.To}] = true
 		if slices.Contains(own, l.To) {
-			add(pl.byUnit[l.From], weightCited)
+			add(pl.byUnit[l.From], citedUnit)
 		} else {
-			add(pl.byUnit[l.From], weightTarget)
+			add(pl.byUnit[l.From], sharedTarget)
 		}
 	})
 }
