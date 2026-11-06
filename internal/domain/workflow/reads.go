@@ -25,6 +25,11 @@ func WithReads(ctx context.Context, names ...string) context.Context {
 	return context.WithValue(ctx, readsKey{}, slices.Concat(ReadsOf(ctx), names))
 }
 
+// OnlyReads is ctx carrying names in place of the reads it carries.
+func OnlyReads(ctx context.Context, names ...string) context.Context {
+	return context.WithValue(ctx, readsKey{}, slices.Clone(names))
+}
+
 // ReadsOf are the reads ctx carries.
 func ReadsOf(ctx context.Context) []string {
 	names, _ := ctx.Value(readsKey{}).([]string)

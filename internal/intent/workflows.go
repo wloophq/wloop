@@ -145,13 +145,14 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 		}
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
+	classify := classifyEnvs(units)
 	for _, u := range units {
-		u.load(turnProblem, extras, tasks, gates)
+		u.load(turnProblem, extras, classify, tasks, gates)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(turnProblem, extras, tasks, gates)
+			u.load(turnProblem, extras, classify, tasks, gates)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -217,9 +218,10 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env,
+	classify map[dunit.ProviderID]expr.Env, tasks TasksDef, gates GatesDef) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file, extras: extras, tasks: tasks, gates: gates}
+	s := &sheet{file: file, extras: extras, classify: classify, tasks: tasks, gates: gates}
 	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
@@ -537,6 +539,9 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepGateOpen {
 			s.gateOpen(p, st.Args)
 		}
+		if use == builtin.StepClassify {
+			s.classifyWith(p, st.Args, w)
+		}
 		args := maps.Clone(raw)
 		delete(args, "use")
 		ps := builtin.CheckStep(use, args)
@@ -600,6 +605,25 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 				}
 			}
 		}
+	}
+}
+
+// classifyWith checks that classify's with names a list fact of the workflow's units.
+func (s *sheet) classifyWith(p string, args map[string]any, w *workflow.Workflow) {
+	with, _ := args["with"].(string)
+	if with == "" || w.Slot == "" {
+		return
+	}
+	env := s.withExtras(builtin.WorkflowEnv(w.Slot), w.Provider, w.Slot)
+	if env[with] != expr.List {
+		var lists []string
+		for name, t := range env {
+			if t == expr.List {
+				lists = append(lists, name)
+			}
+		}
+		slices.Sort(lists)
+		s.add(p+".with", "%s is not a list fact of %s%s", with, w.Provider, expr.DidYouMean(with, lists))
 	}
 }
 
@@ -747,10 +771,11 @@ func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
 // answers to, which Go validates the answer against.
 const schemaArg = "schema"
 
-// withExtras is env with the task.prop.* facts of tasks.toml in the task
-// slot, and the brief.extra.* facts of p's brief intent when slot's units
-// have a brief.
+// withExtras is env with the classify outputs of p's workflows, the
+// task.prop.* facts of tasks.toml in the task slot, and the brief.extra.*
+// facts of p's brief intent when slot's units have a brief.
 func (s *sheet) withExtras(env expr.Env, p dunit.ProviderID, slot string) expr.Env {
+	maps.Copy(env, s.classify[p])
 	if slot == builtin.TaskSlot {
 		maps.Copy(env, s.tasks.Facts())
 	}
