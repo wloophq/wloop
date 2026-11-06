@@ -185,6 +185,10 @@ func newEnv(t *testing.T) *env {
 			name, _ := bundledTasks.PropOf(r)
 			return name
 		},
+		Clarity: facttask.ClarityDeps{Shaping: bundledTasks.ShapingVerbs, ByHand: func(ctx context.Context, kinds []string, ids ...task.ID) (map[task.ID]bool, error) {
+			e.reads["by hand"]++
+			return db.TasksRunByHand(ctx, kinds, ids...)
+		}},
 	})
 	return e
 }

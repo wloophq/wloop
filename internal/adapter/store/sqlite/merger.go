@@ -396,3 +396,34 @@ func putWake(ctx context.Context, tx *Tx, w wake.Wake) error {
 		string(w.Task), eventTime(w.Until), string(on), string(actors), w.When, eventTime(w.Expires), w.Return)
 	return err
 }
+
+// TasksRunByHand are, of ids, or of every task when ids is empty, the tasks on whose own unit an event of one of
+// kinds was recorded by a person or an agent.
+func (db *DB) TasksRunByHand(ctx context.Context, kinds []string, ids ...task.ID) (map[task.ID]bool, error) {
+	out := map[task.ID]bool{}
+	if len(kinds) == 0 {
+		return out, nil
+	}
+	q := `SELECT DISTINCT unit_key FROM events WHERE provider = ? AND kind IN (?` + strings.Repeat(`, ?`, len(kinds)-1) +
+		`) AND (actor LIKE ? OR actor LIKE ?)`
+	args := []any{string(task.UnitOf("").Provider)}
+	for _, k := range kinds {
+		args = append(args, k)
+	}
+	args = append(args, string(task.ActorPerson)+":%", string(task.ActorAgent)+":%")
+	if len(ids) > 0 {
+		q += ` AND unit_key IN (?` + strings.Repeat(`, ?`, len(ids)-1) + `)`
+		for _, id := range ids {
+			args = append(args, string(id))
+		}
+	}
+	err := eachRow(ctx, db.R(), q, args, func(r *sql.Rows) error {
+		var id string
+		if err := r.Scan(&id); err != nil {
+			return err
+		}
+		out[task.ID(id)] = true
+		return nil
+	})
+	return out, err
+}
