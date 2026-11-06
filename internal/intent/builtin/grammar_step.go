@@ -38,6 +38,7 @@ var stepGrammar = []Key{
 	stepKey(StepTaskVerb, "set", KindText, "", "With a verb whose handler is context, the contexts, comma-separated; with area, the area."),
 	stepKey(StepTaskVerb, "by", KindText, "", "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it."),
 	stepKey(StepTaskVerb, "task", KindText, "", "With a verb whose handler is merge, split, relate or unrelate, the fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks, or a classify output, such as classify.<workflow>.task, which no fact table declares before it runs; the step is refused while it names none."),
+	stepKey(StepTaskVerb, "each", KindText, "", "With `task` naming a list fact, `true` runs the verb with every task the list names, in order, each opening its own gate where the verb is gated, so one that waits for you does not hold back the rest; else the verb runs with the first."),
 
 	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
 

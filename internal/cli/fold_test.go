@@ -816,3 +816,66 @@ func TestAMergeARuleReleasedKeepsTheChainThatAskedForIt(t *testing.T) {
 		}
 	}
 }
+
+func TestAPullRequestYouUnrelatedWaitsWithoutHoldingBackTheAsksOthers(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newFoldRig(t)
+	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
+	r.open(t, "t-pr8", "Review acme/api#8", foldPR8, testNow.Add(-47*time.Hour))
+	r.open(t, "t-pr9", "Review acme/api#9", foldPR9, testNow.Add(-46*time.Hour))
+	r.ops(t, askOp("i1", "Review three PRs: acme/api#7, #8 and #9"), linkOpTo("i1", foldPR), linkOpTo("i1", foldPR8), linkOpTo("i1", foldPR9))
+	r.derived(t, "i1")
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(r.ask), Kind: task.VerbEventKind(task.VerbUnrelate),
+		Key: task.PairKey("t-pr", r.now), Actor: "person:cockpit", At: r.now}); err != nil {
+		t.Fatal(err)
+	}
+	r.touch(t, "Review three PRs: acme/api#7, #8 and #9 by Monday")
+	r.settled(t, 4)
+	got := r.relatedOf(t, r.ask)
+	if slices.Contains(got, "t-pr") || !slices.Contains(got, "t-pr8") || !slices.Contains(got, "t-pr9") {
+		t.Fatalf("the ask relates %v, want t-pr8 and t-pr9, and t-pr you unrelated waiting for you", got)
+	}
+	gs, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, r.ask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(gs, func(g gate.Gate) bool {
+		p, ok := coretasks.ProposedVerb(g)
+		return ok && p.Verb == task.VerbRelate && p.Args[task.ArgTask] == "t-pr" && g.Status == gate.Open
+	}) {
+		t.Fatalf("no relate gate with t-pr waits for you: %+v", gs)
+	}
+}
+
+func TestARelationProposedWithATaskThatEndsIsMoot(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := askedRig(t, true)
+	r.te.cfg.Workflows["task-correlate-relate"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.kind == "proposal"`, Mode: "wait"}}}}}
+	if _, err := r.tasks.Do(ctx, r.ask, coretasks.Request{Verb: task.VerbRelate, Args: map[string]string{task.ArgTask: "t-pr"}, Actor: task.ActorWorkflow, Source: "task-correlate-relate"}); err != nil {
+		t.Fatal(err)
+	}
+	relate := func() gate.Gate {
+		gs, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, r.ask)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gs {
+			if p, ok := coretasks.ProposedVerb(g); ok && p.Verb == task.VerbRelate {
+				return g
+			}
+		}
+		t.Fatalf("no relate gate: %+v", gs)
+		return gate.Gate{}
+	}
+	if g := relate(); g.Status != gate.Open {
+		t.Fatalf("the relate gate %+v, want it waiting for you", g)
+	}
+	if _, err := r.tasks.Do(ctx, "t-pr", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	if g := relate(); g.Status != gate.Superseded {
+		t.Fatalf("the relate gate once t-pr ended %+v, want it superseded as moot", g)
+	}
+}

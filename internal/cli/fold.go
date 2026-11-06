@@ -25,21 +25,21 @@ func verbsHandledBy(loaded func() *intentload.Loaded, handler string) func() []s
 	}
 }
 
-// mootMerges supersedes, as moot, the open gates proposing a merge of task id, which ended: a merge takes two
-// open tasks.
+// mootMerges supersedes, as moot, the open gates proposing a merge or a relation of task id, which ended: both
+// pair two open tasks.
 func (e *Env) mootMerges(ctx context.Context, g *gates.Service, id task.ID) {
 	acting, err := g.ActingFor(ctx, id)
 	if err != nil {
-		e.warnf("merge proposals of ended task %s: %v", id, err)
+		e.warnf("merge and relate proposals of ended task %s: %v", id, err)
 		return
 	}
 	for _, o := range acting {
 		p, ok := coretasks.ProposedVerb(o)
-		if !ok || e.loadedIntents().Tasks.Handler(string(p.Verb)) != coretasks.HandlerMerge {
+		if h := e.loadedIntents().Tasks.Handler(string(p.Verb)); !ok || h != coretasks.HandlerMerge && h != coretasks.HandlerRelate {
 			continue
 		}
 		if err := g.Supersede(ctx, o.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
-			e.warnf("merge proposal %d of ended task %s: %v", o.ID, id, err)
+			e.warnf("proposal %d of ended task %s: %v", o.ID, id, err)
 		}
 	}
 }

@@ -1290,6 +1290,7 @@ workflow/task-relate-linked.Trigger.Kind = "sweep"
 workflow/task-relate-linked.When = "size(task.link_target_tasks) > 0 && !(!(\"pull-request\" in task.unit_kinds) && size(task.link_target_units) == 1 && size(task.link_target_tasks) == 1)"
 workflow/task-relate-linked.Steps[0].Use = "task.verb"
 workflow/task-relate-linked.Steps[0].Reach = "local"
+workflow/task-relate-linked.Steps[0].Args[each] = "true"
 workflow/task-relate-linked.Steps[0].Args[task] = "task.link_target_tasks"
 workflow/task-relate-linked.Steps[0].Args[verb] = "relate"
 workflow/task-relate-linked.Order = 61

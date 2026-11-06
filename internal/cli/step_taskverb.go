@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -50,7 +52,7 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 	if e.Origin == task.OriginDerived && len(e.Items) > 0 && s.closes(v) {
 		return "a derived task closes when its items resolve", nil
 	}
-	if _, refusal, err := s.otherTask(ctx, c); err != nil || refusal != "" {
+	if _, refusal, err := s.otherTasks(ctx, c); err != nil || refusal != "" {
 		return refusal, err
 	}
 	if g.Handles(e, v) {
@@ -77,31 +79,46 @@ func (s *stepSet) taskVerbRun(ctx context.Context, c stepCall, _ automation.RunO
 	v := task.Verb(c.arg("verb"))
 	args := map[string]string{}
 	for _, k := range builtin.StepArgs(builtin.StepTaskVerb) {
-		if a := c.arg(k); a != "" && k != "verb" {
+		if a := c.arg(k); a != "" && k != "verb" && k != argEach {
 			args[k] = a
 		}
 	}
-	other, refusal, err := s.otherTask(ctx, c)
+	others, refusal, err := s.otherTasks(ctx, c)
 	switch {
 	case err != nil:
 		return "", err
 	case refusal != "":
 		return "", automation.Refused{Reason: refusal}
-	case other != "":
-		args[task.ArgTask] = string(other)
+	case len(others) == 0:
+		others = []task.ID{""}
 	}
 	var chain workflow.Chain
 	if ev := c.why.Event; ev != nil {
 		chain = ev.Chain
 	}
-	req := coretasks.Request{Verb: v, Args: args, Source: c.why.Workflow, Actor: task.ActorWorkflow, Chain: chain.Then(c.why.Workflow)}
-	if _, err := g.Do(ctx, id, req); err != nil {
-		if r := taskRefusal(err); r != "" {
-			return "", automation.Refused{Reason: r}
+	var ran, refused []string
+	for _, other := range others {
+		a := maps.Clone(args)
+		if other != "" {
+			a[task.ArgTask] = string(other)
 		}
-		return "", err
+		req := coretasks.Request{Verb: v, Args: a, Source: c.why.Workflow, Actor: task.ActorWorkflow, Chain: chain.Then(c.why.Workflow)}
+		if _, err := g.Do(ctx, id, req); err != nil {
+			if r := taskRefusal(err); r != "" {
+				refused = append(refused, r)
+				continue
+			}
+			return "", err
+		}
+		ran = append(ran, string(other))
 	}
-	return fmt.Sprintf("ran %s on %s", v, id), nil
+	if len(ran) == 0 {
+		return "", automation.Refused{Reason: strings.Join(refused, "; ")}
+	}
+	if len(others) == 1 && others[0] == "" {
+		return fmt.Sprintf("ran %s on %s", v, id), nil
+	}
+	return fmt.Sprintf("ran %s on %s with %s", v, id, strings.Join(ran, ", ")), nil
 }
 
 // closes says whether verb moves a task into the done or the dropped category, as the profile says.
@@ -112,33 +129,42 @@ func (s *stepSet) closes(v task.Verb) bool {
 	return ok && (c == task.CategoryDone || c == task.CategoryDropped)
 }
 
-// otherTask is the task c's task argument names, for a verb whose handler takes one: the id the fact it names
-// holds, or the first of a list fact's; refusal says why it names none.
-func (s *stepSet) otherTask(ctx context.Context, c stepCall) (id task.ID, refusal string, err error) {
+// argEach is the task.verb argument that runs the verb with every task a list fact names.
+const argEach = "each"
+
+// otherTasks are the tasks c's task argument names, for a verb whose handler takes one: the id the fact it
+// names holds, or the first of a list fact's, every one of them with each; refusal says why it names none.
+func (s *stepSet) otherTasks(ctx context.Context, c stepCall) (ids []task.ID, refusal string, err error) {
 	name := c.arg(task.ArgTask)
 	handler := s.e.loadedIntents().Tasks.Handler(c.arg("verb"))
 	if name == "" || !slices.Contains(builtin.HandlerArgs[handler], task.ArgTask) {
-		return "", "", nil
+		return nil, "", nil
 	}
 	f, err := s.facts(workflow.WithReads(ctx, name), c.u)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	switch v := f[name].(type) {
 	case string:
-		id = task.ID(v)
+		if v != "" {
+			ids = append(ids, task.ID(v))
+		}
 	case []string:
-		if len(v) > 0 {
-			id = task.ID(v[0])
+		for _, id := range v {
+			ids = append(ids, task.ID(id))
 		}
 	case []any:
-		if len(v) > 0 {
-			first, _ := v[0].(string)
-			id = task.ID(first)
+		for _, x := range v {
+			if id, _ := x.(string); id != "" {
+				ids = append(ids, task.ID(id))
+			}
 		}
 	}
-	if id == "" {
-		return "", fmt.Sprintf("%s names no task", name), nil
+	if len(ids) == 0 {
+		return nil, fmt.Sprintf("%s names no task", name), nil
 	}
-	return id, "", nil
+	if c.arg(argEach) != "true" {
+		ids = ids[:1]
+	}
+	return ids, "", nil
 }

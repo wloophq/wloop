@@ -654,9 +654,12 @@ func (s *sheet) taskVerb(p string, args map[string]any) {
 	}
 	takes := builtin.HandlerArgs[v.Handler]
 	for _, k := range slices.Sorted(maps.Keys(args)) {
-		if k != "verb" && !slices.Contains(takes, k) {
+		if k != "verb" && !slices.Contains(takes, k) && (k != "each" || !slices.Contains(takes, task.ArgTask)) {
 			s.add(p+"."+k, "is not an argument of %s", verb)
 		}
+	}
+	if each, ok := args["each"]; ok && each != "true" && each != "false" {
+		s.add(p+".each", "is %q, want \"true\" or \"false\"", each)
 	}
 	if slices.Contains(takes, "on_activity") && args["until"] == nil && args["on_activity"] != "true" {
 		s.add(p+".verb", "%s needs until or on_activity = \"true\"", verb)

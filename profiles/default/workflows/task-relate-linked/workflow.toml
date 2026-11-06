@@ -8,6 +8,7 @@ order = 61
 use = "task.verb"
 verb = "relate"
 task = "task.link_target_tasks"
+each = "true"
 
 # A relation moves nothing, and Unrelate takes it off: it runs at once. A
 # pair you took apart waits for you instead.
