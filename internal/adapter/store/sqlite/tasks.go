@@ -284,6 +284,28 @@ func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	return es[0], nil
 }
 
+// refuseMerged refuses c, a write of an id no row holds, when an alias names the id: an update, as a sync that
+// read the task before its merge writes, and a create of a task a merge took, which Reconcile gives the task
+// it was merged into instead. A create of an id an older alias names re-derives it, as the v7 aliases expect.
+func refuseMerged(ctx context.Context, tx *Tx, c task.Change) error {
+	id := c.Task.ID
+	into := mergedTo(ctx, tx, id)
+	var aliased int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases WHERE old_id = ? AND (new_id = ? OR ? = '')`,
+		string(id), string(into), string(into)).Scan(&aliased); err != nil {
+		return err
+	}
+	switch {
+	case aliased == 0:
+		return nil
+	case c.Op != task.OpCreate:
+		return fmt.Errorf("%w: %s was merged into another task; a write of it read before the merge is refused", coretasks.ErrNoTask, id)
+	case into != "":
+		return fmt.Errorf("%w: %s was merged into %s; creating it again is refused", coretasks.ErrVerb, id, into)
+	}
+	return nil
+}
+
 // mergedTo is the task the latest merge of id took it into, "" when it was never merged; a read that fails
 // reads as never merged, and the alias walk then takes the best alias.
 func mergedTo(ctx context.Context, q rowQuerier, id task.ID) task.ID {
@@ -334,13 +356,9 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			if err != nil {
 				return err
 			}
-			if len(old) == 0 && c.Op != task.OpCreate {
-				var aliased int
-				if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases WHERE old_id = ?`, string(e.ID)).Scan(&aliased); err != nil {
+			if len(old) == 0 {
+				if err := refuseMerged(ctx, tx, c); err != nil {
 					return err
-				}
-				if aliased > 0 {
-					return fmt.Errorf("%w: %s was merged into another task; a write of it read before the merge is refused", coretasks.ErrNoTask, e.ID)
 				}
 			}
 			if len(old) == 1 {

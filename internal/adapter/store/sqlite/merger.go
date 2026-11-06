@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -185,7 +185,8 @@ func (s taskStore) Merge(ctx context.Context, r merge.Record, into task.Task, ev
 	return err
 }
 
-func (s taskStore) Split(ctx context.Context, r merge.Record, from, into task.Task, evs ...port.Event) error {
+func (s taskStore) Split(ctx context.Context, r merge.Record, sp merge.Split, evs ...port.Event) error {
+	from, into := sp.From, sp.Rest
 	if from.ID != r.From || into.ID != r.Into {
 		return fmt.Errorf("%w: the split of %s from %s writes %s and %s", coretasks.ErrVerb, r.From, r.Into, from.ID, into.ID)
 	}
@@ -230,17 +231,18 @@ func (s taskStore) Split(ctx context.Context, r merge.Record, from, into task.Ta
 				return err
 			}
 		}
-		units := append([]unit.Unit{task.UnitOf(r.From)}, r.Units...)
+		units := append([]unit.Unit{task.UnitOf(r.From)}, sp.Units...)
 		lists := [][]int64{r.Gates, r.Drafts, r.Messages}
+		var kept [3][]int64
+		for _, o := range sp.Others {
+			for i, ids := range [][]int64{o.Gates, o.Drafts, o.Messages} {
+				kept[i] = append(kept[i], ids...)
+			}
+		}
 		var moved [3]int
 		for i, c := range movedColumns {
-			q := `SELECT id FROM ` + c.table + ` WHERE ` + c.task + ` = ? AND ` + unitsIn(len(units)) //nolint:gosec // fixed names
-			args := append([]any{string(r.Into)}, unitArgs(units)...)
-			if c.table == "drafts" {
-				q += ` AND state = ?`
-				args = append(args, string(draft.Held))
-			}
-			ids, err := int64s(ctx, tx, q, args...)
+			ids, err := int64s(ctx, tx, `SELECT id FROM `+c.table+` WHERE `+c.task+` = ? AND `+unitsIn(len(units)), //nolint:gosec // fixed names
+				append([]any{string(r.Into)}, unitArgs(units)...)...)
 			if err != nil {
 				return err
 			}
@@ -249,14 +251,24 @@ func (s taskStore) Split(ctx context.Context, r merge.Record, from, into task.Ta
 				if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM `+c.table+` WHERE id = ? AND `+c.task+` = ?`, id, string(r.Into)).Scan(&n); err != nil { //nolint:gosec // fixed names
 					return err
 				}
-				if n == 1 {
+				if n == 1 && !slices.Contains(ids, id) {
 					ids = append(ids, id)
 				}
 			}
+			ids = slices.DeleteFunc(ids, func(id int64) bool { return slices.Contains(kept[i], id) && !slices.Contains(lists[i], id) })
 			if err := pointRows(ctx, tx, c.table, c.task, r.From, ids); err != nil {
 				return err
 			}
 			moved[i] = len(ids)
+		}
+		for _, h := range sp.Heirs {
+			data, err := json.Marshal(h)
+			if err != nil {
+				return err
+			}
+			if err := writeEvents(ctx, tx, []port.Event{{Unit: task.UnitOf(h.From), Kind: merge.RecordKind, At: h.At, Data: string(data)}}); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM task_aliases WHERE old_id = ? AND new_id = ?`, string(r.From), string(r.Into)); err != nil {
 			return err

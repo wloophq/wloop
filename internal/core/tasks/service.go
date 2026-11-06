@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -194,6 +195,9 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 	if err != nil {
 		return e, Result{}, err
 	}
+	if req, err = s.Addressed(ctx, id, e, req); err != nil {
+		return e, Result{}, err
+	}
 	enabled := map[unit.Unit]bool{}
 	if err := s.writable(ctx, e, enabled); err != nil {
 		if s.d.States.Handler(string(req.Verb)) != HandlerDrop || !errors.Is(err, ErrPluginDisabled) {
@@ -222,6 +226,30 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 	}
 	prev, next, err := s.change(ctx, id, req)
 	return prev, Result{Task: next}, err
+}
+
+// Addressed is req as it may run on e, the task id reads as: a verb sent to the id of a task merged into e is
+// refused with ErrMerged, but split, which splits that task out when it names no other; a verb sent to e's own
+// id, or to an id an older alias leads to, runs as sent.
+func (s *Service) Addressed(ctx context.Context, id task.ID, e task.Task, req Request) (Request, error) {
+	if e.ID == id {
+		return req, nil
+	}
+	r, merged, err := s.MergeOf(ctx, id)
+	if err != nil || !merged {
+		return req, err
+	}
+	if s.d.States.Handler(string(req.Verb)) != HandlerSplit {
+		return req, fmt.Errorf("%w: %s was merged into %s; %s runs on %s", ErrMerged, id, r.Into, req.Verb, e.ID)
+	}
+	if req.Args[task.ArgTask] == "" {
+		req.Args = maps.Clone(req.Args)
+		if req.Args == nil {
+			req.Args = map[string]string{}
+		}
+		req.Args[task.ArgTask] = string(id)
+	}
+	return req, nil
 }
 
 // change applies req.Verb's state change to task id under the lock, returning the task before and after it.
@@ -572,6 +600,9 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 	p, ok := ProposedVerb(g)
 	if g.Status != gate.Approved || g.Task != t.ID || !ok || p.Verb != req.Verb {
 		return false, fmt.Errorf("%w: gate %d does not approve %s on %s", ErrForbidden, req.Approved, req.Verb, t.ID)
+	}
+	if own, isTask := task.IDOf(g.Unit); isTask && own != t.ID {
+		return false, fmt.Errorf("%w: gate %d proposed %s on %s, which was merged into %s since", ErrForbidden, req.Approved, req.Verb, own, t.ID)
 	}
 	if other := task.ID(p.Args[task.ArgTask]); other != "" {
 		o, err := s.d.Store.Task(ctx, other)

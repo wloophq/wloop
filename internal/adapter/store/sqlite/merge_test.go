@@ -115,11 +115,11 @@ func (ms mergeStore) merge(t *testing.T, from, into task.Task, at time.Time) mer
 func (ms mergeStore) split(t *testing.T, r merge.Record, at time.Time) error {
 	t.Helper()
 	into := ms.read(t, r.Into)
-	from, rest, err := merge.Unfold(into, r, merge.Project{}, taskstest.BundledStates, at)
+	sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, taskstest.BundledStates, at)
 	if err != nil {
 		return err
 	}
-	return ms.m.Split(context.Background(), r, from, rest)
+	return ms.m.Split(context.Background(), r, sp)
 }
 
 // rows dumps every row a task's state and the rows that act for it hold, but the rev, as text.
@@ -193,7 +193,7 @@ func sameButUpdated(a, b task.Task) bool {
 	return a.Same(b)
 }
 
-func TestSplitGivesBackTheGatesAndHeldDraftsOfTheMergedTasksUnits(t *testing.T) {
+func TestSplitGivesBackTheGatesAndDraftsOfTheMergedTasksUnits(t *testing.T) {
 	t.Parallel()
 	ms := openMerge(t)
 	x, y := ms.seed(t)
@@ -208,8 +208,8 @@ func TestSplitGivesBackTheGatesAndHeldDraftsOfTheMergedTasksUnits(t *testing.T) 
 	}
 	want := map[task.ID][]string{
 		xID: {"gates [1 draft open]", "gates [2 proposal superseded]", "gates [3 question approved]", "gates [4 draft open]",
-			"drafts [11 held]", "drafts [12 sent]", "drafts [13 held]", "messages [21]"},
-		yID: {"gates [5 draft open]", "drafts [14 sent]", "drafts [15 held]"},
+			"drafts [11 held]", "drafts [12 sent]", "drafts [13 held]", "drafts [14 sent]", "messages [21]"},
+		yID: {"gates [5 draft open]", "drafts [15 held]"},
 	}
 	for id, w := range want {
 		got := slices.DeleteFunc(ms.rows(t, id), func(s string) bool {
@@ -303,17 +303,19 @@ func TestSplitRefusesATaskStoredAgain(t *testing.T) {
 	ms := openMerge(t)
 	x, y := ms.seed(t)
 	r := ms.merge(t, x, y, mergeAt)
-	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: capture(xID, "inbox", 1)}}); err != nil {
-		t.Fatal(err)
+	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: capture(xID, "inbox", 1)}}); !errors.Is(err, coretasks.ErrVerb) {
+		t.Fatalf("a create of the merged task: %v", err)
 	}
+	sqlitetest.Exec(t, ms.db, `INSERT INTO tasks (id, state, category, origin, created, updated, rev) VALUES (?, 'inbox', 'inbox', 'user', ?2, ?2, 1)`,
+		string(xID), eventTime(mergeAt))
 	if _, ok, err := ms.m.MergeOf(context.Background(), xID); ok || err != nil {
 		t.Fatalf("a stored task has a merge record: %v", err)
 	}
-	from, rest, err := merge.Unfold(ms.read(t, yID), r, merge.Project{}, taskstest.BundledStates, mergeAt)
+	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, taskstest.BundledStates, mergeAt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ms.m.Split(context.Background(), r, from, rest); !errors.Is(err, coretasks.ErrVerb) {
+	if err := ms.m.Split(context.Background(), r, sp); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("split of a task stored again: %v", err)
 	}
 }
@@ -323,18 +325,19 @@ func TestSplitRefusesAPairTheRecordDoesNotName(t *testing.T) {
 	ms := openMerge(t)
 	x, y := ms.seed(t)
 	r := ms.merge(t, x, y, mergeAt)
-	from, rest, err := merge.Unfold(ms.read(t, yID), r, merge.Project{}, taskstest.BundledStates, mergeAt)
+	sp, err := merge.Unfold(ms.read(t, yID), r, nil, nil, merge.Project{}, taskstest.BundledStates, mergeAt)
+	from, rest := sp.From, sp.Rest
 	if err != nil {
 		t.Fatal(err)
 	}
 	other := from
 	other.ID = zID
-	if err := ms.m.Split(context.Background(), r, other, rest); !errors.Is(err, coretasks.ErrVerb) {
+	if err := ms.m.Split(context.Background(), r, merge.Split{From: other, Rest: rest}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("split writing another task back: %v", err)
 	}
 	wrong := rest
 	wrong.ID = zID
-	if err := ms.m.Split(context.Background(), r, from, wrong); !errors.Is(err, coretasks.ErrVerb) {
+	if err := ms.m.Split(context.Background(), r, merge.Split{From: from, Rest: wrong}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("split writing another survivor: %v", err)
 	}
 	if got := ms.read(t, xID); got.ID != yID {
@@ -400,7 +403,7 @@ func TestMergeOfReadsTheRecordOfTheHighestEventID(t *testing.T) {
 	}
 }
 
-func TestApplyRefusesAnUpdateOfAMergedTask(t *testing.T) {
+func TestApplyRefusesAnUpdateOrACreateOfAMergedTask(t *testing.T) {
 	t.Parallel()
 	ms := openMerge(t)
 	x, y := ms.seed(t)
@@ -417,6 +420,13 @@ func TestApplyRefusesAnUpdateOfAMergedTask(t *testing.T) {
 	created := capture("t-00000000000000d4", "inbox", 1)
 	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpUpdate, Task: created}}); err != nil {
 		t.Fatalf("an update of an id no alias names: %v", err)
+	}
+	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: stale}}); !errors.Is(err, coretasks.ErrVerb) {
+		t.Fatalf("a create of the merged task: %v", err)
+	}
+	sqlitetest.Exec(t, ms.db, `INSERT INTO task_aliases (old_id, new_id) VALUES ('t-00000000000000d9', ?)`, string(yID))
+	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: capture("t-00000000000000d9", "inbox", 2)}}); err != nil {
+		t.Fatalf("a create of an id an older alias names: %v", err)
 	}
 }
 

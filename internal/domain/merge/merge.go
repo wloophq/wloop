@@ -50,6 +50,10 @@ type Record struct {
 	Gates, Drafts, Messages []int64
 	// Superseded are the open gates the merge superseded.
 	Superseded []int64
+	// IntoProps are Into's properties of the loop's roles (task.LoopRoles) before the merge, with their writers,
+	// so a split that leaves one as it was gives it its writer back.
+	IntoProps   task.Props
+	IntoWritten map[string]task.Written
 }
 
 // Fold is into once from is merged into it, at now, and the record of the merge as far as the two tasks
@@ -94,9 +98,19 @@ func Fold(from, into task.Task, st task.Profile, now time.Time) (task.Task, Reco
 	sortRefs(y.Items)
 	sortRefs(y.Resolved)
 	y.Items, y.Resolved = orNil(y.Items), orNil(y.Resolved)
+	for _, role := range task.LoopRoles {
+		if name, _ := st.PropOf(role); name != "" {
+			if v, ok := into.Props[name]; ok {
+				if r.IntoProps == nil {
+					r.IntoProps, r.IntoWritten = task.Props{}, map[string]task.Written{}
+				}
+				r.IntoProps[name], r.IntoWritten[name] = v, into.Written[name]
+			}
+		}
+	}
 	merged := append(slices.Clone(into.Prop(mergedProp).List), string(from.ID))
 	merged = appendNew(merged, from.Prop(mergedProp).List...)
-	y.SetProp(mergedProp, task.Value{List: merged}, task.WriterWorkflow, now)
+	setList(&y, mergedProp, merged, now)
 	if relatedProp, _ := st.PropOf(task.RoleRelated); relatedProp != "" {
 		own := into.Prop(relatedProp).List
 		related := slices.DeleteFunc(slices.Clone(own), func(id string) bool { return id == string(from.ID) })
@@ -106,10 +120,18 @@ func Fold(from, into task.Task, st task.Profile, now time.Time) (task.Task, Reco
 				r.Related = append(r.Related, task.ID(id))
 			}
 		}
-		y.SetProp(relatedProp, task.Value{List: related}, task.WriterWorkflow, now)
+		setList(&y, relatedProp, related, now)
 	}
 	y.Updated = now
 	return y, r, nil
+}
+
+// setList sets e's property name to list as the loop writes it; a list it holds already keeps its writer.
+func setList(e *task.Task, name string, list []string, at time.Time) {
+	if slices.Equal(e.Prop(name).List, list) {
+		return
+	}
+	e.SetProp(name, task.Value{List: list}, task.WriterWorkflow, at)
 }
 
 // Project is the project a merged task's parent names, as stored when the task is given back: Task is zero
@@ -119,45 +141,113 @@ type Project struct {
 	Children []task.Task
 }
 
-// Unfold gives r.From back by unit. Every ref into holds of a unit in r.Units goes back to from, on the side
-// into holds it now (a ref into resolved comes back resolved), with the refs of r.Task's other units that into
-// still holds; those into gained from the merge leave it. The rest of into stays, so what arrived on into's
-// own units after the merge is into's. from takes everything else from r.Task: state, title, notes,
-// properties, wake; its parent stays only while p, that project, is open, and its position is after its
-// siblings' when another took it. into loses r.Opened back to its resolved refs, r.Related, and from's ids off
-// its property of role merged. The store gives from the gates, held drafts and messages of r's units and ids;
-// the caller then syncs from's units, so from equals r.Task as that sync leaves it, and r.Task exactly when
-// nothing touched from's units while merged.
-func Unfold(into task.Task, r Record, p Project, st task.Profile, now time.Time) (from, rest task.Task, err error) {
+// Split is what a split writes: From, the task given back, and Rest, the survivor without it. From takes back
+// every gate, held draft and message of Units, the units of r.Units no other task still merged into Rest holds,
+// and those of r's ids; Heirs are the records of the tasks still merged into Rest that take over each other unit
+// of r.Units, with it added to their Units, and Others every record of a task still merged into Rest, whose
+// rows stay.
+type Split struct {
+	From, Rest    task.Task
+	Units         []unit.Unit
+	Heirs, Others []Record
+}
+
+// Unfold gives r.From back from into, as the split of it writes it. others are the records of the other tasks
+// merged into into, and owners the task each ref into holds derives (task.DerivedID of its unit and task key),
+// for the refs whose item the ledger still has.
+//
+// From takes the refs of r.Task into holds now, on the side it holds them (a ref into resolved comes back
+// resolved), and every ref no other merged task's record held that derives From or a task merged into it, or
+// that derives none of the others and lies on a unit of Units; into keeps the rest, so what arrived for itself,
+// or for another task merged into it, stays. A ref goes to one task only; one both held before the merge
+// stays on both. From takes everything else from r.Task: state, title, notes, properties, wake; its parent
+// stays only while p, that project, is open, and its position is after its siblings' when another took it. Rest
+// loses r.Opened back to its resolved refs, the units of Units, r.Related, and From's ids off its property of
+// role merged; a property of the loop's roles that ends as it was before the merge gets its writer back. The
+// caller then syncs From's units, so From equals r.Task as that sync leaves it, and r.Task exactly when nothing
+// touched From's units while merged.
+func Unfold(into task.Task, r Record, others []Record, owners map[task.ItemRef]task.ID, p Project, st task.Profile, now time.Time) (Split, error) {
 	if into.ID != r.Into {
-		return task.Task{}, task.Task{}, fmt.Errorf("task %s was merged into %s, not %s", r.From, r.Into, into.ID)
+		return Split{}, fmt.Errorf("task %s was merged into %s, not %s", r.From, r.Into, into.ID)
 	}
 	mergedProp, _ := st.PropOf(task.RoleMerged)
 	if mergedProp == "" || !slices.Contains(into.Prop(mergedProp).List, string(r.From)) {
-		return task.Task{}, task.Task{}, fmt.Errorf("task %s does not list %s as merged into it", into.ID, r.From)
+		return Split{}, fmt.Errorf("task %s does not list %s as merged into it", into.ID, r.From)
 	}
-	brought := func(ref task.ItemRef) bool { return slices.Contains(r.Units, ref.Unit) }
+	out := Split{Others: others}
+	mine := append([]string{string(r.From)}, r.Task.Prop(mergedProp).List...)
+	theirs := []string{string(into.ID)}
+	held := func(o Record, ref task.ItemRef) bool {
+		return slices.Contains(o.Task.Items, ref) || slices.Contains(o.Task.Resolved, ref) || slices.Contains(o.Items, ref) ||
+			slices.Contains(o.Resolved, ref)
+	}
+	for _, o := range others {
+		theirs = append(theirs, string(o.From))
+	}
+	var heirs []Record
+	for _, u := range r.Units {
+		i := slices.IndexFunc(others, func(o Record) bool { return slices.Contains(o.Task.Units, u) })
+		if i < 0 {
+			out.Units = append(out.Units, u)
+			continue
+		}
+		h := slices.IndexFunc(heirs, func(o Record) bool { return o.From == others[i].From })
+		if h < 0 {
+			heirs, h = append(heirs, others[i]), len(heirs)
+			heirs[h].Units = slices.Clone(heirs[h].Units)
+		}
+		heirs[h].Units = append(heirs[h].Units, u)
+	}
+	out.Heirs = heirs
 	was := func(ref task.ItemRef) bool {
 		return slices.Contains(r.Task.Items, ref) || slices.Contains(r.Task.Resolved, ref)
 	}
-	gained := func(ref task.ItemRef) bool {
-		return brought(ref) || slices.Contains(r.Items, ref) || slices.Contains(r.Resolved, ref)
+	takes := func(ref task.ItemRef) bool {
+		if was(ref) {
+			return true
+		}
+		if slices.ContainsFunc(others, func(o Record) bool { return held(o, ref) }) {
+			return false
+		}
+		if owner, ok := owners[ref]; ok && slices.Contains(mine, string(owner)) {
+			return true
+		} else if ok && slices.Contains(theirs, string(owner)) {
+			return false
+		}
+		return slices.Contains(out.Units, ref.Unit)
 	}
-	from = r.Task
+	shared := func(ref task.ItemRef) bool {
+		return was(ref) && !slices.Contains(r.Items, ref) && !slices.Contains(r.Resolved, ref) && !slices.Contains(r.Opened, ref)
+	}
+	from := r.Task
 	from.Items, from.Resolved = nil, nil
-	for _, ref := range into.Items {
-		if brought(ref) || was(ref) {
-			from.Items = append(from.Items, ref)
+	rest := into
+	rest.Items, rest.Resolved = nil, nil
+	for _, side := range []struct {
+		refs           []task.ItemRef
+		toFrom, toRest *[]task.ItemRef
+	}{{into.Items, &from.Items, &rest.Items}, {into.Resolved, &from.Resolved, &rest.Resolved}} {
+		for _, ref := range side.refs {
+			if !takes(ref) {
+				*side.toRest = append(*side.toRest, ref)
+				continue
+			}
+			*side.toFrom = append(*side.toFrom, ref)
+			if shared(ref) {
+				*side.toRest = append(*side.toRest, ref)
+			}
 		}
 	}
-	for _, ref := range into.Resolved {
-		if brought(ref) || was(ref) {
-			from.Resolved = append(from.Resolved, ref)
+	for _, ref := range r.Opened {
+		if (slices.Contains(into.Items, ref) || slices.Contains(into.Resolved, ref)) && !slices.Contains(rest.Resolved, ref) {
+			rest.Resolved = append(rest.Resolved, ref)
 		}
 	}
-	sortRefs(from.Items)
-	sortRefs(from.Resolved)
-	from.Items, from.Resolved = orNil(from.Items), orNil(from.Resolved)
+	for _, e := range []*task.Task{&from, &rest} {
+		sortRefs(e.Items)
+		sortRefs(e.Resolved)
+		e.Items, e.Resolved = orNil(e.Items), orNil(e.Resolved)
+	}
 	if from.Parent != "" {
 		switch {
 		case p.Task.ID != from.Parent || !p.Task.Open():
@@ -175,34 +265,36 @@ func Unfold(into task.Task, r Record, p Project, st task.Profile, now time.Time)
 	if !from.Same(r.Task) {
 		from.Updated = now
 	}
-
-	rest = into
-	rest.Items = slices.DeleteFunc(slices.Clone(into.Items), func(ref task.ItemRef) bool { return gained(ref) || slices.Contains(r.Opened, ref) })
-	rest.Resolved = slices.DeleteFunc(slices.Clone(into.Resolved), gained)
-	for _, ref := range r.Opened {
-		if (slices.Contains(into.Items, ref) || slices.Contains(into.Resolved, ref)) && !slices.Contains(rest.Resolved, ref) {
-			rest.Resolved = append(rest.Resolved, ref)
-		}
-	}
-	sortRefs(rest.Items)
-	sortRefs(rest.Resolved)
-	rest.Items, rest.Resolved = orNil(rest.Items), orNil(rest.Resolved)
-	rest.Units = slices.DeleteFunc(slices.Clone(into.Units), func(u unit.Unit) bool { return slices.Contains(r.Units, u) })
+	rest.Units = slices.DeleteFunc(slices.Clone(into.Units), func(u unit.Unit) bool { return slices.Contains(out.Units, u) })
 	if len(rest.Units) == 0 {
 		rest.Units = nil
 	}
-	gone := append([]string{string(r.From)}, r.Task.Prop(mergedProp).List...)
-	merged := slices.DeleteFunc(slices.Clone(into.Prop(mergedProp).List), func(id string) bool { return slices.Contains(gone, id) })
-	rest.SetProp(mergedProp, task.Value{List: merged}, task.WriterWorkflow, now)
+	merged := slices.DeleteFunc(slices.Clone(into.Prop(mergedProp).List), func(id string) bool { return slices.Contains(mine, id) })
+	setBack(&rest, r, mergedProp, merged, now)
 	if relatedProp, _ := st.PropOf(task.RoleRelated); relatedProp != "" {
 		related := slices.DeleteFunc(slices.Clone(into.Prop(relatedProp).List), func(id string) bool { return slices.Contains(r.Related, task.ID(id)) })
 		if slices.Contains(r.Task.Prop(relatedProp).List, string(into.ID)) {
 			related = appendNew(related, string(r.From))
 		}
-		rest.SetProp(relatedProp, task.Value{List: related}, task.WriterWorkflow, now)
+		setBack(&rest, r, relatedProp, related, now)
 	}
 	rest.Updated = now
-	return from, rest, nil
+	out.From, out.Rest = from, rest
+	return out, nil
+}
+
+// setBack sets rest's property name to list, with the writer it had before r's merge when it holds that list
+// again.
+func setBack(rest *task.Task, r Record, name string, list []string, at time.Time) {
+	if before, ok := r.IntoProps[name]; ok && slices.Equal(before.List, list) {
+		w := r.IntoWritten[name]
+		rest.SetProp(name, before, w.By, w.At)
+		return
+	}
+	if len(list) == 0 {
+		list = nil
+	}
+	setList(rest, name, list, at)
 }
 
 // Survivor is which of a and b a merge keeps and which it folds: the one aHolds or bHolds alone says

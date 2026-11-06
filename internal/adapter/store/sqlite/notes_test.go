@@ -443,11 +443,11 @@ var writes = []writeCase{
 			if err != nil {
 				return err
 			}
-			from, rest, err := merge.Unfold(into, r, merge.Project{}, taskstest.BundledStates, noteAt)
+			sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, taskstest.BundledStates, noteAt)
 			if err != nil {
 				return err
 			}
-			return m.Split(ctx, r, from, rest)
+			return m.Split(ctx, r, sp)
 		},
 		topics: port.TopicTasks, units: []unit.Unit{u7, term1, task.UnitOf("t-1"), task.UnitOf("t-2")},
 	},

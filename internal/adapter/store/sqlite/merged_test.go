@@ -50,8 +50,8 @@ func TestMergedIntoWalksTheAliasesTransitively(t *testing.T) {
 	mergedAway(t, db, first, middle, day.Add(time.Hour))
 	mergedAway(t, db, middle, survivor, day.Add(2*time.Hour))
 	mergedAway(t, db, split, survivor, day.Add(3*time.Hour))
-	putTask(t, db, split)
 	exec(t, db, `DELETE FROM task_aliases WHERE old_id = ?`, split)
+	putTask(t, db, split)
 
 	if got, want := mergedIDs(t, db, survivor), []task.ID{beside, first, middle}; !slices.Equal(got, want) {
 		t.Fatalf("merged into the survivor %q, want %q: transitive, in merge order, without the task split back", got, want)
@@ -87,7 +87,6 @@ func TestMergedIntoFollowsOnlyTheAliasTheMergeRecordNames(t *testing.T) {
 }
 
 func TestAMergedIDReadsTheTaskItsMergeRecordNames_T10C1(t *testing.T) {
-	t.Skip("T1 C1")
 	t.Parallel()
 	db, _ := openTemp(t)
 	const part, merged, survivor = "t-part", "t-merged", "t-survivor"

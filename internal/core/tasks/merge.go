@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/merge"
+	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/domain/task"
 )
@@ -30,9 +31,11 @@ func (s *Service) serveMerges() {
 
 // merge folds e and the open task req.Args[task.ArgTask] names into one, under the service's lock: the
 // one Survives holds on alone stays, else the older, and the other is merged into it (merge.Fold) through
-// the Store's Merger, after the gates acting for it (GateSweeper.ActingFor) are superseded. Both ids are
-// compared as they read, aliases followed: a task merged into e already is e. It refuses e itself, a closed
-// other task, a project, a draft or message task, and a store with no Merger or gates with no GateSweeper.
+// the Store's Merger; then the gates acting for it, and those left acting for a task merged earlier into
+// either (GateSweeper.ActingFor), are superseded. Until they are, Allowed refuses to run any of them on the
+// survivor. Both ids are compared as they read, aliases followed: a task merged into e already is e. It
+// refuses e itself, a closed other task, a project, a draft or message task, and a store with no Merger or
+// gates with no GateSweeper, writing nothing.
 func (s *Service) merge(ctx context.Context, e task.Task, req Request) (Result, error) {
 	m, sw, err := s.mergers(req)
 	if err != nil {
@@ -80,20 +83,20 @@ func (s *Service) merge(ctx context.Context, e task.Task, req Request) (Result, 
 	for _, g := range acting {
 		r.Superseded = append(r.Superseded, g.ID)
 	}
-	if err := sw.Supersede(ctx, r.Superseded...); err != nil {
-		return Result{}, err
-	}
 	evs := append(s.verbEvents(keep, req, now), s.verbEvents(fold, req, now)...)
 	if err := m.Merge(ctx, r, y, evs...); err != nil {
 		return Result{}, err
 	}
+	s.sweep(ctx, sw, r.Superseded, s.mergedIDs(y)...)
 	return Result{Task: y}, nil
 }
 
 // split gives back, under the service's lock, the task req.Args[task.ArgTask] names, one whose merge
-// record (Merger.MergeOf) says it was merged into e, as merge.Unfold says, supersedes the open proposals of
-// one of the two that name the other, then syncs its units. It refuses a task whose record names another,
-// which covers a task merged into one merged elsewhere since: that one is split first.
+// record (Merger.MergeOf) says it was merged into e, as merge.Unfold says, then supersedes the open proposals
+// of one of the two that name the other, and those left acting for a task still merged into e, and syncs its
+// units. It refuses a task whose record names another, which covers a task merged into one merged elsewhere
+// since: that one is split first. A split that was written succeeds, whatever the sync that follows it does:
+// the next sync of its units does the same.
 func (s *Service) split(ctx context.Context, e task.Task, req Request) (Result, error) {
 	m, sw, err := s.mergers(req)
 	if err != nil {
@@ -103,9 +106,7 @@ func (s *Service) split(ctx context.Context, e task.Task, req Request) (Result, 
 	if err != nil {
 		return Result{}, err
 	}
-	if err := s.Sync(ctx, from.Units); err != nil {
-		return Result{Task: rest}, err
-	}
+	_ = s.Sync(ctx, from.Units)
 	return Result{Task: rest}, nil
 }
 
@@ -121,26 +122,105 @@ func (s *Service) unfold(ctx context.Context, m Merger, sw GateSweeper, e task.T
 	if err != nil {
 		return from, rest, err
 	}
-	if !ok || r.Into != cur.ID {
-		return from, rest, fmt.Errorf("%w: %s is not merged into %s", ErrVerb, id, cur.ID)
+	switch {
+	case !ok:
+		return from, rest, fmt.Errorf("%w: %s is not merged into another task", ErrVerb, id)
+	case r.Into != cur.ID:
+		return from, rest, fmt.Errorf("%w: %s was merged into %s, which is merged into %s: split %s out of %s first", ErrVerb, id, r.Into, cur.ID, r.Into, cur.ID)
 	}
 	p, err := s.projectOf(ctx, r.Task)
 	if err != nil {
 		return from, rest, err
 	}
-	now := s.now()
-	if from, rest, err = merge.Unfold(cur, r, p, s.d.States, now); err != nil {
-		return from, rest, fmt.Errorf("%w: %v", ErrVerb, err)
-	}
-	stale, err := s.naming(ctx, sw, from.ID, cur.ID)
+	others, err := s.othersMerged(ctx, m, cur, r)
 	if err != nil {
 		return from, rest, err
 	}
-	if err := sw.Supersede(ctx, stale...); err != nil {
+	owners, err := s.owners(ctx, cur)
+	if err != nil {
 		return from, rest, err
 	}
-	evs := append(s.verbEvents(cur, req, now), s.verbEvents(from, req, now)...)
-	return from, rest, m.Split(ctx, r, from, rest, evs...)
+	now := s.now()
+	sp, err := merge.Unfold(cur, r, others, owners, p, s.d.States, now)
+	if err != nil {
+		return from, rest, fmt.Errorf("%w: %v", ErrVerb, err)
+	}
+	evs := append(s.verbEvents(cur, req, now), s.verbEvents(sp.From, req, now)...)
+	if err := m.Split(ctx, r, sp, evs...); err != nil {
+		return from, rest, err
+	}
+	if stale, err := s.naming(ctx, sw, sp.From.ID, cur.ID); err == nil {
+		s.sweep(ctx, sw, stale, s.mergedIDs(sp.Rest)...)
+	}
+	return sp.From, sp.Rest, nil
+}
+
+// othersMerged are the records of the tasks merged into cur but r.From and those merged into it.
+func (s *Service) othersMerged(ctx context.Context, m Merger, cur task.Task, r merge.Record) ([]merge.Record, error) {
+	name, _ := s.d.States.PropOf(task.RoleMerged)
+	mine := append([]string{string(r.From)}, r.Task.Prop(name).List...)
+	var out []merge.Record
+	for _, id := range cur.Prop(name).List {
+		if slices.Contains(mine, id) {
+			continue
+		}
+		o, ok, err := m.MergeOf(ctx, task.ID(id))
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+// owners are the task each ref cur holds derives from its item, as the ledger keeps the item now.
+func (s *Service) owners(ctx context.Context, cur task.Task) (map[task.ItemRef]task.ID, error) {
+	out := map[task.ItemRef]task.ID{}
+	var units []unit.Unit
+	for _, ref := range slices.Concat(cur.Items, cur.Resolved) {
+		if !slices.Contains(units, ref.Unit) {
+			units = append(units, ref.Unit)
+		}
+	}
+	for _, u := range units {
+		its, err := s.d.Items.Items(ctx, u)
+		if err != nil {
+			return nil, err
+		}
+		for _, it := range its {
+			out[task.ItemRef{Unit: cmp.Or(it.Unit, u), Item: it.ID}] = task.DerivedID(u, cmp.Or(it.TaskKey, it.ID))
+		}
+	}
+	return out, nil
+}
+
+// mergedIDs are the tasks e lists as merged into it.
+func (s *Service) mergedIDs(e task.Task) []task.ID {
+	var out []task.ID
+	for _, id := range e.Role(s.d.States, task.RoleMerged).List {
+		out = append(out, task.ID(id))
+	}
+	return out
+}
+
+// sweep supersedes the gates of ids, and every open gate still acting for one of merged, which no longer reads
+// as itself; a sweep that fails leaves them for the next merge or split of the task, and Allowed refuses to run
+// them meanwhile.
+func (s *Service) sweep(ctx context.Context, sw GateSweeper, ids []int64, merged ...task.ID) {
+	for _, id := range merged {
+		gs, err := sw.ActingFor(ctx, id)
+		if err != nil {
+			continue
+		}
+		for _, g := range gs {
+			if !slices.Contains(ids, g.ID) {
+				ids = append(ids, g.ID)
+			}
+		}
+	}
+	_ = sw.Supersede(ctx, ids...)
 }
 
 // naming are the open gates acting for a or b whose proposed verb names the other.

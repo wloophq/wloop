@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,6 +62,8 @@ func (gateDefs) FirstOf(k gate.Kind) (gates.Def, bool) {
 type serviceGates struct {
 	s *gates.Service
 	r gates.Reader
+	// failing, when it holds, fails every supersede.
+	failing *atomic.Bool
 }
 
 func (g serviceGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
@@ -77,6 +81,9 @@ func (g serviceGates) ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, e
 }
 
 func (g serviceGates) Supersede(ctx context.Context, ids ...int64) error {
+	if g.failing != nil && g.failing.Load() {
+		return errors.New("the gates store is down")
+	}
 	for _, id := range ids {
 		if err := g.s.Supersede(ctx, id, task.ActorPerson); err != nil && !errors.Is(err, gates.ErrResolved) {
 			return err
@@ -99,6 +106,8 @@ type mrig struct {
 	holds map[task.ID]bool
 	// reading, when set, runs as a sync reads the items of a unit.
 	reading func(u unit.Unit)
+	// failSupersede fails the gates' supersede, and failItems the items' reads.
+	failSupersede, failItems atomic.Bool
 }
 
 // hookedItems are the rig's items, read with its reading hook.
@@ -107,6 +116,9 @@ type hookedItems struct{ r *mrig }
 func (h hookedItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
 	if h.r.reading != nil {
 		h.r.reading(u)
+	}
+	if h.r.failItems.Load() {
+		return nil, errors.New("the ledger is down")
 	}
 	return h.r.items.Items(ctx, u)
 }
@@ -124,7 +136,7 @@ func newMergeRig(t *testing.T) *mrig {
 	r.gr = gs
 	r.gates = gates.New(gates.Deps{Store: gs, Reader: gs, Profile: gateDefs{}, Clock: r.clock})
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: hookedItems{r}, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Gates: serviceGates{r.gates, gs},
+		Authority: taskstest.BundledStates.Authority, Gates: serviceGates{r.gates, gs, &r.failSupersede},
 		Survives: func(_ context.Context, verb string, e task.Task) (bool, error) {
 			r.mu.Lock()
 			defer r.mu.Unlock()
@@ -572,7 +584,7 @@ func TestSplitUnwindsAChainFromItsOutermostMerge(t *testing.T) {
 			t.Fatalf("%s reads as %s", id, got.ID)
 		}
 	}
-	if err := r.split(t, web.ID, ask.ID); !errors.Is(err, coretasks.ErrVerb) {
+	if err := r.split(t, web.ID, ask.ID); !errors.Is(err, coretasks.ErrVerb) || !strings.Contains(err.Error(), "split "+string(pr.ID)+" out of "+string(web.ID)+" first") {
 		t.Fatalf("the inner merge split first: %v", err)
 	}
 	r.sync(t, askThread, prUnit, otherPR)
@@ -739,5 +751,257 @@ func TestAWorkflowCannotSplit(t *testing.T) {
 	}
 	if !slices.Equal(r.stored(t), []task.ID{pr.ID}) {
 		t.Fatalf("stored %v", r.stored(t))
+	}
+}
+
+func keyed(u unit.Unit, id, key string) items.Item {
+	it := owed(u, id)
+	it.TaskKey = key
+	return it
+}
+
+func (r *mrig) aliasCount(t *testing.T, id task.ID) int {
+	t.Helper()
+	var n int
+	if err := r.db.R().QueryRowContext(context.Background(), `SELECT count(*) FROM task_aliases WHERE old_id = ?`, string(id)).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestARefusedMergeLeavesEveryGateOpen(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	r.items.byUnit[otherPR] = []items.Item{webItem()}
+	r.sync(t, otherPR)
+	done := r.open(t, gate.Gate{Name: "done", Unit: task.UnitOf(ask.ID), Task: ask.ID, Subject: subject(t, task.VerbDone, nil)})
+	sqlitetest.Exec(t, r.db, `UPDATE tasks SET parent = ? WHERE id = ?`, string(ask.ID), string(webTaskID))
+	req := byPerson
+	req.Args = map[string]string{task.ArgTask: string(ask.ID)}
+	if _, err := r.svc.Do(context.Background(), pr.ID, req); err == nil {
+		t.Fatal("the store merged a parent")
+	}
+	if !slices.Equal(r.stored(t), sortedIDs(pr.ID, ask.ID, webTaskID)) {
+		t.Fatalf("stored %v", r.stored(t))
+	}
+	if got := r.gate(t, done.ID); got.Status != gate.Open {
+		t.Fatalf("a refused merge left the merged task's gate %s", got.Status)
+	}
+}
+
+func TestAMergeOrSplitWriteFailingMidwayRollsBackAndSupersedesNothing(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	done := r.open(t, gate.Gate{Name: "done", Unit: task.UnitOf(ask.ID), Task: ask.ID, Subject: subject(t, task.VerbDone, nil)})
+	q := r.open(t, gate.Gate{Name: "plan", Unit: askThread, Task: ask.ID, Subject: "plan:q"})
+	sqlitetest.Exec(t, r.db, `CREATE TRIGGER boom BEFORE INSERT ON events WHEN NEW.kind = 'merge_record' BEGIN SELECT RAISE(ABORT, 'disk full'); END`)
+	req := byPerson
+	req.Args = map[string]string{task.ArgTask: string(ask.ID)}
+	if _, err := r.svc.Do(context.Background(), pr.ID, req); err == nil {
+		t.Fatal("merge succeeded")
+	}
+	if !slices.Equal(r.stored(t), sortedIDs(pr.ID, ask.ID)) || r.aliasCount(t, ask.ID) != 0 {
+		t.Fatalf("stored %v aliases %d", r.stored(t), r.aliasCount(t, ask.ID))
+	}
+	if g := r.gate(t, q.ID); g.Task != ask.ID {
+		t.Errorf("gate moved %+v", g)
+	}
+	if g := r.gate(t, done.ID); g.Status != gate.Open {
+		t.Errorf("the failed merge superseded %s's proposal: %s", ask.ID, g.Status)
+	}
+	sqlitetest.Exec(t, r.db, `DROP TRIGGER boom`)
+	r.merge(t, pr.ID, ask.ID)
+	sqlitetest.Exec(t, r.db, `CREATE TRIGGER boom2 BEFORE DELETE ON task_aliases BEGIN SELECT RAISE(ABORT, 'disk full'); END`)
+	if err := r.split(t, pr.ID, ask.ID); err == nil {
+		t.Fatal("split succeeded")
+	}
+	if !slices.Equal(r.stored(t), []task.ID{pr.ID}) || r.aliasCount(t, ask.ID) != 1 {
+		t.Fatalf("after a failed split: stored %v aliases %d", r.stored(t), r.aliasCount(t, ask.ID))
+	}
+	sqlitetest.Exec(t, r.db, `DROP TRIGGER boom2`)
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestAGateASupersedeMissedRunsNothingUntilTheNextMergeSupersedesIt fails the supersede after a merge wrote:
+// the merged task's proposal, now on the survivor, stays open, approving it runs nothing, and the next merge
+// into the survivor supersedes it.
+func TestAGateASupersedeMissedRunsNothingUntilTheNextMergeSupersedesIt(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	r.items.byUnit[otherPR] = []items.Item{webItem()}
+	r.sync(t, otherPR)
+	done := r.open(t, gate.Gate{Name: "done", Unit: task.UnitOf(ask.ID), Task: ask.ID, Subject: subject(t, task.VerbDone, nil)})
+	stale := r.open(t, gate.Gate{Name: "done", Unit: task.UnitOf(ask.ID), Task: ask.ID, Subject: subject(t, task.VerbDone, map[string]string{"why": "b"})})
+	r.failSupersede.Store(true)
+	if y := r.merge(t, pr.ID, ask.ID); y.ID != pr.ID {
+		t.Fatalf("kept %s", y.ID)
+	}
+	if g := r.gate(t, done.ID); g.Status != gate.Open || g.Task != pr.ID {
+		t.Fatalf("the missed gate %+v", g)
+	}
+	if err := r.approve(t, done); !errors.Is(err, coretasks.ErrForbidden) {
+		t.Fatalf("approving the merged task's own proposal on the survivor: %v", err)
+	}
+	if y := r.task(t, pr.ID); !y.Open() {
+		t.Fatal("the merged task's done closed the survivor")
+	}
+	r.failSupersede.Store(false)
+	r.merge(t, pr.ID, webTaskID)
+	if g := r.gate(t, stale.ID); g.Status != gate.Superseded {
+		t.Fatalf("the next merge left the missed gate %s", g.Status)
+	}
+}
+
+func TestSplitOfASharedUnitLeavesTheOtherMergedTasksItemsAndGates(t *testing.T) {
+	r := newMergeRig(t)
+	pr, _ := r.seed(t)
+	r.items.byUnit[askThread] = []items.Item{owed(askThread, "s:ask"), keyed(askThread, "s:w1", "k:w")}
+	r.clock.t = t0.Add(2 * time.Minute)
+	r.sync(t, askThread)
+	x := r.task(t, askTaskID)
+	wID := task.DerivedID(askThread, "k:w")
+	wg := r.open(t, gate.Gate{Name: "plan", Unit: askThread, Task: wID, Subject: "plan:w"})
+	r.merge(t, pr.ID, x.ID)
+	r.merge(t, pr.ID, wID)
+	if err := r.split(t, pr.ID, x.ID); err != nil {
+		t.Fatal(err)
+	}
+	if back := r.task(t, x.ID); slices.Contains(back.Items, task.ItemRef{Unit: askThread, Item: "s:w1"}) {
+		t.Errorf("split gave X the item of W, still merged into Y: %v", back.Items)
+	}
+	if g := r.gate(t, wg.ID); g.Task != pr.ID {
+		t.Errorf("W's gate, W still merged into Y, now acts for %s", g.Task)
+	}
+	r.items.byUnit[askThread] = append(r.items.byUnit[askThread], keyed(askThread, "s:w2", "k:w"))
+	r.clock.t = t0.Add(3 * time.Hour)
+	r.sync(t, askThread)
+	if err := r.split(t, pr.ID, wID); err != nil {
+		t.Fatalf("split W back: %v", err)
+	}
+	w, back, y := r.task(t, wID), r.task(t, x.ID), r.task(t, pr.ID)
+	if !slices.Equal(w.Items, []task.ItemRef{{Unit: askThread, Item: "s:w1"}, {Unit: askThread, Item: "s:w2"}}) {
+		t.Errorf("W back %+v", w)
+	}
+	if !slices.Equal(back.Items, []task.ItemRef{{Unit: askThread, Item: "s:ask"}}) {
+		t.Errorf("X %+v", back.Items)
+	}
+	if !slices.Equal(y.Units, []unit.Unit{prUnit}) || !slices.Equal(y.Items, []task.ItemRef{{Unit: prUnit, Item: "gh:review"}}) {
+		t.Errorf("Y after both splits %+v", y)
+	}
+	if g := r.gate(t, wg.ID); g.Task != wID {
+		t.Errorf("after both splits W's gate acts for %s, want W", g.Task)
+	}
+	r.assertHeldOnce(t)
+}
+
+func TestAnItemThatArrivedForTheMergedTaskOnASharedThreadIsHeldOnceAfterTheSplit(t *testing.T) {
+	r := newMergeRig(t)
+	r.seed(t)
+	r.items.byUnit[askThread] = []items.Item{owed(askThread, "s:ask"), keyed(askThread, "s:w1", "k:w")}
+	r.clock.t = t0.Add(2 * time.Minute)
+	r.sync(t, askThread)
+	wID := task.DerivedID(askThread, "k:w")
+	if kept := r.merge(t, askTaskID, wID); kept.ID != askTaskID {
+		t.Fatalf("kept %s", kept.ID)
+	}
+	r.clock.t = t0.Add(time.Hour)
+	r.items.byUnit[askThread] = append(r.items.byUnit[askThread], keyed(askThread, "s:w2", "k:w"))
+	r.sync(t, askThread)
+	if err := r.split(t, askTaskID, wID); err != nil {
+		t.Fatal(err)
+	}
+	r.assertHeldOnce(t)
+	for i := range 5 {
+		r.clock.t = t0.Add(time.Duration(2+i) * time.Hour)
+		r.sync(t, askThread, prUnit)
+		r.assertHeldOnce(t)
+	}
+	if w := r.task(t, wID); !slices.Equal(w.Items, []task.ItemRef{{Unit: askThread, Item: "s:w1"}, {Unit: askThread, Item: "s:w2"}}) {
+		t.Fatalf("W %+v", w)
+	}
+}
+
+// assertHeldOnce fails t when a stored task's item ref is held by two tasks.
+func (r *mrig) assertHeldOnce(t *testing.T) {
+	t.Helper()
+	es, err := r.store.Tasks(context.Background(), task.Query{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[task.ItemRef]task.ID{}
+	for _, e := range es {
+		for _, ref := range slices.Concat(e.Items, e.Resolved) {
+			if other, ok := by[ref]; ok {
+				t.Fatalf("%v held by %s and %s", ref, other, e.ID)
+			}
+			by[ref] = e.ID
+		}
+	}
+}
+
+func TestMergeAndSplitKeepThePersonsRelatedLinksAsThePersonWroteThem(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	p := r.task(t, pr.ID)
+	p.SetProp("related", task.Value{List: []string{"t-00000000000000aa"}}, task.WriterPerson, t0)
+	if err := r.store.Apply(context.Background(), []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
+		t.Fatal(err)
+	}
+	p = r.task(t, pr.ID)
+	r.merge(t, pr.ID, ask.ID)
+	if y := r.task(t, pr.ID); y.Written["related"].By != task.WriterPerson {
+		t.Errorf("Y's person-written related now written by %s", y.Written["related"].By)
+	}
+	if err := r.split(t, pr.ID, ask.ID); err != nil {
+		t.Fatal(err)
+	}
+	if rest := r.task(t, pr.ID); rest.Written["related"] != p.Written["related"] {
+		t.Errorf("Y's related writer %+v, was %+v", rest.Written["related"], p.Written["related"])
+	}
+}
+
+func TestAVerbSentToTheMergedIDIsRefusedAndSplitTakesItBackOut(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	r.merge(t, pr.ID, ask.ID)
+	for _, v := range []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbMerge} {
+		_, err := r.svc.Do(context.Background(), ask.ID, coretasks.Request{Verb: v, Actor: task.ActorPerson, Source: "cockpit",
+			Args: map[string]string{task.ArgTask: string(webTaskID)}})
+		if !errors.Is(err, coretasks.ErrMerged) {
+			t.Fatalf("%s on the merged id: %v", v, err)
+		}
+	}
+	if y := r.task(t, pr.ID); !y.Open() {
+		t.Fatal("a verb on the merged id closed the survivor")
+	}
+	if _, err := r.svc.Do(context.Background(), ask.ID, splitByOne); err != nil {
+		t.Fatalf("split on the merged id: %v", err)
+	}
+	if !slices.Equal(r.stored(t), sortedIDs(pr.ID, ask.ID)) {
+		t.Fatalf("stored %v", r.stored(t))
+	}
+}
+
+func TestASplitThatWroteSucceedsWhenItsSyncFails(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	r.merge(t, pr.ID, ask.ID)
+	reads := 0
+	r.reading = func(u unit.Unit) {
+		if u == askThread {
+			reads++
+			r.failItems.Store(reads > 1)
+		}
+	}
+	err := r.split(t, pr.ID, ask.ID)
+	r.reading = nil
+	r.failItems.Store(false)
+	if err != nil {
+		t.Fatalf("a split that wrote: %v", err)
+	}
+	if got := r.task(t, ask.ID); got.ID != ask.ID || r.aliasCount(t, ask.ID) != 0 {
+		t.Fatalf("after the split %s, %d aliases", got.ID, r.aliasCount(t, ask.ID))
 	}
 }
