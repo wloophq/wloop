@@ -686,6 +686,7 @@ func (s *Service) runHeadless(ctx context.Context, q turn.Turn, said string) Ans
 }
 
 // MarkRead notes that the agent read the answers ids of the unit, now; one read before keeps its time.
+// A refused answer the agent reads reached it after all: it turns typed, so its question no longer asks.
 func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error {
 	if len(ids) == 0 {
 		return nil
@@ -702,6 +703,10 @@ func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error 
 		if a := &b.Answers[i]; a.ReadAt.IsZero() && slices.Contains(ids, a.ID) {
 			a.ReadAt = now
 			evs = append(evs, s.event(u, KindAnswerRead, strconv.FormatInt(a.ID, 10)+":"+now.Format(time.RFC3339Nano), ""))
+			if a.Route == turn.Refused {
+				a.Route, a.NoticedAt = turn.Typed, now
+				evs = append(evs, s.routed(u, a.ID, AnswerResult{Route: turn.Typed, Handle: a.Session, Note: "the agent read it"}))
+			}
 		}
 	}
 	if len(evs) == 0 {

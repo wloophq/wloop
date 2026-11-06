@@ -106,7 +106,7 @@ let stored = "";
 let reloads = 0;
 const banner = { hidden: true };
 const reload = { onclick: null };
-const state = { guidance: {}, busy: new Set() };
+const state = { guidance: {}, busy: new Set(), answered: new Map() };
 const detailState = { answer: "", guidance: "", compose: { key: "", text: "", reaction: "" }, editing: new Map() };
 const document = {
   querySelector: (sel) => sel.startsWith("meta") ? { getAttribute: () => "b1" } : dialogOpen ? {} : null,

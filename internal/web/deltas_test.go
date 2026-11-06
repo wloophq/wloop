@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const deltaPrelude = `const state = { specs: { version: "", byId: {} }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), conn: "" };
+const deltaPrelude = `const state = { specs: { version: "", byId: {} }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), answered: new Map(), conn: "" };
 const API_VERSION = "1";
 const requests = [], timers = [], sources = [];
 let pending, queued = null, chain = Promise.resolve(), retries = 0, opened = false, hash = { view: "needs-me", pr: "" };

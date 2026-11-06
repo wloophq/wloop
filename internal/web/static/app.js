@@ -167,7 +167,7 @@ const ARTIFACT_LINES = 40;
 const PR_URL = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]\S*)?$/;
 const folded = new WeakMap();
 
-const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), guidance: {}, conn: "connecting", authLost: false,
+const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpecs: {}, plan: { items: [], closed: [], error: "", loaded: false }, collapsed: new Set(), collapsedFor: "", rows: [], epoch: "", rev: 0, activity: [], health: null, detail: null, checks: {}, checksLoading: new Set(), busy: new Set(), answered: new Map(), guidance: {}, conn: "connecting", authLost: false,
   explore: { result: null, busy: false, error: "", recent: [], sel: "", status: {} } };
 let lastFocus = null;
 
@@ -1962,7 +1962,7 @@ function guidanceBox(key, placeholder) {
     oninput: (e) => {
       state.guidance[key] = e.target.value;
       const answer = document.querySelector('[data-focus="detail:answer"]');
-      if (answer) answer.disabled = state.busy.has(key) || !e.target.value.trim();
+      if (answer) answer.disabled = state.busy.has(key) || state.answered.has(key) || !e.target.value.trim();
     },
   });
   box.value = state.guidance[key] || "";
@@ -2154,14 +2154,30 @@ function answerNote(r) {
 function turnButton(r, slot, label, name, extra, attrs = {}) {
   const st = (r.actions || []).find((a) => a.id === name);
   if (!st) return null;
+  const sent = answerSent(r);
   return h("button", {
     type: "button",
     class: ["act", st.enabled && attrs.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
     title: st.enabled && !st.note && attrs.title ? attrs.title : actionTitle(st, state.specs.byId[name]),
-    disabled: state.busy.has(keyOf(r)) || !st.enabled || !!attrs.disabled,
+    disabled: state.busy.has(keyOf(r)) || sent || !st.enabled || !!attrs.disabled,
     "data-focus": `detail:${slot}`,
     onclick: () => act(r, name, name === "answer" && answerNote(r) ? { ...extra, guidance: answerNote(r) } : extra),
   }, st.label || label);
+}
+
+function questionShown(r) {
+  const q = r.question;
+  return q ? `${q.record_id || ""}:${q.state}:${!!q.queued}` : "";
+}
+
+// answerSent says that an answer to the question r shows was accepted, so its controls stay off until the
+// row shows the question it left behind.
+function answerSent(r) {
+  const key = keyOf(r);
+  if (!state.answered.has(key)) return false;
+  if (state.answered.get(key) === questionShown(r)) return true;
+  state.answered.delete(key);
+  return false;
 }
 
 // answerBlock is the card's free answer: the box and the button that sends
@@ -3045,6 +3061,7 @@ async function act(row, name, extra = {}) {
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
     setNotice(acceptedNote(name, labelOf(row), out.intake) || `${name} done: ${labelOf(row)}${out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
     ok = true;
+    if (name === "answer" && row.question) state.answered.set(key, questionShown(row));
     if (body.guidance) {
       delete state.guidance[key];
       for (const id of ["guidance", "explore-guidance"]) {

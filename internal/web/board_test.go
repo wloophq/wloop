@@ -773,7 +773,7 @@ func TestQuestionBlockRenders(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
-const state = { busy: new Set(), guidance: { "github:acme/api#7": " check the CI first " }, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
+const state = { busy: new Set(), answered: new Map(), guidance: { "github:acme/api#7": " check the CI first " }, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push({ url, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
 function render() {}
@@ -827,7 +827,7 @@ const document = { getElementById: () => null };
 			Body map[string]any `json:"body"`
 		} `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const view = (n) => { const all = walk(n); return {
@@ -882,7 +882,7 @@ func TestQuestionCardSendsTheChoiceWithTheNoteOrTheTextAlone(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
-const state = { busy: new Set(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
+const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
 async function fetch(url, init) { posts.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
 function render() {}
@@ -899,11 +899,12 @@ const document = { getElementById: () => null };
 		Ready bool             `json:"ready"`
 		Posts []map[string]any `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const click = async (label, note) => {
     state.guidance["github:acme/api#7"] = note;
+    state.answered.clear();
     const b = walk(questionBlock(input)).find((x) => x.tag === "button" && text(x).startsWith(label));
     if (!b.attrs.disabled) await b.attrs.onclick();
     return b;
@@ -924,6 +925,53 @@ const document = { getElementById: () => null };
 	}
 	if !reflect.DeepEqual(got.Posts, want) {
 		t.Errorf("posts %v, want %v", got.Posts, want)
+	}
+}
+
+func TestQuestionCardKeepsItsControlsOffOnceAnAnswerIsSent(t *testing.T) {
+	src := appJS(t)
+	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const roundGate = () => undefined;
+const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
+let refuse = false;
+async function fetch() { return refuse ? { ok: false, status: 409, json: async () => ({ error: "the answer was not delivered" }) } : { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+function render() {}
+function setNotice() {}
+function scheduleLoad() {}
+const document = { getElementById: () => null };
+` + keyJS(t) + jsConst(t, src, "ARTIFACT_LINES") + jsConst(t, src, "API_VERSION")
+	asked := map[string]any{"state": "asked", "kind": "choice", "text": "Publish?", "record_id": 3, "options": []map[string]any{{"id": "publish", "label": "Publish"}, {"id": "hold", "label": "Hold"}}}
+	in := map[string]any{
+		"row":  map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "kind": "loop_waiting", "actions": []map[string]any{{"id": "answer", "enabled": true}, {"id": "continue", "enabled": true}, {"id": "dismiss", "enabled": true}}, "question": asked},
+		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
+	}
+	var got map[string][]bool
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote"}, `(async () => {
+  const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
+  const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
+  const buttons = () => walk(questionBlock(input)).filter((x) => x.tag === "button" && !text(x).startsWith("Send answer"));
+  const off = () => buttons().map((b) => !!b.attrs.disabled);
+  const out = {};
+  refuse = true;
+  await buttons()[0].attrs.onclick();
+  out.refused = off();
+  refuse = false;
+  await buttons()[0].attrs.onclick();
+  out.sent = off();
+  input.row = { ...input.row, question: { ...input.row.question } };
+  out.reloaded = off();
+  input.row = { ...input.row, question: { ...input.row.question, queued: true } };
+  out.moved = off();
+  process.stdout.write(JSON.stringify(out));
+})();`, in, &got)
+	want := map[string][]bool{
+		"refused":  {false, false, false, false},
+		"sent":     {true, true, true, true},
+		"reloaded": {true, true, true, true},
+		"moved":    {false, false},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("disabled %v, want %v", got, want)
 	}
 }
 
@@ -1141,7 +1189,7 @@ var cardGroups = []string{"turn", "intake", "brief"}
 
 func buttonPrelude(t *testing.T) string {
 	return `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, text: c.flat().filter((x) => x !== null && x !== undefined && x !== false).join("") }; }
-const state = { busy: new Set(), guidance: {}, actionError: "", actionDetail: "", specs: { version: "", byId: {} } };
+const state = { busy: new Set(), answered: new Map(), guidance: {}, actionError: "", actionDetail: "", specs: { version: "", byId: {} } };
 const render = () => {}, setNotice = () => {}, scheduleLoad = () => {};
 const document = { getElementById: () => null };
 ` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "FOCUS_PAIRS") + jsFunction(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
@@ -1153,7 +1201,7 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 `
 }
 
-var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "act", "apiError", "acceptedNote"}
+var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)
@@ -1427,7 +1475,7 @@ func TestTheQuestionCardFollowsTheServedStates(t *testing.T) {
 		"hidden":       map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{{ID: "open", Enabled: true}}},
 	}}
 	var got map[string]map[string]*wireButton
-	nodeRun(t, buttonPrelude(t), append(buttonFuncs, "answerNote", "turnButton"), `useSpecs(input.specs);
+	nodeRun(t, buttonPrelude(t), append(buttonFuncs, "answerNote", "questionShown", "answerSent", "turnButton"), `useSpecs(input.specs);
 const out = {};
 for (const [name, row] of Object.entries(input.rows)) {
   out[name] = {};
@@ -1558,7 +1606,7 @@ func TestLoadRefreshesTheSpecsAndKeepsThemWhenTheFetchFails(t *testing.T) {
 		Buttons  []string `json:"buttons"`
 		Error    string   `json:"error"`
 	}
-	nodeRun(t, `const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "", busy: new Set() };
+	nodeRun(t, `const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "", busy: new Set(), answered: new Map() };
 `+keyJS(t)+noPlugins+noViews+noUpdate+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 const focusSlot = (n) => n;
 function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, text: c.flat().join("") }; }
@@ -1713,7 +1761,7 @@ func TestCockpitPlanActionsPostToThePlanOrActOnTheUnit(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "PLAN_ACTS") + jsConst(t, src, "itemLabel") + jsConst(t, src, "planName") + jsConst(t, src, "unitKey") + `
 const API_VERSION = "1";
-const state = { busy: new Set() };
+const state = { busy: new Set(), answered: new Map() };
 const posts = [], acts = [];
 const render = () => {}, setNotice = () => {}, loadPlan = async () => {}, apiError = (o, f) => o.error || f;
 const prompt = () => "look at the retry";
@@ -1757,7 +1805,7 @@ func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
 	}
 	src := appJS(t)
 	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
-const state = { busy: new Set(), planSpecs: {} };
+const state = { busy: new Set(), answered: new Map(), planSpecs: {} };
 const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () => "";
 `
 	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
@@ -1807,7 +1855,7 @@ func TestAQueuedAnswerHidesTheQuestionsOptions(t *testing.T) {
 	src := appJS(t)
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
-const state = { busy: new Set(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
+const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 function render() {}
 function setNotice() {}
 function scheduleLoad() {}
@@ -1829,7 +1877,7 @@ const document = { getElementById: () => null };
 		Open    bool     `json:"open"`
 		Queued  bool     `json:"queued"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const block = questionBlock(input.queued);

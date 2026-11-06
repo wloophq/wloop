@@ -423,7 +423,7 @@ func actPrelude(t *testing.T) string {
 	b.WriteString(jsConst(t, src, "planName"))
 	b.WriteString(`
 const calls = [];
-const state = { specs: { byId: {} }, busy: new Set(), guidance: {} };
+const state = { specs: { byId: {} }, busy: new Set(), answered: new Map(), guidance: {} };
 const pl = (r) => r.payload || {};
 function render() {}
 function setNotice() {}
@@ -433,6 +433,7 @@ function acceptedNote() { return ""; }
 function apiError(out, fallback) { return out.error || fallback; }
 globalThis.fetch = async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({}) }; };
 `)
+	b.WriteString(jsFunction(t, src, "questionShown"))
 	b.WriteString(jsFunction(t, src, "act"))
 	b.WriteString(jsFunction(t, src, "actOnPlan"))
 	return b.String()
