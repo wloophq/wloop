@@ -373,6 +373,9 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		m.confirm(c, confirm, read)
 		return Command{}, false
 	}
+	if pick := m.verbPick(verb); pick != "" {
+		return m.openPick(e, verb, pick)
+	}
 	ask, asks := m.verbAsk(verb)
 	if !asks {
 		return m.send(c)
@@ -507,6 +510,8 @@ type overlay struct {
 	items []paletteItem
 	at    int
 	help  bool
+	// pick is set on a picker of another task, whose text narrows its items.
+	pick *taskPick
 }
 
 type paletteItem struct {
@@ -539,6 +544,9 @@ func (m *Model) paletteItems() []paletteItem {
 				switch {
 				case v.Enabled && ok:
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(v.Verb), b.Help), key: b.Key, about: b.Summary, run: runKey(b)})
+				case v.Enabled && m.verbPick(v.Verb) != "" && offersPick(m.shownDetail(e), m.verbPick(v.Verb)):
+					verb := v.Verb
+					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), about: m.verbSummary(verb), run: func(read uint64) (Command, bool) { return m.taskVerb(verb, read) }})
 				case v.Enabled && slices.Contains(projectHandlers, m.viewsCat.HandlerOf(v.Verb)):
 					verb := v.Verb
 					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), run: func(read uint64) (Command, bool) { return m.taskVerb(verb, read) }})
@@ -653,6 +661,9 @@ func keyOf(name string) Key {
 // it on Esc; the help closes on any other key too.
 func (m *Model) overlayKey(k Key) (Command, bool) {
 	o := m.overlay
+	if o.pick != nil {
+		return m.pickKey(k)
+	}
 	switch {
 	case k.Name == KeyUp || k.Rune == 'k':
 		o.at = max(o.at-1, 0)
@@ -675,6 +686,14 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 	o := m.overlay
 	lines = append(lines, " "+t.Bold(termfmt.Cut(o.title, width-1)))
 	hint := "Enter runs, Esc closes"
+	if o.pick != nil {
+		lines = append(lines, " > "+termfmt.Cut(string(o.pick.query), width-3))
+		body--
+		hint = "type to narrow, Enter picks, Esc closes"
+		if len(o.items) == 0 {
+			hint = "no task holds the text · " + hint
+		}
+	}
 	if o.help {
 		hint = "any key closes"
 	} else if o.at < len(o.items) && o.items[o.at].about != "" {

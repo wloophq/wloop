@@ -342,3 +342,18 @@ func TestTasksSinceNamesTheMovedUnits(t *testing.T) {
 		t.Fatalf("asked %v: units %v %v", q, got, err)
 	}
 }
+
+func TestMatchTasksAsksForTheTextAsTyped(t *testing.T) {
+	asked := make(chan url.Values, 1)
+	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		asked <- r.URL.Query()
+		fmt.Fprint(w, `{"full":true,"tasks":[{"id":"t-2","title":"Book the launch venue","state":"next","units":[]}],"removed":[]}`)
+	})
+	got, err := New(socket).MatchTasks(context.Background(), "launch v")
+	if err != nil || len(got) != 1 || got[0].ID != "t-2" {
+		t.Fatalf("matched %+v %v", got, err)
+	}
+	if q := <-asked; !q.Has(api.TasksMatch) || q.Get(api.TasksMatch) != "launch v" || q.Has("view") {
+		t.Fatalf("asked %v", q)
+	}
+}

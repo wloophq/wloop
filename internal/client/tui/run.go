@@ -32,6 +32,7 @@ type Daemon interface {
 	TasksSince(ctx context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error)
 	Counters(ctx context.Context, area, query string) (api.Counters, error)
 	Task(ctx context.Context, id string) (api.TaskView, error)
+	MatchTasks(ctx context.Context, text string) ([]api.TaskView, error)
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
 	ResolveGate(ctx context.Context, id int64, intent string, req api.TaskRequest) (api.GateView, error)
@@ -142,6 +143,8 @@ type carried struct {
 	lines  []string
 	task   api.TaskView
 	drafts []api.Draft
+	// matched are the open tasks a match command read.
+	matched []api.TaskView
 }
 
 // Run draws the views and applies keys until q, Ctrl-C, the end of the keys
@@ -252,10 +255,13 @@ func Run(ctx context.Context, cfg Config) error {
 			track()
 		case f := <-done:
 			running--
-			if f.cmd.fetch {
+			switch {
+			case f.cmd.matching:
+				m.SetMatches(f.cmd.match, f.matched, f.err)
+			case f.cmd.fetch:
 				m.SetDetail(f.cmd.task, f.task, f.err)
 				m.SetDrafts(f.cmd.task, f.drafts)
-			} else {
+			default:
 				m.Done(f.cmd, f.lines, f.err)
 			}
 			if leaving {
@@ -264,7 +270,7 @@ func Run(ctx context.Context, cfg Config) error {
 				}
 				m.Stay(waitingFor(running))
 			}
-			if !f.cmd.fetch || f.cmd.seen {
+			if !f.cmd.matching && (!f.cmd.fetch || f.cmd.seen) {
 				due.rows.Store(true)
 				due.plan.Store(true)
 				due.tasks.Store(true)
@@ -811,6 +817,9 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		}
 		ds, err := d.TaskDrafts(ctx, c.task)
 		return carried{task: e, drafts: ds}, err
+	case c.matching:
+		es, err := d.MatchTasks(ctx, c.match)
+		return carried{matched: es}, err
 	case c.capture != "":
 		e, err := d.CreateTask(ctx, api.TaskCreate{Title: c.capture})
 		if err != nil {
