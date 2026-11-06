@@ -381,7 +381,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		}},
 		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool {
 			return e.loadedIntents().Tasks.Handler(string(v)) == coretasks.HandlerMerge
-		}},
+		}, Splits: verbsHandledBy(e.loadedIntents, coretasks.HandlerSplit), Events: db.EventsOfKinds},
 		Clarity: facttask.ClarityDeps{Shaping: shapingVerbs(e.loadedIntents), ByHand: db.TasksRunByHand},
 	})
 }

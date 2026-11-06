@@ -14,7 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// CandidateDeps are what task.candidates reads.
+// CandidateDeps are what task.candidates and task.link_target_tasks read.
 type CandidateDeps struct {
 	// From and To are the links from and to any of units, as the link store keeps them; nil: none.
 	From, To func(ctx context.Context, units []unit.Unit) ([]link.Link, error)

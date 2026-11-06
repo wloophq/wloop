@@ -2,6 +2,7 @@ package facttask
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -9,13 +10,19 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // RefusalDeps are what task.refused_merges reads, with Deps.Gates.
 type RefusalDeps struct {
 	// Merges says whether verb v merges two tasks, as the profile's handler of it says; nil: none does.
 	Merges func(v task.Verb) bool
+	// Splits are the verbs that give a merged task back, as the profile's handlers say; nil: none.
+	Splits func() []string
+	// Events are every unit's events of kinds, oldest first; nil: no split is read.
+	Events func(ctx context.Context, kinds []string) ([]workflow.Event, error)
 }
 
 const passRefused = "facts.refused_merges"
@@ -26,8 +33,8 @@ type refusal struct {
 	closed time.Time
 }
 
-// refusedMerges is task.refused_merges of e: the tasks a rejected merge gate paired e with, while no item
-// either task holds was created or changed after the gate closed, sorted. Updated is not read: seeing a task
+// refusedMerges is task.refused_merges of e: the tasks a rejected merge gate or a split paired e with, while no
+// item either task holds was created or changed after the gate closed or the split, sorted. Updated is not read: seeing a task
 // moves it.
 func (p *Provider) refusedMerges(ctx context.Context, e task.Task) ([]string, error) {
 	out := []string{}
@@ -69,7 +76,7 @@ func (p *Provider) refusedMerges(ctx context.Context, e task.Task) ([]string, er
 	return out, nil
 }
 
-// refusals are the rejected proposal gates that proposed a merge.
+// refusals are the rejected proposal gates that proposed a merge, and the splits.
 func (p *Provider) refusals(ctx context.Context) ([]refusal, error) {
 	gs, err := p.d.Gates.Where(ctx, gates.Query{Kind: gate.KindProposal, Statuses: []gate.Status{gate.Rejected}})
 	if err != nil {
@@ -83,6 +90,43 @@ func (p *Provider) refusals(ctx context.Context) ([]refusal, error) {
 			continue
 		}
 		out = append(out, refusal{a: g.Task, b: other, closed: g.ClosedAt})
+	}
+	splits, err := p.splits(ctx)
+	return append(out, splits...), err
+}
+
+// splits are the merges a split gave back, closed when it did: each merge record on a task's own unit and the
+// first split event on that unit after it, which a split writes on both tasks' units.
+func (p *Provider) splits(ctx context.Context) ([]refusal, error) {
+	if p.d.Refusals.Splits == nil || p.d.Refusals.Events == nil {
+		return nil, nil
+	}
+	verbs := p.d.Refusals.Splits()
+	if len(verbs) == 0 {
+		return nil, nil
+	}
+	evs, err := p.d.Refusals.Events(ctx, append(task.VerbEventKinds(verbs), merge.RecordKind))
+	if err != nil {
+		return nil, err
+	}
+	merged := map[task.ID]task.ID{}
+	var out []refusal
+	for _, ev := range evs {
+		id, ok := task.IDOf(ev.Unit)
+		if !ok {
+			continue
+		}
+		if ev.Kind == merge.RecordKind {
+			var r struct{ From, Into task.ID }
+			if json.Unmarshal([]byte(ev.Data), &r) == nil && r.From == id && r.Into != "" {
+				merged[id] = r.Into
+			}
+			continue
+		}
+		if into, ok := merged[id]; ok {
+			out = append(out, refusal{a: id, b: into, closed: ev.At})
+			delete(merged, id)
+		}
 	}
 	return out, nil
 }

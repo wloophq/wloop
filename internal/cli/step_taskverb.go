@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -49,6 +50,9 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 	if e.Origin == task.OriginDerived && len(e.Items) > 0 && s.closes(v) {
 		return "a derived task closes when its items resolve", nil
 	}
+	if _, refusal, err := s.otherTask(ctx, c); err != nil || refusal != "" {
+		return refusal, err
+	}
 	if g.Handles(e, v) {
 		return "", nil
 	}
@@ -77,6 +81,15 @@ func (s *stepSet) taskVerbRun(ctx context.Context, c stepCall, _ automation.RunO
 			args[k] = a
 		}
 	}
+	other, refusal, err := s.otherTask(ctx, c)
+	switch {
+	case err != nil:
+		return "", err
+	case refusal != "":
+		return "", automation.Refused{Reason: refusal}
+	case other != "":
+		args[task.ArgTask] = string(other)
+	}
 	var chain workflow.Chain
 	if ev := c.why.Event; ev != nil {
 		chain = ev.Chain
@@ -97,4 +110,35 @@ func (s *stepSet) closes(v task.Verb) bool {
 	_, to, _ := l.Tasks.Move(string(v))
 	c, ok := l.Tasks.CategoryOf(to)
 	return ok && (c == task.CategoryDone || c == task.CategoryDropped)
+}
+
+// otherTask is the task c's task argument names, for a verb whose handler takes one: the id the fact it names
+// holds, or the first of a list fact's; refusal says why it names none.
+func (s *stepSet) otherTask(ctx context.Context, c stepCall) (id task.ID, refusal string, err error) {
+	name := c.arg(task.ArgTask)
+	handler := s.e.loadedIntents().Tasks.Handler(c.arg("verb"))
+	if name == "" || !slices.Contains(builtin.HandlerArgs[handler], task.ArgTask) {
+		return "", "", nil
+	}
+	f, err := s.facts(workflow.WithReads(ctx, name), c.u)
+	if err != nil {
+		return "", "", err
+	}
+	switch v := f[name].(type) {
+	case string:
+		id = task.ID(v)
+	case []string:
+		if len(v) > 0 {
+			id = task.ID(v[0])
+		}
+	case []any:
+		if len(v) > 0 {
+			first, _ := v[0].(string)
+			id = task.ID(first)
+		}
+	}
+	if id == "" {
+		return "", fmt.Sprintf("%s names no task", name), nil
+	}
+	return id, "", nil
 }

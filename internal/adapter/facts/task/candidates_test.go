@@ -90,7 +90,8 @@ func newCandidateEnv(t *testing.T) *candidateEnv {
 			},
 			Settings: func() facttask.CandidateSettings { return c.s },
 		},
-		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool { return v == task.VerbMerge }},
+		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool { return v == task.VerbMerge },
+			Splits: func() []string { return []string{string(task.VerbSplit)} }, Events: c.db.EventsOfKinds},
 		RoleProp: func(r task.Role) string {
 			name, _ := bundledTasks.PropOf(r)
 			return name
