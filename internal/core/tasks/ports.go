@@ -182,6 +182,12 @@ type GateSweeper interface {
 	Supersede(ctx context.Context, ids ...int64) error
 }
 
+// PairHold is the Gates' capability that says whether the user took task t and other apart (task.undone), so a
+// pair a workflow asked for runs only once they decide; Gates without it hold no pair.
+type PairHold interface {
+	TakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error)
+}
+
 type Result struct {
 	Task  task.Task
 	Lines []string

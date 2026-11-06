@@ -154,37 +154,59 @@ func (g serviceTaskGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, er
 const factUndone = "task.undone"
 
 // policy is the approval of the workflow gt's proposal names, over its task's facts; a proposal that pairs its
-// task with one of task.undone waits for you, whatever that approval says.
+// task with one of task.undone waits for you, whatever approval would decide it, and so does one whose task's
+// facts cannot be read.
 func (g serviceTaskGates) policy(ctx context.Context, gt gate.Gate) (gates.Policy, error) {
-	from := coretasks.ProposalFrom(gt)
-	if from == "" {
-		return nil, nil
-	}
-	w, ok := g.e.configuredWorkflow(from)
-	if !ok {
-		return nil, nil
-	}
-	facts := workflow.Facts{}
-	if g.e.wakeFacts != nil {
-		t, err := g.db.Tasks().Task(ctx, gt.Task)
-		if err != nil {
-			return nil, err
-		}
-		reads := []string{factUndone}
+	w, configured := g.e.configuredWorkflow(coretasks.ProposalFrom(gt))
+	var reads []string
+	if configured {
 		for _, r := range w.Gates[gt.Kind].Rules {
 			reads = append(reads, r.When.Reads()...)
 		}
-		if facts, err = g.e.wakeFacts(workflow.WithReads(ctx, reads...), t); err != nil {
-			return nil, err
-		}
+	}
+	facts, err := g.facts(ctx, gt.Task, reads...)
+	if err != nil {
+		return nil, err
 	}
 	if req, ok := coretasks.ProposedVerb(gt); ok {
-		undone, _ := facts[factUndone].([]string)
-		if other := req.Args[task.ArgTask]; other != "" && slices.Contains(undone, other) {
+		if other := req.Args[task.ArgTask]; other != "" && (facts == nil || slices.Contains(undoneOf(facts), other)) {
 			return waitsForYou{}, nil
 		}
 	}
+	if coretasks.ProposalFrom(gt) == "" || !configured {
+		return nil, nil
+	}
 	return workflowPolicy{w: w, facts: facts, now: g.e.Now()}, nil
+}
+
+// facts are task id's facts task.undone and reads name; nil when no task facts are served.
+func (g serviceTaskGates) facts(ctx context.Context, id task.ID, reads ...string) (workflow.Facts, error) {
+	if g.e.wakeFacts == nil {
+		return nil, nil
+	}
+	t, err := g.db.Tasks().Task(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return g.e.wakeFacts(workflow.WithReads(ctx, append(reads, factUndone)...), t)
+}
+
+func undoneOf(f workflow.Facts) []string {
+	undone, _ := f[factUndone].([]string)
+	return undone
+}
+
+// TakenApart says whether other is one of task.undone of t; true when t's facts cannot be read, so a pair a
+// workflow asked for waits for you rather than run unchecked.
+func (g serviceTaskGates) TakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error) {
+	if g.e.wakeFacts == nil {
+		return true, nil
+	}
+	f, err := g.e.wakeFacts(workflow.WithReads(ctx, factUndone), t)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(undoneOf(f), string(other)), nil
 }
 
 func (g serviceTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {

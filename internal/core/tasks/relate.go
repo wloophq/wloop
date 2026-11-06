@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -82,6 +83,9 @@ func (s *Service) relation(ctx context.Context, e task.Task, req Request, link b
 	if err := s.d.Store.Apply(ctx, cs, evs...); err != nil {
 		return Result{}, err
 	}
+	if !link {
+		s.takeApart(ctx, e.ID, o.ID)
+	}
 	return Result{Task: ne}, nil
 }
 
@@ -137,4 +141,31 @@ func (s *Service) splittable(ctx context.Context, id, to, as task.ID) (bool, err
 	}
 	_, merged, err := m.MergeOf(ctx, id)
 	return merged, err
+}
+
+// takeApart supersedes the open gates acting for a or b whose proposed verb names the other, once the user took
+// the two apart: a proposal of the pair, merge or relate, a rule or a window would release later runs nothing.
+// A sweep that fails leaves them to Allowed, which refuses a workflow's verb on a pair taken apart.
+func (s *Service) takeApart(ctx context.Context, a, b task.ID) {
+	sw, ok := s.d.Gates.(GateSweeper)
+	if !ok {
+		return
+	}
+	if ids, err := s.naming(ctx, sw, a, b); err == nil {
+		_ = sw.Supersede(ctx, ids...)
+	}
+}
+
+// Rejected supersedes the open proposals of the pair rejected gate g proposed, a merge or a relation, the user
+// having kept the two apart; a gate that proposes no pair, or was not rejected, supersedes nothing.
+func (s *Service) Rejected(ctx context.Context, g gate.Gate) {
+	p, ok := ProposedVerb(g)
+	other := task.ID(p.Args[task.ArgTask])
+	if !ok || g.Status != gate.Rejected || g.Task == "" || other == "" {
+		return
+	}
+	if h := s.d.States.Handler(string(p.Verb)); h != HandlerMerge && h != HandlerRelate {
+		return
+	}
+	s.takeApart(ctx, g.Task, other)
 }

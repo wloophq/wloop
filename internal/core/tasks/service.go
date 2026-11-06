@@ -616,6 +616,15 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 		if err != nil || o.ID != other || req.Args[task.ArgTask] != string(other) {
 			return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair that changed since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
 		}
+		if h, ok := s.d.Gates.(PairHold); ok && req.Actor != task.ActorPerson {
+			apart, err := h.TakenApart(ctx, t, other)
+			if err != nil {
+				return false, err
+			}
+			if apart {
+				return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair you took apart since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
+			}
+		}
 	}
 	return false, nil
 }

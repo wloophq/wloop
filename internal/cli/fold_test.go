@@ -3,16 +3,20 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -664,5 +668,127 @@ func TestASecondAskAboutTheSamePullRequestIsMergedIntoItsTask(t *testing.T) {
 	r.settled(t, 2)
 	if got := r.stored(t, "t-pr"); !slices.Contains(got.Units, other) || !slices.Contains(got.Items, task.ItemRef{Unit: other, Item: "j1"}) {
 		t.Fatalf("t-pr reads as %+v, want it holding the second ask", got)
+	}
+}
+
+// windowed makes the fold's merge gates wait an hour, then merge, as a user who chose a window does.
+func (r *foldRig) windowed() {
+	if r.te.cfg.Workflows == nil {
+		r.te.cfg.Workflows = map[string]config.WorkflowConfig{}
+	}
+	r.te.cfg.Workflows["task-fold-linked"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.kind == "proposal" && gate.name == "merge"`, Mode: "delay", Window: config.Days(time.Hour)}}}}}
+}
+
+// windowedRig is askedRig whose fold's merge gate waits its window, open.
+func windowedRig(t *testing.T) (*foldRig, gate.Gate) {
+	t.Helper()
+	r := newFoldRig(t)
+	r.windowed()
+	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
+	r.ops(t, askOp("i1", "Review acme/api#7 before Friday"), reviewLinkOp("i1"))
+	r.derived(t, "i1")
+	r.sweep(t)
+	g, ok := r.proposal(t)
+	if !ok || g.Deadline.IsZero() {
+		t.Fatalf("the fold's merge gate %+v, want one waiting its window", g)
+	}
+	return r, g
+}
+
+// passWindow ticks the gates two hours on, past the window.
+func (r *foldRig) passWindow(t *testing.T) {
+	t.Helper()
+	r.now = r.now.Add(2 * time.Hour)
+	if err := r.gates.Tick(context.Background(), r.now); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAWindowedFoldWhosePairYouUnrelatedRunsNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r, g := windowedRig(t)
+	for _, v := range []task.Verb{task.VerbRelate, task.VerbUnrelate} {
+		if _, err := r.tasks.Do(ctx, r.ask, coretasks.Request{Verb: v, Args: map[string]string{task.ArgTask: "t-pr"}, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, err := r.db.Gates(func() time.Time { return testNow }).Get(ctx, g.ID); err != nil || got.Status != gate.Superseded {
+		t.Fatalf("the fold's merge gate once you unrelated the pair: %+v %v, want it superseded", got, err)
+	}
+	r.passWindow(t)
+	r.apart(t, r.ask, "t-pr")
+}
+
+func TestRejectingARelationOfAPairSupersedesItsMerge(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r, merge := windowedRig(t)
+	r.te.cfg.Workflows["task-correlate-relate"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.kind == "proposal"`, Mode: "wait"}}}}}
+	res, err := r.tasks.Do(ctx, r.ask, coretasks.Request{Verb: task.VerbRelate, Args: map[string]string{task.ArgTask: "t-pr"}, Actor: task.ActorWorkflow, Source: "task-correlate-relate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, res.Task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var relate gate.Gate
+	for _, g := range gs {
+		if p, ok := coretasks.ProposedVerb(g); ok && p.Verb == task.VerbRelate && g.Status == gate.Open {
+			relate = g
+		}
+	}
+	if relate.ID == 0 {
+		t.Fatalf("no relate gate waits for you: %+v", gs)
+	}
+	r.resolve(t, relate, gate.Rejected)
+	if got, err := r.db.Gates(func() time.Time { return testNow }).Get(ctx, merge.ID); err != nil || got.Status != gate.Superseded {
+		t.Fatalf("the pair's merge gate once you rejected its relation: %+v %v, want it superseded", got, err)
+	}
+	r.passWindow(t)
+	r.apart(t, r.ask, "t-pr")
+}
+
+func TestAWindowedFoldOfAPairTakenApartUnseenRunsNothing(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r, g := windowedRig(t)
+	at := r.now.Add(time.Minute)
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(r.ask), Kind: task.VerbEventKind(task.VerbUnrelate),
+		Key: task.PairKey("t-pr", at), Actor: "person:cockpit", At: at}); err != nil {
+		t.Fatal(err)
+	}
+	r.now = r.now.Add(2 * time.Hour)
+	if err := r.gates.Tick(ctx, r.now); err == nil || !strings.Contains(err.Error(), "a pair you took apart") {
+		t.Fatalf("the window's consequence: %v, want the merge refused as a pair you took apart", err)
+	}
+	r.apart(t, r.ask, "t-pr")
+	if got, err := r.db.Gates(func() time.Time { return testNow }).Get(ctx, g.ID); err != nil || got.Status != gate.Approved || got.Rule != gates.RuleWindow {
+		t.Fatalf("the merge gate %+v %v, want its window passed", got, err)
+	}
+}
+
+func TestAPairTakenApartWaitsForYouWhenTheAskingWorkflowIsOff(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := askedRig(t, false)
+	if err := os.WriteFile(filepath.Join(r.dir, "gates.toml"), []byte("[[approval.rule]]\nwhen = 'gate.kind == \"proposal\"'\nmode = \"run\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r.write(t, "")
+	off := false
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"task-fold-linked": {Enabled: &off}}
+	at := r.now.Add(-time.Minute)
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(r.ask), Kind: task.VerbEventKind(task.VerbUnrelate),
+		Key: task.PairKey("t-pr", at), Actor: "person:cockpit", At: at}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.tasks.Do(ctx, r.ask, coretasks.Request{Verb: task.VerbMerge, Args: map[string]string{task.ArgTask: "t-pr"}, Actor: task.ActorWorkflow, Source: "task-fold-linked"}); err != nil {
+		t.Fatal(err)
+	}
+	r.apart(t, r.ask, "t-pr")
+	if _, ok := r.proposal(t); !ok {
+		t.Fatal("no merge gate waits for you on a pair you took apart")
 	}
 }
