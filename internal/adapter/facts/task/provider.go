@@ -100,12 +100,11 @@ type Deps struct {
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
 	// RoleProp is the property role r acts on, "" for none; nil: none.
 	RoleProp func(r task.Role) string
-	// Clarity, LinkTargets, Candidates and Refusals are what task.clarified, task.link_target_tasks,
-	// task.candidates and task.refused_merges read.
-	Clarity     ClarityDeps
-	LinkTargets LinkTargetDeps
-	Candidates  CandidateDeps
-	Refusals    RefusalDeps
+	// Clarity, Candidates and Refusals are what task.clarified, task.candidates and task.link_target_tasks,
+	// and task.refused_merges read.
+	Clarity    ClarityDeps
+	Candidates CandidateDeps
+	Refusals   RefusalDeps
 }
 
 // Link is what the facts read of one unit a task links.
