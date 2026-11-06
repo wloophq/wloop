@@ -93,3 +93,21 @@ func TestAStepThatNamesACostlyFactReadsItComputed(t *testing.T) {
 		t.Fatalf("the step read session.costly as %#v, want it computed", steps.saw)
 	}
 }
+
+func TestACostlyFactIsComputedForAWorkflowThatNamesItAfterOneThatDoesNot(t *testing.T) {
+	plain := sweepWF("a-plain", automationtest.MatchFunc(func(workflow.Vars) bool { return true }), "session.close")
+	plain.Order = 1
+	saw := map[string]any{}
+	costly := sweepWF("b-costly", automationtest.MatchFunc(func(v workflow.Vars) bool {
+		saw["b-costly"] = v.Facts["session.costly"]
+		return true
+	}, "session.costly"), "session.close")
+	costly.Order = 2
+	r := newRig(t, plain, costly)
+	r.e.Units = costlyUnits{r.units}
+	r.put(s1, "a")
+	r.evaluate()
+	if got, ok := saw["b-costly"].([]string); !ok || !slices.Equal(got, []string{"s-2"}) {
+		t.Fatalf("the second workflow read session.costly as %#v, want it computed: one read of a unit's facts serves every workflow", saw["b-costly"])
+	}
+}

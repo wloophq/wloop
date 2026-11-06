@@ -113,7 +113,12 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
 	byWorkflow, storedErr := e.storedItems(ctx, ws)
-	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
+	// A unit's facts are read once for every workflow of the pass, so they carry what any of them reads.
+	var reads []string
+	for _, b := range batches {
+		reads = append(reads, workflow.Reads(b.w)...)
+	}
+	p := &planner{e: e, ctx: workflow.WithReads(ctx, reads...), now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
 		factErr: map[factsRead]error{}, revs: map[unit.Unit]uint64{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
 	if e.Config != nil {
