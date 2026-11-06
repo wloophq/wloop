@@ -187,8 +187,28 @@ func TestConfigUnset(t *testing.T) {
 	if code := te.run("config", "unset", "sweep.fast"); code != 0 || !strings.Contains(te.out.String(), "not set") || len(backups(t, te.ConfigPath)) != 1 {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
-	if code := te.run("config", "unset", "sweep"); code != 1 || !strings.Contains(te.err.String(), "is a table") {
-		t.Fatalf("exit %d: %s", code, te.err)
+	if code := te.run("config", "unset", "sweep"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	if got, want := readFile(t, te.ConfigPath), "# acme's loop\nagent = 'claude' # the agent\n"; got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+}
+
+func TestConfigUnsetUndoesASet(t *testing.T) {
+	t.Parallel()
+	for _, key := range []string{"workflows.task-correlate.enabled", "workflows.task-correlate"} {
+		te := newTestEnv(t, &fake.Manager{})
+		writeFile(t, te.ConfigPath, acmeConfig)
+		if code := te.run("config", "set", "workflows.task-correlate.enabled", "false"); code != 0 {
+			t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+		}
+		if code := te.run("config", "unset", key); code != 0 {
+			t.Fatalf("%s: exit %d: %s%s", key, code, te.out, te.err)
+		}
+		if got := readFile(t, te.ConfigPath); got != acmeConfig {
+			t.Fatalf("%s, got:\n%s", key, got)
+		}
 	}
 }
 

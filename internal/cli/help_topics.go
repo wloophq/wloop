@@ -472,8 +472,9 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Remove a configuration value",
 				Usage:   []string{"config unset <key>"},
 				About: "Remove one key from the config file, so its default applies, keeping the rest as written and the previous file as a backup. " +
+					"A table's name removes the whole table, and a table left with no key or comment loses its header too. " +
 					"It removes a key no setting reads too, so a file that does not load can be fixed one key at a time.",
-				Examples: []string{"config unset sweep.fast"},
+				Examples: []string{"config unset sweep.fast", "config unset workflows.task-check-on"},
 				Docs:     "reference/configuration",
 			},
 			{

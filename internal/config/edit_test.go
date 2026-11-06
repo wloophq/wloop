@@ -134,12 +134,11 @@ func TestDocUnsetOfAKeyTheFileLacksChangesNothing(t *testing.T) {
 	}
 }
 
-func TestDocUnsetRefusesATableAnInlineTableAndAnArrayOfTables(t *testing.T) {
+func TestDocUnsetRefusesAKeyInAnInlineTableOrAnArrayOfTables(t *testing.T) {
 	for _, c := range []struct {
 		raw  string
 		path []string
 	}{
-		{"[workflows.acme-sync]\nenabled = false\n", []string{"workflows", "acme-sync"}},
 		{"views = {orca = {columns = {needs-me = 'x'}}}\n", []string{"views", "orca", "columns", "needs-me"}},
 		{"[[projects]]\nmatch = 'acme/*'\n", []string{"projects", "match"}},
 	} {
@@ -149,6 +148,92 @@ func TestDocUnsetRefusesATableAnInlineTableAndAnArrayOfTables(t *testing.T) {
 		}
 		if err := d.Unset(c.path); err == nil || string(d.Bytes()) != c.raw {
 			t.Errorf("%v: %v\n%s", c.path, err, d.Bytes())
+		}
+	}
+}
+
+func unset(t *testing.T, raw string, path ...string) string {
+	t.Helper()
+	d, err := ParseDoc([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Unset(path); err != nil {
+		t.Fatalf("%v: %v", path, err)
+	}
+	return string(d.Bytes())
+}
+
+func TestDocUnsetUndoesASet(t *testing.T) {
+	x := []string{"workflows", "acme-sync", "enabled"}
+	y := []string{"workflows", "beta-sync", "enabled"}
+	for _, base := range []string{"", "agent = 'claude'\n", "# acme's loop\nagent = 'claude'\n\n# how often\n[sweep]\nfast = '2m'\n"} {
+		withX, err := set(t, base, x, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := unset(t, withX, x...); got != base {
+			t.Errorf("unset of the key, got:\n%s\nwant:\n%s", got, base)
+		}
+		if got := unset(t, withX, x[:2]...); got != base {
+			t.Errorf("unset of the table, got:\n%s\nwant:\n%s", got, base)
+		}
+		withY, err := set(t, base, y, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		both, err := set(t, withX, y, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, order := range [][2][]string{{x, y}, {y, x}} {
+			once := unset(t, both, order[0]...)
+			if left := map[string]string{x[1]: withY, y[1]: withX}[order[0][1]]; once != left {
+				t.Errorf("unset of %v, got:\n%s\nwant:\n%s", order[0], once, left)
+			}
+			if got := unset(t, once, order[1]...); got != base {
+				t.Errorf("unset of %v then %v, got:\n%s\nwant:\n%s", order[0], order[1], got, base)
+			}
+		}
+	}
+}
+
+func TestDocUnsetKeepsATableWithACommentOrASubTable(t *testing.T) {
+	path := []string{"workflows", "acme-sync", "enabled"}
+	for raw, want := range map[string]string{
+		"# switches\n[workflows.acme-sync]\nenabled = false\n":                              "# switches\n[workflows.acme-sync]\n",
+		"[workflows.acme-sync] # off\nenabled = false\n":                                    "[workflows.acme-sync] # off\n",
+		"[workflows.acme-sync]\n# off\nenabled = false\n":                                   "[workflows.acme-sync]\n# off\n",
+		"[workflows.acme-sync]\nenabled = false\n\n# beta\n\n[sweep]\nfast = '2m'\n":        "[workflows.acme-sync]\n\n# beta\n\n[sweep]\nfast = '2m'\n",
+		"[workflows]\nacme-sync.enabled = false\n\n[workflows.beta-sync]\nenabled = true\n": "[workflows]\n\n[workflows.beta-sync]\nenabled = true\n",
+		"[workflows]\nacme-sync.enabled = false\n":                                          "",
+		"[workflows.acme-sync]\nenabled = false\nobserve = ['a']\n":                         "[workflows.acme-sync]\nobserve = ['a']\n",
+	} {
+		if got := unset(t, raw, path...); got != want {
+			t.Errorf("%q, got:\n%s\nwant:\n%s", raw, got, want)
+		}
+	}
+}
+
+func TestDocUnsetRemovesAWholeTable(t *testing.T) {
+	for _, c := range []struct {
+		raw  string
+		path []string
+		want string
+	}{
+		{"agent = 'claude'\n\n# switches\n[workflows.acme-sync]\nenabled = false\n\n[workflows.acme-sync.x]\na = 1\n\n[sweep]\nfast = '2m'\n",
+			[]string{"workflows", "acme-sync"}, "agent = 'claude'\n\n[sweep]\nfast = '2m'\n"},
+		{"[workflows]\nacme-sync.enabled = false\n\n[workflows.beta-sync]\nenabled = true\n\n[sweep]\nfast = '2m'\n",
+			[]string{"workflows"}, "[sweep]\nfast = '2m'\n"},
+		{"[workflows]\nacme-sync.enabled = false\nbeta-sync.enabled = true\n",
+			[]string{"workflows", "acme-sync"}, "[workflows]\nbeta-sync.enabled = true\n"},
+		{"[workflows]\nacme-sync.enabled = false\n", []string{"workflows", "acme-sync"}, ""},
+		{"sweep.fast = '2m'\nagent = 'claude'\n", []string{"sweep"}, "agent = 'claude'\n"},
+		{"agent = 'claude'\n\n[[projects]]\nmatch = 'acme/*'\n\n[[projects]]\nmatch = 'beta/*'\n", []string{"projects"}, "agent = 'claude'\n"},
+		{"[workflows.acme-sync]\nenabled = false\n", []string{"workflows", "beta-sync"}, "[workflows.acme-sync]\nenabled = false\n"},
+	} {
+		if got := unset(t, c.raw, c.path...); got != c.want {
+			t.Errorf("%v of %q, got:\n%s\nwant:\n%s", c.path, c.raw, got, c.want)
 		}
 	}
 }
