@@ -1,7 +1,7 @@
 {
  "id": "07-channel-ask-and-pull-request-among-others",
  "kind": "slack-pr",
- "same_as": "t-0000000000007002",
+ "same_as": "t-00000000000074f7",
  "task": {
   "id": "t-0000000000007001",
   "title": "Ship the dark mode toggle for settings",
@@ -12,7 +12,7 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000007002",
+   "id": "t-00000000000074f7",
    "title": "acme/web#301: Settings dark mode toggle",
    "notes": "Your pull request",
    "items": [

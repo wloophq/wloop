@@ -1,23 +1,21 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/pkg/plugin/evalout"
 )
 
 const evalCorrelationUsage = "usage: eval-correlation --cases <dir> --out <dir> [--workflow task-correlate] [--prompt <file>] [--max-usd 2] [--call-usd 0.05]"
@@ -40,25 +38,31 @@ type caseTask struct {
 	Items []string `json:"items"`
 }
 
-// correlationResult is one case's verdict.
+// correlationResult is one case's verdict. Proposed is what the runtime acts on: same_work, with same_as one of
+// the case's candidates; Stray is any other non-empty same_as.
 type correlationResult struct {
-	ID      string   `json:"id"`
-	Kind    string   `json:"kind"`
-	Want    string   `json:"want"`
-	Got     string   `json:"got"`
-	Reason  string   `json:"reason"`
-	Correct bool     `json:"correct"`
-	CostUSD *float64 `json:"cost_usd,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	ID       string   `json:"id"`
+	Kind     string   `json:"kind"`
+	Want     string   `json:"want"`
+	SameWork bool     `json:"same_work"`
+	Got      string   `json:"got"`
+	Proposed bool     `json:"proposed"`
+	Stray    bool     `json:"stray"`
+	Reason   string   `json:"reason"`
+	Correct  bool     `json:"correct"`
+	Model    string   `json:"model,omitempty"`
+	CostUSD  *float64 `json:"cost_usd,omitempty"`
+	Error    string   `json:"error,omitempty"`
 }
 
-// correlationScore counts the verdicts with "same work" as the positive class: a wrong id counts against
-// both precision and recall.
+// correlationScore counts the proposals the runtime would open, "same work" being the positive class: a
+// proposal of the wrong candidate counts against both precision and recall, and a stray answer is no proposal.
 type correlationScore struct {
 	Cases, Answered, TP, FP, FN, TN int
+	Stray, Skipped                  int
 	Precision, Recall               float64
 	SpentUSD                        float64
-	Skipped                         int
+	Model                           string
 }
 
 type correlationEvalOptions struct {
@@ -138,8 +142,9 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 			err = validAnswer(o.Schema, ans.JSON)
 		}
 		var v struct {
-			SameAs string `json:"same_as"`
-			Reason string `json:"reason"`
+			SameWork bool   `json:"same_work"`
+			SameAs   string `json:"same_as"`
+			Reason   string `json:"reason"`
 		}
 		if err == nil {
 			err = json.Unmarshal(ans.JSON, &v)
@@ -149,25 +154,29 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 		} else {
 			s.Answered++
 		}
-		r.Got, r.Reason, r.Correct = v.SameAs, v.Reason, err == nil && v.SameAs == c.SameAs
+		r.SameWork, r.Got, r.Reason, r.Model = v.SameWork, v.SameAs, v.Reason, ans.Model
+		r.Proposed = err == nil && v.SameWork && slices.ContainsFunc(c.Candidates, func(t caseTask) bool { return t.ID == v.SameAs })
+		r.Stray = err == nil && !r.Proposed && v.SameAs != ""
+		r.Correct = err == nil && (r.Proposed && v.SameAs == c.SameAs || !r.Proposed && c.SameAs == "")
+		if r.Stray {
+			s.Stray++
+		}
+		s.Model = cmp.Or(s.Model, ans.Model)
 		switch {
-		case err != nil && c.SameAs != "":
-			s.FN++
-		case err != nil:
-		case r.Correct && c.SameAs != "":
+		case r.Proposed && v.SameAs == c.SameAs:
 			s.TP++
-		case r.Correct:
-			s.TN++
-		default:
-			if v.SameAs != "" {
-				s.FP++
-			}
+		case r.Proposed:
+			s.FP++
 			if c.SameAs != "" {
 				s.FN++
 			}
+		case c.SameAs != "":
+			s.FN++
+		case err == nil:
+			s.TN++
 		}
 		if o.Log != nil {
-			fmt.Fprintf(o.Log, "%s: want %q got %q\n", c.ID, c.SameAs, v.SameAs)
+			fmt.Fprintf(o.Log, "%s: want %q, same_work %v same_as %q, proposed %v\n", c.ID, c.SameAs, v.SameWork, v.SameAs, r.Proposed)
 		}
 		out = append(out, r)
 	}
@@ -181,8 +190,9 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 }
 
 func (s correlationScore) String() string {
-	return fmt.Sprintf("%d cases, %d answered, %d skipped by the budget; precision %.2f (%d of %d proposed), recall %.2f (%d of %d same-work pairs); spent $%.2f",
-		s.Cases, s.Answered, s.Skipped, s.Precision, s.TP, s.TP+s.FP, s.Recall, s.TP, s.TP+s.FN, s.SpentUSD)
+	return fmt.Sprintf("%d cases, %d answered, %d skipped by the budget; precision %.2f (%d of %d proposed), recall %.2f (%d of %d same-work pairs); "+
+		"%d stray answers no proposal acts on; model %s; spent $%.4f",
+		s.Cases, s.Answered, s.Skipped, s.Precision, s.TP, s.TP+s.FP, s.Recall, s.TP, s.TP+s.FN, s.Stray, cmp.Or(s.Model, "unreported"), s.SpentUSD)
 }
 
 // runEvalCorrelation runs the correlation judgment over the synthetic cases with the configured agent and writes
@@ -199,7 +209,7 @@ func runEvalCorrelation(ctx context.Context, e *Env, args []string) error {
 	if err := fs.Parse(args); err != nil || fs.NArg() > 0 || *cases == "" {
 		return usageError{usage: evalCorrelationUsage}
 	}
-	if err := outsideCheckout(*out); err != nil {
+	if err := evalout.OutsideRepository("out", *out); err != nil {
 		return err
 	}
 	set, err := loadCorrelationCases(*cases)
@@ -210,25 +220,16 @@ func runEvalCorrelation(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	read := func(file string) (string, error) {
-		f, err := profile.Resolve(profile.Chain(cfg), path.Join("workflows", *name, file))
-		if err != nil {
-			return "", err
-		}
-		return string(f.Body), nil
+	prompt, schema, err := e.judgmentFiles(*name)
+	if err != nil {
+		return err
 	}
-	prompt, err := read("prompt.md.tmpl")
 	if *promptFile != "" {
-		var b []byte
-		b, err = os.ReadFile(*promptFile)
+		b, err := os.ReadFile(*promptFile)
+		if err != nil {
+			return err
+		}
 		prompt = string(b)
-	}
-	if err != nil {
-		return err
-	}
-	schema, err := read("schema.json")
-	if err != nil {
-		return err
 	}
 	dir, err := os.MkdirTemp("", brand.Name+"-eval-correlation-")
 	if err != nil {
@@ -265,30 +266,21 @@ func writeCorrelationEval(dir string, results []correlationResult, s correlation
 	return os.WriteFile(filepath.Join(dir, "score.txt"), []byte(s.String()+"\n"), 0o644)
 }
 
-// outsideCheckout refuses a path inside a git checkout, so eval outputs never land where they could be committed.
-func outsideCheckout(dir string) error {
-	if dir == "" {
-		return errors.New("--out is required")
+// judgmentFiles are the prompt and the schema the classify step of workflow names, which must read a with.
+func (e *Env) judgmentFiles(name string) (prompt, schema string, err error) {
+	ws := e.loadedIntents().Workflows
+	i := slices.IndexFunc(ws, func(w workflow.Workflow) bool { return w.Name == name })
+	if i < 0 {
+		return "", "", fmt.Errorf("no workflow %s is loaded", name)
 	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return err
+	j := slices.IndexFunc(ws[i].Steps, func(st workflow.Step) bool { return st.Use == stepClassify })
+	if j < 0 || ws[i].Steps[j].Args[withArg] == nil {
+		return "", "", fmt.Errorf("%s has no classify step with a with to judge", name)
 	}
-	for d := abs; ; d = filepath.Dir(d) {
-		if real, err := filepath.EvalSymlinks(d); err == nil {
-			abs = filepath.Join(real, strings.TrimPrefix(abs, d))
-			break
-		}
-		if filepath.Dir(d) == d {
-			break
-		}
+	c := stepCall{st: ws[i].Steps[j], why: workflow.Why{Workflow: name}}
+	if prompt, err = stepFile(e, c, "prompt"); err != nil {
+		return "", "", err
 	}
-	for d := abs; ; d = filepath.Dir(d) {
-		if _, err := os.Lstat(filepath.Join(d, ".git")); err == nil {
-			return fmt.Errorf("--out %s is inside the git checkout %s; write eval outputs outside any repository", abs, d)
-		}
-		if filepath.Dir(d) == d {
-			return nil
-		}
-	}
+	schema, err = stepFile(e, c, "schema")
+	return prompt, schema, err
 }

@@ -1,7 +1,7 @@
 {
  "id": "01-dm-and-channel-access-request",
  "kind": "dm-channel",
- "same_as": "t-0000000000001002",
+ "same_as": "t-00000000000017e3",
  "task": {
   "id": "t-0000000000001001",
   "title": "Grant Bob write access to the docs repo",
@@ -12,19 +12,19 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000001002",
-   "title": "Docs repo access for Bob",
-   "notes": "#platform-help",
-   "items": [
-    "Bob asks in #platform-help who can give him write access to the docs repository"
-   ]
-  },
-  {
    "id": "t-0000000000001003",
    "title": "Rotate the CI deploy key",
    "notes": "#platform-help",
    "items": [
     "Carol asks to rotate the CI deploy key before Friday"
+   ]
+  },
+  {
+   "id": "t-00000000000017e3",
+   "title": "Docs repo access for Bob",
+   "notes": "#platform-help",
+   "items": [
+    "Bob asks in #platform-help who can give him write access to the docs repository"
    ]
   }
  ]

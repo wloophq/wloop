@@ -1,7 +1,7 @@
 {
  "id": "03-dm-and-channel-budget-numbers",
  "kind": "dm-channel",
- "same_as": "t-0000000000003002",
+ "same_as": "t-0000000000003c05",
  "task": {
   "id": "t-0000000000003001",
   "title": "Send Q3 cloud spend numbers to Grace",
@@ -12,19 +12,19 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000003002",
-   "title": "Q3 spend by team",
-   "notes": "#finance-ops",
-   "items": [
-    "Grace asks in #finance-ops for the Q3 cloud spend per team, she needs it for the board deck"
-   ]
-  },
-  {
    "id": "t-0000000000003003",
    "title": "Renew the monitoring contract",
    "notes": "#finance-ops",
    "items": [
     "Grace asks whether the monitoring contract renews in October"
+   ]
+  },
+  {
+   "id": "t-0000000000003c05",
+   "title": "Q3 spend by team",
+   "notes": "#finance-ops",
+   "items": [
+    "Grace asks in #finance-ops for the Q3 cloud spend per team, she needs it for the board deck"
    ]
   }
  ]

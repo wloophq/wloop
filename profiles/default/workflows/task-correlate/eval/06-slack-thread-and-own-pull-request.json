@@ -1,7 +1,7 @@
 {
  "id": "06-slack-thread-and-own-pull-request",
  "kind": "slack-pr",
- "same_as": "t-0000000000006002",
+ "same_as": "t-0000000000006d38",
  "task": {
   "id": "t-0000000000006001",
   "title": "acme/search#57: Fix pagination past page 10",
@@ -12,7 +12,15 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000006002",
+   "id": "t-0000000000006003",
+   "title": "Search ranking for exact titles",
+   "notes": "#search thread",
+   "items": [
+    "Judy asks why exact title matches rank below partial ones"
+   ]
+  },
+  {
+   "id": "t-0000000000006d38",
    "title": "Search pagination bug",
    "notes": "#search thread",
    "items": [

@@ -1,7 +1,7 @@
 {
  "id": "05-slack-merge-ask-and-pull-request",
  "kind": "slack-pr",
- "same_as": "t-0000000000005002",
+ "same_as": "t-0000000000005b62",
  "task": {
   "id": "t-0000000000005001",
   "title": "Merge the retry fix once green",
@@ -12,20 +12,20 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000005002",
-   "title": "acme/payments#88: Retry declined card charges once",
-   "notes": "Your pull request",
-   "items": [
-    "Checks are running on acme/payments#88",
-    "Ivan approved acme/payments#88"
-   ]
-  },
-  {
    "id": "t-0000000000005003",
    "title": "acme/payments#90: Bump the HTTP client",
    "notes": "Your pull request",
    "items": [
     "Dependency update waiting for review"
+   ]
+  },
+  {
+   "id": "t-0000000000005b62",
+   "title": "acme/payments#88: Retry declined card charges once",
+   "notes": "Your pull request",
+   "items": [
+    "Checks are running on acme/payments#88",
+    "Ivan approved acme/payments#88"
    ]
   }
  ]

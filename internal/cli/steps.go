@@ -168,10 +168,12 @@ func (c stepCall) arg(name string) string {
 
 // file is the file argument name of c's step names beside its workflow's
 // manifest, its default when unset, read through the profile layers.
-func (s *stepSet) file(c stepCall, name string) (string, error) {
+func (s *stepSet) file(c stepCall, name string) (string, error) { return stepFile(s.e, c, name) }
+
+func stepFile(e *Env, c stepCall, name string) (string, error) {
 	r, _ := builtin.StepArg(c.st.Use, name)
 	rel := path.Join("workflows", c.why.Workflow, cmp.Or(c.arg(name), r.Default))
-	f, err := profile.Resolve(profile.Chain(s.e.currentConfig()), rel)
+	f, err := profile.Resolve(profile.Chain(e.currentConfig()), rel)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", c.st.Use, err)
 	}

@@ -1,7 +1,7 @@
 {
  "id": "02-dm-and-channel-release-notes",
  "kind": "dm-channel",
- "same_as": "t-0000000000002002",
+ "same_as": "t-0000000000002a41",
  "task": {
   "id": "t-0000000000002001",
   "title": "Draft the 4.2 release notes",
@@ -12,7 +12,15 @@
  },
  "candidates": [
   {
-   "id": "t-0000000000002002",
+   "id": "t-0000000000002003",
+   "title": "Release notes for 4.1.3",
+   "notes": "#releases",
+   "items": [
+    "Erin asks who wrote the 4.1.3 release notes"
+   ]
+  },
+  {
+   "id": "t-0000000000002a41",
    "title": "Release notes for 4.2",
    "notes": "#releases thread",
    "items": [
