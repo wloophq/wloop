@@ -408,7 +408,7 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 	return out, nil
 }
 
-// names says whether a read ctx carries names a fact that starts with prefix.
+// names says whether a read ctx carries names prefix, as a fact name or inside a text that mentions it.
 func names(ctx context.Context, prefix string) bool {
 	return slices.ContainsFunc(workflow.ReadsOf(ctx), func(r string) bool { return strings.Contains(r, prefix) })
 }
