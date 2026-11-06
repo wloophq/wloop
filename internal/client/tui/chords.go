@@ -690,7 +690,10 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 		lines = append(lines, " > "+termfmt.Cut(string(o.pick.query), width-3))
 		body--
 		hint = "type to narrow, Enter picks, Esc closes"
-		if len(o.items) == 0 {
+		switch {
+		case o.pick.pending:
+			hint = "listing the tasks… · " + hint
+		case len(o.items) == 0:
 			hint = "no task holds the text · " + hint
 		}
 	}

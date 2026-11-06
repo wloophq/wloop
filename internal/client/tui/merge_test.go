@@ -28,8 +28,8 @@ func pickModel(t *testing.T, edit func(*api.TaskView)) (*Model, map[string][]api
 	m := viewsModel(t)
 	cat := viewsCatalog()
 	cat.Verbs = append(cat.Verbs, pickVerbs...)
-	cat.Props = append(cat.Props, api.PropSpec{Name: "related", Type: "string[]", Role: string(dtask.RoleRelated)},
-		api.PropSpec{Name: "merged", Type: "string[]", Role: string(dtask.RoleMerged)})
+	cat.Props = append(cat.Props, api.PropSpec{Name: "linked", Type: "string[]", Role: string(dtask.RoleRelated)},
+		api.PropSpec{Name: "absorbed", Type: "string[]", Role: string(dtask.RoleMerged)})
 	cat.States = []api.StateSpec{{Name: "inbox", Label: "Inbox"}, {Name: "next", Label: "Next"}, {Name: "waiting", Label: "Waiting"}}
 	m.SetViews(cat)
 	tasks := viewTasks()
@@ -80,6 +80,9 @@ func TestTheTUIPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 		t.Fatalf("the palette of a task with nothing merged or related: %v", got)
 	}
 	press(m, Key{Name: KeyEsc})
+	if _, ok := m.taskVerb("split", 0); ok || !strings.HasPrefix(m.status, "Split: no task to pick") {
+		t.Errorf("Split with nothing merged: status %q", m.status)
+	}
 
 	d := &fakeDaemon{tasks: tasks}
 	answer := func(c Command, ok bool) {
@@ -126,6 +129,20 @@ func TestTheTUIPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 	m.Done(c, nil, nil)
 
 	answer(runPalette(t, m, "Relate"))
+	var pending Command
+	for _, k := range typed("Call") {
+		pending, _ = press(m, k)
+	}
+	if c, ok := press(m, Key{Name: KeyEnter}); ok || m.overlay == nil {
+		t.Fatalf("Enter before the answer for Call sent %+v, or closed the picker", c)
+	}
+	answer(pending, true)
+	if c, ok := press(m, Key{Name: KeyEnter}); !ok || c.verb != "relate" || c.args[dtask.ArgTask] != "e4" {
+		t.Fatalf("Enter after the answer for Call sent %+v %v", c, ok)
+	}
+	m.Done(Command{Unit: taskUnit("e1")}, nil, nil)
+
+	answer(runPalette(t, m, "Relate"))
 	if _, ok := press(m, Key{Name: KeyEsc}); ok || m.overlay != nil {
 		t.Fatal("Esc did not close the picker")
 	}
@@ -133,8 +150,8 @@ func TestTheTUIPicksTheOtherTaskOfAMergeFromTheOpenTasks(t *testing.T) {
 
 func TestTheTUIDetailShowsRelatedTasksAndAMergedFromTraceWithSplit(t *testing.T) {
 	m, _ := pickModel(t, func(e *api.TaskView) {
-		e.Props["related"] = json.RawMessage(`["e4","t-40"]`)
-		e.Props["merged"] = json.RawMessage(`["t-9"]`)
+		e.Props["linked"] = json.RawMessage(`["e4","t-40"]`)
+		e.Props["absorbed"] = json.RawMessage(`["t-9"]`)
 		e.Related = []api.TaskRef{{ID: "e4", Title: "Call the bank first", State: "inbox"}, {ID: "t-40", Title: "Old badge order", State: "next", Merged: true}}
 		e.MergedFrom = []api.TaskRef{{ID: "t-9", Title: "Batch export follow-up", State: "inbox", Within: []api.TaskRef{{ID: "t-8", Title: "Export retry", State: "waiting"}}}}
 	})
@@ -142,7 +159,7 @@ func TestTheTUIDetailShowsRelatedTasksAndAMergedFromTraceWithSplit(t *testing.T)
 	m.openTask(e, 0)
 	m.SetDetail("e1", e, nil)
 	screen := screenOf(m, 140, 60)
-	for _, want := range []string{"Call the bank · Next", "Old badge order · Next", "merged     Batch export follow-up · Inbox", "↳ Export retry · Waiting"} {
+	for _, want := range []string{"linked     Call the bank · Next", "Old badge order · Next", "absorbed   Batch export follow-up · Inbox", "↳ Export retry · Waiting"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("the detail lacks %q:\n%s", want, screen)
 		}

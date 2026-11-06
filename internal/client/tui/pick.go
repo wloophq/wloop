@@ -24,6 +24,8 @@ type taskPick struct {
 	verb  string
 	pick  string
 	query []rune
+	// pending is set while the daemon has not answered for query: the items are an older text's.
+	pending bool
 }
 
 // verbPick is the pick of the served verb, "" for a verb that takes no other task.
@@ -55,7 +57,7 @@ func offersPick(e api.TaskView, pick string) bool {
 func (m *Model) openPick(e api.TaskView, verb, pick string) (Command, bool) {
 	e = m.shownDetail(e)
 	if !offersPick(e, pick) {
-		m.status = verb + ": no task to pick on " + taskLabel(e)
+		m.status = cmp.Or(m.verbLabel(verb), verb) + ": no task to pick on " + taskLabel(e)
 		return Command{}, false
 	}
 	m.overlay = &overlay{title: m.verbQuestion(verb) + " for " + taskLabel(e), pick: &taskPick{task: e, verb: verb, pick: pick}}
@@ -67,6 +69,7 @@ func (m *Model) repick() (Command, bool) {
 	p := m.overlay.pick
 	m.overlay.at = 0
 	if p.pick == pickOpen {
+		p.pending = true
 		return Command{Action: "match", match: string(p.query), matching: true}, true
 	}
 	want := strings.ToLower(strings.TrimSpace(string(p.query)))
@@ -85,11 +88,13 @@ func (m *Model) SetMatches(text string, tasks []api.TaskView, err error) {
 	if m.overlay == nil || m.overlay.pick == nil || m.overlay.pick.pick != pickOpen || string(m.overlay.pick.query) != text {
 		return
 	}
+	p := m.overlay.pick
+	p.pending = false
 	if err != nil {
+		m.overlay.items = nil
 		m.status = "tasks not listed: " + err.Error()
 		return
 	}
-	p := m.overlay.pick
 	var items []paletteItem
 	for _, e := range tasks {
 		if e.ID != p.task.ID {
@@ -116,7 +121,8 @@ func (m *Model) pickKey(k Key) (Command, bool) {
 		o.at = max(o.at-1, 0)
 	case k.Name == KeyDown:
 		o.at = min(o.at+1, max(len(o.items)-1, 0))
-	case k.Name == KeyEnter && len(o.items) > 0:
+	case k.Name == KeyEnter && (p.pending || len(o.items) == 0):
+	case k.Name == KeyEnter:
 		m.overlay = nil
 		return o.items[o.at].run(k.Read)
 	case k.Name == KeyEsc:

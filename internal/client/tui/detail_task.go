@@ -284,7 +284,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	if e.Parent != "" {
 		fact("parent", e.Parent, plain)
 	}
-	m.refFacts(e, fact)
+	m.refFacts(e, related.Name, merged.Name, fact)
 	if e.OwedBy != "" {
 		fact("owed by", e.OwedBy, plain)
 	}
@@ -514,12 +514,12 @@ func propText(e api.TaskView, name string, now time.Time) string {
 
 // refFacts are the tasks related to e and its merged-from trace, each under it the tasks merged into it
 // before, which come back with it.
-func (m *Model) refFacts(e api.TaskView, fact func(label, text string, style func(string) string)) {
+func (m *Model) refFacts(e api.TaskView, relatedName, mergedName string, fact func(label, text string, style func(string) string)) {
 	line := func(r api.TaskRef, depth int) string {
 		title, state := m.refShown(r)
 		return strings.Repeat("↳ ", depth) + oneLine(cmp.Or(title, r.ID)) + " · " + m.stateLabel(state)
 	}
-	label := "related"
+	label := relatedName
 	for _, r := range e.Related {
 		fact(label, line(r, 0), plain)
 		label = ""
@@ -531,7 +531,7 @@ func (m *Model) refFacts(e api.TaskView, fact func(label, text string, style fun
 			within(r.Within, depth+1)
 		}
 	}
-	label = "merged"
+	label = mergedName
 	for _, r := range e.MergedFrom {
 		fact(label, line(r, 0), plain)
 		label = ""
