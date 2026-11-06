@@ -43,10 +43,13 @@ function propText(v) {
   return String(v);
 }
 
+// LISTED_ROLES are the roles of the properties the page lists as tasks, not as text.
+const LISTED_ROLES = ["related", "merged"];
+
 // taskProps are the task's properties the profile declares, in its order.
 function taskProps(e) {
   const props = e.props || {};
-  const shown = (taskCatalog().props || []).filter((p) => propText(props[p.name]));
+  const shown = (taskCatalog().props || []).filter((p) => !LISTED_ROLES.includes(p.role) && propText(props[p.name]));
   if (!shown.length) return null;
   return h("dl", { class: "d-props" }, ...shown.flatMap((p) => [h("dt", {}, p.name), h("dd", { "data-prop": p.name }, propText(props[p.name]))]));
 }
@@ -340,7 +343,7 @@ function taskChildren(e) {
 }
 
 // taskPage is a task's page: its header, asks, brief, open gates, runs,
-// timeline, composer and children.
+// timeline, composer, children, related tasks and merged-from trace.
 function taskPage(e) {
-  return [taskHeader(e), taskAsks(e), taskBrief(e), taskGates(e), taskRuns(e), taskTimeline(e), taskComposer(e), taskChildren(e)];
+  return [taskHeader(e), taskAsks(e), taskBrief(e), taskGates(e), taskRuns(e), taskTimeline(e), taskComposer(e), taskChildren(e), taskRelated(e), taskMerged(e)];
 }

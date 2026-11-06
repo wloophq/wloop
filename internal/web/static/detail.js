@@ -36,6 +36,7 @@ const detailEnv = {
   render: () => render(),
   close: () => writeHash({ task: "" }),
   ask: (label, value) => prompt(label, value || ""),
+  palette: (o) => showPalette(o),
   postJSON: (path, body) => taskPost(path, body),
   focused: () => {
     const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-row^="task:"]');
@@ -253,11 +254,76 @@ function verbLabel(verb) {
 
 function verbButtons(e) {
   const replies = handlerVerb("reply");
-  const skip = (verb) => SKIP_HANDLERS.has(verbHandler(verb)) || verb === replies || (isDraftTask(e) && DRAFT_CARD_HANDLERS.includes(verbHandler(verb)));
+  const onRows = (verb) => ["merged", "related"].includes(verbTask(verb).pick);
+  const skip = (verb) => SKIP_HANDLERS.has(verbHandler(verb)) || verb === replies || onRows(verb) || (isDraftTask(e) && DRAFT_CARD_HANDLERS.includes(verbHandler(verb)));
   return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
+    if (verbTask(v.verb).pick) return pickTask(e, v.verb);
     const args = askedArgs(v.verb);
     if (args) taskAct(e, v.verb, args);
   }));
+}
+
+// pickTask asks for the other task verb takes on e, from the tasks its pick offers, and runs verb with it.
+function pickTask(e, verb) {
+  const spec = verbTask(verb);
+  return taskPicker({
+    task: e,
+    ask: { label: spec.input || spec.label || verb, pick: spec.pick },
+    match: async (q) => {
+      try {
+        return (await detailEnv.getJSON("/api/tasks?match=" + encodeURIComponent(q))).tasks || [];
+      } catch (err) {
+        detailEnv.notice(`Could not list the tasks: ${err.message}`, true);
+        return [];
+      }
+    },
+    palette: detailEnv.palette,
+    stateLabel,
+    run: (id) => taskAct(e, verb, { [PICK_ARG]: id }),
+  });
+}
+
+// pickVerb is the verb e offers whose pick is pick, "" when it offers none.
+function pickVerb(e, pick) {
+  const v = (e.verbs || []).find((x) => verbTask(x.verb).pick === pick);
+  return v ? v.verb : "";
+}
+
+// refRow is another task a task's page names: its link and state, the
+// page's own copy of it first, which a later page keeps fresh, and the
+// button of verb on it.
+function refRow(e, r, verb, scope) {
+  const own = !r.merged ? taskById(r.id) : null;
+  const title = (own && own.title) || r.title || r.id;
+  const state = own ? own.state : r.state;
+  return [
+    h("a", { href: "#" + viewHash({ task: r.id, pr: "" }), "data-focus": `${scope}:${r.id}` }, title),
+    state ? [" ", h("span", { class: "pill" }, stateLabel(state))] : null,
+    verb ? [" ", verbButton(e, verb, verbLabel(verb), () => taskAct(e, verb, { [PICK_ARG]: r.id }), { scope: `${scope}:${r.id}` })] : null,
+  ];
+}
+
+// taskRelated lists the tasks related to e, each with the verb that takes the link off.
+function taskRelated(e) {
+  const refs = e.related || [];
+  if (!refs.length) return null;
+  const verb = pickVerb(e, "related");
+  return h("section", { class: "d-related", "aria-label": "Related" },
+    h("h2", { class: "d-sub" }, "Related"),
+    h("ul", { class: "d-tasks" }, ...refs.map((r) => h("li", {}, refRow(e, r, verb, "related")))));
+}
+
+// taskMerged is e's merged-from trace: each task merged into it with the
+// verb that gives it back, and under it, without one, the tasks merged into
+// that one before, which come back with it.
+function taskMerged(e) {
+  const refs = e.merged_from || [];
+  if (!refs.length) return null;
+  const verb = pickVerb(e, "merged");
+  const within = (r) => (r.within || []).length ? h("ul", { class: "d-tasks" }, ...r.within.map((w) => h("li", {}, refRow(e, w, "", "merged"), within(w)))) : null;
+  return h("section", { class: "d-merged", "aria-label": "Merged from" },
+    h("h2", { class: "d-sub" }, "Merged from"),
+    h("ul", { class: "d-tasks" }, ...refs.map((r) => h("li", {}, refRow(e, r, verb, "merged"), within(r)))));
 }
 
 // windowLine says when the window of d's gate sends it, "" when it has none.

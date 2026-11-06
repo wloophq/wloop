@@ -50,9 +50,10 @@ function palOverlay(box) {
   return close;
 }
 
-// showPalette lists items with their keys; typing narrows them, Enter runs
-// the highlighted one, Esc closes.
-function showPalette({ title, items }) {
+// showPalette lists items with their keys; typing narrows them, or asks
+// source for the items of the text typed, Enter runs the highlighted one,
+// Esc closes.
+function showPalette({ title, items, source }) {
   const input = palEl("input", { type: "text", "aria-label": title, placeholder: `${title}: type to narrow`, autocomplete: "off", spellcheck: "false" });
   const list = palEl("ol", { role: "listbox", "aria-label": title });
   const box = palEl("div", { class: "pal", role: "dialog", "aria-label": title }, palEl("div", { class: "pal-head" }, title), input, list);
@@ -67,8 +68,12 @@ function showPalette({ title, items }) {
     list.replaceChildren(...shown.map((it, i) => palEl("li", { role: "option", "aria-selected": String(i === at), onmousedown: (e) => { e.preventDefault(); pick(it); } },
       palEl("span", {}, it.label), it.key ? palEl("kbd", {}, it.key) : null)));
   };
-  input.addEventListener("input", () => {
-    shown = paletteMatch(items, input.value);
+  let asked = 0;
+  input.addEventListener("input", async () => {
+    const n = ++asked;
+    const next = source ? await source(input.value) : paletteMatch(items, input.value);
+    if (n !== asked) return;
+    shown = next;
     at = 0;
     draw();
   });
@@ -83,6 +88,28 @@ function showPalette({ title, items }) {
   });
   draw();
   input.focus();
+}
+
+// PICK_ARG is the argument a verb that takes another task sends the pick in, task.ArgTask.
+const PICK_ARG = "task";
+
+// pickRefs are the tasks a verb's pick offers on task for the text q: the
+// open tasks but task whose title holds q, which match reads from the
+// daemon, else the tasks merged into task or related to it whose title
+// holds q.
+async function pickRefs(pick, task, q, match) {
+  if (pick === "open") return ((await match(q)) || []).filter((e) => e.id !== task.id);
+  const refs = pick === "merged" ? task.merged_from : pick === "related" ? task.related : [];
+  const want = String(q || "").trim().toLowerCase();
+  return (refs || []).filter((r) => String(r.title || r.id).toLowerCase().includes(want));
+}
+
+// taskPicker opens the palette, titled with the verb's question, over the
+// tasks ask.pick offers on task; run takes the id picked.
+async function taskPicker({ task, ask, match, palette, stateLabel, run }) {
+  const items = (refs) => refs.map((r) => ({ label: r.title || r.id, key: stateLabel ? stateLabel(r.state) : r.state || "", run: () => run(r.id) }));
+  const source = async (q) => items(await pickRefs(ask.pick, task, q, match));
+  palette({ title: ask.label, items: await source(""), source });
 }
 
 // showHelp lists every binding by context.
