@@ -3,6 +3,7 @@ package facttask
 import (
 	"cmp"
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -71,7 +72,11 @@ func (p *Provider) candidates(ctx context.Context, e task.Task, refused []string
 	if s.Cap <= 0 || !p.mergeable(e) {
 		return out, nil
 	}
-	refused = append(slices.Clone(refused), p.related(e)...)
+	related, err := p.related(ctx, e)
+	if err != nil {
+		return ranked{}, err
+	}
+	refused = append(slices.Clone(refused), related...)
 	pl, err := p.candidatePool(ctx, e, s.Window)
 	if err != nil {
 		return out, err
@@ -327,16 +332,29 @@ func (p *Provider) mergeable(e task.Task) bool {
 	return p.listed(e) && !e.IsProject() && e.Origin != task.OriginDraft && e.Origin != task.OriginMessage
 }
 
-// related are the ids e's property of role related lists.
-func (p *Provider) related(e task.Task) []string {
+// related are the ids e's property of role related lists, each also as the task it reads as now, so a related
+// task merged into another leaves that one out too.
+func (p *Provider) related(ctx context.Context, e task.Task) ([]string, error) {
 	if p.d.RoleProp == nil {
-		return nil
+		return nil, nil
 	}
 	name := p.d.RoleProp(task.RoleRelated)
 	if name == "" {
-		return nil
+		return nil, nil
 	}
-	return e.Prop(name).List
+	ids := e.Prop(name).List
+	out := slices.Clone(ids)
+	for _, id := range ids {
+		o, err := p.d.Tasks.Task(ctx, task.ID(id))
+		switch {
+		case errors.Is(err, coretasks.ErrNoTask):
+		case err != nil:
+			return nil, err
+		case string(o.ID) != id:
+			out = append(out, string(o.ID))
+		}
+	}
+	return out, nil
 }
 
 func (p *Provider) me() task.Me {

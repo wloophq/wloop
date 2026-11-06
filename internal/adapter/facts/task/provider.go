@@ -100,6 +100,8 @@ type Deps struct {
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
 	// RoleProp is the property role r acts on, "" for none; nil: none.
 	RoleProp func(r task.Role) string
+	// UnitKind is the kind the plugin of p gives the tasks of its units, for task.unit_kinds; nil or "": none.
+	UnitKind func(p unit.ProviderID) string
 	// Clarity, Candidates and Refusals are what task.clarified, task.candidates and task.link_target_tasks,
 	// and task.refused_pairs and task.undone read.
 	Clarity    ClarityDeps
@@ -271,6 +273,13 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	return p.TaskFacts(ctx, e)
 }
 
+func (p *Provider) unitKind(pr unit.ProviderID) string {
+	if p.d.UnitKind == nil {
+		return ""
+	}
+	return p.d.UnitKind(pr)
+}
+
 func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
 	f := workflow.Facts{
 		"task.id":                  string(e.ID),
@@ -279,6 +288,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.unit_provider":       "",
 		"task.units":               []string{},
 		"task.unit_providers":      []string{},
+		"task.unit_kinds":          []string{},
 		"task.link_ended":          false,
 		"task.captured_by_user":    e.CapturedByUser(),
 		"task.turns":               0,
@@ -375,14 +385,17 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	eu := us[0]
 	f["task.unit"], f["task.unit_provider"] = eu.String(), string(eu.Provider)
-	names, providers := make([]string, len(us)), []string{}
+	names, providers, kinds := make([]string, len(us)), []string{}, []string{}
 	for i, u := range us {
 		names[i] = u.String()
 		if !slices.Contains(providers, string(u.Provider)) {
 			providers = append(providers, string(u.Provider))
 		}
+		if k := p.unitKind(u.Provider); k != "" && !slices.Contains(kinds, k) {
+			kinds = append(kinds, k)
+		}
 	}
-	f["task.units"], f["task.unit_providers"] = names, providers
+	f["task.units"], f["task.unit_providers"], f["task.unit_kinds"] = names, providers, kinds
 	ended, err := p.ended(ctx, e, us)
 	if err != nil {
 		return nil, err

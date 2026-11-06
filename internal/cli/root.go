@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/catalog"
@@ -350,6 +351,15 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 // repository it is of.
 func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error), placement func(context.Context, unit.Unit) (string, error)) *facttask.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
+	var kinds sync.Map
+	unitKind := func(p unit.ProviderID) string {
+		if k, ok := kinds.Load(p); ok {
+			return k.(string)
+		}
+		k := e.pluginTaskKind(p)
+		kinds.Store(p, k)
+		return k
+	}
 	return facttask.New(facttask.Deps{
 		Tasks: db.Tasks(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:   coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
@@ -375,6 +385,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			name, _ := e.loadedIntents().Tasks.PropOf(r)
 			return name
 		},
+		UnitKind: unitKind,
 		Candidates: facttask.CandidateDeps{From: db.LinksFrom, To: db.Links().To, Settings: func() facttask.CandidateSettings {
 			t := e.currentConfig().Tasks
 			return facttask.CandidateSettings{Window: time.Duration(t.CandidateWindow), Cap: t.CandidateCap}

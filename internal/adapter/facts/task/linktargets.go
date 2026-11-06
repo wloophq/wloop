@@ -13,12 +13,11 @@ import (
 
 const passHolders = "facts.link_holders"
 
-// linkTargetTasks is task.link_target_tasks of e, without refused and the tasks related to e: the other
-// mergeable tasks holding a unit a review or merge link of e's targets, oldest first.
-func (p *Provider) linkTargetTasks(ctx context.Context, e task.Task, refused []string) ([]string, error) {
-	out := []string{}
+// linkTargets are the units a review or merge link of e's items targets, each once, but e's own; none for a task
+// that may not be merged.
+func (p *Provider) linkTargets(ctx context.Context, e task.Task) ([]unit.Unit, error) {
 	if p.d.Candidates.From == nil || !p.mergeable(e) {
-		return out, nil
+		return nil, nil
 	}
 	own := unitsOf(e)
 	var targets []unit.Unit
@@ -27,6 +26,24 @@ func (p *Provider) linkTargetTasks(ctx context.Context, e task.Task, refused []s
 			targets = append(targets, l.To)
 		}
 	})
+	return targets, err
+}
+
+// linkTargetUnits is task.link_target_units of e: its linkTargets, whatever task holds them or is refused.
+func (p *Provider) linkTargetUnits(ctx context.Context, e task.Task) ([]string, error) {
+	targets, err := p.linkTargets(ctx, e)
+	out := make([]string, len(targets))
+	for i, u := range targets {
+		out[i] = u.String()
+	}
+	return out, err
+}
+
+// linkTargetTasks is task.link_target_tasks of e, without refused and the tasks related to e: the other
+// mergeable tasks holding a unit a review or merge link of e's targets, oldest first.
+func (p *Provider) linkTargetTasks(ctx context.Context, e task.Task, refused []string) ([]string, error) {
+	out := []string{}
+	targets, err := p.linkTargets(ctx, e)
 	if err != nil || len(targets) == 0 {
 		return out, err
 	}
@@ -34,7 +51,11 @@ func (p *Provider) linkTargetTasks(ctx context.Context, e task.Task, refused []s
 	if err != nil {
 		return nil, err
 	}
-	refused = append(slices.Clone(refused), p.related(e)...)
+	related, err := p.related(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	refused = append(slices.Clone(refused), related...)
 	var found []task.Task
 	for _, u := range targets {
 		for _, o := range holders[u] {

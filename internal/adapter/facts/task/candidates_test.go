@@ -97,6 +97,12 @@ func newCandidateEnv(t *testing.T) *candidateEnv {
 			name, _ := bundledTasks.PropOf(r)
 			return name
 		},
+		UnitKind: func(p unit.ProviderID) string {
+			if p == unit.GitHub {
+				return "pull-request"
+			}
+			return "thread"
+		},
 	})
 	return c
 }
