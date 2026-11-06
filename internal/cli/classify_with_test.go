@@ -277,3 +277,27 @@ func TestClassifyWithOnAUnitThatIsNoTaskKeysOnTheUnitsFingerprint(t *testing.T) 
 		t.Fatalf("asked %d times, want once per unit fingerprint", n)
 	}
 }
+
+func TestClassifyWithAsksAgainOnceItsPromptChanges(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newWithRig(t, 5)
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	if _, err := r.run(t); err != nil {
+		t.Fatal(err)
+	}
+	sameAs := builtin.ClassifyFact("same-work", "same_as")
+	named := workflow.WithReads(ctx, sameAs+` != ""`)
+	besideWorkflow(t, r.te, "same-work", map[string]string{"prompt.md.tmpl": "Is it one piece of work?\n" + withPromptTemplate, "schema.json": sameAsSchema})
+	if f, _ := r.classified().Facts(named, r.self); f[sameAs] != nil {
+		t.Fatalf("an output asked with another prompt still reads: %v", f)
+	}
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("a new prompt: %v, want it asked again", err)
+	}
+	if n := len(r.asker.asked()); n != 2 {
+		t.Fatalf("asked %d times, want once per prompt", n)
+	}
+}

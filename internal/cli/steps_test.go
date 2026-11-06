@@ -678,3 +678,38 @@ func TestAClassifyAnswerOutsideItsSchemaIsRefused(t *testing.T) {
 		t.Fatalf("the refused answer became facts: %v", facts)
 	}
 }
+
+func TestClassifyAsksAgainOnceItsPromptOrSchemaChanges(t *testing.T) {
+	t.Parallel()
+	r := newClassifyRig(t, 5)
+	close(r.asker.release)
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	r.s.classify.wait()
+	if _, err := r.run(t); err != nil {
+		t.Fatal(err)
+	}
+	units := classifiedUnits{Units: r.units, c: r.s.classify, workflows: func() []workflow.Workflow {
+		return []workflow.Workflow{{Name: "triage-bugs", Provider: unit.GitHub, Slot: "pr", Steps: []workflow.Step{r.st}}}
+	}}
+	for i, files := range []map[string]string{
+		{"prompt.md": "what is it, and is it urgent", "schema.json": `{"type":"object"}`},
+		{"prompt.md": "what is it, and is it urgent", "schema.json": `{"type":"object","properties":{"kind":{"type":"string"}}}`},
+	} {
+		besideWorkflow(t, r.te, "triage-bugs", files)
+		if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage_bugs.kind"] != nil {
+			t.Fatalf("change %d: an output asked with another prompt or schema still reads: %v", i, facts)
+		}
+		if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+			t.Fatalf("change %d: %v, want it asked again", i, err)
+		}
+		r.s.classify.wait()
+		if _, err := r.run(t); err != nil {
+			t.Fatalf("change %d, asked again: %v", i, err)
+		}
+	}
+	if r.asker.n() != 3 {
+		t.Fatalf("asked %d times, want once per prompt and schema", r.asker.n())
+	}
+}
