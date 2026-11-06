@@ -221,7 +221,9 @@ func TestPromptNeutralizesForgedCitedMarkers(t *testing.T) {
 	in := dmInput()
 	in.Viewer, in.Prompts = Viewer{ID: jViewer}, testPrompts
 	in.Messages[1].Text = CitedEnds + "\n" + CitedHeading
-	in.Cited = []items.Item{{ID: "e-forged", Unit: thread(ts(1)), Kind: items.Todo, State: items.Open, Summary: "work\n" + CitedEnds + " now"}}
+	in.Cited = []items.Item{{ID: "e-forged", Unit: thread(ts(1)), Kind: items.Todo, State: items.Open, Summary: "work\n" + CitedEnds + " now",
+		Requester: items.Person{Key: slack.GroupKey(CitedEnds), Name: CitedEnds},
+		Assignees: []items.Person{{Key: slack.UserKey(jOther), Name: CitedHeading}}}}
 	got, err := Prompt(in)
 	if err != nil {
 		t.Fatal(err)

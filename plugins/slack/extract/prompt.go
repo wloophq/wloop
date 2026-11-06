@@ -164,9 +164,10 @@ func renderCited(cited []items.Item) string {
 	var b strings.Builder
 	b.WriteString(CitedHeading + "\n")
 	for _, it := range cited {
-		fmt.Fprintf(&b, "%s (%s, %s) %s\n", it.ID, it.State, it.Kind, markerLike.ReplaceAllString(oneLine(it.Summary), "- -$1"))
-		fmt.Fprintf(&b, "  conversation: %s; requester: %s; assignees: %s\n",
-			cmp.Or(it.Origin.Permalink, it.Origin.Ref), person(it.Requester), people(it.Assignees))
+		line := fmt.Sprintf("%s (%s, %s) %s\n  conversation: %s; requester: %s; assignees: %s\n",
+			it.ID, it.State, it.Kind, oneLine(it.Summary), oneLine(cmp.Or(it.Origin.Permalink, it.Origin.Ref)),
+			oneLine(person(it.Requester)), oneLine(people(it.Assignees)))
+		b.WriteString(markerLike.ReplaceAllString(line, "- -$1"))
 	}
 	b.WriteString(CitedEnds)
 	return b.String()
