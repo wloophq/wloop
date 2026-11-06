@@ -10,7 +10,15 @@ func TestAMergedTaskIsNotDroppedWhenAMovedUnitIsUnfollowed(t *testing.T) {
 	t.Skip("T1 C2")
 }
 
-func TestAMergedTaskClosesOnceNoItemOfAnyOfItsUnitsCallsForIt(t *testing.T) {
+func TestAMergedOwnTaskIsNotDroppedWhileAMovedUnitsItemsCall(t *testing.T) {
+	t.Skip("T1 C2")
+}
+
+func TestAMergedOwnTaskResolvesWhenNoItemOfAnyUnitCalls(t *testing.T) {
+	t.Skip("T1 C2")
+}
+
+func TestANewItemOfAMergedTasksKeyGoesToTheClosedSurvivorNotANewTask(t *testing.T) {
 	t.Skip("T1 C2")
 }
 
@@ -23,5 +31,9 @@ func TestANewItemOfAMovedKeyGoesToTheSurvivor(t *testing.T) {
 }
 
 func TestAMovedUnitsOwnTaskRulesDoNotTakeItsItemsBack(t *testing.T) {
+	t.Skip("T1 C2")
+}
+
+func TestAMergedTasksTitleNoLongerFollowsItsItem(t *testing.T) {
 	t.Skip("T1 C2")
 }

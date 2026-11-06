@@ -470,3 +470,13 @@ func TestAUserLayerNamesTheDraftsAVerbKeeps(t *testing.T) {
 		t.Errorf("dismiss keeps %q, want none", got)
 	}
 }
+
+func TestNoWriterMayWriteTheMergedOrRelatedProperty(t *testing.T) {
+	t.Parallel()
+	for _, prop := range []string{"merged", "related"} {
+		src := "[props." + prop + "]\nwriters = [\"person\"]\n"
+		if _, problems := loadTasksWith(t, defaultTasks(t), src); !strings.Contains(problems, "props."+prop+".writers: is refused") {
+			t.Errorf("%s: problems %q", prop, problems)
+		}
+	}
+}

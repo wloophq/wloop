@@ -2,7 +2,7 @@ package tasks_test
 
 import "testing"
 
-func TestMergeFoldsTheOtherTaskIntoTheSurvivorInOneApply(t *testing.T) {
+func TestMergeFoldsTheOtherTaskIntoTheSurvivorInOneWrite(t *testing.T) {
 	t.Skip("T1 C1")
 }
 
@@ -18,6 +18,10 @@ func TestMergeRefusesTheSameTaskAClosedOneAndAParent(t *testing.T) {
 	t.Skip("T1 C1")
 }
 
+func TestMergeRefusesATaskAlreadyMergedIntoTheOther(t *testing.T) {
+	t.Skip("T1 C1")
+}
+
 func TestMergeRecordsAVerbEventOnBothTasks(t *testing.T) {
 	t.Skip("T1 C1")
 }
@@ -30,7 +34,11 @@ func TestSyncNeverRecreatesTheMergedTask(t *testing.T) {
 	t.Skip("T1 C2")
 }
 
-func TestSplitGivesTheMergedTaskBackAndTheSurvivorKeepsWhatArrivedAfter(t *testing.T) {
+func TestAMergeAndASyncOfItsUnitsDoNotInterleave(t *testing.T) {
+	t.Skip("T1 C2")
+}
+
+func TestSplitGivesTheMergedTaskBackAndSyncsItsUnits(t *testing.T) {
 	t.Skip("T1 C3")
 }
 
@@ -42,26 +50,30 @@ func TestAWorkflowsMergeOpensTheMergeGate(t *testing.T) {
 	t.Skip("T1 C9")
 }
 
+func TestTheMergeGateNamesBothTasksInItsWords(t *testing.T) {
+	t.Skip("T1 C9")
+}
+
+func TestTwoProposalsOfOnePairInEitherOrderOpenOneGate(t *testing.T) {
+	t.Skip("T1 C9")
+}
+
 func TestAnApprovedMergeGateMergesExactlyItsPair(t *testing.T) {
+	t.Skip("T1 C9")
+}
+
+func TestAnApprovedMergeGateWhosePairChangedRunsNothing(t *testing.T) {
+	t.Skip("T1 C9")
+}
+
+func TestMergeSupersedesTheMergedTasksOwnProposalsAndPlans(t *testing.T) {
+	t.Skip("T1 C9")
+}
+
+func TestSplitSupersedesTheProposalsNamingBothTasks(t *testing.T) {
 	t.Skip("T1 C9")
 }
 
 func TestAWorkflowCannotSplit(t *testing.T) {
 	t.Skip("T1 C9")
-}
-
-func TestRelateLinksBothTasksAndIsIdempotent(t *testing.T) {
-	t.Skip("T2 C4")
-}
-
-func TestUnrelateTakesTheLinkOffBoth(t *testing.T) {
-	t.Skip("T2 C4")
-}
-
-func TestMergeCarriesTheMergedTasksRelationsToTheSurvivor(t *testing.T) {
-	t.Skip("T2 C4")
-}
-
-func TestAWorkflowCannotRelate(t *testing.T) {
-	t.Skip("T2 C9")
 }

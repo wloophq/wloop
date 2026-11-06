@@ -22,10 +22,18 @@ func TestTheTaskVerbStepPassesTheOtherTaskFromAFact(t *testing.T) {
 	t.Skip("T4 C9")
 }
 
+func TestTheTaskVerbStepPassesTheOtherTaskFromAClassifyOutput(t *testing.T) {
+	t.Skip("T4 C9")
+}
+
 func TestAFoldNeverMergesWithoutTheGate(t *testing.T) {
 	t.Skip("T4 C9")
 }
 
 func TestAFoldGateEndsWhenEitherTaskClosesOrIsMergedElsewhere(t *testing.T) {
 	t.Skip("T4 C9")
+}
+
+func TestARefusedFoldIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
+	t.Skip("T4 C11")
 }

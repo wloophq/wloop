@@ -35,21 +35,24 @@ type Reader interface {
 type Store interface {
 	Reader
 	// Apply writes cs and evs in one transaction, bumps Rev and notes port.TopicTasks; when cs change
-	// nothing it writes and notes nothing, and with no cs it writes evs alone.
+	// nothing it writes and notes nothing, and with no cs it writes evs alone. It refuses, with ErrNoTask, an
+	// update of an id an alias names and no row holds, as a sync that read a task before its merge writes.
 	Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error
 }
 
 // Merger is a Store that folds one task into another and gives it back, each in one transaction; a Store
-// without it serves no merge and no split.
+// without it serves no merge and no split. Both start a new epoch of the tasks' position, so a page since
+// an older one is Full and no client keeps the task that went.
 type Merger interface {
 	// Merge writes into as r's fold left it, drops task r.From and aliases it to r.Into, points the gates,
 	// drafts and messages that name r.From at r.Into, and keeps r, completed with their ids, r.From's wake and
-	// its unit's marks, as r.From's merge record; evs are written with it. ErrNoTask when either is not stored.
+	// its unit's marks, as r.From's merge record; evs are written with it, and port.TopicTasks notes both
+	// tasks' units. r.Superseded are gates the caller superseded already. ErrNoTask when either is not stored.
 	Merge(ctx context.Context, r merge.Record, into task.Task, evs ...port.Event) error
-	// Split undoes the merge r records: writes r.Task back with r's wake and marks, points r's gates, drafts
-	// and messages back at r.From, drops the alias, and writes into as the unfold left it, with evs. ErrVerb
-	// when r.From is stored or r.Into is not.
-	Split(ctx context.Context, r merge.Record, into task.Task, evs ...port.Event) error
+	// Split undoes the merge r records, as merge.Unfold says: writes from back with r's wake and marks,
+	// points at r.From the gates, held drafts and messages of r's units and of r's ids, drops the alias, and
+	// writes into as the unfold left it, with evs. ErrVerb when r.From is stored or r.Into is not.
+	Split(ctx context.Context, r merge.Record, from, into task.Task, evs ...port.Event) error
 	// MergeOf is the record of the merge that took task id; false when id is stored or was never merged.
 	MergeOf(ctx context.Context, id task.ID) (merge.Record, bool, error)
 }
@@ -80,6 +83,9 @@ type (
 	// Survives says whether the predicate verb's survivor names (tasks.toml) holds on task t, over its facts:
 	// the task it holds on alone is the one a merge keeps.
 	Survives func(ctx context.Context, verb string, t task.Task) (bool, error)
+	// GateText is the words of the gate verb opens on e with args, the gate's text of gates.toml over the
+	// proposal facts of a verb's gate; "" for a gate with none.
+	GateText func(ctx context.Context, g gate.Gate, verb string, e task.Task, args map[string]string) (string, error)
 )
 
 type Since struct {
@@ -160,6 +166,16 @@ type Gates interface {
 	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
 	// HoldsTask says whether an open gate of task id holds it open until a person settles it or its unit ends.
 	HoldsTask(ctx context.Context, id task.ID) (bool, error)
+}
+
+// GateSweeper is the Gates' capability a merge and a split need, served by the gates service, the only code
+// that resolves a gate; Gates without it refuse both.
+type GateSweeper interface {
+	// ActingFor are the open gates that would act in task id's name: those of kind proposal, plan or step on
+	// its own unit, and the proposals on any task whose proposed verb names id in task.ArgTask.
+	ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, error)
+	// Supersede resolves each open gate of ids as superseded; a gate no longer open is left as it is.
+	Supersede(ctx context.Context, ids ...int64) error
 }
 
 type Result struct {

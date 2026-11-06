@@ -55,6 +55,8 @@ type Deps struct {
 	Activity func(ctx context.Context, id task.ID) error
 	// Survives picks the task a merge keeps, as the merge verb's survivor says; nil: the older stays.
 	Survives Survives
+	// GateText words the gate a gated verb opens; nil writes none.
+	GateText GateText
 }
 
 type handlerKey struct {

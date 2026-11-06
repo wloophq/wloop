@@ -522,6 +522,9 @@ func (l *tasksLoad) mergeProps(s *sheet, props map[string]mProp) {
 		if want, ok := task.RoleTypes[p.Role]; ok && p.Type != want {
 			s.add(path+".role", "%s acts on a property of type %s, not %s", p.Role, want, p.Type)
 		}
+		if slices.Contains(task.LoopRoles, p.Role) && len(p.Writers) > 0 {
+			s.add(path+".writers", "is refused: only the loop writes the property of role %s", p.Role)
+		}
 		if p.Role == task.RoleStar && len(p.Values) < 2 {
 			s.add(path+".role", "star toggles between the property's first two values; it has %d", len(p.Values))
 		}

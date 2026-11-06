@@ -99,6 +99,7 @@ status = "rejected"
 [gates.merge]
 kind = "proposal"
 label = "Merge these tasks?"
+text = "Merge \"{{.proposal.fold}}\" into \"{{.proposal.keep}}\"? Its items, units, gates and drafts move over; Split gives it back."
 
 [gates.merge.intents.approve]
 label = "Merge"

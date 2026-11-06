@@ -73,13 +73,21 @@ const (
 	// relate and unrelate keep the same on both: a string[].
 	RoleRelated Role = "related"
 	// RoleMerged is the property that lists, by id in merge order, the tasks the merge handler folded into the
-	// task, each one split can give back: a string[]. A task that holds one settles item by item, so the items
-	// of one unit no longer calling for it never close or drop it while another of its units' items does.
+	// task, each one split can give back: a string[]. While it lists one, Reconcile treats the task as the
+	// holder of every unit it took in:
+	//   - when no item of unit u calls for it, only u's items move to its resolved ones; it resolves into the
+	//     done category once it holds no open item of any unit, and drops on unfollow only then;
+	//   - an item no task holds whose derived id is one it lists goes to it, whatever its state, so a merged
+	//     task's id is never derived again;
+	//   - its title no longer follows its single item.
 	RoleMerged Role = "merged"
 )
 
 // Roles are every role.
 var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise, RoleRelated, RoleMerged}
+
+// LoopRoles are the roles whose property only the loop's handlers write, so no writer may write it.
+var LoopRoles = []Role{RoleRelated, RoleMerged}
 
 // RoleTypes are the type of the property each role acts on.
 var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate,

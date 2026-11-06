@@ -100,6 +100,12 @@ type Deps struct {
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
 	// RoleProp is the property role r acts on, "" for none; nil: none.
 	RoleProp func(r task.Role) string
+	// Clarity, LinkTargets, Candidates and Refusals are what task.clarified, task.link_target_tasks,
+	// task.candidates and task.refused_merges read.
+	Clarity     ClarityDeps
+	LinkTargets LinkTargetDeps
+	Candidates  CandidateDeps
+	Refusals    RefusalDeps
 }
 
 // Link is what the facts read of one unit a task links.
@@ -304,9 +310,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
 		"task.link_signals":        []string{},
-		"task.clarified":           false,
-		"task.candidates":          []string{},
-		"task.link_target_tasks":   []string{},
+		"task.title":               e.Title,
+		"task.notes":               e.Notes,
+	}
+	if err := p.mergeFacts(ctx, e, f); err != nil {
+		return nil, err
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false

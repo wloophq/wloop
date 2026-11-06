@@ -51,6 +51,10 @@ const (
 // since a position also holds the tasks holding it, as a change named it.
 const TasksUnits = "units"
 
+// TasksMatch is the query parameter of TasksPath that lists every open task whose title holds it, case
+// aside, whatever the view, for a picker of another task; both clients read the same list.
+const TasksMatch = "match"
+
 // ParseUnits reads the TasksUnits of a request.
 func ParseUnits(raw []string) ([]unit.Unit, error) {
 	out := make([]unit.Unit, 0, len(raw))
@@ -224,8 +228,8 @@ type VerbSpec struct {
 	// for approval; every client's reply composer starts on it.
 	Send string `json:"send,omitempty"`
 	// Pick is, on a verb that takes another task, the tasks a person picks it from: open (the open tasks but
-	// this one), merged (TaskView.MergedFrom) or related (TaskView.Related); the pick goes in the argument
-	// task.ArgTask. Empty for a verb that takes none.
+	// this one, as TasksPath lists them with TasksMatch), merged (TaskView.MergedFrom) or related
+	// (TaskView.Related); the pick goes in the argument task.ArgTask. Empty for a verb that takes none.
 	Pick string   `json:"pick,omitempty"`
 	Key  string   `json:"key"`
 	From []string `json:"from,omitempty"`
@@ -280,18 +284,20 @@ type TaskView struct {
 	Parent   string   `json:"parent,omitempty"`
 	Children []string `json:"children,omitempty"`
 	// Related are the tasks related to this one, as its property of role related lists them; MergedFrom the
-	// tasks merged into it, in merge order, each as its merge record keeps it, which split gives back.
+	// tasks merged into it, in merge order, each as its merge record keeps it: the ones split gives back.
 	Related    []TaskRef `json:"related,omitempty"`
 	MergedFrom []TaskRef `json:"merged_from,omitempty"`
 }
 
 // TaskRef is another task as a task's page names it: its id, title and state; Merged says it is merged
-// into another task and reads as that one.
+// into another task and reads as that one. Within are, on an entry of MergedFrom, the tasks merged into it
+// before it was merged, shown without a split: that entry is split first.
 type TaskRef struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	State  string `json:"state,omitempty"`
-	Merged bool   `json:"merged,omitempty"`
+	ID     string    `json:"id"`
+	Title  string    `json:"title"`
+	State  string    `json:"state,omitempty"`
+	Merged bool      `json:"merged,omitempty"`
+	Within []TaskRef `json:"within,omitempty"`
 }
 
 // AskView is an item a task serves, as its asker put it, with the source messages it quotes.

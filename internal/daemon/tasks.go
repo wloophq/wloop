@@ -903,6 +903,12 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	if err := ev.relatedOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.mergedFromOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
 	if err := ev.row(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}

@@ -34,6 +34,6 @@ func TestTheJudgmentsOutputOnlyOpensAGate(t *testing.T) {
 	t.Skip("T6 C10")
 }
 
-func TestTheCorrelationEvalScoresPrecisionAndRecall(t *testing.T) {
+func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	t.Skip("T6 C13")
 }
