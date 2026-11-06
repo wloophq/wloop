@@ -71,7 +71,7 @@ What a turn on a task produces is attached to it, when the turn's intent asks fo
 - With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
 - With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the task posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
 
-Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` marks done a pull request's task, and a task you captured once a turn ran on it, such as a start, when it has a unit and every one of them has ended and no gate waits on you there (`task.link_ended && task.gates_open == 0 && (task.prop.kind == "pull-request" || task.captured_by_user && task.turns > 0)`): a pull request's task that also holds a thread still open stays open. A task a gate opens on a unit no task holds takes the kind the unit's plugin gives its tasks, so a gate on a pull request with no task, such as a merged one, makes it the pull request's task, out of the Inbox. A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. `task.verb` never closes a derived task while it holds an item that calls for it: a workflow closes one by resolving its items with the `items.resolve` step, as the next section says.
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` marks done a task that holds a pull request, whatever its own kind (a Slack ask merged with the pull request's task included), and a task you captured once a turn ran on it, such as a start, when it has a unit and every one of them has ended and no gate waits on you there (`task.link_ended && task.gates_open == 0 && ("pull-request" in task.unit_kinds || task.captured_by_user && task.turns > 0)`): a pull request's task that also holds a thread still open stays open. A task a gate opens on a unit no task holds takes the kind the unit's plugin gives its tasks, so a gate on a pull request with no task, such as a merged one, makes it the pull request's task, out of the Inbox. A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. `task.verb` never closes a derived task while it holds an item that calls for it: a workflow closes one by resolving its items with the `items.resolve` step, as the next section says.
 
 ### Closing a task its source shows done
 
@@ -126,10 +126,13 @@ Four bundled workflows ask for merges and relations. Each opens the verb's gate 
 
 | Workflow | When | Asks for | Its approval |
 |---|---|---|---|
-| `task-fold-linked` | a task's items' review or merge links target the task of a pull request (`task.link_target_tasks`); a sweep, so it holds whichever task came first | merge with that task | released at once |
-| `task-correlate-merge-linked` | the judgment says same work, and a link target or a cited unit also ties the pair (`task.linked_candidates`) | merge with that candidate | released at once |
-| `task-correlate-merge` | the judgment says same work, and only a person ties the pair | merge with that candidate | waits for you |
-| `task-correlate-relate` | the judgment says related work, and the task does not link the candidate's pull request, which `task-fold-linked` handles | relate with that candidate | released at once |
+| `task-fold-linked` | a task that holds no pull request (`task.unit_kinds`) and whose items' review or merge links target exactly one unit (`task.link_target_units`), held by exactly one task (`task.link_target_tasks`); a sweep, so it holds whichever task came first | merge with that task | released at once |
+| `task-relate-linked` | a task's items link the task of a pull request, and it is not the fold's case: an ask about several pull requests, or a task that holds a pull request of its own; one task each sweep | relate with that task | released at once |
+| `task-correlate-merge-linked` | the judgment says same work, a link target or a cited unit also ties the pair (`task.linked_candidates`), the task holds no pull request and does not link the candidate's | merge with that candidate | released at once |
+| `task-correlate-merge` | the judgment says same work, the task does not link the candidate's pull request, and only a person ties the pair or the task holds a pull request of its own | merge with that candidate | waits for you |
+| `task-correlate-relate` | the judgment says related work, and the task does not link the candidate's pull request, which `task-fold-linked` and `task-relate-linked` handle | relate with that candidate | released at once |
+
+Two tasks that each hold their own pull request are never merged at once: an ask that links several pull requests is related to each one's task, and a merge the correlation judges between two pull requests' tasks waits for you. You can still merge them yourself, as a stack of pull requests that is one change.
 
 `task-correlate` judges whether a task just created, or whose items just gained a link, is the same work as one of its **candidates**, related work, or neither. The candidates are the open tasks created within `tasks.candidate_window` (14 days) of the task, ranked by what they share, and cut to `tasks.candidate_cap` (5). A unit one task holds that the other's items link to scores most, then a link target in common, then each person in common (requester, assignees, whom it waits on). A task with no candidate costs no call. The judgment is a model call (`classify` step) that reads the candidates' titles, notes and a few item summaries as data and answers `same`, `related` or `none`, with the candidate's id. A sub-step of a larger task, a follow-up of the same change or another deliverable of the same launch is related work; the same person, week or words about another system is neither. What it reads is untrusted text: it only picks which workflow asks, and must name one of the candidates; the rule that releases a gate reads the gate alone.
 
@@ -141,7 +144,7 @@ when = 'gate.kind == "proposal" && gate.name == "merge"'
 mode = "wait"
 ```
 
-and the same for `task-correlate-merge-linked`, or `task-correlate-relate` with `gate.name == "relate"`.
+and the same for `task-correlate-merge-linked`, or `task-correlate-relate` and `task-relate-linked` with `gate.name == "relate"`.
 
 Limits keep it cheap and quiet:
 

@@ -42,7 +42,7 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 
 ## Merges and relations the loop runs
 
-The bundled `task-fold-linked`, `task-correlate-merge-linked` and `task-correlate-relate` merge or relate two tasks at once, without asking (see [Tasks and views](/concepts/tasks/#merges-and-relations-a-workflow-asks-for)). What picks the pair is other people's text: a review link in a Slack ask, or a model's judgment over titles and item summaries. The residual risk is accepted: a crafted message can merge its task into another one it links, or relate two tasks. Nothing is posted and nothing is lost: Split and Unrelate undo either, a pair you took apart is never merged or related again without you, and the timeline names the workflow that did it. Pin a `wait` rule to those workflows' merge and relate gates to have them ask instead.
+The bundled `task-fold-linked`, `task-relate-linked`, `task-correlate-merge-linked` and `task-correlate-relate` merge or relate two tasks at once, without asking (see [Tasks and views](/concepts/tasks/#merges-and-relations-a-workflow-asks-for)). What picks the pair is other people's text: a review link in a Slack ask, or a model's judgment over titles and item summaries. The residual risk is accepted: a crafted message can merge its task into the one pull request's task it links, or relate two tasks; two tasks that each hold a pull request are never merged at once. Nothing is posted and nothing is lost: Split and Unrelate undo either, a pair you took apart is never merged or related again without you, and the timeline names the workflow that did it. Pin a `wait` rule to those workflows' merge and relate gates to have them ask instead.
 
 ## Starting new work
 
