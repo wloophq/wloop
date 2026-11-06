@@ -256,3 +256,24 @@ func (r *withRig) retitle(t *testing.T, id task.ID, title string) {
 		t.Fatal(err)
 	}
 }
+
+func TestClassifyWithOnAUnitThatIsNoTaskKeysOnTheUnitsFingerprint(t *testing.T) {
+	t.Parallel()
+	r := newWithRig(t, 5)
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	r.units.Put(pr, workflow.Facts{"pr.fingerprint": "head-1", "pr.tasks": []string{"t-a", "t-b"}})
+	r.self, r.st = pr, wfStep("classify", "with", "pr.tasks", "prompt", "prompt.md.tmpl")
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	if _, err := r.run(t); err != nil {
+		t.Fatalf("once classified: %v", err)
+	}
+	r.units.Set(pr, "pr.fingerprint", "head-2")
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("the unit changed and the old output still served: %v", err)
+	}
+	if n := len(r.asker.asked()); n != 2 {
+		t.Fatalf("asked %d times, want once per unit fingerprint", n)
+	}
+}

@@ -107,8 +107,9 @@ const (
 // readingWith marks a context whose facts reads are those a with key takes, which add no with output.
 type readingWith struct{}
 
-// key is u's fingerprint; with a with fact, what the judgment reads instead: the contents of u's task and of
-// the tasks the fact lists, so a write that changes none of them, such as opening a task, keeps the output.
+// key is u's fingerprint; with a with fact, what the judgment reads instead: the contents of u's task, else u's
+// fingerprint, and of the tasks the fact lists, so a write that changes none of them, such as opening a task,
+// keeps the output.
 func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workflow.Facts) (classified, error) {
 	k := classified{fp: fingerprint(u, f)}
 	if with == "" {
@@ -139,6 +140,8 @@ func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workfl
 	slices.Sort(parts)
 	if self != nil {
 		parts = append([]string{contentKey(*self)}, parts...)
+	} else {
+		parts = append([]string{k.fp}, parts...)
 	}
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x1e")))
 	k.fp = "with:" + hex.EncodeToString(sum[:16])

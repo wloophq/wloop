@@ -487,7 +487,7 @@
                   "const": "classify"
                 },
                 "with": {
-                  "description": "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, .Task, the unit's own task when it is one, and .Tasks, the listed tasks in order, each with .ID, .Title, .Notes and .Items, a few of its items' summaries. Every untrusted value is inside this call's markers, .Begin and .End, which carry the code .Nonce. The output is cached by what the prompt reads of the unit's task and the listed tasks (ids, titles, notes, item summaries), so a write that changes none of them, such as opening a task, keeps it; only a reader that names it reads it. An empty list runs nothing.",
+                  "description": "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, .Task, the unit's own task when it is one, and .Tasks, the listed tasks in order, each with .ID, .Title, .Notes and .Items, a few of its items' summaries. Every untrusted value is inside this call's markers, .Begin and .End, which carry the code .Nonce. The output is cached by what the prompt reads of the unit's task and the listed tasks (ids, titles, notes, item summaries), so a write that changes none of them, such as opening a task, keeps it; the unit's facts a prompt prints through .Facts are not part of the key, and with a unit that is not a task the key holds the unit's fingerprint too. Only a reader that names it reads it. An empty list runs nothing.",
                   "type": "string"
                 }
               }
