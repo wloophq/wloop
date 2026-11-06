@@ -524,11 +524,12 @@ func TestViewsSectionSetsOnlyItsColumns(t *testing.T) {
 }
 
 func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
-	if d := Defaults().Tasks; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 {
+	if d := Defaults().Tasks; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 ||
+		d.CandidateWindow != Days(14*24*time.Hour) || d.CandidateCap != 5 {
 		t.Fatalf("defaults %+v", d)
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
-	raw := `tasks = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"]}`
+	raw := `tasks = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"], candidate_window = "3d", candidate_cap = 2}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +537,8 @@ func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" {
+	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" ||
+		g.CandidateWindow != Days(3*24*time.Hour) || g.CandidateCap != 2 {
 		t.Fatalf("tasks %+v", g)
 	}
 }

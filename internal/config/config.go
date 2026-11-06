@@ -155,11 +155,14 @@ type Dossiers struct {
 	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
-// Tasks holds the tasks' settings: when a waiting task goes stale, and the areas and contexts offered.
+// Tasks holds the tasks' settings: when a waiting task goes stale, the areas and contexts offered, and how far
+// task.candidates looks.
 type Tasks struct {
 	StaleWaitingDays int      `json:"stale_waiting_days"` // working days
 	Areas            []string `json:"areas"`
 	Contexts         []string `json:"contexts"`
+	CandidateWindow  Days     `json:"candidate_window"`
+	CandidateCap     int      `json:"candidate_cap"`
 }
 
 // Notifications: DigestAt is the local "HH:MM" of the daily digest, "" for none.
@@ -441,7 +444,7 @@ func Defaults() Config {
 			},
 		},
 		Classify:      Classify{PerDay: 50},
-		Tasks:         Tasks{StaleWaitingDays: 2},
+		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
@@ -661,6 +664,12 @@ func (c Config) validateWorkflows() error {
 	}
 	if c.Turns.PerDay < 0 {
 		return fmt.Errorf("turns.per_day must not be negative, got %d", c.Turns.PerDay)
+	}
+	if c.Tasks.CandidateWindow <= 0 {
+		return fmt.Errorf("tasks.candidate_window must be positive, got %s", time.Duration(c.Tasks.CandidateWindow))
+	}
+	if c.Tasks.CandidateCap < 0 {
+		return fmt.Errorf("tasks.candidate_cap must not be negative, got %d", c.Tasks.CandidateCap)
 	}
 	if c.Drafts.RepeatAfter <= 0 {
 		return fmt.Errorf("drafts.repeat_after must be positive, got %s", time.Duration(c.Drafts.RepeatAfter))
