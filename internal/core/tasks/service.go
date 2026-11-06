@@ -583,10 +583,22 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 			return Result{}, err
 		}
 	}
-	if _, err := s.d.Gates.Open(ctx, g); err != nil {
+	wait, err := s.pairTakenApart(ctx, e, task.ID(req.Args[task.ArgTask]))
+	if err != nil {
+		return Result{}, err
+	}
+	if _, err := s.d.Gates.Open(ctx, g, wait); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: e}, nil
+}
+
+// pairTakenApart says whether the user took e and other apart, so a gate proposing the pair waits for them.
+func (s *Service) pairTakenApart(ctx context.Context, e task.Task, other task.ID) (bool, error) {
+	if other == "" || s.d.TakenApart == nil {
+		return false, nil
+	}
+	return s.d.TakenApart(ctx, e, other)
 }
 
 // Allowed says whether req's actor may run req's verb on t, and whether running it opens the verb's gate
@@ -621,8 +633,8 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 		if err != nil || o.ID != other || req.Args[task.ArgTask] != string(other) {
 			return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair that changed since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
 		}
-		if s.d.TakenApart != nil && req.Actor != task.ActorPerson {
-			apart, err := s.d.TakenApart(ctx, t, other)
+		if req.Actor != task.ActorPerson {
+			apart, err := s.pairTakenApart(ctx, t, other)
 			if err != nil {
 				return false, err
 			}

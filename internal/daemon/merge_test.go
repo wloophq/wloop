@@ -32,7 +32,7 @@ type sweepingGates struct {
 	r gates.Reader
 }
 
-func (g sweepingGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
+func (g sweepingGates) Open(ctx context.Context, gt gate.Gate, _ bool) (gate.Gate, error) {
 	return g.s.Open(ctx, gt, nil)
 }
 func (g sweepingGates) Get(ctx context.Context, id int64) (gate.Gate, error) { return g.r.Get(ctx, id) }

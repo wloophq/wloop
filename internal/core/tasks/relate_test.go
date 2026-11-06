@@ -205,7 +205,7 @@ func TestAWorkflowsRelateOpensTheRelateGateAndItCannotUnrelate(t *testing.T) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"relate": {Name: "relate", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	r.put(t, task.Task{ID: "t-2", State: "next", Origin: task.OriginUser})
@@ -247,5 +247,42 @@ func TestOnlyAMergeAndARelationPairTwoTasks(t *testing.T) {
 		if coretasks.PairsTasks(h) {
 			t.Errorf("%s pairs two tasks", h)
 		}
+	}
+}
+
+// waitRecording are gates that record whether each opened waiting for a person.
+type waitRecording struct {
+	gatestest.TaskGates
+	waits map[task.ID]bool
+}
+
+func (g waitRecording) Open(ctx context.Context, gt gate.Gate, wait bool) (gate.Gate, error) {
+	g.waits[gt.Task] = wait
+	return g.Store.Open(ctx, gt)
+}
+
+func TestAProposalOfAPairTakenApartWaitsForYou(t *testing.T) {
+	ctx := context.Background()
+	d := tasksToml(t)
+	r := newRig()
+	gs := waitRecording{gatestest.TaskGates{Store: gatestest.NewStore(func() time.Time { return t0 })}, map[task.ID]bool{}}
+	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"relate": {Name: "relate", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
+	apart := func(_ context.Context, e task.Task, other task.ID) (bool, error) {
+		return e.ID == "t-1" && other == "t-2", nil
+	}
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+		States: states, Authority: states.Authority, TakenApart: apart})
+	for _, id := range []task.ID{"t-1", "t-2", "t-3"} {
+		r.put(t, task.Task{ID: id, State: "next", Origin: task.OriginUser})
+	}
+	for _, c := range []struct{ on, other task.ID }{{"t-1", "t-2"}, {"t-3", "t-2"}} {
+		req := relateReq(task.VerbRelate, task.ActorWorkflow, c.other)
+		req.Source = "tidy"
+		if _, err := r.svc.Do(ctx, c.on, req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !gs.waits["t-1"] || gs.waits["t-3"] {
+		t.Fatalf("waits %v, want only the pair taken apart to wait", gs.waits)
 	}
 }

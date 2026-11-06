@@ -3,11 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
-	"maps"
-	"slices"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -142,44 +138,36 @@ type serviceTaskGates struct {
 }
 
 // Open opens gt under the approval of the workflow that asked for the verb it proposes, gates.toml's for one
-// a person or an agent asked for.
-func (g serviceTaskGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
-	p, err := g.policy(ctx, gt)
+// a person or an agent asked for; held, it waits for you.
+func (g serviceTaskGates) Open(ctx context.Context, gt gate.Gate, wait bool) (gate.Gate, error) {
+	p, err := g.policy(ctx, gt, wait)
 	if err != nil {
 		return gate.Gate{}, err
 	}
 	return g.e.newGates(g.db, nil).Open(ctx, gt, p)
 }
 
-const factUndone = "task.undone"
-
-// policy is the approval of the workflow gt's proposal names, over its task's facts; a proposal that pairs its
-// task with one of task.undone waits for you, whatever approval would decide it, and so does one whose task's
-// facts cannot be read.
-func (g serviceTaskGates) policy(ctx context.Context, gt gate.Gate) (gates.Policy, error) {
+// policy is the approval of the workflow gt's proposal names, over its task's facts.
+func (g serviceTaskGates) policy(ctx context.Context, gt gate.Gate, wait bool) (gates.Policy, error) {
+	if wait {
+		return waitsForYou{}, nil
+	}
 	w, configured := g.e.configuredWorkflow(coretasks.ProposalFrom(gt))
+	if coretasks.ProposalFrom(gt) == "" || !configured {
+		return nil, nil
+	}
 	var reads []string
-	if configured {
-		for _, r := range w.Gates[gt.Kind].Rules {
-			reads = append(reads, r.When.Reads()...)
-		}
+	for _, r := range w.Gates[gt.Kind].Rules {
+		reads = append(reads, r.When.Reads()...)
 	}
 	facts, err := g.facts(ctx, gt.Task, reads...)
 	if err != nil {
 		return nil, err
 	}
-	if req, ok := coretasks.ProposedVerb(gt); ok {
-		if other := req.Args[task.ArgTask]; other != "" && (facts == nil || slices.Contains(undoneOf(facts), other)) {
-			return waitsForYou{}, nil
-		}
-	}
-	if coretasks.ProposalFrom(gt) == "" || !configured {
-		return nil, nil
-	}
-	return workflowPolicy{w: w, facts: facts, now: g.e.Now()}, nil
+	return g.e.workflowPolicy(w, facts), nil
 }
 
-// facts are task id's facts task.undone and reads name; nil when no task facts are served.
+// facts are task id's facts reads name; nil when no task facts are served.
 func (g serviceTaskGates) facts(ctx context.Context, id task.ID, reads ...string) (workflow.Facts, error) {
 	if g.e.wakeFacts == nil {
 		return nil, nil
@@ -188,12 +176,7 @@ func (g serviceTaskGates) facts(ctx context.Context, id task.ID, reads ...string
 	if err != nil {
 		return nil, err
 	}
-	return g.e.wakeFacts(workflow.WithReads(ctx, append(reads, factUndone)...), t)
-}
-
-func undoneOf(f workflow.Facts) []string {
-	undone, _ := f[factUndone].([]string)
-	return undone
+	return g.e.wakeFacts(workflow.WithReads(ctx, reads...), t)
 }
 
 func (g serviceTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {
@@ -256,48 +239,9 @@ func (p profilePolicy) Decide(_ context.Context, g gate.Gate) (gates.Decision, e
 	return gates.Decision{Mode: m, Window: w, Rule: at}, err
 }
 
-// workflowPolicy is the approval of the gates w's gate.open steps open on a
-// unit whose facts are facts, read with the gate's own.
-type workflowPolicy struct {
-	w     workflow.Workflow
-	facts workflow.Facts
-	now   time.Time
-}
-
-func (p workflowPolicy) Decide(_ context.Context, g gate.Gate) (gates.Decision, error) {
-	a, ok := p.w.Gates[g.Kind]
-	if g.Kind == gate.KindPlan {
-		a, ok = p.w.Approval, true
-	}
-	if !ok {
-		return gates.Decision{Mode: gate.ModeWait}, fmt.Errorf("workflow %s opens no %s gate", p.w.Name, g.Kind)
-	}
-	facts := maps.Clone(p.facts)
-	if facts == nil {
-		facts = workflow.Facts{}
-	}
-	maps.Copy(facts, intentload.GateFacts(g, ""))
-	for i, r := range a.Rules {
-		ok, err := r.When.Match(workflow.Vars{Facts: facts, Now: p.now})
-		if err != nil {
-			return gates.Decision{Mode: gate.ModeWait}, fmt.Errorf("workflows/%s gates.approval rule %d: %w", p.w.Name, i, err)
-		}
-		if ok {
-			return gates.Decision{Mode: gateMode(r.Mode), Window: r.Window, Rule: fmt.Sprintf("workflows/%s gates.approval rule %d", p.w.Name, i)}, nil
-		}
-	}
-	return gates.Decision{Mode: gateMode(a.Mode), Window: a.Window, Rule: "workflows/" + p.w.Name + " gates.approval"}, nil
-}
-
-// gateMode is a run approval's mode as a gate's.
-func gateMode(m workflow.ApprovalMode) gate.Mode {
-	switch m {
-	case workflow.ApprovalRun:
-		return gate.ModeRun
-	case workflow.ApprovalDelay:
-		return gate.ModeDelay
-	}
-	return gate.ModeWait
+// workflowPolicy is the approval of the gates w opens on a unit whose facts are facts, read with the gate's own.
+func (e *Env) workflowPolicy(w workflow.Workflow, facts workflow.Facts) gates.Policy {
+	return gates.WorkflowPolicy(w, facts, func(g gate.Gate) workflow.Facts { return intentload.GateFacts(g, "") }, e.Now())
 }
 
 // gateTasks finds the task a gate's unit is on in the store and opens one

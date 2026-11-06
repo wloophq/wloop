@@ -190,7 +190,7 @@ func TestAGatedVerbOpensTheGateItsVerbNames(t *testing.T) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": confirm}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 
@@ -237,7 +237,7 @@ func personGated(t *testing.T, verb string) (*rig, *gatestest.Store) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": {Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	return r, gs
 }
@@ -374,7 +374,7 @@ func TestAGatedVerbsProposalNamesTheWorkflowThatOpenedIt(t *testing.T) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": {Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 	for _, src := range []string{"tidy", "sweep"} {

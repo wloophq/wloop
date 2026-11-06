@@ -66,7 +66,7 @@ type serviceGates struct {
 	failing *atomic.Bool
 }
 
-func (g serviceGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
+func (g serviceGates) Open(ctx context.Context, gt gate.Gate, _ bool) (gate.Gate, error) {
 	return g.s.Open(ctx, gt, nil)
 }
 func (g serviceGates) Get(ctx context.Context, id int64) (gate.Gate, error) { return g.r.Get(ctx, id) }

@@ -168,7 +168,8 @@ type Ending interface {
 
 // Gates are the gates a gated verb opens and reads back: one open gate per proposal.
 type Gates interface {
-	Open(ctx context.Context, g gate.Gate) (gate.Gate, error)
+	// Open opens g under the approval that decides it, or waiting for a person whatever that decides when wait.
+	Open(ctx context.Context, g gate.Gate, wait bool) (gate.Gate, error)
 	Get(ctx context.Context, id int64) (gate.Gate, error)
 	OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error)
 	// HoldsTask says whether an open gate of task id holds it open until a person settles it or its unit ends.

@@ -328,7 +328,9 @@ func Survivor(a, b task.Task, aHolds, bHolds bool) (keep, fold task.Task) {
 
 // Pairable says whether t may be the other task of a verb that pairs two: a draft's or a message's task may not,
 // as another service serves it. A relation takes a project.
-func Pairable(t task.Task) bool { return t.Origin != task.OriginDraft && t.Origin != task.OriginMessage }
+func Pairable(t task.Task) bool {
+	return t.Origin != task.OriginDraft && t.Origin != task.OriginMessage
+}
 
 // Mergeable says whether t may be merged, or be another's merge candidate: a pairable task that is no project.
 func Mergeable(t task.Task) bool { return Pairable(t) && !t.IsProject() }

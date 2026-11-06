@@ -76,7 +76,7 @@ func (s *stepSet) gateOpenRun(ctx context.Context, c stepCall, _ automation.RunO
 	if err != nil && !errors.Is(err, automation.ErrUnitGone) {
 		return "", err
 	}
-	g, err := s.d.Gates.Open(ctx, gate.Gate{Name: c.arg("name"), Unit: c.u, Subject: w.Name}, workflowPolicy{w: w, facts: facts, now: s.e.Now()})
+	g, err := s.d.Gates.Open(ctx, gate.Gate{Name: c.arg("name"), Unit: c.u, Subject: w.Name}, s.e.workflowPolicy(w, facts))
 	if err != nil {
 		return "", err
 	}
