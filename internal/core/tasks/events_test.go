@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/link"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -62,5 +63,25 @@ func TestALinkOnAHeldItemRecordsTaskLinked(t *testing.T) {
 	}
 	if ev := got[0]; ev.Unit != task.UnitOf(task.DerivedID(unitU, "a")) || ev.Key == "" || ev.At != r.clock.t || ev.Data != pr.String() {
 		t.Fatalf("event %+v", ev)
+	}
+}
+
+func TestATaskAPersonOpensOnAUnitRecordsTaskCreated(t *testing.T) {
+	ctx := context.Background()
+	r := newRig()
+	u := unitU
+	on, err := r.svc.Open(ctx, coretasks.OpenRequest{Title: "Look at the fix", Unit: &u, Origin: task.OriginUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.svc.Capture(ctx, "Buy the tickets", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.svc.Open(ctx, coretasks.OpenRequest{Title: "Send this reply?", Unit: &u}); err != nil {
+		t.Fatal(err)
+	}
+	want := []port.Event{{Unit: task.UnitOf(on.ID), Kind: task.EventCreated, At: t0}}
+	if got := eventsOf(r.store.Events, task.EventCreated); !slices.Equal(got, want) {
+		t.Fatalf("events %+v, want %+v: the task a person opened on a unit only", got, want)
 	}
 }

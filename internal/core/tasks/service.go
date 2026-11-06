@@ -630,10 +630,16 @@ func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit,
 	}
 	e.SetRole(s.d.States, task.RoleContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
 	e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterPlugin, now)
+	cs := []task.Change{{Op: task.OpCreate, Task: e, Why: string(origin)}}
+	var evs []port.Event
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
+		cs[0].Task = e
+		if origin == task.OriginUser {
+			evs = createdEvents(cs, now)
+		}
 	}
-	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e, Why: string(origin)}}); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, evs...); err != nil {
 		return task.Task{}, err
 	}
 	return e, nil
