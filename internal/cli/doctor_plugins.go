@@ -64,7 +64,7 @@ func (e *Env) pluginCheck(ctx context.Context, cfg config.Config, p host.Plugin,
 	}
 	want, why, err := host.Trusted(p, cfg.PluginTrust(p.ID()), sums)
 	if err != nil {
-		fix := fmt.Sprintf("set [plugins.%s] trust = %q in %s", p.ID(), host.TrustPath, e.ConfigPath)
+		fix := fmt.Sprintf("%s config set %s %s", brand.Command, config.Key("plugins", p.ID(), "trust"), host.TrustPath)
 		if p.Bundled {
 			fix = brand.Command + " install"
 		}

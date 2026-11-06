@@ -724,3 +724,14 @@ func TestAConfigWorkflowsBlockOfARenamedWorkflowNamesItsNewName(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestLoadBytesNamesTheFileItDidNotRead(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "absent.toml")
+	c, err := LoadBytes(file, []byte("agent = 'codex'\n"), tools())
+	if err != nil || c.Agent != "codex" {
+		t.Fatalf("agent %q, %v", c.Agent, err)
+	}
+	if _, err := LoadBytes(file, []byte("sweep.fsat = '2m'\n"), tools()); err == nil || !strings.Contains(err.Error(), file) {
+		t.Fatalf("err %v", err)
+	}
+}

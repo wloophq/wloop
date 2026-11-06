@@ -55,6 +55,8 @@ SETUP
   store migrate          Migrate the store to this release's schema
   store restore          Put a backup of the store back
   config get             Print a configuration value
+  config set             Write a configuration value
+  config unset           Remove a configuration value
   version                Print the version
 
 TROUBLESHOOTING

@@ -522,6 +522,13 @@ func LoadFile(file string, base Config) (Config, error) {
 	if err != nil {
 		return c, fmt.Errorf("reading %s: %w", file, err)
 	}
+	return LoadBytes(file, raw, base)
+}
+
+// LoadBytes is LoadFile of raw, the contents file would hold, without
+// reading file.
+func LoadBytes(file string, raw []byte, base Config) (Config, error) {
+	c := base
 	if err := decodeStrict(file, raw, &c); err != nil {
 		return base, err
 	}

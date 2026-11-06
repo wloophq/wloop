@@ -458,6 +458,25 @@ func helpGroups(manager string) []helpGroup {
 				Docs:     "reference/configuration",
 			},
 			{
+				Names:   []string{"config set"},
+				Summary: "Write a configuration value",
+				Usage:   []string{"config set <key> <value>"},
+				About: "Write one key of the config file, keeping its comments and layout. The value is read as TOML (true, 5, [\"a\", \"b\"], \"quoted\") and as a string when it is not TOML. " +
+					"A key no setting reads, or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. " +
+					"The daemon applies profile live; any other key after a restart.",
+				Examples: []string{"config set workflows.task-check-on.enabled false", "config set sweep.fast 5m", `config set plugins.github.automated_reviewers '["acme-bot"]'`},
+				Docs:     "reference/configuration",
+			},
+			{
+				Names:   []string{"config unset"},
+				Summary: "Remove a configuration value",
+				Usage:   []string{"config unset <key>"},
+				About: "Remove one key from the config file, so its default applies, keeping the rest as written and the previous file as a backup. " +
+					"It removes a key no setting reads too, so a file that does not load can be fixed one key at a time.",
+				Examples: []string{"config unset sweep.fast"},
+				Docs:     "reference/configuration",
+			},
+			{
 				Names:    []string{"version"},
 				Summary:  "Print the version",
 				Usage:    []string{"version"},

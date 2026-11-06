@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/unstable"
@@ -51,12 +52,12 @@ type tomlTable struct {
 	keys  int
 }
 
-// tomlKey is a key/value expression: its full path, the end of its key and
-// the end of its value.
+// tomlKey is a key/value expression: its full path, where its key starts
+// and ends, and the end of its value.
 type tomlKey struct {
-	path        []string
-	keyEnd, end int
-	table       int
+	path               []string
+	start, keyEnd, end int
+	table              int
 }
 
 type tomlIndex struct {
@@ -90,7 +91,10 @@ func (d *Doc) index() (*tomlIndex, error) {
 		case unstable.KeyValue:
 			path, keyEnd := keyPath(n)
 			end := int(n.Raw.Offset + n.Raw.Length)
-			x.keys = append(x.keys, tomlKey{path: slices.Concat(x.tables[cur].path, path), keyEnd: keyEnd, end: end, table: cur})
+			first := n.Key()
+			first.Next()
+			x.keys = append(x.keys, tomlKey{path: slices.Concat(x.tables[cur].path, path),
+				start: int(first.Node().Raw.Offset), keyEnd: keyEnd, end: end, table: cur})
 			x.tables[cur].end = d.lineEnd(end)
 			x.tables[cur].keys++
 		}
@@ -160,7 +164,12 @@ func (x *tomlIndex) get(path []string) any {
 // document's is left as written; an empty string or list is not added where
 // the document has no key. An edit that would leave the document invalid
 // is refused and changes nothing.
-func (d *Doc) Set(path []string, v any) error {
+func (d *Doc) Set(path []string, v any) error { return d.set(path, v, false) }
+
+// Put is Set that also adds an empty string or list.
+func (d *Doc) Put(path []string, v any) error { return d.set(path, v, true) }
+
+func (d *Doc) set(path []string, v any, keepEmpty bool) error {
 	enc, err := frontmatter.Value(v)
 	if err != nil {
 		return fmt.Errorf("%s: %w", Key(path...), err)
@@ -174,7 +183,7 @@ func (d *Doc) Set(path []string, v any) error {
 		if was, err := frontmatter.Value(old); err == nil && was == enc {
 			return nil
 		}
-	} else if empty(v) {
+	} else if !keepEmpty && empty(v) {
 		return nil
 	}
 	before := d.src
@@ -194,6 +203,9 @@ func empty(v any) bool {
 }
 
 func (d *Doc) edit(x *tomlIndex, path []string, enc string) error {
+	if err := x.outsideArrays(path); err != nil {
+		return err
+	}
 	for _, k := range x.keys {
 		switch {
 		case slices.Equal(k.path, path):
@@ -266,4 +278,92 @@ func Key(path ...string) string {
 		parts[i] = frontmatter.Key(k)
 	}
 	return strings.Join(parts, ".")
+}
+
+// outsideArrays refuses path when it names an array of tables or a key in
+// one, which a dotted key cannot pick.
+func (x *tomlIndex) outsideArrays(path []string) error {
+	for _, h := range x.tables[1:] {
+		if h.array && (isPrefix(h.path, path) || slices.Equal(h.path, path)) {
+			return fmt.Errorf("%s is in the array of tables %s; edit it by hand", Key(path...), Key(h.path...))
+		}
+	}
+	return nil
+}
+
+// Unset removes the key at path with the rest of its line; a document
+// without it is left as written. A table, or a key written in an inline
+// table or in an array of tables, is refused and changes nothing.
+func (d *Doc) Unset(path []string) error {
+	x, err := d.index()
+	if err != nil {
+		return err
+	}
+	if err := x.outsideArrays(path); err != nil {
+		return err
+	}
+	for _, h := range x.tables[1:] {
+		if isPrefix(path, h.path) || slices.Equal(h.path, path) {
+			return fmt.Errorf("%s is a table; unset its keys one by one", Key(path...))
+		}
+	}
+	for _, k := range x.keys {
+		switch {
+		case slices.Equal(k.path, path):
+			before := d.src
+			to := d.lineEnd(k.end)
+			if to < len(d.src) {
+				to++
+			}
+			d.splice(d.lineStart(k.start), to, "")
+			if _, err := d.index(); err != nil {
+				d.src, d.idx = before, nil
+				return fmt.Errorf("unsetting %s would leave the file invalid: %w", Key(path...), err)
+			}
+			return nil
+		case isPrefix(k.path, path):
+			return fmt.Errorf("%s is written inline; unset %s in it by hand", Key(k.path...), Key(path...))
+		case isPrefix(path, k.path):
+			return fmt.Errorf("%s is a table; unset its keys one by one", Key(path...))
+		}
+	}
+	return nil
+}
+
+// ParseKey is s, a dotted TOML key such as workflows."a.b".enabled, as
+// its parts.
+func ParseKey(s string) ([]string, error) {
+	if strings.ContainsAny(s, "\n\r") {
+		return nil, fmt.Errorf("invalid key %q", s)
+	}
+	src := []byte(s + " = 0")
+	var p unstable.Parser
+	p.Reset(src)
+	var path []string
+	for n := 0; p.NextExpression(); n++ {
+		e := p.Expression()
+		if n > 0 || e.Kind != unstable.KeyValue {
+			return nil, fmt.Errorf("invalid key %q", s)
+		}
+		path, _ = keyPath(e)
+	}
+	if err := p.Error(); err != nil || len(path) == 0 {
+		return nil, fmt.Errorf("invalid key %q", s)
+	}
+	return path, nil
+}
+
+// ParseValue is s as a TOML value, or s itself when it is not one or is a
+// date or a time, which the config only reads as strings.
+func ParseValue(s string) any {
+	var doc map[string]any
+	if err := toml.Unmarshal([]byte("v = "+s), &doc); err != nil || len(doc) != 1 {
+		return s
+	}
+	switch v := doc["v"].(type) {
+	case toml.LocalDate, toml.LocalDateTime, toml.LocalTime, time.Time:
+		return s
+	default:
+		return v
+	}
 }

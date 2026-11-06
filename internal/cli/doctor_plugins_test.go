@@ -106,7 +106,7 @@ func TestDoctorShowsEachPluginsTrust(t *testing.T) {
 
 	checks := te.pluginChecks(t.Context(), te.cfg, &api.Health{Plugins: []api.PluginHealth{{ID: "gamma", Status: "serving"}, {ID: "delta", Status: "down", Reason: "it crashed"}}})
 	acme := checkOf(t, checks, "plugin acme")
-	if acme.mark != markMissing || !strings.Contains(acme.info, "which no install recorded") || !strings.Contains(acme.fix, `[plugins.acme] trust = "path"`) {
+	if acme.mark != markMissing || !strings.Contains(acme.info, "which no install recorded") || !strings.Contains(acme.fix, "config set plugins.acme.trust path") {
 		t.Errorf("an unrecorded user binary: %+v", acme)
 	}
 	beta := checkOf(t, checks, "plugin beta")
