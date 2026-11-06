@@ -158,3 +158,8 @@ func TestARelatedListNamesEachTaskOnceAndNeverItself(t *testing.T) {
 		t.Errorf("the inbox row of t-1 lists %+v, want %+v", got, want)
 	}
 }
+
+func TestARelatedRefShowsItsTaskAsADeltaLeavesIt(t *testing.T) {
+	// A related task's title or state change does not reach the row that lists it on a delta page.
+	t.Skip("T3 C7")
+}
