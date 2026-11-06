@@ -137,3 +137,24 @@ func TestAnAgentTheUserDoesNotDriveCannotRelate(t *testing.T) {
 		t.Fatalf("t-2 related %+v after the refused unrelate", got)
 	}
 }
+
+func TestARelatedListNamesEachTaskOnceAndNeverItself(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-1", Title: "Draft the launch post", State: "inbox", Category: task.CategoryInbox,
+		Props: task.Props{"related": {List: []string{"t-2", "t-3", "t-9", "t-404", "t-4"}}}},
+		task.Task{ID: "t-3", Title: "Book the launch venue", State: "inbox", Category: task.CategoryInbox},
+		task.Task{ID: "t-4", Title: "Order the badges", State: "next", Category: task.CategoryReady})
+	sqlitetest.Exec(t, r.db, `INSERT INTO task_aliases (old_id, new_id) VALUES ('t-2', 't-3'), ('t-9', 't-1')`)
+	want := []api.TaskRef{{ID: "t-2", Title: "Book the launch venue", State: "inbox", Merged: true}, {ID: "t-4", Title: "Order the badges", State: "next"}}
+	if got := r.view(t, "t-1").Related; !reflect.DeepEqual(got, want) {
+		t.Errorf("the detail of t-1 lists %+v, want %+v", got, want)
+	}
+	i := slices.IndexFunc(r.page(t, "view=inbox").Tasks, func(v api.TaskView) bool { return v.ID == "t-1" })
+	if i < 0 {
+		t.Fatal("t-1 is not in the inbox")
+	}
+	if got := r.page(t, "view=inbox").Tasks[i].Related; !reflect.DeepEqual(got, want) {
+		t.Errorf("the inbox row of t-1 lists %+v, want %+v", got, want)
+	}
+}

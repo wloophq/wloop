@@ -836,6 +836,8 @@ type taskViewer struct {
 	// snapshot.
 	rows map[unit.Unit]readmodel.Read
 	read map[unit.Unit]bool
+	// refs are the tasks a listed id reads as, the page's own and each one read once; ok false for none.
+	refs map[task.ID]taskRef
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -997,8 +999,10 @@ func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) 
 	}
 }
 
-// readRows reads the rows of the units of es in one snapshot, for their views.
+// readRows reads the rows of the units of es in one snapshot, for their views, and keeps es for their related
+// lists (knowTasks).
 func (ev *taskViewer) readRows(ctx context.Context, es []task.Task) {
+	ev.knowTasks(es)
 	var units []unit.Unit
 	for _, e := range es {
 		units = append(units, e.Units...)
