@@ -1139,3 +1139,24 @@ func TestSplitAfterAnUnrelateAndARelateAgainKeepsTheSurvivorsLink(t *testing.T) 
 		t.Errorf("relations after the split %v, want %v", got, want)
 	}
 }
+
+func TestAGateHoldingSurvivorEndsOnceTheMergedTasksItemsResolve(t *testing.T) {
+	r := newMergeRig(t)
+	gateUnit := unit.Unit{Provider: "slack", Key: "T1/C9/9.9"}
+	r.clock.t = t0.Add(-time.Hour)
+	held, err := r.svc.Open(context.Background(), coretasks.OpenRequest{Title: "Send this draft?", Unit: &gateUnit, Origin: task.OriginGate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.clock.t = t0
+	_, ask := r.seed(t)
+	r.merge(t, ask.ID, held.ID)
+	it := owed(askThread, "s:ask")
+	settled(&it)
+	r.items.byUnit[askThread] = []items.Item{it}
+	r.clock.t = t0.Add(2 * time.Hour)
+	r.sync(t, askThread)
+	if y := r.task(t, held.ID); y.Open() || len(y.Items) != 0 {
+		t.Fatalf("survivor %s %v: a gate task holding only resolved items of a merged task stays open", y.Category, y.Items)
+	}
+}
