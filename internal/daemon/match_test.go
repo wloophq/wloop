@@ -19,6 +19,7 @@ func TestTasksMatchListsTheOpenTasksWhoseTitleHoldsIt(t *testing.T) {
 		task.Task{ID: "t-3", Title: "Launch retro", State: "done", Category: task.CategoryDone, Created: at(9), Updated: at(1)},
 		task.Task{ID: "t-4", Title: "Order the badges", State: "someday", Category: task.CategoryDeferred, Created: at(9), Updated: at(2)},
 		task.Task{ID: "draft:7", Title: "Reply on the launch thread", State: "outbox", Category: task.CategoryInbox, Origin: task.OriginDraft, Created: at(9), Updated: at(1)},
+		task.Task{ID: "t-6", Title: "Message about the launch", State: "inbox", Category: task.CategoryInbox, Origin: task.OriginMessage, Created: at(9), Updated: at(1)},
 		task.Task{ID: "t-5", Title: "Launch checklist", State: "waiting", Category: task.CategoryWaiting, Created: at(9), Updated: at(3)})
 
 	got := r.page(t, api.TasksMatch+"=launch")
