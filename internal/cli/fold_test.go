@@ -792,3 +792,27 @@ func TestAPairTakenApartWaitsForYouWhenTheAskingWorkflowIsOff(t *testing.T) {
 		t.Fatal("no merge gate waits for you on a pair you took apart")
 	}
 }
+
+func TestAMergeARuleReleasedKeepsTheChainThatAskedForIt(t *testing.T) {
+	t.Parallel()
+	r := askedRig(t, false)
+	r.sweep(t)
+	evs, err := r.db.EventsOfKinds(context.Background(), []string{task.VerbEventKind(task.VerbMerge)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var by []workflow.Event
+	for _, ev := range evs {
+		if ev.Actor == "workflow:task-fold-linked" {
+			by = append(by, ev)
+		}
+	}
+	if len(by) == 0 {
+		t.Fatalf("the merge's events %+v, want them by the fold", evs)
+	}
+	for _, ev := range by {
+		if ev.Chain.Depth < 1 || !ev.Chain.Has("task-fold-linked") {
+			t.Fatalf("the released merge's event chain %+v, want it to carry task-fold-linked", ev.Chain)
+		}
+	}
+}

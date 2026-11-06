@@ -549,6 +549,9 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 	p := proposal{Verb: req.Verb, Args: req.Args}
 	if req.Actor == task.ActorWorkflow {
 		p.From = req.Source
+		if req.Chain.Depth > 0 {
+			p.Chain = &req.Chain
+		}
 	}
 	subject, err := json.Marshal(p)
 	if err != nil {
@@ -642,11 +645,12 @@ func sameProposal(g gate.Gate, p proposal) bool {
 }
 
 // proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it, and the workflow that
-// asked for it, "" for a person or an agent.
+// asked for it, "" for a person or an agent, with the chain of workflows that led it there.
 type proposal struct {
-	Verb task.Verb         `json:"verb"`
-	Args map[string]string `json:"args,omitempty"`
-	From string            `json:"from,omitempty"`
+	Verb  task.Verb         `json:"verb"`
+	Args  map[string]string `json:"args,omitempty"`
+	From  string            `json:"from,omitempty"`
+	Chain *workflow.Chain   `json:"chain,omitempty"`
 }
 
 func proposalOf(g gate.Gate) (proposal, bool) {
@@ -666,7 +670,11 @@ func ProposedVerb(g gate.Gate) (Request, bool) {
 		return Request{}, false
 	}
 	if g.Rule != "" && p.From != "" {
-		return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorWorkflow, Source: p.From, Approved: g.ID}, true
+		req := Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorWorkflow, Source: p.From, Approved: g.ID}
+		if p.Chain != nil {
+			req.Chain = *p.Chain
+		}
+		return req, true
 	}
 	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate", Approved: g.ID}, true
 }
