@@ -498,3 +498,17 @@ func TestSplitLeavesTheRowsAnotherMergedTasksRecordListsOnAUnitTheSplitTaskBroug
 		t.Fatalf("W's draft on the pull request X brought left Y: Y holds %q, X holds %q", got, ms.rows(t, xID))
 	}
 }
+
+func TestAMergeRecordThatCannotBeReadFailsTheReadAndTheCreateOfTheMergedTask(t *testing.T) {
+	t.Parallel()
+	ms := openMerge(t)
+	x, y := ms.seed(t)
+	ms.merge(t, x, y, mergeAt)
+	sqlitetest.Exec(t, ms.db, `UPDATE events SET data = '{' WHERE kind = ?`, merge.RecordKind)
+	if got, err := ms.s.Task(context.Background(), xID); err == nil {
+		t.Fatalf("the merged task read as %s past a merge record no one can read", got.ID)
+	}
+	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: x}}); err == nil {
+		t.Fatal("the merged task was created again past a merge record no one can read")
+	}
+}

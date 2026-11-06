@@ -300,6 +300,12 @@ func mergeOf(ctx context.Context, q rowQuerier, id task.ID) (merge.Record, bool,
 	if stored > 0 {
 		return merge.Record{}, false, nil
 	}
+	return latestMerge(ctx, q, id)
+}
+
+// latestMerge is the record of the latest merge of task id, the one of the highest event id, stored or not;
+// false when id was never merged.
+func latestMerge(ctx context.Context, q rowQuerier, id task.ID) (merge.Record, bool, error) {
 	u := task.UnitOf(id)
 	var data string
 	err := q.QueryRowContext(ctx, `SELECT data FROM events WHERE provider = ? AND unit_key = ? AND kind = ? ORDER BY id DESC LIMIT 1`,
