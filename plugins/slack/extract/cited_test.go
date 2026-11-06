@@ -264,3 +264,33 @@ func TestExtractionIgnoresACitedItemSettledByAThirdParty(t *testing.T) {
 		t.Errorf("the dropped ops are not logged: %v", r.logs)
 	}
 }
+
+func TestExtractionKeepsACitedItemSettledByItsRequesterOrAnAssignee(t *testing.T) {
+	const jAssignee = "U000000CCC"
+	for _, author := range []string{jOther, jAssignee} {
+		t.Run(author, func(t *testing.T) {
+			r := newRig(t)
+			r.facts.convs[jOtherChan] = slack.Conversation{ID: jOtherChan, Name: "deploys", Kind: slack.KindChannel, IsMember: true}
+			cited := slack.ThreadUnit(jTeam, jOtherChan, ts(1))
+			at := unit.Anchor{Unit: cited, Ref: jOtherChan + "/" + ts(1)}
+			if err := r.ledger.host.Apply(items.Extracted,
+				items.Op{Op: items.OpCreate, Unit: cited, Item: "e-open", Anchor: at,
+					Fields: &items.Fields{Kind: ptr(items.Request), Summary: ptr("Carl ships the fix"), Requester: &items.Person{Key: slack.UserKey(jOther), Name: "bob"}}},
+				items.Op{Op: items.OpAssign, Unit: cited, Item: "e-open", Anchor: at, Assignees: []items.Person{{Key: slack.UserKey(jAssignee)}}, Basis: items.ExplicitMention},
+			); err != nil {
+				t.Fatal(err)
+			}
+			r.facts.postLinking(jChan, ts(10), author, "the fix is out", jT0, permalinkOf(jOtherChan, ts(1)))
+			r.asker.reply = func(int, host.Ask) ([]byte, error) {
+				done := jItem("e-open", ts(10), resolved(ts(10)), func(it obj) {
+					it["requester"], it["assignees"] = jPerson(jOther), []any{jPerson(jAssignee)}
+				})
+				return answerJSON(t, []obj{done}, nil, nil, nil), nil
+			}
+			r.run(jT0.Add(2 * time.Minute))
+			if it := itemOf(t, r.items(cited), "e-open"); it.State != items.Resolved {
+				t.Fatalf("a message by %s did not resolve the cited item: %+v", author, it)
+			}
+		})
+	}
+}
