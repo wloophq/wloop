@@ -579,7 +579,11 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 		}
 	}
 	if s.d.GateText != nil {
-		if g.Text, err = s.d.GateText(ctx, g, string(req.Verb), e, req.Args); err != nil {
+		w, err := s.gateWords(ctx, e, req)
+		if err != nil {
+			return Result{}, err
+		}
+		if g.Text, err = s.d.GateText(ctx, g, w); err != nil {
 			return Result{}, err
 		}
 	}
@@ -591,6 +595,26 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 		return Result{}, err
 	}
 	return Result{Task: e}, nil
+}
+
+// gateWords are what the words of the gate req's verb opens on e read.
+func (s *Service) gateWords(ctx context.Context, e task.Task, req Request) (GateWords, error) {
+	w := GateWords{Verb: string(req.Verb), Task: e}
+	id := req.Args[task.ArgTask]
+	if id == "" {
+		return w, nil
+	}
+	o, err := s.d.Store.Task(ctx, task.ID(id))
+	if err != nil {
+		return GateWords{}, err
+	}
+	w.Other = o
+	if s.d.States.Handler(string(req.Verb)) == HandlerMerge {
+		if w.Keep, w.Fold, err = s.survivor(ctx, req.Verb, e, o); err != nil {
+			return GateWords{}, err
+		}
+	}
+	return w, nil
 }
 
 // pairTakenApart says whether the user took e and other apart, so a gate proposing the pair waits for them.

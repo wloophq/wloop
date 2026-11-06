@@ -104,6 +104,8 @@ type mrig struct {
 	clock *clock
 	mu    sync.Mutex
 	holds map[task.ID]bool
+	// words are what the gates GateText worded read.
+	words []coretasks.GateWords
 	// reading, when set, runs as a sync reads the items of a unit.
 	reading func(u unit.Unit)
 	// failSupersede fails the gates' supersede, and failItems the items' reads.
@@ -142,8 +144,11 @@ func newMergeRig(t *testing.T) *mrig {
 			defer r.mu.Unlock()
 			return verb == string(task.VerbMerge) && r.holds[e.ID], nil
 		},
-		GateText: func(_ context.Context, g gate.Gate, verb string, e task.Task, args map[string]string) (string, error) {
-			return fmt.Sprintf("%s %s: %s with %s", g.Name, verb, e.ID, args[task.ArgTask]), nil
+		GateText: func(_ context.Context, g gate.Gate, w coretasks.GateWords) (string, error) {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			r.words = append(r.words, w)
+			return fmt.Sprintf("%s %s: %s with %s", g.Name, w.Verb, w.Task.ID, w.Other.ID), nil
 		}})
 	for _, u := range []unit.Unit{prUnit, askThread, otherPR} {
 		r.facts.facts[u] = task.UnitFacts{Unit: u, Cares: true, Carded: true}
@@ -630,6 +635,24 @@ func TestTheMergeGateNamesBothTasksInItsWords(t *testing.T) {
 	}
 	if gs := r.mergeGates(t); len(gs) != 1 || gs[0].Text != fmt.Sprintf("merge merge: %s with %s", ask.ID, pr.ID) {
 		t.Fatalf("gates %+v", gs)
+	}
+}
+
+func TestTheMergeGateWordsTheTaskTheSurvivorKeepsAndTheOneItFolds(t *testing.T) {
+	for _, held := range []bool{false, true} {
+		r := newMergeRig(t)
+		pr, ask := r.seed(t)
+		r.holds[ask.ID] = held
+		if _, err := r.proposeMerge(ask.ID, pr.ID); err != nil {
+			t.Fatal(err)
+		}
+		keep, fold := pr.ID, ask.ID
+		if held {
+			keep, fold = ask.ID, pr.ID
+		}
+		if len(r.words) != 1 || r.words[0].Keep.ID != keep || r.words[0].Fold.ID != fold {
+			t.Fatalf("survivor holding on the ask %v: words %+v, want %s kept and %s folded", held, r.words, keep, fold)
+		}
 	}
 }
 

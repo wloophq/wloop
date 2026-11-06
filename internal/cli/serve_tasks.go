@@ -28,7 +28,6 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		e.pluginsOff = &atomic.Pointer[[]unit.ProviderID]{}
 		off := func() []unit.ProviderID { return offProviders(cfg, e.pluginsOff.Load()) }
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
-		holds := catalog.Survives(e.loadedIntents, e.factsOfTask)
 		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get, Kind: e.pluginTaskKind}
 		e.wakes = wakes.New(wakes.Deps{Store: db.Wakes(), Tasks: db.Tasks(), Holds: catalog.Holds(e.loadedIntents, e.factsOfTask),
 			Clock: clockFunc(e.Now)})
@@ -39,7 +38,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
-			}, Survives: holds, GateText: verbGateText(e.loadedIntents, db.Tasks(), holds), TakenApart: e.pairTakenApart})
+			}, Survives: catalog.Survives(e.loadedIntents, e.factsOfTask), GateText: verbGateText(e.loadedIntents), TakenApart: e.pairTakenApart})
 	}
 	return e.tasks
 }

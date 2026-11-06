@@ -65,15 +65,10 @@ func (s *Service) merge(ctx context.Context, e task.Task, req Request) (Result, 
 			return Result{}, fmt.Errorf("%w: %s on a %s task", ErrVerb, req.Verb, cmp.Or(classOf(t), t.Origin))
 		}
 	}
-	aHolds, err := s.survives(ctx, req.Verb, a)
+	keep, fold, err := s.survivor(ctx, req.Verb, a, b)
 	if err != nil {
 		return Result{}, err
 	}
-	bHolds, err := s.survives(ctx, req.Verb, b)
-	if err != nil {
-		return Result{}, err
-	}
-	keep, fold := merge.Survivor(a, b, aHolds, bHolds)
 	now := s.now()
 	y, r, err := merge.Fold(fold, keep, s.d.States, now)
 	if err != nil {
@@ -322,11 +317,18 @@ func (s *Service) mergers(req Request) (Merger, GateSweeper, error) {
 	return m, sw, nil
 }
 
-func (s *Service) survives(ctx context.Context, verb task.Verb, t task.Task) (bool, error) {
-	if s.d.Survives == nil {
-		return false, nil
+// survivor is which of a and b a merge by verb keeps and which it folds, as merge.Survivor says over Survives.
+func (s *Service) survivor(ctx context.Context, verb task.Verb, a, b task.Task) (keep, fold task.Task, err error) {
+	var holds [2]bool
+	if s.d.Survives != nil {
+		for i, t := range []task.Task{a, b} {
+			if holds[i], err = s.d.Survives(ctx, string(verb), t); err != nil {
+				return keep, fold, err
+			}
+		}
 	}
-	return s.d.Survives(ctx, string(verb), t)
+	keep, fold = merge.Survivor(a, b, holds[0], holds[1])
+	return keep, fold, nil
 }
 
 // MergeOf is the record of the merge that took task id, as the store keeps it; false when id is stored, was

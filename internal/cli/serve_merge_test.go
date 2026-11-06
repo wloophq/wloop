@@ -4,45 +4,27 @@ import (
 	"context"
 	"slices"
 	"testing"
-	"time"
 
-	"github.com/wloophq/wloop/internal/catalog"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-type titledTasks map[task.ID]task.Task
-
-func (ts titledTasks) Task(_ context.Context, id task.ID) (task.Task, error) {
-	if e, ok := ts[id]; ok {
-		return e, nil
-	}
-	return task.Task{}, coretasks.ErrNoTask
-}
-
-func TestTheMergeGateWordsNameTheTaskTheSurvivorKeepsAndTheOneItFolds(t *testing.T) {
+func TestTheMergeGateWordsNameTheTaskItKeepsAndTheOneItFolds(t *testing.T) {
 	t.Parallel()
 	l := turnBundled(t)
-	loaded := func() *intentload.Loaded { return l }
-	older := task.Task{ID: "t-00000000000000a1", Title: "Review acme/api#7", Created: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)}
-	newer := task.Task{ID: "t-00000000000000b2", Title: "Finish the export", Created: older.Created.Add(time.Hour)}
-	clarified := map[task.ID]bool{}
-	holds := catalog.Survives(loaded, func(_ context.Context, e task.Task) (workflow.Facts, error) {
-		return workflow.Facts{"task.clarified": clarified[e.ID]}, nil
-	})
-	text := verbGateText(loaded, titledTasks{older.ID: older, newer.ID: newer}, holds)
+	text := verbGateText(func() *intentload.Loaded { return l })
+	older := task.Task{ID: "t-00000000000000a1", Title: "Review acme/api#7"}
+	newer := task.Task{ID: "t-00000000000000b2", Title: "Finish the export"}
 	g := gate.Gate{Name: "merge", Kind: gate.KindProposal}
-	got, err := text(context.Background(), g, "merge", newer, map[string]string{task.ArgTask: string(older.ID)})
+	got, err := text(context.Background(), g, coretasks.GateWords{Verb: "merge", Task: newer, Other: older, Keep: older, Fold: newer})
 	if err != nil || got != `Merge "Finish the export" into "Review acme/api#7"? Its items, units, gates and drafts move over; Split gives it back.` {
 		t.Fatalf("words %q, %v", got, err)
 	}
-	clarified[newer.ID] = true
-	if got, err = text(context.Background(), g, "merge", older, map[string]string{task.ArgTask: string(newer.ID)}); err != nil ||
+	if got, err = text(context.Background(), g, coretasks.GateWords{Verb: "merge", Task: older, Other: newer, Keep: newer, Fold: older}); err != nil ||
 		got != `Merge "Review acme/api#7" into "Finish the export"? Its items, units, gates and drafts move over; Split gives it back.` {
-		t.Fatalf("the clarified task kept: %q, %v", got, err)
+		t.Fatalf("the newer task kept: %q, %v", got, err)
 	}
 }
 

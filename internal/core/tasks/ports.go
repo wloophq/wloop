@@ -87,13 +87,20 @@ type (
 	// Survives says whether the predicate verb's survivor names (tasks.toml) holds on task t, over its facts:
 	// the task it holds on alone is the one a merge keeps.
 	Survives func(ctx context.Context, verb string, t task.Task) (bool, error)
-	// GateText is the words of the gate verb opens on e with args, the gate's text of gates.toml over the
-	// proposal facts of a verb's gate; "" for a gate with none.
-	GateText func(ctx context.Context, g gate.Gate, verb string, e task.Task, args map[string]string) (string, error)
+	// GateText is the words of gate g a gated verb opens, the gate's text of gates.toml over the proposal facts
+	// of w; "" for a gate with none.
+	GateText func(ctx context.Context, g gate.Gate, w GateWords) (string, error)
 	// TakenApart says whether the user took task t and other apart (task.undone), so a pair a workflow asked for
 	// runs only once they decide.
 	TakenApart func(ctx context.Context, t task.Task, other task.ID) (bool, error)
 )
+
+// GateWords are what the words of a gated verb's gate read: the verb, the task it runs on, the other task
+// task.ArgTask names, zero when none, and the task a merge keeps and the one it folds, zero but for a merge.
+type GateWords struct {
+	Verb                    string
+	Task, Other, Keep, Fold task.Task
+}
 
 type Since struct {
 	Epoch string
