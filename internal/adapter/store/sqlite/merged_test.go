@@ -72,7 +72,7 @@ func TestMergedIntoFollowsOnlyTheAliasTheMergeRecordNames(t *testing.T) {
 	v7Alias(t, db, merged, part)
 	v7Alias(t, db, gone, part)
 	mergedAway(t, db, merged, survivor, time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC))
-	exec(t, db, `UPDATE tasks SET category = ? WHERE id = ?`, string(task.CategoryDone), survivor)
+	exec(t, db, `UPDATE tasks SET category = ? WHERE id = ?`, string(task.CategoryReady), part)
 
 	if got := mergedIDs(t, db, part); len(got) != 0 {
 		t.Fatalf("merged into the v7 split part %q, want none: a v7 alias carries no history", got)
