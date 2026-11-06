@@ -530,6 +530,22 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && o.Subject == g.Subject }) {
 		return Result{Task: e}, nil
 	}
+	if other := task.ID(req.Args[task.ArgTask]); other != "" {
+		theirs, err := s.d.Gates.OfTask(ctx, other)
+		if err != nil {
+			return Result{}, err
+		}
+		if slices.ContainsFunc(theirs, func(o gate.Gate) bool {
+			return o.Status == gate.Open && o.Name == g.Name && proposes(o, req.Verb, e.ID)
+		}) {
+			return Result{Task: e}, nil
+		}
+	}
+	if s.d.GateText != nil {
+		if g.Text, err = s.d.GateText(ctx, g, string(req.Verb), e, req.Args); err != nil {
+			return Result{}, err
+		}
+	}
 	if _, err := s.d.Gates.Open(ctx, g); err != nil {
 		return Result{}, err
 	}
@@ -557,7 +573,22 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 	if g.Status != gate.Approved || g.Task != t.ID || !ok || p.Verb != req.Verb {
 		return false, fmt.Errorf("%w: gate %d does not approve %s on %s", ErrForbidden, req.Approved, req.Verb, t.ID)
 	}
+	if other := task.ID(p.Args[task.ArgTask]); other != "" {
+		o, err := s.d.Store.Task(ctx, other)
+		if err != nil && !errors.Is(err, ErrNoTask) {
+			return false, err
+		}
+		if err != nil || o.ID != other || req.Args[task.ArgTask] != string(other) {
+			return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair that changed since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
+		}
+	}
 	return false, nil
+}
+
+// proposes says whether gate g proposes verb with the other task id.
+func proposes(g gate.Gate, verb task.Verb, id task.ID) bool {
+	p, ok := ProposedVerb(g)
+	return ok && p.Verb == verb && p.Args[task.ArgTask] == string(id)
 }
 
 // proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it.
