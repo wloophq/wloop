@@ -30,10 +30,13 @@ type Holdings interface {
 }
 
 // Merged is the Reader over the event log: a task's timeline is its own
-// events and those of the units it holds, without the merge records.
+// events and those of the units it holds, without the merge records and the
+// kinds of Except.
 type Merged struct {
 	Log      Log
 	Holdings Holdings
+	// Except are the event kinds no timeline shows, asked for by kind or not.
+	Except []string
 }
 
 var _ Reader = Merged{}
@@ -49,7 +52,7 @@ func (m Merged) Of(ctx context.Context, id task.ID, f Filter) ([]Event, error) {
 			units = append(units, u)
 		}
 	}
-	f.Except = append(slices.Clip(f.Except), merge.RecordKind)
+	f.Except = slices.Concat(f.Except, m.Except, []string{merge.RecordKind})
 	evs, err := m.Log.EventsOf(ctx, units, f)
 	if evs == nil {
 		evs = []Event{}

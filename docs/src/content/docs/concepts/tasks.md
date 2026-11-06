@@ -146,7 +146,7 @@ Restart the daemon to apply it. `tasks.candidate_cap = 0` also stops it, and `ta
 
 ## The timeline and the records
 
-A task's timeline is its own events and those of the units it holds, every one kept forever, newest first: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
+A task's timeline is its own events and those of the units it holds, every one kept forever, newest first, but the loop's bookkeeping that only triggers workflows (`task_created`, `task_linked`, `classified`) and the merge records: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
 
 The open tasks that hold a unit or one of its items are at `GET /api/units/<provider>/<key>/tasks`, one read by the unit whatever view lists them, oldest first with children in their sibling order, but those whose units all belong to a disabled plugin; the cockpit's unit detail shows them from it.
 

@@ -52,3 +52,19 @@ func TestTheTimelineLeavesTheMergeRecordOut(t *testing.T) {
 		t.Fatalf("the merge record asked for by kind %v", seqs(asked))
 	}
 }
+
+func TestTheTimelineLeavesTheKindsItExceptsOut(t *testing.T) {
+	l := &log{}
+	l.add(task.UnitOf(survivor), "task_created") // 1
+	l.add(task.UnitOf(survivor), "message")      // 2
+	l.add(task.UnitOf(survivor), "classified")   // 3
+	r := timeline.Merged{Log: l, Holdings: holdings{}, Except: []string{"task_created", "classified"}}
+	ctx := context.Background()
+
+	if got, _ := r.Of(ctx, survivor, timeline.Filter{}); !slices.Equal(seqs(got), []int64{2}) {
+		t.Fatalf("the timeline %v, want only the message", seqs(got))
+	}
+	if asked, _ := r.Of(ctx, survivor, timeline.Filter{Kinds: []string{"classified"}}); len(asked) != 0 {
+		t.Fatalf("an excepted kind asked for by kind %v", seqs(asked))
+	}
+}
