@@ -41,7 +41,7 @@ func TestSlackDeliversItsKindsAsItsManifestNamesThem(t *testing.T) {
 	t.Parallel()
 	p := bundledPublisher(t, "slack")
 	for k, want := range map[draft.Kind]draft.Delivery{draft.Reply: draft.Message, draft.Nudge: draft.Message, draft.Comment: draft.Message,
-		draft.React: draft.Reaction, draft.Edit: draft.EditDelivery} {
+		draft.React: draft.Reaction, draft.Edit: draft.EditDelivery, draft.Delete: draft.DeleteDelivery} {
 		if got := p.Delivers(k); got != want {
 			t.Errorf("%s: %s, want %s", k, got, want)
 		}

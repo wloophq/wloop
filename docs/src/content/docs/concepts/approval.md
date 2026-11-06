@@ -120,7 +120,7 @@ A rule that releases (`send`, `run` or `delay`) and reads `draft.delivery` in a 
 
 The configuration's `workflows.slack-ask-owner.gates.approval` sets the approval of the questions `slack-ask-owner` proposes like those of any other workflow: a rule that names their delivery, `draft.delivery == "message"`, with `delay` sends them when the window ends, with `send` at once, though they name people other than you.
 
-A draft has a purpose (nudge, close, ask_owner, or any label its proposer names), a delivery (a message, a reaction, a comment or an edit) and the effects sending it applies, each exactly once, after a restart too:
+A draft has a purpose (nudge, close, ask_owner, or any label its proposer names), a delivery (a message, a reaction, a comment, an edit or a deletion) and the effects sending it applies, each exactly once, after a restart too:
 
 | Effect | What it does once the draft is sent |
 |---|---|
@@ -146,6 +146,6 @@ On a terminal the list groups the drafts by purpose (nudges, closings, replies, 
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they find no terminal, and when they detect an agent session's environment that names no workspace manager's handle; from a session that names one, the daemon takes the command for yours only when you drive that session. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 
-The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tools an agent uses to post, react or edit on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved by the agent with the tool as its rule, tracked or not, with the turn that made it, and an edit's record keeps the text it replaced, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
+The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tools an agent uses to post, react, edit or delete on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved by the agent with the tool as its rule, tracked or not, with the turn that made it, an edit's record keeps the text it replaced and a deletion's the text the message held, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
 
 A draft or a post names the turn that proposed it, and that turn's unit when it is not the draft's: a pull request's turn that drafts in a team's Slack thread shows in the Outbox as `turn <n> (<intent>) on <owner>/<repo>#<n>`. Such a draft answers none of the turn's items, declares no effect and, aimed outside the turn's unit, waits for you.

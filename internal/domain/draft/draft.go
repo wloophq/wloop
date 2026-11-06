@@ -13,7 +13,7 @@ import (
 
 type ID int64
 
-type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit"
+type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit", "delete"
 
 const (
 	Reply    Kind = "reply"
@@ -23,14 +23,16 @@ const (
 	AskOwner Kind = "ask_owner"
 	Comment  Kind = "comment"
 	Edit     Kind = "edit"
+	Delete   Kind = "delete"
 )
 
-var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit}
+var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit, Delete}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
 // ConversationKinds are the kinds slack_draft offers on a conversation: all
-// but a review comment and an edit, which slack_edit makes at once.
+// but a review comment, an edit and a deletion, which slack_edit and slack_delete
+// make at once.
 var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
 
 // Emoji says whether a draft of kind k posts an emoji, and no text.
@@ -40,7 +42,7 @@ func (k Kind) Emoji() bool {
 }
 
 // Delivery is how a draft reaches the provider.
-type Delivery string // "message", "reaction", "comment", "edit"
+type Delivery string // "message", "reaction", "comment", "edit", "delete"
 
 const (
 	Message         Delivery = "message"
@@ -48,6 +50,8 @@ const (
 	CommentDelivery Delivery = "comment"
 	// EditDelivery replaces the text of a message the user posted.
 	EditDelivery Delivery = "edit"
+	// DeleteDelivery removes a message the user posted.
+	DeleteDelivery Delivery = "delete"
 )
 
 // ShapeOf is the purpose and delivery of a draft of kind k.
@@ -59,6 +63,8 @@ func ShapeOf(k Kind) (purpose string, d Delivery) {
 		return string(k), CommentDelivery
 	case Edit:
 		return string(k), EditDelivery
+	case Delete:
+		return string(k), DeleteDelivery
 	}
 	return string(k), Message
 }
@@ -72,6 +78,8 @@ func KindOf(purpose string, d Delivery) Kind {
 		return Comment
 	case EditDelivery:
 		return Edit
+	case DeleteDelivery:
+		return Delete
 	}
 	switch k := Kind(purpose); k {
 	case Nudge, Close, AskOwner:
@@ -140,7 +148,7 @@ type Draft struct {
 	Delivery Delivery // how it is posted
 	Effects  []string // applied when it is sent, such as "task.nudged"
 	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
-	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
+	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
 	Reaction string   // Kind "react" only: emoji name without colons
 	Replaced string   // Kind "edit" only: the text the edit replaced
 	Original string   // Text as proposed

@@ -373,7 +373,8 @@
                     "message",
                     "reaction",
                     "comment",
-                    "edit"
+                    "edit",
+                    "delete"
                   ],
                   "type": "string"
                 },

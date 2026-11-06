@@ -273,7 +273,8 @@ func TestInstallBytesArePinned(t *testing.T) {
       "` + brand.ToolPrefix() + `turn_end",
       "` + brand.ToolPrefix() + `slack_send_message",
       "` + brand.ToolPrefix() + `slack_react",
-      "` + brand.ToolPrefix() + `slack_edit"
+      "` + brand.ToolPrefix() + `slack_edit",
+      "` + brand.ToolPrefix() + `slack_delete"
     ]
   }
 }

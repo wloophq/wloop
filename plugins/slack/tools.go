@@ -28,6 +28,7 @@ const (
 	ToolDraft  = "slack_draft"
 	ToolReact  = "slack_react"
 	ToolEdit   = "slack_edit"
+	ToolDelete = "slack_delete"
 )
 
 const (
@@ -118,6 +119,8 @@ func (s *Plugin) CallTool(ctx context.Context, call src.ToolCall) (src.ToolResul
 		return t.react(ctx, call.Args), nil
 	case ToolEdit:
 		return t.edit(ctx, call.Args), nil
+	case ToolDelete:
+		return t.delete(ctx, call.Args), nil
 	}
 	return src.ToolResult{}, src.ErrNotFound
 }
@@ -249,6 +252,38 @@ func (t tools) edit(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	t.recordEdit(ctx, e, got)
 	return answer("edited", fields{"Conversation": got.Conversation, "Message": send.Ref(got.Channel, got.TS), "Permalink": got.Permalink,
 		"Text": got.Text, "Replaced": got.Replaced}, false)
+}
+
+func (t tools) delete(ctx context.Context, raw json.RawMessage) src.ToolResult {
+	var a struct {
+		Message *string `json:"message"`
+	}
+	if err := decodeStrict(raw, &a); err != nil {
+		return badArguments(err)
+	}
+	msg := ""
+	if a.Message != nil {
+		msg = strings.TrimSpace(*a.Message)
+	}
+	if !send.IsMessage(msg) {
+		return fixThese([]Problem{{Answer: "problem_message"}})
+	}
+	s, ok := t.sender()
+	if !ok {
+		return notLoggedIn()
+	}
+	tok, err := t.p.slack.Tokens.Load()
+	if err != nil {
+		return failed(err)
+	}
+	d := send.Delete{Message: msg, User: tok.User}
+	got, err := s.Delete(ctx, d)
+	if err != nil {
+		return failed(err)
+	}
+	t.recordDelete(ctx, d, got)
+	return answer("deleted", fields{"Conversation": got.Conversation, "Message": send.Ref(got.Channel, got.TS), "Permalink": got.Permalink,
+		"Deleted": got.Deleted}, false)
 }
 
 // actArgs checks the arguments of slack_react or slack_edit: a message ref
@@ -488,6 +523,7 @@ const (
 	reactedPurpose   = "react"
 	unreactedPurpose = "unreact"
 	editedPurpose    = "edit"
+	deletedPurpose   = "delete"
 )
 
 func (t tools) recordPost(ctx context.Context, req send.Request, sent send.Sent) {
@@ -517,6 +553,22 @@ func (t tools) recordReaction(ctx context.Context, r send.Reaction, got send.Rea
 func (t tools) recordEdit(ctx context.Context, e send.Edit, got send.Edited) {
 	t.record(ctx, ToolEdit, t.messageUnit(e.Message), draft.Draft{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: e.Message,
 		Text: e.Text, Replaced: got.Replaced}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
+}
+
+// recordDelete finds the unit from the thread read before the deletion:
+// Slack no longer holds the message.
+func (t tools) recordDelete(ctx context.Context, d send.Delete, got send.Deleted) {
+	where := func(ctx context.Context, team string) (unit.Unit, error) {
+		if t.p.db != nil {
+			u, ok, err := LandingOver(t.p.db, t.p.log).UnitOf(ctx, team, got.Channel, got.TS, got.ThreadTS)
+			if err != nil || ok {
+				return u, err
+			}
+		}
+		return dslack.ThreadUnit(team, got.Channel, cmp.Or(got.ThreadTS, got.TS)), nil
+	}
+	t.record(ctx, ToolDelete, where, draft.Draft{Purpose: deletedPurpose, Delivery: draft.DeleteDelivery, Target: d.Message,
+		Text: got.Deleted}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
 }
 
 func (t tools) messageUnit(message string) func(context.Context, string) (unit.Unit, error) {

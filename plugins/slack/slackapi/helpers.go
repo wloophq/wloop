@@ -122,6 +122,11 @@ func (c *Client) UpdateMessage(ctx context.Context, channel, ts, text string) er
 	return c.Call(ctx, "chat.update", url.Values{"channel": {channel}, "ts": {ts}, "text": {text}, "blocks": {"[]"}}, nil)
 }
 
+// DeleteMessage removes the message at ts in channel (chat.delete).
+func (c *Client) DeleteMessage(ctx context.Context, channel, ts string) error {
+	return c.Call(ctx, "chat.delete", url.Values{"channel": {channel}, "ts": {ts}}, nil)
+}
+
 func (c *Client) Permalink(ctx context.Context, channel, ts string) (string, error) {
 	var out struct {
 		Permalink string `json:"permalink"`
