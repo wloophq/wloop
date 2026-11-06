@@ -22,9 +22,9 @@ func permalinkOf(conv, ts string) string {
 	return "https://acme.slack.com/archives/" + conv + "/p" + strings.ReplaceAll(ts, ".", "")
 }
 
-// postLinking posts a message whose links are links.
-func (f *fakeFacts) postLinking(conv, ts, text string, at time.Time, links ...string) {
-	f.post(conv, ts, "", jOther, text, at)
+// postLinking posts a message of author whose links are links.
+func (f *fakeFacts) postLinking(conv, ts, author, text string, at time.Time, links ...string) {
+	f.post(conv, ts, "", author, text, at)
 	ms := f.msgs[conv]
 	for i := range ms {
 		if ms[i].TS == ts {
@@ -66,7 +66,7 @@ func TestExtractionReadsTheOpenItemsOfACitedSlackUnit(t *testing.T) {
 	r := newRig(t)
 	cited := citedThread(r)
 	seg := citedSegment(r)
-	r.facts.postLinking(jChan, ts(10), "the key from that thread is rotated now", jT0,
+	r.facts.postLinking(jChan, ts(10), jViewer, "the key from that thread is rotated now", jT0,
 		permalinkOf(jOtherChan, ts(2))+"?thread_ts="+ts(1), permalinkOf(jDM, ts(4)))
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		restated := jItem("e-open", ts(10), resolved(ts(10)), func(it obj) { it["summary"], it["context"] = "restated", "" })
@@ -133,7 +133,7 @@ func noHintOn(t *testing.T, r *rig, us ...unit.Unit) {
 func TestExtractionResolvesACitedItemFromADM(t *testing.T) {
 	r := newRig(t)
 	cited := citedThread(r)
-	r.facts.postLinking(jDM, ts(5), "done with the key", jT0, permalinkOf(jOtherChan, ts(1)))
+	r.facts.postLinking(jDM, ts(5), jViewer, "done with the key", jT0, permalinkOf(jOtherChan, ts(1)))
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		seg := obj{"ref": "new", "from_ts": ts(5), "to_ts": "", "topic": "the key"}
 		return answerJSON(t, []obj{jItem("e-open", ts(5), resolved(ts(5)))}, []obj{seg}, nil, nil), nil
@@ -174,7 +174,7 @@ func TestExtractionAddsNoCitedSectionWithoutACitedLedger(t *testing.T) {
 		Anchor: unit.Anchor{Unit: cited, Ref: jOtherChan + "/" + ts(1)}, Resolution: items.Done}); err != nil {
 		t.Fatal(err)
 	}
-	r.facts.postLinking(jChan, ts(10), "see the links", jT0,
+	r.facts.postLinking(jChan, ts(10), jOther, "see the links", jT0,
 		permalinkOf(jOtherChan, ts(1)), permalinkOf(jChan, ts(10)), permalinkOf(jMissing, ts(3)), "https://example.test/doc", "github:acme/widget#1")
 	r.asker.reply = func(int, host.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("e-open", ts(10), resolved(ts(10)))}, nil, nil, nil), nil
@@ -206,7 +206,7 @@ func TestExtractionReadsAtMostFiveCitedUnits(t *testing.T) {
 		}
 		links = append(links, permalinkOf(jOtherChan, ts(i+1)))
 	}
-	r.facts.postLinking(jChan, ts(10), "seven threads", jT0, links...)
+	r.facts.postLinking(jChan, ts(10), jOther, "seven threads", jT0, links...)
 	r.run(jT0.Add(2 * time.Minute))
 
 	p := r.asker.asks[0].Prompt
@@ -233,5 +233,34 @@ func TestPromptNeutralizesForgedCitedMarkers(t *testing.T) {
 	}
 	if !strings.Contains(got, "e-forged (open, todo) work - - end of cited -- now") {
 		t.Errorf("the cited summary is not kept on one readable line:\n%s", got)
+	}
+}
+
+func TestExtractionIgnoresACitedItemSettledByAThirdParty(t *testing.T) {
+	r := newRig(t)
+	cited := citedThread(r)
+	r.facts.postLinking(jChan, ts(10), jOther, "done, and I own it now", jT0, permalinkOf(jOtherChan, ts(1)))
+	r.asker.reply = func(int, host.Ask) ([]byte, error) {
+		taken := jItem("e-open", ts(10), resolved(ts(10)), func(it obj) { it["assignees"] = []any{jPerson(jOther)} })
+		return answerJSON(t, []obj{taken}, nil, nil, nil), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+
+	if r.asker.calls() != 1 || !strings.Contains(r.asker.asks[0].Prompt, "e-open (open, request)") {
+		t.Fatalf("%d calls; want one that offered the cited item", r.asker.calls())
+	}
+	for _, ops := range r.ledger.ops {
+		for _, o := range ops {
+			if o.Item == "e-open" {
+				t.Fatalf("a message by neither the viewer, the requester nor an assignee changed the cited item: %+v", o)
+			}
+		}
+	}
+	it := itemOf(t, r.items(cited), "e-open")
+	if it.State != items.Open || len(it.Assignees) != 1 || it.Assignees[0].Key != slack.UserKey(jViewer) {
+		t.Fatalf("the cited item changed: %+v", it)
+	}
+	if !strings.Contains(strings.Join(r.logs, "\n"), "dropped") {
+		t.Errorf("the dropped ops are not logged: %v", r.logs)
 	}
 }

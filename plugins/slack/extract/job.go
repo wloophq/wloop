@@ -618,7 +618,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		return 0, &answerError{err}
 	}
 	if dropped > 0 {
-		j.logf("slack extraction %s: %d links dropped", k, dropped)
+		j.logf("slack extraction %s: %d links or cited-item ops dropped", k, dropped)
 	}
 	if r.Dropped > 0 {
 		j.logf("slack extraction %s: %d items or links citing a message outside the window dropped", k, r.Dropped)

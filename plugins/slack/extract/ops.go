@@ -34,7 +34,8 @@ func itemIDs(in Input, r Result) map[string]string {
 // ("group:<id>") or a team named in the conversation ("group:<name>"); any other key is refused.
 // A new item's id is "e<origin ts without its dot>", suffixed ".2", ".3"... while taken, so a
 // retried run creates it once. An item the result omits gets no op. A cited item gets only an
-// assign or a resolve, on its own unit; a link naming it is dropped.
+// assign or a resolve, on its own unit, from a message by the viewer, its requester or an
+// assignee; a link naming it, or any other op on it, is dropped and counted.
 func Ops(in Input, r Result, team string, parse ParseTarget) (ops []items.Op, dropped int, err error) {
 	b := opBuilder{in: in, ledger: map[string]items.Item{}, ids: map[string]string{}}
 	for _, it := range in.Ledger {
@@ -59,7 +60,8 @@ func Ops(in Input, r Result, team string, parse ParseTarget) (ops []items.Op, dr
 		} else if cur, ok := b.ledger[out.Ref]; ok {
 			ops = append(ops, b.change(cur, out)...)
 		} else {
-			ops = append(ops, b.cite(cited[out.Ref], out)...)
+			kept, n := b.cite(cited[out.Ref], out)
+			ops, dropped = append(ops, kept...), dropped+n
 		}
 	}
 	for _, l := range r.Links {
@@ -178,8 +180,9 @@ func (b *opBuilder) change(cur items.Item, out ItemOut) []items.Op {
 }
 
 // cite is the ops of out on cited, an item of another unit the answer saw only in part: its
-// fields stay as they are.
-func (b *opBuilder) cite(cited items.Item, out ItemOut) []items.Op {
+// fields stay as they are. An op whose message is not by the viewer, the item's requester or an
+// assignee is dropped and counted: only someone the item names settles it from elsewhere.
+func (b *opBuilder) cite(cited items.Item, out ItemOut) (kept []items.Op, dropped int) {
 	var ops []items.Op
 	if len(out.Assignees) > 0 && !slices.Equal(keys(cited.Assignees), keys(b.people(out.Assignees))) {
 		ops = append(ops, b.assign(cited.ID, out))
@@ -187,10 +190,30 @@ func (b *opBuilder) cite(cited items.Item, out ItemOut) []items.Op {
 	if out.State == "resolved" {
 		ops = append(ops, b.resolve(cited.ID, out))
 	}
-	for i := range ops {
-		ops[i].Unit = cited.Unit
+	party := map[string]bool{slack.UserKey(b.in.Viewer.ID): true, cited.Requester.Key: true}
+	for _, k := range keys(cited.Assignees) {
+		party[k] = true
 	}
-	return ops
+	for _, op := range ops {
+		_, ts, _ := strings.Cut(op.Anchor.Ref, "/")
+		if author := b.authorAt(ts); author == "" || !party[slack.UserKey(author)] {
+			dropped++
+			continue
+		}
+		op.Unit = cited.Unit
+		kept = append(kept, op)
+	}
+	return kept, dropped
+}
+
+// authorAt is the user who wrote the window's message at ts, "" when none.
+func (b *opBuilder) authorAt(ts string) string {
+	for _, m := range b.in.Messages {
+		if m.TS == ts {
+			return m.User
+		}
+	}
+	return ""
 }
 
 func (b *opBuilder) assign(id string, out ItemOut) items.Op {
