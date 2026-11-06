@@ -40,6 +40,7 @@ type Ledger struct {
 
 	mu     sync.Mutex
 	settle Settler
+	linked func(ctx context.Context, ls []link.Link) error
 	// confirmedNoops is the last derived value logged as a confirmed noop per item, so an
 	// unchanged disagreement is logged once.
 	confirmedNoops map[itemKey]string
@@ -54,6 +55,23 @@ func (l *Ledger) SetSettle(f Settler) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.settle = f
+}
+
+// SetLinked makes the ledger tell f the links each Apply stored, once it committed; f runs under the ledger's
+// lock, so it must not call the ledger, and its error is logged. nil tells nothing then.
+func (l *Ledger) SetLinked(f func(ctx context.Context, ls []link.Link) error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.linked = f
+}
+
+func (l *Ledger) tellLinked(ctx context.Context, ls []link.Link) {
+	if l.linked == nil || len(ls) == 0 {
+		return
+	}
+	if err := l.linked(ctx, ls); err != nil && l.Log != nil {
+		l.Log("items: linked: %v", err)
+	}
 }
 
 type itemKey struct {
@@ -86,7 +104,11 @@ func (l *Ledger) Apply(ctx context.Context, prov items.Provenance, ops []items.O
 	for i, o := range ops {
 		b.apply(ctx, i, o, prov)
 	}
-	return b.commit(ctx)
+	res, err := b.commit(ctx)
+	if err == nil {
+		l.tellLinked(ctx, b.stored)
+	}
+	return res, err
 }
 
 // Reconcile makes the derived items of u equal desired: create or update each, and resolve an

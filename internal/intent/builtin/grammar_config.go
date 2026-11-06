@@ -157,6 +157,8 @@ var configGrammar = slices.Concat(
 		cfgKey("tasks.stale_waiting_days", KindInt, "2", "Working days after which a waiting task goes stale."),
 		cfgList("tasks.areas", "The areas a task is offered."),
 		cfgList("tasks.contexts", "The contexts a task is offered."),
+		cfgKey("tasks.candidate_window", KindDur, "14d", "How far apart two tasks' creations may be for task.candidates to pair them."),
+		cfgKey("tasks.candidate_cap", KindInt, "5", "The most tasks task.candidates lists; 0 lists none, so no correlation runs."),
 		cfgKey("notifications", KindTable, "", "The notifications."),
 		cfgKey("notifications.digest_at", KindText, "09:00", "The local HH:MM of the daily digest; empty for none."),
 		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),

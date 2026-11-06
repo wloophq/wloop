@@ -306,6 +306,9 @@ func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
 	}
 	env := builtin.WorkflowEnv("task")
 	for k, v := range f {
+		if u, ok := v.(workflow.Unrequested); ok && u.Fact == k && slices.ContainsFunc(builtin.Facts, func(d builtin.Fact) bool { return d.Name == k && d.Costly }) {
+			continue
+		}
 		if typeOf(v) != env[k] {
 			t.Errorf("%s = %#v, want a %s", k, v, env[k])
 		}

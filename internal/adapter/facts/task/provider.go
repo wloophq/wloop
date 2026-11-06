@@ -247,7 +247,11 @@ func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, 
 		}
 		return p.owed(ctx, e, f)
 	})
-	return maps.Clone(f), err
+	if err != nil {
+		return nil, err
+	}
+	out := maps.Clone(f)
+	return out, p.costlyFacts(ctx, e, out)
 }
 
 func fingerprint(e task.Task) string {

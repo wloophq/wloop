@@ -1114,6 +1114,8 @@ The fields each notice reads besides `Name` and `Command`:
 - `tasks.stale_waiting_days` (integer, default `2`): Working days after which a waiting task goes stale.
 - `tasks.areas` (list of strings): The areas a task is offered.
 - `tasks.contexts` (list of strings): The contexts a task is offered.
+- `tasks.candidate_window` (duration, default `14d`): How far apart two tasks' creations may be for task.candidates to pair them.
+- `tasks.candidate_cap` (integer, default `5`): The most tasks task.candidates lists; 0 lists none, so no correlation runs.
 
 ### Cleanup
 

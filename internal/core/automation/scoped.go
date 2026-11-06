@@ -43,8 +43,9 @@ func (e *Engine) unitFacts(ctx context.Context, w workflow.Workflow, u unit.Unit
 }
 
 // reportedFacts are u's facts as its provider reports them, temporal values
-// unresolved.
+// unresolved, with the costly facts w reads.
 func (e *Engine) reportedFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	ctx = workflow.WithReads(ctx, workflow.Reads(w)...)
 	if ef, ok := e.Keep.(EventFacts); ok && w.Trigger.Kind == workflow.TriggerEvent {
 		return ef.EventFacts(ctx, u)
 	}

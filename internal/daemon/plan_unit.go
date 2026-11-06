@@ -61,7 +61,11 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 			out.Errors = append(out.Errors, e)
 		}
 	}
-	facts, factErr := eng.Units.Facts(ctx, u)
+	var reads []string
+	for _, w := range eng.Workflows() {
+		reads = append(reads, workflow.Reads(w)...)
+	}
+	facts, factErr := eng.Units.Facts(workflow.WithReads(ctx, reads...), u)
 	var marks map[string]string
 	var marksErr error
 	marksRead := false

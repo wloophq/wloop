@@ -793,6 +793,16 @@
           },
           "type": "array"
         },
+        "candidate_cap": {
+          "default": 5,
+          "description": "The most tasks task.candidates lists; 0 lists none, so no correlation runs.",
+          "type": "integer"
+        },
+        "candidate_window": {
+          "default": "14d",
+          "description": "How far apart two tasks' creations may be for task.candidates to pair them.",
+          "type": "string"
+        },
         "contexts": {
           "description": "The contexts a task is offered.",
           "items": {

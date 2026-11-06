@@ -52,6 +52,12 @@ func untrusted(f Fact) Fact {
 	return f
 }
 
+// costly marks f as computed only for a reader that names it.
+func costly(f Fact) Fact {
+	f.Costly = true
+	return f
+}
+
 // timeVarying marks f as changing with time alone.
 func timeVarying(f Fact) Fact {
 	f.TimeVarying = true
@@ -233,9 +239,9 @@ var otherFacts = []Fact{
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted, as its plugin's extraction health says; zero when none waits."))),
 	untrusted(wf("task", "link_signals", expr.List, "The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals.")),
 	wf("task", "clarified", expr.Bool, "A person, or an agent through a session the user drives, shaped the task by hand: ran a verb that moves it to a state on it, wrote a property other than those of roles merged and related, or set its parent. The bundled merge verb's survivor reads it."),
-	wf("task", "refused_merges", expr.List, "The tasks a merge gate with this task was rejected for, by id, while neither task changed since: a proposal of either pair is not due again."),
-	untrusted(wf("task", "candidates", expr.List, "The open tasks that may be the same work as this one, by id, the likeliest first: tasks sharing a person among their items' requesters, assignees and waited-on, a link target, or a unit this task's items cite, created close in time to it, without task.refused_merges; capped, and empty when none, so no judgment over them runs.")),
-	untrusted(wf("task", "link_target_tasks", expr.List, "The other open tasks holding a unit a review or merge link of this task's items targets, such as the task of a pull request an ask in a thread links, by id, oldest first, without task.refused_merges.")),
+	costly(untrusted(wf("task", "refused_merges", expr.List, "The tasks a merge gate with this task was rejected for, by id, while no item either task holds was created or changed since; seeing, starring or filing a task changes no item: a proposal of either pair is not due again."))),
+	costly(untrusted(wf("task", "candidates", expr.List, "The open tasks that may be the same work as this one, by id, the likeliest first: tasks sharing a person among their items' requesters, assignees and waited-on, a link target, or a unit one of them holds that the other's items cite, created within tasks.candidate_window of it, without task.refused_merges and the tasks related to it; at most tasks.candidate_cap, and empty when none, so no judgment over them runs."))),
+	costly(untrusted(wf("task", "link_target_tasks", expr.List, "The other open tasks holding a unit a review or merge link of this task's items targets, such as the task of a pull request an ask in a thread links, by id, oldest first, without task.refused_merges."))),
 	untrusted(wf("task", "title", expr.String, "The task's title; a derived task's is its first item's summary.")),
 	untrusted(wf("task", "notes", expr.String, "The task's notes.")),
 	untrusted(wf("task", "link_owes", expr.List, "Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items.")),

@@ -1,0 +1,45 @@
+package catalog
+
+import (
+	"context"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
+)
+
+func TestAViewAndABaselineReadTheFactsTheyName(t *testing.T) {
+	ctx := context.Background()
+	l := new(intentload.Loaded)
+	*l = *bundled(t)
+	env := builtin.WorkflowEnv(builtin.TaskSlot)
+	when, err := expr.CompileWorkflow(`size(task.candidates) > 0`, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Views.Views = append(slices.Clone(l.Views.Views), intentload.ViewDef{ID: "same-work", Over: task.OverTasks, When: when})
+	var got []string
+	facts := func(ctx context.Context, _ task.Task) (workflow.Facts, error) {
+		got = workflow.ReadsOf(ctx)
+		return workflow.Facts{"task.candidates": []string{"t-2"}, "task.link_owes": []string{}}, nil
+	}
+	lens := Lens{Loaded: func() *intentload.Loaded { return l }, Facts: facts, Now: func() time.Time { return time.Time{} }}
+	if in, err := lens.Eval(ctx, "same-work", task.Task{ID: "t-1"}); err != nil || !in {
+		t.Fatalf("eval %v %v", in, err)
+	}
+	if !slices.Contains(got, "task.candidates") {
+		t.Fatalf("the view's facts were read with %v, want its when's reads", got)
+	}
+	got = nil
+	if _, err := Baseline(func() *intentload.Loaded { return l }, facts)(ctx, task.Task{ID: "t-1"}, "task.link_owes"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{"task.link_owes"}) {
+		t.Fatalf("the baseline read the facts with %v", got)
+	}
+}

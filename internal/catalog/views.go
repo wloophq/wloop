@@ -63,7 +63,17 @@ func OwnFacts(def intentload.ViewsDef, id string) bool {
 	if !ok || v.Over != task.OverTasks {
 		return false
 	}
-	reads := []string{"task.category"}
+	for _, r := range append(viewReads(v), "task.category") {
+		if !ownFact(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// viewReads are the facts v reads: its when's, its group and its sort keys.
+func viewReads(v intentload.ViewDef) []string {
+	var reads []string
 	if v.When != nil {
 		reads = append(reads, v.When.Reads()...)
 	}
@@ -73,12 +83,7 @@ func OwnFacts(def intentload.ViewsDef, id string) bool {
 	for _, k := range v.Sort {
 		reads = append(reads, k.Fact)
 	}
-	for _, r := range reads {
-		if !ownFact(r) {
-			return false
-		}
-	}
-	return true
+	return reads
 }
 
 func ownFact(name string) bool {
@@ -188,5 +193,9 @@ func (l Lens) facts(ctx context.Context, view string, t task.Task) (workflow.Fac
 	if OwnFacts(in.Views, view) || l.Facts == nil {
 		return TaskFacts(t, in.Tasks), nil
 	}
-	return l.Facts(ctx, t)
+	var reads []string
+	for _, v := range in.Views.Views {
+		reads = append(reads, viewReads(v)...)
+	}
+	return l.Facts(workflow.WithReads(ctx, reads...), t)
 }

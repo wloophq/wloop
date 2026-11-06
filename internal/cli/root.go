@@ -375,6 +375,13 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 			name, _ := e.loadedIntents().Tasks.PropOf(r)
 			return name
 		},
+		Candidates: facttask.CandidateDeps{From: db.LinksFrom, To: db.Links().To, Settings: func() facttask.CandidateSettings {
+			t := e.currentConfig().Tasks
+			return facttask.CandidateSettings{Window: time.Duration(t.CandidateWindow), Cap: t.CandidateCap}
+		}},
+		Refusals: facttask.RefusalDeps{Merges: func(v task.Verb) bool {
+			return e.loadedIntents().Tasks.Handler(string(v)) == coretasks.HandlerMerge
+		}},
 	})
 }
 

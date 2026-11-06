@@ -183,6 +183,9 @@ type Fact struct {
 	// TimeVarying says that the fact changes as time passes with nothing
 	// else changing, so no workflow key may hold it.
 	TimeVarying bool
+	// Costly says that the fact reads the store across every task, so its provider computes it only for a
+	// reader that names it (workflow.WithReads); any other reader gets workflow.Unrequested, which fails to evaluate.
+	Costly bool
 }
 
 // InputTypes are the types an input declares, with the type its fact has.

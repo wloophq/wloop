@@ -221,6 +221,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `tasks.stale_waiting_days` | integer | `2` | Working days after which a waiting task goes stale. |
 | `tasks.areas` | list of strings |  | The areas a task is offered. |
 | `tasks.contexts` | list of strings |  | The contexts a task is offered. |
+| `tasks.candidate_window` | duration | `14d` | How far apart two tasks' creations may be for task.candidates to pair them. |
+| `tasks.candidate_cap` | integer | `5` | The most tasks task.candidates lists; 0 lists none, so no correlation runs. |
 
 ### Cleanup
 

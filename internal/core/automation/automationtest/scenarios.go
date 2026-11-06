@@ -69,7 +69,7 @@ func checkFacts(t *testing.T, u unit.Unit, facts workflow.Facts) {
 			t.Errorf("%s: facts in slots %q and %q", u, slot, s)
 		}
 		switch v.(type) {
-		case bool, int, string, []string, time.Duration, time.Time, workflow.Temporal:
+		case bool, int, string, []string, time.Duration, time.Time, workflow.Temporal, workflow.Unrequested:
 		default:
 			t.Errorf("%s: fact %q is a %T", u, name, v)
 		}

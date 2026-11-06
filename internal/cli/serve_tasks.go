@@ -132,6 +132,7 @@ func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID
 func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
 	g := e.newTasks(db, cfg, ledger)
+	ledger.SetLinked(g.Linked)
 	var off []unit.ProviderID
 	for _, p := range d.Plugins {
 		if !p.Enabled {
