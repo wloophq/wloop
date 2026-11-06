@@ -774,6 +774,18 @@ func OwedByEnv(d TasksDef) expr.Env {
 	return env
 }
 
+// ShapingVerbs are d's verbs that shape a task by hand, which task.clarified reads: those whose move has a
+// state to go to, and those whose handler files the task under a project, in name order.
+func (d TasksDef) ShapingVerbs() []string {
+	var out []string
+	for _, v := range slices.Sorted(maps.Keys(d.Verbs)) {
+		if _, to, ok := d.Move(v); ok && to != "" || d.Handler(v) == builtin.HandlerProject {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 // SurvivorEnv is the env a verb's survivor compiles over: the task's workflow facts and d's properties.
 func SurvivorEnv(d TasksDef) expr.Env {
 	env := builtin.WorkflowEnv(builtin.TaskSlot)

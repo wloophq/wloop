@@ -93,7 +93,7 @@ var VerbHandlers = []VerbHandler{
 	{"edit", "Edits the text of the task's draft."},
 	{"retry", "Sends again the task's approved draft whose delivery failed."},
 	{"reply", "Posts a reply or a reaction on the task's unit; the composer's verb."},
-	{"project", "Files the task under a parent, creating it from a title."},
+	{HandlerProject, "Files the task under a parent, creating it from a title."},
 	{"context", "Sets the task's contexts: the property of role contexts."},
 	{"area", "Sets the task's area: the property of role area."},
 	{"seen", "Marks the task seen; clients send it when it opens."},
@@ -124,6 +124,10 @@ var HandlerArgs = map[string][]string{
 // verb that names one puts its question in input.
 var InputHandlers = []string{"waiting", "schedule", "project", "context", "area", "delegate", "reply", "promise", "merge", "split", "relate",
 	"unrelate"}
+
+// HandlerProject is the handler that files a task under a parent, which shapes the task by hand as a move to
+// a state does (task.clarified).
+const HandlerProject = "project"
 
 // The tasks a verb that takes another task lets a person pick it from, by TaskPicks.
 const (

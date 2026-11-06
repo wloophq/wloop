@@ -49,10 +49,12 @@ type Merger interface {
 	// its unit's marks, as r.From's merge record; evs are written with it, and port.TopicTasks notes both
 	// tasks' units. r.Superseded are gates the caller superseded already. ErrNoTask when either is not stored.
 	Merge(ctx context.Context, r merge.Record, into task.Task, evs ...port.Event) error
-	// Split undoes the merge r records, as merge.Unfold says: writes from back with r's wake and marks,
-	// points at r.From the gates, held drafts and messages of r's units and of r's ids, drops the alias, and
-	// writes into as the unfold left it, with evs. ErrVerb when r.From is stored or r.Into is not.
-	Split(ctx context.Context, r merge.Record, from, into task.Task, evs ...port.Event) error
+	// Split undoes the merge r records as sp, merge.Unfold's, says: writes sp.From back with r's wake and marks,
+	// points at r.From the gates, drafts and messages of sp.Units and of r's ids but those another record of
+	// sp.Others lists, keeps sp.Heirs as their tasks' merge records, drops the alias, and writes sp.Rest, with
+	// evs. ErrVerb when sp names another pair than r, r.From is stored, r is not its latest record, or r.Into
+	// is not stored.
+	Split(ctx context.Context, r merge.Record, sp merge.Split, evs ...port.Event) error
 	// MergeOf is the record of the merge that took task id; false when id is stored or was never merged.
 	MergeOf(ctx context.Context, id task.ID) (merge.Record, bool, error)
 }
@@ -197,6 +199,8 @@ var (
 	ErrArgs = errors.New("bad task request")
 	// ErrPluginDisabled refuses a change to a task whose unit's plugin is disabled.
 	ErrPluginDisabled = errors.New("the unit's plugin is disabled")
+	// ErrMerged refuses a verb sent to the id of a task merged into another, which reads as that one.
+	ErrMerged = errors.New("the task was merged into another")
 	// ErrForbidden refuses a verb its actor may not run on the task, as the profile's by says.
 	ErrForbidden = errors.New("the actor may not run the verb")
 )

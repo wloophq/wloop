@@ -51,6 +51,8 @@ func (bundledStates) PropOf(r task.Role) (string, []string) {
 		return "focus", []string{"on", "off"}
 	case task.RoleDeadline:
 		return "due", nil
+	case task.RoleMerged:
+		return "merged", nil
 	}
 	return "", nil
 }

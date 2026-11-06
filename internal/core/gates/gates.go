@@ -247,6 +247,33 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 	return s.endHeld(ctx, closed)
 }
 
+// ActingFor are the open gates that would act in task id's name: those of kind proposal, plan or step on its
+// own unit, and the proposals on any task whose proposed verb names id in task.ArgTask.
+func (s *Service) ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	own, err := s.d.Reader.Where(ctx, Query{Unit: task.UnitOf(id)})
+	if err != nil {
+		return nil, err
+	}
+	proposals, err := s.d.Reader.Where(ctx, Query{Kind: gate.KindProposal})
+	if err != nil {
+		return nil, err
+	}
+	var out []gate.Gate
+	for _, g := range own {
+		if g.Kind == gate.KindProposal || g.Kind == gate.KindPlan || g.Kind == gate.KindStep {
+			out = append(out, g)
+		}
+	}
+	for _, g := range proposals {
+		if p, ok := coretasks.ProposedVerb(g); ok && p.Args[task.ArgTask] == string(id) &&
+			!slices.ContainsFunc(out, func(o gate.Gate) bool { return o.ID == g.ID }) {
+			out = append(out, g)
+		}
+	}
+	slices.SortFunc(out, func(a, b gate.Gate) int { return cmp.Compare(a.ID, b.ID) })
+	return out, nil
+}
+
 // HoldsTask says whether an open gate of task id holds it open: one whose ClosesWith names one of its intents,
 // a question to the person only the person, or the end of the task's unit, settles.
 func (s *Service) HoldsTask(ctx context.Context, id task.ID) (bool, error) {

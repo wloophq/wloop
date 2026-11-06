@@ -26,19 +26,8 @@ const wakeColumns = `task_id, until, on_kinds, actors, cond, expires, return_sta
 
 // Put sets w's task's wake, replacing the one it had.
 func (s WakeStore) Put(ctx context.Context, w wake.Wake) error {
-	on, err := json.Marshal(nonNilList(w.On))
-	if err != nil {
-		return err
-	}
-	actors, err := json.Marshal(nonNilList(w.Actors))
-	if err != nil {
-		return err
-	}
-	_, err = s.db.Write(ctx, func(tx *Tx) error {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO wakes (`+wakeColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (task_id) DO UPDATE SET until = excluded.until, on_kinds = excluded.on_kinds, actors = excluded.actors,
-			cond = excluded.cond, expires = excluded.expires, return_state = excluded.return_state`,
-			string(w.Task), eventTime(w.Until), string(on), string(actors), w.When, eventTime(w.Expires), w.Return); err != nil {
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		if err := putWake(ctx, tx, w); err != nil {
 			return fmt.Errorf("the wake of %s: %w", w.Task, err)
 		}
 		return touchWake(ctx, tx, w.Task)

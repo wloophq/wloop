@@ -754,6 +754,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `notify_open`: The button that opens the notification's task in the cockpit.
   - `notify_discard`: The button that discards a draft from its notification.
   - `verb_for_you`: Why a task's page, read from a session the user does not drive, offers Verb disabled: a verb acts for the user, so only the user runs it, or a session they drive.
+  - `task_merged`: Why a verb sent to a task merged into another is refused: Task, the merged task's id, Into, the task it reads as now, and Verb, the verb sent. Split runs on such an id, and splits it out.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
@@ -791,6 +792,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `notify_open`
   - `notify_discard`
   - `verb_for_you` (`Verb`)
+  - `task_merged` (`Task`, `Into`, `Verb`)
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 

@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -249,13 +250,30 @@ func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks
 	return p, err
 }
 
-// Task reads task id, or, when no task has it, the task an alias of id leads to, an open one first: one hop,
-// since every alias leads to a task.
+// Task reads task id, else follows the aliases of id, hop by hop, to the stored task they lead to: at each
+// hop of a merged id the alias to the task its latest merge record names, else a stored task first, an open
+// one before a closed one, then the oldest; ErrNoTask when none leads to one,
+// a cycle included.
 func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	es, err := loadTasks(ctx, s.db.R(), `id = ?`, string(id))
-	if err == nil && len(es) == 0 {
-		es, err = loadTasks(ctx, s.db.R(), `id = (SELECT a.new_id FROM task_aliases a JOIN tasks t ON t.id = a.new_id
-			WHERE a.old_id = ? ORDER BY t.`+isOpen+` DESC, t.created, t.id LIMIT 1)`, append([]any{string(id)}, openArgs()...)...)
+	seen := map[task.ID]bool{id: true}
+	for cur := id; err == nil && len(es) == 0; {
+		var next string
+		var stored bool
+		err = s.db.R().QueryRowContext(ctx, `SELECT a.new_id, t.id IS NOT NULL FROM task_aliases a LEFT JOIN tasks t ON t.id = a.new_id
+			WHERE a.old_id = ?1 AND (a.new_id = ?4 OR ?4 = '')
+			ORDER BY t.id IS NOT NULL DESC, t.category NOT IN (?2, ?3) DESC, t.created, a.new_id LIMIT 1`,
+			string(cur), string(task.CategoryDone), string(task.CategoryDropped), string(mergedTo(ctx, s.db.R(), cur))).Scan(&next, &stored)
+		if errors.Is(err, sql.ErrNoRows) || err == nil && !stored && seen[task.ID(next)] {
+			return task.Task{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
+		}
+		if err != nil {
+			break
+		}
+		cur, seen[task.ID(next)] = task.ID(next), true
+		if stored {
+			es, err = loadTasks(ctx, s.db.R(), `id = ?`, next)
+		}
 	}
 	if err != nil {
 		return task.Task{}, err
@@ -264,6 +282,44 @@ func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
 		return task.Task{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
 	}
 	return es[0], nil
+}
+
+// refuseMerged refuses c, a write of an id no row holds, when an alias names the id: an update, as a sync that
+// read the task before its merge writes, and a create of a task a merge took, which Reconcile gives the task
+// it was merged into instead. A create of an id an older alias names re-derives it, as the v7 aliases expect.
+func refuseMerged(ctx context.Context, tx *Tx, c task.Change) error {
+	id := c.Task.ID
+	into := mergedTo(ctx, tx, id)
+	var aliased int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_aliases WHERE old_id = ? AND (new_id = ? OR ? = '')`,
+		string(id), string(into), string(into)).Scan(&aliased); err != nil {
+		return err
+	}
+	switch {
+	case aliased == 0:
+		return nil
+	case c.Op != task.OpCreate:
+		return fmt.Errorf("%w: %s was merged into another task; a write of it read before the merge is refused", coretasks.ErrNoTask, id)
+	case into != "":
+		return fmt.Errorf("%w: %s was merged into %s; creating it again is refused", coretasks.ErrVerb, id, into)
+	}
+	return nil
+}
+
+// mergedTo is the task the latest merge of id took it into, "" when it was never merged; a read that fails
+// reads as never merged, and the alias walk then takes the best alias.
+func mergedTo(ctx context.Context, q rowQuerier, id task.ID) task.ID {
+	u := task.UnitOf(id)
+	var data string
+	if err := q.QueryRowContext(ctx, `SELECT data FROM events WHERE provider = ? AND unit_key = ? AND kind = ? ORDER BY id DESC LIMIT 1`,
+		string(u.Provider), u.Key, merge.RecordKind).Scan(&data); err != nil {
+		return ""
+	}
+	var r struct{ Into task.ID }
+	if json.Unmarshal([]byte(data), &r) != nil {
+		return ""
+	}
+	return r.Into
 }
 
 func (s taskStore) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
@@ -299,6 +355,11 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			old, err := loadTasks(ctx, tx, `id = ?`, string(e.ID))
 			if err != nil {
 				return err
+			}
+			if len(old) == 0 {
+				if err := refuseMerged(ctx, tx, c); err != nil {
+					return err
+				}
 			}
 			if len(old) == 1 {
 				e.Asleep = old[0].Asleep

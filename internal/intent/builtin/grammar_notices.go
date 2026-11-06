@@ -42,6 +42,8 @@ var Notices = []ToolAnswer{
 	{Name: NoticeNotifyDiscard, Doc: "The button that discards a draft from its notification."},
 	{Name: NoticeVerbForYou, Doc: "Why a task's page, read from a session the user does not drive, offers Verb disabled: a verb acts for the user, so only the user runs it, or a session they drive.",
 		Fields: []AnswerField{str("Verb")}},
+	{Name: NoticeTaskMerged, Doc: "Why a verb sent to a task merged into another is refused: Task, the merged task's id, Into, the task it reads as now, and Verb, the verb sent. Split runs on such an id, and splits it out.",
+		Fields: []AnswerField{str("Task"), str("Into"), str("Verb")}},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
 	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
@@ -53,6 +55,7 @@ const (
 	// NoticeAttachNeedsSession is the notice of task attach run outside a workspace manager's session.
 	NoticeAttachNeedsSession   = "attach_needs_session"
 	NoticeVerbForYou           = "verb_for_you"
+	NoticeTaskMerged           = "task_merged"
 	NoticeChat                 = "chat"
 	NoticeChatTyped            = "chat_typed"
 	NoticeChatNotYours         = "chat_not_yours"

@@ -105,7 +105,7 @@ func writeTasksError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, coretasks.ErrForbidden):
 		writeError(w, http.StatusForbidden, err.Error())
-	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed),
+	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrMerged), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed),
 		errors.Is(err, messages.ErrNotApplied):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
@@ -311,12 +311,23 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	e, err := g.Task(ctx, task.ID(r.PathValue("id")))
+	id := task.ID(r.PathValue("id"))
+	e, err := g.Task(ctx, id)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	v := task.Verb(verb)
+	creq, err := g.Addressed(ctx, id, e, q.task(coretasks.Request{Verb: v, Args: req.Args, Source: req.Source}))
+	if errors.Is(err, coretasks.ErrMerged) {
+		writeError(w, http.StatusConflict, s.notice(builtin.NoticeTaskMerged, map[string]any{"Task": string(id), "Into": string(e.ID), "Verb": verb}))
+		return
+	}
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	req.Args = creq.Args
 	if !offers(s.loaded().Tasks.Verbs, e, v) {
 		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this task: the profile's tasks.toml says where it is", v))
 		return

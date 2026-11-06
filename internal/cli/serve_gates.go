@@ -158,6 +158,23 @@ func (g serviceTaskGates) HoldsTask(ctx context.Context, id task.ID) (bool, erro
 	return g.e.newGates(g.db, nil).HoldsTask(ctx, id)
 }
 
+// ActingFor are the open gates that act in task id's name, as the gates service finds them.
+func (g serviceTaskGates) ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	return g.e.newGates(g.db, nil).ActingFor(ctx, id)
+}
+
+// Supersede supersedes each open gate of ids in the user's name, the merge or split they ran having taken its
+// subject; a gate closed since is left as it is.
+func (g serviceTaskGates) Supersede(ctx context.Context, ids ...int64) error {
+	svc := g.e.newGates(g.db, nil)
+	for _, id := range ids {
+		if err := svc.Supersede(ctx, id, task.ActorPerson); err != nil && !errors.Is(err, gates.ErrResolved) {
+			return err
+		}
+	}
+	return nil
+}
+
 // profileGates are the gates of gates.toml as the profile loads now.
 type profileGates struct{ loaded func() *intentload.Loaded }
 
