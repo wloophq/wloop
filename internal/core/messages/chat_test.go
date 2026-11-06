@@ -245,6 +245,32 @@ func TestChatWorksOnASlackTaskTheUserDidNotCapture(t *testing.T) {
 	}
 }
 
+func TestAChatGoesToTheNewestSessionThatCanReadIt(t *testing.T) {
+	r, _ := chatRig(t)
+	ctx := context.Background()
+	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1700000000.000100"}
+	e, err := r.tasks.Open(ctx, coretasks.OpenRequest{Title: "Does the flag need a warning?", Unit: &thread, Origin: "slack"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := task.UnitOf(e.ID)
+	r.books.Put(turn.Book{Unit: thread, Turns: []turn.Turn{{Seq: 1, Intent: "act", ID: "a1", Session: "term_1", SentTo: "term_1", State: turn.Done, SentAt: t0.Add(-2 * time.Hour)}}})
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: own, StartedAt: t0.Add(-2 * time.Hour)})
+	r.reg.Put(turn.Session{ID: "term_2", WorkspaceID: "ws", Unit: own, StartedAt: t0.Add(-time.Hour)})
+
+	got, err := r.svc.Chat(ctx, messages.ChatRequest{Task: e.ID, Text: "Read the flag's code first."})
+	if err != nil || got.Route != messages.ChatTyped || got.Session != "term_1" {
+		t.Fatalf("chat went %+v %v", got, err)
+	}
+	read, err := r.svc.ReadTask(ctx, messages.ReadRequest{Session: got.Session})
+	if err != nil || len(read.Chat) != 1 {
+		t.Fatalf("the session told of the chat read %+v %v", read.Chat, err)
+	}
+	if _, err := r.svc.ReadTask(ctx, messages.ReadRequest{Session: "term_2", Unit: own}); !errors.Is(err, messages.ErrNotTheTasks) {
+		t.Fatalf("the session passed over read the chat: %v", err)
+	}
+}
+
 func TestReadTaskReadsTheChatOnce(t *testing.T) {
 	r, log := chatRig(t)
 	e := r.capture(t, "Retry the webhook", nil)

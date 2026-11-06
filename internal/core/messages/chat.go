@@ -347,7 +347,8 @@ func (s *Service) worksOn(ctx context.Context, session string, e task.Task) (boo
 		return false, err
 	}
 	for _, u := range units {
-		if slices.ContainsFunc(books[u].Turns, func(t turn.Turn) bool { return t.Session == session || t.SentTo == session }) {
+		b := books[u]
+		if _, ok := b.OfSession(session); ok {
 			return true, nil
 		}
 	}

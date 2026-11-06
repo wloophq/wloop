@@ -31,7 +31,7 @@ func (s *Service) LiveOn(ctx context.Context, units ...unit.Unit) (turn.Session,
 	}
 	holdsTurn := func(id string) bool {
 		for _, b := range books {
-			if slices.ContainsFunc(b.Turns, func(t turn.Turn) bool { return t.Session == id || t.SentTo == id }) {
+			if _, ok := b.OfSession(id); ok {
 				return true
 			}
 		}
