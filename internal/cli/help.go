@@ -208,7 +208,7 @@ func (e *Env) asksHelp(args []string) bool {
 
 // devCommand tells the developer tools, whose own usage 'help dev' lists.
 func devCommand(args []string) bool {
-	return args[0] == "eval-instructions" || args[0] == "slack" && len(args) > 1 && args[1] == "eval"
+	return args[0] == "eval-instructions" || args[0] == "eval-correlation" || args[0] == "slack" && len(args) > 1 && args[1] == "eval"
 }
 
 // colorOf reads --color from args; an unknown value is auto.
@@ -291,7 +291,7 @@ func quoteName(s string) string { return "'" + termfmt.Clean(s) + "'" }
 func (e *Env) commandNames() []string {
 	set := map[string]bool{}
 	for name := range commands() {
-		if !strings.HasPrefix(name, "-") && name != "eval-instructions" {
+		if !strings.HasPrefix(name, "-") && name != "eval-instructions" && name != "eval-correlation" {
 			set[name] = true
 		}
 	}

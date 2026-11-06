@@ -1,0 +1,23 @@
+{
+ "id": "04-slack-review-ask-and-pull-request",
+ "kind": "slack-pr",
+ "same_as": "t-0000000000004002",
+ "task": {
+  "id": "t-0000000000004001",
+  "title": "Review acme/billing#412",
+  "notes": "Pull request: Add CSV export for invoices",
+  "items": [
+   "Review requested on acme/billing#412, Add CSV export for invoices"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000004002",
+   "title": "Heidi asks for a review of the invoice export",
+   "notes": "#billing-dev",
+   "items": [
+    "Heidi asks you to review her pull request adding the CSV export for invoices, acme/billing#412"
+   ]
+  }
+ ]
+}

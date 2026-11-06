@@ -1,0 +1,23 @@
+{
+ "id": "12-sub-step-and-parent-launch",
+ "kind": "sub-step",
+ "same_as": "",
+ "task": {
+  "id": "t-000000000000c001",
+  "title": "Update the pricing page copy for the launch",
+  "notes": "#launch",
+  "items": [
+   "Rosa asks you to update the pricing page copy before the launch"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000c002",
+   "title": "Run the Pro plan launch",
+   "notes": "Project",
+   "items": [
+    "Rosa asks you to own the Pro plan launch: pricing, emails, docs and the announcement"
+   ]
+  }
+ ]
+}
