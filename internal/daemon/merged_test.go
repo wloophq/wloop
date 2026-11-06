@@ -61,3 +61,39 @@ func TestTheSurvivorsTimelineRouteServesTheMergedTasksHistory(t *testing.T) {
 		}
 	}
 }
+
+func TestTheSurvivorsDetailReadsAMergedTasksBriefWhenItHasNone(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.s.deps.TaskRecords = r.db
+	ctx := context.Background()
+	const survivor, merged = task.ID("t-1111111111111111"), task.ID("t-2222222222222222")
+	r.put(t, task.Task{ID: survivor, State: "next", Category: task.CategoryReady, Title: "Ship the export"})
+	if err := r.db.PutRecord(ctx, task.UnitOf(merged), "brief", task.WriterPlugin, []byte(`{"goal":"Export the ledger"}`), tasksNow); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.db.Write(ctx, func(tx *sqlite.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO task_aliases (old_id, new_id) VALUES (?, ?)`, string(merged), string(survivor))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(merged), Kind: merge.RecordKind, Actor: "person",
+		Data: `{"Into":"` + string(survivor) + `"}`, At: tasksNow}); err != nil {
+		t.Fatal(err)
+	}
+
+	var got api.TaskView
+	if code := get(t, r.s, api.TaskPath(string(survivor)), &got); code != 200 {
+		t.Fatalf("GET the survivor: %d", code)
+	}
+	if got.Brief == nil || string(got.Brief.Data) != `{"goal":"Export the ledger"}` {
+		t.Fatalf("the survivor with no brief of its own shows %+v, want the merged task's", got.Brief)
+	}
+	if err := r.db.PutRecord(ctx, task.UnitOf(survivor), "brief", task.WriterPlugin, []byte(`{"goal":"Ship it"}`), tasksNow); err != nil {
+		t.Fatal(err)
+	}
+	if get(t, r.s, api.TaskPath(string(survivor)), &got); got.Brief == nil || string(got.Brief.Data) != `{"goal":"Ship it"}` {
+		t.Fatalf("the survivor's own brief does not win: %+v", got.Brief)
+	}
+}

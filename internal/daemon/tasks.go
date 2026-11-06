@@ -947,7 +947,8 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 }
 
 // brief sets the task's brief record: its own, or the first of its units', as a pull request task's is
-// its pull request's. A detail reads its task's; a page reads every brief once.
+// its pull request's. A detail reads its task's, then those of the tasks merged into it; a page reads every
+// brief once, and its units' only.
 func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if ev.s.deps.TaskRecords == nil {
 		return nil
@@ -955,8 +956,11 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 	var rec port.Event
 	var ok bool
 	if ev.detail {
-		var err error
-		if rec, ok, err = timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, e.Units); err != nil {
+		held, err := timeline.HeldOf(ctx, ev.s.deps.TaskRecords, e)
+		if err != nil {
+			return err
+		}
+		if rec, ok, err = timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, held); err != nil {
 			return err
 		}
 	} else {

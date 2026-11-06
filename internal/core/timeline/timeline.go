@@ -76,6 +76,15 @@ func RecordOf(ctx context.Context, r Records, kind string, id task.ID, held []un
 	return ev, ok, nil
 }
 
+// HeldOf are the units a record of task e is read from after its own: what h lists when r is also
+// Holdings, the units of the tasks merged into e included, else e's units.
+func HeldOf(ctx context.Context, r Records, e task.Task) ([]unit.Unit, error) {
+	if h, ok := r.(Holdings); ok {
+		return h.UnitsOf(ctx, e.ID)
+	}
+	return e.Units, nil
+}
+
 // Pick is task id's record among recs, the records of its kind by unit, as
 // RecordOf picks it.
 func Pick(recs map[unit.Unit]port.Event, id task.ID, held []unit.Unit) (port.Event, bool) {

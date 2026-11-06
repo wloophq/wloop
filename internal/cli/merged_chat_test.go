@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 func TestTheSurvivorsChatReachesTheMergedTasksLiveSession(t *testing.T) {
@@ -41,6 +42,9 @@ func TestTheSurvivorsChatReachesTheMergedTasksLiveSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := te.db.PutRecord(ctx, task.UnitOf(attachTask), builtin.BuildsBrief, task.WriterPlugin, []byte(`{"goal":"Retry three times"}`), testNow); err != nil {
+		t.Fatal(err)
+	}
 	id := te.sessionOf(t, "orca", "term_1")
 	sessions := te.Turns.Sessions.(*turnstest.Sessions)
 	sent := len(sessions.Typed())
@@ -52,7 +56,7 @@ func TestTheSurvivorsChatReachesTheMergedTasksLiveSession(t *testing.T) {
 		t.Fatalf("typed %+v, want the merged task's session", typed)
 	}
 	got, err := te.messages.ReadTask(ctx, messages.ReadRequest{Session: id})
-	if err != nil || got.Task.ID != survivor || len(got.Chat) != 1 || !strings.Contains(got.Chat[0].Data, "Take the timeout case first.") {
+	if err != nil || got.Task.ID != survivor || got.Brief != `{"goal":"Retry three times"}` || len(got.Chat) != 1 || !strings.Contains(got.Chat[0].Data, "Take the timeout case first.") {
 		t.Fatalf("the merged task's session read %+v %v", got, err)
 	}
 }
