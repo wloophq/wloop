@@ -1,0 +1,10 @@
+summary = "Propose merging a task into the task of a pull request its items' review or merge links target, such as a Slack ask to review it, for you to approve"
+provider = "task"
+when = 'size(task.link_target_tasks) > 0'
+key = ["task.fingerprint", "task.link_target_tasks"]
+order = 60
+
+[[step]]
+use = "task.verb"
+verb = "merge"
+task = "task.link_target_tasks"
