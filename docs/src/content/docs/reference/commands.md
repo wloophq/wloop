@@ -3,7 +3,7 @@ title: Commands
 description: Every command of the CLI, generated from its help.
 ---
 
-Every command but `doctor`'s local checks, `install`, `uninstall`, `config get` and `app install` talks to the daemon. Run `{{command}} --help` for the same list, including the commands of the intents your profile adds, and `{{command}} <command> --help` for one command's help.
+Every command but `doctor`'s local checks, `install`, `uninstall`, `config` and `app install` talks to the daemon. Run `{{command}} --help` for the same list, including the commands of the intents your profile adds, and `{{command}} <command> --help` for one command's help.
 
 ## Get started
 
@@ -920,6 +920,44 @@ Examples:
 ```sh
 {{command}} config get agent
 {{command}} config get sweep.fast
+```
+
+See [Configuration](/reference/configuration/).
+
+### config set
+
+Write a configuration value.
+
+```sh
+{{command}} config set <key> <value>
+```
+
+Write one key of the config file, keeping its comments and layout. The value is read as TOML (true, 5, ["a", "b"], "quoted") and as a string when it is not TOML. A key no setting reads, or a value the configuration would refuse, changes nothing. The previous file is kept beside it as a backup. The daemon applies profile live; any other key after a restart.
+
+Examples:
+
+```sh
+{{command}} config set workflows.task-check-on.enabled false
+{{command}} config set sweep.fast 5m
+{{command}} config set plugins.github.automated_reviewers '["acme-bot"]'
+```
+
+See [Configuration](/reference/configuration/).
+
+### config unset
+
+Remove a configuration value.
+
+```sh
+{{command}} config unset <key>
+```
+
+Remove one key from the config file, so its default applies, keeping the rest as written and the previous file as a backup. It removes a key no setting reads too, so a file that does not load can be fixed one key at a time.
+
+Examples:
+
+```sh
+{{command}} config unset sweep.fast
 ```
 
 See [Configuration](/reference/configuration/).

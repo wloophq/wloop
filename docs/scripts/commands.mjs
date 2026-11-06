@@ -73,7 +73,7 @@ const out = [
   'description: Every command of the CLI, generated from its help.',
   '---',
   '',
-  "Every command but `doctor`'s local checks, `install`, `uninstall`, `config get` and `app install` talks to the daemon. Run `{{command}} --help` for the same list, including the commands of the intents your profile adds, and `{{command}} <command> --help` for one command's help.",
+  "Every command but `doctor`'s local checks, `install`, `uninstall`, `config` and `app install` talks to the daemon. Run `{{command}} --help` for the same list, including the commands of the intents your profile adds, and `{{command}} <command> --help` for one command's help.",
 ];
 
 for (const group of main.filter((b) => b.title && b.title !== 'USAGE')) {
