@@ -32,7 +32,7 @@ func (p *Provider) clarified(ctx context.Context, e task.Task) (bool, error) {
 		}
 	}
 	for name, w := range e.Written {
-		if (w.By == task.WriterPerson || w.By == task.WriterAgent) && !slices.Contains(loop, name) && !e.Props[name].IsZero() {
+		if w.By == task.WriterPerson && !slices.Contains(loop, name) && !e.Props[name].IsZero() {
 			return true, nil
 		}
 	}

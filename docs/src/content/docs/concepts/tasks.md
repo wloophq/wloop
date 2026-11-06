@@ -112,7 +112,7 @@ The same work can reach you from more than one source: a Slack ask to review a p
 
 **Who runs them.** You, and a session you drive, run all four. A workflow can only propose a merge: its `merge` verb opens the merge gate, "Merge these tasks?", which says which task folds into which, and approving it runs the merge as yours. A plugin runs none. A merge takes two open tasks, never a project, a draft or a message.
 
-**The survivor.** The task you shaped by hand stays: one you clarified, moved, filed in a project or wrote properties on (`task.clarified`). When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
+**The survivor.** The task you shaped by hand stays: one you clarified, moved or filed in a project, yourself or through a session you drive, or whose properties you wrote (`task.clarified`); an agent's property write, such as a brief's, does not count. When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
 
 **What a merge keeps.** Nothing of the folded task is lost or duplicated. Its items, resolved ones included, its units and its gates move over; open proposals that name it are superseded, since the pair they asked for is done. Its timeline, chat and live session are reachable from the survivor, and its dossier stays open with the survivor, read-only to the survivor's sessions. The survivor's page lists the tasks merged into it ("Merged from"), and the related ones.
 

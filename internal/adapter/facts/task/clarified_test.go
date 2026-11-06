@@ -88,3 +88,14 @@ func TestClarifiedIgnoresMergeSplitRelateAndTheLoopsOwnProperties(t *testing.T) 
 		t.Fatalf("a pass read the verbs run by hand %d times, %v", e.reads["by hand"], err)
 	}
 }
+
+func TestAnAgentsPropertyWriteDoesNotClarifyTheTask(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	briefed := e.task(task.Task{ID: "t-01", State: "inbox", Category: task.CategoryInbox, Title: "briefed", Units: []unit.Unit{chatA}})
+	briefed.SetProp("area", task.Value{Text: "web"}, task.WriterAgent, monday)
+	e.task(briefed)
+	if clarified(t, e, "t-01") {
+		t.Fatal("an agent's property write clarified the task")
+	}
+}
