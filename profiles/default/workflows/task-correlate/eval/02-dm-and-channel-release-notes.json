@@ -1,7 +1,8 @@
 {
  "id": "02-dm-and-channel-release-notes",
  "kind": "dm-channel",
- "same_as": "t-0000000000002a41",
+ "act": "merge",
+ "on": "t-0000000000002a41",
  "task": {
   "id": "t-0000000000002001",
   "title": "Draft the 4.2 release notes",

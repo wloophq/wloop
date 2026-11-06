@@ -1,7 +1,8 @@
 {
  "id": "07-channel-ask-and-pull-request-among-others",
  "kind": "slack-pr",
- "same_as": "t-00000000000074f7",
+ "act": "merge",
+ "on": "t-00000000000074f7",
  "task": {
   "id": "t-0000000000007001",
   "title": "Ship the dark mode toggle for settings",

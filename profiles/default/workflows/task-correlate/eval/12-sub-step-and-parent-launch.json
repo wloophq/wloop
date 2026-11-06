@@ -1,7 +1,8 @@
 {
  "id": "12-sub-step-and-parent-launch",
  "kind": "sub-step",
- "same_as": "",
+ "act": "relate",
+ "on": "t-000000000000c002",
  "task": {
   "id": "t-000000000000c001",
   "title": "Update the pricing page copy for the launch",

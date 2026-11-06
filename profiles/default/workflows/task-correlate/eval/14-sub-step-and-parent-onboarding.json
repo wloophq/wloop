@@ -1,7 +1,8 @@
 {
  "id": "14-sub-step-and-parent-onboarding",
  "kind": "sub-step",
- "same_as": "",
+ "act": "relate",
+ "on": "t-000000000000e002",
  "task": {
   "id": "t-000000000000e001",
   "title": "Create Tara's laptop account",

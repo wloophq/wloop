@@ -1,7 +1,8 @@
 {
  "id": "01-dm-and-channel-access-request",
  "kind": "dm-channel",
- "same_as": "t-00000000000017e3",
+ "act": "merge",
+ "on": "t-00000000000017e3",
  "task": {
   "id": "t-0000000000001001",
   "title": "Grant Bob write access to the docs repo",

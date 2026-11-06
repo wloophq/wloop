@@ -1,7 +1,8 @@
 {
  "id": "11-same-week-different-customers",
  "kind": "look-alike",
- "same_as": "",
+ "act": "",
+ "on": "",
  "task": {
   "id": "t-000000000000b001",
   "title": "Export data for Northwind's audit",

@@ -1,7 +1,8 @@
 {
  "id": "03-dm-and-channel-budget-numbers",
  "kind": "dm-channel",
- "same_as": "t-0000000000003c05",
+ "act": "merge",
+ "on": "t-0000000000003c05",
  "task": {
   "id": "t-0000000000003001",
   "title": "Send Q3 cloud spend numbers to Grace",

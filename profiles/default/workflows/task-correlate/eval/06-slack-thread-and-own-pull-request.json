@@ -1,7 +1,8 @@
 {
  "id": "06-slack-thread-and-own-pull-request",
  "kind": "slack-pr",
- "same_as": "t-0000000000006d38",
+ "act": "merge",
+ "on": "t-0000000000006d38",
  "task": {
   "id": "t-0000000000006001",
   "title": "acme/search#57: Fix pagination past page 10",

@@ -23,12 +23,13 @@ import (
 
 const evalCorrelationUsage = "usage: eval-correlation --cases <dir> --out <dir> [--workflow task-correlate] [--prompt <file>] [--max-usd 2] [--call-usd 0.05]"
 
-// correlationCase is one synthetic judgment: a task, its candidates, and the candidate that is the same work,
-// "" for none.
+// correlationCase is one synthetic judgment: a task, its candidates, and what the workflows acting on the
+// judgment should do: Act the verb they should run, "" for nothing, on the candidate On.
 type correlationCase struct {
 	ID         string         `json:"id"`
 	Kind       string         `json:"kind"`
-	SameAs     string         `json:"same_as"`
+	Act        string         `json:"act"`
+	On         string         `json:"on"`
 	Task       caseTask       `json:"task"`
 	Candidates []caseTask     `json:"candidates"`
 	Facts      workflow.Facts `json:"facts,omitempty"`
@@ -41,31 +42,65 @@ type caseTask struct {
 	Items []string `json:"items"`
 }
 
-// correlationResult is one case's verdict. Answer is the judgment's output as its schema names its fields;
-// Proposed is what the workflow acting on it would do, as its when says over that output, and Got the task it
-// would act on; Stray is an answer naming a task the runtime does not act on.
-type correlationResult struct {
-	ID       string         `json:"id"`
-	Kind     string         `json:"kind"`
-	Want     string         `json:"want"`
-	Answer   map[string]any `json:"answer,omitempty"`
-	Got      string         `json:"got"`
-	Proposed bool           `json:"proposed"`
-	Stray    bool           `json:"stray"`
-	Correct  bool           `json:"correct"`
-	Model    string         `json:"model,omitempty"`
-	CostUSD  *float64       `json:"cost_usd,omitempty"`
-	Error    string         `json:"error,omitempty"`
+// want is what c expects, as an action reads: "<verb> <task>", "" for nothing.
+func (c correlationCase) want() string {
+	if c.Act == "" {
+		return ""
+	}
+	return c.Act + " " + c.On
 }
 
-// correlationScore counts the proposals the runtime would open, "same work" being the positive class: a
-// proposal of the wrong candidate counts against both precision and recall, and a stray answer is no proposal.
+// correlationResult is one case's verdict. Answer is the judgment's output as its schema names its fields;
+// Acted is what the workflows acting on it would do, as their whens say over that output, each "<verb> <task>";
+// Stray is an answer naming a task no workflow acts on.
+type correlationResult struct {
+	ID      string         `json:"id"`
+	Kind    string         `json:"kind"`
+	Want    string         `json:"want"`
+	Answer  map[string]any `json:"answer,omitempty"`
+	Acted   []string       `json:"acted,omitempty"`
+	Stray   bool           `json:"stray"`
+	Correct bool           `json:"correct"`
+	Model   string         `json:"model,omitempty"`
+	CostUSD *float64       `json:"cost_usd,omitempty"`
+	Error   string         `json:"error,omitempty"`
+}
+
+// actScore counts one verb's actions: one on the wrong task, or where the case wants another or none, counts
+// against its precision, and a wanted one not done against its recall.
+type actScore struct {
+	TP, FP, FN        int
+	Precision, Recall float64
+}
+
+func (a *actScore) rates() {
+	if a.TP+a.FP > 0 {
+		a.Precision = float64(a.TP) / float64(a.TP+a.FP)
+	}
+	if a.TP+a.FN > 0 {
+		a.Recall = float64(a.TP) / float64(a.TP+a.FN)
+	}
+}
+
+// correlationScore counts the actions the runtime would take, any action being the positive class, and each
+// verb's apart; a stray answer is no action.
 type correlationScore struct {
-	Cases, Answered, TP, FP, FN, TN int
-	Stray, Skipped                  int
-	Precision, Recall               float64
-	SpentUSD                        float64
-	Model                           string
+	Cases, Answered, TN int
+	Stray, Skipped      int
+	actScore
+	Acts     map[string]*actScore
+	SpentUSD float64
+	Model    string
+}
+
+func (s *correlationScore) act(verb string) *actScore {
+	if s.Acts == nil {
+		s.Acts = map[string]*actScore{}
+	}
+	if s.Acts[verb] == nil {
+		s.Acts[verb] = &actScore{}
+	}
+	return s.Acts[verb]
 }
 
 type correlationEvalOptions struct {
@@ -77,20 +112,24 @@ type correlationEvalOptions struct {
 	Log      io.Writer
 }
 
-// judgment is a classify step with a with, as the profile loads it, and the workflow that acts on its output.
+// judgment is a classify step with a with, as the profile loads it, and the workflows that act on its output.
 type judgment struct {
 	// Name is the judging workflow's; With the fact its step lists the tasks of.
 	Name, With     string
 	Prompt, Schema string
-	// Acts is the workflow whose when reads the judgment's output; Target the fact of that output its steps
-	// name as the task they act on.
-	Acts   workflow.Workflow
-	Target string
+	Acts           []acting
 }
 
-// proposes says what j.Acts would do with the output fields of a judgment over c: whether its when holds, and
-// the task its steps would act on.
-func (j judgment) proposes(c correlationCase, fields map[string]any) (bool, string, error) {
+// acting is a workflow whose when reads a judgment's output: Verb the verb its step runs, Target the fact of that
+// output the step names as the task it acts on.
+type acting struct {
+	Workflow     workflow.Workflow
+	Verb, Target string
+}
+
+// acts are what j.Acts would do with the output fields of a judgment over c, each "<verb> <task>", and whether
+// the output names a task any of them reads.
+func (j judgment) acts(c correlationCase, fields map[string]any) ([]string, bool, error) {
 	f := maps.Clone(c.Facts)
 	if f == nil {
 		f = workflow.Facts{}
@@ -103,10 +142,21 @@ func (j judgment) proposes(c correlationCase, fields map[string]any) (bool, stri
 	for k, v := range fields {
 		f[builtin.ClassifyFact(j.Name, k)] = factValue(v)
 	}
-	got, _ := f[j.Target].(string)
 	trigger := workflow.Facts{"trigger.kind": string(workflow.TriggerEvent), "trigger.event.kind": builtin.EventClassified, "trigger.event.data": j.Name}
-	ok, err := j.Acts.When.Match(workflow.Vars{Facts: f, Trigger: trigger})
-	return ok, got, err
+	var out []string
+	named := false
+	for _, a := range j.Acts {
+		got, _ := f[a.Target].(string)
+		named = named || got != ""
+		ok, err := a.Workflow.When.Match(workflow.Vars{Facts: f, Trigger: trigger})
+		if err != nil {
+			return nil, named, fmt.Errorf("%s: %w", a.Workflow.Name, err)
+		}
+		if ok && !slices.Contains(out, a.Verb+" "+got) {
+			out = append(out, a.Verb+" "+got)
+		}
+	}
+	return out, named, nil
 }
 
 // loadCorrelationCases reads every .json case of dir, sorted by name.
@@ -128,8 +178,8 @@ func loadCorrelationCases(dir string) ([]correlationCase, error) {
 		if err := json.Unmarshal(b, &c); err != nil {
 			return nil, fmt.Errorf("%s: %w", e.Name(), err)
 		}
-		if c.SameAs != "" && !slices.ContainsFunc(c.Candidates, func(t caseTask) bool { return t.ID == c.SameAs }) {
-			return nil, fmt.Errorf("%s: same_as %s is not one of its candidates", e.Name(), c.SameAs)
+		if (c.Act == "") != (c.On == "") || c.On != "" && !slices.ContainsFunc(c.Candidates, func(t caseTask) bool { return t.ID == c.On }) {
+			return nil, fmt.Errorf("%s: act %q on %q: an act names one of its candidates, and no act none", e.Name(), c.Act, c.On)
 		}
 		out = append(out, c)
 	}
@@ -160,7 +210,7 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 			s.Skipped = len(o.Cases) - len(out)
 			break
 		}
-		r := correlationResult{ID: c.ID, Kind: c.Kind, Want: c.SameAs}
+		r := correlationResult{ID: c.ID, Kind: c.Kind, Want: c.want()}
 		prompt, err := casePrompt(o.Judgment.Prompt, c)
 		if err != nil {
 			return out, s, fmt.Errorf("%s: %w", c.ID, err)
@@ -178,52 +228,68 @@ func runCorrelationEval(ctx context.Context, o correlationEvalOptions) ([]correl
 		if err == nil {
 			err = json.Unmarshal(ans.JSON, &r.Answer)
 		}
+		named := false
 		if err == nil {
-			r.Proposed, r.Got, err = o.Judgment.proposes(c, r.Answer)
+			r.Acted, named, err = o.Judgment.acts(c, r.Answer)
 		}
 		if err != nil {
-			r.Proposed, r.Error = false, err.Error()
+			r.Acted, r.Error = nil, err.Error()
 		} else {
 			s.Answered++
 		}
 		r.Model = ans.Model
-		r.Stray = err == nil && !r.Proposed && r.Got != ""
-		r.Correct = err == nil && (r.Proposed && r.Got == c.SameAs || !r.Proposed && c.SameAs == "")
+		r.Stray = err == nil && len(r.Acted) == 0 && named
+		r.Correct = err == nil && (len(r.Acted) == 0 && c.Act == "" || len(r.Acted) == 1 && r.Acted[0] == c.want())
 		if r.Stray {
 			s.Stray++
 		}
 		s.Model = cmp.Or(s.Model, ans.Model)
-		switch {
-		case r.Proposed && r.Got == c.SameAs:
-			s.TP++
-		case r.Proposed:
-			s.FP++
-			if c.SameAs != "" {
-				s.FN++
-			}
-		case c.SameAs != "":
-			s.FN++
-		case err == nil:
-			s.TN++
-		}
+		s.score(c, r, err == nil)
 		if o.Log != nil {
-			fmt.Fprintf(o.Log, "%s: want %q, answer %s, proposed %v %q\n", c.ID, c.SameAs, ans.JSON, r.Proposed, r.Got)
+			fmt.Fprintf(o.Log, "%s: want %q, answer %s, acted %q\n", c.ID, c.want(), ans.JSON, r.Acted)
 		}
 		out = append(out, r)
 	}
-	if s.TP+s.FP > 0 {
-		s.Precision = float64(s.TP) / float64(s.TP+s.FP)
-	}
-	if s.TP+s.FN > 0 {
-		s.Recall = float64(s.TP) / float64(s.TP+s.FN)
+	s.rates()
+	for _, a := range s.Acts {
+		a.rates()
 	}
 	return out, s, nil
 }
 
+// score counts r, the result of c, answered or not.
+func (s *correlationScore) score(c correlationCase, r correlationResult, answered bool) {
+	hit := false
+	for _, a := range r.Acted {
+		verb, _, _ := strings.Cut(a, " ")
+		if a == c.want() {
+			hit = true
+			s.TP++
+			s.act(verb).TP++
+			continue
+		}
+		s.FP++
+		s.act(verb).FP++
+	}
+	switch {
+	case c.Act != "" && !hit:
+		s.FN++
+		s.act(c.Act).FN++
+	case c.Act == "" && len(r.Acted) == 0 && answered:
+		s.TN++
+	}
+}
+
 func (s correlationScore) String() string {
-	return fmt.Sprintf("%d cases, %d answered, %d skipped by the budget; precision %.2f (%d of %d proposed), recall %.2f (%d of %d same-work pairs); "+
-		"%d stray answers no proposal acts on; model %s; spent $%.4f",
-		s.Cases, s.Answered, s.Skipped, s.Precision, s.TP, s.TP+s.FP, s.Recall, s.TP, s.TP+s.FN, s.Stray, cmp.Or(s.Model, "unreported"), s.SpentUSD)
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d cases, %d answered, %d skipped by the budget; precision %.2f (%d of %d acted), recall %.2f (%d of %d wanted)",
+		s.Cases, s.Answered, s.Skipped, s.Precision, s.TP, s.TP+s.FP, s.Recall, s.TP, s.TP+s.FN)
+	for _, verb := range slices.Sorted(maps.Keys(s.Acts)) {
+		a := s.Acts[verb]
+		fmt.Fprintf(&b, "; %s precision %.2f (%d of %d), recall %.2f (%d of %d)", verb, a.Precision, a.TP, a.TP+a.FP, a.Recall, a.TP, a.TP+a.FN)
+	}
+	fmt.Fprintf(&b, "; %d stray answers no workflow acts on; model %s; spent $%.4f", s.Stray, cmp.Or(s.Model, "unreported"), s.SpentUSD)
+	return b.String()
 }
 
 // runEvalCorrelation runs the correlation judgment over the synthetic cases with the configured agent and writes
@@ -298,7 +364,7 @@ func writeCorrelationEval(dir string, results []correlationResult, s correlation
 }
 
 // judgment is the classify step of workflow name, which must read a with, its prompt and schema, and the
-// loaded workflow whose when reads its output.
+// loaded workflows whose whens read its output, in their load order.
 func (e *Env) judgment(name string) (judgment, error) {
 	ws := e.loadedIntents().Workflows
 	i := slices.IndexFunc(ws, func(w workflow.Workflow) bool { return w.Name == name })
@@ -327,13 +393,19 @@ func (e *Env) judgment(name string) (judgment, error) {
 		if w.Name == name || w.When == nil || !slices.ContainsFunc(w.When.Reads(), func(r string) bool { return strings.HasPrefix(r, prefix) }) {
 			continue
 		}
-		reads := workflow.StepReads(w.Steps)
-		k := slices.IndexFunc(reads, func(r string) bool { return strings.HasPrefix(r, prefix) })
-		if k < 0 {
-			continue
+		for _, st := range w.Steps {
+			reads := workflow.StepReads([]workflow.Step{st})
+			k := slices.IndexFunc(reads, func(r string) bool { return strings.HasPrefix(r, prefix) })
+			if k < 0 {
+				continue
+			}
+			verb, _ := st.Args["verb"].(string)
+			out.Acts = append(out.Acts, acting{Workflow: w, Verb: cmp.Or(verb, st.Use), Target: reads[k]})
+			break
 		}
-		out.Acts, out.Target = w, reads[k]
-		return out, nil
 	}
-	return judgment{}, fmt.Errorf("no loaded workflow acts on %s's judgment: none whose when reads %s* names one of those facts as the task its steps act on", name, prefix)
+	if len(out.Acts) == 0 {
+		return judgment{}, fmt.Errorf("no loaded workflow acts on %s's judgment: none whose when reads %s* names one of those facts as the task its steps act on", name, prefix)
+	}
+	return out, nil
 }

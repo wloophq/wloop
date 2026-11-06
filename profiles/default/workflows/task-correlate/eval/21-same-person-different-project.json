@@ -1,0 +1,24 @@
+{
+ "id": "21-same-person-different-project",
+ "kind": "look-alike",
+ "act": "",
+ "on": "",
+ "task": {
+  "id": "t-0000000000015001",
+  "title": "Write the quarterly security report",
+  "notes": "DM with Hugo",
+  "items": [
+   "Hugo asks you for the quarterly security report by Friday"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000015002",
+   "title": "Plan the office move",
+   "notes": "DM with Hugo",
+   "items": [
+    "Hugo asks you to plan the office move to the third floor"
+   ]
+  }
+ ]
+}

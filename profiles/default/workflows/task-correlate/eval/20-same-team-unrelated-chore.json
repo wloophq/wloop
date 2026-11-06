@@ -1,0 +1,24 @@
+{
+ "id": "20-same-team-unrelated-chore",
+ "kind": "look-alike",
+ "act": "",
+ "on": "",
+ "task": {
+  "id": "t-0000000000014001",
+  "title": "Rotate the staging database password",
+  "notes": "#platform",
+  "items": [
+   "Ana asks you to rotate the staging database password"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000014002",
+   "title": "Upgrade the staging Kubernetes nodes",
+   "notes": "#platform",
+   "items": [
+    "Ana asks you to upgrade the staging nodes to the new image"
+   ]
+  }
+ ]
+}

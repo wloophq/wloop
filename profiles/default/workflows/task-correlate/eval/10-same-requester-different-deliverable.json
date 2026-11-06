@@ -1,7 +1,8 @@
 {
  "id": "10-same-requester-different-deliverable",
  "kind": "look-alike",
- "same_as": "",
+ "act": "",
+ "on": "",
  "task": {
   "id": "t-000000000000a001",
   "title": "Write the incident report for Tuesday's outage",

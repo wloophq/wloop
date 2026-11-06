@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,16 +17,12 @@ import (
 
 const correlationCases = "../../profiles/default/workflows/task-correlate/eval"
 
-// fakeJudge answers each case's prompt with the id answers names for its task, costing cost per call.
+// fakeJudge answers each case's prompt with the verdict and task answers names for its task, costing cost per call.
 type fakeJudge struct {
 	mu      sync.Mutex
-	answers map[string]string
-	// stray are answers with same_work that name no candidate, by task id.
-	stray map[string]string
-	// unsure are answers without same_work that name a candidate, by task id.
-	unsure map[string]string
-	cost   float64
-	calls  int
+	answers map[string][2]string
+	cost    float64
+	calls   int
 }
 
 var selfID = regexp.MustCompile(`(?m)^- id: (t-[0-9a-f]+)`)
@@ -38,18 +35,14 @@ func (j *fakeJudge) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
 	if m == nil {
 		return turns.Answer{}, os.ErrInvalid
 	}
-	got := j.answers[m[1]]
-	sameWork := got != ""
-	if a, ok := j.stray[m[1]]; ok {
-		got, sameWork = a, true
-	}
-	if a, ok := j.unsure[m[1]]; ok {
-		got, sameWork = a, false
-	}
-	b, _ := json.Marshal(map[string]any{"same_work": sameWork, "same_as": got, "reason": "fake"})
+	a := j.answers[m[1]]
+	b, _ := json.Marshal(map[string]any{"verdict": a[0], "task": a[1], "reason": "fake"})
 	c := j.cost
 	return turns.Answer{JSON: b, CostUSD: &c}, nil
 }
+
+// verdictOf is the bundled schema's verdict for a case's act.
+var verdictOf = map[string]string{"merge": "same", "relate": "related", "": "none"}
 
 func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	t.Parallel()
@@ -57,23 +50,21 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	same, notFirst, kinds := 0, 0, map[string]int{}
+	acts, notFirst, kinds := map[string]int{}, 0, map[string]int{}
 	for _, c := range cases {
 		kinds[c.Kind]++
-		if c.SameAs != "" {
-			same++
-			if c.Candidates[0].ID != c.SameAs {
-				notFirst++
-			}
+		acts[c.Act]++
+		if c.Act != "" && c.Candidates[0].ID != c.On {
+			notFirst++
 		}
 	}
 	if notFirst < 3 {
-		t.Errorf("the same-work candidate is first in all but %d positive cases: a judge picking the first would score", notFirst)
+		t.Errorf("the wanted candidate is first in all but %d cases: a judge picking the first would score", notFirst)
 	}
-	if len(cases) < 12 || same*2 != len(cases) {
-		t.Fatalf("%d cases, %d same work: want at least 12 with balanced labels", len(cases), same)
+	if acts["merge"] < 6 || acts["relate"] < 6 || acts[""] < 6 {
+		t.Fatalf("cases by act %v: want at least 6 merges, 6 relations and 6 of neither", acts)
 	}
-	for _, k := range []string{"dm-channel", "slack-pr", "look-alike", "sub-step"} {
+	for _, k := range []string{"dm-channel", "slack-pr", "look-alike", "sub-step", "follow-up", "same-launch"} {
 		if kinds[k] == 0 {
 			t.Errorf("no %s case", k)
 		}
@@ -83,22 +74,22 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	judge := &fakeJudge{answers: map[string]string{}, stray: map[string]string{}, unsure: map[string]string{}, cost: 0.0004}
-	var wrongPositive, wrongNegative string
-	var strays []string
+	judge := &fakeJudge{answers: map[string][2]string{}, cost: 0.0004}
+	planted := map[string]string{}
+	strays := 0
 	for _, c := range cases {
-		judge.answers[c.Task.ID] = c.SameAs
+		judge.answers[c.Task.ID] = [2]string{verdictOf[c.Act], c.On}
 		switch {
-		case c.SameAs != "" && wrongPositive == "":
-			wrongPositive, judge.answers[c.Task.ID] = c.ID, ""
-		case c.SameAs == "" && wrongNegative == "":
-			wrongNegative, judge.answers[c.Task.ID] = c.ID, c.Candidates[0].ID
-		case c.SameAs == "" && len(strays) == 0:
-			strays, judge.stray[c.Task.ID] = append(strays, c.ID), `""`
-		case c.SameAs == "" && len(strays) == 1:
-			strays, judge.stray[c.Task.ID] = append(strays, c.ID), "t-00000000deadbeef"
-		case c.SameAs == "" && len(strays) == 2:
-			strays, judge.unsure[c.Task.ID] = append(strays, c.ID), c.Candidates[0].ID
+		case c.Act == "merge" && planted["missed merge"] == "":
+			planted["missed merge"], judge.answers[c.Task.ID] = c.ID, [2]string{"none", ""}
+		case c.Act == "relate" && planted["relate as merge"] == "":
+			planted["relate as merge"], judge.answers[c.Task.ID] = c.ID, [2]string{"same", c.On}
+		case c.Act == "" && planted["false relate"] == "":
+			planted["false relate"], judge.answers[c.Task.ID] = c.ID, [2]string{"related", c.Candidates[0].ID}
+		case c.Act == "" && strays == 0:
+			strays, judge.answers[c.Task.ID] = 1, [2]string{"same", "t-00000000deadbeef"}
+		case c.Act == "" && strays == 1:
+			strays, judge.answers[c.Task.ID] = 2, [2]string{"none", c.Candidates[0].ID}
 		}
 	}
 	o := correlationEvalOptions{Asker: judge, Cases: cases, Judgment: j, MaxUSD: 2, CallUSD: 0.05}
@@ -106,22 +97,26 @@ func TestTheCorrelationEvalCommandScoresCasesWithAFakeJudge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pos := same
-	if score.TP != pos-1 || score.FP != 1 || score.FN != 1 || score.TN != len(cases)-pos-1 || score.Stray != 3 || score.Answered != len(cases) {
+	merge, relate := score.Acts["merge"], score.Acts["relate"]
+	if merge == nil || relate == nil {
+		t.Fatalf("score %+v, want merges and relations apart", score)
+	}
+	if merge.TP != acts["merge"]-1 || merge.FP != 1 || merge.FN != 1 || relate.TP != acts["relate"]-1 || relate.FP != 1 || relate.FN != 1 {
+		t.Fatalf("merge %+v relate %+v", *merge, *relate)
+	}
+	if score.TN != acts[""]-1 || score.Stray != 2 || score.Answered != len(cases) || score.TP != merge.TP+relate.TP || score.FP != 2 || score.FN != 2 {
 		t.Fatalf("score %+v", score)
 	}
-	if want := float64(pos-1) / float64(pos); score.Precision != want || score.Recall != want {
-		t.Fatalf("precision %v recall %v, want %v", score.Precision, score.Recall, want)
-	}
 	for _, r := range results {
-		if r.Correct == (r.ID == wrongPositive || r.ID == wrongNegative) {
+		wrong := slices.Contains(slices.Collect(maps.Values(planted)), r.ID)
+		if r.Correct == wrong {
 			t.Errorf("result %+v", r)
 		}
-		if r.Stray != slices.Contains(strays, r.ID) || r.Stray && r.Proposed {
-			t.Errorf("a stray answer is shown apart and proposes nothing: %+v", r)
+		if r.Stray && len(r.Acted) > 0 {
+			t.Errorf("a stray answer is shown apart and acts on nothing: %+v", r)
 		}
 	}
-	if !strings.Contains(score.String(), "3 stray") || !strings.Contains(score.String(), "$0.0056") {
+	if !strings.Contains(score.String(), "2 stray") || !strings.Contains(score.String(), "merge precision") || !strings.Contains(score.String(), "relate precision") {
 		t.Errorf("score %s", score)
 	}
 
@@ -188,8 +183,17 @@ func TestTheCorrelationEvalJudgesWithTheFilesTheWorkflowsStepNames(t *testing.T)
 		t.Fatalf("a classify with no with: %v", err)
 	}
 	j, err := te.judgment("task-correlate")
-	if err != nil || j.Acts.Name != "task-correlate-merge" || j.Target != "classify.task_correlate.same_as" || j.With != "task.candidates" {
+	if err != nil || j.With != "task.candidates" {
 		t.Fatalf("the bundled correlation: %+v %v", j, err)
+	}
+	var acting []string
+	for _, a := range j.Acts {
+		acting = append(acting, a.Workflow.Name+" "+a.Verb+" "+a.Target)
+	}
+	slices.Sort(acting)
+	if want := []string{"task-correlate-merge merge classify.task_correlate.task", "task-correlate-merge-linked merge classify.task_correlate.task",
+		"task-correlate-relate relate classify.task_correlate.task"}; !slices.Equal(acting, want) {
+		t.Fatalf("the workflows acting on the bundled correlation %v, want %v", acting, want)
 	}
 }
 
@@ -227,7 +231,10 @@ func TestTheCorrelationEvalScoresWhatTheWorkflowActingOnTheJudgmentProposes(t *t
 		t.Fatal(err)
 	}
 	c := func(id, want string, cands ...string) correlationCase {
-		cc := correlationCase{ID: id, SameAs: want, Task: caseTask{ID: id, Title: id}}
+		cc := correlationCase{ID: id, On: want, Task: caseTask{ID: id, Title: id}}
+		if want != "" {
+			cc.Act = "merge"
+		}
 		for _, x := range cands {
 			cc.Candidates = append(cc.Candidates, caseTask{ID: x, Title: x})
 		}
@@ -248,9 +255,9 @@ func TestTheCorrelationEvalScoresWhatTheWorkflowActingOnTheJudgmentProposes(t *t
 		t.Fatal(err)
 	}
 	if score.TP != 1 || score.FN != 1 || score.TN != 1 || score.FP != 0 || score.Stray != 1 {
-		t.Fatalf("score %+v, want only the sure match proposed: %+v", score, results)
+		t.Fatalf("score %+v, want only the sure match acted on: %+v", score, results)
 	}
-	if !results[0].Proposed || results[0].Got != "t-00000000000000a1" || results[1].Proposed {
+	if !slices.Equal(results[0].Acted, []string{"merge t-00000000000000a1"}) || len(results[1].Acted) != 0 {
 		t.Fatalf("results %+v", results)
 	}
 }

@@ -1,7 +1,8 @@
 {
  "id": "04-slack-review-ask-and-pull-request",
  "kind": "slack-pr",
- "same_as": "t-0000000000004019",
+ "act": "merge",
+ "on": "t-0000000000004019",
  "task": {
   "id": "t-0000000000004001",
   "title": "Review acme/billing#412",
