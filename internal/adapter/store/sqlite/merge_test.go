@@ -469,3 +469,32 @@ func TestAMergedTaskFollowsItsMergeNotAnOlderAlias(t *testing.T) {
 		t.Fatalf("the merged task reads as %s, not the task it was merged into", got.ID)
 	}
 }
+
+func TestSplitLeavesTheRowsAnotherMergedTasksRecordListsOnAUnitTheSplitTaskBrought(t *testing.T) {
+	t.Parallel()
+	ms := openMerge(t)
+	x, y := ms.seed(t)
+	w := capture(zID, "inbox", -300)
+	w.Units = []unit.Unit{{Provider: "slack", Key: "T1/C2/9.9"}}
+	applyTasks(t, ms.s, w)
+	sqlitetest.Exec(t, ms.db, `INSERT INTO drafts (id, provider, unit_key, task, kind, origin_kind, state, created_at, updated_at) VALUES
+		(31, 'github', 'acme/api#7', ?1, 'comment', 'turn', 'held', ?2, ?2)`, string(zID), eventTime(mergeAt))
+	rx := ms.merge(t, x, y, mergeAt)
+	rw := ms.merge(t, ms.read(t, zID), ms.read(t, yID), mergeAt.Add(time.Minute))
+	if !slices.Equal(rw.Drafts, []int64{31}) {
+		t.Fatalf("W's record drafts %v", rw.Drafts)
+	}
+	sp, err := merge.Unfold(ms.read(t, yID), rx, []merge.Record{rw}, nil, merge.Project{}, taskstest.BundledStates, mergeAt.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(sp.Units, []unit.Unit{mergePR}) {
+		t.Fatalf("X takes back by unit %v", sp.Units)
+	}
+	if err := ms.m.Split(context.Background(), rx, sp); err != nil {
+		t.Fatal(err)
+	}
+	if got := ms.rows(t, yID); !slices.Contains(got, "drafts [31 held]") {
+		t.Fatalf("W's draft on the pull request X brought left Y: Y holds %q, X holds %q", got, ms.rows(t, xID))
+	}
+}

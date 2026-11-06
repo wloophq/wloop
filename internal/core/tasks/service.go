@@ -229,7 +229,7 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 }
 
 // Addressed is req as it may run on e, the task id reads as: a verb sent to the id of a task merged into e is
-// refused with ErrMerged, but split, which splits that task out when it names no other; a verb sent to e's own
+// refused with ErrMerged, but split, which splits that task out when it names no other task; a verb sent to e's own
 // id, or to an id an older alias leads to, runs as sent.
 func (s *Service) Addressed(ctx context.Context, id task.ID, e task.Task, req Request) (Request, error) {
 	if e.ID == id {
@@ -239,7 +239,7 @@ func (s *Service) Addressed(ctx context.Context, id task.ID, e task.Task, req Re
 	if err != nil || !merged {
 		return req, err
 	}
-	if s.d.States.Handler(string(req.Verb)) != HandlerSplit {
+	if other := req.Args[task.ArgTask]; s.d.States.Handler(string(req.Verb)) != HandlerSplit || other != "" && other != string(id) {
 		return req, fmt.Errorf("%w: %s was merged into %s; %s runs on %s", ErrMerged, id, r.Into, req.Verb, e.ID)
 	}
 	if req.Args[task.ArgTask] == "" {

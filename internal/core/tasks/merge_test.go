@@ -1005,3 +1005,24 @@ func TestASplitThatWroteSucceedsWhenItsSyncFails(t *testing.T) {
 		t.Fatalf("after the split %s, %d aliases", got.ID, r.aliasCount(t, ask.ID))
 	}
 }
+
+func TestASplitSentToAMergedIDThatNamesAnotherTaskIsRefused(t *testing.T) {
+	r := newMergeRig(t)
+	pr, ask := r.seed(t)
+	r.items.byUnit[otherPR] = []items.Item{webItem()}
+	r.sync(t, otherPR)
+	r.merge(t, pr.ID, ask.ID)
+	r.merge(t, pr.ID, webTaskID)
+	_, err := r.svc.Do(context.Background(), ask.ID, coretasks.Request{Verb: task.VerbSplit, Actor: task.ActorPerson, Source: "cockpit",
+		Args: map[string]string{task.ArgTask: string(webTaskID)}})
+	if !errors.Is(err, coretasks.ErrMerged) {
+		t.Fatalf("a split on the merged id naming another task: %v", err)
+	}
+	if !slices.Equal(r.stored(t), []task.ID{pr.ID}) {
+		t.Fatalf("stored %v", r.stored(t))
+	}
+	if _, err := r.svc.Do(context.Background(), ask.ID, coretasks.Request{Verb: task.VerbSplit, Actor: task.ActorPerson, Source: "cockpit",
+		Args: map[string]string{task.ArgTask: string(ask.ID)}}); err != nil {
+		t.Fatalf("a split on the merged id naming itself: %v", err)
+	}
+}

@@ -40,7 +40,8 @@ type Record struct {
 	// stored, so a split writes these back.
 	Marks map[string]string
 	// Items, Resolved and Units are what Into gained: From's item refs and units Into did not hold, units in
-	// From's order after Into's. Opened are the refs Into held resolved that From held open, which moved into
+	// From's order after Into's, and in Units also those From took over, as an heir (Split.Heirs), when a task
+	// merged into Into before it was split out. Opened are the refs Into held resolved that From held open, which moved into
 	// Into's open items. Related are the ids Into's property of role related gained from From's, without
 	// From's and Into's own; no third task is written.
 	Items, Resolved, Opened []task.ItemRef
@@ -157,8 +158,8 @@ type Split struct {
 // for the refs whose item the ledger still has.
 //
 // From takes the refs of r.Task into holds now, on the side it holds them (a ref into resolved comes back
-// resolved), and every ref no other merged task's record held that derives From or a task merged into it, or
-// that derives none of the others and lies on a unit of Units; into keeps the rest, so what arrived for itself,
+// resolved), and every other ref that derives From or a task merged into it, or that derives none of the
+// others and lies on a unit of Units; into keeps the rest, so what arrived for itself,
 // or for another task merged into it, stays. A ref goes to one task only; one both held before the merge
 // stays on both. From takes everything else from r.Task: state, title, notes, properties, wake; its parent
 // stays only while p, that project, is open, and its position is after its siblings' when another took it. Rest
@@ -177,10 +178,6 @@ func Unfold(into task.Task, r Record, others []Record, owners map[task.ItemRef]t
 	out := Split{Others: others}
 	mine := append([]string{string(r.From)}, r.Task.Prop(mergedProp).List...)
 	theirs := []string{string(into.ID)}
-	held := func(o Record, ref task.ItemRef) bool {
-		return slices.Contains(o.Task.Items, ref) || slices.Contains(o.Task.Resolved, ref) || slices.Contains(o.Items, ref) ||
-			slices.Contains(o.Resolved, ref)
-	}
 	for _, o := range others {
 		theirs = append(theirs, string(o.From))
 	}
@@ -205,9 +202,6 @@ func Unfold(into task.Task, r Record, others []Record, owners map[task.ItemRef]t
 	takes := func(ref task.ItemRef) bool {
 		if was(ref) {
 			return true
-		}
-		if slices.ContainsFunc(others, func(o Record) bool { return held(o, ref) }) {
-			return false
 		}
 		if owner, ok := owners[ref]; ok && slices.Contains(mine, string(owner)) {
 			return true
