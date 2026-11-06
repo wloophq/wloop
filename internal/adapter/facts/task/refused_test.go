@@ -71,7 +71,7 @@ func TestRefusedMergesListsARejectedPairUntilEitherTaskChanges(t *testing.T) {
 	}
 }
 
-func TestARefusalOfATaskMergedAwayHoldsNeitherWay(t *testing.T) {
+func TestARefusalOfATaskMergedAwayHoldsForItsSurvivor(t *testing.T) {
 	t.Parallel()
 	c := newCandidateEnv(t)
 	for _, id := range []task.ID{"t-z", "t-y"} {
@@ -79,12 +79,65 @@ func TestARefusalOfATaskMergedAwayHoldsNeitherWay(t *testing.T) {
 	}
 	c.reject("t-z", "t-x", task.VerbMerge)
 	c.aliases["t-x"] = "t-y"
-	refused := func(id task.ID) []string { return c.list(context.Background(), id, "task.refused_pairs") }
-	if got := refused("t-z"); len(got) != 0 {
-		t.Errorf("refused merges of t-z %v, want none once t-x merged into t-y", got)
+	for _, fact := range []string{"task.refused_pairs", "task.undone"} {
+		if got, want := c.list(context.Background(), "t-z", fact), []string{"t-y"}; !slices.Equal(got, want) {
+			t.Errorf("%s of t-z %v, want %v: t-x, which you kept apart from t-z, is in t-y now", fact, got, want)
+		}
+		if got, want := c.list(context.Background(), "t-y", fact), []string{"t-z"}; !slices.Equal(got, want) {
+			t.Errorf("%s of t-y %v, want %v", fact, got, want)
+		}
 	}
-	if got := refused("t-y"); len(got) != 0 {
-		t.Errorf("refused merges of t-y %v, want none", got)
+}
+
+func TestAPairStaysUndoneAfterEitherSideIsMergedAway(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	for _, id := range []task.ID{"t-ask", "t-x"} {
+		c.open(id, chat("T1/C1/"+string(id)), monday.Add(-time.Hour))
+	}
+	c.merged("t-ask", "t-pr", monday.Add(10*time.Minute))
+	c.split("t-ask", "t-pr", monday.Add(20*time.Minute))
+	c.unrelated("t-old", "t-x", monday.Add(30*time.Minute))
+	c.aliases["t-pr"] = "t-x"
+	c.aliases["t-old"] = "t-ask"
+	if got, want := c.list(context.Background(), "t-ask", "task.undone"), []string{"t-x"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-ask %v, want %v once t-pr, split from it, merged into t-x", got, want)
+	}
+	if got, want := c.list(context.Background(), "t-x", "task.undone"), []string{"t-ask"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-x %v, want %v", got, want)
+	}
+}
+
+func TestASplitOfAChainTakesApartEveryTaskItHeld(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	for _, id := range []task.ID{"t-1", "t-2", "t-3"} {
+		c.open(id, chat("T1/C1/"+string(id)), monday.Add(-time.Hour))
+	}
+	c.merged("t-1", "t-2", monday.Add(10*time.Minute))
+	c.merged("t-2", "t-3", monday.Add(20*time.Minute))
+	c.split("t-2", "t-3", monday.Add(30*time.Minute))
+	c.split("t-1", "t-2", monday.Add(40*time.Minute))
+	if got, want := c.list(context.Background(), "t-1", "task.undone"), []string{"t-2", "t-3"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-1 %v, want %v: t-1 was in t-3, through t-2, until the split", got, want)
+	}
+	if got, want := c.list(context.Background(), "t-3", "task.undone"), []string{"t-1", "t-2"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-3 %v, want %v", got, want)
+	}
+}
+
+func TestASplitOutOfAMergedSurvivorTakesItApartFromTheOuterOne(t *testing.T) {
+	t.Parallel()
+	c := newCandidateEnv(t)
+	for _, id := range []task.ID{"t-1", "t-2", "t-3"} {
+		c.open(id, chat("T1/C1/"+string(id)), monday.Add(-time.Hour))
+	}
+	c.merged("t-1", "t-2", monday.Add(10*time.Minute))
+	c.merged("t-2", "t-3", monday.Add(20*time.Minute))
+	c.split("t-1", "t-3", monday.Add(30*time.Minute))
+	c.aliases["t-2"] = "t-3"
+	if got, want := c.list(context.Background(), "t-1", "task.undone"), []string{"t-3"}; !slices.Equal(got, want) {
+		t.Fatalf("undone of t-1 %v, want %v: split out of t-3, which still holds t-2", got, want)
 	}
 }
 

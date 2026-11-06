@@ -59,22 +59,22 @@ func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]strin
 		return nil, err
 	}
 	for _, r := range rs {
-		other := r.b
-		switch e.ID {
-		case r.a:
-		case r.b:
-			other = r.a
+		a, b, err := p.resolvePair(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		var o task.Task
+		switch {
+		case a.ID == "" || b.ID == "" || a.ID == b.ID:
+			continue
+		case a.ID == e.ID:
+			o = b
+		case b.ID == e.ID:
+			o = a
 		default:
 			continue
 		}
-		o, err := p.passTask(ctx, other)
-		switch {
-		case errors.Is(err, coretasks.ErrNoTask):
-			continue
-		case err != nil:
-			return nil, err
-		}
-		if o.ID != other || slices.Contains(out, string(o.ID)) {
+		if slices.Contains(out, string(o.ID)) {
 			continue
 		}
 		if expire {
@@ -90,6 +90,23 @@ func (p *Provider) apart(ctx context.Context, e task.Task, expire bool) ([]strin
 	}
 	slices.Sort(out)
 	return out, nil
+}
+
+// resolvePair is r's two tasks under the ids they read as now, a side merged away into its survivor; a side
+// that is gone reads as the zero task.
+func (p *Provider) resolvePair(ctx context.Context, r refusal) (task.Task, task.Task, error) {
+	var out [2]task.Task
+	for i, id := range []task.ID{r.a, r.b} {
+		o, err := p.passTask(ctx, id)
+		switch {
+		case errors.Is(err, coretasks.ErrNoTask):
+		case err != nil:
+			return task.Task{}, task.Task{}, err
+		default:
+			out[i] = o
+		}
+	}
+	return out[0], out[1], nil
 }
 
 // refusals are the rejected proposal gates that proposed a merge or a relation, the splits and the unrelations.
@@ -169,11 +186,41 @@ func (p *Provider) splits(ctx context.Context) ([]refusal, error) {
 			continue
 		}
 		if into, ok := merged[id]; ok {
-			out = append(out, refusal{a: id, b: into, closed: ev.At})
+			for _, x := range append([]task.ID{id}, foldedInto(merged, id)...) {
+				for _, y := range append([]task.ID{into}, survivorsOf(merged, into)...) {
+					out = append(out, refusal{a: x, b: y, closed: ev.At})
+				}
+			}
 			delete(merged, id)
 		}
 	}
 	return out, nil
+}
+
+// foldedInto are the tasks merged, directly or through others, into id, which a split of id takes apart with it.
+func foldedInto(merged map[task.ID]task.ID, id task.ID) []task.ID {
+	var out []task.ID
+	for next := []task.ID{id}; len(next) > 0; {
+		cur := next[0]
+		next = next[1:]
+		for x, into := range merged {
+			if into == cur && x != id && !slices.Contains(out, x) {
+				out = append(out, x)
+				next = append(next, x)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// survivorsOf are the tasks into is itself merged into, nearest first, which held id until a split of it.
+func survivorsOf(merged map[task.ID]task.ID, into task.ID) []task.ID {
+	var out []task.ID
+	for next, ok := merged[into]; ok && !slices.Contains(out, next) && next != into; next, ok = merged[next] {
+		out = append(out, next)
+	}
+	return out
 }
 
 // itemsMovedAfter says whether one of the heldItems of es was created or changed after at.

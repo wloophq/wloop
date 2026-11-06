@@ -494,6 +494,45 @@ func TestASplitFoldWaitsForYouEverAfter(t *testing.T) {
 	}
 }
 
+func TestASplitFoldWaitsForYouAfterThePullRequestsTaskIsMergedAway(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := askedRig(t, false)
+	r.open(t, "t-x", "Ship the api", unit.Unit{Provider: unit.GitHub, Key: "acme/api#70"}, testNow.Add(-96*time.Hour))
+	r.sweep(t)
+	if got := r.stored(t, r.ask); got.ID != "t-pr" {
+		t.Fatalf("the ask reads as %s, want it merged into t-pr", got.ID)
+	}
+	r.now = r.now.Add(time.Hour)
+	r.split(t)
+	if _, err := r.tasks.Do(ctx, "t-x", coretasks.Request{Verb: task.VerbMerge, Args: map[string]string{task.ArgTask: "t-pr"}, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.stored(t, "t-pr"); got.ID != "t-x" {
+		t.Fatalf("t-pr reads as %s, want it merged into t-x", got.ID)
+	}
+	r.touch(t, "Review acme/api#7 before Monday")
+	r.sweep(t)
+	if got := r.stored(t, r.ask); got.ID != r.ask {
+		t.Fatalf("the ask you split from t-pr was merged on its own into %s, which holds t-pr now", got.ID)
+	}
+	open := 0
+	for _, id := range []task.ID{r.ask, "t-x"} {
+		gs, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gs {
+			if p, ok := coretasks.ProposedVerb(g); ok && p.Verb == task.VerbMerge && g.Status == gate.Open {
+				open++
+			}
+		}
+	}
+	if open != 1 {
+		t.Fatalf("%d open merge gates for the ask and t-x, want the one that waits for you", open)
+	}
+}
+
 var (
 	foldPR8 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
 	foldPR9 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
