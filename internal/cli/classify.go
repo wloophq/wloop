@@ -107,7 +107,8 @@ const (
 // readingWith marks a context whose facts reads are those a with key takes, which add no with output.
 type readingWith struct{}
 
-// key is u's fingerprint, and with a with fact the fingerprints of the tasks it lists, sorted.
+// key is u's fingerprint; with a with fact, what the judgment reads instead: the contents of u's task and of
+// the tasks the fact lists, so a write that changes none of them, such as opening a task, keeps the output.
 func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workflow.Facts) (classified, error) {
 	k := classified{fp: fingerprint(u, f)}
 	if with == "" {
@@ -126,21 +127,26 @@ func (c *classifier) key(ctx context.Context, with string, u unit.Unit, f workfl
 	if !ok && v != nil {
 		return k, fmt.Errorf("classify: with %s is %v, not a list of task ids", with, v)
 	}
-	fps := make([]string, 0, len(ids))
-	listed := workflow.OnlyReads(inner)
-	for _, id := range ids {
-		tu := task.UnitOf(task.ID(id))
-		tf, err := c.s.facts(listed, tu)
-		if err != nil {
-			return k, fmt.Errorf("classify: the facts of %s: %w", id, err)
-		}
-		fps = append(fps, fingerprint(tu, tf))
-		k.with = append(k.with, task.ID(id))
+	self, listed, err := c.promptTasks(inner, promptMarks{}, u, ids)
+	if err != nil {
+		return k, err
 	}
-	slices.Sort(fps)
-	sum := sha256.Sum256([]byte(strings.Join(fps, "\n")))
-	k.fp += "+" + hex.EncodeToString(sum[:8])
+	parts := make([]string, 0, len(listed))
+	for _, t := range listed {
+		k.with = append(k.with, task.ID(t.ID))
+		parts = append(parts, contentKey(t))
+	}
+	slices.Sort(parts)
+	if self != nil {
+		parts = append([]string{contentKey(*self)}, parts...)
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x1e")))
+	k.fp = "with:" + hex.EncodeToString(sum[:16])
 	return k, nil
+}
+
+func contentKey(t promptTask) string {
+	return strings.Join(append([]string{t.ID, t.Title, t.Notes}, t.Items...), "\x1f")
 }
 
 // refusal is why no call may start now: no store or agent, the day's cap
@@ -364,6 +370,9 @@ func (u classifiedUnits) add(ctx context.Context, un unit.Unit, f workflow.Facts
 		fp := factString(f, w.Slot+".fingerprint")
 		if with, _ := w.Steps[i].Args[withArg].(string); with != "" {
 			if ctx.Value(readingWith{}) != nil || !names(ctx, builtin.ClassifyFact(w.Name, "")) {
+				continue
+			}
+			if _, err := u.c.s.tasks(); err != nil {
 				continue
 			}
 			k, err := u.c.key(ctx, with, un, f)

@@ -97,39 +97,54 @@ func renderWith(text string, d withData) (string, error) {
 // withPrompt is the prompt of a classify whose with lists ids: text over u's facts, u's task when it is one,
 // and the tasks ids name that still exist.
 func (c *classifier) withPrompt(ctx context.Context, text string, u unit.Unit, f workflow.Facts, ids []task.ID) (string, error) {
-	g, err := c.s.tasks()
+	m := newPromptMarks()
+	listed := make([]string, len(ids))
+	for i, id := range ids {
+		listed[i] = string(id)
+	}
+	self, tasks, err := c.promptTasks(ctx, m, u, listed)
 	if err != nil {
 		return "", err
 	}
-	m := newPromptMarks()
-	d := withData{Facts: m.markedFacts(f), promptMarks: m}
+	return renderWith(text, withData{Facts: m.markedFacts(f), Task: self, Tasks: tasks, promptMarks: m})
+}
+
+// promptTasks are u's task when it is one, and the tasks of ids that still exist, as the prompt reads them
+// inside m's markers.
+func (c *classifier) promptTasks(ctx context.Context, m promptMarks, u unit.Unit, ids []string) (*promptTask, []promptTask, error) {
+	g, err := c.s.tasks()
+	if err != nil {
+		return nil, nil, err
+	}
 	read := c.itemSummaries(ctx)
+	var self *promptTask
 	if id, ok := task.IDOf(u); ok {
 		e, err := g.Task(ctx, id)
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
 		pt, err := c.promptTask(m, e, read)
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
-		d.Task = &pt
+		self = &pt
 	}
+	var out []promptTask
 	for _, id := range ids {
-		e, err := g.Task(ctx, id)
+		e, err := g.Task(ctx, task.ID(id))
 		if errors.Is(err, coretasks.ErrNoTask) {
 			continue
 		}
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
 		pt, err := c.promptTask(m, e, read)
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
-		d.Tasks = append(d.Tasks, pt)
+		out = append(out, pt)
 	}
-	return renderWith(text, d)
+	return self, out, nil
 }
 
 func (c *classifier) promptTask(m promptMarks, e task.Task, read func(task.ItemRef) (string, bool, error)) (promptTask, error) {

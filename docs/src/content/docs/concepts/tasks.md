@@ -131,7 +131,7 @@ The candidates are the open tasks created within `tasks.candidate_window` (14 da
 
 Limits keep it cheap and quiet:
 
-- one call per task and per set of candidates, never again for an unchanged pair;
+- one call per task and per set of candidates, never again while the titles, notes and item summaries it read stay the same: opening or moving a task does not call again;
 - the day's calls count against `classify.per_day` (50), shared with every classify workflow;
 - a merge you reject, or a split you run, is remembered: the pair is not proposed again until an item of either task changes;
 - an open merge gate ends with its tasks: when either closes, is merged elsewhere or is split.
