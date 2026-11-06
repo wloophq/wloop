@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -29,7 +30,7 @@ func (s *Service) Match(ctx context.Context, text string, except task.ID) ([]tas
 	}
 	want := strings.ToLower(strings.TrimSpace(text))
 	out := slices.DeleteFunc(open, func(e task.Task) bool {
-		return e.ID == except || e.Origin == task.OriginDraft || e.Origin == task.OriginMessage || !strings.Contains(strings.ToLower(e.Title), want)
+		return e.ID == except || !merge.Pairable(e) || !strings.Contains(strings.ToLower(e.Title), want)
 	})
 	slices.SortStableFunc(out, func(a, b task.Task) int { return cmp.Or(b.Updated.Compare(a.Updated), cmp.Compare(a.ID, b.ID)) })
 	return out, nil

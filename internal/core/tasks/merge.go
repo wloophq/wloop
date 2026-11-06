@@ -61,7 +61,7 @@ func (s *Service) merge(ctx context.Context, e task.Task, req Request) (Result, 
 		return Result{}, fmt.Errorf("%w: a merge of %s (%s) and %s (%s): both must be open", ErrVerb, a.ID, a.State, b.ID, b.State)
 	}
 	for _, t := range []task.Task{a, b} {
-		if t.Origin == task.OriginDraft || t.Origin == task.OriginMessage || t.IsProject() {
+		if !merge.Mergeable(t) {
 			return Result{}, fmt.Errorf("%w: %s on a %s task", ErrVerb, req.Verb, cmp.Or(classOf(t), t.Origin))
 		}
 	}

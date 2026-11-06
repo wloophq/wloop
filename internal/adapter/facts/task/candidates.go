@@ -11,6 +11,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/link"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -329,7 +330,7 @@ func heldItems(e task.Task, got map[unit.Unit][]items.Item) []items.Item {
 // mergeable says whether e may be a candidate or have any: an open task of an enabled plugin, neither a project
 // nor a draft's or a message's.
 func (p *Provider) mergeable(e task.Task) bool {
-	return p.listed(e) && !e.IsProject() && e.Origin != task.OriginDraft && e.Origin != task.OriginMessage
+	return p.listed(e) && merge.Mergeable(e)
 }
 
 // related are the ids e's property of role related lists, each also as the task it reads as now, so a related

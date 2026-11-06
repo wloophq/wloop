@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -48,7 +49,7 @@ func (s *Service) relation(ctx context.Context, e task.Task, req Request, link b
 	switch {
 	case o.ID == e.ID:
 		return Result{}, fmt.Errorf("%w: %s of task %s with itself", ErrArgs, req.Verb, e.ID)
-	case o.Origin == task.OriginDraft || o.Origin == task.OriginMessage:
+	case !merge.Pairable(o):
 		return Result{}, fmt.Errorf("%w: %s with a %s task", ErrVerb, req.Verb, o.Origin)
 	}
 	now := s.now()

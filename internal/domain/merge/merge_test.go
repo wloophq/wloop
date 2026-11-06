@@ -362,3 +362,23 @@ func TestFoldAndUnfoldKeepTheWriterOfAPersonsRelatedTasks(t *testing.T) {
 		t.Fatalf("the split gives the person's list back %+v, %v", rest.Written["related"], err)
 	}
 }
+
+func TestAMergeTakesNoProjectDraftOrMessageAndARelationTakesAProject(t *testing.T) {
+	project := task.Task{ID: "t-p", Origin: task.OriginUser, Props: task.Props{task.PropKind: {Text: task.KindProject}}}
+	for _, c := range []struct {
+		t                   task.Task
+		pairable, mergeable bool
+	}{
+		{task.Task{ID: "t-1", Origin: task.OriginUser}, true, true},
+		{project, true, false},
+		{task.Task{ID: "t-d", Origin: task.OriginDraft}, false, false},
+		{task.Task{ID: "t-m", Origin: task.OriginMessage}, false, false},
+	} {
+		if got := merge.Pairable(c.t); got != c.pairable {
+			t.Errorf("Pairable(%s) = %v, want %v", c.t.ID, got, c.pairable)
+		}
+		if got := merge.Mergeable(c.t); got != c.mergeable {
+			t.Errorf("Mergeable(%s) = %v, want %v", c.t.ID, got, c.mergeable)
+		}
+	}
+}
