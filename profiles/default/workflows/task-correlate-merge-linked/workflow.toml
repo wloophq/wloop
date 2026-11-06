@@ -1,6 +1,6 @@
-summary = "Merge a task into the candidate the correlation judged the same work, when a link target or a cited unit also ties them"
+summary = "Merge a task into the candidate the correlation judged the same work, when a link target or a cited unit also ties them and the task holds no pull request of its own"
 provider = "task"
-when = 'trigger.event.data == "task-correlate" && classify.task_correlate.verdict == "same" && classify.task_correlate.task in task.linked_candidates'
+when = 'trigger.event.data == "task-correlate" && classify.task_correlate.verdict == "same" && classify.task_correlate.task in task.linked_candidates && !(classify.task_correlate.task in task.link_target_tasks) && !("pull-request" in task.unit_kinds)'
 key = ["trigger.event.id"]
 
 [trigger]

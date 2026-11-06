@@ -36,7 +36,7 @@ const (
 
 var (
 	olderUnit = unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}
-	newerUnit = unit.Unit{Provider: unit.GitHub, Key: "acme/web#9"}
+	newerUnit = unit.Unit{Provider: "slack", Key: "T1/C1/1700000000.000900"}
 )
 
 // correlationRig is the sweep as serve wires it over a store holding two tasks, the newer just created,
@@ -622,5 +622,45 @@ func TestARelatedVerdictOnAPullRequestTheTaskLinksIsLeftToTheFold(t *testing.T) 
 	}
 	if e, err := r.db.Tasks().Task(ctx, newerTask); err != nil || e.ID != olderTask {
 		t.Fatalf("the newer task reads as %s (%v), want the fold to merge it", e.ID, err)
+	}
+}
+
+func TestCorrelationNeverMergesTwoPullRequestTasksAtOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, sameAs(olderTask))
+	e, err := r.db.Tasks().Task(ctx, newerTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Units = append(e.Units, unit.Unit{Provider: unit.GitHub, Key: "acme/web#9"})
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: e}}); err != nil {
+		t.Fatal(err)
+	}
+	r.cite()
+	r.happen(task.EventCreated)
+	r.settle(4)
+	if e, err := r.db.Tasks().Task(ctx, newerTask); err != nil || e.ID != newerTask {
+		t.Fatalf("the newer task reads as %s (%v), want it apart: it holds a pull request of its own", e.ID, err)
+	}
+	if gs := r.merges(); len(gs[gate.Approved]) != 0 || len(gs[gate.Open]) != 1 {
+		t.Fatalf("merge gates %+v, want one waiting for you", gs)
+	}
+}
+
+func TestASameWorkVerdictOnAPullRequestTheTaskLinksIsLeftToTheFold(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newCorrelationRig(t, sameAs(olderTask))
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"task-fold-linked": {Enabled: new(bool)}}
+	l := link.Link{From: newerUnit, To: olderUnit, Kind: link.Review, Item: "y1", Evidence: unit.Anchor{Unit: newerUnit, Ref: "c:y1"},
+		Origin: link.Extraction, At: testNow}
+	if err := r.db.Links().Put(ctx, l); err != nil {
+		t.Fatal(err)
+	}
+	r.happen(task.EventCreated)
+	r.settle(4)
+	if gs := r.merges(); len(gs) != 0 {
+		t.Fatalf("a same verdict on the pull request the task links opened merge gates %+v: the fold decides that pair", gs)
 	}
 }

@@ -13,7 +13,7 @@ task = "classify.task_correlate.task"
 
 # A relation moves nothing, and Unrelate takes it off: it runs at once. A
 # pair you took apart waits for you instead. A pull request the task links
-# is left to task-fold-linked.
+# is left to task-fold-linked and task-relate-linked.
 [[gates.approval.rule]]
 when = 'gate.kind == "proposal" && gate.name == "relate"'
 mode = "run"

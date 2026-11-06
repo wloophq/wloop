@@ -1,6 +1,6 @@
 summary = "Commit a pull request's task as it lands: a review request is a commitment to review, so what it asks of you is in Needs me and never in the Inbox"
 provider = "task"
-when = 'task.category == "inbox" && task.prop.kind == "pull-request"'
+when = 'task.category == "inbox" && "pull-request" in task.unit_kinds'
 order = 52
 
 [[step]]

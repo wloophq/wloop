@@ -37,7 +37,7 @@ func (p *meteredProposer) pass(context.Context) error {
 // the median sweep, which runs nothing, stays flat as the units grow; the
 // heaviest runs items, whose steps read and write on their own.
 const (
-	sweepStatementsMedian = 111
+	sweepStatementsMedian = 112
 	sweepStatementsMax    = 800
 	sweepReadTxsMedian    = 5
 	sweepReadTxsMax       = 55

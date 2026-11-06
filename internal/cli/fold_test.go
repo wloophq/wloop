@@ -493,3 +493,137 @@ func TestASplitFoldWaitsForYouEverAfter(t *testing.T) {
 		t.Fatalf("t-pr reads as %s once you approved, want the ask you moved", got.ID)
 	}
 }
+
+var (
+	foldPR8 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
+	foldPR9 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
+)
+
+// linkOpTo links the thread's item id to pr for review.
+func linkOpTo(id string, pr unit.Unit) items.Op {
+	return items.Op{Op: items.OpLink, Unit: foldThread, Item: id, Anchor: unit.Anchor{Unit: foldThread, Ref: "m:" + id}, To: &pr, LinkKind: link.Review}
+}
+
+// settled sweeps until a sweep changes no task, at most n times.
+func (r *foldRig) settled(t *testing.T, n int) {
+	t.Helper()
+	for range n {
+		r.sweep(t)
+	}
+}
+
+// relatedOf are the tasks id's related property lists.
+func (r *foldRig) relatedOf(t *testing.T, id task.ID) []string {
+	t.Helper()
+	name, _ := r.te.loadedIntents().Tasks.PropOf(task.RoleRelated)
+	return r.stored(t, id).Prop(name).List
+}
+
+// apart says each of ids still reads as itself.
+func (r *foldRig) apart(t *testing.T, ids ...task.ID) {
+	t.Helper()
+	for _, id := range ids {
+		if got := r.stored(t, id); got.ID != id {
+			t.Errorf("%s reads as %s, want it apart", id, got.ID)
+		}
+	}
+}
+
+func TestAnAskLinkingSeveralPullRequestsIsRelatedToEachAndMergedIntoNone(t *testing.T) {
+	t.Parallel()
+	r := newFoldRig(t)
+	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
+	r.open(t, "t-pr8", "Review acme/api#8", foldPR8, testNow.Add(-47*time.Hour))
+	r.open(t, "t-pr9", "Review acme/api#9", foldPR9, testNow.Add(-46*time.Hour))
+	r.ops(t, askOp("i1", "Review three PRs: acme/api#7, #8 and #9"), linkOpTo("i1", foldPR), linkOpTo("i1", foldPR8), linkOpTo("i1", foldPR9))
+	r.derived(t, "i1")
+	r.settled(t, 4)
+	r.apart(t, r.ask, "t-pr", "t-pr8", "t-pr9")
+	got := r.relatedOf(t, r.ask)
+	for _, id := range []string{"t-pr", "t-pr8", "t-pr9"} {
+		if !slices.Contains(got, id) {
+			t.Errorf("the ask relates %v, want %s among them", got, id)
+		}
+	}
+}
+
+func TestRelatingSomeOfAnAsksPullRequestsNeverMergesTheRest(t *testing.T) {
+	t.Parallel()
+	r := newFoldRig(t)
+	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
+	r.open(t, "t-pr8", "Review acme/api#8", foldPR8, testNow.Add(-47*time.Hour))
+	r.ops(t, askOp("i1", "Review acme/api#7 and #8"), linkOpTo("i1", foldPR), linkOpTo("i1", foldPR8))
+	r.derived(t, "i1")
+	if _, err := r.tasks.Do(context.Background(), r.ask, coretasks.Request{Verb: task.VerbRelate, Args: map[string]string{task.ArgTask: "t-pr"},
+		Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	r.settled(t, 3)
+	r.apart(t, r.ask, "t-pr", "t-pr8")
+	if got := r.relatedOf(t, r.ask); !slices.Contains(got, "t-pr8") {
+		t.Errorf("the ask relates %v, want t-pr8 among them", got)
+	}
+}
+
+func TestAnAskLinkingAPullRequestWithATaskAndOneWithoutIsNotMerged(t *testing.T) {
+	t.Parallel()
+	r := newFoldRig(t)
+	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
+	r.ops(t, askOp("i1", "Review acme/api#7 and #8"), linkOpTo("i1", foldPR), linkOpTo("i1", foldPR8))
+	r.derived(t, "i1")
+	r.settled(t, 3)
+	r.apart(t, r.ask, "t-pr")
+	if got := r.relatedOf(t, r.ask); !slices.Contains(got, "t-pr") {
+		t.Errorf("the ask relates %v, want t-pr", got)
+	}
+}
+
+func TestASurvivingAskHoldingAPullRequestDoesNotFoldAnotherItsItemLinks(t *testing.T) {
+	t.Parallel()
+	r := askedRig(t, false)
+	if _, err := r.tasks.Do(context.Background(), r.ask, coretasks.Request{Verb: task.VerbWaiting, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	r.sweep(t)
+	if got := r.stored(t, "t-pr"); got.ID != r.ask {
+		t.Fatalf("t-pr reads as %s, want the ask you moved", got.ID)
+	}
+	r.open(t, "t-pr8", "Review acme/api#8", foldPR8, testNow.Add(-47*time.Hour))
+	r.ops(t, linkOpTo("i1", foldPR8))
+	r.settled(t, 3)
+	r.apart(t, r.ask, "t-pr8")
+	if got := r.relatedOf(t, r.ask); !slices.Contains(got, "t-pr8") {
+		t.Errorf("the surviving ask relates %v, want t-pr8", got)
+	}
+}
+
+func TestASecondAskAboutTheSamePullRequestIsMergedIntoItsTask(t *testing.T) {
+	t.Parallel()
+	r := askedRig(t, false)
+	r.sweep(t)
+	if got := r.stored(t, r.ask); got.ID != "t-pr" {
+		t.Fatalf("the first ask reads as %s, want it merged into t-pr", got.ID)
+	}
+	other := unit.Unit{Provider: "slack", Key: "T1/C2/1700000000.000200"}
+	if _, err := r.db.Cards().Save(context.Background(), card.Card{Unit: other, Title: "#frontend", State: "thread", Cares: true}, testNow); err != nil {
+		t.Fatal(err)
+	}
+	kind, summary := items.Request, "Merge acme/api#7 once green"
+	pr := foldPR
+	ops := []items.Op{
+		{Op: items.OpCreate, Unit: other, Item: "j1", Anchor: unit.Anchor{Unit: other, Ref: "m:j1"},
+			Fields: &items.Fields{Kind: &kind, Summary: &summary, Requester: &items.Person{Key: "slack:U0003", Name: "Tito Tres"},
+				WaitingOn: &[]items.Person{{Key: "slack:U0002", Name: "Davi Dois"}}}},
+		{Op: items.OpLink, Unit: other, Item: "j1", Anchor: unit.Anchor{Unit: other, Ref: "m:j1"}, To: &pr, LinkKind: link.Merge},
+	}
+	if res, err := r.te.itemsLedger(r.db, r.te.cfg, t.Logf).Apply(context.Background(), items.Extracted, ops); err != nil || len(res.Refused) > 0 {
+		t.Fatalf("ops: %+v %v", res.Refused, err)
+	}
+	if err := r.tasks.Sync(context.Background(), []unit.Unit{other}); err != nil {
+		t.Fatal(err)
+	}
+	r.settled(t, 2)
+	if got := r.stored(t, "t-pr"); !slices.Contains(got.Units, other) || !slices.Contains(got.Items, task.ItemRef{Unit: other, Item: "j1"}) {
+		t.Fatalf("t-pr reads as %+v, want it holding the second ask", got)
+	}
+}
