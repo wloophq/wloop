@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -234,55 +235,124 @@ func (r *foldRig) stored(t *testing.T, id task.ID) task.Task {
 	return e
 }
 
-// asked is the rig with the pull request's task, then a Slack thread's ask whose item links it for review.
-func askedRig(t *testing.T) *foldRig {
+// released is the one merge gate of the fold a rule approved, on either task.
+func (r *foldRig) released(t *testing.T) (gate.Gate, bool) {
+	t.Helper()
+	var out []gate.Gate
+	for _, id := range []task.ID{r.ask, "t-pr"} {
+		gs, err := r.db.Gates(func() time.Time { return testNow }).OfTask(context.Background(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gs {
+			if p, ok := coretasks.ProposedVerb(g); ok && g.Status == gate.Approved && g.Rule != "" && p.Verb == task.VerbMerge {
+				out = append(out, g)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return gate.Gate{}, false
+	}
+	return out[len(out)-1], true
+}
+
+// asking configures the fold's merge gates to wait for you, as a user who replaced its approval's rules does.
+func (r *foldRig) asking() {
+	if r.te.cfg.Workflows == nil {
+		r.te.cfg.Workflows = map[string]config.WorkflowConfig{}
+	}
+	r.te.cfg.Workflows["task-fold-linked"] = config.WorkflowConfig{Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Rule: []config.ApprovalRuleConfig{{When: `gate.name == "merge"`, Mode: "wait"}}}}}
+}
+
+// split splits r.ask back out of t-pr, as a person does.
+func (r *foldRig) split(t *testing.T) {
+	t.Helper()
+	if _, err := r.tasks.Do(context.Background(), "t-pr", coretasks.Request{Verb: task.VerbSplit, Args: map[string]string{task.ArgTask: string(r.ask)},
+		Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.stored(t, r.ask); got.ID != r.ask {
+		t.Fatalf("the Slack task reads as %s after the split", got.ID)
+	}
+}
+
+// touch changes the Slack ask an hour later, as a new message in the thread does.
+func (r *foldRig) touch(t *testing.T, summary string) {
+	t.Helper()
+	r.now = r.now.Add(time.Hour)
+	r.ops(t, items.Op{Op: items.OpUpdate, Unit: foldThread, Item: "i1", Anchor: unit.Anchor{Unit: foldThread, Ref: "m:i1" + summary[len(summary)-1:]}, Fields: &items.Fields{Summary: &summary}})
+}
+
+// asked is the rig with the pull request's task, then a Slack thread's ask whose item links it for review;
+// asking makes the fold wait for you.
+func askedRig(t *testing.T, asking bool) *foldRig {
 	t.Helper()
 	r := newFoldRig(t)
+	if asking {
+		r.asking()
+	}
 	r.open(t, "t-pr", "Review acme/api#7", foldPR, testNow.Add(-48*time.Hour))
 	r.ops(t, askOp("i1", "Review acme/api#7 before Friday"), reviewLinkOp("i1"))
 	r.derived(t, "i1")
 	return r
 }
 
-func TestASlackItemLinkingAPullRequestWithATaskProposesItsMerge(t *testing.T) {
+func TestASlackItemLinkingAPullRequestWithATaskIsMergedIntoIt(t *testing.T) {
 	t.Parallel()
-	r := askedRig(t)
+	r := askedRig(t, false)
 	r.sweep(t)
+	if got := r.stored(t, r.ask); got.ID != "t-pr" || !slices.Contains(got.Units, foldThread) || !slices.Contains(got.Items, task.ItemRef{Unit: foldThread, Item: "i1"}) {
+		t.Fatalf("the Slack task reads as %+v, want t-pr holding the thread and its ask", got)
+	}
+	g, ok := r.released(t)
+	if !ok {
+		t.Fatal("no merge gate a rule approved")
+	}
+	if g.By != task.ActorWorkflow || g.Rule != "workflows/task-fold-linked gates.approval rule 0" || g.Name != "merge" || g.Kind != gate.KindProposal {
+		t.Fatalf("the merge gate %+v, want the fold's rule to approve it", g)
+	}
+	if want := `Merge "Review acme/api#7 before Friday" into "Review acme/api#7"? Its items, units, gates and drafts move over; Split gives it back.`; g.Text != want {
+		t.Errorf("the gate's words %q, want %q", g.Text, want)
+	}
+	evs, err := r.db.EventsOfKinds(context.Background(), []string{task.VerbEventKind(task.VerbMerge)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) == 0 || !slices.ContainsFunc(evs, func(ev workflow.Event) bool { return ev.Actor == "workflow:task-fold-linked" }) {
+		t.Fatalf("the merge's events %+v, want them by the workflow task-fold-linked", evs)
+	}
+	r.touch(t, "Review acme/api#7 before Monday")
+	if hs := r.holders(t, "i1"); len(hs) != 1 || hs[0].ID != "t-pr" {
+		t.Fatalf("the tasks holding i1 after a later sync: %+v, want only t-pr", hs)
+	}
+	r.sweep(t)
+	if g, ok := r.proposal(t); ok {
+		t.Fatalf("a merged pair is proposed again: %+v", g)
+	}
+}
+
+func TestAFoldThatWaitsForYouMergesOnceApproved(t *testing.T) {
+	t.Parallel()
+	r := askedRig(t, true)
+	for range 3 {
+		r.sweep(t)
+	}
 	g, ok := r.proposal(t)
 	if !ok {
 		t.Fatal("no merge proposal")
 	}
 	p, _ := coretasks.ProposedVerb(g)
-	if g.Task != r.ask || p.Args[task.ArgTask] != "t-pr" || g.Kind != gate.KindProposal || g.Name != "merge" {
-		t.Fatalf("gate %+v proposing %+v, want a merge of t-ask with t-pr", g, p)
+	if g.Task != r.ask || p.Args[task.ArgTask] != "t-pr" || coretasks.ProposalFrom(g) != "task-fold-linked" {
+		t.Fatalf("gate %+v proposing %+v, want a merge of the ask with t-pr from task-fold-linked", g, p)
 	}
-	if want := `Merge "Review acme/api#7 before Friday" into "Review acme/api#7"? Its items, units, gates and drafts move over; Split gives it back.`; g.Text != want {
-		t.Errorf("the gate's words %q, want %q", g.Text, want)
-	}
-}
-
-func TestAnApprovedFoldMergesTheSlackTaskIntoThePullRequestsTask(t *testing.T) {
-	t.Parallel()
-	r := askedRig(t)
-	r.sweep(t)
-	g, ok := r.proposal(t)
-	if !ok {
-		t.Fatal("no merge proposal")
+	for _, id := range []task.ID{r.ask, "t-pr"} {
+		if got := r.stored(t, id); got.ID != id {
+			t.Fatalf("%s reads as %s before the gate was approved", id, got.ID)
+		}
 	}
 	r.resolve(t, g, gate.Approved)
-	got := r.stored(t, r.ask)
-	if got.ID != "t-pr" || !slices.Contains(got.Units, foldThread) || !slices.Contains(got.Items, task.ItemRef{Unit: foldThread, Item: "i1"}) {
-		t.Fatalf("the Slack task reads as %+v, want t-pr holding the thread and its ask", got)
-	}
-	r.now = r.now.Add(time.Hour)
-	summary := "Review acme/api#7 before Monday"
-	r.ops(t, items.Op{Op: items.OpUpdate, Unit: foldThread, Item: "i1", Anchor: unit.Anchor{Unit: foldThread, Ref: "m:i1b"}, Fields: &items.Fields{Summary: &summary}})
-	if hs := r.holders(t, "i1"); len(hs) != 1 || hs[0].ID != "t-pr" {
-		t.Fatalf("the tasks holding i1 after a later sync: %+v, want only t-pr", hs)
-	}
-	r.sweep(t)
-	if _, ok := r.proposal(t); ok {
-		t.Fatal("a merged pair is proposed again")
+	if got := r.stored(t, r.ask); got.ID != "t-pr" {
+		t.Fatalf("the Slack task reads as %s once approved, want t-pr", got.ID)
 	}
 }
 
@@ -293,64 +363,25 @@ func TestASlackTaskCreatedBeforeTheLinkIsFoldedTheSame(t *testing.T) {
 	r.ops(t, askOp("i1", "Have a look at the export fix"))
 	r.derived(t, "i1")
 	r.sweep(t)
-	if g, ok := r.proposal(t); ok {
-		t.Fatalf("a proposal before any link: %+v", g)
+	if got := r.stored(t, r.ask); got.ID != r.ask {
+		t.Fatalf("a merge before any link: %s", got.ID)
 	}
 	r.ops(t, reviewLinkOp("i1"))
 	r.sweep(t)
-	g, ok := r.proposal(t)
-	if !ok {
-		t.Fatal("no merge proposal once the link arrived")
-	}
-	r.resolve(t, g, gate.Approved)
 	if got := r.stored(t, r.ask); got.ID != "t-pr" {
-		t.Fatalf("t-ask reads as %s, want t-pr", got.ID)
+		t.Fatalf("t-ask reads as %s once the link arrived, want t-pr", got.ID)
 	}
 }
 
 func TestAFoldKeepsTheSlackTaskWhenItAloneWasClarified(t *testing.T) {
 	t.Parallel()
-	r := askedRig(t)
+	r := askedRig(t, false)
 	if _, err := r.tasks.Do(context.Background(), r.ask, coretasks.Request{Verb: task.VerbWaiting, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
 	r.sweep(t)
-	g, ok := r.proposal(t)
-	if !ok {
-		t.Fatal("no merge proposal")
-	}
-	if want := `Merge "Review acme/api#7" into "Review acme/api#7 before Friday"? Its items, units, gates and drafts move over; Split gives it back.`; g.Text != want {
-		t.Errorf("the gate's words %q, want %q", g.Text, want)
-	}
-	r.resolve(t, g, gate.Approved)
 	if got := r.stored(t, "t-pr"); got.ID != r.ask || !slices.Contains(got.Units, foldPR) {
 		t.Fatalf("t-pr reads as %+v, want the Slack task a person moved, holding the pull request", got)
-	}
-}
-
-func TestAFoldNeverMergesWithoutTheGate(t *testing.T) {
-	t.Parallel()
-	r := askedRig(t)
-	for range 3 {
-		r.sweep(t)
-	}
-	if _, ok := r.proposal(t); !ok {
-		t.Fatal("no merge proposal")
-	}
-	for _, id := range []task.ID{r.ask, "t-pr"} {
-		if got := r.stored(t, id); got.ID != id {
-			t.Fatalf("%s reads as %s before the gate was approved", id, got.ID)
-		}
-	}
-	if _, err := r.tasks.Do(context.Background(), r.ask, coretasks.Request{Verb: task.VerbMerge, Args: map[string]string{task.ArgTask: "t-pr"},
-		Actor: task.ActorWorkflow, Source: "task-fold-linked"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := r.stored(t, r.ask); got.ID != r.ask {
-		t.Fatalf("a workflow's merge ran without the gate: t-ask reads as %s", got.ID)
-	}
-	if _, ok := r.proposal(t); !ok {
-		t.Fatal("the workflow's merge opened no gate")
 	}
 }
 
@@ -359,7 +390,7 @@ func TestAFoldGateEndsWhenEitherTaskCloses(t *testing.T) {
 	for _, ask := range []bool{true, false} {
 		t.Run(fmt.Sprintf("the Slack task %v", ask), func(t *testing.T) {
 			t.Parallel()
-			r := askedRig(t)
+			r := askedRig(t, true)
 			closed := task.ID("t-pr")
 			if ask {
 				closed = r.ask
@@ -385,7 +416,7 @@ func TestAFoldGateEndsWhenEitherTaskCloses(t *testing.T) {
 
 func TestAFoldGateEndsWhenEitherTaskIsMergedElsewhere(t *testing.T) {
 	t.Parallel()
-	r := askedRig(t)
+	r := askedRig(t, true)
 	r.open(t, "t-other", "Ship the export", unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}, testNow.Add(-72*time.Hour))
 	r.sweep(t)
 	g, ok := r.proposal(t)
@@ -405,9 +436,9 @@ func TestAFoldGateEndsWhenEitherTaskIsMergedElsewhere(t *testing.T) {
 	}
 }
 
-func TestARefusedFoldIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
+func TestARefusedFoldIsProposedAgainOnceEitherTaskChangesAndWaitsForYou(t *testing.T) {
 	t.Parallel()
-	r := askedRig(t)
+	r := askedRig(t, true)
 	r.sweep(t)
 	g, ok := r.proposal(t)
 	if !ok {
@@ -418,45 +449,47 @@ func TestARefusedFoldIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
 	if again, ok := r.proposal(t); ok {
 		t.Fatalf("a refused fold proposed again: %+v", again)
 	}
-	r.now = r.now.Add(time.Hour)
-	summary := "Review acme/api#7 before Monday"
-	r.ops(t, items.Op{Op: items.OpUpdate, Unit: foldThread, Item: "i1", Anchor: unit.Anchor{Unit: foldThread, Ref: "m:i1b"}, Fields: &items.Fields{Summary: &summary}})
+	delete(r.te.cfg.Workflows, "task-fold-linked")
+	r.touch(t, "Review acme/api#7 before Monday")
 	r.sweep(t)
 	if _, ok := r.proposal(t); !ok {
 		t.Fatal("no proposal once the ask changed")
 	}
+	if got := r.stored(t, r.ask); got.ID != r.ask {
+		t.Fatalf("a fold you refused ran on its own: the ask reads as %s", got.ID)
+	}
 }
 
-func TestASplitFoldIsNotProposedAgainUntilEitherTaskChanges(t *testing.T) {
+func TestASplitFoldWaitsForYouEverAfter(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := askedRig(t)
+	r := askedRig(t, false)
 	r.sweep(t)
-	g, ok := r.proposal(t)
-	if !ok {
-		t.Fatal("no merge proposal")
+	if got := r.stored(t, r.ask); got.ID != "t-pr" {
+		t.Fatalf("the ask reads as %s, want it merged into t-pr", got.ID)
 	}
-	r.resolve(t, g, gate.Approved)
 	r.now = r.now.Add(time.Hour)
-	if _, err := r.tasks.Do(ctx, "t-pr", coretasks.Request{Verb: task.VerbSplit, Args: map[string]string{task.ArgTask: string(r.ask)},
-		Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := r.stored(t, r.ask); got.ID != r.ask {
-		t.Fatalf("the Slack task reads as %s after the split", got.ID)
-	}
+	r.split(t)
 	if _, err := r.tasks.Do(ctx, r.ask, coretasks.Request{Verb: task.VerbWaiting, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
 	r.sweep(t)
 	if again, ok := r.proposal(t); ok {
-		t.Fatalf("a pair the user split proposed again: %+v", again)
+		t.Fatalf("a pair the user split proposed again before it changed: %+v", again)
 	}
-	r.now = r.now.Add(time.Hour)
-	summary := "Review acme/api#7 before Monday"
-	r.ops(t, items.Op{Op: items.OpUpdate, Unit: foldThread, Item: "i1", Anchor: unit.Anchor{Unit: foldThread, Ref: "m:i1b"}, Fields: &items.Fields{Summary: &summary}})
-	r.sweep(t)
-	if _, ok := r.proposal(t); !ok {
-		t.Fatal("no proposal once the ask changed after the split")
+	for _, summary := range []string{"Review acme/api#7 before Monday", "Review acme/api#7 before Tuesday"} {
+		r.touch(t, summary)
+		r.sweep(t)
+		if got := r.stored(t, r.ask); got.ID != r.ask {
+			t.Fatalf("a pair you split was merged again on its own once the ask changed: it reads as %s", got.ID)
+		}
+		if _, ok := r.proposal(t); !ok {
+			t.Fatal("no proposal for you once the ask changed after the split")
+		}
+	}
+	g, _ := r.proposal(t)
+	r.resolve(t, g, gate.Approved)
+	if got := r.stored(t, "t-pr"); got.ID != r.ask {
+		t.Fatalf("t-pr reads as %s once you approved, want the ask you moved", got.ID)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -140,8 +141,50 @@ type serviceTaskGates struct {
 	db *sqlite.DB
 }
 
+// Open opens gt under the approval of the workflow that asked for the verb it proposes, gates.toml's for one
+// a person or an agent asked for.
 func (g serviceTaskGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
-	return g.e.newGates(g.db, nil).Open(ctx, gt, nil)
+	p, err := g.policy(ctx, gt)
+	if err != nil {
+		return gate.Gate{}, err
+	}
+	return g.e.newGates(g.db, nil).Open(ctx, gt, p)
+}
+
+const factUndone = "task.undone"
+
+// policy is the approval of the workflow gt's proposal names, over its task's facts; a proposal that pairs its
+// task with one of task.undone waits for you, whatever that approval says.
+func (g serviceTaskGates) policy(ctx context.Context, gt gate.Gate) (gates.Policy, error) {
+	from := coretasks.ProposalFrom(gt)
+	if from == "" {
+		return nil, nil
+	}
+	w, ok := g.e.configuredWorkflow(from)
+	if !ok {
+		return nil, nil
+	}
+	facts := workflow.Facts{}
+	if g.e.wakeFacts != nil {
+		t, err := g.db.Tasks().Task(ctx, gt.Task)
+		if err != nil {
+			return nil, err
+		}
+		reads := []string{factUndone}
+		for _, r := range w.Gates[gt.Kind].Rules {
+			reads = append(reads, r.When.Reads()...)
+		}
+		if facts, err = g.e.wakeFacts(workflow.WithReads(ctx, reads...), t); err != nil {
+			return nil, err
+		}
+	}
+	if req, ok := coretasks.ProposedVerb(gt); ok {
+		undone, _ := facts[factUndone].([]string)
+		if other := req.Args[task.ArgTask]; other != "" && slices.Contains(undone, other) {
+			return waitsForYou{}, nil
+		}
+	}
+	return workflowPolicy{w: w, facts: facts, now: g.e.Now()}, nil
 }
 
 func (g serviceTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {

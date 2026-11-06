@@ -86,12 +86,18 @@ func (s *stepSet) gateOpenRun(ctx context.Context, c stepCall, _ automation.RunO
 // configuredWorkflow is the loaded workflow name with the configuration
 // laid over it.
 func (s *stepSet) configuredWorkflow(name string) (workflow.Workflow, bool) {
-	l := s.e.loadedIntents()
+	return s.e.configuredWorkflow(name)
+}
+
+// configuredWorkflow is the loaded workflow name with the configuration
+// laid over it.
+func (e *Env) configuredWorkflow(name string) (workflow.Workflow, bool) {
+	l := e.loadedIntents()
 	for _, w := range l.Workflows {
 		if w.Name != name {
 			continue
 		}
-		if out := applyConfigWith([]workflow.Workflow{w}, s.e.currentConfig(), briefExtrasOf(l)); len(out) == 1 {
+		if out := applyConfigWith([]workflow.Workflow{w}, e.currentConfig(), briefExtrasOf(l)); len(out) == 1 {
 			return out[0], true
 		}
 	}
