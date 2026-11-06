@@ -18,9 +18,6 @@ import (
 //go:embed optimize.md
 var optimizeTemplate string
 
-// MaxPromptWords is the extractor template's cap, as extract's tests count it.
-const MaxPromptWords = 5500
-
 // OptimizeCallUSD caps the optimizer's call.
 const OptimizeCallUSD = 5.0
 
@@ -52,8 +49,8 @@ type devReport struct {
 // CheckTemplate refuses a template over the word cap or that drops or
 // repeats a placeholder.
 func CheckTemplate(t string) error {
-	if n := len(strings.Fields(t)); n > MaxPromptWords {
-		return fmt.Errorf("the candidate has %d words, over %d", n, MaxPromptWords)
+	if n := len(strings.Fields(t)); n > extract.MaxPromptWords {
+		return fmt.Errorf("the candidate has %d words, over %d", n, extract.MaxPromptWords)
 	}
 	for _, p := range Placeholders {
 		if n := strings.Count(t, p); n != 1 {
@@ -96,8 +93,8 @@ func Optimize(ctx context.Context, o OptimizeOptions) (changelog []string, cost 
 	}
 	prompt := fill(optimizeTemplate, map[string]string{
 		"WORDS":   strconv.Itoa(len(strings.Fields(o.Current))),
-		"CAP":     words(MaxPromptWords),
-		"TARGET":  words(MaxPromptWords - 100),
+		"CAP":     words(extract.MaxPromptWords),
+		"TARGET":  words(extract.MaxPromptWords - 100),
 		"SCHEMA":  o.Prompts.Schema(),
 		"CURRENT": o.Current,
 		"REPORTS": string(reports),

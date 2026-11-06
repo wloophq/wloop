@@ -14,6 +14,9 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/jsonschema"
 )
 
+// MaxPromptWords caps the extraction prompt's template, counted as space-separated words.
+const MaxPromptWords = 5600
+
 // PromptFile and BriefSchemaFile are the extraction's prompt and its
 // brief's schema in the plugin's profile layer.
 const (

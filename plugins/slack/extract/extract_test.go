@@ -107,8 +107,8 @@ func TestPromptPlaceholders(t *testing.T) {
 			t.Errorf("%s appears %d times in the template", p, n)
 		}
 	}
-	if n := len(strings.Fields(promptTemplate)); n > 5600 {
-		t.Errorf("the template has %d words, over 5600", n)
+	if n := len(strings.Fields(promptTemplate)); n > MaxPromptWords {
+		t.Errorf("the template has %d words, over %d", n, MaxPromptWords)
 	}
 	in := loadInput(t)
 	in.Messages[0].Text += " {{NOW}}"

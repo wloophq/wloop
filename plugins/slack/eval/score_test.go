@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/plugins/slack/extract"
 	"github.com/wloophq/wloop/plugins/slack/host"
 )
 
@@ -151,7 +152,7 @@ func optimizeIn(t *testing.T, a host.Asker) (OptimizeOptions, string) {
 }
 
 func TestOptimizeRefusesOverCap(t *testing.T) {
-	long := validTemplate() + strings.Repeat(" word", MaxPromptWords)
+	long := validTemplate() + strings.Repeat(" word", extract.MaxPromptWords)
 	a := &optimizer{prompt: long}
 	o, newFile := optimizeIn(t, a)
 	_, _, err := Optimize(context.Background(), o)
@@ -169,7 +170,7 @@ func TestOptimizeRefusesOverCap(t *testing.T) {
 	if raw, _ := os.ReadFile(newFile); string(raw) != validTemplate() {
 		t.Errorf("the candidate was not written")
 	}
-	if !strings.Contains(a.got[0], "at most "+words(MaxPromptWords)+" words") || strings.Contains(a.got[0], "{{CAP}}") {
+	if !strings.Contains(a.got[0], "at most "+words(extract.MaxPromptWords)+" words") || strings.Contains(a.got[0], "{{CAP}}") {
 		t.Errorf("the optimizer is not told the cap")
 	}
 }
