@@ -22,4 +22,4 @@ The candidates:
   - items:{{range .Items}}
     - {{.}}{{else}} none{{end}}
 {{end}}
-Answer with `same_as`, the id of the one candidate that is the same work as the task, copied from the list above, or an empty string when none is; and `reason`, one sentence.
+Answer with `same_work`: true when one candidate is the same work as the task, false when none is. With `same_work` true, `same_as` is that candidate's id, copied from the list above; with `same_work` false, leave `same_as` empty. Then `reason`, one sentence.

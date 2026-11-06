@@ -22,6 +22,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -190,7 +192,11 @@ func (r *correlationRig) approve() {
 	r.resolve(open[0], "approve", gate.Approved)
 }
 
-func sameAs(id task.ID) string { return `{"same_as":"` + string(id) + `","reason":"the same export"}` }
+func sameAs(id task.ID) string {
+	return `{"same_work":true,"same_as":"` + string(id) + `","reason":"the same export"}`
+}
+
+const differentWork = `{"same_work":false,"same_as":"","reason":"different systems"}`
 
 func TestASameWorkVerdictOpensAMergeGate(t *testing.T) {
 	t.Parallel()
@@ -233,7 +239,7 @@ func TestAnApprovedCorrelationMergesTheTasks(t *testing.T) {
 
 func TestADifferentWorkVerdictOpensNothing(t *testing.T) {
 	t.Parallel()
-	r := newCorrelationRig(t, `{"same_as":"","reason":"different systems"}`)
+	r := newCorrelationRig(t, differentWork)
 	r.happen(task.EventCreated)
 	r.settle(4)
 	if len(r.asker.asked()) != 1 {
@@ -241,6 +247,13 @@ func TestADifferentWorkVerdictOpensNothing(t *testing.T) {
 	}
 	if gs := r.merges(); len(gs) > 0 {
 		t.Fatalf("merge gates %+v", gs)
+	}
+
+	unsure := newCorrelationRig(t, `{"same_work":false,"same_as":"`+string(olderTask)+`","reason":"alike, not the same"}`)
+	unsure.happen(task.EventCreated)
+	unsure.settle(4)
+	if gs := unsure.merges(); len(gs) > 0 || len(unsure.asker.asked()) != 1 {
+		t.Fatalf("same_work false naming a candidate opened %+v", gs)
 	}
 }
 
@@ -289,7 +302,7 @@ func TestARefusedPairIsNotProposedAgainUntilOneOfThemChanges(t *testing.T) {
 func TestTheJudgmentRunsAtMostPerDayAndCachesByFingerprint(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newCorrelationRig(t, `{"same_as":"","reason":"different systems"}`)
+	r := newCorrelationRig(t, differentWork)
 	r.te.cfg.Classify.PerDay = 1
 	r.happen(task.EventCreated)
 	r.settle(3)
@@ -328,7 +341,7 @@ func TestTheJudgmentRunsAtMostPerDayAndCachesByFingerprint(t *testing.T) {
 func TestTheJudgmentReadsAtMostTheCappedCandidates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newCorrelationRig(t, `{"same_as":"","reason":"different systems"}`)
+	r := newCorrelationRig(t, differentWork)
 	for i := range 4 {
 		u := unit.Unit{Provider: unit.GitHub, Key: "acme/ops#" + strconv.Itoa(10+i)}
 		r.item(u, "z1", "github:dana", "billing export step "+strconv.Itoa(i))
@@ -409,6 +422,7 @@ func TestTheJudgmentsOutputOnlyOpensAGate(t *testing.T) {
 
 func TestTheCorrelationWorkflowsTurnOffWithOneSwitch(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	r := newCorrelationRig(t, sameAs(olderTask))
 	off := false
 	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"task-correlate": {Enabled: &off}}
@@ -416,5 +430,34 @@ func TestTheCorrelationWorkflowsTurnOffWithOneSwitch(t *testing.T) {
 	r.settle(4)
 	if n := len(r.asker.asked()); n != 0 || len(r.merges()) != 0 {
 		t.Fatalf("switched off, asked %d times, gates %+v", n, r.merges())
+	}
+
+	f, err := r.eng.Units.Facts(workflow.WithReads(ctx, "task.candidates"), task.UnitOf(newerTask))
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := r.steps.classify.key(ctx, "task.candidates", task.UnitOf(newerTask), f)
+	if err != nil || len(k.with) != 1 {
+		t.Fatalf("key %+v %v", k, err)
+	}
+	if err := r.db.Classifications().Save(ctx, task.UnitOf(newerTask), "task-correlate", k.fp, []byte(sameAs(olderTask)), r.clock()); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(newerTask), Kind: builtin.EventClassified, Key: "stored",
+		Data: workflow.ChainData("task-correlate", workflow.Chain{}.Then("task-correlate")), At: r.clock()}); err != nil {
+		t.Fatal(err)
+	}
+	r.settle(3)
+	if gs := r.merges(); len(gs) != 0 {
+		t.Fatalf("a stored verdict of the switched-off correlation opened %+v", gs)
+	}
+	r.te.cfg.Workflows = nil
+	if err := sqlite.New(r.db).RecordEvents(ctx, port.Event{Unit: task.UnitOf(newerTask), Kind: builtin.EventClassified, Key: "again",
+		Data: workflow.ChainData("task-correlate", workflow.Chain{}.Then("task-correlate")), At: r.clock()}); err != nil {
+		t.Fatal(err)
+	}
+	r.settle(3)
+	if gs := r.merges(); len(gs[gate.Open]) != 1 {
+		t.Fatalf("switched on, the stored verdict opened %+v", gs)
 	}
 }

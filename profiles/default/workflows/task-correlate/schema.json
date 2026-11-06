@@ -1,12 +1,16 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["same_as", "reason"],
+  "required": ["same_work", "same_as", "reason"],
   "properties": {
+    "same_work": {
+      "type": "boolean",
+      "description": "True when one candidate task is the same piece of work as this task; false when none is."
+    },
     "same_as": {
       "type": "string",
       "maxLength": 64,
-      "description": "The id of the one candidate task that is the same piece of work as this task; empty when none is."
+      "description": "With same_work, the id of that candidate, copied from the list; with same_work false, empty."
     },
     "reason": {
       "type": "string",
