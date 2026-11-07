@@ -1037,163 +1037,6 @@ async function copyCandidates() {
   }
 }
 
-function sortLabel(sort, fields = catalog.fields) {
-  const { field, desc } = parseSort(sort, fields);
-  return field ? `${fieldById(field, fields).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
-}
-
-// lensResult is what lens shows of its view: a task view's tasks in the daemon's order, a row view's rows.
-function lensResult(lens) {
-  if (typeof isCoreView === "function" && isCoreView(lens.view)) return pipelineOf(taskLensItems(), lens, null);
-  return pipeline(state.rows, lens);
-}
-
-async function copyList(lens) {
-  const res = lensResult(lens);
-  const items = groupedRows(res.groups);
-  const grouped = res.group ? groupField(res.group, lens.fields).label.toLowerCase() : "";
-  const w = lensWords();
-  try {
-    await navigator.clipboard.writeText(listYAML({ view: lens.view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort, lens.fields), at: new Date().toISOString() }, items));
-    setNotice(fillWord(grouped ? w.copied_grouped : w.copied, { count: items.length, view: lens.view, group: grouped }));
-  } catch (err) {
-    setNotice(t("Could not copy: {error}", { error: err.message }), true);
-  }
-}
-
-function chip(attrs, label) {
-  return h("button", { type: "button", class: "chip", ...attrs }, label);
-}
-
-function setGroup(g) {
-  const lens = { ...readLens(), group: g };
-  const res = lensResult(lens);
-  writeHash({ g });
-  if (res.group) setNotice(tn("Grouped by {field}: {n} groups", res.groups.filter((x) => x.rows.length).length, { field: groupField(res.group, lens.fields).label.toLowerCase() }));
-}
-
-function clearLens() {
-  lastFocus = "top:search";
-  writeHash({ q: "", g: "", s: "" });
-}
-
-// lensChips are one chip per filtered field and sign, which takes it out.
-function lensChips(lens, applied) {
-  const by = new Map();
-  for (const x of lens.quals) {
-    const k = `${x.field}:${x.neg ? "-" : ""}`;
-    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
-    by.get(k).values.push(x.field === "kind" ? kindLabel(x.value) : x.raw);
-  }
-  const list = [...by.values()];
-  return list.map((c, i) => {
-    const f = fieldById(c.field, lens.fields);
-    const off = applied && !applied.includes(c.field);
-    const next = list[i + 1] || list[i - 1];
-    return chip({
-      class: "chip on" + (off ? " off" : ""), "data-focus": `lens:chip:${c.field}:${c.neg ? "-" : ""}`,
-      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
-      onclick: () => {
-        lastFocus = next ? `lens:chip:${next.field}:${next.neg ? "-" : ""}` : "lens:group";
-        writeHash({ q: withoutQualifiers(lens.q, c.field, c.neg, lens.fields) });
-      },
-    }, chipWords(f.label, c.values, c.neg));
-  });
-}
-
-function chipWords(label, values, neg) {
-  const vars = { field: label, values: values.join(" " + t("or") + " ") };
-  return neg ? t("{field}: not {values} ×", vars) : t("{field}: {values} ×", vars);
-}
-
-// stripLegend is the hues of lens's strip facet, in its rank, when fields offer it.
-
-function stripLegend(lens, fields) {
-  const s = lens.stripSpec;
-  if (!s || !s.rank || (fields && !fields.some((x) => x.id === s.id))) return null;
-  return h("span", { class: "legend", title: (lens.words || lensWords()).legend_title || undefined },
-    h("span", { class: "lens-label" }, `${s.label}:`),
-    s.rank.map((v) => h("span", { class: "lg w-" + stripColor(s, v) }, h("span", { class: "sw", "aria-hidden": "true" }), (s.labels || {})[v] || v)));
-}
-
-function lensSelect(id, label, value, options, onchange) {
-  return h("label", { class: "lens-pick" }, h("span", { class: "lens-label" }, label),
-    h("select", { "data-focus": `lens:${id}`, onchange: (e) => onchange(e.target.value) },
-      options.map(([v, text]) => h("option", { value: v, selected: v === value }, text))));
-}
-
-// renderLens draws the bar of filters, grouping and order in tools, #tools by default. It rebuilds only when
-// what it shows changed, so an open select survives live updates.
-function renderLens(lens, res, tools = document.getElementById("tools")) {
-  const recent = lens.view === "recent";
-  if (lens.view === "explore" || (recent && !lens.quals.length)) {
-    hideLens(tools);
-    return;
-  }
-  tools.hidden = false;
-  const offered = (lens.offered || catalog.fields).map((f) => f.id);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
-  if (tools.dataset.sig === sig) return;
-  tools.dataset.sig = sig;
-  const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear"));
-  tools.replaceChildren(...(recent ? [...lensChips(lens, ACTIVITY_FIELDS), clear] : lensBar(lens, res)));
-}
-
-function hideLens(tools) {
-  tools.hidden = true;
-  tools.replaceChildren();
-  tools.dataset.sig = "";
-}
-
-// lensBar is the bar's controls: the group and sort menus over the fields lens offers, the layout, the chips of
-// what it filters by, the count and Copy list.
-function lensBar(lens, res) {
-  const offered = lens.offered || catalog.fields;
-  const fields = lens.fields || catalog.fields;
-  const current = tagKeyField(lens.group, fields);
-  const groups = offered.filter((f) => f.group && f.menu !== false);
-  if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
-  const board = lens.layout === "board";
-  const w = lensWords();
-  const own = lens.defaultGroup || (board ? lens.boardGroup : "");
-  const ownField = own ? groupField(own, fields) : null;
-  const { field, desc } = parseSort(lens.sort, fields);
-  const sortWord = lens.defaultSort;
-  const picked = lens.group && lens.group !== NO_GROUP ? groupField(lens.group, fields) : null;
-  const toggle = (layout, label) => h("button", {
-    type: "button", class: "act", "aria-pressed": String(board === (layout === "board")), "data-focus": `lens:${layout || "list"}`,
-    onclick: () => writeHash({ layout }),
-  }, label);
-  const items = [
-    lensSelect("group", t("Group"), lens.group, [
-      ["", ownField ? fillWord(lens.defaultGroup ? w.default_group : w.board_group, { label: ownField.label }) : w.no_group],
-      ...(ownField ? [[NO_GROUP, w.no_group]] : []),
-      ...groups.map((f) => [f.id, f.label])], setGroup),
-    lensSelect("sort", t("Sort"), field, [["", sortWord], ...offered.filter((f) => f.sort).map((f) => [f.id, f.label])],
-      (v) => writeHash({ s: v })),
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:dir", disabled: !field, "aria-label": desc ? t("Descending") : t("Ascending"),
-      title: field ? (desc ? t("Sorted descending; click to flip") : t("Sorted ascending; click to flip")) : t("Pick a sort to choose its direction"),
-      onclick: () => writeHash({ s: field + (desc ? "" : "-desc") }),
-    }, desc ? "↓" : "↑"),
-    h("div", { class: "toggle", role: "group", "aria-label": t("Layout") }, toggle("", t("List")), toggle("board", t("Board"))),
-    stripLegend(lens, offered),
-    ...lensChips(lens),
-    picked ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: t("Stop grouping"), onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
-      t("Grouped by {field} ×", { field: picked.label.toLowerCase() })) : null,
-    field ? chip({ class: "chip on", "data-focus": "lens:chip:sort", title: t("Back to {sort}", { sort: sortWord.toLowerCase() }), onclick: () => { lastFocus = "lens:sort"; writeHash({ s: "" }); } },
-      t("Sorted by {field} {arrow} ×", { field: fieldById(field, fields).label.toLowerCase(), arrow: desc ? "↓" : "↑" })) : null,
-    h("span", { class: "lens-count" }, res ? t("{shown} of {total}", { shown: fmtNumber(res.shown), total: fmtNumber(res.total) }) : ""),
-    lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear")) : null,
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:copy-list", title: t("Copy the items shown here, in this order, as YAML, to paste for an agent"),
-      onclick: () => copyList(lens),
-    }, t("Copy list")),
-  ];
-  return items.filter(Boolean);
-}
-
 async function setPaused(paused) {
   state.pausing = true;
   state.actionError = "";
@@ -1213,44 +1056,6 @@ async function setPaused(paused) {
   }
   state.pausing = false;
   scheduleLoad({ health: true });
-}
-
-function railItem(label, count, active, hash, cls, tip) {
-  const tipID = tip ? "rail-tip-" + hash.replace(/[^A-Za-z0-9_-]/g, "-") : undefined;
-  return h("li", {},
-    h("a", { href: "#" + hash, class: (active ? "on " : "") + (cls || ""), "aria-current": active ? "page" : undefined, "aria-describedby": tipID, "data-focus": "rail:" + hash },
-      h("span", { class: "label", title: tip ? undefined : label }, label),
-      h("span", { class: "count" }, count),
-      tip ? h("span", { class: "rail-tip", role: "tooltip", id: tipID }, tip) : null));
-}
-
-function lensHash(change) {
-  const { q, g, s: sort, layout, view, area } = readHash();
-  return hashString({ view, q, g, s: sort, layout, area, ...change });
-}
-
-function renderRail() {
-  const lens = readLens();
-  const nav = viewNav(tasksState.catalog, catalog.views, [...pluginViews.keys()], viewCounters(readHash()));
-  const views = railSections(nav, providerName).flatMap((sec) => [
-    sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
-    ...sec.views.map((v) => {
-      const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
-      const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
-    })]).filter(Boolean);
-  document.getElementById("views").replaceChildren(...views);
-
-  const counts = new Map();
-  for (const r of state.rows) {
-    if (!passes(r, lens.view, lens, "waits-on")) continue;
-    for (const w of waitingWho(r)) counts.set(w, (counts.get(w) || 0) + 1);
-  }
-  const people = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  document.getElementById("people").replaceChildren(...people.map(([who, n]) => {
-    const on = lens.quals.some((x) => x.field === "waits-on" && !x.neg && x.value === normValue("waits-on", who));
-    return railItem(who, n, on, lensHash({ q: toggledQualifier(lens.q, "waits-on", who, false) }));
-  }));
 }
 
 // focusSlot is the slot an action keeps focus in when a render swaps it for
@@ -2786,7 +2591,7 @@ function render() {
   renderSync();
   renderPause();
   renderWarnings();
-  renderRail();
+  renderRail(railNav(readLens()), readHash());
   renderExplore(readHash().view);
   renderPlan(readHash().view);
   renderPluginView(readHash().view);

@@ -2,7 +2,7 @@
 
 const CHORD_MS = 1000;
 const KEY_CONTEXTS = ["detail", "question", "plan", "review", "list", "global"];
-const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|tab:|palette$|help$|filter$|open-source$|capture$|quit$)/;
+const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|tab:|palette$|help$|filter$|filter:add$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
 // VERB_ASKS are, by handler, how a verb that asks for a value first turns
@@ -341,6 +341,7 @@ function createKeys(env) {
       return true;
     }
     if (a === "filter") return env.filter() !== false;
+    if (a === "filter:add") return env.addFilter ? env.addFilter() !== false : false;
     if (a === "capture") return capture();
     if (a === "open-source") {
       const link = sourceLink(env.selected());
@@ -411,6 +412,7 @@ function createKeys(env) {
   return {
     handle,
     paletteItems,
+    openPalette() { env.palette({ title: t("Actions"), items: paletteItems() }); },
     setBindings(list) { bindings = (list || []).map((b) => ({ ...b })); },
     bindings: () => bindings,
   };
@@ -535,6 +537,7 @@ function appEnv() {
       box.focus();
       box.select();
     },
+    addFilter: () => openFilterPalette(),
     openURL: (u) => window.open(u, "_blank", "noopener"),
     leave: (el) => el.blur(),
     ask: (o) => askInput(o),

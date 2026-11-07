@@ -1,0 +1,151 @@
+package web
+
+import (
+	"slices"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+// railDoc stands in for the page's rail: its views, people and omnibox entry, each keeping what it was given.
+const railDoc = `
+const railEls = {};
+for (const id of ["views", "people", "omnibox-entry"]) railEls[id] = { id, kids: [], replaceChildren(...ns) { this.kids = ns; } };
+globalThis.document = { getElementById: (id) => railEls[id], querySelector: () => null };
+const railRoute = (view) => ({ view, area: "", ctx: [], q: "", g: "", s: "", layout: "", task: "" });
+const railLinks = () => all(railEls.views.kids, (x) => x.tag === "a").map((a) => text(a.children[0]));
+`
+
+func TestTheRailCollapsesEmptyViews(t *testing.T) {
+	var got struct {
+		Closed, Open         []string
+		Label, Count         string
+		Expanded, ExpandedOn string
+		Omnibox              string
+	}
+	counters := api.Counters{Views: map[string]int{"inbox": 3, "someday": 0, "logbook": 0}}
+	nodeRun(t, viewsPrelude(t)+railDoc, nil, `
+tasksState.catalog = input.cat;
+const nav = viewNav(input.cat, [], [], input.counters);
+renderRail(nav, railRoute("someday"));
+const folder = byFocus(railEls.views.kids, "rail:empties");
+const closed = railLinks();
+const expanded = folder.attrs["aria-expanded"];
+folder.attrs.onclick();
+process.stdout.write(JSON.stringify({ Closed: closed, Open: railLinks(), Label: text(folder.children[0]), Count: text(folder.children[1]),
+  Expanded: expanded, ExpandedOn: byFocus(railEls.views.kids, "rail:empties").attrs["aria-expanded"], Omnibox: text(railEls["omnibox-entry"].kids) }));`,
+		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
+	if want := []string{"Focus", "Inbox", "Outbox", "Fits now", "Waiting", "Projects", "Someday"}; !slices.Equal(got.Closed, want) {
+		t.Errorf("rail %v, want %v: Logbook folds, Someday is the view shown", got.Closed, want)
+	}
+	if got.Label != "Empty" || got.Count != "1" || got.Expanded != "false" {
+		t.Errorf("the Empty entry reads %q %q, expanded %q", got.Label, got.Count, got.Expanded)
+	}
+	if got.ExpandedOn != "true" || got.Open[len(got.Open)-1] != "Logbook" {
+		t.Errorf("opened, the Empty entry is expanded %q and the rail %v", got.ExpandedOn, got.Open)
+	}
+	if got.Omnibox != "Search or ask⌘K" {
+		t.Errorf("the omnibox entry reads %q", got.Omnibox)
+	}
+}
+
+func TestTheRailHeadsEachPluginSection(t *testing.T) {
+	served := []api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: string(unit.GitHub)}, {ID: "slack", Label: "Conversations", Provider: "slack"},
+		{ID: "all", Label: "All", Provider: string(unit.GitHub)}}
+	var got struct {
+		Heads, Links []string
+	}
+	nodeRun(t, viewsPrelude(t)+railDoc, nil, `
+applyPlugins(input.plugins);
+tasksState.catalog = input.cat;
+renderRail(viewNav(input.cat, input.served, [], null), railRoute("inbox"));
+process.stdout.write(JSON.stringify({ Heads: byClass(railEls.views.kids, "rail-head").map(text), Links: railLinks() }));`,
+		map[string]any{"cat": viewsCatalog(), "served": served,
+			"plugins": []api.Plugin{{ID: unit.GitHub, Name: "GitHub", Enabled: true}, {ID: "slack", Name: "Slack", Enabled: true}}}, &got)
+	if want := []string{"GitHub", "Slack"}; !slices.Equal(got.Heads, want) {
+		t.Errorf("section heads %v, want %v", got.Heads, want)
+	}
+	if want := []string{"Needs me", "All", "Conversations"}; !slices.Equal(got.Links[len(got.Links)-3:], want) {
+		t.Errorf("rail %v ends with %v", got.Links, want)
+	}
+}
+
+func TestNavListsCoreThenPluginViews(t *testing.T) {
+	var got struct {
+		IDs    []string `json:"ids"`
+		Core   []bool   `json:"core"`
+		Counts []any    `json:"counts"`
+	}
+	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "fits-now": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
+	nodeRun(t, viewsPrelude(t), nil, `
+const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
+process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
+		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
+	plugin := []string{"mine", "plan", "dash", "all", "explore", "recent"}
+	want := slices.Concat(coreViewIDs, plugin, []string{"fake-board"})
+	if !slices.Equal(got.IDs, want) {
+		t.Fatalf("nav %v, want %v", got.IDs, want)
+	}
+	if got.IDs[0] != "focus" {
+		t.Errorf("first view %q, want focus", got.IDs[0])
+	}
+	for i, c := range got.Core {
+		if c != (i < len(coreViewIDs)) {
+			t.Errorf("%s core=%v", got.IDs[i], c)
+		}
+	}
+	for i, id := range coreViewIDs {
+		if n, ok := got.Counts[i].(float64); !ok || int(n) != counters.Views[id] {
+			t.Errorf("%s count %v, want %d", id, got.Counts[i], counters.Views[id])
+		}
+	}
+}
+
+func TestDisabledPluginViewsVanish(t *testing.T) {
+	var got struct {
+		IDs      []string `json:"ids"`
+		View     string   `json:"view"`
+		Before   string   `json:"before"`
+		Enabled  string   `json:"enabled"`
+		CoreStay string   `json:"core_stay"`
+	}
+	nodeRun(t, viewsPrelude(t), nil, `
+const served = catalog.views;
+const nav = viewNav(input.cat, [], [], null);
+process.stdout.write(JSON.stringify({
+  ids: nav.map((v) => v.id),
+  view: resolveView("mine", input.cat, [], () => false),
+  before: resolveView("mine", null, [], () => false),
+  enabled: resolveView("mine", input.cat, served, () => false),
+  core_stay: resolveView("waiting", input.cat, [], () => false),
+}));`, map[string]any{"cat": viewsCatalog()}, &got)
+	if !slices.Equal(got.IDs, coreViewIDs) {
+		t.Errorf("nav with the GitHub plugin off %v, want the core views alone", got.IDs)
+	}
+	if got.View != "focus" {
+		t.Errorf("#view=mine with the plugin off shows %q, want focus", got.View)
+	}
+	if got.Before != "mine" || got.Enabled != "mine" || got.CoreStay != "waiting" {
+		t.Errorf("before load %q, plugin on %q, core %q", got.Before, got.Enabled, got.CoreStay)
+	}
+}
+
+func TestRailGroupsViewsByPlugin(t *testing.T) {
+	served := []api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github"}, {ID: "slack", Label: "Slack", Provider: "slack"},
+		{ID: "all", Label: "All", Provider: "github"}}
+	var got []struct {
+		Title string
+		Views []string
+	}
+	nodeRun(t, viewsPrelude(t), nil, `
+const nav = viewNav(input.cat, input.served, [], null);
+const names = { github: "GitHub", slack: "Slack" };
+process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) => ({ Title: s.title, Views: s.views.map((v) => v.id) }))));`,
+		map[string]any{"cat": viewsCatalog(), "served": served}, &got)
+	if len(got) != 3 || got[0].Title != "" || !slices.Equal(got[0].Views, coreViewIDs) ||
+		got[1].Title != "GitHub" || !slices.Equal(got[1].Views, []string{"needs-me", "all"}) ||
+		got[2].Title != "Slack" || !slices.Equal(got[2].Views, []string{"slack"}) {
+		t.Errorf("sections %+v", got)
+	}
+}

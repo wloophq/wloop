@@ -559,7 +559,7 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(plugin, "[lens]\ncol_aside = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
+	write(plugin, "[lens]\nlist_empty = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
 	write(user, "[facets.author]\nshow = \"who\"\n")
 	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil))
 	if len(problems) > 0 {
@@ -569,7 +569,7 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	if a.Show.Part != "who" || a.Show.Values != "first" || a.LabelPrefix == nil || *a.LabelPrefix != "by " || a.RowClass["me"] != "mine" {
 		t.Errorf("author: %+v", a)
 	}
-	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"col_aside": "Workspace"}) {
+	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"list_empty": "Workspace"}) {
 		t.Errorf("row words %v", got)
 	}
 	write(user, "[facets.author]\nshow = \"\"\n")
@@ -577,9 +577,9 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	if a := texts["acme"].Facets["author"]; len(problems) > 0 || a.Show.Part != "" || a.Show.Values != "first" {
 		t.Errorf("show = \"\" over a placed facet: %+v, problems %v", a.Show, problems)
 	}
-	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
+	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\nlist_empty = \"{{.label}}\"\n")
 	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}, readerOf(nil))
-	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
+	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.list_empty") {
 		t.Errorf("problems: %s", got)
 	}
 }

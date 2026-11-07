@@ -3,9 +3,6 @@
 # request's row. A user profile's plugins/github/ui.toml replaces the keys
 # it sets.
 
-[lens]
-col_aside = "Workspace"
-
 [views.mine]
 label = "My PRs"
 unit = "Pull request"

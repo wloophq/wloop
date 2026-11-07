@@ -1,6 +1,3 @@
-[lens]
-col_aside = "Workspace"
-
 [views.mine]
 label = "Meus PRs"
 unit = "Pull request"

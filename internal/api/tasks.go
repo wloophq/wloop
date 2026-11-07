@@ -101,8 +101,8 @@ type LensWords struct {
 	RowWords
 }
 
-// RowWords are the words of a row: its age, its facet buttons' title and aria-label, its columns' heads and
-// the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
+// RowWords are the words of a row: its age, its facet buttons' title and aria-label, the head of a mixed list's
+// unit, the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
 type RowWords struct {
 	AgeNow           string `json:"age_now"`
 	AgeMinutes       string `json:"age_minutes"`
@@ -124,11 +124,6 @@ type RowWords struct {
 	LegendTitle      string `json:"legend_title"`
 	SortBy           string `json:"sort_by"`
 	ColUnit          string `json:"col_unit"`
-	ColWho           string `json:"col_who"`
-	ColAge           string `json:"col_age"`
-	ColWhy           string `json:"col_why"`
-	ColAside         string `json:"col_aside"`
-	ColActions       string `json:"col_actions"`
 	Stale            string `json:"stale"`
 	StaleTitle       string `json:"stale_title"`
 	Briefing         string `json:"briefing"`
@@ -137,7 +132,6 @@ type RowWords struct {
 	BriefingError    string `json:"briefing_error"`
 	Questions        string `json:"questions"`
 	QuestionsTitle   string `json:"questions_title"`
-	Changed          string `json:"changed"`
 	Starred          string `json:"starred"`
 	Until            string `json:"until"`
 	Due              string `json:"due"`

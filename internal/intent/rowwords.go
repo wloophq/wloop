@@ -29,11 +29,6 @@ type RowWords struct {
 	LegendTitle      string
 	SortBy           string
 	ColUnit          string
-	ColWho           string
-	ColAge           string
-	ColWhy           string
-	ColAside         string
-	ColActions       string
 	Stale            string
 	StaleTitle       string
 	Briefing         string
@@ -42,7 +37,6 @@ type RowWords struct {
 	BriefingError    string
 	Questions        string
 	QuestionsTitle   string
-	Changed          string
 	Starred          string
 	Until            string
 	Due              string
@@ -100,16 +94,6 @@ func (w *RowWords) field(key string) *string {
 		return &w.SortBy
 	case "col_unit":
 		return &w.ColUnit
-	case "col_who":
-		return &w.ColWho
-	case "col_age":
-		return &w.ColAge
-	case "col_why":
-		return &w.ColWhy
-	case "col_aside":
-		return &w.ColAside
-	case "col_actions":
-		return &w.ColActions
 	case "stale":
 		return &w.Stale
 	case "stale_title":
@@ -126,8 +110,6 @@ func (w *RowWords) field(key string) *string {
 		return &w.Questions
 	case "questions_title":
 		return &w.QuestionsTitle
-	case "changed":
-		return &w.Changed
 	case "starred":
 		return &w.Starred
 	case "until":

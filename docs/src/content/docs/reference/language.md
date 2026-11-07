@@ -275,7 +275,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `empty` (template, localized): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
 - `default_sort` (string, localized): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
-- `lens` (table): What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
+- `lens` (table): What every list's rows and toolbar say. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
 - `lens.default_group` (template, localized): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
 - `lens.board_group` (template, localized): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
 - `lens.no_group` (string, localized): The group menu's entry that lists the view in one group.
@@ -366,13 +366,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.tip_kind` (template, localized): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
 - `lens.tip_why` (template, localized): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
 - `lens.legend_title` (template, localized): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
-- `lens.sort_by` (template, localized): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
-- `lens.col_unit` (template, localized): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
-- `lens.col_who` (template, localized): The head of the column of whom a row waits on and its situation.
-- `lens.col_age` (template, localized): The head of the column of a row's age.
-- `lens.col_why` (template, localized): The head of the column of why a row waits.
-- `lens.col_aside` (template, localized): The head of the column of a row's workspace and links.
-- `lens.col_actions` (template, localized): The head of the column of a row's actions, read only by a screen reader.
+- `lens.sort_by` (template, localized): The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template, localized): What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.
 - `lens.stale` (template, localized): The flag of a row whose plugin is not reporting.
 - `lens.stale_title` (template, localized): The stale flag's tooltip.
 - `lens.briefing` (template, localized): The flag of a row whose intake waits for its brief.
@@ -381,7 +376,6 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.briefing_error` (template, localized): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
 - `lens.questions` (template, localized): The pill of a brief's open questions, over their number `{{.n}}`.
 - `lens.questions_title` (template, localized): That pill's tooltip, over `{{.n}}`.
-- `lens.changed` (template, localized): The flag of a task that changed since you last opened it.
 - `lens.starred` (template, localized): The tooltip of a starred task's star.
 - `lens.until` (template, localized): The flag of a task asleep until a date, over the `{{.date}}`.
 - `lens.due` (template, localized): The flag of a task's deadline, over the `{{.date}}`.
@@ -922,13 +916,8 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.tip_kind` (template, localized): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
 - `lens.tip_why` (template, localized): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
 - `lens.legend_title` (template, localized): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
-- `lens.sort_by` (template, localized): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
-- `lens.col_unit` (template, localized): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
-- `lens.col_who` (template, localized): The head of the column of whom a row waits on and its situation.
-- `lens.col_age` (template, localized): The head of the column of a row's age.
-- `lens.col_why` (template, localized): The head of the column of why a row waits.
-- `lens.col_aside` (template, localized): The head of the column of a row's workspace and links.
-- `lens.col_actions` (template, localized): The head of the column of a row's actions, read only by a screen reader.
+- `lens.sort_by` (template, localized): The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template, localized): What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.
 - `lens.stale` (template, localized): The flag of a row whose plugin is not reporting.
 - `lens.stale_title` (template, localized): The stale flag's tooltip.
 - `lens.briefing` (template, localized): The flag of a row whose intake waits for its brief.
@@ -937,7 +926,6 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.briefing_error` (template, localized): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
 - `lens.questions` (template, localized): The pill of a brief's open questions, over their number `{{.n}}`.
 - `lens.questions_title` (template, localized): That pill's tooltip, over `{{.n}}`.
-- `lens.changed` (template, localized): The flag of a task that changed since you last opened it.
 - `lens.starred` (template, localized): The tooltip of a starred task's star.
 - `lens.until` (template, localized): The flag of a task asleep until a date, over the `{{.date}}`.
 - `lens.due` (template, localized): The flag of a task's deadline, over the `{{.date}}`.

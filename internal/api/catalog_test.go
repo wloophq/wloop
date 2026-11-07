@@ -18,12 +18,12 @@ func TestFacetMechanicsDiffNamesWhatDiffers(t *testing.T) {
 }
 
 func TestAProvidersRowWordsReplaceTheProfilesForItsRows(t *testing.T) {
-	base := LensWords{RowWords: RowWords{ColAside: "Links", Stale: "stale"}}
-	c := CatalogResponse{Lens: []ProviderWords{{Provider: "github", Words: map[string]string{"col_aside": "Workspace"}}}}
-	if got := c.RowWordsOf("github", base); got.ColAside != "Workspace" || got.Stale != "stale" {
+	base := LensWords{RowWords: RowWords{ListEmpty: "Links", Stale: "stale"}}
+	c := CatalogResponse{Lens: []ProviderWords{{Provider: "github", Words: map[string]string{"list_empty": "Workspace"}}}}
+	if got := c.RowWordsOf("github", base); got.ListEmpty != "Workspace" || got.Stale != "stale" {
 		t.Errorf("github's words %+v", got.RowWords)
 	}
-	if got := c.RowWordsOf("slack", base); got.ColAside != "Links" {
+	if got := c.RowWordsOf("slack", base); got.ListEmpty != "Links" {
 		t.Errorf("slack's words %+v", got.RowWords)
 	}
 }

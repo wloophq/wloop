@@ -113,6 +113,7 @@ function harness(o = {}) {
     detailAt: (el) => !!(el && el.inDetail),
     detach: () => { log.detached = (log.detached || 0) + 1; },
     copyLink: () => { log.copied = (log.copied || 0) + 1; },
+    addFilter: o.addFilter,
   };
   const keys = createKeys(env);
   keys.setBindings(BINDINGS);

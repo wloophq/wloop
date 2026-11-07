@@ -37,6 +37,7 @@ var nonProse = map[string]string{
 	"Contents":            "a macOS bundle's directory",
 	"use strict":          "a script's directive",
 	"Esc":                 "the Escape key's name as the served bindings spell it",
+	"Plus":                "the + key's name in aria-keyshortcuts",
 	"noopener noreferrer": "a link's rel tokens",
 }
 

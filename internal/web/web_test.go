@@ -49,12 +49,15 @@ func TestCockpitKnowsThePendingRound(t *testing.T) {
 }
 
 func TestCockpitHasTheRecentView(t *testing.T) {
-	rec := httptest.NewRecorder()
-	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
-	body := rec.Body.String()
-	for _, want := range []string{`v.id === "recent"`, "/api/activity", "renderActivity"} {
+	var body string
+	for _, name := range []string{"app.js", "rail.js"} {
+		rec := httptest.NewRecorder()
+		Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/"+name, nil))
+		body += rec.Body.String()
+	}
+	for _, want := range []string{`v.id !== "recent"`, "/api/activity", "renderActivity"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("app.js lacks %s", want)
+			t.Errorf("app.js and rail.js lack %s", want)
 		}
 	}
 }

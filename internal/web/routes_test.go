@@ -14,6 +14,7 @@ func routesPrelude(t *testing.T) string {
 	b.WriteString(staticJS(t, "row.js"))
 	b.WriteString(staticJS(t, "routes.js"))
 	b.WriteString(staticJS(t, "views.js"))
+	b.WriteString(staticJS(t, "toolbar.js"))
 	b.WriteString(taskLensJS(t))
 	for _, c := range []string{"UNIT_KEY", "QUERY_MAX"} {
 		b.WriteString(jsConst(t, src, c))

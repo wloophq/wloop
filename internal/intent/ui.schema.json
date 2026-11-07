@@ -307,32 +307,8 @@
           "description": "The briefing flag's tooltip, over the intake's `{{.seq}}`.",
           "type": "string"
         },
-        "changed": {
-          "description": "The flag of a task that changed since you last opened it.",
-          "type": "string"
-        },
-        "col_actions": {
-          "description": "The head of the column of a row's actions, read only by a screen reader.",
-          "type": "string"
-        },
-        "col_age": {
-          "description": "The head of the column of a row's age.",
-          "type": "string"
-        },
-        "col_aside": {
-          "description": "The head of the column of a row's workspace and links.",
-          "type": "string"
-        },
         "col_unit": {
-          "description": "The head of the column of a row's title, ref and flags in a view whose rows mix kinds.",
-          "type": "string"
-        },
-        "col_who": {
-          "description": "The head of the column of whom a row waits on and its situation.",
-          "type": "string"
-        },
-        "col_why": {
-          "description": "The head of the column of why a row waits.",
+          "description": "What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.",
           "type": "string"
         },
         "countdown_minutes": {
@@ -420,7 +396,7 @@
           "type": "string"
         },
         "sort_by": {
-          "description": "A column head's tooltip, over the `{{.label}}` of the facet it sorts by.",
+          "description": "The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by.",
           "type": "string"
         },
         "stale": {

@@ -22,8 +22,8 @@ import (
 var scriptDebts = map[string]map[string]int{
 	"app.js": {
 		"closed": 3, "draft": 2, "guidance": 5, "review": 1, "wait": 1,
-		"age": 2, "author": 3, "due": 6, "is": 5, "kind": 3, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 1, "tag": 5, "type": 1, "waits-on": 5,
-		"all": 1, "dash": 7, "explore": 14, "mine": 0, "plan": 9, "recent": 8,
+		"age": 2, "author": 3, "due": 6, "is": 5, "kind": 2, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 1, "tag": 5, "type": 1, "waits-on": 1,
+		"all": 1, "dash": 7, "explore": 12, "mine": 0, "plan": 7, "recent": 6,
 	},
 	"dash.js": {
 		"draft": 1, "dash": 5,
@@ -33,8 +33,10 @@ var scriptDebts = map[string]map[string]int{
 	"keys.js":    {"review": 3, "plan": 6},
 	"palette.js": {"merged": 1},
 	"plugins.js": {"author": 1},
+	"rail.js":    {"waits-on": 4, "explore": 1, "plan": 1, "recent": 1},
 	"row.js":     {"age": 1, "kind": 1},
 	"task.js":    {"draft": 2, "merged": 1, "kind": 1, "all": 1},
+	"toolbar.js": {"kind": 1, "explore": 1, "recent": 1},
 	"views.js":   {"draft": 1, "where": 1, "review": 1, "plan": 1},
 }
 

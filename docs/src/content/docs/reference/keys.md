@@ -39,6 +39,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
+| `+` | add a filter (web): a palette of the list's fields, then the values its items hold of the one picked |
 | `Cmd+K` (web), `Ctrl+K` (terminal) | the palette, with every action and its key |
 | `?` | help |
 | `Tab` | next view of the group (terminal) |

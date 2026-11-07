@@ -17,6 +17,7 @@ dismiss = "dispensar"
 reply = "responder na conversa"
 edit = "editar o texto do rascunho"
 open-source = "abrir a origem"
+"filter:add" = "adicionar um filtro por campo e valor"
 "group:cycle" = "agrupar pelo próximo campo"
 "sort:cycle" = "ordenar pelo próximo campo"
 

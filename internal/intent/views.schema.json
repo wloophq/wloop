@@ -248,7 +248,7 @@
     },
     "lens": {
       "additionalProperties": false,
-      "description": "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
+      "description": "What every list's rows and toolbar say. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
       "properties": {
         "age_days": {
           "description": "A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.",
@@ -286,32 +286,8 @@
           "description": "The briefing flag's tooltip, over the intake's `{{.seq}}`.",
           "type": "string"
         },
-        "changed": {
-          "description": "The flag of a task that changed since you last opened it.",
-          "type": "string"
-        },
-        "col_actions": {
-          "description": "The head of the column of a row's actions, read only by a screen reader.",
-          "type": "string"
-        },
-        "col_age": {
-          "description": "The head of the column of a row's age.",
-          "type": "string"
-        },
-        "col_aside": {
-          "description": "The head of the column of a row's workspace and links.",
-          "type": "string"
-        },
         "col_unit": {
-          "description": "The head of the column of a row's title, ref and flags in a view whose rows mix kinds.",
-          "type": "string"
-        },
-        "col_who": {
-          "description": "The head of the column of whom a row waits on and its situation.",
-          "type": "string"
-        },
-        "col_why": {
-          "description": "The head of the column of why a row waits.",
+          "description": "What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.",
           "type": "string"
         },
         "copied": {
@@ -427,7 +403,7 @@
           "type": "string"
         },
         "sort_by": {
-          "description": "A column head's tooltip, over the `{{.label}}` of the facet it sorts by.",
+          "description": "The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by.",
           "type": "string"
         },
         "sorted": {
@@ -489,13 +465,7 @@
         "briefing_attempt",
         "briefing_error",
         "briefing_title",
-        "changed",
-        "col_actions",
-        "col_age",
-        "col_aside",
         "col_unit",
-        "col_who",
-        "col_why",
         "copied",
         "copied_grouped",
         "countdown_minutes",

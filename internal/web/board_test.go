@@ -30,14 +30,18 @@ func appJS(t *testing.T) string {
 	return string(render(raw))
 }
 
-// cockpitJS is app.js and dash.js, the scripts whose functions tests run.
+// cockpitJS is app.js, dash.js, rail.js and toolbar.js, the scripts whose functions tests run.
 func cockpitJS(t *testing.T) string {
 	t.Helper()
-	raw, err := fs.ReadFile(files, "static/dash.js")
-	if err != nil {
-		t.Fatal(err)
+	out := appJS(t)
+	for _, name := range []string{"dash.js", "rail.js", "toolbar.js"} {
+		raw, err := fs.ReadFile(files, "static/"+name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out += "\n" + string(render(raw))
 	}
-	return appJS(t) + "\n" + string(render(raw))
+	return out
 }
 
 // jsFunction is the source of a top-level function in app.js.

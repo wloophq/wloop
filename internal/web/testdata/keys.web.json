@@ -132,6 +132,13 @@
       "help": "open the source"
     },
     {
+      "key": "+",
+      "action": "filter:add",
+      "context": "list",
+      "owner": "core",
+      "help": "add a filter by a field and a value"
+    },
+    {
       "key": "n",
       "action": "capture",
       "context": "global",

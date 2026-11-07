@@ -31,39 +31,6 @@ function resolveView(view, cat, served, plugin) {
   return (coreViews(cat)[0] || served[0] || { id: "" }).id;
 }
 
-// viewNav is the rail: the core views with their counters, then each plugin
-// view (count left to the caller).
-function viewNav(cat, served, plugin, counters) {
-  const views = (counters && counters.views) || {};
-  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true }));
-  const taken = new Set(out.map((v) => v.id));
-  for (const v of served) {
-    if (taken.has(v.id)) continue;
-    taken.add(v.id);
-    out.push({ id: v.id, label: v.label, provider: v.provider || "", core: false });
-  }
-  for (const id of plugin) {
-    if (!taken.has(id)) out.push({ id, label: id, provider: (typeof pluginViews !== "undefined" && (pluginViews.get(id) || {}).plugin) || "", core: false });
-  }
-  return out;
-}
-
-// railSections splits viewNav's list: the core views untitled, then one
-// section per provider, titled by name(provider), in the order they first
-// appear.
-function railSections(nav, name) {
-  const out = [{ title: "", views: nav.filter((v) => v.core) }];
-  const by = new Map();
-  for (const v of nav.filter((x) => !x.core)) {
-    if (!by.has(v.provider)) {
-      by.set(v.provider, { title: v.provider ? name(v.provider) : t("Plugins"), views: [] });
-      out.push(by.get(v.provider));
-    }
-    by.get(v.provider).views.push(v);
-  }
-  return out.filter((sec) => sec.views.length);
-}
-
 // tasksURL lists view, narrowed to area; a page since a position also
 // holds the tasks of units, as provider:key.
 function tasksURL(view, area, ctx, since, units) {

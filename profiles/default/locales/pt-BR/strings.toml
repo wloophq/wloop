@@ -356,7 +356,6 @@
 "automatic rounds paused" = "rodadas automáticas pausadas"
 "Automatic rounds paused" = "Rodadas automáticas pausadas"
 "Automatic rounds resumed" = "Rodadas automáticas retomadas"
-"Back to {sort}" = "Voltar para {sort}"
 "Blocked" = "Bloqueados"
 "blocked" = "bloqueado"
 "Board" = "Quadro"
@@ -407,7 +406,6 @@
 "API budget {remaining} of {limit} left" = "cota da API: restam {remaining} de {limit}"
 "Goal:" = "Objetivo:"
 "Group" = "Agrupar"
-"Grouped by {field} ×" = "Agrupado por {field} ×"
 "Grouped by {field}: {n} groups" = { one = "Agrupado por {field}: {n} grupo", other = "Agrupado por {field}: {n} grupos" }
 "Guidance" = "Orientação"
 "Guidance for the next round (optional)" = "Orientação para a próxima rodada (opcional)"
@@ -486,9 +484,7 @@
 "Slow sync: the API budget is low until {time}" = "Sincronização lenta: a cota da API está baixa até {time}"
 "Sort" = "Ordenar"
 "Sorted ascending; click to flip" = "Ordem crescente; clique para inverter"
-"Sorted by {field} {arrow} ×" = "Ordenado por {field} {arrow} ×"
 "Sorted descending; click to flip" = "Ordem decrescente; clique para inverter"
-"Stop grouping" = "Desagrupar"
 "synced {ago}" = "sincronizado {ago}"
 "syncing" = "sincronizando"
 "Tell the agent what to do next" = "Diga ao agente o que fazer em seguida"
@@ -591,6 +587,12 @@
 "Open its task" = "Abrir a tarefa"
 "Close without a message" = "Encerrar sem mensagem"
 "Don't nudge this conversation" = "Não cobrar nesta conversa"
+"Search or ask" = "Buscar ou pedir"
+"Empty" = "Vazias"
+"Filter" = "Filtro"
+"Remove filter {label}" = "Remover o filtro {label}"
+"{field}: {values}" = "{field}: {values}"
+"{field}: not {values}" = "{field}: não {values}"
 
 [formats]
 time = "15:04"

@@ -238,7 +238,7 @@ func TestARowShowsWhatItsOwnPluginSays(t *testing.T) {
 	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
 		t.Fatal(err)
 	}
-	cat["lens"] = []any{map[string]any{"provider": "github", "words": map[string]string{"filter_label": "GitHub filter {{.value}}", "col_aside": "Workspace", "countdown_title": "GitHub sends at {{.time}}"}}}
+	cat["lens"] = []any{map[string]any{"provider": "github", "words": map[string]string{"filter_label": "GitHub filter {{.value}}", "countdown_title": "GitHub sends at {{.time}}"}}}
 	raw, err := json.Marshal(cat)
 	if err != nil {
 		t.Fatal(err)

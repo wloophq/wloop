@@ -70,6 +70,7 @@ func core() []Binding {
 		{"r", "reply", List, screens},
 		{"i", "edit", List, terminalOnly},
 		{"o", "open-source", List, everySurface},
+		{"+", "filter:add", List, webOnly},
 		{"=", "group:cycle", List, terminalOnly},
 		{"-", "sort:cycle", List, terminalOnly},
 		{"n", "capture", Global, screens},

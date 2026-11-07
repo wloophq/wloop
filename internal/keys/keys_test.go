@@ -41,6 +41,7 @@ func spec92() []row {
 		{"r", "reply", List, screen},
 		{"i", "edit", List, []Surface{TUI}},
 		{"o", "open-source", List, all},
+		{"+", "filter:add", List, []Surface{Web}},
 		{"=", "group:cycle", List, []Surface{TUI}},
 		{"-", "sort:cycle", List, []Surface{TUI}},
 		{"n", "capture", Global, screen},

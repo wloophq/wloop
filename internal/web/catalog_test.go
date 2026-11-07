@@ -105,13 +105,12 @@ const setInterval = () => 0;
 // cockpitScript is dash.js and app.js up to the listeners and the boot,
 // over domShim.
 func cockpitScript(t *testing.T) string {
-	src := cockpitJS(t)
 	app := appJS(t)
 	boot := strings.Index(app, "\nwindow.addEventListener(\"hashchange\"")
 	if boot < 0 {
 		t.Fatal("app.js has no hashchange listener")
 	}
-	raw := strings.TrimPrefix(src, app) + "\n" + app[:boot]
+	raw := staticJS(t, "dash.js") + "\n" + app[:boot]
 	return domShim + pluginsJS(t) + viewsScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
 }
 

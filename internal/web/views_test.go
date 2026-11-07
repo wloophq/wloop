@@ -48,10 +48,11 @@ const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () =
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\nfollowStrings = () => {};\n"
 
-// viewsScripts are markdown.js, row.js, routes.js, window.js, views.js, review.js, gate.js, task.js and detail.js,
-// in the page's order.
+// viewsScripts are markdown.js, row.js, routes.js, window.js, views.js, review.js, gate.js, task.js, detail.js,
+// rail.js and toolbar.js, in the page's order.
 func viewsScripts(t *testing.T) string {
-	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "row.js") + staticJS(t, "routes.js") + staticJS(t, "window.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "gate.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
+	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "row.js") + staticJS(t, "routes.js") + staticJS(t, "window.js") + staticJS(t, "views.js") +
+		staticJS(t, "review.js") + staticJS(t, "gate.js") + staticJS(t, "task.js") + staticJS(t, "detail.js") + staticJS(t, "rail.js") + staticJS(t, "toolbar.js")
 }
 
 // viewsPrelude is viewsScripts, plugins.js and the lens the task views run, over a tree h.
@@ -74,66 +75,6 @@ func task(id, state string, mod func(*api.TaskView)) api.TaskView {
 		mod(&e)
 	}
 	return e
-}
-
-func TestNavListsCoreThenPluginViews(t *testing.T) {
-	var got struct {
-		IDs    []string `json:"ids"`
-		Core   []bool   `json:"core"`
-		Counts []any    `json:"counts"`
-	}
-	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "fits-now": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
-	nodeRun(t, viewsPrelude(t), nil, `
-const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
-process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
-		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	plugin := []string{"mine", "plan", "dash", "all", "explore", "recent"}
-	want := slices.Concat(coreViewIDs, plugin, []string{"fake-board"})
-	if !slices.Equal(got.IDs, want) {
-		t.Fatalf("nav %v, want %v", got.IDs, want)
-	}
-	if got.IDs[0] != "focus" {
-		t.Errorf("first view %q, want focus", got.IDs[0])
-	}
-	for i, c := range got.Core {
-		if c != (i < len(coreViewIDs)) {
-			t.Errorf("%s core=%v", got.IDs[i], c)
-		}
-	}
-	for i, id := range coreViewIDs {
-		if n, ok := got.Counts[i].(float64); !ok || int(n) != counters.Views[id] {
-			t.Errorf("%s count %v, want %d", id, got.Counts[i], counters.Views[id])
-		}
-	}
-}
-
-func TestDisabledPluginViewsVanish(t *testing.T) {
-	var got struct {
-		IDs      []string `json:"ids"`
-		View     string   `json:"view"`
-		Before   string   `json:"before"`
-		Enabled  string   `json:"enabled"`
-		CoreStay string   `json:"core_stay"`
-	}
-	nodeRun(t, viewsPrelude(t), nil, `
-const served = catalog.views;
-const nav = viewNav(input.cat, [], [], null);
-process.stdout.write(JSON.stringify({
-  ids: nav.map((v) => v.id),
-  view: resolveView("mine", input.cat, [], () => false),
-  before: resolveView("mine", null, [], () => false),
-  enabled: resolveView("mine", input.cat, served, () => false),
-  core_stay: resolveView("waiting", input.cat, [], () => false),
-}));`, map[string]any{"cat": viewsCatalog()}, &got)
-	if !slices.Equal(got.IDs, coreViewIDs) {
-		t.Errorf("nav with the GitHub plugin off %v, want the core views alone", got.IDs)
-	}
-	if got.View != "focus" {
-		t.Errorf("#view=mine with the plugin off shows %q, want focus", got.View)
-	}
-	if got.Before != "mine" || got.Enabled != "mine" || got.CoreStay != "waiting" {
-		t.Errorf("before load %q, plugin on %q, core %q", got.Before, got.Enabled, got.CoreStay)
-	}
 }
 
 func TestNavCountsComeFromThePage(t *testing.T) {

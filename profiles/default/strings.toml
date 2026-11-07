@@ -360,7 +360,6 @@
 "automatic rounds paused" = "automatic rounds paused"
 "Automatic rounds paused" = "Automatic rounds paused"
 "Automatic rounds resumed" = "Automatic rounds resumed"
-"Back to {sort}" = "Back to {sort}"
 "Blocked" = "Blocked"
 "blocked" = "blocked"
 "Board" = "Board"
@@ -411,7 +410,6 @@
 "API budget {remaining} of {limit} left" = "API budget {remaining} of {limit} left"
 "Goal:" = "Goal:"
 "Group" = "Group"
-"Grouped by {field} ×" = "Grouped by {field} ×"
 "Grouped by {field}: {n} groups" = { one = "Grouped by {field}: {n} group", other = "Grouped by {field}: {n} groups" }
 "Guidance" = "Guidance"
 "Guidance for the next round (optional)" = "Guidance for the next round (optional)"
@@ -490,9 +488,7 @@
 "Slow sync: the API budget is low until {time}" = "Slow sync: the API budget is low until {time}"
 "Sort" = "Sort"
 "Sorted ascending; click to flip" = "Sorted ascending; click to flip"
-"Sorted by {field} {arrow} ×" = "Sorted by {field} {arrow} ×"
 "Sorted descending; click to flip" = "Sorted descending; click to flip"
-"Stop grouping" = "Stop grouping"
 "synced {ago}" = "synced {ago}"
 "syncing" = "syncing"
 "Tell the agent what to do next" = "Tell the agent what to do next"
@@ -599,6 +595,12 @@
 "Open its task" = "Open its task"
 "Close without a message" = "Close without a message"
 "Don't nudge this conversation" = "Don't nudge this conversation"
+"Search or ask" = "Search or ask"
+"Empty" = "Empty"
+"Filter" = "Filter"
+"Remove filter {label}" = "Remove filter {label}"
+"{field}: {values}" = "{field}: {values}"
+"{field}: not {values}" = "{field}: not {values}"
 
 [formats]
 time = "3:04 PM"

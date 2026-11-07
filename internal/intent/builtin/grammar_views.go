@@ -4,7 +4,7 @@ package builtin
 var viewsGrammar = []Key{
 	{Path: "empty", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it."},
 	{Path: "default_sort", In: SurfaceViews, Localized: true, Kind: KindText, Required: true, Doc: "What clients call a view's own order in the sort menu, such as \"View order\". Required in the bundled profile; a user layer may replace it."},
-	{Path: "lens", In: SurfaceViews, Kind: KindTable, Doc: "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any."},
+	{Path: "lens", In: SurfaceViews, Kind: KindTable, Doc: "What every list's rows and toolbar say. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any."},
 	{Path: "lens.default_group", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`."},
 	{Path: "lens.board_group", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`."},
 	{Path: "lens.no_group", In: SurfaceViews, Localized: true, Kind: KindText, Required: true, Doc: "The group menu's entry that lists the view in one group."},
