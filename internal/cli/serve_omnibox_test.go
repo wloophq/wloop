@@ -96,7 +96,6 @@ func TestTheOmniboxAgentRunsApartFromTheSnapshots(t *testing.T) {
 }
 
 func TestTheServedOmniboxAskerUsesTheVocabulary(t *testing.T) {
-	t.Skip("B10: wire Asker.Allowed to Vocabulary.Allowed and Snapshot.Vocabulary")
 	te, db := servedDossiers(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

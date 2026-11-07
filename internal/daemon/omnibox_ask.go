@@ -84,6 +84,7 @@ func (s *Server) omniboxSnapshot(ctx context.Context, g *coretasks.Service) (omn
 	for _, v := range s.viewsCatalog().Views {
 		snap.Views = append(snap.Views, omnibox.SnapshotView{ID: v.ID, Label: v.Label, When: v.When})
 	}
+	snap.Vocabulary = s.omniboxVocabulary().Verbs
 	return snap, views, nil
 }
 

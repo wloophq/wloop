@@ -196,13 +196,6 @@ func writeJSON(w http.ResponseWriter, v any) {
 	_, _ = w.Write(append(body, '\n'))
 }
 
-// notImplemented answers 501 naming the task that implements the route.
-func notImplemented(task string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusNotImplemented, "not implemented: "+task)
-	}
-}
-
 func writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

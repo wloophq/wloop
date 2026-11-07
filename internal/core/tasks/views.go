@@ -297,6 +297,9 @@ func (s *Service) listed(ctx context.Context, spec ViewSpec, q task.Query, all [
 	hidden := s.hiderFor(spec)
 	var out []task.Task
 	for _, e := range all {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		in, err := s.in(ctx, spec, q, e, hidden)
 		if err != nil {
 			return nil, err
@@ -538,6 +541,11 @@ func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
+}
+
+// Open are n's open tasks, in the store's order.
+func (n Snapshot) Open() []task.Task {
+	return slices.DeleteFunc(slices.Clone(n.pass.Tasks), func(e task.Task) bool { return !e.Open() })
 }
 
 // Held are those of units a task of n holds, as its own or an item's, in their order.

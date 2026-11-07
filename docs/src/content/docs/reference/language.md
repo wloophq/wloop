@@ -1110,6 +1110,24 @@ The fields each notice reads besides `Name` and `Command`:
 - `counters[].clause.many` (string, localized): Its many form.
 - `counters[].clause.other` (string, localized): Its other form.
 
+## The omnibox (`omnibox.toml`)
+
+- `search` (table): How a search groups the tasks it finds.
+- `search.limit` (integer, default `5`): The most results a group shows; its count counts them all.
+- `search.other` (string, localized): The label of the last group, which holds what no group's view holds.
+- `search.groups[]` (table): A group, in order: a result goes to the first group whose view holds it. A user's list replaces the whole list.
+- `search.groups[].id` (string): The group's id. Required.
+- `search.groups[].label` (string, localized): The group's label. Required.
+- `search.groups[].view` (string): The view of views.toml whose tasks the group holds. Required.
+- `verbs` (table): The verbs the omnibox knows, by id: typed first, a verb's word runs its target on what the rest names. No operation runs, from a verb or from the agent, that no verb targets.
+- `verbs.<name>` (table): One verb: its words and one target, action or verb, with op when nothing is named.
+- `verbs.<name>.words` (list of strings): The words that name the verb in every language, in one list, such as ["review", "revisar"]: vocabulary, not a text a locale translates. Required.
+- `verbs.<name>.action` (string): The catalog action it runs on each unit named.
+- `verbs.<name>.verb` (string): The task verb of tasks.toml it runs on each task named; never one that resolves a gate.
+- `verbs.<name>.op` (one of `capture`, `start`): What it runs on the text when it names no unit or task.
+  - `capture`: Captures a task titled with the text.
+  - `start`: Captures a task briefed with the text and starts it.
+
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
 - `override` (bool, default `false`): Drops the blocks before it whose path is an ancestor of its own.

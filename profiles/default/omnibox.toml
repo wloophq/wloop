@@ -1,0 +1,48 @@
+# The omnibox: how a search groups the tasks it finds, by whom they wait
+# on, and the verbs it knows. A result goes to the first group whose view
+# holds it, else to the last group. A verb's words, in every language in
+# one list, name it typed first; it runs its action on each unit named,
+# its task verb on each task named, or its op on text that names nothing.
+# No operation runs, typed or proposed by the agent, that no verb targets.
+# A user profile's omnibox.toml replaces the keys it sets, a list of groups
+# the whole list, and a verb's words its words.
+
+[verbs.review]
+words  = ["review", "revise", "revisar"]
+action = "review"
+
+[verbs.track]
+words  = ["track", "follow", "acompanhe", "acompanhar"]
+action = "track"
+
+[verbs.done]
+words = ["done", "close", "feche", "concluir"]
+verb  = "done"
+
+[verbs.capture]
+words = ["capture", "note", "anote", "capturar"]
+op    = "capture"
+
+[verbs.delegate]
+words = ["delegate", "delegue", "delegar"]
+verb  = "delegate"
+op    = "start"
+
+[search]
+limit = 5
+other = "Elsewhere"
+
+[[search.groups]]
+id    = "you"
+label = "Needs you"
+view  = "needs-me"
+
+[[search.groups]]
+id    = "others"
+label = "Waiting on others"
+view  = "waiting"
+
+[[search.groups]]
+id    = "done"
+label = "Done"
+view  = "logbook"

@@ -71,7 +71,7 @@ func Localized(s Surface, path []string) bool {
 var surfaceFiles = map[string]Surface{
 	"actions.toml": SurfaceActions, "views.toml": SurfaceViews, "tasks.toml": SurfaceTasks, "gates.toml": SurfaceGates,
 	"keys.toml": SurfaceKeys, "notices.toml": SurfaceNotices, "strings.toml": SurfaceStrings, "ui.toml": SurfaceUI, "timeline.toml": SurfaceTimeline,
-	"decisions.toml": SurfaceDecisions, "home.toml": SurfaceHome,
+	"decisions.toml": SurfaceDecisions, "home.toml": SurfaceHome, "omnibox.toml": SurfaceOmnibox,
 }
 
 // SurfaceOf is the surface of profile file rel when it may hold a text a person reads; false otherwise.

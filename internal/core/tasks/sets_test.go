@@ -111,6 +111,24 @@ func TestSetsKeepCalledOncePerTask(t *testing.T) {
 	}
 }
 
+func TestSetsStopWhenTheCallerGivesUp(t *testing.T) {
+	r := newSetsRig()
+	r.seed(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	keep := func(context.Context, task.Task) (bool, error) {
+		calls++
+		cancel()
+		return true, nil
+	}
+	if _, err := r.svc.Sets(ctx, []task.View{"ready", "waiting", "inbox"}, keep); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if calls != 1 || r.reads > 4 {
+		t.Fatalf("keep called %d times and facts read %d times after the caller gave up", calls, r.reads)
+	}
+}
+
 func TestSetsUnknownView(t *testing.T) {
 	r := newSetsRig()
 	if _, err := r.svc.Sets(context.Background(), []task.View{"ready", "nope"}, nil); !errors.Is(err, coretasks.ErrNoView) {

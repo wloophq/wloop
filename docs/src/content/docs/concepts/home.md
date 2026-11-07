@@ -43,6 +43,28 @@ Each `[[sections]]` shows the first `limit` rows of a view, titled by the view's
 
 Each counter of a kind opens its queue (`#queue=<kind>`): the kind's decisions one at a time, the oldest first, one item per decision, so a task with two open questions is two items. An item is a task's open gate, offered with the gate's card, or a state of one of its units, offered with the unit's situation. Its primary action is, for a gate, the kind's `primary` intent when the gate offers it, else the gate's first; for a unit, the plugin layer's `[primary]` of the kind, a catalog action of its units or `open`, which opens the unit at its source. No queue merges: a unit that waits only for a merge opens where you merge it. The queue's title is the plugin's `[decisions.<kind>] queue` when every item is that plugin's, else the kind's. `GET /api/queues/<kind>?q=<lens query>` narrows a queue as the counters narrow, which the Outbox's groups use to review their drafts as a queue.
 
+## Search
+
+`GET /api/search?q=<lens query>` finds every task the query matches in the rail's views, accents and case aside, and groups them by `omnibox.toml`'s `[[search.groups]]`: a result goes to the first group whose view holds it, else to the last group (`search.other`). A group shows its first `search.limit` results, those whose title or unit holds the query as whole words first, then the view's order, and counts them all; each result lists the rail views it appears in.
+
+## Typed text
+
+`POST /api/omnibox/resolve` classifies what you type and runs nothing:
+
+```
+one token a plugin claims (a pasted address)    -> unit: its tasks and the actions its row offers
+first word one of a verb's words:
+  each ref names one unit or task                -> verb: one operation per ref, to confirm
+  a ref names more than one                       -> agent (never guessed)
+  a ref names nothing                             -> search
+  no ref, and the verb has an op                  -> verb: capture or start the rest of the text
+anything else                                     -> search
+```
+
+`omnibox.toml`'s `[verbs.<id>]` list each verb's `words`, in every language in one list (vocabulary, not a translated text), and its target: a catalog `action` on each unit named, a task `verb` on each task named, and an `op` (`capture` or `start`) for text that names nothing. A verb whose task verb resolves a gate (approve, answer, edit, retry, dismiss), or whose action resolves a gate, posts or discards unpublished work (`draft.edit`, `draft.retry`, `draft.close-silently`, `draft.skip-workflow`, `plan_apply`, `plan_dismiss`, `remove_force`), does not load: a gate is resolved on the gate itself. A verb on an action the bundled vocabulary names that no enabled plugin offers leaves the omnibox quietly, in whichever layer it is declared; any other unknown action is a problem. A lone ref (a pasted address, a unit's label, a task id) opens its unit, or the task itself when it holds none. No operation runs, typed or proposed by the omnibox's agent, that no verb targets.
+
+`POST /api/omnibox/run` runs the operations you confirmed, in order, each as one request to the handler a click reaches (`POST /api/units/<provider>/<key>/<action>`, `POST /api/tasks/<id>/<verb>`, `POST /api/tasks`), with your request's headers, so each is refused or gated exactly as that click; each result keeps the handler's status, refusal and output. An operation no verb targets is refused alone, and the others run. `start` captures a task briefed with the text, titled as the `start` intent titles a capture, then starts it in the repository named; the start is not tried when the capture fails.
+
 ## Changing it
 
 A user profile's `home.toml` replaces the keys it sets, and a list of counters or sections the whole list; `decisions.toml` and a plugin's `plugins/<id>/decisions.toml` replace the mappings they name. The words are localized like every profile text: `locales/<tag>/home.toml` and `locales/<tag>/decisions.toml` translate them, a plural text form by form.

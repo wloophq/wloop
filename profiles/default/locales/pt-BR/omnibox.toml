@@ -1,0 +1,11 @@
+[search]
+other = "Em outros lugares"
+
+[[search.groups]]
+label = "Precisa de você"
+
+[[search.groups]]
+label = "Esperando outras pessoas"
+
+[[search.groups]]
+label = "Concluídas"

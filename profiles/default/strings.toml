@@ -565,6 +565,18 @@
 "unknown_task" = "No task {id} exists"
 "unknown_unit" = "No task holds {unit}"
 "outside_vocabulary" = "No omnibox verb runs {name}"
+# piece B
+# Why typed text fell to search or to the agent, by its code.
+"unclaimed_address" = "No plugin recognizes {address}"
+"no_unit_or_task" = "No unit or task is {ref}"
+"ambiguous_ref" = "{ref} names more than one unit or task"
+"nothing_named" = "Name what to run {verb} on"
+"run_invalid" = "It did not run: the request was not valid"
+"run_forbidden" = "It did not run: not allowed from here"
+"run_not_found" = "It did not run: it no longer exists"
+"run_conflict" = "It did not run: it changed meanwhile"
+"run_unavailable" = "It did not run: not available right now"
+"run_failed" = "It did not run"
 
 [formats]
 time = "3:04 PM"
