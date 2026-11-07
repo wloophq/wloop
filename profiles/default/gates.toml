@@ -187,3 +187,9 @@ mode = "wait"
 [[approval.rule]]
 when = 'gate.kind == "plan"'
 mode = "run"
+
+# What sending a draft does besides posting it, by effect: a draft's card
+# says it in these words.
+[effects]
+"task.nudged" = "The task is marked as nudged."
+"unit.closed" = "The conversation is closed and the open tasks that hold it end."

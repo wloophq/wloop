@@ -265,6 +265,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `attribution` (table): How the task's page names who made a change.
 - `attribution.via_session` (string): The name of a change an agent made for you through a session you drove; {session} is the session's id.
 - `attribution.via_workflow` (string): The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name.
+- `detail` (table): What a task's detail panel offers.
+- `detail.verbs` (list of strings): The verbs the detail shows as buttons, in order, each a verb of verbs; those the task does not offer are left out, and every other verb it offers waits behind a More button that opens the palette. A user layer's list replaces the one below it.
 - `areas` (list of strings): The areas a task may be in, the values of the area property.
 - `contexts` (list of strings): The contexts the menu offers; a task may hold others.
 - `stale_waiting_days` (integer): Working days a task waits before it is stale.
@@ -427,6 +429,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `gates.<name>.ends_task.<name>` (one of `done`, `dropped`): The category the task ends in.
   - `done`: Done: the task leaves the lists for the Logbook.
   - `dropped`: Dropped: the task goes to the trash.
+- `effects` (table by name): What sending a draft does besides posting it, one sentence per effect, by effect name; a draft's card shows the sentences of the effects it carries. A user layer sets only the effects it names; an empty sentence takes a lower layer's off.
+- `effects.<name>` (string, localized): The sentence, such as "The task is marked as nudged."; the key is an effect a draft may carry.
 - `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.
 
 ## Record kinds (`records.toml`)
@@ -444,7 +448,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Key help (`keys.toml`)
 
-- `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`capture`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
+- `help` (table): The help line of each core key, by context (list, global, question, review, plan, detail), then action (`capture`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
 - `help.<name>` (table): The keys of one context, by action.
 - `help.<name>.<name>` (string, localized): What the key does, as the help and the palette list it. Required.
 

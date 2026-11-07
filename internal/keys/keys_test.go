@@ -57,6 +57,8 @@ func spec92() []row {
 		{"Enter", "approve", Plan, screen},
 		{"c", "link:copy", Global, []Surface{Web}},
 		{"t", "detail:detach", Detail, []Surface{Web}},
+		{"]", "tab:next", Detail, []Surface{Web}},
+		{"[", "tab:prev", Detail, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,

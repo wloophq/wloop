@@ -202,6 +202,20 @@
       "help": "open in a window of its own"
     },
     {
+      "key": "]",
+      "action": "tab:next",
+      "context": "detail",
+      "owner": "core",
+      "help": "next tab"
+    },
+    {
+      "key": "[",
+      "action": "tab:prev",
+      "context": "detail",
+      "owner": "core",
+      "help": "previous tab"
+    },
+    {
       "key": "1",
       "action": "answer:1",
       "context": "question",

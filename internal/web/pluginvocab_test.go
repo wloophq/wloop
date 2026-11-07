@@ -29,12 +29,12 @@ var scriptDebts = map[string]map[string]int{
 		"draft": 1, "dash": 5,
 		"author": 4, "ci": 4, "due": 2, "is": 5, "kind": 10, "opened": 5, "risk": 5, "size": 5, "tag": 8, "type": 2, "wait": 1, "waits-on": 2, "where": 3,
 	},
-	"detail.js":  {"draft": 2, "merged": 4, "all": 4},
+	"detail.js":  {"draft": 1, "merged": 4, "all": 4},
 	"keys.js":    {"review": 3, "plan": 6},
 	"palette.js": {"merged": 1},
 	"plugins.js": {"author": 1},
 	"row.js":     {"age": 1, "kind": 1},
-	"task.js":    {"draft": 3, "merged": 1, "kind": 1, "all": 1},
+	"task.js":    {"draft": 2, "merged": 1, "kind": 1, "all": 1},
 	"views.js":   {"draft": 1, "where": 1, "review": 1, "plan": 1},
 }
 

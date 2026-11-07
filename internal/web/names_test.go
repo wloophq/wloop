@@ -58,6 +58,7 @@ func TestSlackTaskDetailReadsByName(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 (async () => {
+  taskState.tab = "asks";
   await loadDetailPane({ task: "e-9" });
   const box = { dataset: {}, contains: () => false, replaceChildren(...ns) { this.kids = ns.map((n) => Array.isArray(n) ? String(n) : n); } };
   renderTaskDetail(box, { task: "e-9" });

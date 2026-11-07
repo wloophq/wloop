@@ -74,7 +74,10 @@ type TasksDef struct {
 	// session's id.
 	ViaSession string
 	// ViaWorkflow names a change a workflow made; {workflow} is the workflow's name.
-	ViaWorkflow      string
+	ViaWorkflow string
+	// DetailVerbs are the verbs a task's detail offers as its buttons, in order; the rest it offers wait in a
+	// palette.
+	DetailVerbs      []string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -341,6 +344,7 @@ type mTasks struct {
 	OwedBy           *mOwedBy             `toml:"owed_by"`
 	Chat             *mChat               `toml:"chat"`
 	Attribution      *mAttribution        `toml:"attribution"`
+	Detail           *mDetail             `toml:"detail"`
 	Areas            []string             `toml:"areas"`
 	Contexts         []string             `toml:"contexts"`
 	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
@@ -382,6 +386,10 @@ type mChat struct {
 	Intent *string `toml:"intent"`
 }
 
+type mDetail struct {
+	Verbs []string `toml:"verbs"`
+}
+
 type mAttribution struct {
 	ViaSession  *string `toml:"via_session"`
 	ViaWorkflow *string `toml:"via_workflow"`
@@ -404,6 +412,8 @@ type tasksLoad struct {
 	// survivors are the verbs' survivor predicates, by path, compiled once every layer's properties are read.
 	survivors map[string]ref
 	owed      *ref
+	// detail are the verbs detail.verbs names, checked once every layer's verbs are read.
+	detail []ref
 	// roles are the file that gave each role its property: a later layer's moves it, one file gives it once.
 	roles map[task.Role]string
 }
@@ -466,6 +476,13 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	if m.Attribution != nil {
 		text(s, "attribution.via_session", m.Attribution.ViaSession, &l.def.ViaSession)
 		text(s, "attribution.via_workflow", m.Attribution.ViaWorkflow, &l.def.ViaWorkflow)
+	}
+	if m.Detail != nil && m.Detail.Verbs != nil {
+		l.def.DetailVerbs = slices.Clone(m.Detail.Verbs)
+		l.detail = nil
+		for i, v := range m.Detail.Verbs {
+			l.detail = append(l.detail, ref{s, fmt.Sprintf("detail.verbs[%d]", i), v})
+		}
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)
@@ -707,6 +724,11 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 			if !slices.Contains(names, r.name) {
 				out = append(out, r.s.problem(r.path, "names no gate of %s%s", GatesFile, expr.DidYouMean(r.name, names)))
 			}
+		}
+	}
+	for _, r := range l.detail {
+		if _, ok := l.def.Verbs[r.name]; !ok {
+			out = append(out, r.s.problem(r.path, "names no verb %s%s", r.name, expr.DidYouMean(r.name, l.def.VerbOrder)))
 		}
 	}
 	if r := l.owed; r != nil && strings.TrimSpace(r.name) != "" {

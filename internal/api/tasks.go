@@ -166,6 +166,10 @@ type ViewsCatalog struct {
 	Facets      []FacetSpec `json:"facets,omitempty"`
 	DefaultSort string      `json:"default_sort,omitempty"`
 	Lens        LensWords   `json:"lens"`
+	// DetailVerbs are the verbs a task's detail shows as buttons, in order (tasks.toml's detail.verbs); Effects
+	// the sentence that says what each effect does when a draft is sent, by effect name (gates.toml's effects).
+	DetailVerbs []string          `json:"detail_verbs"`
+	Effects     map[string]string `json:"effects"`
 	// Version changes whenever anything above does.
 	Version string `json:"version,omitempty"`
 }

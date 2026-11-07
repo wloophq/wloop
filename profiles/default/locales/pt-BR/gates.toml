@@ -115,3 +115,7 @@ summary = "Retomar a execução como estava, sem seu texto."
 [gates.missing-record.intents.dismiss]
 label = "Dispensar"
 summary = "Fechar a execução parada sem retomá-la."
+
+[effects]
+"task.nudged" = "A tarefa fica marcada como cobrada."
+"unit.closed" = "A conversa é encerrada e as tarefas abertas que a contêm terminam."

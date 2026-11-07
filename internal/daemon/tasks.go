@@ -155,6 +155,10 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 			To: t.To})
 	}
 	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
+	cat.DetailVerbs, cat.Effects = nonNil(slices.Clone(l.Tasks.DetailVerbs)), maps.Clone(l.Gates.Effects)
+	if cat.Effects == nil {
+		cat.Effects = map[string]string{}
+	}
 	cat.Version = api.VersionOf(cat)
 	return cat
 }

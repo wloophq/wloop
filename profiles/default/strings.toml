@@ -591,6 +591,14 @@
 # piece C
 "Changed since you saw it" = "Changed since you saw it"
 "{n} draft waits for you" = { one = "{n} draft waits for you", other = "{n} drafts wait for you" }
+"Risk" = "Risk"
+"Size" = "Size"
+"Tags" = "Tags"
+"More {n}" = "More {n}"
+"Sections" = "Sections"
+"Open its task" = "Open its task"
+"Close without a message" = "Close without a message"
+"Don't nudge this conversation" = "Don't nudge this conversation"
 
 [formats]
 time = "3:04 PM"

@@ -1,28 +1,8 @@
 "use strict";
 
 // SKIP_HANDLERS are the handlers of the verbs the page offers elsewhere: seen when it opens, answer in its
-// gate and a draft's in its card; the verb whose handler replies is in the composer.
+// gate and a draft's in its card (gate.js); the verb whose handler replies is in the composer.
 const SKIP_HANDLERS = new Set(["seen", "answer", "edit", "retry"]);
-// DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
-// card offers, the kind's own dismiss among them.
-const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
-const DRAFT_CARD_HANDLERS = ["approve", "drop", "edit", "retry"];
-
-// draftWord is the label of a draft's action id, from the served specs, else its verb's.
-function draftWord(id) {
-  const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
-  return (sp && sp.label) || verbLabel(verbFor(DRAFT_HANDLERS[id]));
-}
-
-// gateWord is the label gates.toml gives the intent of e's draft gate that resolves it to status, else verb's.
-function gateWord(e, status, verb) {
-  const d = draftOf(e) || {};
-  const name = (d.intents || {})[status];
-  const g = (e.gates || []).find((x) => x.kind === "draft");
-  const intent = g && name ? (g.intents || []).find((x) => x.id === name) : null;
-  return (intent && intent.label) || verbLabel(verb);
-}
-
 const detailState = {
   id: "", task: null, error: "", seenFor: "", editing: new Map(), unitKey: "", unitTasks: [], compose: { key: "", text: "", reaction: "" },
 };
@@ -156,6 +136,7 @@ const detailPane = {
     return g ? { task: e, gate: g } : null;
   },
   resolve: (task, gate, intent) => resolveGate(task, gate, intent),
+  tab: (dir) => stepTab(detailState.task, dir === "prev" ? -1 : 1, true),
 };
 
 async function loadDetailPane(route) {
@@ -253,14 +234,53 @@ function verbLabel(verb) {
   return verbTask(verb).label || verb;
 }
 
-function verbButtons(e) {
+// offeredVerbs are the verbs e offers that the page lists as its own: not those it offers elsewhere, the reply
+// verb, a verb on a related or merged task's row, nor, on a draft's own task, those of the draft's card.
+function offeredVerbs(e) {
   const replies = handlerVerb("reply");
   const onRows = (verb) => ["merged", "related"].includes(verbTask(verb).pick);
   const skip = (verb) => SKIP_HANDLERS.has(verbHandler(verb)) || verb === replies || onRows(verb) || (isDraftTask(e) && DRAFT_CARD_HANDLERS.includes(verbHandler(verb)));
-  return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
-    if (verbTask(v.verb).pick) return pickTask(e, v.verb);
-    const args = askedArgs(v.verb);
-    if (args) taskAct(e, v.verb, args);
+  return (e.verbs || []).filter((v) => !skip(v.verb));
+}
+
+// runVerb runs verb on e: over the tasks it picks from, or after the question it puts first.
+function runVerb(e, verb) {
+  if (verbTask(verb).pick) return pickTask(e, verb);
+  const args = askedArgs(verb);
+  return args ? taskAct(e, verb, args) : null;
+}
+
+// detailVerbs are the verbs the profile's detail.verbs names, in its order.
+function detailVerbs() {
+  return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.detail_verbs) || []);
+}
+
+// primaryVerbs are the buttons of the profile's detail verbs e offers, each with its key, then More, which
+// opens the palette over the other verbs e offers.
+function primaryVerbs(e) {
+  const offered = offeredVerbs(e);
+  const named = detailVerbs();
+  const buttons = named.map((verb) => offered.find((v) => v.verb === verb)).filter(Boolean).map((v) => {
+    const key = verbTask(v.verb).key;
+    return verbButton(e, v.verb, [h("span", { class: "lb" }, verbLabel(v.verb)), key ? [" ", h("kbd", {}, key)] : null], () => runVerb(e, v.verb));
+  });
+  const rest = moreVerbs(e);
+  if (!rest.length) return buttons;
+  return [...buttons, h("button", {
+    type: "button", class: "act more", "data-focus": `detail:more:${e.id}`, "aria-keyshortcuts": "Meta+K",
+    onclick: () => detailEnv.palette({ title: t("Actions"), items: moreVerbs(e) }),
+  }, h("span", { class: "lb" }, t("More {n}", { n: fmtNumber(rest.length) })), " ", h("kbd", {}, "⌘K"))];
+}
+
+// moreVerbs are the palette items of the verbs e offers past the profile's detail verbs, each running as its
+// button would; a verb offered but off says why.
+function moreVerbs(e) {
+  const named = new Set(detailVerbs());
+  return offeredVerbs(e).filter((v) => !named.has(v.verb)).map((v) => ({
+    label: verbLabel(v.verb),
+    key: verbTask(v.verb).key || "",
+    meta: v.enabled ? undefined : v.reason,
+    run: () => (v.enabled ? runVerb(e, v.verb) : detailEnv.notice(`${verbLabel(v.verb)}: ${v.reason || t("not offered here")}`, true)),
   }));
 }
 
@@ -325,38 +345,6 @@ function taskMerged(e) {
   return h("section", { class: "d-merged", "aria-label": t("Merged from") },
     h("h2", { class: "d-sub" }, t("Merged from")),
     h("ul", { class: "d-tasks" }, ...refs.map((r) => h("li", {}, refRow(e, r, verb, "merged"), within(r)))));
-}
-
-// windowLine says when the window of d's gate sends it, "" when it has none.
-function windowLine(d) {
-  return d.deadline ? t("Sends at {time} unless you decide first", { time: stamp(d.deadline) }) : "";
-}
-
-// draftCard shows the draft a task carries, with approve, edit and
-// discard through the task's verbs.
-function draftCard(e, scope) {
-  const d = draftOf(e);
-  const editing = detailState.editing.has(e.id);
-  const purpose = (d.purpose || "").replaceAll("_", " ").trim();
-  const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (d.state && d.state !== "held" ? ` (${d.state})` : "");
-  const [approve, drop, edit, retry] = DRAFT_CARD_HANDLERS.map((x) => offeredVerb(e, x));
-  const buttons = editing ? [
-    verbButton(e, approve, gateWord(e, "approved", approve), () => approveEdited(e), { scope, primary: true }),
-    h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, t("Cancel")),
-  ] : [
-    d.state === "failed" ? verbButton(e, retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, approve, gateWord(e, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), { scope, primary: true }),
-    verbButton(e, edit || approve, draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, drop, gateWord(e, "rejected", drop), () => taskAct(e, drop, {}), { scope }),
-  ];
-  return h("section", { class: "d-draft", "aria-label": t("Draft") },
-    h("div", { class: "d-sub" }, head),
-    draftWhere(d),
-    editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${e.id}`, oninput: (ev) => detailState.editing.set(e.id, ev.target.value) }, detailState.editing.get(e.id))
-      : h("pre", { class: "draft-text" }, d.text || (d.reaction ? `:${d.reaction}:` : "")),
-    d.error ? h("p", { class: "err" }, d.error) : null,
-    windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...buttons));
 }
 
 // composeFor is the composer's text for key, empty when it last held another key's.
@@ -427,13 +415,6 @@ function unitComposer(u) {
 
 function personName(p) {
   return (p && (p.name || p.key)) || "";
-}
-
-// draftWhere is where a draft posts, as its publisher named it; the raw target, marked unknown, when it could not.
-function draftWhere(d) {
-  if (d.where) return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.where));
-  const pending = ["held", "failed", "queued", "sending"].includes(d.state);
-  return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "");
 }
 
 // unitHomeView is the view a unit opens in: its provider's "all" when it

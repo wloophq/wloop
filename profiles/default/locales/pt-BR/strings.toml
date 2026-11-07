@@ -583,6 +583,14 @@
 # piece C
 "Changed since you saw it" = "Mudou desde que você viu"
 "{n} draft waits for you" = { one = "{n} rascunho espera por você", other = "{n} rascunhos esperam por você" }
+"Risk" = "Risco"
+"Size" = "Tamanho"
+"Tags" = "Tags"
+"More {n}" = "Mais {n}"
+"Sections" = "Seções"
+"Open its task" = "Abrir a tarefa"
+"Close without a message" = "Encerrar sem mensagem"
+"Don't nudge this conversation" = "Não cobrar nesta conversa"
 
 [formats]
 time = "15:04"

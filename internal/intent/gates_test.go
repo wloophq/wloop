@@ -356,3 +356,24 @@ func TestAGateNamesWhatItsClosingDoesToATaskHeldForGates(t *testing.T) {
 		t.Errorf("an unknown status or category loads: %q", problems)
 	}
 }
+
+func TestEffectWordsNameKnownEffects(t *testing.T) {
+	t.Parallel()
+	d, problems := loadGatesWith(t, "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.Effects["task.nudged"] == "" {
+		t.Errorf("the bundled gates.toml words no task.nudged: %v", d.Effects)
+	}
+	d, problems = loadGatesWith(t, "[effects]\n\"task.nudged\" = \"Marked as nudged.\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.Effects["task.nudged"] != "Marked as nudged." || d.Effects["unit.closed"] == "" {
+		t.Errorf("a user layer's effect words give %v", d.Effects)
+	}
+	if _, problems := loadGatesWith(t, "[effects]\nnope = \"x\"\n"); !strings.Contains(problems, "effects.nope") {
+		t.Errorf("an effect no effect is loads: %q", problems)
+	}
+}

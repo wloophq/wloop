@@ -2,7 +2,7 @@
 
 const CHORD_MS = 1000;
 const KEY_CONTEXTS = ["detail", "question", "plan", "review", "list", "global"];
-const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|palette$|help$|filter$|open-source$|capture$|quit$)/;
+const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|tab:|palette$|help$|filter$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
 // VERB_ASKS are, by handler, how a verb that asks for a value first turns
@@ -331,6 +331,7 @@ function createKeys(env) {
     if (a.startsWith("step:")) return env.step ? env.step(a.slice(5)) !== false : false;
     if (a === "detail:detach") return env.detach ? env.detach() !== false : false;
     if (a === "link:copy") return env.copyLink ? env.copyLink() !== false : false;
+    if (a.startsWith("tab:")) return env.tab ? env.tab(a.slice(4)) !== false : false;
     if (a === "palette") {
       env.palette({ title: t("Actions"), items: paletteItems() });
       return true;
@@ -465,6 +466,7 @@ function appEnv() {
     detailAt: (el) => detailFocused(el),
     detach: () => detachView(),
     copyLink: () => copyViewLink(),
+    tab: (dir) => (readHash().task ? detailPane.tab(dir) : false),
     questionAt: (el) => {
       if (readHash().task) return detailPane.gateAt(el);
       const d = state.detail;

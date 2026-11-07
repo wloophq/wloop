@@ -271,7 +271,7 @@ function taskModel(e, open, copy, lens) {
       due ? h("span", { class: "flag due" }, fillWord(w.due, { date: shortDate(due) })) : null,
       e.wake && e.wake.until ? h("span", { class: "flag due" }, fillWord(w.until, { date: shortDate(e.wake.until) })) : null,
       e.extraction_lag ? h("span", { class: "flag due", title: w.unread_title }, fillWord(w.unread, { lag: shortLag(e.extraction_lag) })) : null],
-    after: [projectFacts(e, w), draft ? draftCard(e, "outbox") : null],
+    after: [projectFacts(e, w), draft ? draftCard(e, draftOf(e), { scope: "outbox" }) : null],
     lead: stripDot(strip, lens, scope, w),
     why: e.reason || "",
     cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],

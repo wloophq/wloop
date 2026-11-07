@@ -46,6 +46,8 @@ approve = "apply the selected plan step"
 
 [help.detail]
 "detail:detach" = "open in a window of its own"
+"tab:next" = "next tab"
+"tab:prev" = "previous tab"
 
 [help.question]
 "answer:{n}" = "the gate's intent {n}"

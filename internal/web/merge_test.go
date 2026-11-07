@@ -129,6 +129,7 @@ func TestTheCockpitTaskPageShowsRelatedTasksAndAMergedFromTraceWithSplit(t *test
 	var got struct {
 		Sections []string
 		Head     []string
+		More     []string
 		Props    []string
 		Related  []string
 		Merged   []string
@@ -147,8 +148,12 @@ func TestTheCockpitTaskPageShowsRelatedTasksAndAMergedFromTraceWithSplit(t *test
 tasksState.tasks = [{ id: "t-2", title: "Book the launch hall", state: "doing", units: [] }, { id: "t-4", title: "Stale copy", state: "doing", units: [] }];
 let picker = null;
 detailEnv.palette = (o) => { picker = o; };
+taskState.tab = "related";
 const box = await page("t-0123456789abcdef");
-const head = box.children[0];
+const head = cls(box, "tabpanel")[0];
+const props = cls(box, "props")[0];
+await cls(box, "more")[0].on.click();
+const more = picker.items.map((i) => i.label);
 const text = (n) => n.textContent;
 const related = cls(box, "d-related")[0], merged = cls(box, "d-merged")[0];
 const lis = (n) => walk(n, (x) => x.tag === "li").map(text);
@@ -157,9 +162,10 @@ await picker.items[0].run();
 await focus(box, "related:t-2:unrelate:t-0123456789abcdef").on.click();
 await focus(box, "merged:t-9:split:t-0123456789abcdef").on.click();
 done({
-  Sections: box.children.map((c) => c.attrs.class),
+  Sections: head.children.map((c) => c.attrs.class),
   Head: walk(head, (x) => x.tag === "button").map(text),
-  Props: walk(head, (x) => x.tag === "dt").map(text),
+  More: more,
+  Props: walk(props, (x) => x.tag === "dt").map(text),
   Related: lis(related), Merged: lis(merged),
   Buttons: walk(box, (x) => x.tag === "button" && ["Split", "Unrelate"].includes(x.textContent)).map((b) => b.attrs["data-focus"]),
   Names: walk(box, (x) => x.tag === "button" && ["Split", "Unrelate"].includes(x.textContent)).map((b) => b.attrs["aria-label"]),
@@ -167,14 +173,17 @@ done({
   Posts: posts,
 });`+"\n})().catch((e) => { console.error(e); process.exit(1); });", map[string]any{"catalog": cat, "answers": answers}, &got)
 
-	if n := len(got.Sections); n < 2 || got.Sections[n-2] != "d-related" || got.Sections[n-1] != "d-merged" {
-		t.Errorf("sections %v end without the related and merged-from sections", got.Sections)
+	if want := []string{"d-related", "d-merged", "d-actions"}; !slices.Equal(got.Sections, want) {
+		t.Errorf("the Related tab holds %v, want the related and merged-from sections, then the verbs that take a task in", got.Sections)
 	}
-	if !slices.Contains(got.Head, "Merge") || !slices.Contains(got.Head, "Relate") || slices.Contains(got.Head, "Split") || slices.Contains(got.Head, "Unrelate") {
-		t.Errorf("the header's verbs %v: want Merge and Relate there, Split and Unrelate on their rows", got.Head)
+	if !slices.Contains(got.Head, "Merge") || !slices.Contains(got.Head, "Relate") {
+		t.Errorf("the Related tab's buttons %v: want Merge and Relate there", got.Head)
+	}
+	if !slices.Contains(got.More, "Merge") || !slices.Contains(got.More, "Relate") || slices.Contains(got.More, "Split") || slices.Contains(got.More, "Unrelate") {
+		t.Errorf("the More palette %v: want Merge and Relate there, Split and Unrelate on their rows", got.More)
 	}
 	if slices.Contains(got.Props, "related") || slices.Contains(got.Props, "merged") {
-		t.Errorf("the header lists the related or merged property as text: %v", got.Props)
+		t.Errorf("the props list the related or merged property as text: %v", got.Props)
 	}
 	if want := []string{"Book the launch hall Doing Unrelate", "Order the badges Parked Unrelate"}; !reflect.DeepEqual(got.Related, want) {
 		t.Errorf("related rows %q, want the page's own copy of t-2 and the ref of a merged t-4 %q", got.Related, want)

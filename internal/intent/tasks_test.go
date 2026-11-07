@@ -480,3 +480,29 @@ func TestNoWriterMayWriteTheMergedOrRelatedProperty(t *testing.T) {
 		}
 	}
 }
+
+func TestDetailVerbsNameDeclaredVerbs(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	for _, v := range d.DetailVerbs {
+		if _, ok := d.Verbs[v]; !ok {
+			t.Errorf("the bundled detail.verbs names %s, which no verb is", v)
+		}
+	}
+	if len(d.DetailVerbs) == 0 {
+		t.Error("the bundled profile names no primary verb of the detail")
+	}
+	d, problems = loadTasksWith(t, defaultTasks(t), "[detail]\nverbs = [\"waiting\", \"done\"]\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if !slices.Equal(d.DetailVerbs, []string{"waiting", "done"}) {
+		t.Errorf("a user layer's detail.verbs gives %q", d.DetailVerbs)
+	}
+	if _, problems := loadTasksWith(t, defaultTasks(t), "[detail]\nverbs = [\"done\", \"nope\"]\n"); !strings.Contains(problems, "detail.verbs[1]") || !strings.Contains(problems, "nope") {
+		t.Errorf("a detail verb no verb is loads: %q", problems)
+	}
+}

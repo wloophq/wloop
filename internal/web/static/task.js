@@ -1,12 +1,12 @@
 "use strict";
 
-// taskState is what the task page holds beside the task: its timeline, the
-// kinds it is narrowed to and every kind seen, the composer's text, each
-// gate's answer and a run's transcript.
-const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", answers: new Map(), transcript: null };
+// taskState is what the task page holds beside the task: its timeline, the kinds it is narrowed to and every
+// kind seen, the composer's text, a run's transcript, the drafts that wait on it and the tab picked.
+const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [], tab: "" };
 
 function resetTaskPage(id) {
-  Object.assign(taskState, { id, timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", answers: new Map(), transcript: null });
+  Object.assign(taskState, { id, timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [] });
+  resetGates();
 }
 
 function taskCatalog() {
@@ -22,9 +22,13 @@ function timelineURL(id, kinds) {
   return taskPath(id, "timeline") + q;
 }
 
-// loadTaskPage reads the timeline of e, narrowed to the kinds picked.
+// loadTaskPage reads the timeline of e, narrowed to the kinds picked, and the drafts that wait on e.
 async function loadTaskPage(e) {
   if (taskState.id !== e.id) resetTaskPage(e.id);
+  await Promise.all([loadTimeline(e), loadTaskDrafts(e)]);
+}
+
+async function loadTimeline(e) {
   try {
     const events = await detailEnv.getJSON(timelineURL(e.id, taskState.kinds));
     if (taskState.id !== e.id) return;
@@ -34,6 +38,16 @@ async function loadTaskPage(e) {
   } catch (err) {
     if (taskState.id === e.id) taskState.timelineError = t("Could not load the timeline: {error}", { error: err.message });
   }
+}
+
+// loadTaskDrafts reads the drafts e's pending draft ids name; none when it names none or they cannot be read.
+async function loadTaskDrafts(e) {
+  if (!(e.drafts || []).length) {
+    taskState.drafts = [];
+    return;
+  }
+  const out = await detailEnv.getJSON("/api/drafts?" + new URLSearchParams({ task: e.id }).toString()).catch(() => null);
+  if (taskState.id === e.id) taskState.drafts = (out && out.drafts) || [];
 }
 
 function propText(v) {
@@ -46,49 +60,94 @@ function propText(v) {
 // LISTED_ROLES are the roles of the properties the page lists as tasks, not as text.
 const LISTED_ROLES = ["related", "merged"];
 
-// taskProps are the task's properties the profile declares, in its order.
+function briefData(e) {
+  const r = e.brief;
+  return r && r.data && typeof r.data === "object" ? r.data : {};
+}
+
+// tagMax is how many brief tags a row shows before it counts the rest, as the profile's tag facet says.
+function tagMax() {
+  const spec = (taskCatalog().facets || []).find((f) => f.fact === "brief.tags");
+  return (spec && spec.show_max) || 0;
+}
+
+// moreWord is the lens's word for n more pieces.
+function moreWord(n) {
+  const w = typeof lensWords === "function" ? lensWords().more : "";
+  return w && typeof fillWord === "function" ? fillWord(w, { n: fmtNumber(n) }) : "+" + fmtNumber(n);
+}
+
+// taskProps is the task's facts as a label and value grid: the properties the profile declares, in its order,
+// the brief's risk with its reason and its size, each card's signals in their tone, then the brief's tags, the
+// first the tag facet shows and the count of the rest, which opens the Brief tab.
 function taskProps(e) {
   const props = e.props || {};
-  const shown = (taskCatalog().props || []).filter((p) => !LISTED_ROLES.includes(p.role) && propText(props[p.name]));
-  if (!shown.length) return null;
-  return h("dl", { class: "d-props" }, ...shown.flatMap((p) => [h("dt", {}, p.name), h("dd", { "data-prop": p.name }, propText(props[p.name]))]));
+  const rows = (taskCatalog().props || []).filter((p) => !LISTED_ROLES.includes(p.role) && propText(props[p.name]))
+    .map((p) => [p.name, propText(props[p.name]), { "data-prop": p.name }]);
+  const b = briefData(e);
+  if (b.risk) rows.push([t("Risk"), [h("span", { class: "risk-" + b.risk }, b.risk), b.risk_why ? " · " + b.risk_why : null], { "data-prop": "brief:risk" }]);
+  if (b.size) rows.push([t("Size"), b.size, { "data-prop": "brief:size" }]);
+  for (const c of e.cards || []) {
+    for (const g of (c.card || {}).signals || []) rows.push([g.key, g.at ? fmtDate(g.at, "datetime") : g.value, { class: "tone-" + (g.tone || "neutral") }]);
+  }
+  const tags = b.tags || [];
+  const max = tagMax() || tags.length;
+  if (tags.length) {
+    rows.push([t("Tags"), [...tags.slice(0, max).map((x) => h("span", { class: "pill" }, x)),
+      tags.length > max ? h("button", { type: "button", class: "more", "data-focus": "task:props:tags", onclick: () => pickTab("brief") }, moreWord(tags.length - max)) : null], {}]);
+  }
+  if (!rows.length) return null;
+  return h("dl", { class: "props d-props" }, ...rows.flatMap(([k, v, at]) => [h("dt", {}, k), h("dd", at, v)]));
 }
 
-// taskLinks are the task's units: a unit's card where it has one, else its
-// label, opening the unit in the cockpit.
+// taskLinks are the cards of the task's units that have one; the head names every unit.
 function taskLinks(e) {
-  const cards = e.cards || [];
-  const units = e.units || [];
-  if (!units.length) return null;
-  return h("div", { class: "d-links" }, ...units.map((u, i) => {
-    const c = cards.find((x) => x.card && x.card.unit && x.card.unit.provider === u.provider && x.card.unit.key === u.key);
-    if (c) return unitCard(c);
-    return h("div", { class: "meta" }, unitRef(u, (e.unit_labels || [])[i] || unitLabel(u), ""));
-  }));
+  const cards = (e.units || []).map((u) => cardOf(e, u)).filter(Boolean);
+  return cards.length ? h("div", { class: "d-links" }, ...cards.map(unitCard)) : null;
 }
 
-function taskHeader(e) {
+function cardOf(e, u) {
+  return (e.cards || []).find((x) => x.card && x.card.unit && x.card.unit.provider === u.provider && x.card.unit.key === u.key) || null;
+}
+
+function unitLabels(e) {
+  return (e.units || []).map((u, i) => (e.unit_labels || [])[i] || unitLabel(u));
+}
+
+// taskWhen is whom the task waits on and since when, as its row says it.
+function taskWhen(e) {
+  if (typeof rowParts !== "function" || typeof rowWhen !== "function") return null;
+  const lens = { static: true, ts: [], quals: [], specs: taskCatalog().facets || [], words: typeof lensWords === "function" ? lensWords() : {} };
+  const m = { scope: "detail", words: lens.words, parts: rowParts({ facets: e.facets || {} }, lens.specs, lens.words) };
+  if (!(m.parts.who || []).length && !(m.parts.age || []).length) return null;
+  return h("div", { class: "d-when" }, rowWhen(m, lens));
+}
+
+// taskHead is the task's units, each opening in the cockpit and at its source, its title, state, whom it waits on
+// and since when, why, and its notes.
+function taskHead(e) {
+  const labels = unitLabels(e);
   return h("header", { class: "d-head" },
     h("button", { type: "button", class: "close", "aria-label": t("Close detail"), "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
     detailWindowControls(),
-    h("h1", {}, starred(e) ? h("span", { class: "star" }, "★ ") : null, e.title || e.id),
+    labels.length ? h("div", { class: "d-units meta" }, ...(e.units || []).map((u, i) => h("span", { class: "d-unit" }, unitRef(u, labels[i], (cardOf(e, u) || { card: {} }).card.link || "")))) : null,
+    h("h1", {}, starred(e) ? h("span", { class: "star" }, "★ ") : null, titleWithoutRef(e.title || e.id, labels)),
     h("div", { class: "meta" },
       h("span", { class: "pill state", "data-category": e.category || "" }, stateLabel(e.state)),
       e.changed ? [" ", h("span", { class: "flag" }, t("changed"))] : null,
       e.owed_by ? [" ", t("owed by"), " ", h("strong", {}, e.owed_by)] : null,
-      e.wake && e.wake.until ? [" ", t("wakes {time}", { time: stamp(e.wake.until) })] : null),
-    e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
-    taskProps(e),
-    taskLinks(e),
-    h("div", { class: "d-actions" }, ...verbButtons(e), ...taskIntentButtons(e)));
+      e.wake && e.wake.until ? [" ", t("wakes {time}", { time: fmtDate(e.wake.until, "datetime") })] : null,
+      draftMark(e) ? [" ", draftMark(e)] : null),
+    taskWhen(e),
+    e.reason ? h("p", { class: "why" }, e.reason) : null,
+    e.notes ? h("p", { class: "d-notes" }, e.notes) : null);
 }
 
 function taskAsks(e) {
   const asks = e.asks || [];
   if (!asks.length) return null;
   return h("section", { class: "d-asks", "aria-label": t("Asks") },
-    h("h2", { class: "d-sub" }, t("Asks")),
-    h("ul", { class: "asks" }, ...asks.map((a) => h("li", { class: "ask" },
+    h("ul", { class: "asks" }, ...asks.map((a) => h("li", { class: "ask-item" },
       h("div", {}, a.asker ? h("strong", {}, a.asker + ": ") : null, a.summary,
         safeURL(a.permalink) ? [" ", h("a", { href: safeURL(a.permalink), target: "_blank", rel: "noopener noreferrer", class: "ext" }, t("source"))] : null),
       ...(a.quotes || []).map((q) => h("blockquote", { class: "quote" }, q))))));
@@ -97,86 +156,31 @@ function taskAsks(e) {
 function taskBrief(e) {
   const r = e.brief;
   if (!r) return null;
-  const b = r.data && typeof r.data === "object" ? r.data : {};
-  const known = b.text || b.goal || b.context || b.risk || (b.open_questions || []).length;
+  const b = briefData(e);
+  const known = b.text || b.goal || b.context || b.risk || (b.open_questions || []).length || (b.tags || []).length;
   return h("section", { class: "d-brief", "aria-label": t("Brief") },
-    h("h2", { class: "d-sub" }, t("Brief")),
-    b.text ? h("div", { class: "draft-text" }, b.text) : null,
     b.goal ? h("p", { class: "goal" }, b.goal) : null,
+    b.text ? renderMarkdown(b.text, { fold: 8, key: "brief:" + e.id }) : null,
     b.context ? h("p", {}, b.context) : null,
     b.risk ? h("p", { class: "risk-" + b.risk }, t("Risk: {risk}", { risk: b.risk }), b.risk_why ? ` (${b.risk_why})` : "") : null,
     (b.open_questions || []).length ? h("ul", {}, ...b.open_questions.map((q) => h("li", {}, q))) : null,
+    (b.tags || []).length ? h("div", { class: "d-brief-tags" }, ...b.tags.map((x) => h("span", { class: "pill" }, x))) : null,
     known ? null : h("pre", { class: "draft-text" }, JSON.stringify(r.data, null, 2)),
-    r.at ? h("div", { class: "meta" }, stamp(r.at)) : null);
+    r.at ? h("div", { class: "meta" }, h("time", { datetime: r.at }, fmtDate(r.at, "datetime"))) : null);
 }
 
-// resolveGate resolves gate g of task e with intent id; an intent that takes
-// an answer sends the option picked, if any, then the text typed in the gate.
-async function resolveGate(e, g, id, option) {
-  const intent = (g.intents || []).find((x) => x.id === id);
-  if (!intent) return null;
-  const args = {};
-  if (intent.answer) {
-    const text = (taskState.answers.get(g.id) || "").trim();
-    if (!text && !option) {
-      detailEnv.notice(t("{action}: write the answer first", { action: intent.label }), true);
-      return null;
-    }
-    args.answer = [option, text].filter(Boolean).join("\n");
-  }
-  try {
-    const out = await detailEnv.post("/api/gates/" + encodeURIComponent(g.id) + "/" + encodeURIComponent(id), verbBody(args));
-    detailEnv.notice(`${intent.label}: ${(e && (e.title || e.id)) || g.text || g.kind}`);
-    taskState.answers.delete(g.id);
-    detailEnv.changed();
-    return out || {};
-  } catch (err) {
-    detailEnv.notice(t("{action} failed: {error}", { action: intent.label, error: err.message }), true);
-    return null;
-  }
-}
-
-// gateCard is an open gate with its intents in the profile's order, each
-// with the digit that picks it while the card has the focus.
-function gateCard(e, g) {
-  const intents = g.intents || [];
-  const subject = g.subject && typeof g.subject === "object" ? g.subject : {};
-  const deflt = intents.find((x) => x.id === g.default);
-  return h("article", { class: "d-gate", "data-gate": String(g.id), "data-kind": g.kind, "aria-label": g.text || g.name || g.kind },
-    h("h3", { class: "d-sub" }, g.text || g.name || g.kind),
-    subject.text ? h("pre", { class: "draft-text" }, subject.text) : null,
-    g.delivery ? h("p", { class: "meta" }, g.delivery) : null,
-    g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: stamp(g.deadline) }) : t("Until {time}", { time: stamp(g.deadline) })) : null,
-    gateOptions(e, g, subject, intents),
-    intents.some((x) => x.answer) ? h("textarea", { rows: 2, "aria-label": t("Answer"), "data-focus": `gate:${g.id}:text`,
-      oninput: (ev) => { taskState.answers.set(g.id, ev.target.value); } }, taskState.answers.get(g.id) || "") : null,
-    h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
-      type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
-      onclick: () => resolveGate(e, g, x.id),
-    }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label))));
-}
-
-// gateOptions are the options of a question gate's message, the recommended first, each answering with
-// itself and the note typed below.
-function gateOptions(e, g, subject, intents) {
-  const answer = intents.find((x) => x.answer);
-  const opts = subject.options || [];
-  if (!answer || !opts.length) return null;
-  const ordered = [...opts.filter((o) => o.id === subject.recommend), ...opts.filter((o) => o.id !== subject.recommend)];
-  return h("div", { class: "q-options" }, ...ordered.map((o) => h("button", {
-    type: "button", class: "act" + (o.id === subject.recommend ? " primary" : ""), title: o.consequence || undefined,
-    "data-focus": `gate:${g.id}:option:${o.id}`, onclick: () => resolveGate(e, g, answer.id, o.id),
-  }, o.label, o.id === subject.recommend ? h("span", { class: "rec" }, " " + t("recommended")) : null)));
-}
-
+// taskGates are the decisions that wait on the task: its open gates, the draft it carries as a draft's own task,
+// and the drafts that wait on it, each a card.
 function taskGates(e) {
-  const d = isDraftTask(e) ? draftOf(e) : null;
-  const gates = (e.gates || []).filter((g) => g.status === "open" && !(d && g.kind === "draft"));
-  if (!gates.length && !d) return null;
+  const own = isDraftTask(e) ? draftOf(e) : null;
+  const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d) => !own || d.id !== own.id);
+  const gates = (e.gates || []).filter((g) => g.status === "open" && !(own && g.subject === own) && !drafts.some((d) => d.gate && d.gate === g.id));
+  if (!gates.length && !own && !drafts.length) return null;
   return h("section", { class: "d-gates", "aria-label": t("Open gates") },
     h("h2", { class: "d-sub" }, t("Waiting on you")),
     ...gates.map((g) => gateCard(e, g)),
-    d ? draftCard(e, "detail") : null);
+    own ? draftCard(e, own, { scope: "detail" }) : null,
+    ...drafts.map((d) => draftCard(e, d, { scope: "detail" })));
 }
 
 const RUN_PATHS = { open: "/api/runs/{seq}/open", enter: "/api/runs/{seq}/enter", transcript: "/api/runs/{seq}/transcript" };
@@ -231,7 +235,7 @@ function runCard(r) {
 function taskRuns(e) {
   const runs = e.runs || [];
   if (!runs.length) return null;
-  return h("section", { class: "d-runs", "aria-label": t("Runs") }, h("h2", { class: "d-sub" }, t("Runs")), ...runs.map(runCard));
+  return h("section", { class: "d-runs", "aria-label": t("Runs") }, ...runs.map(runCard));
 }
 
 function eventText(ev) {
@@ -256,7 +260,6 @@ function taskTimeline(e) {
   };
   const events = (taskState.timeline || []).filter((ev) => !kinds.length || kinds.includes(ev.kind));
   return h("section", { class: "d-timeline", "aria-label": t("Timeline") },
-    h("h2", { class: "d-sub" }, t("Timeline")),
     taskState.kindsSeen.length ? h("div", { class: "chips kinds", role: "group", "aria-label": t("Kinds") },
       h("button", { type: "button", class: "chip" + (kinds.length ? "" : " on"), "aria-pressed": String(!kinds.length), "data-focus": "timeline:kind:", onclick: () => pickKinds(e, []) }, t("all")),
       ...taskState.kindsSeen.map(chip)) : null,
@@ -318,7 +321,7 @@ function taskComposer(e) {
   const now = verbTask(verb).send === "now";
   const replies = [replyButton(t("Send reply"), "now", "task:compose:reply", now), replyButton(t("Save as draft"), "draft", "task:compose:draft", !now)];
   if (!now) replies.reverse();
-  return h("section", { class: "d-compose", "aria-label": t("Message") },
+  return h("section", { class: "compose d-compose", "aria-label": t("Message") },
     h("textarea", { rows: 3, "aria-label": t("Message"), placeholder: t("Write to the agent"), "data-focus": "task:compose:text",
       oninput: (ev) => { taskState.text = ev.target.value; },
       onkeydown: (ev) => {
@@ -343,8 +346,93 @@ function taskChildren(e) {
     })));
 }
 
-// taskPage is a task's page: its header, asks, brief, open gates, runs,
-// timeline, composer, children, related tasks and merged-from trace.
+// relatedVerbs are the buttons of the verbs e offers that take another task in: merge and relate.
+function relatedVerbs(e) {
+  const verbs = ["merge", "relate"].map((x) => offeredVerb(e, x)).filter(Boolean);
+  if (!verbs.length) return null;
+  return h("div", { class: "d-actions" }, ...verbs.map((v) => verbButton(e, v, verbLabel(v), () => pickTask(e, v), { scope: "related" })));
+}
+
+// TASK_TABS are the task page's tabs in their order: each one's label, whether e has anything to show in it,
+// the count its label carries, and its body. Timeline always shows.
+const TASK_TABS = [
+  { id: "brief", label: () => t("Brief"), shows: (e) => !!e.brief, count: () => 0, body: (e) => [taskBrief(e)] },
+  { id: "timeline", label: () => t("Timeline"), shows: () => true, count: () => (taskState.timeline || []).length, body: (e) => [taskTimeline(e)] },
+  { id: "asks", label: () => t("Asks"), shows: (e) => (e.asks || []).length > 0, count: (e) => (e.asks || []).length, body: (e) => [taskAsks(e)] },
+  { id: "related", label: () => t("Related"), shows: (e) => relatedCount(e) > 0, count: relatedCount, body: (e) => [taskRelated(e), taskChildren(e), taskMerged(e), relatedVerbs(e)] },
+  { id: "runs", label: () => t("Runs"), shows: (e) => (e.runs || []).length > 0, count: (e) => (e.runs || []).length, body: (e) => [taskRuns(e)] },
+];
+
+function relatedCount(e) {
+  return (e.related || []).length + (e.children || []).length + (e.merged_from || []).length;
+}
+
+// shownTabs are the tabs e has something in, in their order.
+function shownTabs(e) {
+  return TASK_TABS.filter((x) => x.shows(e));
+}
+
+// selectedTab is the tab picked when e shows it, else the first e shows.
+function selectedTab(e) {
+  const shown = shownTabs(e);
+  return (shown.find((x) => x.id === taskState.tab) || shown[0]).id;
+}
+
+// pickTab shows tab id; focus moves the focus to its tab, as the arrow keys do.
+function pickTab(id, focus) {
+  taskState.tab = id;
+  detailEnv.render();
+  if (!focus || typeof document === "undefined" || !document.querySelector) return;
+  const el = document.querySelector(`[data-focus="task:tab:${id}"]`);
+  if (el) el.focus();
+}
+
+// stepTab shows the tab delta tabs from the one shown on e, wrapping around; false when e has one tab.
+function stepTab(e, delta, focus) {
+  if (!e) return false;
+  const shown = shownTabs(e);
+  if (shown.length < 2) return false;
+  const at = shown.findIndex((x) => x.id === selectedTab(e));
+  pickTab(shown[(at + delta + shown.length) % shown.length].id, focus);
+  return true;
+}
+
+const TAB_KEYS = { ArrowRight: 1, ArrowLeft: -1 };
+
+// taskTabs are e's tabs with something in them, the one selected and the tab strip and panel; the strip is a
+// tablist the arrow keys move along.
+function taskTabs(e) {
+  const shown = shownTabs(e);
+  const selected = selectedTab(e);
+  const tab = shown.find((x) => x.id === selected);
+  const strip = h("div", {
+    class: "tabs", role: "tablist", "aria-label": t("Sections"),
+    onkeydown: (ev) => {
+      if (!TAB_KEYS[ev.key]) return;
+      if (ev.preventDefault) ev.preventDefault();
+      stepTab(e, TAB_KEYS[ev.key], true);
+    },
+  }, ...shown.map((x) => {
+    const on = x.id === selected;
+    const n = x.count(e);
+    return h("button", {
+      type: "button", role: "tab", class: "tab" + (on ? " on" : ""), id: "task-tab-" + x.id, "aria-selected": String(on), "aria-controls": "task-tabpanel",
+      tabindex: on ? 0 : -1, "data-focus": "task:tab:" + x.id, onclick: () => pickTab(x.id),
+    }, x.label(), n ? [" ", h("span", { class: "n" }, fmtNumber(n))] : null);
+  }));
+  const body = h("div", { class: "d-tabs" }, strip,
+    h("div", { class: "tabpanel", role: "tabpanel", id: "task-tabpanel", "aria-labelledby": "task-tab-" + selected }, tab.body(e)));
+  return { tabs: shown.map((x) => ({ id: x.id, label: x.label(), count: x.count(e) })), selected, body };
+}
+
+// taskVerbs are the profile's primary verbs the task offers, More over the rest, and the intents that serve it.
+function taskVerbs(e) {
+  const buttons = [...primaryVerbs(e), ...taskIntentButtons(e)].filter(Boolean);
+  return buttons.length ? h("div", { class: "verbs d-actions" }, ...buttons) : null;
+}
+
+// taskPage is a task's page: its head, facts, units, the decisions that wait on it, its verbs, its tabs and the
+// composer.
 function taskPage(e) {
-  return [taskHeader(e), taskAsks(e), taskBrief(e), taskGates(e), taskRuns(e), taskTimeline(e), taskComposer(e), taskChildren(e), taskRelated(e), taskMerged(e)];
+  return [taskHead(e), taskProps(e), taskLinks(e), taskGates(e), taskVerbs(e), taskTabs(e).body, taskComposer(e)];
 }

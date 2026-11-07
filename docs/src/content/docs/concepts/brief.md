@@ -20,7 +20,7 @@ With briefs on, the daemon writes a short preview of every open pull request in 
 | `breaking` | `api`, `schema`, `config`, `behavior`, `cli` |
 | `audience` | `end-user`, `internal`, `developer`, `operator` |
 
-A brief is a record of kind `brief` (see [the records](/concepts/tasks/#the-timeline-and-the-records)): the pull request keeps its newest, with its tags, and each task that holds the pull request takes its risk and, as its `effort`, its size. The cockpit shows the brief in the detail panel, and size and risk as pills on each row. The `/` filter searches the goal, and the `type:`, `size:`, `risk:` and `tag:` qualifiers read it. Profile blocks can depend on it: a block under `kind=fix/` or `tags/lang=go/` applies only to pull requests whose brief says so.
+A brief is a record of kind `brief` (see [the records](/concepts/tasks/#the-timeline-and-the-records)): the pull request keeps its newest, with its tags, and each task that holds the pull request takes its risk and, as its `effort`, its size. The cockpit shows the brief in the detail panel's Brief tab, its risk with the reason and its size in the panel's property grid, and size and risk as pills on each row. The `/` filter searches the goal, and the `type:`, `size:`, `risk:` and `tag:` qualifiers read it. Profile blocks can depend on it: a block under `kind=fix/` or `tags/lang=go/` applies only to pull requests whose brief says so.
 
 ## Slack conversations
 

@@ -40,6 +40,8 @@ approve = "aplicar o passo do plano selecionado"
 
 [help.detail]
 "detail:detach" = "abrir numa janela própria"
+"tab:next" = "próxima aba"
+"tab:prev" = "aba anterior"
 
 [help.question]
 "answer:{n}" = "a opção {n} da decisão"
