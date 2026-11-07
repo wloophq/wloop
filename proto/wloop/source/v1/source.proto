@@ -396,6 +396,9 @@ message Draft {
   DraftOrigin origin = 13;
   string state = 14;
   DraftEvidence evidence = 15;
+  // broadcast is "on" or "off" for a thread reply also posted, or not, to its
+  // conversation, "" for a draft that replies in no thread.
+  string broadcast = 16;
 }
 
 message Placement {
@@ -522,6 +525,9 @@ message PlaceRequest {
 
 message PlaceResponse {
   string target = 1;
+  // broadcast is the draft's broadcast as proposed: "" when it replies in no
+  // thread, else "on" or "off".
+  string broadcast = 2;
 }
 
 message PublishRequest {

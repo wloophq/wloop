@@ -67,7 +67,7 @@ func init() {
 }
 
 func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
-	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Nudge, Target: "#general",
+	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Nudge, Target: "#general", Broadcast: draft.BroadcastOn,
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true, Replaced: "pong",
 		Origin: draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA",
 			Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}, Session: "s-worker"},
@@ -93,7 +93,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	full.State, full.Reason, full.Error = draft.Sent, "", "may have been posted"
 	full.Evidence = draft.Evidence{Ref: "1.5", Permalink: "https://example.test/p", At: at.Add(time.Second)}
 	full.SendingAt, full.UpdatedAt = at.Add(time.Millisecond), at.Add(2*time.Second)
-	full.Reaction, full.Items = "eyes", nil
+	full.Reaction, full.Items, full.Broadcast = "eyes", nil, draft.BroadcastOff
 	if _, err := s.Update(ctx, full, draft.Held); err != nil {
 		t.Fatal(err)
 	}

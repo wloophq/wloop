@@ -291,6 +291,37 @@ done({ Without: labels(draft(input.bare)), With: labels(c),
 	}
 }
 
+func TestADraftCardTogglesAThreadReplysBroadcast(t *testing.T) {
+	var got struct {
+		On, Plain, Sent []bool
+		Boxes           int
+		Posts           []any
+	}
+	on := pendingDraft()
+	on.Broadcast = "on"
+	plain := pendingDraft()
+	sent := pendingDraft()
+	sent.Broadcast, sent.State = "off", "sent"
+	runGate(t, `
+const box = (c) => walk(c, (x) => x.tag === "input" && attr(x, "type") === "checkbox");
+const c = draft(input.on);
+const checked = (c) => box(c).map((b) => "checked" in b.attrs);
+const on = checked(c);
+await focus(c, "outbox:broadcast:draft:7").on.change({ target: { checked: false } });
+done({ On: on, Plain: checked(draft(input.plain)), Sent: box(draft(input.sent)).map((b) => "disabled" in b.attrs), Boxes: box(c).length, Posts: posts });`,
+		map[string]any{"on": on, "plain": plain, "sent": sent}, &got)
+	if !slices.Equal(got.On, []bool{true}) || len(got.Plain) != 0 {
+		t.Errorf("checkboxes on a broadcast reply %v, on a draft in no thread %v", got.On, got.Plain)
+	}
+	if !slices.Equal(got.Sent, []bool{true}) {
+		t.Errorf("a sent draft's checkbox disabled %v, want off", got.Sent)
+	}
+	posted := mustJS(t, got.Posts)
+	if len(got.Posts) != 1 || !strings.Contains(posted, "/api/tasks/draft:7/edit") || !strings.Contains(posted, `"broadcast":"false"`) {
+		t.Errorf("posts %s, want the draft's edit verb with broadcast false", posted)
+	}
+}
+
 func TestADraftCardNamesItsMentions(t *testing.T) {
 	var got []map[string]string
 	d := pendingDraft()

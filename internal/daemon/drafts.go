@@ -171,13 +171,15 @@ type noPublisher struct {
 func (n noPublisher) Error() string { return n.err.Error() }
 func (n noPublisher) Unwrap() error { return n.err }
 
-// draftAction is what a draft verb takes: Text an approval posts or an edit sets, Reason a discard's, Confirm a
-// retry's of a draft that may have been posted, Rev the draft's version the caller showed.
+// draftAction is what a draft verb takes: Text an approval posts or an edit sets, Broadcast an edit's turn of a
+// thread reply's broadcast, Reason a discard's, Confirm a retry's of a draft that may have been posted, Rev the
+// draft's version the caller showed.
 type draftAction struct {
-	Text    *string
-	Reason  string
-	Confirm bool
-	Rev     *int64
+	Text      *string
+	Broadcast *bool
+	Reason    string
+	Confirm   bool
+	Rev       *int64
 }
 
 // draftDo runs action on draft id as actor: refused with pluginOff when the draft's plugin is disabled, but for
@@ -205,10 +207,10 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		}
 		got, err = s.decideDraft(ctx, d, gate.Approved, a.Text, actor)
 	case "edit":
-		if a.Text == nil {
-			return draft.Draft{}, badRequest{"edit takes the draft's new text"}
+		if a.Text == nil && a.Broadcast == nil {
+			return draft.Draft{}, badRequest{"edit takes the draft's new text or broadcast"}
 		}
-		got, err = o.Edit(ctx, id, *a.Text)
+		got, err = o.Amend(ctx, id, outbox.Amendment{Text: a.Text, Broadcast: a.Broadcast})
 	case "discard":
 		if d.State == draft.Held {
 			got, err = s.decideDraft(ctx, d, gate.Rejected, nil, actor)
@@ -362,6 +364,13 @@ func (s *Server) draftVerb(handler string) coretasks.VerbHandler {
 			a.Text = &text
 		}
 		a.Reason = req.Args["reason"]
+		if raw, ok := req.Args["broadcast"]; ok {
+			b, err := strconv.ParseBool(raw)
+			if err != nil {
+				return coretasks.Result{}, fmt.Errorf("%w: broadcast is true or false, not %q", coretasks.ErrArgs, raw)
+			}
+			a.Broadcast = &b
+		}
 		if raw, ok := req.Args["confirm"]; ok {
 			b, err := strconv.ParseBool(raw)
 			if err != nil {
@@ -411,7 +420,7 @@ func taskDraftError(err error) error {
 // draftView is d on the wire, with g, its gate, and its actions as they stand.
 func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
-		Target: d.Target, Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
+		Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},
 		State: string(d.State), Error: d.Error, Reason: d.Reason, Permalink: d.Evidence.Permalink, Gate: g.ID,
@@ -628,6 +637,9 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	rctx, scope := meter.Start(ctx, meter.Loop("drafts"))
 	if err := o.Recover(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: recover: %v", err)
+	}
+	if err := o.PlaceBroadcasts(rctx); err != nil && ctx.Err() == nil {
+		s.logf("drafts: placing broadcasts: %v", err)
 	}
 	s.adoptDrafts(rctx)
 	scope.End()

@@ -117,6 +117,7 @@ func (ps *pubSlack) publisher(allow ...string) *Publisher {
 
 func (ps *pubSlack) publisherWith(token func() (auth.Token, error), allow ...string) *Publisher {
 	p := PublisherOver(ps.f.db, &send.Service{Client: ps.f.slack.Client, PostAllowlist: allow}, token, ps.f.host.Broker().Items, func() time.Time { return ps.f.now }, ps.f.logs.logf)
+	p.Profile = ps.f.host.Broker().Profile
 	p.People = func(context.Context, unit.Unit) ([]items.Person, error) {
 		return []items.Person{
 			{Key: "github:octo", Name: "Octo Cat"},

@@ -57,7 +57,7 @@ func TaskID(s string) (task.ID, error) {
 // WireDraft is d as the protocol carries it.
 func WireDraft(d draft.Draft) src.Draft {
 	return src.Draft{ID: int64(d.ID), Unit: Wire(d.Unit), Items: d.Items, Task: d.Task, Kind: string(d.Kind), Purpose: d.Purpose,
-		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
+		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: src.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent, Workflow: d.Origin.Workflow,
 			Rule: d.Origin.Rule, Key: d.Origin.Key, Unit: wireOrZero(d.Origin.Unit)},
 		State: string(d.State), Evidence: src.Evidence(d.Evidence)}
@@ -82,7 +82,7 @@ func (c Units) Draft(d src.Draft) (draft.Draft, error) {
 		return draft.Draft{}, err
 	}
 	out := draft.Draft{ID: draft.ID(d.ID), Unit: u, Items: d.Items, Task: d.Task, Kind: draft.Kind(d.Kind), Purpose: d.Purpose,
-		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
+		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: draft.Origin{Kind: draft.OriginKind(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Key: d.Origin.Key},
 		Evidence: draft.Evidence(d.Evidence)}

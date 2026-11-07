@@ -199,6 +199,7 @@
 "Could not load the {step} step: {error}" = "Could not load the {step} step: {error}"
 "Could not load the {view} list: {error}" = "Could not load the {view} list: {error}"
 "Counts" = "Counts"
+"Also send to the conversation" = "Also send to the conversation"
 "destination unknown" = "destination unknown"
 "Draft" = "Draft"
 "Draft text" = "Draft text"

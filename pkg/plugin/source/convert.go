@@ -300,7 +300,7 @@ func draftPB(d Draft) *pb.Draft {
 	o := d.Origin
 	return &pb.Draft{
 		Id: d.ID, Unit: unitPB(d.Unit), Items: d.Items, Task: d.Task, Kind: d.Kind, Purpose: d.Purpose,
-		Delivery: d.Delivery, Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction,
+		Delivery: d.Delivery, Effects: d.Effects, Target: d.Target, Broadcast: d.Broadcast, Text: d.Text, Reaction: d.Reaction,
 		Replaced: d.Replaced, State: d.State, Evidence: draftEvidencePB(d.Evidence),
 		Origin: &pb.DraftOrigin{Kind: o.Kind, TurnSeq: o.TurnSeq, Intent: o.Intent, Workflow: o.Workflow, Rule: o.Rule, Key: o.Key, Unit: unitPB(o.Unit)},
 	}
@@ -310,7 +310,7 @@ func draftGo(d *pb.Draft) Draft {
 	o := d.GetOrigin()
 	return Draft{
 		ID: d.GetId(), Unit: unitGo(d.GetUnit()), Items: d.GetItems(), Task: d.GetTask(), Kind: d.GetKind(), Purpose: d.GetPurpose(),
-		Delivery: d.GetDelivery(), Effects: d.GetEffects(), Target: d.GetTarget(), Text: d.GetText(), Reaction: d.GetReaction(),
+		Delivery: d.GetDelivery(), Effects: d.GetEffects(), Target: d.GetTarget(), Broadcast: d.GetBroadcast(), Text: d.GetText(), Reaction: d.GetReaction(),
 		Replaced: d.GetReplaced(), State: d.GetState(), Evidence: draftEvidenceGo(d.GetEvidence()),
 		Origin: DraftOrigin{Kind: o.GetKind(), TurnSeq: o.GetTurnSeq(), Intent: o.GetIntent(), Workflow: o.GetWorkflow(), Rule: o.GetRule(), Key: o.GetKey(), Unit: unitGo(o.GetUnit())},
 	}

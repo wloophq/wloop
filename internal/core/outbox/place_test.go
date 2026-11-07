@@ -11,17 +11,18 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// placing names the target of a draft proposed without one.
+// placing names the target of a draft proposed without one, and its broadcast.
 type placing struct {
 	*fakeEffects
-	target string
-	refuse error
-	asked  []draft.Draft
+	target    string
+	broadcast draft.Broadcast
+	refuse    error
+	asked     []draft.Draft
 }
 
-func (p *placing) Place(ctx context.Context, d draft.Draft) (string, error) {
+func (p *placing) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	p.asked = append(p.asked, d)
-	return p.target, p.refuse
+	return draft.Placed{Target: p.target, Broadcast: p.broadcast}, p.refuse
 }
 
 func withPlacer(e *env, target string) *placing {
@@ -46,13 +47,13 @@ func TestADraftWithNoTargetStoresItsPlacement(t *testing.T) {
 	}
 }
 
-func TestAnExplicitTargetIsNotPlaced(t *testing.T) {
+func TestAnExplicitTargetIsKept(t *testing.T) {
 	e := newEnv()
 	pl := withPlacer(e, "msg:elsewhere")
 	p := reply("done")
 	p.Unit, p.Target = segment, "U000BBB"
-	if d := e.propose(p); d.Target != "U000BBB" || len(pl.asked) != 0 {
-		t.Fatalf("target %q, asked %d", d.Target, len(pl.asked))
+	if d := e.propose(p); d.Target != "U000BBB" || len(pl.asked) != 1 || pl.asked[0].Target != "U000BBB" {
+		t.Fatalf("target %q, asked %+v", d.Target, pl.asked)
 	}
 }
 

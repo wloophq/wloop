@@ -35,9 +35,12 @@ type posting struct {
 	withdrawals []src.Withdrawal
 }
 
-func (p posting) Validate(context.Context, src.Draft) error        { return nil }
-func (p posting) Where(context.Context, src.Draft) (string, error) { return "", nil }
-func (p posting) Place(context.Context, src.Draft) (string, error) { return "", nil }
+func (p posting) Validate(context.Context, src.Draft) error            { return nil }
+func (p posting) Where(context.Context, src.Draft) (string, error)     { return "", nil }
+func (p posting) Place(context.Context, src.Draft) (src.Placed, error) { return src.Placed{}, nil }
+
+var _ src.Publisher = posting{}
+
 func (p posting) Verify(context.Context, src.Draft, time.Time) (src.Evidence, bool, error) {
 	return src.Evidence{}, false, nil
 }

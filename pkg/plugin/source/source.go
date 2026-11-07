@@ -87,7 +87,7 @@ type Presenter interface {
 type Publisher interface {
 	Validate(ctx context.Context, d Draft) error
 	Where(ctx context.Context, d Draft) (string, error)
-	Place(ctx context.Context, d Draft) (string, error)
+	Place(ctx context.Context, d Draft) (Placed, error)
 	Publish(ctx context.Context, d Draft) (Evidence, error)
 	Verify(ctx context.Context, d Draft, startedAt time.Time) (Evidence, bool, error)
 }

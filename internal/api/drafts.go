@@ -38,6 +38,9 @@ type Draft struct {
 	Delivery string   `json:"delivery"`
 	Effects  []string `json:"effects"`
 	Target   string   `json:"target"`
+	// Broadcast is "on" or "off" for a thread reply also posted, or not, to its conversation, which edit's
+	// broadcast argument turns; "" when the draft replies in no thread.
+	Broadcast string `json:"broadcast"`
 	// Where names the conversation or person the draft posts to; "" when its publisher could not tell.
 	Where string `json:"where"`
 	Text  string `json:"text"`

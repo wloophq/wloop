@@ -261,6 +261,23 @@ func TestCallToolDraftOpensTheSessionsGate(t *testing.T) {
 	}
 }
 
+func TestCallToolDraftCarriesTheBroadcastItAsks(t *testing.T) {
+	t.Parallel()
+	f := newToolFixture(t, true)
+	for i, tc := range []struct{ args, want string }{
+		{`{"text":"Done","broadcast":true}`, "on"},
+		{`{"text":"Done","broadcast":false}`, "off"},
+		{`{"text":"Done"}`, ""},
+	} {
+		if r := f.call(t, ToolDraft, tc.args); r.Answer != "proposed" {
+			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
+		}
+		if got := f.h.Gates()[i].Draft.Broadcast; got != tc.want {
+			t.Errorf("%s: broadcast %q, want %q", tc.args, got, tc.want)
+		}
+	}
+}
+
 func TestCallToolReadsAndSearchesAsText(t *testing.T) {
 	t.Parallel()
 	f := newToolFixture(t, true)
