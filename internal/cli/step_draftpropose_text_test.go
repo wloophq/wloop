@@ -11,7 +11,10 @@ import (
 
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 // templateLayers are the bundled layer, read from a map holding wf's text in English and pt-BR, and a user
@@ -98,6 +101,16 @@ func TestADraftTemplateCanUsePlural(t *testing.T) {
 	})
 	if body, _ := renderTemplate(t, layers, bundled, "pt-BR", []int{1, 2}); body != "estes" {
 		t.Errorf("plural: %q", body)
+	}
+}
+
+func BenchmarkADraftsLanguageAndTemplate(b *testing.B) {
+	layers := profile.Chain(config.Config{})
+	for b.Loop() {
+		lang := draftLanguage(workflow.Facts{"slack.language": "pt"}, "slack.language", "en", intentload.Locales(layers, turn.BundledFS()))
+		if _, _, err := draftTemplate(layers, turn.BundledFS(), "task-not-mine", defaultDraftText, draft.Message, lang); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

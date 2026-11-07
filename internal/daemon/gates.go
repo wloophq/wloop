@@ -22,8 +22,10 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 )
@@ -92,8 +94,9 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]api.GateView, len(gs))
+	byUnit := map[unit.Unit][]items.Item{}
 	for i, g := range gs {
-		out[i] = s.gateView(ctx, g)
+		out[i] = s.gateView(ctx, g, byUnit)
 	}
 	writeJSON(w, out)
 }
@@ -147,7 +150,7 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		writeGateError(w, err)
 		return
 	}
-	writeJSON(w, s.gateView(ctx, g))
+	writeJSON(w, s.gateView(ctx, g, map[unit.Unit][]items.Item{}))
 }
 
 func writeGateError(w http.ResponseWriter, err error) {
@@ -171,12 +174,12 @@ func writeGateError(w http.ResponseWriter, err error) {
 }
 
 // gateView is g as clients offer it: a draft gate with its draft as its subject and its delivery, a question,
-// post or proposal gate with its message.
-func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
+// post or proposal gate with its message. A draft's items are read once into byUnit.
+func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.GateView {
 	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
 		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
 			if d, err := o.Store.Get(ctx, draft.ID(id)); err == nil {
-				return s.draftGateView(g, s.draftDetail(ctx, d, g, nil))
+				return s.draftGateView(g, s.draftDetail(ctx, d, g, s.itemsOnce(ctx, byUnit, d.Unit)))
 			}
 		}
 	}
@@ -257,7 +260,7 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 	}
 	for _, g := range gs {
 		if g.Status == gate.Open {
-			v.Gates = append(v.Gates, ev.s.gateView(ctx, g))
+			v.Gates = append(v.Gates, ev.s.gateView(ctx, g, ev.unitItems()))
 		}
 	}
 	return nil

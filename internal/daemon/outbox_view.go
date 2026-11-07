@@ -225,6 +225,14 @@ func draftTitle(d draft.Draft, where string) string {
 	return fmt.Sprintf("%s on %s: %s", d.Purpose, where, first)
 }
 
+// unitItems are the items the page read, by unit, for itemsOnce.
+func (ev *taskViewer) unitItems() map[unit.Unit][]items.Item {
+	if ev.items == nil {
+		ev.items = map[unit.Unit][]items.Item{}
+	}
+	return ev.items
+}
+
 // withDraft sets a draft task's gate on v, its subject the draft, and its verbs: approve and dismiss while its gate
 // is open, dismiss also while its delivery may still go, edit and retry as the draft's actions stand; the others
 // are refused.
@@ -245,10 +253,7 @@ func (ev *taskViewer) withDraft(ctx context.Context, e task.Task, v *api.TaskVie
 	if err != nil {
 		return err
 	}
-	if ev.items == nil {
-		ev.items = map[unit.Unit][]items.Item{}
-	}
-	dv := s.draftDetail(ctx, d, g, s.itemsOnce(ctx, ev.items, d.Unit))
+	dv := s.draftDetail(ctx, d, g, s.itemsOnce(ctx, ev.unitItems(), d.Unit))
 	if g.ID != 0 {
 		v.Gates = []api.GateView{s.draftGateView(g, dv)}
 	}

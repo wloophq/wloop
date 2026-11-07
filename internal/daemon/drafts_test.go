@@ -964,6 +964,18 @@ func TestMentionNamesReadsEveryPersonOfTheItems(t *testing.T) {
 	}
 }
 
+func BenchmarkMentionNamesOfAThreadsItems(b *testing.B) {
+	its := make([]items.Item, 40)
+	for i := range its {
+		its[i] = items.Item{Requester: items.Person{Key: fmt.Sprintf("slack:UREQ%d", i), Name: "R"},
+			WaitingOn: []items.Person{{Key: fmt.Sprintf("slack:UW%d", i), Name: "W", Aliases: []string{fmt.Sprintf("github:w%d", i)}}}}
+	}
+	text := "@{slack:UW1} @{slack:UW2} @{github:w3}, any news on these?\n- one\n- two\n- three"
+	for b.Loop() {
+		mentionNames(text, its)
+	}
+}
+
 type takingFx struct{ *fakeFx }
 
 func (takingFx) Takes(target string) bool { return strings.HasPrefix(target, "#") }

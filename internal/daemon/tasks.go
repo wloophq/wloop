@@ -237,7 +237,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if ok && listed[e.ID] {
-			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate))
+			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate, vs.unitItems()))
 		}
 	}
 	writeJSON(w, page)
