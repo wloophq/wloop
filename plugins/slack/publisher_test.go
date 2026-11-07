@@ -233,12 +233,12 @@ func TestPublishConvertsMarkdown(t *testing.T) {
 
 func TestPublishConvertsMentions(t *testing.T) {
 	ps := newPubSlack(t)
-	text := "@{slack:U000000AAA} and @{github:octo}, **@{github:sneaky}**, @{group:infra}, @{group:channel participants}"
+	text := "@{slack:U000000AAA} and @{github:octo}, **@{github:sneaky}**, @{group:infra}, @{group:channel participants} @{see below}"
 	if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
 		t.Fatal(err)
 	}
 	got := ps.posted(t).Get("text")
-	want := "<@U000000AAA> and Octo Cat, *@\u2060here &lt;@\u2060U0000000009&gt; &amp; &lt;!channel&gt;*, infra, channel participants"
+	want := "<@U000000AAA> and Octo Cat, *@\u2060here &lt;@\u2060U0000000009&gt; &amp; &lt;!channel&gt;*, infra, channel participants @{see below}"
 	if got != want {
 		t.Fatalf("posted %q, want %q", got, want)
 	}

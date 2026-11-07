@@ -40,7 +40,7 @@ func purposeName(purpose string) string {
 	return strings.ReplaceAll(purpose, "_", " ")
 }
 
-var mentionToken = regexp.MustCompile(`@\{([^{}\n]+)\}`)
+var mentionToken = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 
 // mentionName is how a mention key reads: the name the unit's items know, else the id after the provider.
 func mentionName(d api.Draft, key string) string {

@@ -108,7 +108,8 @@ function mdInline(s, names, depth = 0, links = true) {
   const out = [];
   const closers = mdClosers(s);
   const labelEnd = links ? mdLabelEnds(s) : null;
-  const keyEnd = names ? mdKeyEnds(s) : null;
+  const keyEnd = names ? mdKeyEnds(s, true) : null;
+  const groupEnd = names ? mdKeyEnds(s, false) : null;
   let start = 0;
   const flush = (i) => {
     if (i > start) out.push(s.slice(start, i));
@@ -162,8 +163,9 @@ function mdInline(s, names, depth = 0, links = true) {
         continue;
       }
     }
-    if (names && c === "@" && s[i + 1] === "{" && s[keyEnd[i + 2]] === "}" && keyEnd[i + 2] > i + 2) {
-      const end = keyEnd[i + 2];
+    const ends = names && (s.startsWith("group:", i + 2) ? groupEnd : keyEnd);
+    if (names && c === "@" && s[i + 1] === "{" && s[ends[i + 2]] === "}" && ends[i + 2] > i + 2) {
+      const end = ends[i + 2];
       const key = s.slice(i + 2, end);
       flush(i);
       out.push(h("span", { class: "mention", title: key }, "@" + (Object.hasOwn(names, key) ? names[key] : key)));
@@ -248,10 +250,12 @@ function mdLabelEnds(s) {
   return end;
 }
 
-// mdKeyEnds holds, for each position, where a mention key starting there would end: the next brace or line end.
-function mdKeyEnds(s) {
+// mdKeyEnds holds, for each position, where a mention key starting there would end: the next brace or line end,
+// or, when spaces end it as they end every key but a group's, the next brace or space.
+function mdKeyEnds(s, spaces) {
   const end = new Int32Array(s.length + 1);
   end[s.length] = s.length;
-  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "{" || s[i] === "}" || s[i] === "\n" ? i : end[i + 1];
+  const stop = spaces ? (ch) => /\s/.test(ch) : (ch) => ch === "\n";
+  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "{" || s[i] === "}" || stop(s[i]) ? i : end[i + 1];
   return end;
 }
