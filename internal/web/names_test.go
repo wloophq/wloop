@@ -71,7 +71,7 @@ globalThis.document = { activeElement: null, body: { classList: { add() {} } } }
 	if got.Pills != 1 {
 		t.Errorf("%d waiting pills in the head %q, want 1", got.Pills, got.Head)
 	}
-	for _, s := range []string{"#general", "Ana owes the doc", "@team-a", "last activity 2026-10-23T14:15:00Z"} {
+	for _, s := range []string{"#general", "Ana owes the doc", "@team-a", "last activity10/23"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the detail lacks %q: %s", s, got.Text)
 		}

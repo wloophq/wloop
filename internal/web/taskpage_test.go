@@ -213,3 +213,40 @@ done(seen);`, pageAnswers(t), &got)
 		t.Errorf("tabs %q, want %q", got, want)
 	}
 }
+
+func TestPropsUseTheProfilesWords(t *testing.T) {
+	e := pageTask(t)
+	e.Props = map[string]json.RawMessage{"kind": raw(t, "capture"), "priority": raw(t, "high"), "owner": raw(t, map[string]string{"key": "github:ana", "name": "Ana"})}
+	e.Brief = &api.RecordView{Kind: "brief", Data: raw(t, map[string]any{"risk": "high", "risk_why": "Perda de dados", "size": "m"})}
+	cat := taskCatalog()
+	cat.Props = []api.PropSpec{{Name: "kind", Type: "enum", Values: []string{"start", "capture"}}, {Name: "priority", Type: "enum", Values: []string{"low", "high"}}, {Name: "owner", Type: "actor"}}
+	cat.Facets = []api.FacetSpec{
+		{ID: "prop.kind", Fact: "task.prop.kind", Label: "Tipo", Labels: map[string]string{"capture": "captura"}},
+		{ID: "prop.priority", Fact: "task.prop.priority", Label: "Prioridade"},
+		{ID: "brief-risk", Fact: "brief.risk", Label: "Risco", Labels: map[string]string{"high": "alto"}},
+		{ID: "brief-size", Fact: "brief.size", Label: "Tamanho", Labels: map[string]string{"m": "M"}},
+	}
+	var got [][]string
+	runTaskPageOn(t, cat, `
+const props = taskProps(input.answers.task);
+const dts = walk(props, (x) => x.tag === "dt"), dds = walk(props, (x) => x.tag === "dd");
+done(dts.map((d, i) => [d.textContent, dds[i].textContent]));`, map[string]any{"task": e}, &got)
+	want := [][]string{{"Tipo", "captura"}, {"Prioridade", "high"}, {"owner", "Ana"}, {"Risco", "alto · Perda de dados"}, {"Tamanho", "M"}}
+	if mustJS(t, got) != mustJS(t, want) {
+		t.Errorf("props %v, want %v", got, want)
+	}
+}
+
+func TestTheDetailShowsEachSignalOnce(t *testing.T) {
+	e := pageTask(t)
+	e.Cards[0].Card.Signals = []card.Signal{{Key: "checks", Value: "failing", Tone: "bad"}}
+	answers := pageAnswers(t)
+	answers["/api/tasks/"+e.ID] = e
+	var got []string
+	runTaskPage(t, `
+const box = await page("t-0123456789abcdef");
+done(walk(box, (x) => x.children.some((c) => c.data !== undefined && c.data.includes("failing"))).map((x) => x.tag));`, answers, &got)
+	if !slices.Equal(got, []string{"dd"}) {
+		t.Errorf("the signal shows in %q, want one dd", got)
+	}
+}

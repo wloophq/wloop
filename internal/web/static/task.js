@@ -50,11 +50,18 @@ async function loadTaskDrafts(e) {
   if (taskState.id === e.id) taskState.drafts = (out && out.drafts) || [];
 }
 
-function propText(v) {
+// propText is a property's value as a person reads it: a name, or the word facet f gives the value.
+function propText(v, f) {
   if (v === null || v === undefined) return "";
-  if (Array.isArray(v)) return v.map(propText).filter(Boolean).join(", ");
+  if (Array.isArray(v)) return v.map((x) => propText(x, f)).filter(Boolean).join(", ");
   if (typeof v === "object") return v.name || v.key || "";
-  return String(v);
+  const labels = (f && f.labels) || {};
+  return Object.hasOwn(labels, String(v)) ? labels[String(v)] : String(v);
+}
+
+// taskFacetOf is the profile's task facet that reads fact, null when none does.
+function taskFacetOf(fact) {
+  return (taskCatalog().facets || []).find((f) => f.fact === fact && !f.provider) || null;
 }
 
 // LISTED_ROLES are the roles of the properties the page lists as tasks, not as text.
@@ -83,10 +90,15 @@ function moreWord(n) {
 function taskProps(e) {
   const props = e.props || {};
   const rows = (taskCatalog().props || []).filter((p) => !LISTED_ROLES.includes(p.role) && propText(props[p.name]))
-    .map((p) => [p.name, propText(props[p.name]), { "data-prop": p.name }]);
+    .map((p) => {
+      const f = taskFacetOf("task.prop." + p.name);
+      return [f ? f.label : p.name, propText(props[p.name], f), { "data-prop": p.name }];
+    });
   const b = briefData(e);
-  if (b.risk) rows.push([t("Risk"), [h("span", { class: "risk-" + b.risk }, b.risk), b.risk_why ? " · " + b.risk_why : null], { "data-prop": "brief:risk" }]);
-  if (b.size) rows.push([t("Size"), b.size, { "data-prop": "brief:size" }]);
+  const risk = taskFacetOf("brief.risk");
+  const size = taskFacetOf("brief.size");
+  if (b.risk) rows.push([risk ? risk.label : t("Risk"), [h("span", { class: "risk-" + b.risk }, propText(b.risk, risk)), b.risk_why ? " · " + b.risk_why : null], { "data-prop": "brief:risk" }]);
+  if (b.size) rows.push([size ? size.label : t("Size"), propText(b.size, size), { "data-prop": "brief:size" }]);
   for (const c of e.cards || []) {
     for (const g of (c.card || {}).signals || []) rows.push([g.key, g.at ? fmtDate(g.at, "datetime") : g.value, { class: "tone-" + (g.tone || "neutral") }]);
   }
@@ -103,7 +115,7 @@ function taskProps(e) {
 // taskLinks are the cards of the task's units that have one; the head names every unit.
 function taskLinks(e) {
   const cards = (e.units || []).map((u) => cardOf(e, u)).filter(Boolean);
-  return cards.length ? h("div", { class: "d-links" }, ...cards.map(unitCard)) : null;
+  return cards.length ? h("div", { class: "d-links" }, ...cards.map((c) => unitCard(c, { signals: false }))) : null;
 }
 
 function cardOf(e, u) {

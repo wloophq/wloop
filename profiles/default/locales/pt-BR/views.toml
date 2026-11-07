@@ -133,17 +133,36 @@ label = "Sinais"
 [facets."prop.kind"]
 label = "Tipo"
 
+[facets."prop.kind".values]
+start = "trabalho novo"
+capture = "captura"
+project = "projeto"
+
 [facets."prop.area"]
 label = "Área"
 
 [facets."prop.risk"]
 label = "Risco da tarefa"
 
+[facets."prop.risk".values]
+high = "alto"
+medium = "médio"
+low = "baixo"
+
 [facets."prop.focus"]
 label = "Foco"
 
+[facets."prop.focus".values]
+on = "com estrela"
+off = "sem estrela"
+
 [facets."prop.priority"]
 label = "Prioridade"
+
+[facets."prop.priority".values]
+high = "alta"
+normal = "normal"
+low = "baixa"
 
 [facets.type]
 label = "Tipo"
@@ -153,6 +172,11 @@ empty = "sem brief"
 label = "Risco"
 empty = "sem brief"
 label_prefix = "risco "
+
+[facets.risk.values]
+high = "alto"
+medium = "médio"
+low = "baixo"
 
 [facets.size]
 label = "Tamanho"

@@ -434,10 +434,10 @@ function unitRef(u, label, link) {
   ];
 }
 
-// unitCard is a unit's stored card (#unit-card).
-function unitCard(s) {
+// unitCard is a unit's stored card (#unit-card); opts.signals false leaves its signals to a grid that shows them.
+function unitCard(s, opts = {}) {
   const c = s.card || {};
-  const signals = c.signals || [];
+  const signals = opts.signals === false ? [] : c.signals || [];
   const lh = c.last_human;
   return h("section", { class: "d-card" + (s.stale ? " stale" : ""), "aria-label": t("Card") },
     h("div", { class: "meta" },

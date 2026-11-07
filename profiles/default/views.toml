@@ -215,6 +215,11 @@ label = "Kind"
 group = true
 sort  = "text"
 
+[facets."prop.kind".values]
+start   = "new work"
+capture = "capture"
+project = "project"
+
 [facets."prop.area"]
 fact  = "task.prop.area"
 label = "Area"
@@ -229,6 +234,11 @@ group = true
 sort  = "rank"
 rank  = ["high", "medium", "low"]
 
+[facets."prop.risk".values]
+high   = "high"
+medium = "medium"
+low    = "low"
+
 [facets."prop.focus"]
 fact  = "task.prop.focus"
 label = "Focus"
@@ -236,12 +246,21 @@ group = true
 sort  = "rank"
 rank  = ["on", "off"]
 
+[facets."prop.focus".values]
+on  = "starred"
+off = "not starred"
+
 [facets."prop.priority"]
 fact  = "task.prop.priority"
 label = "Priority"
 group = true
 sort  = "rank"
 rank  = ["high", "normal", "low"]
+
+[facets."prop.priority".values]
+high   = "high"
+normal = "normal"
+low    = "low"
 
 [facets.type]
 fact  = "brief.kind"
@@ -262,6 +281,11 @@ empty = "no brief"
 merge = "rows-first"
 show  = "meta"
 label_prefix = "risk "
+
+[facets.risk.values]
+high   = "high"
+medium = "medium"
+low    = "low"
 
 [facets.size]
 fact  = "brief.size"
