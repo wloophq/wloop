@@ -201,6 +201,9 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	if d.Permalink == "" {
 		fmt.Fprintf(w, "to:       %s\n", draftWhere(d))
 	}
+	if d.Broadcast != "" {
+		fmt.Fprintf(w, "broadcast: %s\n", d.Broadcast)
+	}
 	origin := d.Origin.Kind
 	switch {
 	case d.Origin.TurnSeq > 0:
