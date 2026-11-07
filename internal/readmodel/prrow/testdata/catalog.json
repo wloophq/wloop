@@ -1,5 +1,5 @@
 {
-  "version": "72cd38bb6844",
+  "version": "fe90b28b0f24",
   "views": [
     {
       "id": "mine",
@@ -142,6 +142,9 @@
       "rank": [
         "me"
       ],
+      "labels": {
+        "me": "me"
+      },
       "menu": true,
       "show": "meta",
       "show_values": "first",
@@ -185,6 +188,9 @@
       "label": "Waits on (person)",
       "provider": "github",
       "group": true,
+      "labels": {
+        "me": "me"
+      },
       "match": "team",
       "menu": true,
       "show": "who"
@@ -259,6 +265,11 @@
         "medium",
         "low"
       ],
+      "labels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium"
+      },
       "empty": "no brief",
       "menu": true,
       "show": "meta",
