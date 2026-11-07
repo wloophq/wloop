@@ -12,4 +12,6 @@ import (
 func Available() bool { return false }
 
 // Run needs a darwin build with the purego tag.
-func Run(string, *texts.Catalog, func(window.Host)) { panic("the window needs macOS and the purego build tag") }
+func Run(string, *texts.Catalog, func(window.Host)) {
+	panic("the window needs macOS and the purego build tag")
+}

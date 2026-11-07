@@ -157,10 +157,14 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	if len(pos) > 1 {
-		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>>] [--print] [--view <view>]")
+		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>> | <cockpit URL> | #<route>] [--print] [--view <view>]")
+	}
+	route, isRoute := "", len(pos) == 0
+	if len(pos) == 1 {
+		route, isRoute = cockpitRoute(e.StateDir, pos[0])
 	}
 	var ref pr.Ref
-	if len(pos) == 1 {
+	if len(pos) == 1 && !isRoute {
 		if ref, err = pr.ParseURL(pos[0]); err != nil {
 			return err
 		}
@@ -172,16 +176,15 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(pos) == 1 && !*printURL {
+	if len(pos) == 1 && !isRoute && !*printURL {
 		out, err := c.Action(ctx, ref.Unit(), "open", api.ActionRequest{})
 		printLines(e.Out, out)
 		return err
 	}
-	route := ""
 	if *view != "" {
-		route = "view=" + url.QueryEscape(*view)
+		route = strings.TrimSuffix("view="+url.QueryEscape(*view)+"&"+route, "&")
 	}
-	if len(pos) == 1 {
+	if len(pos) == 1 && !isRoute {
 		route = strings.TrimPrefix(route+"&"+unitRoute(ref.Unit()), "&")
 	}
 	u, err := cockpitURL(e.StateDir, route)
@@ -192,7 +195,27 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 		_, err := fmt.Fprintln(e.Out, u)
 		return err
 	}
+	if res, err := c.Window(ctx, api.WindowRequest{Action: api.WindowOpen, Route: route}); err == nil && res.Delivered {
+		return nil
+	}
 	return e.openInBrowser(ctx, u)
+}
+
+// cockpitRoute reads arg as a cockpit route: a "#..." hash, or a URL of the
+// daemon's own cockpit, whose hash is the route.
+func cockpitRoute(stateDir, arg string) (string, bool) {
+	if hash, ok := strings.CutPrefix(arg, "#"); ok {
+		return hash, true
+	}
+	u, err := url.Parse(arg)
+	if err != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "localhost") {
+		return "", false
+	}
+	info, err := daemon.ReadInfo(filepath.Join(stateDir, httpInfoFile))
+	if err != nil || u.Port() != strconv.Itoa(info.Port) {
+		return "", false
+	}
+	return u.Fragment, true
 }
 
 // cockpitURL is the cockpit address with its token, at route, a hash
