@@ -149,3 +149,27 @@ process.stdout.write(JSON.stringify({ Queue: r.queue, Q: r.q, IDs: list.ids, Cap
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestHomeSectionRowsAreNoListItemsInAList(t *testing.T) {
+	var got struct{ Tags []string }
+	nodeRun(t, homePrelude(t), nil, homeRun+`
+process.stdout.write(JSON.stringify({ Tags: byClass(nodes, "rows").map((x) => x.tag) }));`, homeFixture(), &got)
+	if len(got.Tags) == 0 || slices.Contains(got.Tags, "ol") {
+		t.Fatalf("rows containers %v: a section's rows are divs, so they sit in a div, not a list", got.Tags)
+	}
+}
+
+func TestAScreenRowWithNoViewUsesTheProfilesFirstView(t *testing.T) {
+	var got struct{ Views []string }
+	nodeRun(t, viewsPrelude(t)+jsFunction(t, appJS(t), "screenRow"), nil, `
+tasksState.catalog = { views: [{ id: "mine", label: "Mine" }, { id: "later", label: "Later" }] };
+const views = [];
+const realLens = lensOf;
+lensOf = (r) => { views.push(r.view); return realLens(r); };
+screenRow({ id: "t-1", title: "one", units: [] });
+screenRow({ id: "t-2", title: "two", units: [] }, "later");
+process.stdout.write(JSON.stringify({ Views: views }));`, nil, &got)
+	if !slices.Equal(got.Views, []string{"mine", "later"}) {
+		t.Fatalf("lens views %v: a row no view names takes the profile's first view, never a view id the client names", got.Views)
+	}
+}

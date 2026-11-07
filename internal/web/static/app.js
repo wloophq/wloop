@@ -2654,9 +2654,9 @@ async function loadQueue() {
   if (route.view === QUEUE) await queueLoad(route, screenEnv());
 }
 
-// screenRow is task e's row as the list of view draws it.
+// screenRow is task e's row as the list of view draws it, the profile's first view when none is named.
 function screenRow(e, view) {
-  const lens = lensOf({ view: view || "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+  const lens = lensOf({ view: view || (coreViews()[0] || { id: "" }).id, q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
   return rowView(taskModel(e, "", "", lens), lens);
 }
 

@@ -27,7 +27,7 @@ function homeSection(s, row) {
     h("header", { class: "home-head" },
       h("h2", {}, s.label),
       s.total > rows.length ? h("a", { class: "see-all", href: "#view=" + encodeURIComponent(s.view), "data-focus": "home:all:" + s.id }, tn("See all {n}", s.total)) : null),
-    rows.length ? h("ol", { class: "rows" }, ...rows.map((e) => row(e, s.view))) : h("p", { class: "empty" }, t("Nothing here right now.")));
+    rows.length ? h("div", { class: "rows" }, ...rows.map((e) => row(e, s.view))) : h("p", { class: "empty" }, t("Nothing here right now.")));
 }
 
 // homeCapture is the capture field: Enter captures what is typed as a new task and clears the field.
