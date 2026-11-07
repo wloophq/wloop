@@ -40,7 +40,7 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
-	app.Menu.Set(wailsMenu(menuOf(name, cat.T)))
+	app.Menu.Set(wailsMenu(menuOf(name, cat)))
 	h := newHost(app, name)
 	app.Event.OnApplicationEvent(events.Mac.ApplicationDidFinishLaunching, func(*application.ApplicationEvent) {
 		go application.InvokeSync(func() {
