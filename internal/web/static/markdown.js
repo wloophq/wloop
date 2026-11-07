@@ -248,10 +248,10 @@ function mdLabelEnds(s) {
   return end;
 }
 
-// mdKeyEnds holds, for each position, where a mention key starting there would end: the next brace or space.
+// mdKeyEnds holds, for each position, where a mention key starting there would end: the next brace or line end.
 function mdKeyEnds(s) {
   const end = new Int32Array(s.length + 1);
   end[s.length] = s.length;
-  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "{" || s[i] === "}" || /\s/.test(s[i]) ? i : end[i + 1];
+  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "{" || s[i] === "}" || s[i] === "\n" ? i : end[i + 1];
   return end;
 }

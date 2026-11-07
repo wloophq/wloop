@@ -288,7 +288,7 @@ func TestMarkdownNamesMentionsAsText(t *testing.T) {
 		}
 		mentions = append(mentions, m.Text+"|"+m.Attrs["title"])
 	}
-	want := []string{"@Ana|slack:UANA", "@slack:UBRUNO|slack:UBRUNO", "@<i>x</i>|<b>"}
+	want := []string{"@Ana|slack:UANA", "@slack:UBRUNO|slack:UBRUNO", "@x y|x y", "@<i>x</i>|<b>"}
 	if !slices.Equal(mentions, want) {
 		t.Errorf("mentions %q, want %q", mentions, want)
 	}
@@ -297,8 +297,5 @@ func TestMarkdownNamesMentionsAsText(t *testing.T) {
 	}
 	if code := got.tags("code"); len(code) != 1 || code[0].Text != "@{slack:UANA}" {
 		t.Errorf("code %+v, want the mention kept as written", code)
-	}
-	if !strings.Contains(got.Text, "@{x y}") {
-		t.Errorf("text %q keeps a key with a space as written", got.Text)
 	}
 }
