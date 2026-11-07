@@ -36,7 +36,7 @@ folder.attrs.onclick();
 process.stdout.write(JSON.stringify({ Closed: closed, Open: railLinks(), Label: text(folder.children[0]), Count: text(folder.children[1]),
   Expanded: expanded, ExpandedOn: byFocus(railEls.views.kids, "rail:empties").attrs["aria-expanded"], Omnibox: text(railEls["omnibox-entry"].kids) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	if want := []string{"Focus", "Inbox", "Outbox", "Fits now", "Waiting", "Projects", "Someday"}; !slices.Equal(got.Closed, want) {
+	if want := []string{"Home", "Focus", "Inbox", "Outbox", "Fits now", "Waiting", "Projects", "Someday"}; !slices.Equal(got.Closed, want) {
 		t.Errorf("rail %v, want %v: Logbook folds, Someday is the view shown", got.Closed, want)
 	}
 	if got.Label != "Empty" || got.Count != "1" || got.Expanded != "false" {
@@ -47,6 +47,35 @@ process.stdout.write(JSON.stringify({ Closed: closed, Open: railLinks(), Label: 
 	}
 	if got.Omnibox != "Search or ask⌘K" {
 		t.Errorf("the omnibox entry reads %q", got.Omnibox)
+	}
+}
+
+func TestRailListsHomeFirstAndHidesRailFalse(t *testing.T) {
+	cat := viewsCatalog()
+	cat.Views = append(cat.Views, api.TaskViewSpec{ID: "home-blocked", Label: "Blocked by you"})
+	counters := api.Counters{Views: map[string]int{"inbox": 3, "focus": 1, "outbox": 1, "fits-now": 1, "waiting": 1, "projects": 1, "someday": 1, "logbook": 1}}
+	var got struct {
+		Links    []string
+		Hrefs    []string
+		HomeOn   string
+		InboxOn  string
+		HomeHref string
+	}
+	nodeRun(t, viewsPrelude(t)+railDoc, nil, `
+tasksState.catalog = input.cat;
+const nav = viewNav(input.cat, [], [], input.counters);
+renderRail(nav, railRoute("home"));
+const links = all(railEls.views.kids, (x) => x.tag === "a");
+const homeOn = links[0].attrs["aria-current"];
+renderRail(nav, railRoute("inbox"));
+const again = all(railEls.views.kids, (x) => x.tag === "a");
+process.stdout.write(JSON.stringify({ Links: railLinks(), Hrefs: again.map((a) => a.attrs.href), HomeOn: homeOn || "", InboxOn: again[0].attrs["aria-current"] || "", HomeHref: again[0].attrs.href }));`,
+		map[string]any{"cat": cat, "counters": counters}, &got)
+	if len(got.Links) == 0 || got.Links[0] != "Home" || got.HomeHref != "#view=home" || slices.Contains(got.Links, "Blocked by you") {
+		t.Fatalf("rail %v, home href %q", got.Links, got.HomeHref)
+	}
+	if got.HomeOn != "page" || got.InboxOn != "" {
+		t.Errorf("home current on the home %q, on the inbox %q", got.HomeOn, got.InboxOn)
 	}
 }
 
