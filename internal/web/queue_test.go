@@ -9,7 +9,7 @@ import (
 // queueHarness runs queue.js over a fake daemon: queues answers GET /api/queues/<kind> and the tasks GET
 // /api/tasks/<id>; posts are logged; a post to a path in refuse answers 409.
 const queueHarness = `
-const log = { gets: [], posts: [], opened: [], tasks: [], notices: [], renders: 0, nav: [] };
+const log = { gets: [], posts: [], bodies: [], opened: [], tasks: [], notices: [], renders: 0, nav: [], acts: [] };
 const env = {
   route: () => readRoute(globalThis.hash),
   get: async (url) => {
@@ -22,9 +22,10 @@ const env = {
     }
     return JSON.parse(JSON.stringify(input.queues[decodeURIComponent(url.split("/")[3].split("?")[0])]));
   },
-  post: async (url, body) => { log.posts.push(url); if ((input.refuse || []).includes(url)) throw Object.assign(new Error("it changed"), { status: 409 }); return {}; },
+  post: async (url, body) => { log.posts.push(url); log.bodies.push(body); if ((input.refuse || []).includes(url)) throw Object.assign(new Error("it changed"), { status: 409 }); return {}; },
   openSource: (e, u) => log.opened.push(u ? u.provider + ":" + u.key : ""),
   openTask: (id) => log.tasks.push(id),
+  act: async (u, id) => { log.acts.push(unitPath(u, id)); if ((input.refuse || []).includes(unitPath(u, id))) throw new Error("it changed"); },
   row: (e) => h("li", { "data-task": e.id }, e.title),
   render: () => { log.renders++; },
   navigate: (v) => log.nav.push(v),
@@ -130,20 +131,60 @@ func TestQueueStaleItemConflict(t *testing.T) {
 		"situation": map[string]string{"provider": "alpha", "kind": "no_reviewer", "label": "no reviewer"},
 		"primary":   map[string]string{"kind": "action", "id": "request-review", "label": "Request a review"}}
 	var got struct {
-		Posts []string
-		Gets  int
-		Error string
+		Posts, Acts []string
+		Gets        int
+		Error       string
 	}
 	nodeRun(t, queuePrelude(t), nil, `
 (async () => {
 globalThis.hash = "#queue=pick-someone";
 await queueLoad(env.route(), env);
 await queueAct(queueState.queue.items[0], env);
-process.stdout.write(JSON.stringify({ Posts: log.posts, Gets: log.gets.length, Error: text(byClass(view(), "err")) }));
+process.stdout.write(JSON.stringify({ Posts: log.posts, Acts: log.acts, Gets: log.gets.length, Error: text(byClass(view(), "err")) }));
 })();`, map[string]any{"queues": map[string]any{"pick-someone": map[string]any{"kind": "pick-someone", "title": "Pick someone", "total": 1, "items": []any{item}}},
 		"refuse": []string{"/api/units/alpha/acme%2Fapi%231/request-review"}}, &got)
-	if len(got.Posts) != 1 || got.Gets != 2 || !strings.Contains(got.Error, "it changed") {
-		t.Fatalf("%+v: a refused action shows why, the queue reloads, nothing posts twice", got)
+	if len(got.Acts) != 1 || len(got.Posts) != 0 || got.Gets != 2 || !strings.Contains(got.Error, "it changed") {
+		t.Fatalf("%+v: a refused action shows why, the queue reloads, nothing runs twice", got)
+	}
+}
+
+func TestQueueActionRunsThroughTheActionPath(t *testing.T) {
+	item := map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []map[string]string{{"provider": "alpha", "key": "acme/api#1"}}},
+		"situation": map[string]string{"provider": "alpha", "kind": "stalled", "label": "stalled"},
+		"primary":   map[string]string{"kind": "action", "id": "take_over", "label": "Take over"}}
+	var got struct{ Posts, Acts []string }
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=last-step";
+await queueLoad(env.route(), env);
+queueKeyAction("queue:primary", env);
+await new Promise((r) => setTimeout(r, 5));
+process.stdout.write(JSON.stringify({ Posts: log.posts, Acts: log.acts }));
+})();`, map[string]any{"queues": map[string]any{"last-step": map[string]any{"kind": "last-step", "title": "Last steps", "total": 1, "items": []any{item}}}}, &got)
+	if !slices.Equal(got.Acts, []string{"/api/units/alpha/acme%2Fapi%231/take_over"}) || len(got.Posts) != 0 {
+		t.Fatalf("%+v: an action primary runs through the cockpit's action path (its confirm, input and basis), never a raw post", got)
+	}
+}
+
+func TestQueueEnterApprovesTheDraftRevisionShown(t *testing.T) {
+	draft := map[string]any{"id": 4, "gate": 7, "rev": 3, "text": "Thanks, merged.", "delivery": "reply", "unit": "alpha:acme/api#1"}
+	item := map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []any{}},
+		"gate":    map[string]any{"id": 7, "kind": "draft", "delivery": "held", "subject": draft, "intents": []map[string]any{{"id": "approve", "label": "Send"}}},
+		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Send"}}
+	var got struct {
+		Posts  []string
+		Bodies []map[string]any
+	}
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=send-draft";
+await queueLoad(env.route(), env);
+queueKeyAction("queue:primary", env);
+await new Promise((r) => setTimeout(r, 5));
+process.stdout.write(JSON.stringify({ Posts: log.posts, Bodies: log.bodies }));
+})();`, map[string]any{"queues": map[string]any{"send-draft": map[string]any{"kind": "send-draft", "title": "Send drafts", "total": 1, "items": []any{item}}}}, &got)
+	if !slices.Equal(got.Posts, []string{"/api/gates/7/approve"}) || mustJSON(t, got.Bodies[0]["args"]) != `{"rev":"3"}` {
+		t.Fatalf("%+v: Enter on a draft approves the revision on screen", got)
 	}
 }
 

@@ -26,11 +26,16 @@ function listQueue(tasks) {
   };
 }
 
+// queueDraft reports whether gate g is a draft's, which the daemon serves with its delivery and the draft.
+function queueDraft(g) {
+  return !!(g && g.delivery && g.subject && typeof g.subject === "object");
+}
+
 // queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
 // daemon serves with its delivery), else its unit's row with the situation that makes it.
 function queueItemCard(item, env) {
   const g = item.gate;
-  if (g && g.delivery && g.subject && typeof g.subject === "object") return draftCard(item.task, g.subject, { scope: "queue" });
+  if (queueDraft(g)) return draftCard(item.task, g.subject, { scope: "queue" });
   if (g) return gateCard(item.task, g, { scope: "queue" });
   return h("div", { class: "queue-unit" },
     env.row(item.task),
@@ -86,10 +91,12 @@ async function queueAct(item, env) {
   queueState.busy = true;
   queueState.error = "";
   try {
-    if (p.kind === "gate") await resolveGate(item.task, item.gate, p.id);
+    const g = item.gate;
+    if (p.kind === "gate" && queueDraft(g)) await resolveDraft({ ...g.subject, gate: g.subject.gate || g.id }, p.id, p.label || p.id, {});
+    else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
     else if (p.kind === "action") {
       const u = queueUnit(item);
-      if (u) await env.post(unitPath(u, p.id), { source: "cockpit" });
+      if (u) await env.act(u, p.id);
     } else if (p.kind === "open") env.openSource(item.task, queueUnit(item));
     else if (p.kind === "task") env.openTask(item.task.id);
   } catch (err) {
