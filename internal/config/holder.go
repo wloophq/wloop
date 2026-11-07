@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"maps"
 	"os"
 	"reflect"
@@ -142,23 +143,40 @@ func (h *Holder) Config() Config {
 }
 
 // Warning is what a restart or a fix of config.toml would change: the load
-// failure of a file that broke, else that a changed file needs a restart; ""
+// failure of a file that broke, else that a changed file needs a restart; none
 // when the running config matches the file.
-func (h *Holder) Warning() string {
+func (h *Holder) Warning() Warning {
 	h.refresh()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.warning()
 }
 
-func (h *Holder) warning() string {
+// Warning is what a restart or a fix of config.toml would change, as a key of the client strings
+// (strings.toml) and its {name} params; Key is "" when there is nothing to say.
+type Warning struct {
+	Key    string
+	Params map[string]any
+}
+
+// The keys of the config warnings, which strings.toml words.
+const (
+	WarningBroken = "config.toml does not load, so the running config stays: {error}"
+	WarningStale  = "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest"
+)
+
+func (w Warning) same(o Warning) bool {
+	return w.Key == o.Key && fmt.Sprint(w.Params) == fmt.Sprint(o.Params)
+}
+
+func (h *Holder) warning() Warning {
 	switch {
 	case h.badFile != nil:
-		return "config.toml does not load, so the running config stays: " + h.badFile.Error()
+		return Warning{Key: WarningBroken, Params: map[string]any{"error": h.badFile.Error()}}
 	case h.stale:
-		return "config.toml changed; only " + liveNames() + " apply live, restart the daemon to apply the rest"
+		return Warning{Key: WarningStale, Params: map[string]any{"keys": liveNames()}}
 	}
-	return ""
+	return Warning{}
 }
 
 // Stale reports that the file changed in a way only a restart applies.
@@ -228,7 +246,7 @@ func (h *Holder) reload() func() {
 			}
 		}
 	}
-	if on := h.opts.OnWarningChange; on != nil && h.warning() != before {
+	if on := h.opts.OnWarningChange; on != nil && !h.warning().same(before) {
 		calls = append(calls, on)
 	}
 	if len(calls) == 0 {
@@ -249,14 +267,11 @@ func equalExceptLive(a, b Config) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-// liveNames are the live keys as a warning names them: "profile, x and y".
+// liveNames are the live keys as a warning lists them.
 func liveNames() string {
 	names := make([]string, len(liveKeys))
 	for i, k := range liveKeys {
 		names[i] = k.name
 	}
-	if len(names) == 1 {
-		return names[0]
-	}
-	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+	return strings.Join(names, ", ")
 }

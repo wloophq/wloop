@@ -1,5 +1,8 @@
 [strings]
 # piece D
+# The daemon's warnings.
+"config.toml does not load, so the running config stays: {error}" = "o config.toml não carrega, então a configuração em uso continua: {error}"
+"config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest" = "o config.toml mudou; só estas configurações valem na hora: {keys}. Reinicie o daemon para aplicar o resto"
 # The app window's menus.
 "Hide {name}" = "Ocultar o {name}"
 "Hide Others" = "Ocultar os outros"

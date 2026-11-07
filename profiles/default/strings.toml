@@ -4,6 +4,9 @@
 
 [strings]
 # piece D
+# The daemon's warnings.
+"config.toml does not load, so the running config stays: {error}" = "config.toml does not load, so the running config stays: {error}"
+"config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest" = "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest"
 # The app window's menus.
 "Hide {name}" = "Hide {name}"
 "Hide Others" = "Hide Others"

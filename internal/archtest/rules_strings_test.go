@@ -321,7 +321,7 @@ func catalogKeys(t *testing.T) map[string]bool {
 var jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
 
 // TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is
-// a key of `strings.toml`, and every key of it is read by a client or names a text the API serves.
+// a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves.
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	keys := catalogKeys(t)
 	used := map[string]bool{}
@@ -338,7 +338,7 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	literals := map[string]bool{}
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		client := strings.HasPrefix(file, "internal/client/")
-		if !client && !strings.HasPrefix(file, "internal/api/") {
+		if !client && !strings.HasPrefix(file, "internal/api/") && !strings.HasPrefix(file, "internal/config/") {
 			return
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
