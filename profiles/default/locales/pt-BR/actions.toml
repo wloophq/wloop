@@ -1,0 +1,112 @@
+[take_over]
+label = "Assumir"
+summary = "Tornar seu o pull request de outra pessoa, para desenvolver: a partir daí ele conta como um dos seus, e o Address trabalha nele."
+why = "Ele já é seu"
+confirm = "Assumir {{.pr.slug}}? Ele passa a ser seu para desenvolver: o {{name}} cria ou renomeia o workspace de autor dele."
+
+[pause]
+label = "Pausar"
+summary = "Parar as rodadas automáticas neste pull request até você retomar, e descartar a que está esperando; ele continua nas suas listas. Silenciar o esconde."
+
+[resume]
+label = "Retomar"
+summary = "Deixar as rodadas automáticas rodarem de novo neste pull request."
+
+[mute]
+label = "Silenciar"
+summary = "Adiar a tarefa deste pull request, fora das listas que esperam por você, por um tempo ou até mudar quem ela espera; as rodadas de review e de address continuam, sem aviso, e nenhum nudge sai automaticamente. Pausar para as rodadas."
+
+[mute.input]
+label = "Silenciar por"
+help = "2d, 36h"
+
+[unmute]
+label = "Reativar"
+summary = "Acordar agora a tarefa deste pull request, de volta às listas que esperam por você."
+
+[track]
+label = "Acompanhar"
+summary = "Seguir este pull request como um do escopo, embora nenhum outro motivo o traga."
+
+[untrack]
+label = "Deixar de acompanhar"
+summary = "Parar de seguir este pull request por você ter pedido para acompanhá-lo; outro motivo ainda pode mantê-lo."
+
+[open]
+label = "Abrir"
+summary = "Abrir o workspace do pull request no gerenciador de workspaces dele, ou o próprio pull request quando ele não tem um."
+
+[remove]
+label = "Remover"
+summary = "Apagar o workspace deste pull request quando nada nele se perderia. Forçar remoção o apaga seja o que for que ele guarde."
+confirm = "Remover o workspace de {{.pr.slug}}? O checkout é apagado e os terminais são fechados. A remoção é recusada enquanto o agente trabalha ou espera, ou quando há arquivos sem commit, commits sem push ou arquivos ignorados fora das pastas de build e de dependências.{{if .row.open}} O pull request continua aberto: nenhuma primeira rodada automática traz o workspace de volta; Review ou Address trazem.{{end}}"
+
+[remove_force]
+label = "Forçar remoção"
+summary = "Apagar o workspace deste pull request mesmo com a remoção recusada; o que ele guarda se perde para sempre."
+note = "Recusada: {{.row.remove_refusal}}"
+confirm = """
+Forçar a remoção do workspace de {{.pr.slug}}?
+
+A remoção foi recusada:
+{{.row.remove_refusal}}
+
+Forçar apaga o checkout com o que está listado acima, para sempre."""
+
+[brief_refresh]
+label = "Refazer brief"
+summary = "Refazer agora o brief deste pull request, a partir do que ele tem hoje."
+note = "Refazer agora o brief deste pull request"
+why = "o brief está desligado; ligue brief.enabled na configuração"
+
+[intake_without]
+label = "Começar sem brief"
+summary = "Começar agora o turno que esta entrada espera, sem esperar o brief. Cancelar descarta a entrada."
+why = "a entrada {{.row.intake_seq}} é um turno manual, que só a sessão dele começa; cancele com {{command}} intake cancel {{.row.intake_seq}}"
+
+[intake_cancel]
+label = "Cancelar"
+summary = "Descartar esta entrada: o turno que ela espera nunca começa."
+
+["draft.edit"]
+label = "Editar"
+summary = "Mudar o texto do rascunho; ele volta a esperar sua aprovação."
+why = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} está desativado{{else if eq .draft.refusal \"state\"}}o rascunho está {{.draft.state}}{{else}}{{.draft.provider}} não publica nada{{end}}"
+
+["draft.edit".input]
+label = "Texto"
+
+["draft.retry"]
+label = "Tentar de novo"
+summary = "Enviar este rascunho de novo depois que a publicação falhou."
+why = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} está desativado{{else if eq .draft.refusal \"state\"}}o rascunho está {{.draft.state}}{{else}}{{.draft.provider}} não publica nada{{end}}"
+confirm = "{{if .draft.maybe_posted}}Este rascunho pode já ter sido publicado. Confira a conversa antes: tentar de novo pode publicá-lo duas vezes.{{end}}"
+
+[plan_apply]
+label = "Aplicar"
+summary = "Executar agora este item do plano, com as mesmas proteções da varredura. Dispensar o descarta."
+
+[plan_dismiss]
+label = "Dispensar"
+summary = "Descartar este item do plano para sempre; ele não executa."
+
+[plan_guide]
+label = "Orientar"
+summary = "Dizer ao agente o que a rodada deve olhar; seu texto vai com a rodada que espera agora, ou com a próxima quando nenhuma espera."
+note = "Roda a rodada agora com sua orientação"
+
+[plan_guide.input]
+label = "Orientação"
+help = "o que a rodada deve olhar"
+
+["run.open"]
+label = "Abrir workspace"
+summary = "Trazer para a tela o workspace da execução, no gerenciador de workspaces em que ela rodou."
+
+["run.enter"]
+label = "Entrar na sessão"
+summary = "Trazer para a tela a sessão do agente da execução, para digitar nela; uma sessão sem processo vivo é acordada antes."
+
+["run.transcript"]
+label = "Transcrição"
+summary = "Ler o que a pessoa digitou e o que o agente respondeu na sessão da execução."

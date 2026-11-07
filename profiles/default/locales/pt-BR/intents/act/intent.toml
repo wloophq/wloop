@@ -1,0 +1,11 @@
+label = "Agir"
+summary = "Agir sobre os itens abertos de uma unidade sem mexer no código: resolver o que der e propor as respostas necessárias como rascunhos para você aprovar; o Address trabalha no código de um pull request que você desenvolve"
+
+[guidance]
+help = "o que fazer com os itens"
+
+[action]
+note = "Executa uma chamada de agente somente leitura sobre os itens selecionados; as respostas que ela rascunha esperam sua aprovação{{if .row.recommended}} (recomendado: {{.row.recommended}}){{end}}"
+
+[[action.refuse]]
+why = "Não é seu: assuma antes"

@@ -1,0 +1,135 @@
+[states.inbox]
+label = "Inbox"
+
+[states.next]
+label = "Próximas"
+
+[states.waiting]
+label = "Aguardando"
+
+[states.scheduled]
+label = "Agendadas"
+
+[states.someday]
+label = "Algum dia"
+
+[states.done]
+label = "Concluídas"
+
+[states.reference]
+label = "Referência"
+
+[states.trash]
+label = "Lixeira"
+
+[verbs.next]
+label = "Próxima"
+summary = "Mover para Próximas: compromisso firmado, você ou um agente vai fazer."
+
+[verbs.waiting]
+label = "Aguardando"
+summary = "Mover para Aguardando, à espera das pessoas que você indicar; ela volta na data que você definir."
+
+[verbs.schedule]
+label = "Agendar"
+summary = "Esconder até uma data ou até a unidade dela andar, e então trazer de volta para onde estava."
+
+[verbs.wake]
+label = "Acordar"
+summary = "Trazer de volta do adiamento, para onde estava antes."
+
+[verbs.someday]
+label = "Algum dia"
+summary = "Mover para Algum dia: agora não, guardada para olhar depois."
+
+[verbs.reference]
+label = "Referência"
+summary = "Guardar como referência: nada a fazer, mas vale encontrar de novo; um rascunho que ela carrega é descartado."
+
+[verbs.focus]
+label = "Foco"
+summary = "Marcar com estrela em Foco, ou tirar a estrela."
+
+[verbs.project]
+label = "Projeto"
+summary = "Anexar a um projeto, ou começar um projeto novo com ela."
+
+[verbs.approve]
+label = "Aprovar"
+summary = "Aprovar o que ela propõe: o rascunho, a resposta recomendada ou a ação da unidade."
+
+[verbs.delegate]
+label = "Delegar"
+summary = "Entregar a um agente, que executa a ação da unidade."
+
+[verbs.done]
+label = "Concluir"
+summary = "Marcar como concluída: ela sai das suas listas para o Histórico, e um rascunho que ela carrega é descartado."
+
+[verbs.dismiss]
+label = "Dispensar"
+summary = "Jogar fora: vai para a lixeira, e um rascunho que ela carrega é descartado."
+
+[verbs.seen]
+label = "Vista"
+summary = "Marcar como lido o que mudou nela."
+
+[verbs.context]
+label = "Contexto"
+summary = "Definir os contextos em que ela aparece."
+
+[verbs.area]
+label = "Área"
+summary = "Definir a área a que ela pertence."
+
+[verbs.answer]
+label = "Responder"
+summary = "Responder à pergunta que ela faz."
+
+[verbs.edit]
+label = "Editar"
+summary = "Mudar o rascunho antes do envio."
+
+[verbs.retry]
+label = "Tentar de novo"
+summary = "Enviar de novo o rascunho que falhou."
+
+[verbs.reviewed]
+label = "Revisado"
+summary = "Marcar o projeto como revisado; a próxima revisão vem depois do intervalo dele."
+
+[verbs.sequential]
+label = "Sequencial"
+summary = "Fazer as ações do projeto uma de cada vez, ou todas ao mesmo tempo de novo."
+
+[verbs.reply]
+label = "Responder"
+summary = "Escrever uma resposta na unidade; Enviar publica agora, Salvar como rascunho a guarda para sua aprovação."
+
+[verbs.acknowledge]
+label = "Confirmar recebimento"
+summary = "Avisar a quem pediu que você está cuidando: com um prazo, propõe uma resposta \"estou vendo, até tal hora\" e marca como prometido; sem prazo, propõe uma reação."
+
+[verbs.not-mine]
+label = "Não é comigo"
+summary = "Dizer que não é sua: ela vai para a lixeira com os rascunhos que carrega, e uma resposta indicando a quem pediu outro caminho espera sua aprovação."
+
+[verbs.hand-to]
+label = "Passar para"
+summary = "Passar para alguém: ela fica à espera dessa pessoa, e Cobrar a lista quando a data de checagem passa sem nada andar."
+
+[verbs.merge]
+label = "Juntar"
+summary = "Juntar a esta outra tarefa que é o mesmo trabalho, ou esta àquela: fica a que você moldou à mão, senão a mais antiga, e ela recebe os itens, unidades, decisões e rascunhos da outra; Separar desfaz."
+
+[verbs.split]
+label = "Separar"
+summary = "Devolver uma tarefa juntada a esta, como era antes da junção, com seus itens, unidades, decisões e rascunhos."
+
+[verbs.relate]
+label = "Relacionar"
+summary = "Vincular outra tarefa como trabalho relacionado e distinto: nada se move, e cada uma lista a outra."
+
+[verbs.unrelate]
+label = "Desfazer relação"
+summary = "Tirar das duas o vínculo com uma tarefa relacionada."

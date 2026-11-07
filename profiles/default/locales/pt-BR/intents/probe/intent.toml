@@ -1,0 +1,2 @@
+label = "Sondar"
+summary = "Verificar se a home de um agente consegue ler o turno, registrá-lo, receber uma resposta e ser retomada"

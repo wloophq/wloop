@@ -1,0 +1,2 @@
+label = "Anexar"
+summary = "Tornar uma sessão iniciada fora do loop uma execução de uma tarefa, mantendo o contexto dela"
