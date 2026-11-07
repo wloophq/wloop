@@ -50,5 +50,6 @@ function readRoute(hash) {
     area: (p.get("area") || "").slice(0, 100),
     ctx,
     q: p.get("q") || "",
+    panel: p.get("panel") || "",
   };
 }

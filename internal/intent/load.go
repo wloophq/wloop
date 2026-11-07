@@ -81,6 +81,8 @@ func (p Problems) Error() string {
 type TemplateCheck func(d dintent.Def, t *template.Template) []Problem
 
 type Loaded struct {
+	// Locale is the locale the person-read texts were loaded in.
+	Locale    string
 	Registry  *dintent.Registry
 	Templates map[dintent.Name]*template.Template // body on a clone of base, missingkey=error
 	Programs  map[dintent.Name]Programs

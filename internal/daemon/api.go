@@ -128,6 +128,18 @@ func (s *Server) routes() []route {
 		{"GET " + api.DigestPath, s.handleDigest},
 		{"GET " + api.ReviewPath, s.handleReview},
 		{"POST " + api.ReviewStepDone, s.handleReviewStepDone},
+		{"GET " + api.StringsPath, s.handleStrings},
+		{"GET " + api.HomePath, s.handleHome},
+		{"GET " + api.QueuePath, s.handleQueue},
+		{"GET " + api.SearchPath, s.handleSearch},
+		{"POST " + api.OmniboxResolvePath, s.handleOmniboxResolve},
+		{"POST " + api.OmniboxAskPath, s.handleOmniboxAsk},
+		{"POST " + api.OmniboxRunPath, s.handleOmniboxRun},
+		{"POST " + api.WindowPath, s.handleWindow},
+		{"POST " + api.WorkflowDisable, s.handleWorkflowDisable},
+		{"POST " + api.UnitSkip, s.handleUnitSkip},
+		{"DELETE " + api.UnitSkip, s.handleUnitUnskip},
+		{"POST " + api.DraftCloseSilently, s.handleDraftCloseSilently},
 
 		{"POST " + api.AgentTurnsStart, s.handleTurnStart},
 		{"POST " + api.AgentTurnsByHand, s.handleTurnByHand},
@@ -182,6 +194,13 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(append(body, '\n'))
+}
+
+// notImplemented answers 501 naming the task that implements the route.
+func notImplemented(task string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusNotImplemented, "not implemented: "+task)
+	}
 }
 
 func writeError(w http.ResponseWriter, code int, msg string) {

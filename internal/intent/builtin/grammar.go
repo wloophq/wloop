@@ -64,6 +64,9 @@ type Key struct {
 	Doc     string
 	// Required says that the table holding the key must set it.
 	Required bool
+	// Localized says that the key holds a text a person reads, which a layer's locales/<tag>/ mirror
+	// translates.
+	Localized bool
 }
 
 // Value is one value of an enum key.

@@ -186,6 +186,8 @@ type TaskViewSpec struct {
 	Badge        bool   `json:"badge,omitempty"`
 	HideDisabled bool   `json:"hide_disabled,omitempty"`
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
+	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
+	Rail bool `json:"rail"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.
@@ -292,6 +294,8 @@ type TaskView struct {
 	// tasks merged into it, in merge order, each as its merge record keeps it: the ones split gives back.
 	Related    []TaskRef `json:"related,omitempty"`
 	MergedFrom []TaskRef `json:"merged_from,omitempty"`
+	// Drafts are the ids of the task's pending drafts (held or failed), ascending.
+	Drafts []int64 `json:"drafts"`
 }
 
 // TaskRef is another task as a task's page names it: its id, title and state; Merged says it is merged

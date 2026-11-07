@@ -71,3 +71,13 @@ location.hash = "#view=focus";
 		t.Errorf("first load asked %v, want %s", got.Asked, want)
 	}
 }
+
+func TestReadRouteReadsThePanel(t *testing.T) {
+	var got struct{ Panel, Q, None string }
+	nodeRun(t, routesPrelude(t), nil, `
+const p = readRoute("#panel=omnibox&q=abc");
+process.stdout.write(JSON.stringify({ Panel: p.panel, Q: p.q, None: readRoute("#view=inbox").panel }));`, nil, &got)
+	if got.Panel != "omnibox" || got.Q != "abc" || got.None != "" {
+		t.Fatalf("got %+v", got)
+	}
+}
