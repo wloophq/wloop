@@ -94,7 +94,7 @@ func TestEveryPieceOfARowIsAFacetThatKeepsItsRow(t *testing.T) {
 		"facets": map[string][]string{"where": {"general"}, "waits-on": {"Ana"}, "conversation": {"#general"}}}
 	e := task("e-1", "next", func(e *api.TaskView) {
 		e.Title, e.Units, e.UnitLabels = "Answer the deploy question", []unit.Unit{slackUnit}, []string{"#general thread"}
-		e.Facets = map[string][]string{"source": {"slack"}, "state": {"next"}, "waits-on": {"bia"}, "contexts": {"calls"}, "moved": {"2026-10-12T10:30:00Z"},
+		e.Facets = map[string][]string{"source": {"slack"}, "state": {"next"}, "waits-on": {"bia"}, "contexts": {"calls"}, "turn": {"others"}, "moved": {"2026-10-12T10:30:00Z"},
 			"where": {"general"}, "risk": {"none"}}
 	})
 	var cat map[string]any
@@ -143,7 +143,7 @@ process.stdout.write(JSON.stringify({ PR: rowShown(input.pr, "mine"), Slack: row
 	if strings.Count(got.Slack.Text, "general") != 1 {
 		t.Errorf("the conversation repeats its channel: %s", got.Slack.Text)
 	}
-	for _, want := range []string{"source:Slack", "contexts:@calls", "waits-on:bia", "state:Next", "moved:1h 30m"} {
+	for _, want := range []string{"source:Slack", "contexts:@calls", "waits-on:bia", "state:Next", "moved:moved {{.at}}"} {
 		if !slices.Contains(labelsOf(got.Task), want) {
 			t.Errorf("the task lacks %s: %v", want, labelsOf(got.Task))
 		}

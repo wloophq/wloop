@@ -149,6 +149,7 @@ type RowWords struct {
 	Sequential       string `json:"sequential"`
 	Every            string `json:"every"`
 	Reviewed         string `json:"reviewed"`
+	More             string `json:"more"`
 }
 
 type ViewsCatalog struct {

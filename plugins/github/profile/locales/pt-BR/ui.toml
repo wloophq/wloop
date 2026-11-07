@@ -154,6 +154,7 @@ label = "No escopo como"
 
 [facets.age]
 label = "Esperando há"
+show_label = "desde {{.at}}"
 
 [facets.age.buckets]
 1d = "0-1 dia"

@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -70,10 +71,8 @@ type FacetBucket struct {
 
 // Problem is a problem at key of the facet's declaration, in the file of the layer that set it.
 func (f FacetDef) Problem(key, format string, args ...any) Problem {
-	s := f.from[key]
-	if s == nil {
-		s = f.from["fact"]
-	}
+	top, _, _ := strings.Cut(key, ".")
+	s := cmp.Or(f.from[key], f.from[top], f.from["fact"])
 	if s == nil {
 		return Problem{File: ViewsFile, Field: "facets." + f.ID + "." + key, Msg: fmt.Sprintf(format, args...)}
 	}
@@ -175,23 +174,26 @@ type mView struct {
 const HomeView = "home"
 
 type mFacet struct {
-	Fact        *string            `toml:"fact"`
-	Label       *string            `toml:"label"`
-	Group       *bool              `toml:"group"`
-	Sort        *string            `toml:"sort"`
-	Rank        []string           `toml:"rank"`
-	Values      map[string]string  `toml:"values"`
-	Empty       *string            `toml:"empty"`
-	LabelPrefix *string            `toml:"label_prefix"`
-	Show        any                `toml:"show"`
-	ShowValues  *string            `toml:"show_values"`
-	Match       *string            `toml:"match"`
-	Menu        *bool              `toml:"menu"`
-	Strip       *bool              `toml:"strip"`
-	Colors      map[string]string  `toml:"colors"`
-	Buckets     map[string]mBucket `toml:"buckets"`
-	Merge       *string            `toml:"merge"`
-	Units       *string            `toml:"units"`
+	Fact        *string             `toml:"fact"`
+	Label       *string             `toml:"label"`
+	Group       *bool               `toml:"group"`
+	Sort        *string             `toml:"sort"`
+	Rank        []string            `toml:"rank"`
+	Values      map[string]string   `toml:"values"`
+	Empty       *string             `toml:"empty"`
+	LabelPrefix *string             `toml:"label_prefix"`
+	Show        any                 `toml:"show"`
+	ShowValues  *string             `toml:"show_values"`
+	ShowWhen    map[string][]string `toml:"show_when"`
+	ShowMax     *int                `toml:"show_max"`
+	ShowLabel   *string             `toml:"show_label"`
+	Match       *string             `toml:"match"`
+	Menu        *bool               `toml:"menu"`
+	Strip       *bool               `toml:"strip"`
+	Colors      map[string]string   `toml:"colors"`
+	Buckets     map[string]mBucket  `toml:"buckets"`
+	Merge       *string             `toml:"merge"`
+	Units       *string             `toml:"units"`
 }
 
 type mBucket struct {
@@ -377,6 +379,10 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 			f.LabelPrefix = *m.LabelPrefix
 		}
 		readShow(s, path, m.Show, m.ShowValues, &f.Show)
+		readPlacement(s, path, placement{When: m.ShowWhen, Max: m.ShowMax, Label: m.ShowLabel}, &f.Show)
+		if m.ShowWhen != nil {
+			set("show_when")
+		}
 		for _, o := range []struct {
 			key string
 			v   *string
@@ -578,6 +584,15 @@ func ViewEnv(over string, tasks TasksDef) expr.Env {
 // share a key.
 func (l *viewsLoad) check(tasks TasksDef) Problems {
 	var out Problems
+	for i := range l.def.Facets {
+		f := &l.def.Facets[i]
+		for _, facet := range slices.Sorted(maps.Keys(f.Show.When)) {
+			if !slices.ContainsFunc(l.def.Facets, func(g FacetDef) bool { return g.ID == facet }) {
+				out = append(out, f.Problem("show_when."+facet, "names no facet"))
+				delete(f.Show.When, facet)
+			}
+		}
+	}
 	ids := l.def.IDs()
 	for i := range l.def.Views {
 		v := &l.def.Views[i]

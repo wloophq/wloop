@@ -55,6 +55,7 @@ var RowWords = []RowWord{
 	{Key: "sequential", Vars: []string{}, Doc: "The flag of a project that takes its children one at a time."},
 	{Key: "every", Vars: []string{"every"}, Doc: "How often a project is reviewed, over the `{{.every}}`."},
 	{Key: "reviewed", Vars: []string{"date"}, Doc: "When a project was last reviewed, over the `{{.date}}`."},
+	{Key: "more", Vars: []string{"n"}, Doc: "The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`."},
 }
 
 func rowWordRows(in Surface, required bool) []Key {

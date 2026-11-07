@@ -138,6 +138,14 @@ type FacetSpec struct {
 	ShowValues string `json:"show_values,omitempty"`
 	// LabelPrefix goes before each shown value's label on a row, never in a group's head.
 	LabelPrefix string `json:"label_prefix,omitempty"`
+	// ShowWhen names, by facet id, the values a row must hold in that facet for this facet to show; empty
+	// shows it always.
+	ShowWhen map[string][]string `json:"show_when,omitempty"`
+	// ShowMax is how many of the values the part shows at most; the rest count into one piece. 0 shows all.
+	ShowMax int `json:"show_max,omitempty"`
+	// ShowLabel is an age part's label, a template over `{{.age}}`, which Parts fills, and `{{.at}}`, the
+	// raw time a client writes in its own locale.
+	ShowLabel string `json:"show_label,omitempty"`
 	// RowClass is the class of a row that holds a value, by value.
 	RowClass map[string]string `json:"row_class,omitempty"`
 	// Displays are, on a facet merged across providers, each provider's display keys, by provider: a row
@@ -150,21 +158,25 @@ type FacetSpec struct {
 // FacetDisplay is where and how one provider shows a facet's values on its rows: FacetSpec's keys of the
 // same names.
 type FacetDisplay struct {
-	Show        string            `json:"show,omitempty"`
-	ShowOnly    []string          `json:"show_only,omitempty"`
-	ShowValues  string            `json:"show_values,omitempty"`
-	LabelPrefix string            `json:"label_prefix,omitempty"`
-	RowClass    map[string]string `json:"row_class,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Strip       bool              `json:"strip,omitempty"`
-	Colors      map[string]string `json:"colors,omitempty"`
+	Show        string              `json:"show,omitempty"`
+	ShowOnly    []string            `json:"show_only,omitempty"`
+	ShowValues  string              `json:"show_values,omitempty"`
+	LabelPrefix string              `json:"label_prefix,omitempty"`
+	ShowWhen    map[string][]string `json:"show_when,omitempty"`
+	ShowMax     int                 `json:"show_max,omitempty"`
+	ShowLabel   string              `json:"show_label,omitempty"`
+	RowClass    map[string]string   `json:"row_class,omitempty"`
+	Labels      map[string]string   `json:"labels,omitempty"`
+	Strip       bool                `json:"strip,omitempty"`
+	Colors      map[string]string   `json:"colors,omitempty"`
 	// BucketLabels are the words of the facet's buckets, by bucket id.
 	BucketLabels map[string]string `json:"bucket_labels,omitempty"`
 }
 
 // Display is the facet's own display keys.
 func (f FacetSpec) Display() FacetDisplay {
-	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix, RowClass: f.RowClass, Labels: f.Labels,
+	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix,
+		ShowWhen: f.ShowWhen, ShowMax: f.ShowMax, ShowLabel: f.ShowLabel, RowClass: f.RowClass, Labels: f.Labels,
 		Strip: f.Strip, Colors: f.Colors, BucketLabels: f.bucketLabels()}
 }
 
@@ -176,6 +188,7 @@ func (f FacetSpec) For(provider string) FacetSpec {
 		return f
 	}
 	f.Show, f.ShowOnly, f.ShowValues, f.LabelPrefix, f.RowClass = d.Show, d.ShowOnly, d.ShowValues, d.LabelPrefix, d.RowClass
+	f.ShowWhen, f.ShowMax, f.ShowLabel = d.ShowWhen, d.ShowMax, d.ShowLabel
 	f.Strip, f.Colors = d.Strip, d.Colors
 	if len(d.BucketLabels) > 0 {
 		f.Buckets = slices.Clone(f.Buckets)

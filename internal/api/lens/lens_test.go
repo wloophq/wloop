@@ -150,3 +150,52 @@ func TestACountdownSaysTheTimeLeftInTheRowWords(t *testing.T) {
 		}
 	}
 }
+
+var placeWords = api.LensWords{RowWords: api.RowWords{AgeNow: "now", AgeMinutes: "{{.m}}m", AgeHours: "{{.h}}h {{.m}}m", AgeDays: "{{.d}}d {{.h}}h", More: "+{{.n}}"}}
+
+var placeNow = time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
+
+func TestShowWhenPlacesOnlyForTheNamedValues(t *testing.T) {
+	specs := []api.FacetSpec{
+		{ID: "turn", Label: "Whose turn"},
+		{ID: "owed", Label: "Owed", Sort: "time", Show: "age", ShowWhen: map[string][]string{"turn": {"me"}}, ShowLabel: "since {{.at}}"},
+		{ID: "moved", Label: "Moved", Sort: "time", Show: "age", ShowWhen: map[string][]string{"turn": {"others", "nobody"}}, ShowLabel: "moved {{.at}}"},
+	}
+	t1, t2 := "2026-11-07T09:00:00Z", "2026-11-06T12:00:00Z"
+	mine := lens.Item{Facets: map[string][]string{"turn": {"me"}, "owed": {t1}, "moved": {t2}}}
+	if got := lens.Parts(mine, specs, placeWords, placeNow)["age"]; len(got) != 1 || got[0].Field != "owed" {
+		t.Errorf("your turn places %+v, want the owed piece", got)
+	}
+	theirs := lens.Item{Facets: map[string][]string{"turn": {"Others"}, "owed": {t1}, "moved": {t2}}}
+	if got := lens.Parts(theirs, specs, placeWords, placeNow)["age"]; len(got) != 1 || got[0].Field != "moved" {
+		t.Errorf("their turn places %+v, want the moved piece", got)
+	}
+	none := lens.Item{Facets: map[string][]string{"owed": {t1}, "moved": {t2}}}
+	if got := lens.Parts(none, specs, placeWords, placeNow)["age"]; len(got) != 0 {
+		t.Errorf("an item with no turn places %+v", got)
+	}
+}
+
+func TestShowMaxCountsTheRest(t *testing.T) {
+	specs := []api.FacetSpec{{ID: "tag", Label: "Tag", Show: "meta", ShowMax: 2}}
+	it := lens.Item{Facets: map[string][]string{"tag": {"a", "b", "c", "d", "e"}}}
+	got := lens.Parts(it, specs, placeWords, placeNow)["meta"]
+	want := []lens.Piece{{Field: "tag", Value: "a", Raw: "a", Label: "a"}, {Field: "tag", Value: "b", Raw: "b", Label: "b"}, {Field: "tag", Label: "+3"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+	two := lens.Item{Facets: map[string][]string{"tag": {"a", "b"}}}
+	if got := lens.Parts(two, specs, placeWords, placeNow)["meta"]; len(got) != 2 {
+		t.Errorf("two tags place %+v, want no rest piece", got)
+	}
+}
+
+func TestShowLabelCarriesItsTemplate(t *testing.T) {
+	specs := []api.FacetSpec{{ID: "owed", Label: "Owed", Sort: "time", Show: "age", ShowLabel: "since {{.at}}, {{.age}}"}}
+	it := lens.Item{Facets: map[string][]string{"owed": {"2026-11-07T09:00:00Z"}}}
+	got := lens.Parts(it, specs, placeWords, placeNow)["age"]
+	want := []lens.Piece{{Field: "owed", Value: "2026-11-07T09:00:00Z", Raw: "2026-11-07T09:00:00Z", Label: "since {{.at}}, 3h 0m", Template: "since {{.at}}, {{.age}}"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

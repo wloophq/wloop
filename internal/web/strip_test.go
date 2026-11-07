@@ -115,7 +115,7 @@ process.stdout.write(JSON.stringify({ PR: rowStripShown(input.pr, "mine"), Slack
 	if !strings.HasPrefix(got.Slack.Tip, "Others' turn (Ana): waits on others") {
 		t.Errorf("the conversation's tooltip %q", got.Slack.Tip)
 	}
-	for _, want := range []string{"situation:waits on others", "age:3h 0m"} {
+	for _, want := range []string{"situation:waits on others", "age:since {{.at}}"} {
 		if !slices.Contains(got.SlackPieces, want) {
 			t.Errorf("the conversation lacks %s: %v", want, got.SlackPieces)
 		}

@@ -72,7 +72,7 @@ func TestTheCockpitPlacesPiecesAsTheGoLens(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []map[string]any
-	nodeRun(t, "", []string{"fold", "fillWord", "goDuration", "bucketOf", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts"}, `
+	nodeRun(t, "", []string{"fold", "fillWord", "goDuration", "bucketOf", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "holdsWhen", "rowParts"}, `
 const now = Date.parse(input.now);
 process.stdout.write(JSON.stringify(input.cases.map((c) => rowParts(c.item, input.specs, input.words, now))));`,
 		map[string]any{"now": table.Now, "words": table.Parts.Words, "specs": table.Parts.Specs, "cases": table.Parts.Cases}, &got)

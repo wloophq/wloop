@@ -1,5 +1,5 @@
 {
-  "version": "b83eea507395",
+  "version": "51fc02c57391",
   "views": [
     {
       "id": "mine",
@@ -449,7 +449,8 @@
           "within": ""
         }
       ],
-      "show": "age"
+      "show": "age",
+      "show_label": "since {{.at}}"
     },
     {
       "id": "lane",

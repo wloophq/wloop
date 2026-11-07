@@ -546,7 +546,7 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
-var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
+var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "holdsWhen", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
 	"columnSort", "sortPick", "rowHead", "rowTr", "rowMeta", "rowWho", "rowCard", "roveKey", "roveStop", "rowStops", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 

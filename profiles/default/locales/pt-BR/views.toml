@@ -58,6 +58,7 @@ open_children = "abertas: {{.n}}"
 sequential = "sequencial"
 every = "a cada {{.every}}"
 reviewed = "revisado em {{.date}}"
+more = "+{{.n}}"
 
 [facets.source]
 label = "Origem"
@@ -101,9 +102,15 @@ empty = "sem posição"
 [facets.where]
 label = "Onde"
 
+[facets.owed]
+label = "Devida desde"
+empty = "ninguém deve"
+show_label = "desde {{.at}}"
+
 [facets.moved]
 label = "Movimentada"
 empty = "nunca movimentada"
+show_label = "movida em {{.at}}"
 
 [facets.moved.buckets.1d]
 label = "0-1 dia"

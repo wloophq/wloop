@@ -72,6 +72,7 @@ open_children      = "{{.n}} open"
 sequential         = "sequential"
 every              = "every {{.every}}"
 reviewed           = "reviewed {{.date}}"
+more               = "+{{.n}}"
 
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind
@@ -159,13 +160,25 @@ group = true
 sort  = "text"
 match = "suffix"
 
+# The row's date follows whom the task waits on: since when it owes you, or when someone last moved it.
+[facets.owed]
+fact       = "task.owed_since"
+label      = "Owed since"
+sort       = "time"
+empty      = "owed by nobody"
+show       = "age"
+show_when  = { turn = ["me"] }
+show_label = "since {{.at}}"
+
 [facets.moved]
-fact  = "task.moved_at"
-label = "Moved"
-group = true
-sort  = "time"
-empty = "never moved"
-show  = "age"
+fact       = "task.moved_at"
+label      = "Moved"
+group      = true
+sort       = "time"
+empty      = "never moved"
+show       = "age"
+show_when  = { turn = ["others", "nobody"] }
+show_label = "moved {{.at}}"
 
 [facets.moved.buckets.1d]
 within = "24h"
@@ -274,11 +287,12 @@ l  = "L"
 xl = "XL"
 
 [facets.tag]
-fact  = "brief.tags"
-label = "Tag"
-match = "prefix"
-merge = "rows-first"
-show  = "meta"
+fact     = "brief.tags"
+label    = "Tag"
+match    = "prefix"
+merge    = "rows-first"
+show     = "meta"
+show_max = 2
 
 [views.inbox]
 label         = "Inbox"

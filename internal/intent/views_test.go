@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -397,7 +398,7 @@ func TestTaskFacetsLoadFromViews(t *testing.T) {
 	for _, f := range views.Facets {
 		ids = append(ids, f.ID)
 	}
-	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "where", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "where", "owed", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("facets %v, want %v", ids, want)
 	}
@@ -580,6 +581,44 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}, readerOf(nil))
 	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
 		t.Errorf("problems: %s", got)
+	}
+}
+
+func TestShowWhenNamesADeclaredFacet(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.moved]\nshow_when = { turn = [\"others\", \"nobody\"] }\nshow_max = 3\nshow_label = \"moved {{.at}}, {{.age}} ago\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	m, _ := facetOf(views, "moved")
+	if !reflect.DeepEqual(m.Show.When, map[string][]string{"turn": {"others", "nobody"}}) || m.Show.Max != 3 || m.Show.Label != "moved {{.at}}, {{.age}} ago" {
+		t.Errorf("moved shows %+v", m.Show)
+	}
+	for src, key := range map[string]string{
+		"[facets.moved]\nshow_when = { nope = [\"x\"] }\n":   "facets.moved.show_when.nope",
+		"[facets.moved]\nshow_when = { turn = [] }\n":        "facets.moved.show_when.turn",
+		"[facets.tag]\nshow_max = -1\n":                      "facets.tag.show_max",
+		"[facets.moved]\nshow_label = \"since {{.when}}\"\n": "facets.moved.show_label",
+	} {
+		if _, problems := loadFacets(t, src); !strings.Contains(problems.Error(), key) {
+			t.Errorf("%q: problems %v, want one at %s", src, problems, key)
+		}
+	}
+}
+
+func TestAPluginsUIPlacesItsAgeByTheTimeRule(t *testing.T) {
+	plugin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(plugin, UIFile), []byte("[facets.age]\nlabel = \"Waiting for\"\nshow = \"age\"\nshow_label = \"since {{.at}}\"\nshow_when = { lane = [\"me\"] }\n\n[facets.tags]\nlabel = \"Tags\"\nshow = \"meta\"\nshow_max = 2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}, readerOf(nil))
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if a := texts["acme"].Facets["age"]; a.Show.Label != "since {{.at}}" || !reflect.DeepEqual(a.Show.When, map[string][]string{"lane": {"me"}}) {
+		t.Errorf("age %+v", a.Show)
+	}
+	if tags := texts["acme"].Facets["tags"]; tags.Show.Max != 2 {
+		t.Errorf("tags %+v", tags.Show)
 	}
 }
 

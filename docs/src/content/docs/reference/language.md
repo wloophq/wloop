@@ -307,6 +307,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
   - `all`: Every value, in the item's order.
   - `first`: The first value alone.
+- `facets.<name>.show_when` (table by name): Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = ["me"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.
+- `facets.<name>.show_when.<name>` (list of strings): The values one facet must hold.
+- `facets.<name>.show_max` (integer): How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.
+- `facets.<name>.show_label` (template, localized): For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.
 - `facets.<name>.empty` (string, localized): What a group of tasks with no value shows.
 - `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
@@ -387,6 +391,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.sequential` (template, localized): The flag of a project that takes its children one at a time.
 - `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
 - `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
+- `lens.more` (template, localized): The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
@@ -846,6 +851,10 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
   - `all`: Every value, in the item's order.
   - `first`: The first value alone.
+- `facets.<name>.show_when` (table by name): Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = ["me"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.
+- `facets.<name>.show_when.<name>` (list of strings): The values one facet must hold.
+- `facets.<name>.show_max` (integer): How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.
+- `facets.<name>.show_label` (template, localized): For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.
 - `facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it.
 - `facets.<name>.row_class` (table): The class of a row that holds a value, by value, such as `{ me = "mine" }`, which the cockpit's stylesheet colors.
 - `facets.<name>.row_class.<name>` (string): One value's class.
@@ -936,6 +945,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.sequential` (template, localized): The flag of a project that takes its children one at a time.
 - `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
 - `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
+- `lens.more` (template, localized): The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.

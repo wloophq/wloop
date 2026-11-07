@@ -1431,6 +1431,7 @@ function specFor(spec, provider) {
   const d = (spec.displays || {})[provider];
   if (!d) return spec;
   return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
+    show_when: d.show_when, show_max: d.show_max, show_label: d.show_label,
     strip: !!d.strip, colors: d.colors,
     buckets: d.bucket_labels ? (spec.buckets || []).map((b) => (b.id in d.bucket_labels ? { ...b, label: d.bucket_labels[b.id] } : b)) : spec.buckets,
     labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
@@ -1457,7 +1458,10 @@ function partPiece(spec, raw, words, now) {
       const b = spec.buckets.find((x) => x.id === p.value);
       if (b) p.label = b.label || p.value;
     }
-    if (agePart(spec.show)) p.label = ageText(words, now - at);
+    if (agePart(spec.show)) {
+      p.label = ageText(words, now - at);
+      if (spec.show_label) [p.label, p.template] = [spec.show_label.replaceAll("{{.age}}", p.label), spec.show_label];
+    }
   }
   if (spec.label_prefix && !p.label.startsWith(spec.label_prefix)) p.label = spec.label_prefix + p.label;
   return p;
@@ -1473,6 +1477,11 @@ function agePart(part) {
   return part === "age";
 }
 
+// holdsWhen mirrors lens's holds: whether it holds, in each facet when names, one of its values.
+function holdsWhen(it, when) {
+  return Object.entries(when || {}).every(([facet, values]) => ((it.facets || {})[facet] || []).some((v) => values.some((w) => fold(v) === fold(w))));
+}
+
 // rowParts mirrors lens.Parts: the pieces of item it each part of a row shows, by part, from the specs
 // that show in one, in their order, none from another provider's spec.
 function rowParts(it, specs, words, now = Date.now()) {
@@ -1480,14 +1489,20 @@ function rowParts(it, specs, words, now = Date.now()) {
   for (const s of specs || []) {
     if (s.provider && it.provider && s.provider !== it.provider) continue;
     const spec = specFor(s, it.provider || "");
-    if (!spec.show || (agePart(spec.show) && out[spec.show])) continue;
+    if (!spec.show || (agePart(spec.show) && out[spec.show]) || !holdsWhen(it, spec.show_when)) continue;
     const pieces = [];
+    let rest = 0;
     for (const raw of (it.facets || {})[spec.id] || []) {
       const p = partPiece(spec, raw, words, now);
       if (!p || ((spec.show_only || []).length && !spec.show_only.some((v) => fold(v) === fold(raw)))) continue;
+      if (spec.show_max > 0 && pieces.length === spec.show_max) {
+        rest++;
+        continue;
+      }
       pieces.push(p);
       if (spec.show_values === "first" || agePart(spec.show)) break;
     }
+    if (rest) pieces.push({ field: spec.id, value: "", raw: "", label: fillWord(words.more, { n: rest }) });
     if (pieces.length) out[spec.show] = [...(out[spec.show] || []), ...pieces];
   }
   return out;
