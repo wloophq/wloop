@@ -74,7 +74,7 @@ jobs:
       - run: make test PKGS="./cmd/... ./internal/client/menubar/macos/"
       - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
       - run: CGO_ENABLED=0 go test -tags purego ./internal/client/window/...
-      - run: CGO_ENABLED=0 go build -tags purego ./cmd/wloop
+      - run: CGO_ENABLED=0 go build -tags purego ./cmd/...
 
   brand:
     strategy:

@@ -33,15 +33,15 @@ func titles(items []menuItem) []string {
 }
 
 func TestMenuTitlesComeFromTheCatalog(t *testing.T) {
-	got := strings.Join(titles(menuOf("wloop", ptBR)), ", ")
-	want := "wloop, Ocultar wloop, Ocultar outros, Mostrar tudo, Encerrar wloop, Editar, Desfazer, Refazer, Recortar, Copiar, Colar, Selecionar tudo, Janela, Minimizar, Zoom, Fechar"
+	got := strings.Join(titles(menuOf("Acme", ptBR)), ", ")
+	want := "Acme, Ocultar Acme, Ocultar outros, Mostrar tudo, Encerrar Acme, Editar, Desfazer, Refazer, Recortar, Copiar, Colar, Selecionar tudo, Janela, Minimizar, Zoom, Fechar"
 	if got != want {
 		t.Fatalf("menu titles\n got %s\nwant %s", got, want)
 	}
 }
 
 func TestMenuOffersNoDeveloperTools(t *testing.T) {
-	for _, title := range titles(menuOf("wloop", func(k string, _ map[string]any) string { return k })) {
+	for _, title := range titles(menuOf("Acme", func(k string, _ map[string]any) string { return k })) {
 		if strings.Contains(title, "Reload") || strings.Contains(title, "Developer") {
 			t.Errorf("the menu offers %q", title)
 		}

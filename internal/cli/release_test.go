@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/wloophq/wloop/internal/brand/brandtest"
 )
 
 type goreleaserOverride struct {
@@ -33,13 +35,15 @@ func TestReleaseBuildsTheBinaryWithTheWindow(t *testing.T) {
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(cfg.Builds, func(b goreleaserBuild) bool { return b.ID == "wloop" })
+	// The release names its build after the project, which keeps the default brand.
+	id := brandtest.DefaultName
+	i := slices.IndexFunc(cfg.Builds, func(b goreleaserBuild) bool { return b.ID == id })
 	if i < 0 {
-		t.Fatal("no build with id wloop")
+		t.Fatalf("no build with id %s", id)
 	}
 	b := cfg.Builds[i]
 	if !slices.Contains(b.Env, "CGO_ENABLED=0") {
-		t.Errorf("the wloop build's env is %v, want CGO_ENABLED=0", b.Env)
+		t.Errorf("the binary's build env is %v, want CGO_ENABLED=0", b.Env)
 	}
 	if slices.Contains(b.Tags, "purego") {
 		t.Error("every target builds with purego; linux would lose the standard library's crypto assembly for nothing")
@@ -48,7 +52,7 @@ func TestReleaseBuildsTheBinaryWithTheWindow(t *testing.T) {
 		if !slices.ContainsFunc(b.Overrides, func(o goreleaserOverride) bool {
 			return o.Goos == "darwin" && o.Goarch == arch && slices.Contains(o.Tags, "purego")
 		}) {
-			t.Errorf("no override builds wloop for darwin/%s with the purego tag: %+v", arch, b.Overrides)
+			t.Errorf("no override builds the binary for darwin/%s with the purego tag: %+v", arch, b.Overrides)
 		}
 	}
 }
