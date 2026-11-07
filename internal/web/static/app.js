@@ -2683,12 +2683,12 @@ function pageGates() {
 }
 
 // pageQuestion is the gate a digit answers from el: the one whose card holds el, else, on a queue, its item's
-// gate when that is no draft's.
+// gate when that is no draft's and no detail is open over the queue.
 function pageQuestion(el) {
   const at = gateAt(el, pageGates());
   if (at || (el && el.closest && el.closest(".d-gate"))) return at;
   const route = readRoute(location.hash);
-  if (route.view !== QUEUE) return null;
+  if (route.view !== QUEUE || route.task || route.unit || (el && el.closest && el.closest("#detail"))) return null;
   const queue = queueShown(route);
   const item = queue && (queue.items || [])[queueState.at];
   return item && item.gate && !queueDraft(item.gate) ? { task: item.task, gate: item.gate } : null;

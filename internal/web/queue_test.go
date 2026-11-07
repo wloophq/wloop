@@ -267,8 +267,8 @@ process.stdout.write(JSON.stringify({ Switched: switched, SwitchedText: switched
 
 func TestDigitsAnswerAGateCardOutsideTheDetail(t *testing.T) {
 	var got struct {
-		Queue, List, Detail, None string
-		Unfocused                 int
+		Queue, List, Detail, None           string
+		Unfocused, OverDetail, BesideDetail int
 	}
 	nodeRun(t, queuePrelude(t)+jsFunction(t, appJS(t), "pageGates")+jsFunction(t, appJS(t), "pageQuestion"), nil, `
 const gate = (id) => ({ id, kind: "question", intents: [{ id: "answer" }, { id: "continue" }] });
@@ -282,8 +282,12 @@ tasksState.tasks = [{ id: "t-2" }];
 detailState.task = { id: "t-3", gates: [gate(9)] };
 const at = (id) => { const q = gateAt(inCard(id), pageGates()); return q ? q.task.id + ":" + q.gate.id : ""; };
 const unfocused = pageQuestion({ closest: () => null });
-process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10), Unfocused: unfocused ? unfocused.gate.id : 0 }));`, nil, &got)
-	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" || got.Unfocused != 7 {
+location.hash = "#queue=answer&task=t-9";
+const overDetail = pageQuestion({ closest: (sel) => (sel === "#detail" ? {} : null) });
+const besideDetail = pageQuestion({ closest: () => null });
+process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10), Unfocused: unfocused ? unfocused.gate.id : 0,
+  OverDetail: overDetail ? overDetail.gate.id : 0, BesideDetail: besideDetail ? besideDetail.gate.id : 0 }));`, nil, &got)
+	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" || got.Unfocused != 7 || got.OverDetail != 0 || got.BesideDetail != 0 {
 		t.Fatalf("%+v: a digit answers the focused gate card wherever the page draws it", got)
 	}
 }
