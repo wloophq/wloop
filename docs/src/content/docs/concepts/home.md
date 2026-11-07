@@ -43,6 +43,10 @@ Each `[[sections]]` shows the first `limit` rows of a view, titled by the view's
 
 Each counter of a kind opens its queue (`#queue=<kind>`): the kind's decisions one at a time, the oldest first, one item per decision, so a task with two open questions is two items. An item is a task's open gate, offered with the gate's card, or a state of one of its units, offered with the unit's situation. Its primary action is, for a gate, the kind's `primary` intent when the gate offers it, else the gate's first; for a unit, the plugin layer's `[primary]` of the kind, a catalog action of its units or `open`, which opens the unit at its source. No queue merges: a unit that waits only for a merge opens where you merge it. The queue's title is the plugin's `[decisions.<kind>] queue` when every item is that plugin's, else the kind's. `GET /api/queues/<kind>?q=<lens query>` narrows a queue as the counters narrow, which the Outbox's groups use to review their drafts as a queue.
 
+## Search
+
+`GET /api/search?q=<lens query>` finds every task the query matches in the rail's views, accents and case aside, and groups them by `omnibox.toml`'s `[[search.groups]]`: a result goes to the first group whose view holds it, else to the last group (`search.other`). A group shows its first `search.limit` results, those whose title or unit holds the query as whole words first, then the view's order, and counts them all; each result lists the rail views it appears in.
+
 ## Changing it
 
 A user profile's `home.toml` replaces the keys it sets, and a list of counters or sections the whole list; `decisions.toml` and a plugin's `plugins/<id>/decisions.toml` replace the mappings they name. The words are localized like every profile text: `locales/<tag>/home.toml` and `locales/<tag>/decisions.toml` translate them, a plural text form by form.

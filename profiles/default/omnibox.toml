@@ -1,0 +1,23 @@
+# The omnibox: how a search groups the tasks it finds, by whom they wait
+# on. A result goes to the first group whose view holds it, else to the
+# last group. A user profile's omnibox.toml replaces the keys it sets, and
+# a list of groups the whole list.
+
+[search]
+limit = 5
+other = "Elsewhere"
+
+[[search.groups]]
+id    = "you"
+label = "Needs you"
+view  = "needs-me"
+
+[[search.groups]]
+id    = "others"
+label = "Waiting on others"
+view  = "waiting"
+
+[[search.groups]]
+id    = "done"
+label = "Done"
+view  = "logbook"

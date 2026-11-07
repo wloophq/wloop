@@ -1110,6 +1110,16 @@ The fields each notice reads besides `Name` and `Command`:
 - `counters[].clause.many` (string, localized): Its many form.
 - `counters[].clause.other` (string, localized): Its other form.
 
+## The omnibox (`omnibox.toml`)
+
+- `search` (table): How a search groups the tasks it finds.
+- `search.limit` (integer, default `5`): The most results a group shows; its count counts them all.
+- `search.other` (string, localized): The label of the last group, which holds what no group's view holds.
+- `search.groups[]` (table): A group, in order: a result goes to the first group whose view holds it. A user's list replaces the whole list.
+- `search.groups[].id` (string): The group's id. Required.
+- `search.groups[].label` (string, localized): The group's label. Required.
+- `search.groups[].view` (string): The view of views.toml whose tasks the group holds. Required.
+
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
 - `override` (bool, default `false`): Drops the blocks before it whose path is an ancestor of its own.

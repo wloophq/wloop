@@ -1,0 +1,52 @@
+{
+  "$id": "https://github.com/wloophq/wloop/omnibox.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "search": {
+      "additionalProperties": false,
+      "description": "How a search groups the tasks it finds.",
+      "properties": {
+        "groups": {
+          "description": "A group, in order: a result goes to the first group whose view holds it. A user's list replaces the whole list.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "description": "The group's id. Required.",
+                "type": "string"
+              },
+              "label": {
+                "description": "The group's label. Required.",
+                "type": "string"
+              },
+              "view": {
+                "description": "The view of views.toml whose tasks the group holds. Required.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "view"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "default": 5,
+          "description": "The most results a group shows; its count counts them all.",
+          "type": "integer"
+        },
+        "other": {
+          "description": "The label of the last group, which holds what no group's view holds.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "title": "The omnibox (omnibox.toml)",
+  "type": "object"
+}

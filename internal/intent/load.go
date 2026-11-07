@@ -130,6 +130,8 @@ type Loaded struct {
 	Decisions Decisions
 	// Home is home.toml in Locale.
 	Home HomeDef
+	// Omnibox is omnibox.toml in Locale.
+	Omnibox OmniboxDef
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -238,6 +240,9 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			home, homeProblems := loadHome(layers, r)
 			stringProblems = append(append(stringProblems, homeProblems...), home.check(views)...)
 			l.Home = home.def
+			omnibox, omniboxProblems := loadOmnibox(layers, r)
+			stringProblems = append(append(stringProblems, omniboxProblems...), omnibox.check(views)...)
+			l.Omnibox = omnibox.def
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, stringProblems, *r.problems)
 			l.Locale, l.reader = locale, r

@@ -66,3 +66,8 @@ var DecisionsSchema []byte
 //
 //go:embed home.schema.json
 var HomeSchema []byte
+
+// OmniboxSchema is the JSON Schema of omnibox.toml, for editors.
+//
+//go:embed omnibox.schema.json
+var OmniboxSchema []byte
