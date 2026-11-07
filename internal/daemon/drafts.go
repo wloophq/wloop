@@ -663,3 +663,7 @@ func originUnit(o draft.Origin) string {
 	}
 	return o.Unit.Label()
 }
+
+func (s *Server) handleDraftCloseSilently(w http.ResponseWriter, r *http.Request) {
+	notImplemented("E11")(w, r)
+}

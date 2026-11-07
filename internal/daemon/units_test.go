@@ -84,3 +84,7 @@ func TestAModuleCodecReachesTheRoute(t *testing.T) {
 		t.Fatalf("slack:x: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestSkipRoutesSetAndClearASkip(t *testing.T) {
+	t.Skip("E10 skip routes set and clear a skip; unit detail lists skipped_workflows")
+}

@@ -13,6 +13,15 @@ import (
 // GatePath; a draft gate's Subject is its Draft.
 const Drafts = "/api/drafts"
 
+// DraftCloseSilently takes a DraftCloseSilentlyRequest: it closes the held draft's conversation as the
+// draft would, applying its effects without posting it, and answers the Draft.
+const DraftCloseSilently = Drafts + "/{id}/close-silently"
+
+// DraftCloseSilentlyRequest names the draft's version the person saw.
+type DraftCloseSilentlyRequest struct {
+	Rev int64 `json:"rev"`
+}
+
 type DraftsResponse struct {
 	Drafts []Draft `json:"drafts"`
 }
@@ -30,8 +39,12 @@ type Draft struct {
 	Effects  []string `json:"effects"`
 	Target   string   `json:"target"`
 	// Where names the conversation or person the draft posts to; "" when its publisher could not tell.
-	Where    string `json:"where"`
-	Text     string `json:"text"`
+	Where string `json:"where"`
+	Text  string `json:"text"`
+	// Why is why the draft was proposed, in the interface language when it was made; Language is the
+	// language Text is written in.
+	Why      string `json:"why"`
+	Language string `json:"language"`
 	Reaction string `json:"reaction"`
 	Original string `json:"original"`
 	// Replaced is the text a sent edit replaced.

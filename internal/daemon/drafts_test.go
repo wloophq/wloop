@@ -1016,3 +1016,15 @@ func TestTheSenderSettlesDraftsAndHeldTasksAtStart(t *testing.T) {
 		t.Errorf("the held draft of no task names %q, want its gate's task %s", d.Task, g.Task)
 	}
 }
+
+func TestCloseSilentlyAppliesTheEffectsWithoutPosting(t *testing.T) {
+	t.Skip("E11 close-silently applies the effects without posting")
+}
+
+func TestCloseSilentlyRefusesADraftWhoseEffectsAreNotSilent(t *testing.T) {
+	t.Skip("E11 close-silently refuses a draft whose effects post")
+}
+
+func TestCloseSilentlyNeedsAPersonsClient(t *testing.T) {
+	t.Skip("E11 close-silently needs a person's client")
+}

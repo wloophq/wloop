@@ -1408,3 +1408,11 @@ func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
 		t.Fatalf("merged %+v (%v), want both units, the counters and rev 3", c, ok)
 	}
 }
+
+func TestRailFalseViewsServedWithRail(t *testing.T) {
+	t.Skip("B2 GET /api/views serves each view's rail")
+}
+
+func TestATaskWithNoDraftsListsNone(t *testing.T) {
+	t.Skip("E8 a task with no drafts lists none, never null")
+}
