@@ -85,6 +85,6 @@ func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style fun
 		fact("error", d.Error, t.Red)
 	}
 	if d.Deadline != nil {
-		fact("sends", d.Deadline.Local().Format("2006-01-02 15:04")+" unless you decide first", t.Dim)
+		fact(m.w().T("sends", nil), m.w().T("{time} unless you decide first", map[string]any{"time": m.w().Time(d.Deadline.Local(), "datetime")}), t.Dim)
 	}
 }

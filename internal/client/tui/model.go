@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -97,6 +98,8 @@ type EditRequest struct {
 
 type Model struct {
 	view int
+	// words are the client strings the daemon served; English until it serves them.
+	words *texts.Catalog
 	// facets are the fields a query of a task view names: the plugins' and the profile's, one by id.
 	facets    []api.FacetSpec
 	facetByID map[string]api.FacetSpec
@@ -417,12 +420,12 @@ func (m *Model) action(k Key) (Command, bool) {
 		return Command{}, false
 	}
 	if running, busy := m.busy[r.Unit]; busy {
-		m.status = fmt.Sprintf("%s %s still running", running, r.Label)
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": running, "task": r.Label})
 		return Command{}, false
 	}
 	switch {
 	case !offered:
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(spec.Label), r.Label)
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(spec.Label), "task": r.Label})
 	case !st.Enabled:
 		m.status = st.Reason
 	default:
@@ -454,13 +457,13 @@ func (m *Model) begin(r api.Row, spec api.ActionSpec, st api.ActionState, read u
 	if spec.Input == nil {
 		return m.finish(c, st, read)
 	}
-	label := inputLabel(r.Label, spec, st)
+	label := inputLabel(m.w(), r.Label, spec, st)
 	if spec.Input.Kind == "answer" {
 		if r.Question == nil {
-			m.status = "no open question on " + r.Label
+			m.status = m.w().T("no open question on {task}", map[string]any{"task": r.Label})
 			return Command{}, false
 		}
-		label = questionLabel(r.Label, r.Question)
+		label = questionLabel(m.w(), r.Label, r.Question)
 	}
 	m.ask(spec, st, c, label, read)
 	m.prompt.question = r.Question
@@ -476,14 +479,14 @@ func (m *Model) finish(c Command, st api.ActionState, read uint64) (Command, boo
 	return m.send(c)
 }
 
-func inputLabel(name string, spec api.ActionSpec, st api.ActionState) string {
+func inputLabel(w *texts.Catalog, name string, spec api.ActionSpec, st api.ActionState) string {
 	in := spec.Input
 	var hints []string
 	if in.Placeholder != "" {
 		hints = append(hints, in.Placeholder)
 	}
 	if in.UntilState {
-		hints = append(hints, "empty: until it changes")
+		hints = append(hints, w.T("empty: until it changes", nil))
 	}
 	hint := strings.Join(hints, "; ")
 	label := strings.ToLower(cmp.Or(st.Label, spec.Label)) + " " + name
@@ -496,24 +499,27 @@ func inputLabel(name string, spec api.ActionSpec, st api.ActionState) string {
 	return label
 }
 
-const queuedAnswer = "your answer is queued until the agent's session is free; an answer now replaces it"
+// queuedAnswer says that an answer waits for the agent's session, in w's words.
+func queuedAnswer(w *texts.Catalog) string {
+	return w.T("your answer is queued until the agent's session is free; an answer now replaces it", nil)
+}
 
 // questionLabel is the question's summary, with the drafted verdict and
 // the numbered options of a choice.
-func questionLabel(name string, q *api.QuestionView) string {
+func questionLabel(w *texts.Catalog, name string, q *api.QuestionView) string {
 	if q.Queued {
-		return name + ": " + queuedAnswer
+		return name + ": " + queuedAnswer(w)
 	}
 	text := q.Text
 	if text == "" {
 		text = q.LastMessage
 	}
 	if text == "" {
-		text = "the agent stopped"
+		text = w.T("the agent stopped", nil)
 	}
 	label := name + ": " + text
 	if q.Verdict != "" {
-		label += fmt.Sprintf(" (drafted %s, %d blocking, %d non-blocking)", q.Verdict, q.Blocking, q.NonBlocking)
+		label += " (" + w.T("drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking", map[string]any{"verdict": q.Verdict, "blocking": q.Blocking, "nonblocking": q.NonBlocking}) + ")"
 	}
 	if q.Kind == "confirm" {
 		return label + " y/n"
@@ -584,7 +590,7 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		}
 		m.status = p.action + " " + p.cmd.Label + " cancelled"
 		if k.Read <= p.read {
-			m.status += ": a y typed together with the key before it does not confirm"
+			m.status += ": " + m.w().T("a y typed together with the key before it does not confirm", nil)
 		}
 		return Command{}, false
 	}
@@ -642,7 +648,7 @@ func (m *Model) TakeEdit() *EditRequest {
 // Edited submits what the editor returned for e; an empty text cancels.
 func (m *Model) Edited(e *EditRequest, text string, err error) (Command, bool) {
 	if err != nil {
-		m.status = e.Label + ": the editor failed: " + err.Error()
+		m.status = m.w().T("{task}: the editor failed: {error}", map[string]any{"task": e.Label, "error": err.Error()})
 		return Command{}, false
 	}
 	return e.submit(editedText(text))
@@ -742,7 +748,7 @@ func (m *Model) jump() {
 	for i, v := range m.views {
 		labels[i] = v.Label
 	}
-	m.status = addr + " is not in " + orList(labels) + "; " + brand.Command + " open " + addr + " shows it"
+	m.status = m.w().T("{address} is not in {views}; {command} shows it", map[string]any{"address": addr, "views": orList(labels), "command": brand.Command + " open " + addr})
 }
 
 // links says whether addr is link or a page under it.
@@ -764,7 +770,7 @@ func (m *Model) Done(c Command, lines []string, err error) {
 	delete(m.busy, c.Unit)
 	switch {
 	case err != nil:
-		m.status = fmt.Sprintf("%s %s failed: %v", c.Action, c.Label, err)
+		m.status = m.w().T("{action} {task} failed: {error}", map[string]any{"action": c.Action, "task": c.Label, "error": m.errorText(err)})
 	case len(lines) > 0:
 		m.status = fmt.Sprintf("%s %s: %s", c.Action, c.Label, lines[len(lines)-1])
 	default:
@@ -778,4 +784,12 @@ func orList(names []string) string {
 		return strings.Join(names, "")
 	}
 	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+}
+
+// w is the client strings the terminal reads its words in.
+func (m *Model) w() *texts.Catalog {
+	if m.words == nil {
+		return texts.English()
+	}
+	return m.words
 }

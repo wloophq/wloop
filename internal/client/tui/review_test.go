@@ -233,3 +233,12 @@ func TestProjectFactsCountTheOpenChildren(t *testing.T) {
 		t.Errorf("facts %q", got)
 	}
 }
+
+func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.strings == nil {
+		return api.Strings{Locale: "en"}, nil
+	}
+	return *f.strings, nil
+}

@@ -85,7 +85,7 @@ func parseFile(t *testing.T, path string) (*token.FileSet, *ast.File) {
 
 func parseOnce(path string) (*ast.File, error) {
 	parse, _ := parsed.LoadOrStore(path, sync.OnceValues(func() (*ast.File, error) {
-		return parser.ParseFile(fileSet, path, nil, 0)
+		return parser.ParseFile(fileSet, path, nil, parser.ParseComments)
 	}))
 	return parse.(func() (*ast.File, error))()
 }

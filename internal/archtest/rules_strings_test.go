@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/net/html"
 )
 
 // nonProse are literals that read like prose and are not: what each is, by literal.
@@ -45,9 +46,7 @@ var proseClients = []string{"menubar", "tui", "window"}
 
 // proseDebts are the prose literals each client still quotes outside the catalog, by script or by client
 // package. A count only shrinks: a count above or below the real one fails.
-var proseDebts = map[string]int{
-	"tui": 85,
-}
+var proseDebts = map[string]int{}
 
 var (
 	proseWord   = regexp.MustCompile(`^[\pL][\pL'’-]*[.,:;!?…)]*$`)
@@ -181,28 +180,29 @@ func ruleClientProse(file string, src string) []string {
 	return out
 }
 
-// goExempt are the calls whose literal arguments are no text a person reads, or are the catalog's keys.
-var goExempt = map[string]bool{"T": true, "TN": true, "New": true, "panic": true, "Errorf": true, "Log": true, "Logf": true, "logf": true, "Printf": true, "Println": true,
-	"Debug": true, "Info": true, "Warn": true, "Error": true, "Sprintf": true, "Fprintf": true, "Exec": true, "Command": true, "CommandContext": true}
+// goExempt are the calls whose literal arguments are no text a person reads (logs, panics, the arguments of a
+// process), or are the catalog's keys.
+var goExempt = map[string]bool{"T": true, "TN": true, "panic": true, "Log": true, "Logf": true, "logf": true,
+	"Debug": true, "Info": true, "Warn": true, "Error": true, "Exec": true, "Command": true, "CommandContext": true}
+
+// proseInternal marks a literal no person reads, such as an error that only wraps another, on its line:
+// "//prose:internal <why>".
+const proseInternal = "//prose:internal "
 
 // ruleGoClientProse flags each prose literal of the Go client file outside the catalog: the catalog's keys,
-// errors, logs and formats are not prose a client shows itself.
+// logs and literals marked proseInternal are not prose a client shows.
 func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File) []string {
-	exempt := map[*ast.BasicLit]bool{}
-	exemptAll := func(n ast.Node) {
-		ast.Inspect(n, func(m ast.Node) bool {
-			if lit, ok := m.(*ast.BasicLit); ok {
-				exempt[lit] = true
+	internal := map[int]bool{}
+	for _, g := range f.Comments {
+		for _, c := range g.List {
+			if strings.HasPrefix(c.Text, proseInternal) {
+				internal[fset.Position(c.Pos()).Line] = true
 			}
-			return true
-		})
+		}
 	}
+	exempt := map[*ast.BasicLit]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch x := n.(type) {
-		case *ast.FuncDecl:
-			if x.Name.Name == "Error" && x.Recv != nil {
-				exemptAll(x.Body)
-			}
 		case *ast.CallExpr:
 			name := ""
 			switch fn := x.Fun.(type) {
@@ -233,7 +233,7 @@ func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File) []string {
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING || exempt[lit] {
+		if !ok || lit.Kind != token.STRING || exempt[lit] || internal[fset.Position(lit.Pos()).Line] {
 			return true
 		}
 		s, err := strconv.Unquote(lit.Value)
@@ -272,7 +272,7 @@ func cockpitScripts(t *testing.T) map[string]string {
 	return out
 }
 
-// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts and the Go clients quote no text
+// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts, its page and the Go clients quote no text
 // a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for
 // the debts `proseDebts` counts, which only shrink.
 func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
@@ -283,6 +283,11 @@ func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
 		}
 		got[proseBucket(file)] = append(got[proseBucket(file)], ruleClientProse(file, src)...)
 	}
+	page, err := os.ReadFile(filepath.Join("..", "..", webStatic, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got["index.html"] = append(got["index.html"], ruleHTMLProse(webStatic+"/index.html", string(page))...)
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		if strings.HasPrefix(file, "internal/client/") && slices.Contains(proseClients, proseBucket(file)) {
 			got[proseBucket(file)] = append(got[proseBucket(file)], ruleGoClientProse(fset, file, f)...)
@@ -318,9 +323,13 @@ func catalogKeys(t *testing.T) map[string]bool {
 	return out
 }
 
-var jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
+var (
+	jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
+	pageKey   = regexp.MustCompile(`data-i18n(?:-[a-z-]+)?="([^"]*)"`)
+)
 
-// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is
+// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the
+// page's `data-i18n` attributes) is
 // a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves.
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	keys := catalogKeys(t)
@@ -333,6 +342,17 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 					t.Errorf("%s:%d reads %q, which strings.toml lacks", file, l.line, l.text)
 				}
 			}
+		}
+	}
+	page, err := os.ReadFile(filepath.Join("..", "..", webStatic, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range pageKey.FindAllStringSubmatch(string(page), -1) {
+		k := html.UnescapeString(m[1])
+		used[k] = true
+		if !keys[k] {
+			t.Errorf("%s/index.html reads %q, which strings.toml lacks", webStatic, k)
 		}
 	}
 	literals := map[string]bool{}
@@ -367,5 +387,81 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 		if !used[k] && !literals[k] {
 			t.Errorf("strings.toml's %q is read by no client", k)
 		}
+	}
+}
+
+// htmlTextAttrs are the attributes whose value a person reads, each worded by its data-i18n-<attr> key.
+var htmlTextAttrs = []string{"title", "placeholder", "aria-label"}
+
+// ruleHTMLProse flags each prose text node or text attribute of the page file whose element carries no
+// data-i18n key for it.
+func ruleHTMLProse(file, src string) []string {
+	var out []string
+	z := html.NewTokenizer(strings.NewReader(src))
+	var open []html.Token
+	line := 1
+	for {
+		tt := z.Next()
+		raw := string(z.Raw())
+		switch tt {
+		case html.ErrorToken:
+			return out
+		case html.StartTagToken, html.SelfClosingTagToken:
+			tok := z.Token()
+			attrs := map[string]string{}
+			for _, a := range tok.Attr {
+				attrs[a.Key] = a.Val
+			}
+			for _, name := range htmlTextAttrs {
+				if v, ok := attrs[name]; ok && isProse(v) && attrs["data-i18n-"+name] == "" {
+					out = append(out, fmt.Sprintf("%s:%d: <%s %s=%q>; a text a person reads carries a data-i18n-%s key in strings.toml", file, line, tok.Data, name, v, name))
+				}
+			}
+			if tt == html.StartTagToken {
+				open = append(open, tok)
+			}
+		case html.EndTagToken:
+			if len(open) > 0 {
+				open = open[:len(open)-1]
+			}
+		case html.TextToken:
+			text := strings.TrimSpace(html.UnescapeString(raw))
+			if len(open) == 0 || !isProse(text) {
+				break
+			}
+			el := open[len(open)-1]
+			if el.Data == "script" || el.Data == "style" {
+				break
+			}
+			if !slices.ContainsFunc(el.Attr, func(a html.Attribute) bool { return a.Key == "data-i18n" }) {
+				out = append(out, fmt.Sprintf("%s:%d: <%s> says %q; a text a person reads carries a data-i18n key in strings.toml", file, line, el.Data, text))
+			}
+		}
+		line += strings.Count(raw, "\n")
+	}
+}
+
+// proseInternalMarks is how many literals of the person-facing clients are marked proseInternal; a new mark
+// raises it on purpose, in review.
+const proseInternalMarks = 10
+
+// TestProseInternalMarksStayFew checks that the clients mark as no text a person reads exactly
+// proseInternalMarks literals, so a mark is a reviewed exception.
+func TestProseInternalMarksStayFew(t *testing.T) {
+	n := 0
+	forEachFile(t, false, func(_ *token.FileSet, file string, f *ast.File) {
+		if !strings.HasPrefix(file, "internal/client/") || !slices.Contains(proseClients, proseBucket(file)) {
+			return
+		}
+		for _, g := range f.Comments {
+			for _, c := range g.List {
+				if strings.HasPrefix(c.Text, proseInternal) {
+					n++
+				}
+			}
+		}
+	})
+	if n != proseInternalMarks {
+		t.Errorf("the clients mark %d literals %q, proseInternalMarks is %d", n, strings.TrimSpace(proseInternal), proseInternalMarks)
 	}
 }

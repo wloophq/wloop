@@ -40,7 +40,14 @@ function applyCatalog(c) {
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
   catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
   catalog.details = c.details || [];
-  catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
+  const searching = (c.views || []).find((v) => v.search) || {};
+  catalog.search = searching.search || null;
+  catalog.searchProvider = searching.provider || "";
+}
+
+// searchService is the service the served search runs on, as its plugin names it.
+function searchService() {
+  return providerName(catalog.searchProvider || "");
 }
 
 // exploreSearch is the served Explore search: its presets, filters, sorts
@@ -884,7 +891,7 @@ function renderWarnings() {
   const items = [];
   const hl = state.health;
   if (hl) {
-    if (hl.slow_sync) items.push(t("Slow sync: GitHub budget low until {time}", { time: stamp(hl.rate_limit.reset_at) }));
+    if (hl.slow_sync) items.push(t("Slow sync: the API budget is low until {time}", { time: stamp(hl.rate_limit.reset_at) }));
     for (const w of hl.warnings || []) items.push(w);
     for (const j of hl.jobs || []) if (j.last_error) items.push(`${j.name}: ${j.last_error}`);
   }
@@ -916,7 +923,7 @@ function renderSync() {
   if (hl.paused) parts.push(t("automatic rounds paused"));
   if (sync) parts.push(sync.running ? t("syncing") : isSet(sync.last_ok) ? t("synced {ago}", { ago: ago(sync.last_ok) }) : t("not synced yet"));
   const rl = hl.rate_limit;
-  if (rl && rl.limit) parts.push(t("GitHub budget {remaining} of {limit} left", { remaining: fmtNumber(rl.remaining), limit: fmtNumber(rl.limit) }));
+  if (rl && rl.limit) parts.push(t("API budget {remaining} of {limit} left", { remaining: fmtNumber(rl.remaining), limit: fmtNumber(rl.limit) }));
   if (hl.version) parts.push(hl.version);
   el.textContent = parts.join(" · ");
   el.classList.toggle("slow", !!hl.slow_sync);
@@ -1815,7 +1822,7 @@ function emptyNote(view, q) {
     return [t("{unit} is not in the inventory.", { unit: refLabel({ owner, repo, number }) }), " ",
       h("button", { type: "button", class: "act", "data-focus": "empty:explore", onclick: () => { writeHash({ view: "explore", q: "", x: q.trim() }); explore(q); } }, t("Explore it")),
       " ",
-      h("a", { href: typed, target: "_blank", rel: "noopener noreferrer", "data-focus": "empty:gh" }, t("Open it on GitHub"))];
+      h("a", { href: typed, target: "_blank", rel: "noopener noreferrer", "data-focus": "empty:gh" }, t("Open it on {provider}", { provider: searchService() }))];
   }
   if (!q) return [t("Nothing in {view} right now.", { view: label })];
   const note = t("Nothing in {view} matches \"{query}\".", { view: label, query: q });
@@ -2149,7 +2156,7 @@ async function copyReviewRequest(r, b) {
     } else {
       await navigator.clipboard.writeText(text);
     }
-    setNotice(t("Copied the review request for {unit}; paste it in Slack.", { unit: labelOf(r) }));
+    setNotice(t("Copied the review request for {unit}; paste it in a chat.", { unit: labelOf(r) }));
   } catch (err) {
     setNotice(t("Could not copy: {error}", { error: err.message }), true);
   }
@@ -2440,7 +2447,7 @@ function renderDetail() {
     intakeBlock(r),
     inCard ? null : h("label", { class: "d-sub", for: "guidance" }, guidanceLabel(r)));
   const acts = h("div", { class: "d-acts" },
-    h("div", { class: "d-actions" }, [...actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) }), h("button", { type: "button", class: "act", "data-focus": "detail:copy-review", title: t("Copy a review request with the title, link and brief, formatted for Slack"), onclick: () => copyReviewRequest(r, d.brief) }, t("Copy review request"))]),
+    h("div", { class: "d-actions" }, [...actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) }), h("button", { type: "button", class: "act", "data-focus": "detail:copy-review", title: t("Copy a review request with the title, link and brief, formatted for a chat message"), onclick: () => copyReviewRequest(r, d.brief) }, t("Copy review request"))]),
     actionNotes(r, "detail"),
     briefBlock(d.brief, r, readLens()));
   const log = h("div", { class: "d-log" },
@@ -2605,10 +2612,10 @@ async function explore(query) {
 
 function exploreStatus() {
   const ex = state.explore;
-  if (ex.busy) return t("Searching GitHub…");
+  if (ex.busy) return t("Searching {provider}…", { provider: searchService() });
   if (ex.error) return ex.error;
   const r = ex.result;
-  if (!r) return t("A search runs only when you press Enter or Search; each one spends about 1 point of GitHub's hourly budget.");
+  if (!r) return t("A search runs only when you press Enter or Search; each one spends about 1 point of the hourly API budget of {provider}.", { provider: searchService() });
   const shown = r.candidates.length;
   const order = (exploreSearch().sorts || []).find((s) => s.sort === querySort(r.query || ""));
   const cost = r.rate_limit && r.rate_limit.limit ? " · " + t("cost {cost}, {remaining} of {limit} left", { cost: r.cost, remaining: r.rate_limit.remaining, limit: r.rate_limit.limit }) : "";
@@ -3282,6 +3289,7 @@ setInterval(render, 60000);
 setInterval(tickCountdowns, 1000);
 loadStrings(getJSON).then(() => {
   document.documentElement.lang = I18N.locale;
+  translateStatic(document);
   load();
   connect();
 });
@@ -3289,5 +3297,6 @@ loadStrings(getJSON).then(() => {
 // i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them.
 function i18nChanged() {
   document.documentElement.lang = I18N.locale;
+  translateStatic(document);
   render();
 }

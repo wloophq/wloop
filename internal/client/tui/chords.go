@@ -145,7 +145,7 @@ func (m *Model) dispatch(k Key) (Command, bool) {
 			full = strings.TrimSpace(full)
 		}
 		if i < 0 {
-			m.status = full + ": no such key"
+			m.status = m.w().T("{key}: no such key", map[string]any{"key": full})
 			return Command{}, false
 		}
 		return m.run(m.keys[i], k)
@@ -269,7 +269,7 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	case a == "capture":
 		m.prompt = &prompt{action: "capture", label: "capture", read: k.Read, submit: func(text string) (Command, bool) {
 			if text == "" {
-				m.status = "capture cancelled: nothing typed"
+				m.status = m.w().T("capture cancelled: nothing typed", nil)
 				return Command{}, false
 			}
 			return m.send(Command{Unit: taskUnit("capture"), Label: termfmt.Cut(text, 48), Action: "capture", capture: text})
@@ -305,16 +305,16 @@ func (m *Model) navigate(to string) {
 		return
 	}
 	if p := slices.IndexFunc(m.served, func(p api.Plugin) bool { return string(p.ID) == to }); p >= 0 {
-		m.status = "no " + cmp.Or(m.served[p].Name, to) + " views: the plugin is disabled or not loaded"
+		m.status = m.w().T("no {plugin} views: the plugin is disabled or not loaded", map[string]any{"plugin": cmp.Or(m.served[p].Name, to)})
 		return
 	}
-	m.status = "no " + to + " view here"
+	m.status = m.w().T("no {view} view here", map[string]any{"view": to})
 }
 
 // pickArea makes the lists follow area n of the served areas.
 func (m *Model) pickArea(n int) {
 	if n < 1 || n > len(m.viewsCat.Areas) {
-		m.status = fmt.Sprintf("no area %d", n)
+		m.status = m.w().T("no area {n}", map[string]any{"n": n})
 		return
 	}
 	m.setArea(m.viewsCat.Areas[n-1])
@@ -323,7 +323,7 @@ func (m *Model) pickArea(n int) {
 func (m *Model) setArea(a string) {
 	m.area = a
 	m.counters, m.filtered = api.Counters{}, nil
-	m.status = "area: " + cmp.Or(a, "every area")
+	m.status = m.w().T("area: {area}", map[string]any{"area": cmp.Or(a, m.w().T("every area", nil))})
 }
 
 func (m *Model) startFilter() {
@@ -345,11 +345,11 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		return m.pickedVerb(e, d, verb, read)
 	}
 	if i := slices.IndexFunc(e.Verbs, func(v api.VerbState) bool { return v.Verb == verb }); i >= 0 && !e.Verbs[i].Enabled {
-		m.status = verb + ": " + cmp.Or(e.Verbs[i].Reason, "not offered here")
+		m.status = verb + ": " + cmp.Or(e.Verbs[i].Reason, m.w().T("not offered here", nil))
 		return Command{}, false
 	}
 	if _, busy := m.busy[taskUnit(e.ID)]; busy {
-		m.status = fmt.Sprintf("%s %s still running", m.busy[taskUnit(e.ID)], taskLabel(e))
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[taskUnit(e.ID)], "task": taskLabel(e)})
 		return Command{}, false
 	}
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
@@ -359,7 +359,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	case handler == handlerEdit:
 		shown := m.shownDetail(e)
 		if draftOn(shown) == nil || !m.detailOpen(e) {
-			m.status = "open a draft, or pick one with its digit, to edit it"
+			m.status = m.w().T("open a draft, or pick one with its digit, to edit it", nil)
 			return Command{}, false
 		}
 		c.task = "draft:" + strconv.FormatInt(draftOn(shown).ID, 10)
@@ -383,7 +383,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + taskLabel(e), read: read, submit: func(text string) (Command, bool) {
 		args, ok := ask(text)
 		if !ok {
-			m.status = verb + " " + c.Label + " cancelled: nothing usable typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing usable typed", map[string]any{"verb": verb, "task": c.Label})
 			return Command{}, false
 		}
 		c.args = args
@@ -399,25 +399,25 @@ func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool
 	target := draftTarget(e)
 	handler := m.viewsCat.HandlerOf(c.verb)
 	if handler == ownDismiss {
-		m.confirm(c, "discard the draft to "+target+"?", read)
+		m.confirm(c, m.w().T("discard the draft to {target}?", map[string]any{"target": target}), read)
 		return Command{}, false
 	}
 	if !m.detailOpen(e) {
-		m.status = "open the draft to " + c.verb + " it (Enter)"
+		m.status = m.w().T("open the draft to {verb} it (Enter)", map[string]any{"verb": c.verb})
 		return Command{}, false
 	}
 	shown := m.shownDetail(e)
 	if draftOn(shown) == nil {
-		m.status = "no draft on screen to " + c.verb
+		m.status = m.w().T("no draft on screen to {verb}", map[string]any{"verb": c.verb})
 		return Command{}, false
 	}
 	c.args = map[string]string{"rev": strconv.FormatInt(draftOn(shown).Rev, 10)}
 	if handler == handlerRetry {
-		m.confirm(c, "post again to "+target+"?", read)
+		m.confirm(c, m.w().T("post again to {target}?", map[string]any{"target": target}), read)
 		return Command{}, false
 	}
 	c.args["text"] = draftOn(shown).Text
-	m.confirm(c, "post to "+target+"?", read)
+	m.confirm(c, m.w().T("post to {target}?", map[string]any{"target": target}), read)
 	return Command{}, false
 }
 
@@ -466,7 +466,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 			continue
 		}
 		if _, busy := m.busy[r.Unit]; busy {
-			m.status = fmt.Sprintf("%s %s still running", m.busy[r.Unit], r.Label)
+			m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
 			return Command{}, false
 		}
 		if !st.Enabled {
@@ -476,7 +476,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 		return m.begin(r, *spec, st, k.Read)
 	}
 	if fallback != nil {
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(fallback.Label), taskLabel(e))
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(fallback.Label), "task": taskLabel(e)})
 	}
 	return Command{}, false
 }
@@ -491,7 +491,7 @@ func (m *Model) openSource() (Command, bool) {
 		}
 		link := m.sourceLink(e)
 		if link == "" && len(e.Units) == 0 {
-			m.status = taskLabel(e) + " has no source to open"
+			m.status = m.w().T("{task} has no source to open", map[string]any{"task": taskLabel(e)})
 			return Command{}, false
 		}
 		return m.send(Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: "open-source", task: e.ID, open: link, openFind: link == ""})
@@ -523,7 +523,7 @@ type paletteItem struct {
 }
 
 func (m *Model) openPalette() {
-	m.overlay = &overlay{title: "Actions", items: m.paletteItems()}
+	m.overlay = &overlay{title: m.w().T("Actions", nil), items: m.paletteItems()}
 }
 
 // paletteItems are the selection's actions with their keys, the global
@@ -571,7 +571,7 @@ func (m *Model) paletteItems() []paletteItem {
 			items = append(items, paletteItem{label: b.Help, key: b.Key, about: b.Summary, run: runKey(b)})
 		}
 	}
-	return append(items, paletteItem{label: "Area...", run: func(uint64) (Command, bool) {
+	return append(items, paletteItem{label: m.w().T("Area...", nil), run: func(uint64) (Command, bool) {
 		m.openAreas()
 		return Command{}, false
 	}})
@@ -589,7 +589,7 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 		about := strings.Join(slices.DeleteFunc([]string{s.Summary, st.Note}, func(x string) bool { return x == "" }), " · ")
 		items = append(items, paletteItem{label: cmp.Or(st.Label, s.Label) + " " + r.Label, key: s.Key, about: about, run: func(read uint64) (Command, bool) {
 			if _, busy := m.busy[r.Unit]; busy {
-				m.status = fmt.Sprintf("%s %s still running", m.busy[r.Unit], r.Label)
+				m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
 				return Command{}, false
 			}
 			return m.begin(r, spec, st, read)
@@ -600,7 +600,7 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 
 // openAreas lists No area and the served areas, each with its Shift key.
 func (m *Model) openAreas() {
-	items := []paletteItem{{label: "No area", run: func(uint64) (Command, bool) { m.setArea(""); return Command{}, false }}}
+	items := []paletteItem{{label: m.w().T("No area", nil), run: func(uint64) (Command, bool) { m.setArea(""); return Command{}, false }}}
 	for i, a := range m.viewsCat.Areas {
 		key := ""
 		if i < 9 {
@@ -608,17 +608,22 @@ func (m *Model) openAreas() {
 		}
 		items = append(items, paletteItem{label: a, key: key, run: func(uint64) (Command, bool) { m.setArea(a); return Command{}, false }})
 	}
-	m.overlay = &overlay{title: "Area", items: items}
+	m.overlay = &overlay{title: m.w().T("Area", nil), items: items}
 }
 
-var helpHeads = []struct{ context, head string }{
-	{ctxGlobal, "Everywhere"}, {ctxList, "On the selection"}, {ctxQuestion, "In a question"}, {ctxPlan, "In the plan"}, {"review", "In the review"},
+// helpHeads are the help's sections, each a key context and its heading.
+func (m *Model) helpHeads() []struct{ context, head string } {
+	w := m.w()
+	return []struct{ context, head string }{
+		{ctxGlobal, w.T("Everywhere", nil)}, {ctxList, w.T("On the selection", nil)}, {ctxQuestion, w.T("In a question", nil)},
+		{ctxPlan, w.T("In the plan", nil)}, {"review", w.T("In the review", nil)},
+	}
 }
 
 // openHelp lists every binding of the terminal by context.
 func (m *Model) openHelp() {
 	var items []paletteItem
-	for _, h := range helpHeads {
+	for _, h := range m.helpHeads() {
 		head := false
 		for _, b := range m.keys {
 			if b.Context != h.context {
@@ -630,7 +635,7 @@ func (m *Model) openHelp() {
 			items = append(items, paletteItem{label: "  " + b.Help, key: b.Key, about: b.Summary})
 		}
 	}
-	m.overlay = &overlay{title: "Keys", items: items, help: true}
+	m.overlay = &overlay{title: m.w().T("Keys", nil), items: items, help: true}
 }
 
 // keyOf is the key press a binding's name stands for.
@@ -685,20 +690,20 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 	t := m.t
 	o := m.overlay
 	lines = append(lines, " "+t.Bold(termfmt.Cut(o.title, width-1)))
-	hint := "Enter runs, Esc closes"
+	hint := m.w().T("Enter runs, Esc closes", nil)
 	if o.pick != nil {
 		lines = append(lines, " > "+termfmt.Cut(string(o.pick.query), width-3))
 		body--
-		hint = "type to narrow, Enter picks, Esc closes"
+		hint = m.w().T("type to narrow, Enter picks, Esc closes", nil)
 		switch {
 		case o.pick.pending:
-			hint = "listing the tasks… · " + hint
+			hint = m.w().T("listing the tasks…", nil) + " · " + hint
 		case len(o.items) == 0:
-			hint = "no task holds the text · " + hint
+			hint = m.w().T("no task holds the text", nil) + " · " + hint
 		}
 	}
 	if o.help {
-		hint = "any key closes"
+		hint = m.w().T("any key closes", nil)
 	} else if o.at < len(o.items) && o.items[o.at].about != "" {
 		hint = o.items[o.at].about + " · " + hint
 	}

@@ -14,9 +14,9 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
 | `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports the GitHub plugin's API client or gh: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
-| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
+| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the page's `data-i18n` attributes) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
-| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
+| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts, its page and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
@@ -53,6 +53,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheWindowAdapterImportsWails` | No Go file outside `internal/client/window/wails` imports Wails, test files and files a build tag leaves out of this build included: the window host stays one adapter behind the window client's port. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestPluginsImportOnlyTheSDK` | No package under `plugins/`, nor the stand-in plugin's, imports a package under `internal/` or a package of another plugin, tests included: every plugin builds against the SDK and its own packages alone. |
+| `TestProseInternalMarksStayFew` | The clients mark as no text a person reads exactly proseInternalMarks literals, so a mark is a reviewed exception. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/` and a plugin's profile layer, `plugins/<id>/profile/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "plugins.slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |

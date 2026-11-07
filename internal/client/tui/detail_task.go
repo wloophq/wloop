@@ -56,7 +56,7 @@ func (m *Model) SetDetail(id string, e api.TaskView, err error) {
 		return
 	}
 	if err != nil {
-		m.status = "detail of " + id + " not loaded: " + err.Error()
+		m.status = m.w().T("detail of {task} not loaded: {error}", map[string]any{"task": id, "error": err.Error()})
 		return
 	}
 	m.opened, m.detailStale = &e, false
@@ -88,7 +88,7 @@ func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 	}
 	for _, u := range e.Units {
 		if r, ok := m.rowOf(u); ok && r.Question != nil {
-			c := rowCard(r)
+			c := m.rowCard(r)
 			return c, true
 		}
 	}
@@ -109,10 +109,10 @@ func gateText(g api.GateView) string {
 	return cmp.Or(g.Text, g.Name, g.Kind)
 }
 
-func rowCard(r api.Row) askCard {
+func (m *Model) rowCard(r api.Row) askCard {
 	q := r.Question
 	if q.Queued {
-		return askCard{text: queuedAnswer, row: &r}
+		return askCard{text: queuedAnswer(m.w()), row: &r}
 	}
 	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r}
 }
@@ -131,7 +131,7 @@ func (m *Model) activeCard() (askCard, bool) {
 		return askCard{}, false
 	}
 	if r, ok := m.selected(); ok && r.Question != nil {
-		return rowCard(r), true
+		return m.rowCard(r), true
 	}
 	return askCard{}, false
 }
@@ -168,7 +168,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		return Command{}, false
 	}
 	if n < 1 || n > len(c.answers()) {
-		m.status = fmt.Sprintf("no option %d", n)
+		m.status = m.w().T("no option {n}", map[string]any{"n": n})
 		return Command{}, false
 	}
 	if c.row != nil {
@@ -176,7 +176,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		st, ok := actionState(r, "answer")
 		switch {
 		case !ok:
-			m.status = "no answer on " + r.Label
+			m.status = m.w().T("no answer on {task}", map[string]any{"task": r.Label})
 			return Command{}, false
 		case !st.Enabled:
 			m.status = st.Reason
@@ -286,14 +286,14 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 	}
 	m.refFacts(e, related.Name, merged.Name, fact)
 	if e.OwedBy != "" {
-		fact("owed by", e.OwedBy, plain)
+		fact(m.w().T("owed by", nil), e.OwedBy, plain)
 	}
 	if e.Notes != "" {
 		para("notes", e.Notes)
 	}
 	card, carded := m.questionCard(e)
 	if carded && card.gate == nil {
-		fact("asks", cmp.Or(card.text, "the agent stopped"), t.Yellow)
+		fact(m.w().T("asks", nil), cmp.Or(card.text, m.w().T("the agent stopped", nil)), t.Yellow)
 		for i, a := range card.answers() {
 			fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
 		}
@@ -392,7 +392,7 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 		state = append(state, string(c.Outcome))
 	}
 	if s.Stale {
-		state = append(state, "plugin disabled, read-only")
+		state = append(state, m.w().T("plugin disabled, read-only", nil))
 	}
 	fact("", strings.Join(slices.DeleteFunc(state, func(s string) bool { return s == "" }), " · "), t.Dim)
 	if c.Why != "" {
@@ -426,7 +426,7 @@ func (m *Model) taskKeys(e api.TaskView, width, col int) []string {
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }

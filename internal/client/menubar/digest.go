@@ -36,7 +36,7 @@ func (c *Controller) digests(ctx context.Context) {
 	}
 }
 
-var errNotShown = errors.New("notifications are off")
+var errNotShown = errors.New("notifications are off") //prose:internal a sentinel the digest loop compares, never shown
 
 // postDigest posts day's digest unless it was posted, or found empty,
 // already; an error leaves it to be tried again.

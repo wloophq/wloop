@@ -102,7 +102,7 @@ func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 			return Command{}, false, false
 		}
 		if st.Done {
-			m.status = st.Label + " is already done"
+			m.status = m.w().T("{step} is already done", map[string]any{"step": st.Label})
 			return Command{}, false, true
 		}
 		steps[at].Done = true
@@ -156,7 +156,7 @@ func (m *Model) renderReview(lines []string, width, body int, now time.Time) []s
 		lines = append(lines, m.reviewSteps(width)...)
 	}
 	if m.rv.review.Done {
-		lines = append(lines, "  "+t.Dim(termfmt.Cut("Review done. A new one starts the next time you open it.", width-2)))
+		lines = append(lines, "  "+t.Dim(termfmt.Cut(m.w().T("Review done. A new one starts the next time you open it.", nil), width-2)))
 	}
 	st, ok := m.reviewStep()
 	if !ok {
@@ -226,9 +226,9 @@ func (m *Model) reviewSteps(width int) []string {
 func (m *Model) reviewHelp() []helpItem {
 	var items []helpItem
 	if m.rv.head {
-		items = append(items, helpItem{"Enter", "step done"})
+		items = append(items, helpItem{"Enter", m.w().T("step done", nil)})
 	}
-	return append(items, helpItem{"]", "next step"}, helpItem{"[", "previous step"})
+	return append(items, helpItem{"]", m.w().T("next step", nil)}, helpItem{"[", m.w().T("previous step", nil)})
 }
 
 // projectFacts are a project's review mark, open children, with no next

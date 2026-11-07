@@ -22,7 +22,7 @@ const (
 	leaveScreen = "\x1b[?2004l\x1b[?25h\x1b[?1049l"
 )
 
-var ErrNotTerminal = errors.New(brand.Command + " tui needs a terminal on stdin and stdout")
+var ErrNotTerminal = errors.New(brand.Command + " tui needs a terminal on stdin and stdout") //prose:internal the command line's error, English by the spec
 
 // TTY is the process's terminal in raw mode on the alternate screen.
 type TTY struct {
@@ -162,7 +162,7 @@ func (t *TTY) Draw(lines []string) error {
 
 func (t *TTY) recover() {
 	if p := recover(); p != nil {
-		t.failed.CompareAndSwap(nil, fmt.Errorf(brand.Command+" tui: reading the terminal: %v", p))
+		t.failed.CompareAndSwap(nil, fmt.Errorf(brand.Command+" tui: reading the terminal: %v", p)) //prose:internal the command line's error, English by the spec
 	}
 }
 

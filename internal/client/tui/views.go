@@ -252,7 +252,7 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 		case !m.tasksLoaded:
 			text = "loading…"
 		case len(m.filter) > 0:
-			text = "Nothing in " + v.Label + " matches \"" + string(m.filter) + "\"."
+			text = m.w().T("Nothing in {view} matches \"{filter}\".", map[string]any{"view": v.Label, "filter": string(m.filter)})
 		}
 		return append(lines, "  "+m.t.Dim(termfmt.Cut(text, width-2)))
 	}
