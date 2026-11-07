@@ -3027,14 +3027,30 @@ document.getElementById("explore-form").addEventListener("submit", (e) => {
 document.getElementById("explore-q").addEventListener("input", (e) => writeHash({ x: e.target.value.slice(0, 256) }, true));
 document.getElementById("explore-guidance").addEventListener("input", (e) => { state.guidance[e.target.dataset.key] = e.target.value; });
 
+// panelPage says the page is the floating panel's, which shows the omnibox alone and none of the cockpit.
+function panelPage() {
+  return readRoute(location.hash).panel === "omnibox";
+}
+
+// refreshClock re-renders the cockpit's relative times; the panel has none.
+function refreshClock() {
+  if (!panelPage()) render();
+}
+
 setupDetailResize();
-setInterval(render, 60000);
+setInterval(refreshClock, 60000);
 setInterval(tickCountdowns, 1000);
 loadStrings(getJSON).then(() => {
   document.documentElement.lang = I18N.locale;
   translateStatic(document);
-  if (readRoute(location.hash).panel === "omnibox") {
+  if (panelPage()) {
     showOmnibox({ panel: true });
+    panelFollow(window, document, {
+      reset: () => showOmnibox({ panel: true }),
+      health: () => getJSON("/api/health"),
+      strings: (stamp) => followStrings(stamp, getJSON),
+      build: checkPanelBuild,
+    });
     return;
   }
   tellLinkNotice();
@@ -3042,9 +3058,15 @@ loadStrings(getJSON).then(() => {
   connect();
 });
 
-// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them.
+// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them: the cockpit, or
+// the panel's omnibox with the text typed in it.
 function i18nChanged() {
   document.documentElement.lang = I18N.locale;
   translateStatic(document);
-  render();
+  if (!panelPage()) {
+    render();
+    return;
+  }
+  const field = document.querySelector(".omni-input");
+  showOmnibox({ panel: true, text: field ? field.value : "" });
 }

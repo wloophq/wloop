@@ -477,6 +477,28 @@ async function omniFetch(url, body, signal) {
   return out;
 }
 
+// panelFollow keeps the floating panel current each time it shows again after it was left: an empty
+// omnibox, then the daemon's strings and build as its health names them.
+function panelFollow(win, doc, env) {
+  let away = false;
+  const leave = () => { away = true; };
+  const back = async () => {
+    if (!away || doc.visibilityState === "hidden") return;
+    away = false;
+    env.reset();
+    try {
+      const health = await env.health();
+      env.strings(health.strings);
+      env.build(health);
+    } catch {
+      // The panel's next show asks again.
+    }
+  };
+  win.addEventListener("blur", leave);
+  win.addEventListener("focus", back);
+  doc.addEventListener("visibilitychange", () => (doc.visibilityState === "hidden" ? leave() : back()));
+}
+
 // openOmnibox opens the omnibox in this window over the selection's actions, as Cmd+K does.
 function openOmnibox() {
   if (typeof cockpitKeys === "object" && cockpitKeys) cockpitKeys.openPalette();
