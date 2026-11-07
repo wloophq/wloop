@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/catalog"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -65,6 +66,7 @@ func countedLensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.
 		Clock: fixedClock(now), Me: func() task.Me { return meID }, OwedBy: catalog.OwedByOf(loaded),
 		Props:      func(t task.Task) workflow.Facts { return catalog.PropFacts(t, loaded().Tasks) },
 		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
+		Decisions:  func() decision.Map { return loaded().Decisions.Map },
 		RoleProp: func(r task.Role) string {
 			name, _ := loaded().Tasks.PropOf(r)
 			return name

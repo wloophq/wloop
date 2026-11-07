@@ -192,8 +192,8 @@ func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	if f.views != nil {
 		return api.ViewsCatalog{Views: f.views, Verbs: verbs}, nil
 	}
-	return api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus", Badge: true}, {ID: "inbox", Label: "Inbox", Badge: true},
-		{ID: "outbox", Label: "Outbox", Over: "gates", Badge: true}}, Verbs: verbs}, nil
+	return api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus", Badge: true, Rail: true}, {ID: "inbox", Label: "Inbox", Badge: true, Rail: true},
+		{ID: "outbox", Label: "Outbox", Over: "gates", Badge: true, Rail: true}, {ID: "home-blocked", Label: "Blocked by you", Badge: true}}, Verbs: verbs}, nil
 }
 
 // bundledVerbs are the verbs a notification's buttons run, as the bundled profile serves them.

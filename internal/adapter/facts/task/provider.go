@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -95,6 +96,9 @@ type Deps struct {
 	// Links are what a unit's plugin reports of it, under the host's overlays, for task.link_signal.* and
 	// task.since_movement; nil: every signal off and no unit ever moved.
 	Links func(ctx context.Context, u unit.Unit) (Link, error)
+	// Decisions is how the profile maps gates, situations and signals to decision kinds, for task.decisions;
+	// nil: none.
+	Decisions func() decision.Map
 	// Extraction is when the oldest message of units still waiting to be extracted arrived, as their plugins'
 	// extraction health says, for task.extraction_lag; zero when none waits, and nil none ever does.
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
@@ -115,6 +119,8 @@ type Link struct {
 	Signals map[string]bool
 	// Moved is when the unit last moved: its situation began or a run on it changed it; zero when unknown.
 	Moved time.Time
+	// Situation is the unit's situation, as its plugin derives it; "" when none.
+	Situation string
 }
 
 // Wakes reads a task's wake; false when it has none.
@@ -366,6 +372,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		return nil, err
 	}
 	f["task.gates_open"] = len(gs)
+	f["task.decisions"], f["task.decision_since"] = []string{}, time.Time{}
 	us := unitsOf(e)
 	if p.d.OpenTurns != nil {
 		o, err := p.openTurns(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...))
@@ -374,8 +381,14 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		}
 		f["task.turns_open_by_hand"], f["task.turn_by_hand_at"], f["task.turns_running"] = o.byHand, o.byHandAt, o.running
 	}
-	if err := p.links(ctx, e, us, f); err != nil {
+	sources, err := p.links(ctx, e, us, f)
+	if err != nil {
 		return nil, err
+	}
+	if p.d.Decisions != nil {
+		if found := p.d.Decisions().Of(gs, sources); len(found) > 0 {
+			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since
+		}
 	}
 	if f["task.placement"], err = p.placement(ctx, append([]unit.Unit{task.UnitOf(e.ID)}, us...)); err != nil {
 		return nil, err
@@ -491,17 +504,20 @@ func owing(e task.Task, u unit.Unit, its []items.Item) []items.Item {
 
 // links sets task.link_signal.<name>, on when the signal is on for any of us, task.link_signals, the declared
 // signals any of us reports, task.moved_at, the newest of those moves, and task.since_movement, the time
-// since the newest of e's own last change and its units' last moves.
-func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f workflow.Facts) error {
+// since the newest of e's own last change and its units' last moves. It returns each unit's state, the source
+// of its decisions.
+func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f workflow.Facts) ([]decision.Source, error) {
 	moved := e.Updated
 	reported := []string{}
+	var sources []decision.Source
 	defer func() { slices.Sort(reported); f["task.link_signals"] = reported }()
 	if p.d.Links != nil {
 		for _, u := range us {
 			l, err := p.d.Links(ctx, u)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			sources = append(sources, decision.Source{Unit: u, Situation: l.Situation, Signals: l.Signals, Since: l.Moved})
 			for name, on := range l.Signals {
 				if _, declared := f[builtin.LinkSignalPrefix+name]; !declared {
 					continue
@@ -520,7 +536,7 @@ func (p *Provider) links(ctx context.Context, e task.Task, us []unit.Unit, f wor
 	if !moved.IsZero() {
 		f["task.since_movement"] = max(p.d.Clock.Now().Sub(moved), 0)
 	}
-	return nil
+	return sources, nil
 }
 
 // family sets the facts of e's place among its parent's children and of its own children:

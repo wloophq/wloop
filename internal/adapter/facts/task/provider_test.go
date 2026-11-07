@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -61,6 +62,8 @@ type env struct {
 	repos map[unit.Unit]string
 	open  map[unit.Unit][]turn.Turn
 	links map[unit.Unit]facttask.Link
+	// decisions maps gates, situations and signals to decision kinds.
+	decisions decision.Map
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -172,6 +175,7 @@ func newEnv(t *testing.T) *env {
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
 		},
+		Decisions: func() decision.Map { return e.decisions },
 		Extraction: func(_ context.Context, us []unit.Unit) (time.Time, error) {
 			var oldest time.Time
 			for _, u := range us {

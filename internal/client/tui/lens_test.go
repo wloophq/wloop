@@ -18,8 +18,8 @@ import (
 // lensCatalog is a profile's views, verbs and states the terminal knows nothing of beforehand.
 func lensCatalog() api.ViewsCatalog {
 	return api.ViewsCatalog{
-		Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Group: "task.state"}, {ID: "mine", Label: "Mine", Badge: true},
-			{ID: "sends", Label: "Sends", Over: "gates"}},
+		Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Group: "task.state", Rail: true}, {ID: "mine", Label: "Mine", Badge: true, Rail: true},
+			{ID: "sends", Label: "Sends", Over: "gates", Rail: true}},
 		States: []api.StateSpec{{Name: "parked", Label: "Parked", Category: "waiting"}, {Name: "doing", Label: "Doing", Category: "active"}},
 		Facets: []api.FacetSpec{{ID: "state", Fact: "task.state", Label: "State", Group: true, Menu: true, Rank: []string{"parked", "doing"},
 			Labels: map[string]string{"parked": "Parked", "doing": "Doing"}, Empty: "none"}},
@@ -46,7 +46,7 @@ func TestTUIListsLensViewsFromTheCatalog(t *testing.T) {
 		t.Fatalf("started on %+v, want the catalog's first view", v)
 	}
 	withFocus := newModel(t)
-	withFocus.SetViews(api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled"}, {ID: "focus", Label: "Focus"}}})
+	withFocus.SetViews(api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Rail: true}, {ID: "focus", Label: "Focus", Rail: true}}})
 	if v, ok := withFocus.viewOnScreen(); !ok || v.ID != "stalled" {
 		t.Fatalf("started on %+v, want the catalog's first view over a later focus", v)
 	}
@@ -393,7 +393,7 @@ func TestTheTUIGroupsStatesAndContextsAsTheBundledProfileDeclares(t *testing.T) 
 	m := newModel(t)
 	c := lensCatalog()
 	c.Facets = bundledFacets(t)
-	c.Views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled"}}
+	c.Views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Rail: true}}
 	m.SetViews(c)
 	a, b, d, e := lensTask("t-1", "Done one", "done"), lensTask("t-2", "Inbox one", "inbox"), lensTask("t-3", "Next one", "next"), lensTask("t-4", "Other", "next")
 	d.Facets["contexts"], e.Facets["contexts"] = []string{"computer"}, []string{"calls"}
