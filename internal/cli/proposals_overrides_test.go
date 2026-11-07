@@ -398,3 +398,45 @@ mode = "send"
 		t.Fatalf("logged %q", logged)
 	}
 }
+
+func TestADisabledWorkflowKeepsItsDrafts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	b, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-ask-owner", "workflow.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-ask-owner", "text.md.tmpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userProfile(t, r.te, map[string]string{"workflows/my-ask/workflow.toml": string(b), "workflows/my-ask/text.md.tmpl": string(text)})
+	off := false
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {Enabled: &off}}
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mine := func() []draft.Draft {
+		t.Helper()
+		ds, err := r.svc.List(ctx, outbox.Filter{Workflow: "my-ask"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ds
+	}
+	if ds := mine(); len(ds) == 0 || ds[0].State != draft.Held {
+		t.Fatalf("my-ask proposed %+v", ds)
+	}
+	r.te.cfg.Workflows["my-ask"] = config.WorkflowConfig{Enabled: &off}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range mine() {
+		if d.State != draft.Held {
+			t.Fatalf("stopping a workflow withdrew its draft: %+v", d)
+		}
+	}
+}

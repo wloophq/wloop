@@ -166,7 +166,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 |---|---|---|---|
 | `workflows` | table by name |  | Overrides of each workflow's manifest, by workflow name. |
 | `workflows.&lt;name&gt;` | table |  | One workflow's overrides. |
-| `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. |
+| `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay. |
 | `workflows.&lt;name&gt;.observe` | bool |  | Plans the workflow's items pending, for you to run; left out, the manifest's. |
 | `workflows.&lt;name&gt;.only_when` | predicate |  | A condition ANDed with the workflow's when. |
 

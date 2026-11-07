@@ -134,7 +134,7 @@ var configGrammar = slices.Concat(
 
 		cfgKey("workflows", KindMap, "", "Overrides of each workflow's manifest, by workflow name."),
 		cfgKey("workflows.*", KindTable, "", "One workflow's overrides."),
-		cfgKey("workflows.*.enabled", KindBool, "", "Switches the workflow; left out, it is on."),
+		cfgKey("workflows.*.enabled", KindBool, "", "Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay."),
 		cfgKey("workflows.*.observe", KindBool, "", "Plans the workflow's items pending, for you to run; left out, the manifest's."),
 		cfgKey("workflows.*.only_when", KindPred, "", "A condition ANDed with the workflow's when."),
 	},

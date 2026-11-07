@@ -888,7 +888,7 @@
         "description": "One workflow's overrides.",
         "properties": {
           "enabled": {
-            "description": "Switches the workflow; left out, it is on.",
+            "description": "Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay.",
             "type": "boolean"
           },
           "gates": {
