@@ -107,17 +107,17 @@ func TestTextsResolvePerKeyWhenAFileReplacesAnotherWhole(t *testing.T) {
 
 func TestTextsFileRule(t *testing.T) {
 	for _, c := range []struct {
-		name, locale, want string
-		layers             []map[string]string
+		name, locale, want, served string
+		layers                     []map[string]string
 	}{
-		{"bundled", "pt-BR", "Oi", nil},
-		{"a user copy", "pt-BR", "Oi", []map[string]string{{"workflows/w/text.md.tmpl": "Hi"}}},
-		{"the user's own", "pt-BR", "Hey", []map[string]string{{"workflows/w/text.md.tmpl": "Hey"}}},
-		{"English", "en", "Hi", nil},
+		{"bundled", "pt-BR", "Oi", "pt-BR", nil},
+		{"a user copy", "pt-BR", "Oi", "pt-BR", []map[string]string{{"workflows/w/text.md.tmpl": "Hi"}}},
+		{"the user's own", "pt-BR", "Hey", "", []map[string]string{{"workflows/w/text.md.tmpl": "Hey"}}},
+		{"English", "en", "Hi", "", nil},
 	} {
 		r, err := newTexts(t, c.locale, c.layers...).File("workflows/w/text.md.tmpl")
-		if err != nil || string(r.Body) != c.want {
-			t.Errorf("%s: %q %v", c.name, r.Body, err)
+		if err != nil || string(r.Body) != c.want || r.Locale != c.served {
+			t.Errorf("%s: %q in %q %v, want %q in %q", c.name, r.Body, r.Locale, err, c.want, c.served)
 		}
 	}
 	if _, err := newTexts(t, "pt-BR").File("workflows/absent/text.md.tmpl"); err == nil {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io/fs"
 	"path"
@@ -47,25 +48,12 @@ func draftTemplate(layers []profile.Layer, bundled fs.FS, workflowName, file str
 	if err != nil {
 		return nil, "", fmt.Errorf("draft.propose: %w", err)
 	}
-	written := writtenIn(r, rel)
+	written := cmp.Or(r.Locale, i18n.Default)
 	t, err := template.New(rel).Funcs(intentload.TextFuncs(written)).Option("missingkey=error").Parse(string(r.Body))
 	if err != nil {
 		return nil, "", fmt.Errorf("draft.propose: %s: %w", r.Path, err)
 	}
 	return t, written, nil
-}
-
-// writtenIn is the locale of r, file rel of a layer: <tag> for its locales/<tag>/rel, else the default.
-func writtenIn(r profile.Resolved, rel string) string {
-	base, ok := strings.CutSuffix(path.Clean("/"+strings.ReplaceAll(r.Path, `\`, "/")), "/"+rel)
-	if !ok {
-		return i18n.Default
-	}
-	dir, tag := path.Split(base)
-	if path.Base(dir) != profile.LocalesDir || tag == "" {
-		return i18n.Default
-	}
-	return tag
 }
 
 // draftLanguage is the locale a draft on a unit is written in: the unit's language, the value of fact
