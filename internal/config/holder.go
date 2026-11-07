@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -45,6 +46,33 @@ type liveKey struct {
 var liveKeys = []liveKey{
 	{"profile", func(r *Config, f Config) { r.Profile = f.Profile }},
 	{"ui.locale", func(r *Config, f Config) { r.UI.Locale = f.UI.Locale }},
+	{"workflows.<name>.enabled", takeWorkflowSwitches},
+}
+
+// takeWorkflowSwitches sets each workflow's enabled in r to f's, on a copy of r's workflows, since the
+// running and start configs share theirs; a workflow left with no setting drops out.
+func takeWorkflowSwitches(r *Config, f Config) {
+	out := maps.Clone(r.Workflows)
+	for name := range f.Workflows {
+		if _, ok := out[name]; !ok {
+			if out == nil {
+				out = map[string]WorkflowConfig{}
+			}
+			out[name] = WorkflowConfig{}
+		}
+	}
+	for name, w := range out {
+		w.Enabled = f.Workflows[name].Enabled
+		if reflect.ValueOf(w).IsZero() {
+			delete(out, name)
+			continue
+		}
+		out[name] = w
+	}
+	if len(out) == 0 {
+		out = nil
+	}
+	r.Workflows = out
 }
 
 // Holder is the one configuration a serve holds. Config is the config the
@@ -150,6 +178,20 @@ func (h *Holder) statFile() fileSig {
 		return fileSig{}
 	}
 	return fileSig{modTime: fi.ModTime(), size: fi.Size(), exists: true}
+}
+
+// Reload reads the file now, whatever the stat interval, as a change the serve just made to it asks.
+func (h *Holder) Reload() {
+	var changed func()
+	h.mu.Lock()
+	if h.opts.Path != "" && h.opts.Load != nil {
+		h.checked, h.sig = h.opts.Now(), h.statFile()
+		changed = h.reload()
+	}
+	h.mu.Unlock()
+	if changed != nil {
+		changed()
+	}
 }
 
 func (h *Holder) refresh() {
