@@ -84,7 +84,7 @@ func TestDraftsFilteredByTask(t *testing.T) {
 	r := newOutboxRig(t)
 	r.put(t, unitTask("t-a", task.OriginDerived, r7u), unitTask("t-b", task.OriginDerived, r7u))
 	ctx := context.Background()
-	propose :=func(taskID, text string) draft.Draft {
+	propose := func(taskID, text string) draft.Draft {
 		d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Task: taskID, Kind: draft.Reply, Text: text,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 		if err != nil {
