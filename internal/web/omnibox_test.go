@@ -10,7 +10,7 @@ import (
 // input.resolve POST /api/omnibox/resolve by text, input.ask the asks in order (a string throws it); posts
 // are logged with their bodies; later runs at once unless held.
 const omniHarness = `
-const log = { gets: [], posts: [], opened: [], closed: 0, renders: 0 };
+const log = { gets: [], posts: [], opened: [], acts: [], closed: 0, renders: 0 };
 const held = [];
 let hold = false;
 let asks = 0;
@@ -27,6 +27,7 @@ const env = {
   clear: () => {},
   now: () => 0,
   open: (href) => log.opened.push(href),
+  act: async (u, id) => { log.acts.push(u.key + " " + id); },
   close: () => { log.closed++; },
   render: () => { log.renders++; },
 };
@@ -226,6 +227,95 @@ all(n, (x) => x.tag === "button")[1].attrs.onclick();
 process.stdout.write(JSON.stringify({ Items: all(n, (x) => x.tag === "button").map(text), Ran: ran }));`, nil, &got)
 	if !slices.Equal(got.Items, []string{"to Nextx", "donee"}) || !slices.Equal(got.Ran, []string{"done"}) {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func pastedUnit(tasks ...any) map[string]any {
+	return map[string]any{"https://example.test/acme/api/pull/8": map[string]any{"kind": "unit", "unit": map[string]any{
+		"unit": map[string]string{"provider": "alpha", "key": "acme/api#8"}, "label": "acme/api#8", "tasks": tasks,
+		"actions": []any{map[string]any{"id": "pause", "label": "Pause"}, map[string]any{"id": "remove", "label": "Remove"}}}}}
+}
+
+func TestOmniboxUnitActionUsesTheActionPath(t *testing.T) {
+	var got struct {
+		Acts []string
+		Runs int
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+const pause = all(nodes(st), (x) => x.tag === "button" && text(x).includes("Pause"))[0];
+await pause.attrs.onclick();
+process.stdout.write(JSON.stringify({ Acts: log.acts, Runs: log.posts.filter((p) => p.url === "/api/omnibox/run").length }));
+})();`, map[string]any{"resolve": pastedUnit()}, &got)
+	if !slices.Equal(got.Acts, []string{"acme/api#8 pause"}) || got.Runs != 0 {
+		t.Fatalf("%+v: a unit's action runs through the detail's action path, never /api/omnibox/run", got)
+	}
+}
+
+func TestOmniboxActRunsTheServedRowsAction(t *testing.T) {
+	var got struct {
+		Got  []string
+		Acts []string
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+state.specs = { byId: {} };
+const gets = [];
+const acts = [];
+globalThis.getJSON = async (url) => { gets.push(url); return { row: { unit: { provider: "alpha", key: "acme/api#8" }, actions: [{ id: "pause", enabled: true, confirm: "Pause it?" }] } }; };
+globalThis.refreshSpecs = async () => {};
+globalThis.act = async (row, id, extra) => { acts.push(row.actions[0].confirm + " " + id + " " + JSON.stringify(extra)); return true; };
+await omniboxAct({ provider: "alpha", key: "acme/api#8" }, "pause");
+process.stdout.write(JSON.stringify({ Got: gets, Acts: acts }));
+})();`, nil, &got)
+	if !slices.Equal(got.Got, []string{"/api/units/alpha/acme%2Fapi%238"}) || !slices.Equal(got.Acts, []string{"Pause it? pause {}"}) {
+		t.Fatalf("%+v: the action runs through act on the row the unit's detail serves, with its confirm", got)
+	}
+}
+
+func TestOmniboxEnterOnAUnitRunsNothing(t *testing.T) {
+	var got struct {
+		Opened []string
+		Acts   []string
+		Runs   int
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+await omniboxEnter(st, env, false);
+const bare = omniboxNew(false, []);
+input.resolve["https://example.test/acme/api/pull/8"].unit.tasks = [];
+await omniboxType(bare, "https://example.test/acme/api/pull/8", env);
+await omniboxEnter(bare, env, false);
+process.stdout.write(JSON.stringify({ Opened: log.opened, Acts: log.acts, Runs: log.posts.filter((p) => p.url === "/api/omnibox/run").length }));
+})();`, map[string]any{"resolve": pastedUnit(map[string]any{"id": "t-8", "title": "review 8"})}, &got)
+	if !slices.Equal(got.Opened, []string{"#task=t-8", "#unit=alpha/acme%2Fapi%238"}) || len(got.Acts) != 0 || got.Runs != 0 {
+		t.Fatalf("%+v: Enter on a unit opens its task, else the unit, and runs no action", got)
+	}
+}
+
+func TestOmniboxAskAgainAfterTypingDuringAnAsk(t *testing.T) {
+	var got struct {
+		Asks   int
+		Asking bool
+		Answer string
+	}
+	ask := []any{map[string]any{"answer": map[string]any{"text": "old", "tasks": []any{}}}, map[string]any{"answer": map[string]any{"text": "new", "tasks": []any{}}}}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "who waits", env);
+const first = omniboxEnter(st, env, true);
+await omniboxType(st, "who waits on Ada", env);
+await first;
+await omniboxEnter(st, env, true);
+process.stdout.write(JSON.stringify({ Asks: log.posts.filter((p) => p.url === "/api/omnibox/ask").length, Asking: st.asking, Answer: st.answer ? st.answer.answer.text : "" }));
+})();`, map[string]any{"ask": ask}, &got)
+	if got.Asks != 2 || got.Asking || got.Answer != "new" {
+		t.Fatalf("%+v: typing during an ask lets the next ask run", got)
 	}
 }
 

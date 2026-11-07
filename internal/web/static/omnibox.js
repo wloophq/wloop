@@ -211,6 +211,7 @@ function omniboxType(st, text, env) {
   st.askError = "";
   st.ran = null;
   st.askSeq++;
+  st.asking = false;
   env.clear(st.timer);
   if (st.abort) st.abort.abort();
   const seq = ++st.seq;
@@ -288,19 +289,44 @@ async function omniboxRun(st, env, ops) {
   env.render();
 }
 
-// omniboxUnitOps are the actions a resolved unit offers, as operations on it.
-function omniboxUnitOps(st) {
-  const u = st.resolved && st.resolved.kind === "unit" ? st.resolved.unit : null;
-  return u ? (u.actions || []).map((a) => ({ op: "action", unit: u.unit, action: a.id, reason: a.label })) : [];
+// omniboxUnit is the unit a pasted address resolved to, or null.
+function omniboxUnit(st) {
+  return st.resolved && st.resolved.kind === "unit" ? st.resolved.unit : null;
 }
 
-// omniboxEnter is Enter in the field: run the operations to confirm, else the unit's first action, else ask
-// the agent where only it would help, else open the first result; with Cmd it asks the agent.
+// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes.
+async function omniboxUnitAction(st, env, id) {
+  await env.act(omniboxUnit(st).unit, id);
+  if (env.changed) env.changed();
+  env.render();
+}
+
+// omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
+// asks for the action's confirm and input.
+async function omniboxAct(u, id) {
+  const d = await getJSON(unitPath(u));
+  await refreshSpecs([d.row]);
+  const input = (state.specs.byId[id] || {}).input;
+  const extra = {};
+  if (input && (input.kind === "text" || input.kind === "answer")) {
+    const v = await askInput({ label: input.label || id, placeholder: input.placeholder });
+    if (v === null || v === undefined) return;
+    extra.guidance = String(v).trim();
+  }
+  return act(d.row, id, extra);
+}
+
+// omniboxEnter is Enter in the field: run the operations to confirm, else open a pasted address's task or
+// unit, else ask the agent where only it would help, else open the first result; with Cmd it asks the agent.
 function omniboxEnter(st, env, ask) {
   if (ask) return omniboxAsk(st, env);
   if (st.ops.some((_, i) => st.checked[i])) return omniboxRun(st, env);
-  const unitOps = omniboxUnitOps(st);
-  if (unitOps.length) return omniboxRun(st, env, unitOps.slice(0, 1));
+  const unit = omniboxUnit(st);
+  if (unit) {
+    const first = (unit.tasks || [])[0];
+    env.open(first ? "#task=" + encodeURIComponent(first.id) : "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key));
+    return Promise.resolve();
+  }
   if (st.resolved && st.resolved.kind === "agent") return omniboxAsk(st, env);
   const first = st.search && (st.search.groups || []).flatMap((g) => g.results || [])[0];
   if (first) env.open("#task=" + encodeURIComponent(first.task.id));
@@ -419,8 +445,8 @@ function renderOmnibox(st, env) {
     out.push(h("section", { class: "omni-unit" },
       h("h3", {}, r.unit.permalink ? h("a", { href: r.unit.permalink, target: "_blank", rel: "noopener" }, r.unit.label) : r.unit.label),
       h("ol", {}, ...(r.unit.tasks || []).map((e) => h("li", {}, omniboxTaskLink(e)))),
-      h("div", { class: "d-actions" }, ...omniboxUnitOps(st).map((op, i) => h("button", { type: "button", class: "act" + (i === 0 ? " primary" : ""),
-        onclick: () => omniboxRun(st, env, [op]) }, i === 0 ? h("kbd", {}, "↵") : null, " ", op.reason || op.action)))));
+      h("div", { class: "d-actions" }, ...(r.unit.actions || []).map((a) => h("button", { type: "button", class: "act",
+        onclick: () => omniboxUnitAction(st, env, a.id) }, a.label || a.id)))));
   }
   if (r && r.kind === "agent" && !agent) out.push(h("p", { class: "omni-hint" }, t("Press ⌘↵ to ask the agent")));
   out.push(...omniboxAnswer(st, env));
@@ -466,6 +492,7 @@ function showOmnibox(opts = {}) {
     clear: (id) => clearTimeout(id),
     now: () => performance.now(),
     open: (href) => { location.hash = href; if (!st.panel) close(); },
+    act: (u, id) => omniboxAct(u, id),
     close: () => close(),
     changed: () => { if (typeof scheduleLoad === "function") scheduleLoad({ tasks: true }); },
     render: () => results.replaceChildren(...renderOmnibox(st, env)),
