@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
 	"os"
 	"slices"
@@ -115,27 +114,34 @@ func runConfigGet(e *Env, key string) error {
 // runConfigEdit applies edit to key in the config file and writes the
 // result, after a backup of the file, when the result loads. A file that
 // does not load may still lose a key, so unset can remove the keys it names.
+// editConfig edits key path of the config file through config.EditFile: a result that does not load with
+// the defaults is refused, the previous file is backed up beside it and the new one written atomically.
+func (e *Env) editConfig(path []string, edit func(*config.Doc, []string) error) (config.Edited, error) {
+	return config.EditFile(e.ConfigPath, config.FileEdit{Path: path, Edit: edit,
+		Load: func(raw []byte) error {
+			_, err := config.LoadBytes(e.ConfigPath, raw, Defaults())
+			return err
+		},
+		Backup: func(raw []byte) (string, error) {
+			return backup.File(e.ConfigPath, raw, e.Now().UTC().Format("20060102-150405"))
+		},
+		Write: func(raw []byte) error { return writeAtomic(e.ConfigPath, raw) }})
+}
+
 func runConfigEdit(e *Env, key string, edit func(*config.Doc, []string) error) error {
 	path, err := config.ParseKey(key)
 	if err != nil {
 		return err
 	}
 	file := tilde(e.ConfigPath, e.Home)
-	raw, err := os.ReadFile(e.ConfigPath)
-	exists := err == nil
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	d, err := config.ParseDoc(raw)
+	raw, _ := os.ReadFile(e.ConfigPath)
+	done, err := e.editConfig(path, edit)
 	if err != nil {
-		return fmt.Errorf("%s: %w", e.ConfigPath, err)
-	}
-	if err := edit(d, path); err != nil {
 		return err
 	}
-	next := d.Bytes()
+	d, still := done.Doc, done.Still
 	key = config.Key(path...)
-	if bytes.Equal(next, raw) {
+	if !done.Changed {
 		if v := d.Get(path...); v != nil {
 			enc, _ := frontmatter.Value(v)
 			_, err = fmt.Fprintf(e.Out, "%s is already %s in %s.\n", key, enc, file)
@@ -144,23 +150,8 @@ func runConfigEdit(e *Env, key string, edit func(*config.Doc, []string) error) e
 		}
 		return err
 	}
-	var still error
-	if _, err := config.LoadBytes(e.ConfigPath, next, Defaults()); err != nil {
-		_, was := config.LoadBytes(e.ConfigPath, raw, Defaults())
-		if was == nil || d.Get(path...) != nil {
-			return err
-		}
-		still = err
-	}
-	if exists {
-		name, err := backup.File(e.ConfigPath, raw, e.Now().UTC().Format("20060102-150405"))
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(e.Out, "Kept the previous config in %s.\n", tilde(name, e.Home))
-	}
-	if err := writeAtomic(e.ConfigPath, next); err != nil {
-		return err
+	if done.Backup != "" {
+		fmt.Fprintf(e.Out, "Kept the previous config in %s.\n", tilde(done.Backup, e.Home))
 	}
 	if v := d.Get(path...); v != nil {
 		enc, _ := frontmatter.Value(v)
