@@ -102,7 +102,7 @@ func loadWorkflows(layers []profile.Layer, r layerReader, turnProblem func(inten
 				continue
 			}
 			dir := path.Join("workflows", e.Name())
-			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir, rel: dir, r: r}}
+			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir, rel: dir, r: r, layer: bundledLayer}}
 			bundledUnits[u.name] = u
 			units = append(units, u)
 		}
@@ -127,7 +127,7 @@ func loadWorkflows(layers []profile.Layer, r layerReader, turnProblem func(inten
 				case l.Embedded():
 					problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), b.files.base("workflow.toml"))})
 				case len(overrides([]string{dir})) > 0:
-					b.files.overlay = append(b.files.overlay, dir)
+					b.files.overlaid(l, dir)
 				}
 				continue
 			}
@@ -176,6 +176,7 @@ func loadWorkflows(layers []profile.Layer, r layerReader, turnProblem func(inten
 			continue
 		}
 		loaded = append(loaded, u.wf)
+		r.used[u.files.rel] = u.files.top()
 		warnings = append(warnings, u.warnings...)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {

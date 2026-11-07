@@ -23,11 +23,13 @@ type layerReader struct {
 	// texts is nil when no layer holds the locale's texts: every file reads as written.
 	texts    *profile.Texts
 	problems *Problems
+	// used is the highest layer each loaded workflow reads its files from, by its directory.
+	used map[string]profile.Layer
 }
 
 // newLayerReader reads layers, the bundled one from bundled, in locale.
 func newLayerReader(locale string, layers []profile.Layer, bundled fs.FS) layerReader {
-	r := layerReader{bundled: bundled, locale: locale, problems: &Problems{}}
+	r := layerReader{bundled: bundled, locale: locale, problems: &Problems{}, used: map[string]profile.Layer{}}
 	if t := profile.NewTexts(layers, bundled, locale, textKey); t.Translates() {
 		r.texts = t
 	}
@@ -36,7 +38,7 @@ func newLayerReader(locale string, layers []profile.Layer, bundled fs.FS) layerR
 
 // readerOf reads bundled and the layers as they are written, in English.
 func readerOf(bundled fs.FS) layerReader {
-	return layerReader{bundled: bundled, locale: i18n.Default, problems: &Problems{}}
+	return layerReader{bundled: bundled, locale: i18n.Default, problems: &Problems{}, used: map[string]profile.Layer{}}
 }
 
 // textKey says whether the key at path of rel holds a text a person reads, as the grammar marks it.
@@ -75,16 +77,19 @@ func (r layerReader) readBundled(rel string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.localize(profile.Layer{Name: "bundled", Source: "embedded"}, rel, body), nil
+	return r.localize(bundledLayer, rel, body), nil
 }
 
-// file is the whole-file text rel resolved across the layers in r's locale; false when r translates no
+// bundledLayer is the bundled layer, whose files the reader reads from its bundled FS.
+var bundledLayer = profile.Layer{Name: "bundled", Source: "embedded"}
+
+// file is the whole-file text rel as layer l's level resolves it in r's locale; false when r translates no
 // whole-file text rel names, and the caller reads its own layer.
-func (r layerReader) file(rel string) (profile.Resolved, bool, error) {
+func (r layerReader) file(l profile.Layer, rel string) (profile.Resolved, bool, error) {
 	if r.texts == nil || !localizedFile(rel) {
 		return profile.Resolved{}, false, nil
 	}
-	res, err := r.texts.File(rel)
+	res, err := r.texts.FileAt(l, rel)
 	r.report(r.texts.Problems(rel))
 	return res, true, err
 }
@@ -160,12 +165,19 @@ func number(n any) float64 {
 	return 0
 }
 
-// ProfileFile is rel resolved through l's layers, a whole-file text a person reads in l's locale.
+// ProfileFile is rel, a file of a workflow's directory, resolved through the layers that workflow loaded
+// from, a whole-file text a person reads in l's locale.
 func (l *Loaded) ProfileFile(rel string) (profile.Resolved, error) {
-	if t := l.reader.texts; t != nil && localizedFile(rel) {
-		return t.File(rel)
+	layers := l.layers
+	if at, ok := l.reader.used[path.Dir(rel)]; ok {
+		if i := slices.IndexFunc(layers, func(x profile.Layer) bool { return x.Name == at.Name }); i >= 0 {
+			layers = layers[:i+1]
+		}
 	}
-	for _, layer := range slices.Backward(l.layers) {
+	if t := l.reader.texts; t != nil && localizedFile(rel) && len(layers) > 0 {
+		return t.FileAt(layers[len(layers)-1], rel)
+	}
+	for _, layer := range slices.Backward(layers) {
 		res, err := l.reader.read(layer, rel)
 		if !errors.Is(err, fs.ErrNotExist) {
 			return res, err

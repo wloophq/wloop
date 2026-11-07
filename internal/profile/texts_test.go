@@ -182,11 +182,44 @@ func TestLocalizeRefusesAFieldTheBaseTextDoesNotName(t *testing.T) {
 	if p := x.Problems("workflows/w/text.md.tmpl"); len(p) != 1 || !strings.Contains(p[0].Msg, ".who") {
 		t.Errorf("%+v", p)
 	}
+	for _, tr := range []string{"Oi {{nofunc .name}}", `Oi {{template "nope"}}`, "Oi {{$.x.y}}", "Oi {{with .name}}{{.x}}{{end}}"} {
+		if msg := fieldsProblem(tr, "Hi {{.name}} {{with .name}}{{.z}}{{end}}"); msg == "" {
+			t.Errorf("%s: accepted", tr)
+		}
+	}
+	for _, tr := range []string{"Oi {{name}} {{.n}}", `Oi {{template "t"}} {{$.a}}`} {
+		if msg := fieldsProblem(tr, `Hi {{name}} {{.n}} {{template "t"}} {{$.a}}`); msg != "" {
+			t.Errorf("%s: %s", tr, msg)
+		}
+	}
 }
 
 func TestAvailableListsEveryLayersLocales(t *testing.T) {
 	x := newTexts(t, "en", map[string]string{"locales/es/actions.toml": "", "locales/.hidden/x": ""})
 	if got := x.Available(); !slices.Equal(got, []string{"en", "es", "pt-BR"}) {
 		t.Fatalf("%q", got)
+	}
+}
+
+func TestLocalizeResolvesOnlyAtOrBelowItsLayer(t *testing.T) {
+	x := newTexts(t, "pt-BR", map[string]string{
+		"actions.toml":               "[pause]\nlabel = \"Hold\"\n",
+		"locales/pt-BR/actions.toml": "[pause]\nlabel = \"Segurar\"\n\n[resume]\nlabel = \"Retomar\"\n",
+		"workflows/w/text.md.tmpl":   "Hey",
+	})
+	bundledSrc := []byte(bundledActions["actions.toml"])
+	got, _ := x.Localize(x.layers[0], "actions.toml", bundledSrc)
+	if !strings.Contains(string(got), `label = "Pausar"`) || !strings.Contains(string(got), `label = "Retomar"`) {
+		t.Errorf("the bundled layer's view: %s", got)
+	}
+	got, _ = x.Localize(x.layers[1], "actions.toml", []byte("[pause]\nlabel = \"Hold\"\n"))
+	if string(got) != "[pause]\nlabel = \"Segurar\"\n" {
+		t.Errorf("the user layer's view: %q", got)
+	}
+	if r, _ := x.FileAt(x.layers[0], "workflows/w/text.md.tmpl"); string(r.Body) != "Oi" {
+		t.Errorf("the bundled layer's file: %q", r.Body)
+	}
+	if r, _ := x.FileAt(x.layers[1], "workflows/w/text.md.tmpl"); string(r.Body) != "Hey" {
+		t.Errorf("the user layer's file: %q", r.Body)
 	}
 }

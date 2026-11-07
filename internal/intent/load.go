@@ -345,7 +345,7 @@ func load(layers []profile.Layer, r layerReader, base *template.Template, check 
 				name: dintent.Name(e.Name()), dir: path.Join("intents", e.Name()), bundled: true,
 				source: dintent.Source{Layer: "bundled"},
 			}
-			u.files = files{bundled: bundled, dir: u.dir, rel: u.dir, r: r}
+			u.files = files{bundled: bundled, dir: u.dir, rel: u.dir, r: r, layer: bundledLayer}
 			units = append(units, u)
 			bundledUnits[u.name] = u
 		}
@@ -368,7 +368,7 @@ func load(layers []profile.Layer, r layerReader, base *template.Template, check 
 					continue
 				}
 				if _, skip := plain[name]; !skip && len(overrides([]string{dir})) > 0 {
-					b.files.overlay = append(b.files.overlay, dir)
+					b.files.overlaid(l, dir)
 					b.source = dintent.Source{Layer: l.Name, Dir: dir, Overrides: overrides(b.files.overlay)}
 				}
 				continue

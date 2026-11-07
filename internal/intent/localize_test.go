@@ -238,3 +238,28 @@ func (p Problems) only(field string) Problems {
 	}
 	return out
 }
+
+func TestARevertedWorkflowReadsTheBundledText(t *testing.T) {
+	bundled := bundledWith(t, ptBR)
+	manifest, _ := fs.ReadFile(bundled, "workflows/answer-unread/workflow.toml")
+	dir := userDir(t, map[string]string{
+		"workflows/answer-unread/workflow.toml": "bogus = 1\n" + string(manifest),
+		"workflows/answer-unread/text.md.tmpl":  "Mine",
+	})
+	for locale, want := range map[string]string{"pt-BR": ptBR["locales/pt-BR/workflows/answer-unread/text.md.tmpl"], "en": string(must(fs.ReadFile(bundled, "workflows/answer-unread/text.md.tmpl")))} {
+		l, _ := LoadIn(locale, userLayer(dir), bundled, testBase(), nil)
+		if len(l.RevertedWorkflows["answer-unread"]) == 0 {
+			t.Fatalf("%s: not reverted", locale)
+		}
+		if r, err := l.ProfileFile("workflows/answer-unread/text.md.tmpl"); err != nil || string(r.Body) != want {
+			t.Errorf("%s: %q %v", locale, r.Body, err)
+		}
+	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}

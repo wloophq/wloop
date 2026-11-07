@@ -68,9 +68,12 @@ func (t *Texts) Locale() string { return t.locale }
 // text reads as its layers write it.
 func (t *Texts) Translates() bool { return t.dir != "" }
 
-// Localize is src, layer l's file rel, with each text key's value replaced by Text(rel, path). Its problems
-// are those of rel's locale files in every layer, reported by the first of Localize and Problems to read rel.
+// Localize is src, layer l's file rel, with each text key's value replaced by the text l's level resolves to:
+// the layer rule over l and the layers below it, and the translations of the layers above it for the texts
+// they hold no English of. Its problems are those of rel's locale files in every layer, reported by the first
+// of Localize and Problems to read rel.
 func (t *Texts) Localize(l Layer, rel string, src []byte) ([]byte, Problems) {
+	at := t.index(l)
 	strs, err := tomlStrings(src)
 	if err != nil {
 		return src, t.Problems(rel)
@@ -80,7 +83,7 @@ func (t *Texts) Localize(l Layer, rel string, src []byte) ([]byte, Problems) {
 		if !t.keys(rel, s.path) {
 			continue
 		}
-		if v, ok := t.Text(rel, s.path); ok && v != s.text {
+		if v, ok := t.textAt(rel, s.path, at); ok && v != s.text {
 			values[pathKey(s.path)] = v
 		}
 	}
@@ -104,16 +107,32 @@ func (t *Texts) Problems(rel string) Problems {
 	return f.problems
 }
 
+// index is l's place among t's layers by its name; the top one when t has no such layer.
+func (t *Texts) index(l Layer) int {
+	for i, x := range t.layers {
+		if x.Name == l.Name {
+			return i
+		}
+	}
+	return len(t.layers) - 1
+}
+
 // Text is the text at path of rel in t's locale, by the layer rule; false when no layer holds it.
 func (t *Texts) Text(rel string, path []string) (string, bool) {
+	return t.textAt(rel, path, len(t.layers)-1)
+}
+
+// textAt is Text as layer at's level reads it: a layer above at gives only a translation of a text it holds
+// no English of.
+func (t *Texts) textAt(rel string, path []string, at int) (string, bool) {
 	f := t.file(rel)
 	k := pathKey(path)
 	for i := len(t.layers) - 1; i >= 0; i-- {
-		if s, ok := f.loc[i][k]; ok {
-			return s, true
+		s, own := f.base[i][k]
+		if loc, ok := f.loc[i][k]; ok && (i <= at || !own) {
+			return loc, true
 		}
-		s, ok := f.base[i][k]
-		if !ok {
+		if !own || i > at {
 			continue
 		}
 		below, held := f.baseBelow(i, k)
@@ -135,13 +154,19 @@ func (f *fileTexts) baseBelow(i int, k string) (string, bool) {
 
 // File is the whole-file text rel in t's locale, by the same rule.
 func (t *Texts) File(rel string) (Resolved, error) {
+	return t.FileAt(t.layers[len(t.layers)-1], rel)
+}
+
+// FileAt is File as layer l's level reads it, the way Localize reads a key.
+func (t *Texts) FileAt(l Layer, rel string) (Resolved, error) {
 	f := t.file(rel)
+	at := t.index(l)
 	for i := len(t.layers) - 1; i >= 0; i-- {
-		if r := f.wholeLoc[i]; r != nil {
-			return *r, nil
-		}
 		r := f.whole[i]
-		if r == nil {
+		if loc := f.wholeLoc[i]; loc != nil && (i <= at || r == nil) {
+			return *loc, nil
+		}
+		if r == nil || i > at {
 			continue
 		}
 		var below *Resolved
@@ -343,8 +368,8 @@ func fieldsProblem(text, base string) string {
 
 var placeholder = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_]*\}`)
 
-// fieldsOf are the field chains a template text reads ({{.pr.slug}} as .pr.slug), or the {name}
-// placeholders of a plain text.
+// fieldsOf are what a template text reaches: its field and variable chains ({{.pr.slug}} as .pr.slug), the
+// functions it calls and the templates it runs; or the {name} placeholders of a plain text.
 func fieldsOf(text string) ([]string, error) {
 	if !strings.Contains(text, "{{") {
 		return placeholder.FindAllString(text, -1), nil
@@ -378,6 +403,14 @@ func fieldsOf(text string) ([]string, error) {
 			}
 		case *parse.FieldNode:
 			out = append(out, "."+strings.Join(x.Ident, "."))
+		case *parse.VariableNode:
+			out = append(out, strings.Join(x.Ident, "."))
+		case *parse.ChainNode:
+			walk(x.Node)
+			out = append(out, "(…)."+strings.Join(x.Field, "."))
+		case *parse.IdentifierNode:
+			out = append(out, "function "+x.Ident)
+
 		case *parse.IfNode:
 			walk(x.Pipe)
 			walk(x.List)
@@ -391,6 +424,7 @@ func fieldsOf(text string) ([]string, error) {
 			walk(x.List)
 			walk(x.ElseList)
 		case *parse.TemplateNode:
+			out = append(out, fmt.Sprintf("template %q", x.Name))
 			walk(x.Pipe)
 		}
 	}
