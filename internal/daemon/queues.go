@@ -42,7 +42,7 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l := s.loaded()
-	out := api.Queue{Kind: string(q.Kind), Title: q.Title, Empty: q.Empty, Total: len(q.Items), Items: []api.QueueItem{}}
+	out := api.Queue{Kind: string(q.Kind), View: string(q.View), Title: q.Title, Empty: q.Empty, Total: len(q.Items), Items: []api.QueueItem{}}
 	tasks := make([]task.Task, len(q.Items))
 	for i, it := range q.Items {
 		tasks[i] = it.Task

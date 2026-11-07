@@ -63,9 +63,10 @@ type HomeCapture struct {
 	Key  string `json:"key,omitempty"`
 }
 
-// Queue is a decision kind's items, oldest decision first.
+// Queue is a decision kind's items, oldest decision first; View is the view whose rows draw its items.
 type Queue struct {
 	Kind  string      `json:"kind"`
+	View  string      `json:"view"`
 	Title string      `json:"title"`
 	Empty string      `json:"empty"`
 	Total int         `json:"total"`

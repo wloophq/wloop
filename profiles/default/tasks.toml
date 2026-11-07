@@ -420,3 +420,21 @@ via_workflow = "the loop, by workflow {workflow}"
 # verb the task offers waits behind its More button, in the palette.
 [detail]
 verbs = ["done", "waiting", "focus", "delegate", "schedule"]
+
+# What a run card calls where its turn and its agent session stand.
+[runs.states]
+sent = "sent"
+started = "started"
+asked = "asked"
+done = "done"
+settled = "settled"
+failed = "failed"
+unrecorded = "unrecorded"
+dismissed = "dismissed"
+replaced = "replaced"
+withdrawn = "withdrawn"
+
+[runs.sessions]
+active = "active"
+dormant = "dormant"
+closed = "closed"

@@ -85,7 +85,7 @@ func TestQueueOfOnePluginUsesItsTitle(t *testing.T) {
 	d := fakeDecisions{"t-a": {{Kind: decision.LastStep, Unit: unit.Unit{Provider: "alpha", Key: "x"}, Situation: "merge", Since: t0}}}
 	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-last-step": {{ID: "t-a"}}}}, Decisions: d, Words: queueWords()}
 	q, _ := s.Queue(context.Background(), decision.LastStep, nil)
-	if q.Title != "Ready to land" || q.Empty != "Nothing waits." {
+	if q.Title != "Ready to land" || q.Empty != "Nothing waits." || q.View != "decide-last-step" {
 		t.Fatalf("queue %+v", q)
 	}
 }

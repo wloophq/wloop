@@ -169,6 +169,9 @@ type ViewsCatalog struct {
 	// (gates.toml's drafts.purposes and drafts.states).
 	DraftPurposes map[string]string `json:"draft_purposes"`
 	DraftStates   map[string]string `json:"draft_states"`
+	// RunStates word a run's turn state and SessionStates its session's, by state (tasks.toml's runs).
+	RunStates     map[string]string `json:"run_states"`
+	SessionStates map[string]string `json:"session_states"`
 	// Version changes whenever anything above does.
 	Version string `json:"version,omitempty"`
 }

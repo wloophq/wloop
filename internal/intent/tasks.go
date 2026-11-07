@@ -15,6 +15,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -77,9 +78,11 @@ type TasksDef struct {
 	ViaWorkflow string
 	// DetailVerbs are the verbs a task's detail offers as its buttons, in order; the rest it offers wait in a
 	// palette.
-	DetailVerbs      []string
-	Areas, Contexts  []string
-	StaleWaitingDays int
+	DetailVerbs []string
+	// RunStates word a run's turn state and SessionStates its session's, by state: tasks.toml's [runs].
+	RunStates, SessionStates map[string]string
+	Areas, Contexts          []string
+	StaleWaitingDays         int
 }
 
 // PropDef is a task property: the fact task.prop.<Name>. Values are an
@@ -345,6 +348,7 @@ type mTasks struct {
 	Chat             *mChat               `toml:"chat"`
 	Attribution      *mAttribution        `toml:"attribution"`
 	Detail           *mDetail             `toml:"detail"`
+	Runs             *mRuns               `toml:"runs"`
 	Areas            []string             `toml:"areas"`
 	Contexts         []string             `toml:"contexts"`
 	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
@@ -388,6 +392,11 @@ type mChat struct {
 
 type mDetail struct {
 	Verbs []string `toml:"verbs"`
+}
+
+type mRuns struct {
+	States   map[string]string `toml:"states"`
+	Sessions map[string]string `toml:"sessions"`
 }
 
 type mAttribution struct {
@@ -483,6 +492,10 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 		for i, v := range m.Detail.Verbs {
 			l.detail = append(l.detail, ref{s, fmt.Sprintf("detail.verbs[%d]", i), v})
 		}
+	}
+	if m.Runs != nil {
+		l.def.RunStates = mergeStateWords(s, "runs.states", l.def.RunStates, m.Runs.States, turn.States)
+		l.def.SessionStates = mergeStateWords(s, "runs.sessions", l.def.SessionStates, m.Runs.Sessions, turn.SessionStates)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)
@@ -871,4 +884,22 @@ func writerNames() []string {
 		out[i] = string(w)
 	}
 	return out
+}
+
+// mergeStateWords lays the words m gives the states of section over into: a word replaces a lower layer's, an
+// empty word takes it off, and a word for none of states is a problem.
+func mergeStateWords[S ~string](s *sheet, section string, into, m map[string]string, states []S) map[string]string {
+	known := make([]string, len(states))
+	for i, st := range states {
+		known[i] = string(st)
+	}
+	var names []string
+	for _, name := range declared(s, section, m) {
+		if !slices.Contains(known, name) {
+			s.add(section+"."+name, "names no state%s; the states are %s", expr.DidYouMean(name, known), strings.Join(known, ", "))
+			continue
+		}
+		names = append(names, name)
+	}
+	return mergeWords(into, m, names)
 }

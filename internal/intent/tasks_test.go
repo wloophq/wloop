@@ -481,6 +481,24 @@ func TestNoWriterMayWriteTheMergedOrRelatedProperty(t *testing.T) {
 	}
 }
 
+func TestRunStateWordsNameKnownStates(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "[runs.states]\nstarted = \"under way\"\nfailed = \"\"\n[runs.sessions]\ndormant = \"asleep\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.RunStates["started"] != "under way" || d.RunStates["asked"] == "" || d.SessionStates["dormant"] != "asleep" {
+		t.Errorf("run states %v, sessions %v: a user layer's word replaces the bundled one", d.RunStates, d.SessionStates)
+	}
+	if _, ok := d.RunStates["failed"]; ok {
+		t.Errorf("an empty word keeps the state worded: %v", d.RunStates)
+	}
+	_, problems = loadTasksWith(t, defaultTasks(t), "[runs.states]\nstartd = \"x\"\n[runs.sessions]\nasleep = \"y\"\n")
+	if !strings.Contains(problems, "runs.states.startd") || !strings.Contains(problems, "runs.sessions.asleep") {
+		t.Errorf("a word for no state loads: %q", problems)
+	}
+}
+
 func TestDetailVerbsNameDeclaredVerbs(t *testing.T) {
 	t.Parallel()
 	d, problems := loadTasksWith(t, defaultTasks(t), "")

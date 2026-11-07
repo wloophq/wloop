@@ -133,3 +133,20 @@ summary = "Vincular outra tarefa como trabalho relacionado e distinto: nada se m
 [verbs.unrelate]
 label = "Desfazer relação"
 summary = "Tirar das duas o vínculo com uma tarefa relacionada."
+
+[runs.states]
+sent = "enviado"
+started = "iniciado"
+asked = "perguntou"
+done = "concluído"
+settled = "resolvido"
+failed = "falhou"
+unrecorded = "sem registro"
+dismissed = "dispensado"
+replaced = "substituído"
+withdrawn = "retirado"
+
+[runs.sessions]
+active = "ativa"
+dormant = "dormente"
+closed = "fechada"
