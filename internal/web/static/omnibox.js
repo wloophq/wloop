@@ -497,8 +497,12 @@ function omniboxSearch(st, opt, env) {
     }))));
 }
 
-// omniboxCount is how many results the search found, said politely as they arrive.
-function omniboxCount(st) {
+// omniboxCount is how many results the search found, said politely as they arrive, or the selected choice
+// when it is no option of the list.
+function omniboxCount(st, env) {
+  const choices = omniboxChoices(st, env);
+  const sel = omniboxSelected(st, choices);
+  if (sel && !omniboxIsOption(sel)) return h("output", { class: "omni-status", "aria-live": "polite" }, omniboxSelectionWords(st, sel));
   const n = ((st.search && st.search.groups) || []).reduce((sum, g) => sum + (g.results || []).length, 0);
   return h("output", { class: "omni-status", "aria-live": "polite" }, st.search ? tn("{n} results", n) : "");
 }
@@ -532,7 +536,21 @@ function omniboxOption(st, env) {
 function omniboxActiveID(st, env) {
   const choices = omniboxChoices(st, env);
   const i = choices.findIndex((c) => c.id === omniboxSelected(st, choices));
-  return i < 0 ? "" : omniboxOptionID(i);
+  return i < 0 || !omniboxIsOption(choices[i].id) ? "" : omniboxOptionID(i);
+}
+
+// omniboxIsOption says whether choice id is an option of the results' listbox: a result or a selection's
+// action; the operations to run, a pasted unit and the agent keep their own controls.
+function omniboxIsOption(id) {
+  return id.startsWith("task:") || id.startsWith("item:");
+}
+
+// omniboxSelectionWords are the words of a selected choice that is no option, which the status says.
+function omniboxSelectionWords(st, id) {
+  if (id === "ops") return tn("Run {n}", st.checked.filter(Boolean).length);
+  if (id === "unit") return (omniboxUnit(st) || {}).label || "";
+  if (id === "ask") return t("Press ⌘↵ to ask the agent");
+  return "";
 }
 
 // renderOmnibox is the omnibox below its field: the path answering, then the selection's actions while
@@ -562,7 +580,7 @@ function renderOmnibox(st, env) {
   out.push(omniboxRan(st));
   if (st.asking) out.push(h("p", { class: "loading" }, t("Asking the agent...")));
   if (st.askError) out.push(h("p", { class: "err omni-ask-error" }, st.askError));
-  out.push(omniboxCount(st), h("div", { class: "omni-list", role: "listbox", id: "omni-list", "aria-label": t("Search or ask") }, ...omniboxSearch(st, opt, env)));
+  out.push(omniboxCount(st, env), h("div", { class: "omni-list", role: "listbox", id: "omni-list", "aria-label": t("Search or ask") }, ...omniboxSearch(st, opt, env)));
   return out.filter(Boolean);
 }
 

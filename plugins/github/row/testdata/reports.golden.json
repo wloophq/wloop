@@ -33,6 +33,7 @@
         "waiting_on": "me",
         "since": "2026-10-14T02:00:00Z",
         "reason": "review requested, no review on the head",
+        "reason_key": "review_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-10-14T02:00:00Z",
@@ -352,6 +353,7 @@
         "waiting_on": "me",
         "since": "2026-10-13T13:00:00Z",
         "reason": "review requested, no review on the head",
+        "reason_key": "review_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-10-13T13:00:00Z",
@@ -673,6 +675,7 @@
         "waiting_on": "carol",
         "since": "2026-10-13T00:00:00Z",
         "reason": "review requested, no review on the head",
+        "reason_key": "review_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-10-13T00:00:00Z",
@@ -990,6 +993,7 @@
         "waiting_on": "author",
         "since": "2026-10-12T11:00:00Z",
         "reason": "no reviewer requested",
+        "reason_key": "no_reviewer_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-10-12T11:00:00Z",
@@ -1324,7 +1328,8 @@
         "kind": "draft",
         "waiting_on": "author",
         "since": "2026-10-11T22:00:00Z",
-        "reason": "draft"
+        "reason": "draft",
+        "reason_key": "draft"
       },
       "card": {
         "label": "acme/api#5",
@@ -1640,6 +1645,10 @@
         "waiting_on": "author",
         "since": "2026-10-11T09:00:00Z",
         "reason": "checks failing: lint, unit",
+        "reason_key": "checks_failing_named",
+        "reason_params": {
+          "checks": "lint, unit"
+        },
         "stalled": {
           "kind": 9,
           "time": "2026-10-11T09:00:00Z",
@@ -1985,6 +1994,10 @@
         "waiting_on": "author",
         "since": "2026-10-05T15:00:00Z",
         "reason": "changes requested by carol",
+        "reason_key": "changes_requested",
+        "reason_params": {
+          "actor": "carol"
+        },
         "stalled": {
           "kind": 9,
           "time": "2026-10-05T15:00:00Z",
@@ -2340,6 +2353,7 @@
         "waiting_on": "author",
         "since": "2026-10-14T13:00:00Z",
         "reason": "approved and green",
+        "reason_key": "approved_green",
         "stalled": {
           "kind": 9,
           "time": "2026-10-14T13:00:00Z",
@@ -2683,6 +2697,10 @@
         "waiting_on": "author",
         "since": "2026-10-14T14:00:00Z",
         "reason": "merge conflicts with main",
+        "reason_key": "merge_conflicts",
+        "reason_params": {
+          "branch": "main"
+        },
         "stalled": {
           "kind": 9,
           "time": "2026-10-14T14:00:00Z",
@@ -3017,6 +3035,10 @@
         "waiting_on": "author",
         "since": "2026-10-09T15:00:00Z",
         "reason": "me-login commented, no reply",
+        "reason_key": "commented_no_reply",
+        "reason_params": {
+          "actor": "me-login"
+        },
         "stalled": {
           "kind": 9,
           "time": "2026-10-09T15:00:00Z",
@@ -3348,6 +3370,7 @@
         "waiting_on": "author",
         "since": "2026-10-08T16:00:00Z",
         "reason": "no reviewer requested",
+        "reason_key": "no_reviewer_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-10-08T16:00:00Z",
@@ -3680,7 +3703,8 @@
         "kind": "done",
         "waiting_on": "nobody",
         "since": "2026-10-13T15:00:00Z",
-        "reason": "merged"
+        "reason": "merged",
+        "reason_key": "merged"
       },
       "card": {
         "label": "acme/api#13",
@@ -3943,7 +3967,8 @@
         "kind": "done",
         "waiting_on": "nobody",
         "since": "2026-10-13T15:00:00Z",
-        "reason": "closed"
+        "reason": "closed",
+        "reason_key": "closed"
       },
       "card": {
         "label": "acme/api#14",
@@ -4205,7 +4230,11 @@
         "kind": "held",
         "waiting_on": "me",
         "since": "2026-10-14T14:00:00Z",
-        "reason": "automatic round held: cap reached"
+        "reason": "automatic round held: cap reached",
+        "reason_key": "round_held",
+        "reason_params": {
+          "why": "cap reached"
+        }
       },
       "card": {
         "label": "acme/api#18",
@@ -4518,7 +4547,11 @@
         "kind": "blocked",
         "waiting_on": "me",
         "since": "2026-10-14T13:00:00Z",
-        "reason": "round blocked: no access"
+        "reason": "round blocked: no access",
+        "reason_key": "round_blocked",
+        "reason_params": {
+          "why": "no access"
+        }
       },
       "card": {
         "label": "acme/api#19",
@@ -4829,7 +4862,11 @@
         "kind": "to_address",
         "waiting_on": "me",
         "since": "2026-10-14T12:00:00Z",
-        "reason": "review to address, no workspace: carol asked"
+        "reason": "review to address, no workspace: carol asked",
+        "reason_key": "to_address",
+        "reason_params": {
+          "why": "carol asked"
+        }
       },
       "card": {
         "label": "acme/api#20",
@@ -5152,7 +5189,8 @@
       "situation": {
         "kind": "loop_waiting",
         "waiting_on": "me",
-        "reason": "the agent asked you something"
+        "reason": "the agent asked you something",
+        "reason_key": "agent_asked"
       },
       "card": {
         "label": "acme/api#25",
@@ -5465,6 +5503,7 @@
         "waiting_on": "carol",
         "since": "2026-09-30T13:00:00Z",
         "reason": "review requested, no review on the head",
+        "reason_key": "review_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-09-30T13:00:00Z",
@@ -5793,6 +5832,7 @@
         "waiting_on": "author",
         "since": "2026-09-30T00:00:00Z",
         "reason": "no reviewer requested",
+        "reason_key": "no_reviewer_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-09-30T00:00:00Z",
@@ -6117,6 +6157,7 @@
         "waiting_on": "author",
         "since": "2026-10-13T15:00:00Z",
         "reason": "approved and green",
+        "reason_key": "approved_green",
         "stalled": {
           "kind": 9,
           "time": "2026-10-13T15:00:00Z",
@@ -6401,6 +6442,7 @@
         "waiting_on": "me",
         "since": "2026-08-15T15:00:00Z",
         "reason": "review requested, no review on the head",
+        "reason_key": "review_requested",
         "stalled": {
           "kind": 9,
           "time": "2026-08-15T15:00:00Z",

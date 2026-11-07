@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], reasons: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -36,6 +36,7 @@ function applyCatalog(c) {
   catalog.specs = c.facets || [];
   catalog.fields = catalog.specs.map(fieldOf);
   catalog.lens = c.lens || [];
+  catalog.reasons = c.reasons || [];
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
   catalog.eventTones = new Map((c.events || []).filter((e) => e.tone).map((e) => [e.kind, e.tone]));
@@ -793,6 +794,15 @@ function servedLayout(view) {
 }
 
 // rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
+// reasonText is why row r waits, in its plugin's words of the reason it names filled with the reason's values,
+// else as the plugin wrote it.
+function reasonText(r) {
+  const s = r.summary || {};
+  const words = ((catalog.reasons || []).find((w) => w.provider === unitOf(r).provider) || {}).words || {};
+  const word = s.reason_key ? words[s.reason_key] : "";
+  return word ? fillWord(word, s.reason_params || {}) : s.reason || "";
+}
+
 function rowWords(provider) {
   const own = provider ? ((catalog.lens || []).find((w) => w.provider === provider) || {}).words : null;
   return own ? { ...lensWords(), ...own } : lensWords();
@@ -1359,7 +1369,7 @@ function rowModel(r, pr, lens, copy, kind = "row") {
   const n = Number.isInteger((p.brief || {}).open_questions) ? p.brief.open_questions : 0;
   const ws = p.workspace || {};
   const strip = stripOf(item, lens.specs);
-  const why = sm(r).reason || "";
+  const why = reasonText(r);
   const groups = new Set((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => fold(x.name || "")));
   const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
   return {
@@ -2100,7 +2110,7 @@ function renderDetail() {
     h("div", { class: "d-sit " + waitClass(r) + (sm(r).stalled ? " late" : "") },
       h("div", { class: "d-clock" }, roundGate(r) ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
       h("div", {}, t("Waiting on"), " ", h("strong", {}, waitingLabel(r)), isSet(sm(r).since) ? " " + t("since {time}", { time: stamp(sm(r).since) }) : ""),
-      h("div", { class: "why" }, sm(r).reason),
+      h("div", { class: "why" }, reasonText(r)),
       sm(r).line && sm(r).line !== sm(r).reason ? h("div", { class: "line" }, sm(r).line) : null,
       sm(r).stalled ? h("div", { class: "late-note" }, t("Past its threshold")) : null),
     checksBlock(r),

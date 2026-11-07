@@ -543,7 +543,7 @@ func situationPB(s *Situation) *pb.Situation {
 	if s == nil {
 		return nil
 	}
-	out := &pb.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: ts(s.Since), Reason: s.Reason}
+	out := &pb.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: ts(s.Since), Reason: s.Reason, ReasonKey: s.ReasonKey, ReasonParams: s.ReasonParams}
 	if s.Stalled.Kind != KindNone {
 		out.Stalled = factPB(Fact{Value: s.Stalled})
 	}
@@ -554,7 +554,7 @@ func situationGo(s *pb.Situation) *Situation {
 	if s == nil {
 		return nil
 	}
-	out := &Situation{Kind: s.GetKind(), WaitingOn: s.GetWaitingOn(), Since: tm(s.GetSince()), Reason: s.GetReason()}
+	out := &Situation{Kind: s.GetKind(), WaitingOn: s.GetWaitingOn(), Since: tm(s.GetSince()), Reason: s.GetReason(), ReasonKey: s.GetReasonKey(), ReasonParams: s.GetReasonParams()}
 	if s.GetStalled() != nil {
 		out.Stalled = factGo(s.GetStalled()).Value
 	}

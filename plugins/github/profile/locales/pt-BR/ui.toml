@@ -210,6 +210,28 @@ draft = "draft"
 muted = "silenciado"
 done = "fechado"
 
+[reasons]
+merged = "mesclado"
+closed = "fechado"
+round_blocked = "rodada bloqueada: {{.why}}"
+round_held = "rodada automática retida: {{.why}}"
+to_address = "review a atender, sem workspace: {{.why}}"
+agent_asked = "o agente perguntou algo a você"
+round_in_progress = "rodada de review em andamento"
+draft = "rascunho"
+checks_failing = "checks falhando no head"
+checks_failing_named = "checks falhando: {{.checks}}"
+checks_failing_more = "checks falhando: {{.checks}} e mais {{.more}}"
+changes_requested = "mudanças pedidas por {{.actor}}"
+merge_conflicts = "conflitos de merge com {{.branch}}"
+approved_green = "aprovado e verde"
+approved_checks_pending = "aprovado, checks pendentes"
+review_requested = "review pedida, nenhuma review no head"
+review_requested_again = "review pedida de novo depois da sua"
+reviewer_not_back = "{{.author}} respondeu, {{.reviewer}} não voltou"
+commented_no_reply = "{{.actor}} comentou, sem resposta"
+no_reviewer_requested = "nenhum revisor pedido"
+
 [events.opened]
 label = "aberto"
 

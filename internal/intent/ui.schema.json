@@ -524,6 +524,14 @@
         }
       ]
     },
+    "reasons": {
+      "additionalProperties": {
+        "description": "One reason's words, `{{.name}}` where a value the situation gives goes, such as `changes requested by {{.actor}}`.",
+        "type": "string"
+      },
+      "description": "Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it.",
+      "type": "object"
+    },
     "situations": {
       "additionalProperties": {
         "description": "One situation's words.",

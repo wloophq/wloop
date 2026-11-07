@@ -349,3 +349,31 @@ process.stdout.write(JSON.stringify({ Labels: buttons.map((b) => b.attrs["aria-l
 		t.Fatalf("%+v: a facet button names its value by the word the row shows", got)
 	}
 }
+
+func TestARowSaysWhyInItsPluginsWords(t *testing.T) {
+	pr := wireRow("me", time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC), tagRows()[0])
+	pr["views"] = []string{"all"}
+	sum := pr["summary"].(map[string]any)
+	sum["reason"], sum["reason_key"], sum["reason_params"] = "changes requested by bia", "changes_requested", map[string]string{"actor": "bia"}
+	other := wireRow("me", time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC), tagRows()[1])
+	other["views"] = []string{"all"}
+	other["summary"].(map[string]any)["reason"] = "round soon: review"
+	var cat map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
+		t.Fatal(err)
+	}
+	cat["reasons"] = []any{map[string]any{"provider": "github", "words": map[string]string{"changes_requested": "mudanças pedidas por {{.actor}}"}}}
+	raw, err := json.Marshal(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct{ Why, Tip, Other string }
+	rowViewRun(t, raw, `state.rows = [input.pr, input.other];
+const lens = lensOf({ ...readHash(), view: "all" });
+const m = rowModel(input.pr, "", lens, "");
+process.stdout.write(JSON.stringify({ Why: m.why, Tip: m.tip, Other: rowModel(input.other, "", lens, "").why }));`,
+		map[string]any{"pr": pr, "other": other, "now": 0}, &got)
+	if got.Why != "mudanças pedidas por bia" || !strings.Contains(got.Tip, "mudanças pedidas por bia") || got.Other != "round soon: review" {
+		t.Fatalf("%+v: a row says why in its plugin's words, filled with the reason's values; a reason no plugin words reads as written", got)
+	}
+}

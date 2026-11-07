@@ -119,6 +119,13 @@ func (p *Reported) Details() []api.DetailSpec {
 	return nil
 }
 
+func (p *Reported) Reasons() api.ProviderWords {
+	if rp, ok := p.src.Catalog.(ReasonPresenter); ok {
+		return rp.Reasons()
+	}
+	return api.ProviderWords{}
+}
+
 func (p *Reported) Lens() api.ProviderWords {
 	if lp, ok := p.src.Catalog.(LensPresenter); ok {
 		return lp.Lens()

@@ -15,6 +15,11 @@ type EventPresenter interface {
 	Details() []api.DetailSpec
 }
 
+// ReasonPresenter is optional on a Presenter: its words of the reasons its rows name.
+type ReasonPresenter interface {
+	Reasons() api.ProviderWords
+}
+
 // LensPresenter is optional on a Presenter: its own row words.
 type LensPresenter interface {
 	Lens() api.ProviderWords

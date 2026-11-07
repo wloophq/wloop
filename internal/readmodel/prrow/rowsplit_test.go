@@ -371,3 +371,27 @@ func readTestdata(t *testing.T, path string) []byte {
 	}
 	return []byte(brandtest.Expand(string(raw)))
 }
+
+// TestARowNamesItsSituationsReason checks that a row carries the key and the values of the reason its
+// plugin's situation gives, for the plugin's words, and none for a reason the host's overlays wrote.
+func TestARowNamesItsSituationsReason(t *testing.T) {
+	keyed := 0
+	for _, r := range deriveCases(t, fixtureNow) {
+		s := r.Summary
+		if situation.Kind(r.Kind) == situation.KindMuted && s.ReasonKey != "" {
+			t.Errorf("%s: a muted row names the reason %q", r.Label, s.ReasonKey)
+		}
+		if s.ReasonKey == "" {
+			continue
+		}
+		keyed++
+		for k, v := range s.ReasonParams {
+			if !strings.Contains(s.Reason, v) {
+				t.Errorf("%s: the reason %q lacks its %s %q", r.Label, s.Reason, k, v)
+			}
+		}
+	}
+	if keyed == 0 {
+		t.Fatal("no row names its reason")
+	}
+}

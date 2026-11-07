@@ -137,8 +137,9 @@ func snapshot() source.Snapshot {
 	anchor := source.Anchor{Unit: pr, Ref: "review:9", Permalink: "https://pulls.example/acme/api/pull/12#r9", At: t0}
 	return source.Snapshot{
 		Unit: pr, Rev: 42, At: t0,
-		Data:      json.RawMessage(`{"title":"Add retries","draft":false}`),
-		Situation: &source.Situation{Kind: "to_review", WaitingOn: "pulls:bruno", Since: t0, Reason: "Ana asked", Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
+		Data: json.RawMessage(`{"title":"Add retries","draft":false}`),
+		Situation: &source.Situation{Kind: "to_review", WaitingOn: "pulls:bruno", Since: t0, Reason: "Ana asked", ReasonKey: "asked_by", ReasonParams: map[string]string{"actor": "Ana"},
+			Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
 		Card: &source.Card{
 			Label: "api#12", Title: "Add retries", State: "open", Outcome: "",
 			Signals:   []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0}},

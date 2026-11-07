@@ -35,7 +35,10 @@ type Situation struct {
 	WaitingOn string // logins, "me", "author", "nobody"
 	Since     time.Time
 	Reason    string
-	Stalled   bool
+	// ReasonKey names Reason in its plugin's words, which ReasonParams fill; a reason the host writes has none.
+	ReasonKey    string
+	ReasonParams map[string]string
+	Stalled      bool
 }
 
 // Turn is what the loop's store says of the turn that drives a unit's row:

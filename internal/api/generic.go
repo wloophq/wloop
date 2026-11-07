@@ -13,6 +13,10 @@ type Summary struct {
 	OpenItems int       `json:"open_items"`
 	Reason    string    `json:"reason"` // one sentence: why it waits
 	Line      string    `json:"line"`   // the short status every client shows (menu bar, TUI list)
+	// ReasonKey names Reason in its plugin's words (CatalogResponse.Reasons), which ReasonParams fill; empty
+	// for a reason no plugin words.
+	ReasonKey    string            `json:"reason_key,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
 }
 
 type RowItem struct {
@@ -38,6 +42,8 @@ type CatalogResponse struct {
 	Details []DetailSpec `json:"details,omitempty"`
 	// Lens are the plugins' own row words, which replace the views catalog's for their rows.
 	Lens []ProviderWords `json:"lens,omitempty"`
+	// Reasons are the plugins' words of the reasons their rows name (Summary.ReasonKey), by key.
+	Reasons []ProviderWords `json:"reasons,omitempty"`
 }
 
 // ProviderWords are a provider's words, by key.

@@ -121,6 +121,14 @@ func (c Catalog) Lens() api.ProviderWords {
 	return api.ProviderWords{Provider: c.Source.Provider, Words: c.texts().Lens.Set()}
 }
 
+// Reasons are the plugin's words of the reasons its situations name, by reason key.
+func (c Catalog) Reasons() api.ProviderWords {
+	if c.Source == nil {
+		return api.ProviderWords{}
+	}
+	return api.ProviderWords{Provider: c.Source.Provider, Words: maps.Clone(c.texts().Reasons)}
+}
+
 // Events are the words of the event kinds the manifest declares that its
 // profile layer words; a kind it leaves out shows as itself.
 func (c Catalog) Events() []api.EventSpec {

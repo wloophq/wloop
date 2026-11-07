@@ -58,6 +58,19 @@ func TestTUIRendersAThreadRow(t *testing.T) {
 	}
 }
 
+func TestTUISaysWhyInThePluginsWords(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Reasons = []api.ProviderWords{{Provider: "thread", Words: map[string]string{"asked_by": "{{.actor}} perguntou a você"}}}
+	m.SetCatalog(c)
+	r := threadRow()
+	r.Summary.ReasonKey, r.Summary.ReasonParams = "asked_by", map[string]string{"actor": "ana"}
+	m.SetData([]api.Row{r}, api.Health{Viewer: "me-login"})
+	if screen := strings.Join(m.Render(120, 30, now), "\n"); !strings.Contains(screen, "ana perguntou a você") || strings.Contains(screen, "ana asked you") {
+		t.Fatalf("the why reads the plugin's words:\n%s", screen)
+	}
+}
+
 func TestFilterSearchesFacets(t *testing.T) {
 	m := newModel(t)
 	th := threadRow()

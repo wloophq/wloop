@@ -299,6 +299,7 @@
       "line": "merged",
       "open_items": 0,
       "reason": "merged",
+      "reason_key": "merged",
       "since": "0001-01-01T00:00:00Z",
       "stalled": false,
       "waits_on": "nobody"

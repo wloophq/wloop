@@ -893,6 +893,8 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens` (table): The plugin's own words of its rows, replacing the row words of views.toml's [lens] by the same keys.
 - `situations` (table): How each situation the plugin derives shows, by kind, in a few words.
 - `situations.<name>` (string, localized): One situation's words.
+- `reasons` (table): Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it.
+- `reasons.<name>` (string, localized): One reason's words, `{{.name}}` where a value the situation gives goes, such as `changes requested by {{.actor}}`.
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
 - `events.<name>` (table): One event kind's words.
 - `events.<name>.label` (string, localized): The event in a few words. Required.

@@ -21,6 +21,7 @@ type UITexts struct {
 	Views      map[string]UIView  `toml:"views"`
 	Facets     map[string]UIFacet `toml:"facets"`
 	Situations map[string]string  `toml:"situations"`
+	Reasons    map[string]string  `toml:"reasons"`
 	Events     map[string]UIEvent `toml:"events"`
 	Menubar    map[string]string  `toml:"menubar"`
 	Detail     map[string]UIField `toml:"detail"`
@@ -243,6 +244,7 @@ func mergeUI(into, over UITexts) UITexts {
 	into.Lens = into.Lens.Over(over.Lens)
 	into.Events = mergeMap(into.Events, over.Events, func(_, y UIEvent) UIEvent { return y })
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
+	into.Reasons = mergeMap(into.Reasons, over.Reasons, func(_, y string) string { return y })
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
 	if over.Noun != nil {
