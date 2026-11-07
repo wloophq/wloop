@@ -2669,6 +2669,19 @@ function openTaskSource(e, u) {
   else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
 }
 
+// pageGates are the gates the page draws as cards, each with its task: the detail's, the queue's item's and
+// the gates list's.
+function pageGates() {
+  const out = [];
+  const e = detailState.task;
+  if (e) out.push({ task: e, gates: e.gates || [] });
+  const queue = queueShown(readRoute(location.hash));
+  const item = queue && (queue.items || [])[queueState.at];
+  if (item && item.gate) out.push({ task: item.task, gates: [item.gate] });
+  for (const g of tasksState.gates || []) out.push({ task: taskById(g.task), gates: [g] });
+  return out;
+}
+
 // screenEnv is what the home and the queue screens read and run through.
 function screenEnv() {
   return {

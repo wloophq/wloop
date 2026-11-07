@@ -262,3 +262,24 @@ process.stdout.write(JSON.stringify({ Switched: switched, SwitchedText: switched
 		t.Errorf("a successful load keeps the last error: %+v", got)
 	}
 }
+
+func TestDigitsAnswerAGateCardOutsideTheDetail(t *testing.T) {
+	var got struct {
+		Queue, List, Detail, None string
+	}
+	nodeRun(t, queuePrelude(t)+jsFunction(t, appJS(t), "pageGates"), nil, `
+const gate = (id) => ({ id, kind: "question", intents: [{ id: "answer" }, { id: "continue" }] });
+const inCard = (id) => ({ closest: (s) => (s === ".d-gate" ? { getAttribute: () => String(id) } : null) });
+globalThis.hash = "#queue=answer";
+globalThis.location = { hash: "#queue=answer" };
+queueState.key = queueKey(readRoute("#queue=answer"));
+queueState.queue = { items: [{ task: { id: "t-1" }, gate: gate(7) }] };
+tasksState.gates = [Object.assign(gate(8), { task: "t-2" })];
+tasksState.tasks = [{ id: "t-2" }];
+detailState.task = { id: "t-3", gates: [gate(9)] };
+const at = (id) => { const q = gateAt(inCard(id), pageGates()); return q ? q.task.id + ":" + q.gate.id : ""; };
+process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10) }));`, nil, &got)
+	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" {
+		t.Fatalf("%+v: a digit answers the focused gate card wherever the page draws it", got)
+	}
+}

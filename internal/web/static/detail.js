@@ -129,12 +129,6 @@ const detailPane = {
   selected: () => taskById(detailEnv.focused()) || detailState.task,
   act: (verb, args, task) => actOn(task || detailPane.selected(), verb, args),
   load: (route) => loadDetailPane(route),
-  gateAt: (el) => {
-    const e = detailState.task;
-    const card = e && el && el.closest ? el.closest(".d-gate") : null;
-    const g = card && (e.gates || []).find((x) => String(x.id) === card.getAttribute("data-gate"));
-    return g ? { task: e, gate: g } : null;
-  },
   resolve: (task, gate, intent) => resolveGate(task, gate, intent),
   tab: (dir) => stepTab(detailState.task, dir === "prev" ? -1 : 1, true),
 };

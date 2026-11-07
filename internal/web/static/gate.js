@@ -127,6 +127,19 @@ function gateCard(e, g, opts = {}) {
       answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null)));
 }
 
+// gateAt is the gate whose card holds el, with its task, among sources: each a task and the gates the page
+// draws of it.
+function gateAt(el, sources) {
+  const card = el && el.closest ? el.closest(".d-gate") : null;
+  if (!card) return null;
+  const id = card.getAttribute("data-gate");
+  for (const s of sources) {
+    const g = (s.gates || []).find((x) => String(x.id) === id);
+    if (g) return { task: s.task, gate: g };
+  }
+  return null;
+}
+
 // DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
 // card offers on the draft's own task, the kind's own dismiss among them.
 const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
