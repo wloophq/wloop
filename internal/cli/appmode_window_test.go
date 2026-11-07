@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 )
@@ -56,7 +58,7 @@ func TestAppModeWithAHostRunsTheWindowController(t *testing.T) {
 	tray := &recTray{}
 	host := &recHost{}
 	var win config.Window
-	te.RunNative = func(w config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
+	te.RunNative = func(w config.Window, _ *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
 		win = w
 		setup(tray, silentNotifier{}, host)
 		eventually(t, "the controller to listen", func() bool {
@@ -100,9 +102,12 @@ func (n *nativeCalls) add(s string) { n.mu.Lock(); n.calls = append(n.calls, s);
 func fakeRunners(n *nativeCalls, available bool) nativeRunners {
 	return nativeRunners{
 		windowAvailable: available,
-		runWindow:       func(ready func(window.Host)) { n.add("window"); ready(&recHost{}) },
-		attach:          func(setup func(menubar.Tray, menubar.Notifier)) { n.add("attach"); setup(&recTray{}, silentNotifier{}) },
-		runMenu:         func(setup func(menubar.Tray, menubar.Notifier)) { n.add("menu"); setup(&recTray{}, silentNotifier{}) },
+		runWindow: func(words *texts.Catalog, ready func(window.Host)) {
+			n.add("window " + words.T("Edit", nil))
+			ready(&recHost{})
+		},
+		attach:  func(setup func(menubar.Tray, menubar.Notifier)) { n.add("attach"); setup(&recTray{}, silentNotifier{}) },
+		runMenu: func(setup func(menubar.Tray, menubar.Notifier)) { n.add("menu"); setup(&recTray{}, silentNotifier{}) },
 	}
 }
 
@@ -110,8 +115,8 @@ func TestNativeHostRunsTheWindowWhenEnabled(t *testing.T) {
 	t.Parallel()
 	n := &nativeCalls{}
 	var host window.Host
-	fakeRunners(n, true).run(config.Window{Enabled: true}, func(_ menubar.Tray, _ menubar.Notifier, h window.Host) { host = h })
-	if strings.Join(n.calls, ",") != "window,attach" || host == nil {
+	fakeRunners(n, true).run(config.Window{Enabled: true}, texts.New(api.Strings{Locale: "pt-BR", Strings: map[string]api.Text{"Edit": {"other": "Editar"}}}), func(_ menubar.Tray, _ menubar.Notifier, h window.Host) { host = h })
+	if strings.Join(n.calls, ",") != "window Editar,attach" || host == nil {
 		t.Fatalf("ran %v with host %v", n.calls, host)
 	}
 }
@@ -124,7 +129,7 @@ func TestWindowDisabledRunsNoHost(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			n := &nativeCalls{}
 			hosted := true
-			fakeRunners(n, c.available).run(config.Window{Enabled: c.enabled}, func(_ menubar.Tray, _ menubar.Notifier, h window.Host) { hosted = h != nil })
+			fakeRunners(n, c.available).run(config.Window{Enabled: c.enabled}, texts.English(), func(_ menubar.Tray, _ menubar.Notifier, h window.Host) { hosted = h != nil })
 			if strings.Join(n.calls, ",") != "menu" || hosted {
 				t.Fatalf("ran %v, host given %v", n.calls, hosted)
 			}
@@ -175,4 +180,22 @@ func TestTheWindowControllerIsAwaitedByItsOwner(t *testing.T) {
 		close(events.release)
 		<-waited
 	})
+}
+
+type servedStrings struct {
+	s   api.Strings
+	err error
+}
+
+func (d servedStrings) Strings(context.Context) (api.Strings, error) { return d.s, d.err }
+
+func TestAppWordsAreTheServedStringsElseEnglish(t *testing.T) {
+	t.Parallel()
+	pt := servedStrings{s: api.Strings{Locale: "pt-BR", Strings: map[string]api.Text{"Edit": {"other": "Editar"}}}}
+	if got := appWords(context.Background(), pt).T("Edit", nil); got != "Editar" {
+		t.Fatalf("%q", got)
+	}
+	if got := appWords(context.Background(), servedStrings{err: errors.New("dial unix: no such file")}).T("Edit", nil); got != "Edit" {
+		t.Fatalf("%q", got)
+	}
 }

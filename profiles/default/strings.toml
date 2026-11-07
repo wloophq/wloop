@@ -1,0 +1,49 @@
+# The texts the clients show (the cockpit, the menu bar, the terminal client), by their English text with
+# {name} placeholders. A text with plural forms is a table of its CLDR forms: { one = "...", other = "..." }.
+# Each piece adds its keys in its own block.
+
+[strings]
+# piece D
+# The menu bar.
+"more…" = "more…"
+"(stale)" = "(stale)"
+"Task {task} has no unit to act on" = "Task {task} has no unit to act on"
+"This notification offers no {action}" = "This notification offers no {action}"
+"PR {n}" = "PR {n}"
+"PR !" = "PR !"
+"PR ?" = "PR ?"
+"Daemon not answering: {error}" = "Daemon not answering: {error}"
+"Quit {name}" = "Quit {name}"
+"Store needs attention: {why}" = "Store needs attention: {why}"
+"a store command is running" = "a store command is running"
+"it needs a migration" = "it needs a migration"
+"a newer release wrote it" = "a newer release wrote it"
+"its migration failed" = "its migration failed"
+"Copy command: {command}" = "Copy command: {command}"
+"briefs unavailable: {why}" = "briefs unavailable: {why}"
+"briefs unavailable since {time}: {error}" = "briefs unavailable since {time}: {error}"
+"Open workspace" = "Open workspace"
+"Open in {manager}" = "Open in {manager}"
+"Open cockpit" = "Open cockpit"
+"Sweep now" = "Sweep now"
+"Pause automatic rounds" = "Pause automatic rounds"
+"Resume automatic rounds" = "Resume automatic rounds"
+"Not synced yet" = "Not synced yet"
+"Synced {time}" = "Synced {time}"
+"Loading {plugin}" = "Loading {plugin}"
+"Loading {plugin}: {reason}" = "Loading {plugin}: {reason}"
+"Answer not sent" = "Answer not sent"
+"Answer queued" = "Answer queued"
+"answer queued; the agent session is told of it when the agent stops" = "answer queued; the agent session is told of it when the agent stops"
+"Reply not saved" = "Reply not saved"
+"Nothing was typed." = "Nothing was typed."
+"Reply saved to the Outbox" = "Reply saved to the Outbox"
+"Reply sent" = "Reply sent"
+"Action not sent" = "Action not sent"
+
+[formats]
+time = "3:04 PM"
+date = "Jan 2"
+datetime = "Jan 2 3:04 PM"
+decimal = "."
+group = ","

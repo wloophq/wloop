@@ -3003,6 +3003,7 @@ async function load() {
   if (health.status === "fulfilled") {
     state.health = health.value;
     checkBuild(state.health);
+    followStrings(state.health.strings, getJSON);
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
   // A daemon that cannot open its store says why in its health's warnings.
@@ -3117,6 +3118,7 @@ async function applyChange(c) {
     if (c.health) {
       state.health = await getJSON("/api/health");
       checkBuild(state.health);
+      followStrings(state.health.strings, getJSON);
     }
   } catch {
     return load();
@@ -3250,5 +3252,14 @@ document.getElementById("explore-guidance").addEventListener("input", (e) => { s
 setupDetailResize();
 setInterval(render, 60000);
 setInterval(tickCountdowns, 1000);
-load();
-connect();
+loadStrings(getJSON).then(() => {
+  document.documentElement.lang = I18N.locale;
+  load();
+  connect();
+});
+
+// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them.
+function i18nChanged() {
+  document.documentElement.lang = I18N.locale;
+  render();
+}

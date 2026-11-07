@@ -3,6 +3,9 @@ package cli
 import (
 	"context"
 	"sync"
+	"time"
+
+	"github.com/wloophq/wloop/internal/api"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
@@ -17,7 +20,7 @@ import (
 // menu bar attaches to, and the menu bar alone.
 type nativeRunners struct {
 	windowAvailable bool
-	runWindow       func(ready func(window.Host))
+	runWindow       func(words *texts.Catalog, ready func(window.Host))
 	attach          func(setup func(menubar.Tray, menubar.Notifier))
 	runMenu         func(setup func(menubar.Tray, menubar.Notifier))
 }
@@ -25,22 +28,36 @@ type nativeRunners struct {
 func macNative(imageDir string) nativeRunners {
 	return nativeRunners{
 		windowAvailable: wails.Available(),
-		runWindow:       func(ready func(window.Host)) { wails.Run(brand.Name, texts.English(), ready) },
+		runWindow:       func(words *texts.Catalog, ready func(window.Host)) { wails.Run(brand.Name, words, ready) },
 		attach:          func(setup func(menubar.Tray, menubar.Notifier)) { macos.Attach(imageDir, setup) },
 		runMenu:         func(setup func(menubar.Tray, menubar.Notifier)) { macos.Run(imageDir, setup) },
 	}
 }
 
-// run runs the window host when this build has one and win enables it, the
-// menu bar alone otherwise, whose setup gets no host.
-func (n nativeRunners) run(win config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
+// run runs the window host, its menus worded by words, when this build has one
+// and win enables it, the menu bar alone otherwise, whose setup gets no host.
+func (n nativeRunners) run(win config.Window, words *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
 	if n.windowAvailable && win.Enabled {
-		n.runWindow(func(h window.Host) {
+		n.runWindow(words, func(h window.Host) {
 			n.attach(func(t menubar.Tray, notes menubar.Notifier) { setup(t, notes, h) })
 		})
 		return
 	}
 	n.runMenu(func(t menubar.Tray, notes menubar.Notifier) { setup(t, notes, nil) })
+}
+
+// appWords are the client strings the daemon serves, for the native menus the app builds once; English when
+// the daemon does not answer within a second.
+func appWords(ctx context.Context, daemon interface {
+	Strings(context.Context) (api.Strings, error)
+}) *texts.Catalog {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	s, err := daemon.Strings(ctx)
+	if err != nil {
+		return texts.English()
+	}
+	return texts.New(s)
 }
 
 // windowShow starts the window controller on host until ctx ends, in wg, and

@@ -106,7 +106,7 @@ func under(path string, roots ...string) bool {
 const pluginStore = "pkg/plugin/store"
 
 // TestArchitecture checks that only the store imports the SQLite driver;
-// clients import only the API, the domain and `termfmt`; the domain imports
+// clients import only the API, the domain, `termfmt` and `i18n`; the domain imports
 // only the domain; the brief reaches agents and the store only through its
 // ports; the API imports only the domain; only `intent/expr` imports cel-go; a
 // core interface has at most five methods.
@@ -125,8 +125,8 @@ func TestArchitecture(t *testing.T) {
 				broken = append(broken, fmt.Sprintf("%s imports %s; only the store may (C1)", self, imp))
 			case under(self, "internal/domain") && !std(imp) && !(internal && under(dep, "internal/domain")):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the domain imports only the standard library and the domain (C3)", self, imp))
-			case under(self, "internal/client") && internal && !under(dep, "internal/api", "internal/domain", "internal/client", "internal/termfmt"):
-				broken = append(broken, fmt.Sprintf("%s imports %s; a client imports only the API and internal/termfmt (C2)", self, imp))
+			case under(self, "internal/client") && internal && !under(dep, "internal/api", "internal/domain", "internal/client", "internal/termfmt", "internal/i18n"):
+				broken = append(broken, fmt.Sprintf("%s imports %s; a client imports only the API, internal/termfmt and internal/i18n (C2)", self, imp))
 			case under(self, "internal/brief") && (imp == "os/exec" || (internal && under(dep, "internal/adapter/agent"))):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the brief runs the agent only through turns.Asker (C4)", self, imp))
 			case under(self, "internal/brief") && internal && under(dep, "internal/adapter/store/sqlite"):

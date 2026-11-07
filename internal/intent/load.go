@@ -118,6 +118,12 @@ type Loaded struct {
 	// UI are each plugin's words of its manifest's views, facets and
 	// situations, from its layers' ui.toml, by plugin id.
 	UI map[string]UITexts
+	// Strings are the clients' texts in Locale, by their English text; Formats the Go clients' date and
+	// number formats in Locale.
+	Strings map[string]i18n.Forms
+	Formats map[string]string
+	// StringsStamp changes when Locale, Strings or Formats do.
+	StringsStamp string
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -213,8 +219,11 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			keyTexts, keyProblems := loadKeys(layers, r)
 			notices, noticeProblems := loadNotices(layers, r)
 			ui, uiProblems := loadUI(layers, r)
+			var stringProblems Problems
+			l.Strings, l.Formats, stringProblems = loadStrings(layers, r)
+			l.StringsStamp = stringsStamp(locale, l.Strings, l.Formats)
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, *r.problems)
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, stringProblems, *r.problems)
 			l.Locale, l.reader = locale, r
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {

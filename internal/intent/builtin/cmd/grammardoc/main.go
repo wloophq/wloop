@@ -446,6 +446,7 @@ var schemas = []struct {
 	{"records.schema.json", "Record kinds (records.toml)", builtin.SurfaceRecords},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
 	{"ui.schema.json", "A plugin's views, facets and situations (ui.toml)", builtin.SurfaceUI},
+	{"strings.schema.json", "Client strings (strings.toml)", builtin.SurfaceStrings},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 

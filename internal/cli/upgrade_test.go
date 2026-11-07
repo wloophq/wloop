@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 )
@@ -137,7 +138,7 @@ func runAppUntil(t *testing.T, te *testEnv, source string, done <-chan struct{})
 			t.Error("quit through AppKit, which exits 0 and is not restarted")
 		}
 	}
-	te.RunNative = func(_ config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
+	te.RunNative = func(_ config.Window, _ *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
 		setup(&recTray{}, silentNotifier{}, nil)
 		writeBinary(t, source, "binary v3")
 		<-done

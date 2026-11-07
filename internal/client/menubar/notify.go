@@ -206,11 +206,11 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	}
 	res, err := c.cfg.Daemon.TaskDo(ctx, tk, c.verbOf(handlerAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, tk, "Answer not sent", err.Error())
+		c.notifyNote(r.ID, tk, c.words().T("Answer not sent", nil), err.Error())
 		return err
 	}
 	if slices.Contains(res.Lines, api.AnswerQueued) {
-		c.notifyNote(r.ID, tk, "Answer queued", api.AnswerQueued)
+		c.notifyNote(r.ID, tk, c.words().T("Answer queued", nil), c.words().T(api.AnswerQueued, nil))
 	}
 	return nil
 }
@@ -218,17 +218,17 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 // reply writes the notification's text as a reply on its task's unit, and says where it went.
 func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if strings.TrimSpace(r.Text) == "" {
-		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
+		c.notifyNote(r.ID, task, c.words().T("Reply not saved", nil), c.words().T("Nothing was typed.", nil))
 		return nil
 	}
 	args := map[string]string{"text": r.Text, "send": "draft"}
-	title := "Reply saved to the Outbox"
+	title := c.words().T("Reply saved to the Outbox", nil)
 	if r.Send {
-		args["send"], title = "now", "Reply sent"
+		args["send"], title = "now", c.words().T("Reply sent", nil)
 	}
 	res, err := c.cfg.Daemon.TaskDo(ctx, task, c.verbOf(handlerReply), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, task, "Reply not saved", err.Error())
+		c.notifyNote(r.ID, task, c.words().T("Reply not saved", nil), err.Error())
 		return err
 	}
 	body := ""
@@ -241,10 +241,9 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 
 func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
 	var err error
-	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok {
-		if cat == api.CategoryOutbox && !slices.Contains(c.draftButtons(), r.Identifier) {
-			return errors.New("a draft's notification offers no " + r.Identifier)
-		}
+	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok && cat == api.CategoryOutbox && !slices.Contains(c.draftButtons(), r.Identifier) {
+		err = notOffered{action: r.Identifier}
+	} else if ok {
 		var args map[string]string
 		if v, mode, ok := strings.Cut(verb, ":"); ok {
 			verb, args = v, map[string]string{"mode": mode}
@@ -257,9 +256,33 @@ func (c *Controller) served(ctx context.Context, r Response, cat Category, task 
 		}
 	}
 	if err != nil {
-		c.notifyNote(r.ID, task, "Action not sent", err.Error())
+		c.notifyNote(r.ID, task, c.words().T("Action not sent", nil), c.errorText(err))
 	}
 	return err
+}
+
+// notOffered is a button the notification of a draft does not offer.
+type notOffered struct{ action string }
+
+func (e notOffered) Error() string { return "a draft's notification offers no " + e.action }
+
+// noUnit is a task with no unit an action could act on.
+type noUnit struct{ task string }
+
+func (e noUnit) Error() string { return "task " + e.task + " has no unit to act on" }
+
+// errorText is err as a note's body says it: the menu bar's own errors in the catalog's words, the
+// daemon's as it wrote them.
+func (c *Controller) errorText(err error) string {
+	var offered notOffered
+	var unitless noUnit
+	switch {
+	case errors.As(err, &offered):
+		return c.words().T("This notification offers no {action}", map[string]any{"action": offered.action})
+	case errors.As(err, &unitless):
+		return c.words().T("Task {task} has no unit to act on", map[string]any{"task": unitless.task})
+	}
+	return err.Error()
 }
 
 // unitOf is the first unit of the notification's task, read again from the
@@ -277,7 +300,7 @@ func (c *Controller) unitOf(ctx context.Context, id, task string) (unit.Unit, er
 		units = e.Units
 	}
 	if len(units) == 0 {
-		return unit.Unit{}, errors.New("task " + task + " has no unit to act on")
+		return unit.Unit{}, noUnit{task: task}
 	}
 	return units[0], nil
 }

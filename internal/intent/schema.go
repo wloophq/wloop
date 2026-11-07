@@ -46,3 +46,8 @@ var RecordsSchema []byte
 //
 //go:embed keys.schema.json
 var KeysSchema []byte
+
+// StringsSchema is the JSON Schema of strings.toml, for editors.
+//
+//go:embed strings.schema.json
+var StringsSchema []byte
