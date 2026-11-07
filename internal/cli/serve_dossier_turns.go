@@ -135,7 +135,8 @@ func (e *Env) checkTurnEnds(ctx context.Context, t *dossiers.Turns, q <-chan por
 }
 
 // dossierGrant opens the dossier u's turns read, its task's when a task holds u, for a session about to launch and grants it: read everywhere, write
-// under the dossiers' write directories. None without the dossiers or a unit, or when it cannot open.
+// under the dossiers' write directories; the dossiers of the tasks merged into that task are granted read only. None without the dossiers or a
+// unit, or when it cannot open.
 func (e *Env) dossierGrant(ctx context.Context, u unit.Unit) []turns.Dir {
 	if e.dossierTurns == nil || u.IsZero() {
 		return nil
@@ -145,7 +146,25 @@ func (e *Env) dossierGrant(ctx context.Context, u unit.Unit) []turns.Dir {
 		e.dossierTurns.Log("dossier of %s: opening it for the session: %v", u.Label(), err)
 		return nil
 	}
-	return []turns.Dir{{Path: d.Path, Write: append([]string(nil), dossiers.WriteDirs...)}}
+	out := []turns.Dir{{Path: d.Path, Write: append([]string(nil), dossiers.WriteDirs...)}}
+	for _, p := range e.mergedDossiers(ctx, u) {
+		out = append(out, turns.Dir{Path: p})
+	}
+	return out
+}
+
+// mergedDossiers are the paths of the dossiers of the tasks merged into u's task, which its sessions read.
+func (e *Env) mergedDossiers(ctx context.Context, u unit.Unit) []string {
+	merged, err := e.dossierTurns.Dossiers.MergedOf(ctx, u)
+	if err != nil {
+		e.dossierTurns.Log("dossier of %s: reading the merged tasks' dossiers: %v", u.Label(), err)
+		return nil
+	}
+	var out []string
+	for _, d := range merged {
+		out = append(out, d.Path)
+	}
+	return out
 }
 
 // dossierReader is the session turns' dossier reader; nil without the dossiers.
@@ -175,7 +194,7 @@ func (s sessionDossiers) Dossier(ctx context.Context, u unit.Unit) (turn.Dossier
 		t.Log("dossier of %s: opening it for the turn: %v", u.Label(), err)
 		return turn.Dossier{}, false, nil
 	}
-	out := turn.Dossier{Path: d.Path}
+	out := turn.Dossier{Path: d.Path, Merged: s.e.mergedDossiers(ctx, u)}
 	if s.e.Turns == nil || s.e.dossierGrants == nil {
 		return out, true, nil
 	}

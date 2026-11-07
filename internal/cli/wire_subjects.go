@@ -25,6 +25,7 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		p := e.taskFacts(w.DB, unitsEnded(w.Modules), unitsPlacement(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
 		w.Engine.Subjects[task.Codec{}.Provider()] = p
 		e.wakeFacts = p.TaskFacts
+		e.takenApart = p.TakenApart
 		if w.Deps != nil {
 			w.Deps.Row = catalog.RowOf(e.loadedIntents, e.lens().Facts)
 		}

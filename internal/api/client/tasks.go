@@ -48,6 +48,17 @@ func (c *Client) TasksSince(ctx context.Context, q TaskQuery, since api.Since) (
 	return page, err
 }
 
+// MatchTasks are the open tasks whose title holds text, for a picker of another task than except.
+func (c *Client) MatchTasks(ctx context.Context, text, except string) ([]api.TaskView, error) {
+	q := url.Values{api.TasksMatch: {text}}
+	if except != "" {
+		q.Set(api.TasksExcept, except)
+	}
+	var page api.TasksPage
+	err := c.do(ctx, ReadTimeout, http.MethodGet, api.TasksPath+"?"+q.Encode(), nil, &page)
+	return page.Tasks, err
+}
+
 // Task is task id with its cards and items.
 func (c *Client) Task(ctx context.Context, id string) (api.TaskView, error) {
 	var e api.TaskView

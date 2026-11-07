@@ -69,13 +69,30 @@ const (
 	// RolePromise is the property the promise handler sets from the time you promise an answer by, which the
 	// fact task.promised reads: a date.
 	RolePromise Role = "promise"
+	// RoleRelated is the property that lists, by id, the tasks the relate handler linked to the task, which
+	// relate and unrelate keep the same on both: a string[].
+	RoleRelated Role = "related"
+	// RoleMerged is the property that lists, by id in merge order, the tasks the merge handler folded into the
+	// task, each followed by those merged into it before: a string[]. Split gives back the ones whose merge
+	// record names the task. While it lists one, Reconcile treats the task as the holder of every unit it took
+	// in:
+	//   - when no item of unit u calls for it, only u's items move to its resolved ones; it resolves into the
+	//     done category once it holds no open item of any unit, and drops on unfollow only then;
+	//   - an item no task holds whose derived id is one it lists goes to it, whatever its state, so a merged
+	//     task's id is never derived again;
+	//   - its title no longer follows its single item.
+	RoleMerged Role = "merged"
 )
 
 // Roles are every role.
-var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise}
+var Roles = []Role{RoleArea, RoleContexts, RoleStar, RoleDeadline, RolePromise, RoleRelated, RoleMerged}
+
+// LoopRoles are the roles whose property only the loop's handlers write, so no writer may write it.
+var LoopRoles = []Role{RoleRelated, RoleMerged}
 
 // RoleTypes are the type of the property each role acts on.
-var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate}
+var RoleTypes = map[Role]PropType{RoleArea: PropString, RoleContexts: PropStrings, RoleStar: PropEnum, RoleDeadline: PropDate, RolePromise: PropDate,
+	RoleRelated: PropStrings, RoleMerged: PropStrings}
 
 // Profile is the profile as the rules read it: its states, and the property each role acts on with its
 // values, "" for a role no property takes.

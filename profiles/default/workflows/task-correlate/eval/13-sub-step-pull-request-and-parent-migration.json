@@ -1,0 +1,24 @@
+{
+ "id": "13-sub-step-pull-request-and-parent-migration",
+ "kind": "sub-step",
+ "act": "relate",
+ "on": "t-000000000000d002",
+ "task": {
+  "id": "t-000000000000d001",
+  "title": "acme/api#140: Move the users table reads to the replica",
+  "notes": "Your pull request",
+  "items": [
+   "Waiting for review"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000d002",
+   "title": "Move all read traffic to the replicas",
+   "notes": "DM with Sam",
+   "items": [
+    "Sam asks you to move every service's read traffic to the database replicas this quarter"
+   ]
+  }
+ ]
+}

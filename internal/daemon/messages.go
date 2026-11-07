@@ -73,6 +73,9 @@ func (s *Server) Decide(ctx context.Context, g gate.Gate) error {
 	req, ok := coretasks.ProposedVerb(g)
 	switch {
 	case ok && g.Status != gate.Approved:
+		if s.deps.Tasks != nil {
+			s.deps.Tasks.Rejected(ctx, g)
+		}
 		return nil
 	case ok:
 		return s.runApprovedVerb(ctx, g, req)

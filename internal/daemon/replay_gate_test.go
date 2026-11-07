@@ -132,7 +132,7 @@ type storeTaskGates struct {
 	r gates.Reader
 }
 
-func (g storeTaskGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
+func (g storeTaskGates) Open(ctx context.Context, gt gate.Gate, _ bool) (gate.Gate, error) {
 	return g.Service.Open(ctx, gt, nil)
 }
 func (g storeTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {

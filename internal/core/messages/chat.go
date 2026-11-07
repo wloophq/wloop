@@ -56,11 +56,19 @@ type TaskUnits interface {
 	TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 }
 
+// MergedTasks are the tasks merged into a task, whose chat and sessions the task's are.
+type MergedTasks interface {
+	// MergedInto are the tasks merged into task id, transitively.
+	MergedInto(ctx context.Context, id task.ID) ([]task.ID, error)
+}
+
 // ChatDeps are what the chat on the tasks needs; a Service with zero ChatDeps serves no chat.
 type ChatDeps struct {
 	Sessions Sessions
 	Log      TaskLog
 	Units    TaskUnits
+	// Merged nil merges no task's chat into another's.
+	Merged MergedTasks
 	// Intent is the profile's chat intent, the turn a message starts when no session of its task is live.
 	Intent func() string
 }
@@ -101,7 +109,7 @@ type ChatRefusal struct{ Why string }
 func (r ChatRefusal) Error() string { return r.Why }
 
 // Chat keeps the message on the task's own unit, then delivers it: a live session of any of the task's
-// units is typed the notice that a message waits, which the agent reads with the task's read tool, or, while
+// units, or of the own unit of a task merged into it, is typed the notice that a message waits, which the agent reads with the task's read tool, or, while
 // its agent is busy, is told at its next stop; with none, a turn of the chat intent starts on the task's own
 // unit with every message its agents have not read as its guidance, oldest first, resuming the last run
 // there that had a session.
@@ -134,7 +142,11 @@ func (s *Service) Chat(ctx context.Context, r ChatRequest) (ChatResult, error) {
 	if len(newest) > 0 {
 		out.Seq = newest[0].Seq
 	}
-	sess, live, err := c.Sessions.LiveOn(ctx, append([]unit.Unit{own}, e.Units...)...)
+	chat, err := s.chatUnits(ctx, e.ID)
+	if err != nil {
+		return out, err
+	}
+	sess, live, err := c.Sessions.LiveOn(ctx, append(chat, e.Units...)...)
 	if err != nil {
 		return out, err
 	}
@@ -197,10 +209,27 @@ func chatText(ev timeline.Event) string {
 	return m.Text
 }
 
-// unreadChat are the messages on task id's chat its agents have not read, oldest first.
+// chatUnits are the units task id's chat is on: its own, then that of every task merged into it.
+func (s *Service) chatUnits(ctx context.Context, id task.ID) ([]unit.Unit, error) {
+	out := []unit.Unit{task.UnitOf(id)}
+	if s.ChatDeps.Merged == nil {
+		return out, nil
+	}
+	merged, err := s.ChatDeps.Merged.MergedInto(ctx, id)
+	for _, m := range merged {
+		out = append(out, task.UnitOf(m))
+	}
+	return out, err
+}
+
+// unreadChat are the messages on task id's chat its agents have not read, oldest first; how far they read
+// is marked on its own unit, the merged tasks' messages included.
 func (s *Service) unreadChat(ctx context.Context, id task.ID) ([]timeline.Event, error) {
-	own := task.UnitOf(id)
-	marks, err := s.ChatDeps.Log.Marks(ctx, own)
+	chat, err := s.chatUnits(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	marks, err := s.ChatDeps.Log.Marks(ctx, chat[0])
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +239,7 @@ func (s *Service) unreadChat(ctx context.Context, id task.ID) ([]timeline.Event,
 	}
 	var out []timeline.Event
 	for _, ev := range evs {
-		if ev.Unit == own && !mark.Handled(marks[ChatRead], ev.Seq) {
+		if slices.Contains(chat, ev.Unit) && !mark.Handled(marks[ChatRead], ev.Seq) {
 			out = append(out, ev)
 		}
 	}
@@ -248,9 +277,13 @@ func (w waitingChats) Waiting(ctx context.Context, u unit.Unit) (unit.Unit, bool
 	if err != nil || !ok {
 		return unit.Unit{}, false, err
 	}
-	own := task.UnitOf(e.ID)
+	chat, err := w.s.chatUnits(ctx, e.ID)
+	if err != nil {
+		return unit.Unit{}, false, err
+	}
+	own := chat[0]
 	newest, err := w.s.ChatDeps.Log.Of(ctx, e.ID, timeline.Filter{Kinds: []string{KindChat}, Limit: 1})
-	if err != nil || len(newest) == 0 || newest[0].Unit != own {
+	if err != nil || len(newest) == 0 || !slices.Contains(chat, newest[0].Unit) {
 		return unit.Unit{}, false, err
 	}
 	marks, err := w.s.ChatDeps.Log.Marks(ctx, own)
@@ -336,12 +369,17 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 // ErrNotTheTasks refuses a read of a task's chat to a session with no turn on the task or a unit it holds.
 var ErrNotTheTasks = errors.New("this session has no turn on the task")
 
-// worksOn says whether session has a turn on e's own unit or on one e holds: the sessions a chat goes to.
+// worksOn says whether session has a turn on e's own unit, on one e holds or on the own unit of a task merged
+// into e: the sessions a chat goes to.
 func (s *Service) worksOn(ctx context.Context, session string, e task.Task) (bool, error) {
 	if session == "" {
 		return false, nil
 	}
-	units := append([]unit.Unit{task.UnitOf(e.ID)}, e.Units...)
+	chat, err := s.chatUnits(ctx, e.ID)
+	if err != nil {
+		return false, err
+	}
+	units := append(chat, e.Units...)
 	books, err := s.Books.Books(ctx, units...)
 	if err != nil {
 		return false, err

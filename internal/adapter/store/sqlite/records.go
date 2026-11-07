@@ -45,6 +45,12 @@ func (db *DB) EventsOf(ctx context.Context, units []unit.Unit, f timeline.Filter
 			args = append(args, k)
 		}
 	}
+	if len(f.Except) > 0 {
+		q += ` AND kind NOT IN (?` + strings.Repeat(", ?", len(f.Except)-1) + `)`
+		for _, k := range f.Except {
+			args = append(args, k)
+		}
+	}
 	if f.Before > 0 {
 		q += ` AND id < ?`
 		args = append(args, f.Before)
@@ -91,10 +97,11 @@ func (db *DB) Records(ctx context.Context, kind string, units ...unit.Unit) (map
 	return out, nil
 }
 
-// UnitsOf are the units task id holds, in its order.
+// UnitsOf are the units task id holds, in its order, then the own unit of every task merged into id, in
+// merge order.
 func (db *DB) UnitsOf(ctx context.Context, id task.ID) ([]unit.Unit, error) {
 	var out []unit.Unit
-	err := eachRow(ctx, db.R(), `SELECT provider, unit_key FROM task_units WHERE task_id = ? ORDER BY ord`, []any{string(id)}, func(rows *sql.Rows) error {
+	if err := eachRow(ctx, db.R(), `SELECT provider, unit_key FROM task_units WHERE task_id = ? ORDER BY ord`, []any{string(id)}, func(rows *sql.Rows) error {
 		var u unit.Unit
 		var provider string
 		if err := rows.Scan(&provider, &u.Key); err != nil {
@@ -103,7 +110,13 @@ func (db *DB) UnitsOf(ctx context.Context, id task.ID) ([]unit.Unit, error) {
 		u.Provider = unit.ProviderID(provider)
 		out = append(out, u)
 		return nil
-	})
+	}); err != nil {
+		return nil, err
+	}
+	merged, err := db.MergedInto(ctx, id)
+	for _, m := range merged {
+		out = append(out, task.UnitOf(m))
+	}
 	return out, err
 }
 

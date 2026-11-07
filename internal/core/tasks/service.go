@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,6 +54,12 @@ type Deps struct {
 	// Activity is told each task Sync finds asleep with a person's activity on its unit since the user saw it,
 	// for a wake on activity; nil: none is told.
 	Activity func(ctx context.Context, id task.ID) error
+	// Survives picks the task a merge keeps, as the merge verb's survivor says; nil: the older stays.
+	Survives Survives
+	// GateText words the gate a gated verb opens; nil writes none.
+	GateText GateText
+	// TakenApart holds the pairs the user took apart; nil holds none.
+	TakenApart TakenApart
 }
 
 type handlerKey struct {
@@ -93,6 +100,7 @@ func New(d Deps) *Service {
 	if s.authority == nil {
 		s.authority = userOnly
 	}
+	s.serveMerges()
 	return s
 }
 
@@ -189,6 +197,9 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 	if err != nil {
 		return e, Result{}, err
 	}
+	if req, err = s.Addressed(ctx, id, e, req); err != nil {
+		return e, Result{}, err
+	}
 	enabled := map[unit.Unit]bool{}
 	if err := s.writable(ctx, e, enabled); err != nil {
 		if s.d.States.Handler(string(req.Verb)) != HandlerDrop || !errors.Is(err, ErrPluginDisabled) {
@@ -217,6 +228,30 @@ func (s *Service) do(ctx context.Context, id task.ID, req Request) (task.Task, R
 	}
 	prev, next, err := s.change(ctx, id, req)
 	return prev, Result{Task: next}, err
+}
+
+// Addressed is req as it may run on e, the task id reads as: a verb sent to the id of a task merged into e is
+// refused with ErrMerged, but split, which splits that task out when it names no other task; a verb sent to e's own
+// id, or to an id an older alias leads to, runs as sent.
+func (s *Service) Addressed(ctx context.Context, id task.ID, e task.Task, req Request) (Request, error) {
+	if e.ID == id {
+		return req, nil
+	}
+	r, merged, err := s.MergeOf(ctx, id)
+	if err != nil || !merged {
+		return req, err
+	}
+	if other := req.Args[task.ArgTask]; s.d.States.Handler(string(req.Verb)) != HandlerSplit || other != "" && other != string(id) {
+		return req, fmt.Errorf("%w: %s was merged into %s; %s runs on %s", ErrMerged, id, r.Into, req.Verb, e.ID)
+	}
+	if req.Args[task.ArgTask] == "" {
+		req.Args = maps.Clone(req.Args)
+		if req.Args == nil {
+			req.Args = map[string]string{}
+		}
+		req.Args[task.ArgTask] = string(id)
+	}
+	return req, nil
 }
 
 // change applies req.Verb's state change to task id under the lock, returning the task before and after it.
@@ -513,7 +548,14 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 		return Result{}, fmt.Errorf("%w: %s opens a gate, and no gates are served", ErrVerb, req.Verb)
 	}
 	g, _ := s.d.States.Gate(string(req.Verb))
-	subject, err := json.Marshal(proposal{Verb: req.Verb, Args: req.Args})
+	p := proposal{Verb: req.Verb, Args: req.Args}
+	if req.Actor == task.ActorWorkflow {
+		p.From = req.Source
+		if req.Chain.Depth > 0 {
+			p.Chain = &req.Chain
+		}
+	}
+	subject, err := json.Marshal(p)
 	if err != nil {
 		return Result{}, err
 	}
@@ -522,13 +564,65 @@ func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error
 	if err != nil {
 		return Result{}, err
 	}
-	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && o.Subject == g.Subject }) {
+	if slices.ContainsFunc(held, func(o gate.Gate) bool { return o.Status == gate.Open && o.Name == g.Name && sameProposal(o, p) }) {
 		return Result{Task: e}, nil
 	}
-	if _, err := s.d.Gates.Open(ctx, g); err != nil {
+	if other := task.ID(req.Args[task.ArgTask]); other != "" {
+		theirs, err := s.d.Gates.OfTask(ctx, other)
+		if err != nil {
+			return Result{}, err
+		}
+		if slices.ContainsFunc(theirs, func(o gate.Gate) bool {
+			return o.Status == gate.Open && o.Name == g.Name && proposes(o, req.Verb, e.ID)
+		}) {
+			return Result{Task: e}, nil
+		}
+	}
+	if s.d.GateText != nil {
+		w, err := s.gateWords(ctx, e, req)
+		if err != nil {
+			return Result{}, err
+		}
+		if g.Text, err = s.d.GateText(ctx, g, w); err != nil {
+			return Result{}, err
+		}
+	}
+	wait, err := s.pairTakenApart(ctx, e, task.ID(req.Args[task.ArgTask]))
+	if err != nil {
+		return Result{}, err
+	}
+	if _, err := s.d.Gates.Open(ctx, g, wait); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: e}, nil
+}
+
+// gateWords are what the words of the gate req's verb opens on e read.
+func (s *Service) gateWords(ctx context.Context, e task.Task, req Request) (GateWords, error) {
+	w := GateWords{Verb: string(req.Verb), Task: e}
+	id := req.Args[task.ArgTask]
+	if id == "" {
+		return w, nil
+	}
+	o, err := s.d.Store.Task(ctx, task.ID(id))
+	if err != nil {
+		return GateWords{}, err
+	}
+	w.Other = o
+	if s.d.States.Handler(string(req.Verb)) == HandlerMerge {
+		if w.Keep, w.Fold, err = s.survivor(ctx, req.Verb, e, o); err != nil {
+			return GateWords{}, err
+		}
+	}
+	return w, nil
+}
+
+// pairTakenApart says whether the user took e and other apart, so a gate proposing the pair waits for them.
+func (s *Service) pairTakenApart(ctx context.Context, e task.Task, other task.ID) (bool, error) {
+	if other == "" || s.d.TakenApart == nil {
+		return false, nil
+	}
+	return s.d.TakenApart(ctx, e, other)
 }
 
 // Allowed says whether req's actor may run req's verb on t, and whether running it opens the verb's gate
@@ -552,23 +646,82 @@ func (s *Service) Allowed(ctx context.Context, t task.Task, req Request) (gated 
 	if g.Status != gate.Approved || g.Task != t.ID || !ok || p.Verb != req.Verb {
 		return false, fmt.Errorf("%w: gate %d does not approve %s on %s", ErrForbidden, req.Approved, req.Verb, t.ID)
 	}
+	if own, isTask := task.IDOf(g.Unit); isTask && own != t.ID {
+		return false, fmt.Errorf("%w: gate %d proposed %s on %s, which was merged into %s since", ErrForbidden, req.Approved, req.Verb, own, t.ID)
+	}
+	if other := task.ID(p.Args[task.ArgTask]); other != "" {
+		o, err := s.d.Store.Task(ctx, other)
+		if err != nil && !errors.Is(err, ErrNoTask) {
+			return false, err
+		}
+		if err != nil || o.ID != other || req.Args[task.ArgTask] != string(other) {
+			return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair that changed since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
+		}
+		if req.Actor != task.ActorPerson {
+			apart, err := s.pairTakenApart(ctx, t, other)
+			if err != nil {
+				return false, err
+			}
+			if apart {
+				return false, fmt.Errorf("%w: gate %d proposed %s of %s and %s, a pair you took apart since", ErrForbidden, req.Approved, req.Verb, t.ID, other)
+			}
+		}
+	}
 	return false, nil
 }
 
-// proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it.
-type proposal struct {
-	Verb task.Verb         `json:"verb"`
-	Args map[string]string `json:"args,omitempty"`
+// proposes says whether gate g proposes verb with the other task id.
+func proposes(g gate.Gate, verb task.Verb, id task.ID) bool {
+	p, ok := ProposedVerb(g)
+	return ok && p.Verb == verb && p.Args[task.ArgTask] == string(id)
 }
 
-// ProposedVerb is the request a gate a gated verb opened proposes, run as the person who approved it: Do runs
-// it once the gate is approved, without the verb's by; false for a gate no verb opened.
-func ProposedVerb(g gate.Gate) (Request, bool) {
+// sameProposal says whether gate g proposes p's verb with p's arguments, whoever asked for it.
+func sameProposal(g gate.Gate, p proposal) bool {
+	o, ok := proposalOf(g)
+	return ok && o.Verb == p.Verb && maps.Equal(o.Args, p.Args)
+}
+
+// proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it, and the workflow that
+// asked for it, "" for a person or an agent, with the chain of workflows that led it there.
+type proposal struct {
+	Verb  task.Verb         `json:"verb"`
+	Args  map[string]string `json:"args,omitempty"`
+	From  string            `json:"from,omitempty"`
+	Chain *workflow.Chain   `json:"chain,omitempty"`
+}
+
+func proposalOf(g gate.Gate) (proposal, bool) {
 	var p proposal
 	if json.Unmarshal([]byte(g.Subject), &p) != nil || p.Verb == "" {
+		return proposal{}, false
+	}
+	return p, true
+}
+
+// ProposedVerb is the request a gate a gated verb opened proposes: Do runs it once the gate is approved,
+// without the verb's by, as the person who approved it, or as the workflow that asked for it when a rule
+// or a window released the gate; false for a gate no verb opened.
+func ProposedVerb(g gate.Gate) (Request, bool) {
+	p, ok := proposalOf(g)
+	if !ok {
 		return Request{}, false
 	}
+	if g.Rule != "" && p.From != "" {
+		req := Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorWorkflow, Source: p.From, Approved: g.ID}
+		if p.Chain != nil {
+			req.Chain = *p.Chain
+		}
+		return req, true
+	}
 	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate", Approved: g.ID}, true
+}
+
+// ProposalFrom is the workflow that asked for the verb gate g proposes, "" when a person or an agent did or
+// no verb opened g.
+func ProposalFrom(g gate.Gate) string {
+	p, _ := proposalOf(g)
+	return p.From
 }
 
 // writable refuses a task with a unit whose plugin is disabled; ok caches the answers per unit.
@@ -625,10 +778,16 @@ func (s *Service) create(ctx context.Context, title, notes string, u *unit.Unit,
 	}
 	e.SetRole(s.d.States, task.RoleContexts, task.Value{List: slices.Clone(contexts)}, task.WriterPlugin, now)
 	e.SetProp(task.PropKind, task.Value{Text: kind}, task.WriterPlugin, now)
+	cs := []task.Change{{Op: task.OpCreate, Task: e, Why: string(origin)}}
+	var evs []port.Event
 	if u != nil && !u.IsZero() {
 		e.Units = []unit.Unit{*u}
+		cs[0].Task = e
+		if origin == task.OriginUser {
+			evs = createdEvents(cs, now)
+		}
 	}
-	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e, Why: string(origin)}}); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, evs...); err != nil {
 		return task.Task{}, err
 	}
 	return e, nil
@@ -813,7 +972,7 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 			return nil, err
 		}
 		if len(cs) > 0 {
-			if err := s.d.Store.Apply(ctx, cs); err != nil {
+			if err := s.d.Store.Apply(ctx, cs, createdEvents(cs, now)...); err != nil {
 				return nil, err
 			}
 		}
@@ -935,7 +1094,7 @@ func Ended(e task.Task, err error) (bool, error) {
 	return err == nil && !e.Open(), err
 }
 
-// HeldOpen are the open tasks opened only to hold gates.
+// HeldOpen are the open tasks held only for gates (heldOnly).
 func (s *Service) HeldOpen(ctx context.Context) ([]task.ID, error) {
 	es, err := s.d.Store.Tasks(ctx, task.Query{})
 	if err != nil {
@@ -943,17 +1102,22 @@ func (s *Service) HeldOpen(ctx context.Context) ([]task.ID, error) {
 	}
 	var out []task.ID
 	for _, e := range es {
-		if e.Origin == task.OriginGate && e.Open() {
+		if s.heldOnly(e) {
 			out = append(out, e.ID)
 		}
 	}
 	return out, nil
 }
 
-// EndHeld closes task id, opened only to hold gates, into category c; a task of another origin, or one closed
-// already, is left as it is.
+// EndHeld closes task id, held only for gates (heldOnly), into category c; any other task is left as it is.
 func (s *Service) EndHeld(ctx context.Context, id task.ID, c task.Category) error {
-	return s.close(ctx, id, c, func(e task.Task) bool { return e.Origin == task.OriginGate && e.Open() })
+	return s.close(ctx, id, c, s.heldOnly)
+}
+
+// heldOnly says whether e is open and held only for gates: opened to hold one, with no open item and no task
+// merged into it.
+func (s *Service) heldOnly(e task.Task) bool {
+	return e.Origin == task.OriginGate && e.Open() && len(e.Items) == 0 && len(e.Role(s.d.States, task.RoleMerged).List) == 0
 }
 
 // UnitClosed ends the open tasks that hold u, its closure posted: each moves into the done category.

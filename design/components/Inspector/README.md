@@ -10,12 +10,16 @@ The task's page in the detail panel: everything about one task, in one column, i
 6. **Timeline**: TimelineRows as a chat, oldest first, with the kind chips.
 7. **Composer**: a box with **Send** (`primary`, to the task's agent) and **Save as draft** beside it (a reply held in the Outbox).
 8. **Children**: the child tasks, each with its state pill.
+9. **Related**: the related tasks, each with its state pill and the verb that takes the link off (`act`, named with the verb and the task's title).
+10. **Merged from**: the tasks merged into this one, each with its state pill and the verb that splits it back; a task merged into that one before sits under it in a nested `d-tasks`, with no verb, as it comes back with it.
 
 A section with nothing to show is left out, so a fresh task reads as a header and a composer.
 
 ## Consumer provides
-The task with its properties, links, asks, brief, gates, runs and children; the catalog's states and properties to word them; the timeline's events.
+The task with its properties, links, asks, brief, gates, runs, children, related tasks and merged-from trace; the catalog's states and properties to word them; the timeline's events.
 
 ## Do / don't
 - Do word states, properties, verbs and intents from the catalog; the client names none of them.
 - Don't add a section per kind of gate or per intent: gates and runs each have one card.
+- Do put a verb that picks from the merged or related tasks on each of their rows, never in the header; the header's verbs that take another task open the palette over the open tasks.
+- Don't list the related or merged property as text among the `d-props`: their sections show them as tasks.

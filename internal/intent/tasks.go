@@ -44,6 +44,9 @@ type VerbText struct {
 	// KeepDrafts are the purposes of the held drafts a task keeps when the verb ends it; the others are
 	// withdrawn.
 	KeepDrafts []string
+	// Survivor, on a merge, is the predicate over each task's facts (SurvivorEnv) that names the one that
+	// stays; nil when the verb sets none.
+	Survivor workflow.Predicate
 }
 
 // TasksDef is the profile's tasks.toml over every layer. Props and States
@@ -69,7 +72,9 @@ type TasksDef struct {
 	ChatAt dintent.Pos
 	// ViaSession names a change an agent made for the user through a session they drove; {session} is the
 	// session's id.
-	ViaSession       string
+	ViaSession string
+	// ViaWorkflow names a change a workflow made; {workflow} is the workflow's name.
+	ViaWorkflow      string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -353,6 +358,7 @@ type mVerbText struct {
 	Handler    *string           `toml:"handler"`
 	Send       *string           `toml:"send"`
 	KeepDrafts []string          `toml:"keep_drafts"`
+	Survivor   *string           `toml:"survivor"`
 }
 
 type mProp struct {
@@ -377,7 +383,8 @@ type mChat struct {
 }
 
 type mAttribution struct {
-	ViaSession *string `toml:"via_session"`
+	ViaSession  *string `toml:"via_session"`
+	ViaWorkflow *string `toml:"via_workflow"`
 }
 
 // ref is a name a file's key holds, checked once every layer is read.
@@ -394,7 +401,9 @@ type tasksLoad struct {
 	states map[string]ref
 	gates  map[string]ref
 	preds  map[string]ref
-	owed   *ref
+	// survivors are the verbs' survivor predicates, by path, compiled once every layer's properties are read.
+	survivors map[string]ref
+	owed      *ref
 	// roles are the file that gave each role its property: a later layer's moves it, one file gives it once.
 	roles map[task.Role]string
 }
@@ -409,7 +418,8 @@ func BundledTasks(bundled fs.FS) (TasksDef, Problems) {
 // states, its by keys actors, its gate one gates declares (nil gates checks
 // none), and its by predicates compile over the task's facts.
 func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef, Problems) {
-	l := &tasksLoad{def: TasksDef{Verbs: map[string]VerbText{}}, states: map[string]ref{}, gates: map[string]ref{}, preds: map[string]ref{}}
+	l := &tasksLoad{def: TasksDef{Verbs: map[string]VerbText{}}, states: map[string]ref{}, gates: map[string]ref{}, preds: map[string]ref{},
+		survivors: map[string]ref{}}
 	problems, read := readLayered(layers, bundled, TasksFile, l.merge)
 	if !read {
 		return l.def, problems
@@ -455,6 +465,7 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	}
 	if m.Attribution != nil {
 		text(s, "attribution.via_session", m.Attribution.ViaSession, &l.def.ViaSession)
+		text(s, "attribution.via_workflow", m.Attribution.ViaWorkflow, &l.def.ViaWorkflow)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)
@@ -514,6 +525,9 @@ func (l *tasksLoad) mergeProps(s *sheet, props map[string]mProp) {
 		}
 		if want, ok := task.RoleTypes[p.Role]; ok && p.Type != want {
 			s.add(path+".role", "%s acts on a property of type %s, not %s", p.Role, want, p.Type)
+		}
+		if slices.Contains(task.LoopRoles, p.Role) && len(p.Writers) > 0 {
+			s.add(path+".writers", "is refused: only the loop writes the property of role %s", p.Role)
 		}
 		if p.Role == task.RoleStar && len(p.Values) < 2 {
 			s.add(path+".role", "star toggles between the property's first two values; it has %d", len(p.Values))
@@ -621,6 +635,9 @@ func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
 		if t.KeepDrafts != nil {
 			w.KeepDrafts = slices.Clone(t.KeepDrafts)
 		}
+		if t.Survivor != nil {
+			l.survivors[path] = ref{s, path + ".survivor", *t.Survivor}
+		}
 		if w.Gate == "" && slices.Contains(slices.Collect(maps.Values(w.By)), "gate") {
 			s.add(path+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
 		}
@@ -702,6 +719,22 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 		}
 		l.def.Owed = prog
 	}
+	survivors := SurvivorEnv(l.def)
+	for _, path := range slices.Sorted(maps.Keys(l.survivors)) {
+		r := l.survivors[path]
+		pred, err := expr.CompileWorkflow(r.name, survivors)
+		if err != nil {
+			msg, snippet := exprMsg(err)
+			p := r.s.problem(r.path, "%s", msg)
+			p.Snippet = snippet
+			out = append(out, p)
+			continue
+		}
+		id := strings.TrimPrefix(path, "verbs.")
+		v := l.def.Verbs[id]
+		v.Survivor = pred
+		l.def.Verbs[id] = v
+	}
 	env := ByEnv(l.def)
 	for _, at := range slices.Sorted(maps.Keys(l.preds)) {
 		r := l.preds[at]
@@ -741,6 +774,25 @@ func OwedByEnv(d TasksDef) expr.Env {
 	for _, name := range OwedFacts {
 		delete(env, name)
 	}
+	maps.Copy(env, d.Facts())
+	return env
+}
+
+// ShapingVerbs are d's verbs that shape a task by hand, which task.clarified reads: those whose move has a
+// state to go to, and those whose handler files the task under a project, in name order.
+func (d TasksDef) ShapingVerbs() []string {
+	var out []string
+	for _, v := range slices.Sorted(maps.Keys(d.Verbs)) {
+		if _, to, ok := d.Move(v); ok && to != "" || d.Handler(v) == builtin.HandlerProject {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// SurvivorEnv is the env a verb's survivor compiles over: the task's workflow facts and d's properties.
+func SurvivorEnv(d TasksDef) expr.Env {
+	env := builtin.WorkflowEnv(builtin.TaskSlot)
 	maps.Copy(env, d.Facts())
 	return env
 }

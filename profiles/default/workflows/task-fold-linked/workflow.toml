@@ -1,0 +1,16 @@
+summary = "Merge a task into the task of the one pull request its items' review or merge links target, such as a Slack ask to review it, when it holds no pull request of its own"
+provider = "task"
+when = '!("pull-request" in task.unit_kinds) && size(task.link_target_units) == 1 && size(task.link_target_tasks) == 1'
+key = ["task.fingerprint", "task.items_changed_at", "task.link_target_tasks", "task.link_target_units"]
+order = 60
+
+[[step]]
+use = "task.verb"
+verb = "merge"
+task = "task.link_target_tasks"
+
+# A link to the pull request is enough: the merge runs at once, and Split
+# gives it back. A pair you took apart waits for you instead.
+[[gates.approval.rule]]
+when = 'gate.kind == "proposal" && gate.name == "merge"'
+mode = "run"

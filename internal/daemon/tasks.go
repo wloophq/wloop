@@ -105,7 +105,7 @@ func writeTasksError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, coretasks.ErrForbidden):
 		writeError(w, http.StatusForbidden, err.Error())
-	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed),
+	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrMerged), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed),
 		errors.Is(err, messages.ErrNotApplied):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
@@ -151,7 +151,8 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 	for _, v := range s.verbOrder() {
 		t, b := l.Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
 		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: l.Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
-			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Key: verbKey(task.Verb(v)), From: slices.Clone(t.From), To: t.To})
+			Input: cmp.Or(t.Input, b.Input), Send: s.replySend(v), Pick: builtin.TaskPicks[l.Tasks.Handler(v)], Key: verbKey(task.Verb(v)), From: slices.Clone(t.From),
+			To: t.To})
 	}
 	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
 	cat.Version = api.VersionOf(cat)
@@ -175,6 +176,10 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
+	if q.Has(api.TasksMatch) {
+		s.handleMatch(w, r, g, q.Get(api.TasksMatch), task.ID(q.Get(api.TasksExcept)))
+		return
+	}
 	view := task.View(q.Get("view"))
 	since, err := api.ParseSince(q.Get("since"))
 	if err != nil {
@@ -310,12 +315,23 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	e, err := g.Task(ctx, task.ID(r.PathValue("id")))
+	id := task.ID(r.PathValue("id"))
+	e, err := g.Task(ctx, id)
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	v := task.Verb(verb)
+	creq, err := g.Addressed(ctx, id, e, q.task(coretasks.Request{Verb: v, Args: req.Args, Source: req.Source}))
+	if errors.Is(err, coretasks.ErrMerged) {
+		writeError(w, http.StatusConflict, s.notice(builtin.NoticeTaskMerged, map[string]any{"Task": string(id), "Into": string(e.ID), "Verb": verb}))
+		return
+	}
+	if err != nil {
+		writeTasksError(w, err)
+		return
+	}
+	req.Args = creq.Args
 	if !offers(s.loaded().Tasks.Verbs, e, v) {
 		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this task: the profile's tasks.toml says where it is", v))
 		return
@@ -835,6 +851,8 @@ type taskViewer struct {
 	// snapshot.
 	rows map[unit.Unit]readmodel.Read
 	read map[unit.Unit]bool
+	// refs are the tasks a listed id reads as, the page's own and each one read once; ok false for none.
+	refs map[task.ID]taskRef
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -902,6 +920,12 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.childrenOf(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	if err := ev.relatedOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
+	if err := ev.mergedFromOf(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
 	if err := ev.row(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
@@ -938,7 +962,8 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 }
 
 // brief sets the task's brief record: its own, or the first of its units', as a pull request task's is
-// its pull request's. A detail reads its task's; a page reads every brief once.
+// its pull request's. A detail reads its task's, then those of the tasks merged into it; a page reads every
+// brief once, and its units' only.
 func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if ev.s.deps.TaskRecords == nil {
 		return nil
@@ -946,8 +971,11 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 	var rec port.Event
 	var ok bool
 	if ev.detail {
-		var err error
-		if rec, ok, err = timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, e.Units); err != nil {
+		held, err := timeline.HeldOf(ctx, ev.s.deps.TaskRecords, e)
+		if err != nil {
+			return err
+		}
+		if rec, ok, err = timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, held); err != nil {
 			return err
 		}
 	} else {
@@ -990,8 +1018,10 @@ func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) 
 	}
 }
 
-// readRows reads the rows of the units of es in one snapshot, for their views.
+// readRows reads the rows of the units of es in one snapshot, for their views, and keeps es for their related
+// lists (knowTasks).
 func (ev *taskViewer) readRows(ctx context.Context, es []task.Task) {
+	ev.knowTasks(es)
 	var units []unit.Unit
 	for _, e := range es {
 		units = append(units, e.Units...)
@@ -1205,11 +1235,14 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 			continue
 		}
 		st := api.VerbState{Verb: name}
+		none := ev.nothingToPick(e, verb)
 		switch {
 		case off != "" && ev.s.handlerOf(verb) != handlerDrop:
 			st.Reason = off
 		case ev.resolvesGate(ctx, e, verb):
 			st.Enabled = true
+		case none != "":
+			st.Reason = none
 		case ev.g.Handles(e, verb):
 			st.Enabled = true
 		case ev.s.replies(verb):
@@ -1235,6 +1268,18 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 		out = append(out, st)
 	}
 	return out
+}
+
+// nothingToPick is why verb, picking from a list of e's (builtin.PickRoles), has no task to pick on e; "" when
+// it has one or picks from elsewhere.
+func (ev *taskViewer) nothingToPick(e task.Task, verb task.Verb) string {
+	tasks := ev.s.loaded().Tasks
+	pick := builtin.TaskPicks[tasks.Handler(string(verb))]
+	role, ok := builtin.PickRoles[pick]
+	if !ok || len(e.Role(tasks, role).List) > 0 {
+		return ""
+	}
+	return ev.s.notice(builtin.NoticeNothingToPick, map[string]any{"Verb": string(verb), "Pick": pick})
 }
 
 // syncTasks runs Sync once per burst of item, source-event, card and gate notes, on its own goroutine, until ctx

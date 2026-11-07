@@ -22,7 +22,7 @@ func heldRig(t *testing.T) (*rig, *gatestest.Store) {
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	gs.Holding = []gate.Kind{gate.KindQuestion}
 	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, States: taskstest.BundledStates,
-		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Gates: gs})
+		Authority: taskstest.BundledStates.Authority, Wakes: r.wakes, Gates: gatestest.TaskGates{Store: gs}})
 	return r, gs
 }
 

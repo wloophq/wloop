@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/pkg/plugin/evalout"
 	"github.com/wloophq/wloop/plugins/slack/eval"
 	"github.com/wloophq/wloop/plugins/slack/extract"
 	"github.com/wloophq/wloop/plugins/slack/host"
@@ -68,35 +68,6 @@ func (e evalEnv) evalFlags(name string) *flag.FlagSet {
 	return fs
 }
 
-// outsideRepository refuses a path inside a git checkout, so real Slack
-// content never lands where it could be committed.
-func outsideRepository(flagName, path string) error {
-	if path == "" {
-		return fmt.Errorf("--%s is required", flagName)
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	for dir, rest := abs, ""; ; dir, rest = filepath.Dir(dir), filepath.Join(filepath.Base(dir), rest) {
-		if real, err := filepath.EvalSymlinks(dir); err == nil {
-			abs = filepath.Join(real, rest)
-			break
-		}
-		if filepath.Dir(dir) == dir {
-			break
-		}
-	}
-	for dir := abs; ; dir = filepath.Dir(dir) {
-		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
-			return fmt.Errorf("--%s %s is inside the git checkout %s; write eval outputs outside any repository", flagName, abs, dir)
-		}
-		if filepath.Dir(dir) == dir {
-			return nil
-		}
-	}
-}
-
 func (e evalEnv) evalNow() time.Time { return e.p.now() }
 
 func (e evalEnv) slackEvalExport(ctx context.Context, args []string) error {
@@ -109,7 +80,7 @@ func (e evalEnv) slackEvalExport(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if err := outsideRepository("out", *out); err != nil {
+	if err := evalout.OutsideRepository("out", *out); err != nil {
 		return err
 	}
 	from, err := time.ParseInLocation(time.DateOnly, *since, time.Local)
@@ -159,7 +130,7 @@ func (e evalEnv) slackEvalRun(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if err := outsideRepository("out", *out); err != nil {
+	if err := evalout.OutsideRepository("out", *out); err != nil {
 		return err
 	}
 	if *split != "all" && *split != eval.SplitDev && *split != eval.SplitHoldout {
@@ -227,7 +198,7 @@ func (e evalEnv) slackEvalScore(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if err := outsideRepository("out", *out); err != nil {
+	if err := evalout.OutsideRepository("out", *out); err != nil {
 		return err
 	}
 	if *label == "" {
@@ -255,10 +226,10 @@ func (e evalEnv) slackEvalOptimize(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if err := outsideRepository("out", *out); err != nil {
+	if err := evalout.OutsideRepository("out", *out); err != nil {
 		return err
 	}
-	if err := outsideRepository("new", *newFile); err != nil {
+	if err := evalout.OutsideRepository("new", *newFile); err != nil {
 		return err
 	}
 	if *label == "" || *promptFile == "" {

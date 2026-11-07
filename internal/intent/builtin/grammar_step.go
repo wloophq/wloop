@@ -26,6 +26,7 @@ var stepGrammar = []Key{
 
 	stepKey(StepClassify, "prompt", KindFile, "prompt.md", "The classification's prompt, beside the manifest."),
 	stepKey(StepClassify, "schema", KindFile, "schema.json", "The JSON schema of its answer, beside the manifest."),
+	stepKey(StepClassify, "with", KindText, "", "A list fact of task ids, such as task.candidates, whose tasks the prompt reads beside the unit: the prompt is then a template over .Facts, the unit's facts, .Task, the unit's own task when it is one, and .Tasks, the listed tasks in order, each with .ID, .Title, .Notes and .Items, a few of its items' summaries. Every untrusted value is inside this call's markers, .Begin and .End, which carry the code .Nonce. The output is cached by what the prompt reads of the unit's task and the listed tasks (ids, titles, notes, item summaries) and by the prompt and the schema, so a write that changes none of them, such as opening a task, keeps it, and an edit of the prompt or the schema asks again; the unit's facts a prompt prints through .Facts are not part of the key, and with a unit that is not a task the key holds the unit's fingerprint too. Only a reader that names it reads it. An empty list runs nothing."),
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 
@@ -36,6 +37,8 @@ var stepGrammar = []Key{
 	stepKey(StepTaskVerb, "resurface", KindText, "", "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
 	stepKey(StepTaskVerb, "set", KindText, "", "With a verb whose handler is context, the contexts, comma-separated; with area, the area."),
 	stepKey(StepTaskVerb, "by", KindText, "", "With a verb whose handler is promise, the time the task is promised by: HH:MM, YYYY-MM-DD or RFC 3339; empty clears it."),
+	stepKey(StepTaskVerb, "task", KindText, "", "With a verb whose handler is merge, split, relate or unrelate, the fact that names the other task: a string fact holding its id, or a list fact whose first element does, such as task.link_target_tasks, or a classify output, such as classify.<workflow>.task, which no fact table declares before it runs; the step is refused while it names none."),
+	stepKey(StepTaskVerb, "each", KindText, "", "With `task` naming a list fact, `true` runs the verb with every task the list names, in order, each opening its own gate where the verb is gated, so one that waits for you does not hold back the rest; else the verb runs with the first."),
 
 	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
 

@@ -414,7 +414,11 @@ func TestAnEnumWithoutValuesIsAProblem(t *testing.T) {
 
 func TestAnIntentRefuseReadsATaskProperty(t *testing.T) {
 	t.Parallel()
-	bundled := withChat(t, fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}})
+	gates, err := os.ReadFile("../../profiles/default/" + GatesFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundled := withChat(t, fstest.MapFS{TasksFile: {Data: []byte(defaultTasks(t))}, GatesFile: {Data: gates}})
 	for kind, want := range map[string]string{"project": "", "galaxy": "galaxy"} {
 		dir := t.TempDir()
 		refuse := "\n[[refuse]]\nwhen = 'task.prop.kind == \"" + kind + "\"'\nwhy = \"A project starts its children.\"\n"
@@ -464,5 +468,15 @@ func TestAUserLayerNamesTheDraftsAVerbKeeps(t *testing.T) {
 	}
 	if got := d.Verbs["dismiss"].KeepDrafts; got != nil {
 		t.Errorf("dismiss keeps %q, want none", got)
+	}
+}
+
+func TestNoWriterMayWriteTheMergedOrRelatedProperty(t *testing.T) {
+	t.Parallel()
+	for _, prop := range []string{"merged", "related"} {
+		src := "[props." + prop + "]\nwriters = [\"person\"]\n"
+		if _, problems := loadTasksWith(t, defaultTasks(t), src); !strings.Contains(problems, "props."+prop+".writers: is refused") {
+			t.Errorf("%s: problems %q", prop, problems)
+		}
 	}
 }

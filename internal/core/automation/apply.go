@@ -47,6 +47,7 @@ func (e *Engine) runItem(ctx context.Context, it workflow.Item, o RunOpts) (resu
 		return e.stopped(ctx, it, Transient{Err: fmt.Errorf("reading the owners of %s: %w", it.Unit.Label(), err)}, nil, now)
 	}
 	var evs []port.Event
+	ctx = workflow.WithReads(ctx, workflow.StepReads(it.Steps)...)
 	for i, st := range it.Steps {
 		detail, err := e.Steps.Run(ctx, st, it.Unit, it.Why, o)
 		if err == nil {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/catalog"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -67,11 +68,15 @@ func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
 // harness(o) returns { keys, log, press, tick }.
 const keysHarness = `
 function harness(o = {}) {
-  const log = { posts: [], nav: [], area: [], opened: [], moves: [], unit: [], plan: [], asked: [], left: 0, filter: 0, closed: 0, detail: 0, palette: null, help: null, hints: [], timers: [] };
+  const log = { posts: [], gets: [], nav: [], area: [], opened: [], moves: [], unit: [], plan: [], asked: [], left: 0, filter: 0, closed: 0, detail: 0, palette: null, help: null, hints: [], timers: [] };
   let t = 0;
   const env = {
     now: () => t,
-    fetch: async (url, init) => {
+    fetch: async (url, init = {}) => {
+      if (!init.method) {
+        log.gets.push(url);
+        return { ok: true, status: 200, json: async () => (o.get ? o.get(url) : {}) };
+      }
       log.posts.push({ url, body: JSON.parse(init.body), api: init.headers["X-Loop-API"] });
       return { ok: true, status: 200, json: async () => ({}) };
     },
@@ -149,7 +154,8 @@ func servedVerbs(t *testing.T) []string {
 	return slices.Sorted(maps.Keys(words.Verbs))
 }
 
-// servedVerbSpecs are the bundled verbs as the catalog serves them: their handler and the question they ask.
+// servedVerbSpecs are the bundled verbs as the catalog serves them: their handler, the question they ask and
+// the tasks they pick another task from.
 func servedVerbSpecs(t *testing.T) []api.VerbSpec {
 	t.Helper()
 	words, problems := intentload.BundledTasks(os.DirFS("../../profiles/default"))
@@ -158,7 +164,7 @@ func servedVerbSpecs(t *testing.T) []api.VerbSpec {
 	}
 	var out []api.VerbSpec
 	for _, v := range slices.Sorted(maps.Keys(words.Verbs)) {
-		out = append(out, api.VerbSpec{Verb: v, Handler: words.Handler(v), Label: words.Verbs[v].Label, Input: words.Verbs[v].Input})
+		out = append(out, api.VerbSpec{Verb: v, Handler: words.Handler(v), Label: words.Verbs[v].Label, Input: words.Verbs[v].Input, Pick: builtin.TaskPicks[words.Handler(v)]})
 	}
 	return out
 }

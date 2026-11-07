@@ -1,0 +1,33 @@
+{
+ "id": "06-slack-thread-and-own-pull-request",
+ "kind": "slack-pr",
+ "act": "merge",
+ "on": "t-0000000000006d38",
+ "task": {
+  "id": "t-0000000000006001",
+  "title": "acme/search#57: Fix pagination past page 10",
+  "notes": "Your pull request",
+  "items": [
+   "Judy requested changes: handle an empty last page"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000006003",
+   "title": "Search ranking for exact titles",
+   "notes": "#search thread",
+   "items": [
+    "Judy asks why exact title matches rank below partial ones"
+   ]
+  },
+  {
+   "id": "t-0000000000006d38",
+   "title": "Search pagination bug",
+   "notes": "#search thread",
+   "items": [
+    "Judy reports that search results stop after page 10 and asks you to fix it",
+    "You said a fix is up in acme/search#57"
+   ]
+  }
+ ]
+}

@@ -100,6 +100,13 @@ type Deps struct {
 	Extraction func(ctx context.Context, units []unit.Unit) (time.Time, error)
 	// RoleProp is the property role r acts on, "" for none; nil: none.
 	RoleProp func(r task.Role) string
+	// UnitKind is the kind the plugin of p gives the tasks of its units, for task.unit_kinds; nil or "": none.
+	UnitKind func(p unit.ProviderID) string
+	// Clarity, Candidates and Refusals are what task.clarified, task.candidates and task.link_target_tasks,
+	// and task.refused_pairs and task.undone read.
+	Clarity    ClarityDeps
+	Candidates CandidateDeps
+	Refusals   RefusalDeps
 }
 
 // Link is what the facts read of one unit a task links.
@@ -241,7 +248,11 @@ func (p *Provider) TaskFacts(ctx context.Context, e task.Task) (workflow.Facts, 
 		}
 		return p.owed(ctx, e, f)
 	})
-	return maps.Clone(f), err
+	if err != nil {
+		return nil, err
+	}
+	out := maps.Clone(f)
+	return out, p.costlyFacts(ctx, e, out)
 }
 
 func fingerprint(e task.Task) string {
@@ -262,6 +273,13 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	return p.TaskFacts(ctx, e)
 }
 
+func (p *Provider) unitKind(pr unit.ProviderID) string {
+	if p.d.UnitKind == nil {
+		return ""
+	}
+	return p.d.UnitKind(pr)
+}
+
 func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error) {
 	f := workflow.Facts{
 		"task.id":                  string(e.ID),
@@ -270,6 +288,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.unit_provider":       "",
 		"task.units":               []string{},
 		"task.unit_providers":      []string{},
+		"task.unit_kinds":          []string{},
 		"task.link_ended":          false,
 		"task.captured_by_user":    e.CapturedByUser(),
 		"task.turns":               0,
@@ -277,6 +296,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.link_closure_posted": false,
 		"task.items_open":          0,
 		"task.items_resolved":      0,
+		"task.items_changed_at":    time.Time{},
 		"task.settled_at":          time.Time{},
 		"task.fingerprint":         fingerprint(e),
 		"task.category":            string(e.Category),
@@ -304,6 +324,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.extraction_lag":      time.Duration(0),
 		"task.link_owes":           []string{},
 		"task.link_signals":        []string{},
+		"task.title":               e.Title,
+		"task.notes":               e.Notes,
+	}
+	if err := p.mergeFacts(ctx, e, f); err != nil {
+		return nil, err
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false
@@ -360,14 +385,17 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	eu := us[0]
 	f["task.unit"], f["task.unit_provider"] = eu.String(), string(eu.Provider)
-	names, providers := make([]string, len(us)), []string{}
+	names, providers, kinds := make([]string, len(us)), []string{}, []string{}
 	for i, u := range us {
 		names[i] = u.String()
 		if !slices.Contains(providers, string(u.Provider)) {
 			providers = append(providers, string(u.Provider))
 		}
+		if k := p.unitKind(u.Provider); k != "" && !slices.Contains(kinds, k) {
+			kinds = append(kinds, k)
+		}
 	}
-	f["task.units"], f["task.unit_providers"] = names, providers
+	f["task.units"], f["task.unit_providers"], f["task.unit_kinds"] = names, providers, kinds
 	ended, err := p.ended(ctx, e, us)
 	if err != nil {
 		return nil, err
@@ -398,6 +426,15 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		}
 	}
 	f["task.items_open"], f["task.items_resolved"] = open, resolved
+	var changed time.Time
+	for _, it := range heldItems(e, got) {
+		for _, at := range []time.Time{it.CreatedAt, it.UpdatedAt} {
+			if at.After(changed) {
+				changed = at
+			}
+		}
+	}
+	f["task.items_changed_at"] = changed
 	f["task.link_owes"] = p.linkOwes(e, us, got)
 	f["task.ask_age"], f["task.askers"], f["task.asker_names"] = p.asks(e, us, got)
 	if p.d.Extraction != nil {

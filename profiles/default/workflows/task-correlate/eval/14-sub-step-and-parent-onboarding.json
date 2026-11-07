@@ -1,0 +1,32 @@
+{
+ "id": "14-sub-step-and-parent-onboarding",
+ "kind": "sub-step",
+ "act": "relate",
+ "on": "t-000000000000e002",
+ "task": {
+  "id": "t-000000000000e001",
+  "title": "Create Tara's laptop account",
+  "notes": "#it-requests",
+  "items": [
+   "Uma asks for a laptop account for the new hire Tara"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000e002",
+   "title": "Onboard Tara",
+   "notes": "DM with Uma",
+   "items": [
+    "Uma asks you to run Tara's onboarding: accounts, access, buddy and first tasks"
+   ]
+  },
+  {
+   "id": "t-000000000000e003",
+   "title": "Create Victor's laptop account",
+   "notes": "#it-requests",
+   "items": [
+    "Uma asks for a laptop account for Victor"
+   ]
+  }
+ ]
+}

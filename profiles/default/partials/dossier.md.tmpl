@@ -15,4 +15,12 @@ the dossier after the turn and restores any other change.
 This session started before the dossier was granted to it: the path is
 reachable on its next launch. Write nothing there in this turn.
 {{- end}}
+{{- with .Merged}}
+
+The tasks merged into this work keep their own dossiers, which you may read
+and never write:
+{{range .}}
+- `{{.}}`
+{{- end}}
+{{- end}}
 {{end}}{{end}}

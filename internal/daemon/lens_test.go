@@ -68,7 +68,8 @@ func countedLensFacts(db *sqlite.DB, loaded func() *intentload.Loaded, now time.
 		RoleProp: func(r task.Role) string {
 			name, _ := loaded().Tasks.PropOf(r)
 			return name
-		}})
+		},
+		Clarity: facttask.ClarityDeps{Shaping: func() []string { return loaded().Tasks.ShapingVerbs() }, ByHand: db.TasksRunByHand}})
 	return func(ctx context.Context, t task.Task) (workflow.Facts, error) {
 		read := func() (workflow.Facts, error) {
 			reads.Add(1)

@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	reads = append(reads, "DB.Links", "DB.LinkTargets", "linkStore.From", "linkStore.To")
+	reads = append(reads, "DB.Links", "DB.LinkTargets", "DB.LinksFrom", "linkStore.From", "linkStore.To")
 	writes = append(writes,
 		writeCase{
 			method: "linkStore.ReplaceFacts",
@@ -42,6 +42,8 @@ func init() {
 		hotPlan{name: "links from a unit", query: linksFromSQL, args: 2, want: []string{"SEARCH links USING PRIMARY KEY (provider=? AND unit_key=?)"},
 			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 		hotPlan{name: "links to units", query: linksToSQL, args: 1, want: []string{"SEARCH links USING INDEX links_to (to_provider=? AND to_key=?)"},
+			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+		hotPlan{name: "links from units", query: linksFromUnitsSQL, args: 1, want: []string{"SEARCH links USING PRIMARY KEY (provider=? AND unit_key=?)"},
 			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 		hotPlan{name: "link targets", query: linkTargetsSQL, args: 0, want: []string{"links USING COVERING INDEX links_to"}},
 	)
@@ -133,6 +135,29 @@ func TestLinksTo(t *testing.T) {
 	sameLinks(t, got, []link.Link{c, b, a})
 	if got, err := db.Links().To(ctx, nil); err != nil || len(got) != 0 {
 		t.Fatalf("To(nil) = %v %v", got, err)
+	}
+}
+
+func TestLinksFromUnits(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	ctx := context.Background()
+	a := sampleLink(linkThread2, linkPull, link.Extraction, noteAt)
+	b := sampleLink(linkThread, linkPull, link.Extraction, noteAt.Add(2*time.Hour))
+	c := sampleLink(linkThread, linkPull2, link.User, noteAt.Add(time.Hour))
+	other := sampleLink(unit.Unit{Provider: "slack", Key: "C000AAA/3.3"}, linkPull, link.Extraction, noteAt)
+	for _, l := range []link.Link{a, b, c, other} {
+		if err := db.Links().Put(ctx, l); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := db.LinksFrom(ctx, []unit.Unit{linkThread, linkThread2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sameLinks(t, got, []link.Link{c, b, a})
+	if got, err := db.LinksFrom(ctx, nil); err != nil || len(got) != 0 {
+		t.Fatalf("LinksFrom(nil) = %v %v", got, err)
 	}
 }
 

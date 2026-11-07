@@ -111,7 +111,7 @@ func TestAGatedDelegateOnABridgedTaskOpensTheGateAndRunsNothing(t *testing.T) {
 	c := newCatalogRig(t)
 	store, gs := taskstest.New(), gatestest.NewStore(func() time.Time { return catalogNow })
 	states := gatingStates{States: taskstest.BundledStates, verb: task.VerbDelegate}
-	c.s.deps.Tasks = coretasks.New(coretasks.Deps{States: states, Authority: states.Authority, Gates: gs, Store: store,
+	c.s.deps.Tasks = coretasks.New(coretasks.Deps{States: states, Authority: states.Authority, Gates: gatestest.TaskGates{Store: gs}, Store: store,
 		Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
 	e := task.Task{ID: "t-r", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived,
 		Created: catalogNow, Updated: catalogNow}

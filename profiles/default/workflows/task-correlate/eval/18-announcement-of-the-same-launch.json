@@ -1,0 +1,24 @@
+{
+ "id": "18-announcement-of-the-same-launch",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-0000000000012002",
+ "task": {
+  "id": "t-0000000000012001",
+  "title": "Draft the changelog post for the export feature",
+  "notes": "DM with Rosa",
+  "items": [
+   "Rosa asks you to draft the changelog post announcing CSV export"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000012002",
+   "title": "Ship CSV export",
+   "notes": "#product",
+   "items": [
+    "Rosa asks you to ship CSV export to all workspaces next week"
+   ]
+  }
+ ]
+}

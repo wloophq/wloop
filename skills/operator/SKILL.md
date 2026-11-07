@@ -32,6 +32,7 @@ rounds. This session only drives the CLI: never review the PR here.
 | run a kind of turn their profile defines | `{{command}} <intent> <url> [flags] [guidance]`; `{{command}} --help` lists the intents and their flags |
 | watch what needs them in the terminal, with one-key actions | tell them to run `{{command}} tui` in their own terminal (it needs one; do not run it here) |
 | know a configuration value the loop uses | `{{command}} config get <key>` (defaults included; `sweep.fast` for nested keys) |
+| change a configuration value, such as turning a workflow off | `{{command}} config set <key> <value>` or `{{command}} config unset <key>` (only when the user asks; it keeps a backup and says when the daemon needs a restart) |
 | find out why something did not happen | `{{command}} doctor`, then the logs below |
 | change how reviews are done (what to look at, labels, voice), everywhere or in one project | follow the `{{name}}-profile` skill, which places the rule with `{{command}} profile add`; `{{command}} profile show <owner/repo>` lists the blocks a round there reads; it applies from the next round |
 | see what a review would publish, without publishing | `{{command}} profile try <url>` |
@@ -103,7 +104,7 @@ and Needs me by default. A user's `views.toml` changes the bundled views or adds
 - Git access without prompts comes from the daemon's latest fetch per host;
   `{{command}} doctor --git` checks it live with an `ls-remote`.
 - Every command but `doctor`'s local checks, `install`, `uninstall` and
-  `config get` needs the daemon; when it is down, the error names the
+  `config` needs the daemon; when it is down, the error names the
   `launchctl kickstart` command that starts it.
 - Daemon logs: `serve.out.log` and `serve.err.log` in the state directory
   (`$XDG_STATE_HOME/{{statedir}}`, by default `~/.local/state/{{statedir}}`). A

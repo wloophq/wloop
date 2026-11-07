@@ -524,11 +524,12 @@ func TestViewsSectionSetsOnlyItsColumns(t *testing.T) {
 }
 
 func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
-	if d := Defaults().Tasks; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 {
+	if d := Defaults().Tasks; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 ||
+		d.CandidateWindow != Days(14*24*time.Hour) || d.CandidateCap != 5 {
 		t.Fatalf("defaults %+v", d)
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
-	raw := `tasks = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"]}`
+	raw := `tasks = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"], candidate_window = "3d", candidate_cap = 2}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +537,8 @@ func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" {
+	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" ||
+		g.CandidateWindow != Days(3*24*time.Hour) || g.CandidateCap != 2 {
 		t.Fatalf("tasks %+v", g)
 	}
 }
@@ -721,6 +723,17 @@ func TestAConfigWorkflowsBlockOfARenamedWorkflowNamesItsNewName(t *testing.T) {
 	}
 	_, err := LoadFile(path, tools())
 	if err == nil || !strings.Contains(err.Error(), `workflows.entry-results-ended: `) || !strings.Contains(err.Error(), `did you mean "task-results-ended"?`) {
+		t.Fatalf("err %v", err)
+	}
+}
+
+func TestLoadBytesNamesTheFileItDidNotRead(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "absent.toml")
+	c, err := LoadBytes(file, []byte("agent = 'codex'\n"), tools())
+	if err != nil || c.Agent != "codex" {
+		t.Fatalf("agent %q, %v", c.Agent, err)
+	}
+	if _, err := LoadBytes(file, []byte("sweep.fsat = '2m'\n"), tools()); err == nil || !strings.Contains(err.Error(), file) {
 		t.Fatalf("err %v", err)
 	}
 }

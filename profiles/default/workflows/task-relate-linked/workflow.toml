@@ -1,0 +1,17 @@
+summary = "Relate a task to the task of each pull request its items' review or merge links target, when it is no single pull request's ask to merge: an ask about several pull requests, or a task that holds a pull request of its own"
+provider = "task"
+when = 'size(task.link_target_tasks) > 0 && !(!("pull-request" in task.unit_kinds) && size(task.link_target_units) == 1 && size(task.link_target_tasks) == 1)'
+key = ["task.fingerprint", "task.items_changed_at", "task.link_target_tasks", "task.link_target_units"]
+order = 61
+
+[[step]]
+use = "task.verb"
+verb = "relate"
+task = "task.link_target_tasks"
+each = "true"
+
+# A relation moves nothing, and Unrelate takes it off: it runs at once. A
+# pair you took apart waits for you instead.
+[[gates.approval.rule]]
+when = 'gate.kind == "proposal" && gate.name == "relate"'
+mode = "run"

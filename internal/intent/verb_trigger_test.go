@@ -87,4 +87,14 @@ func TestATaskVerbStepNamesAVerbAWorkflowMayRun(t *testing.T) {
 	if !strings.Contains(got, "step[0].set: is not an argument of schedule") || !strings.Contains(got, "schedule needs until or on_activity") {
 		t.Errorf("schedule's arguments come from its handler:\n%s", got)
 	}
+	for args, problem := range map[string]string{
+		"verb = \"schedule\"\nuntil = \"2026-01-01\"\neach = \"true\"":          "step[0].each: is not an argument of schedule",
+		"verb = \"relate\"\ntask = \"task.link_target_tasks\"\neach = \"yes\"":  `step[0].each: is "yes", want "true" or "false"`,
+		"verb = \"relate\"\ntask = \"task.link_target_tasks\"\neach = \"true\"": "",
+	} {
+		got := userWorkflowProblems(t, "mine", taskWorkflow(`task.state == "inbox"`, "use = \"task.verb\"\n"+args))
+		if problem == "" && strings.TrimSpace(got) != "" || !strings.Contains(got, problem) {
+			t.Errorf("%s: want %q in\n%s", args, problem, got)
+		}
+	}
 }

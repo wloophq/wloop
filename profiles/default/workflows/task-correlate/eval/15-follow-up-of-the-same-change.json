@@ -1,0 +1,32 @@
+{
+ "id": "15-follow-up-of-the-same-change",
+ "kind": "follow-up",
+ "act": "relate",
+ "on": "t-000000000000f002",
+ "task": {
+  "id": "t-000000000000f001",
+  "title": "Backfill the invoice totals after the rounding fix",
+  "notes": "DM with Omar",
+  "items": [
+   "Omar asks you to backfill last month's invoice totals once the rounding fix is out"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000f003",
+   "title": "Renew the TLS certificate of the status page",
+   "notes": "#ops",
+   "items": [
+    "Pia asks you to renew the status page certificate before it expires"
+   ]
+  },
+  {
+   "id": "t-000000000000f002",
+   "title": "acme/billing#88: Fix the invoice rounding",
+   "notes": "Your pull request",
+   "items": [
+    "Omar asks you to fix the rounding of invoice totals"
+   ]
+  }
+ ]
+}

@@ -581,3 +581,21 @@ func TestARefusedSettleLeavesTheLinkApplied(t *testing.T) {
 		t.Fatalf("item %+v", it)
 	}
 }
+
+func TestTheLedgerTellsTheLinksABatchStoredOnce(t *testing.T) {
+	s := newMem()
+	l, _ := newLedger(s)
+	l.Links = &fakeLinks{}
+	var told [][]link.Link
+	l.SetLinked(func(_ context.Context, ls []link.Link) error {
+		told = append(told, ls)
+		return nil
+	})
+	op := items.Op{Op: items.OpLink, Unit: thread, Item: "i1", Anchor: anchor("C000AAA/1.3"), To: &pull, LinkKind: link.Review}
+	apply(t, l, items.Extracted, create(thread, "i1", "review o/r#1"), op)
+	apply(t, l, items.Extracted, op)
+	apply(t, l, items.Extracted, create(thread, "i2", "no link"))
+	if len(told) != 1 || len(told[0]) != 1 || told[0][0].To != pull || told[0][0].Item != "i1" {
+		t.Fatalf("told %+v, want the one new link once", told)
+	}
+}

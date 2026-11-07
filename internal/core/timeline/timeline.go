@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -22,16 +23,20 @@ type Log interface {
 
 // Holdings are the units the tasks hold.
 type Holdings interface {
-	// UnitsOf are the units task id holds, in its order; empty for a task
-	// with none or no such task.
+	// UnitsOf are the units task id holds, in its order, then the own unit
+	// (task.UnitOf) of every task merged into id, transitively; empty for a
+	// task with none or no such task.
 	UnitsOf(ctx context.Context, id task.ID) ([]unit.Unit, error)
 }
 
 // Merged is the Reader over the event log: a task's timeline is its own
-// events and those of the units it holds.
+// events and those of the units it holds, without the merge records and the
+// kinds of Except.
 type Merged struct {
 	Log      Log
 	Holdings Holdings
+	// Except are the event kinds no timeline shows, asked for by kind or not.
+	Except []string
 }
 
 var _ Reader = Merged{}
@@ -47,6 +52,7 @@ func (m Merged) Of(ctx context.Context, id task.ID, f Filter) ([]Event, error) {
 			units = append(units, u)
 		}
 	}
+	f.Except = slices.Concat(f.Except, m.Except, []string{merge.RecordKind})
 	evs, err := m.Log.EventsOf(ctx, units, f)
 	if evs == nil {
 		evs = []Event{}
@@ -71,6 +77,26 @@ func RecordOf(ctx context.Context, r Records, kind string, id task.ID, held []un
 	}
 	ev, ok := Pick(got, id, held)
 	return ev, ok, nil
+}
+
+// HeldOf are the units a record of task e is read from after its own: e's units, then, when r is also
+// Holdings, the other units it lists, the newest merged task's first.
+func HeldOf(ctx context.Context, r Records, e task.Task) ([]unit.Unit, error) {
+	h, ok := r.(Holdings)
+	if !ok {
+		return e.Units, nil
+	}
+	all, err := h.UnitsOf(ctx, e.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := slices.Clone(e.Units)
+	for _, u := range slices.Backward(all) {
+		if !slices.Contains(e.Units, u) {
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }
 
 // Pick is task id's record among recs, the records of its kind by unit, as

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "task", "reason"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["same", "related", "none"],
+      "description": "same when one candidate task is the same piece of work as this task; related when none is, but one is distinct work this task is part of or bears on; none otherwise."
+    },
+    "task": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "With verdict same or related, the id of that candidate, copied from the list; with none, empty."
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "description": "One sentence on why, naming what the two have in common or what sets them apart."
+    }
+  }
+}

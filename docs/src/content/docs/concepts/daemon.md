@@ -9,7 +9,7 @@ description: The background process that reads GitHub, keeps the store and serve
 - the cockpit, on `127.0.0.1` (`http.port`, a free port by default), behind a token that `{{command}} open` hands over;
 - {{name}}'s MCP server on `127.0.0.1:47800` (`mcp.port`), which agent sessions call to record their turns. The daemon does not start when that port is taken, since every session sends its key there.
 
-Every command that reads or writes {{name}}'s state goes through the daemon. With no daemon, a command fails within a second and says how to start it. `doctor` still runs the checks that need no state, and `install`, `config get` and `app install` need no daemon at all. A client and a daemon of different API major versions refuse each other and name the one to restart.
+Every command that reads or writes {{name}}'s state goes through the daemon. With no daemon, a command fails within a second and says how to start it. `doctor` still runs the checks that need no state, and `install`, `config` and `app install` need no daemon at all. A client and a daemon of different API major versions refuse each other and name the one to restart.
 
 ## Jobs
 

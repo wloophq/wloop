@@ -25,6 +25,8 @@ const (
 	eventsSinceSQL      = `SELECT id, provider, unit_key, kind, key, actor, data, at FROM events WHERE id > ? ORDER BY id`
 	eventsSinceKindsSQL = `SELECT id, provider, unit_key, kind, key, actor, data, at FROM events
 		WHERE id > ? AND +kind IN (SELECT value FROM json_each(?)) ORDER BY id`
+	eventsOfKindsSQL = `SELECT id, provider, unit_key, kind, key, actor, data, at FROM events
+		WHERE kind IN (SELECT value FROM json_each(?)) ORDER BY id`
 )
 
 func (e events) Since(ctx context.Context, cursor int64, kinds []string) ([]workflow.Event, error) {
@@ -36,7 +38,20 @@ func (e events) Since(ctx context.Context, cursor int64, kinds []string) ([]work
 		}
 		q, args = eventsSinceKindsSQL, append(args, string(list))
 	}
-	rows, err := e.db.R().QueryContext(ctx, q, args...)
+	return e.db.workflowEvents(ctx, q, args...)
+}
+
+// EventsOfKinds are every unit's events of kinds, oldest first, as Events().Since reads them.
+func (db *DB) EventsOfKinds(ctx context.Context, kinds []string) ([]workflow.Event, error) {
+	list, err := json.Marshal(kinds)
+	if err != nil {
+		return nil, err
+	}
+	return db.workflowEvents(ctx, eventsOfKindsSQL, string(list))
+}
+
+func (db *DB) workflowEvents(ctx context.Context, q string, args ...any) ([]workflow.Event, error) {
+	rows, err := db.R().QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

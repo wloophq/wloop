@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	reads = append(reads, "DB.Dossiers", "dossierStore.Get", "dossierStore.List", "dossierStore.Open", "dossierStore.Owner", "DB.AgentWorktrees")
+	reads = append(reads, "DB.Dossiers", "dossierStore.Get", "dossierStore.List", "dossierStore.Open", "dossierStore.Owner", "dossierStore.MergedOwners", "DB.AgentWorktrees")
 	writes = append(writes, writeCase{
 		method: "dossierStore.Put",
 		call: func(ctx context.Context, e *noteEnv) error {

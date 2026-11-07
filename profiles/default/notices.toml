@@ -9,6 +9,10 @@ record_owed = "This {{.Name}} turn on {{.Unit}} has no record. Call the `turn_en
 
 attach_needs_session = "`{{.Command}} task attach {{.Task}}` makes the agent session it runs in a run of the task, and it runs in no session a workspace manager started ({{.Managers}}). Run it from the agent session to attach, inside one of them."
 
+task_merged = "{{.Task}} was merged into {{.Into}}: open {{.Into}} and run {{.Verb}} there, or Split to take {{.Task}} back out."
+
+nothing_to_pick = "{{if eq .Pick \"merged\"}}No task was merged into this one{{else}}No task is related to this one{{end}}."
+
 verb_for_you = "{{.Verb}} acts for you, so only you run it, or a session you drive; this session runs a turn the loop sent or the loop typed into it last."
 
 chat_not_yours = "This session has no turn on {{.Unit}}: it reads the answers and the chat of the tasks it works on only, and nothing was read."

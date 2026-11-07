@@ -25,10 +25,25 @@ type taskLog struct {
 	events []timeline.Event
 	marks  map[unit.Unit]map[string]string
 	briefs map[task.ID]string
+	// merged are the tasks merged into each task.
+	merged map[task.ID][]task.ID
 }
 
 func newTaskLog() *taskLog {
-	return &taskLog{marks: map[unit.Unit]map[string]string{}, briefs: map[task.ID]string{}}
+	return &taskLog{marks: map[unit.Unit]map[string]string{}, briefs: map[task.ID]string{}, merged: map[task.ID][]task.ID{}}
+}
+
+// mergeInto lists ids as the tasks merged into id.
+func (l *taskLog) mergeInto(id task.ID, ids ...task.ID) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.merged[id] = ids
+}
+
+func (l *taskLog) MergedInto(_ context.Context, id task.ID) ([]task.ID, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Clone(l.merged[id]), nil
 }
 
 func (l *taskLog) RecordEvents(_ context.Context, evs ...port.Event) error {
@@ -43,10 +58,14 @@ func (l *taskLog) RecordEvents(_ context.Context, evs ...port.Event) error {
 func (l *taskLog) Of(_ context.Context, id task.ID, f timeline.Filter) ([]timeline.Event, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	units := []unit.Unit{task.UnitOf(id)}
+	for _, m := range l.merged[id] {
+		units = append(units, task.UnitOf(m))
+	}
 	var out []timeline.Event
 	for i := len(l.events) - 1; i >= 0; i-- {
 		ev := l.events[i]
-		if ev.Unit != task.UnitOf(id) || (len(f.Kinds) > 0 && !slices.Contains(f.Kinds, ev.Kind)) {
+		if !slices.Contains(units, ev.Unit) || (len(f.Kinds) > 0 && !slices.Contains(f.Kinds, ev.Kind)) {
 			continue
 		}
 		if out = append(out, ev); f.Limit > 0 && len(out) == f.Limit {

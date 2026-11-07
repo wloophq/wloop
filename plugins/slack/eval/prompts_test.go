@@ -21,7 +21,11 @@ var shipped = sync.OnceValues(func() (*extract.Prompts, error) {
 	if err != nil {
 		return nil, err
 	}
-	return extract.NewPrompts(string(tmpl), string(brief))
+	cited, err := os.ReadFile(filepath.Join(profileDir, extract.CitedFile))
+	if err != nil {
+		return nil, err
+	}
+	return extract.NewPrompts(string(tmpl), string(brief), string(cited))
 })
 
 func shippedPrompts(t testing.TB) *extract.Prompts {

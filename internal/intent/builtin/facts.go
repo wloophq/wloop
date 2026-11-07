@@ -52,6 +52,12 @@ func untrusted(f Fact) Fact {
 	return f
 }
 
+// costly marks f as computed only for a reader that names it.
+func costly(f Fact) Fact {
+	f.Costly = true
+	return f
+}
+
 // timeVarying marks f as changing with time alone.
 func timeVarying(f Fact) Fact {
 	f.TimeVarying = true
@@ -199,6 +205,7 @@ var otherFacts = []Fact{
 	enum(wf("task", "unit_provider", expr.String, "The provider of task.unit; empty for a task with none."), enumOf(append([]string{""}, providerIDs()...)...)),
 	wf("task", "units", expr.List, "The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them."),
 	wf("task", "unit_providers", expr.List, "The providers of task.units, each once, in order."),
+	wf("task", "unit_kinds", expr.List, "The task kinds the plugins of task.units give their units' tasks, each once, in order, such as pull-request for a task that holds a pull request, whatever its own kind."),
 	timeVarying(wf("task", "link_ended", expr.Bool, "The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
 	wf("task", "turns", expr.Int, "Turns run on the task itself, such as a start; turns on its units are not counted."),
 	wf("task", "captured_by_user", expr.Bool, "The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service."),
@@ -206,6 +213,7 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "link_closure_posted", expr.Bool, "A closure was posted on task.unit, from the facts the tasks receive.")),
 	untrusted(wf("task", "items_open", expr.Int, "Open items of the task's units.")),
 	untrusted(wf("task", "items_resolved", expr.Int, "Resolved items of the task's units.")),
+	untrusted(wf("task", "items_changed_at", expr.Time, "When an item the task holds, open or resolved, or any item of a unit it holds none of, was last created or changed; zero when none. Test with `> timestamp(0)`.")),
 	wf("task", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`."),
 	untrusted(wf("task", "fingerprint", expr.String, "The task's id, state and update time.")),
 	untrusted(enum(wf("task", "category", expr.String, "The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped."), enumOf(categoryNames()...))),
@@ -232,6 +240,15 @@ var otherFacts = []Fact{
 	untrusted(wf("task", "promised", expr.Time, "When you promised the task by: the property of role promise, which acknowledge sets; zero when unset. Untrusted, since a profile may let an agent write that property. Test with `> timestamp(0)`.")),
 	timeVarying(untrusted(wf("task", "extraction_lag", expr.Duration, "How long the oldest message of a unit linked to the task has waited to be extracted, as its plugin's extraction health says; zero when none waits."))),
 	untrusted(wf("task", "link_signals", expr.List, "The link signals the units the task links report, on or off, each once, by name: the profile reads whether a source keeps its own staleness, such as 'stalled' in task.link_signals.")),
+	wf("task", "clarified", expr.Bool, "The task was shaped by hand: a person, or an agent through a session the user drives, ran a verb on it that moves it to a state or sets its parent, or a person wrote a property other than those of roles merged and related; no agent's property write counts. The bundled merge verb's survivor reads it."),
+	costly(untrusted(wf("task", "refused_pairs", expr.List, "The tasks of task.undone while no item either task holds was created or changed since they were taken apart; seeing, starring or filing a task changes no item: a proposal of either pair is not due again."))),
+	costly(wf("task", "undone", expr.List, "The tasks you took apart from this one, by id as they read now, whatever changed since: a merge or relate gate with it you rejected, a split of the two, an unrelate of the two; a task merged since into another names that one, and a split takes apart every task the split one held, through earlier merges, from every task it was in. A gate a workflow's verb opens on such a pair waits for you whatever its approval says, and one a rule or a window released before runs nothing.")),
+	costly(untrusted(wf("task", "candidates", expr.List, "The open tasks that may be the same work as this one, by id, the likeliest first: tasks sharing a person among their items' requesters, assignees and waited-on, a link target, or a unit one of them holds that the other's items cite, created within tasks.candidate_window of it, without task.refused_pairs and the tasks related to it; at most tasks.candidate_cap, and empty when none, so no judgment over them runs."))),
+	costly(untrusted(wf("task", "linked_candidates", expr.List, "The tasks of task.candidates that share a link target or a cited unit with this one, not only a person, in its order."))),
+	costly(untrusted(wf("task", "link_target_tasks", expr.List, "The other open tasks holding a unit a review or merge link of this task's items targets, such as the task of a pull request an ask in a thread links, by id, oldest first, without task.refused_pairs and the tasks related to it; neither side a project, a draft's or a message's task."))),
+	costly(untrusted(wf("task", "link_target_units", expr.List, "The units a review or merge link of this task's items targets, each once, but the task's own, whatever task holds them and whether or not it is refused or related: how many pull requests an ask links."))),
+	untrusted(wf("task", "title", expr.String, "The task's title; a derived task's is its first item's summary.")),
+	untrusted(wf("task", "notes", expr.String, "The task's notes.")),
 	untrusted(wf("task", "link_owes", expr.List, "Who the open items the task holds wait on, each once: me for the user, else a person's key such as slack:U0123; a unit the task holds with none of its items, all the unit's open items.")),
 	wf("gate", "kind", expr.String, "The gate's kind: draft, plan, question, post, proposal, trust or step."),
 	wf("gate", "name", expr.String, "The gate's name in gates.toml; empty for a gate of no profile name."),
@@ -450,6 +467,12 @@ func ExtraFacts(props []jsonschema.Property) expr.Env {
 
 // ClassifyPrefix names a classify step's output as a fact.
 const ClassifyPrefix = "classify."
+
+// ClassifyFact names field of workflow's classify output as a fact: classify.<workflow>.<field>, each - of
+// the workflow's name an _, so a predicate can name it.
+func ClassifyFact(workflow, field string) string {
+	return ClassifyPrefix + strings.ReplaceAll(workflow, "-", "_") + "." + field
+}
 
 // IsUntrusted says whether a rule may not trust the fact name: an agent or a
 // third party sets its value. A brief's extra fields and a classification's

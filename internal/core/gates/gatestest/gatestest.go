@@ -50,6 +50,13 @@ func (s *Store) Open(_ context.Context, g gate.Gate) (gate.Gate, error) {
 	return clone(g), nil
 }
 
+// TaskGates are s as the tasks service opens its gates, each as the store opens it, wait or not.
+type TaskGates struct{ *Store }
+
+func (g TaskGates) Open(ctx context.Context, gt gate.Gate, _ bool) (gate.Gate, error) {
+	return g.Store.Open(ctx, gt)
+}
+
 func (s *Store) Resolve(_ context.Context, id int64, r gates.Resolution) (gate.Gate, error) {
 	if r.Status == "" || r.Status == gate.Open {
 		return gate.Gate{}, fmt.Errorf("resolving gate %d to %q is no resolution", id, r.Status)

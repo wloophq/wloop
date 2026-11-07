@@ -75,6 +75,7 @@ func ExtractorPrompt(tmpl string, in extract.Input) (string, error) {
 	}
 	values := baseValues(in)
 	values["LEDGER"] = "(no items yet)"
+	values["CITED"] = ""
 	values["CONTEXTS"] = "(no context is offered: leave `place.context` empty)"
 	values["VOCABULARY"] = extract.VocabularyOf(in.Vocabulary)
 	values["CONVERSATION"] = extract.Render(in)

@@ -19,7 +19,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [Behavior lives in the profile](/architecture/decisions/behavior-lives-in-the-profile/) | Behavior is profile files; Go provides a closed vocabulary and never enumerates intents. |
 | [Clients are thin and speak one versioned API](/architecture/decisions/clients-are-thin-and-speak-one-versioned-api/) | The daemon computes what clients show; clients speak internal/api and decide nothing. |
 | [Every spawn is metered](/architecture/decisions/every-spawn-is-metered/) | A package that spawns a process imports the meter, which counts each boundary call. |
-| [Gates hold every decision](/architecture/decisions/gates-hold-every-decision/) | A decision waiting on you is a gate; no rule that releases one reads an untrusted fact, and no unattended agent resolves one. |
+| [Gates hold every decision](/architecture/decisions/gates-hold-every-decision/) | A decision the loop could wait on is a gate; you decide which wait for you, no rule that releases one reads an untrusted fact, and no unattended agent resolves one. |
 | [Go reads categories, never states](/architecture/decisions/go-reads-categories/) | The profile names a task's states; Go and the store's SQL read only the closed set of categories. |
 | [One adapter reaches each outside tool](/architecture/decisions/one-adapter-reaches-each-outside-tool/) | Each outside tool is reached by one adapter, and its name stays there and in the root. |
 | [One brand package](/architecture/decisions/one-brand-package/) | Every user-visible name derives from internal/brand. |

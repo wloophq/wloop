@@ -61,6 +61,8 @@ cd docs && npm run dev
 
 `{{command}} help dev` lists the developer tools, which the main help leaves out. `{{command}} eval-instructions [--scenario <glob>]...` (`make eval-instructions`) judges the rendered turn instructions of every scenario in `internal/turn` and writes the report under the state directory's `eval/`.
 
+`{{command}} eval-correlation --cases profiles/default/workflows/task-correlate/eval --out <dir> [--max-usd 2]` runs the `task-correlate` judgment, with the profile's prompt and schema, over the synthetic cases with the configured agent, stops before a call would pass `--max-usd`, scores each answer by what the loaded workflows whose `when` reads that judgment's output (`task-correlate-merge`, `task-correlate-merge-linked`, `task-correlate-relate`) would do, each `when` evaluated over the answer's fields, the case's candidates and its `facts`, and writes `results.json` and `score.txt` under `--out`, which must lie outside any git checkout. A case names the verb it wants run, `act` (`merge`, `relate`, or empty for none), and the candidate it wants it on, `on`; the score gives precision and recall over every action and per verb, an action on the wrong candidate or of the wrong verb counting against both. It calls the model, so no test runs it.
+
 ## macOS smoke test
 
 The native layer has contract tests only. Before a release, on a Mac with a logged-in user:

@@ -190,7 +190,7 @@ func TestAGatedVerbOpensTheGateItsVerbNames(t *testing.T) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": confirm}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
 
@@ -237,7 +237,7 @@ func personGated(t *testing.T, verb string) (*rig, *gatestest.Store) {
 	r := newRig()
 	gs := gatestest.NewStore(func() time.Time { return t0 })
 	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": {Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
-	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gs,
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
 		States: states, Authority: states.Authority})
 	return r, gs
 }
@@ -365,5 +365,34 @@ func TestWorkflowVerbsRecordEventsWithTheirActor(t *testing.T) {
 	data, got := workflow.SplitChain(evs[0].Data)
 	if data != "inbox" || got.Depth != 1 || !slices.Equal(got.Workflows, []string{"triage"}) {
 		t.Errorf("data %q, chain %+v", data, got)
+	}
+}
+
+func TestAGatedVerbsProposalNamesTheWorkflowThatOpenedIt(t *testing.T) {
+	ctx := context.Background()
+	d := tasksToml(t, verbEdit{"done", `by      = { person = "true", agent = "true", workflow = "true" }`, `by      = { person = "true", agent = "true", workflow = "gate" }` + "\ngate    = \"close-check\""})
+	r := newRig()
+	gs := gatestest.NewStore(func() time.Time { return t0 })
+	states := profileStates{TasksDef: d, gates: map[string]gate.Gate{"close-check": {Name: "close-check", Kind: gate.KindProposal, Intents: []string{"approve", "reject"}}}}
+	r.svc = coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock, Gates: gatestest.TaskGates{Store: gs},
+		States: states, Authority: states.Authority})
+	e := r.put(t, task.Task{ID: "t-1", State: "next", Origin: task.OriginUser})
+	for _, src := range []string{"tidy", "sweep"} {
+		if _, err := r.svc.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbDone, Actor: task.ActorWorkflow, Source: src}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	open, _ := gs.OfTask(ctx, e.ID)
+	if len(open) != 1 || coretasks.ProposalFrom(open[0]) != "tidy" {
+		t.Fatalf("gates %+v, want one proposal from tidy, the first workflow that asked", open)
+	}
+	if req, _ := coretasks.ProposedVerb(open[0]); req.Actor != task.ActorPerson {
+		t.Errorf("a gate a person approves runs as %s", req.Actor)
+	}
+	released := open[0]
+	released.Status, released.By, released.Rule = gate.Approved, task.ActorWorkflow, "workflows/tidy gates.approval rule 0"
+	req, ok := coretasks.ProposedVerb(released)
+	if !ok || req.Actor != task.ActorWorkflow || req.Source != "tidy" || req.Approved != released.ID {
+		t.Fatalf("a gate a rule released proposes %+v, want it run as the workflow tidy", req)
 	}
 }

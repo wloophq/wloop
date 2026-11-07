@@ -1141,7 +1141,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	d.Startup = nil
 	g, err := te.newGates(storeDB, nil).Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: r7.Unit(), Subject: it.ID},
-		workflowPolicy{w: workflow.Workflow{Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: 4 * time.Minute}}})
+		te.workflowPolicy(workflow.Workflow{Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: 4 * time.Minute}}, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -51,6 +51,15 @@ const (
 // since a position also holds the tasks holding it, as a change named it.
 const TasksUnits = "units"
 
+// TasksMatch is the query parameter of TasksPath that lists every open task whose title holds it, case
+// aside, whatever the view, for a picker of another task; both clients read the same list. The page is Full
+// and its views hold only the id, title, state, category and units of each task, the newest change first.
+const TasksMatch = "match"
+
+// TasksExcept is the query parameter of a TasksMatch request that names the task the picker picks for, which
+// the list leaves out, as its id reads.
+const TasksExcept = "except"
+
 // ParseUnits reads the TasksUnits of a request.
 func ParseUnits(raw []string) ([]unit.Unit, error) {
 	out := make([]unit.Unit, 0, len(raw))
@@ -222,7 +231,11 @@ type VerbSpec struct {
 	Input   string `json:"input,omitempty"` // the question a verb that asks for a value puts first
 	// Send is what a reply of a verb whose handler is reply does by default: "now" sends it, "draft" holds it
 	// for approval; every client's reply composer starts on it.
-	Send string   `json:"send,omitempty"`
+	Send string `json:"send,omitempty"`
+	// Pick is, on a verb that takes another task, the tasks a person picks it from: open (the open tasks but
+	// this one, as TasksPath lists them with TasksMatch and TasksExcept), merged (TaskView.MergedFrom) or related
+	// (TaskView.Related); the pick goes in the argument task.ArgTask. Empty for a verb that takes none.
+	Pick string   `json:"pick,omitempty"`
 	Key  string   `json:"key"`
 	From []string `json:"from,omitempty"`
 	To   string   `json:"to,omitempty"`
@@ -275,6 +288,21 @@ type TaskView struct {
 	// Parent is the parent task's id; Children are its children's, in sibling order.
 	Parent   string   `json:"parent,omitempty"`
 	Children []string `json:"children,omitempty"`
+	// Related are the tasks related to this one, as its property of role related lists them; MergedFrom the
+	// tasks merged into it, in merge order, each as its merge record keeps it: the ones split gives back.
+	Related    []TaskRef `json:"related,omitempty"`
+	MergedFrom []TaskRef `json:"merged_from,omitempty"`
+}
+
+// TaskRef is another task as a task's page names it: its id, title and state; Merged says it is merged
+// into another task and reads as that one. Within are, on an entry of MergedFrom, the tasks merged into it
+// before it was merged, shown without a split: that entry is split first.
+type TaskRef struct {
+	ID     string    `json:"id"`
+	Title  string    `json:"title"`
+	State  string    `json:"state,omitempty"`
+	Merged bool      `json:"merged,omitempty"`
+	Within []TaskRef `json:"within,omitempty"`
 }
 
 // AskView is an item a task serves, as its asker put it, with the source messages it quotes.
@@ -441,7 +469,7 @@ type TaskCreate struct {
 // TaskRequest args: waiting {on, resurface}; schedule {until (RFC3339 or YYYY-MM-DD), on_activity "true"};
 // project {id | title (creates one)}; context {set "a,b"}; area {set}; answer: as ActionRequest fields;
 // delegate {guidance, mode "headless" | "session"}; reply {text | reaction, kind "reply" | "react",
-// send "now"}.
+// send "now"}; merge, split, relate, unrelate {task (task.ArgTask): the other task's id}.
 type TaskRequest struct {
 	Args   map[string]string `json:"args,omitempty"`
 	Source string            `json:"source"`

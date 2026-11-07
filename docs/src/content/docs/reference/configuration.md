@@ -3,7 +3,7 @@ title: Configuration
 description: Every key of config.toml, with its default.
 ---
 
-The configuration is `$XDG_CONFIG_HOME/{{name}}/config.toml`, by default `~/.config/{{name}}/config.toml`, a [TOML](https://toml.io) file like the profile's manifests; `#` starts a comment. Every key is optional; a key the loop does not read is an error that names it, and a close key when one exists, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way: a duration or a date written without quotes, a number where a string goes, `inf` or `nan`. A key left out keeps its default. A former `config.json` is not read; when it is the only file, every command that loads the configuration fails, naming `config.toml`. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key).
+The configuration is `$XDG_CONFIG_HOME/{{name}}/config.toml`, by default `~/.config/{{name}}/config.toml`, a [TOML](https://toml.io) file like the profile's manifests; `#` starts a comment. Every key is optional; a key the loop does not read is an error that names it, and a close key when one exists, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way: a duration or a date written without quotes, a number where a string goes, `inf` or `nan`. A key left out keeps its default. A former `config.json` is not read; when it is the only file, every command that loads the configuration fails, naming `config.toml`. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key). `{{command}} config set <key> <value>` writes one key, keeping the file's comments and layout, and `{{command}} config unset <key>` removes one, or a whole table (`workflows.<name>`); a table an unset leaves with no key, comment or sub-table loses its header too, so an unset undoes a set. Set refuses a key no setting reads, a `workflows.<name>` key whose name is none of the profile's workflows (`{{command}} doctor` lists them) nor a disabled plugin's, which can be switched before the plugin is enabled, and a result the loop would refuse; unset removes any key, one no setting reads too, and refuses only a result that would no longer load. Each keeps the previous file as `config.toml.loop-<stamp>.bak`.
 
 The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are strings: `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON Schema, for an editor whose TOML support reads one.
 
@@ -221,6 +221,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `tasks.stale_waiting_days` | integer | `2` | Working days after which a waiting task goes stale. |
 | `tasks.areas` | list of strings |  | The areas a task is offered. |
 | `tasks.contexts` | list of strings |  | The contexts a task is offered. |
+| `tasks.candidate_window` | duration | `14d` | How far apart two tasks' creations may be for task.candidates to pair them. |
+| `tasks.candidate_cap` | integer | `5` | The most tasks task.candidates lists; 0 lists none, so no correlation runs. |
 
 ### Cleanup
 

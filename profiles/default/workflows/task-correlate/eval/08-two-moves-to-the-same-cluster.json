@@ -1,0 +1,24 @@
+{
+ "id": "08-two-moves-to-the-same-cluster",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-0000000000008002",
+ "task": {
+  "id": "t-0000000000008001",
+  "title": "Migrate the billing database to the new cluster",
+  "notes": "DM with Nina",
+  "items": [
+   "Nina asks you to plan the billing database migration this week"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000008002",
+   "title": "Migrate the search index to the new cluster",
+   "notes": "#infra",
+   "items": [
+    "Nina asks you to move the search index to the new cluster this week"
+   ]
+  }
+ ]
+}

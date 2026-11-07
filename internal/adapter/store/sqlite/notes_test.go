@@ -18,8 +18,10 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
+	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/snapshot"
@@ -406,6 +408,50 @@ var writes = []writeCase{
 		topics: port.TopicTasks | port.TopicGates, units: []unit.Unit{u7, task.UnitOf("t-1")},
 	},
 	{
+		method: "taskStore.Merge",
+		seed:   seedMergePair,
+		call: func(ctx context.Context, e *noteEnv) error {
+			from, into := mergePair(context.Background(), e)
+			y, r, err := merge.Fold(from, into, taskstest.BundledStates, noteAt)
+			if err != nil {
+				return err
+			}
+			return e.db.Tasks().(coretasks.Merger).Merge(ctx, r, y)
+		},
+		topics: port.TopicTasks | port.TopicLoopEvents, units: []unit.Unit{u7, term1, task.UnitOf("t-1"), task.UnitOf("t-2")},
+	},
+	{
+		method: "taskStore.Split",
+		seed: func(t *testing.T, e *noteEnv) {
+			seedMergePair(t, e)
+			from, into := mergePair(context.Background(), e)
+			y, r, err := merge.Fold(from, into, taskstest.BundledStates, noteAt)
+			if err == nil {
+				err = e.db.Tasks().(coretasks.Merger).Merge(context.Background(), r, y)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			m := e.db.Tasks().(coretasks.Merger)
+			r, _, err := m.MergeOf(ctx, "t-1")
+			if err != nil {
+				return err
+			}
+			into, err := e.db.Tasks().Task(ctx, "t-2")
+			if err != nil {
+				return err
+			}
+			sp, err := merge.Unfold(into, r, nil, nil, merge.Project{}, nil, taskstest.BundledStates, noteAt)
+			if err != nil {
+				return err
+			}
+			return m.Split(ctx, r, sp)
+		},
+		topics: port.TopicTasks, units: []unit.Unit{u7, term1, task.UnitOf("t-1"), task.UnitOf("t-2")},
+	},
+	{
 		method: "taskStore.Recategorize",
 		seed: func(t *testing.T, e *noteEnv) {
 			if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryWaiting, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
@@ -438,7 +484,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
 	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
-	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.TasksHolding", "DB.ItemsHeld",
+	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
 	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",
@@ -451,7 +497,7 @@ var reads = []string{
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
+	"taskStore.MergeOf", "DB.TasksRunByHand", "DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
 	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.All", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 	"draftStore.SettledAt",
@@ -774,4 +820,23 @@ func TestSubscriberWriteDeadlockDetected(t *testing.T) {
 	if n := rowsOf(t, db, `SELECT agent_session FROM agent_sessions`); !slices.Equal(n, []string{"a2"}) {
 		t.Fatalf("agent sessions %v: the subscriber's write went through", n)
 	}
+}
+
+// seedMergePair stores t-1 on u7 and t-2 on term_1, a pair to merge.
+func seedMergePair(t *testing.T, e *noteEnv) {
+	for _, c := range []struct {
+		id task.ID
+		u  unit.Unit
+	}{{"t-1", u7}, {"t-2", term1}} {
+		if err := e.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: c.id, State: "inbox",
+			Category: task.CategoryInbox, Units: []unit.Unit{c.u}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func mergePair(ctx context.Context, e *noteEnv) (from, into task.Task) {
+	from, _ = e.db.Tasks().Task(ctx, "t-1")
+	into, _ = e.db.Tasks().Task(ctx, "t-2")
+	return from, into
 }

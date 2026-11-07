@@ -1,0 +1,32 @@
+{
+ "id": "09-pull-request-and-the-org-wide-plan",
+ "kind": "sub-step",
+ "act": "relate",
+ "on": "t-0000000000009003",
+ "task": {
+  "id": "t-0000000000009001",
+  "title": "acme/api#120: Upgrade the logging library",
+  "notes": "Your pull request",
+  "items": [
+   "Waiting for review"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000009002",
+   "title": "acme/worker#45: Upgrade the logging library",
+   "notes": "Owen's pull request",
+   "items": [
+    "Owen asks for your review"
+   ]
+  },
+  {
+   "id": "t-0000000000009003",
+   "title": "Logging library upgrade plan",
+   "notes": "#platform",
+   "items": [
+    "Owen asks every team to upgrade the logging library by the end of the month"
+   ]
+  }
+ ]
+}

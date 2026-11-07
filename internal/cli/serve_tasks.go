@@ -38,7 +38,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 			Views: lensViews(e.loadedIntents), ViewEval: e.lens().Eval, ViewSort: e.lens().Sort,
 			Activity: func(ctx context.Context, id task.ID) error {
 				return e.wakes.Event(ctx, id, wake.OnActivity, "")
-			}})
+			}, Survives: catalog.Survives(e.loadedIntents, e.factsOfTask), GateText: verbGateText(e.loadedIntents), TakenApart: e.pairTakenApart})
 	}
 	return e.tasks
 }
@@ -51,9 +51,18 @@ func (e *Env) factsOfTask(ctx context.Context, t task.Task) (workflow.Facts, err
 	return catalog.TaskFacts(t, e.loadedIntents().Tasks), nil
 }
 
+// pairTakenApart says whether the user took t and other apart; true before serve wired the task subject, so a
+// pair a workflow asked for waits for you rather than run unchecked.
+func (e *Env) pairTakenApart(ctx context.Context, t task.Task, other task.ID) (bool, error) {
+	if e.takenApart == nil {
+		return true, nil
+	}
+	return e.takenApart(ctx, t, other)
+}
+
 // taskEnding settles what a task that ended holds, while it stays ended: its held drafts, but those of the
-// purposes the verb's keep_drafts names, and the gates gates.toml closes with the task that opened before it
-// ended.
+// purposes the verb's keep_drafts names, the gates gates.toml closes with the task that opened before it
+// ended, and the merges and relations proposed with it.
 type taskEnding struct{ e *Env }
 
 func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task.Actor, session string) {
@@ -71,6 +80,7 @@ func (d taskEnding) Ended(ctx context.Context, t task.Task, v task.Verb, by task
 			at = d.e.Now()
 		}
 		_ = g.TaskEnded(ctx, t.ID, by, session, at)
+		d.e.mootMerges(ctx, g, t.ID)
 	}
 }
 
@@ -132,6 +142,7 @@ func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID
 func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
 	g := e.newTasks(db, cfg, ledger)
+	ledger.SetLinked(g.Linked)
 	var off []unit.ProviderID
 	for _, p := range d.Plugins {
 		if !p.Enabled {

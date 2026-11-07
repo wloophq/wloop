@@ -185,6 +185,10 @@ func newEnv(t *testing.T) *env {
 			name, _ := bundledTasks.PropOf(r)
 			return name
 		},
+		Clarity: facttask.ClarityDeps{Shaping: bundledTasks.ShapingVerbs, ByHand: func(ctx context.Context, kinds []string, ids ...task.ID) (map[task.ID]bool, error) {
+			e.reads["by hand"]++
+			return db.TasksRunByHand(ctx, kinds, ids...)
+		}},
 	})
 	return e
 }
@@ -306,6 +310,9 @@ func TestTaskFactsAreTheSlotsFacts(t *testing.T) {
 	}
 	env := builtin.WorkflowEnv("task")
 	for k, v := range f {
+		if u, ok := v.(workflow.Unrequested); ok && u.Fact == k && slices.ContainsFunc(builtin.Facts, func(d builtin.Fact) bool { return d.Name == k && d.Costly }) {
+			continue
+		}
 		if typeOf(v) != env[k] {
 			t.Errorf("%s = %#v, want a %s", k, v, env[k])
 		}

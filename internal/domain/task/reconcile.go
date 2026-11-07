@@ -73,6 +73,9 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 		}
 		if !held {
 			id = DerivedID(f.Unit, keyOf(it))
+			if into, ok := mergedInto(id, byID, order, st); ok {
+				id = into
+			}
 		}
 		if _, known := byID[id]; !known && len(wanted[id]) == 0 {
 			created = append(created, id)
@@ -98,14 +101,25 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st Profile, no
 		case hasOwn && id == own:
 			e.Items, e.Resolved = unheld(old, f.Unit)
 			why = "no item calls for it"
+			alone := len(old.Units) == 1
+			if merged(old, st) {
+				alone = len(e.Items) == 0
+			}
 			switch {
 			case !old.Open() || old.Origin != OriginDerived:
-			case f.Carded && !f.Cares:
+			case f.Carded && !f.Cares && (!merged(old, st) || len(e.Items) == 0):
 				op, why = OpResolve, "its unit is no longer followed"
 				err = e.MoveTo(CategoryDropped, st)
 				e.SetProp(PropUnfollowed, Value{Time: now}, WriterPlugin, now)
-			case len(old.Units) == 1 && settledSince(its, f.Unit.String(), old.openChangedAt()):
+			case alone && settledSince(its, f.Unit.String(), old.openChangedAt()):
 				op, why = OpResolve, "its unit asks nothing more"
+				err = e.MoveTo(CategoryDone, st)
+			}
+		case (old.Origin == OriginDerived || old.Origin == OriginGate) && slices.Contains(old.Units, f.Unit) && merged(old, st):
+			e.Items, e.Resolved = unheld(old, f.Unit)
+			why = "no item of " + f.Unit.String() + " calls for it"
+			if old.Open() && len(e.Items) == 0 && len(old.Items)+len(old.Resolved) > 0 {
+				op, why = OpResolve, "its items resolved"
 				err = e.MoveTo(CategoryDone, st)
 			}
 		case old.Origin == OriginDerived && slices.Contains(old.Units, f.Unit) && len(old.Items)+len(old.Resolved) > 0:
@@ -220,6 +234,19 @@ func compareBool(a, b bool) int {
 	return -1
 }
 
+// merged says whether e lists a task merged into it, in the property of role merged.
+func merged(e Task, st Profile) bool { return len(e.Role(st, RoleMerged).List) > 0 }
+
+// mergedInto is the task of have that lists id as merged into it, whatever its state.
+func mergedInto(id ID, byID map[ID]Task, order []ID, st Profile) (ID, bool) {
+	for _, h := range order {
+		if slices.Contains(byID[h].Role(st, RoleMerged).List, string(id)) {
+			return h, true
+		}
+	}
+	return "", false
+}
+
 // unheld is what old holds once no item of u calls for it: those items move to its resolved ones.
 func unheld(old Task, u unit.Unit) (held, resolved []ItemRef) {
 	here := slices.DeleteFunc(slices.Clone(old.Items), func(r ItemRef) bool { return r.Unit != u })
@@ -311,7 +338,7 @@ func update(old Task, f UnitFacts, ws []items.Item, me Me, st Profile, now time.
 	if old.Origin == OriginGate && slices.ContainsFunc(ws, func(it items.Item) bool { return it.TaskKey != "" }) {
 		e.Origin = OriginDerived
 	}
-	if e.Origin == OriginDerived && len(e.Items) == 1 {
+	if e.Origin == OriginDerived && len(e.Items) == 1 && !merged(old, st) {
 		e.Title = ws[0].Summary
 	}
 	if due, _ := st.PropOf(RoleDeadline); due != "" && e.Written[due].By != WriterPerson {

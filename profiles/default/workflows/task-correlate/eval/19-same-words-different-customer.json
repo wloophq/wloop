@@ -1,0 +1,24 @@
+{
+ "id": "19-same-words-different-customer",
+ "kind": "look-alike",
+ "act": "",
+ "on": "",
+ "task": {
+  "id": "t-0000000000013001",
+  "title": "Send the renewal quote to Northwind",
+  "notes": "DM with Teo",
+  "items": [
+   "Teo asks you to send Northwind their renewal quote"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000013002",
+   "title": "Send the renewal quote to Globex",
+   "notes": "#sales",
+   "items": [
+    "Teo asks you to send Globex their renewal quote"
+   ]
+  }
+ ]
+}

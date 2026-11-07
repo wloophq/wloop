@@ -237,6 +237,8 @@ type Env struct {
 	// serve wired the task subject.
 	wakes     *wakes.Service
 	wakeFacts func(ctx context.Context, t task.Task) (workflow.Facts, error)
+	// takenApart says whether the user took a pair of tasks apart, once serve wired the task subject.
+	takenApart coretasks.TakenApart
 	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveTasks.
 	pluginsOff *atomic.Pointer[[]unit.ProviderID]
 	messages   *messages.Service
@@ -606,6 +608,9 @@ var devUsage = `DEVELOPER TOOLS
   eval-instructions [--scenario <glob>]...
                                   Judge the rendered instructions of the eval scenarios and write
                                   the report under the state directory's eval/
+  eval-correlation --cases <dir> --out <dir> [--max-usd 2] [--prompt <file>]
+                                  Run the task correlation judgment over synthetic cases with the
+                                  configured agent; write its precision and recall under --out
   slack eval export|run|score|optimize ...
                                   The extraction eval: export fixtures from the store, run and score
                                   them against the bar, propose a prompt from the dev judgments
@@ -740,6 +745,7 @@ func commands() map[string]command {
 		"turn":              func(ctx context.Context, e *Env, args []string) error { return exitCode(runTurn(ctx, e, args)) },
 		"probe":             runProbe,
 		"eval-instructions": runEvalInstructions,
+		"eval-correlation":  runEvalCorrelation,
 		"profile":           runProfile,
 		"brief":             runBrief,
 		"install":           runInstall,

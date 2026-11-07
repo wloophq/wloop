@@ -1,0 +1,24 @@
+{
+ "id": "23-same-reviewer-same-day",
+ "kind": "look-alike",
+ "act": "",
+ "on": "",
+ "task": {
+  "id": "t-0000000000017001",
+  "title": "Review acme/api#130: retry jitter",
+  "notes": "Owen's pull request",
+  "items": [
+   "Owen asks for your review of the retry jitter change"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000017002",
+   "title": "Review acme/docs#77: typo fixes",
+   "notes": "Owen's pull request",
+   "items": [
+    "Owen asks for your review of the typo fixes in the docs"
+   ]
+  }
+ ]
+}

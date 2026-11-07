@@ -1,0 +1,24 @@
+{
+ "id": "16-two-deliverables-of-one-migration",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-0000000000010002",
+ "task": {
+  "id": "t-0000000000010001",
+  "title": "Update the runbook for the new queue",
+  "notes": "#payments",
+  "items": [
+   "Lia asks you to rewrite the payments runbook for the new queue"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000010002",
+   "title": "Move the payments workers to the new queue",
+   "notes": "DM with Lia",
+   "items": [
+    "Lia asks you to move the payments workers from the old broker to the new queue"
+   ]
+  }
+ ]
+}

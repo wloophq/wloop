@@ -1,0 +1,32 @@
+{
+ "id": "17-sub-step-review-and-parent-rollout",
+ "kind": "sub-step",
+ "act": "relate",
+ "on": "t-0000000000011003",
+ "task": {
+  "id": "t-0000000000011001",
+  "title": "Review acme/web#212: dark mode toggle",
+  "notes": "#frontend",
+  "items": [
+   "Ivo asks you to review the dark mode toggle"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-0000000000011002",
+   "title": "Review acme/web#215: footer links",
+   "notes": "#frontend",
+   "items": [
+    "Ivo asks you to review the footer links change"
+   ]
+  },
+  {
+   "id": "t-0000000000011003",
+   "title": "Ship dark mode to every page",
+   "notes": "Project",
+   "items": [
+    "Ivo asks you to own the dark mode rollout across the site"
+   ]
+  }
+ ]
+}

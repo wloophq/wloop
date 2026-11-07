@@ -25,6 +25,9 @@ const (
 	linksToSQL   = `SELECT ` + linkColumns + ` FROM links
 		WHERE (to_provider, to_key) IN (SELECT value->>0, value->>1 FROM json_each(?))
 		ORDER BY provider, unit_key, at, to_provider, to_key, kind, item`
+	linksFromUnitsSQL = `SELECT ` + linkColumns + ` FROM links
+		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?))
+		ORDER BY provider, unit_key, at, to_provider, to_key, kind, item`
 	linkTargetsSQL = `SELECT DISTINCT to_provider, to_key FROM links WHERE item != '' AND kind IN ('review', 'merge')
 		ORDER BY to_provider, to_key`
 	insertFactsLinkSQL = `INSERT INTO links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`
@@ -165,6 +168,16 @@ func (s linkStore) From(ctx context.Context, u unit.Unit) ([]link.Link, error) {
 }
 
 func (s linkStore) To(ctx context.Context, units []unit.Unit) ([]link.Link, error) {
+	return s.db.linksOf(ctx, linksToSQL, units)
+}
+
+// LinksFrom are the links from any of units, sorted by From, then At.
+func (db *DB) LinksFrom(ctx context.Context, units []unit.Unit) ([]link.Link, error) {
+	return db.linksOf(ctx, linksFromUnitsSQL, units)
+}
+
+// linksOf are the links query reads over units, passed as one JSON list of [provider, key] pairs.
+func (db *DB) linksOf(ctx context.Context, query string, units []unit.Unit) ([]link.Link, error) {
 	if len(units) == 0 {
 		return nil, nil
 	}
@@ -176,7 +189,7 @@ func (s linkStore) To(ctx context.Context, units []unit.Unit) ([]link.Link, erro
 	if err != nil {
 		return nil, err
 	}
-	return scanLinks(s.db.R().QueryContext(ctx, linksToSQL, string(raw)))
+	return scanLinks(db.R().QueryContext(ctx, query, string(raw)))
 }
 
 func linkArgs(l link.Link, evidence string) []any {

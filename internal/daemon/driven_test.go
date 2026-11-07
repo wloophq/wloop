@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/gates"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -189,5 +190,22 @@ func TestADraftAWorkerWritesIsItsOwnSubject(t *testing.T) {
 	}
 	if _, g := write("term_2", `,"send":true`); g.Status != gate.Approved || g.By != task.ActorAgent || g.BySession != mine {
 		t.Errorf("a draft a session the user drives sends at once: %+v", g)
+	}
+}
+
+func TestTheTimelineNamesAChangeAWorkflowMade(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.s.deps.Timeline = timeline.Merged{Log: r.db, Holdings: r.db}
+	r.put(t, task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox})
+	if _, err := r.s.deps.Tasks.Do(context.Background(), "t-1", coretasks.Request{Verb: task.VerbNext, Actor: task.ActorWorkflow, Source: "tidy"}); err != nil {
+		t.Fatal(err)
+	}
+	var evs []api.TimelineEvent
+	if code := get(t, r.s, api.TaskPath("t-1", "timeline")+"?kinds=verb_next", &evs); code != 200 {
+		t.Fatalf("GET the timeline: %d", code)
+	}
+	if len(evs) != 1 || evs[0].By != "the loop, by workflow tidy" || evs[0].Actor != "workflow:tidy" {
+		t.Fatalf("the timeline %+v", evs)
 	}
 }

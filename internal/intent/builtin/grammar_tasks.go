@@ -9,7 +9,7 @@ var tasksGrammar = []Key{
 	{Path: "verbs.*.label", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "The name people read on its button. Required."},
 	{Path: "verbs.*.summary", In: SurfaceTasks, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip. Required."},
 	{Path: "verbs.*.offer", In: SurfaceTasks, Kind: KindPred, Default: "true", Doc: "When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run."},
-	{Path: "verbs.*.input", In: SurfaceTasks, Kind: KindText, Doc: "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise)."},
+	{Path: "verbs.*.input", In: SurfaceTasks, Kind: KindText, Doc: "The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise, merge, split, relate, unrelate); a verb that takes another task puts it over the list of tasks the person picks from."},
 	{Path: "verbs.*.from", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The states the verb moves a task from, each a state of states; every state when absent."},
 	{Path: "verbs.*.to", In: SurfaceTasks, Kind: KindText, Doc: "The state the verb moves a task to, a state of states; absent, the verb moves none."},
 	{Path: "verbs.*.by", In: SurfaceTasks, Kind: KindMap, Doc: "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not."},
@@ -17,6 +17,7 @@ var tasksGrammar = []Key{
 	{Path: "verbs.*.gate", In: SurfaceTasks, Kind: KindText, Doc: "The gate, of gates.toml, a by.<actor> of \"gate\" opens; required when one does."},
 	{Path: "verbs.*.handler", In: SurfaceTasks, Kind: KindEnum, Values: verbHandlerValues, Doc: "What the verb runs besides its move, a handler of the loop's; none when absent."},
 	{Path: "verbs.*.send", In: SurfaceTasks, Kind: KindEnum, Values: named("now", "draft"), Default: "draft", Doc: "On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it."},
+	{Path: "verbs.*.survivor", In: SurfaceTasks, Kind: KindPred, Doc: "On a verb whose handler is merge: a predicate over each of the two tasks' facts; the task it holds on alone is the one that stays and takes the other in, and the older stays when it holds on both or neither."},
 	{Path: "verbs.*.keep_drafts", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The purposes of the held drafts a task keeps when the verb moves it from an open state to a done or dropped one; every other held draft of the task is withdrawn with the reason ended, and holds its workflow from proposing again on the unit while the task stays ended. Every held draft is withdrawn when absent."},
 	{Path: "props", In: SurfaceTasks, Kind: KindMap, Doc: "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type."},
 	{Path: "props.*", In: SurfaceTasks, Kind: KindTable, Doc: "A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."},
@@ -35,6 +36,7 @@ var tasksGrammar = []Key{
 	{Path: "chat.intent", In: SurfaceTasks, Kind: KindText, Doc: "The intent of the turn a message starts on a task with no live session."},
 	{Path: "attribution", In: SurfaceTasks, Kind: KindTable, Doc: "How the task's page names who made a change."},
 	{Path: "attribution.via_session", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change an agent made for you through a session you drove; {session} is the session's id."},
+	{Path: "attribution.via_workflow", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name."},
 	{Path: "areas", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The areas a task may be in, the values of the area property."},
 	{Path: "contexts", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The contexts the menu offers; a task may hold others."},
 	{Path: "stale_waiting_days", In: SurfaceTasks, Kind: KindInt, Doc: "Working days a task waits before it is stale."},
@@ -55,6 +57,8 @@ var RoleDocs = map[task.Role]string{
 	task.RoleStar:     "An enum: the star handler toggles it between its first value, starred, and its second.",
 	task.RoleDeadline: "A date: a task takes it from its items' deadline, and a draft's task from its gate's window.",
 	task.RolePromise:  "A date: the promise handler sets it to the time you promise the task by, and task.promised reads it.",
+	task.RoleRelated:  "A string[] of task ids: the relate handler adds each of two tasks to the other's, unrelate takes it off both.",
+	task.RoleMerged:   "A string[] of task ids, in merge order: the merge handler adds the task it folds in, split takes it off; a task that holds one settles item by item.",
 }
 
 func propRoleValues() []Value {
@@ -90,13 +94,17 @@ var VerbHandlers = []VerbHandler{
 	{"edit", "Edits the text of the task's draft."},
 	{"retry", "Sends again the task's approved draft whose delivery failed."},
 	{"reply", "Posts a reply or a reaction on the task's unit; the composer's verb."},
-	{"project", "Files the task under a parent, creating it from a title."},
+	{HandlerProject, "Files the task under a parent, creating it from a title."},
 	{"context", "Sets the task's contexts: the property of role contexts."},
 	{"area", "Sets the task's area: the property of role area."},
 	{"seen", "Marks the task seen; clients send it when it opens."},
 	{"promise", "Sets the property of role promise to the time its by names: HH:MM, today or tomorrow once that passed; YYYY-MM-DD, 18:00 that day; or an RFC 3339 time. An empty by clears it."},
 	{"reviewed", "Marks a parent task reviewed."},
 	{"sequential", "Switches a parent task's children between sequential and parallel."},
+	{"merge", "Folds the task and the other task its task argument names into one: the one the verb's survivor holds on alone stays, else the older; the other's items, units, gates, drafts and messages move to it, its id leads to it, and split gives it back."},
+	{"split", "Gives back a task merged into this one, as it was before the merge: its items, units, gates, drafts and messages; what reached this task after the merge stays."},
+	{"relate", "Links the task and the other task its task argument names as related, distinct work: nothing moves, and each lists the other in its property of role related."},
+	{"unrelate", "Takes the link between the task and a related one off both."},
 }
 
 // HandlerArgs are the arguments a verb takes by its handler, which a
@@ -107,11 +115,35 @@ var HandlerArgs = map[string][]string{
 	"waiting":  {"on", "resurface"},
 	"context":  {"set"},
 	"area":     {"set"},
+	"merge":    {task.ArgTask},
+	"split":    {task.ArgTask},
+	"relate":   {task.ArgTask},
+	"unrelate": {task.ArgTask},
 }
 
 // InputHandlers are the handlers that ask for a value before they run: a
 // verb that names one puts its question in input.
-var InputHandlers = []string{"waiting", "schedule", "project", "context", "area", "delegate", "reply", "promise"}
+var InputHandlers = []string{"waiting", "schedule", "project", "context", "area", "delegate", "reply", "promise", "merge", "split", "relate",
+	"unrelate"}
+
+// HandlerProject is the handler that files a task under a parent, which shapes the task by hand as a move to
+// a state does (task.clarified).
+const HandlerProject = "project"
+
+// The tasks a verb that takes another task lets a person pick it from, by TaskPicks.
+const (
+	PickOpen    = "open"    // the open tasks but this one
+	PickMerged  = "merged"  // the tasks merged into this one: its property of role merged
+	PickRelated = "related" // the tasks related to this one: its property of role related
+)
+
+// TaskPicks are the handlers that ask for another task rather than a text, by the tasks the person picks it
+// from; the pick is sent as the argument task.ArgTask.
+var TaskPicks = map[string]string{"merge": PickOpen, "relate": PickOpen, "split": PickMerged, "unrelate": PickRelated}
+
+// PickRoles are the picks that offer the tasks a property of the task lists, by the role of that property; a
+// verb of such a pick is offered disabled while that list is empty.
+var PickRoles = map[string]task.Role{PickMerged: task.RoleMerged, PickRelated: task.RoleRelated}
 
 func verbHandlerValues() []Value {
 	out := make([]Value, len(VerbHandlers))

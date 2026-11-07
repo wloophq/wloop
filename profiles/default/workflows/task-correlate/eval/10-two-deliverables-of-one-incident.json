@@ -1,0 +1,24 @@
+{
+ "id": "10-two-deliverables-of-one-incident",
+ "kind": "same-launch",
+ "act": "relate",
+ "on": "t-000000000000a002",
+ "task": {
+  "id": "t-000000000000a001",
+  "title": "Write the incident report for Tuesday's outage",
+  "notes": "DM with Paula",
+  "items": [
+   "Paula asks for the incident report of Tuesday's checkout outage"
+  ]
+ },
+ "candidates": [
+  {
+   "id": "t-000000000000a002",
+   "title": "Present the outage at Friday's review",
+   "notes": "#eng-leads",
+   "items": [
+    "Paula asks you to present Tuesday's checkout outage at the Friday review"
+   ]
+  }
+ ]
+}
