@@ -8,11 +8,16 @@ All three are clients of the daemon. They show the same views and offer the same
 ## The cockpit
 
 ```sh
-{{command}} open                         # opens the cockpit in your browser
+{{command}} open                         # opens the cockpit: in the app's window, or your browser
 {{command}} open --print                 # prints the URL with its token, for another browser
 {{command}} open --print --view stalled  # opens on one view
+{{command}} open '#task=<id>'            # opens a cockpit route; so does a URL of the cockpit itself
 {{command}} open <url>                   # focuses the pull request's workspace in its manager
 ```
+
+On macOS, while `{{app}}.app` runs, `open` and a notification's click show the cockpit in the app's own window. There is one window, and it reopens where you left it. It is in the Dock and ⌘Tab while it shows; closing it hides it. Without the app, with `window.enabled = false`, or on another system, `open` uses the browser, which always works.
+
+The global shortcut `window.hotkey` (`ctrl+option+space`; `""` for none) opens a floating panel over whatever app you are in, without leaving it until you type, on the route `#panel=omnibox`. A link to any other route in the panel opens that route in the main window and brings it forward. Escape hides the panel, and so does clicking elsewhere. A shortcut that does not parse, or that the system refuses, is logged as `window.hotkey` with the chord; the window and the menu bar keep working. Another app holding the same chord through a system shortcut takes it without an error.
 
 The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [lists](/concepts/tasks/#views) beside it. Needs me, Stalled, In loop, Approved and Done are lists of tasks across sources: a pull request shows there through its task. The GitHub views list what exists in GitHub:
 
@@ -44,7 +49,7 @@ The views of your profile's `views.toml`, in its order and starting on the first
 
 ## The menu bar (macOS)
 
-`{{command}} app`, which the LaunchAgent starts from `{{app}}.app`, puts an item in the menu bar. It shows `PR <n>`, the count of the views your profile's `[badge]` names (the bundled Inbox and Needs me), or `PR ?` while the daemon does not answer. Its menu names the plugins still loading, lists up to five tasks of each badge view (a pending round's task among them, through its open plan gate), then any section a plugin's manifest declares (`[[source.ui.menubar]]`; the bundled plugins declare none), then Open cockpit (on the first badge view), Sweep now, Pause automatic rounds (or Resume), the sync line and Quit. Quit stops the menu bar; the daemon keeps running.
+`{{command}} app`, which the LaunchAgent starts from `{{app}}.app`, puts an item in the menu bar. It shows `PR <n>`, the count of the views your profile's `[badge]` names (the bundled Inbox and Needs me), or `PR ?` while the daemon does not answer. Its menu names the plugins still loading, lists up to five tasks of each badge view (a pending round's task among them, through its open plan gate), then any section a plugin's manifest declares (`[[source.ui.menubar]]`; the bundled plugins declare none), then Open cockpit (on the first badge view, in the app's window when it has one), Sweep now, Pause automatic rounds (or Resume), the sync line and Quit. Quit stops the menu bar; the daemon keeps running.
 
 ## Notifications (macOS)
 

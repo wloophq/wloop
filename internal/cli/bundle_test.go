@@ -12,6 +12,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/window"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -264,7 +266,9 @@ func TestAppRebuildsAStaleBundleAndRestartsInPlace(t *testing.T) {
 	mustBuild(t, te)
 	te.Executable = bundleExe(te.Home)
 	te.NativeAvailable = func() bool { return true }
-	te.RunNative = func(func(menubar.Tray, menubar.Notifier)) { t.Error("the menu ran from a stale bundle") }
+	te.RunNative = func(config.Window, func(menubar.Tray, menubar.Notifier, window.Host)) {
+		t.Error("the menu ran from a stale bundle")
+	}
 	reexecs := 0
 	te.Reexec = func() error { reexecs++; return errors.New("exec refused") }
 	sourceSays(te, "v0.17.0\n")

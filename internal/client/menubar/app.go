@@ -59,7 +59,10 @@ type Config struct {
 	// CockpitURL is the cockpit's address at a hash route such as
 	// "task=<id>" or "view=inbox".
 	CockpitURL func(route string) (string, error)
-	Quit       func()
+	// Window shows the cockpit's own window at a route; nil opens the
+	// browser at CockpitURL instead.
+	Window func(route string) error
+	Quit   func()
 	// Copy puts text on the clipboard; nil offers no copy.
 	Copy func(text string) error
 	Now  func() time.Time
@@ -532,6 +535,9 @@ func (c *Controller) later(fn func(ctx context.Context) error) func() {
 }
 
 func (c *Controller) open(route string) error {
+	if c.cfg.Window != nil {
+		return c.cfg.Window(route)
+	}
 	u, err := c.cfg.CockpitURL(route)
 	if err != nil {
 		return err

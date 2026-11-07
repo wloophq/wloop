@@ -290,7 +290,7 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 
 func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 	t.Parallel()
-	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
+	s, hand, _ := newClockedByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
 	byHand := func(body string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
 		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(body))

@@ -55,7 +55,7 @@ type Since struct {
 // the previous change, or All when too much moved to list. A "notify"
 // change carries the notices a workflow raised for the user.
 type Change struct {
-	Type    string      `json:"type"` // "changed" or "notify"
+	Type    string      `json:"type"` // "changed", "notify" or "window"
 	Epoch   string      `json:"epoch"`
 	Rev     uint64      `json:"rev"`
 	Units   []unit.Unit `json:"units,omitempty"`
@@ -64,8 +64,8 @@ type Change struct {
 	Notices []Notice    `json:"notices,omitempty"`
 	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
 	Counters *Counters `json:"counters,omitempty"`
-	// Window is a window request, sent only to the events client named WindowClient.
-	Window *WindowRequest `json:"window,omitempty"`
+	// Windows are window requests, in the order they came, sent only to the events client named WindowClient.
+	Windows []WindowRequest `json:"windows,omitempty"`
 }
 
 // Notice is a notification a workflow's notify.self step raised; ID is

@@ -210,6 +210,14 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `notifications` | table |  | The notifications. |
 | `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
 
+### Window
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `window` | table |  | The app's own window on macOS. |
+| `window.enabled` | bool | `true` | Show the cockpit in the app's own window on macOS; false opens it in the browser. |
+| `window.hotkey` | string | `ctrl+option+space` | The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none. |
+
 ### Units and tasks
 
 | Setting | Kind | Default | Meaning |

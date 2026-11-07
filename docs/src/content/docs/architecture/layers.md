@@ -81,6 +81,7 @@ The commands call the daemon through `internal/api/client`. Those that work with
 | An API route | its path in `internal/api`, its handler in `internal/daemon`, its call in `internal/api/client` | |
 | A CLI command | `internal/cli`, calling the daemon through `internal/api/client` | `make docs-ref` |
 | A view in the cockpit, the terminal or the menu bar | served by the daemon as data (rows, actions, facets, counters) and rendered by `internal/web/static`, `internal/client/tui` or `internal/client/menubar`; a plugin's own view through its `Module.UI` | |
+| A native host for the cockpit's window | an adapter beside `internal/client/window/wails` implementing `window.Host`, picked in `internal/cli/nativehost.go`; when and where the window shows stays in `internal/client/window` | |
 | A store table or query | `internal/adapter/store/sqlite/schema.sql` with a migration to the next schema version, and a store method there; SQL text lives nowhere else | see [Changing the store's schema](/architecture/development/#changing-the-stores-schema) |
 | A user-visible name | derived from `internal/brand` | |
 | A constraint future code must obey, that a test keeps | an entry under `docs/src/content/docs/architecture/decisions/` naming that test | `make docs-ref`; see [the decision log](/architecture/decisions/) |

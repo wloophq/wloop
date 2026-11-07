@@ -55,6 +55,7 @@ var groups = map[builtin.Surface][]group{
 		{"Workflow gate approval", []string{"workflows.*.gates"}},
 		{"Turns and headless calls", []string{"turns", "headless", "brief", "classify"}},
 		{"Drafts and notifications", []string{"drafts", "notifications"}},
+		{"Window", []string{"window"}},
 		{"Units and tasks", []string{"items", "tasks"}},
 		{"Cleanup", []string{"cleanup"}},
 		{"Dossiers", []string{"dossiers"}},

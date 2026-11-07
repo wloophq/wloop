@@ -22,11 +22,13 @@ type pkg struct {
 	GoFiles      []string
 	TestGoFiles  []string
 	XTestGoFiles []string
-	Imports      []string
-	TestImports  []string
-	XTestImports []string
-	Standard     bool
-	EmbedFiles   []string
+	// IgnoredGoFiles are the files a build tag leaves out of this build.
+	IgnoredGoFiles []string
+	Imports        []string
+	TestImports    []string
+	XTestImports   []string
+	Standard       bool
+	EmbedFiles     []string
 }
 
 var forbidden = []string{"os/exec", "net/http", "database/sql"}

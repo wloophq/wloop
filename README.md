@@ -52,7 +52,7 @@ After `brew upgrade`, run `wloop install` and, on macOS, `wloop app install` aga
 | `wloop outbox` | The drafts that wait for your approval |
 | `wloop status` | The tasks of the views the badge counts, such as Inbox and Needs me, then the pull requests you track |
 | `wloop tui` | The same views in the terminal, with one-key actions |
-| `wloop open` | The web cockpit |
+| `wloop open` | The cockpit, in the app's window on macOS or in the browser |
 | `wloop plan` | What the workflows would do now, and why |
 | `wloop profile try <url>` | What a review would publish with your profile, without publishing |
 | `wloop doctor` | Diagnose the setup without changing anything |

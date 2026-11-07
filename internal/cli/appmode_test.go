@@ -14,6 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/window"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/lock"
 )
 
@@ -29,8 +31,8 @@ func TestAppQuitExitsZero(t *testing.T) {
 	quit := make(chan struct{})
 	te.QuitNative = func() { close(quit) }
 	tray := &recTray{}
-	te.RunNative = func(setup func(menubar.Tray, menubar.Notifier)) {
-		setup(tray, silentNotifier{})
+	te.RunNative = func(_ config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
+		setup(tray, silentNotifier{}, nil)
 		eventually(t, "the menu from the daemon", func() bool { return tray.title() != "PR ?" && tray.has("Quit "+brand.Name) })
 		eventually(t, "the daemon to see the notifier", func() bool {
 			h, err := client.New(d.socket).Health(context.Background())
@@ -68,8 +70,8 @@ func TestAppShowsTheDaemonMissingWhileItWaits(t *testing.T) {
 	quit := make(chan struct{})
 	te.QuitNative = func() { close(quit) }
 	tray := &recTray{}
-	te.RunNative = func(setup func(menubar.Tray, menubar.Notifier)) {
-		setup(tray, silentNotifier{})
+	te.RunNative = func(_ config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
+		setup(tray, silentNotifier{}, nil)
 		eventually(t, "the menu without the daemon", func() bool { return tray.title() == "PR ?" && tray.has("Quit "+brand.Name) })
 		tray.click(t, "Quit "+brand.Name)
 		<-quit
@@ -84,7 +86,9 @@ func TestAppOutsideTheBundleIsAnError(t *testing.T) {
 	te := newTestEnv(t, nil)
 	te.Executable = "/opt/homebrew/bin/" + brand.Name
 	te.NativeAvailable = func() bool { return true }
-	te.RunNative = func(func(menubar.Tray, menubar.Notifier)) { t.Error("the menu ran outside the bundle") }
+	te.RunNative = func(config.Window, func(menubar.Tray, menubar.Notifier, window.Host)) {
+		t.Error("the menu ran outside the bundle")
+	}
 	if err := runApp(context.Background(), te.Env, nil); err == nil || !strings.Contains(err.Error(), brand.Command+" app install") {
 		t.Fatalf("err = %v", err)
 	}
