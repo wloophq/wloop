@@ -47,11 +47,9 @@ type Texts struct {
 
 // fileTexts are one profile file's texts in every layer.
 type fileTexts struct {
-	base, loc []map[string]string // by layer, then by path key
-	order     []map[string][]string
-	whole     []*Resolved // by layer, for a whole-file text: the base, then the locale file
-	wholeLoc  []*Resolved
-	problems  Problems
+	base, loc       []map[string]string // by layer, then by path key
+	whole, wholeLoc []*Resolved         // by layer, of a whole-file text
+	problems        Problems
 }
 
 // NewTexts resolves the texts keys names across layers, the bundled layer reading bundled, in locale.
@@ -310,7 +308,7 @@ func (t *Texts) near(f *fileTexts, i int, p []string) string {
 	var siblings []string
 	for j := i; j >= 0; j-- {
 		for k := range f.base[j] {
-			if parent, last, ok := cutLast(k); ok && parent == prefix && !slices.Contains(siblings, last) {
+			if parent, last := cutLast(k); parent == prefix && !slices.Contains(siblings, last) {
 				siblings = append(siblings, last)
 			}
 		}
@@ -319,12 +317,13 @@ func (t *Texts) near(f *fileTexts, i int, p []string) string {
 	return expr.DidYouMean(p[len(p)-1], siblings)
 }
 
-func cutLast(k string) (string, string, bool) {
+// cutLast is path key k's parent key and last segment.
+func cutLast(k string) (string, string) {
 	i := strings.LastIndex(k, "\x00")
 	if i < 0 {
-		return "", k, true
+		return "", k
 	}
-	return k[:i], k[i+1:], true
+	return k[:i], k[i+1:]
 }
 
 // fieldsProblem says why text names a field or placeholder base does not, "" when it names none.
