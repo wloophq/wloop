@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -23,6 +24,23 @@ func (k *skippingKeep) Skipped(_ context.Context, workflow string, u unit.Unit) 
 		}
 	}
 	return false, nil
+}
+
+func TestTheSweepWithdrawsADraftOfASkippedSubject(t *testing.T) {
+	plain := sweepWF("nudge", never, "notify.self")
+	r := newRig(t, plain)
+	ws := withWithdrawals(r)
+	r.put(s1, "a")
+	r.put(s2, "b")
+	ws.Put("nudge", owned(1, s1, 0), owned(2, s2, 0))
+	r.e.Keep = &skippingKeep{Units: r.units, skipped: map[string][]unit.Unit{"nudge": {s1}}}
+	r.sweep()
+	if got, ok := ws.Withdrawn(1); !ok || got != draft.WithdrawSkipped {
+		t.Errorf("the skipped subject's draft: withdrawn %v %q, want %q", ok, got, draft.WithdrawSkipped)
+	}
+	if _, ok := ws.Withdrawn(2); ok {
+		t.Error("a draft of a subject not skipped was withdrawn")
+	}
 }
 
 func TestTheEngineSkipsASkippedSubject(t *testing.T) {

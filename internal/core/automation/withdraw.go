@@ -11,7 +11,8 @@ import (
 
 // withdraw discards every proposed draft whose applying workflow's
 // [drafts.withdraw] when matches it on fresh facts, with the workflow's reason,
-// and every draft of a workflow no longer loaded as moot; a draft of a
+// every draft of a workflow no longer loaded as moot, and every draft of a
+// workflow the Keep skips on its subject as skipped; a draft of a
 // disabled plugin's unit, or of a workflow that failed to load, is left as
 // it is.
 func (e *Engine) withdraw(ctx context.Context) error {
@@ -73,9 +74,16 @@ func (e *Engine) withdraw(ctx context.Context) error {
 
 func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workflow, d ProposedDraft, vars workflow.Vars) (string, error) {
 	w, ok := live[d.Workflow]
-	switch {
-	case !ok:
+	if !ok {
 		return draft.WithdrawMoot, nil
+	}
+	if skip, err := e.skipped(ctx, d.Workflow, d.Subject); err != nil || skip {
+		if skip {
+			return draft.WithdrawSkipped, nil
+		}
+		return "", err
+	}
+	switch {
 	case w.Withdraw == nil || w.Observe:
 		return "", nil
 	}
