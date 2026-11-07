@@ -3,6 +3,7 @@ package tasks
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -107,7 +108,18 @@ func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
 	}
 	p.mu.Unlock()
 	l.once.Do(func() { l.v, l.err = load() })
+	if l.err != nil && cancelled(l.err) {
+		p.mu.Lock()
+		if p.once[key] == l {
+			delete(p.once, key)
+		}
+		p.mu.Unlock()
+	}
 	return l.v, l.err
+}
+
+func cancelled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // Units are the units of every task of the pass, its own and its items', each once, in pass order.
@@ -170,6 +182,10 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 		return load()
 	}
 	v, err := p.Once(key, func() (any, error) { return load() })
+	if err != nil && cancelled(err) && ctx.Err() == nil {
+		// The load another reader of the pass ran ended with its reader's context.
+		v, err = p.Once(key, func() (any, error) { return load() })
+	}
 	if err != nil {
 		var zero T
 		return zero, err
@@ -258,12 +274,11 @@ func (s *Service) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) 
 	if spec.Over != task.OverTasks {
 		return s.sourced(ctx, spec, q)
 	}
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	pass, err := s.pass(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ctx = WithPass(ctx, &Pass{Tasks: all})
-	return s.list(ctx, spec, q, all)
+	return s.list(WithPass(ctx, pass), spec, q, pass.Tasks)
 }
 
 // sourced are the tasks of the view over another thing than the stored tasks, from its ViewSource, narrowed to
@@ -461,13 +476,16 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since, uni
 	if err != nil {
 		return Page{}, err
 	}
-	all := p.Tasks
-	if !p.Full {
-		if all, err = s.d.Store.Tasks(ctx, task.Query{All: true}); err != nil {
+	pass, err := s.pass(ctx)
+	if err != nil {
+		return Page{}, err
+	}
+	if !pass.covers(p) {
+		if pass, err = s.newPass(ctx); err != nil {
 			return Page{}, err
 		}
 	}
-	pass := &Pass{Tasks: all}
+	all := pass.Tasks
 	ctx = WithPass(ctx, pass)
 	switch {
 	case spec.Over != task.OverTasks:
@@ -536,11 +554,11 @@ type Snapshot struct {
 
 // Snapshot reads every stored task, whatever its category.
 func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	pass, err := s.pass(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
+	return Snapshot{s: s, pass: pass}, nil
 }
 
 // Open are n's open tasks, in the store's order.

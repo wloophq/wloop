@@ -48,6 +48,34 @@ func TestAPassLoadsOnceWhatEveryTaskReads(t *testing.T) {
 	}
 }
 
+func TestALoadCancelledWithItsCallerIsLoadedAgainByTheNext(t *testing.T) {
+	p := &Pass{}
+	gone, cancel := context.WithCancel(WithPass(context.Background(), p))
+	cancel()
+	if _, err := Once(gone, "items", func() (int, error) { return 0, gone.Err() }); !errors.Is(err, context.Canceled) {
+		t.Fatalf("the cancelled caller got %v", err)
+	}
+	got, err := Once(WithPass(context.Background(), p), "items", func() (int, error) { return 7, nil })
+	if err != nil || got != 7 {
+		t.Fatalf("the next caller got %v, %v; want a fresh load", got, err)
+	}
+}
+
+func TestACallerWaitingOnAnotherCallersCancelledLoadLoadsItself(t *testing.T) {
+	ctx := WithPass(context.Background(), &Pass{})
+	loads := 0
+	got, err := Once(ctx, "items", func() (int, error) {
+		loads++
+		if loads == 1 {
+			return 0, context.Canceled
+		}
+		return 7, nil
+	})
+	if err != nil || got != 7 || loads != 2 {
+		t.Fatalf("got %v, %v after %d loads; want 7 after 2", got, err, loads)
+	}
+}
+
 func TestAPassUnitsAreEveryTasksOwnAndItemsUnitsOnce(t *testing.T) {
 	pr := unit.Unit{Provider: "github", Key: "acme/api#1"}
 	thread := unit.Unit{Provider: "slack", Key: "T1/C1/1.2"}
