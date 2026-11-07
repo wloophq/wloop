@@ -169,7 +169,7 @@ function renderLens(lens, res, tools = document.getElementById("tools")) {
   tools.hidden = false;
   const offered = (lens.offered || catalog.fields).map((f) => f.id);
   const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
+    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords(), boundKey("filter:add")]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
   const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear"));
