@@ -67,6 +67,34 @@ func readFile(t *testing.T, file string) string {
 	return string(raw)
 }
 
+func TestDisablingAWorkflowStopsItsDraftsWithoutARestart(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeFile(t, te.ConfigPath, acmeConfig)
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
+	cfg, err := te.readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.Env.cfg = te.configHolder(cfg)
+	running := func() bool {
+		return slices.ContainsFunc(applyConfig(te.loadedIntents().Workflows, te.currentConfig()),
+			func(w workflow.Workflow) bool { return w.Name == "task-check-on" })
+	}
+	if !running() {
+		t.Fatal("task-check-on is not loaded")
+	}
+	if err := te.setConfig([]string{"workflows", "task-check-on", "enabled"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(readFile(t, te.ConfigPath), "[workflows.task-check-on]\nenabled = false\n") || len(backups(t, te.ConfigPath)) != 1 {
+		t.Fatalf("file %q", readFile(t, te.ConfigPath))
+	}
+	if running() || te.Env.cfg.Stale() {
+		t.Fatalf("task-check-on still runs (stale %v)", te.Env.cfg.Stale())
+	}
+}
+
 func TestConfigSetWritesTheValueKeepingTheFileAndABackup(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {

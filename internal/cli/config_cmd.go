@@ -128,6 +128,18 @@ func (e *Env) editConfig(path []string, edit func(*config.Doc, []string) error) 
 		Write: func(raw []byte) error { return writeAtomic(e.ConfigPath, raw) }})
 }
 
+// setConfig sets key path of the config file to v, then makes the serve's config holder read it, so the keys
+// that apply live apply now.
+func (e *Env) setConfig(path []string, v any) error {
+	if _, err := e.editConfig(path, func(d *config.Doc, p []string) error { return d.Set(p, v) }); err != nil {
+		return err
+	}
+	if e.cfg != nil {
+		e.cfg.Reload()
+	}
+	return nil
+}
+
 func runConfigEdit(e *Env, key string, edit func(*config.Doc, []string) error) error {
 	path, err := config.ParseKey(key)
 	if err != nil {

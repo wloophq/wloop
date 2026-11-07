@@ -314,7 +314,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
-		Timeline: taskTimeline(db),
+		Timeline:  taskTimeline(db),
+		ConfigSet: e.setConfig,
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,

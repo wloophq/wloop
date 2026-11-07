@@ -48,6 +48,8 @@ var Notices = []ToolAnswer{
 		Fields: []AnswerField{str("Verb"), str("Pick")}},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
+	{Name: NoticeWorkflowUnknown, Doc: "Why a request naming Workflow is refused when the profile loads no workflow of that name.",
+		Fields: []AnswerField{str("Workflow")}},
 	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
 		Fields: []AnswerField{str("Task"), str("Managers")}},
 }
@@ -89,6 +91,7 @@ const (
 	NoticeNotifyDraftFailed    = "notify_draft_failed"
 	NoticeNotifyOpen           = "notify_open"
 	NoticeNotifyDiscard        = "notify_discard"
+	NoticeWorkflowUnknown      = "workflow_unknown"
 )
 
 // NoticeOf is the notice name, false when there is none.

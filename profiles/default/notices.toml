@@ -74,3 +74,5 @@ notify_draft_failed = "Draft failed"
 notify_open = "Open"
 
 notify_discard = "Discard"
+
+workflow_unknown = "No workflow named {{.Workflow}} is loaded."
