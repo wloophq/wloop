@@ -194,7 +194,8 @@ const OMNI_DEBOUNCE_MS = 120;
 // omniboxNew is an empty omnibox; items are the selection's actions it lists while nothing is typed.
 function omniboxNew(panel, items) {
   return { panel: !!panel, items: items || [], text: "", seq: 0, askSeq: 0, abort: null, timer: null, search: null, resolved: null,
-    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "" };
+    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "",
+    answered: "", pending: Promise.resolve() };
 }
 
 // omniboxOps makes ops the operations to confirm, every one checked.
@@ -219,11 +220,13 @@ function omniboxType(st, text, env) {
   if (!text.trim()) {
     st.search = null;
     st.resolved = null;
+    st.answered = text;
     omniboxOps(st, []);
     env.render();
-    return Promise.resolve();
+    st.pending = Promise.resolve();
+    return st.pending;
   }
-  return new Promise((done) => {
+  st.pending = new Promise((done) => {
     st.timer = env.later(async () => {
       const ctl = new AbortController();
       st.abort = ctl;
@@ -234,6 +237,7 @@ function omniboxType(st, text, env) {
       if (seq === st.seq) {
         st.search = search;
         st.resolved = resolved;
+        st.answered = text;
         st.took = env.now() - started;
         omniboxOps(st, (resolved && resolved.preview && resolved.preview.operations) || []);
         env.render();
@@ -241,6 +245,7 @@ function omniboxType(st, text, env) {
       done();
     }, OMNI_DEBOUNCE_MS);
   });
+  return st.pending;
 }
 
 // omniboxAsk asks the read-only agent about the text, with the questions it asked and their answers; a reply
@@ -357,12 +362,16 @@ function omniboxMove(st, delta, env) {
   env.render();
 }
 
-// omniboxEnter is Enter in the field: run the selected choice; with Cmd it asks the agent.
-function omniboxEnter(st, env, ask) {
+// omniboxEnter is Enter in the field: run the selected choice once the answer to the text typed is in; with
+// Cmd it asks the agent.
+async function omniboxEnter(st, env, ask) {
   if (ask) return omniboxAsk(st, env);
+  const text = st.text;
+  if (st.answered !== text) await st.pending;
+  if (st.answered !== text || st.text !== text) return;
   const choices = omniboxChoices(st, env);
   const pick = choices.find((c) => c.id === omniboxSelected(st, choices));
-  return Promise.resolve(pick ? pick.run() : undefined);
+  return pick ? pick.run() : undefined;
 }
 
 // omniboxKey is a key in the omnibox's field: the arrows (and Ctrl+N, Ctrl+P) move the selection, Enter runs

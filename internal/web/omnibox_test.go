@@ -527,3 +527,27 @@ process.stdout.write(JSON.stringify(out));
 		t.Fatalf("%+v: a redraw gives the focus back to its control, and the field points at the selected choice, scrolled into view", got)
 	}
 }
+
+func TestOmniboxEnterActsOnlyOnTheAnswerForTheCurrentText(t *testing.T) {
+	var got struct {
+		Before, After []string
+	}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "re", env);
+hold = true;
+const typed = omniboxType(st, "retries", env);
+const entered = omniboxEnter(st, env, false);
+await new Promise((r) => setTimeout(r, 5));
+const before = log.opened.slice();
+hold = false;
+held.splice(0).forEach((fn) => fn());
+await typed;
+await entered;
+process.stdout.write(JSON.stringify({ Before: before, After: log.opened }));
+})();`, map[string]any{"search": retriesSearch()}, &got)
+	if len(got.Before) != 0 || !slices.Equal(got.After, []string{"#task=t-1"}) {
+		t.Fatalf("%+v: Enter waits for the answer to the text typed, never runs the older text's first result", got)
+	}
+}
