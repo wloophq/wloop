@@ -1,0 +1,13 @@
+# The texts the clients show (the cockpit, the menu bar, the terminal client), by their English text with
+# {name} placeholders. A text with plural forms is a table of its CLDR forms: { one = "...", other = "..." }.
+# Each piece adds its keys in its own block.
+
+[strings]
+# piece D
+
+[formats]
+time = "3:04 PM"
+date = "Jan 2"
+datetime = "Jan 2 3:04 PM"
+decimal = "."
+group = ","

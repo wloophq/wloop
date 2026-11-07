@@ -645,7 +645,7 @@ See [Write your review profile](/guides/review-profile/).
 The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]
+{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--config]
 ```
 
 Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
@@ -659,6 +659,7 @@ Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.t
 | `--gates` | The schema of gates.toml |
 | `--records` | The schema of records.toml |
 | `--keys` | The schema of keys.toml |
+| `--strings` | The schema of strings.toml |
 | `--config` | The schema of config.toml |
 
 Examples:

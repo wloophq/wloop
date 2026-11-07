@@ -1,0 +1,9 @@
+[strings]
+# piece D
+
+[formats]
+time = "15:04"
+date = "02/01"
+datetime = "02/01 15:04"
+decimal = ","
+group = "."

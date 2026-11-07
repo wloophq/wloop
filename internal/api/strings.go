@@ -1,5 +1,7 @@
 package api
 
+import "encoding/json"
+
 // StringsPath serves the client strings in the daemon's interface language, as Strings.
 const StringsPath = "/api/strings"
 
@@ -13,4 +15,29 @@ type Strings struct {
 	Locale  string            `json:"locale"`
 	Strings map[string]Text   `json:"strings"`
 	Formats map[string]string `json:"formats"`
+}
+
+// MarshalJSON writes a text with only an "other" form as a bare string, else the object of its forms.
+func (t Text) MarshalJSON() ([]byte, error) {
+	if len(t) == 1 {
+		if s, ok := t["other"]; ok {
+			return json.Marshal(s)
+		}
+	}
+	return json.Marshal(map[string]string(t))
+}
+
+// UnmarshalJSON reads a bare string as the "other" form, else the object of forms.
+func (t *Text) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		*t = Text{"other": s}
+		return nil
+	}
+	var m map[string]string
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	*t = m
+	return nil
 }
