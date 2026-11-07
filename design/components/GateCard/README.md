@@ -17,6 +17,8 @@ An `article.ask.d-gate` on `raise`, `rule-strong` border, `radius-lg`:
 
 A `section.d-draft` on `raise`: its purpose and, once it left your hands, its state as the heading, in the words of `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` (a purpose with no word shows as named); in the Outbox, what it answers (the [OutboxGroup](../OutboxGroup/README.md) context block); where it posts and the language its text is written in (by name, `Intl.DisplayNames`); the text as it will be posted (markdown); why it was drafted; what sending it does besides posting, one sentence per effect from `gates.toml`'s `[effects]`; the window line when its gate has one; its actions; links to its task and to its unit at the source.
 
+While a gate's or a draft's intent is on its way, its card dims (`.resolving`, `aria-busy`, over `motion-fast`) and takes no clicks; the next redraw drops it, and a failure brings it back.
+
 On a draft's own task its actions are the task's verbs (approve, edit, discard, retry); on any other task, its gate's intents. **Close without a message** and **Don't nudge this conversation** show only when the draft serves them among its actions, off with their reason when refused.
 
 ## Consumer provides

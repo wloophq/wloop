@@ -22,6 +22,14 @@ function gateOption(g) {
   return (subject.options || []).some((o) => o.id === subject.recommend) ? subject.recommend : "";
 }
 
+// markResolving dims the card drawn for selector while its decision is on its way; a failed one comes back.
+function markResolving(selector, on) {
+  const card = typeof document === "object" && document.querySelector ? document.querySelector(selector) : null;
+  if (!card || !card.classList) return;
+  card.classList.toggle("resolving", on);
+  card.setAttribute("aria-busy", String(on));
+}
+
 // resolveGate resolves gate g of task e with intent id; an intent that takes an answer sends the option given,
 // else the one picked on the card, then the text typed in it.
 async function resolveGate(e, g, id, option) {
@@ -37,6 +45,8 @@ async function resolveGate(e, g, id, option) {
     }
     args.answer = [pick, text].filter(Boolean).join("\n");
   }
+  const card = `.d-gate[data-gate=${JSON.stringify(String(g.id))}]`;
+  markResolving(card, true);
   try {
     const out = await detailEnv.post("/api/gates/" + encodeURIComponent(g.id) + "/" + encodeURIComponent(id), verbBody(args));
     detailEnv.notice(`${intent.label}: ${(e && (e.title || e.id)) || g.text || g.kind}`);
@@ -45,6 +55,7 @@ async function resolveGate(e, g, id, option) {
     detailEnv.changed();
     return out || {};
   } catch (err) {
+    markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: intent.label, error: err.message }), true);
     return null;
   }
@@ -232,12 +243,15 @@ function taskHref(id) {
 
 // resolveDraft resolves d's gate with intent, sending args with the draft's version.
 async function resolveDraft(d, intent, label, args) {
+  const card = `.d-draft[data-draft=${JSON.stringify(String(d.id))}]`;
+  markResolving(card, true);
   try {
     await detailEnv.post("/api/gates/" + encodeURIComponent(d.gate) + "/" + encodeURIComponent(intent), verbBody({ ...args, rev: String(d.rev) }));
     detailEnv.notice(`${label}: ${d.where || d.target || d.unit}`);
     detailState.editing.delete("draft:" + d.id);
     detailEnv.changed();
   } catch (err) {
+    markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: label, error: err.message }), true);
   }
 }

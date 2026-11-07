@@ -1411,7 +1411,7 @@ function toggleCollapsed(key) {
   render();
 }
 
-// unitTitle names a row view's unit column: the view's unit, else the lens's word for a mixed view.
+// unitTitle names a row view's unit in its count line: the view's unit, else the lens's word for a mixed view.
 function unitTitle(view, lens) {
   return (catalog.views.find((x) => x.id === view) || {}).unit || (lens.words || {}).col_unit || "";
 }

@@ -43,8 +43,8 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 ### Spacing and layout
 
 - Steps: `space-2`, `space-4`, `space-6`, `space-8`, `space-10`, `space-12`, `space-16`, `space-24`. The page gutter is `space-16`.
-- Three columns: rail (`rail-width`), list, detail (`detail-width`, resizable). Below `breakpoint-narrow` the rail wraps into a tab row with a bottom marker, the detail stacks under the list, and the Why and Where columns hide.
-- Lists scroll; the top bar and table heads stick.
+- Three columns: rail (`rail-width`), list, detail (`detail-width`, resizable). Below `breakpoint-narrow` the rail wraps into a tab row with a bottom marker, the detail covers the list, and a row's workspace and actions hide.
+- Lists scroll; the top bar and a grouped list's group heads stick.
 
 ### Shape, borders, elevation
 
@@ -64,18 +64,17 @@ Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (
 
 ### Motion
 
-Only in answer to an action (a panel or the palette appearing, a resolved gate leaving, a pressed control), short: every transition reads `motion-fast` (120ms) with `motion-ease`. Under `prefers-reduced-motion: reduce` the generated tokens set `motion-fast` to 0ms, so nothing moves. Live updates never animate: they replace content in place, and the sync line reports freshness.
+Only in answer to an action, short: the detail panel and the palette fade in as they open (`@starting-style`), a decision card dims while its gate is being resolved and comes back if that fails, and controls ease their hover and press. Every transition reads `motion-fast` (120ms) with `motion-ease`, and there are no keyframe animations. Under `prefers-reduced-motion: reduce` the generated tokens set `motion-fast` to 0ms, so nothing moves. Live updates never animate: they replace content in place, and the sync line reports freshness.
 
 ## Iconography
 
 There is no icon set in the cockpit. Use text and a few Unicode glyphs:
 
 - `▍` in `me` before the product name.
-- `↑` `↓` after a sorted column head.
 - `★` in `late` for a starred task.
 - `×` for close and for removing a filter chip.
 - `●` (the `dot` class) in the waiter hue beside a `who` word.
-- State glyphs for tasks, one per category of state, drawn in CSS at `state-glyph` size: dashed circle (inbox), circle (ready), circle with a dot (active), half-filled circle (waiting), dotted circle (deferred), filled check (done), slashed circle (dropped). A profile's states take the glyph of their category.
+- State glyphs for tasks, one per category of state, shapes drawn in CSS at `state-glyph` size in the waiter's hue: dashed circle (inbox), circle (ready), circle with a dot (active), half-filled circle (waiting), dotted circle (deferred), filled disc with a check (done), slashed circle (dropped). A profile's states take the glyph of their category ([StateGlyph](components/StateGlyph/README.md)).
 - Source marks: two uppercase letters of the provider in a `hover` tile, never a logo.
 
 The menu bar notifications use four 128px PNG badges (assets group **Notifications**), each in the hue of what it means: `round` in `loop` (clock), `ask` in `me` (question), `held` in `late` (pause), `blocked` in `err` (stop). The docs site and the cockpit's favicon use the loop mark in `me` (**Logos**).
