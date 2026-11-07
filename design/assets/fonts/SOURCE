@@ -1,0 +1,13 @@
+Geist and Geist Mono, SIL Open Font License 1.1 (internal/web/static/fonts/OFL.txt).
+
+Release: https://github.com/vercel/geist-font/releases/tag/v1.9.2
+Archive: geist-font-v1.9.2.zip
+  sha256 15f066d58dcb99fb10014a49913009fdaf41e464cfb8851a44b44e593c95d3d8
+
+Files kept, served from internal/web/static/fonts/:
+  Geist-Variable.woff2      from Geist/webfonts/Geist[wght].woff2
+    sha256 3626eba547294501c8a4d662c7d9ea3b49734409a4c5a1ccf12fa86429b1687e
+  GeistMono-Variable.woff2  from GeistMono/webfonts/GeistMono[wght].woff2
+    sha256 5d93ee62680bbec1abc5405c2658311f9396f6f9a821ef8551ec463887e600d4
+  OFL.txt                   from OFL.txt
+    sha256 021caa749f89fecd7c2e40a50499de29e84d2bc19251659b47d499c2fbfffc17

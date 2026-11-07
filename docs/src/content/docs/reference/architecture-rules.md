@@ -95,6 +95,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `embedKept` entry | Status | Reason |
 |---|---|---|
+| `internal/web/static/fonts/OFL.txt` | ✅ | the SIL Open Font License must ship with the fonts the cockpit serves |
 | `skills` | ✅ | the skills install writes into agent homes |
 
 ### `TestProviderIdentityThroughAPluginPackageOnlyShrinks`

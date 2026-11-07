@@ -2,7 +2,7 @@
 
 // THEME_TOKENS are the custom properties of app.css that ctx.theme() hands
 // a plugin view.
-const THEME_TOKENS = ["bg", "panel", "ink", "muted", "rule", "hover", "sel", "me", "author", "reviewer", "loop", "none",
+const THEME_TOKENS = ["bg", "panel", "raise", "code-bg", "ink", "muted", "faint", "rule", "rule-strong", "hover", "sel", "me", "author", "reviewer", "loop", "none",
   "me-text", "author-text", "reviewer-text", "loop-text", "none-text", "on-me", "mine-bg", "mine-text", "late", "late-bg",
   "err", "err-bg", "mark", "mono", "sans"];
 
