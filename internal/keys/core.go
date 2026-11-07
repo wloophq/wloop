@@ -89,6 +89,12 @@ func core() []Binding {
 		{"t", "detail:detach", Detail, webOnly},
 		{"]", "tab:next", Detail, webOnly},
 		{"[", "tab:prev", Detail, webOnly},
+		{"g h", "nav:home", Global, webOnly},
+		{"Enter", "queue:primary", Queue, webOnly},
+		{"j", "queue:skip", Queue, webOnly},
+		{"k", "queue:back", Queue, webOnly},
+		{"o", "open-source", Queue, webOnly},
+		{"Esc", "queue:home", Queue, webOnly},
 	}
 	for n := 1; n <= 9; n++ {
 		b = append(b,

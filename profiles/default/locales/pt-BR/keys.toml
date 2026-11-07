@@ -30,6 +30,7 @@ quit = "sair"
 "nav:cycle" = "próxima visão do grupo"
 "area:{n}" = "área {n}"
 "link:copy" = "copiar um link para esta visão"
+"nav:home" = "ir para o início"
 
 [help.review]
 "step:done" = "marcar o passo como feito"
@@ -46,3 +47,10 @@ approve = "aplicar o passo do plano selecionado"
 
 [help.question]
 "answer:{n}" = "a opção {n} da decisão"
+
+[help.queue]
+"queue:primary" = "executar a ação principal da decisão"
+"queue:skip" = "próxima decisão, sem agir"
+"queue:back" = "decisão anterior"
+open-source = "abrir na origem"
+"queue:home" = "voltar ao início"

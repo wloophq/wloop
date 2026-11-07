@@ -1,11 +1,7 @@
 "use strict";
 
-// railEnv is what the rail's omnibox entry runs: the actions palette, until the omnibox takes its place.
-const railEnv = {
-  omnibox: () => {
-    if (typeof cockpitKeys === "object" && cockpitKeys) cockpitKeys.openPalette();
-  },
-};
+// railEnv is what the rail's omnibox entry runs.
+const railEnv = { omnibox: () => openOmnibox() };
 
 const railState = { emptiesOpen: false };
 
@@ -84,9 +80,10 @@ function railViews(all, route) {
   const item = (v) => railItem(v.label, v.count, v.id === route.view, lensHash({ view: v.id, task: "", pr: "" }, route),
     (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
   const empties = nav.filter((v) => railFolds(v, route.view));
-  const views = railSections(nav.filter((v) => !railFolds(v, route.view)), providerName).flatMap((sec) => [
+  const home = railItem(t("Home"), "", route.view === HOME, "view=" + HOME, "core",t("What waits on you, and what stalled the longest"));
+  const views = [home, ...railSections(nav.filter((v) => !railFolds(v, route.view)), providerName).flatMap((sec) => [
     sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
-    ...sec.views.map(item)]);
+    ...sec.views.map(item)])];
   if (!empties.length) return views.filter(Boolean);
   const open = railState.emptiesOpen;
   const toggle = h("li", {}, h("button", {

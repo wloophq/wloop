@@ -23,7 +23,7 @@ EventSource.CLOSED = 2;
 const unit = (k) => ({ provider: "github", key: k });
 const row = (k, title) => ({ unit: unit(k), label: k, title });
 let pages = {};
-` + noPlugins + noViews + noUpdate + `const getJSON = async (url) => {
+` + noPlugins + noViews + noUpdate + noScreens + `const getJSON = async (url) => {
   requests.push(url);
   if (url === "/api/health") return { viewer: "me" };
   if (url === "/api/catalog") return { version: "c1", views: [], facets: [], situations: [] };

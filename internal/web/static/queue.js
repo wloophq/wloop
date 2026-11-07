@@ -1,0 +1,141 @@
+"use strict";
+
+// A decision queue: one decision at a time, the oldest first, with its card or its unit's row, its primary
+// action, the progress through the queue and the decision next up. The daemon orders the items and names each
+// primary; this draws them and walks them.
+
+// queueState is where the queue screen stands: the queue it shows, the item at, and the last error.
+const queueState = { key: "", queue: null, at: 0, error: "", busy: false };
+
+// queueKey names a queue route's items: a kind and its lens query, or the tasks a list names.
+function queueKey(route) {
+  return route.queue === QUEUE_LIST ? QUEUE_LIST + ":" + route.ids.join(",") : route.queue + "?" + (route.q || "");
+}
+
+// queueURL is the API path of a kind's queue narrowed by its lens query.
+function queueURL(route) {
+  return "/api/queues/" + encodeURIComponent(route.queue) + (route.q ? "?q=" + encodeURIComponent(route.q) : "");
+}
+
+// listQueue is the queue of the tasks ids name, in their order, each opened by its own detail.
+function listQueue(tasks) {
+  return {
+    kind: QUEUE_LIST, title: t("Results"), empty: t("Nothing left in this list."), total: tasks.length,
+    items: tasks.map((e) => ({ task: e, primary: { kind: "task", id: e.id, label: t("Open") } })),
+  };
+}
+
+// queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
+// daemon serves with its delivery), else its unit's row with the situation that makes it.
+function queueItemCard(item, env) {
+  const g = item.gate;
+  if (g && g.delivery && g.subject && typeof g.subject === "object") return draftCard(item.task, g.subject, { scope: "queue" });
+  if (g) return gateCard(item.task, g, { scope: "queue" });
+  return h("div", { class: "queue-unit" },
+    env.row(item.task),
+    item.situation && item.situation.label ? h("p", { class: "situation" }, item.situation.label) : null);
+}
+
+// queuePrimary is item's primary action as a button; Enter on the queue runs it too.
+function queuePrimary(item, env) {
+  const p = item.primary || {};
+  if (!p.kind) return null;
+  return h("button", { type: "button", class: "act primary queue-primary", "data-focus": "queue:primary", "aria-keyshortcuts": "Enter", disabled: queueState.busy || undefined,
+    onclick: () => env.primary(item) }, h("kbd", {}, "↵"), " ", p.label || p.id);
+}
+
+// queueLoad reads route's queue into queueState through env.get, keeping the item at while the same queue
+// reloads; a list queue reads each task it names, in order, leaving out the ones gone.
+async function queueLoad(route, env) {
+  const key = queueKey(route);
+  const same = queueState.key === key;
+  try {
+    const queue = route.queue === QUEUE_LIST
+      ? listQueue((await Promise.all(route.ids.map((id) => env.get("/api/tasks/" + encodeURIComponent(id)).catch(() => null)))).filter(Boolean))
+      : await env.get(queueURL(route));
+    if (queueKey(env.route()) !== key) return;
+    queueState.key = key;
+    queueState.queue = queue;
+    if (!same) queueState.at = 0;
+    queueState.at = Math.min(queueState.at, Math.max((queue.items || []).length - 1, 0));
+  } catch (err) {
+    queueState.error = t("Could not load the queue: {error}", { error: err.message });
+  }
+}
+
+// queueUnit is the unit of item's task its situation is on: the first of its units of that provider.
+function queueUnit(item) {
+  const p = item.situation ? item.situation.provider : "";
+  return ((item.task && item.task.units) || []).find((u) => !p || u.provider === p) || null;
+}
+
+// queueAct runs item's primary: its gate's intent as the card does, its unit's catalog action, its unit's
+// source, or the task's detail; then the queue reloads, so a decision settled elsewhere leaves it and a
+// refused one shows why. Nothing runs twice while a run is in flight.
+async function queueAct(item, env) {
+  if (queueState.busy) return;
+  const p = item.primary || {};
+  queueState.busy = true;
+  queueState.error = "";
+  try {
+    if (p.kind === "gate") await resolveGate(item.task, item.gate, p.id);
+    else if (p.kind === "action") {
+      const u = queueUnit(item);
+      if (u) await env.post(unitPath(u, p.id), { source: "cockpit" });
+    } else if (p.kind === "open") env.openSource(item.task, queueUnit(item));
+    else if (p.kind === "task") env.openTask(item.task.id);
+  } catch (err) {
+    queueState.error = t("{action} failed: {error}", { action: p.label || p.id, error: err.message });
+  } finally {
+    queueState.busy = false;
+  }
+  if (p.kind === "gate" || p.kind === "action") await queueLoad(env.route(), env);
+  env.render();
+}
+
+// queueKeyAction runs a queue key's action: the primary, the next or the previous decision, its source, the home.
+function queueKeyAction(action, env) {
+  const items = (queueState.queue && queueState.queue.items) || [];
+  const item = items[queueState.at];
+  switch (action) {
+    case "queue:primary":
+      if (item) queueAct(item, env);
+      return !!item;
+    case "queue:skip":
+    case "queue:back":
+      queueState.at = Math.min(Math.max(queueState.at + (action === "queue:skip" ? 1 : -1), 0), Math.max(items.length - 1, 0));
+      env.render();
+      return true;
+    case "open-source":
+      if (item) env.openSource(item.task, queueUnit(item));
+      return !!item;
+    case "queue:home":
+      env.navigate(HOME);
+      return true;
+  }
+  return false;
+}
+
+// renderQueue is the queue screen's nodes for queue, at its item at.
+function renderQueue(queue, at, env) {
+  const home = h("a", { class: "crumb", href: "#view=" + HOME, "data-focus": "queue:home" }, t("Home"));
+  if (!queue) return [h("div", { class: "queue" }, h("nav", { class: "crumbs" }, home), h("p", { class: "loading" }, t("Loading the queue...")))];
+  const items = queue.items || [];
+  const head = h("nav", { class: "crumbs", "aria-label": t("Where you are") }, home, h("span", { class: "sep", "aria-hidden": "true" }, "/"), h("span", {}, queue.title));
+  const err = queueState.error ? h("p", { class: "err", role: "alert" }, queueState.error) : null;
+  if (!items.length) {
+    return [h("div", { class: "queue empty" }, head, err, h("p", { class: "empty" }, queue.empty || t("Nothing left in this queue.")),
+      h("a", { class: "back-home", href: "#view=" + HOME }, t("Back to the home")))];
+  }
+  const i = Math.min(Math.max(at, 0), items.length - 1);
+  const item = items[i];
+  const next = items[i + 1];
+  const more = items.length - i - 2;
+  return [h("div", { class: "queue", "data-item": String(i) },
+    head,
+    h("p", { class: "progress", "aria-live": "polite" }, t("{n} of {total}", { n: fmtNumber(i + 1), total: fmtNumber(items.length) })),
+    err,
+    h("div", { class: "queue-item" }, queueItemCard(item, env), queuePrimary(item, env)),
+    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task),
+      more > 0 ? h("p", { class: "more" }, tn("+{n} more", more)) : null) : null)];
+}

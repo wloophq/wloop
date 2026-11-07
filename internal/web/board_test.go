@@ -1595,7 +1595,7 @@ func TestLoadRefreshesTheSpecsAndKeepsThemWhenTheFetchFails(t *testing.T) {
 		Error    string   `json:"error"`
 	}
 	nodeRun(t, `const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "", busy: new Set(), answered: new Map() };
-`+keyJS(t)+noPlugins+noViews+noUpdate+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
+`+keyJS(t)+noPlugins+noViews+noUpdate+noScreens+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 const focusSlot = (n) => n;
 function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, text: c.flat().join("") }; }
 const fetches = []; let listed = "v1"; let actionsFail = false; let detailVersion = "v1";
@@ -1661,7 +1661,7 @@ func TestSpecsLoadWithAnEmptyInventory(t *testing.T) {
 		Fetches []string `json:"fetches"`
 		Version string   `json:"version"`
 	}
-	nodeRun(t, noPlugins+noViews+noUpdate+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
+	nodeRun(t, noPlugins+noViews+noUpdate+noScreens+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
 const fetches = [];
 const getJSON = async (url) => {
   if (url === "/api/rows") return { rows: [] };

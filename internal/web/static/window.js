@@ -136,7 +136,7 @@ function installTitleBar(doc) {
     h("span", { id: "window-title", class: "tb-title" }));
   top.append(h("span", { class: "tb-tools" },
     iconButton("link", t("Copy a link to this view"), "top:copy-link", () => copyViewLink(), "link:copy"),
-    iconButton("search", t("Open the omnibox"), "top:omnibox", () => postWindow({ action: "panel" }))));
+    iconButton("search", t("Open the omnibox"), "top:omnibox", () => openOmnibox())));
 }
 
 // syncWindowChrome follows the route and the rendered page: the detail

@@ -49,6 +49,9 @@ var coreViewIDs = []string{"focus", "inbox", "outbox", "fits-now", "waiting", "p
 // noViews stands in for views.js where a test runs app.js's loading alone.
 const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () => {};\n"
 
+// noScreens stands in for the home's and the queue's loads where a test runs app.js's loading alone.
+const noScreens = "const loadHome = async () => {};\nconst loadQueue = async () => {};\n"
+
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\nfollowStrings = () => {};\n"
 

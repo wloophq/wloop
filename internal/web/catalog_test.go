@@ -294,7 +294,7 @@ location.hash = "";
 const missing = readHash().view;
 process.stdout.write(JSON.stringify({ before, unknown, after, missing }));
 `, nil, &got)
-	if got.Before != "stalled" || got.After != "stalled" || got.Unknown != "needs-me" || got.Missing != "needs-me" {
+	if got.Before != "stalled" || got.After != "stalled" || got.Unknown != "needs-me" || got.Missing != "home" {
 		t.Fatalf("%+v", got)
 	}
 }

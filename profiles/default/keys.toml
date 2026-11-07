@@ -36,6 +36,7 @@ quit = "quit"
 "nav:cycle" = "next view in the group"
 "area:{n}" = "area {n}"
 "link:copy" = "copy a link to this view"
+"nav:home" = "go to the home"
 
 [help.review]
 "step:done" = "mark the step done"
@@ -52,3 +53,10 @@ approve = "apply the selected plan step"
 
 [help.question]
 "answer:{n}" = "the gate's intent {n}"
+
+[help.queue]
+"queue:primary" = "run the decision's primary action"
+"queue:skip" = "next decision, without acting"
+"queue:back" = "previous decision"
+open-source = "open the source"
+"queue:home" = "back to the home"

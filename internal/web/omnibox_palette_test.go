@@ -83,7 +83,7 @@ return { title: pal.title, items: strip(pal.items), help: k.log.help, bindings: 
 		order = append(order, g.Context)
 		n += len(g.Bindings)
 	}
-	if !reflect.DeepEqual(order, []string{"global", "list", "detail", "question", "plan", "review"}) || n != got.Bindings {
+	if !reflect.DeepEqual(order, []string{"global", "list", "detail", "question", "queue", "plan", "review"}) || n != got.Bindings {
 		t.Errorf("help groups %v hold %d of %d bindings", order, n, got.Bindings)
 	}
 }

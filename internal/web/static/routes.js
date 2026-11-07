@@ -42,12 +42,30 @@ function routeHash(view, unitKey, rest) {
   return parts.join("&");
 }
 
+// HOME is the cockpit's home route, which no view of the profile may be named; QUEUE the view of a decision
+// queue's route.
+const HOME = "home";
+const QUEUE = "queue";
+// QUEUE_LIST is the queue of the tasks a route's ids name, in their order; QUEUE_IDS_MAX the most it takes.
+const QUEUE_LIST = "list";
+const QUEUE_IDS_MAX = 200;
+
+// routeView is the view a route's parameters name: its view, the queue's for a queue, none for an item opened
+// alone, else the home.
+function routeView(p) {
+  if (p.get("view")) return p.get("view");
+  if (p.get("queue")) return QUEUE;
+  return p.get("task") || p.get("unit") || p.get("panel") ? "" : HOME;
+}
+
 // readRoute is the route a hash names; view is "" when it names none.
 function readRoute(hash) {
   const p = new URLSearchParams(String(hash || "").replace(/^#/, ""));
   const ctx = (p.get("ctx") || "").split(",").map((c) => c.trim()).filter(Boolean);
   return {
-    view: p.get("view") || "",
+    view: routeView(p),
+    queue: (p.get("queue") || "").slice(0, 100),
+    ids: (p.get("ids") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, QUEUE_IDS_MAX),
     unit: routeUnitKey(p.get("unit")),
     task: (p.get("task") || "").slice(0, 200),
     area: (p.get("area") || "").slice(0, 100),

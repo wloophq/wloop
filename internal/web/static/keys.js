@@ -1,7 +1,7 @@
 "use strict";
 
 const CHORD_MS = 1000;
-const KEY_CONTEXTS = ["detail", "question", "plan", "review", "list", "global"];
+const KEY_CONTEXTS = ["detail", "question", "queue", "plan", "review", "list", "global"];
 const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|tab:|palette$|help$|filter$|filter:add$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
@@ -84,7 +84,7 @@ function questionOptions(q) {
 }
 
 // keyContextOf is the key context a view adds before the list's.
-const keyContextOf = (view) => (view === "plan" || view === "review" ? view : "");
+const keyContextOf = (view) => (view === "plan" || view === "review" || view === QUEUE ? view : "");
 
 const CONTEXT_HEADS = {
   get global() { return t("Everywhere"); },
@@ -93,9 +93,10 @@ const CONTEXT_HEADS = {
   get plan() { return t("In the plan"); },
   get review() { return t("In the review"); },
   get detail() { return t("In the detail"); },
+  get queue() { return t("In a queue"); },
 };
 
-const HELP_ORDER = ["global", "list", "detail", "question", "plan", "review"];
+const HELP_ORDER = ["global", "list", "detail", "question", "queue", "plan", "review"];
 
 // helpGroups are every binding by context.
 function helpGroups(bindings) {
@@ -313,8 +314,15 @@ function createKeys(env) {
     return items;
   }
 
+  // openPalette opens the omnibox over the selection's actions, or the actions palette where none is wired.
+  function openPalette() {
+    if (env.omnibox) env.omnibox(paletteItems());
+    else env.palette({ title: t("Actions"), items: paletteItems() });
+  }
+
   async function run(b, ctx) {
     const a = b.action;
+    if (b.context === "queue") return env.queue ? env.queue(a) !== false : false;
     if (b.context === "plan") return servedAction(b) ? planAction(a, b.key) : a === "approve" ? planAction("plan_apply", b.key) : false;
     if (servedAction(b)) return b.context === "list" ? unitAction(a) : false;
     if (a === "move:down" || a === "move:up") return env.move(a === "move:down" ? 1 : -1) !== false;
@@ -333,7 +341,7 @@ function createKeys(env) {
     if (a === "link:copy") return env.copyLink ? env.copyLink() !== false : false;
     if (a.startsWith("tab:")) return env.tab ? env.tab(a.slice(4)) !== false : false;
     if (a === "palette") {
-      env.palette({ title: t("Actions"), items: paletteItems() });
+      openPalette();
       return true;
     }
     if (a === "help") {
@@ -412,7 +420,7 @@ function createKeys(env) {
   return {
     handle,
     paletteItems,
-    openPalette() { env.palette({ title: t("Actions"), items: paletteItems() }); },
+    openPalette,
     setBindings(list) { bindings = (list || []).map((b) => ({ ...b })); },
     bindings: () => bindings,
     keyOf: (action) => (bindings.find((b) => b.action === action) || {}).key || "",
@@ -465,6 +473,7 @@ function appEnv() {
     pluginKey: (e) => pluginViews.has(readHash().view) && pluginKeyDown(e),
     planAction: (it, id) => actOnPlan(it, id),
     viewContext: () => keyContextOf(readHash().view),
+    queue: (action) => queueKeyAction(action, screenEnv()),
     step: (action) => reviewKey(action),
     redraw: () => render(),
     detailAt: (el) => detailFocused(el),
@@ -544,6 +553,7 @@ function appEnv() {
     leave: (el) => el.blur(),
     ask: (o) => askInput(o),
     palette: (o) => showPalette(o),
+    omnibox: (items) => showOmnibox({ items }),
     stateLabel: (name) => stateLabel(name),
     help: (groups) => showHelp(groups),
     notice: (text, err) => setNotice(text, err),
