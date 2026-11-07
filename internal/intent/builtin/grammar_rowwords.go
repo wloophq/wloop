@@ -60,7 +60,7 @@ var RowWords = []RowWord{
 func rowWordRows(in Surface, required bool) []Key {
 	out := make([]Key, len(RowWords))
 	for i, w := range RowWords {
-		out[i] = Key{Path: "lens." + w.Key, In: in, Kind: KindTemplate, Required: required, Doc: w.Doc}
+		out[i] = Key{Path: "lens." + w.Key, In: in, Kind: KindTemplate, Required: required, Localized: true, Doc: w.Doc}
 	}
 	return out
 }

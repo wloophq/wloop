@@ -172,8 +172,15 @@ func hasKeys(k builtin.Key) bool {
 	return false
 }
 
-// kind is what a row's value is, with its values.
+// kind is what a row's value is, with its values, and whether a locale translates it.
 func kind(k builtin.Key) string {
+	if k.Localized {
+		return kindOf(k) + ", localized"
+	}
+	return kindOf(k)
+}
+
+func kindOf(k builtin.Key) string {
 	vs := values(k)
 	quoted := make([]string, len(vs))
 	for i, v := range vs {
@@ -267,6 +274,7 @@ var sections = []struct {
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
+	{builtin.SurfaceStrings, "Client strings (`strings.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
