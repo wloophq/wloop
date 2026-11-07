@@ -82,6 +82,16 @@ summary = "Enviar este rascunho de novo depois que a publicação falhou."
 why = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} está desativado{{else if eq .draft.refusal \"state\"}}o rascunho está {{.draft.state}}{{else}}{{.draft.provider}} não publica nada{{end}}"
 confirm = "{{if .draft.maybe_posted}}Este rascunho pode já ter sido publicado. Confira a conversa antes: tentar de novo pode publicá-lo duas vezes.{{end}}"
 
+["draft.close-silently"]
+label = "Fechar sem mensagem"
+summary = "Fecha a conversa como este rascunho faria, sem publicá-lo."
+why = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} está desativado{{else if eq .draft.refusal \"state\"}}o rascunho está {{.draft.state}}; só um rascunho em espera fecha sem a mensagem{{else if eq .draft.refusal \"no_effects\"}}este rascunho não faz nada sem a mensagem{{else}}o que este rascunho faz precisa da mensagem: ele publica{{end}}"
+
+["draft.skip-workflow"]
+label = "Não cobrar nesta conversa"
+summary = "Para este tipo de rascunho nesta conversa; a tarefa continua onde está."
+why = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} está desativado{{else if eq .draft.refusal \"not_from_workflow\"}}nenhum workflow propôs este rascunho{{else}}este tipo de rascunho já está parado nesta conversa{{end}}"
+
 [plan_apply]
 label = "Aplicar"
 summary = "Executar agora este item do plano, com as mesmas proteções da varredura. Dispensar o descarta."

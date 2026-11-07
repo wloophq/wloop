@@ -43,6 +43,10 @@
       "enabled": false,
       "reason": "the draft is held",
       "refusal": "draft.retry.why"
+    },
+    {
+      "id": "draft.close-silently",
+      "enabled": true
     }
   ],
   "rev": 0,

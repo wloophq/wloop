@@ -69,7 +69,7 @@ untrusted = true
 [[source.facts]]
 name = "slack.closure_posted"
 type = "bool"
-doc = "A closure was posted on the unit, by the extraction or a sent draft's unit.closed."
+doc = "A closure was posted on the unit, or closed without a message, by the extraction or a draft's unit.closed."
 untrusted = true
 
 [[source.facts]]

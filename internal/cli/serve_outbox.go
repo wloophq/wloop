@@ -35,6 +35,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
+		Silent: builtin.SilentEffect,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err

@@ -447,6 +447,32 @@
     "source": "builtin"
   },
   {
+    "id": "draft.close-silently",
+    "label": "Close without a message",
+    "summary": "Close the conversation as this draft would, without posting it.",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "draft.skip-workflow",
+    "label": "Don't nudge this conversation",
+    "summary": "Stop this kind of draft on this conversation; the task stays where it is.",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
     "id": "run.open",
     "label": "Open workspace",
     "summary": "Bring the run's workspace on screen in the workspace manager it ran in.",

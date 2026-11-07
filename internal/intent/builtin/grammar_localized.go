@@ -10,7 +10,7 @@ import (
 const SurfaceStrings Surface = "strings"
 
 // LocalizedFiles are the whole-file texts a person reads, by file name under workflows/<name>/.
-var LocalizedFiles = []string{"text.md.tmpl"}
+var LocalizedFiles = []string{"text.md.tmpl", "why.md.tmpl"}
 
 // PersonNotices are the notices a person reads; the others an agent reads, in English.
 var PersonNotices = []string{

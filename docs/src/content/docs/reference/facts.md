@@ -96,7 +96,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 |---|---|---|---|
 | `draft.state` | string | draft_action | The draft's state. |
 | `draft.provider` | string | draft_action | The provider of the draft's unit. |
-| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
+| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 
 ### An item proposal's gate (`proposal.*`; slot `proposal`)
@@ -312,7 +312,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.channel` | string | The conversation's channel id. |
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
 | `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.closure_posted` | bool | A closure was posted on the unit, or closed without a message, by the extraction or a draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.live_task` | bool | A live task is attached to the unit: neither done, in the trash nor deferred, as a snoozed or muted task is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_resolved` | int | Resolved items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
@@ -338,11 +338,11 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 
 | `draft` fact | Type | Meaning |
 |---|---|---|
-| `draft.person_waited` | bool | The draft's person is still waited on by its task; true for a draft of no person. |
-| `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
+| `draft.person_waited` | bool | One of the draft's people, the person a per-person draft is to or those its text mentions, is still waited on by its task; true for a draft of no people. |
+| `draft.items_owed` | int | Items of the draft still open and held by any of its people, or unowned for a draft of no people. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
-| `draft.person_asks_you` | bool | The draft's person asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no person. |
+| `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
 
 ### Gates (`gate.*`)
 
@@ -419,8 +419,8 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `plan.cleared` | any | Drops the unit's pending plan items. |
 | `turn.guidance_handed` | any | Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent. |
 | `turn.round_sent` | any | Records the round-sent event on the unit when a person sends the turn. |
-| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. |
-| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. |
+| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post. |
+| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |

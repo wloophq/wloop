@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http/httptest"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -273,7 +275,7 @@ func TestDraftsListByState(t *testing.T) {
 	for _, d := range res.Drafts {
 		ids = append(ids, d.ID)
 		if d.State != "held" || d.Unit != "github/acme/api#7" || d.Gate == 0 || d.Deadline != nil || d.Intents["approved"] != "approve" ||
-			d.Intents["rejected"] != "discard" || len(d.Actions) != 2 {
+			d.Intents["rejected"] != "discard" || len(d.Actions) != 3 {
 			t.Errorf("draft %+v", d)
 		}
 	}
@@ -673,7 +675,7 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 	if code := r.getDraft(t, d.ID, &got); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
-	if len(got.Actions) != 2 {
+	if len(got.Actions) != 3 {
 		t.Fatalf("actions %+v", got.Actions)
 	}
 	for _, st := range got.Actions {
@@ -1151,14 +1153,123 @@ func TestTheSenderSettlesDraftsAndHeldTasksAtStart(t *testing.T) {
 	}
 }
 
+// silentRig is an outbox rig whose drafts apply unit.closed and task.nudged, recorded in applied.
+func silentRig(t *testing.T) (*outboxRig, *[]string) {
+	t.Helper()
+	r := newOutboxRig(t)
+	var applied []string
+	r.o.Silent = builtin.SilentEffect
+	r.o.Applier = outbox.EffectApplier{Store: r.db.DraftEffects(), Clock: r.clock, Effects: func(_ unit.ProviderID, name string) (outbox.Effect, bool) {
+		return func(context.Context, draft.Draft) error { applied = append(applied, name); return nil }, true
+	}}
+	return r, &applied
+}
+
+func (r *outboxRig) proposeWith(t *testing.T, effects ...string) draft.Draft {
+	t.Helper()
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "Closing this out", Effects: effects,
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "wf", Rule: "wf", Key: strings.Join(effects, ",")}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func (r *outboxRig) closeSilently(t *testing.T, d draft.Draft, session string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := apiRequest("POST", strings.Replace(api.DraftCloseSilently, "{id}", strconv.FormatInt(int64(d.ID), 10), 1),
+		strings.NewReader(fmt.Sprintf(`{"rev":%d}`, d.Rev)))
+	if session != "" {
+		req.Header.Set(api.SessionHeader, session)
+	}
+	rec := httptest.NewRecorder()
+	r.s.Handler().ServeHTTP(rec, req)
+	return rec
+}
+
 func TestCloseSilentlyAppliesTheEffectsWithoutPosting(t *testing.T) {
-	t.Skip("E11 close-silently applies the effects without posting")
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	rec := r.closeSilently(t, d, "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var got api.Draft
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || got.State != "dropped" || got.Reason != draft.ReasonClosedSilently {
+		t.Fatalf("%s %v", rec.Body, err)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if !slices.Equal(*applied, []string{builtin.EffectUnitClosed}) || stored.EffectsAppliedAt.IsZero() || len(r.fx.calls) != 0 {
+		t.Fatalf("applied %v at %v, publisher calls %v", *applied, stored.EffectsAppliedAt, r.fx.calls)
+	}
+	if g, _, _ := r.o.GateOf(context.Background(), stored); g.Status != gate.Rejected {
+		t.Errorf("gate %s, want rejected", g.Status)
+	}
 }
 
 func TestCloseSilentlyRefusesADraftWhoseEffectsAreNotSilent(t *testing.T) {
-	t.Skip("E11 close-silently refuses a draft whose effects post")
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectTaskNudged)
+	rec := r.closeSilently(t, d, "")
+	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "effect_posts") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if g, _, _ := r.o.GateOf(context.Background(), stored); stored.State != draft.Held || g.Status != gate.Open || len(*applied) != 0 {
+		t.Fatalf("draft %s, gate %s, applied %v", stored.State, g.Status, *applied)
+	}
 }
 
 func TestCloseSilentlyNeedsAPersonsClient(t *testing.T) {
-	t.Skip("E11 close-silently needs a person's client")
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	if rec := r.closeSilently(t, d, "term_agent1"); rec.Code != 403 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if stored.State != draft.Held || len(*applied) != 0 {
+		t.Fatalf("draft %s, applied %v", stored.State, *applied)
+	}
+}
+
+func TestCloseSilentlyRefusesAStaleRev(t *testing.T) {
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	d.Rev++
+	if rec := r.closeSilently(t, d, ""); rec.Code != 409 || len(*applied) != 0 {
+		t.Fatalf("%d %s, applied %v", rec.Code, rec.Body, *applied)
+	}
+}
+
+func TestADraftsActionsSayWhetherItsWorkflowIsSkipped(t *testing.T) {
+	t.Parallel()
+	r, _ := silentRig(t)
+	sk := memSkips{}
+	r.s.deps.Skips = sk
+	d := r.proposeWith(t, builtin.EffectTaskNudged)
+	state := func() api.ActionState {
+		t.Helper()
+		var one api.Draft
+		if code := r.getDraft(t, d.ID, &one); code != 200 {
+			t.Fatalf("GET %d", code)
+		}
+		for _, a := range one.Actions {
+			if a.ID == catalog.DraftSkipWorkflow {
+				return a
+			}
+		}
+		t.Fatal("no skip-workflow action")
+		return api.ActionState{}
+	}
+	if st := state(); !st.Enabled {
+		t.Fatalf("before the skip: %+v", st)
+	}
+	sk[r7u] = []string{"wf"}
+	if st := state(); st.Enabled {
+		t.Fatalf("after the skip: %+v", st)
+	}
 }

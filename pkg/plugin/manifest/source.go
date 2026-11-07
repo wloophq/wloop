@@ -87,6 +87,7 @@ type Effect struct {
 	Name    string   `toml:"name" doc:"The effect's name, <slot>.<name>. Required."`
 	Applies []string `toml:"applies" doc:"What may carry it. Required." enum:"turn,draft"`
 	Doc     string   `toml:"doc" doc:"What the effect does. Required."`
+	Silent  bool     `toml:"silent" doc:"A draft effect that applies without the draft's post, so a person may close the conversation without the message."`
 }
 
 // Event is an event kind only a plugin's units record.

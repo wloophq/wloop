@@ -13,8 +13,8 @@ import (
 
 // AppliedStore keeps when a sent draft's effects were applied.
 type AppliedStore interface {
-	// Unapplied are the sent drafts that declare effects and whose
-	// EffectsAppliedAt is zero, oldest first.
+	// Unapplied are the drafts whose effects are due (draft.EffectsDue),
+	// that declare effects and whose EffectsAppliedAt is zero, oldest first.
 	Unapplied(ctx context.Context) ([]draft.Draft, error)
 	// MarkApplied stores at as the draft's EffectsAppliedAt.
 	MarkApplied(ctx context.Context, id draft.ID, at time.Time) error
@@ -50,11 +50,12 @@ func (a EffectApplier) Implements(p unit.ProviderID, name string) bool {
 var ErrUnknownEffect = errors.New("no implementation of the effect")
 
 // Apply runs every effect d declares, in order, then marks d applied; a
-// draft not sent, or already applied, is left as it is. When an effect
+// draft whose effects are not due (draft.EffectsDue), or already applied, is
+// left as it is. When an effect
 // fails nothing is marked, so the next Pending pass runs them all again:
 // each effect is idempotent.
 func (a EffectApplier) Apply(ctx context.Context, d draft.Draft) error {
-	if d.State != draft.Sent || !d.EffectsAppliedAt.IsZero() {
+	if !d.EffectsDue() || !d.EffectsAppliedAt.IsZero() {
 		return nil
 	}
 	for _, name := range d.Effects {

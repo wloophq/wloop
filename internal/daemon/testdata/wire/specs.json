@@ -1,5 +1,5 @@
 {
-  "version": "9373394a48af",
+  "version": "8ad46135340f",
   "specs": [
     {
       "id": "answer",
@@ -494,6 +494,36 @@
       "source": "builtin",
       "scope": "draft",
       "verb": "retry"
+    },
+    {
+      "id": "draft.close-silently",
+      "label": "Close without a message",
+      "summary": "Close the conversation as this draft would, without posting it.",
+      "group": "draft",
+      "surfaces": [
+        "row",
+        "detail",
+        "tui",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "draft",
+      "verb": "close-silently"
+    },
+    {
+      "id": "draft.skip-workflow",
+      "label": "Don't nudge this conversation",
+      "summary": "Stop this kind of draft on this conversation; the task stays where it is.",
+      "group": "draft",
+      "surfaces": [
+        "row",
+        "detail",
+        "tui",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "draft",
+      "verb": "skip-workflow"
     },
     {
       "id": "run.open",

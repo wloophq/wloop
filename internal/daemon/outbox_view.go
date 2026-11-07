@@ -261,7 +261,7 @@ func (ev *taskViewer) withDraft(ctx context.Context, e task.Task, v *api.TaskVie
 	for _, st := range dv.Actions {
 		actions[strings.TrimPrefix(st.ID, "draft.")] = st
 	}
-	facts := s.draftFacts(d)
+	facts := s.draftFacts(ctx, d)
 	open := g.Status == gate.Open
 	for i, vs := range v.Verbs {
 		action, ok := draftHandlers[s.loaded().Tasks.Handler(vs.Verb)]

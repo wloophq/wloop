@@ -178,8 +178,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
-  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.
-  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.
+  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
+  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 
@@ -526,14 +526,15 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
   - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `delete`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
-  - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest.
+  - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.
+  - `why` (file, default `why.md.tmpl`): The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
   - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item; an intent's help.target is free text.
   - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
-  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.
-  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.
+  - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
+  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.

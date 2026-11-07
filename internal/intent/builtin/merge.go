@@ -433,7 +433,7 @@ func effectRow(p unit.ProviderID, e manifest.Effect) Effect {
 			a |= AppliesDraft
 		}
 	}
-	return Effect{Name: e.Name, Provider: p, Applies: a, Doc: e.Doc, Plugin: true}
+	return Effect{Name: e.Name, Provider: p, Applies: a, Doc: e.Doc, Plugin: true, Silent: e.Silent}
 }
 
 func roleRow(p unit.ProviderID, r manifest.Role) Role {

@@ -27,6 +27,9 @@ type Effect struct {
 	// Plugin says a draft effect applies through the unit's plugin, so it
 	// waits while that plugin is not built.
 	Plugin bool
+	// Silent says a draft effect applies without the draft's post, so a
+	// person may close the conversation without the message.
+	Silent bool
 }
 
 // The effects the host applies by name.
@@ -43,11 +46,11 @@ const (
 var Effects = slices.Clone(coreEffects)
 
 var coreEffects = []Effect{
-	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
-	{EffectGuidanceHanded, "", AppliesTurn, "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent.", false},
-	{EffectRoundSent, "", AppliesTurn, "Records the round-sent event on the unit when a person sends the turn.", false},
-	{EffectTaskNudged, "", AppliesDraft, "Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists.", false},
-	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit.", true},
+	{Name: EffectPlanCleared, Applies: AppliesTurn, Doc: "Drops the unit's pending plan items."},
+	{Name: EffectGuidanceHanded, Applies: AppliesTurn, Doc: "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent."},
+	{Name: EffectRoundSent, Applies: AppliesTurn, Doc: "Records the round-sent event on the unit when a person sends the turn."},
+	{Name: EffectTaskNudged, Applies: AppliesDraft, Doc: "Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post."},
+	{Name: EffectUnitClosed, Applies: AppliesDraft, Doc: "Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.", Plugin: true, Silent: true},
 }
 
 // EffectNames are the names of the draft effects: what a draft's effects, a
@@ -66,6 +69,12 @@ func effectNames(a Applies) []string {
 		}
 	}
 	return out
+}
+
+// SilentEffect says whether draft effect name applies without the draft's post.
+func SilentEffect(name string) bool {
+	e, ok := EffectOf(name)
+	return ok && e.Silent
 }
 
 // EffectOf is the effect named name.

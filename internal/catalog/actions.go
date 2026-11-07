@@ -11,6 +11,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // The surfaces an action spec names.
@@ -184,6 +185,8 @@ var builtinActions = []builtinAction{
 	}},
 	draftAction("draft.edit", "edit", &api.InputSpec{Kind: "text", Required: true}),
 	draftAction("draft.retry", "retry", nil),
+	draftAction(DraftCloseSilently, "close-silently", nil),
+	draftAction(DraftSkipWorkflow, "skip-workflow", nil),
 	runAction(RunOpen),
 	runAction(RunEnter),
 	runAction(RunTranscript),
@@ -286,10 +289,18 @@ func gateTexted(in intentload.GateIntent, st api.ActionState, facts map[string]a
 	return st
 }
 
-// draftFrom are the draft states each draft action moves a draft from.
+// The draft actions of the Outbox's cards: close the conversation without the draft's message, and stop the
+// draft's workflow on its conversation.
+const (
+	DraftCloseSilently = "draft.close-silently"
+	DraftSkipWorkflow  = "draft.skip-workflow" //nolint:gosec // G101: an action id, no credential
+)
+
+// draftFrom are the draft states each draft action moves a draft from; an action absent moves any.
 var draftFrom = map[string][]string{
-	"draft.edit":  {"held", "failed"},
-	"draft.retry": {"failed"},
+	"draft.edit":       {"held", "failed"},
+	"draft.retry":      {"failed"},
+	DraftCloseSilently: {"held"},
 }
 
 // DraftFacts are what a draft's actions depend on.
@@ -300,6 +311,48 @@ type DraftFacts struct {
 	Disabled, NoPublisher bool
 	// MayHaveBeenPosted is a failed draft whose post may have reached its provider.
 	MayHaveBeenPosted bool
+	// Effects are the draft's effects; Workflow the workflow that proposed it, "" for none; Skipped says that
+	// workflow is stopped on the draft's unit.
+	Effects  []string
+	Workflow string
+	Skipped  bool
+}
+
+// draftOffers says whether draft action id is offered on a draft of f at all: stopping a workflow's drafts on a
+// conversation is offered on a draft that nudges someone (builtin.EffectTaskNudged), the one it names.
+func draftOffers(id string, f DraftFacts) bool {
+	return id != DraftSkipWorkflow || slices.Contains(f.Effects, builtin.EffectTaskNudged)
+}
+
+// DraftRefusal is why draft action id is disabled on a draft of f, as a code of builtin.DraftRefusals; "" when
+// it is enabled.
+func DraftRefusal(id string, f DraftFacts) string {
+	from, moves := draftFrom[id]
+	switch {
+	case f.Disabled:
+		return "plugin_off"
+	case moves && !slices.Contains(from, f.State):
+		return "state"
+	case f.NoPublisher && slices.Contains(postingDraftActions, id):
+		return "posts_nothing"
+	}
+	switch id {
+	case DraftCloseSilently:
+		switch {
+		case len(f.Effects) == 0:
+			return "no_effects"
+		case slices.ContainsFunc(f.Effects, func(e string) bool { return !builtin.SilentEffect(e) }):
+			return "effect_posts"
+		}
+	case DraftSkipWorkflow:
+		switch {
+		case f.Workflow == "":
+			return "not_from_workflow"
+		case f.Skipped:
+			return "skipped"
+		}
+	}
+	return ""
 }
 
 // postingDraftActions are the draft actions that lead to a post.
@@ -310,18 +363,10 @@ var postingDraftActions = []string{"draft.retry"}
 func DraftStates(l *intentload.Loaded, f DraftFacts) []api.ActionState {
 	out := []api.ActionState{}
 	for _, b := range builtinActions {
-		if b.spec.Scope != ScopeDraft {
+		if b.spec.Scope != ScopeDraft || !draftOffers(b.spec.ID, f) {
 			continue
 		}
-		refusal := ""
-		switch {
-		case f.Disabled:
-			refusal = "plugin_off"
-		case !slices.Contains(draftFrom[b.spec.ID], f.State):
-			refusal = "state"
-		case f.NoPublisher && slices.Contains(postingDraftActions, b.spec.ID):
-			refusal = "posts_nothing"
-		}
+		refusal := DraftRefusal(b.spec.ID, f)
 		facts := intentload.DraftActionFactMap(func(name string) any {
 			switch name {
 			case "draft.state":

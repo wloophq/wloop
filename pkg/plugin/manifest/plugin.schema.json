@@ -177,6 +177,10 @@
               "name": {
                 "description": "The effect's name, \u003cslot\u003e.\u003cname\u003e. Required.",
                 "type": "string"
+              },
+              "silent": {
+                "description": "A draft effect that applies without the draft's post, so a person may close the conversation without the message.",
+                "type": "boolean"
               }
             },
             "required": [
