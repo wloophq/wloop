@@ -193,7 +193,7 @@ const providerName = (id) => id;
 		Row, Card string
 		Keys      []string
 	}
-	nodeRun(t, prelude, slices.Concat(lensFuncs, rowFuncs, []string{"fieldById", "rowModel", "countdown", "age",
+	nodeRun(t, prelude, slices.Concat(lensFuncs, rowFuncs, []string{"fieldById", "rowModel", "reasonText", "countdown", "age",
 		"intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons", "openRow", "openSlot"}), `
 const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "", fields: catalog.fields, specs: catalog.specs, words: lensWords() };
 const tr = rowView(rowModel(input, "", lens, ""), lens);

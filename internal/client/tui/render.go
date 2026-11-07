@@ -317,8 +317,8 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 	if s := r.Summary; s.Line != "" && s.Line != s.Reason && s.Line != kind {
 		fact(m.w().T("status", nil), s.Line, plain)
 	}
-	if r.Summary.Reason != "" {
-		fact(m.w().T("why", nil), r.Summary.Reason, plain)
+	if why := m.catalog.ReasonOf(r); why != "" {
+		fact(m.w().T("why", nil), why, plain)
 	}
 	p := prOf(r)
 	if b := p.Brief; b != nil {
