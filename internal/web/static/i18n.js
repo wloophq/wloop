@@ -48,6 +48,17 @@ function fmtNumber(n) {
   return new Intl.NumberFormat(I18N.locale).format(n);
 }
 
+// fmtLanguage is the name of the language a BCP 47 code names, in the interface language; the code when Intl
+// names none.
+function fmtLanguage(code) {
+  if (!code) return "";
+  try {
+    return new Intl.DisplayNames([I18N.locale], { type: "language" }).of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
 function applyStrings(body) {
   if (!body || typeof body.locale !== "string" || !body.locale) return false;
   try {

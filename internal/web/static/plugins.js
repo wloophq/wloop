@@ -173,9 +173,7 @@ function pluginList(el, rows, opts) {
     return;
   }
   const { pr } = readHash();
-  const models = rows.map((r) => rowModel(r, pr, lens, ""));
-  const cols = rowColumns(models);
-  el.replaceChildren(h("table", { class: "plugin-list" }, rowHead(cols, lens, unitTitle(lens.view, lens)), h("tbody", {}, models.map((m) => rowTr(m, lens, cols)))));
+  el.replaceChildren(h("div", { class: "rows plugin-list" }, rows.map((r) => rowView(rowModel(r, pr, lens, ""), lens))));
 }
 
 function pluginDetail(el, unit) {

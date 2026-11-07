@@ -103,6 +103,17 @@ func cmpOr(s, fallback string) string {
 	return s
 }
 
+// compactAge writes an age piece that carries a show_label as its age alone: the terminal's age column is
+// a few cells wide and its header already says what the time is.
+func compactAge(parts map[string][]lens.Piece, w api.RowWords, now time.Time) map[string][]lens.Piece {
+	for i, p := range parts["age"] {
+		if at, err := time.Parse(time.RFC3339, p.Raw); err == nil && p.Template != "" {
+			parts["age"][i].Label = lens.Age(w, now.Sub(at))
+		}
+	}
+	return parts
+}
+
 func labels(ps []lens.Piece, sep string) string {
 	out := make([]string, len(ps))
 	for i, p := range ps {
@@ -138,7 +149,7 @@ func whoCell(l listLine, w int) string {
 func (m *Model) rowLine(r api.Row, now time.Time) listLine {
 	t := m.t
 	words := m.rowWordsOf(string(r.Unit.Provider))
-	l := listLine{parts: lens.Parts(m.rowItem(r), m.catalog.Facets, words, now), label: r.Label, link: r.Link, title: r.Title}
+	l := listLine{parts: compactAge(lens.Parts(m.rowItem(r), m.catalog.Facets, words, now), words.RowWords, now), label: r.Label, link: r.Link, title: r.Title}
 	if r.Stale {
 		l.title = staleMark + " " + r.Title
 	}
@@ -161,7 +172,7 @@ func (m *Model) rowLine(r api.Row, now time.Time) listLine {
 // taskLine is a task's line: its facets placed by the profile's task specs, its first unit's label, a star
 // before the title of a starred task.
 func (m *Model) taskLine(e api.TaskView, now time.Time) listLine {
-	l := listLine{parts: lens.Parts(taskItem(e), m.viewsCat.Facets, m.viewsCat.Lens, now), title: e.Title, changed: e.Changed,
+	l := listLine{parts: compactAge(lens.Parts(taskItem(e), m.viewsCat.Facets, m.viewsCat.Lens, now), m.viewsCat.Lens.RowWords, now), title: e.Title, changed: e.Changed,
 		facts: projectFacts(e, m.viewsCat.Lens.RowWords)}
 	if len(e.Units) > 0 {
 		l.label = e.UnitLabel(0)

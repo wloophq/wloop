@@ -65,7 +65,7 @@ func TestTheFocusOutlivesARender(t *testing.T) {
 const lens = lensOf({ ...readHash(), view: "mine" });
 const board = () => renderBoard(pipeline(state.rows, lens).groups, "", lens);
 const table = () => renderTable(pipeline(state.rows, lens), "", lens);
-const drafts = () => { const tl = lensOf({ ...readHash(), view: "outbox" }); tasksState.tasks = input.drafts; document.getElementById("tasks").replaceChildren(taskTable(pipelineOf(taskLensItems(), tl, null), tl, "", taskLensItems())); };
+const drafts = () => { const tl = lensOf({ ...readHash(), view: "outbox" }); tasksState.tasks = input.drafts; document.getElementById("tasks").replaceChildren(taskList(pipelineOf(taskLensItems(), tl, null), tl, "")); };
 const again = (draw) => { draw(); document.activeElement = document.body; restoreFocus(); return slotOf(document.activeElement); };
 board();
 focusOn(under(document.getElementById("board"), '[data-focus^="facet:card:"]')[0]);
@@ -152,7 +152,7 @@ const tr = under(table, '[data-row^="row:"]')[0];
 process.stdout.write(JSON.stringify({ Tag: table.tag, Row: tr ? tr.attrs["data-row"] : "", Facets: under(table, '[data-rove]').filter((n) => n.attrs.class === "facet").length,
   Empty: empty.textContent, Given: given.textContent }));`,
 		map[string]any{"pr": wireRow("me", now, pr), "catalog": json.RawMessage(servedCatalog(t)), "now": now.UnixMilli()}, &got)
-	if got.Tag != "table" || got.Row != "row:github:acme/web#2" || got.Facets == 0 {
+	if got.Tag != "div" || got.Row != "row:github:acme/web#2" || got.Facets == 0 {
 		t.Errorf("a plugin view's list %+v, want the cockpit's row with its facet buttons", got)
 	}
 	if got.Empty != "Nothing here right now." || got.Given != "No pull requests" {

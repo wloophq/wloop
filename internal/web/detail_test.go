@@ -186,7 +186,7 @@ tasksState.catalog = input.cat;
   await byFocus(pane, "detail:toss:draft:12").attrs.onclick();
   const toss = posts.map(show);
   byFocus(pane, "detail:open:retry:draft:12").attrs.onclick();
-  const others = (detailState.task.verbs || []).map((v) => v.verb).filter((v) => byFocus(h("div", {}, ...verbButtons(detailState.task)), "detail:" + v + ":draft:12"));
+  const others = offeredVerbs(detailState.task).map((v) => v.verb);
   process.stdout.write(JSON.stringify({ Seen: seen, Retry: retry, Toss: toss, Editing: detailState.editing.has("draft:12"), Others: others }));
 })();`, map[string]any{"cat": cat, "answers": map[string]any{"/api/tasks/draft:12": e}}, &got)
 	if want := []string{`/api/tasks/draft:12/look {"source":"cockpit"}`}; !slices.Equal(got.Seen, want) {
@@ -244,10 +244,11 @@ func TestAVerbButtonSaysWhatItDoes(t *testing.T) {
 	e := task("e-2", "next", func(e *api.TaskView) {
 		e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}, {Verb: "someday", Reason: "not on a someday task"}}
 	})
-	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}}}
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}},
+		DetailVerbs: []string{"done", "someday"}}
 	nodeRun(t, viewsPrelude(t), nil, `
 tasksState.catalog = input.cat;
-const pane = h("div", {}, ...verbButtons(input.task));
+const pane = h("div", {}, ...primaryVerbs(input.task));
 process.stdout.write(JSON.stringify({
   On: byFocus(pane, "detail:done:e-2").attrs.title,
   Off: byFocus(pane, "detail:someday:e-2").attrs.title,
@@ -260,11 +261,11 @@ process.stdout.write(JSON.stringify({
 func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
 	var got struct{ Asked []string }
 	e := task("e-3", "next", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
-	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "waiting", Handler: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "waiting", Handler: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}, DetailVerbs: []string{"waiting"}}
 	nodeRun(t, viewsPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
 tasksState.catalog = input.cat;
 detailEnv.ask = (label) => { asked.push(label); return "ana"; };
-const pane = h("div", {}, ...verbButtons(input.task));
+const pane = h("div", {}, ...primaryVerbs(input.task));
 (async () => {
   await byFocus(pane, "detail:waiting:e-3").attrs.onclick();
   process.stdout.write(JSON.stringify({ Asked: asked }));
@@ -294,6 +295,7 @@ func TestAVerbTheTaskDoesNotOfferHasNoButton(t *testing.T) {
 	var got struct{ Approve, Dismiss, Done int }
 	e := task("e-4", "inbox", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
+tasksState.catalog = { detail_verbs: ["approve", "dismiss", "done"] };
 const pane = h("div", {}, ...taskPage(input.task));
 const n = (verb) => byFocus(pane, "detail:" + verb + ":e-4") ? 1 : 0;
 process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss"), Done: n("done") }));`, map[string]any{"task": e, "answers": map[string]any{}}, &got)

@@ -4,7 +4,7 @@ package builtin
 var viewsGrammar = []Key{
 	{Path: "empty", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it."},
 	{Path: "default_sort", In: SurfaceViews, Localized: true, Kind: KindText, Required: true, Doc: "What clients call a view's own order in the sort menu, such as \"View order\". Required in the bundled profile; a user layer may replace it."},
-	{Path: "lens", In: SurfaceViews, Kind: KindTable, Doc: "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any."},
+	{Path: "lens", In: SurfaceViews, Kind: KindTable, Doc: "What every list's rows and toolbar say. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any."},
 	{Path: "lens.default_group", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`."},
 	{Path: "lens.board_group", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`."},
 	{Path: "lens.no_group", In: SurfaceViews, Localized: true, Kind: KindText, Required: true, Doc: "The group menu's entry that lists the view in one group."},
@@ -28,6 +28,10 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.label_prefix", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does."},
 	{Path: "facets.*.show", In: SurfaceViews, Kind: KindAny, Values: ShowParts, Doc: ShowDoc},
 	{Path: "facets.*.show_values", In: SurfaceViews, Kind: KindEnum, Values: ShowValues, Default: "all", Doc: ShowValuesDoc},
+	{Path: "facets.*.show_when", In: SurfaceViews, Kind: KindMap, Doc: ShowWhenDoc},
+	{Path: "facets.*.show_when.*", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: ShowWhenElem},
+	{Path: "facets.*.show_max", In: SurfaceViews, Kind: KindInt, Doc: ShowMaxDoc},
+	{Path: "facets.*.show_label", In: SurfaceViews, Localized: true, Kind: KindTemplate, Doc: ShowLabelDoc},
 	{Path: "facets.*.empty", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "What a group of tasks with no value shows."},
 	{Path: "facets.*.match", In: SurfaceViews, Kind: KindEnum, Values: named("exact", "suffix", "prefix", "team"), Default: "exact", Doc: "How a filter's text matches a value: the whole value, its last segment, its first, or a person's team."},
 	{Path: "facets.*.menu", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "Whether the facet is offered in the filter menu."},
@@ -90,5 +94,9 @@ func ShowValues() []Value {
 const (
 	ShowDoc       = "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show."
 	ShowValuesDoc = "How many of an item's values the part shows: all, or the first alone."
+	ShowWhenDoc   = "Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = [\"me\"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on."
+	ShowWhenElem  = "The values one facet must hold."
+	ShowMaxDoc    = "How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all."
+	ShowLabelDoc  = "For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone."
 	ColorsDoc     = "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's."
 )

@@ -1037,163 +1037,6 @@ async function copyCandidates() {
   }
 }
 
-function sortLabel(sort, fields = catalog.fields) {
-  const { field, desc } = parseSort(sort, fields);
-  return field ? `${fieldById(field, fields).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
-}
-
-// lensResult is what lens shows of its view: a task view's tasks in the daemon's order, a row view's rows.
-function lensResult(lens) {
-  if (typeof isCoreView === "function" && isCoreView(lens.view)) return pipelineOf(taskLensItems(), lens, null);
-  return pipeline(state.rows, lens);
-}
-
-async function copyList(lens) {
-  const res = lensResult(lens);
-  const items = groupedRows(res.groups);
-  const grouped = res.group ? groupField(res.group, lens.fields).label.toLowerCase() : "";
-  const w = lensWords();
-  try {
-    await navigator.clipboard.writeText(listYAML({ view: lens.view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort, lens.fields), at: new Date().toISOString() }, items));
-    setNotice(fillWord(grouped ? w.copied_grouped : w.copied, { count: items.length, view: lens.view, group: grouped }));
-  } catch (err) {
-    setNotice(t("Could not copy: {error}", { error: err.message }), true);
-  }
-}
-
-function chip(attrs, label) {
-  return h("button", { type: "button", class: "chip", ...attrs }, label);
-}
-
-function setGroup(g) {
-  const lens = { ...readLens(), group: g };
-  const res = lensResult(lens);
-  writeHash({ g });
-  if (res.group) setNotice(tn("Grouped by {field}: {n} groups", res.groups.filter((x) => x.rows.length).length, { field: groupField(res.group, lens.fields).label.toLowerCase() }));
-}
-
-function clearLens() {
-  lastFocus = "top:search";
-  writeHash({ q: "", g: "", s: "" });
-}
-
-// lensChips are one chip per filtered field and sign, which takes it out.
-function lensChips(lens, applied) {
-  const by = new Map();
-  for (const x of lens.quals) {
-    const k = `${x.field}:${x.neg ? "-" : ""}`;
-    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
-    by.get(k).values.push(x.field === "kind" ? kindLabel(x.value) : x.raw);
-  }
-  const list = [...by.values()];
-  return list.map((c, i) => {
-    const f = fieldById(c.field, lens.fields);
-    const off = applied && !applied.includes(c.field);
-    const next = list[i + 1] || list[i - 1];
-    return chip({
-      class: "chip on" + (off ? " off" : ""), "data-focus": `lens:chip:${c.field}:${c.neg ? "-" : ""}`,
-      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
-      onclick: () => {
-        lastFocus = next ? `lens:chip:${next.field}:${next.neg ? "-" : ""}` : "lens:group";
-        writeHash({ q: withoutQualifiers(lens.q, c.field, c.neg, lens.fields) });
-      },
-    }, chipWords(f.label, c.values, c.neg));
-  });
-}
-
-function chipWords(label, values, neg) {
-  const vars = { field: label, values: values.join(" " + t("or") + " ") };
-  return neg ? t("{field}: not {values} ×", vars) : t("{field}: {values} ×", vars);
-}
-
-// stripLegend is the hues of lens's strip facet, in its rank, when fields offer it.
-
-function stripLegend(lens, fields) {
-  const s = lens.stripSpec;
-  if (!s || !s.rank || (fields && !fields.some((x) => x.id === s.id))) return null;
-  return h("span", { class: "legend", title: (lens.words || lensWords()).legend_title || undefined },
-    h("span", { class: "lens-label" }, `${s.label}:`),
-    s.rank.map((v) => h("span", { class: "lg w-" + stripColor(s, v) }, h("span", { class: "sw", "aria-hidden": "true" }), (s.labels || {})[v] || v)));
-}
-
-function lensSelect(id, label, value, options, onchange) {
-  return h("label", { class: "lens-pick" }, h("span", { class: "lens-label" }, label),
-    h("select", { "data-focus": `lens:${id}`, onchange: (e) => onchange(e.target.value) },
-      options.map(([v, text]) => h("option", { value: v, selected: v === value }, text))));
-}
-
-// renderLens draws the bar of filters, grouping and order in tools, #tools by default. It rebuilds only when
-// what it shows changed, so an open select survives live updates.
-function renderLens(lens, res, tools = document.getElementById("tools")) {
-  const recent = lens.view === "recent";
-  if (lens.view === "explore" || (recent && !lens.quals.length)) {
-    hideLens(tools);
-    return;
-  }
-  tools.hidden = false;
-  const offered = (lens.offered || catalog.fields).map((f) => f.id);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
-  if (tools.dataset.sig === sig) return;
-  tools.dataset.sig = sig;
-  const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear"));
-  tools.replaceChildren(...(recent ? [...lensChips(lens, ACTIVITY_FIELDS), clear] : lensBar(lens, res)));
-}
-
-function hideLens(tools) {
-  tools.hidden = true;
-  tools.replaceChildren();
-  tools.dataset.sig = "";
-}
-
-// lensBar is the bar's controls: the group and sort menus over the fields lens offers, the layout, the chips of
-// what it filters by, the count and Copy list.
-function lensBar(lens, res) {
-  const offered = lens.offered || catalog.fields;
-  const fields = lens.fields || catalog.fields;
-  const current = tagKeyField(lens.group, fields);
-  const groups = offered.filter((f) => f.group && f.menu !== false);
-  if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
-  const board = lens.layout === "board";
-  const w = lensWords();
-  const own = lens.defaultGroup || (board ? lens.boardGroup : "");
-  const ownField = own ? groupField(own, fields) : null;
-  const { field, desc } = parseSort(lens.sort, fields);
-  const sortWord = lens.defaultSort;
-  const picked = lens.group && lens.group !== NO_GROUP ? groupField(lens.group, fields) : null;
-  const toggle = (layout, label) => h("button", {
-    type: "button", class: "act", "aria-pressed": String(board === (layout === "board")), "data-focus": `lens:${layout || "list"}`,
-    onclick: () => writeHash({ layout }),
-  }, label);
-  const items = [
-    lensSelect("group", t("Group"), lens.group, [
-      ["", ownField ? fillWord(lens.defaultGroup ? w.default_group : w.board_group, { label: ownField.label }) : w.no_group],
-      ...(ownField ? [[NO_GROUP, w.no_group]] : []),
-      ...groups.map((f) => [f.id, f.label])], setGroup),
-    lensSelect("sort", t("Sort"), field, [["", sortWord], ...offered.filter((f) => f.sort).map((f) => [f.id, f.label])],
-      (v) => writeHash({ s: v })),
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:dir", disabled: !field, "aria-label": desc ? t("Descending") : t("Ascending"),
-      title: field ? (desc ? t("Sorted descending; click to flip") : t("Sorted ascending; click to flip")) : t("Pick a sort to choose its direction"),
-      onclick: () => writeHash({ s: field + (desc ? "" : "-desc") }),
-    }, desc ? "↓" : "↑"),
-    h("div", { class: "toggle", role: "group", "aria-label": t("Layout") }, toggle("", t("List")), toggle("board", t("Board"))),
-    stripLegend(lens, offered),
-    ...lensChips(lens),
-    picked ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: t("Stop grouping"), onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
-      t("Grouped by {field} ×", { field: picked.label.toLowerCase() })) : null,
-    field ? chip({ class: "chip on", "data-focus": "lens:chip:sort", title: t("Back to {sort}", { sort: sortWord.toLowerCase() }), onclick: () => { lastFocus = "lens:sort"; writeHash({ s: "" }); } },
-      t("Sorted by {field} {arrow} ×", { field: fieldById(field, fields).label.toLowerCase(), arrow: desc ? "↓" : "↑" })) : null,
-    h("span", { class: "lens-count" }, res ? t("{shown} of {total}", { shown: fmtNumber(res.shown), total: fmtNumber(res.total) }) : ""),
-    lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear")) : null,
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:copy-list", title: t("Copy the items shown here, in this order, as YAML, to paste for an agent"),
-      onclick: () => copyList(lens),
-    }, t("Copy list")),
-  ];
-  return items.filter(Boolean);
-}
-
 async function setPaused(paused) {
   state.pausing = true;
   state.actionError = "";
@@ -1213,44 +1056,6 @@ async function setPaused(paused) {
   }
   state.pausing = false;
   scheduleLoad({ health: true });
-}
-
-function railItem(label, count, active, hash, cls, tip) {
-  const tipID = tip ? "rail-tip-" + hash.replace(/[^A-Za-z0-9_-]/g, "-") : undefined;
-  return h("li", {},
-    h("a", { href: "#" + hash, class: (active ? "on " : "") + (cls || ""), "aria-current": active ? "page" : undefined, "aria-describedby": tipID, "data-focus": "rail:" + hash },
-      h("span", { class: "label", title: tip ? undefined : label }, label),
-      h("span", { class: "count" }, count),
-      tip ? h("span", { class: "rail-tip", role: "tooltip", id: tipID }, tip) : null));
-}
-
-function lensHash(change) {
-  const { q, g, s: sort, layout, view, area } = readHash();
-  return hashString({ view, q, g, s: sort, layout, area, ...change });
-}
-
-function renderRail() {
-  const lens = readLens();
-  const nav = viewNav(tasksState.catalog, catalog.views, [...pluginViews.keys()], viewCounters(readHash()));
-  const views = railSections(nav, providerName).flatMap((sec) => [
-    sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
-    ...sec.views.map((v) => {
-      const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
-      const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
-    })]).filter(Boolean);
-  document.getElementById("views").replaceChildren(...views);
-
-  const counts = new Map();
-  for (const r of state.rows) {
-    if (!passes(r, lens.view, lens, "waits-on")) continue;
-    for (const w of waitingWho(r)) counts.set(w, (counts.get(w) || 0) + 1);
-  }
-  const people = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  document.getElementById("people").replaceChildren(...people.map(([who, n]) => {
-    const on = lens.quals.some((x) => x.field === "waits-on" && !x.neg && x.value === normValue("waits-on", who));
-    return railItem(who, n, on, lensHash({ q: toggledQualifier(lens.q, "waits-on", who, false) }));
-  }));
 }
 
 // focusSlot is the slot an action keeps focus in when a render swaps it for
@@ -1431,6 +1236,7 @@ function specFor(spec, provider) {
   const d = (spec.displays || {})[provider];
   if (!d) return spec;
   return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
+    show_when: d.show_when, show_max: d.show_max, show_label: d.show_label,
     strip: !!d.strip, colors: d.colors,
     buckets: d.bucket_labels ? (spec.buckets || []).map((b) => (b.id in d.bucket_labels ? { ...b, label: d.bucket_labels[b.id] } : b)) : spec.buckets,
     labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
@@ -1457,7 +1263,10 @@ function partPiece(spec, raw, words, now) {
       const b = spec.buckets.find((x) => x.id === p.value);
       if (b) p.label = b.label || p.value;
     }
-    if (agePart(spec.show)) p.label = ageText(words, now - at);
+    if (agePart(spec.show)) {
+      p.label = ageText(words, now - at);
+      if (spec.show_label) [p.label, p.template] = [spec.show_label.replaceAll("{{.age}}", p.label), spec.show_label];
+    }
   }
   if (spec.label_prefix && !p.label.startsWith(spec.label_prefix)) p.label = spec.label_prefix + p.label;
   return p;
@@ -1473,6 +1282,11 @@ function agePart(part) {
   return part === "age";
 }
 
+// holdsWhen mirrors lens's holds: whether it holds, in each facet when names, one of its values.
+function holdsWhen(it, when) {
+  return Object.entries(when || {}).every(([facet, values]) => ((it.facets || {})[facet] || []).some((v) => values.some((w) => fold(v) === fold(w))));
+}
+
 // rowParts mirrors lens.Parts: the pieces of item it each part of a row shows, by part, from the specs
 // that show in one, in their order, none from another provider's spec.
 function rowParts(it, specs, words, now = Date.now()) {
@@ -1480,14 +1294,20 @@ function rowParts(it, specs, words, now = Date.now()) {
   for (const s of specs || []) {
     if (s.provider && it.provider && s.provider !== it.provider) continue;
     const spec = specFor(s, it.provider || "");
-    if (!spec.show || (agePart(spec.show) && out[spec.show])) continue;
+    if (!spec.show || (agePart(spec.show) && out[spec.show]) || !holdsWhen(it, spec.show_when)) continue;
     const pieces = [];
+    let rest = 0;
     for (const raw of (it.facets || {})[spec.id] || []) {
       const p = partPiece(spec, raw, words, now);
       if (!p || ((spec.show_only || []).length && !spec.show_only.some((v) => fold(v) === fold(raw)))) continue;
+      if (spec.show_max > 0 && pieces.length === spec.show_max) {
+        rest++;
+        continue;
+      }
       pieces.push(p);
       if (spec.show_values === "first" || agePart(spec.show)) break;
     }
+    if (rest) pieces.push({ field: spec.id, value: "", raw: "", label: fillWord(words.more, { n: rest }) });
     if (pieces.length) out[spec.show] = [...(out[spec.show] || []), ...pieces];
   }
   return out;
@@ -1502,141 +1322,6 @@ function rowClasses(it, specs) {
     for (const v of (it.facets || {})[spec.id] || []) if ((spec.row_class || {})[v]) out.push(spec.row_class[v]);
   }
   return [...new Set(out)];
-}
-
-// partClass is the class a part's pieces read in.
-function partClass(part) {
-  return { meta: "pill", flag: "flag", kind: "pill", aside: "col" }[part] || part;
-}
-
-// pieceButtons are a part's pieces, each a facet button whose label marks the search's hits.
-function pieceButtons(m, lens, part) {
-  return (m.parts[part] || []).map((p) => facet(lens, p.field, p.value,
-    h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value, title: agePart(part) ? stamp(p.raw) : undefined }, marked(p.label, lens.ts)),
-    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true }));
-}
-
-// rowColumnDefs are a row's columns: the parts each shows, and whether a row has anything for it.
-function rowColumnDefs() {
-  return [
-    { id: "unit", cls: "c-pr", parts: ["ref"], has: () => true },
-    { id: "who", cls: "c-wait", parts: ["strip", "who", "kind"], has: (m) => !!(m.parts.who || m.parts.kind || m.lead) },
-    { id: "since", cls: "c-for", parts: ["age"], has: (m) => !!(m.parts.age || m.age) },
-    { id: "why", cls: "c-why", parts: [], has: (m) => !!m.why },
-    { id: "aside", cls: "c-where", parts: ["aside"], has: (m) => !!(m.parts.aside || (m.aside || []).some(Boolean)) },
-    { id: "actions", cls: "c-act", parts: [], has: (m) => (m.actions || []).some(Boolean) },
-  ];
-}
-
-// rowColumns are the columns some of the models has a piece for.
-function rowColumns(models) {
-  return rowColumnDefs().filter((c) => models.some((m) => c.has(m)));
-}
-
-// columnSort is the field a column's head sorts by: the first sortable facet of its parts, the strip's the
-// view's strip facet.
-function columnSort(col, lens) {
-  for (const part of col.parts) {
-    if (part === "strip") {
-      const f = lens.strip ? fieldById(lens.strip, lens.fields) : null;
-      if (f && f.sort) return f;
-      continue;
-    }
-    for (const s of lens.specs || []) {
-      const f = fieldById(s.id, lens.fields);
-      if (f && f.sort && specFor(s, lens.provider || "").show === part) return f;
-    }
-  }
-  return null;
-}
-
-// sortPick cycles a column head's sort: ascending, descending, then the default.
-function sortPick(id) {
-  const { field, desc } = parseSort(readHash().s, readLens().fields);
-  writeHash({ s: field !== id ? id : desc ? "" : id + "-desc" });
-}
-
-// rowHead is the head of a table of rows: one cell per column, each that sorts a button.
-function rowHead(cols, lens, unit) {
-  const w = lens.words || {};
-  const { field, desc } = parseSort(lens.sort, lens.fields);
-  const heads = { unit: unit || w.col_unit, who: w.col_who, since: w.col_age, why: w.col_why, aside: w.col_aside };
-  return h("thead", {}, h("tr", {}, cols.map((c) => {
-    if (c.id === "actions") return h("th", { scope: "col", class: c.cls }, h("span", { class: "sr" }, w.col_actions));
-    const f = lens.static ? null : columnSort(c, lens);
-    if (!f) return h("th", { scope: "col", class: c.cls }, heads[c.id]);
-    return h("th", { scope: "col", class: c.cls, "aria-sort": f.id === field ? (desc ? "descending" : "ascending") : "none" },
-      h("button", { type: "button", class: "th-sort", "data-sort": f.id, "data-focus": "th:" + f.id, title: fillWord(w.sort_by, { label: f.label.toLowerCase() }), onclick: () => sortPick(f.id) }, heads[c.id]));
-  })));
-}
-
-// rowTr is one table row of a model, its cells those of cols: the title with its ref, meta and flags; who it
-// waits on with its kind; its age; why; its aside; its actions.
-function rowTr(m, lens, cols) {
-  const open = m.open;
-  const cells = {
-    unit: () => [
-      h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null,
-        m.href ? h("a", { href: m.href, "data-focus": m.scope + ":title", ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
-      rowMeta(m, lens),
-      m.after || null],
-    who: () => rowWho(m, lens),
-    since: (c) => m.age || pieceButtons(m, lens, c.parts[0]),
-    why: () => m.why || "",
-    aside: () => [m.asideLead || null, pieceButtons(m, lens, "aside"), m.aside || null],
-    actions: () => m.actions || null,
-  };
-  return h("tr", {
-    class: [...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    title: m.tip || undefined,
-    tabindex: 0,
-    "aria-selected": m.selected ? "true" : "false",
-    "data-focus": m.scope,
-    "data-row": m.scope,
-    "data-rove": "",
-    onclick: open || undefined,
-    onkeydown: (e) => {
-      if (roveKey(e) || !open) return;
-      if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-        e.preventDefault();
-        open();
-      }
-    },
-  }, cols.map((c) => h("td", { class: c.cls }, cells[c.id](c))));
-}
-
-// rowMeta is a model's ref, meta and flag parts, with what no facet carries after each.
-function rowMeta(m, lens) {
-  return h("div", { class: "meta" },
-    h("span", { class: "ref" }, pieceButtons(m, lens, "ref"), (m.ref || []).map((x) => typeof x === "string" ? marked(x, lens.ts) : x)),
-    pieceButtons(m, lens, "meta"), m.meta || null,
-    pieceButtons(m, lens, "flag"), m.flags || null);
-}
-
-// rowWho is whom a model waits on: its strip's dot and its who pieces, then its kind.
-function rowWho(m, lens) {
-  return [h("div", { class: "who" }, m.lead || null, m.lead ? " " : null, joined(pieceButtons(m, lens, "who"))), pieceButtons(m, lens, "kind")];
-}
-
-// rowCard is a model as a board's card: an li whose title is the control that opens it, stretched over the
-// card, with the pieces its row shows as siblings, the arrows moving between them.
-function rowCard(m, lens) {
-  const label = h("span", { title: m.titleTip || undefined }, marked(m.title, lens.ts));
-  const at = { class: "open", "data-focus": m.scope, "data-rove": "", title: m.tip || undefined, "aria-current": m.selected ? "true" : undefined };
-  const title = m.open ? h("button", { type: "button", ...at, onclick: m.open }, label) : m.href ? h("a", { ...at, href: m.href }, label) : label;
-  return h("li", {
-    class: ["card", ...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    "data-row": m.scope,
-    onkeydown: roveKey,
-  },
-    h("div", { class: "title" }, m.pre || null, title),
-    rowMeta(m, lens),
-    h("div", { class: "card-who" }, rowWho(m, lens), m.age || pieceButtons(m, lens, "age")),
-    m.after || null);
-}
-
-function joined(nodes) {
-  return nodes.flatMap((n, i) => (i ? [", ", n] : [n]));
 }
 
 // refTail is a unit's label after the first ref piece's label, when the label starts with it.
@@ -1662,7 +1347,7 @@ function rowModel(r, pr, lens, copy, kind = "row") {
   const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
   return {
     key, scope, item, parts, words: w, nouns, selected: key === pr, open: () => openRow(scope, key),
-    title: r.title || labelOf(r), titleTip: (p.brief || {}).goal,
+    title: titleWithoutRef(r.title || labelOf(r), [labelOf(r)]), titleTip: (p.brief || {}).goal,
     ref: [refTail(labelOf(r), parts.ref)],
     meta: [
       p.head && lens.ts.some((term) => fold(p.head).includes(term)) ? h("span", { class: "head" }, marked(p.head, lens.ts)) : null,
@@ -1714,48 +1399,13 @@ function toggleCollapsed(key) {
   render();
 }
 
-// rowTable is the body of a table of models: a tbody per group of res, each under its head when the lens
-// groups, the head a collapse toggle with an "only this" filter.
-function rowTable(res, model, lens, cols) {
-  const grouped = !!res.group;
-  const multi = grouped && multiCopy(res.group);
-  return res.groups.filter((g) => g.rows.length).map((g, i) => {
-    const key = `${g.field}:${g.key}`;
-    const collapsed = grouped && state.collapsed.has(key);
-    const rows = g.rows.map((it) => {
-      const tr = rowTr(model(it, multi ? g.key : ""), lens, cols);
-      tr.hidden = collapsed;
-      return tr;
-    });
-    if (!grouped) return h("tbody", {}, rows);
-    const id = `g-${lens.view}-${i}`;
-    return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") },
-        h("th", { scope: "rowgroup", colspan: cols.length },
-          h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
-            `${collapsed ? "▸" : "▾"} ${g.label}`),
-          h("span", { class: "count" }, g.rows.length),
-          onlyThis(g, lens))),
-      rows);
-  });
-}
-
 // unitTitle names a row view's unit column: the view's unit, else the lens's word for a mixed view.
 function unitTitle(view, lens) {
   return (catalog.views.find((x) => x.id === view) || {}).unit || (lens.words || {}).col_unit || "";
 }
 
 function renderTable(res, pr, lens) {
-  const table = document.getElementById("table");
-  const inView = state.rows.filter((r) => inViewOf(r, lens));
-  const models = new Map();
-  const model = (r, copy) => {
-    const k = copy ? `${keyOf(r)}@${copy}` : keyOf(r);
-    if (!models.has(k)) models.set(k, rowModel(r, pr, lens, copy));
-    return models.get(k);
-  };
-  const cols = rowColumns(inView.map((r) => model(r, "")));
-  table.replaceChildren(rowHead(cols, lens, unitTitle(lens.view, lens)), ...rowTable(res, model, lens, cols));
+  document.getElementById("table").replaceChildren(rowList(res, (r, copy) => rowModel(r, pr, lens, copy), lens));
 }
 
 function inViewOf(r, lens) {
@@ -1842,7 +1492,7 @@ function lane(g, lens, title, item) {
 
 function renderBoard(groups, pr, lens) {
   const title = (catalog.views.find((v) => v.id === lens.view) || {}).label || lens.view;
-  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowCard(rowModel(r, pr, lens, copy, "card"), lens))));
+  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowView(rowModel(r, pr, lens, copy, "card"), lens, { card: true }))));
 }
 
 function loopOnly() {
@@ -2495,7 +2145,7 @@ function revealOpenRow(pr) {
   }
   if (state.revealed === pr) return;
   const slot = openSlot(pr);
-  const row = (slot && document.querySelector(`[data-focus="${CSS.escape(slot)}"]`)) || document.querySelector("tbody tr.sel, .card.sel");
+  const row = (slot && document.querySelector(`[data-focus="${CSS.escape(slot)}"]`)) || document.querySelector(".row.sel, .card.sel");
   if (!row) return;
   state.revealed = pr;
   row.scrollIntoView({ block: "nearest" });
@@ -2941,7 +2591,7 @@ function render() {
   renderSync();
   renderPause();
   renderWarnings();
-  renderRail();
+  renderRail(railNav(readLens()), readHash());
   renderExplore(readHash().view);
   renderPlan(readHash().view);
   renderPluginView(readHash().view);

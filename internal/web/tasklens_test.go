@@ -103,9 +103,9 @@ func mixedTasks() []api.TaskView {
 var taskLensFuncs = []string{"tokens", "unquote", "terms", "fieldById", "tagKeyField", "groupField", "tagKeys", "normValue", "qualifierOf", "qualifiers", "qualifierToken",
 	"toggledQualifier", "withoutQualifiers", "haystack", "matches", "itemValues", "itemKey", "filtersOf", "passesFilters", "parseSort", "lensFields", "fieldsFor",
 	"viewSource", "offeredFields", "viewGroupField", "defaultSortLabel", "lensOf", "lensPicks", "effectiveGroup", "cmp", "keyRank", "keyOrder", "compareItems",
-	"groupLabel", "groupItems", "pipelineOf", "groupedRows", "groupQualifier", "onlyThis", "multiCopy", "renderLens", "hideLens", "lensBar", "lensSelect",
-	"boardGroupField", "lensWords", "fillWord", "lane", "rowByKey",
-	"lensChips", "chipWords", "chip", "stripLegend", "viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "setGroup", "clearLens", "copyList", "lensResult", "sortLabel", "listYAML", "copyEntry", "yamlString", "inView"}
+	"groupLabel", "groupItems", "pipelineOf", "groupedRows", "groupQualifier", "onlyThis", "multiCopy",
+	"boardGroupField", "lensWords", "fillWord", "lane", "rowByKey", "hashString",
+	"viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "listYAML", "copyEntry", "yamlString", "inView"}
 
 // taskLensJS declares the served GitHub catalog and the lens functions views.js calls, over a state with no rows.
 func taskLensJS(t *testing.T) string {
@@ -123,7 +123,7 @@ func taskLensJS(t *testing.T) string {
 			b.WriteString(jsFunction(t, src, f))
 		}
 	}
-	b.WriteString("const taskListNodes = (r, open) => { const p = viewPage(r, open); return [...p.head, ...(p.res ? lensBar(p.lens, p.res) : []), ...p.body]; };\n")
+	b.WriteString("const taskListNodes = (r, open) => { const p = viewPage(r, open); return [...p.head, ...(p.res ? lensToolbar(p.lens, p.res) : []), ...p.body]; };\n")
 	return b.String()
 }
 
@@ -157,7 +157,7 @@ func TestNeedsMeOffersTheFieldsItsTasksHave(t *testing.T) {
 	}
 	nodeRun(t, mixedPrelude(t), nil, `
 const p = viewPage(route({}), "");
-const bar = lensBar(p.lens, p.res);
+const bar = lensToolbar(p.lens, p.res);
 process.stdout.write(JSON.stringify({ Group: options(bar, "lens:group"), Sort: options(bar, "lens:sort"), Mine: fieldsFor("mine", input.rows).map((f) => f.id) }));`,
 		mixedInput(t, map[string]any{"rows": rows}), &got)
 	for _, id := range []string{"where", "ci", "source", "conversation", "kind", "state", "category", "tag:lang"} {
@@ -199,7 +199,7 @@ func TestATaskViewGroupsBySourceAndFilters(t *testing.T) {
 const p = viewPage(route({ q: "where:general", g: "source" }), "");
 const body = h("div", {}, ...p.body);
 process.stdout.write(JSON.stringify({ Group: p.res.group, Groups: p.res.groups.filter((g) => g.rows.length).map((g) => ({ Key: g.key, Label: g.label, IDs: g.rows.map((it) => it.task.id) })),
-  Text: text(body), Nested: p.body.some(Array.isArray), Count: text(byClass(lensBar(p.lens, p.res), "lens-count")) }));`, mixedInput(t, nil), &got)
+  Text: text(body), Nested: p.body.some(Array.isArray), Count: text(byClass(lensToolbar(p.lens, p.res), "lens-count")) }));`, mixedInput(t, nil), &got)
 	if got.Group != "source" || len(got.Groups) != 1 || got.Groups[0].Key != "slack" || !slices.Equal(got.Groups[0].IDs, []string{"s-1"}) {
 		t.Fatalf("where:general grouped by source: %+v", got)
 	}
@@ -242,7 +242,7 @@ func TestTheViewGroupIsTheLensDefault(t *testing.T) {
 	nodeRun(t, mixedPrelude(t), nil, `
 tasksState.key = viewQueryKey("waiting", "", []);
 const p = viewPage(route({ view: "waiting" }), "");
-const bar = lensBar(p.lens, p.res);
+const bar = lensToolbar(p.lens, p.res);
 const flat = viewPage(route({ view: "waiting", g: NO_GROUP }), "");
 process.stdout.write(JSON.stringify({ Group: p.res.group, Keys: p.res.groups.map((g) => g.key), First: text(byFocus(bar, "lens:group").children[0]),
   Picked: flat.res.group }));`, mixedInput(t, nil), &got)
@@ -332,7 +332,7 @@ func TestATaskBoardGroupsByTheProfilesStripFacet(t *testing.T) {
 	}
 	nodeRun(t, mixedPrelude(t), nil, `
 const p = viewPage(route({ layout: "board" }), "");
-const first = (pg) => text(byFocus(lensBar(pg.lens, pg.res), "lens:group").children[0]);
+const first = (pg) => text(byFocus(lensToolbar(pg.lens, pg.res), "lens:group").children[0]);
 const g = p.res.group, f = first(p);
 tasksState.tasks = input.tasks.map((e) => ({ ...e, facets: { source: e.facets.source } }));
 const bare = viewPage(route({ layout: "board" }), "");
@@ -351,7 +351,7 @@ func TestTheLensSaysTheProfilesWords(t *testing.T) {
 tasksState.catalog = { ...input.cat, lens: { ...input.cat.lens, default_group: "{{.label}} as the view has it", copied_grouped: "{{.count}} by {{ .group }} off {{.view}}" } };
 tasksState.key = viewQueryKey("waiting", "", []);
 const p = viewPage(route({ view: "waiting" }), "");
-process.stdout.write(JSON.stringify({ First: text(byFocus(lensBar(p.lens, p.res), "lens:group").children[0]),
+process.stdout.write(JSON.stringify({ First: text(byFocus(lensToolbar(p.lens, p.res), "lens:group").children[0]),
   Copied: fillWord(lensWords().copied_grouped, { count: 3, view: "waiting", group: "source" }) }));`, mixedInput(t, nil), &got)
 	if got.First != "Waits on (person) as the view has it" || got.Copied != "3 by source off waiting" {
 		t.Errorf("words %+v", got)
@@ -366,7 +366,7 @@ func TestATaskInTwoGroupsHasTwoFocusSlotsAndTheKeysWalkBoth(t *testing.T) {
 	nodeRun(t, mixedPrelude(t), nil, `
 tasksState.tasks = input.tasks.map((e) => e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e);
 const p = viewPage(route({ g: "tag:lang" }), "");
-const focus = all(h("div", {}, ...p.body), (x) => x.tag === "tr" && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
+const focus = all(h("div", {}, ...p.body), (x) => x.attrs["data-row"] && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
 const nodes = focus.map((f) => ({ dataset: { focus: f } }));
 const walk = [];
 let at = null;

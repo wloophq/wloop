@@ -37,6 +37,8 @@ var tasksGrammar = []Key{
 	{Path: "attribution", In: SurfaceTasks, Kind: KindTable, Doc: "How the task's page names who made a change."},
 	{Path: "attribution.via_session", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change an agent made for you through a session you drove; {session} is the session's id."},
 	{Path: "attribution.via_workflow", In: SurfaceTasks, Kind: KindText, Doc: "The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name."},
+	{Path: "detail", In: SurfaceTasks, Kind: KindTable, Doc: "What a task's detail panel offers."},
+	{Path: "detail.verbs", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The verbs the detail shows as buttons, in order, each a verb of verbs; those the task does not offer are left out, and every other verb it offers waits behind a More button that opens the palette. A user layer's list replaces the one below it."},
 	{Path: "areas", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The areas a task may be in, the values of the area property."},
 	{Path: "contexts", In: SurfaceTasks, Kind: KindList, Elem: KindText, Doc: "The contexts the menu offers; a task may hold others."},
 	{Path: "stale_waiting_days", In: SurfaceTasks, Kind: KindInt, Doc: "Working days a task waits before it is stale."},

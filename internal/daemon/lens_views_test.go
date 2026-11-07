@@ -171,3 +171,24 @@ func TestTheOutboxPageAndCountAgreeUnderAFilter(t *testing.T) {
 		}
 	}
 }
+
+func TestTheCatalogServesTheDetailVerbsAndTheEffectWords(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Tasks.DetailVerbs = []string{"waiting", "done"}
+	l.Gates.Effects = map[string]string{"task.nudged": "Marked as nudged."}
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	var cat api.ViewsCatalog
+	get(t, r.s, api.ViewsPath, &cat)
+	if !slices.Equal(cat.DetailVerbs, []string{"waiting", "done"}) {
+		t.Errorf("detail_verbs %q, want the profile's", cat.DetailVerbs)
+	}
+	if cat.Effects["task.nudged"] != "Marked as nudged." || len(cat.Effects) != 1 {
+		t.Errorf("effects %v, want the profile's words", cat.Effects)
+	}
+	var bundled api.ViewsCatalog
+	get(t, newTasksRig(t, nil).s, api.ViewsPath, &bundled)
+	if len(bundled.DetailVerbs) == 0 || bundled.Effects["task.nudged"] == "" {
+		t.Errorf("the bundled profile serves detail_verbs %q, effects %v", bundled.DetailVerbs, bundled.Effects)
+	}
+}

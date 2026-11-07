@@ -29,6 +29,8 @@ type GatesDef struct {
 	// Approval is gates.toml's [approval]: how a gate is decided when no
 	// manifest or configuration says, the default of each kind.
 	Approval GateApproval
+	// Effects are the sentences that say what each effect does when a draft is sent, by effect name.
+	Effects map[string]string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -178,8 +180,9 @@ func (d GatesDef) names() []string {
 }
 
 type mGatesFile struct {
-	Gates    map[string]mGate `toml:"gates"`
-	Approval *mApproval       `toml:"approval"`
+	Gates    map[string]mGate  `toml:"gates"`
+	Approval *mApproval        `toml:"approval"`
+	Effects  map[string]string `toml:"effects"`
 }
 
 type mGate struct {
@@ -219,6 +222,7 @@ func loadGates(layers []profile.Layer, r layerReader) (GatesDef, Problems) {
 		if m.Approval != nil {
 			s.profileApproval(&d, m.Approval)
 		}
+		mergeEffects(s, &d, m.Effects)
 		s.addGrammar(grammar(builtin.SurfaceGates, src))
 		return s.problems
 	})
@@ -293,6 +297,29 @@ func pinnedKinds(p workflow.Predicate) []gate.Kind {
 		}
 	}
 	return out
+}
+
+// mergeEffects lays a file's effect words over d's: each key names an effect of builtin.Effects, and an
+// empty sentence takes a lower layer's off.
+func mergeEffects(s *sheet, d *GatesDef, m map[string]string) {
+	for _, name := range declared(s, "effects", m) {
+		if _, ok := builtin.EffectOf(name); !ok {
+			names := make([]string, len(builtin.Effects))
+			for i, e := range builtin.Effects {
+				names[i] = e.Name
+			}
+			s.add("effects."+name, "names no effect%s; the effects are %s", expr.DidYouMean(name, names), strings.Join(names, ", "))
+			continue
+		}
+		if d.Effects == nil {
+			d.Effects = map[string]string{}
+		}
+		if v := strings.TrimSpace(m[name]); v != "" {
+			d.Effects[name] = v
+		} else {
+			delete(d.Effects, name)
+		}
+	}
 }
 
 func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {

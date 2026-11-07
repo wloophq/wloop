@@ -17,6 +17,7 @@ dismiss = "dispensar"
 reply = "responder na conversa"
 edit = "editar o texto do rascunho"
 open-source = "abrir a origem"
+"filter:add" = "adicionar um filtro por campo e valor"
 "group:cycle" = "agrupar pelo próximo campo"
 "sort:cycle" = "ordenar pelo próximo campo"
 
@@ -40,6 +41,8 @@ approve = "aplicar o passo do plano selecionado"
 
 [help.detail]
 "detail:detach" = "abrir numa janela própria"
+"tab:next" = "próxima aba"
+"tab:prev" = "aba anterior"
 
 [help.question]
 "answer:{n}" = "a opção {n} da decisão"

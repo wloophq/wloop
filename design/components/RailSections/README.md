@@ -1,6 +1,6 @@
 # RailSections
 
-*Proposed.* The rail organized tasks first, then one section per plugin, then the loop.
+*Partly built.* The rail organized tasks first, then one section per plugin, then the loop. Built: the profile's views under no head, one section per plugin headed by its served name, and the empty views folded into one Empty entry (see Rail). Proposed: the rest below.
 
 Top: the area switcher and Review, which walks the profile's review steps as a mode. Then the profile's views in the order of its `views.toml`, under no heading of the client's own; one section per plugin, headed by its name and source mark, its views in catalog order, collapsed past three into "n more"; Loop (Plan, Recent).
 

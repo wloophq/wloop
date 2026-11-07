@@ -58,6 +58,7 @@ func TestSlackTaskDetailReadsByName(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 (async () => {
+  taskState.tab = "asks";
   await loadDetailPane({ task: "e-9" });
   const box = { dataset: {}, contains: () => false, replaceChildren(...ns) { this.kids = ns.map((n) => Array.isArray(n) ? String(n) : n); } };
   renderTaskDetail(box, { task: "e-9" });
@@ -70,7 +71,7 @@ globalThis.document = { activeElement: null, body: { classList: { add() {} } } }
 	if got.Pills != 1 {
 		t.Errorf("%d waiting pills in the head %q, want 1", got.Pills, got.Head)
 	}
-	for _, s := range []string{"#general", "Ana owes the doc", "@team-a", "last activity 2026-10-23T14:15:00Z"} {
+	for _, s := range []string{"#general", "Ana owes the doc", "@team-a", "last activity10/23"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the detail lacks %q: %s", s, got.Text)
 		}
@@ -130,24 +131,5 @@ func TestUnitColumnNamesTheViewsUnit(t *testing.T) {
 process.stdout.write(JSON.stringify(["needs-me", "slack", "all"].map((v) => unitTitle(v, { words: { col_unit: "Item" } }))));`, map[string]any{"views": views}, &got)
 	if want := []string{"Pull request", "Conversation", "Item"}; !slices.Equal(got, want) {
 		t.Errorf("columns %q, want %q", got, want)
-	}
-}
-
-func TestRailGroupsViewsByPlugin(t *testing.T) {
-	served := []api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: "github"}, {ID: "slack", Label: "Slack", Provider: "slack"},
-		{ID: "all", Label: "All", Provider: "github"}}
-	var got []struct {
-		Title string
-		Views []string
-	}
-	nodeRun(t, viewsPrelude(t), nil, `
-const nav = viewNav(input.cat, input.served, [], null);
-const names = { github: "GitHub", slack: "Slack" };
-process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) => ({ Title: s.title, Views: s.views.map((v) => v.id) }))));`,
-		map[string]any{"cat": viewsCatalog(), "served": served}, &got)
-	if len(got) != 3 || got[0].Title != "" || !slices.Equal(got[0].Views, coreViewIDs) ||
-		got[1].Title != "GitHub" || !slices.Equal(got[1].Views, []string{"needs-me", "all"}) ||
-		got[2].Title != "Slack" || !slices.Equal(got[2].Views, []string{"slack"}) {
-		t.Errorf("sections %+v", got)
 	}
 }

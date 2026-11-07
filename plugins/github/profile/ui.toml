@@ -3,9 +3,6 @@
 # request's row. A user profile's plugins/github/ui.toml replaces the keys
 # it sets.
 
-[lens]
-col_aside = "Workspace"
-
 [views.mine]
 label = "My PRs"
 unit = "Pull request"
@@ -121,6 +118,7 @@ label = "In scope as"
 label = "Waiting for"
 buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
 show = "age"
+show_label = "since {{.at}}"
 
 [facets.lane]
 label = "Board lane"

@@ -33,11 +33,6 @@ tip_why = "{{.tip}}. {{.why}}"
 legend_title = "A faixa à esquerda de cada linha tem a cor de quem ela espera"
 sort_by = "Ordenar por {{.label}}"
 col_unit = "Item"
-col_who = "Esperando"
-col_age = "Há"
-col_why = "Por quê"
-col_aside = "Links"
-col_actions = "Ações"
 stale = "desatualizado"
 stale_title = "O plugin não está reportando; este é o último relato dele"
 briefing = "preparando brief"
@@ -46,7 +41,6 @@ briefing_attempt = "tentativa {{.n}}"
 briefing_error = "último erro: {{.error}}"
 questions = "? {{.n}}"
 questions_title = "{{.n}} {{plural .n \"one\" \"pergunta aberta\" \"other\" \"perguntas abertas\"}} no brief"
-changed = "mudou"
 starred = "Com estrela"
 until = "até {{.date}}"
 due = "prazo {{.date}}"
@@ -58,6 +52,7 @@ open_children = "abertas: {{.n}}"
 sequential = "sequencial"
 every = "a cada {{.every}}"
 reviewed = "revisado em {{.date}}"
+more = "+{{.n}}"
 
 [facets.source]
 label = "Origem"
@@ -101,9 +96,15 @@ empty = "sem posição"
 [facets.where]
 label = "Onde"
 
+[facets.owed]
+label = "Devida desde"
+empty = "ninguém deve"
+show_label = "desde {{.at}}"
+
 [facets.moved]
 label = "Movimentada"
 empty = "nunca movimentada"
+show_label = "movida em {{.at}}"
 
 [facets.moved.buckets.1d]
 label = "0-1 dia"
@@ -132,17 +133,36 @@ label = "Sinais"
 [facets."prop.kind"]
 label = "Tipo"
 
+[facets."prop.kind".values]
+start = "trabalho novo"
+capture = "captura"
+project = "projeto"
+
 [facets."prop.area"]
 label = "Área"
 
 [facets."prop.risk"]
 label = "Risco da tarefa"
 
+[facets."prop.risk".values]
+high = "alto"
+medium = "médio"
+low = "baixo"
+
 [facets."prop.focus"]
 label = "Foco"
 
+[facets."prop.focus".values]
+on = "com estrela"
+off = "sem estrela"
+
 [facets."prop.priority"]
 label = "Prioridade"
+
+[facets."prop.priority".values]
+high = "alta"
+normal = "normal"
+low = "baixa"
 
 [facets.type]
 label = "Tipo"
@@ -152,6 +172,11 @@ empty = "sem brief"
 label = "Risco"
 empty = "sem brief"
 label_prefix = "risco "
+
+[facets.risk.values]
+high = "alto"
+medium = "médio"
+low = "baixo"
 
 [facets.size]
 label = "Tamanho"

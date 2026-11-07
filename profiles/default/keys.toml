@@ -23,6 +23,7 @@ dismiss = "dismiss"
 reply = "reply in the conversation"
 edit = "edit the draft's text"
 open-source = "open the source"
+"filter:add" = "add a filter by a field and a value"
 "group:cycle" = "group by the next field"
 "sort:cycle" = "sort by the next field"
 
@@ -46,6 +47,8 @@ approve = "apply the selected plan step"
 
 [help.detail]
 "detail:detach" = "open in a window of its own"
+"tab:next" = "next tab"
+"tab:prev" = "previous tab"
 
 [help.question]
 "answer:{n}" = "the gate's intent {n}"

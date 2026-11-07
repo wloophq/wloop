@@ -97,17 +97,24 @@ type UIEvent struct {
 
 // UIFacet is a facet's words.
 type UIFacet struct {
-	Label       string            `toml:"label"`
-	Empty       string            `toml:"empty"`
-	Values      map[string]string `toml:"values"`
-	Buckets     map[string]string `toml:"buckets"`
-	ShowRaw     any               `toml:"show"`
-	ShowValues  *string           `toml:"show_values"`
-	LabelPrefix *string           `toml:"label_prefix"`
-	RowClass    map[string]string `toml:"row_class"`
-	Colors      map[string]string `toml:"colors"`
+	Label       string              `toml:"label"`
+	Empty       string              `toml:"empty"`
+	Values      map[string]string   `toml:"values"`
+	Buckets     map[string]string   `toml:"buckets"`
+	ShowRaw     any                 `toml:"show"`
+	ShowValues  *string             `toml:"show_values"`
+	ShowWhen    map[string][]string `toml:"show_when"`
+	ShowMax     *int                `toml:"show_max"`
+	ShowLabel   *string             `toml:"show_label"`
+	LabelPrefix *string             `toml:"label_prefix"`
+	RowClass    map[string]string   `toml:"row_class"`
+	Colors      map[string]string   `toml:"colors"`
 	// Show is where the facet's values show on the plugin's rows, read from ShowRaw and ShowValues.
 	Show Show `toml:"-"`
+}
+
+func (f UIFacet) placement() placement {
+	return placement{When: f.ShowWhen, Max: f.ShowMax, Label: f.ShowLabel}
 }
 
 // loadUI reads ui.toml from each plugin's layers, by plugin id: a higher
@@ -138,8 +145,9 @@ func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems
 		for id, f := range m.Facets {
 			if f.ShowRaw != nil || f.ShowValues != nil {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
-				m.Facets[id] = f
 			}
+			readPlacement(s, "facets."+id, f.placement(), &f.Show)
+			m.Facets[id] = f
 		}
 		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
 		if m.NounRaw != nil {
@@ -218,6 +226,16 @@ func mergeUI(into, over UITexts) UITexts {
 		}
 		if b.LabelPrefix != nil {
 			a.LabelPrefix = b.LabelPrefix
+		}
+		a.Show = a.Show.over(b.placement(), b.Show)
+		if b.ShowWhen != nil {
+			a.ShowWhen = b.ShowWhen
+		}
+		if b.ShowMax != nil {
+			a.ShowMax = b.ShowMax
+		}
+		if b.ShowLabel != nil {
+			a.ShowLabel = b.ShowLabel
 		}
 		return a
 	})

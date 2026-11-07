@@ -47,11 +47,6 @@ tip_why            = "{{.tip}}. {{.why}}"
 legend_title       = "The strip on the left of each row is the color of whom it waits on"
 sort_by            = "Sort by {{.label}}"
 col_unit           = "Item"
-col_who            = "Waiting on"
-col_age            = "For"
-col_why            = "Why"
-col_aside          = "Links"
-col_actions        = "Actions"
 stale              = "stale"
 stale_title        = "Its plugin is not reporting; this is its last report"
 briefing           = "briefing"
@@ -60,7 +55,6 @@ briefing_attempt   = "attempt {{.n}}"
 briefing_error     = "last error: {{.error}}"
 questions          = "? {{.n}}"
 questions_title    = "{{.n}} open {{plural .n \"one\" \"question\" \"other\" \"questions\"}} in the brief"
-changed            = "changed"
 starred            = "Starred"
 until              = "until {{.date}}"
 due                = "due {{.date}}"
@@ -72,6 +66,7 @@ open_children      = "{{.n}} open"
 sequential         = "sequential"
 every              = "every {{.every}}"
 reviewed           = "reviewed {{.date}}"
+more               = "+{{.n}}"
 
 # The task facets: the fields every client filters, groups and sorts tasks
 # by. A facet reads a fact of the task (task.*), or a field of a record kind
@@ -159,13 +154,25 @@ group = true
 sort  = "text"
 match = "suffix"
 
+# The row's date follows whom the task waits on: since when it owes you, or when someone last moved it.
+[facets.owed]
+fact       = "task.owed_since"
+label      = "Owed since"
+sort       = "time"
+empty      = "owed by nobody"
+show       = "age"
+show_when  = { turn = ["me"] }
+show_label = "since {{.at}}"
+
 [facets.moved]
-fact  = "task.moved_at"
-label = "Moved"
-group = true
-sort  = "time"
-empty = "never moved"
-show  = "age"
+fact       = "task.moved_at"
+label      = "Moved"
+group      = true
+sort       = "time"
+empty      = "never moved"
+show       = "age"
+show_when  = { turn = ["others", "nobody"] }
+show_label = "moved {{.at}}"
 
 [facets.moved.buckets.1d]
 within = "24h"
@@ -208,6 +215,11 @@ label = "Kind"
 group = true
 sort  = "text"
 
+[facets."prop.kind".values]
+start   = "new work"
+capture = "capture"
+project = "project"
+
 [facets."prop.area"]
 fact  = "task.prop.area"
 label = "Area"
@@ -222,6 +234,11 @@ group = true
 sort  = "rank"
 rank  = ["high", "medium", "low"]
 
+[facets."prop.risk".values]
+high   = "high"
+medium = "medium"
+low    = "low"
+
 [facets."prop.focus"]
 fact  = "task.prop.focus"
 label = "Focus"
@@ -229,12 +246,21 @@ group = true
 sort  = "rank"
 rank  = ["on", "off"]
 
+[facets."prop.focus".values]
+on  = "starred"
+off = "not starred"
+
 [facets."prop.priority"]
 fact  = "task.prop.priority"
 label = "Priority"
 group = true
 sort  = "rank"
 rank  = ["high", "normal", "low"]
+
+[facets."prop.priority".values]
+high   = "high"
+normal = "normal"
+low    = "low"
 
 [facets.type]
 fact  = "brief.kind"
@@ -256,6 +282,11 @@ merge = "rows-first"
 show  = "meta"
 label_prefix = "risk "
 
+[facets.risk.values]
+high   = "high"
+medium = "medium"
+low    = "low"
+
 [facets.size]
 fact  = "brief.size"
 label = "Size"
@@ -274,11 +305,12 @@ l  = "L"
 xl = "XL"
 
 [facets.tag]
-fact  = "brief.tags"
-label = "Tag"
-match = "prefix"
-merge = "rows-first"
-show  = "meta"
+fact     = "brief.tags"
+label    = "Tag"
+match    = "prefix"
+merge    = "rows-first"
+show     = "meta"
+show_max = 2
 
 [views.inbox]
 label         = "Inbox"

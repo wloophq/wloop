@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -29,8 +30,8 @@ func defaultLists() []byte {
 }
 
 // splitLists is src, the tables of tasks.toml and views.toml together,
-// as the two files: [verbs.*], [states.*], [props.*], [owed_by], [chat] and
-// [attribution] tables in tasks.toml, the rest in views.toml.
+// as the two files: [verbs.*], [states.*], [props.*], [owed_by], [chat],
+// [attribution] and [detail] tables in tasks.toml, the rest in views.toml.
 func splitLists(src string) map[string]string {
 	out := map[string]string{}
 	file := ViewsFile
@@ -42,7 +43,7 @@ func splitLists(src string) map[string]string {
 		if strings.HasPrefix(line, "[") {
 			file = ViewsFile
 			if strings.HasPrefix(line, "[verbs") || strings.HasPrefix(line, "[states") || strings.HasPrefix(line, "[props") || strings.HasPrefix(line, "[owed_by") || strings.HasPrefix(line, "[chat]") ||
-				strings.HasPrefix(line, "[attribution]") {
+				strings.HasPrefix(line, "[attribution]") || strings.HasPrefix(line, "[detail]") {
 				file = TasksFile
 			}
 		}
@@ -397,7 +398,7 @@ func TestTaskFacetsLoadFromViews(t *testing.T) {
 	for _, f := range views.Facets {
 		ids = append(ids, f.ID)
 	}
-	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "where", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
+	want := []string{"source", "state", "category", "contexts", "waits-on", "turn", "asked-by", "placement", "where", "owed", "moved", "gates", "signal", "prop.kind", "prop.area", "prop.risk", "prop.focus", "prop.priority", "type", "risk", "size", "tag"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("facets %v, want %v", ids, want)
 	}
@@ -558,7 +559,7 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(plugin, "[lens]\ncol_aside = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
+	write(plugin, "[lens]\nlist_empty = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
 	write(user, "[facets.author]\nshow = \"who\"\n")
 	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil))
 	if len(problems) > 0 {
@@ -568,7 +569,7 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	if a.Show.Part != "who" || a.Show.Values != "first" || a.LabelPrefix == nil || *a.LabelPrefix != "by " || a.RowClass["me"] != "mine" {
 		t.Errorf("author: %+v", a)
 	}
-	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"col_aside": "Workspace"}) {
+	if got := texts["acme"].Lens.Set(); !maps.Equal(got, map[string]string{"list_empty": "Workspace"}) {
 		t.Errorf("row words %v", got)
 	}
 	write(user, "[facets.author]\nshow = \"\"\n")
@@ -576,10 +577,48 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	if a := texts["acme"].Facets["author"]; len(problems) > 0 || a.Show.Part != "" || a.Show.Values != "first" {
 		t.Errorf("show = \"\" over a placed facet: %+v, problems %v", a.Show, problems)
 	}
-	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
+	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\nlist_empty = \"{{.label}}\"\n")
 	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}, readerOf(nil))
-	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
+	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.list_empty") {
 		t.Errorf("problems: %s", got)
+	}
+}
+
+func TestShowWhenNamesADeclaredFacet(t *testing.T) {
+	views, problems := loadFacets(t, "[facets.moved]\nshow_when = { turn = [\"others\", \"nobody\"] }\nshow_max = 3\nshow_label = \"moved {{.at}}, {{.age}} ago\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	m, _ := facetOf(views, "moved")
+	if !reflect.DeepEqual(m.Show.When, map[string][]string{"turn": {"others", "nobody"}}) || m.Show.Max != 3 || m.Show.Label != "moved {{.at}}, {{.age}} ago" {
+		t.Errorf("moved shows %+v", m.Show)
+	}
+	for src, key := range map[string]string{
+		"[facets.moved]\nshow_when = { nope = [\"x\"] }\n":   "facets.moved.show_when.nope",
+		"[facets.moved]\nshow_when = { turn = [] }\n":        "facets.moved.show_when.turn",
+		"[facets.tag]\nshow_max = -1\n":                      "facets.tag.show_max",
+		"[facets.moved]\nshow_label = \"since {{.when}}\"\n": "facets.moved.show_label",
+	} {
+		if _, problems := loadFacets(t, src); !strings.Contains(problems.Error(), key) {
+			t.Errorf("%q: problems %v, want one at %s", src, problems, key)
+		}
+	}
+}
+
+func TestAPluginsUIPlacesItsAgeByTheTimeRule(t *testing.T) {
+	plugin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(plugin, UIFile), []byte("[facets.age]\nlabel = \"Waiting for\"\nshow = \"age\"\nshow_label = \"since {{.at}}\"\nshow_when = { lane = [\"me\"] }\n\n[facets.tags]\nlabel = \"Tags\"\nshow = \"meta\"\nshow_max = 2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}, readerOf(nil))
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if a := texts["acme"].Facets["age"]; a.Show.Label != "since {{.at}}" || !reflect.DeepEqual(a.Show.When, map[string][]string{"lane": {"me"}}) {
+		t.Errorf("age %+v", a.Show)
+	}
+	if tags := texts["acme"].Facets["tags"]; tags.Show.Max != 2 {
+		t.Errorf("tags %+v", tags.Show)
 	}
 }
 
@@ -625,5 +664,27 @@ func TestTheTaskStripIsTheTasksOwnTurn(t *testing.T) {
 	}
 	if _, problems := loadFacets(t, "[facets.turn]\nturn_of = \"waits-on\"\n"); len(problems) != 1 {
 		t.Errorf("turn_of is no key: %v", problems)
+	}
+}
+
+func TestACopiedViewsFileFromTheLastReleaseLoads(t *testing.T) {
+	layers := []profile.Layer{{Name: "user", Dir: "testdata/lastrelease"}}
+	bundled := os.DirFS("../../profiles/default")
+	for _, locale := range []string{"en", "pt-BR"} {
+		r := newLayerReader(locale, layers, bundled)
+		_, _, problems := loadViews(layers, r, nil)
+		problems = append(problems, *r.problems...)
+		if len(problems) > 0 {
+			t.Errorf("%s: the last release's views.toml copied whole: %s", locale, problems.Error())
+		}
+	}
+	plugin, user := t.TempDir(), t.TempDir()
+	for dir, body := range map[string]string{plugin: "[lens]\nlist_empty = \"Workspace\"\n", user: "[lens]\ncol_aside = \"Workspace\"\n"} {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil)); len(problems) > 0 {
+		t.Errorf("a plugin's ui.toml with a retired row word: %s", problems.Error())
 	}
 }

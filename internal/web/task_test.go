@@ -117,6 +117,7 @@ func pageAnswers(t *testing.T) map[string]any {
 func TestTaskPageSections(t *testing.T) {
 	var got struct {
 		Sections []string
+		Tabs     []string
 		Head     string
 		State    string
 		Category string
@@ -126,21 +127,29 @@ func TestTaskPageSections(t *testing.T) {
 		Child    string
 	}
 	runTaskPage(t, `
-const box = await page("t-0123456789abcdef");
+let box = await page("t-0123456789abcdef");
 const head = box.children[0];
+const props = cls(box, "props")[0];
+const sections = box.children.map((c) => c.attrs.class);
+const tabs = walk(cls(box, "tabs")[0], (x) => x.attrs.role === "tab").map((b) => b.attrs["data-focus"]);
+taskState.tab = "related";
+box = await page("t-0123456789abcdef");
 done({
-  Sections: box.children.map((c) => c.attrs.class),
+  Sections: sections, Tabs: tabs,
   Head: head.textContent,
   State: cls(head, "state")[0].textContent,
   Category: cls(head, "state")[0].attrs["data-category"],
-  Props: Object.fromEntries(walk(head, (x) => x.tag === "dd").map((d) => [d.attrs["data-prop"], d.textContent])),
+  Props: Object.fromEntries(walk(props, (x) => x.tag === "dd").map((d) => [d.attrs["data-prop"], d.textContent])),
   Ref: cls(head, "ref")[0].attrs.href,
   Ext: cls(head, "ext")[0].attrs.href,
   Child: focus(box, "child:t-00000000000000c1").attrs.href,
 });`, pageAnswers(t), &got)
-	want := []string{"d-head", "d-asks", "d-brief", "d-gates", "d-runs", "d-timeline", "d-compose", "d-children"}
+	want := []string{"d-head", "props d-props", "d-links", "d-gates", "verbs d-actions", "d-tabs", "compose d-compose"}
 	if !slices.Equal(got.Sections, want) {
 		t.Errorf("sections %v, want %v", got.Sections, want)
+	}
+	if want := []string{"task:tab:brief", "task:tab:timeline", "task:tab:asks", "task:tab:related", "task:tab:runs"}; !slices.Equal(got.Tabs, want) {
+		t.Errorf("tabs %v, want %v", got.Tabs, want)
 	}
 	if got.State != "Doing" || got.Category != "active" {
 		t.Errorf("the state reads %q in category %q, want the catalog's Doing in active", got.State, got.Category)
@@ -151,7 +160,7 @@ done({
 	if got.Ref != "#view=all&unit=github/acme%2Fapi%238" || got.Ext != "https://github.com/acme/api/pull/8" {
 		t.Errorf("links: ref %q ext %q", got.Ref, got.Ext)
 	}
-	for _, s := range []string{"Ship the retry change", "owed by me", "Retry flaky uploads", "Finish"} {
+	for _, s := range []string{"Ship the retry change", "owed by me", "acme/api#8"} {
 		if !strings.Contains(got.Head, s) {
 			t.Errorf("the header lacks %q: %s", s, got.Head)
 		}
@@ -168,62 +177,15 @@ func TestAsksShowTheirSourceQuotes(t *testing.T) {
 		Source string
 	}
 	runTaskPage(t, `
+taskState.tab = "asks";
 const box = await page("t-0123456789abcdef");
 const asks = cls(box, "d-asks")[0];
-done({ Quotes: cls(asks, "quote").map((q) => q.textContent), Ask: cls(asks, "ask")[0].textContent, Source: cls(asks, "ext")[0].attrs.href });`, pageAnswers(t), &got)
+done({ Quotes: cls(asks, "quote").map((q) => q.textContent), Ask: cls(asks, "ask-item")[0].textContent, Source: cls(asks, "ext")[0].attrs.href });`, pageAnswers(t), &got)
 	if !slices.Equal(got.Quotes, []string{"can we get the retry out before the freeze?", "Friday at the latest"}) {
 		t.Errorf("quotes %q", got.Quotes)
 	}
 	if !strings.Contains(got.Ask, "Bruno: Ship it before Friday") || got.Source != "https://chat.example/p/1" {
 		t.Errorf("ask %q from %q", got.Ask, got.Source)
-	}
-}
-
-func TestAGateShowsItsProfileIntentsAndDigitKeys(t *testing.T) {
-	var got struct {
-		Buttons [][]string
-		Boxes   []int
-		Keyed   []string
-		Clicked []any
-		Empty   string
-	}
-	src := strings.Replace(staticJS(t, "keys.js"), `if (typeof document !== "undefined" && typeof state !== "undefined") installKeys(appEnv());`, "", 1)
-	raw, _ := json.Marshal(webBindings(t))
-	runTaskPage(t, strings.Replace(src, `"use strict";`, "", 1)+`
-const box = await page("t-0123456789abcdef");
-const gates = cls(box, "d-gate");
-const keys = createKeys({
-  selected: () => detailState.task,
-  questionAt: (el) => detailPane.gateAt(el),
-  resolveGate: (task, gate, intent) => detailPane.resolve(task, gate, intent),
-  verbs: () => [],
-});
-keys.setBindings(`+string(raw)+`);
-const inGate = (g) => ({ tagName: "DIV", closest: (s) => (s === ".d-gate" ? g : null) });
-const press = (key, target) => keys.handle({ key, code: "Digit" + key, target, defaultPrevented: false, preventDefault() {} });
-await press("2", inGate(gates[0]));
-await press("1", inGate(gates[1]));
-const empty = notices.slice(-1)[0];
-const keyed = posts.splice(0).map((p) => p.path);
-focus(box, "gate:9:text").on.input({ target: { value: "Take the timeout case first" } });
-await focus(box, "gate:9:answer").on.click();
-done({
-  Buttons: gates.map((g) => walk(g, (x) => x.tag === "button").map((b) => b.textContent)),
-  Boxes: gates.map((g) => walk(g, (x) => x.tag === "textarea").length),
-  Keyed: keyed, Clicked: posts, Empty: empty,
-});`, pageAnswers(t), &got)
-	if want := [][]string{{"1 Run now", "2 Skip"}, {"1 Answer", "2 Dismiss"}}; !slices.EqualFunc(got.Buttons, want, slices.Equal) {
-		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
-	}
-	if !slices.Equal(got.Boxes, []int{0, 1}) {
-		t.Errorf("answer boxes %v, want one on the gate whose intent takes an answer", got.Boxes)
-	}
-	if !slices.Equal(got.Keyed, []string{"/api/gates/7/skip"}) || !strings.HasPrefix(got.Empty, "! Answer") {
-		t.Errorf("digits posted %v, then said %q", got.Keyed, got.Empty)
-	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "Take the timeout case first"}}}}
-	if mustJS(t, got.Clicked) != mustJS(t, want) {
-		t.Errorf("answering posted %v, want %v", got.Clicked, want)
 	}
 }
 
@@ -238,6 +200,7 @@ func TestARunOffersOpenEnterTranscript(t *testing.T) {
 	answers := pageAnswers(t)
 	answers["/api/runs/3/transcript"] = []map[string]string{{"role": "user", "text": "Take the timeout case first."}, {"role": "assistant", "text": "Done; tests pass."}}
 	runTaskPage(t, `
+taskState.tab = "runs";
 let box = await page("t-0123456789abcdef");
 await focus(box, "run:3:open").on.click();
 await focus(box, "run:3:enter").on.click();
@@ -274,6 +237,7 @@ func TestTheTimelineFiltersByKind(t *testing.T) {
 	answers := pageAnswers(t)
 	answers["/api/tasks/t-0123456789abcdef/timeline?kinds=message"] = timelineEvents()
 	runTaskPage(t, `
+taskState.tab = "timeline";
 let box = await page("t-0123456789abcdef");
 const said = (b) => cls(b, "msg").map((m) => m.textContent);
 const before = said(box);
@@ -429,32 +393,5 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 		if mustJS(t, got.Posts) != mustJS(t, want) {
 			t.Errorf("send %s: posts %v, want %v", send, got.Posts, want)
 		}
-	}
-}
-
-// TestAQuestionGateOffersItsOptions checks that a question gate whose message offers options shows one button
-// per option, the recommended first, and that picking one answers with the option and the note typed beside it.
-func TestAQuestionGateOffersItsOptions(t *testing.T) {
-	var got struct {
-		Buttons []string
-		Clicked []any
-	}
-	in := pageAnswers(t)
-	e := pageTask(t)
-	e.Gates[1].Subject = json.RawMessage(`{"kind": "question", "text": "Approve it?", "recommend": "approve",
-		"options": [{"id": "threads", "label": "Resolve the threads"}, {"id": "approve", "label": "Approve", "consequence": "Publishes APPROVE"}]}`)
-	in["/api/tasks/"+e.ID] = e
-	runTaskPage(t, `
-const box = await page("t-0123456789abcdef");
-const gate = cls(box, "d-gate")[1];
-focus(box, "gate:9:text").on.input({ target: { value: "ship it" } });
-await focus(box, "gate:9:option:approve").on.click();
-done({ Buttons: walk(gate, (x) => x.tag === "button").map((b) => b.textContent), Clicked: posts });`, in, &got)
-	if want := []string{"Approve recommended", "Resolve the threads", "1 Answer", "2 Dismiss"}; !slices.Equal(got.Buttons, want) {
-		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
-	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "approve\nship it"}}}}
-	if mustJS(t, got.Clicked) != mustJS(t, want) {
-		t.Errorf("picking an option posted %v, want %v", got.Clicked, want)
 	}
 }

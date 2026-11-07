@@ -1207,9 +1207,45 @@
    "age_now": "now",
    "age_minutes": "{{.m}}m",
    "age_hours": "{{.h}}h {{.m}}m",
-   "age_days": "{{.d}}d {{.h}}h"
+   "age_days": "{{.d}}d {{.h}}h",
+   "more": "+{{.n}}"
   },
   "specs": [
+   {
+    "id": "pturn",
+    "label": "Whose turn"
+   },
+   {
+    "id": "powed",
+    "label": "Owed",
+    "sort": "time",
+    "show": "age",
+    "show_when": {
+     "pturn": [
+      "me"
+     ]
+    },
+    "show_label": "since {{.at}}"
+   },
+   {
+    "id": "pmoved",
+    "label": "Moved",
+    "sort": "time",
+    "show": "age",
+    "show_when": {
+     "pturn": [
+      "others",
+      "nobody"
+     ]
+    },
+    "show_label": "moved {{.at}}"
+   },
+   {
+    "id": "ptag",
+    "label": "Tag",
+    "show": "meta",
+    "show_max": 2
+   },
    {
     "id": "where",
     "label": "Where",
@@ -1384,6 +1420,51 @@
    }
   ],
   "cases": [
+   {
+    "item": {
+     "facets": {
+      "pturn": ["me"],
+      "powed": ["2026-11-04T09:00:00Z"],
+      "pmoved": ["2026-11-03T12:00:00Z"]
+     },
+     "texts": []
+    },
+    "want": {
+     "age": [
+      {"field": "powed", "value": "2026-11-04T09:00:00Z", "raw": "2026-11-04T09:00:00Z", "label": "since {{.at}}", "template": "since {{.at}}"}
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "pturn": ["Others"],
+      "powed": ["2026-11-04T09:00:00Z"],
+      "pmoved": ["2026-11-03T12:00:00Z"]
+     },
+     "texts": []
+    },
+    "want": {
+     "age": [
+      {"field": "pmoved", "value": "2026-11-03T12:00:00Z", "raw": "2026-11-03T12:00:00Z", "label": "moved {{.at}}", "template": "moved {{.at}}"}
+     ]
+    }
+   },
+   {
+    "item": {
+     "facets": {
+      "ptag": ["a", "b", "c", "d", "e"]
+     },
+     "texts": []
+    },
+    "want": {
+     "meta": [
+      {"field": "ptag", "value": "a", "raw": "a", "label": "a"},
+      {"field": "ptag", "value": "b", "raw": "b", "label": "b"},
+      {"field": "ptag", "value": "", "raw": "", "label": "+3"}
+     ]
+    }
+   },
    {
     "item": {
      "provider": "github",

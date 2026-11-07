@@ -70,6 +70,7 @@ func core() []Binding {
 		{"r", "reply", List, screens},
 		{"i", "edit", List, terminalOnly},
 		{"o", "open-source", List, everySurface},
+		{"+", "filter:add", List, webOnly},
 		{"=", "group:cycle", List, terminalOnly},
 		{"-", "sort:cycle", List, terminalOnly},
 		{"n", "capture", Global, screens},
@@ -86,6 +87,8 @@ func core() []Binding {
 		{"Enter", "approve", Plan, screens},
 		{"c", "link:copy", Global, webOnly},
 		{"t", "detail:detach", Detail, webOnly},
+		{"]", "tab:next", Detail, webOnly},
+		{"[", "tab:prev", Detail, webOnly},
 	}
 	for n := 1; n <= 9; n++ {
 		b = append(b,

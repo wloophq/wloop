@@ -41,6 +41,7 @@ func spec92() []row {
 		{"r", "reply", List, screen},
 		{"i", "edit", List, []Surface{TUI}},
 		{"o", "open-source", List, all},
+		{"+", "filter:add", List, []Surface{Web}},
 		{"=", "group:cycle", List, []Surface{TUI}},
 		{"-", "sort:cycle", List, []Surface{TUI}},
 		{"n", "capture", Global, screen},
@@ -57,6 +58,8 @@ func spec92() []row {
 		{"Enter", "approve", Plan, screen},
 		{"c", "link:copy", Global, []Surface{Web}},
 		{"t", "detail:detach", Detail, []Surface{Web}},
+		{"]", "tab:next", Detail, []Surface{Web}},
+		{"[", "tab:prev", Detail, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,

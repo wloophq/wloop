@@ -96,6 +96,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Home` | ✅ | KeyboardEvent.key |
 | `Meta` | ✅ | KeyboardEvent.key |
 | `POST` | ✅ | an HTTP method |
+| `Plus` | ✅ | the + key's name in aria-keyshortcuts |
 | `Shift` | ✅ | KeyboardEvent.key |
 | `Tab` | ✅ | KeyboardEvent.key |
 | `noopener noreferrer` | ✅ | a link's rel tokens |

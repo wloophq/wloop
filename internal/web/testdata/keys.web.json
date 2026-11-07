@@ -132,6 +132,13 @@
       "help": "open the source"
     },
     {
+      "key": "+",
+      "action": "filter:add",
+      "context": "list",
+      "owner": "core",
+      "help": "add a filter by a field and a value"
+    },
+    {
       "key": "n",
       "action": "capture",
       "context": "global",
@@ -200,6 +207,20 @@
       "context": "detail",
       "owner": "core",
       "help": "open in a window of its own"
+    },
+    {
+      "key": "]",
+      "action": "tab:next",
+      "context": "detail",
+      "owner": "core",
+      "help": "next tab"
+    },
+    {
+      "key": "[",
+      "action": "tab:prev",
+      "context": "detail",
+      "owner": "core",
+      "help": "previous tab"
     },
     {
       "key": "1",

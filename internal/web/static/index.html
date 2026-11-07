@@ -11,7 +11,6 @@
 </head>
 <body>
 <header id="top">
-  <span class="mark">{{name}}</span>
   <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" data-i18n-aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-i18n-placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
   <span id="sync" class="sync">connecting</span>
   <span id="notice" class="notice" role="status" aria-live="polite"></span>
@@ -20,6 +19,8 @@
 <div id="update" class="update" role="status" hidden><span data-i18n="A new version is running.">A new version is running.</span> <button id="update-reload" type="button" class="act" data-focus="update:reload" data-i18n="Reload">Reload</button></div>
 <main id="app">
   <nav id="rail" aria-label="Views" data-i18n-aria-label="Views">
+    <div class="rail-mark"><span class="mark">{{name}}</span></div>
+    <button id="omnibox-entry" type="button" class="find" aria-keyshortcuts="Meta+K" data-focus="rail:omnibox"></button>
     <ul id="views" class="views"></ul>
     <h2 class="rail-head" data-i18n="Waiting on">Waiting on</h2>
     <ul id="people" class="views people"></ul>
@@ -49,7 +50,7 @@
     <details id="list-box" class="list-box" open>
       <summary id="list-sum" class="list-sum"></summary>
       <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" data-i18n-aria-label="Filter, group and sort" hidden></div>
-      <table id="table"></table>
+      <div id="table"></div>
       <div id="board" class="board" hidden></div>
       <ol id="activity" class="activity" aria-label="Recent activity" data-i18n-aria-label="Recent activity" hidden></ol>
       <p id="empty" class="empty" hidden></p>
@@ -61,6 +62,7 @@
 <script src="/static/vendor/echarts.min.js?v={{build}}"></script>
 <script src="/static/i18n.js?v={{build}}"></script>
 <script src="/static/markdown.js?v={{build}}"></script>
+<script src="/static/row.js?v={{build}}"></script>
 <script src="/static/dash.js?v={{build}}"></script>
 <script src="/static/plugins.js?v={{build}}"></script>
 <script src="/static/routes.js?v={{build}}"></script>
@@ -68,9 +70,12 @@
 <script src="/static/window.js?v={{build}}"></script>
 <script src="/static/views.js?v={{build}}"></script>
 <script src="/static/review.js?v={{build}}"></script>
+<script src="/static/gate.js?v={{build}}"></script>
 <script src="/static/task.js?v={{build}}"></script>
 <script src="/static/detail.js?v={{build}}"></script>
 <script src="/static/update.js?v={{build}}"></script>
+<script src="/static/rail.js?v={{build}}"></script>
+<script src="/static/toolbar.js?v={{build}}"></script>
 <script src="/static/app.js?v={{build}}"></script>
 <script src="/static/palette.js?v={{build}}"></script>
 <script src="/static/keys.js?v={{build}}"></script>

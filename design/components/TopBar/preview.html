@@ -1,10 +1,18 @@
-<!-- @dsCard group="Navigation" height=64 -->
+<!-- @dsCard group="Navigation" height=120 -->
 <!doctype html><html><body>
 <style>body{padding:16px}</style>
 <header id="top">
-<span class="mark">wloop</span>
 <input class="search" type="search" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:  ( / )">
 <span class="sync">synced just now · GitHub budget 4746 of 5000 left</span>
 <span class="notice">Automatic rounds paused</span>
 </header>
+<div class="tools" role="toolbar">
+<label class="pill lens-pick"><span class="lens-label">Group</span><select><option>Repository</option></select></label>
+<span class="pill sort-pick"><label class="pill lens-pick"><span class="lens-label">Sort</span><select><option>Waiting longest</option></select></label><button class="dir" type="button" disabled>↑</button></span>
+<button class="chip pill on" type="button">Risk: high ×</button>
+<button class="pill add" type="button">Filter <kbd>+</kbd></button>
+<span class="lens-count">4 of 12</span>
+<div class="seg" role="group"><button type="button" aria-pressed="true">List</button><button type="button" aria-pressed="false">Board</button></div>
+<button class="pill" type="button">Copy list</button>
+</div>
 </body></html>

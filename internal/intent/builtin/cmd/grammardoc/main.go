@@ -174,6 +174,9 @@ func hasKeys(k builtin.Key) bool {
 
 // kind is what a row's value is, with its values, and whether a locale translates it.
 func kind(k builtin.Key) string {
+	if k.Retired {
+		return "retired, not read"
+	}
 	if k.Localized {
 		return kindOf(k) + ", localized"
 	}
@@ -569,6 +572,9 @@ func schemaOfNode(n *node) map[string]any {
 	}
 	if n.row != nil {
 		s["description"] = n.row.Doc
+		if n.row.Retired {
+			s["deprecated"] = true
+		}
 		if d, ok := typedDefault(*n.row); ok {
 			s["default"] = d
 		}

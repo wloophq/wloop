@@ -181,6 +181,14 @@
               }
             ]
           },
+          "show_label": {
+            "description": "For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.",
+            "type": "string"
+          },
+          "show_max": {
+            "description": "How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.",
+            "type": "integer"
+          },
           "show_values": {
             "default": "all",
             "description": "How many of an item's values the part shows: all, or the first alone.",
@@ -189,6 +197,17 @@
               "first"
             ],
             "type": "string"
+          },
+          "show_when": {
+            "additionalProperties": {
+              "description": "The values one facet must hold.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": "Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = [\"me\"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.",
+            "type": "object"
           },
           "sort": {
             "description": "How the facet's values order: by rank, as text, or as instants (time). Absent, as text.",
@@ -229,7 +248,7 @@
     },
     "lens": {
       "additionalProperties": false,
-      "description": "What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
+      "description": "What every list's rows and toolbar say. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.",
       "properties": {
         "age_days": {
           "description": "A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.",
@@ -268,31 +287,37 @@
           "type": "string"
         },
         "changed": {
+          "deprecated": true,
           "description": "The flag of a task that changed since you last opened it.",
           "type": "string"
         },
         "col_actions": {
-          "description": "The head of the column of a row's actions, read only by a screen reader.",
+          "deprecated": true,
+          "description": "The head of the list column of a row's actions.",
           "type": "string"
         },
         "col_age": {
-          "description": "The head of the column of a row's age.",
+          "deprecated": true,
+          "description": "The head of the list column of a row's age.",
           "type": "string"
         },
         "col_aside": {
-          "description": "The head of the column of a row's workspace and links.",
+          "deprecated": true,
+          "description": "The head of the list column of a row's workspace and links.",
           "type": "string"
         },
         "col_unit": {
-          "description": "The head of the column of a row's title, ref and flags in a view whose rows mix kinds.",
+          "description": "What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.",
           "type": "string"
         },
         "col_who": {
-          "description": "The head of the column of whom a row waits on and its situation.",
+          "deprecated": true,
+          "description": "The head of the list column of whom a row waits on.",
           "type": "string"
         },
         "col_why": {
-          "description": "The head of the column of why a row waits.",
+          "deprecated": true,
+          "description": "The head of the list column of why a row waits.",
           "type": "string"
         },
         "copied": {
@@ -367,6 +392,10 @@
           "description": "What a plugin view's list says when it holds no row and the plugin gives no words of its own.",
           "type": "string"
         },
+        "more": {
+          "description": "The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`.",
+          "type": "string"
+        },
         "no_group": {
           "description": "The group menu's entry that lists the view in one group.",
           "type": "string"
@@ -404,7 +433,7 @@
           "type": "string"
         },
         "sort_by": {
-          "description": "A column head's tooltip, over the `{{.label}}` of the facet it sorts by.",
+          "description": "The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by.",
           "type": "string"
         },
         "sorted": {
@@ -466,13 +495,7 @@
         "briefing_attempt",
         "briefing_error",
         "briefing_title",
-        "changed",
-        "col_actions",
-        "col_age",
-        "col_aside",
         "col_unit",
-        "col_who",
-        "col_why",
         "copied",
         "copied_grouped",
         "countdown_minutes",
@@ -491,6 +514,7 @@
         "legend_title",
         "list_count",
         "list_empty",
+        "more",
         "no_group",
         "no_lens",
         "no_next_action",

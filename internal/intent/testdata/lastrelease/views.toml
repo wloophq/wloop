@@ -1,0 +1,447 @@
+# The lists of tasks and gates, in the order clients list them: each
+# view's when says what it lists, over the facts of a task (or of a gate,
+# with over = "gates"), and its key jumps to it. The review walks the
+# views its steps name, in order; the badge adds up the counts of the
+# views it names. A user profile's views.toml replaces the keys it sets
+# and adds its own views and steps after these.
+
+empty = "Nothing in {{.label}} right now."
+
+# What the sort menu calls a view's own order.
+default_sort = "View order"
+
+# What every list's lens bar says.
+[lens]
+default_group  = "{{.label}} (default)"
+board_group    = "{{.label}} (board)"
+no_group       = "None"
+copied         = "Copied {{.count}} from {{.view}} as YAML."
+copied_grouped = "Copied {{.count}} from {{.view}}, grouped by {{.group}}, as YAML."
+tag_key        = "{{.label}} {{.key}}"
+tag_key_empty  = "no {{.key}}"
+grouped        = "group: {{.label}}"
+sorted         = "sort: {{.label}}"
+descending     = "{{.label}} (descending)"
+no_lens        = "nothing to group or sort here"
+
+# What a row says beside its facets: its age, its facet buttons, its
+# columns' heads, and the flags no facet carries. A plugin's ui.toml may
+# replace any of these for its own rows.
+age_now            = "now"
+age_minutes        = "{{.m}}m"
+age_hours          = "{{.h}}h {{.m}}m"
+age_days           = "{{.d}}d {{.h}}h"
+filter_label       = "Filter by {{.label}} {{.value}}"
+filter_title       = "Filter by {{.label}} {{.value}} · Alt+click leaves it out"
+filter_title_group = "Filter by {{.label}} {{.value}} · Shift+click groups by {{.group}} · Alt+click leaves it out"
+filter_group       = "waits on (group)"
+list_count         = "{{.unit}}: {{.shown}} of {{.total}}"
+list_empty         = "Nothing here right now."
+countdown_title    = "sends at {{.time}}"
+countdown_sending  = "sending"
+countdown_seconds  = "in {{.s}} s"
+countdown_minutes  = "in {{.m}}m {{.s}}s"
+tip_named          = "{{.strip}} ({{.who}})"
+tip_kind           = "{{.tip}}: {{.kind}}"
+tip_why            = "{{.tip}}. {{.why}}"
+legend_title       = "The strip on the left of each row is the color of whom it waits on"
+sort_by            = "Sort by {{.label}}"
+col_unit           = "Item"
+col_who            = "Waiting on"
+col_age            = "For"
+col_why            = "Why"
+col_aside          = "Links"
+col_actions        = "Actions"
+stale              = "stale"
+stale_title        = "Its plugin is not reporting; this is its last report"
+briefing           = "briefing"
+briefing_title     = "intake {{.seq}} waits for the brief"
+briefing_attempt   = "attempt {{.n}}"
+briefing_error     = "last error: {{.error}}"
+questions          = "? {{.n}}"
+questions_title    = "{{.n}} open {{plural .n \"one\" \"question\" \"other\" \"questions\"}} in the brief"
+changed            = "changed"
+starred            = "Starred"
+until              = "until {{.date}}"
+due                = "due {{.date}}"
+unread             = "unread {{.lag}}"
+unread_title       = "The oldest message on its links not yet read by the extraction"
+review_due         = "review due"
+no_next_action     = "no next action"
+open_children      = "{{.n}} open"
+sequential         = "sequential"
+every              = "every {{.every}}"
+reviewed           = "reviewed {{.date}}"
+
+# The task facets: the fields every client filters, groups and sorts tasks
+# by. A facet reads a fact of the task (task.*), or a field of a record kind
+# (brief.*). A plugin's row facet of the same id must agree on group, sort,
+# rank, match and buckets; where rows and the task both have a value, merge
+# says which wins. show places a facet's values on a task's row, each a
+# button that filters by it; a facet without show is for the lens alone.
+[facets.source]
+fact  = "task.unit_providers"
+label = "Source"
+group = true
+sort  = "text"
+show  = "meta"
+
+[facets.source.values]
+github    = "GitHub"
+slack     = "Slack"
+session   = "Session"
+workspace = "Workspace"
+task      = "Task"
+
+[facets.state]
+fact  = "task.state"
+label = "State"
+group = true
+sort  = "rank"
+show  = "kind"
+
+[facets.category]
+fact  = "task.category"
+label = "Category"
+group = true
+sort  = "rank"
+
+[facets.contexts]
+fact         = "task.prop.contexts"
+label        = "Context"
+group        = true
+sort         = "rank"
+empty        = "no context"
+label_prefix = "@"
+show         = "meta"
+
+[facets.waits-on]
+fact   = "task.owed_by"
+label  = "Waits on (person)"
+group  = true
+match  = "team"
+merge  = "rows-first"
+show   = "who"
+
+[facets.turn]
+fact    = "task.turn"
+merge   = "own"
+label   = "Whose turn"
+group   = true
+sort    = "rank"
+rank    = ["me", "others", "nobody"]
+values  = { me = "Your turn", others = "Others' turn", nobody = "Nobody's turn" }
+strip   = true
+colors  = { me = "me", others = "author", nobody = "nobody" }
+
+[facets.asked-by]
+fact  = "task.asker_names"
+label = "Asked by"
+group = true
+sort  = "text"
+show  = "meta"
+
+[facets.placement]
+fact  = "task.placement"
+label = "Placement"
+group = true
+sort  = "text"
+match = "suffix"
+empty = "no placement"
+
+# where is the unit's place, a repository or a channel, as its rows say it, else the task's placement; a
+# task's row shows it on its unit labels, each a button that filters by the where value it names.
+[facets.where]
+fact  = "task.placement"
+merge = "rows-first"
+label = "Where"
+group = true
+sort  = "text"
+match = "suffix"
+
+[facets.moved]
+fact  = "task.moved_at"
+label = "Moved"
+group = true
+sort  = "time"
+empty = "never moved"
+show  = "age"
+
+[facets.moved.buckets.1d]
+within = "24h"
+label  = "0-1 days"
+
+[facets.moved.buckets.3d]
+within = "72h"
+label  = "1-3 days"
+
+[facets.moved.buckets.7d]
+within = "168h"
+label  = "3-7 days"
+
+[facets.moved.buckets.2w]
+within = "336h"
+label  = "1-2 weeks"
+
+[facets.moved.buckets.4w]
+within = "672h"
+label  = "2-4 weeks"
+
+[facets.moved.buckets.older]
+label = "over 4 weeks"
+
+# The number of the task's open gates, a count.
+[facets.gates]
+fact  = "task.gates_open"
+label = "Open gates"
+group = true
+sort  = "text"
+
+[facets.signal]
+fact  = "task.link_signals"
+label = "Signals"
+group = true
+
+[facets."prop.kind"]
+fact  = "task.prop.kind"
+label = "Kind"
+group = true
+sort  = "text"
+
+[facets."prop.area"]
+fact  = "task.prop.area"
+label = "Area"
+group = true
+sort  = "text"
+show  = "meta"
+
+[facets."prop.risk"]
+fact  = "task.prop.risk"
+label = "Task risk"
+group = true
+sort  = "rank"
+rank  = ["high", "medium", "low"]
+
+[facets."prop.focus"]
+fact  = "task.prop.focus"
+label = "Focus"
+group = true
+sort  = "rank"
+rank  = ["on", "off"]
+
+[facets."prop.priority"]
+fact  = "task.prop.priority"
+label = "Priority"
+group = true
+sort  = "rank"
+rank  = ["high", "normal", "low"]
+
+[facets.type]
+fact  = "brief.kind"
+label = "Type"
+group = true
+sort  = "text"
+empty = "no brief"
+merge = "rows-first"
+show  = "meta"
+
+[facets.risk]
+fact  = "brief.risk"
+label = "Risk"
+group = true
+sort  = "rank"
+rank  = ["high", "medium", "low"]
+empty = "no brief"
+merge = "rows-first"
+show  = "meta"
+label_prefix = "risk "
+
+[facets.size]
+fact  = "brief.size"
+label = "Size"
+group = true
+sort  = "rank"
+rank  = ["xs", "s", "m", "l", "xl"]
+empty = "no brief"
+merge = "rows-first"
+show  = "meta"
+
+[facets.size.values]
+xs = "XS"
+s  = "S"
+m  = "M"
+l  = "L"
+xl = "XL"
+
+[facets.tag]
+fact  = "brief.tags"
+label = "Tag"
+match = "prefix"
+merge = "rows-first"
+show  = "meta"
+
+[views.inbox]
+label         = "Inbox"
+summary       = "What nobody has clarified yet; once clarified, a task leaves for good."
+empty         = "Inbox zero: everything is clarified."
+key           = "g i"
+when          = "task.category == 'inbox'"
+hide_disabled = true
+
+[views.needs-me]
+label         = "Needs me"
+summary       = "Tasks whose next step is yours: a gate to answer or your own next action."
+empty         = "Nothing waits on you."
+key           = "g m"
+when          = "task.owed_by == 'me' && task.category != 'inbox' && (task.gates_open > 0 || task.category in ['ready', 'active', 'waiting'])"
+sort          = "-task.sequential_next"
+hide_disabled = true
+
+[views.waiting]
+label         = "Waiting"
+summary       = "Tasks whose next step is someone else's, grouped by who owes it."
+empty         = "Nobody owes you anything."
+key           = "g w"
+when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && (task.owed_by != '' || task.turns_running == 0)"
+group         = "task.owed_by"
+
+[views.chase]
+label         = "Chase"
+summary       = "Tasks someone else owes whose check date passed with nothing moving: time to nudge."
+empty         = "Nothing to chase: nobody is late."
+key           = "g c"
+when          = "task.category in ['ready', 'active', 'waiting'] && task.owed_by != 'me' && task.owed_by != '' && !('stalled' in task.link_signals) && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on"
+group         = "task.owed_by"
+hide_disabled = true
+
+[views.fits-now]
+label         = "Fits now"
+summary       = "Your next steps that take half an hour or less."
+empty         = "Nothing of yours fits in half an hour."
+key           = "g n"
+when          = "task.owed_by == 'me' && task.category in ['ready', 'active'] && task.prop.size > duration('0s') && task.prop.size <= duration('30m')"
+sort          = "task.prop.size"
+hide_disabled = true
+
+[views.blocked-by-me]
+label         = "Blocked by me"
+summary       = "Asks that wait on you, grouped by who asked, the oldest first."
+empty         = "Nobody is blocked by you."
+key           = "g b"
+when          = "task.owed_by == 'me' && size(task.askers) > 0 && !(task.category in ['deferred', 'done', 'dropped'])"
+group         = "task.asker_names"
+sort          = "-task.ask_age"
+hide_disabled = true
+
+[views.stalled]
+label         = "Stalled"
+summary       = "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving."
+empty         = "Nothing is stalled."
+key           = "g t"
+when          = "task.link_signal.stalled || (!('stalled' in task.link_signals) && task.owed_by != 'me' && task.check_on > timestamp(0) && task.check_on < now && now - task.since_movement < task.check_on)"
+hide_disabled = true
+
+[views.in-loop]
+label         = "In loop"
+summary       = "Tasks an agent is working on right now."
+empty         = "No agent is working on anything."
+key           = "g u"
+when          = "task.link_signal.in_loop || task.turns_running > 0"
+hide_disabled = true
+
+[views.approved]
+label         = "Approved"
+summary       = "Work a source says is approved and ready to land."
+key           = "g a"
+when          = "task.link_signal.ready"
+hide_disabled = true
+remove_clean  = true
+
+[views.snoozed]
+label         = "Snoozed"
+summary       = "Tasks asleep until a date, an event or a condition."
+empty         = "Nothing is snoozed."
+key           = "g z"
+when          = "task.wake_until > timestamp(0) || task.wake_when != '' || task.state == 'scheduled'"
+hide_disabled = true
+
+[views.focus]
+label         = "Focus"
+summary       = "The tasks you marked to focus on."
+empty         = "Nothing in focus: mark a task to focus on it."
+key           = "g f"
+when          = "task.prop.focus == 'on' && !(task.category in ['done', 'dropped'])"
+hide_disabled = true
+
+[views.projects]
+label         = "Projects"
+summary       = "Your open projects."
+empty         = "No open projects."
+key           = "g p"
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped'])"
+hide_disabled = true
+
+[views.someday]
+label         = "Someday"
+summary       = "Tasks you might do some day, out of the way until then."
+when          = "task.state == 'someday'"
+hide_disabled = true
+
+[views.logbook]
+label         = "Logbook"
+summary       = "What you finished, the latest first."
+empty         = "Nothing finished yet."
+when          = "task.category == 'done'"
+sort          = "task.since_movement"
+
+[views.done]
+label         = "Done"
+summary       = "Finished tasks that still hold a workspace on disk, to remove."
+empty         = "No finished task holds a workspace."
+key           = "g d"
+when          = "task.category == 'done' && task.link_signal.workspace"
+hide_disabled = true
+remove_clean  = true
+
+[views.outbox]
+label         = "Outbox"
+summary       = "Drafts waiting for your approval, and approved ones still sending or that failed to send."
+empty         = "No drafts wait on you."
+key           = "g o"
+over          = "gates"
+when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
+hide_disabled = true
+
+[views.review-projects]
+label         = "Projects to review"
+summary       = "Projects past their review, or with no next action of yours and not in Someday."
+empty         = "Every project has a next action and is reviewed."
+when          = "task.prop.kind == 'project' && !(task.category in ['done', 'dropped']) && (task.review_due || (!task.children_mine && task.state != 'someday'))"
+hide_disabled = true
+
+# The review lists nothing itself: the clients walk its steps.
+[views.review]
+label         = "Review"
+summary       = "The weekly review: walk each step until the lists are clean."
+key           = "g r"
+
+[review.inbox]
+label = "Inbox to zero"
+
+[review.outbox]
+label = "Outbox"
+
+[review.waiting]
+label = "Waiting: nudge?"
+
+[review.review-projects]
+label = "Projects without a next action or past their review"
+
+[review.someday]
+label = "Someday"
+
+[review.focus]
+label = "Prune Focus"
+
+[badge]
+views = ["inbox", "needs-me"]

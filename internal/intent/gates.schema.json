@@ -54,6 +54,14 @@
       },
       "type": "object"
     },
+    "effects": {
+      "additionalProperties": {
+        "description": "The sentence, such as \"The task is marked as nudged.\"; the key is an effect a draft may carry.",
+        "type": "string"
+      },
+      "description": "What sending a draft does besides posting it, one sentence per effect, by effect name; a draft's card shows the sentences of the effects it carries. A user layer sets only the effects it names; an empty sentence takes a lower layer's off.",
+      "type": "object"
+    },
     "gates": {
       "additionalProperties": {
         "additionalProperties": false,

@@ -1,17 +1,17 @@
-<!-- @dsCard group="Navigation" height=320 -->
+<!-- @dsCard group="Navigation" height=360 -->
 <!doctype html><html><body>
 <style>body{padding:16px}</style>
-<nav class="rail-demo" style="padding:10px 0;width:188px;border-right:1px solid var(--rule)">
+<nav id="rail" style="width:208px">
+<div class="rail-mark"><span class="mark">wloop</span></div>
+<button class="find" type="button"><span class="label">Search or ask</span><kbd>⌘K</kbd></button>
 <ul class="views">
-<li><a class="core" href="#"><span class="label">Inbox</span><span class="count">3</span></a></li>
-<li><a class="on core" href="#"><span class="label">Needs me</span><span class="count">6</span></a></li>
-<li><a class="core" href="#"><span class="label">Waiting</span><span class="count">9</span></a></li>
-<li><a class="core" href="#"><span class="label">Snoozed</span><span class="count">4</span></a></li>
-<li><a class="core" href="#"><span class="label">Outbox</span><span class="count">2</span></a></li>
-<li class="rail-head" role="presentation">Pull requests</li>
-<li><a href="#" class="plugin late-count"><span class="label">Stalled</span><span class="count">3</span></a></li>
-<li><a href="#" class="plugin"><span class="label">My PRs</span><span class="count">7</span></a></li>
-<li class="rail-head" role="presentation">Loop</li>
-<li><a href="#"><span class="label">Plan</span><span class="count">2</span></a></li>
+<li><a class="nav core" href="#"><span class="label">Inbox</span><span class="count">3</span></a></li>
+<li><a class="nav on core" href="#"><span class="label">Needs me</span><span class="count">6</span></a></li>
+<li><a class="nav core" href="#"><span class="label">Waiting</span><span class="count">9</span></a></li>
+<li><a class="nav core" href="#"><span class="label">Outbox</span><span class="count">2</span></a></li>
+<li class="rail-head" role="presentation">GitHub</li>
+<li><a href="#" class="nav plugin late-count"><span class="label">Stalled</span><span class="count">3</span></a></li>
+<li><a href="#" class="nav plugin"><span class="label">My PRs</span><span class="count">7</span></a></li>
+<li><button class="nav rail-empties" type="button" aria-expanded="false"><span class="label">Empty</span><span class="count">2</span></button></li>
 </ul></nav>
 </body></html>

@@ -105,13 +105,12 @@ const setInterval = () => 0;
 // cockpitScript is dash.js and app.js up to the listeners and the boot,
 // over domShim.
 func cockpitScript(t *testing.T) string {
-	src := cockpitJS(t)
 	app := appJS(t)
 	boot := strings.Index(app, "\nwindow.addEventListener(\"hashchange\"")
 	if boot < 0 {
 		t.Fatal("app.js has no hashchange listener")
 	}
-	raw := strings.TrimPrefix(src, app) + "\n" + app[:boot]
+	raw := staticJS(t, "dash.js") + "\n" + app[:boot]
 	return domShim + pluginsJS(t) + viewsScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
 }
 
@@ -136,9 +135,8 @@ state.health = { viewer: "me" };
 const r = input.row;
 state.rows = [r];
 const lens = lensOf({ ...readHash(), view: "mine" });
-const m = rowModel(r, "", lens, "");
-const tr = rowTr(m, lens, rowColumns([m]));
-const c = rowCard(rowModel(r, "", lens, "", "card"), lens);
+const tr = rowView(rowModel(r, "", lens, ""), lens);
+const c = rowView(rowModel(r, "", lens, "", "card"), lens, { card: true });
 location.hash = "#" + routeHash("mine", keyOf(r));
 state.detail = { row: r, events: [] };
 renderDetail();
@@ -203,7 +201,7 @@ const filters = (el, out = []) => {
   for (const c of (el && el.children) || []) filters(c, out);
   return out;
 };
-const tr = (r) => { const m = rowModel(r, "", lens, ""); return rowTr(m, lens, rowColumns([m])); };
+const tr = (r) => rowView(rowModel(r, "", lens, ""), lens);
 process.stdout.write(JSON.stringify(input.rows.map((r) => filters(tr(r)))));`,
 		map[string]any{"catalog": catalog, "views": servedViews(t), "rows": []any{
 			row(map[string][]string{"waits-on": {"ana"}}),

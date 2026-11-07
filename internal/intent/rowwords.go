@@ -29,11 +29,6 @@ type RowWords struct {
 	LegendTitle      string
 	SortBy           string
 	ColUnit          string
-	ColWho           string
-	ColAge           string
-	ColWhy           string
-	ColAside         string
-	ColActions       string
 	Stale            string
 	StaleTitle       string
 	Briefing         string
@@ -42,7 +37,6 @@ type RowWords struct {
 	BriefingError    string
 	Questions        string
 	QuestionsTitle   string
-	Changed          string
 	Starred          string
 	Until            string
 	Due              string
@@ -54,6 +48,7 @@ type RowWords struct {
 	Sequential       string
 	Every            string
 	Reviewed         string
+	More             string
 }
 
 // field is the word of key; nil for a key builtin.RowWords does not name.
@@ -99,16 +94,6 @@ func (w *RowWords) field(key string) *string {
 		return &w.SortBy
 	case "col_unit":
 		return &w.ColUnit
-	case "col_who":
-		return &w.ColWho
-	case "col_age":
-		return &w.ColAge
-	case "col_why":
-		return &w.ColWhy
-	case "col_aside":
-		return &w.ColAside
-	case "col_actions":
-		return &w.ColActions
 	case "stale":
 		return &w.Stale
 	case "stale_title":
@@ -125,8 +110,6 @@ func (w *RowWords) field(key string) *string {
 		return &w.Questions
 	case "questions_title":
 		return &w.QuestionsTitle
-	case "changed":
-		return &w.Changed
 	case "starred":
 		return &w.Starred
 	case "until":
@@ -149,6 +132,8 @@ func (w *RowWords) field(key string) *string {
 		return &w.Every
 	case "reviewed":
 		return &w.Reviewed
+	case "more":
+		return &w.More
 	}
 	return nil
 }
@@ -175,11 +160,61 @@ func (w RowWords) Over(over RowWords) RowWords {
 }
 
 // Show is where a facet's values show on a row: Part, one of builtin.ShowParts, "" for the lens alone; Only
-// the values the part shows, all when empty; Values "all" or "first".
+// the values the part shows, all when empty; Values "all" or "first"; When the values, by facet id, a row
+// must hold for the facet to show; Max how many values show before the rest count into one; Label an age
+// part's label over {{.age}} and {{.at}}.
 type Show struct {
 	Part   string
 	Only   []string
 	Values string
+	When   map[string][]string
+	Max    int
+	Label  string
+}
+
+// placement is a facet's show_when, show_max and show_label as a file writes them.
+type placement struct {
+	When  map[string][]string `toml:"show_when"`
+	Max   *int                `toml:"show_max"`
+	Label *string             `toml:"show_label"`
+}
+
+// readPlacement lays p, the placement keys of the facet at path, over sh; whether each show_when facet is
+// declared is checked once every layer is read.
+func readPlacement(s *sheet, path string, p placement, sh *Show) {
+	if p.When != nil {
+		n := len(s.problems)
+		for _, facet := range slices.Sorted(maps.Keys(p.When)) {
+			if len(p.When[facet]) == 0 || slices.Contains(p.When[facet], "") {
+				s.add(path+".show_when."+facet, "must be a list of values")
+			}
+		}
+		if len(s.problems) == n {
+			sh.When = maps.Clone(p.When)
+		}
+	}
+	if p.Max != nil {
+		if *p.Max < 0 {
+			s.add(path+".show_max", "must be 0 or more")
+		} else {
+			sh.Max = *p.Max
+		}
+	}
+	word(s, path+".show_label", p.Label, &sh.Label, "age", "at")
+}
+
+// over lays the placement keys o sets over sh.
+func (sh Show) over(o placement, from Show) Show {
+	if o.When != nil {
+		sh.When = from.When
+	}
+	if o.Max != nil {
+		sh.Max = from.Max
+	}
+	if o.Label != nil {
+		sh.Label = from.Label
+	}
+	return sh
 }
 
 // readShow reads a facet's show at path, a part's name, "" for the lens alone, or a table of one part to its

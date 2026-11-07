@@ -18,12 +18,19 @@ type Piece struct {
 	Value string `json:"value"`
 	Raw   string `json:"raw"`
 	Label string `json:"label"`
+	// Template is an age piece's show_label, whose {{.at}} a client fills with Raw in its own locale.
+	Template string `json:"template,omitempty"`
 }
+
+// AtVar is the variable of an age piece's template a client fills with its time.
+const AtVar = "{{.at}}"
 
 // Parts are the pieces of it each part of a row shows, by part, from the specs that show in one, in their
 // order: a spec of another provider places none, and a spec merged across providers places it with its
-// provider's display keys. A value "none" and a time facet's value that is no time never show, and the age
-// part holds the first time of its first facet, labeled with its age at now in words.
+// provider's display keys, and a spec whose show_when the item does not hold places none. A value "none" and
+// a time facet's value that is no time never show, the age part holds the first time of its first facet,
+// labeled with its age at now in words (or its show_label with {{.age}} filled), and a part with show_max
+// counts the values past it into one last piece.
 func Parts(it Item, specs []api.FacetSpec, words api.LensWords, now time.Time) map[string][]Piece {
 	out := map[string][]Piece{}
 	for _, s := range specs {
@@ -31,19 +38,27 @@ func Parts(it Item, specs []api.FacetSpec, words api.LensWords, now time.Time) m
 			continue
 		}
 		spec := s.For(it.Provider)
-		if spec.Show == "" || (spec.Show == "age" && len(out["age"]) > 0) {
+		if spec.Show == "" || (spec.Show == "age" && len(out["age"]) > 0) || !holds(it, spec.ShowWhen) {
 			continue
 		}
 		var pieces []Piece
+		rest := 0
 		for _, raw := range it.Facets[spec.ID] {
 			p, ok := piece(spec, raw, words, now)
 			if !ok || (len(spec.ShowOnly) > 0 && !slices.ContainsFunc(spec.ShowOnly, func(v string) bool { return api.Fold(v) == api.Fold(raw) })) {
+				continue
+			}
+			if spec.ShowMax > 0 && len(pieces) == spec.ShowMax {
+				rest++
 				continue
 			}
 			pieces = append(pieces, p)
 			if spec.ShowValues == "first" || spec.Show == "age" {
 				break
 			}
+		}
+		if rest > 0 {
+			pieces = append(pieces, Piece{Field: spec.ID, Label: Word(words.More, map[string]string{"n": strconv.Itoa(rest)})})
 		}
 		out[spec.Show] = append(out[spec.Show], pieces...)
 	}
@@ -53,6 +68,18 @@ func Parts(it Item, specs []api.FacetSpec, words api.LensWords, now time.Time) m
 		}
 	}
 	return out
+}
+
+// holds says whether it holds, in each facet when names, one of its values.
+func holds(it Item, when map[string][]string) bool {
+	for facet, values := range when {
+		if !slices.ContainsFunc(it.Facets[facet], func(v string) bool {
+			return slices.ContainsFunc(values, func(w string) bool { return api.Fold(v) == api.Fold(w) })
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 func piece(spec api.FacetSpec, raw string, words api.LensWords, now time.Time) (Piece, bool) {
@@ -75,6 +102,9 @@ func piece(spec api.FacetSpec, raw string, words api.LensWords, now time.Time) (
 		}
 		if spec.Show == "age" {
 			p.Label = Age(words.RowWords, now.Sub(at))
+			if spec.ShowLabel != "" {
+				p.Label, p.Template = strings.ReplaceAll(spec.ShowLabel, "{{.age}}", p.Label), spec.ShowLabel
+			}
 		}
 	}
 	if spec.LabelPrefix != "" && !strings.HasPrefix(p.Label, spec.LabelPrefix) {

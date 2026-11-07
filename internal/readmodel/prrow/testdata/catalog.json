@@ -1,5 +1,5 @@
 {
-  "version": "b83eea507395",
+  "version": "c8cb59e0b383",
   "views": [
     {
       "id": "mine",
@@ -449,7 +449,8 @@
           "within": ""
         }
       ],
-      "show": "age"
+      "show": "age",
+      "show_label": "since {{.at}}"
     },
     {
       "id": "lane",
@@ -723,14 +724,6 @@
       "field": "profile_chain",
       "label": "Review profile",
       "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
-    }
-  ],
-  "lens": [
-    {
-      "provider": "github",
-      "words": {
-        "col_aside": "Workspace"
-      }
     }
   ]
 }

@@ -153,6 +153,6 @@ function reviewPanel(open) {
   }
   const lens = { ...lensOf({ view: step.view, q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false }), static: true };
   const items = tasksState.tasks.map(taskItemOf);
-  parts.push(taskTable({ groups: [{ field: "", key: "", raw: "", label: "", rows: items }], group: "" }, lens, open, items));
+  parts.push(taskList({ groups: [{ field: "", key: "", raw: "", label: "", rows: items }], group: "" }, lens, open));
   return parts;
 }

@@ -43,6 +43,20 @@
       },
       "type": "array"
     },
+    "detail": {
+      "additionalProperties": false,
+      "description": "What a task's detail panel offers.",
+      "properties": {
+        "verbs": {
+          "description": "The verbs the detail shows as buttons, in order, each a verb of verbs; those the task does not offer are left out, and every other verb it offers waits behind a More button that opens the palette. A user layer's list replaces the one below it.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "owed_by": {
       "additionalProperties": false,
       "description": "Who owes a task's next step.",

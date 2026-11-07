@@ -28,13 +28,8 @@ var RowWords = []RowWord{
 	{Key: "tip_kind", Vars: []string{"tip", "kind"}, Doc: "A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels."},
 	{Key: "tip_why", Vars: []string{"tip", "why"}, Doc: "A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`."},
 	{Key: "legend_title", Vars: []string{}, Doc: "The tooltip of the legend of a view's strip, the colors of its strip facet's values."},
-	{Key: "sort_by", Vars: []string{"label"}, Doc: "A column head's tooltip, over the `{{.label}}` of the facet it sorts by."},
-	{Key: "col_unit", Vars: []string{}, Doc: "The head of the column of a row's title, ref and flags in a view whose rows mix kinds."},
-	{Key: "col_who", Vars: []string{}, Doc: "The head of the column of whom a row waits on and its situation."},
-	{Key: "col_age", Vars: []string{}, Doc: "The head of the column of a row's age."},
-	{Key: "col_why", Vars: []string{}, Doc: "The head of the column of why a row waits."},
-	{Key: "col_aside", Vars: []string{}, Doc: "The head of the column of a row's workspace and links."},
-	{Key: "col_actions", Vars: []string{}, Doc: "The head of the column of a row's actions, read only by a screen reader."},
+	{Key: "sort_by", Vars: []string{"label"}, Doc: "The tooltip of the list toolbar's Sort chip, over the `{{.label}}` of the facet it sorts by."},
+	{Key: "col_unit", Vars: []string{}, Doc: "What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`."},
 	{Key: "stale", Vars: []string{}, Doc: "The flag of a row whose plugin is not reporting."},
 	{Key: "stale_title", Vars: []string{}, Doc: "The stale flag's tooltip."},
 	{Key: "briefing", Vars: []string{}, Doc: "The flag of a row whose intake waits for its brief."},
@@ -43,7 +38,6 @@ var RowWords = []RowWord{
 	{Key: "briefing_error", Vars: []string{"error"}, Doc: "What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`."},
 	{Key: "questions", Vars: []string{"n"}, Doc: "The pill of a brief's open questions, over their number `{{.n}}`."},
 	{Key: "questions_title", Vars: []string{"n"}, Doc: "That pill's tooltip, over `{{.n}}`."},
-	{Key: "changed", Vars: []string{}, Doc: "The flag of a task that changed since you last opened it."},
 	{Key: "starred", Vars: []string{}, Doc: "The tooltip of a starred task's star."},
 	{Key: "until", Vars: []string{"date"}, Doc: "The flag of a task asleep until a date, over the `{{.date}}`."},
 	{Key: "due", Vars: []string{"date"}, Doc: "The flag of a task's deadline, over the `{{.date}}`."},
@@ -55,6 +49,26 @@ var RowWords = []RowWord{
 	{Key: "sequential", Vars: []string{}, Doc: "The flag of a project that takes its children one at a time."},
 	{Key: "every", Vars: []string{"every"}, Doc: "How often a project is reviewed, over the `{{.every}}`."},
 	{Key: "reviewed", Vars: []string{"date"}, Doc: "When a project was last reviewed, over the `{{.date}}`."},
+	{Key: "more", Vars: []string{"n"}, Doc: "The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`."},
+}
+
+// RetiredRowWords are the row words a release stopped reading, each with what it named. A [lens] that still
+// sets one loads, so a profile that copied a whole file keeps working.
+var RetiredRowWords = []RowWord{
+	{Key: "col_who", Doc: "The head of the list column of whom a row waits on."},
+	{Key: "col_age", Doc: "The head of the list column of a row's age."},
+	{Key: "col_why", Doc: "The head of the list column of why a row waits."},
+	{Key: "col_aside", Doc: "The head of the list column of a row's workspace and links."},
+	{Key: "col_actions", Doc: "The head of the list column of a row's actions."},
+	{Key: "changed", Doc: "The flag of a task that changed since you last opened it."},
+}
+
+func retiredRowWordRows(in Surface) []Key {
+	out := make([]Key, len(RetiredRowWords))
+	for i, w := range RetiredRowWords {
+		out[i] = Key{Path: "lens." + w.Key, In: in, Kind: KindTemplate, Localized: true, Retired: true, Doc: w.Doc}
+	}
+	return out
 }
 
 func rowWordRows(in Surface, required bool) []Key {

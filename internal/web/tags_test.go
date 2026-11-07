@@ -129,12 +129,12 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 		t.Fatal(err)
 	}
 	css := string(raw)
-	for _, want := range []string{"tbody tr.mine { background: var(--mine-bg); }", ".card.mine { background: var(--mine-bg); }", ".legend .sw {"} {
+	for _, want := range []string{".row.mine { background: var(--mine-bg); }", ".card.mine { background: var(--mine-bg); }", ".legend .sw {"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("app.css lacks %s", want)
 		}
 	}
-	if strings.Index(css, "tbody tr.mine {") > strings.Index(css, "tbody tr.sel,") || strings.Index(css, ".card.mine {") > strings.Index(css, ".card.sel,") {
+	if strings.Index(css, ".row.mine {") > strings.Index(css, ".row.sel,") || strings.Index(css, ".card.mine {") > strings.Index(css, ".card.sel,") {
 		t.Error("the mine tint must come before the selection, so the open row still shows as open")
 	}
 	var got struct {
@@ -155,9 +155,10 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 	}
 	rowViewRun(t, json.RawMessage(servedCatalog(t)), `state.rows = input.rows;
 const lens = lensOf({ ...readHash(), view: "mine" });
+const openOf = (n) => (n.attrs.class === "open" ? n : n.children.map((c) => (c && c.attrs ? openOf(c) : null)).find(Boolean));
 process.stdout.write(JSON.stringify({
-  cards: input.rows.map((r) => { const c = rowCard(rowModel(r, "", lens, "", "card"), lens); return { class: c.attrs.class, title: c.children[0].children[0].attrs.title }; }),
-  rows: input.rows.map((r) => rowTr(rowModel(r, "", lens, ""), lens, []).attrs.title),
+  cards: input.rows.map((r) => { const c = rowView(rowModel(r, "", lens, "", "card"), lens, { card: true }); return { class: c.attrs.class, title: openOf(c).attrs.title }; }),
+  rows: input.rows.map((r) => rowView(rowModel(r, "", lens, ""), lens).attrs.title),
   legend: stripLegend({ stripSpec: viewStrip("mine") }),
 }));`, map[string]any{"rows": wireRows("me", time.Now(), rows...), "now": time.Now().UnixMilli()}, &got)
 	classes := func(i int) []string { return strings.Fields(got.Cards[i]["class"]) }
