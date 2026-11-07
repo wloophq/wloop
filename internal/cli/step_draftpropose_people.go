@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -80,17 +81,19 @@ func (s draftSubject) held() []items.Item {
 }
 
 // unitOwed are, for one draft on the subject's conversation, the people it is to and the items it lists:
-// everyone the conversation's open items wait on, me left out, then each who asks me something left out
-// with the items only they owe, unless everyone does. A task's draft speaks for the whole conversation, so
-// it lists what other tasks hold there too, and its effects reach their tasks.
-func (s draftSubject) unitOwed(me task.Me) ([]items.Person, []items.Item) {
+// those the subject's open items, and the open items of absorbed (the items of a draft the new one
+// replaces), wait on, me left out, then each who asks me something left out with the items only they owe,
+// unless everyone does.
+func (s draftSubject) unitOwed(me task.Me, absorbed []string) ([]items.Person, []items.Item) {
 	isMe := func(p items.Person) bool { return p.Is(me) }
-	var pool []items.Item
+	pool := s.held()
 	for _, it := range s.items {
-		if it.State == items.Open && it.Unit == s.unit {
+		if it.State == items.Open && it.Unit == s.unit && slices.Contains(absorbed, it.ID) &&
+			!slices.ContainsFunc(pool, func(h items.Item) bool { return h.ID == it.ID }) {
 			pool = append(pool, it)
 		}
 	}
+	slices.SortStableFunc(pool, func(a, b items.Item) int { return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID)) })
 	var people []items.Person
 	for _, it := range pool {
 		for _, p := range it.WaitingOn {

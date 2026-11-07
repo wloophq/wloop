@@ -157,6 +157,8 @@ type draftCandidate struct {
 	refusal string
 	// perUnit says the draft is to the whole conversation, which replaces its workflow's per-person drafts.
 	perUnit bool
+	// absorbs are the held drafts to the whole conversation whose items this one lists too, which it replaces.
+	absorbs []draft.ID
 	// timed says the refusal is a hold that ends with time.
 	timed bool
 }
@@ -202,6 +204,11 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 		if cd.refusal != "" {
 			timed = timed || cd.timed
 			continue
+		}
+		for _, id := range cd.absorbs {
+			if _, err := ob.Withdraw(ctx, id, draft.WithdrawSuperseded); err != nil && !errors.Is(err, outbox.ErrConflict) {
+				return "", err
+			}
 		}
 		d, err := ob.Propose(ctx, cd.p)
 		switch {
@@ -289,6 +296,17 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			return nil, err
 		}
 	}
+	var priorDrafts []draft.Draft
+	var priorRead bool
+	prior := func() ([]draft.Draft, error) {
+		if priorRead {
+			return priorDrafts, nil
+		}
+		var err error
+		priorDrafts, err = ob.List(ctx, outbox.Filter{Unit: &sub.unit, Rule: w.Name})
+		priorRead = err == nil
+		return priorDrafts, err
+	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
 		its := selectItems(sub, a.items, person, now, deps.Codecs)
@@ -296,10 +314,20 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		if person.Key != "" {
 			to = []items.Person{person}
 		}
+		var absorbs []draft.ID
 		if a.per != "person" && a.items == "owed" {
-			to, its = sub.unitOwed(deps.me())
+			if to, its = sub.unitOwed(deps.me(), nil); len(its) > 0 {
+				ps, err := prior()
+				if err != nil {
+					return nil, err
+				}
+				if ids, absorbed := heldPerUnit(ps, sub.unit, w.Name); len(ids) > 0 && !covers(absorbed, itemIDs(its)) {
+					absorbs = ids
+					to, its = sub.unitOwed(deps.me(), absorbed)
+				}
+			}
 		}
-		cd := draftCandidate{person: person.Key, perUnit: a.per != "person"}
+		cd := draftCandidate{person: person.Key, perUnit: a.per != "person", absorbs: absorbs}
 		key := sub.unit.String()
 		if a.per == "person" {
 			key += ":" + person.Key
@@ -322,8 +350,11 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, cd.timed, err = holdOf(ctx, ob, deps.Tasks, cd.p, person.Key, a, now)
+			ps, err := prior()
 			if err != nil {
+				return nil, err
+			}
+			if cd.refusal, cd.timed, err = holdOf(ctx, ps, deps.Tasks, cd.p, person.Key, a, now, cd.absorbs); err != nil {
 				return nil, err
 			}
 		}
@@ -364,6 +395,24 @@ func (s *stepSet) draftLanguage(ctx context.Context, u unit.Unit, userLocale str
 		return "", err
 	}
 	return draftLanguage(facts, fact, userLocale, intentload.Locales(profile.Chain(s.d.Drafts.Config()), turn.BundledFS())), nil
+}
+
+// heldPerUnit are the held drafts among prior of workflow to the whole of conversation u, and the items they
+// list.
+func heldPerUnit(prior []draft.Draft, u unit.Unit, workflow string) ([]draft.ID, []string) {
+	var ids []draft.ID
+	var its []string
+	for _, d := range prior {
+		if d.State == draft.Held && d.Origin.Kind == draft.OriginAuto && d.Origin.Workflow == workflow && d.Origin.Key == u.String() {
+			ids, its = append(ids, d.ID), append(its, d.Items...)
+		}
+	}
+	return ids, its
+}
+
+// covers says whether listed holds every one of ids.
+func covers(listed, ids []string) bool {
+	return !slices.ContainsFunc(ids, func(id string) bool { return !slices.Contains(listed, id) })
 }
 
 // supersede withdraws the held per-person drafts of d's workflow on d's unit, which d, to the whole
@@ -555,20 +604,26 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: with ended
 // hold, while that task stays ended it holds a proposal of no task or of that task; otherwise as a settled one.
-func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time) (string, bool, error) {
-	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule})
-	if err != nil {
-		return "", false, err
-	}
+func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time, absorbs []draft.ID) (string, bool, error) {
 	refusal, timed := "", false
 	for _, d := range prior {
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
 			continue
 		}
+		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
+		perConversation := person == "" && a.per != "person" && a.items == "owed"
+		if perConversation && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != "" {
+			if d.State == draft.Queued || d.State == draft.Sending {
+				return held, false, nil
+			}
+			continue
+		}
 		if person == "" && d.Origin.Key != p.Origin.Key || person != "" && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != person {
 			continue
 		}
-		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
+		if perConversation && (slices.Contains(absorbs, d.ID) || !covers(d.Items, p.Items)) {
+			continue
+		}
 		if a.holdEnded && d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
 			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
 				return held, false, err
@@ -577,7 +632,7 @@ func holdOf(ctx context.Context, ob draftOutbox, tasks draftTasks, p outbox.Prop
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
-		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
+		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot || d.Reason == draft.WithdrawSuperseded):
 		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
 				refusal, timed = held, true

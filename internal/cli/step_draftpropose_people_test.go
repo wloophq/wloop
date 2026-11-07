@@ -114,6 +114,28 @@ func TestAPerUnitNudgeSupersedesHeldPerPersonNudges(t *testing.T) {
 	}
 }
 
+func TestAnApprovedPerPersonNudgeHoldsTheConversationsOne(t *testing.T) {
+	t.Parallel()
+	r := nudgeRig(t)
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana))
+	ctx := context.Background()
+	d, err := r.svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Purpose: "nudge", Text: "@{" + ana.Key + "}, any news?",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: draftThread.String() + ":" + ana.Key}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := approveDraft(ctx, r.svc, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.check(draftThread); !strings.Contains(got, "held by draft") {
+		t.Fatalf("refusal %q, want the approved nudge to hold", got)
+	}
+	r.run(draftThread)
+	if ds := r.drafts(); len(ds) != 1 {
+		t.Fatalf("%d drafts, want the approved one alone", len(ds))
+	}
+}
+
 func TestTheWithdrawSweepReadsAPerUnitDraftsPeople(t *testing.T) {
 	t.Parallel()
 	r := nudgeRig(t)

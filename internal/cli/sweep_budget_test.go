@@ -38,7 +38,7 @@ func (p *meteredProposer) pass(context.Context) error {
 // heaviest runs items, whose steps read and write on their own, a draft that joins or leaves its task's
 // pending drafts moving that task on.
 const (
-	sweepStatementsMedian = 116
+	sweepStatementsMedian = 117
 	sweepStatementsMax    = 810
 	sweepReadTxsMedian    = 5
 	sweepReadTxsMax       = 55
