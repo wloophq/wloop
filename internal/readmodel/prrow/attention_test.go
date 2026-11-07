@@ -12,6 +12,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 )
@@ -116,5 +118,42 @@ func TestAQueuedAnswerOffersNoOptionToTap(t *testing.T) {
 	q.Queued = true
 	if got := ids(); slices.Contains(got, "answer:option:publish") || slices.Contains(got, "answer:option:hold") || !slices.Contains(got, "answer:text") {
 		t.Fatalf("a queued answer's actions: %v", got)
+	}
+}
+
+// TestANotificationSaysWhyInThePluginsWords checks that a notification's body words its row's reason in the
+// plugin's words, filled with the reason's values, while its id stays the one the reason's sentence gives,
+// whatever the language.
+func TestANotificationSaysWhyInThePluginsWords(t *testing.T) {
+	english := Deriver{Now: policyNow, Loaded: bundled(t)}
+	worded := english
+	worded.Reasons = map[string]string{"round_held": "rodada automática retida: {{.why}}", "round_blocked": "rodada bloqueada: {{.why}}", "agent_asked": "o agente perguntou algo a você"}
+	for _, r := range []api.Row{
+		{Unit: policyRef(4).Unit(), Kind: api.Kind(situation.KindHeldByCap), Title: "Cap", Summary: api.Summary{WaitsOn: "me", Since: policyNow,
+			Reason: "automatic round held: daily cap", ReasonKey: "round_held", ReasonParams: map[string]string{"why": "daily cap"}}},
+		{Unit: policyRef(5).Unit(), Kind: api.Kind(situation.KindBlocked), Title: "Block", Summary: api.Summary{WaitsOn: "me", Since: policyNow,
+			Reason: "round blocked: no access", ReasonKey: "round_blocked", ReasonParams: map[string]string{"why": "no access"}}},
+		{Unit: policyRef(6).Unit(), Kind: api.Kind(situation.KindLoopWaiting), Title: "Docs", Summary: api.Summary{WaitsOn: "me", Since: policyNow,
+			Reason: "the agent asked you something", ReasonKey: "agent_asked"}},
+	} {
+		en, pt := english.Attention(r, nil), worded.Attention(r, nil)
+		if en == nil || pt == nil || en.ID != pt.ID || !strings.Contains(en.Body, r.Summary.Reason) {
+			t.Fatalf("%s: %+v then %+v", r.Kind, en, pt)
+		}
+		want := strings.ReplaceAll(worded.Reasons[r.Summary.ReasonKey], "{{.why}}", r.Summary.ReasonParams["why"])
+		if !strings.HasPrefix(pt.Body, want+" · ") {
+			t.Errorf("%s: body %q, want it to say %q", r.Kind, pt.Body, want)
+		}
+	}
+}
+
+func TestTheProvidersNoticeReadsItsPluginsReasonWords(t *testing.T) {
+	p := New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})
+	in := &input{set: &shared{RowSettings: readmodel.RowSettings{Loaded: bundled(t)}}}
+	held := api.Row{Unit: policyRef(4).Unit(), Kind: api.Kind(situation.KindHeldByCap), Title: "Cap", Summary: api.Summary{WaitsOn: "me", Since: policyNow,
+		Reason: "a sentence the words replace", ReasonKey: "round_held", ReasonParams: map[string]string{"why": "daily cap"}}}
+	n, ok := p.Notice(readmodel.Base{}, held, in, policyNow)
+	if !ok || !strings.HasPrefix(n.Attention.Body, "automatic round held: daily cap · ") {
+		t.Fatalf("%+v: the provider's notice says why in its plugin's words", n.Attention)
 	}
 }
