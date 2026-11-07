@@ -567,6 +567,7 @@ func TestTheOmniboxListboxHoldsOnlyOptions(t *testing.T) {
 (async () => {
 const st = omniboxNew(false, []);
 await omniboxType(st, "done t-1", env);
+st.sel = "task:t-1";
 const n = nodes(st);
 const lists = all(n, (x) => x.attrs.role === "listbox");
 const inList = new Set(all(lists, (x) => x.attrs.role === "option"));
@@ -580,5 +581,29 @@ process.stdout.write(JSON.stringify({ Outside: outside, Controls: controls, List
 	}
 	if got.Status != "2 results" || !slices.Equal(got.Opened, []string{"#task=t-2"}) {
 		t.Errorf("%+v: a polite status counts the results, and an option opens its task", got)
+	}
+}
+
+func TestTheOmniboxPointsOnlyAtAnOptionAndSaysAnyOtherSelection(t *testing.T) {
+	var got struct {
+		OpsActive, OpsStatus, ResultActive string
+		ResultIsOption                     bool
+	}
+	resolve := map[string]any{"done t-1": map[string]any{"kind": "verb", "preview": map[string]any{"operations": []any{
+		map[string]any{"op": "verb", "verb": "done", "task": "t-1"}}}}}
+	search := map[string]any{"done t-1": retriesSearch()["retries"]}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "done t-1", env);
+const out = { OpsActive: omboxActive(), OpsStatus: text(all(nodes(st), (x) => x.tag === "output")) };
+press(st, "ArrowDown");
+out.ResultActive = omboxActive();
+out.ResultIsOption = all(nodes(st), (x) => x.attrs.id === out.ResultActive)[0].attrs.role === "option";
+process.stdout.write(JSON.stringify(out));
+function omboxActive() { return omniboxActiveID(st, env); }
+})();`, map[string]any{"resolve": resolve, "search": search}, &got)
+	if got.OpsActive != "" || !strings.Contains(got.OpsStatus, "Run 1") || got.ResultActive == "" || !got.ResultIsOption {
+		t.Fatalf("%+v: the field points only at an option of its listbox, and the status says any other selection", got)
 	}
 }
