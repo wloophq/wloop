@@ -36,7 +36,9 @@ const view = () => renderQueue(queueState.queue, queueState.at, env);
 const shown = () => all(view(), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-task"]);
 `
 
-func queuePrelude(t *testing.T) string { return viewsPrelude(t) + staticJS(t, "queue.js") + queueHarness }
+func queuePrelude(t *testing.T) string {
+	return viewsPrelude(t) + staticJS(t, "queue.js") + queueHarness
+}
 
 func situationItem(id, title string) map[string]any {
 	return map[string]any{"task": map[string]any{"id": id, "title": title, "units": []map[string]string{{"provider": "alpha", "key": "acme/api#" + id}}},
@@ -69,7 +71,7 @@ process.stdout.write(JSON.stringify({ Progress: text(byClass(nodes, "progress"))
 
 func TestQueueEnterRunsPrimaryGate(t *testing.T) {
 	gateItem := map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []any{}},
-		"gate": map[string]any{"id": 7, "kind": "question", "text": "Ship it?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}, {"id": "dismiss", "label": "Dismiss"}}},
+		"gate":    map[string]any{"id": 7, "kind": "question", "text": "Ship it?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}, {"id": "dismiss", "label": "Dismiss"}}},
 		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Approve"}}
 	var got struct {
 		Posts []string

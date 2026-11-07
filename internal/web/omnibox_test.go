@@ -34,7 +34,9 @@ const nodes = (st) => renderOmnibox(st, env);
 const groups = (st) => all(nodes(st), (x) => x.attrs["data-group"]).map((g) => text(g.children[0]));
 `
 
-func omniPrelude(t *testing.T) string { return viewsPrelude(t) + staticJS(t, "omnibox.js") + omniHarness }
+func omniPrelude(t *testing.T) string {
+	return viewsPrelude(t) + staticJS(t, "omnibox.js") + omniHarness
+}
 
 func retriesSearch() map[string]any {
 	res := func(id, title string, views ...string) map[string]any {

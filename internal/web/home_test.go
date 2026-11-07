@@ -74,7 +74,9 @@ process.stdout.write(JSON.stringify({ Rows: all(blocked, (x) => x.attrs["data-ta
 	if !slices.Equal(got.Rows, []string{"t-1", "t-2", "t-3"}) || got.Views[0] != "home-blocked" {
 		t.Errorf("rows %v in %v", got.Rows, got.Views)
 	}
-	if !slices.ContainsFunc(got.Links, func(l struct{ Href, Text string }) bool { return l.Href == "#view=home-blocked" && l.Text == "See all 5" }) {
+	if !slices.ContainsFunc(got.Links, func(l struct{ Href, Text string }) bool {
+		return l.Href == "#view=home-blocked" && l.Text == "See all 5"
+	}) {
 		t.Errorf("no see-all link to home-blocked: %+v", got.Links)
 	}
 	if !strings.Contains(got.Stalled, "Nothing here right now.") || slices.ContainsFunc(got.Links, func(l struct{ Href, Text string }) bool { return l.Href == "#view=home-stalled" }) {
