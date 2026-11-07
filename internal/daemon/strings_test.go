@@ -25,7 +25,7 @@ func TestGetStringsServesTheLoadedLocale(t *testing.T) {
 		t.Fatalf("status %d", code)
 	}
 	if got.Locale != "pt-BR" || got.Strings["Open cockpit"]["other"] != "Abrir o cockpit" || got.Strings["{n} drafts"]["one"] != "{n} rascunho" ||
-		got.Formats["time"] != "15:04" || got.Formats["group"] != "." {
+		got.Formats["time"] != "15:04" || got.Formats["group"] != "." || got.Stamp == "" || got.Stamp != pt.StringsStamp {
 		t.Fatalf("%+v", got)
 	}
 	var en api.Strings

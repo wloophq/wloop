@@ -9,7 +9,7 @@ import (
 
 func (s *Server) handleStrings(w http.ResponseWriter, _ *http.Request) {
 	l := s.loaded()
-	out := api.Strings{Locale: l.Locale, Strings: make(map[string]api.Text, len(l.Strings)), Formats: maps.Clone(l.Formats)}
+	out := api.Strings{Locale: l.Locale, Stamp: l.StringsStamp, Strings: make(map[string]api.Text, len(l.Strings)), Formats: maps.Clone(l.Formats)}
 	for k, f := range l.Strings {
 		out.Strings[k] = api.Text(f)
 	}

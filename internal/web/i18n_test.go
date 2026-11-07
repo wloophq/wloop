@@ -127,22 +127,58 @@ function i18nChanged() { changed++; }
 
 func TestTheCockpitFollowsALiveLocaleChange(t *testing.T) {
 	var got struct {
-		Reads, Changed int
-		Before, After  string
+		Reads, Changed         int
+		Before, After          string
+		FailedBootReads        int
+		FailedBootText         string
+		RetryReads, StaleReads int
+		RetryText, StaleText   string
 	}
 	nodeRun(t, staticJS(t, "i18n.js"), nil, `
-let changed = 0, reads = 0;
+let changed = 0, reads = 0, fail = false, answer = null;
 function i18nChanged() { changed++; }
-const getJSON = async () => { reads++; return {locale: "pt-BR", strings: {"Open cockpit": "Abrir o cockpit"}}; };
+const pt = (stamp) => ({locale: "pt-BR", stamp, strings: {"Open cockpit": "Abrir o cockpit " + stamp}});
+const getJSON = async () => { reads++; if (fail) throw new Error("HTTP 500"); return answer || pt("pt-2"); };
+const tick = () => new Promise((r) => setTimeout(r, 10));
 (async () => {
+  const out = {};
+  applyStrings({locale: "en", stamp: "en-1", strings: {}});
   followStrings("en-1", getJSON);
   followStrings("en-1", getJSON);
-  const before = t("Open cockpit");
-  followStrings("pt-BR-2", getJSON);
-  await new Promise((r) => setTimeout(r, 20));
-  process.stdout.write(JSON.stringify({Reads: reads, Changed: changed, Before: before, After: t("Open cockpit")}));
+  out.Before = t("Open cockpit");
+  followStrings("pt-2", getJSON);
+  await tick();
+  Object.assign(out, {Reads: reads, Changed: changed, After: t("Open cockpit")});
+
+  I18N.locale = "en"; I18N.strings = {}; I18N.stamp = ""; reads = 0;
+  followStrings("pt-2", getJSON);
+  await tick();
+  Object.assign(out, {FailedBootReads: reads, FailedBootText: t("Open cockpit")});
+
+  reads = 0; fail = true;
+  followStrings("pt-3", getJSON);
+  await tick();
+  fail = false; answer = pt("pt-3");
+  followStrings("pt-3", getJSON);
+  await tick();
+  Object.assign(out, {RetryReads: reads, RetryText: t("Open cockpit")});
+
+  reads = 0; answer = pt("pt-4");
+  followStrings("pt-5", getJSON);
+  await tick();
+  Object.assign(out, {StaleReads: reads, StaleText: t("Open cockpit")});
+  process.stdout.write(JSON.stringify(out));
 })();`, nil, &got)
-	if got.Reads != 1 || got.Changed != 1 || got.Before != "Open cockpit" || got.After != "Abrir o cockpit" {
-		t.Fatalf("got %+v", got)
+	if got.Reads != 1 || got.Changed != 1 || got.Before != "Open cockpit" || got.After != "Abrir o cockpit pt-2" {
+		t.Errorf("a live change: %+v", got)
+	}
+	if got.FailedBootReads != 1 || got.FailedBootText != "Abrir o cockpit pt-2" {
+		t.Errorf("after a failed boot read: %+v", got)
+	}
+	if got.RetryReads != 2 || got.RetryText != "Abrir o cockpit pt-3" {
+		t.Errorf("a failed read is retried: %+v", got)
+	}
+	if got.StaleReads != 1 || got.StaleText != "Abrir o cockpit pt-3" {
+		t.Errorf("an answer older than the latest health is dropped: %+v", got)
 	}
 }
