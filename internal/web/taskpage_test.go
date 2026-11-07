@@ -26,6 +26,7 @@ func TestTheDetailListsTheProfilesPrimaryVerbsAndTheRestInThePalette(t *testing.
 	}
 	runTaskPageOn(t, cat, `
 let opened = null;
+globalThis.cockpitKeys = { bindings: () => [{ action: "palette", key: "Cmd+K" }] };
 detailEnv.palette = (o) => { opened = o; };
 const verbs = h("div", {}, ...primaryVerbs(input.answers.task));
 const buttons = walk(verbs, (x) => x.tag === "button");

@@ -27,6 +27,7 @@ func TestTheRailCollapsesEmptyViews(t *testing.T) {
 	counters := api.Counters{Views: map[string]int{"inbox": 3, "someday": 0, "logbook": 0}}
 	nodeRun(t, viewsPrelude(t)+railDoc, nil, `
 tasksState.catalog = input.cat;
+globalThis.cockpitKeys = { bindings: () => [{ action: "palette", key: "Cmd+K" }] };
 const nav = viewNav(input.cat, [], [], input.counters);
 renderRail(nav, railRoute("someday"));
 const folder = byFocus(railEls.views.kids, "rail:empties");
@@ -202,5 +203,20 @@ process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) =
 		got[1].Title != "GitHub" || !slices.Equal(got[1].Views, []string{"needs-me", "all"}) ||
 		got[2].Title != "Slack" || !slices.Equal(got[2].Views, []string{"slack"}) {
 		t.Errorf("sections %+v", got)
+	}
+}
+
+func TestTheOmniboxEntriesShowTheServedPaletteKey(t *testing.T) {
+	var got struct{ Bound, Unbound []string }
+	nodeRun(t, viewsPrelude(t), nil, `
+const box = { kids: [], replaceChildren(...n) { this.kids = n; } };
+const kbds = () => all(box.kids, (x) => x.tag === "kbd").map(text);
+railOmnibox(box);
+const unbound = kbds();
+globalThis.cockpitKeys = { bindings: () => [{ action: "palette", key: "Ctrl+P" }] };
+railOmnibox(box);
+process.stdout.write(JSON.stringify({ Bound: kbds(), Unbound: unbound }));`, nil, &got)
+	if !slices.Equal(got.Bound, []string{"⌃P"}) || len(got.Unbound) != 0 {
+		t.Fatalf("%+v: the rail shows the palette's served key, and none when nothing is bound", got)
 	}
 }

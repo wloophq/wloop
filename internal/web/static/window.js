@@ -63,11 +63,22 @@ function installDrag(doc, win) {
   return true;
 }
 
-// keyHint is label with the key the served bindings give action.
-function keyHint(label, action) {
+// servedKey is the key the served bindings give action, "" when none is bound.
+function servedKey(action) {
   const keys = typeof cockpitKeys !== "undefined" ? cockpitKeys : null;
   const b = action && keys ? keys.bindings().find((x) => x.action === action) : null;
-  return b ? t("{action} ({key})", { action: label, key: b.key }) : label;
+  return b ? b.key : "";
+}
+
+// keyHint is label with the key the served bindings give action.
+function keyHint(label, action) {
+  const key = servedKey(action);
+  return key ? t("{action} ({key})", { action: label, key }) : label;
+}
+
+// keyCap is the served key of action as a key cap reads it, "" when none is bound.
+function keyCap(action) {
+  return servedKey(action).replace(/Cmd\+/g, "⌘").replace(/Ctrl\+/g, "⌃").replace(/Alt\+/g, "⌥").replace(/Shift\+/g, "⇧");
 }
 
 // iconButton draws the icon app.css names by data-icon.

@@ -260,10 +260,11 @@ function primaryVerbs(e) {
   });
   const rest = moreVerbs(e);
   if (!rest.length) return buttons;
+  const key = keyCap("palette");
   return [...buttons, h("button", {
-    type: "button", class: "act more", "data-focus": `detail:more:${e.id}`, "aria-keyshortcuts": "Meta+K",
+    type: "button", class: "act more", "data-focus": `detail:more:${e.id}`, "aria-keyshortcuts": servedKey("palette").replace("Cmd+", "Meta+") || undefined,
     onclick: () => detailEnv.palette({ title: t("Actions"), items: moreVerbs(e) }),
-  }, h("span", { class: "lb" }, t("More {n}", { n: fmtNumber(rest.length) })), " ", h("kbd", {}, "⌘K"))];
+  }, h("span", { class: "lb" }, t("More {n}", { n: fmtNumber(rest.length) })), key ? [" ", h("kbd", {}, key)] : null)];
 }
 
 // moreVerbs are the palette items of the verbs e offers past the profile's detail verbs, each running as its
