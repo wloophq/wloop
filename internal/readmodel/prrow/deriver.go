@@ -147,7 +147,7 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 	o.Tracked = o.Tracked || rep.Payload.Override.Tracked
 	r := api.Row{
 		Unit: pr.Ref.Unit(), Link: cmp.Or(pr.URL, pr.Ref.URL()), Label: pr.Ref.String(), Title: pr.Title, Kind: api.Kind(res.Kind),
-		Summary: api.Summary{WaitsOn: res.WaitingOn, Since: res.Since, Reason: res.Reason, Stalled: res.Stalled},
+		Summary: api.Summary{WaitsOn: res.WaitingOn, Since: res.Since, Reason: res.Reason, Stalled: res.Stalled, ReasonKey: res.ReasonKey, ReasonParams: res.ReasonParams},
 	}
 	p := rep.Payload
 	p.Reasons, p.Workspace.AgentStates = nonNil(p.Reasons), nonNil(p.Workspace.AgentStates)
@@ -157,10 +157,11 @@ func (d Deriver) Parts(rep Report, evs []dinv.Event, o dinv.Override) (api.Row, 
 		r.Question = f.Question
 	}
 	if pend, ok := d.Plans[pr.Ref.Unit()]; ok && res.Kind != overlay.KindDone {
-		over := pend.Over(overlay.Situation{Kind: string(r.Kind),
-			WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason, Stalled: r.Summary.Stalled})
+		over := pend.Over(overlay.Situation{Kind: string(r.Kind), WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason,
+			ReasonKey: r.Summary.ReasonKey, ReasonParams: r.Summary.ReasonParams, Stalled: r.Summary.Stalled})
 		r.Kind = api.Kind(over.Kind)
 		r.Summary.WaitsOn, r.Summary.Since, r.Summary.Reason, r.Summary.Stalled = over.WaitingOn, over.Since, over.Reason, over.Stalled
+		r.Summary.ReasonKey, r.Summary.ReasonParams = over.ReasonKey, over.ReasonParams
 	}
 	if res.Kind == overlay.KindMuted {
 		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = unmuted.Kind, unmuted.WaitingOn, unmuted.Reason

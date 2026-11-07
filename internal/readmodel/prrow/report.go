@@ -111,7 +111,8 @@ func ReportOf(s src.Snapshot) (Report, bool, error) {
 func (r Report) source(now time.Time) overlay.Situation {
 	s := r.Situation
 	stalled, _ := value.Resolve(s.Stalled, now).(bool)
-	return overlay.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: s.Since, Reason: overlay.Cut(s.Reason), Stalled: stalled}
+	return overlay.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: s.Since, Reason: overlay.Cut(s.Reason), ReasonKey: s.ReasonKey, ReasonParams: s.ReasonParams,
+		Stalled: stalled}
 }
 
 // SituationOf is the situation of the report at now under the host's

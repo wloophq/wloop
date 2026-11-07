@@ -3,6 +3,7 @@ package readmodel_test
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -100,7 +101,7 @@ func TestAStalePluginsRowsKeepTheLastSnapshot(t *testing.T) {
 	}
 	snaps.SetDown("acme", true)
 	stale, staleRev := row("down")
-	if !stale.Stale || stale.Title != fresh.Title || stale.Summary != fresh.Summary || staleRev == rev {
+	if !stale.Stale || stale.Title != fresh.Title || !reflect.DeepEqual(stale.Summary, fresh.Summary) || staleRev == rev {
 		t.Fatalf("a down plugin's row %+v at rev %d, want its last snapshot marked stale past %d", stale, staleRev, rev)
 	}
 	snaps.SetDown("acme", false)

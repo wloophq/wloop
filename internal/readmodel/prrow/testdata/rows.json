@@ -15,7 +15,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -190,7 +191,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -356,7 +358,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -512,7 +515,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [
       "mine"
@@ -672,7 +676,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "draft",
-      "line": "draft"
+      "line": "draft",
+      "reason_key": "draft"
     },
     "views": [
       "mine"
@@ -836,7 +841,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "checks failing: lint, unit",
-      "line": "checks failing: lint, unit"
+      "line": "checks failing: lint, unit",
+      "reason_key": "checks_failing_named",
+      "reason_params": {
+        "checks": "lint, unit"
+      }
     },
     "views": [
       "mine"
@@ -1003,7 +1012,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "changes requested by carol",
-      "line": "changes requested by carol"
+      "line": "changes requested by carol",
+      "reason_key": "changes_requested",
+      "reason_params": {
+        "actor": "carol"
+      }
     },
     "views": [
       "mine"
@@ -1170,7 +1183,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "approved and green",
-      "line": "approved and green"
+      "line": "approved and green",
+      "reason_key": "approved_green"
     },
     "views": [
       "mine"
@@ -1343,7 +1357,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "merge conflicts with main",
-      "line": "merge conflicts with main"
+      "line": "merge conflicts with main",
+      "reason_key": "merge_conflicts",
+      "reason_params": {
+        "branch": "main"
+      }
     },
     "views": [
       "mine"
@@ -1503,7 +1521,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "me-login commented, no reply",
-      "line": "me-login commented, no reply"
+      "line": "me-login commented, no reply",
+      "reason_key": "commented_no_reply",
+      "reason_params": {
+        "actor": "me-login"
+      }
     },
     "views": [],
     "facets": {
@@ -1662,7 +1684,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [],
     "facets": {
@@ -1827,7 +1850,12 @@
       "closed": false,
       "open_items": 0,
       "reason": "me-login replied, dave has not returned",
-      "line": "me-login replied, dave has not returned"
+      "line": "me-login replied, dave has not returned",
+      "reason_key": "reviewer_not_back",
+      "reason_params": {
+        "author": "me-login",
+        "reviewer": "dave"
+      }
     },
     "views": [
       "mine"
@@ -1993,7 +2021,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "merged",
-      "line": "merged"
+      "line": "merged",
+      "reason_key": "merged"
     },
     "views": [],
     "facets": {
@@ -2111,7 +2140,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "closed",
-      "line": "closed"
+      "line": "closed",
+      "reason_key": "closed"
     },
     "views": [],
     "facets": {
@@ -2552,7 +2582,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [],
     "facets": {
@@ -2711,7 +2742,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "automatic round held: cap reached",
-      "line": "held (cap)"
+      "line": "held (cap)",
+      "reason_key": "round_held",
+      "reason_params": {
+        "why": "cap reached"
+      }
     },
     "views": [],
     "facets": {
@@ -2886,7 +2921,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: no access",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "no access"
+      }
     },
     "views": [],
     "facets": {
@@ -3045,7 +3084,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "review to address, no workspace: carol asked",
-      "line": "review to address, no workspace: carol asked"
+      "line": "review to address, no workspace: carol asked",
+      "reason_key": "to_address",
+      "reason_params": {
+        "why": "carol asked"
+      }
     },
     "views": [
       "mine"
@@ -3885,7 +3928,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "the agent asked you something",
-      "line": "agent asks"
+      "line": "agent asks",
+      "reason_key": "agent_asked"
     },
     "views": [],
     "facets": {
@@ -4054,7 +4098,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [
       "mine"
@@ -4209,7 +4254,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [],
     "facets": {
@@ -4375,7 +4421,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "approved and green",
-      "line": "approved and green"
+      "line": "approved and green",
+      "reason_key": "approved_green"
     },
     "views": [],
     "facets": {
@@ -4542,7 +4589,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "briefing… (attempt 2; timeout)"
+      "line": "briefing… (attempt 2; timeout)",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -4712,7 +4760,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -4874,7 +4923,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {

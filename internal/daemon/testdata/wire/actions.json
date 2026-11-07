@@ -396,7 +396,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: no workspace",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "no workspace"
+      }
     },
     "views": [],
     "facets": {
@@ -554,7 +558,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: could not start: /src/api is not trusted in /home/.claude-work",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "could not start: /src/api is not trusted in /home/.claude-work"
+      }
     },
     "views": [],
     "facets": {
@@ -723,7 +731,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -882,7 +891,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "could not start: /src/api/wt is not trusted in the agent home of its terminal"
+      }
     },
     "views": [],
     "facets": {
@@ -1051,7 +1064,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1211,7 +1225,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "merged",
-      "line": "merged"
+      "line": "merged",
+      "reason_key": "merged"
     },
     "views": [],
     "facets": {
@@ -1332,7 +1347,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "merged",
-      "line": "merged"
+      "line": "merged",
+      "reason_key": "merged"
     },
     "views": [],
     "facets": {
@@ -1549,7 +1565,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1723,7 +1740,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1877,7 +1895,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "automatic round held: daily cap",
-      "line": "held (cap)"
+      "line": "held (cap)",
+      "reason_key": "round_held",
+      "reason_params": {
+        "why": "daily cap"
+      }
     },
     "views": [],
     "facets": {
@@ -2043,7 +2065,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -2219,7 +2242,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -2397,7 +2421,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [
       "mine"
@@ -2550,7 +2575,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [],
     "facets": {
@@ -2708,7 +2734,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [
       "mine"
@@ -2868,7 +2895,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -3387,7 +3415,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "automatic round held: daily cap",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "round_held",
+      "reason_params": {
+        "why": "daily cap"
+      }
     },
     "views": [],
     "facets": {
@@ -3747,7 +3779,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -4023,7 +4056,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {

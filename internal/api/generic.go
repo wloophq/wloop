@@ -13,6 +13,10 @@ type Summary struct {
 	OpenItems int       `json:"open_items"`
 	Reason    string    `json:"reason"` // one sentence: why it waits
 	Line      string    `json:"line"`   // the short status every client shows (menu bar, TUI list)
+	// ReasonKey names Reason in its plugin's words (CatalogResponse.Reasons), which ReasonParams fill; empty
+	// for a reason no plugin words.
+	ReasonKey    string            `json:"reason_key,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
 }
 
 type RowItem struct {
