@@ -140,3 +140,21 @@ func TestEveryBundledDraftWorkflowHasAWhy(t *testing.T) {
 		}
 	}
 }
+
+func TestAClosureWordsEachResolutionInItsLanguage(t *testing.T) {
+	t.Parallel()
+	data := draftTextData{Items: []draftTextItem{{Line: "The deck", Resolution: "answered"}, {Line: "The budget", Resolution: "moot"}, {Line: "The copy"}}}
+	for locale, want := range map[string]string{
+		"pt-BR": "- The deck: respondido\n- The budget: sem efeito\n- The copy: resolvido",
+		"en":    "- The deck: answered\n- The budget: moot\n- The copy: resolved",
+	} {
+		tmpl, written, err := draftTemplate(profile.BundledChain(), turn.BundledFS(), "slack-closure", defaultDraftText, draft.Message, locale)
+		if err != nil || written != locale {
+			t.Fatalf("%s: written in %q, %v", locale, written, err)
+		}
+		var b bytes.Buffer
+		if err := tmpl.Execute(&b, data); err != nil || !strings.HasSuffix(b.String(), want) {
+			t.Errorf("%s: %q %v, want it to end %q", locale, b.String(), err, want)
+		}
+	}
+}
