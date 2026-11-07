@@ -30,9 +30,13 @@ function stamp(t) { return String(t); }
 
 // viewsCatalog is GET /api/views with the core views the daemon serves.
 func viewsCatalog() api.ViewsCatalog {
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "fits-now", Label: "Fits now"},
+		{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
+	for i := range views {
+		views[i].Rail = true
+	}
 	return api.ViewsCatalog{
-		Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "fits-now", Label: "Fits now"},
-			{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}},
+		Views:    views,
 		Areas:    []string{"OSS", "Hiring"},
 		Contexts: []string{"@decide", "@reply"},
 		Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve", Label: "Approve"}, {Verb: "edit", Handler: "edit", Label: "Edit"}, {Verb: "dismiss", Handler: "drop", Label: "Discard"},

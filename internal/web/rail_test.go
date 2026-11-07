@@ -50,6 +50,32 @@ process.stdout.write(JSON.stringify({ Closed: closed, Open: railLinks(), Label: 
 	}
 }
 
+func TestTheRailLeavesOutViewsOffTheRail(t *testing.T) {
+	cat := viewsCatalog()
+	for i := range cat.Views {
+		cat.Views[i].Rail = cat.Views[i].ID != "someday" && cat.Views[i].ID != "logbook"
+	}
+	counters := api.Counters{Views: map[string]int{"inbox": 3, "someday": 2, "logbook": 0}}
+	var got struct{ Inbox, Opened []string }
+	nodeRun(t, viewsPrelude(t)+railDoc, nil, `
+tasksState.catalog = input.cat;
+railState.emptiesOpen = true;
+const nav = viewNav(input.cat, [], [], input.counters);
+renderRail(nav, railRoute("inbox"));
+const inbox = railLinks();
+renderRail(nav, railRoute("someday"));
+process.stdout.write(JSON.stringify({ Inbox: inbox, Opened: railLinks() }));`,
+		map[string]any{"cat": cat, "counters": counters}, &got)
+	for _, off := range []string{"Someday", "Logbook"} {
+		if slices.Contains(got.Inbox, off) {
+			t.Errorf("rail %v lists %s, which is off the rail, as an entry or under Empty", got.Inbox, off)
+		}
+	}
+	if !slices.Contains(got.Opened, "Someday") || slices.Contains(got.Opened, "Logbook") {
+		t.Errorf("rail %v: the view shown stays reachable even off the rail, the others stay out", got.Opened)
+	}
+}
+
 func TestTheRailHeadsEachPluginSection(t *testing.T) {
 	served := []api.ViewSpec{{ID: "needs-me", Label: "Needs me", Provider: string(unit.GitHub)}, {ID: "slack", Label: "Conversations", Provider: "slack"},
 		{ID: "all", Label: "All", Provider: string(unit.GitHub)}}

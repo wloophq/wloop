@@ -13,7 +13,8 @@ const railState = { emptiesOpen: false };
 // view (count left to the caller).
 function viewNav(cat, served, plugin, counters) {
   const views = (counters && counters.views) || {};
-  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true }));
+  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true,
+    offRail: v.rail === false }));
   const taken = new Set(out.map((v) => v.id));
   for (const v of served) {
     if (taken.has(v.id)) continue;
@@ -76,8 +77,10 @@ function railNav(lens) {
 const railFolds = (v, current) => v.count === 0 && v.id !== current;
 
 // railViews are the rail's entries: each section's views under its provider's name, but the empty ones, which
-// one Empty entry counts and lists in place when opened.
-function railViews(nav, route) {
+// one Empty entry counts and lists in place when opened, and the views the profile keeps off the rail, unless
+// one is the view shown.
+function railViews(all, route) {
+  const nav = all.filter((v) => !v.offRail || v.id === route.view);
   const item = (v) => railItem(v.label, v.count, v.id === route.view, lensHash({ view: v.id, task: "", pr: "" }, route),
     (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
   const empties = nav.filter((v) => railFolds(v, route.view));
@@ -90,7 +93,7 @@ function railViews(nav, route) {
     type: "button", class: "nav rail-empties", "aria-expanded": String(open), "data-focus": "rail:empties",
     onclick: () => {
       railState.emptiesOpen = !open;
-      renderRail(nav, route);
+      renderRail(all, route);
       const again = document.querySelector('[data-focus="rail:empties"]');
       if (again) again.focus();
     },
