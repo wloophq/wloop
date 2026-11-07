@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -103,7 +104,12 @@ type Asker struct {
 	Dir string
 	// Tier is the model tier of the call; "" is balanced.
 	Tier turns.Tier
+	// Timeout bounds the call; 0 is DefaultTimeout.
+	Timeout time.Duration
 }
+
+// DefaultTimeout bounds an omnibox call when Asker.Timeout is zero.
+const DefaultTimeout = 2 * time.Minute
 
 // Ask runs one call on in over snap and returns its answer, its task ids and operations checked against
 // snap and the vocabulary. It passes turns.ErrOverCap, turns.ErrNoRestricted and the agent's errors through.
@@ -137,16 +143,25 @@ func (a *Asker) Ask(ctx context.Context, in AskRequest, snap Snapshot) (AskReply
 	if err := a.Budget.Reserve(ctx); err != nil {
 		return AskReply{}, err
 	}
-	got, callErr := a.Agent.Ask(ctx, q)
-	if err := a.Budget.Settle(ctx, got.CostUSD, a.Record); err != nil {
-		callErr = errors.Join(callErr, fmt.Errorf("recording the omnibox call's cost: %w", err))
-	}
-	if callErr != nil {
-		return AskReply{}, callErr
+	got, err := a.call(ctx, q)
+	if err != nil {
+		return AskReply{}, err
 	}
 	out, err := a.check(got.JSON, snap)
 	out.CostUSD = got.CostUSD
 	return out, err
+}
+
+// call runs the reserved call under the timeout and settles it however it returns, a panic included.
+func (a *Asker) call(ctx context.Context, q turns.Ask) (got turns.Answer, err error) {
+	defer func() {
+		if serr := a.Budget.Settle(ctx, got.CostUSD, a.Record); serr != nil {
+			err = errors.Join(err, fmt.Errorf("recording the omnibox call's cost: %w", serr))
+		}
+	}()
+	bounded, cancel := context.WithTimeout(ctx, cmp.Or(a.Timeout, DefaultTimeout))
+	defer cancel()
+	return a.Agent.Ask(bounded, q)
 }
 
 func (a *Asker) question(in AskRequest, dir string) (turns.Ask, error) {

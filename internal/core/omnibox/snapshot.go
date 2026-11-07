@@ -2,6 +2,7 @@ package omnibox
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,12 +44,29 @@ type SnapshotView struct {
 	When  string `json:"when,omitempty"`
 }
 
+// snapshotPrefix names each call's snapshot directory under Asker.Dir.
+const snapshotPrefix = "ask-"
+
+// SweepSnapshots removes the snapshot directories under dir that a call left when its process died; dir
+// missing is no error.
+func SweepSnapshots(dir string) error {
+	left, err := filepath.Glob(filepath.Join(dir, snapshotPrefix+"*"))
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range left {
+		errs = append(errs, os.RemoveAll(d))
+	}
+	return errors.Join(errs...)
+}
+
 // write puts s's files in a new directory under parent; the caller removes it.
 func (s Snapshot) write(parent string) (string, error) {
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return "", err
 	}
-	dir, err := os.MkdirTemp(parent, "ask-")
+	dir, err := os.MkdirTemp(parent, snapshotPrefix)
 	if err != nil {
 		return "", err
 	}

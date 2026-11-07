@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/omnibox"
@@ -184,10 +185,107 @@ func TestAskFollowUpIsCarriedByTheClient(t *testing.T) {
 		t.Fatalf("no markers:\n%s", p)
 	}
 	inside, _ := between(p, "<<<USER REQUEST "+m[1]+">>>\n", "<<<END OF USER REQUEST "+m[1]+">>>")
-	for _, want := range []string{"fix the brotli CVE", "In which repository?", "acme/web"} {
+	for _, want := range []string{"fix the brotli CVE", "You asked: In which repository?", "The user answered: acme/web"} {
 		if !strings.Contains(inside, want) {
 			t.Fatalf("%q is not between the markers:\n%s", want, inside)
 		}
+	}
+}
+
+func TestTheFollowUpWordsComeFromTheProfile(t *testing.T) {
+	w, err := omnibox.ParseWrapper(`{{define "before"}}B
+{{end}}{{define "follow"}}Q={{.Question}} A={{.Answer}}
+{{end}}{{define "after"}}AFTER
+{{end}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := w.Prompt(omnibox.AskRequest{Text: "x", Follow: []omnibox.AskFollowUp{{Question: "which?", Answer: "both"}}}, "/snap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := userMarkers.FindStringSubmatch(p)
+	inside, ok := between(p, "<<<USER REQUEST "+m[1]+">>>\n", "<<<END OF USER REQUEST "+m[1]+">>>")
+	if !ok || !strings.Contains(inside, "Q=which? A=both\n") || strings.Contains(p, "You asked") {
+		t.Fatalf("the follow-up is not worded by the profile between the markers:\n%s", p)
+	}
+}
+
+func TestAWrapperWithoutFollowIsRefused(t *testing.T) {
+	if _, err := omnibox.ParseWrapper(`{{define "before"}}x{{end}}{{define "after"}}y{{end}}`); err == nil {
+		t.Fatal("a wrapper without follow parsed")
+	}
+}
+
+// stalled blocks until its call's context ends.
+type stalled struct{ agent }
+
+func (s *stalled) Ask(ctx context.Context, q turns.Ask) (turns.Answer, error) {
+	s.asks = append(s.asks, q)
+	<-ctx.Done()
+	return turns.Answer{}, ctx.Err()
+}
+
+func TestAStalledAgentTimesOut(t *testing.T) {
+	for name, limit := range map[string]time.Duration{"set": 30 * time.Second, "default": 0} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				r := newRig(t, "")
+				s := &stalled{}
+				r.a.Agent, r.a.Timeout = s, limit
+				start := time.Now()
+				_, err := r.a.Ask(context.Background(), omnibox.AskRequest{Text: "x"}, snapshot())
+				took := time.Since(start)
+				want := limit
+				if want == 0 {
+					want = omnibox.DefaultTimeout
+				}
+				if !errors.Is(err, context.DeadlineExceeded) || took != want {
+					t.Fatalf("err %v after %v, want the deadline after %v", err, took, want)
+				}
+				if !slices.Equal(r.recorded, []float64{0.25}) || r.a.Budget.Reserved() != 0 {
+					t.Fatalf("recorded %v reserved %v", r.recorded, r.a.Budget.Reserved())
+				}
+				if es, _ := os.ReadDir(r.dir); len(es) != 0 {
+					t.Fatalf("%d snapshot directories left", len(es))
+				}
+			})
+		})
+	}
+}
+
+type panicking struct{}
+
+func (*panicking) Ask(context.Context, turns.Ask) (turns.Answer, error) { panic("the agent adapter broke") }
+
+func TestAPanickingAgentReleasesItsReservation(t *testing.T) {
+	r := newRig(t, "")
+	r.a.Agent = &panicking{}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = r.a.Ask(context.Background(), omnibox.AskRequest{Text: "x"}, snapshot())
+	}()
+	if r.a.Budget.Reserved() != 0 || !slices.Equal(r.recorded, []float64{0.25}) {
+		t.Fatalf("reserved %v recorded %v after a panic", r.a.Budget.Reserved(), r.recorded)
+	}
+}
+
+func TestSweepRemovesLeftoverSnapshots(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"ask-1", "ask-2", "other"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := omnibox.SweepSnapshots(dir); err != nil {
+		t.Fatal(err)
+	}
+	es, _ := os.ReadDir(dir)
+	if len(es) != 1 || es[0].Name() != "other" {
+		t.Fatalf("left %v", es)
+	}
+	if err := omnibox.SweepSnapshots(filepath.Join(dir, "missing")); err != nil {
+		t.Fatalf("a missing directory: %v", err)
 	}
 }
 

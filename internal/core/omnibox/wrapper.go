@@ -17,7 +17,8 @@ import (
 const WrapperFile = "prompts/omnibox.md.tmpl"
 
 // Wrapper is the omnibox call's prompt around the user's request, a template defining "before", the text
-// ahead of the request's markers, and "after", the text between the end marker and the answer schema. The
+// ahead of the request's markers, "follow", one question already answered (an AskFollowUp), written after the
+// request inside the markers, and "after", the text between the end marker and the answer schema. The
 // markers, the request between them and the schema are written in Go.
 type Wrapper struct{ t *template.Template }
 
@@ -41,7 +42,7 @@ func ParseWrapper(src string) (Wrapper, error) {
 	if err != nil {
 		return Wrapper{}, err
 	}
-	for _, name := range []string{"before", "after"} {
+	for _, name := range []string{"before", "follow", "after"} {
 		if t.Lookup(name) == nil {
 			return Wrapper{}, fmt.Errorf("%s defines no %q template", WrapperFile, name)
 		}
@@ -64,7 +65,11 @@ func (w Wrapper) Prompt(in AskRequest, dir string) (string, error) {
 	}
 	b.WriteString(begin + "\n" + strings.TrimSpace(in.Text) + "\n")
 	for _, f := range in.Follow {
-		b.WriteString("\nYou asked: " + strings.TrimSpace(f.Question) + "\nThe user answered: " + strings.TrimSpace(f.Answer) + "\n")
+		b.WriteString("\n")
+		f := AskFollowUp{Question: strings.TrimSpace(f.Question), Answer: strings.TrimSpace(f.Answer)}
+		if err := w.t.ExecuteTemplate(&b, "follow", f); err != nil {
+			return "", err
+		}
 	}
 	b.WriteString(end + "\n\n")
 	if err := w.t.ExecuteTemplate(&b, "after", d); err != nil {
