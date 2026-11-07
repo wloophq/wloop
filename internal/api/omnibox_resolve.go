@@ -8,3 +8,8 @@ const (
 	OmniboxWhyAmbiguous    = "ambiguous_ref"
 	OmniboxWhyNothingNamed = "nothing_named"
 )
+
+// OmniboxRunFailed is the Error of an OmniboxResult whose handler refused or failed, worded with
+// Params["error"], the handler's own message; outside the vocabulary and incomplete operations take the drop
+// codes.
+const OmniboxRunFailed = "run_failed"

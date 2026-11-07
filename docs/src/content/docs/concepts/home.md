@@ -63,6 +63,8 @@ anything else                                     -> search
 
 `omnibox.toml`'s `[verbs.<id>]` list each verb's `words`, in every language in one list (vocabulary, not a translated text), and its target: a catalog `action` on each unit named, a task `verb` on each task named, and an `op` (`capture` or `start`) for text that names nothing. A verb whose task verb resolves a gate (approve, answer, edit, retry, dismiss) does not load: a gate is resolved on the gate itself. No operation runs, typed or proposed by the omnibox's agent, that no verb targets.
 
+`POST /api/omnibox/run` runs the operations you confirmed, in order, each as one request to the handler a click reaches (`POST /api/units/<provider>/<key>/<action>`, `POST /api/tasks/<id>/<verb>`, `POST /api/tasks`), with your request's headers, so each is refused or gated exactly as that click; each result keeps the handler's status, refusal and output. An operation no verb targets is refused alone, and the others run. `start` captures a task briefed with the text, titled as the `start` intent titles a capture, then starts it in the repository named; the start is not tried when the capture fails.
+
 ## Changing it
 
 A user profile's `home.toml` replaces the keys it sets, and a list of counters or sections the whole list; `decisions.toml` and a plugin's `plugins/<id>/decisions.toml` replace the mappings they name. The words are localized like every profile text: `locales/<tag>/home.toml` and `locales/<tag>/decisions.toml` translate them, a plural text form by form.

@@ -564,6 +564,7 @@
 "no_unit_or_task" = "Nenhum item ou tarefa é {ref}"
 "ambiguous_ref" = "{ref} nomeia mais de um item ou tarefa"
 "nothing_named" = "Diga em que executar {verb}"
+"run_failed" = "Não rodou: {error}"
 
 [formats]
 time = "15:04"

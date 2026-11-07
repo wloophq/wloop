@@ -571,6 +571,7 @@
 "no_unit_or_task" = "No unit or task is {ref}"
 "ambiguous_ref" = "{ref} names more than one unit or task"
 "nothing_named" = "Name what to run {verb} on"
+"run_failed" = "It did not run: {error}"
 
 [formats]
 time = "3:04 PM"
