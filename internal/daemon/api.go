@@ -239,8 +239,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
+	plugins, sources := s.pluginsHealth(r.Context())
 	if s.deps.PluginHealth != nil {
-		h.Plugins = s.deps.PluginHealth(r.Context())
+		h.Plugins = plugins
 	}
 	if s.deps.Budget != nil {
 		h.RateLimit = s.graphQLBudget()
@@ -300,7 +301,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if w := profileWarning(l, append(s.heldProblems(l), s.facetProblems(l)...)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
-	for _, src := range s.sourceHealth(r.Context()) {
+	for _, src := range sources {
 		h.Warnings = append(h.Warnings, sourceWarnings(src)...)
 	}
 	writeJSON(w, h)

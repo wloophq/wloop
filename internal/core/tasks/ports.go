@@ -126,6 +126,31 @@ type Wakes interface {
 	Of(ctx context.Context, id task.ID) (wake.Wake, bool, error)
 }
 
+// AllWakes is an optional capability of Wakes: every task's wake, which a pass reads once for all.
+type AllWakes interface {
+	All(ctx context.Context) ([]wake.Wake, error)
+}
+
+// WakeIn is task id's wake in ws; in a pass, with every task's read once when ws reads them all.
+func WakeIn(ctx context.Context, ws interface {
+	Of(ctx context.Context, id task.ID) (wake.Wake, bool, error)
+}, id task.ID) (wake.Wake, bool, error) {
+	var all func() (map[task.ID]wake.Wake, error)
+	if a, ok := ws.(AllWakes); ok {
+		all = func() (map[task.ID]wake.Wake, error) {
+			got, err := a.All(ctx)
+			out := make(map[task.ID]wake.Wake, len(got))
+			for _, w := range got {
+				out[w.Task] = w
+			}
+			return out, err
+		}
+	}
+	return Lookup(ctx, wakesKey, id, all, func() (wake.Wake, bool, error) { return ws.Of(ctx, id) })
+}
+
+const wakesKey = "wakes"
+
 // Items is the items ledger's reader.
 type Items interface {
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)

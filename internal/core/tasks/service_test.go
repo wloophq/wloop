@@ -80,7 +80,7 @@ func owed(u unit.Unit, id string) items.Item {
 	return items.Item{ID: id, Unit: u, Summary: "do " + id, State: "open", Requester: ana, WaitingOn: []items.Person{meP}, CreatedAt: t0}
 }
 
-func (r *rig) put(t *testing.T, e task.Task) task.Task {
+func (r *rig) put(t testing.TB, e task.Task) task.Task {
 	t.Helper()
 	if e.Created.IsZero() {
 		e.Created, e.Updated = t0, t0

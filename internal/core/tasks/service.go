@@ -60,6 +60,9 @@ type Deps struct {
 	GateText GateText
 	// TakenApart holds the pairs the user took apart; nil holds none.
 	TakenApart TakenApart
+	// Gen is the store's change generation; with it, the reads that start while it holds share one pass for
+	// up to passReuse. nil: every read has a pass of its own.
+	Gen func() port.Generation
 }
 
 type handlerKey struct {
@@ -93,6 +96,7 @@ type Service struct {
 	runs ProjectStore
 	// review serializes the review's read-modify-write of its run.
 	review sync.Mutex
+	shared sharedPass
 }
 
 func New(d Deps) *Service {
@@ -308,7 +312,7 @@ func (s *Service) WakeOf(ctx context.Context, id task.ID) (wake.Wake, bool, erro
 	if s.d.Wakes == nil {
 		return wake.Wake{}, false, nil
 	}
-	return s.d.Wakes.Of(ctx, id)
+	return WakeIn(ctx, s.d.Wakes, id)
 }
 
 func (s *Service) applyWake(ctx context.Context, id task.ID, wc wakeChange) error {

@@ -325,10 +325,11 @@ done({ On: on, Plain: checked(draft(input.plain)), Sent: box(draft(input.sent)).
 func TestADraftCardNamesItsMentions(t *testing.T) {
 	var got []map[string]string
 	d := pendingDraft()
-	d.Text = "@{slack:UANA} and @{slack:UBRUNO}, any news? cc @{slack:UCAIO}"
-	d.Names = map[string]string{"slack:UANA": "Ana", "slack:UBRUNO": "Bruno"}
+	d.Text = "@{slack:UANA} and @{slack:UBRUNO}, any news? cc @{slack:UCAIO} @{group:channel participants}"
+	d.Names = map[string]string{"slack:UANA": "Ana", "slack:UBRUNO": "Bruno", "group:channel participants": "channel participants"}
 	runGate(t, `done(cls(draft(input.draft), "mention").map((m) => ({ text: m.textContent, title: attr(m, "title") })));`, map[string]any{"draft": d}, &got)
-	want := []map[string]string{{"text": "@Ana", "title": "slack:UANA"}, {"text": "@Bruno", "title": "slack:UBRUNO"}, {"text": "@slack:UCAIO", "title": "slack:UCAIO"}}
+	want := []map[string]string{{"text": "@Ana", "title": "slack:UANA"}, {"text": "@Bruno", "title": "slack:UBRUNO"}, {"text": "@slack:UCAIO", "title": "slack:UCAIO"},
+		{"text": "@channel participants", "title": "group:channel participants"}}
 	if mustJS(t, got) != mustJS(t, want) {
 		t.Errorf("mentions %v, want %v", got, want)
 	}

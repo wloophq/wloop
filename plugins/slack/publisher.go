@@ -388,7 +388,7 @@ func (p *Publisher) resolve(ctx context.Context, r send.Request, pl *plan) error
 }
 
 var (
-	mentionRE = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+	mentionRE = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 	// typedTokenRE are the mention, channel and special tokens a draft's text spells out itself; only
 	// user mentions, typed or written @{slack:U...}, reach Slack as tokens.
 	typedTokenRE     = regexp.MustCompile(`<[@#!][^<>]*>`)

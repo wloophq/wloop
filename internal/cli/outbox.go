@@ -180,7 +180,7 @@ func outboxShow(ctx context.Context, e *Env, c *client.Client, args []string) er
 	return nil
 }
 
-var mentionPattern = regexp.MustCompile(`@\{[^}\s]+\}|(?:^|[^\w@{])@[A-Za-z0-9][\w./-]*`)
+var mentionPattern = regexp.MustCompile(`@\{(?:group:[^{}\n]+|[^{}\s]+)\}|(?:^|[^\w@{])@[A-Za-z0-9][\w./-]*`)
 
 // mentionsOf are the people text names: structured mentions and raw @handles.
 func mentionsOf(text string) []string {

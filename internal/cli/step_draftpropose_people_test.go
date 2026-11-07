@@ -222,4 +222,14 @@ func TestDraftPeopleReadsTheKeyOrTheMentions(t *testing.T) {
 	if got := draftPeople(perUnit, draftThread); !slices.Equal(got, []string{ana.Key, bruno.Key}) {
 		t.Errorf("per unit: %v", got)
 	}
+	group := draft.Draft{Unit: draftThread, Origin: draft.Origin{Key: draftThread.String()},
+		Original: "@{group:channel participants} @{" + ana.Key + "}, any news?"}
+	if got := draftPeople(group, draftThread); !slices.Equal(got, []string{"group:channel participants", ana.Key}) {
+		t.Errorf("a group whose name has a space: %v", got)
+	}
+	prose := draft.Draft{Unit: draftThread, Origin: draft.Origin{Key: draftThread.String()},
+		Original: "@{" + ana.Key + "}, the steps are @{see below}"}
+	if got := draftPeople(prose, draftThread); !slices.Equal(got, []string{ana.Key}) {
+		t.Errorf("prose in braces read as a person: %v", got)
+	}
 }

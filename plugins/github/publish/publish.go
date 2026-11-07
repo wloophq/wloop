@@ -112,7 +112,7 @@ func (p *Publisher) prepare(ctx context.Context, d src.Draft) (pr.Ref, string, e
 	return ref, body, nil
 }
 
-var mentionRE = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+var mentionRE = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 
 // body is d's text as GitHub takes it: a github mention as @login, any
 // other person by name.
