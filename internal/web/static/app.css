@@ -300,6 +300,9 @@ body.resizing { user-select: none; cursor: col-resize; }
 .row .l1 > .facet, .row .ch, .row .draft-mark, .row .star { flex: none; }
 .row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 .row > .meta { grid-area: r1; display: flex; align-items: center; justify-content: safe flex-end; gap: var(--space-6); min-width: 0; overflow: hidden; white-space: nowrap; }
+.row > .meta > * { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row > .meta > .facet > * { display: block; overflow: hidden; text-overflow: ellipsis; }
+.row > .meta > .act { flex: none; }
 .row .l2 { grid-area: l2; display: flex; align-items: baseline; gap: var(--space-8); min-width: 0; color: var(--muted); font-size: var(--text-meta); }
 .row .l2 .ref { flex: 0 1 auto; max-width: 60%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
 .row .why { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
