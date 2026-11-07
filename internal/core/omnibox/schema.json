@@ -1,0 +1,53 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "description": "Exactly one of answer or proposal.",
+  "properties": {
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "tasks"],
+      "description": "A question's answer: a short text and the ids of the tasks it lists, in order.",
+      "properties": {
+        "text": {"type": "string", "maxLength": 2000},
+        "tasks": {"type": "array", "maxItems": 100, "items": {"type": "string"}}
+      }
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "operations"],
+      "description": "Operations the user may confirm, each with its reason, and the one question to ask first if something is ambiguous.",
+      "properties": {
+        "summary": {"type": "string", "maxLength": 1000},
+        "question": {"type": "string", "maxLength": 500},
+        "operations": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["op", "reason"],
+            "properties": {
+              "op": {"enum": ["action", "verb", "capture", "start"], "description": "action: run action on unit; verb: apply verb to task; capture: a new task titled title; start: a new task from brief, started in repo"},
+              "unit": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["provider", "key"],
+                "properties": {"provider": {"type": "string"}, "key": {"type": "string"}}
+              },
+              "task": {"type": "string"},
+              "action": {"type": "string"},
+              "verb": {"type": "string"},
+              "title": {"type": "string", "maxLength": 200},
+              "brief": {"type": "string", "maxLength": 4000},
+              "repo": {"type": "string"},
+              "guidance": {"type": "string", "maxLength": 2000},
+              "reason": {"type": "string", "maxLength": 500}
+            }
+          }
+        }
+      }
+    }
+  }
+}
