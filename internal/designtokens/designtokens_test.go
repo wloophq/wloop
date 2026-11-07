@@ -65,6 +65,68 @@ func TestCSSRendersThemesAndScales(t *testing.T) {
 	}
 }
 
+const withFont = `"fonts": [{"family": "Geist", "src": "/static/fonts/Geist-Variable.woff2", "weight": "100 900"}],
+  "families"`
+
+func TestCSSDeclaresEachFontFace(t *testing.T) {
+	tok, err := Parse([]byte(strings.Replace(sample, `"families"`, withFont, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := tok.CSS()
+	for _, want := range []string{
+		"@font-face {",
+		`font-family: "Geist";`,
+		`src: url("/static/fonts/Geist-Variable.woff2") format("woff2");`,
+		"font-weight: 100 900;",
+		"font-style: normal;",
+		"font-display: swap;",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("CSS lacks %q:\n%s", want, css)
+		}
+	}
+	if strings.Index(css, "@font-face") < strings.Index(css, Begin) {
+		t.Error("the font face is outside the generated region")
+	}
+}
+
+func TestParseRefusesAFontOutsideStatic(t *testing.T) {
+	for _, src := range []string{"https://fonts.example/x.woff2", "/static/fonts/../app.js", "/static/fonts/x.ttf", `/static/fonts/x\".woff2`, "/static/fonts/x y.woff2"} {
+		bad := strings.Replace(strings.Replace(sample, `"families"`, withFont, 1), "/static/fonts/Geist-Variable.woff2", src, 1)
+		if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "Geist") {
+			t.Errorf("%s: err = %v, want one naming the font", src, err)
+		}
+	}
+}
+
+const withMotion = `"motion": {"tokens": [{"name": "motion-fast", "value": "120ms"}, {"name": "motion-ease", "value": "cubic-bezier(0.2, 0, 0, 1)"}]},
+ "meta": {`
+
+func TestCSSRendersMotionAndReducedMotion(t *testing.T) {
+	tok, err := Parse([]byte(strings.Replace(sample, `"meta": {`, withMotion, 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := tok.CSS()
+	for _, want := range []string{
+		"  --motion-fast: 120ms;\n",
+		"  --motion-ease: cubic-bezier(0.2, 0, 0, 1);\n",
+		"@media (prefers-reduced-motion: reduce) {\n  :root {\n    --motion-fast: 0ms;\n  }\n}\n",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("CSS lacks %q:\n%s", want, css)
+		}
+	}
+}
+
+func TestParseRefusesAMotionDurationThatIsNotMilliseconds(t *testing.T) {
+	bad := strings.Replace(strings.Replace(sample, `"meta": {`, withMotion, 1), `"120ms"`, `"0.12s"`, 1)
+	if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "motion-fast") {
+		t.Errorf("err = %v, want one naming motion-fast", err)
+	}
+}
+
 func TestParseRefusesAStyleSizeThatIsNotPixels(t *testing.T) {
 	bad := strings.Replace(sample, `"fontSize": "20px"`, `"fontSize": "1.5rem"`, 1)
 	if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "kpi") {

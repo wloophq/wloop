@@ -19,7 +19,7 @@ On macOS, while `{{app}}.app` runs, `open` and a notification's click show the c
 
 The global shortcut `window.hotkey` (`ctrl+option+space`; `""` for none) opens a floating panel over whatever app you are in, without leaving it until you type, on the route `#panel=omnibox`. A link to any other route in the panel opens that route in the main window and brings it forward. Escape hides the panel, and so does clicking elsewhere. A shortcut that does not parse, or that the system refuses, is logged as `window.hotkey` with the chord; the window and the menu bar keep working. Another app holding the same chord through a system shortcut takes it without an error.
 
-The page listens on `127.0.0.1` only and asks for the token that `open` hands over. It opens on **Focus**, with the [lists](/concepts/tasks/#views) beside it. Needs me, Stalled, In loop, Approved and Done are lists of tasks across sources: a pull request shows there through its task. The GitHub views list what exists in GitHub:
+The page listens on `127.0.0.1` only and asks for the token that `open` hands over, and loads nothing from elsewhere: its scripts and its fonts (Geist for prose, Geist Mono for refs, counts and dates) ship in the binary. It follows the system's light or dark appearance, and moves only in answer to what you do, not at all when the system asks for reduced motion. It opens on **Focus**, with the [lists](/concepts/tasks/#views) beside it. Needs me, Stalled, In loop, Approved and Done are lists of tasks across sources: a pull request shows there through its task. The GitHub views list what exists in GitHub:
 
 | View | Shows |
 |---|---|

@@ -15,6 +15,7 @@ type embedAllowed struct{ path, reason string }
 // embedKept is prose that stays in Go for good.
 var embedKept = []embedAllowed{
 	{"skills", "the skills install writes into agent homes"},
+	{"internal/web/static/fonts/OFL.txt", "the SIL Open Font License must ship with the fonts the cockpit serves"},
 }
 
 // embedMoving is prose that moves to the profile; the list only shrinks.

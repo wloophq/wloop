@@ -77,9 +77,9 @@ func serve(w http.ResponseWriter, r *http.Request, name string, a asset) {
 	http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(a.body))
 }
 
-// csp allows only the cockpit's own scripts and no framing; styles stay
-// open for the inline styles the charts write.
-const csp = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+// csp allows only the cockpit's own scripts and fonts and no framing; styles
+// stay open for the inline styles the charts write.
+const csp = "script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 // Handler serves the cockpit page of version at "/" and its assets under "/static/". The page names its
 // Build and loads each asset under a URL of that build.

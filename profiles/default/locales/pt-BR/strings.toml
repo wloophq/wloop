@@ -36,6 +36,8 @@
 "Reply saved to the Outbox" = "Resposta salva no Outbox"
 "Reply sent" = "Resposta enviada"
 "Action not sent" = "Ação não enviada"
+# piece C
+"Read all" = "Ler tudo"
 
 [formats]
 time = "15:04"

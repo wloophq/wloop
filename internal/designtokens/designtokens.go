@@ -36,6 +36,7 @@ type Tokens struct {
 		} `json:"tokens"`
 	} `json:"color"`
 	Type struct {
+		Fonts    []Font            `json:"fonts"`
 		Families map[string]string `json:"families"`
 		Groups   []struct {
 			Styles []struct {
@@ -47,9 +48,24 @@ type Tokens struct {
 	Spacing family `json:"spacing"`
 	Radius  family `json:"radius"`
 	Layout  family `json:"layout"`
+	Motion  family `json:"motion"`
 
 	text []sizeStep
 }
+
+// Font is a self-hosted face: one @font-face, served by the cockpit itself.
+type Font struct {
+	Family string `json:"family"`
+	Src    string `json:"src"`
+	Weight string `json:"weight"`
+	Style  string `json:"style"`
+}
+
+// fontSrc keeps a face under the cockpit's own font directory, so the CSP's
+// font-src 'self' holds and the URL needs no escaping.
+var fontSrc = regexp.MustCompile(`^/static/fonts/[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*\.woff2$`)
+
+var millis = regexp.MustCompile(`^[0-9]+ms$`)
 
 // sizeStep is one step of the text scale: a distinct style size, named after
 // the first style that uses it.
@@ -59,11 +75,16 @@ type sizeStep struct {
 }
 
 type family struct {
-	Tokens []struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	} `json:"tokens"`
+	Tokens []token `json:"tokens"`
 }
+
+type token struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// duration tells a motion duration from an easing, which names end in -ease.
+func (m token) duration() bool { return !strings.HasSuffix(m.Name, "-ease") }
 
 // themeValue is a color per theme id; a plain string is the first theme's.
 type themeValue map[string]string
@@ -115,6 +136,19 @@ func Parse(raw []byte) (Tokens, error) {
 			}
 		}
 	}
+	for _, f := range t.Type.Fonts {
+		if !fontSrc.MatchString(f.Src) || strings.Contains(f.Src, "..") {
+			return t, fmt.Errorf("font %s: src %q is not a woff2 file under /static/fonts/", f.Family, f.Src)
+		}
+		if f.Family == "" || strings.ContainsAny(f.Family+f.Weight+f.Style, `"\;{}`) {
+			return t, fmt.Errorf("font %s: family, weight and style must be plain words", f.Family)
+		}
+	}
+	for _, m := range t.Motion.Tokens {
+		if m.duration() && !millis.MatchString(m.Value) {
+			return t, fmt.Errorf("motion %s: %q is not a duration in ms", m.Name, m.Value)
+		}
+	}
 	seen := map[float64]bool{}
 	for _, g := range t.Type.Groups {
 		for _, s := range g.Styles {
@@ -132,11 +166,17 @@ func Parse(raw []byte) (Tokens, error) {
 	return t, nil
 }
 
-// CSS renders the generated region, markers included: the light colors and
-// font families, the size scales, then the dark colors.
+// CSS renders the generated region, markers included: the font faces, the
+// light colors and font families, the size scales and motion, then the dark
+// colors.
 func (t Tokens) CSS() string {
 	var b strings.Builder
-	b.WriteString(Begin + "\n:root {\n")
+	b.WriteString(Begin + "\n")
+	for _, f := range t.Type.Fonts {
+		fmt.Fprintf(&b, "@font-face {\n  font-family: %q;\n  src: url(%q) format(\"woff2\");\n  font-weight: %s;\n  font-style: %s;\n  font-display: swap;\n}\n\n",
+			f.Family, f.Src, cmp.Or(f.Weight, "400"), cmp.Or(f.Style, "normal"))
+	}
+	b.WriteString(":root {\n")
 	for _, c := range t.Color.Tokens {
 		if v, ok := c.Value.in("light", true); ok {
 			fmt.Fprintf(&b, "  --%s: %s;\n", c.Name, v)
@@ -162,7 +202,7 @@ func (t Tokens) scale() string {
 	for _, s := range t.text {
 		fmt.Fprintf(&b, "  --%s: %spx;\n", s.name, strconv.FormatFloat(s.px, 'f', -1, 64))
 	}
-	for _, f := range []family{t.Radius, t.Spacing, t.Layout} {
+	for _, f := range []family{t.Radius, t.Spacing, t.Layout, t.Motion} {
 		for _, s := range f.Tokens {
 			// A custom property cannot be read by a media query.
 			if strings.HasPrefix(s.Name, "breakpoint-") {
@@ -172,6 +212,15 @@ func (t Tokens) scale() string {
 		}
 	}
 	b.WriteString("}\n")
+	var still strings.Builder
+	for _, m := range t.Motion.Tokens {
+		if m.duration() {
+			fmt.Fprintf(&still, "    --%s: 0ms;\n", m.Name)
+		}
+	}
+	if still.Len() > 0 {
+		b.WriteString("\n@media (prefers-reduced-motion: reduce) {\n  :root {\n" + still.String() + "  }\n}\n")
+	}
 	return b.String()
 }
 

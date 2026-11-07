@@ -27,8 +27,10 @@ The interface runs on four surfaces that share one vocabulary: the web cockpit (
 
 ### Color
 
-- **Surfaces.** `bg` is the page; `panel` raises the top bar, detail panel, cards, tiles and buttons. Hover with `hover`; select or press with `sel`. A row you own sits on `mine-bg`.
-- **Text.** `ink` for primary, `muted` for everything secondary. Both hold 4.5:1 on every surface in both themes (a test in `internal/web/contrast_test.go` enforces it).
+- **Neutral.** The grays are neutral, without a hue; the one accent is `me`, and the five waiter hues are the only other color.
+- **Surfaces.** `bg` is the page; `panel` raises the rail, toolbar, detail panel, tiles and buttons; `raise` sets inset cards on `panel` (the open gate, option cards, drafts, runs, the composer); `code-bg` grounds code in agent prose. Hover with `hover`; select or press with `sel`. A row you own sits on `mine-bg`.
+- **Text.** `ink` for primary, `muted` for secondary (reasons, labels), `faint` for tertiary (refs, counts, key hints, timestamps). All three hold 4.5:1 on every surface in both themes (a test in `internal/web/contrast_test.go` enforces it), so `faint` stays readable where it carries a date.
+- **Borders.** `rule` for hairlines between things, `rule-strong` for the borders of controls (buttons, chips, inputs, option cards, key hints).
 - **Waiters.** Strip and dot use the mark tokens (`me`, `author`, `reviewer`, `loop`, `none`); words use their `-text` twins. `none` is deliberately faint; the word carries it.
 - **Accent.** `me` doubles as the app accent: primary button fill (text `on-me`), focus ring, current-view bar, selected row tint (`me` at 14% over `panel`). Because of that, keep at most one primary button per region: on a gate card, its first intent; in the composer, Send.
 - **Signals.** `late` on `late-bg` for time and medium risk; `err` on `err-bg` for failures and high risk; `loop-text` for good. Never signal by hue alone: each carries a word (late age, "risk high", "blocked").
@@ -36,7 +38,7 @@ The interface runs on four surfaces that share one vocabulary: the web cockpit (
 
 ### Type
 
-System faces only: `sans` for interface and prose, `mono` for figures and identifiers. No webfonts ship. Use the scale as defined: `heading` 16, `list-heading` 15, `body` and `row-title` 13, `meta` and `code` and `age` 12, `overline` and `pill` 11, `flag` 10. `kpi` 20 and `age-lg` 18 are the only large figures.
+Geist for interface and prose (`sans`), Geist Mono for figures and identifiers (`mono`), with tabular figures on code, key hints, counts and dates. Both are variable woff2 files under the SIL Open Font License 1.1, self-hosted in `internal/web/static/fonts/` with their licence; `design/assets/fonts/SOURCE` records the release and checksums. The CSP allows fonts from the cockpit only (`font-src 'self'`), and the system stacks stay as fallback. Use the scale as defined: `heading` 16, `list-heading` 15, `body` and `row-title` 13, `meta` and `code` and `age` 12, `overline` and `pill` 11, `flag` 10. `kpi` 20 and `age-lg` 18 are the only large figures.
 
 ### Spacing and layout
 
@@ -47,7 +49,7 @@ System faces only: `sans` for interface and prose, `mono` for figures and identi
 ### Shape, borders, elevation
 
 - Hairlines in `rule`, 1px; dashed for soft separators inside a list (timeline, activity) and for disabled or stale controls.
-- Radii: `radius-md` for controls and cards, `radius-lg` for tiles and panels, `radius-pill` for chips, `radius-sm` for flags and the late age.
+- Radii: `radius-md` for controls and cards, `radius-lg` for inset cards, tiles and panels, `radius-pill` for chips, `radius-sm` for flags, key hints, code spans and the late age.
 - No shadows. Elevation is `panel` over `bg` plus a `rule` border.
 - The waits-on strip is the one colored edge: `strip-row` on rows and the situation block, `strip-card` on cards, tasks and the current rail view.
 
@@ -62,7 +64,7 @@ System faces only: `sans` for interface and prose, `mono` for figures and identi
 
 ### Motion
 
-None beyond the browser's. Live updates replace content in place; the sync line reports freshness.
+Only in answer to an action (a panel or the palette appearing, a resolved gate leaving, a pressed control), short: every transition reads `motion-fast` (120ms) with `motion-ease`. Under `prefers-reduced-motion: reduce` the generated tokens set `motion-fast` to 0ms, so nothing moves. Live updates never animate: they replace content in place, and the sync line reports freshness.
 
 ## Iconography
 

@@ -142,6 +142,7 @@ func TestPluginThemeFollowsCockpit(t *testing.T) {
 		t.Fatal(err)
 	}
 	lightCSS, darkCSS, _ := strings.Cut(string(b), "@media (prefers-color-scheme: dark)")
+	_, lightCSS, _ = strings.Cut(lightCSS, ":root {")
 	lightCSS, _, _ = strings.Cut(lightCSS, "\n}\n")
 	darkCSS, _, _ = strings.Cut(darkCSS, "\n}\n")
 	want := map[string]map[string]string{"light": {}, "dark": {}}
