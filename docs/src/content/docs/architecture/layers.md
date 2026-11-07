@@ -47,7 +47,7 @@ Dependencies point down and inward. An adapter imports the port it implements an
 Some packages sit beside the layers with rules of their own:
 
 - **The intent vocabulary**: `internal/intent` (the loader), `internal/intent/builtin` (the names Go provides), `internal/intent/expr` (the predicate compiler, the only importer of cel-go), `internal/frontmatter`, `internal/catalog` (the actions a row offers). Each imports a fixed set; the loader never reaches the core, the daemon or an adapter, and only the catalog builds action specs or evaluates an intent's predicates.
-- **Shared leaves**: `internal/brand` (every user-visible name), `internal/meter` (the cost of each boundary call, standard library only), `internal/procgroup` (the process group of each agent call the daemon runs, stopped on cancel and on the daemon's stop), `internal/termfmt`, `internal/keys`, `internal/config`.
+- **Shared leaves**: `internal/brand` (every user-visible name), `internal/meter` (the cost of each boundary call, standard library only), `internal/procgroup` (the process group of each agent call the daemon runs, stopped on cancel and on the daemon's stop), `internal/termfmt`, `internal/keys`, `internal/config`, `internal/i18n` (locale matching, plural forms and `{name}` interpolation, the standard library and `golang.org/x/text` only).
 - **Outside the core for now**: `internal/brief` runs its agent only through `turns.Asker` and reads the store only through the inventory; `internal/profile` composes the review profile's blocks; `internal/turn` renders a turn's instructions.
 
 ## Ports

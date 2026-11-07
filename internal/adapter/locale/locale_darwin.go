@@ -29,14 +29,28 @@ func loadCF() bool {
 		if err != nil {
 			return
 		}
-		purego.RegisterLibFunc(&cf.copyPreferredLanguages, lib, "CFLocaleCopyPreferredLanguages")
-		purego.RegisterLibFunc(&cf.arrayGetCount, lib, "CFArrayGetCount")
-		purego.RegisterLibFunc(&cf.arrayGetValueAtIndex, lib, "CFArrayGetValueAtIndex")
-		purego.RegisterLibFunc(&cf.stringGetCString, lib, "CFStringGetCString")
-		purego.RegisterLibFunc(&cf.release, lib, "CFRelease")
-		cf.ok = true
+		cf.ok = bind(lib, map[string]any{
+			"CFLocaleCopyPreferredLanguages": &cf.copyPreferredLanguages, "CFArrayGetCount": &cf.arrayGetCount,
+			"CFArrayGetValueAtIndex": &cf.arrayGetValueAtIndex, "CFStringGetCString": &cf.stringGetCString, "CFRelease": &cf.release,
+		}, purego.Dlsym)
 	})
 	return cf.ok
+}
+
+// bind points each function of fns at its symbol in lib; false, binding none, when lookup misses one.
+func bind(lib uintptr, fns map[string]any, lookup func(lib uintptr, name string) (uintptr, error)) bool {
+	syms := map[string]uintptr{}
+	for name := range fns {
+		sym, err := lookup(lib, name)
+		if err != nil || sym == 0 {
+			return false
+		}
+		syms[name] = sym
+	}
+	for name, fn := range fns {
+		purego.RegisterFunc(fn, syms[name])
+	}
+	return true
 }
 
 // Preferred are the system's preferred languages, most preferred first: macOS's list, else the environment's.

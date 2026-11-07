@@ -180,3 +180,7 @@ func TestUILocaleAppliesWithoutARestart(t *testing.T) {
 		t.Fatalf("warning %q", w)
 	}
 }
+
+func TestConfigWarningIsACodeNotEnglish(t *testing.T) {
+	t.Skip("D10 the config warning is served as a code plus the live key names, its words in strings.toml")
+}
