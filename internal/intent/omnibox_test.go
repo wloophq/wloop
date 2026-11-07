@@ -41,7 +41,7 @@ func TestVerbTargetIsExactlyOne(t *testing.T) {
 	for body, field := range map[string]string{
 		"[verbs.x]\nwords = [\"x\"]\naction = \"review\"\nverb = \"done\"\n": "verbs.x",
 		"[verbs.x]\nwords = [\"x\"]\n":                                       "verbs.x",
-		"[verbs.x]\nwords = [\"x\"]\naction = \"reveiw\"\n":                  "verbs.x.action",
+		"[verbs.x]\nwords = [\"x\"]\naction = \"revieww\"\n":                 "verbs.x.action",
 		"[verbs.x]\nwords = [\"x\"]\nverb = \"dnoe\"\n":                      "verbs.x.verb",
 		"[verbs.x]\nwords = [\"two words\"]\nop = \"capture\"\n":             "verbs.x.words",
 	} {
@@ -53,7 +53,7 @@ func TestVerbTargetIsExactlyOne(t *testing.T) {
 			t.Errorf("%q: the verb loaded", body)
 		}
 	}
-	_, problems := loadProfile(t, "en", map[string]string{"omnibox.toml": "[verbs.x]\nwords = [\"x\"]\naction = \"reveiw\"\n"})
+	_, problems := loadProfile(t, "en", map[string]string{"omnibox.toml": "[verbs.x]\nwords = [\"x\"]\naction = \"revieww\"\n"})
 	if _, ok := problemAt(problems, "verbs.x.action", "review"); !ok {
 		t.Errorf("no did-you-mean: %v", problems)
 	}
