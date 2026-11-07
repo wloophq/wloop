@@ -8,8 +8,10 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func queuePath(kind string) string { return strings.Replace(api.QueuePath, "{kind}", kind, 1) }
@@ -90,5 +92,37 @@ func TestEveryHomeCounterCountsWhatItsQueueLists(t *testing.T) {
 		if c.Kind == "answer" && c.Count != 3 {
 			t.Errorf("answer: %d, want the 3 open questions", c.Count)
 		}
+	}
+}
+
+func TestAClosedTasksUnitsWaitOnNoDecision(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	thread := unit.Unit{Provider: "fake", Key: "dm-1"}
+	r.withLiveRows(map[unit.Unit]liveRow{thread: {signals: map[string]bool{"waits_on_viewer": true}}})
+	m := decision.Map{Signals: map[unit.ProviderID]map[string]decision.Kind{"fake": {"waits_on_viewer": decision.Answer}}}
+	for _, e := range []task.Task{
+		{ID: "t-00000000000000d1", State: "done", Category: task.CategoryDone, Units: []unit.Unit{thread}},
+		{ID: "t-00000000000000d2", State: "trash", Category: task.CategoryDropped, Units: []unit.Unit{thread}},
+	} {
+		found, err := (&taskDecisions{s: r.s, m: m}).Of(context.Background(), e)
+		if err != nil || len(found) != 0 {
+			t.Errorf("a %s task waits on %+v (%v)", e.State, found, err)
+		}
+	}
+	open := task.Task{ID: "t-00000000000000d3", State: "next", Category: task.CategoryReady, Units: []unit.Unit{thread}}
+	if found, err := (&taskDecisions{s: r.s, m: m}).Of(context.Background(), open); err != nil || len(found) != 1 {
+		t.Fatalf("an open task waits on %+v (%v), want its thread's answer", found, err)
+	}
+}
+
+func TestAnOpenQuestionOnADoneTaskStaysInItsQueue(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-00000000000000d1", State: "done", Category: task.CategoryDone, Title: "asked after it ended"})
+	r.withGates(t, "t-00000000000000d1")
+	var q api.Queue
+	if code := get(t, r.s, queuePath("answer"), &q); code != 200 || q.Total != 1 {
+		t.Fatalf("%d %+v", code, q)
 	}
 }

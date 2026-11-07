@@ -123,8 +123,8 @@ func (w homeWords) Plugin(p unit.ProviderID) home.PluginWords {
 
 func (w homeWords) Form(n int) string { return i18n.Form(w.l.Locale, float64(n)) }
 
-// taskDecisions are the decisions a task waits on: its open gates, read once for every task, and its units'
-// situations and signals as the read model holds them.
+// taskDecisions are the decisions a task waits on: its open gates, read once for every task, and, while it is
+// open, its units' situations and signals as the read model holds them.
 type taskDecisions struct {
 	s     *Server
 	m     decision.Map
@@ -146,7 +146,11 @@ func (d *taskDecisions) Of(ctx context.Context, e task.Task) ([]decision.Found, 
 		}
 	}
 	var sources []decision.Source
-	for _, u := range e.LinkedUnits() {
+	var units []unit.Unit
+	if e.Open() {
+		units = e.LinkedUnits()
+	}
+	for _, u := range units {
 		signals, situation, moved, ok, err := d.s.LinkState(ctx, u)
 		if err != nil {
 			return nil, err
