@@ -27,6 +27,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 | [One engine plans automatic work, and planning writes nothing](/architecture/decisions/one-engine-plans-automatic-work-and-planning-writes-nothing/) | Workflows are the only planner of automatic work, and evaluating a plan writes nothing. |
 | [One grammar for the profile language](/architecture/decisions/one-grammar-for-the-profile-language/) | Every reserved key of the profile and the configuration is a row of builtin.Grammar. |
 | [Only the gates service resolves a gate](/architecture/decisions/only-the-gates-service-resolves-a-gate/) | Every decision waiting on you is a gate, closed only by you, a trusted policy rule or a passed window. |
+| [Only the window adapter imports Wails](/architecture/decisions/only-the-window-adapter-imports-wails/) | The native window is one adapter behind the window client's port, and only it imports Wails. |
 | [Ports and adapters, dependencies inward](/architecture/decisions/ports-and-adapters-dependencies-inward/) | The domain and the core import inward only; adapters implement the core's ports. |
 | [Small ports owned by their consumer](/architecture/decisions/small-ports-owned-by-their-consumer/) | A port belongs to the core package that uses it and has at most five methods. |
 | [Sources are plugins](/architecture/decisions/sources-are-compiled-in-plugins/) | A source is a plugin, a process of its own that imports only the SDK; the host names it in one file, and neither side imports the other. |

@@ -32,6 +32,15 @@ func Run(imageDir string, setup func(tray menubar.Tray, notes menubar.Notifier))
 	nsApp.Send(sel("run"))
 }
 
+// Attach starts the tray and notifier inside a run loop another host owns,
+// as Run's setup does, without taking the run loop or the app's delegate;
+// the caller is on the main thread.
+func Attach(imageDir string, setup func(tray menubar.Tray, notes menubar.Notifier)) {
+	loadFrameworks()
+	setupPump()
+	setup(newTray(), newNotifier(imageDir))
+}
+
 // Quit ends the process through AppKit; before Run it does nothing.
 func Quit() {
 	if pump == 0 {
