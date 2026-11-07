@@ -1,7 +1,15 @@
 "use strict";
 
-// FILTER_KEY is the key of the core binding filter:add, which opens the "+ Filter" palette.
-const FILTER_KEY = "+";
+// boundKey is the key the served bindings give action, "" until they load or when nothing binds it, so a hint
+// never names a key the dispatcher does not run.
+function boundKey(action) {
+  return typeof cockpitKeys === "object" && cockpitKeys ? cockpitKeys.keyOf(action) : "";
+}
+
+// ariaKey names key as aria-keyshortcuts spells it.
+function ariaKey(key) {
+  return key === "+" ? "Plus" : key;
+}
 
 function sortLabel(sort, fields = catalog.fields) {
   const { field, desc } = parseSort(sort, fields);
@@ -184,6 +192,7 @@ function lensToolbar(lens, res) {
   if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
   const board = lens.layout === "board";
   const w = lensWords();
+  const filterKey = boundKey("filter:add");
   const own = lens.defaultGroup || (board ? lens.boardGroup : "");
   const ownField = own ? groupField(own, fields) : null;
   const { field, desc } = parseSort(lens.sort, fields);
@@ -207,9 +216,9 @@ function lensToolbar(lens, res) {
       }, desc ? "↓" : "↑")),
     ...lensChips(lens),
     h("button", {
-      type: "button", class: "pill add", "data-focus": "lens:add-filter", "aria-keyshortcuts": "Plus",
+      type: "button", class: "pill add", "data-focus": "lens:add-filter", "aria-keyshortcuts": filterKey ? ariaKey(filterKey) : undefined,
       onclick: () => openFilterPalette(),
-    }, t("Filter"), " ", h("kbd", {}, FILTER_KEY)),
+    }, t("Filter"), filterKey ? [" ", h("kbd", {}, filterKey)] : null),
     stripLegend(lens, offered),
     h("span", { class: "lens-count" }, res ? t("{shown} of {total}", { shown: fmtNumber(res.shown), total: fmtNumber(res.total) }) : ""),
     lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear")) : null,

@@ -409,8 +409,6 @@ function stepTab(e, delta, focus) {
 }
 
 const TAB_KEYS = { ArrowRight: 1, ArrowLeft: -1 };
-// TAB_STEP_KEYS are the keys of the core bindings tab:prev and tab:next.
-const TAB_STEP_KEYS = ["[", "]"];
 
 // taskTabs are e's tabs with something in them, the one selected and the tab strip and panel; the strip is a
 // tablist the arrow keys move along.
@@ -418,8 +416,10 @@ function taskTabs(e) {
   const shown = shownTabs(e);
   const selected = selectedTab(e);
   const tab = shown.find((x) => x.id === selected);
+  const steps = [boundKey("tab:prev"), boundKey("tab:next")];
+  const hint = shown.length > 1 && steps.every(Boolean);
   const strip = h("div", {
-    class: "tabs", role: "tablist", "aria-label": t("Sections"), "aria-keyshortcuts": shown.length > 1 ? TAB_STEP_KEYS.join(" ") : undefined,
+    class: "tabs", role: "tablist", "aria-label": t("Sections"), "aria-keyshortcuts": hint ? steps.map(ariaKey).join(" ") : undefined,
     onkeydown: (ev) => {
       if (!TAB_KEYS[ev.key]) return;
       if (ev.preventDefault) ev.preventDefault();
@@ -432,7 +432,7 @@ function taskTabs(e) {
       type: "button", role: "tab", class: "tab" + (on ? " on" : ""), id: "task-tab-" + x.id, "aria-selected": String(on), "aria-controls": "task-tabpanel",
       tabindex: on ? 0 : -1, "data-focus": "task:tab:" + x.id, onclick: () => pickTab(x.id),
     }, x.label(), n ? [" ", h("span", { class: "n" }, fmtNumber(n))] : null);
-  }), shown.length > 1 ? h("span", { class: "keyhint", "aria-hidden": "true" }, h("kbd", {}, TAB_STEP_KEYS[0]), " ", h("kbd", {}, TAB_STEP_KEYS[1])) : null);
+  }), hint ? h("span", { class: "keyhint", "aria-hidden": "true" }, h("kbd", {}, steps[0]), " ", h("kbd", {}, steps[1])) : null);
   const body = h("div", { class: "d-tabs" }, strip,
     h("div", { class: "tabpanel", role: "tabpanel", id: "task-tabpanel", "aria-labelledby": "task-tab-" + selected }, tab.body(e)));
   return { tabs: shown.map((x) => ({ id: x.id, label: x.label(), count: x.count(e) })), selected, body };

@@ -197,13 +197,26 @@ func TestMotionStopsUnderReducedMotion(t *testing.T) {
 }
 
 func TestTheTabsShowTheKeysThatStepThem(t *testing.T) {
-	var got struct{ Hint, Shortcuts string }
+	var bindings []api.KeyView
+	for _, b := range webBindings(t) {
+		if b.Action == "tab:next" {
+			b.Key = "}"
+		}
+		bindings = append(bindings, b)
+	}
+	var got struct{ Hint, Shortcuts, Unloaded string }
 	runTaskPage(t, `
-const strip = cls(taskTabs(input.answers.task).body, "tabs")[0];
-done({ Hint: cls(strip, "keyhint").map((x) => x.textContent).join("|"), Shortcuts: strip.attrs["aria-keyshortcuts"] || "" });`,
-		map[string]any{"task": pageTask(t)}, &got)
-	if got.Hint != "[ ]" || got.Shortcuts != "[ ]" {
-		t.Errorf("the tab strip hints %q with shortcuts %q, want the keys of tab:prev and tab:next", got.Hint, got.Shortcuts)
+const strip = () => cls(taskTabs(input.answers.task).body, "tabs")[0];
+const unloaded = cls(strip(), "keyhint").length + (strip().attrs["aria-keyshortcuts"] || "");
+globalThis.cockpitKeys = { keyOf: (a) => (input.answers.bindings.find((b) => b.action === a) || {}).key || "" };
+const s = strip();
+done({ Hint: cls(s, "keyhint").map((x) => x.textContent).join("|"), Shortcuts: s.attrs["aria-keyshortcuts"] || "", Unloaded: String(unloaded) });`,
+		map[string]any{"task": pageTask(t), "bindings": bindings}, &got)
+	if got.Hint != "[ }" || got.Shortcuts != "[ }" {
+		t.Errorf("the tab strip hints %q with shortcuts %q, want the served keys of tab:prev and tab:next", got.Hint, got.Shortcuts)
+	}
+	if got.Unloaded != "0" {
+		t.Errorf("before the keys load the strip hints %q, want no hint", got.Unloaded)
 	}
 }
 

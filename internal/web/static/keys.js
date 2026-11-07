@@ -415,6 +415,7 @@ function createKeys(env) {
     openPalette() { env.palette({ title: t("Actions"), items: paletteItems() }); },
     setBindings(list) { bindings = (list || []).map((b) => ({ ...b })); },
     bindings: () => bindings,
+    keyOf: (action) => (bindings.find((b) => b.action === action) || {}).key || "",
   };
 }
 
