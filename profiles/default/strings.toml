@@ -643,6 +643,15 @@
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: not {values}"
 "{n} event" = { one = "{n} event", other = "{n} events" }
+# The terminal client's status line and footer.
+"{verb} {task} cancelled: nothing typed" = "{verb} {task} cancelled: nothing typed"
+"delegate {task}: {question} (no agent session: {reason})" = "delegate {task}: {question} (no agent session: {reason})"
+"tasks not listed: {error}" = "tasks not listed: {error}"
+"plan not loaded: {error}" = "plan not loaded: {error}"
+"filter {text} (Esc clears)" = "filter {text} (Esc clears)"
+"actions not refreshed: {error}" = "actions not refreshed: {error}"
+"tasks not refreshed: {error}" = "tasks not refreshed: {error}"
+"review not refreshed: {error}" = "review not refreshed: {error}"
 
 [formats]
 time = "3:04 PM"

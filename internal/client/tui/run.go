@@ -354,11 +354,11 @@ func (m *Model) apply(r loaded) {
 	}
 	switch {
 	case r.specsErr != nil:
-		m.status = "actions not refreshed: " + r.specsErr.Error()
+		m.status = m.w().T("actions not refreshed: {error}", map[string]any{"error": r.specsErr.Error()})
 	case r.tasksErr != nil:
-		m.status = "tasks not refreshed: " + r.tasksErr.Error()
+		m.status = m.w().T("tasks not refreshed: {error}", map[string]any{"error": r.tasksErr.Error()})
 	case r.reviewErr != nil:
-		m.status = "review not refreshed: " + r.reviewErr.Error()
+		m.status = m.w().T("review not refreshed: {error}", map[string]any{"error": r.reviewErr.Error()})
 	case r.filteredErr != nil:
 		m.status = m.w().T("filtered counts not refreshed: {error}", map[string]any{"error": r.filteredErr.Error()})
 	}

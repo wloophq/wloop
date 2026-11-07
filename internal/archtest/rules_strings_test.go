@@ -19,26 +19,27 @@ import (
 
 // nonProse are literals that read like prose and are not: what each is, by literal.
 var nonProse = map[string]string{
-	"Escape":              "KeyboardEvent.key",
-	"Enter":               "KeyboardEvent.key",
-	"Backspace":           "KeyboardEvent.key",
-	"Tab":                 "KeyboardEvent.key",
-	"Shift":               "KeyboardEvent.key",
-	"Control":             "KeyboardEvent.key",
-	"Meta":                "KeyboardEvent.key",
-	"Alt":                 "KeyboardEvent.key",
-	"Delete":              "KeyboardEvent.key",
-	"Home":                "KeyboardEvent.key",
-	"End":                 "KeyboardEvent.key",
-	"Accept":              "an HTTP header name",
-	"POST":                "an HTTP method",
-	"GET":                 "an HTTP method",
-	"DELETE":              "an HTTP method",
-	"Contents":            "a macOS bundle's directory",
-	"use strict":          "a script's directive",
-	"Esc":                 "the Escape key's name as the served bindings spell it",
-	"Plus":                "the + key's name in aria-keyshortcuts",
-	"noopener noreferrer": "a link's rel tokens",
+	"Escape":                       "KeyboardEvent.key",
+	"Enter":                        "KeyboardEvent.key",
+	"Backspace":                    "KeyboardEvent.key",
+	"Tab":                          "KeyboardEvent.key",
+	"Shift":                        "KeyboardEvent.key",
+	"Control":                      "KeyboardEvent.key",
+	"Meta":                         "KeyboardEvent.key",
+	"Alt":                          "KeyboardEvent.key",
+	"Delete":                       "KeyboardEvent.key",
+	"Home":                         "KeyboardEvent.key",
+	"End":                          "KeyboardEvent.key",
+	"Accept":                       "an HTTP header name",
+	"POST":                         "an HTTP method",
+	"GET":                          "an HTTP method",
+	"DELETE":                       "an HTTP method",
+	"Contents":                     "a macOS bundle's directory",
+	"use strict":                   "a script's directive",
+	"Esc":                          "the Escape key's name as the served bindings spell it",
+	"Plus":                         "the + key's name in aria-keyshortcuts",
+	"noopener noreferrer":          "a link's rel tokens",
+	"(prefers-color-scheme: dark)": "a CSS media query",
 }
 
 // proseClients are the Go clients whose words a person reads; the hook and the CLI's turn client write what
@@ -50,9 +51,9 @@ var proseClients = []string{"menubar", "tui", "window"}
 var proseDebts = map[string]int{}
 
 var (
-	proseWord   = regexp.MustCompile(`^[\pL][\pL'’-]*[.,:;!?…)]*$`)
+	proseWord   = regexp.MustCompile(`^[("“]?[\pL][\pL'’-]*[.,:;!?…)"”]*$`)
 	capitalized = regexp.MustCompile(`^\p{Lu}\p{Ll}{2,}[.,:;!?…]*$`)
-	keyValue    = regexp.MustCompile(`^[\w.-]+:[^\s]*$`)
+	keyValue    = regexp.MustCompile(`^[\w.-]+:\S+$`)
 )
 
 // isProse says whether literal s is a text a person reads: two or more words of letters, or one capitalized

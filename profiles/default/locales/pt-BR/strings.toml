@@ -637,6 +637,15 @@
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: não {values}"
 "{n} event" = { one = "{n} evento", other = "{n} eventos" }
+# The terminal client's status line and footer.
+"{verb} {task} cancelled: nothing typed" = "{verb} {task} cancelado: nada foi digitado"
+"delegate {task}: {question} (no agent session: {reason})" = "delegar {task}: {question} (sem sessão de agente: {reason})"
+"tasks not listed: {error}" = "tarefas não listadas: {error}"
+"plan not loaded: {error}" = "plano não carregado: {error}"
+"filter {text} (Esc clears)" = "filtro {text} (Esc limpa)"
+"actions not refreshed: {error}" = "ações não atualizadas: {error}"
+"tasks not refreshed: {error}" = "tarefas não atualizadas: {error}"
+"review not refreshed: {error}" = "revisão não atualizada: {error}"
 
 [formats]
 time = "15:04"

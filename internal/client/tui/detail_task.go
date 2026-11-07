@@ -223,7 +223,7 @@ func (m *Model) resolveGate(c askCard, x api.IntentView, read uint64) (Command, 
 	}
 	m.prompt = &prompt{action: x.ID, label: label + ": " + c.text, read: read, editor: true, submit: func(text string) (Command, bool) {
 		if text == "" {
-			m.status = label + " " + cmd.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": label, "task": cmd.Label})
 			return Command{}, false
 		}
 		cmd.args = map[string]string{"answer": text}

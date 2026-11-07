@@ -146,7 +146,7 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 		return Command{}, false
 	}
 	c := Command{Unit: taskUnit(de.ID), Label: taskLabel(e), Action: verb, task: de.ID, verb: verb}
-	target := draftTarget(de)
+	target := draftTarget(m.w(), de)
 	switch m.viewsCat.HandlerOf(verb) {
 	case handlerEdit:
 		return m.editPrompt(c, d, read)
@@ -167,7 +167,7 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) {
 	submit := func(text string) (Command, bool) {
 		if text == "" {
-			m.status = "edit " + c.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "edit", "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text}
@@ -177,7 +177,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 		m.edit = &EditRequest{Label: "edit", Text: d.Text, submit: submit}
 		return Command{}, false
 	}
-	m.prompt = &prompt{action: "edit", label: m.w().T("edit the draft to {target} ({key}: editor)", map[string]any{"target": draftTarget(draftTask(api.ViewsCatalog{}, d, "")), "key": "Ctrl+E"}), text: []rune(d.Text),
+	m.prompt = &prompt{action: "edit", label: m.w().T("edit the draft to {target} ({key}: editor)", map[string]any{"target": draftTarget(m.w(), draftTask(api.ViewsCatalog{}, d, "")), "key": "Ctrl+E"}), text: []rune(d.Text),
 		read: read, submit: submit, editor: true}
 	return Command{}, false
 }
@@ -193,7 +193,7 @@ func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read u
 	}
 	off := sessionOff(m.w(), e, c.verb)
 	if off != "" {
-		labels[""] = "delegate " + name + ": " + q + " (no agent session: " + off + ")"
+		labels[""] = m.w().T("delegate {task}: {question} (no agent session: {reason})", map[string]any{"task": name, "question": q, "reason": off})
 	}
 	p := &prompt{action: c.verb, label: labels[""], read: read, editor: true}
 	mode := ""
@@ -260,7 +260,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 	}
 	p.submit = func(text string) (Command, bool) {
 		if text == "" {
-			m.status = "reply " + c.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "reply", "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text, "send": "draft"}

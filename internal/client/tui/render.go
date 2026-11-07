@@ -532,7 +532,7 @@ func (m *Model) bottom(width int) string {
 		}
 		return termfmt.Cut(head+text+tail, width)
 	case p == nil && len(m.filter) > 0:
-		return m.fill("filter "+termfmt.Clean(string(m.filter))+" (Esc clears)  ", m.helpItems(), width)
+		return m.fill(m.w().T("filter {text} (Esc clears)", map[string]any{"text": termfmt.Clean(string(m.filter))})+"  ", m.helpItems(), width)
 	case p == nil:
 		return m.fill("", m.helpItems(), width)
 	case p.confirm:

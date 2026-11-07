@@ -278,7 +278,9 @@ func (m *Model) kindLabel(r api.Row) string { return m.catalog.KindLabel(r) }
 func (m *Model) SetSpecs(specs []api.ActionSpec) { m.specs = specs }
 
 // SetError keeps the last rows on screen while the daemon does not answer.
-func (m *Model) SetError(err error) { m.err = "daemon not answering: " + err.Error() }
+func (m *Model) SetError(err error) {
+	m.err = m.w().T("Daemon not answering: {error}", map[string]any{"error": err.Error()})
+}
 
 // in are the rows of view id the filter keeps, in the order the list shows
 // them, and beside each the head of the group it opens.
@@ -617,14 +619,14 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		switch {
 		case in.Kind == "answer":
 			if text == "" {
-				m.status = "answer " + p.cmd.Label + " cancelled: nothing typed"
+				m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "answer", "task": p.cmd.Label})
 				return Command{}, false
 			}
 			c.Req = answerRequest(p.question, text)
 		case in.Kind == "duration":
 			c.Req.Until, c.Req.UntilState = text, text == "" && in.UntilState
 		case text == "" && in.Required:
-			m.status = p.action + " " + p.cmd.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": p.action, "task": p.cmd.Label})
 			return Command{}, false
 		default:
 			c.Req.Guidance = text

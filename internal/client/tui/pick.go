@@ -83,7 +83,7 @@ func (m *Model) SetMatches(text string, tasks []api.TaskView, err error) {
 	p.pending = false
 	if err != nil {
 		m.overlay.items = nil
-		m.status = "tasks not listed: " + err.Error()
+		m.status = m.w().T("tasks not listed: {error}", map[string]any{"error": err.Error()})
 		return
 	}
 	var items []paletteItem

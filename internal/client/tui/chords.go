@@ -396,7 +396,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 // the revision on screen (and its text, to approve) after a y; a discard
 // asks for a y too.
 func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool) {
-	target := draftTarget(e)
+	target := draftTarget(m.w(), e)
 	handler := m.viewsCat.HandlerOf(c.verb)
 	if handler == ownDismiss {
 		m.confirm(c, m.w().T("discard the draft to {target}?", map[string]any{"target": target}), read)
