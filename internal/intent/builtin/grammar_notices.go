@@ -48,6 +48,8 @@ var Notices = []ToolAnswer{
 		Fields: []AnswerField{str("Verb"), str("Pick")}},
 	{Name: "record_owed", Doc: "The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.",
 		Fields: []AnswerField{str("Unit"), str("Turn"), str("ScratchDir")}},
+	{Name: NoticeConfigUnavailable, Doc: "Why a request to change the configuration, such as stopping a workflow, is refused by a daemon that edits no config file."},
+	{Name: NoticeSkipsUnavailable, Doc: "Why a request to skip a workflow on a unit, or to undo it, is refused by a daemon that keeps no skips."},
 	{Name: NoticeWorkflowUnknown, Doc: "Why a request naming Workflow is refused when the profile loads no workflow of that name.",
 		Fields: []AnswerField{str("Workflow")}},
 	{Name: NoticeAttachNeedsSession, Doc: "Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.",
@@ -92,6 +94,8 @@ const (
 	NoticeNotifyOpen           = "notify_open"
 	NoticeNotifyDiscard        = "notify_discard"
 	NoticeWorkflowUnknown      = "workflow_unknown"
+	NoticeConfigUnavailable    = "config_unavailable"
+	NoticeSkipsUnavailable     = "skips_unavailable"
 )
 
 // NoticeOf is the notice name, false when there is none.

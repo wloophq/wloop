@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -151,6 +152,19 @@ func TestSkipRoutesSetAndClearASkip(t *testing.T) {
 	}
 	if got := skipped(); len(got) != 0 {
 		t.Fatalf("after DELETE: %v", got)
+	}
+}
+
+func TestADaemonThatKeepsNoSkipsSaysSoInTheProfilesWords(t *testing.T) {
+	t.Parallel()
+	th := unit.Unit{Provider: "thread", Key: "C1/171.1"}
+	s := newServerWith(t, func(d *Deps) {
+		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})
+	})
+	rec := post(t, s, api.UnitPath(th, "skip", s.loaded().Workflows[0].Name), "")
+	want := s.loaded().Notices[builtin.NoticeSkipsUnavailable]
+	if rec.Code != 503 || want == "" || !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("%d %s, want the notice %q", rec.Code, rec.Body, want)
 	}
 }
 

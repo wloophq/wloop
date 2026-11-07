@@ -76,3 +76,7 @@ notify_open = "Open"
 notify_discard = "Discard"
 
 workflow_unknown = "No workflow named {{.Workflow}} is loaded."
+
+config_unavailable = "This daemon does not change its configuration; edit config.toml instead."
+
+skips_unavailable = "This daemon keeps no skips, so a workflow cannot be stopped on one conversation here."

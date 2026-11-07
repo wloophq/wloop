@@ -759,6 +759,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `task_merged`: Why a verb sent to a task merged into another is refused: Task, the merged task's id, Into, the task it reads as now, and Verb, the verb sent. Split runs on such an id, and splits it out.
   - `nothing_to_pick`: Why a task's page offers Verb disabled when it picks from the tasks of Pick (merged or related) and the task lists none.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
+  - `config_unavailable`: Why a request to change the configuration, such as stopping a workflow, is refused by a daemon that edits no config file.
+  - `skips_unavailable`: Why a request to skip a workflow on a unit, or to undo it, is refused by a daemon that keeps no skips.
   - `workflow_unknown`: Why a request naming Workflow is refused when the profile loads no workflow of that name.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
@@ -799,6 +801,8 @@ The fields each notice reads besides `Name` and `Command`:
   - `task_merged` (`Task`, `Into`, `Verb`)
   - `nothing_to_pick` (`Verb`, `Pick`)
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
+  - `config_unavailable`
+  - `skips_unavailable`
   - `workflow_unknown` (`Workflow`)
   - `attach_needs_session` (`Task`, `Managers`)
 

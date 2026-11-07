@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // configSets records the config edits a server asks for.
@@ -56,6 +57,16 @@ func TestAFailedConfigEditIsAnError(t *testing.T) {
 	sets.err = errors.New("config.toml does not load")
 	if rec := post(t, s, api.WorkflowDisablePath(name), ""); rec.Code != 500 || !strings.Contains(rec.Body.String(), "does not load") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestADaemonThatEditsNoConfigSaysSoInTheProfilesWords(t *testing.T) {
+	t.Parallel()
+	s := newServerWith(t, func(*Deps) {})
+	rec := post(t, s, api.WorkflowDisablePath(s.loaded().Workflows[0].Name), "")
+	want := s.loaded().Notices[builtin.NoticeConfigUnavailable]
+	if rec.Code != 503 || want == "" || !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("%d %s, want the notice %q", rec.Code, rec.Body, want)
 	}
 }
 

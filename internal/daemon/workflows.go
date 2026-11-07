@@ -21,7 +21,7 @@ func (s *Server) handleWorkflowDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.deps.ConfigSet == nil {
-		writeError(w, http.StatusServiceUnavailable, "this daemon changes no configuration")
+		writeError(w, http.StatusServiceUnavailable, s.notice(builtin.NoticeConfigUnavailable, nil))
 		return
 	}
 	if err := s.deps.ConfigSet([]string{"workflows", name, "enabled"}, false); err != nil {

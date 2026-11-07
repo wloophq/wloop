@@ -36,7 +36,7 @@ func (s *Server) setSkip(w http.ResponseWriter, r *http.Request, skip bool) {
 		return
 	}
 	if s.deps.Skips == nil {
-		writeError(w, http.StatusServiceUnavailable, "this daemon keeps no skips")
+		writeError(w, http.StatusServiceUnavailable, s.notice(builtin.NoticeSkipsUnavailable, nil))
 		return
 	}
 	set := s.deps.Skips.Unskip
