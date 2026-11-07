@@ -2682,6 +2682,18 @@ function pageGates() {
   return out;
 }
 
+// pageQuestion is the gate a digit answers from el: the one whose card holds el, else, on a queue, its item's
+// gate when that is no draft's.
+function pageQuestion(el) {
+  const at = gateAt(el, pageGates());
+  if (at || (el && el.closest && el.closest(".d-gate"))) return at;
+  const route = readRoute(location.hash);
+  if (route.view !== QUEUE) return null;
+  const queue = queueShown(route);
+  const item = queue && (queue.items || [])[queueState.at];
+  return item && item.gate && !queueDraft(item.gate) ? { task: item.task, gate: item.gate } : null;
+}
+
 // screenEnv is what the home and the queue screens read and run through.
 function screenEnv() {
   return {
@@ -2691,6 +2703,7 @@ function screenEnv() {
     row: screenRow,
     openSource: openTaskSource,
     openTask: (id) => writeHash({ task: id, pr: "" }),
+    keyOf: (action) => (typeof cockpitKeys === "object" && cockpitKeys ? cockpitKeys.keyOf(action) : ""),
     act: async (u, id) => {
       if ((await omniboxAct(u, id)) === false) throw new Error(state.actionError || t("{action} failed", { action: id }));
     },

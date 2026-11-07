@@ -28,11 +28,13 @@ const env = {
   act: async (u, id) => { log.acts.push(unitPath(u, id)); if ((input.refuse || []).includes(unitPath(u, id))) throw new Error("it changed"); },
   row: (e) => h("li", { "data-task": e.id }, e.title),
   render: () => { log.renders++; },
+  keyOf: (action) => ({ "queue:primary": "Enter", "queue:edit": "e", "queue:discard": "x", "queue:close-silently": "m", "queue:skip-workflow": "n" })[action] || "",
   navigate: (v) => log.nav.push(v),
 };
 detailEnv.post = env.post;
 detailEnv.notice = (m, err) => log.notices.push((err ? "!" : "") + m);
 detailEnv.changed = () => {};
+detailEnv.render = () => {};
 const view = () => renderQueue(queueState.queue, queueState.at, env);
 const shown = () => all(view(), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-task"]);
 `
@@ -266,8 +268,9 @@ process.stdout.write(JSON.stringify({ Switched: switched, SwitchedText: switched
 func TestDigitsAnswerAGateCardOutsideTheDetail(t *testing.T) {
 	var got struct {
 		Queue, List, Detail, None string
+		Unfocused                 int
 	}
-	nodeRun(t, queuePrelude(t)+jsFunction(t, appJS(t), "pageGates"), nil, `
+	nodeRun(t, queuePrelude(t)+jsFunction(t, appJS(t), "pageGates")+jsFunction(t, appJS(t), "pageQuestion"), nil, `
 const gate = (id) => ({ id, kind: "question", intents: [{ id: "answer" }, { id: "continue" }] });
 const inCard = (id) => ({ closest: (s) => (s === ".d-gate" ? { getAttribute: () => String(id) } : null) });
 globalThis.hash = "#queue=answer";
@@ -278,8 +281,77 @@ tasksState.gates = [Object.assign(gate(8), { task: "t-2" })];
 tasksState.tasks = [{ id: "t-2" }];
 detailState.task = { id: "t-3", gates: [gate(9)] };
 const at = (id) => { const q = gateAt(inCard(id), pageGates()); return q ? q.task.id + ":" + q.gate.id : ""; };
-process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10) }));`, nil, &got)
-	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" {
+const unfocused = pageQuestion({ closest: () => null });
+process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10), Unfocused: unfocused ? unfocused.gate.id : 0 }));`, nil, &got)
+	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" || got.Unfocused != 7 {
 		t.Fatalf("%+v: a digit answers the focused gate card wherever the page draws it", got)
+	}
+}
+
+// queuedDraft is a queue of one held reply, draft 4 at revision 3 behind gate 7, that serves closing silently
+// and refuses to skip its workflow.
+func queuedDraft() map[string]any {
+	draft := map[string]any{"id": 4, "gate": 7, "rev": 3, "text": "Thanks, merged.", "unit": "alpha/acme/api#1", "state": "held",
+		"intents": map[string]string{"approved": "approve", "rejected": "discard"}, "origin": map[string]string{"kind": "workflow", "workflow": "nudge"},
+		"actions": []map[string]any{{"id": "draft.close-silently", "enabled": true}, {"id": "draft.skip-workflow", "enabled": false, "reason": "the workflow is off"}}}
+	item := map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []any{}},
+		"gate":    map[string]any{"id": 7, "kind": "draft", "delivery": "held", "subject": draft, "intents": []map[string]any{{"id": "approve", "label": "Send"}, {"id": "discard", "label": "Discard"}}},
+		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Send"}}
+	return map[string]any{"queues": map[string]any{"send-draft": map[string]any{"kind": "send-draft", "title": "Send drafts", "total": 1, "items": []any{item}}}}
+}
+
+func TestQueueKeysRunTheDraftCardsActions(t *testing.T) {
+	var got struct {
+		Posts            []string
+		Bodies           []map[string]any
+		Hints            []string
+		Took             []bool
+		Notices          []string
+		EditedText, Rev  string
+	}
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=send-draft";
+await queueLoad(env.route(), env);
+const tick = () => new Promise((r) => setTimeout(r, 5));
+const card = queueItemCard(queueState.queue.items[0], env);
+const hints = all(card, (x) => x.tag === "button").map((b) => all(b, (k) => k.tag === "kbd").map(text).join("") + " " + text(b).replace(/^\S+ /, ""));
+const took = [];
+took.push(queueKeyAction("queue:close-silently", env)); await tick();
+took.push(queueKeyAction("queue:skip-workflow", env)); await tick();
+took.push(queueKeyAction("queue:discard", env)); await tick();
+took.push(queueKeyAction("queue:edit", env));
+detailState.editing.set("draft:4", "Thanks, merged and released.");
+took.push(queueKeyAction("queue:primary", env)); await tick();
+process.stdout.write(JSON.stringify({ Posts: log.posts, Bodies: log.bodies, Hints: hints, Took: took, Notices: log.notices }));
+})();`, queuedDraft(), &got)
+	want := []string{"/api/drafts/4/close-silently", "/api/gates/7/discard", "/api/gates/7/approve"}
+	if !slices.Equal(got.Posts, want) {
+		t.Fatalf("posts %v, want %v", got.Posts, want)
+	}
+	if mustJSON(t, got.Bodies[0]) != `{"rev":3}` || mustJSON(t, got.Bodies[1]["args"]) != `{"rev":"3"}` || mustJSON(t, got.Bodies[2]["args"]) != `{"rev":"3","text":"Thanks, merged and released."}` {
+		t.Errorf("bodies %v: each key sends the revision shown, the edited text with the approve", got.Bodies)
+	}
+	if !slices.Equal(got.Took, []bool{true, true, true, true, true}) || !slices.ContainsFunc(got.Notices, func(n string) bool { return strings.Contains(n, "the workflow is off") }) {
+		t.Errorf("took %v, notices %v: a refused action's key says why", got.Took, got.Notices)
+	}
+	for _, w := range []string{"↵", "e", "x", "m", "n"} {
+		if !slices.ContainsFunc(got.Hints, func(h string) bool { return strings.HasPrefix(h, w+" ") }) {
+			t.Errorf("no button shows the key %q: %v", w, got.Hints)
+		}
+	}
+}
+
+func TestQueueDraftKeysPassWhenTheCardOffersNothing(t *testing.T) {
+	var got struct{ Took []bool }
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=last-step";
+await queueLoad(env.route(), env);
+const took = ["queue:edit", "queue:discard", "queue:close-silently", "queue:skip-workflow"].map((a) => queueKeyAction(a, env));
+process.stdout.write(JSON.stringify({ Took: took }));
+})();`, map[string]any{"queues": map[string]any{"last-step": threeQueue()}}, &got)
+	if !slices.Equal(got.Took, []bool{false, false, false, false}) {
+		t.Fatalf("%+v: with no draft the keys go on to their other bindings", got)
 	}
 }

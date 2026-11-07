@@ -613,6 +613,7 @@
 "to open" = "para abrir"
 "to ask the agent" = "para perguntar ao agente"
 "to close" = "para fechar"
+"{action}: {reason}" = "{action}: {reason}"
 "run_state_sent" = "enviado"
 "run_state_started" = "iniciado"
 "run_state_asked" = "perguntou"

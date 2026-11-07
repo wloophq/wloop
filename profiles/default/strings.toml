@@ -619,6 +619,7 @@
 "to open" = "to open"
 "to ask the agent" = "to ask the agent"
 "to close" = "to close"
+"{action}: {reason}" = "{action}: {reason}"
 "run_state_sent" = "sent"
 "run_state_started" = "started"
 "run_state_asked" = "asked"

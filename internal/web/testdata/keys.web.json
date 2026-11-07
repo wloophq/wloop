@@ -265,6 +265,34 @@
       "help": "back to the home"
     },
     {
+      "key": "e",
+      "action": "queue:edit",
+      "context": "queue",
+      "owner": "core",
+      "help": "edit the draft before it goes"
+    },
+    {
+      "key": "x",
+      "action": "queue:discard",
+      "context": "queue",
+      "owner": "core",
+      "help": "discard the draft"
+    },
+    {
+      "key": "m",
+      "action": "queue:close-silently",
+      "context": "queue",
+      "owner": "core",
+      "help": "close without a message"
+    },
+    {
+      "key": "n",
+      "action": "queue:skip-workflow",
+      "context": "queue",
+      "owner": "core",
+      "help": "stop drafting nudges in this conversation"
+    },
+    {
       "key": "1",
       "action": "answer:1",
       "context": "question",

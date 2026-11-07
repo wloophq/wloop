@@ -31,11 +31,16 @@ function queueDraft(g) {
   return !!(g && g.delivery && g.subject && typeof g.subject === "object");
 }
 
+// queueDraftOf is the draft of gate g, which names its gate.
+function queueDraftOf(g) {
+  return { ...g.subject, gate: g.subject.gate || g.id };
+}
+
 // queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
 // daemon serves with its delivery), else its unit's row with the situation that makes it.
 function queueItemCard(item, env) {
   const g = item.gate;
-  if (queueDraft(g)) return draftCard(item.task, g.subject, { scope: "queue" });
+  if (queueDraft(g)) return draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf });
   if (g) return gateCard(item.task, g, { scope: "queue" });
   return h("div", { class: "queue-unit" },
     env.row(item.task),
@@ -92,7 +97,9 @@ async function queueAct(item, env) {
   queueState.error = "";
   try {
     const g = item.gate;
-    if (p.kind === "gate" && queueDraft(g)) await resolveDraft({ ...g.subject, gate: g.subject.gate || g.id }, p.id, p.label || p.id, {});
+    const card = p.kind === "gate" && queueDraft(g) ? queueDraftAction(item, "queue:primary") : null;
+    if (card && card.enabled) await card.run();
+    else if (p.kind === "gate" && queueDraft(g)) await resolveDraft(queueDraftOf(g), p.id, p.label || p.id, {});
     else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
     else if (p.kind === "action") {
       const u = queueUnit(item);
@@ -106,6 +113,29 @@ async function queueAct(item, env) {
   }
   if (p.kind === "gate" || p.kind === "action") await queueLoad(env.route(), env);
   env.render();
+}
+
+// queueDraftAction is the action of item's draft card that key runs, null when the card offers none.
+function queueDraftAction(item, key) {
+  if (!item || !queueDraft(item.gate)) return null;
+  return draftActions(item.task, queueDraftOf(item.gate)).find((a) => a.key === key) || null;
+}
+
+// queueDraftKey runs the action of item's draft card that key names, then reloads the queue; false when the
+// card offers none, so the key goes on to its other bindings. A refused action says why.
+function queueDraftKey(item, key, env) {
+  const a = queueDraftAction(item, key);
+  if (!a) return false;
+  if (!a.enabled) {
+    detailEnv.notice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+    return true;
+  }
+  (async () => {
+    await a.run();
+    if (key !== "queue:edit") await queueLoad(env.route(), env);
+    env.render();
+  })();
+  return true;
 }
 
 // queueKeyAction runs a queue key's action: the primary, the next or the previous decision, its source, the home.
@@ -122,6 +152,11 @@ function queueKeyAction(action, env) {
       queueState.at = Math.min(Math.max(queueState.at + (action === "queue:skip" ? 1 : -1), 0), Math.max(items.length - 1, 0));
       env.render();
       return true;
+    case "queue:edit":
+    case "queue:discard":
+    case "queue:close-silently":
+    case "queue:skip-workflow":
+      return queueDraftKey(item, action, env);
     case "open-source":
       if (item) env.openSource(item.task, queueUnit(item));
       return !!item;
