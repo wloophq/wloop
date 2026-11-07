@@ -60,6 +60,12 @@ func spec92() []row {
 		{"t", "detail:detach", Detail, []Surface{Web}},
 		{"]", "tab:next", Detail, []Surface{Web}},
 		{"[", "tab:prev", Detail, []Surface{Web}},
+		{"g h", "nav:home", Global, []Surface{Web}},
+		{"Enter", "queue:primary", Queue, []Surface{Web}},
+		{"j", "queue:skip", Queue, []Surface{Web}},
+		{"k", "queue:back", Queue, []Surface{Web}},
+		{"o", "open-source", Queue, []Surface{Web}},
+		{"Esc", "queue:home", Queue, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,
