@@ -118,7 +118,7 @@ func (m *Model) planAction(k Key) (Command, bool) {
 	}
 	label := itemLabel(it)
 	if running, busy := m.busy[it.Unit]; busy {
-		m.status = m.w().T("{action} {task} still running", map[string]any{"action": running, "task": label})
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(running), "task": label})
 		return Command{}, false
 	}
 	switch {

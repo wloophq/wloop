@@ -349,7 +349,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		return Command{}, false
 	}
 	if _, busy := m.busy[taskUnit(e.ID)]; busy {
-		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[taskUnit(e.ID)], "task": taskLabel(e)})
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(m.busy[taskUnit(e.ID)]), "task": taskLabel(e)})
 		return Command{}, false
 	}
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
@@ -383,7 +383,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	m.prompt = &prompt{action: verb, label: m.w().T("{question} for {task}", map[string]any{"question": m.verbQuestion(verb), "task": taskLabel(e)}), read: read, submit: func(text string) (Command, bool) {
 		args, ok := ask(text)
 		if !ok {
-			m.status = m.w().T("{verb} {task} cancelled: nothing usable typed", map[string]any{"verb": verb, "task": c.Label})
+			m.status = m.w().T("{verb} {task} cancelled: nothing usable typed", map[string]any{"verb": m.actionWord(verb), "task": c.Label})
 			return Command{}, false
 		}
 		c.args = args
@@ -403,12 +403,12 @@ func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool
 		return Command{}, false
 	}
 	if !m.detailOpen(e) {
-		m.status = m.w().T("open the draft to {verb} it (Enter)", map[string]any{"verb": c.verb})
+		m.status = m.w().T("open the draft to {verb} it (Enter)", map[string]any{"verb": m.actionWord(c.verb)})
 		return Command{}, false
 	}
 	shown := m.shownDetail(e)
 	if draftOn(shown) == nil {
-		m.status = m.w().T("no draft on screen to {verb}", map[string]any{"verb": c.verb})
+		m.status = m.w().T("no draft on screen to {verb}", map[string]any{"verb": m.actionWord(c.verb)})
 		return Command{}, false
 	}
 	c.args = map[string]string{"rev": strconv.FormatInt(draftOn(shown).Rev, 10)}
@@ -466,7 +466,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 			continue
 		}
 		if _, busy := m.busy[r.Unit]; busy {
-			m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
+			m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(m.busy[r.Unit]), "task": r.Label})
 			return Command{}, false
 		}
 		if !st.Enabled {
@@ -589,7 +589,7 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 		about := strings.Join(slices.DeleteFunc([]string{s.Summary, st.Note}, func(x string) bool { return x == "" }), " · ")
 		items = append(items, paletteItem{label: cmp.Or(st.Label, s.Label) + " " + r.Label, key: s.Key, about: about, run: func(read uint64) (Command, bool) {
 			if _, busy := m.busy[r.Unit]; busy {
-				m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
+				m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(m.busy[r.Unit]), "task": r.Label})
 				return Command{}, false
 			}
 			return m.begin(r, spec, st, read)

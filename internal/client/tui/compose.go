@@ -167,7 +167,7 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) {
 	submit := func(text string) (Command, bool) {
 		if text == "" {
-			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "edit", "task": c.Label})
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text}
@@ -260,7 +260,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 	}
 	p.submit = func(text string) (Command, bool) {
 		if text == "" {
-			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "reply", "task": c.Label})
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text, "send": "draft"}

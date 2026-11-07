@@ -116,3 +116,30 @@ func TestStatusAndFooterInPtBR(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusNamesActionsByTheirWordsInPtBR(t *testing.T) {
+	m := newModel(t)
+	m.words = ptBR(t)
+	m.viewsCat.Verbs = append(m.viewsCat.Verbs, api.VerbSpec{Verb: "reply", Label: "responder"})
+	m.specs = append(m.specs, api.ActionSpec{ID: "hand_off", Label: "Passar adiante"})
+	for _, c := range []struct {
+		cmd   Command
+		lines []string
+		want  string
+	}{
+		{Command{Action: "capture", Label: "ligar para Ada"}, nil, "capturar ligar para Ada: feito"},
+		{Command{Action: "open-source", Label: "t-1"}, []string{"https://example.test/1"}, "abrir a origem t-1: https://example.test/1"},
+		{Command{Action: "reply", Label: "t-2"}, nil, "responder t-2: feito"},
+		{Command{Action: "hand_off", Label: "acme/api#7"}, nil, "passar adiante acme/api#7: feito"},
+	} {
+		m.Done(c.cmd, c.lines, nil)
+		if m.status != c.want {
+			t.Errorf("%s: %q, want %q", c.cmd.Action, m.status, c.want)
+		}
+	}
+	m.prompt = &prompt{action: "reply", cmd: Command{Label: "t-2"}, confirm: true, read: 1}
+	press(m, Key{Rune: 'n', Read: 2})
+	if !strings.HasPrefix(m.status, "responder t-2 cancelado") {
+		t.Errorf("a cancelled reply: %q", m.status)
+	}
+}

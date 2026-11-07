@@ -422,7 +422,7 @@ func (m *Model) action(k Key) (Command, bool) {
 		return Command{}, false
 	}
 	if running, busy := m.busy[r.Unit]; busy {
-		m.status = m.w().T("{action} {task} still running", map[string]any{"action": running, "task": r.Label})
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(running), "task": r.Label})
 		return Command{}, false
 	}
 	switch {
@@ -590,7 +590,7 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		if k.Read > p.read && (k.Rune == 'y' || k.Rune == 'Y') {
 			return m.send(p.cmd)
 		}
-		m.status = m.w().T("{verb} {task} cancelled", map[string]any{"verb": p.action, "task": p.cmd.Label})
+		m.status = m.w().T("{verb} {task} cancelled", map[string]any{"verb": m.actionWord(p.action), "task": p.cmd.Label})
 		if k.Read <= p.read {
 			m.status += ": " + m.w().T("a y typed together with the key before it does not confirm", nil)
 		}
@@ -619,14 +619,14 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		switch {
 		case in.Kind == "answer":
 			if text == "" {
-				m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": "answer", "task": p.cmd.Label})
+				m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord("answer"), "task": p.cmd.Label})
 				return Command{}, false
 			}
 			c.Req = answerRequest(p.question, text)
 		case in.Kind == "duration":
 			c.Req.Until, c.Req.UntilState = text, text == "" && in.UntilState
 		case text == "" && in.Required:
-			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": p.action, "task": p.cmd.Label})
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(p.action), "task": p.cmd.Label})
 			return Command{}, false
 		default:
 			c.Req.Guidance = text
@@ -770,14 +770,37 @@ func (m *Model) send(c Command) (Command, bool) {
 // Done reports a finished action on the status line.
 func (m *Model) Done(c Command, lines []string, err error) {
 	delete(m.busy, c.Unit)
+	action := m.actionWord(c.Action)
 	switch {
 	case err != nil:
-		m.status = m.w().T("{action} {task} failed: {error}", map[string]any{"action": c.Action, "task": c.Label, "error": m.errorText(err)})
+		m.status = m.w().T("{action} {task} failed: {error}", map[string]any{"action": action, "task": c.Label, "error": m.errorText(err)})
 	case len(lines) > 0:
-		m.status = fmt.Sprintf("%s %s: %s", c.Action, c.Label, lines[len(lines)-1])
+		m.status = m.w().T("{action} {task}: {result}", map[string]any{"action": action, "task": c.Label, "result": lines[len(lines)-1]})
 	default:
-		m.status = m.w().T("{action} {task}: done", map[string]any{"action": c.Action, "task": c.Label})
+		m.status = m.w().T("{action} {task}: done", map[string]any{"action": action, "task": c.Label})
 	}
+}
+
+// actionWord is how the status line names an action id: the served label of its action, plan action or verb, the
+// catalog's word for the client's own actions, else the id.
+func (m *Model) actionWord(id string) string {
+	switch id {
+	case "capture":
+		return m.w().T("capture", nil)
+	case "open-source":
+		return m.w().T("open the source", nil)
+	case "detail":
+		return m.w().T("load the detail", nil)
+	}
+	for _, specs := range [][]api.ActionSpec{m.specs, m.planSpecs} {
+		if i := slices.IndexFunc(specs, func(s api.ActionSpec) bool { return s.ID == id }); i >= 0 && specs[i].Label != "" {
+			return strings.ToLower(specs[i].Label)
+		}
+	}
+	if l := m.verbLabel(id); l != "" {
+		return strings.ToLower(l)
+	}
+	return id
 }
 
 // orList joins names as "a, b or c".
