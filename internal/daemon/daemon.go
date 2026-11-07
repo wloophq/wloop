@@ -453,6 +453,7 @@ type Server struct {
 	readRows     func(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error)
 	reconcile    reconcileState
 	homes        homeCache
+	healths      pluginHealths
 	mutesFailing atomic.Bool
 	// intakesExpiredAt is the minute the read model's keeper last expired
 	// the session intakes; only the keeper touches it.
