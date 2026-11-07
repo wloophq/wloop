@@ -168,7 +168,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		return Command{}, false
 	}
 	if n < 1 || n > len(c.answers()) {
-		m.status = fmt.Sprintf("no option %d", n)
+		m.status = m.w().T("no option {n}", map[string]any{"n": n})
 		return Command{}, false
 	}
 	if c.row != nil {

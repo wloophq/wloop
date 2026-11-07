@@ -3,6 +3,8 @@ package archtest
 import (
 	"go/parser"
 	"go/token"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -20,20 +22,31 @@ getJSON("/api/strings");
 `
 	flagged(t, "js", ruleClientProse("internal/web/static/x.js", js), 3, "goes through t or tn")
 	src := `package p
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 type noUnit struct{}
-func (noUnit) Error() string { return "task has no unit to act on" }
+func (noUnit) Error() string { return "task has no unit to act on" } //prose:internal the note words it through the catalog
 var items = []MenuItem{{Title: "Sweep now"}}
 var keyed = c.T("Sweep now", nil)
 var err = errors.New("task has no unit")
+var status = fmt.Sprintf("waiting for %d things", 3)
+var wrapped = fmt.Errorf("reading the plan: %w", err) //prose:internal wraps an error the caller words
 func f() { panic("the window needs macOS") }
 `
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "p.go", src, 0)
+	f, err := parser.ParseFile(fset, "p.go", src, parser.ParseComments)
 	if err != nil {
 		t.Fatal(err)
 	}
-	flagged(t, "go", ruleGoClientProse(fset, "internal/client/menubar/p.go", f), 1, "Sweep now")
+	got := ruleGoClientProse(fset, "internal/client/menubar/p.go", f)
+	flagged(t, "go", got, 3, "texts.Catalog")
+	for _, want := range []string{"Sweep now", "task has no unit", "waiting for %d things"} {
+		if !slices.ContainsFunc(got, func(g string) bool { return strings.Contains(g, want) }) {
+			t.Errorf("%q is not flagged: %q", want, got)
+		}
+	}
 	for s, want := range map[string]bool{"Open cockpit": true, "Waiting": true, "row muted": true, "is:open waits-on:me": false, "https://x.y": false,
 		".row .title": false, "Escape": false, "ok": false, "a": false, "Jan": true} {
 		if got := isProse(s); got != want {

@@ -264,12 +264,12 @@ func (c *Controller) served(ctx context.Context, r Response, cat Category, task 
 // notOffered is a button the notification of a draft does not offer.
 type notOffered struct{ action string }
 
-func (e notOffered) Error() string { return "a draft's notification offers no " + e.action }
+func (e notOffered) Error() string { return "a draft's notification offers no " + e.action } //prose:internal errorText words it through the catalog
 
 // noUnit is a task with no unit an action could act on.
 type noUnit struct{ task string }
 
-func (e noUnit) Error() string { return "task " + e.task + " has no unit to act on" }
+func (e noUnit) Error() string { return "task " + e.task + " has no unit to act on" } //prose:internal errorText words it through the catalog
 
 // errorText is err as a note's body says it: the menu bar's own errors in the catalog's words, the
 // daemon's as it wrote them.

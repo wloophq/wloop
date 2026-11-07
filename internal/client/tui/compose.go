@@ -83,11 +83,11 @@ func (m *Model) pickDraft(k Key) bool {
 		return false
 	}
 	if n > len(ds) {
-		m.status = fmt.Sprintf("no draft %d", n)
+		m.status = m.w().T("no draft {n}", map[string]any{"n": n})
 		return true
 	}
 	m.picked = ds[n-1].ID
-	m.status = fmt.Sprintf("draft %d picked: a approves, i edits, Backspace discards, Esc lets go", n)
+	m.status = m.w().T("draft {n} picked: a approves, i edits, {back} discards, {esc} lets go", map[string]any{"n": n, "back": "Backspace", "esc": "Esc"})
 	return true
 }
 

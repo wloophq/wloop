@@ -180,28 +180,29 @@ func ruleClientProse(file string, src string) []string {
 	return out
 }
 
-// goExempt are the calls whose literal arguments are no text a person reads, or are the catalog's keys.
-var goExempt = map[string]bool{"T": true, "TN": true, "New": true, "panic": true, "Errorf": true, "Log": true, "Logf": true, "logf": true, "Printf": true, "Println": true,
-	"Debug": true, "Info": true, "Warn": true, "Error": true, "Sprintf": true, "Fprintf": true, "Exec": true, "Command": true, "CommandContext": true}
+// goExempt are the calls whose literal arguments are no text a person reads (logs, panics, the arguments of a
+// process), or are the catalog's keys.
+var goExempt = map[string]bool{"T": true, "TN": true, "panic": true, "Log": true, "Logf": true, "logf": true,
+	"Debug": true, "Info": true, "Warn": true, "Error": true, "Exec": true, "Command": true, "CommandContext": true}
+
+// proseInternal marks a literal no person reads, such as an error that only wraps another, on its line:
+// "//prose:internal <why>".
+const proseInternal = "//prose:internal "
 
 // ruleGoClientProse flags each prose literal of the Go client file outside the catalog: the catalog's keys,
-// errors, logs and formats are not prose a client shows itself.
+// logs and literals marked proseInternal are not prose a client shows.
 func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File) []string {
-	exempt := map[*ast.BasicLit]bool{}
-	exemptAll := func(n ast.Node) {
-		ast.Inspect(n, func(m ast.Node) bool {
-			if lit, ok := m.(*ast.BasicLit); ok {
-				exempt[lit] = true
+	internal := map[int]bool{}
+	for _, g := range f.Comments {
+		for _, c := range g.List {
+			if strings.HasPrefix(c.Text, proseInternal) {
+				internal[fset.Position(c.Pos()).Line] = true
 			}
-			return true
-		})
+		}
 	}
+	exempt := map[*ast.BasicLit]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch x := n.(type) {
-		case *ast.FuncDecl:
-			if x.Name.Name == "Error" && x.Recv != nil {
-				exemptAll(x.Body)
-			}
 		case *ast.CallExpr:
 			name := ""
 			switch fn := x.Fun.(type) {
@@ -232,7 +233,7 @@ func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File) []string {
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		lit, ok := n.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING || exempt[lit] {
+		if !ok || lit.Kind != token.STRING || exempt[lit] || internal[fset.Position(lit.Pos()).Line] {
 			return true
 		}
 		s, err := strconv.Unquote(lit.Value)
@@ -437,5 +438,30 @@ func ruleHTMLProse(file, src string) []string {
 			}
 		}
 		line += strings.Count(raw, "\n")
+	}
+}
+
+// proseInternalMarks is how many literals of the person-facing clients are marked proseInternal; a new mark
+// raises it on purpose, in review.
+const proseInternalMarks = 10
+
+// TestProseInternalMarksStayFew checks that the clients mark as no text a person reads exactly
+// proseInternalMarks literals, so a mark is a reviewed exception.
+func TestProseInternalMarksStayFew(t *testing.T) {
+	n := 0
+	forEachFile(t, false, func(_ *token.FileSet, file string, f *ast.File) {
+		if !strings.HasPrefix(file, "internal/client/") || !slices.Contains(proseClients, proseBucket(file)) {
+			return
+		}
+		for _, g := range f.Comments {
+			for _, c := range g.List {
+				if strings.HasPrefix(c.Text, proseInternal) {
+					n++
+				}
+			}
+		}
+	})
+	if n != proseInternalMarks {
+		t.Errorf("the clients mark %d literals %q, proseInternalMarks is %d", n, strings.TrimSpace(proseInternal), proseInternalMarks)
 	}
 }

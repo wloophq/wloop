@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -151,6 +152,20 @@ type carried struct {
 	drafts []api.Draft
 	// matched are the open tasks a match command read.
 	matched []api.TaskView
+}
+
+// worded is an error of the terminal's own, which words itself in a catalog.
+type worded func(*texts.Catalog) string
+
+func (e worded) Error() string { return e(texts.English()) }
+
+// errorText is err as the status line says it: the terminal's own errors in the model's words.
+func (m *Model) errorText(err error) string {
+	var w worded
+	if errors.As(err, &w) {
+		return w(m.w())
+	}
+	return err.Error()
 }
 
 // Run draws the views and applies keys until q, Ctrl-C, the end of the keys
@@ -353,7 +368,7 @@ func (m *Model) apply(r loaded) {
 func edit(t Terminal, text string) (string, error) {
 	ed, ok := t.(Editor)
 	if !ok {
-		return "", errors.New("no editor here: type the text on the bottom line")
+		return "", worded(func(w *texts.Catalog) string { return w.T("no editor here: type the text on the bottom line", nil) })
 	}
 	return ed.Edit(text)
 }
@@ -810,14 +825,18 @@ func specsVersion(rows []api.Row) string {
 	return ""
 }
 
-func acceptedLine(i api.Intake) string {
-	switch {
-	case !i.Joined:
-		return fmt.Sprintf("accepted as intake %d", i.Seq)
-	case i.Waiting():
-		return fmt.Sprintf("joined intake %d", i.Seq)
+// acceptedLine says what became of a request, in the model's words.
+func acceptedLine(i api.Intake) func(*texts.Catalog) string {
+	params := map[string]any{"n": i.Seq}
+	return func(w *texts.Catalog) string {
+		switch {
+		case !i.Joined:
+			return w.T("accepted as intake {n}", params)
+		case i.Waiting():
+			return w.T("joined intake {n}", params)
+		}
+		return w.T("intake {n} is already starting the turn; this request changed nothing", params)
 	}
-	return fmt.Sprintf("intake %d is already starting the turn; this request changed nothing", i.Seq)
 }
 
 // carry takes c to the daemon: a task's verb, detail or capture, a link
@@ -866,15 +885,15 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		}
 		return carried{note: func(w *texts.Catalog) string { return w.T("the review is done", nil) }}, nil
 	}
-	lines, err := carryAction(ctx, d, c)
-	return carried{lines: lines}, err
+	lines, said, err := carryAction(ctx, d, c)
+	return carried{lines: lines, note: said}, err
 }
 
 // openLink opens the command's link, looking it up first from the task's
 // cards when the list had none.
 func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskView, error) {
 	if cfg.OpenURL == nil {
-		return nil, api.TaskView{}, errors.New("opening links is not supported here")
+		return nil, api.TaskView{}, worded(func(w *texts.Catalog) string { return w.T("opening links is not supported here", nil) })
 	}
 	link := c.open
 	if link == "" {
@@ -888,11 +907,13 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 			}
 		}
 		if link == "" {
-			return nil, e, errors.New("its unit has no link")
+			return nil, e, worded(func(w *texts.Catalog) string { return w.T("its unit has no link", nil) })
 		}
 	}
 	if !strings.HasPrefix(link, "https://") {
-		return nil, api.TaskView{}, fmt.Errorf("not opening %q: only https links open", link)
+		return nil, api.TaskView{}, worded(func(w *texts.Catalog) string {
+			return w.T("not opening {link}: only https links open", map[string]any{"link": strconv.Quote(link)})
+		})
 	}
 	if err := cfg.OpenURL(link); err != nil {
 		return nil, api.TaskView{}, err
@@ -901,25 +922,25 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 }
 
 // carryAction takes a plan action to its item, any other to its unit.
-func carryAction(ctx context.Context, d Daemon, c Command) ([]string, error) {
+func carryAction(ctx context.Context, d Daemon, c Command) ([]string, func(*texts.Catalog) string, error) {
 	if act, ok := planActs[c.Action]; ok && c.PlanID != "" {
 		res, err := d.ActOnPlan(ctx, api.PlanActRequest{IDs: []string{c.PlanID}, Action: act, Guidance: c.Req.Guidance})
 		switch {
 		case err != nil:
-			return nil, err
+			return nil, nil, err
 		case len(res.Errors) > 0:
-			return nil, errors.New(strings.Join(res.Errors, "; "))
+			return nil, nil, errors.New(strings.Join(res.Errors, "; "))
 		case len(res.Items) == 0:
-			return nil, nil
+			return nil, nil, nil
 		}
 		it := res.Items[0]
-		return []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}, nil
+		return []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}, nil, nil
 	}
 	res, err := d.Ask(ctx, c.Unit, c.Action, c.Req)
 	if res.Intake != nil {
-		return []string{acceptedLine(*res.Intake)}, err
+		return nil, acceptedLine(*res.Intake), err
 	}
-	return res.Output, err
+	return res.Output, nil, err
 }
 
 func deref(p *[]api.PlanItem) []api.PlanItem {

@@ -314,7 +314,7 @@ func (m *Model) navigate(to string) {
 // pickArea makes the lists follow area n of the served areas.
 func (m *Model) pickArea(n int) {
 	if n < 1 || n > len(m.viewsCat.Areas) {
-		m.status = fmt.Sprintf("no area %d", n)
+		m.status = m.w().T("no area {n}", map[string]any{"n": n})
 		return
 	}
 	m.setArea(m.viewsCat.Areas[n-1])
@@ -349,7 +349,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 		return Command{}, false
 	}
 	if _, busy := m.busy[taskUnit(e.ID)]; busy {
-		m.status = fmt.Sprintf("%s %s still running", m.busy[taskUnit(e.ID)], taskLabel(e))
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[taskUnit(e.ID)], "task": taskLabel(e)})
 		return Command{}, false
 	}
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
@@ -466,7 +466,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 			continue
 		}
 		if _, busy := m.busy[r.Unit]; busy {
-			m.status = fmt.Sprintf("%s %s still running", m.busy[r.Unit], r.Label)
+			m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
 			return Command{}, false
 		}
 		if !st.Enabled {
@@ -476,7 +476,7 @@ func (m *Model) taskUnitAction(k Key) (Command, bool) {
 		return m.begin(r, *spec, st, k.Read)
 	}
 	if fallback != nil {
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(fallback.Label), taskLabel(e))
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(fallback.Label), "task": taskLabel(e)})
 	}
 	return Command{}, false
 }
@@ -589,7 +589,7 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 		about := strings.Join(slices.DeleteFunc([]string{s.Summary, st.Note}, func(x string) bool { return x == "" }), " · ")
 		items = append(items, paletteItem{label: cmp.Or(st.Label, s.Label) + " " + r.Label, key: s.Key, about: about, run: func(read uint64) (Command, bool) {
 			if _, busy := m.busy[r.Unit]; busy {
-				m.status = fmt.Sprintf("%s %s still running", m.busy[r.Unit], r.Label)
+				m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.busy[r.Unit], "task": r.Label})
 				return Command{}, false
 			}
 			return m.begin(r, spec, st, read)

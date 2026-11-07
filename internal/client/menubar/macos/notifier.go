@@ -218,10 +218,10 @@ func nsError(err objc.ID) error {
 	if desc := goString(err.Send(sel("localizedDescription"))); desc != "" {
 		return errors.New(desc)
 	}
-	return errors.New("unknown error")
+	return errors.New("unknown error") //prose:internal logged when macOS gives no description
 }
 
-var errPostTimeout = errors.New("the notification center did not answer")
+var errPostTimeout = errors.New("the notification center did not answer") //prose:internal logged, never shown
 
 const postTimeout = 5 * time.Second
 
@@ -253,7 +253,7 @@ func (n *notifier) Post(note menubar.Notification) error {
 	select {
 	case err := <-got:
 		if err != nil {
-			return fmt.Errorf("the notification center refused the notification: %w", err)
+			return fmt.Errorf("the notification center refused the notification: %w", err) //prose:internal logged by the menu bar, never shown
 		}
 		return nil
 	case <-time.After(postTimeout):
@@ -269,7 +269,7 @@ func (n *notifier) attachment(img menubar.Image) objc.ID {
 	path, err := imageFile(n.imageDir, img)
 	if path == "" {
 		if err != nil {
-			attachmentFailed.Do(func() { fmt.Fprintf(os.Stderr, "notification image: %v; posting without images\n", err) })
+			attachmentFailed.Do(func() { fmt.Fprintf(os.Stderr, "notification image: %v; posting without images\n", err) }) //prose:internal the app's log on stderr
 		}
 		return 0
 	}
@@ -277,7 +277,7 @@ func (n *notifier) attachment(img menubar.Image) objc.ID {
 	a := class("UNNotificationAttachment").Send(sel("attachmentWithIdentifier:URL:options:error:"), nsString(string(img)), url, objc.ID(0), objc.ID(0))
 	if a == 0 {
 		os.Remove(path)
-		attachmentFailed.Do(func() { fmt.Fprintf(os.Stderr, "notification image: macOS refused %s; posting without images\n", path) })
+		attachmentFailed.Do(func() { fmt.Fprintf(os.Stderr, "notification image: macOS refused %s; posting without images\n", path) }) //prose:internal the app's log on stderr
 	}
 	return a
 }

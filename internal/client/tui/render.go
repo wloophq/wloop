@@ -349,7 +349,7 @@ func (m *Model) question(q *api.QuestionView, fact func(label, text string, styl
 	}
 	fact(label, text, t.Yellow)
 	if q.Verdict != "" {
-		fact("", fmt.Sprintf("drafted %s, %d blocking, %d non-blocking", q.Verdict, q.Blocking, q.NonBlocking), t.Dim)
+		fact("", m.w().T("drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking", map[string]any{"verdict": q.Verdict, "blocking": q.Blocking, "nonblocking": q.NonBlocking}), t.Dim)
 	}
 	if q.Kind == "confirm" {
 		fact("", m.w().T("y yes · n no", nil), plain)
@@ -508,9 +508,9 @@ func (m *Model) statusLine(width int) string {
 	case m.status != "":
 		text = m.status
 	case len(m.health.Warnings) > 1:
-		text, style = fmt.Sprintf("warning: %s (+%d more)", m.health.Warnings[0], len(m.health.Warnings)-1), t.Yellow
+		text, style = m.w().T("warning: {warning} (+{n} more)", map[string]any{"warning": m.health.Warnings[0], "n": len(m.health.Warnings) - 1}), t.Yellow
 	case len(m.health.Warnings) == 1:
-		text, style = "warning: "+m.health.Warnings[0], t.Yellow
+		text, style = m.w().T("warning: {warning}", map[string]any{"warning": m.health.Warnings[0]}), t.Yellow
 	}
 	if text = termfmt.Cut(text, width); text == "" {
 		return ""

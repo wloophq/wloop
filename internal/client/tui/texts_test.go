@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,4 +78,17 @@ func TestRunReadsTheServedStrings(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+func TestTheTerminalWordsItsOwnErrors(t *testing.T) {
+	m := newModel(t)
+	m.words = ptBR(t)
+	_, _, err := openLink(context.Background(), Config{}, Command{})
+	m.Done(Command{Action: "Abrir", Label: "t-1"}, nil, err)
+	if want := "Abrir t-1 falhou: abrir links não é suportado aqui"; m.status != want {
+		t.Fatalf("%q, want %q", m.status, want)
+	}
+	if err.Error() != "opening links is not supported here" {
+		t.Fatalf("%q", err)
+	}
 }

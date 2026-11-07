@@ -420,12 +420,12 @@ func (m *Model) action(k Key) (Command, bool) {
 		return Command{}, false
 	}
 	if running, busy := m.busy[r.Unit]; busy {
-		m.status = fmt.Sprintf("%s %s still running", running, r.Label)
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": running, "task": r.Label})
 		return Command{}, false
 	}
 	switch {
 	case !offered:
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(spec.Label), r.Label)
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(spec.Label), "task": r.Label})
 	case !st.Enabled:
 		m.status = st.Reason
 	default:
@@ -519,7 +519,7 @@ func questionLabel(w *texts.Catalog, name string, q *api.QuestionView) string {
 	}
 	label := name + ": " + text
 	if q.Verdict != "" {
-		label += fmt.Sprintf(" (drafted %s, %d blocking, %d non-blocking)", q.Verdict, q.Blocking, q.NonBlocking)
+		label += " (" + w.T("drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking", map[string]any{"verdict": q.Verdict, "blocking": q.Blocking, "nonblocking": q.NonBlocking}) + ")"
 	}
 	if q.Kind == "confirm" {
 		return label + " y/n"
@@ -770,7 +770,7 @@ func (m *Model) Done(c Command, lines []string, err error) {
 	delete(m.busy, c.Unit)
 	switch {
 	case err != nil:
-		m.status = fmt.Sprintf("%s %s failed: %v", c.Action, c.Label, err)
+		m.status = m.w().T("{action} {task} failed: {error}", map[string]any{"action": c.Action, "task": c.Label, "error": m.errorText(err)})
 	case len(lines) > 0:
 		m.status = fmt.Sprintf("%s %s: %s", c.Action, c.Label, lines[len(lines)-1])
 	default:

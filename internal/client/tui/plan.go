@@ -118,12 +118,12 @@ func (m *Model) planAction(k Key) (Command, bool) {
 	}
 	label := itemLabel(it)
 	if running, busy := m.busy[it.Unit]; busy {
-		m.status = fmt.Sprintf("%s %s still running", running, label)
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": running, "task": label})
 		return Command{}, false
 	}
 	switch {
 	case !offered:
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(spec.Label), label)
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(spec.Label), "task": label})
 	case !st.Enabled:
 		m.status = st.Reason
 	default:
@@ -210,7 +210,7 @@ func (m *Model) closedLines(width int, now time.Time) []string {
 		return nil
 	}
 	t := m.t
-	out := []string{"  " + t.Bold(fmt.Sprintf("Sessions closed in the last day (%d)", len(m.closed)))}
+	out := []string{"  " + t.Bold(m.w().T("Sessions closed in the last day ({n})", map[string]any{"n": len(m.closed)}))}
 	for _, c := range m.closed {
 		out = append(out, "  "+termfmt.Cut(fmt.Sprintf("%s  %s  %s", span(now.Sub(c.At)), c.Session, oneLine(c.Reason)), width-2))
 		if c.Resume != "" {
