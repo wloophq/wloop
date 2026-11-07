@@ -1,0 +1,106 @@
+# What the timeline calls each of the core's event kinds; a plugin words its own kinds in its manifest.
+
+[events.held]
+label = "paused"
+
+[events.released]
+label = "resumed"
+
+[events.muted]
+label = "muted"
+
+[events.unmuted]
+label = "unmuted"
+
+[events.adopted]
+label = "adopted"
+
+[events.status]
+label = "board"
+
+[events.removed]
+label = "workspace removed"
+
+[events.nudged]
+label = "nudged"
+
+[events.tracked]
+label = "tracked"
+
+[events.untracked]
+label = "untracked"
+
+[events.answered]
+label = "answered"
+
+[events.turn_sent]
+label = "turn sent"
+
+[events.turn_started]
+label = "turn started"
+
+[events.turn_ended]
+label = "turn ended"
+
+[events.turn_resumed]
+label = "turn resumed"
+
+[events.turn_withdrawn]
+label = "turn withdrawn"
+
+[events.question_dismissed]
+label = "question dismissed"
+
+[events.turn_delivered]
+label = "turn delivered"
+
+[events.answer_routed]
+label = "answer routed"
+
+[events.late_record]
+label = "late record"
+
+[events.stop_blocked]
+label = "stop blocked"
+
+[events.turn_stopped]
+label = "turn stopped"
+
+[events.guide_trimmed]
+label = "guide trimmed"
+
+[events.dossier_restored]
+label = "dossier file restored"
+
+[events.dossier_granted]
+label = "dossier granted to the session"
+
+[events.dossier_call]
+label = "dossier compaction, US$"
+
+[events.brief_waiting]
+label = "waiting for the brief"
+
+[events.intake_accepted]
+label = "request accepted"
+
+[events.intake_briefing]
+label = "request waits for the brief"
+
+[events.intake_starting]
+label = "request starting"
+
+[events.intake_started]
+label = "request started"
+
+[events.intake_failed]
+label = "request failed"
+
+[events.intake_canceled]
+label = "request canceled"
+
+[events.intake_guidance]
+label = "request guidance replaced"
+
+[events.workflow_step_ran]
+label = "step ran"

@@ -992,23 +992,6 @@ func TestAnswerSaidJoinsTheChoiceAndTheNote(t *testing.T) {
 	}
 }
 
-func TestEveryLoopActionHasALabelAndIsALoopEvent(t *testing.T) {
-	src := appJS(t)
-	labels := src[strings.Index(src, "const EVENT_LABEL = {"):]
-	labels = labels[:strings.Index(labels, "};")]
-	loop := src[strings.Index(src, "const LOOP_EVENTS = "):]
-	loop = loop[:strings.Index(loop, "\n")]
-	for _, kind := range []string{"turn_sent", "turn_delivered", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn",
-		"answered", "answer_routed", "question_dismissed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"} {
-		if !strings.Contains(labels, kind+": ") {
-			t.Errorf("%s has no label", kind)
-		}
-		if !strings.Contains(loop, `"`+kind+`"`) {
-			t.Errorf("%s is not a loop event", kind)
-		}
-	}
-}
-
 func TestTimelineShowsAnAnswerOnceWhenTheTurnHasNoSentAt(t *testing.T) {
 	d := map[string]any{
 		"turn":   map[string]any{"turn": map[string]any{"seq": 1}, "answers": []any{map[string]any{"turn_seq": 1, "text": "go", "source": "tui", "at": "2026-10-18T12:00:00Z"}}},

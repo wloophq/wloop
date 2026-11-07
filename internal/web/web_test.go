@@ -51,7 +51,7 @@ func TestCockpitHasTheRecentView(t *testing.T) {
 
 func TestCockpitOffersRemoveAllCleanOnAViewThatAsks(t *testing.T) {
 	for file, wants := range map[string][]string{
-		"app.js":   {`removed: "workspace removed"`, `h("details"`, "out.detail"},
+		"app.js":   {`h("details"`, "out.detail"},
 		"views.js": {"/api/workspaces/remove-clean", "spec.remove_clean", "Remove all clean", "k.detail"},
 	} {
 		rec := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 		Label string `json:"label"`
 		Loop  bool   `json:"loop"`
 	}
-	nodeRun(t, jsBlock(t, appJS(t), "EVENT_LABEL")+jsConst(t, appJS(t), "LOOP_EVENTS")+jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
+	nodeRun(t, jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
 		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true }] });
 process.stdout.write(JSON.stringify({ label: eventLabel("round_blocked"), loop: loopEvent("round_blocked") }));`, nil, &got)
 	if got.Label != "round blocked" || !got.Loop {
@@ -117,7 +117,7 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
 		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
-		`turn_sent: "turn sent"`, `turn_started: "turn started"`, `turn_ended: "turn ended"`, `turn_resumed: "turn resumed"`, "timelineEvents(d)"} {
+		"timelineEvents(d)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("app.js lacks %s", want)
 		}

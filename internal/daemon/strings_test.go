@@ -34,3 +34,17 @@ func TestGetStringsServesTheLoadedLocale(t *testing.T) {
 		t.Fatalf("%+v", en)
 	}
 }
+
+func TestCatalogServesCoreEventLabels(t *testing.T) {
+	t.Parallel()
+	var got api.CatalogResponse
+	get(t, newServer(t), api.Catalog, &got)
+	var sent, held bool
+	for _, e := range got.Events {
+		sent = sent || e == api.EventSpec{Kind: "turn_sent", Label: "turn sent", Loop: true}
+		held = held || e.Provider == "" && e.Kind == "held" && e.Label == "paused"
+	}
+	if !sent || !held {
+		t.Fatalf("%+v", got.Events)
+	}
+}

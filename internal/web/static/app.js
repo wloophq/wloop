@@ -54,14 +54,14 @@ function reviewDecision(decision) {
   return (s.decisions || {})[decision] || s.no_decision || "";
 }
 
-// eventLabel is an event kind in a few words: its plugin's, else the core's.
+// eventLabel is an event kind in a few words, as the catalog serves it: a plugin's kinds and the core's.
 function eventLabel(kind) {
-  return catalog.events.get(kind) || EVENT_LABEL[kind] || kind.replaceAll("_", " ");
+  return catalog.events.get(kind) || kind.replaceAll("_", " ");
 }
 
 // loopEvent says whether an event kind is the loop's doing.
 function loopEvent(kind) {
-  return LOOP_EVENTS.has(kind) || catalog.loopEvents.has(kind);
+  return catalog.loopEvents.has(kind);
 }
 
 function kindLabel(kind, provider) {
@@ -144,16 +144,6 @@ function sm(r) {
   return r.summary || {};
 }
 
-const EVENT_LABEL = {
-  held: "paused", released: "resumed", muted: "muted", unmuted: "unmuted", adopted: "adopted", status: "board",
-  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered",
-  turn_sent: "turn sent", turn_started: "turn started", turn_ended: "turn ended", turn_resumed: "turn resumed",
-  turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
-  turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
-  stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
-  workflow_step_ran: "step ran",
-};
-const LOOP_EVENTS = new Set(["held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_MIN = 300;

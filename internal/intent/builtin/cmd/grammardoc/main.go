@@ -275,6 +275,7 @@ var sections = []struct {
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
 	{builtin.SurfaceStrings, "Client strings (`strings.toml`)"},
+	{builtin.SurfaceTimeline, "The core's event kinds (`timeline.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
@@ -447,6 +448,7 @@ var schemas = []struct {
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
 	{"ui.schema.json", "A plugin's views, facets and situations (ui.toml)", builtin.SurfaceUI},
 	{"strings.schema.json", "Client strings (strings.toml)", builtin.SurfaceStrings},
+	{"timeline.schema.json", "The core's event kinds (timeline.toml)", builtin.SurfaceTimeline},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 

@@ -1,0 +1,104 @@
+[events.held]
+label = "pausado"
+
+[events.released]
+label = "retomado"
+
+[events.muted]
+label = "silenciado"
+
+[events.unmuted]
+label = "silêncio removido"
+
+[events.adopted]
+label = "assumido"
+
+[events.status]
+label = "quadro"
+
+[events.removed]
+label = "workspace removido"
+
+[events.nudged]
+label = "cutucado"
+
+[events.tracked]
+label = "acompanhado"
+
+[events.untracked]
+label = "não acompanhado"
+
+[events.answered]
+label = "respondido"
+
+[events.turn_sent]
+label = "turno enviado"
+
+[events.turn_started]
+label = "turno iniciado"
+
+[events.turn_ended]
+label = "turno encerrado"
+
+[events.turn_resumed]
+label = "turno retomado"
+
+[events.turn_withdrawn]
+label = "turno retirado"
+
+[events.question_dismissed]
+label = "pergunta dispensada"
+
+[events.turn_delivered]
+label = "turno entregue"
+
+[events.answer_routed]
+label = "resposta encaminhada"
+
+[events.late_record]
+label = "registro atrasado"
+
+[events.stop_blocked]
+label = "parada bloqueada"
+
+[events.turn_stopped]
+label = "turno parado"
+
+[events.guide_trimmed]
+label = "guia cortado"
+
+[events.dossier_restored]
+label = "arquivo do dossiê restaurado"
+
+[events.dossier_granted]
+label = "dossiê concedido à sessão"
+
+[events.dossier_call]
+label = "compactação do dossiê, US$"
+
+[events.brief_waiting]
+label = "esperando o brief"
+
+[events.intake_accepted]
+label = "pedido aceito"
+
+[events.intake_briefing]
+label = "pedido espera o brief"
+
+[events.intake_starting]
+label = "pedido iniciando"
+
+[events.intake_started]
+label = "pedido iniciado"
+
+[events.intake_failed]
+label = "pedido falhou"
+
+[events.intake_canceled]
+label = "pedido cancelado"
+
+[events.intake_guidance]
+label = "orientação do pedido substituída"
+
+[events.workflow_step_ran]
+label = "passo executado"
