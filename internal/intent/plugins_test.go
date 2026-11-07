@@ -158,7 +158,7 @@ func TestTheBundledSlackLayerLoadsWithNoPluginDirectory(t *testing.T) {
 					t.Errorf("workflow %s loaded: %t, want %t", w, !c.want, c.want)
 				}
 			}
-			tools, problems := loadTools(profile.Chain(cfg), os.DirFS("../../profiles/default"))
+			tools, problems := loadTools(profile.Chain(cfg), readerOf(os.DirFS("../../profiles/default")))
 			if len(problems) > 0 {
 				t.Fatalf("%s", problems.Error())
 			}

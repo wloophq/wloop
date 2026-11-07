@@ -410,17 +410,17 @@ type tasksLoad struct {
 
 // BundledTasks is the bundled profile's tasks.toml alone.
 func BundledTasks(bundled fs.FS) (TasksDef, Problems) {
-	return loadTasks(nil, bundled, nil)
+	return loadTasks(nil, readerOf(bundled), nil)
 }
 
 // loadTasks reads tasks.toml from bundled and the user's layers: a higher
 // layer's key replaces a lower one's. A verb's to and from name declared
 // states, its by keys actors, its gate one gates declares (nil gates checks
 // none), and its by predicates compile over the task's facts.
-func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef, Problems) {
+func loadTasks(layers []profile.Layer, r layerReader, gates *GatesDef) (TasksDef, Problems) {
 	l := &tasksLoad{def: TasksDef{Verbs: map[string]VerbText{}}, states: map[string]ref{}, gates: map[string]ref{}, preds: map[string]ref{},
 		survivors: map[string]ref{}}
-	problems, read := readLayered(layers, bundled, TasksFile, l.merge)
+	problems, read := readLayered(layers, r, TasksFile, l.merge)
 	if !read {
 		return l.def, problems
 	}

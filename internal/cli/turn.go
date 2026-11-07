@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -86,13 +87,32 @@ type envIntents struct {
 	// configErr is the last config failure reported.
 	layers    []profile.Layer
 	configErr string
+	// locale is the locale of the texts a person reads; English when nil, as the CLI reads them.
+	locale func() string
+}
+
+// useLocale makes locale the locale the registry's texts load in.
+func (st *envIntents) useLocale(locale func() string) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.locale = locale
+}
+
+func (st *envIntents) currentLocale() string {
+	st.mu.Lock()
+	locale := st.locale
+	st.mu.Unlock()
+	if locale == nil {
+		return i18n.Default
+	}
+	return locale()
 }
 
 // newEnvIntents is the registry cache of e and of every copy of it, over
 // the bundled intents and the configured profile's.
 func newEnvIntents(e *Env) *envIntents {
 	st := &envIntents{}
-	c, err := turn.NewCache(func() []profile.Layer { return st.profileLayers(e) }, intentload.CacheOptions{Recheck: e.IntentRecheck, OnReload: func() { e.noteConfig() }})
+	c, err := turn.NewCache(func() []profile.Layer { return st.profileLayers(e) }, intentload.CacheOptions{Recheck: e.IntentRecheck, OnReload: func() { e.noteConfig() }, Locale: st.currentLocale})
 	if err != nil {
 		panic(err)
 	}

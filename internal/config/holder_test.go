@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -160,5 +161,22 @@ func TestHolderCallsOnWarningChangeWhenTheWarningFlips(t *testing.T) {
 	r.h.Config()
 	if r.flips != 2 {
 		t.Fatalf("%d flips after the file broke, want 2", r.flips)
+	}
+}
+
+func TestUILocaleAppliesWithoutARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nui = {locale = \"pt-BR\"}\n")
+	r.later()
+	if got := r.h.Config().UI.Locale; got != "pt-BR" || r.h.Stale() || r.h.Warning() != "" {
+		t.Fatalf("locale %q, stale %v, warning %q", got, r.h.Stale(), r.h.Warning())
+	}
+	r.write("sweep = {fast = \"5m\"}\nui = {locale = \"en\"}\n")
+	r.later()
+	if got := r.h.Config().UI.Locale; got != "en" || !r.h.Stale() {
+		t.Fatalf("locale %q, stale %v", got, r.h.Stale())
+	}
+	if w := r.h.Warning(); !strings.Contains(w, "ui.locale") || !strings.Contains(w, "profile") {
+		t.Fatalf("warning %q", w)
 	}
 }

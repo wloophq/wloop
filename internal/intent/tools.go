@@ -34,7 +34,8 @@ type mToolText struct {
 // loadTools reads tools.toml from bundled and the other layers, by tool
 // name: a higher layer's key replaces a lower one's, and a user's text that
 // fails keeps the lower one. A plugin's tools are worded by its layer.
-func loadTools(layers []profile.Layer, bundled fs.FS) (map[string]ToolText, Problems) {
+func loadTools(layers []profile.Layer, r layerReader) (map[string]ToolText, Problems) {
+	bundled := r.bundled
 	out := map[string]ToolText{}
 	if bundled == nil {
 		return out, nil
@@ -168,5 +169,5 @@ func (s *sheet) toolText(path, src string, fields []builtin.AnswerField) bool {
 // BundledTools are the tools' texts of bundled and the bundled plugins'
 // layers.
 func BundledTools(bundled fs.FS) (map[string]ToolText, Problems) {
-	return loadTools(profile.BundledChain(), bundled)
+	return loadTools(profile.BundledChain(), readerOf(bundled))
 }

@@ -274,17 +274,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `empty` (template, localized): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
 - `default_sort` (string, localized): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
 - `lens` (table): What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
-- `lens.default_group` (template): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
-- `lens.board_group` (template): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
-- `lens.no_group` (string): The group menu's entry that lists the view in one group.
-- `lens.copied` (template): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
-- `lens.copied_grouped` (template): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
-- `lens.tag_key` (template): The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.
-- `lens.tag_key_empty` (template): The group of the items with no tag of that key, over the `{{.key}}`.
-- `lens.grouped` (template): What the terminal says after a group pick, over the picked entry's `{{.label}}`.
-- `lens.sorted` (template): What the terminal says after a sort pick, over the picked entry's `{{.label}}`.
-- `lens.descending` (template): The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.
-- `lens.no_lens` (string): What the terminal says when a group or sort pick is asked where no list is on screen.
+- `lens.default_group` (template, localized): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
+- `lens.board_group` (template, localized): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
+- `lens.no_group` (string, localized): The group menu's entry that lists the view in one group.
+- `lens.copied` (template, localized): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
+- `lens.copied_grouped` (template, localized): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
+- `lens.tag_key` (template, localized): The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.
+- `lens.tag_key_empty` (template, localized): The group of the items with no tag of that key, over the `{{.key}}`.
+- `lens.grouped` (template, localized): What the terminal says after a group pick, over the picked entry's `{{.label}}`.
+- `lens.sorted` (template, localized): What the terminal says after a sort pick, over the picked entry's `{{.label}}`.
+- `lens.descending` (template, localized): The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.
+- `lens.no_lens` (string, localized): What the terminal says when a group or sort pick is asked where no list is on screen.
 - `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets.
 - `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.
@@ -1155,6 +1155,11 @@ The fields each notice reads besides `Name` and `Command`:
 - `dossiers.total_cap_mb` (integer, default `2048`): The size of dossiers and archives doctor reports.
 - `dossiers.max_file_mb` (integer, default `5`): The largest file a dossier keeps; a larger one is linked.
 - `dossiers.compact_at_kb` (integer, default `256`): The log size that triggers compaction.
+
+### Interface
+
+- `ui` (table): The interface.
+- `ui.locale` (string): The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart.
 
 ### Daemon
 

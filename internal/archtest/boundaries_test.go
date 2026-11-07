@@ -74,15 +74,15 @@ func leafImports(pkg string, imports []string) []string {
 }
 
 // loaderImports (R3) flags an import of the loader, internal/intent, beyond
-// go-toml, the domain, the front matter, its own subpackages, the profile and
-// the key map.
+// go-toml, the domain, the front matter, its own subpackages, the profile,
+// the key map and i18n.
 func loaderImports(pkg string, imports []string) []string {
 	if pkg != module+"internal/intent" {
 		return nil
 	}
 	var out []string
 	for _, imp := range imports {
-		if !allowedImport(imp, true, "internal/domain", "internal/frontmatter", "internal/intent", "internal/profile", "internal/keys") {
+		if !allowedImport(imp, true, "internal/domain", "internal/frontmatter", "internal/intent", "internal/profile", "internal/keys", "internal/i18n") {
 			out = append(out, fmt.Sprintf("internal/intent imports %s; the loader reads manifests and never reaches turn, the daemon, the cli, the catalog, the core or adapters", imp))
 		}
 	}

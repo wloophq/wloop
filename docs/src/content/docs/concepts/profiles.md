@@ -54,6 +54,21 @@ A turn of any intent records, asks, takes answers and resumes the same way. A us
 
 See [Add your own intent](/guides/custom-intent/) and the [intent manifest](/reference/intent-manifest/).
 
+## Languages
+
+Every text a person reads, a label, a summary, a confirmation, a view's empty line, a notification, comes from the profile and resolves in the interface language: the configuration's `ui.locale`, else the system's preferred languages, else English. Data is never translated: titles, briefs, messages and what an agent writes show as written, and ids stay the same in every language.
+
+A layer translates its files in a mirror under `locales/<tag>/`: `locales/pt-BR/actions.toml` holds the same keys as `actions.toml`, only the texts, and `locales/pt-BR/workflows/<name>/text.md.tmpl` replaces a whole text file. The [language reference](/reference/language/) marks each key that is a text with "localized". Each text resolves on its own, from the highest layer down (your profile, then each plugin's layer, then the bundled one):
+
+1. a layer that holds the text in your language wins;
+2. a layer whose English text differs from the one below it wins with that text, so a label you rewrote reads as you wrote it in every language;
+3. a layer that holds the same English text as the one below it, as a copied file does, passes to the layer below;
+4. the bundled English text ends the walk, so a text without a translation shows in English, never as a key or empty.
+
+With the bundled `pause.label = "Pause"` translated as `"Pausar"`: no file of yours, or a copy of `actions.toml` that keeps `"Pause"`, reads `"Pausar"`; your `"Hold"` reads `"Hold"`; your `"Hold"` with your own `locales/pt-BR/actions.toml` saying `"Segurar"` reads `"Segurar"`. The rule holds per key also where a file of yours replaces another whole, such as a workflow's `workflow.toml`.
+
+A translation may use only the fields its English text uses (`{{.label}}`, `{name}`); one that names another, or a key that is no text, is a profile problem that names the file and the key, and the English text shows instead. Where a count meets a noun, a template text writes `{{plural .n "one" "draft" "other" "drafts"}}`, and the form follows the language's plural rules. See [Translate the interface](/guides/localization/).
+
 ## The skills
 
 `{{command}} install` installs five skills into every agent home:

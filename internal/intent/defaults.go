@@ -6,12 +6,14 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -46,6 +48,16 @@ type sheet struct {
 	// gates is the profile's gates.toml, whose [approval] decides what a
 	// manifest's [gates.approval] leaves out.
 	gates GatesDef
+	// funcs are the template functions of the file's texts; TextFuncs of English when nil.
+	funcs template.FuncMap
+}
+
+// textFuncs are the template functions of s's texts.
+func (s *sheet) textFuncs() template.FuncMap {
+	if s.funcs == nil {
+		return TextFuncs(i18n.Default)
+	}
+	return s.funcs
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.

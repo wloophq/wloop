@@ -248,6 +248,13 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `dossiers.max_file_mb` | integer | `5` | The largest file a dossier keeps; a larger one is linked. |
 | `dossiers.compact_at_kb` | integer | `256` | The log size that triggers compaction. |
 
+### Interface
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `ui` | table |  | The interface. |
+| `ui.locale` | string |  | The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart. |
+
 ### Daemon
 
 | Setting | Kind | Default | Meaning |

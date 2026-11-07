@@ -66,6 +66,10 @@ func NewTexts(layers []Layer, bundled fs.FS, locale string, keys TextKeys) *Text
 // Locale is the locale t resolves texts in.
 func (t *Texts) Locale() string { return t.locale }
 
+// Translates says whether some layer holds texts in t's locale, or in the one nearest it; when false every
+// text reads as its layers write it.
+func (t *Texts) Translates() bool { return t.dir != "" }
+
 // Localize is src, layer l's file rel, with each text key's value replaced by Text(rel, path). Its problems
 // are those of rel's locale files in every layer, reported by the first of Localize and Problems to read rel.
 func (t *Texts) Localize(l Layer, rel string, src []byte) ([]byte, Problems) {

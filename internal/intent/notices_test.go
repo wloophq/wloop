@@ -12,7 +12,7 @@ import (
 )
 
 func TestEveryNoticeHasABundledText(t *testing.T) {
-	notices, problems := loadNotices(nil, os.DirFS("../../profiles/default"))
+	notices, problems := loadNotices(nil, readerOf(os.DirFS("../../profiles/default")))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -30,7 +30,7 @@ func TestAUserNoticeReplacesTheBundledOneUnlessItFails(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, NoticesFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	notices, problems := loadNotices([]profile.Layer{{Name: "user", Dir: dir}}, fstest.MapFS{NoticesFile: {Data: []byte(bundled)}})
+	notices, problems := loadNotices([]profile.Layer{{Name: "user", Dir: dir}}, readerOf(fstest.MapFS{NoticesFile: {Data: []byte(bundled)}}))
 	if notices["answered"] != "look at {{.Gate}} on {{.Unit}}" || notices["record_owed"] != "owed {{.Turn}}" {
 		t.Fatalf("notices %+v", notices)
 	}

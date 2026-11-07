@@ -201,18 +201,18 @@ type mGateIntent struct {
 }
 
 // BundledGates is the gates.toml of bundled alone.
-func BundledGates(bundled fs.FS) (GatesDef, Problems) { return loadGates(nil, bundled) }
+func BundledGates(bundled fs.FS) (GatesDef, Problems) { return loadGates(nil, readerOf(bundled)) }
 
 // loadGates reads gates.toml from bundled and the user's layers: a higher
 // layer's key replaces a lower one's.
-func loadGates(layers []profile.Layer, bundled fs.FS) (GatesDef, Problems) {
+func loadGates(layers []profile.Layer, r layerReader) (GatesDef, Problems) {
 	var d GatesDef
-	problems, read := readLayered(layers, bundled, GatesFile, func(file string, src []byte) Problems {
+	problems, read := readLayered(layers, r, GatesFile, func(file string, src []byte) Problems {
 		m, problems, _, complete := decode[mGatesFile](file, src)
 		if !complete {
 			return problems
 		}
-		s := &sheet{file: file, at: positions(src), problems: problems}
+		s := &sheet{file: file, at: positions(src), problems: problems, funcs: r.funcs()}
 		for _, name := range declared(s, "gates", m.Gates) {
 			mergeGate(s, &d, name, m.Gates[name])
 		}
@@ -317,7 +317,7 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	case *m.Text == "":
 		g.Text = nil
 	default:
-		tmpl, err := ActionText(path+".text", *m.Text, sampleFacts(builtin.ProposalSlot))
+		tmpl, err := ActionText(s.textFuncs(), path+".text", *m.Text, sampleFacts(builtin.ProposalSlot))
 		if err != nil {
 			_, msg := templateMsg(path+".text", err)
 			s.add(path+".text", "%s", msg)
@@ -389,7 +389,7 @@ func mergeIntent(s *sheet, g *GateDef, path, name string, m mGateIntent) {
 		case *v == "":
 			delete(in.Texts, name)
 		default:
-			tmpl, err := ActionText(path+"."+name, *v, SampleActionFacts())
+			tmpl, err := ActionText(s.textFuncs(), path+"."+name, *v, SampleActionFacts())
 			if err != nil {
 				_, msg := templateMsg(path+"."+name, err)
 				s.add(path+"."+name, "%s", msg)

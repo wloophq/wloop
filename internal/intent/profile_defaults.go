@@ -38,7 +38,8 @@ func checkSessionName(src string) error {
 	return err
 }
 
-func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Problems) {
+func readDefaults(layers []profile.Layer, r layerReader) (manifestDefaults, Problems) {
+	bundled := r.bundled
 	var out manifestDefaults
 	var problems Problems
 	merge := func(file string, src []byte) {
