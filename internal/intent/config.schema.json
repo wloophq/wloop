@@ -867,7 +867,7 @@
     },
     "window": {
       "additionalProperties": false,
-      "description": "The app's own window on macOS.",
+      "description": "The app's own window on macOS, which the app reads when it starts.",
       "properties": {
         "enabled": {
           "default": true,
@@ -888,7 +888,7 @@
         "description": "One workflow's overrides.",
         "properties": {
           "enabled": {
-            "description": "Switches the workflow; left out, it is on.",
+            "description": "Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay.",
             "type": "boolean"
           },
           "gates": {

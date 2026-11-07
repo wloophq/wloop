@@ -16,11 +16,11 @@ profiles/default/decisions.toml      [gates] question = "answer", plan = "approv
 plugins/<id>/decisions.toml          [situations] merge = "last-step"   [signals] ready = "last-step"
 ```
 
-The fact `task.decisions` lists the kinds a task waits on, the oldest first, and `task.decision_since` says since when the oldest waits. Each kind names a view of `views.toml` (`decide-answer`, `decide-last-step`, ...) that lists its tasks; those views, and the home's own, set `rail = false`, so the rail leaves them out. A view may not be named `home`, the cockpit's home route.
+The fact `task.decisions` lists the kinds a task waits on, the oldest first: those of its open gates and, while the task is open, those of its units, so a done or dropped task's threads and pull requests wait on nothing while a question still open on it does. `task.decision_since` says since when the oldest waits. Each kind names a view of `views.toml` (`decide-answer`, `decide-last-step`, ...) that lists its tasks; those views, and the home's own, set `rail = false`, so the rail leaves them out. A view may not be named `home`, the cockpit's home route.
 
 ## The briefing
 
-`home.toml` lists the counters in order. A counter counts a decision kind's view, or a view of its own with its noun and clause:
+`home.toml` lists the counters in order. A counter counts the decisions of a kind, one per decision as its queue lists them, or the tasks of a view of its own with its noun and clause:
 
 ```toml
 [[counters]]
@@ -33,7 +33,7 @@ noun   = { one = "task", other = "tasks" }
 clause = { other = "the loop handles {counter}" }
 ```
 
-Each counter with something to count is a clause, `{counter}` where its count goes; the clauses are joined into sentences of at most `per_sentence`, with `join`, `last_join` and `end`. A count reads as `count` (`{n} {noun}`). When every task a kind counts is one plugin's units, the count uses the plugin's noun and clause, from its `ui.toml` (`noun`, `[decisions.<kind>] clause`); when several plugins share it, each plugin's count is listed and the kind's own clause stands. When nothing counts, the briefing says `empty`.
+Each counter with something to count is a clause, `{counter}` where its count goes; the clauses are joined into sentences of at most `per_sentence`, with `join`, `last_join` and `end`. A count reads as `count` (`{n} {noun}`). When every decision a kind counts is of one plugin's units, the count uses the plugin's noun and clause, from its `ui.toml` (`noun`, `[decisions.<kind>] clause`); when several plugins share it, each plugin's count is listed and the kind's own clause stands. When nothing counts, the briefing says `empty`.
 
 ## Sections and capture
 

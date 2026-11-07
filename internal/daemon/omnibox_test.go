@@ -143,3 +143,18 @@ func TestOmniboxResolveEmptyText(t *testing.T) {
 		t.Fatalf("%d", rec.Code)
 	}
 }
+
+func TestOmniboxResolveReadsAForgeAddressThroughTheCodecs(t *testing.T) {
+	t.Parallel()
+	declines := func(d *Deps) {
+		d.Resolve = func(context.Context, string) (unit.Unit, bool, error) { return unit.Unit{}, false, nil }
+	}
+	for name, edit := range map[string]func(*Deps){"no resolver": nil, "a resolver that declines": declines} {
+		r := newTasksRig(t, edit)
+		r.put(t, task.Task{ID: "t-0000000000000008", State: "next", Category: task.CategoryReady, Title: "review the retries", Units: []unit.Unit{pastedPR}})
+		got := resolve(t, r, "https://github.com/acme/api/pull/8")
+		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != pastedPR || len(got.Unit.Tasks) != 1 {
+			t.Errorf("%s: %+v", name, got)
+		}
+	}
+}

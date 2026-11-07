@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/texts"
 )
 
 var ptBRStrings = api.Strings{Locale: "pt-BR", Strings: map[string]api.Text{
@@ -128,5 +129,19 @@ func TestTheMenuBarWordsItsOwnErrors(t *testing.T) {
 	}
 	if r.c.words().T("more…", nil) != "mais…" || r.c.words().T("(stale)", nil) != "(desatualizado)" {
 		t.Error("more and stale are not the catalog's")
+	}
+}
+
+func TestEachNewCatalogRewordsTheWindowMenus(t *testing.T) {
+	r := newRig(t)
+	var worded []string
+	r.c.cfg.Reword = func(c *texts.Catalog) { worded = append(worded, c.T("Sweep now", nil)) }
+	r.c.Refresh(context.Background())
+	s := ptBRStrings
+	r.d.strings, r.d.health.Strings = &s, "pt-BR-1"
+	r.c.Refresh(context.Background())
+	r.c.Refresh(context.Background())
+	if !slices.Equal(worded, []string{"Sweep now", "Varrer agora"}) {
+		t.Fatalf("the window menus were worded %q, want once in English at start and once in pt-BR after the stamp moved", worded)
 	}
 }

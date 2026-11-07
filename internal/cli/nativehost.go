@@ -46,7 +46,7 @@ func (n nativeRunners) run(win config.Window, words *texts.Catalog, setup func(m
 	n.runMenu(func(t menubar.Tray, notes menubar.Notifier) { setup(t, notes, nil) })
 }
 
-// appWords are the client strings the daemon serves, for the native menus the app builds once; English when
+// appWords are the client strings the daemon serves, for the native menus the app builds at its start; English when
 // the daemon does not answer within a second.
 func appWords(ctx context.Context, daemon interface {
 	Strings(context.Context) (api.Strings, error)
@@ -58,6 +58,14 @@ func appWords(ctx context.Context, daemon interface {
 		return texts.English()
 	}
 	return texts.New(s)
+}
+
+// rewordOf is how host words its own menus anew from the client strings; nil when it has none.
+func rewordOf(host window.Host) func(*texts.Catalog) {
+	if r, ok := host.(interface{ Reword(*texts.Catalog) }); ok {
+		return r.Reword
+	}
+	return nil
 }
 
 // windowShow starts the window controller on host until ctx ends, in wg, and

@@ -254,3 +254,15 @@ func TestASweepWhosePassNeverRunsFails(t *testing.T) {
 		t.Fatal("a sweep whose pass never ran succeeded")
 	}
 }
+
+func TestADraftOfADisabledWorkflowStays(t *testing.T) {
+	r := newRig(t, withdrawWF("ask", draft.WithdrawAssigned))
+	ws := withWithdrawals(r)
+	r.e.Disabled = func() []string { return []string{"nudge"} }
+	r.put(s1, "a")
+	ws.Put("nudge", owned(1, s1, 0))
+	r.sweep()
+	if got, ok := ws.Withdrawn(1); ok {
+		t.Fatalf("the draft of a disabled workflow was withdrawn: %q", got)
+	}
+}

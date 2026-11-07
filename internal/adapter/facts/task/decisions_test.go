@@ -49,3 +49,20 @@ func TestDecisionsFactEmptyWithoutMapping(t *testing.T) {
 		t.Fatalf("task.decision_since = %v, want zero", got)
 	}
 }
+
+func TestAClosedTaskWaitsOnNoDecision(t *testing.T) {
+	t.Parallel()
+	for state, category := range map[task.State]task.Category{"done": task.CategoryDone, "trash": task.CategoryDropped} {
+		e := newEnv(t)
+		e.decisions = decision.Map{Situations: map[unit.ProviderID]map[string]decision.Kind{chatA.Provider: {"waits_on_viewer": decision.Answer}}}
+		closed := e.task(task.Task{ID: "t-00000000000000c3", State: state, Category: category, Title: "c", Units: []unit.Unit{chatA}})
+		e.links[chatA] = facttask.Link{Situation: "waits_on_viewer", Moved: monday}
+		f, err := e.p.TaskFacts(context.Background(), closed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := f["task.decisions"]; len(got.([]string)) != 0 {
+			t.Errorf("a %s task: task.decisions = %v, want none", state, got)
+		}
+	}
+}

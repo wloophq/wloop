@@ -557,7 +557,7 @@ func TestRunSurvivesTheDaemonGoingAway(t *testing.T) {
 		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
 		d.set(true)
 		d.announce()
-		eventually(t, "the error", func() bool { return strings.Contains(term.screen(), "daemon not answering: connection refused") })
+		eventually(t, "the error", func() bool { return strings.Contains(term.screen(), "Daemon not answering: connection refused") })
 		if !strings.Contains(term.screen(), "Batch export") {
 			t.Fatal("the last rows left the screen")
 		}

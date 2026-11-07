@@ -1,5 +1,4 @@
 [strings]
-# piece D
 # The daemon's warnings.
 "config.toml does not load, so the running config stays: {error}" = "o config.toml não carrega, então a configuração em uso continua: {error}"
 "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest" = "o config.toml mudou; só estas configurações valem na hora: {keys}. Reinicie o daemon para aplicar o resto"
@@ -541,7 +540,7 @@
 "{unit} by {author} · opened {opened} · updated {updated}" = "{unit} de {author} · aberto {opened} · atualizado {updated}"
 "{unit} is in the inventory." = "{unit} está no inventário."
 "{unit} is not in the inventory." = "{unit} não está no inventário."
-# piece C
+# The Outbox.
 "Read all" = "Ler tudo"
 "Could not load the Outbox: {error}" = "Não foi possível carregar a Outbox: {error}"
 "{n} draft" = { one = "{n} rascunho", other = "{n} rascunhos" }
@@ -551,7 +550,7 @@
 "Stopped {workflow}" = "{workflow} parado"
 "open" = "aberto"
 "resolved" = "resolvido"
-# piece B11
+# The omnibox agent call's errors.
 "Type what to ask the agent" = "Digite o que perguntar ao agente"
 "Today's spend cap for agent calls is reached; ask again tomorrow" = "O limite de gasto de hoje com chamadas ao agente foi atingido; pergunte de novo amanhã"
 "No agent here can answer from the omnibox: {error}" = "Nenhum agente aqui pode responder pela omnibox: {error}"
@@ -563,7 +562,7 @@
 "unknown_task" = "A tarefa {id} não existe"
 "unknown_unit" = "Nenhuma tarefa contém {unit}"
 "outside_vocabulary" = "Nenhum verbo da omnibox executa {name}"
-# piece B
+# Why typed text fell to search or to the agent, by its code.
 "unclaimed_address" = "Nenhum plugin reconhece {address}"
 "no_unit_or_task" = "Nenhum item ou tarefa é {ref}"
 "ambiguous_ref" = "{ref} nomeia mais de um item ou tarefa"
@@ -610,7 +609,7 @@
 "Capture: {title}" = "Capturar: {title}"
 "Start: {brief}" = "Iniciar: {brief}"
 "Start in {repo}: {brief}" = "Iniciar em {repo}: {brief}"
-# piece F
+# The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Voltar"
 "Forward" = "Avançar"
 "Copy a link to this view" = "Copiar um link para esta visão"
@@ -620,7 +619,7 @@
 "That link could not be read, so the default view opened" = "Não foi possível ler esse link, então a visão padrão abriu"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "No detalhe"
-# piece C
+# The detail's chrome, the Outbox's groups and the filter bar.
 "Changed since you saw it" = "Mudou desde que você viu"
 "{n} draft waits for you" = { one = "{n} rascunho espera por você", other = "{n} rascunhos esperam por você" }
 "Risk" = "Risco"
@@ -638,6 +637,15 @@
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: não {values}"
 "{n} event" = { one = "{n} evento", other = "{n} eventos" }
+# The terminal client's status line and footer.
+"{verb} {task} cancelled: nothing typed" = "{verb} {task} cancelado: nada foi digitado"
+"delegate {task}: {question} (no agent session: {reason})" = "delegar {task}: {question} (sem sessão de agente: {reason})"
+"tasks not listed: {error}" = "tarefas não listadas: {error}"
+"plan not loaded: {error}" = "plano não carregado: {error}"
+"filter {text} (Esc clears)" = "filtro {text} (Esc limpa)"
+"actions not refreshed: {error}" = "ações não atualizadas: {error}"
+"tasks not refreshed: {error}" = "tarefas não atualizadas: {error}"
+"review not refreshed: {error}" = "revisão não atualizada: {error}"
 
 [formats]
 time = "15:04"

@@ -108,19 +108,24 @@ func (s Service) viewOf(c Counter) task.View {
 	return c.View
 }
 
-// count is counter c over its tasks ts, and its clause in the served plural form.
+// count is counter c over its tasks ts, and its clause in the served plural form: a kind's counter counts the
+// decisions its queue lists, a view's the tasks.
 func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task) (Count, string, error) {
 	n := len(ts)
+	var shares []share
+	if c.Kind != "" {
+		ds, err := s.decisions(ctx, c.Kind, ts)
+		if err != nil {
+			return Count{}, "", err
+		}
+		n, shares = len(ds), sharesOf(ds)
+	}
 	out := Count{ID: c.ID, Kind: c.Kind, View: s.viewOf(c), N: n}
 	form := s.Words.Form(n)
 	noun, clause := c.Noun, c.Clause
 	if c.Kind != "" {
 		kw := s.Words.Kind(c.Kind)
 		noun, clause = noun.Or(kw.Noun), clause.Or(kw.Clause)
-		shares, err := s.shares(ctx, c.Kind, ts)
-		if err != nil {
-			return Count{}, "", err
-		}
 		for _, sh := range shares {
 			pn := noun
 			if sh.Plugin != "" {
@@ -146,33 +151,24 @@ func (s Service) count(ctx context.Context, p Profile, c Counter, ts []task.Task
 	return out, clause.For(form), nil
 }
 
-// share is a plugin's tasks among a kind's; "" holds those only a gate puts there.
+// share is a plugin's decisions among a kind's; "" holds those of no unit.
 type share struct {
 	Plugin unit.ProviderID
 	N      int
 }
 
-// shares counts ts by the plugin of the first decision of kind k each waits on, the most first.
-func (s Service) shares(ctx context.Context, k decision.Kind, ts []task.Task) ([]share, error) {
+// sharesOf counts ds by the plugin of each decision's unit, the most first.
+func sharesOf(ds []taskDecision) []share {
 	by := map[unit.ProviderID]int{}
-	for _, e := range ts {
-		found, err := s.Decisions.Of(ctx, e)
-		if err != nil {
-			return nil, err
-		}
-		i := slices.IndexFunc(found, func(f decision.Found) bool { return f.Kind == k })
-		var p unit.ProviderID
-		if i >= 0 {
-			p = found[i].Unit.Provider
-		}
-		by[p]++
+	for _, d := range ds {
+		by[d.found.Unit.Provider]++
 	}
 	out := make([]share, 0, len(by))
 	for p, n := range by {
 		out = append(out, share{p, n})
 	}
 	slices.SortFunc(out, func(a, b share) int { return cmp.Or(b.N-a.N, cmp.Compare(a.Plugin, b.Plugin)) })
-	return out, nil
+	return out
 }
 
 func (p Profile) countText(n int, noun string) string {

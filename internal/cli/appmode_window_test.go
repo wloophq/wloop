@@ -25,11 +25,13 @@ type recHost struct {
 	mu       sync.Mutex
 	shown    []string
 	listened *window.Handlers
+	reworded int
 }
 
 func (h *recHost) ShowMain(url string)         { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
 func (h *recHost) ShowPanel(string)            {}
 func (h *recHost) HidePanel()                  {}
+func (h *recHost) Reword(*texts.Catalog)       { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
 func (h *recHost) ShowDetached(string, string) {}
 func (h *recHost) Listen(hs window.Handlers) error {
 	h.mu.Lock()
@@ -75,6 +77,7 @@ func TestAppModeWithAHostRunsTheWindowController(t *testing.T) {
 			return slices.Contains(shown, "http://127.0.0.1:4321/?token=tok#task=t-1")
 		})
 		eventually(t, "the menu from the daemon", func() bool { return tray.has("Quit " + brand.Name) })
+		eventually(t, "the window menus worded from the daemon's strings", func() bool { host.mu.Lock(); defer host.mu.Unlock(); return host.reworded > 0 })
 		tray.click(t, "Quit "+brand.Name)
 		<-quit
 	}

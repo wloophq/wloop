@@ -458,7 +458,7 @@ label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
 
-# piece B: the home's sections and the decision queues. The rail leaves
+# The home's sections and the decision queues. The rail leaves
 # them out; decisions.toml names each kind's view.
 [views.home-blocked]
 label         = "Blocked by you"

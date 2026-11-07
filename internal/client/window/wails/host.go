@@ -196,6 +196,11 @@ func (h *host) handlers() window.Handlers {
 // title bar around them (window.InsetTitleBar marks its URL).
 var insetTitleBar = application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}
 
+// Reword words the app's menus from cat.
+func (h *host) Reword(cat *texts.Catalog) {
+	application.InvokeAsync(func() { h.app.Menu.Set(wailsMenu(menuOf(h.name, cat))) })
+}
+
 func (h *host) ShowMain(url string) {
 	h.do(func() {
 		navigate(h.main, &h.mainURL, window.InsetTitleBar(url))

@@ -297,11 +297,11 @@ See [Cockpit, terminal client and menu bar](/concepts/surfaces/).
 The cockpit, a workspace or a pull request.
 
 ```sh
-{{command}} open [<url>]
-{{command}} open [<url>] --print [--view <view>]
+{{command}} open [<pr-url> | #<route> | <cockpit-url> | {{command}}://open/#<route>]
+{{command}} open [<pr-url> | #<route>] --print [--view <view>]
 ```
 
-Open the workspace of a pull request in Claude Desktop or Orca, or the pull request itself when it has none. With no URL, open the cockpit. With `--print`, print the cockpit URL with its token instead of opening it.
+Open the workspace of a pull request in Claude Desktop or Orca, or the pull request itself when it has none. With no argument, open the cockpit; with a route (#queue=answer), a URL of this cockpit or a {{name}}:// link, open the cockpit there. The cockpit opens in the app's window when the app runs, else in the browser. With `--print`, print the cockpit URL with its token instead of opening it.
 
 | Flag | Description |
 | --- | --- |
@@ -313,6 +313,8 @@ Examples:
 ```sh
 {{command}} open
 {{command}} open https://github.com/acme/api/pull/7
+{{command}} open '#queue=answer'
+{{command}} open {{command}}://open/#view=needs-me
 {{command}} open --print --view needs-me
 ```
 

@@ -48,7 +48,8 @@ func f() { panic("the window needs macOS") }
 		}
 	}
 	for s, want := range map[string]bool{"Open cockpit": true, "Waiting": true, "row muted": true, "is:open waits-on:me": false, "https://x.y": false,
-		".row .title": false, "Escape": false, "ok": false, "a": false, "Jan": true} {
+		".row .title": false, "Escape": false, "ok": false, "a": false, "Jan": true,
+		"tasks not listed: ": true, " (Esc clears)  ": true, "daemon not answering: ": true, `"quoted words"`: true, "author:ana is:open": false} {
 		if got := isProse(s); got != want {
 			t.Errorf("isProse(%q) = %v", s, got)
 		}

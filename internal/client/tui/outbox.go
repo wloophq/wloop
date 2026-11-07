@@ -6,6 +6,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/lens"
+	"github.com/wloophq/wloop/internal/client/texts"
 )
 
 // outboxList lays the drafts out on the list's line: how long since each last changed, its target as the ref,
@@ -18,7 +19,7 @@ func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now tim
 		if d := draftOn(e); d != nil {
 			text = oneLine(d.Text)
 		}
-		l := listLine{label: draftTarget(e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(e)}}}}
+		l := listLine{label: draftTarget(m.w(), e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(e)}}}}
 		_, l.busy = m.busy[taskUnit(e.ID)]
 		if since := now.Sub(e.Updated); !e.Updated.IsZero() && since > 0 {
 			l.age, l.ageStyle = lens.Age(words, since), m.t.Dim
@@ -33,7 +34,7 @@ func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now tim
 
 // draftTarget is where the draft goes as its publisher named it, else its raw target or unit, marked
 // unknown while the draft is still to be posted.
-func draftTarget(e api.TaskView) string {
+func draftTarget(w *texts.Catalog, e api.TaskView) string {
 	d := draftOn(e)
 	if d != nil && d.Where != "" {
 		return oneLine(d.Where)
@@ -46,7 +47,7 @@ func draftTarget(e api.TaskView) string {
 		raw = e.UnitLabel(0)
 	}
 	if d != nil && d.Permalink == "" {
-		raw += " (destination unknown)"
+		raw += " (" + w.T("destination unknown", nil) + ")"
 	}
 	return raw
 }
@@ -68,7 +69,7 @@ func draftState(e api.TaskView) string {
 // paragraphs, why it failed, and when its window sends it.
 func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
-	fact("to", draftTarget(draftTask(api.ViewsCatalog{}, *d, "")), plain)
+	fact("to", draftTarget(m.w(), draftTask(api.ViewsCatalog{}, *d, "")), plain)
 	head := d.Purpose
 	if d.Edited {
 		head += " · edited"

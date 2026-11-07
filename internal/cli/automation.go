@@ -153,6 +153,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	eng := &automation.Engine{
 		Workflows: workflows,
 		Broken:    e.brokenWorkflows,
+		Disabled:  func() []string { return disabledWorkflows(e.currentConfig()) },
 		Units:     units,
 		Keep:      unitKeeping{units},
 		Steps:     steps,
@@ -188,6 +189,17 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 // brokenWorkflows are the user workflows that failed to load.
 func (e *Env) brokenWorkflows() []string {
 	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
+}
+
+// disabledWorkflows are the workflows cfg turns off.
+func disabledWorkflows(cfg config.Config) []string {
+	var out []string
+	for name, wc := range cfg.Workflows {
+		if wc.Enabled != nil && !*wc.Enabled {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 func (e *Env) currentConfig() config.Config {

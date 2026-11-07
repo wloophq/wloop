@@ -119,12 +119,20 @@ func (t *taskRefs) open(ctx context.Context) ([]task.Task, error) {
 	return t.tasks, nil
 }
 
-// claim is the unit a plugin claims address is; false when none does.
+// claim is the unit address is: the one a plugin's resolver claims, else the one a unit codec reads; false when
+// neither does.
 func (t *taskRefs) claim(ctx context.Context, address string) (unit.Unit, bool, error) {
-	if t.s.deps.Resolve == nil {
-		return unit.Unit{}, false, nil
+	if t.s.deps.Resolve != nil {
+		if u, ok, err := t.s.deps.Resolve(ctx, address); err != nil || ok {
+			return u, ok, err
+		}
 	}
-	return t.s.deps.Resolve(ctx, address)
+	if t.s.deps.Units != nil {
+		if u, ok := t.s.deps.Units.ParseURL(address); ok {
+			return u, true, nil
+		}
+	}
+	return unit.Unit{}, false, nil
 }
 
 // Find is the unit an address or a unit's label names, with the open task that holds it, or the open tasks

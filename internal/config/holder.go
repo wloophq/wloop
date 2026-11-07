@@ -264,6 +264,8 @@ func equalExceptLive(a, b Config) bool {
 		k.take(&a, Config{})
 		k.take(&b, Config{})
 	}
+	// The app reads window.* when it starts; no restart of the daemon applies them.
+	a.Window, b.Window = Window{}, Window{}
 	return reflect.DeepEqual(a, b)
 }
 

@@ -66,6 +66,9 @@ type Config struct {
 	// Window shows the cockpit's own window at a route; nil opens the
 	// browser at CockpitURL instead.
 	Window func(route string) error
+	// Reword gets each catalog of client strings the daemon serves, as the
+	// strings change; nil rewords nothing.
+	Reword func(*texts.Catalog)
 	Quit   func()
 	// Copy puts text on the clipboard; nil offers no copy.
 	Copy func(text string) error
@@ -134,8 +137,12 @@ func (c *Controller) loadStrings(ctx context.Context, stamp string) {
 		c.cfg.Log("client strings: %v", err)
 		return
 	}
-	c.catalog.Store(texts.New(s))
+	cat := texts.New(s)
+	c.catalog.Store(cat)
 	c.stringsStamp = stamp
+	if c.cfg.Reword != nil {
+		c.cfg.Reword(cat)
+	}
 }
 
 func New(cfg Config) *Controller {

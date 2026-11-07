@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,5 +91,23 @@ func TestTheTerminalWordsItsOwnErrors(t *testing.T) {
 	}
 	if err.Error() != "opening links is not supported here" {
 		t.Fatalf("%q", err)
+	}
+}
+
+func TestStatusAndFooterInPtBR(t *testing.T) {
+	m := newModel(t)
+	m.words = ptBR(t)
+	m.SetData(oneRow(), api.Health{})
+	m.SetError(errors.New("x"))
+	m.SetPlan(nil, errors.New("y"))
+	m.filter = []rune("foo")
+	screen := strings.Join(m.Render(100, 30, now), "\n")
+	for got, want := range map[string]string{m.err: "O daemon não responde: x", m.planErr: "plano não carregado: y"} {
+		if got != want {
+			t.Errorf("%q, want %q", got, want)
+		}
+	}
+	if !strings.Contains(screen, "filtro foo (Esc limpa)") {
+		t.Errorf("the filter footer is not in pt-BR:\n%s", screen)
 	}
 }

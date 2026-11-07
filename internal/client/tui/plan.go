@@ -25,7 +25,7 @@ var shown = []string{"pending", "blocked"}
 func (m *Model) SetPlan(items []api.PlanItem, err error) {
 	m.planLoaded = true
 	if err != nil {
-		m.planErr = "plan not loaded: " + err.Error()
+		m.planErr = m.w().T("plan not loaded: {error}", map[string]any{"error": err.Error()})
 		return
 	}
 	m.planErr = ""

@@ -1354,7 +1354,7 @@ The fields each notice reads besides `Name` and `Command`:
 
 - `workflows` (table by name): Overrides of each workflow's manifest, by workflow name.
 - `workflows.<name>` (table): One workflow's overrides.
-- `workflows.<name>.enabled` (bool): Switches the workflow; left out, it is on.
+- `workflows.<name>.enabled` (bool): Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay.
 - `workflows.<name>.observe` (bool): Plans the workflow's items pending, for you to run; left out, the manifest's.
 - `workflows.<name>.only_when` (predicate): A condition ANDed with the workflow's when.
 
@@ -1388,7 +1388,7 @@ The fields each notice reads besides `Name` and `Command`:
 
 ### Window
 
-- `window` (table): The app's own window on macOS.
+- `window` (table): The app's own window on macOS, which the app reads when it starts.
 - `window.enabled` (bool, default `true`): Show the cockpit in the app's own window on macOS; false opens it in the browser.
 - `window.hotkey` (string, default `ctrl+option+space`): The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.
 

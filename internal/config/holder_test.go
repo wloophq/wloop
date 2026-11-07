@@ -239,3 +239,12 @@ func TestConfigWarningIsACodeNotEnglish(t *testing.T) {
 		t.Fatalf("%+v", w)
 	}
 }
+
+func TestTheWindowKeysLeaveTheDaemonFresh(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nwindow = {enabled = false}\n")
+	r.later()
+	if r.h.Stale() || r.h.Warning().Key != "" {
+		t.Fatalf("a window key the app reads made the daemon stale: %+v", r.h.Warning())
+	}
+}

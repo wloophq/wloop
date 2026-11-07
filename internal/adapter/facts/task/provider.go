@@ -385,6 +385,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	if err != nil {
 		return nil, err
 	}
+	if !e.Open() {
+		sources = nil
+	}
 	if p.d.Decisions != nil {
 		if found := p.d.Decisions().Of(gs, sources); len(found) > 0 {
 			f["task.decisions"], f["task.decision_since"] = decision.Names(found), found[0].Since

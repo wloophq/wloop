@@ -13,16 +13,19 @@ import (
 // [drafts.withdraw] when matches it on fresh facts, with the workflow's reason,
 // every draft of a workflow no longer loaded as moot, and every draft of a
 // workflow the Keep skips on its subject as skipped; a draft of a
-// disabled plugin's unit, or of a workflow that failed to load, is left as
-// it is.
+// disabled plugin's unit, of a workflow that failed to load or of one the
+// configuration turns off, is left as it is.
 func (e *Engine) withdraw(ctx context.Context) error {
 	if e.Withdrawals == nil {
 		return nil
 	}
 	live := e.live()
-	var broken []string
+	var kept []string
 	if e.Broken != nil {
-		broken = e.Broken()
+		kept = e.Broken()
+	}
+	if e.Disabled != nil {
+		kept = append(kept, e.Disabled()...)
 	}
 	vars := workflow.Vars{Now: e.now()}
 	if e.Config != nil {
@@ -42,7 +45,7 @@ func (e *Engine) withdraw(ctx context.Context) error {
 				return err
 			}
 			for _, c := range ds {
-				if judged[c.ID] || c.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(c.Subject.Provider) || slices.Contains(broken, c.Workflow) {
+				if judged[c.ID] || c.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(c.Subject.Provider) || slices.Contains(kept, c.Workflow) {
 					continue
 				}
 				judged[c.ID] = true

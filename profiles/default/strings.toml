@@ -1,9 +1,7 @@
 # The texts the clients show (the cockpit, the menu bar, the terminal client), by their English text with
 # {name} placeholders. A text with plural forms is a table of its CLDR forms: { one = "...", other = "..." }.
-# Each piece adds its keys in its own block.
 
 [strings]
-# piece D
 # The daemon's warnings.
 "config.toml does not load, so the running config stays: {error}" = "config.toml does not load, so the running config stays: {error}"
 "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest" = "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest"
@@ -545,7 +543,7 @@
 "{unit} by {author} · opened {opened} · updated {updated}" = "{unit} by {author} · opened {opened} · updated {updated}"
 "{unit} is in the inventory." = "{unit} is in the inventory."
 "{unit} is not in the inventory." = "{unit} is not in the inventory."
-# piece C
+# The Outbox.
 "Read all" = "Read all"
 "Could not load the Outbox: {error}" = "Could not load the Outbox: {error}"
 "{n} draft" = { one = "{n} draft", other = "{n} drafts" }
@@ -555,7 +553,6 @@
 "Stopped {workflow}" = "Stopped {workflow}"
 "open" = "open"
 "resolved" = "resolved"
-# piece B11
 # The omnibox agent call's errors.
 "Type what to ask the agent" = "Type what to ask the agent"
 "Today's spend cap for agent calls is reached; ask again tomorrow" = "Today's spend cap for agent calls is reached; ask again tomorrow"
@@ -569,7 +566,6 @@
 "unknown_task" = "No task {id} exists"
 "unknown_unit" = "No task holds {unit}"
 "outside_vocabulary" = "No omnibox verb runs {name}"
-# piece B
 # Why typed text fell to search or to the agent, by its code.
 "unclaimed_address" = "No plugin recognizes {address}"
 "no_unit_or_task" = "No unit or task is {ref}"
@@ -619,7 +615,6 @@
 "Capture: {title}" = "Capture: {title}"
 "Start: {brief}" = "Start: {brief}"
 "Start in {repo}: {brief}" = "Start in {repo}: {brief}"
-# piece F
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Back"
 "Forward" = "Forward"
@@ -630,7 +625,7 @@
 "That link could not be read, so the default view opened" = "That link could not be read, so the default view opened"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "In the detail"
-# piece C
+# The detail's chrome, the Outbox's groups and the filter bar.
 "Changed since you saw it" = "Changed since you saw it"
 "{n} draft waits for you" = { one = "{n} draft waits for you", other = "{n} drafts wait for you" }
 "Risk" = "Risk"
@@ -648,6 +643,15 @@
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: not {values}"
 "{n} event" = { one = "{n} event", other = "{n} events" }
+# The terminal client's status line and footer.
+"{verb} {task} cancelled: nothing typed" = "{verb} {task} cancelled: nothing typed"
+"delegate {task}: {question} (no agent session: {reason})" = "delegate {task}: {question} (no agent session: {reason})"
+"tasks not listed: {error}" = "tasks not listed: {error}"
+"plan not loaded: {error}" = "plan not loaded: {error}"
+"filter {text} (Esc clears)" = "filter {text} (Esc clears)"
+"actions not refreshed: {error}" = "actions not refreshed: {error}"
+"tasks not refreshed: {error}" = "tasks not refreshed: {error}"
+"review not refreshed: {error}" = "review not refreshed: {error}"
 
 [formats]
 time = "3:04 PM"
