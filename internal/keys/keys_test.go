@@ -258,9 +258,18 @@ func TestViewKeysComeFromTheCatalog(t *testing.T) {
 		t.Fatalf("Views = %v, want %v", got, want)
 	}
 	for _, b := range Core {
-		if strings.HasPrefix(b.Action, "nav:") && b.Action != "nav:cycle" {
+		if strings.HasPrefix(b.Action, "nav:") && b.Action != "nav:cycle" && b.Action != "nav:home" {
 			t.Errorf("core binds %s to %s: a view's key comes from the catalog", b.Key, b.Action)
 		}
+	}
+}
+
+func TestHomeKeyIsCore(t *testing.T) {
+	if !slices.ContainsFunc(Core, func(b Binding) bool { return b.Key == "g h" && b.Action == "nav:home" && b.Context == Global }) {
+		t.Fatal("no core g h for the home")
+	}
+	if err := CheckView("g h"); err == nil {
+		t.Fatal("a view may take g h, the home's key")
 	}
 }
 

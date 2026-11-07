@@ -223,6 +223,48 @@
       "help": "previous tab"
     },
     {
+      "key": "g h",
+      "action": "nav:home",
+      "context": "global",
+      "owner": "core",
+      "help": "go to the home"
+    },
+    {
+      "key": "Enter",
+      "action": "queue:primary",
+      "context": "queue",
+      "owner": "core",
+      "help": "run the decision's primary action"
+    },
+    {
+      "key": "j",
+      "action": "queue:skip",
+      "context": "queue",
+      "owner": "core",
+      "help": "next decision, without acting"
+    },
+    {
+      "key": "k",
+      "action": "queue:back",
+      "context": "queue",
+      "owner": "core",
+      "help": "previous decision"
+    },
+    {
+      "key": "o",
+      "action": "open-source",
+      "context": "queue",
+      "owner": "core",
+      "help": "open the source"
+    },
+    {
+      "key": "Esc",
+      "action": "queue:home",
+      "context": "queue",
+      "owner": "core",
+      "help": "back to the home"
+    },
+    {
       "key": "1",
       "action": "answer:1",
       "context": "question",

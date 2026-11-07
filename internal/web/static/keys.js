@@ -1,7 +1,7 @@
 "use strict";
 
 const CHORD_MS = 1000;
-const KEY_CONTEXTS = ["detail", "question", "plan", "review", "list", "global"];
+const KEY_CONTEXTS = ["detail", "question", "queue", "plan", "review", "list", "global"];
 const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|tab:|palette$|help$|filter$|filter:add$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
@@ -84,7 +84,7 @@ function questionOptions(q) {
 }
 
 // keyContextOf is the key context a view adds before the list's.
-const keyContextOf = (view) => (view === "plan" || view === "review" ? view : "");
+const keyContextOf = (view) => (view === "plan" || view === "review" || view === QUEUE ? view : "");
 
 const CONTEXT_HEADS = {
   get global() { return t("Everywhere"); },
@@ -93,9 +93,10 @@ const CONTEXT_HEADS = {
   get plan() { return t("In the plan"); },
   get review() { return t("In the review"); },
   get detail() { return t("In the detail"); },
+  get queue() { return t("In a queue"); },
 };
 
-const HELP_ORDER = ["global", "list", "detail", "question", "plan", "review"];
+const HELP_ORDER = ["global", "list", "detail", "question", "queue", "plan", "review"];
 
 // helpGroups are every binding by context.
 function helpGroups(bindings) {
@@ -315,6 +316,7 @@ function createKeys(env) {
 
   async function run(b, ctx) {
     const a = b.action;
+    if (b.context === "queue") return env.queue ? env.queue(a) !== false : false;
     if (b.context === "plan") return servedAction(b) ? planAction(a, b.key) : a === "approve" ? planAction("plan_apply", b.key) : false;
     if (servedAction(b)) return b.context === "list" ? unitAction(a) : false;
     if (a === "move:down" || a === "move:up") return env.move(a === "move:down" ? 1 : -1) !== false;
@@ -465,6 +467,7 @@ function appEnv() {
     pluginKey: (e) => pluginViews.has(readHash().view) && pluginKeyDown(e),
     planAction: (it, id) => actOnPlan(it, id),
     viewContext: () => keyContextOf(readHash().view),
+    queue: (action) => queueKeyAction(action, screenEnv()),
     step: (action) => reviewKey(action),
     redraw: () => render(),
     detailAt: (el) => detailFocused(el),

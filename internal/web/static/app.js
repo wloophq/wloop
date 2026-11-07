@@ -1428,14 +1428,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isCoreView(view);
+  const listless = view === "recent" || view === "explore" || view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || pluginViews.has(view) || isCoreView(view);
+  listBox.hidden = view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     if (isCoreView(view)) hideLens(document.getElementById("tools"));
@@ -2608,6 +2608,7 @@ function render() {
   renderPlan(readHash().view);
   renderPluginView(readHash().view);
   renderTasks(readHash());
+  renderScreens(readHash());
   renderDash(readLens());
   renderRows();
   renderDetail();
@@ -2628,6 +2629,74 @@ async function getJSON(url) {
 // open task that holds it; "" when none does or the read failed otherwise.
 function unitFallback(err, tasks) {
   return err && err.status === 404 && tasks && tasks.length ? "#" + viewHash({ task: tasks[0].id, pr: "" }) : "";
+}
+
+// homeState is the home the daemon last served, and why it could not serve it.
+const homeState = { home: null, error: "" };
+
+async function loadHome() {
+  if (readHash().view !== HOME) return;
+  try {
+    homeState.home = await getJSON("/api/home");
+    homeState.error = "";
+  } catch (err) {
+    homeState.error = t("Could not load the home: {error}", { error: err.message });
+  }
+}
+
+async function loadQueue() {
+  const route = readRoute(location.hash);
+  if (route.view === QUEUE) await queueLoad(route, screenEnv());
+}
+
+// screenRow is task e's row as the list of view draws it.
+function screenRow(e, view) {
+  const lens = lensOf({ view: view || "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+  return rowView(taskModel(e, "", "", lens), lens);
+}
+
+// openTaskSource opens unit u of task e at its source, else the task's first unit's; the unit's detail when
+// no card links it.
+function openTaskSource(e, u) {
+  const card = ((e && e.cards) || []).find((x) => x.card && u && x.card.unit.provider === u.provider && x.card.unit.key === u.key);
+  const link = (card && safeURL(card.card.link)) || sourceLink(e);
+  if (link) window.open(link, "_blank", "noopener");
+  else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
+}
+
+// screenEnv is what the home and the queue screens read and run through.
+function screenEnv() {
+  return {
+    route: () => readRoute(location.hash),
+    get: getJSON,
+    post: (url, body) => detailEnv.post(url, body),
+    row: screenRow,
+    openSource: openTaskSource,
+    openTask: (id) => writeHash({ task: id, pr: "" }),
+    navigate: (view) => { location.hash = hashString({ view }); },
+    render,
+    capture: async (title) => {
+      try {
+        await detailEnv.post("/api/tasks", { title });
+        setNotice(t("captured: {title}", { title }));
+        scheduleLoad({ tasks: true });
+        return true;
+      } catch (err) {
+        setNotice(t("capture failed: {error}", { error: err.message }), true);
+        return false;
+      }
+    },
+  };
+}
+
+// renderScreens draws the home or the queue when the route shows one, and hides both otherwise.
+function renderScreens(route) {
+  const home = document.getElementById("home");
+  const queue = document.getElementById("queue");
+  home.hidden = route.view !== HOME;
+  queue.hidden = route.view !== QUEUE;
+  if (!home.hidden) home.replaceChildren(...(homeState.error ? [h("p", { class: "err" }, homeState.error)] : renderHome(homeState.home, screenEnv())));
+  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueState.queue, queueState.at, screenEnv()));
 }
 
 async function loadActivity() {
@@ -2713,7 +2782,7 @@ async function load() {
     state.authLost = false;
   }
   forgetTasksPage();
-  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
+  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks(), loadHome(), loadQueue()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
 }
@@ -2832,6 +2901,8 @@ async function applyChange(c) {
     loadPlan(),
     loadRoundGates(),
     c.tasks ? loadTasks(route, c.units) : null,
+    c.tasks || c.all || c.units.length ? loadHome() : null,
+    c.tasks || c.all || c.units.length ? loadQueue() : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2902,7 +2973,7 @@ window.addEventListener("hashchange", async () => {
   searchBox.value = readHash().q;
   document.getElementById("explore-q").value = readHash().x;
   render();
-  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash())]);
+  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash()), loadHome(), loadQueue()]);
   render();
 });
 

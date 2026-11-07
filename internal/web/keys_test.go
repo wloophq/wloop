@@ -140,6 +140,9 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	b.WriteString("\nconst BINDINGS = " + string(raw) + ";\n")
 	b.WriteString("const VERBS = " + mustJS(t, servedVerbs(t)) + ";\n")
 	b.WriteString("const VERB_SPECS = " + mustJS(t, servedVerbSpecs(t)) + ";\n")
+	if !strings.Contains(prelude, "const QUEUE ") {
+		b.WriteString(`const QUEUE = "queue";` + "\n")
+	}
 	b.WriteString(staticJS(t, "palette.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))

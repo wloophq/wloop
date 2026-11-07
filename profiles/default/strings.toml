@@ -581,6 +581,27 @@
 "run_conflict" = "It did not run: it changed meanwhile"
 "run_unavailable" = "It did not run: not available right now"
 "run_failed" = "It did not run"
+# The home and the decision queues.
+"Home" = "Home"
+"What waits on you, and what stalled the longest" = "What waits on you, and what stalled the longest"
+"Loading the home..." = "Loading the home..."
+"Could not load the home: {error}" = "Could not load the home: {error}"
+"See all {n}" = { one = "See all {n}", other = "See all {n}" }
+"Nothing here right now." = "Nothing here right now."
+"Capture a task" = "Capture a task"
+"Decision queue" = "Decision queue"
+"In a queue" = "In a queue"
+"Where you are" = "Where you are"
+"Loading the queue..." = "Loading the queue..."
+"Could not load the queue: {error}" = "Could not load the queue: {error}"
+"{n} of {total}" = "{n} of {total}"
+"Next up" = "Next up"
+"+{n} more" = { one = "+{n} more", other = "+{n} more" }
+"Nothing left in this queue." = "Nothing left in this queue."
+"Back to the home" = "Back to the home"
+"Results" = "Results"
+"Nothing left in this list." = "Nothing left in this list."
+"Open" = "Open"
 # piece F
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Back"

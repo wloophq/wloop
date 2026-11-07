@@ -84,7 +84,7 @@ function railViews(all, route) {
   const item = (v) => railItem(v.label, v.count, v.id === route.view, lensHash({ view: v.id, task: "", pr: "" }, route),
     (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
   const empties = nav.filter((v) => railFolds(v, route.view));
-  const home = railItem(t("Home"), "", route.view === HOME, "view=" + HOME, "core home", t("What waits on you, and what stalled the longest"));
+  const home = railItem(t("Home"), "", route.view === HOME, "view=" + HOME, "core",t("What waits on you, and what stalled the longest"));
   const views = [home, ...railSections(nav.filter((v) => !railFolds(v, route.view)), providerName).flatMap((sec) => [
     sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
     ...sec.views.map(item)])];
