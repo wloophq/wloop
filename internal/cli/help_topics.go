@@ -127,14 +127,17 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"open"},
 				Summary: "The cockpit, a workspace or a pull request",
-				Usage:   []string{"open [<url>]", "open [<url>] --print [--view <view>]"},
+				Usage: []string{"open [<pr-url> | #<route> | <cockpit-url> | " + brand.URLScheme() + "://open/#<route>]",
+					"open [<pr-url> | #<route>] --print [--view <view>]"},
 				About: "Open the workspace of a pull request in " + manager + ", or the pull request itself when it has none. " +
-					"With no URL, open the cockpit. With --print, print the cockpit URL with its token instead of opening it.",
+					"With no argument, open the cockpit; with a route (#queue=answer), a URL of this cockpit or a " + brand.URLScheme() + ":// link, " +
+					"open the cockpit there. The cockpit opens in the app's window when the app runs, else in the browser. " +
+					"With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
 					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
 				},
-				Examples: []string{"open", "open " + pr, "open --print --view needs-me"},
+				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=needs-me", "open --print --view needs-me"},
 				Docs:     "concepts/surfaces",
 			},
 			{
