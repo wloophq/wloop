@@ -263,12 +263,12 @@ const agePiece = (n) => { if (n && n.attrs && n.attrs["data-field"] === "age") r
 location.hash = "#" + hashString({ view: "all" });
 state.loaded = true;
 renderRows();
-process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0].attrs["aria-selected"], AgeTitle: (agePiece(trs[0]) || { attrs: {} }).attrs.title || "",
+process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0].attrs["aria-current"], AgeTitle: (agePiece(trs[0]) || { attrs: {} }).attrs.title || "",
   Actions: (function acts(n, out = []) { if (n && n.attrs && String(n.attrs.class || "").split(" ").includes("act")) out.push(n.textContent); for (const c of (n && n.children) || []) acts(c, out); return out; })(trs[0]), Labels: trs.map((tr) => labels(tr)), SlackClass: trs[1].attrs.class.split(" "),
   Count: document.getElementById("list-sum").textContent, Countdown: countdownTitle }));`,
 		map[string]any{"pr": wireRow("me", now, pr), "slack": slack, "now": now.UnixMilli()}, &got)
 	if !strings.Contains(" "+got.Class+" ", " sel ") || got.Selected != "true" {
-		t.Errorf("the open row is %q, aria-selected %q", got.Class, got.Selected)
+		t.Errorf("the open row is %q, aria-current %q", got.Class, got.Selected)
 	}
 	if !slices.Equal(got.Actions, []string{"Open"}) {
 		t.Errorf("the row's actions %q, want the Open it serves", got.Actions)

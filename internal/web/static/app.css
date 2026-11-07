@@ -280,9 +280,6 @@ body.resizing { user-select: none; cursor: col-resize; }
 }
 .rail-head { margin: 0; padding: var(--space-12) var(--space-8) var(--space-4); font: 400 var(--text-overline)/1.4 var(--sans); color: var(--faint); }
 
-/* index.html still names the list's box a table; it holds rows, not table parts. */
-#table { display: block; }
-
 .row {
   display: grid;
   grid-template-columns: 16px 1fr auto;

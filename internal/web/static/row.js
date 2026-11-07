@@ -133,7 +133,7 @@ function rowView(m, lens, opts = {}) {
     class: cls,
     title: m.tip || undefined,
     tabindex: 0,
-    "aria-selected": m.selected ? "true" : "false",
+    "aria-current": m.selected ? "true" : undefined,
     "data-focus": m.scope,
     "data-row": m.scope,
     "data-rove": "",

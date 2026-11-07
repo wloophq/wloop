@@ -229,3 +229,19 @@ func TestRowCSSKeepsEachLineOnOneLine(t *testing.T) {
 		t.Error(".row .r2 wraps, so who and the date could break across lines")
 	}
 }
+
+func TestARowMarksTheOpenTaskAsCurrent(t *testing.T) {
+	var got []map[string]string
+	rowRun(t, `
+const marks = (r) => ({ current: String(r.attrs["aria-current"] ?? ""), selected: String(r.attrs["aria-selected"] ?? "") });
+process.stdout.write(JSON.stringify([marks(rowView(taskModel(input.task, "e-1", "", lens), lens)), marks(rowView(taskModel(input.task, "e-2", "", lens), lens))]));`,
+		map[string]any{"task": rowTask(nil)}, &got)
+	want := []map[string]string{{"current": "true", "selected": ""}, {"current": "", "selected": ""}}
+	if mustJS(t, got) != mustJS(t, want) {
+		t.Errorf("the open row and another mark %v, want %v", got, want)
+	}
+	page := staticJS(t, "index.html")
+	if !strings.Contains(page, `<div id="table"></div>`) || strings.Contains(page, "<table") {
+		t.Error("index.html holds the row list in a table, which reads as a table without rows")
+	}
+}
