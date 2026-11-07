@@ -46,9 +46,7 @@ var proseClients = []string{"menubar", "tui", "window"}
 
 // proseDebts are the prose literals each client still quotes outside the catalog, by script or by client
 // package. A count only shrinks: a count above or below the real one fails.
-var proseDebts = map[string]int{
-	"tui": 0,
-}
+var proseDebts = map[string]int{}
 
 var (
 	proseWord   = regexp.MustCompile(`^[\pL][\pL'’-]*[.,:;!?…)]*$`)
