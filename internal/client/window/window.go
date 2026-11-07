@@ -5,6 +5,8 @@ package window
 import (
 	"context"
 	"net/url"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,7 +29,12 @@ type Host interface {
 	// ShowPanel shows the panel without activating the app.
 	ShowPanel(url string)
 	HidePanel()
-	// Listen binds the hotkey and the reopen; an error leaves the reopen bound.
+	// ShowDetached shows and focuses the secondary window id, opening it at
+	// url when none is open; it closes for good and is not restored at
+	// relaunch.
+	ShowDetached(id, url string)
+	// Listen binds the hotkey, the reopen and opened links; an error leaves
+	// the reopen and the links bound.
 	Listen(h Handlers) error
 }
 
@@ -42,6 +49,8 @@ type Handlers struct {
 	// OnPanelHidden runs when the host hid the panel on its own, as on
 	// focus loss.
 	OnPanelHidden func()
+	// OnOpenURL runs for each deep link the system hands the app.
+	OnOpenURL func(link string)
 }
 
 // Events is the daemon's events stream.
@@ -87,6 +96,7 @@ func (c *Controller) Run(ctx context.Context) error {
 		OnHotkey:      c.TogglePanel,
 		OnReopen:      func() { _ = c.Show("") },
 		OnPanelHidden: func() { c.setPanel(false) },
+		OnOpenURL:     c.OpenLink,
 	})
 	if err != nil {
 		c.cfg.Log("window.hotkey %q: %v", c.cfg.Hotkey, err)
@@ -129,7 +139,35 @@ func (c *Controller) handle(req api.WindowRequest) {
 		c.showPanel()
 	case api.WindowHidePanel:
 		c.hidePanel()
+	case api.WindowDetach:
+		c.detach(req.Route)
 	}
+}
+
+// OpenLink shows a deep link's route in the main window; a link it cannot
+// read shows the default view, which says so.
+func (c *Controller) OpenLink(link string) {
+	route, ok := LinkRoute(link)
+	if !ok {
+		c.cfg.Log("window: %q is not a link the app opens", link)
+		route = MalformedLinkRoute
+	}
+	_ = c.Show(route)
+}
+
+// detach shows the item route names in its own window, one per item; a
+// route that names none opens in the main window.
+func (c *Controller) detach(route string) {
+	item := itemOf(route)
+	if item == "" {
+		_ = c.Show(route)
+		return
+	}
+	u, err := c.url(item + "&" + detailLayout)
+	if err != nil {
+		return
+	}
+	c.cfg.Host.ShowDetached(item, u)
 }
 
 // Show shows the main window at route ("" keeps where it was) and hides the
@@ -140,7 +178,7 @@ func (c *Controller) Show(route string) error {
 		c.showPanel()
 		return nil
 	}
-	u, err := c.url(route)
+	u, err := c.url(withoutDetailLayout(route))
 	if err != nil {
 		return err
 	}
@@ -191,6 +229,29 @@ func (c *Controller) setPanel(shown bool) {
 func panelRoute(route string) bool {
 	q, _ := url.ParseQuery(route)
 	return q.Get("panel") != ""
+}
+
+// detailLayout is the route flag of a window that shows one item's detail
+// alone.
+const detailLayout = "layout=detail"
+
+// itemOf is the parameter of route naming the item its detail shows, the
+// task before the unit, as the cockpit does; "" when it names none.
+func itemOf(route string) string {
+	parts := strings.Split(route, "&")
+	for _, name := range []string{"task=", "unit="} {
+		for _, p := range parts {
+			if strings.HasPrefix(p, name) && len(p) > len(name) {
+				return p
+			}
+		}
+	}
+	return ""
+}
+
+func withoutDetailLayout(route string) string {
+	parts := strings.Split(route, "&")
+	return strings.Join(slices.DeleteFunc(parts, func(p string) bool { return p == detailLayout }), "&")
 }
 
 func (c *Controller) url(route string) (string, error) {

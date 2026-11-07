@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -157,11 +158,19 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	if len(pos) > 1 {
-		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>> | <cockpit URL> | #<route>] [--print] [--view <view>]")
+		return errors.New("usage: " + brand.Command + " open [<https://github.com/<owner>/<repo>/pull/<n>> | <cockpit URL> | #<route> | " + brand.URLScheme() + "://open/#<route>] [--print] [--view <view>]")
 	}
 	route, isRoute := "", len(pos) == 0
 	if len(pos) == 1 {
 		route, isRoute = cockpitRoute(e.StateDir, pos[0])
+	}
+	if len(pos) == 1 && window.IsLink(pos[0]) {
+		var ok bool
+		if route, ok = window.LinkRoute(pos[0]); !ok {
+			fmt.Fprintf(e.Err, "%s is not a link %s opens; opening the cockpit\n", pos[0], brand.Command)
+			route = window.MalformedLinkRoute
+		}
+		isRoute = true
 	}
 	var ref pr.Ref
 	if len(pos) == 1 && !isRoute {

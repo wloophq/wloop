@@ -33,6 +33,7 @@ func TestDerivedNamesFollowName(t *testing.T) {
 		{"StateDir", StateDir(), "zzbrand"},
 		{"SkillName", SkillName("review"), "zzbrand-review"},
 		{"DocsURL", DocsURL(), "https://zzbrandhq.github.io/zzbrand/"},
+		{"URLScheme", URLScheme(), "zzbrand"},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, c.got, c.want)

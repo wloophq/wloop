@@ -40,6 +40,19 @@ func TestWindowRequestReachesOnlyTheWindowClient(t *testing.T) {
 	}
 }
 
+func TestADetachRequestReachesTheWindowClient(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	win := s.hub.subscribe(api.WindowClient)
+	t.Cleanup(func() { s.hub.unsubscribe(win) })
+	if res := windowResult(t, s, `{"action":"detach","route":"task=t-1"}`); !res.Delivered {
+		t.Fatal("not delivered with a window client listening")
+	}
+	if c, ok := win.take(); !ok || !slices.Equal(c.Windows, []api.WindowRequest{{Action: api.WindowDetach, Route: "task=t-1"}}) {
+		t.Fatalf("the window client took %+v (%v)", c, ok)
+	}
+}
+
 func TestQuickWindowRequestsAreAllDelivered(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)

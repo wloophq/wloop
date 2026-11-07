@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -206,6 +208,26 @@ func TestInfoPlistVersionsAreNumeric(t *testing.T) {
 		if got := plistString(p, "LoopVersion"); got != raw {
 			t.Errorf("LoopVersion = %q, want %q", got, raw)
 		}
+	}
+}
+
+func TestInfoPlistRegistersTheLinkScheme(t *testing.T) {
+	t.Parallel()
+	p := infoPlist("v1.0.0", "/bin/"+brand.Name)
+	d := xml.NewDecoder(strings.NewReader(p))
+	for {
+		if _, err := d.Token(); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatalf("Info.plist is not well-formed: %v", err)
+		}
+	}
+	want := `<key>CFBundleURLTypes</key><array><dict>` +
+		`<key>CFBundleURLName</key><string>` + bundleID + `</string>` +
+		`<key>CFBundleURLSchemes</key><array><string>` + brand.URLScheme() + `</string></array>` +
+		`</dict></array>`
+	if !strings.Contains(p, want) {
+		t.Fatalf("Info.plist does not register the %s scheme:\n%s", brand.URLScheme(), p)
 	}
 }
 
