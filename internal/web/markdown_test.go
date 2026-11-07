@@ -176,35 +176,39 @@ func TestMarkdownFoldsAHugeAnswerCheaply(t *testing.T) {
 // quadratic growth without a clock.
 const workCounterJS = `
 let work = 0;
-const indexOf0 = String.prototype.indexOf, slice0 = String.prototype.slice, exec0 = RegExp.prototype.exec;
+const indexOf0 = String.prototype.indexOf, slice0 = String.prototype.slice, exec0 = RegExp.prototype.exec, charAt0 = String.prototype.charAt;
+String.prototype.charAt = function (i) { work++; return charAt0.call(this, i); };
 String.prototype.indexOf = function (x, from) { const r = indexOf0.call(this, x, from); work += (r < 0 ? this.length : r) - (from || 0) + 1; return r; };
 String.prototype.slice = function (a, b) { const r = slice0.call(this, a, b); work += r.length + 1; return r; };
 RegExp.prototype.exec = function (s) {
   const from = this.sticky || this.global ? this.lastIndex : 0;
   const m = exec0.call(this, s);
-  work += this.sticky ? (m ? m[0].length : 0) + 1 : String(s).length - from + 1;
+  work += (this.sticky && m ? m[0].length : String(s).length - from) + 1;
   return m;
 };
 function workOf(text) { work = 0; renderMarkdown(text); return work; }
 `
 
 func TestMarkdownInlineIsLinear(t *testing.T) {
-	shapes := map[string]string{
-		"lone stars":       "*a ",
-		"lone underscores": " _a",
-		"lone doubles":     "**a ",
-		"globs":            "*.go ",
-		"open brackets":    "[",
-		"open links":       "[a](b",
-		"labels":           "[a] ",
-		"bare h":           "h",
-		"backticks":        "` a ",
-		"nested emphasis":  "*a **b _c ",
+	// Each shape is a unit repeated n times, a middle, then a tail unit repeated n times.
+	shapes := map[string][3]string{
+		"lone stars":            {"*a ", "", ""},
+		"lone underscores":      {" _a", "", ""},
+		"lone doubles":          {"**a ", "", ""},
+		"globs":                 {"*.go ", "", ""},
+		"open brackets":         {"[", "", ""},
+		"open links":            {"[a](b", "", ""},
+		"labels":                {"[a] ", "", ""},
+		"bare h":                {"h", "", ""},
+		"backticks":             {"` a ", "", ""},
+		"nested emphasis":       {"*a **b _c ", "", ""},
+		"openers sharing a url": {"[", "a](", "x"},
 	}
 	var got map[string][2]int
 	nodeRun(t, markdownPrelude(t)+workCounterJS, nil, `
 const out = {};
-for (const [name, unit] of Object.entries(input)) out[name] = [workOf(unit.repeat(2000)), workOf(unit.repeat(4000))];
+const build = ([unit, middle, tail], n) => unit.repeat(n) + middle + tail.repeat(n);
+for (const [name, s] of Object.entries(input)) out[name] = [workOf(build(s, 2000)), workOf(build(s, 4000))];
 process.stdout.write(JSON.stringify(out));`, shapes, &got)
 	for name := range shapes {
 		w := got[name]

@@ -11,7 +11,6 @@ const MD_FENCE = /^\s*(```|~~~)/;
 const MD_HEADING = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/;
 const MD_QUOTE = /^\s{0,3}>\s?/;
 const MD_ITEM = /^\s{0,3}([-*+]|\d{1,9}[.)])\s+/;
-const MD_LINK_URL = /\(((?:[^()\s]|\([^()\s]*\))+)\)/y;
 const MD_BARE_URL = /https:\/\/[^\s<>()[\]]+/y;
 const MD_WORD = /[\p{L}\p{N}]/u;
 // MD_DEPTH caps nested quotes and emphases; deeper markers stay text in the innermost node.
@@ -112,6 +111,9 @@ function mdInline(s, depth = 0, links = true) {
     if (i > start) out.push(s.slice(start, i));
   };
   const nested = depth < MD_DEPTH;
+  // Every [ before the same ] shares its link target, scanned once.
+  let targetOf = -1;
+  let target = null;
   let i = 0;
   while (i < s.length) {
     const c = s[i];
@@ -144,14 +146,16 @@ function mdInline(s, depth = 0, links = true) {
     }
     if (links && c === "[" && s[labelEnd[i + 1]] === "]" && labelEnd[i + 1] > i + 1) {
       const close = labelEnd[i + 1];
-      MD_LINK_URL.lastIndex = close + 1;
-      const m = MD_LINK_URL.exec(s);
-      if (m) {
+      if (close !== targetOf) {
+        targetOf = close;
+        target = mdLinkTarget(s, close + 1);
+      }
+      if (target) {
         flush(i);
         const label = mdInline(s.slice(i + 1, close), depth + 1, false);
-        const href = safeURL(m[1]);
+        const href = safeURL(target.url);
         out.push(href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label);
-        start = i = close + 1 + m[0].length;
+        start = i = target.end;
         continue;
       }
     }
@@ -202,6 +206,27 @@ function mdClosers(s) {
       return k < list.length ? list[k] : -1;
     },
   };
+}
+
+// mdLinkTarget reads a link's (url) at open: no whitespace, parentheses only as balanced pairs one level deep.
+// It answers the url and where the link ends, or null.
+function mdLinkTarget(s, open) {
+  if (s.charAt(open) !== "(") return null;
+  let j = open + 1;
+  for (;;) {
+    const c = s.charAt(j);
+    if (c === "" || /\s/.test(c)) return null;
+    if (c === ")") return j > open + 1 ? { url: s.slice(open + 1, j), end: j + 1 } : null;
+    if (c === "(") {
+      let k = j + 1;
+      let d = s.charAt(k);
+      while (d !== "" && d !== "(" && d !== ")" && !/\s/.test(d)) d = s.charAt(++k);
+      if (d !== ")") return null;
+      j = k + 1;
+      continue;
+    }
+    j++;
+  }
 }
 
 // mdLabelEnds holds, for each position, where a link label starting there would end: the next ] or line end.
