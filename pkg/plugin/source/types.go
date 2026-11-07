@@ -56,6 +56,10 @@ type Situation struct {
 	WaitingOn string    `json:"waiting_on,omitempty"`
 	Since     time.Time `json:"since,omitzero"`
 	Reason    string    `json:"reason,omitempty"`
+	// ReasonKey names Reason in the words of the plugin's profile layer (ui.toml's [reasons]), which
+	// ReasonParams fill; empty leaves Reason as it is.
+	ReasonKey    string            `json:"reason_key,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
 	// Stalled is an After value: the situation is stalled once it holds.
 	Stalled Value `json:"stalled,omitzero"`
 }

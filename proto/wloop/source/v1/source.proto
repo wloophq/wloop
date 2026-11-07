@@ -346,6 +346,10 @@ message Situation {
   string reason = 4;
   // stalled is an After value: the situation is stalled once it holds.
   Fact stalled = 5;
+  // reason_key names reason in the words of the plugin's profile layer (ui.toml's [reasons]), which
+  // reason_params fill; empty leaves reason as it is.
+  string reason_key = 6;
+  map<string, string> reason_params = 7;
 }
 
 // Link is a link the unit's source holds to an address, which the host
