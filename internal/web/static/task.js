@@ -176,7 +176,7 @@ function taskBrief(e) {
     b.goal ? h("p", { class: "goal" }, b.goal) : null,
     b.text ? renderMarkdown(b.text, { fold: 8, key: "brief:" + e.id }) : null,
     b.context ? h("p", {}, b.context) : null,
-    b.risk ? h("p", { class: "risk-" + b.risk }, t("Risk: {risk}", { risk: b.risk }), b.risk_why ? ` (${b.risk_why})` : "") : null,
+    b.risk ? h("p", { class: "risk-" + b.risk }, t("Risk: {risk}", { risk: propText(b.risk, taskFacetOf("brief.risk")) }), b.risk_why ? ` (${b.risk_why})` : "") : null,
     (b.open_questions || []).length ? h("ul", {}, ...b.open_questions.map((q) => h("li", {}, q))) : null,
     (b.tags || []).length ? h("div", { class: "d-brief-tags" }, ...b.tags.map((x) => h("span", { class: "pill" }, x))) : null,
     known ? null : h("pre", { class: "draft-text" }, JSON.stringify(r.data, null, 2)),
@@ -227,6 +227,18 @@ function transcriptLines(out) {
   return list.map((x) => (typeof x === "string" ? x : [x.role || x.actor || "", x.text || ""].filter(Boolean).join(": ")));
 }
 
+// RUN_STATE_WORDS word a run's turn state and its session's state.
+const RUN_STATE_WORDS = {
+  sent: () => t("run_state_sent"), started: () => t("run_state_started"), asked: () => t("run_state_asked"), done: () => t("run_state_done"), settled: () => t("run_state_settled"),
+  failed: () => t("run_state_failed"), unrecorded: () => t("run_state_unrecorded"), dismissed: () => t("run_state_dismissed"), replaced: () => t("run_state_replaced"),
+  withdrawn: () => t("run_state_withdrawn"), active: () => t("run_state_active"), dormant: () => t("run_state_dormant"), closed: () => t("run_state_closed"),
+};
+
+// runStateWord is state in words, else as the daemon names it.
+function runStateWord(state) {
+  return Object.hasOwn(RUN_STATE_WORDS, state) ? RUN_STATE_WORDS[state]() : state;
+}
+
 // runCard is a run with where it ran and its session; its actions are the
 // ones the run offers.
 function runCard(r) {
@@ -237,13 +249,13 @@ function runCard(r) {
   }, label);
   const shown = taskState.transcript && taskState.transcript.seq === r.seq ? taskState.transcript : null;
   return h("article", { class: "d-run", "data-run": String(r.seq) },
-    h("div", { class: "meta" }, h("strong", {}, r.intent), " ", h("span", { class: "pill" }, r.state),
+    h("div", { class: "meta" }, h("strong", {}, r.intent), " ", h("span", { class: "pill" }, runStateWord(r.state)),
       r.manager ? [" ", t("in {manager}", { manager: r.manager })] : null,
-      r.session ? [" ", t("session"), " ", h("code", {}, r.session), r.session_state ? ` (${r.session_state})` : ""] : null),
+      r.session ? [" ", t("session"), " ", h("code", {}, r.session), r.session_state ? ` (${runStateWord(r.session_state)})` : ""] : null),
     r.worktree || r.workspace ? h("div", { class: "meta" }, h("code", {}, r.worktree || r.workspace)) : null,
     r.resume ? h("div", { class: "meta" }, t("Resume:"), " ", h("code", {}, r.resume)) : null,
     h("div", { class: "d-actions" }, button("open", t("Open workspace")), button("enter", t("Enter session")), button("transcript", t("Transcript"))),
-    shown ? (shown.error ? h("p", { class: "plan-error" }, shown.error) : h("ol", { class: "transcript" }, ...shown.lines.map((l) => h("li", {}, l)))) : null);
+    shown ? (shown.error ? h("p", { class: "plan-error" }, shown.error) : h("ol", { class: "transcript" }, ...shown.lines.map((l, i) => h("li", {}, renderMarkdown(l, { fold: 12, key: `run:${r.seq}:${i}` }))))) : null);
 }
 
 function taskRuns(e) {

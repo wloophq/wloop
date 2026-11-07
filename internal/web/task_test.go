@@ -413,3 +413,23 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 		}
 	}
 }
+
+func TestARunAndABriefReadInTheLocale(t *testing.T) {
+	var got struct {
+		Run, Brief, Line string
+		Strong           int
+	}
+	nodeRun(t, viewsPrelude(t)+stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml"), nil, `
+tasksState.catalog = { facets: [{ id: "risk", fact: "brief.risk", label: "Risco", labels: { high: "alto" } }] };
+taskState.transcript = { seq: 3, lines: ["assistant: **Done**; tests pass."] };
+const run = runCard({ seq: 3, intent: "start", state: "started", session: "s-1", session_state: "dormant", actions: [] });
+const brief = taskBrief({ id: "t-1", brief: { data: { risk: "high" } } });
+const line = byClass(run, "transcript");
+process.stdout.write(JSON.stringify({ Run: text(byClass(run, "meta")[0]), Brief: text(brief), Line: text(line), Strong: all(line, (x) => x.tag === "strong").length }));`, nil, &got)
+	if !strings.Contains(got.Run, "iniciado") || !strings.Contains(got.Run, "(dormente)") || !strings.Contains(got.Brief, "Risco: alto") {
+		t.Errorf("%+v: a run's states and the brief's risk read in pt-BR", got)
+	}
+	if got.Strong != 1 || strings.Contains(got.Line, "**") {
+		t.Errorf("%+v: a transcript line renders as markdown", got)
+	}
+}
