@@ -77,7 +77,7 @@ func TestAnOpenedLinkShowsItsRouteInTheMainWindow(t *testing.T) {
 		r := newRig(make(chan api.Change))
 		r.run(t)
 		synctest.Wait()
-		r.host.handlers().OnOpenURL("wloop://open/#task=t-1")
+		r.host.handlers().OnOpenURL(link("://open/#task=t-1"))
 		want(t, r.host.taken(), "main "+base+"#task=t-1", "hide-panel")
 	})
 }
@@ -87,9 +87,9 @@ func TestAMalformedLinkOpensTheDefaultRouteAndSaysSo(t *testing.T) {
 		r := newRig(make(chan api.Change))
 		r.run(t)
 		synctest.Wait()
-		r.host.handlers().OnOpenURL("wloop://elsewhere/#task=t-1")
+		r.host.handlers().OnOpenURL(link("://elsewhere/#task=t-1"))
 		want(t, r.host.taken(), "main "+base+"#"+MalformedLinkRoute, "hide-panel")
-		if got := r.logs.all(); !strings.Contains(got, "wloop://elsewhere/#task=t-1") {
+		if got := r.logs.all(); !strings.Contains(got, link("://elsewhere/#task=t-1")) {
 			t.Errorf("the log %q does not name the link", got)
 		}
 	})

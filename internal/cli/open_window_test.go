@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/window"
 )
 
@@ -103,11 +104,12 @@ func TestOpenRoutesToTheWindow(t *testing.T) {
 
 func TestOpenALinkRoutesToTheWindow(t *testing.T) {
 	t.Parallel()
-	for link, route := range map[string]string{
-		"wloop://open/#task=t-1":                   "task=t-1",
-		"wloop://open/#unit=github/acme%2Fapi%238": "unit=github/acme%2Fapi%238",
-		"wloop://open/":                            "",
+	for rest, route := range map[string]string{
+		"://open/#task=t-1":                   "task=t-1",
+		"://open/#unit=github/acme%2Fapi%238": "unit=github/acme%2Fapi%238",
+		"://open/":                            "",
 	} {
+		link := brand.URLScheme() + rest
 		t.Run(link, func(t *testing.T) {
 			te, opened := cockpitEnv(t)
 			got := listenAsWindow(t, te)
@@ -128,13 +130,14 @@ func TestOpenAMalformedLinkOpensTheDefaultRouteAndSaysSo(t *testing.T) {
 	t.Parallel()
 	te, opened := cockpitEnv(t)
 	got := listenAsWindow(t, te)
-	if code := te.run("open", "wloop://elsewhere/#task=t-1"); code != 0 {
+	link := brand.URLScheme() + "://elsewhere/#task=t-1"
+	if code := te.run("open", link); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if w := nextWindowRequest(t, got); w != (api.WindowRequest{Action: api.WindowOpen, Route: window.MalformedLinkRoute}) {
 		t.Fatalf("requested %+v", w)
 	}
-	if !strings.Contains(te.err.String(), "wloop://elsewhere/#task=t-1") {
+	if !strings.Contains(te.err.String(), link) {
 		t.Fatalf("stderr %q does not name the link", te.err)
 	}
 	if len(*opened) != 0 {
@@ -145,7 +148,7 @@ func TestOpenAMalformedLinkOpensTheDefaultRouteAndSaysSo(t *testing.T) {
 func TestOpenALinkFallsBackToTheBrowserAtItsRoute(t *testing.T) {
 	t.Parallel()
 	te, opened := cockpitEnv(t)
-	if code := te.run("open", "wloop://open/#task=t-1"); code != 0 {
+	if code := te.run("open", brand.URLScheme()+"://open/#task=t-1"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if want := browserCommand() + " http://127.0.0.1:4321/?token=tok#task=t-1"; !slices.Equal(*opened, []string{want}) {

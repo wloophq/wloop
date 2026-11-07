@@ -20,7 +20,7 @@ func IsLink(s string) bool {
 	return ok && strings.EqualFold(scheme, brand.URLScheme())
 }
 
-// LinkRoute is the cockpit route of a deep link, wloop://open/#<route>; ok is
+// LinkRoute is the cockpit route of a deep link, <scheme>://open/#<route>; ok is
 // false for anything else. The route is kept as written, still escaped.
 func LinkRoute(link string) (route string, ok bool) {
 	head, route, _ := strings.Cut(strings.TrimSpace(link), "#")
