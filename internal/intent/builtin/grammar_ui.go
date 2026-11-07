@@ -49,6 +49,8 @@ var uiGrammar = []Key{
 	{Path: "lens", In: SurfaceUI, Kind: KindTable, Doc: "The plugin's own words of its rows, replacing the row words of views.toml's [lens] by the same keys."},
 	{Path: "situations", In: SurfaceUI, Kind: KindTable, Doc: "How each situation the plugin derives shows, by kind, in a few words."},
 	{Path: "situations.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One situation's words."},
+	{Path: "reasons", In: SurfaceUI, Kind: KindTable, Doc: "Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it."},
+	{Path: "reasons.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One reason's words, `{{.name}}` where a value the situation gives goes, such as `changes requested by {{.actor}}`."},
 	{Path: "events", In: SurfaceUI, Kind: KindTable, Doc: "How each event kind the plugin declares shows on a timeline, by kind."},
 	{Path: "events.*", In: SurfaceUI, Kind: KindTable, Doc: "One event kind's words."},
 	{Path: "events.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The event in a few words. Required."},
