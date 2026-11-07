@@ -564,12 +564,16 @@ func nodeScript(t *testing.T, script string, in, out any) {
 	nodeScriptEnv(t, nil, script, in, out)
 }
 
-// nodeScriptEnv is nodeScript with env added to node's environment.
+// nodeScriptEnv is nodeScript with env added to node's environment. The script runs after i18n.js, which
+// the cockpit loads before every other script, unless it brings its own.
 func nodeScriptEnv(t *testing.T, env []string, script string, in, out any) {
 	t.Helper()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
+	}
+	if !strings.Contains(script, "const I18N = ") {
+		script = staticJS(t, "i18n.js") + "\n" + script
 	}
 	raw, _ := json.Marshal(in)
 	cmd := exec.Command(node, scriptFile(t, "const input = JSON.parse(require(\"fs\").readFileSync(0, \"utf8\"));\n"+script))

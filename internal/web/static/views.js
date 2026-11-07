@@ -1,9 +1,13 @@
 "use strict";
 
 // REVIEW is the route and the key context of the review, a mode of the cockpit that walks the catalog's review
-// views; REVIEW_TITLE is its title.
+// views; reviewTitle is its title.
 const REVIEW = "review";
-const REVIEW_TITLE = "Review";
+
+function reviewTitle() {
+  return t("Review");
+}
+
 const tasksState = { catalog: null, catalogError: "", key: "", page: null, units: [], tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
@@ -52,7 +56,7 @@ function railSections(nav, name) {
   const by = new Map();
   for (const v of nav.filter((x) => !x.core)) {
     if (!by.has(v.provider)) {
-      by.set(v.provider, { title: v.provider ? name(v.provider) : "Plugins", views: [] });
+      by.set(v.provider, { title: v.provider ? name(v.provider) : t("Plugins"), views: [] });
       out.push(by.get(v.provider));
     }
     by.get(v.provider).views.push(v);
@@ -205,7 +209,7 @@ async function loadTaskList(route) {
     tasksState.units = tasksState.units.filter((u) => !units.includes(u));
     tasksState.error = "";
   } catch (err) {
-    tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
+    tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: err.message });
     return;
   }
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
@@ -215,8 +219,8 @@ function unitLabel(u) {
   return !u ? "" : `${u.provider}:${u.key}`;
 }
 
-function shortDate(t) {
-  const d = new Date(t);
+function shortDate(at) {
+  const d = new Date(at);
   return isNaN(d) ? "" : d.toISOString().slice(0, 10);
 }
 
@@ -313,8 +317,8 @@ function projectFacts(e, w) {
 }
 
 // localDate is an instant's day where the browser is, unlike shortDate's UTC day for deadlines.
-function localDate(t) {
-  const d = new Date(t);
+function localDate(at) {
+  const d = new Date(at);
   return isNaN(d) ? "" : d.toLocaleDateString("en-CA");
 }
 
@@ -359,9 +363,9 @@ function areaPicker(route) {
   if (!areas.length) return null;
   const counts = (viewCounters(route) || {}).areas || {};
   return h("label", { class: "lens-pick" },
-    h("span", { class: "lens-label" }, "Area"),
+    h("span", { class: "lens-label" }, t("Area")),
     h("select", { "data-focus": "view:area", onchange: (ev) => writeHash({ area: ev.target.value }) },
-      h("option", { value: "", selected: !route.area }, "All areas"),
+      h("option", { value: "", selected: !route.area }, t("All areas")),
       ...areas.map((a) => h("option", { value: a, selected: route.area === a }, counts[a] === undefined ? a : `${a} (${counts[a]})`))));
 }
 
@@ -419,15 +423,15 @@ function viewPage(route, open) {
   const head = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     spec && spec.remove_clean ? h("button", {
       type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
-      title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
+      title: t("Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished"),
       onclick: () => removeAllClean(n, route.view),
-    }, "Remove all clean") : null), viewIntro(spec)];
+    }, t("Remove all clean")) : null), viewIntro(spec)];
   const page = { head, lens: lensOf(route), res: null, body: [] };
   const body = page.body;
   if (tasksState.error) body.push(h("p", { class: "plan-error" }, tasksState.error));
   if (loaded) body.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
-    body.push(h("p", { class: "empty" }, "Loading."));
+    body.push(h("p", { class: "empty" }, t("Loading.")));
     return page;
   }
   if (spec && spec.over === "gates") {
@@ -440,7 +444,7 @@ function viewPage(route, open) {
     return page;
   }
   if (!page.res.shown) {
-    body.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
+    body.push(h("p", { class: "empty" }, t("Nothing here matches \"{query}\".", { query: route.q })));
     return page;
   }
   if (page.lens.layout === "board") body.push(taskBoard(page.res, page.lens, open));
@@ -457,18 +461,18 @@ function taskBoard(res, lens, open) {
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.
 function viewIntro(spec) {
   if (!spec || !spec.summary) return null;
-  const rule = [["Lists", spec.when], ["Sorted by", spec.sort], ["Grouped by", spec.group]].filter(([, v]) => v);
+  const rule = [[t("Lists"), spec.when], [t("Sorted by"), spec.sort], [t("Grouped by"), spec.group]].filter(([, v]) => v);
   return h("div", { class: "view-intro" },
     h("p", { class: "view-summary" }, spec.summary),
     rule.length ? h("details", { class: "view-rule" },
-      h("summary", {}, "Why these tasks?"),
+      h("summary", {}, t("Why these tasks?")),
       h("dl", {}, ...rule.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, h("code", {}, v))]))) : null);
 }
 
 // loadingNotes say which plugins have not reported all their units yet, and why, so a short list reads as
 // incomplete rather than empty.
 function loadingNotes(loading) {
-  return (loading || []).map((l) => h("p", { class: "loading", "data-plugin": l.plugin }, `Loading ${l.plugin}${l.reason ? ": " + l.reason : ""}`));
+  return (loading || []).map((l) => h("p", { class: "loading", "data-plugin": l.plugin }, l.reason ? t("Loading {plugin}: {reason}", { plugin: l.plugin, reason: l.reason }) : t("Loading {plugin}", { plugin: l.plugin })));
 }
 
 // viewLabel is the profile's word for a core view.
@@ -491,7 +495,7 @@ const removeState = { busy: false };
 // removeAllClean removes the clean workspaces the n tasks of a view that offers it hold, and says what it removed
 // and what it kept, with why.
 async function removeAllClean(n, view) {
-  if (!confirm(`Remove the workspaces of the ${n} task${n === 1 ? "" : "s"} in ${viewLabel(view)}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.`)) return;
+  if (!confirm(tn("Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.", n, { view: viewLabel(view) }))) return;
   removeState.busy = true;
   state.actionError = "";
   state.actionDetail = "";
@@ -508,18 +512,18 @@ async function removeAllClean(n, view) {
     const kept = (out.kept || []).map((k) => `${labelOf(k)} (${k.reason})`);
     const details = (out.kept || []).filter((k) => k.detail).map((k) => `${labelOf(k)}: ${k.detail}`);
     const text = [
-      `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
-      kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
+      removed.length ? tn("Removed {n}: {list}.", removed.length, { list: removed.join(", ") }) : tn("Removed {n}.", 0),
+      kept.length ? tn("Kept {n}: {list}.", kept.length, { list: kept.join("; ") }) : "",
     ].filter(Boolean).join(" ");
     setNotice(text);
     document.getElementById("notice").title = text;
     if (details.length) {
-      state.actionError = `Kept ${details.length} with details`;
+      state.actionError = tn("Kept {n} with details", details.length);
       state.actionSource = "";
       state.actionDetail = details.join("\n");
     }
   } catch (err) {
-    state.actionError = `remove all clean failed: ${err.message}`;
+    state.actionError = t("remove all clean failed: {error}", { error: err.message });
   }
   removeState.busy = false;
   scheduleLoad({ all: true, tasks: true });
@@ -537,7 +541,7 @@ function renderTasks(route) {
     head.replaceChildren();
     hideLens(tools);
     body.replaceChildren(...(on ? reviewPanel(route.task) : []));
-    if (on) box.setAttribute("aria-label", REVIEW_TITLE);
+    if (on) box.setAttribute("aria-label", reviewTitle());
     return;
   }
   box.setAttribute("aria-label", viewLabel(route.view));

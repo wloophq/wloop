@@ -18,22 +18,25 @@ import (
 
 // nonProse are literals that read like prose and are not: what each is, by literal.
 var nonProse = map[string]string{
-	"Escape":    "KeyboardEvent.key",
-	"Enter":     "KeyboardEvent.key",
-	"Backspace": "KeyboardEvent.key",
-	"Tab":       "KeyboardEvent.key",
-	"Shift":     "KeyboardEvent.key",
-	"Control":   "KeyboardEvent.key",
-	"Meta":      "KeyboardEvent.key",
-	"Alt":       "KeyboardEvent.key",
-	"Delete":    "KeyboardEvent.key",
-	"Home":      "KeyboardEvent.key",
-	"End":       "KeyboardEvent.key",
-	"Accept":    "an HTTP header name",
-	"POST":      "an HTTP method",
-	"GET":       "an HTTP method",
-	"DELETE":    "an HTTP method",
-	"Contents":  "a macOS bundle's directory",
+	"Escape":              "KeyboardEvent.key",
+	"Enter":               "KeyboardEvent.key",
+	"Backspace":           "KeyboardEvent.key",
+	"Tab":                 "KeyboardEvent.key",
+	"Shift":               "KeyboardEvent.key",
+	"Control":             "KeyboardEvent.key",
+	"Meta":                "KeyboardEvent.key",
+	"Alt":                 "KeyboardEvent.key",
+	"Delete":              "KeyboardEvent.key",
+	"Home":                "KeyboardEvent.key",
+	"End":                 "KeyboardEvent.key",
+	"Accept":              "an HTTP header name",
+	"POST":                "an HTTP method",
+	"GET":                 "an HTTP method",
+	"DELETE":              "an HTTP method",
+	"Contents":            "a macOS bundle's directory",
+	"use strict":          "a script's directive",
+	"Esc":                 "the Escape key's name as the served bindings spell it",
+	"noopener noreferrer": "a link's rel tokens",
 }
 
 // proseClients are the Go clients whose words a person reads; the hook and the CLI's turn client write what
@@ -43,8 +46,7 @@ var proseClients = []string{"menubar", "tui", "window"}
 // proseDebts are the prose literals each client still quotes outside the catalog, by script or by client
 // package. A count only shrinks: a count above or below the real one fails.
 var proseDebts = map[string]int{
-	"app.js": 196, "dash.js": 60, "detail.js": 33, "keys.js": 20, "palette.js": 6, "panel.js": 1, "plugins.js": 6, "review.js": 11,
-	"routes.js": 1, "task.js": 38, "update.js": 1, "views.js": 18, "tui": 87,
+	"app.js": 164, "tui": 85,
 }
 
 var (
@@ -183,9 +185,9 @@ func ruleClientProse(file string, src string) []string {
 var goExempt = map[string]bool{"T": true, "TN": true, "New": true, "panic": true, "Errorf": true, "Log": true, "Logf": true, "logf": true, "Printf": true, "Println": true,
 	"Debug": true, "Info": true, "Warn": true, "Error": true, "Sprintf": true, "Fprintf": true, "Exec": true, "Command": true, "CommandContext": true}
 
-// ruleGoClientProse flags each prose literal of the Go client file outside the catalog: the catalog's keys
-// (keys), errors, logs and formats are not prose a client shows itself.
-func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File, keys map[string]bool) []string {
+// ruleGoClientProse flags each prose literal of the Go client file outside the catalog: the catalog's keys,
+// errors, logs and formats are not prose a client shows itself.
+func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File) []string {
 	exempt := map[*ast.BasicLit]bool{}
 	exemptAll := func(n ast.Node) {
 		ast.Inspect(n, func(m ast.Node) bool {
@@ -235,7 +237,7 @@ func ruleGoClientProse(fset *token.FileSet, file string, f *ast.File, keys map[s
 			return true
 		}
 		s, err := strconv.Unquote(lit.Value)
-		if err == nil && !keys[s] && isProse(s) {
+		if err == nil && isProse(s) {
 			out = append(out, fmt.Sprintf("%s:%d quotes %q; a text a person reads goes through texts.Catalog with its key in strings.toml", file, fset.Position(lit.Pos()).Line, s))
 		}
 		return true
@@ -281,10 +283,9 @@ func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
 		}
 		got[proseBucket(file)] = append(got[proseBucket(file)], ruleClientProse(file, src)...)
 	}
-	keys := catalogKeys(t)
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		if strings.HasPrefix(file, "internal/client/") && slices.Contains(proseClients, proseBucket(file)) {
-			got[proseBucket(file)] = append(got[proseBucket(file)], ruleGoClientProse(fset, file, f, keys)...)
+			got[proseBucket(file)] = append(got[proseBucket(file)], ruleGoClientProse(fset, file, f)...)
 		}
 	})
 	for _, b := range slices.Sorted(maps.Keys(got)) {

@@ -32,7 +32,7 @@ async function loadTaskPage(e) {
     taskState.timelineError = "";
     for (const ev of taskState.timeline) if (!taskState.kindsSeen.includes(ev.kind)) taskState.kindsSeen.push(ev.kind);
   } catch (err) {
-    if (taskState.id === e.id) taskState.timelineError = `Could not load the timeline: ${err.message}`;
+    if (taskState.id === e.id) taskState.timelineError = t("Could not load the timeline: {error}", { error: err.message });
   }
 }
 
@@ -69,13 +69,13 @@ function taskLinks(e) {
 
 function taskHeader(e) {
   return h("header", { class: "d-head" },
-    h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
+    h("button", { type: "button", class: "close", "aria-label": t("Close detail"), "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
     h("h1", {}, starred(e) ? h("span", { class: "star" }, "★ ") : null, e.title || e.id),
     h("div", { class: "meta" },
       h("span", { class: "pill state", "data-category": e.category || "" }, stateLabel(e.state)),
-      e.changed ? [" ", h("span", { class: "flag" }, "changed")] : null,
-      e.owed_by ? [" owed by ", h("strong", {}, e.owed_by)] : null,
-      e.wake && e.wake.until ? [" wakes ", stamp(e.wake.until)] : null),
+      e.changed ? [" ", h("span", { class: "flag" }, t("changed"))] : null,
+      e.owed_by ? [" ", t("owed by"), " ", h("strong", {}, e.owed_by)] : null,
+      e.wake && e.wake.until ? [" ", t("wakes {time}", { time: stamp(e.wake.until) })] : null),
     e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
     taskProps(e),
     taskLinks(e),
@@ -85,11 +85,11 @@ function taskHeader(e) {
 function taskAsks(e) {
   const asks = e.asks || [];
   if (!asks.length) return null;
-  return h("section", { class: "d-asks", "aria-label": "Asks" },
-    h("h2", { class: "d-sub" }, "Asks"),
+  return h("section", { class: "d-asks", "aria-label": t("Asks") },
+    h("h2", { class: "d-sub" }, t("Asks")),
     h("ul", { class: "asks" }, ...asks.map((a) => h("li", { class: "ask" },
       h("div", {}, a.asker ? h("strong", {}, a.asker + ": ") : null, a.summary,
-        safeURL(a.permalink) ? [" ", h("a", { href: safeURL(a.permalink), target: "_blank", rel: "noopener noreferrer", class: "ext" }, "source")] : null),
+        safeURL(a.permalink) ? [" ", h("a", { href: safeURL(a.permalink), target: "_blank", rel: "noopener noreferrer", class: "ext" }, t("source"))] : null),
       ...(a.quotes || []).map((q) => h("blockquote", { class: "quote" }, q))))));
 }
 
@@ -98,12 +98,12 @@ function taskBrief(e) {
   if (!r) return null;
   const b = r.data && typeof r.data === "object" ? r.data : {};
   const known = b.text || b.goal || b.context || b.risk || (b.open_questions || []).length;
-  return h("section", { class: "d-brief", "aria-label": "Brief" },
-    h("h2", { class: "d-sub" }, "Brief"),
+  return h("section", { class: "d-brief", "aria-label": t("Brief") },
+    h("h2", { class: "d-sub" }, t("Brief")),
     b.text ? h("div", { class: "draft-text" }, b.text) : null,
     b.goal ? h("p", { class: "goal" }, b.goal) : null,
     b.context ? h("p", {}, b.context) : null,
-    b.risk ? h("p", { class: "risk-" + b.risk }, `Risk: ${b.risk}`, b.risk_why ? ` (${b.risk_why})` : "") : null,
+    b.risk ? h("p", { class: "risk-" + b.risk }, t("Risk: {risk}", { risk: b.risk }), b.risk_why ? ` (${b.risk_why})` : "") : null,
     (b.open_questions || []).length ? h("ul", {}, ...b.open_questions.map((q) => h("li", {}, q))) : null,
     known ? null : h("pre", { class: "draft-text" }, JSON.stringify(r.data, null, 2)),
     r.at ? h("div", { class: "meta" }, stamp(r.at)) : null);
@@ -118,7 +118,7 @@ async function resolveGate(e, g, id, option) {
   if (intent.answer) {
     const text = (taskState.answers.get(g.id) || "").trim();
     if (!text && !option) {
-      detailEnv.notice(`${intent.label}: write the answer first`, true);
+      detailEnv.notice(t("{action}: write the answer first", { action: intent.label }), true);
       return null;
     }
     args.answer = [option, text].filter(Boolean).join("\n");
@@ -130,7 +130,7 @@ async function resolveGate(e, g, id, option) {
     detailEnv.changed();
     return out || {};
   } catch (err) {
-    detailEnv.notice(`${intent.label} failed: ${err.message}`, true);
+    detailEnv.notice(t("{action} failed: {error}", { action: intent.label, error: err.message }), true);
     return null;
   }
 }
@@ -145,9 +145,9 @@ function gateCard(e, g) {
     h("h3", { class: "d-sub" }, g.text || g.name || g.kind),
     subject.text ? h("pre", { class: "draft-text" }, subject.text) : null,
     g.delivery ? h("p", { class: "meta" }, g.delivery) : null,
-    g.deadline ? h("p", { class: "meta" }, deflt ? `${deflt.label} at ${stamp(g.deadline)} unless you pick another` : `Until ${stamp(g.deadline)}`) : null,
+    g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: stamp(g.deadline) }) : t("Until {time}", { time: stamp(g.deadline) })) : null,
     gateOptions(e, g, subject, intents),
-    intents.some((x) => x.answer) ? h("textarea", { rows: 2, "aria-label": "Answer", "data-focus": `gate:${g.id}:text`,
+    intents.some((x) => x.answer) ? h("textarea", { rows: 2, "aria-label": t("Answer"), "data-focus": `gate:${g.id}:text`,
       oninput: (ev) => { taskState.answers.set(g.id, ev.target.value); } }, taskState.answers.get(g.id) || "") : null,
     h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
       type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
@@ -165,15 +165,15 @@ function gateOptions(e, g, subject, intents) {
   return h("div", { class: "q-options" }, ...ordered.map((o) => h("button", {
     type: "button", class: "act" + (o.id === subject.recommend ? " primary" : ""), title: o.consequence || undefined,
     "data-focus": `gate:${g.id}:option:${o.id}`, onclick: () => resolveGate(e, g, answer.id, o.id),
-  }, o.label, o.id === subject.recommend ? h("span", { class: "rec" }, " recommended") : null)));
+  }, o.label, o.id === subject.recommend ? h("span", { class: "rec" }, " " + t("recommended")) : null)));
 }
 
 function taskGates(e) {
   const d = isDraftTask(e) ? draftOf(e) : null;
   const gates = (e.gates || []).filter((g) => g.status === "open" && !(d && g.kind === "draft"));
   if (!gates.length && !d) return null;
-  return h("section", { class: "d-gates", "aria-label": "Open gates" },
-    h("h2", { class: "d-sub" }, "Waiting on you"),
+  return h("section", { class: "d-gates", "aria-label": t("Open gates") },
+    h("h2", { class: "d-sub" }, t("Waiting on you")),
     ...gates.map((g) => gateCard(e, g)),
     d ? draftCard(e, "detail") : null);
 }
@@ -189,7 +189,7 @@ async function runAct(r, action, label) {
     await detailEnv.post(runPath(action, r.seq), { source: "cockpit" });
     detailEnv.notice(`${label}: ${r.intent}`);
   } catch (err) {
-    detailEnv.notice(`${label} failed: ${err.message}`, true);
+    detailEnv.notice(t("{action} failed: {error}", { action: label, error: err.message }), true);
   }
 }
 
@@ -198,7 +198,7 @@ async function runTranscript(r) {
     const out = await detailEnv.getJSON(runPath("transcript", r.seq));
     taskState.transcript = { seq: r.seq, lines: transcriptLines(out) };
   } catch (err) {
-    taskState.transcript = { seq: r.seq, error: `Could not load the transcript: ${err.message}` };
+    taskState.transcript = { seq: r.seq, error: t("Could not load the transcript: {error}", { error: err.message }) };
   }
   detailEnv.render();
 }
@@ -216,21 +216,21 @@ function runCard(r) {
     type: "button", class: "act" + (offers.has(action) ? "" : " off"), disabled: !offers.has(action), "data-focus": `run:${r.seq}:${action}`,
     onclick: () => (action === "transcript" ? runTranscript(r) : runAct(r, action, label)),
   }, label);
-  const t = taskState.transcript && taskState.transcript.seq === r.seq ? taskState.transcript : null;
+  const shown = taskState.transcript && taskState.transcript.seq === r.seq ? taskState.transcript : null;
   return h("article", { class: "d-run", "data-run": String(r.seq) },
     h("div", { class: "meta" }, h("strong", {}, r.intent), " ", h("span", { class: "pill" }, r.state),
-      r.manager ? [" in ", r.manager] : null,
-      r.session ? [" session ", h("code", {}, r.session), r.session_state ? ` (${r.session_state})` : ""] : null),
+      r.manager ? [" ", t("in {manager}", { manager: r.manager })] : null,
+      r.session ? [" ", t("session"), " ", h("code", {}, r.session), r.session_state ? ` (${r.session_state})` : ""] : null),
     r.worktree || r.workspace ? h("div", { class: "meta" }, h("code", {}, r.worktree || r.workspace)) : null,
-    r.resume ? h("div", { class: "meta" }, "Resume: ", h("code", {}, r.resume)) : null,
-    h("div", { class: "d-actions" }, button("open", "Open workspace"), button("enter", "Enter session"), button("transcript", "Transcript")),
-    t ? (t.error ? h("p", { class: "plan-error" }, t.error) : h("ol", { class: "transcript" }, ...t.lines.map((l) => h("li", {}, l)))) : null);
+    r.resume ? h("div", { class: "meta" }, t("Resume:"), " ", h("code", {}, r.resume)) : null,
+    h("div", { class: "d-actions" }, button("open", t("Open workspace")), button("enter", t("Enter session")), button("transcript", t("Transcript"))),
+    shown ? (shown.error ? h("p", { class: "plan-error" }, shown.error) : h("ol", { class: "transcript" }, ...shown.lines.map((l) => h("li", {}, l)))) : null);
 }
 
 function taskRuns(e) {
   const runs = e.runs || [];
   if (!runs.length) return null;
-  return h("section", { class: "d-runs", "aria-label": "Runs" }, h("h2", { class: "d-sub" }, "Runs"), ...runs.map(runCard));
+  return h("section", { class: "d-runs", "aria-label": t("Runs") }, h("h2", { class: "d-sub" }, t("Runs")), ...runs.map(runCard));
 }
 
 function eventText(ev) {
@@ -254,14 +254,14 @@ function taskTimeline(e) {
       onclick: () => pickKinds(e, on ? kinds.filter((k) => k !== kind) : [...kinds, kind]) }, kind.replaceAll("_", " "));
   };
   const events = (taskState.timeline || []).filter((ev) => !kinds.length || kinds.includes(ev.kind));
-  return h("section", { class: "d-timeline", "aria-label": "Timeline" },
-    h("h2", { class: "d-sub" }, "Timeline"),
-    taskState.kindsSeen.length ? h("div", { class: "chips kinds", role: "group", "aria-label": "Kinds" },
-      h("button", { type: "button", class: "chip" + (kinds.length ? "" : " on"), "aria-pressed": String(!kinds.length), "data-focus": "timeline:kind:", onclick: () => pickKinds(e, []) }, "all"),
+  return h("section", { class: "d-timeline", "aria-label": t("Timeline") },
+    h("h2", { class: "d-sub" }, t("Timeline")),
+    taskState.kindsSeen.length ? h("div", { class: "chips kinds", role: "group", "aria-label": t("Kinds") },
+      h("button", { type: "button", class: "chip" + (kinds.length ? "" : " on"), "aria-pressed": String(!kinds.length), "data-focus": "timeline:kind:", onclick: () => pickKinds(e, []) }, t("all")),
       ...taskState.kindsSeen.map(chip)) : null,
     taskState.timelineError ? h("p", { class: "plan-error" }, taskState.timelineError) : null,
-    !taskState.timeline && !taskState.timelineError ? h("p", { class: "empty" }, "Loading the timeline.") : null,
-    taskState.timeline && !events.length ? h("p", { class: "empty" }, "Nothing here yet.") : null,
+    !taskState.timeline && !taskState.timelineError ? h("p", { class: "empty" }, t("Loading the timeline.")) : null,
+    taskState.timeline && !events.length ? h("p", { class: "empty" }, t("Nothing here yet.")) : null,
     events.length ? h("ol", { class: "chat" }, ...events.map((ev) => h("li", { class: `msg ev-${ev.kind} by-${String(ev.actor || "").replace(/[^a-z0-9-]/gi, "")}`, "data-seq": String(ev.seq) },
       h("div", { class: "meta" }, ev.by || ev.actor ? h("strong", { title: ev.actor || "" }, ev.by || ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
       eventText(ev) ? h("p", {}, eventText(ev)) : null))) : null);
@@ -271,18 +271,18 @@ function taskTimeline(e) {
 async function sendChat(e) {
   const text = taskState.text.trim();
   if (!text) {
-    detailEnv.notice("Write a message first", true);
+    detailEnv.notice(t("Write a message first"), true);
     return null;
   }
   try {
     const out = await detailEnv.post(taskPath(e.id, "chat"), { text });
     taskState.text = "";
-    detailEnv.notice(`Sent to ${e.title || e.id}`);
+    detailEnv.notice(t("Sent to {task}", { task: e.title || e.id }));
     await loadTaskPage(e);
     detailEnv.render();
     return out || {};
   } catch (err) {
-    detailEnv.notice(`Sending failed: ${err.message}`, true);
+    detailEnv.notice(t("Sending failed: {error}", { error: err.message }), true);
     return null;
   }
 }
@@ -293,7 +293,7 @@ async function sendChat(e) {
 async function replyWith(e, verb, send) {
   const text = taskState.text.trim();
   if (!text) {
-    detailEnv.notice("Write a message first", true);
+    detailEnv.notice(t("Write a message first"), true);
     return null;
   }
   const out = await taskAct(e, verb, { kind: "reply", text, send });
@@ -312,13 +312,13 @@ function taskComposer(e) {
   const reply = verb ? verbState(e, verb) : null;
   const on = !!(reply && reply.enabled);
   const replyButton = (label, send, focus, first) => h("button", { type: "button", class: "act" + (first ? " default" : "") + (on ? "" : " off"), disabled: !on,
-    title: reply ? (on ? verbTask(verb).summary : reply.reason) || undefined : "Not offered here",
+    title: reply ? (on ? verbTask(verb).summary : reply.reason) || undefined : t("Not offered here"),
     "data-focus": focus, onclick: () => replyWith(e, verb, send) }, label);
   const now = verbTask(verb).send === "now";
-  const replies = [replyButton("Send reply", "now", "task:compose:reply", now), replyButton("Save as draft", "draft", "task:compose:draft", !now)];
+  const replies = [replyButton(t("Send reply"), "now", "task:compose:reply", now), replyButton(t("Save as draft"), "draft", "task:compose:draft", !now)];
   if (!now) replies.reverse();
-  return h("section", { class: "d-compose", "aria-label": "Message" },
-    h("textarea", { rows: 3, "aria-label": "Message", placeholder: "Write to the agent", "data-focus": "task:compose:text",
+  return h("section", { class: "d-compose", "aria-label": t("Message") },
+    h("textarea", { rows: 3, "aria-label": t("Message"), placeholder: t("Write to the agent"), "data-focus": "task:compose:text",
       oninput: (ev) => { taskState.text = ev.target.value; },
       onkeydown: (ev) => {
         if (ev.key !== "Enter" || !(ev.ctrlKey || ev.metaKey)) return;
@@ -326,15 +326,15 @@ function taskComposer(e) {
         sendChat(e);
       } }, taskState.text),
     h("div", { class: "d-actions" },
-      h("button", { type: "button", class: "act primary", "data-focus": "task:compose:send", onclick: () => sendChat(e) }, "Send"),
+      h("button", { type: "button", class: "act primary", "data-focus": "task:compose:send", onclick: () => sendChat(e) }, t("Send")),
       ...replies));
 }
 
 function taskChildren(e) {
   const kids = e.children || [];
   if (!kids.length) return null;
-  return h("section", { class: "d-children", "aria-label": "Children" },
-    h("h2", { class: "d-sub" }, "Children"),
+  return h("section", { class: "d-children", "aria-label": t("Children") },
+    h("h2", { class: "d-sub" }, t("Children")),
     h("ol", { class: "d-tasks" }, ...kids.map((id) => {
       const c = taskById(id);
       return h("li", {}, h("a", { href: "#" + viewHash({ task: id, pr: "" }), "data-focus": "child:" + id }, (c && c.title) || id),

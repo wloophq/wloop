@@ -25,7 +25,6 @@ type noUnit struct{}
 func (noUnit) Error() string { return "task has no unit to act on" }
 var items = []MenuItem{{Title: "Sweep now"}}
 var keyed = c.T("Sweep now", nil)
-var known = "Quit {name}"
 var err = errors.New("task has no unit")
 func f() { panic("the window needs macOS") }
 `
@@ -34,7 +33,7 @@ func f() { panic("the window needs macOS") }
 	if err != nil {
 		t.Fatal(err)
 	}
-	flagged(t, "go", ruleGoClientProse(fset, "internal/client/menubar/p.go", f, map[string]bool{"Quit {name}": true}), 1, "Sweep now")
+	flagged(t, "go", ruleGoClientProse(fset, "internal/client/menubar/p.go", f), 1, "Sweep now")
 	for s, want := range map[string]bool{"Open cockpit": true, "Waiting": true, "row muted": true, "is:open waits-on:me": false, "https://x.y": false,
 		".row .title": false, "Escape": false, "ok": false, "a": false, "Jan": true} {
 		if got := isProse(s); got != want {

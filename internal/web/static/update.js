@@ -32,7 +32,7 @@ function reloadBlocked(doc) {
     texts.push(detailState.answer, detailState.guidance, detailState.compose.text, detailState.compose.reaction);
     if (detailState.editing.size) return true;
   }
-  return texts.some((t) => String(t || "").trim() !== "");
+  return texts.some((text) => String(text || "").trim() !== "");
 }
 
 const RELOADED_KEY = "reloaded-for";
