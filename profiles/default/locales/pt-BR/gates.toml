@@ -119,3 +119,25 @@ summary = "Fechar a execução parada sem retomá-la."
 [effects]
 "task.nudged" = "A tarefa fica marcada como cobrada."
 "unit.closed" = "A conversa é encerrada e as tarefas abertas que a contêm terminam."
+
+[drafts]
+by_hand = "Escritos à mão"
+by_hand_about = "Respostas e reações que você mesmo escreveu, esperando o envio."
+
+[drafts.purposes]
+nudge = "Cutucar"
+close = "Encerrar"
+ask_owner = "Perguntar quem é o responsável"
+acknowledge = "Confirmar recebimento"
+redirect = "Indicar outro caminho"
+reply = "Responder"
+react = "Reagir"
+unreact = "Remover uma reação"
+
+[drafts.states]
+held = "esperando por você"
+queued = "na fila"
+sending = "enviando"
+sent = "enviado"
+failed = "falhou no envio"
+dropped = "descartado"

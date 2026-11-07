@@ -54,6 +54,37 @@
       },
       "type": "object"
     },
+    "drafts": {
+      "additionalProperties": false,
+      "description": "The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.",
+      "properties": {
+        "by_hand": {
+          "description": "The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.",
+          "type": "string"
+        },
+        "by_hand_about": {
+          "description": "One line under that title.",
+          "type": "string"
+        },
+        "purposes": {
+          "additionalProperties": {
+            "description": "The purpose's word, such as \"Nudge\".",
+            "type": "string"
+          },
+          "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.",
+          "type": "object"
+        },
+        "states": {
+          "additionalProperties": {
+            "description": "The state's words, such as \"failed to send\"; the key is a draft state: held, queued, sending, sent, failed or dropped.",
+            "type": "string"
+          },
+          "description": "Where a draft's delivery stands, by state, as its card says it.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "effects": {
       "additionalProperties": {
         "description": "The sentence, such as \"The task is marked as nudged.\"; the key is an effect a draft may carry.",

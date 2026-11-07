@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -31,6 +32,15 @@ type GatesDef struct {
 	Approval GateApproval
 	// Effects are the sentences that say what each effect does when a draft is sent, by effect name.
 	Effects map[string]string
+	// Drafts are the words a draft's card and the Outbox read: gates.toml's [drafts].
+	Drafts DraftWords
+}
+
+// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts no
+// workflow proposed and no purpose names, Purposes name a purpose and States a delivery state, by its id.
+type DraftWords struct {
+	ByHand, ByHandAbout string
+	Purposes, States    map[string]string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -183,6 +193,14 @@ type mGatesFile struct {
 	Gates    map[string]mGate  `toml:"gates"`
 	Approval *mApproval        `toml:"approval"`
 	Effects  map[string]string `toml:"effects"`
+	Drafts   *mDraftWords      `toml:"drafts"`
+}
+
+type mDraftWords struct {
+	ByHand      *string           `toml:"by_hand"`
+	ByHandAbout *string           `toml:"by_hand_about"`
+	Purposes    map[string]string `toml:"purposes"`
+	States      map[string]string `toml:"states"`
 }
 
 type mGate struct {
@@ -223,6 +241,7 @@ func loadGates(layers []profile.Layer, r layerReader) (GatesDef, Problems) {
 			s.profileApproval(&d, m.Approval)
 		}
 		mergeEffects(s, &d, m.Effects)
+		mergeDraftWords(s, &d.Drafts, m.Drafts)
 		s.addGrammar(grammar(builtin.SurfaceGates, src))
 		return s.problems
 	})
@@ -320,6 +339,48 @@ func mergeEffects(s *sheet, d *GatesDef, m map[string]string) {
 			delete(d.Effects, name)
 		}
 	}
+}
+
+// mergeDraftWords lays a file's [drafts] over w: a key set replaces a lower layer's, an empty word takes it off.
+func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
+	if m == nil {
+		return
+	}
+	if m.ByHand != nil {
+		w.ByHand = strings.TrimSpace(*m.ByHand)
+	}
+	if m.ByHandAbout != nil {
+		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
+	}
+	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
+	states := make([]string, len(draft.States))
+	for i, st := range draft.States {
+		states[i] = string(st)
+	}
+	var known []string
+	for _, name := range declared(s, "drafts.states", m.States) {
+		if !slices.Contains(states, name) {
+			s.add("drafts.states."+name, "names no draft state%s; the states are %s", expr.DidYouMean(name, states), strings.Join(states, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.States = mergeWords(w.States, m.States, known)
+}
+
+// mergeWords is into with the words of names in m laid over it, an empty word taking one off.
+func mergeWords(into, m map[string]string, names []string) map[string]string {
+	for _, name := range names {
+		if into == nil {
+			into = map[string]string{}
+		}
+		if v := strings.TrimSpace(m[name]); v != "" {
+			into[name] = v
+		} else {
+			delete(into, name)
+		}
+	}
+	return into
 }
 
 func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {

@@ -92,6 +92,7 @@ type UIView struct {
 type UIEvent struct {
 	Label string `toml:"label"`
 	Loop  bool   `toml:"loop"`
+	Tone  string `toml:"tone"`
 	Data  string `toml:"data"`
 }
 

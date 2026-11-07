@@ -14,3 +14,7 @@ repeat_after = "config.drafts.repeat_after"
 [drafts.withdraw]
 when = '!draft.person_waited || draft.items_owed == 0 || draft.person_asks_you'
 reason = "moot"
+
+[outbox]
+title = "Ask who hasn't answered"
+about = "Drafted when a conversation where you wait on someone goes quiet."

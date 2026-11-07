@@ -53,7 +53,22 @@ The TCP port answers 404 for AgentAPI and AdminAPI, refuses an unexpected `Host`
 A client parses input, calls one API operation and renders the answer. The daemon computes the rows, their actions, the facets, the counters and the notifications; no client derives a situation or decides which actions a row offers. Clients import only `internal/api`, `internal/api/client`, the domain and `internal/termfmt`.
 
 - The CLI, the terminal client (`internal/client/tui`) and the menu bar (`internal/client/menubar`, its own process under its own LaunchAgent) call UserAPI over the socket.
-- The cockpit calls UserAPI over HTTP.
+- The cockpit calls UserAPI over HTTP. Its scripts, plain files under `internal/web/static` loaded in order by `index.html`, each have one reason to change:
+  - `app.js`: the boot, the state the pages share, the lens's pieces (`rowParts`, mirroring `lens.Parts`), the plugin rows and the unit detail;
+  - `i18n.js`: the profile's strings through `t` and `tn`, dates and numbers in the user's locale;
+  - `markdown.js`: agent prose as DOM nodes, safe by construction, only `https://` links;
+  - `row.js`: the one two-line row every list draws, task and plugin rows alike, and its board card;
+  - `rail.js`: the rail, its views by section with the empty ones folded, whom the rows wait on, the omnibox entry;
+  - `toolbar.js`: a list's toolbar: group, sort, filter chips, **+ Filter**, layout, copy;
+  - `views.js` and `review.js`: the task views and the Review that walks them;
+  - `gate.js`: the one decision card, a gate or a draft with its actions, for the detail, the Outbox and the queues;
+  - `task.js`: the task page: head, properties, primary verbs, tabs, composer;
+  - `timeline.js`: a task's timeline as the facts the daemon folds, raw events folded under each;
+  - `outbox.js`: the Outbox, its drafts grouped by why;
+  - `detail.js`: the detail panel that holds a task's or a unit's page;
+  - `window.js`: the title bar a native window draws over the page, the detach of a detail and the links to a view;
+  - `keys.js` and `palette.js`: the served key map and the palette and help it opens;
+  - `dash.js`, `plugins.js`, `routes.js`, `panel.js` and `update.js`: the dashboard, plugin views, routes, the omnibox panel and the update banner.
 - The window (`internal/client/window`) runs in the menu bar's process on macOS. It shows the cockpit's own URL in one main window, an omnibox panel and a window per detached task or unit, through a `Host` port that one adapter implements: `internal/client/window/wails`, the only package that imports Wails, built with the `purego` tag on darwin. The main and detached windows draw their controls over the page and mark its URL `titlebar=inset`, so the cockpit draws the title bar itself, dragged through Wails' `--wails-draggable`. It follows the event stream as the events client `window`. Any process asks it to act with `POST /api/window` (`open` a route, show the `panel`, `hide-panel`, `detach` a route's task or unit). A `{{command}}://open/#<route>` link the system hands the app reaches the window through the same `Host`, which keeps a link that launched the app until the window listens; `window.LinkRoute` reads it, for the app and for `{{command}} open`. The daemon relays the request only to that client, without moving the rows' position, and answers whether one took it, so `{{command}} open` falls back to the browser when none did. The panel's page reaches the window the same way, through `panel.js`, with no bridge between Go and the page.
 - The hooks (`internal/client/hook`) call AgentAPI with a 2-second budget, allow on any failure and never block an agent except to hold a stop that owes a record.
 

@@ -415,6 +415,7 @@ function createKeys(env) {
     openPalette() { env.palette({ title: t("Actions"), items: paletteItems() }); },
     setBindings(list) { bindings = (list || []).map((b) => ({ ...b })); },
     bindings: () => bindings,
+    keyOf: (action) => (bindings.find((b) => b.action === action) || {}).key || "",
   };
 }
 
@@ -465,6 +466,7 @@ function appEnv() {
     planAction: (it, id) => actOnPlan(it, id),
     viewContext: () => keyContextOf(readHash().view),
     step: (action) => reviewKey(action),
+    redraw: () => render(),
     detailAt: (el) => detailFocused(el),
     detach: () => detachView(),
     copyLink: () => copyViewLink(),
@@ -569,6 +571,8 @@ async function installKeys(env) {
     loadedAt = Date.now();
     try {
       keys.setBindings((await getJSON("/api/keys?surface=web")).bindings);
+      // The key hints read the bindings; draw them now rather than on the next change.
+      if (env.redraw) env.redraw();
     } catch (err) {
       env.notice(t("Could not load the keys: {error}", { error: err.message }), true);
     }

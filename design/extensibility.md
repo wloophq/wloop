@@ -25,7 +25,7 @@ Two things in wloop are open-ended: sources and behavior. Plugins bring new kind
 | Field | From | Renders as |
 |---|---|---|
 | provider id | the unit (`<provider>:<key>`) | the source chip's mark, the rail section |
-| unit kind | the plugin's view `Unit` label | the chip's kind word, the column head |
+| unit kind | the plugin's view `Unit` label | the chip's kind word, the list's count line |
 | `card.label` | the plugin | the chip's key, in `code` |
 | `card.title` | the plugin | the unit card's title |
 | `card.state`, `card.outcome` | the plugin's own word; `done` or `moot` | a `pill`; an outcome greys the card |

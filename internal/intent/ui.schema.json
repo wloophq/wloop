@@ -103,8 +103,18 @@
             "type": "string"
           },
           "loop": {
-            "description": "The event is the loop's doing, which the activity's loop filter keeps.",
+            "description": "The event is the loop's doing, which the activity's loop filter keeps; its tone is \"loop\" when it sets no other.",
             "type": "boolean"
+          },
+          "tone": {
+            "description": "The tone the timeline and the activity draw the event in.",
+            "enum": [
+              "",
+              "loop",
+              "me",
+              "people"
+            ],
+            "type": "string"
           }
         },
         "required": [

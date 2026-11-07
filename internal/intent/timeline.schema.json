@@ -11,6 +11,16 @@
           "label": {
             "description": "What the timeline calls an event of the kind, such as \"paused\".",
             "type": "string"
+          },
+          "tone": {
+            "description": "The tone the timeline and the activity draw an event of the kind in; \"loop\" is what the activity's loop filter keeps.",
+            "enum": [
+              "",
+              "loop",
+              "me",
+              "people"
+            ],
+            "type": "string"
           }
         },
         "required": [
@@ -19,6 +29,75 @@
         "type": "object"
       },
       "description": "The core's event kinds, by kind, as the timeline names them.",
+      "type": "object"
+    },
+    "facts": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One fact: the events that open it, close it and join it, and how it reads.",
+        "properties": {
+          "absorb": {
+            "description": "The event kinds that join the fact: its open span, or the fact just before them when it is this one.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "end": {
+            "description": "The event kinds that close it; when set the fact is a span, running until one comes, else each start is a fact of its own.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "description": "How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent.",
+            "type": "string"
+          },
+          "order": {
+            "description": "Where the fact is tried among the others, lowest first; name order breaks a tie.",
+            "type": "integer"
+          },
+          "running": {
+            "description": "How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent.",
+            "type": "string"
+          },
+          "start": {
+            "description": "The event kinds that open the fact: a core kind, a plugin's declared kind or a task verb's verb_<verb>.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subs": {
+            "additionalProperties": {
+              "description": "One value's words.",
+              "type": "string"
+            },
+            "description": "The words of the values {{.sub}} reads, by value; a value it leaves out reads as itself.",
+            "type": "object"
+          },
+          "tone": {
+            "description": "The fact's tone; its first event's when absent.",
+            "enum": [
+              "",
+              "loop",
+              "me",
+              "people"
+            ],
+            "type": "string"
+          },
+          "unfinished": {
+            "description": "How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start"
+        ],
+        "type": "object"
+      },
+      "description": "The facts a task's timeline folds its events into, by name; a later layer adds a fact or replaces one of the same name whole.",
       "type": "object"
     }
   },

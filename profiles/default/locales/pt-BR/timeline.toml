@@ -105,3 +105,83 @@ label = "orientação do pedido substituída"
 
 [events.workflow_step_ran]
 label = "passo executado"
+
+[events.session_started]
+label = "sessão do agente iniciada"
+
+[events.session_launched]
+label = "sessão do agente aberta"
+
+[events.session_abandoned]
+label = "sessão do agente abandonada"
+
+[events.session_idle]
+label = "sessão do agente ociosa"
+
+[events.session_active]
+label = "sessão do agente ativa"
+
+[events.session_closed]
+label = "sessão do agente encerrada"
+
+[events.session_typed]
+label = "digitado na sessão do agente"
+
+[events.session_prompted]
+label = "sessão do agente recebeu um prompt"
+
+[events.session_unit]
+label = "sessão do agente vinculada"
+
+[events.session_adopted]
+label = "sessão do agente adotada"
+
+[events.session_dormant]
+label = "sessão do agente adormecida"
+
+[events.session_woken]
+label = "sessão do agente acordada"
+
+[events.session_merged]
+label = "sessão do agente unida"
+
+[events.mcp_seen]
+label = "o agente alcançou o loop"
+
+[events.turn_dismissed]
+label = "turno descartado por uma regra"
+
+[events.answer_refused]
+label = "resposta recusada"
+
+[events.answer_read]
+label = "resposta lida"
+
+[events.view_applied]
+label = "visão aplicada"
+
+[events.record]
+label = "registro gravado"
+
+[events.gate_resolved]
+label = "decisão resolvida"
+
+[events.message]
+label = "mensagem"
+
+[facts.round]
+label   = "Round do agente, {{.duration}}"
+running = "Round do agente em andamento"
+unfinished = "Round do agente, sem fim registrado"
+
+[facts.answer]
+label = "Você respondeu ao agente"
+
+[facts.decision]
+label = "Decisão resolvida"
+
+[facts.moved]
+label = "Movida: {{.event}}"
+
+[facts.board]
+label = "Quadro: {{.sub}}"

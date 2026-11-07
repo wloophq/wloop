@@ -1,7 +1,15 @@
 "use strict";
 
-// FILTER_KEY is the key of the core binding filter:add, which opens the "+ Filter" palette.
-const FILTER_KEY = "+";
+// boundKey is the key the served bindings give action, "" until they load or when nothing binds it, so a hint
+// never names a key the dispatcher does not run.
+function boundKey(action) {
+  return typeof cockpitKeys === "object" && cockpitKeys ? cockpitKeys.keyOf(action) : "";
+}
+
+// ariaKey names key as aria-keyshortcuts spells it.
+function ariaKey(key) {
+  return key === "+" ? "Plus" : key;
+}
 
 function sortLabel(sort, fields = catalog.fields) {
   const { field, desc } = parseSort(sort, fields);
@@ -161,7 +169,7 @@ function renderLens(lens, res, tools = document.getElementById("tools")) {
   tools.hidden = false;
   const offered = (lens.offered || catalog.fields).map((f) => f.id);
   const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
+    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords(), boundKey("filter:add")]);
   if (tools.dataset.sig === sig) return;
   tools.dataset.sig = sig;
   const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear"));
@@ -184,6 +192,7 @@ function lensToolbar(lens, res) {
   if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
   const board = lens.layout === "board";
   const w = lensWords();
+  const filterKey = boundKey("filter:add");
   const own = lens.defaultGroup || (board ? lens.boardGroup : "");
   const ownField = own ? groupField(own, fields) : null;
   const { field, desc } = parseSort(lens.sort, fields);
@@ -207,13 +216,13 @@ function lensToolbar(lens, res) {
       }, desc ? "↓" : "↑")),
     ...lensChips(lens),
     h("button", {
-      type: "button", class: "pill add", "data-focus": "lens:add-filter", "aria-keyshortcuts": "Plus",
+      type: "button", class: "pill add", "data-focus": "lens:add-filter", "aria-keyshortcuts": filterKey ? ariaKey(filterKey) : undefined,
       onclick: () => openFilterPalette(),
-    }, t("Filter"), " ", h("kbd", {}, FILTER_KEY)),
+    }, t("Filter"), filterKey ? [" ", h("kbd", {}, filterKey)] : null),
     stripLegend(lens, offered),
     h("span", { class: "lens-count" }, res ? t("{shown} of {total}", { shown: fmtNumber(res.shown), total: fmtNumber(res.total) }) : ""),
     lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear")) : null,
-    h("div", { class: "seg", role: "group", "aria-label": t("Layout") }, toggle("", t("List")), toggle("board", t("Board"))),
+    h("div", { class: "seg", role: "group", "aria-label": t("Layout") }, toggle(servedLayout(lens.view) === "board" ? "list" : "", t("List")), toggle("board", t("Board"))),
     h("button", {
       type: "button", class: "pill", "data-focus": "lens:copy-list", title: t("Copy the items shown here, in this order, as YAML, to paste for an agent"),
       onclick: () => copyList(lens),

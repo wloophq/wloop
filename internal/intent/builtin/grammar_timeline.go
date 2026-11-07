@@ -1,6 +1,7 @@
 package builtin
 
-// SurfaceTimeline is timeline.toml, the words of the core's event kinds.
+// SurfaceTimeline is timeline.toml, the words and tones of the core's event kinds and the facts a timeline folds
+// its events into.
 const SurfaceTimeline Surface = "timeline"
 
 // EventKinds are the kinds of the events the core records on a unit's timeline; a plugin's own kinds are in its
@@ -42,10 +43,52 @@ var EventKinds = []Value{
 	{Name: "intake_canceled", Doc: "A request canceled."},
 	{Name: "intake_guidance", Doc: "A request's guidance replaced."},
 	{Name: "workflow_step_ran", Doc: "A workflow's step ran."},
+	{Name: "session_started", Doc: "An agent session started."},
+	{Name: "session_launched", Doc: "An agent session launched."},
+	{Name: "session_abandoned", Doc: "An agent session abandoned before it started."},
+	{Name: "session_idle", Doc: "An agent session went idle."},
+	{Name: "session_active", Doc: "An agent session became active again."},
+	{Name: "session_closed", Doc: "An agent session closed."},
+	{Name: "session_typed", Doc: "Someone typed in an agent session."},
+	{Name: "session_prompted", Doc: "An agent session got a prompt."},
+	{Name: "session_unit", Doc: "An agent session tied to the unit."},
+	{Name: "session_adopted", Doc: "An agent session adopted."},
+	{Name: "session_dormant", Doc: "An agent session went dormant."},
+	{Name: "session_woken", Doc: "A dormant agent session woken."},
+	{Name: "session_merged", Doc: "An agent session merged into another."},
+	{Name: "mcp_seen", Doc: "An agent session reached the loop's tools."},
+	{Name: "turn_dismissed", Doc: "A turn dismissed by a rule."},
+	{Name: "answer_refused", Doc: "An answer refused."},
+	{Name: "answer_read", Doc: "An answer read by its session."},
+	{Name: "view_applied", Doc: "A view's change applied."},
+	{Name: "record", Doc: "A record written, such as a brief."},
+	{Name: "gate_resolved", Doc: "A decision that waited on you resolved."},
+	{Name: "message", Doc: "A message in the task's conversation with its agent."},
+}
+
+// Tones are the tones a timeline draws an event or a fact in.
+var Tones = []Value{
+	{Name: "", Doc: "No tone."},
+	{Name: "loop", Doc: "The loop's or an agent's doing."},
+	{Name: "me", Doc: "Your doing, or what waits on you."},
+	{Name: "people", Doc: "Someone else's doing."},
 }
 
 var timelineGrammar = []Key{
 	{Path: "events", In: SurfaceTimeline, Kind: KindMap, Doc: "The core's event kinds, by kind, as the timeline names them."},
 	{Path: "events.*", In: SurfaceTimeline, Kind: KindTable, Values: func() []Value { return EventKinds }, Doc: "One event kind."},
 	{Path: "events.*.label", In: SurfaceTimeline, Kind: KindText, Required: true, Localized: true, Doc: "What the timeline calls an event of the kind, such as \"paused\"."},
+	{Path: "events.*.tone", In: SurfaceTimeline, Kind: KindEnum, Values: func() []Value { return Tones }, Doc: "The tone the timeline and the activity draw an event of the kind in; \"loop\" is what the activity's loop filter keeps."},
+	{Path: "facts", In: SurfaceTimeline, Kind: KindMap, Doc: "The facts a task's timeline folds its events into, by name; a later layer adds a fact or replaces one of the same name whole."},
+	{Path: "facts.*", In: SurfaceTimeline, Kind: KindTable, Doc: "One fact: the events that open it, close it and join it, and how it reads."},
+	{Path: "facts.*.start", In: SurfaceTimeline, Kind: KindList, Elem: KindText, Required: true, Doc: "The event kinds that open the fact: a core kind, a plugin's declared kind or a task verb's verb_<verb>."},
+	{Path: "facts.*.end", In: SurfaceTimeline, Kind: KindList, Elem: KindText, Doc: "The event kinds that close it; when set the fact is a span, running until one comes, else each start is a fact of its own."},
+	{Path: "facts.*.absorb", In: SurfaceTimeline, Kind: KindList, Elem: KindText, Doc: "The event kinds that join the fact: its open span, or the fact just before them when it is this one."},
+	{Path: "facts.*.label", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent."},
+	{Path: "facts.*.running", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent."},
+	{Path: "facts.*.unfinished", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent."},
+	{Path: "facts.*.tone", In: SurfaceTimeline, Kind: KindEnum, Values: func() []Value { return Tones }, Doc: "The fact's tone; its first event's when absent."},
+	{Path: "facts.*.order", In: SurfaceTimeline, Kind: KindInt, Doc: "Where the fact is tried among the others, lowest first; name order breaks a tie."},
+	{Path: "facts.*.subs", In: SurfaceTimeline, Kind: KindMap, Doc: "The words of the values {{.sub}} reads, by value; a value it leaves out reads as itself."},
+	{Path: "facts.*.subs.*", In: SurfaceTimeline, Kind: KindText, Localized: true, Doc: "One value's words."},
 }

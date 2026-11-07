@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -38,7 +38,7 @@ function applyCatalog(c) {
   catalog.lens = c.lens || [];
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
-  catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
+  catalog.eventTones = new Map((c.events || []).filter((e) => e.tone).map((e) => [e.kind, e.tone]));
   catalog.details = c.details || [];
   const searching = (c.views || []).find((v) => v.search) || {};
   catalog.search = searching.search || null;
@@ -66,9 +66,14 @@ function eventLabel(kind) {
   return catalog.events.get(kind) || kind.replaceAll("_", " ");
 }
 
-// loopEvent says whether an event kind is the loop's doing.
+// eventTone is the tone the catalog draws an event kind in, "" for none.
+function eventTone(kind) {
+  return catalog.eventTones.get(kind) || "";
+}
+
+// loopEvent says whether an event kind is the loop's doing: its tone is the loop's.
 function loopEvent(kind) {
-  return catalog.loopEvents.has(kind);
+  return eventTone(kind) === "loop";
 }
 
 function kindLabel(kind, provider) {
@@ -770,9 +775,16 @@ function lensOf(route) {
   const provider = core ? "" : (catalog.views.find((v) => v.id === view) || {}).provider || "";
   const specs = core ? ((typeof tasksState === "object" && tasksState.catalog) || {}).facets || [] : catalog.specs;
   const strip = viewStrip(view);
-  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
+  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || servedLayout(view), tk, done,
     fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view),
     specs, provider, words: rowWords(provider), strip: (strip || {}).id || "", stripSpec: strip };
+}
+
+// servedLayout is the layout the profile draws a core view in when the hash names none: "board", or "" for
+// its list.
+function servedLayout(view) {
+  const spec = typeof viewSpec === "function" ? viewSpec(view) : null;
+  return spec && spec.layout === "board" ? "board" : "";
 }
 
 // rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
@@ -1399,7 +1411,7 @@ function toggleCollapsed(key) {
   render();
 }
 
-// unitTitle names a row view's unit column: the view's unit, else the lens's word for a mixed view.
+// unitTitle names a row view's unit in its count line: the view's unit, else the lens's word for a mixed view.
 function unitTitle(view, lens) {
   return (catalog.views.find((x) => x.id === view) || {}).unit || (lens.words || {}).col_unit || "";
 }
@@ -1584,7 +1596,7 @@ function renderActivity(lens) {
     const data = eventData(e);
     const requested = catalog.eventData.get(e.kind) === "requested" && e.data;
     out.push(h("li", {
-      class: `a-ev ev-${e.kind}` + (loopEvent(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
+      class: ["a-ev", "ev-" + e.kind, eventTone(e.kind), key === pr && id === activitySelected ? "sel" : ""].filter(Boolean).join(" "),
       tabindex: 0,
       "data-focus": id,
       onclick: open,

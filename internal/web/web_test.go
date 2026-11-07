@@ -93,8 +93,8 @@ func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 		Label string `json:"label"`
 		Loop  bool   `json:"loop"`
 	}
-	nodeRun(t, jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
-		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true }] });
+	nodeRun(t, jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "eventTone", "loopEvent"},
+		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true, tone: "loop" }] });
 process.stdout.write(JSON.stringify({ label: eventLabel("round_blocked"), loop: loopEvent("round_blocked") }));`, nil, &got)
 	if got.Label != "round blocked" || !got.Loop {
 		t.Fatalf("%+v", got)
@@ -172,7 +172,7 @@ func TestCockpitHasTheStalledBoard(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js":    {"function renderBoard", "layout: route.layout", `f.id === "lane"`, `"aria-pressed"`},
-		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "detail"]`},
+		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "list", "detail"]`},
 		"/":                 {`id="board"`},
 		"/static/app.css":   {".board", ".card", ".lane-head"},
 	} {

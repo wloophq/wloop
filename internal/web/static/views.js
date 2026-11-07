@@ -179,6 +179,7 @@ async function loadTaskList(route) {
     tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: err.message });
     return;
   }
+  if ((viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT) await loadOutbox();
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -385,8 +386,8 @@ function taskLensItems() {
   return tasksState.tasks.map(taskItemOf);
 }
 
-// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads
-// or for a list of gates), and its body. The lens counts what the filter shows of the view, as a pull
+// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads,
+// for a list of gates or the Outbox), and its body, drawn in the view's served layout. The lens counts what the filter shows of the view, as a pull
 // request list's bar does.
 function viewPage(route, open) {
   const label = viewLabel(route.view);
@@ -405,6 +406,12 @@ function viewPage(route, open) {
   if (loaded) body.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
     body.push(h("p", { class: "empty" }, t("Loading.")));
+    return page;
+  }
+  if (spec && spec.layout === OUTBOX_LAYOUT) {
+    if (outboxState.error) body.push(h("p", { class: "plan-error" }, outboxState.error));
+    const groups = (outboxState.page && outboxState.page.groups) || [];
+    body.push(groups.length ? outboxPage(outboxState.page) : h("p", { class: "empty" }, outboxState.page ? spec.empty : t("Loading.")));
     return page;
   }
   if (spec && spec.over === "gates") {

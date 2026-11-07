@@ -11,3 +11,7 @@ intent = "nudge"
 [[gates.approval.rule]]
 when = 'gate.kind == "plan"'
 mode = "wait"
+
+[outbox]
+title = "Nudge after a long silence"
+about = "Drafted when someone else's open pull request has gone quiet for weeks."

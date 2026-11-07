@@ -1,5 +1,15 @@
 package builtin
 
+// The layouts a view is drawn in.
+const (
+	ViewLayoutList   = "list"
+	ViewLayoutBoard  = "board"
+	ViewLayoutOutbox = "outbox"
+)
+
+// ViewLayouts are the layouts of views.*.layout.
+var ViewLayouts = []string{ViewLayoutList, ViewLayoutBoard, ViewLayoutOutbox}
+
 // viewsGrammar is the keys of views.toml.
 var viewsGrammar = []Key{
 	{Path: "empty", In: SurfaceViews, Localized: true, Kind: KindTemplate, Required: true, Doc: "What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it."},
@@ -57,6 +67,7 @@ var viewsGrammar = []Key{
 	{Path: "views.*.hide_disabled", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units."},
 	{Path: "views.*.rail", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "The rail lists the view; false keeps it for the home, a queue or search."},
 	{Path: "views.*.remove_clean", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why."},
+	{Path: "views.*.layout", In: SurfaceViews, Kind: KindEnum, Values: named(ViewLayouts...), Default: ViewLayoutList, Doc: "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists."},
 	{Path: "badge", In: SurfaceViews, Kind: KindTable, Doc: "The menu bar's badge."},
 	{Path: "badge.views", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The views whose counts the badge adds up, each a view of views."},
 	{Path: "review", In: SurfaceViews, Kind: KindTable, Doc: "The review's steps, in the order the review walks them."},

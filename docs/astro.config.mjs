@@ -47,6 +47,7 @@ export default defineConfig({
             'concepts/brief',
             'concepts/profiles',
             'concepts/tasks',
+            'concepts/timeline',
             'concepts/slack',
             'concepts/board',
           ],

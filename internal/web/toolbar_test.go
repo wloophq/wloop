@@ -103,6 +103,42 @@ process.stdout.write(JSON.stringify(out));`, mixedInput(t, map[string]any{"rows"
 	}
 }
 
+func TestTheFilterHintIsTheServedKey(t *testing.T) {
+	var got struct{ Kbd, Shortcut, Before string }
+	keysRun(t, toolbarPrelude(t), `
+const pill = () => all(lensToolbar(lensOf(route({ view: "mine" })), null), (n) => n.attrs && n.attrs["data-focus"] === "lens:add-filter")[0];
+const before = all(pill(), (n) => n.tag === "kbd").length + (pill().attrs["aria-keyshortcuts"] || "");
+cockpitKeys = createKeys({});
+cockpitKeys.setBindings(BINDINGS.map((b) => (b.action === "filter:add" ? { ...b, key: "=" } : b)));
+const p = pill();
+return { Kbd: all(p, (n) => n.tag === "kbd").map(text).join("|"), Shortcut: p.attrs["aria-keyshortcuts"] || "", Before: String(before) };`,
+		mixedInput(t, map[string]any{"rows": mineRows(), "task": taskFixture()}), &got)
+	if got.Kbd != "=" || got.Shortcut != "=" {
+		t.Errorf("the Filter pill hints %q with shortcut %q, want the served key of filter:add", got.Kbd, got.Shortcut)
+	}
+	if got.Before != "0" {
+		t.Errorf("before the keys load the pill hints %q, want no hint", got.Before)
+	}
+}
+
+func TestTheToolbarRedrawsWhenTheKeysLoad(t *testing.T) {
+	var got struct{ Before, After string }
+	keysRun(t, toolbarPrelude(t), `
+const tools = { dataset: {}, hidden: false, kids: [], replaceChildren(...c) { this.kids = c; } };
+const lens = lensOf(route({ view: "mine" }));
+const kbd = () => all(tools.kids, (n) => n.attrs && n.attrs["data-focus"] === "lens:add-filter").flatMap((p) => all(p, (n) => n.tag === "kbd")).map(text).join("|");
+renderLens(lens, null, tools);
+const before = kbd();
+cockpitKeys = createKeys({});
+cockpitKeys.setBindings(BINDINGS);
+renderLens(lens, null, tools);
+return { Before: before, After: kbd() };`,
+		mixedInput(t, map[string]any{"rows": mineRows(), "task": taskFixture()}), &got)
+	if got.Before != "" || got.After != "+" {
+		t.Errorf("the Filter pill hints %q before the keys load and %q after, want none then +", got.Before, got.After)
+	}
+}
+
 func TestFilterKeyOpensTheFieldPalette(t *testing.T) {
 	var plus []string
 	for _, b := range webBindings(t) {

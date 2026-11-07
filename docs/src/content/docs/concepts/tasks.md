@@ -163,7 +163,7 @@ Restart the daemon to apply it. `tasks.candidate_cap = 0` also stops it, and `ta
 
 ## The timeline and the records
 
-A task's timeline is its own events and those of the units it holds, every one kept forever, newest first, but the loop's bookkeeping that only triggers workflows (`task_created`, `task_linked`, `classified`) and the merge records: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
+A task's timeline is its own events and those of the units it holds, every one kept forever, newest first, but the loop's bookkeeping that only triggers workflows (`task_created`, `task_linked`, `classified`) and the merge records: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for. With `as=nodes` it answers the events folded into facts by the profile's `timeline.toml`, as the task page shows them (see [The timeline](/concepts/timeline/)).
 
 The open tasks that hold a unit or one of its items are at `GET /api/units/<provider>/<key>/tasks`, one read by the unit whatever view lists them, oldest first with children in their sibling order, but those whose units all belong to a disabled plugin; the cockpit's unit detail shows them from it.
 
@@ -211,7 +211,7 @@ A task is open while its category is neither `done` nor `dropped`. Beside its st
 
 ## Views
 
-A view is a list of the profile's `views.toml`: a `when`, a condition over a task's facts (or a gate's, with `over = "gates"`), and the tasks or gates it holds, with its `label`, its `summary` (one line on what it lists, which the cockpit shows on the view's item and under its heading, and the help beside its key), its `empty` (what it shows when it lists nothing, the top-level `empty` of `views.toml` when absent, with the view's label as `{{.label}}`), the `key` that jumps to it, the fact it groups by (`group`) and those it sorts by (`sort`). A view lists its tasks the oldest first, a parent's children in their sibling order, then by its `sort`; `hide_disabled` leaves out the tasks whose units are all of a disabled plugin; `remove_clean` offers to remove at once the workspaces its tasks' links hold, keeping each one whose checkout holds anything not published, with why. The area and the contexts you pick narrow every view and its count. The bundled views:
+A view is a list of the profile's `views.toml`: a `when`, a condition over a task's facts (or a gate's, with `over = "gates"`), and the tasks or gates it holds, with its `label`, its `summary` (one line on what it lists, which the cockpit shows on the view's item and under its heading, and the help beside its key), its `empty` (what it shows when it lists nothing, the top-level `empty` of `views.toml` when absent, with the view's label as `{{.label}}`), the `key` that jumps to it, the fact it groups by (`group`) and those it sorts by (`sort`). A view lists its tasks the oldest first, a parent's children in their sibling order, then by its `sort`; `hide_disabled` leaves out the tasks whose units are all of a disabled plugin; `remove_clean` offers to remove at once the workspaces its tasks' links hold, keeping each one whose checkout holds anything not published, with why; `layout` is how the cockpit draws it: `list` (the default), `board` or `outbox`. The area and the contexts you pick narrow every view and its count. The bundled views:
 
 | View | Lists |
 |---|---|

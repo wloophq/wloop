@@ -543,6 +543,14 @@
 "{unit} is not in the inventory." = "{unit} não está no inventário."
 # piece C
 "Read all" = "Ler tudo"
+"Could not load the Outbox: {error}" = "Não foi possível carregar a Outbox: {error}"
+"{n} draft" = { one = "{n} rascunho", other = "{n} rascunhos" }
+"Stop drafting these" = "Parar de rascunhar estes"
+"Stop this workflow" = "Parar este workflow"
+"Keep it" = "Manter"
+"Stopped {workflow}" = "{workflow} parado"
+"open" = "aberto"
+"resolved" = "resolvido"
 # piece B11
 "Type what to ask the agent" = "Digite o que perguntar ao agente"
 "Today's spend cap for agent calls is reached; ask again tomorrow" = "O limite de gasto de hoje com chamadas ao agente foi atingido; pergunte de novo amanhã"
@@ -593,6 +601,7 @@
 "Remove filter {label}" = "Remover o filtro {label}"
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: não {values}"
+"{n} event" = { one = "{n} evento", other = "{n} eventos" }
 
 [formats]
 time = "15:04"

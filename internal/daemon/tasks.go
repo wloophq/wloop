@@ -159,6 +159,7 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 	if cat.Effects == nil {
 		cat.Effects = map[string]string{}
 	}
+	cat.DraftPurposes, cat.DraftStates = nonNilMap(l.Gates.Drafts.Purposes), nonNilMap(l.Gates.Drafts.States)
 	cat.Version = api.VersionOf(cat)
 	return cat
 }
@@ -169,7 +170,7 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean, Rail: v.Rail})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout})
 	}
 	return out
 }
@@ -1166,7 +1167,7 @@ func (ev *taskViewer) asks(ctx context.Context, e task.Task, v *api.TaskView) er
 		return nil
 	}
 	quotes := briefQuotes(v.Brief)
-	byUnit := map[unit.Unit][]items.Item{}
+	byUnit := ev.unitItems()
 	for _, ref := range e.Items {
 		its, ok := byUnit[ref.Unit]
 		if !ok {

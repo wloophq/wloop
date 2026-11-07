@@ -97,6 +97,8 @@ type ViewDef struct {
 	When     workflow.Predicate
 	ownEmpty string
 	groupAt  *sheet
+	// Layout is how the cockpit draws the view, one of builtin.ViewLayouts.
+	Layout string
 }
 
 func (v ViewDef) groupProblem(format string, args ...any) Problem {
@@ -168,6 +170,7 @@ type mView struct {
 	HideDisabled *bool   `toml:"hide_disabled"`
 	RemoveClean  *bool   `toml:"remove_clean"`
 	Rail         *bool   `toml:"rail"`
+	Layout       *string `toml:"layout"`
 }
 
 // HomeView is the cockpit's home route, which no view may be named.
@@ -458,7 +461,7 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			continue
 		}
 		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })
-		v := ViewDef{ID: id, Over: task.OverTasks, Rail: true}
+		v := ViewDef{ID: id, Over: task.OverTasks, Rail: true, Layout: builtin.ViewLayoutList}
 		if i >= 0 {
 			v = l.def.Views[i]
 		}
@@ -513,6 +516,10 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		}
 		if m.Rail != nil {
 			v.Rail = *m.Rail
+		}
+		if m.Layout != nil {
+			s.oneOf(path+".layout", *m.Layout, builtin.ValuesOf(builtin.SurfaceViews, "views.*.layout"))
+			v.Layout = *m.Layout
 		}
 		switch {
 		case len(s.problems) > n && i < 0:

@@ -343,6 +343,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
+- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
 - `review` (table): The review's steps, in the order the review walks them.
@@ -431,6 +432,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `dropped`: Dropped: the task goes to the trash.
 - `effects` (table by name): What sending a draft does besides posting it, one sentence per effect, by effect name; a draft's card shows the sentences of the effects it carries. A user layer sets only the effects it names; an empty sentence takes a lower layer's off.
 - `effects.<name>` (string, localized): The sentence, such as "The task is marked as nudged."; the key is an effect a draft may carry.
+- `drafts` (table): The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.
+- `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
+- `drafts.by_hand_about` (string, localized): One line under that title.
+- `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
+- `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
+- `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
+- `drafts.states.<name>` (string, localized): The state's words, such as "failed to send"; the key is a draft state: held, queued, sending, sent, failed or dropped.
 - `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.
 
 ## Record kinds (`records.toml`)
@@ -517,6 +525,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.withdraw.reason` (one of `assigned`, `moot`, default `moot`): The reason the withdrawn draft stores.
   - `assigned`: Its items got an owner.
   - `moot`: It no longer applies.
+- `outbox` (table): How the Outbox heads the group of the drafts the workflow proposed.
+- `outbox.title` (string, localized): The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent.
+- `outbox.about` (string, localized): One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet."
 
 ## Steps and their arguments
 
@@ -880,7 +891,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
 - `events.<name>` (table): One event kind's words.
 - `events.<name>.label` (string, localized): The event in a few words. Required.
-- `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps.
+- `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps; its tone is "loop" when it sets no other.
+- `events.<name>.tone` (one of ``, `loop`, `me`, `people`): The tone the timeline and the activity draw the event in.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
 - `events.<name>.data` (one of ``, `none`, `first_field`, `short_sha`, `requested`): How the event's data shows on a timeline.
   - ``: Its data as it is.
   - `none`: No data.
@@ -1025,7 +1041,49 @@ The fields each notice reads besides `Name` and `Command`:
   - `intake_canceled`: A request canceled.
   - `intake_guidance`: A request's guidance replaced.
   - `workflow_step_ran`: A workflow's step ran.
+  - `session_started`: An agent session started.
+  - `session_launched`: An agent session launched.
+  - `session_abandoned`: An agent session abandoned before it started.
+  - `session_idle`: An agent session went idle.
+  - `session_active`: An agent session became active again.
+  - `session_closed`: An agent session closed.
+  - `session_typed`: Someone typed in an agent session.
+  - `session_prompted`: An agent session got a prompt.
+  - `session_unit`: An agent session tied to the unit.
+  - `session_adopted`: An agent session adopted.
+  - `session_dormant`: An agent session went dormant.
+  - `session_woken`: A dormant agent session woken.
+  - `session_merged`: An agent session merged into another.
+  - `mcp_seen`: An agent session reached the loop's tools.
+  - `turn_dismissed`: A turn dismissed by a rule.
+  - `answer_refused`: An answer refused.
+  - `answer_read`: An answer read by its session.
+  - `view_applied`: A view's change applied.
+  - `record`: A record written, such as a brief.
+  - `gate_resolved`: A decision that waited on you resolved.
+  - `message`: A message in the task's conversation with its agent.
 - `events.<name>.label` (string, localized): What the timeline calls an event of the kind, such as "paused".
+- `events.<name>.tone` (one of ``, `loop`, `me`, `people`): The tone the timeline and the activity draw an event of the kind in; "loop" is what the activity's loop filter keeps.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
+- `facts` (table by name): The facts a task's timeline folds its events into, by name; a later layer adds a fact or replaces one of the same name whole.
+- `facts.<name>` (table): One fact: the events that open it, close it and join it, and how it reads.
+- `facts.<name>.start` (list of strings): The event kinds that open the fact: a core kind, a plugin's declared kind or a task verb's verb_&lt;verb&gt;.
+- `facts.<name>.end` (list of strings): The event kinds that close it; when set the fact is a span, running until one comes, else each start is a fact of its own.
+- `facts.<name>.absorb` (list of strings): The event kinds that join the fact: its open span, or the fact just before them when it is this one.
+- `facts.<name>.label` (template, localized): How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent.
+- `facts.<name>.running` (template, localized): How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent.
+- `facts.<name>.unfinished` (template, localized): How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent.
+- `facts.<name>.tone` (one of ``, `loop`, `me`, `people`): The fact's tone; its first event's when absent.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
+- `facts.<name>.order` (integer): Where the fact is tried among the others, lowest first; name order breaks a tie.
+- `facts.<name>.subs` (table by name): The words of the values {{.sub}} reads, by value; a value it leaves out reads as itself.
+- `facts.<name>.subs.<name>` (string, localized): One value's words.
 
 ## Decision kinds (`decisions.toml`)
 

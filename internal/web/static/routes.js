@@ -2,8 +2,9 @@
 
 const ROUTE_PROVIDER = /^[a-z][a-z0-9-]*$/;
 const ROUTE_KEY_MAX = 300;
-// ROUTE_LAYOUTS are a list's board and a window that shows one item's detail alone.
-const ROUTE_LAYOUTS = ["board", "detail"];
+// ROUTE_LAYOUTS are a list's board, its list (over a view the profile draws as a board) and a window that shows
+// one item's detail alone.
+const ROUTE_LAYOUTS = ["board", "list", "detail"];
 
 // routeUnitKey reads a unit= value, "<provider>/<key>" once decoded, as the
 // cockpit's unit key "<provider>:<key>"; "" when it is not one.

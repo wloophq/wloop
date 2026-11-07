@@ -1,7 +1,8 @@
 "use strict";
 
 const PALETTE_CSS = `
-.pal-back { position: fixed; inset: 0; background: rgb(0 0 0 / 0.25); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; z-index: 50; }
+.pal-back { position: fixed; inset: 0; background: rgb(0 0 0 / 0.25); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; z-index: 50; transition: opacity var(--motion-fast) var(--motion-ease); }
+@starting-style { .pal-back { opacity: 0; } }
 .pal { background: var(--panel); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; width: min(36rem, calc(100vw - 2rem)); max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgb(0 0 0 / 0.25); font: 14px var(--sans); }
 .pal-head { padding: 0.5rem 0.75rem; color: var(--muted); border-bottom: 1px solid var(--rule); }
 .pal input { margin: 0.5rem 0.75rem; padding: 0.4rem 0.5rem; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; }

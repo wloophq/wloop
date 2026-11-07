@@ -84,13 +84,14 @@ type SearchSort struct {
 	Shown string `json:"shown,omitempty"`
 }
 
-// EventSpec is how a plugin's event kind shows on a timeline; Loop says
-// it is the loop's doing.
+// EventSpec is how an event kind, a plugin's or the core's (Provider ""), shows on a timeline; Loop says it is
+// the loop's doing, and Tone is what it is drawn in: "loop", "me", "people" or "".
 type EventSpec struct {
 	Provider string `json:"provider"`
 	Kind     string `json:"kind"`
 	Label    string `json:"label"`
 	Loop     bool   `json:"loop,omitempty"`
+	Tone     string `json:"tone,omitempty"`
 	// Data is how its data shows: "" as it is, "none", "first_field",
 	// "short_sha" or "requested".
 	Data string `json:"data,omitempty"`

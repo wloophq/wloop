@@ -1,1 +1,5 @@
 summary = "Fechar uma conversa do Slack que você começou quando os itens dela se resolveram, listando a resolução de cada item"
+
+[outbox]
+title = "Encerrar o que se resolveu"
+about = "Rascunhado quando todos os itens de uma conversa que você começou se resolvem."

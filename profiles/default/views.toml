@@ -443,6 +443,7 @@ key           = "g o"
 over          = "gates"
 when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
 hide_disabled = true
+layout        = "outbox"
 
 [views.review-projects]
 label         = "Projects to review"
