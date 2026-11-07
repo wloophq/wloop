@@ -141,7 +141,10 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		e.cfg.Break(err)
 	}
-	detected := preferredLanguages()
+	var detected []string
+	if e.Languages != nil {
+		detected = e.Languages()
+	}
 	e.intentState().useLocale(func() string {
 		cfg := e.cfg.Config()
 		return serveLocale(cfg, detected, intentload.Locales(profile.Chain(cfg), turn.BundledFS()))
