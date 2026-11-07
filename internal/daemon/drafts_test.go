@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -856,6 +857,36 @@ func TestDraftTitleNamesWhereItGoes(t *testing.T) {
 type unitItems map[unit.Unit][]items.Item
 
 func (u unitItems) Items(_ context.Context, x unit.Unit) ([]items.Item, error) { return u[x], nil }
+
+// countedItems counts its item reads.
+type countedItems struct {
+	unitItems
+	n *atomic.Int32
+}
+
+func (c countedItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
+	c.n.Add(1)
+	return c.unitItems.Items(ctx, u)
+}
+
+func TestADraftWithNoItemsAndNoMentionReadsNoItems(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	n := &atomic.Int32{}
+	r.s.deps.Items = countedItems{unitItems{r7u: {{ID: "i1", Summary: "s", State: items.Open}}}, n}
+	r.propose(t, r7u, "no mention here", draft.Wait)
+	var gs []api.GateView
+	if code := get(t, r.s, api.GatesPath, &gs); code != 200 || len(gs) != 1 {
+		t.Fatalf("%d %+v", code, gs)
+	}
+	var res api.DraftsResponse
+	if code := get(t, r.s, api.Drafts, &res); code != 200 || len(res.Drafts) != 1 {
+		t.Fatalf("%d %+v", code, res)
+	}
+	if got := n.Load(); got != 0 {
+		t.Errorf("%d item reads, want none", got)
+	}
+}
 
 func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	t.Parallel()

@@ -459,19 +459,14 @@ func (s *Server) draftFacts(d draft.Draft) catalog.DraftFacts {
 var mentionKey = regexp.MustCompile(`@\{([^{}\s]+)\}`)
 
 // draftDetail is draftView with the names of the people the text mentions and the items it is about, read
-// from the unit's items; its is those items, nil to read them.
-func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, its []items.Item) api.Draft {
+// from the unit's items, which only a draft with items or a mention reads, once per unit into byUnit (nil
+// keeps none).
+func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.Draft {
 	v := s.draftView(ctx, d, g)
 	if s.deps.Items == nil || (len(d.Items) == 0 && !mentionKey.MatchString(d.Text)) {
 		return v
 	}
-	if its == nil {
-		var err error
-		if its, err = s.deps.Items.Items(ctx, d.Unit); err != nil {
-			s.logf("drafts: the items of %s: %v", d.Unit.Label(), err)
-			return v
-		}
-	}
+	its := s.itemsOnce(ctx, byUnit, d.Unit)
 	v.Names = mentionNames(d.Text, its)
 	for _, id := range d.Items {
 		iv := api.ItemView{Unit: d.Unit, ID: id}
@@ -517,19 +512,14 @@ func (s *Server) draftDetails(ctx context.Context, ps []outbox.Pending) []api.Dr
 	byUnit := map[unit.Unit][]items.Item{}
 	out := make([]api.Draft, 0, len(ps))
 	for _, p := range ps {
-		out = append(out, s.draftDetail(ctx, p.Draft, p.Gate, s.itemsOnce(ctx, byUnit, p.Draft.Unit)))
+		out = append(out, s.draftDetail(ctx, p.Draft, p.Gate, byUnit))
 	}
 	return out
 }
 
-// itemsOnce are u's items, read once into byUnit; empty, never nil, when they do not read, so draftDetail
-// does not read them again. Nil with no items reader.
+// itemsOnce are u's items, read once into byUnit (nil keeps none); a failed read is logged and reads as none.
 func (s *Server) itemsOnce(ctx context.Context, byUnit map[unit.Unit][]items.Item, u unit.Unit) []items.Item {
-	if s.deps.Items == nil {
-		return nil
-	}
-	its, ok := byUnit[u]
-	if ok {
+	if its, ok := byUnit[u]; ok {
 		return its
 	}
 	its, err := s.deps.Items.Items(ctx, u)
@@ -539,7 +529,9 @@ func (s *Server) itemsOnce(ctx context.Context, byUnit map[unit.Unit][]items.Ite
 	if its == nil {
 		its = []items.Item{}
 	}
-	byUnit[u] = its
+	if byUnit != nil {
+		byUnit[u] = its
+	}
 	return its
 }
 

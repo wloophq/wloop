@@ -179,7 +179,7 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit
 	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
 		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
 			if d, err := o.Store.Get(ctx, draft.ID(id)); err == nil {
-				return s.draftGateView(g, s.draftDetail(ctx, d, g, s.itemsOnce(ctx, byUnit, d.Unit)))
+				return s.draftGateView(g, s.draftDetail(ctx, d, g, byUnit))
 			}
 		}
 	}

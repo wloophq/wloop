@@ -253,7 +253,7 @@ func (ev *taskViewer) withDraft(ctx context.Context, e task.Task, v *api.TaskVie
 	if err != nil {
 		return err
 	}
-	dv := s.draftDetail(ctx, d, g, s.itemsOnce(ctx, ev.unitItems(), d.Unit))
+	dv := s.draftDetail(ctx, d, g, ev.unitItems())
 	if g.ID != 0 {
 		v.Gates = []api.GateView{s.draftGateView(g, dv)}
 	}
