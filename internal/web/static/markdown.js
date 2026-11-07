@@ -2,7 +2,8 @@
 
 // renderMarkdown draws agent prose as DOM nodes through h() and text nodes only, so no text ever becomes
 // markup: the subset agents write (paragraphs, emphasis, code, lists, links, headings, quotes), links only
-// to https:// through safeURL. A mention @{<key>} reads as the name opts.names gives its key, else the key.
+// to https:// through safeURL. Only when the caller passes opts.names, a mention @{<key>} reads as the name it
+// gives its key, else the key; other prose keeps @{...} as written, since agents cite git refs like HEAD@{1}.
 
 // MD_OPEN holds the keys of folded texts the reader opened, so a re-render keeps them open.
 const MD_OPEN = new Set();
@@ -26,7 +27,7 @@ function renderMarkdown(text, opts) {
     const box = ev && ev.currentTarget && ev.currentTarget.closest ? ev.currentTarget.closest(".md") : null;
     if (box) box.replaceWith(renderMarkdown(text, { ...o, fold: 0 }));
   };
-  const names = o.names || {};
+  const names = o.names || null;
   return h("div", { class: "md" }, shown.map((b) => mdBlock(b, names)), folded ? h("button", { type: "button", class: "md-more", onclick: open }, t("Read all")) : null);
 }
 
@@ -107,7 +108,7 @@ function mdInline(s, names, depth = 0, links = true) {
   const out = [];
   const closers = mdClosers(s);
   const labelEnd = links ? mdLabelEnds(s) : null;
-  const keyEnd = mdKeyEnds(s);
+  const keyEnd = names ? mdKeyEnds(s) : null;
   let start = 0;
   const flush = (i) => {
     if (i > start) out.push(s.slice(start, i));
@@ -161,7 +162,7 @@ function mdInline(s, names, depth = 0, links = true) {
         continue;
       }
     }
-    if (c === "@" && s[i + 1] === "{" && s[keyEnd[i + 2]] === "}" && keyEnd[i + 2] > i + 2) {
+    if (names && c === "@" && s[i + 1] === "{" && s[keyEnd[i + 2]] === "}" && keyEnd[i + 2] > i + 2) {
       const end = keyEnd[i + 2];
       const key = s.slice(i + 2, end);
       flush(i);

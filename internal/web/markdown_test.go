@@ -186,7 +186,7 @@ RegExp.prototype.exec = function (s) {
   work += (this.sticky && m ? m[0].length : String(s).length - from) + 1;
   return m;
 };
-function workOf(text) { work = 0; renderMarkdown(text); return work; }
+function workOf(text) { work = 0; renderMarkdown(text, { names: {} }); return work; }
 `
 
 func TestMarkdownInlineIsLinear(t *testing.T) {
@@ -265,6 +265,17 @@ func TestMarkdownKeepsUnclosedMarkersAsText(t *testing.T) {
 		if n := got.all(func(x mdNode) bool { return x.Tag == "strong" || x.Tag == "em" || x.Tag == "code" || x.Tag == "a" }); len(n) != 0 {
 			t.Errorf("%q built %+v", raw, n)
 		}
+	}
+}
+
+func TestMarkdownKeepsBracesWithoutNames(t *testing.T) {
+	const raw = "Run git rebase @{upstream} or git reset --hard HEAD@{1}."
+	got := renderMD(t, raw, "")
+	if got.Text != raw {
+		t.Errorf("text %q, want %q", got.Text, raw)
+	}
+	if n := got.all(func(n mdNode) bool { return n.Attrs["class"] == "mention" }); len(n) != 0 {
+		t.Errorf("agent prose without names made mentions: %+v", n)
 	}
 }
 
