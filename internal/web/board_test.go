@@ -133,7 +133,7 @@ func filterPrelude(t *testing.T) string {
 
 var queryFuncs = []string{"fold", "tokens", "unquote", "terms", "fieldById", "normValue", "qualifierOf", "qualifiers"}
 
-var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
+var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "reasonText", "fillWord", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
 
 func TestFilterFoldsAndMarks(t *testing.T) {
 	cases := [][2]string{
@@ -365,6 +365,19 @@ func TestTheFilterFindsARowsSearchTexts(t *testing.T) {
 	}
 }
 
+func TestTheFilterFindsAReasonByItsWords(t *testing.T) {
+	var got []bool
+	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}})
+	sum := row["summary"].(map[string]any)
+	sum["reason"], sum["reason_key"] = "no reviewer requested", "no_reviewer_requested"
+	nodeRun(t, filterPrelude(t), filterFuncs, `
+catalog.reasons = [{ provider: "github", words: { no_reviewer_requested: "nenhum revisor pedido" } }];
+process.stdout.write(JSON.stringify(["revisor", "reviewer", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
+	if !slices.Equal(got, []bool{true, true, false}) {
+		t.Fatalf("%v: the filter finds a row by the words its reason shows, and by its sentence", got)
+	}
+}
+
 func TestAReviewRequestIsReadyForSlack(t *testing.T) {
 	in := []map[string]any{
 		{"row": map[string]any{"label": "acme/widgets#4877", "unit": map[string]any{"provider": "github", "key": "acme/widgets#4877"}, "link": "https://github.com/acme/widgets/pull/4877", "title": "perf(queue): refill <each> free slot"},
@@ -555,7 +568,7 @@ var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", 
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "reasonText", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
 	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "rowTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
 	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 

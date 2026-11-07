@@ -359,7 +359,7 @@ function withoutQualifiers(q, field, neg, fields = catalog.fields) {
 
 // rowTexts are the texts a free word searches in a row.
 function rowTexts(r) {
-  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line,
+  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, reasonText(r), sm(r).line,
     ...(r.search || []), ...Object.values(r.facets || {}).flat()];
 }
 
