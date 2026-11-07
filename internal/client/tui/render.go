@@ -34,7 +34,7 @@ const factLabel = 9
 func (m *Model) Render(width, height int, now time.Time) []string {
 	m.now = now
 	if width < 20 || height < 5 {
-		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
+		return pad([]string{termfmt.Fit(m.w().T("{name}: terminal too small", map[string]any{"name": brand.Name}), width)}, height)
 	}
 	lines := []string{m.tabs(width)}
 	if height >= 7 {
@@ -126,7 +126,7 @@ func (m *Model) tabs(width int) string {
 		shown, _ := m.in(v.ID)
 		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(shown)), i})
 	}
-	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
+	add(first, tab{m.w().T("Plan {n}", map[string]any{"n": len(m.plan)}), m.planView()})
 	mine := 0
 	for i, g := range groups {
 		if slices.ContainsFunc(g, func(x tab) bool { return x.view == m.view }) {
@@ -173,10 +173,10 @@ func (m *Model) tabs(width int) string {
 		flags = append(flags, "area "+m.area)
 	}
 	if m.health.Paused {
-		flags = append(flags, "automatic rounds paused")
+		flags = append(flags, m.w().T("automatic rounds paused", nil))
 	}
 	if m.health.SlowSync {
-		flags = append(flags, "slow sync")
+		flags = append(flags, m.w().T("slow sync", nil))
 	}
 	if right := strings.Join(flags, " · "); right != "" {
 		if gap := width - cells - termfmt.Cells(right); gap >= 3 {
@@ -302,7 +302,7 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 	_, pending := m.roundGate(r)
 	switch {
 	case pending:
-		waiting += " · round in " + age
+		waiting += " · " + m.w().T("round in {time}", map[string]any{"time": age})
 	case r.Summary.Stalled:
 		waiting += " · " + strings.TrimPrefix(age, "!") + ", stalled"
 	case age != "-":
@@ -339,10 +339,10 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 func (m *Model) question(q *api.QuestionView, fact func(label, text string, style func(string) string)) {
 	t := m.t
 	if q.Queued {
-		fact("answer", queuedAnswer, t.Dim)
+		fact(m.w().T("answer", nil), queuedAnswer(m.w()), t.Dim)
 		return
 	}
-	text := cmp.Or(q.Text, q.LastMessage, "the agent stopped")
+	text := cmp.Or(q.Text, q.LastMessage, m.w().T("the agent stopped", nil))
 	label := "asks"
 	if q.Text == "" {
 		label = "stopped"
@@ -352,7 +352,7 @@ func (m *Model) question(q *api.QuestionView, fact func(label, text string, styl
 		fact("", fmt.Sprintf("drafted %s, %d blocking, %d non-blocking", q.Verdict, q.Blocking, q.NonBlocking), t.Dim)
 	}
 	if q.Kind == "confirm" {
-		fact("", "y yes · n no", plain)
+		fact("", m.w().T("y yes · n no", nil), plain)
 		return
 	}
 	for i, o := range q.Options {
@@ -392,7 +392,7 @@ func (m *Model) offered(r api.Row, width, col int) []string {
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }
@@ -493,9 +493,9 @@ func (m *Model) empty() string {
 	case !m.loaded:
 		return "loading…"
 	case len(m.filter) > 0:
-		return "Nothing in " + m.views[m.view].Label + " matches \"" + string(m.filter) + "\"."
+		return m.w().T("Nothing in {view} matches \"{filter}\".", map[string]any{"view": m.views[m.view].Label, "filter": string(m.filter)})
 	}
-	return "Nothing in " + m.views[m.view].Label + " right now."
+	return m.w().T("Nothing in {view} right now.", map[string]any{"view": m.views[m.view].Label})
 }
 
 // statusLine is the last message: an error red, a warning yellow.
@@ -522,7 +522,7 @@ func (m *Model) bottom(width int) string {
 	p := m.prompt
 	switch {
 	case p == nil && m.filtering:
-		head, tail, text := "/", "  Enter keeps, Esc clears", string(m.filter)+"_"
+		head, tail, text := "/", "  "+m.w().T("Enter keeps, Esc clears", nil), string(m.filter)+"_"
 		room := width - termfmt.Cells(head) - termfmt.Cells(tail)
 		if termfmt.Cells(text) > room && room < 8 {
 			tail, room = "", width-termfmt.Cells(head)
@@ -536,9 +536,9 @@ func (m *Model) bottom(width int) string {
 	case p == nil:
 		return m.fill("", m.helpItems(), width)
 	case p.confirm:
-		return termfmt.Cut(p.label+" y confirms, any other key cancels", width)
+		return termfmt.Cut(p.label+" "+m.w().T("y confirms, any other key cancels", nil), width)
 	}
-	head := p.label + " (Enter sends, Esc cancels): "
+	head := p.label + " (" + m.w().T("Enter sends, Esc cancels", nil) + "): "
 	text := string(p.text) + "_"
 	if room := width - termfmt.Cells(head); termfmt.Cells(text) > room && room > 1 {
 		text = termfmt.Ellipsis + termfmt.Suffix(text, room-termfmt.Cells(termfmt.Ellipsis))

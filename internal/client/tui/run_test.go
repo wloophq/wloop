@@ -23,6 +23,7 @@ import (
 
 type fakeDaemon struct {
 	mu         sync.Mutex
+	strings    *api.Strings
 	rows       []api.Row
 	down       bool
 	panics     bool
@@ -695,7 +696,7 @@ func TestRunWaitsForARunningActionBeforeLeaving(t *testing.T) {
 		term, done := start(t, d)
 		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
 		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
-		eventually(t, "the wait", func() bool { return strings.Contains(term.screen(), "waiting for 1 running action") })
+		eventually(t, "the wait", func() bool { return strings.Contains(term.screen(), "running actions to wait for: 1") })
 		select {
 		case <-done:
 			t.Fatal("left with an action running")
@@ -767,10 +768,10 @@ func TestRunKeepsCountingTheActionsItWaitsFor(t *testing.T) {
 		term, done := start(t, d)
 		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Cache warmup") })
 		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Name: KeyDown}, Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
-		eventually(t, "two", func() bool { return strings.Contains(term.screen(), "waiting for 2 running action(s) to finish") })
+		eventually(t, "two", func() bool { return strings.Contains(term.screen(), "running actions to wait for: 2") })
 		d.hold <- struct{}{}
 		eventually(t, "one", func() bool {
-			return strings.Contains(term.screen(), "waiting for 1 running action(s) to finish; q again")
+			return strings.Contains(term.screen(), "running actions to wait for: 1; q again")
 		})
 		d.hold <- struct{}{}
 		if err := <-done; err != nil {

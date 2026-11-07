@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
-
-const planLabel = "Plan"
 
 // planActs are the plan actions POST /api/plan carries, by their spec id;
 // the other actions an item offers are its unit's.
@@ -135,7 +134,7 @@ func (m *Model) planAction(k Key) (Command, bool) {
 		if spec.Input == nil {
 			return m.finish(c, st, k.Read)
 		}
-		m.ask(*spec, st, c, inputLabel(label, *spec, st), k.Read)
+		m.ask(*spec, st, c, inputLabel(m.w(), label, *spec, st), k.Read)
 	}
 	return Command{}, false
 }
@@ -190,9 +189,9 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 		body -= len(closed) + 1
 	}
 	if len(m.plan) == 0 {
-		text := "Nothing pending or blocked in the plan."
+		text := m.w().T("Nothing pending or blocked in the plan.", nil)
 		if !m.planLoaded {
-			text = "loading…"
+			text = m.w().T("loading…", nil)
 		}
 		lines = append(lines, "  "+m.t.Dim(text))
 	} else {
@@ -305,9 +304,9 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	switch left, _ := m.timeLeft(it, now); {
 	case it.Decision != "pending":
 	case left == "wait":
-		decision += " · waits for you"
+		decision += " · " + m.w().T("waits for you", nil)
 	default:
-		decision += " · runs in " + left
+		decision += " · " + m.w().T("runs in {time}", map[string]any{"time": left})
 	}
 	if it.Observe {
 		decision += " · observe"
@@ -325,7 +324,7 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	if len(matched) > 0 {
 		fact("matched", strings.Join(matched, ", "), t.Dim)
 	}
-	if g := gain(it.Gain); g != "" {
+	if g := gain(m.w(), it.Gain); g != "" {
 		fact("frees", g, plain)
 	}
 	if it.Error != "" {
@@ -339,13 +338,13 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	return append(lines, m.itemKeys(it, width, col)...)
 }
 
-func gain(g api.Gain) string {
+func gain(w *texts.Catalog, g api.Gain) string {
 	var parts []string
 	if g.MemoryBytes > 0 {
-		parts = append(parts, mib(g.MemoryBytes)+" of memory")
+		parts = append(parts, w.T("{size} of memory", map[string]any{"size": mib(g.MemoryBytes)}))
 	}
 	if g.DiskBytes > 0 {
-		parts = append(parts, mib(g.DiskBytes)+" of disk")
+		parts = append(parts, w.T("{size} of disk", map[string]any{"size": mib(g.DiskBytes)}))
 	}
 	return strings.Join(parts, " and ")
 }
@@ -379,7 +378,7 @@ func (m *Model) itemKeys(it api.PlanItem, width, col int) []string {
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }

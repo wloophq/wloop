@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -448,7 +449,7 @@ func TestCaptureAndOpenSourceInTUI(t *testing.T) {
 		t.Fatalf("capture %+v %v", c, ok)
 	}
 	d := &fakeDaemon{tasks: map[string][]api.TaskView{}}
-	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || !slices.Equal(d.captures, []string{"Buy cables"}) || len(got.lines) != 1 {
+	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || !slices.Equal(d.captures, []string{"Buy cables"}) || got.note == nil || !strings.HasPrefix(got.note(texts.English()), "in the Inbox as ") {
 		t.Fatalf("captured %v: %v", d.captures, err)
 	}
 
