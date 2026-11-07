@@ -1022,7 +1022,7 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 }
 
 // facets sets the task's facets: those of its facts row set, its brief's, and its units' rows', joined as
-// the profile's facets say, and its reason, its primary unit's row's.
+// the profile's facets say, and its reason, its primary unit's row's in the words of that row's plugin.
 func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) {
 	defs := ev.s.loaded().Views.Facets
 	own := map[string][]string{}
@@ -1040,7 +1040,7 @@ func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) 
 		v.Facets = nil
 	}
 	if len(e.Units) > 0 {
-		v.Reason = rows[e.Units[0]].Row.Summary.Reason
+		v.Reason = ev.s.rowsCatalog().ReasonOf(rows[e.Units[0]].Row)
 	}
 }
 
