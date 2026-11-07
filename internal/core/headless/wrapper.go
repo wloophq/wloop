@@ -44,6 +44,13 @@ func ParseWrapper(src string) (Wrapper, error) {
 	return Wrapper{t: t}, nil
 }
 
+// Markers are one call's markers around the untrusted data it quotes, named what, and their fresh code:
+// a marker with any other code is part of the data.
+func Markers(what string) (begin, end, nonce string) {
+	nonce = randomHex()
+	return "<<<" + what + " " + nonce + ">>>", "<<<END OF " + what + " " + nonce + ">>>", nonce
+}
+
 // Prompt is the headless call's prompt: the wrapper's before, the unit's
 // instructions between this call's markers, the wrapper's after, then the
 // answer schema, last so nothing quoted from the unit follows it.
@@ -51,9 +58,9 @@ func (w Wrapper) Prompt(r Request, checkout, dossier, instructions string) (stri
 	if w.t == nil {
 		return "", errors.New("no headless wrapper is loaded")
 	}
-	nonce := randomHex()
+	begin, end, nonce := Markers("UNIT DATA")
 	d := WrapperData{Name: brand.Name, Unit: r.Unit.Label(), Checkout: checkout, Dossier: dossier,
-		Begin: "<<<UNIT DATA " + nonce + ">>>", End: "<<<END OF UNIT DATA " + nonce + ">>>", Nonce: nonce, MaxDrafts: MaxDrafts}
+		Begin: begin, End: end, Nonce: nonce, MaxDrafts: MaxDrafts}
 	if len(r.Items) > 0 {
 		d.Items = "`" + strings.Join(r.Items, "`, `") + "`"
 	}

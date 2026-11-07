@@ -396,6 +396,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = links.serve(d, mods)
 	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
 	serveProjects(d.Tasks, db, dossierSvc)
+	e.callBudget = callBudget(db, cfg, e.Now)
 	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)

@@ -2,19 +2,25 @@ package sqlite
 
 import (
 	"context"
+	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// DossierSpent is the cost of the dossier calls recorded in [from, to).
-func (db *DB) DossierSpent(ctx context.Context, from, to time.Time) (float64, error) {
+// CallSpent is the cost of the calls recorded in [from, to) as events of kinds, whose Data is the cost.
+func (db *DB) CallSpent(ctx context.Context, from, to time.Time, kinds ...string) (float64, error) {
+	if len(kinds) == 0 {
+		return 0, nil
+	}
+	args := []any{from.UTC().Format(event.TimeLayout), to.UTC().Format(event.TimeLayout)}
+	for _, k := range kinds {
+		args = append(args, k)
+	}
 	var spent float64
 	err := db.R().QueryRowContext(ctx, `SELECT COALESCE(SUM(CAST(data AS REAL)), 0) FROM events
-		WHERE kind = ? AND at >= ? AND at < ?`,
-		dossiers.KindCall, from.UTC().Format(event.TimeLayout), to.UTC().Format(event.TimeLayout)).Scan(&spent)
+		WHERE at >= ? AND at < ? AND kind IN (?`+strings.Repeat(",?", len(kinds)-1)+`)`, args...).Scan(&spent)
 	return spent, err
 }
 

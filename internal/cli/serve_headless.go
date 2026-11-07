@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/headless"
+	"github.com/wloophq/wloop/internal/core/omnibox"
 	coreplacement "github.com/wloophq/wloop/internal/core/placement"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -40,7 +45,7 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		Default: e.headlessDefault,
 		Caps:    headless.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
 		Context: ctx,
-		Spent:   e.withDossierSpend(db),
+		Spent:   e.withCallSpend(db),
 		Dossier: e.headlessDossier,
 		Logged:  e.headlessLogged,
 		Clock:   clockFunc(e.Now),
@@ -57,7 +62,51 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		}
 	}
 	d.Headless = svc
+	d.OmniboxAsk = e.omniboxAsker(db, cfg, logf)
 	return d
+}
+
+// omniboxAsker is the omnibox's read-only agent call, booked on the calls' budget, its cost recorded as an
+// event on the empty unit. Its vocabulary is not wired yet, so it drops every operation it is proposed.
+func (e *Env) omniboxAsker(db *sqlite.DB, cfg config.Config, logf func(string, ...any)) *omnibox.Asker {
+	dir := filepath.Join(e.StateDir, "omnibox")
+	snapshots := filepath.Join(dir, "snapshots")
+	if !e.omniboxSwept {
+		e.omniboxSwept = true
+		if err := omnibox.SweepSnapshots(snapshots); err != nil {
+			logf("omnibox: removing the snapshots a stop left: %v", err)
+		}
+	}
+	events := sqlite.New(db)
+	return &omnibox.Asker{Agent: lazyAsker{e: e, cfg: cfg, dir: filepath.Join(dir, "run")}, Budget: e.callBudget, Tier: cfg.Headless.Tier,
+		Dir: snapshots,
+		Record: func(ctx context.Context, cost float64) error {
+			return events.RecordEvents(ctx, port.Event{Kind: omnibox.KindCall, Key: randomKey(), At: e.Now(), Data: strconv.FormatFloat(cost, 'f', -1, 64)})
+		},
+		Repos: e.omniboxRepos}
+}
+
+// omniboxRepos are the repositories the workspace managers know, each as owner/name when it has a remote.
+func (e *Env) omniboxRepos(ctx context.Context) ([]string, error) {
+	if e.WS == nil {
+		return nil, nil
+	}
+	repos, err := e.WS.Repos(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, r := range repos {
+		name := r.ID
+		if _, ownerRepo, ok := strings.Cut(r.RemoteKey, "/"); ok {
+			name = ownerRepo
+		}
+		if name != "" && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 // sessionPlacer is the daemon's Placer: the unit's placement, else the neutral repository; an error

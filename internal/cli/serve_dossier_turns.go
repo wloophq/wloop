@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/dossiers"
+	"github.com/wloophq/wloop/internal/core/omnibox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/dossier"
@@ -55,8 +56,7 @@ func (e *Env) serveDossierTurns(ctx context.Context, svc *dossiers.Service, db *
 	t := &dossiers.Turns{Dossiers: svc, Pages: pages, Log: logf, Events: record, Serial: e.dossierMu,
 		Moves: func(ctx context.Context) error { return e.applyDossierMoves(ctx, db) }}
 	calls := &dossiers.Calls{Turns: t, Asker: lazyAsker{e: e, cfg: cfg, dir: filepath.Join(e.StateDir, "dossier-calls")},
-		Caps:  dossiers.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
-		Spent: storedSpend(db),
+		Budget: e.callBudget, Tier: cfg.Headless.Tier,
 		Record: func(ctx context.Context, u unit.Unit, cost float64) error {
 			return record(ctx, port.Event{Unit: u, Kind: dossiers.KindCall, Key: randomKey(), At: e.Now(), Data: strconv.FormatFloat(cost, 'f', -1, 64)})
 		}}
@@ -234,7 +234,7 @@ func (e *Env) grantLaunched(ctx context.Context, u unit.Unit, handle string) {
 	}
 }
 
-// storedSpend is the day's headless spend as stored: the headless turns' and the dossier calls'.
+// storedSpend is the day's headless spend as stored: the headless turns' and the calls that are not turns.
 func storedSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {
 	turns := headlessSpent(db)
 	return func(ctx context.Context, day time.Time) (float64, error) {
@@ -243,9 +243,15 @@ func storedSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float6
 			return 0, err
 		}
 		from := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
-		calls, err := db.DossierSpent(ctx, from, from.AddDate(0, 0, 1))
+		calls, err := db.CallSpent(ctx, from, from.AddDate(0, 0, 1), dossiers.KindCall, omnibox.KindCall)
 		return got + calls, err
 	}
+}
+
+// callBudget books the calls that are not turns against the headless caps and the stored spend.
+func callBudget(db *sqlite.DB, cfg config.Config, now func() time.Time) *turns.Budget {
+	return &turns.Budget{Caps: turns.BudgetCaps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD},
+		Spent: storedSpend(db), Clock: clockFunc(now)}
 }
 
 func randomKey() string {
@@ -276,15 +282,15 @@ func (e *Env) headlessLogged(ctx context.Context, u unit.Unit, seq int64, log st
 	}
 }
 
-// withDossierSpend is the headless turns' spend with the dossier calls', stored and running, so both
-// share one daily cap.
-func (e *Env) withDossierSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {
+// withCallSpend is the headless turns' spend with the calls' that are not turns, stored and running, so
+// all share one daily cap.
+func (e *Env) withCallSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {
 	stored := storedSpend(db)
 	return func(ctx context.Context, day time.Time) (float64, error) {
 		got, err := stored(ctx, day)
-		if err != nil || e.dossierCalls == nil {
+		if err != nil || e.callBudget == nil {
 			return got, err
 		}
-		return got + e.dossierCalls.Reserved(), nil
+		return got + e.callBudget.Reserved(), nil
 	}
 }

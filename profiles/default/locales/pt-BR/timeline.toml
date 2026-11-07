@@ -76,6 +76,9 @@ label = "dossiê concedido à sessão"
 [events.dossier_call]
 label = "compactação do dossiê, US$"
 
+[events.omnibox_call]
+label = "chamada ao agente da omnibox, US$"
+
 [events.brief_waiting]
 label = "esperando o brief"
 

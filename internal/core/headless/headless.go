@@ -101,7 +101,7 @@ type Readier interface {
 
 var (
 	ErrBusy        = turns.ErrHeadlessBusy
-	ErrOverCap     = errors.New("the headless spend cap is reached")
+	ErrOverCap     = turns.ErrOverCap
 	ErrNotHeadless = errors.New("the turn is not headless")
 )
 

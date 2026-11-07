@@ -19,6 +19,8 @@ import (
 	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/lock"
+	"github.com/wloophq/wloop/internal/core/omnibox"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -166,7 +168,7 @@ func TestHeadlessTurnsCountTheDossierCalls(t *testing.T) {
 	t.Parallel()
 	te, db := servedDossiers(t)
 	ctx := context.Background()
-	te.dossierCalls.Caps = dossiers.Caps{PerCallUSD: 0.5, PerDayUSD: 0.5}
+	te.dossierCalls.Budget.Caps = turns.BudgetCaps{PerCallUSD: 0.5, PerDayUSD: 0.5}
 	te.dossierCalls.Asker = &dossierAsker{reply: `{"notes":"x"}`}
 	if _, err := te.dossierTurns.Open(ctx, headlessThread); err != nil {
 		t.Fatal(err)
@@ -183,6 +185,29 @@ func TestHeadlessTurnsCountTheDossierCalls(t *testing.T) {
 	spent, err := d.Spent(ctx, testNow)
 	if err != nil || spent != 0.5 {
 		t.Fatalf("the headless cap reads %v spent: %v", spent, err)
+	}
+}
+
+func TestHeadlessCapCountsOmniboxCalls(t *testing.T) {
+	t.Parallel()
+	te, db := servedDossiers(t)
+	ctx := context.Background()
+	if err := sqlite.New(db).RecordEvents(ctx, port.Event{Kind: omnibox.KindCall, Key: "c1", At: testNow, Data: "0.9"}); err != nil {
+		t.Fatal(err)
+	}
+	te.cfg.Headless.PerCallUSD, te.cfg.Headless.PerDayUSD = 0.2, 1.0
+	d := serveDepsAgain(t, te, db)
+	if spent, err := d.Spent(ctx, testNow); err != nil || spent != 0.9 {
+		t.Fatalf("the headless cap reads %v spent: %v", spent, err)
+	}
+	if err := te.callBudget.Reserve(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if spent, err := d.Spent(ctx, testNow); err != nil || spent != 0.9+0.2 {
+		t.Fatalf("with a call running the headless cap reads %v spent: %v", spent, err)
+	}
+	if err := te.callBudget.Reserve(ctx); !errors.Is(err, headless.ErrOverCap) {
+		t.Fatalf("a second call past the day's cap: %v", err)
 	}
 }
 
@@ -263,7 +288,7 @@ func TestDossierSpendSurvivesARestart(t *testing.T) {
 	n := 0
 	compactOnce := func() error {
 		t.Helper()
-		te.dossierCalls.Caps = dossiers.Caps{PerCallUSD: 0.5, PerDayUSD: 0.5}
+		te.dossierCalls.Budget.Caps = turns.BudgetCaps{PerCallUSD: 0.5, PerDayUSD: 0.5}
 		te.dossierCalls.Asker = &dossierAsker{reply: `{"notes":"x"}`}
 		te.dossierTurns.Dossiers.Policy.CompactAt = 1
 		d, err := te.dossierTurns.Open(ctx, headlessThread)

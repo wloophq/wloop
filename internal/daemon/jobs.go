@@ -290,9 +290,15 @@ func (s *Server) worded(w config.Warning) string {
 	if w.Key == "" {
 		return ""
 	}
-	text := w.Key
-	if forms, ok := s.loaded().Strings[w.Key]; ok && forms["other"] != "" {
+	return s.word(w.Key, w.Params)
+}
+
+// word is the client string key in the loaded locale, filled with params; the key itself when the catalog
+// lacks it.
+func (s *Server) word(key string, params map[string]any) string {
+	text := key
+	if forms, ok := s.loaded().Strings[key]; ok && forms["other"] != "" {
 		text = forms["other"]
 	}
-	return i18n.Interpolate(text, w.Params)
+	return i18n.Interpolate(text, params)
 }

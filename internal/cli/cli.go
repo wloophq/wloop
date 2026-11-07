@@ -264,9 +264,15 @@ type Env struct {
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool
+	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
+	// never removes a snapshot a running call of this process reads.
+	omniboxSwept bool
 	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
 	dossierTurns *dossiers.Turns
 	dossierCalls *dossiers.Calls
+	// callBudget books the headless calls that are not turns, the dossiers' and the omnibox's, against
+	// the headless caps; rebuilt by each serve pass.
+	callBudget *turns.Budget
 	// dossierGrants reads, and recordGrant writes, the sessions launched with their unit's dossier.
 	dossierGrants func(ctx context.Context, u unit.Unit) (map[string]time.Time, error)
 	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error

@@ -547,6 +547,18 @@
 "{unit} is not in the inventory." = "{unit} não está no inventário."
 # piece C
 "Read all" = "Ler tudo"
+# piece B11
+"Type what to ask the agent" = "Digite o que perguntar ao agente"
+"Today's spend cap for agent calls is reached; ask again tomorrow" = "O limite de gasto de hoje com chamadas ao agente foi atingido; pergunte de novo amanhã"
+"No agent here can answer from the omnibox: {error}" = "Nenhum agente aqui pode responder pela omnibox: {error}"
+"The agent could not answer: {error}" = "O agente não conseguiu responder: {error}"
+"The agent took too long to answer; nothing changed" = "O agente demorou demais para responder; nada mudou"
+"This daemon runs no omnibox agent" = "Este daemon não roda o agente da omnibox"
+"unknown_operation" = "A omnibox não executa {op}"
+"incomplete_operation" = "O agente propôs {op} sem o que a operação precisa"
+"unknown_task" = "A tarefa {id} não existe"
+"unknown_unit" = "Nenhuma tarefa contém {unit}"
+"outside_vocabulary" = "Nenhum verbo da omnibox executa {name}"
 
 [formats]
 time = "15:04"
