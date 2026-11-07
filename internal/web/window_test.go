@@ -110,15 +110,17 @@ func TestADetachedWindowHandsAnotherItemToTheMainWindow(t *testing.T) {
 win.location.hash = "#task=t-1&layout=detail";
 const installed = detailWindowInstall(win, doc, (body) => posted.push(body));
 win.addEventListener("hashchange", () => { appSaw++; });
-const e = event({ target: link("#task=t-2") });
+const e = event({ target: link("#task=t-2&layout=detail") });
 doc.dispatch("click", e);
-win.location.hash = "#unit=github/acme%2Fapi%238";
+win.location.hash = "#unit=github/acme%2Fapi%238&layout=detail";
+win.dispatch("hashchange", event({}));
+win.location.hash = "#view=inbox";
 win.dispatch("hashchange", event({}));
 `+panelReport, &got)
 	if !got.Installed || !got.Prevented {
 		t.Fatalf("installed %v, the link's default prevented %v", got.Installed, got.Prevented)
 	}
-	if len(got.Posted) != 2 || got.Posted[0]["route"] != "task=t-2" || got.Posted[1]["route"] != "unit=github/acme%2Fapi%238" || got.Posted[0]["action"] != "open" {
+	if len(got.Posted) != 3 || got.Posted[0]["route"] != "task=t-2&layout=detail" || got.Posted[1]["route"] != "unit=github/acme%2Fapi%238&layout=detail" || got.Posted[2]["route"] != "view=inbox" || got.Posted[0]["action"] != "open" {
 		t.Fatalf("posted %v", got.Posted)
 	}
 	if got.Hash != "#task=t-1&layout=detail" || got.AppSaw != 0 {

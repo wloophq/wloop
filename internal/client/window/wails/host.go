@@ -207,6 +207,9 @@ func (h *host) ShowMain(url string) {
 // bringForward shows w, focused, with the app in the Dock and ⌘Tab.
 func bringForward(w *application.WebviewWindow) {
 	setActivationPolicy(activationPolicyRegular)
+	if w.IsMinimised() {
+		w.UnMinimise()
+	}
 	w.Show()
 	application.InvokeSync(func() {
 		nsApp().Send(objc.RegisterName("activateIgnoringOtherApps:"), true)
