@@ -358,6 +358,8 @@ type Deps struct {
 	// ConfigSet sets key path of the config file to v and applies the keys that apply live; nil: the
 	// daemon changes no configuration.
 	ConfigSet func(path []string, v any) error
+	// Skips are the workflows the user stopped on one unit; nil refuses a skip and lists none.
+	Skips Skips
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;
 	// the Sync worker calls it before each batch until it succeeds. nil: Tasks' identity stands.
 	TasksMe func(ctx context.Context) (grew bool, err error)

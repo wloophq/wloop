@@ -2,8 +2,10 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +87,89 @@ func TestAModuleCodecReachesTheRoute(t *testing.T) {
 	}
 }
 
+// memSkips keeps skips in memory, as the daemon's Skips.
+type memSkips map[unit.Unit][]string
+
+func (m memSkips) Skip(_ context.Context, wf string, u unit.Unit) error {
+	if !slices.Contains(m[u], wf) {
+		m[u] = append(m[u], wf)
+	}
+	return nil
+}
+
+func (m memSkips) Unskip(_ context.Context, wf string, u unit.Unit) error {
+	m[u] = slices.DeleteFunc(m[u], func(w string) bool { return w == wf })
+	return nil
+}
+
+func (m memSkips) Of(_ context.Context, u unit.Unit) ([]string, error) {
+	return slices.Clone(m[u]), nil
+}
+
+func skipServer(t *testing.T) (*Server, memSkips, unit.Unit, string) {
+	t.Helper()
+	th := unit.Unit{Provider: "thread", Key: "C1/171.1"}
+	sk := memSkips{}
+	s := newServerWith(t, func(d *Deps) {
+		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})
+		d.RowProviders = append(d.RowProviders, func(readmodel.RowDeps) readmodel.Provider { return threadRows{units: []unit.Unit{th}} })
+		d.Skips = sk
+	})
+	return s, sk, th, s.loaded().Workflows[0].Name
+}
+
 func TestSkipRoutesSetAndClearASkip(t *testing.T) {
-	t.Skip("E10 skip routes set and clear a skip; unit detail lists skipped_workflows")
+	t.Parallel()
+	s, sk, th, wf := skipServer(t)
+	skipped := func() []string {
+		t.Helper()
+		var raw map[string]json.RawMessage
+		if code := get(t, s, api.UnitPath(th), &raw); code != http.StatusOK {
+			t.Fatalf("detail: %d", code)
+		}
+		var out []string
+		if err := json.Unmarshal(raw["skipped_workflows"], &out); err != nil || out == nil {
+			t.Fatalf("skipped_workflows %s %v, want a list", raw["skipped_workflows"], err)
+		}
+		return out
+	}
+	if got := skipped(); len(got) != 0 {
+		t.Fatalf("before: %v", got)
+	}
+	rec := post(t, s, api.UnitPath(th, "skip", wf), "")
+	var st api.UnitSkipState
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &st) != nil || st != (api.UnitSkipState{Unit: "thread/C1/171.1", Workflow: wf, Skipped: true}) {
+		t.Fatalf("POST: %d %s", rec.Code, rec.Body)
+	}
+	if got := skipped(); !slices.Equal(got, []string{wf}) || !slices.Equal(sk[th], []string{wf}) {
+		t.Fatalf("after POST: %v", got)
+	}
+	del := httptest.NewRecorder()
+	s.Handler().ServeHTTP(del, apiRequest("DELETE", api.UnitPath(th, "skip", wf), nil))
+	if del.Code != 200 || json.Unmarshal(del.Body.Bytes(), &st) != nil || st.Skipped {
+		t.Fatalf("DELETE: %d %s", del.Code, del.Body)
+	}
+	if got := skipped(); len(got) != 0 {
+		t.Fatalf("after DELETE: %v", got)
+	}
+}
+
+func TestSkippingAnUnknownWorkflowIsNotFound(t *testing.T) {
+	t.Parallel()
+	s, sk, th, _ := skipServer(t)
+	if rec := post(t, s, api.UnitPath(th, "skip", "no-such-workflow"), ""); rec.Code != 404 || len(sk) != 0 {
+		t.Fatalf("%d %s, skips %v", rec.Code, rec.Body, sk)
+	}
+}
+
+func TestAnAgentCannotSkipAWorkflow(t *testing.T) {
+	t.Parallel()
+	s, sk, th, wf := skipServer(t)
+	req := apiRequest("POST", api.UnitPath(th, "skip", wf), nil)
+	req.Header.Set(api.SessionHeader, "term_agent1")
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != 403 || len(sk) != 0 {
+		t.Fatalf("%d %s, skips %v", rec.Code, rec.Body, sk)
+	}
 }

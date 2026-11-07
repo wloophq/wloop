@@ -19,7 +19,7 @@ type Engine struct {
 	Units  Units
 	// Keep is the host's own bookkeeping of the units, which no unit
 	// reports: a value implementing any of Preparer, Refresher, Settler,
-	// Gainer, Owner, Seener, Scoper and EventFacts; nil keeps none.
+	// Gainer, Owner, Seener, Scoper, EventFacts and Skipper; nil keeps none.
 	Keep     any
 	Events   Events
 	Steps    Steps

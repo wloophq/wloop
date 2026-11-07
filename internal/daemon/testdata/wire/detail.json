@@ -251,7 +251,7 @@
     },
     "views": []
   },
-  "skipped_workflows": null,
+  "skipped_workflows": [],
   "turn": {
     "answers": [
       {

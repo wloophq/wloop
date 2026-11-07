@@ -605,6 +605,7 @@ func (s *Server) handleDetail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, u.Label()+" is not in the inventory")
 		return
 	}
+	d.SkippedWorkflows = s.skippedOn(ctx, u)
 	writeJSON(w, d)
 }
 
