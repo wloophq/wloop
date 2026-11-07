@@ -135,6 +135,23 @@ func TestCountsLeaveOutUncountedViews(t *testing.T) {
 	}
 }
 
+func TestCountsKeepBadgeAndReviewViewsOffTheRail(t *testing.T) {
+	r := newSetsRig()
+	ready := func(e task.Task) bool { return e.Category == task.CategoryReady }
+	r.lens.add(testView{coretasks.ViewSpec{ID: "badged-ready", Over: task.OverTasks, Uncounted: true}, ready})
+	r.lens.add(testView{coretasks.ViewSpec{ID: "reviewed-ready", Over: task.OverTasks, Uncounted: true}, ready})
+	r.lens.badge = []task.View{"badged-ready"}
+	r.lens.review = []task.View{"reviewed-ready"}
+	r.seed(t)
+	c, err := r.svc.Counts(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Badge != 2 || c.Views["badged-ready"] != 2 || c.Views["reviewed-ready"] != 2 {
+		t.Fatalf("badge %d views %v: a view the badge or a review step names counts, on the rail or off it", c.Badge, c.Views)
+	}
+}
+
 func TestCountsMatchSets(t *testing.T) {
 	ctx := context.Background()
 	r := newSetsRig()

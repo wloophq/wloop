@@ -23,8 +23,8 @@ type ViewSpec struct {
 	Over         string
 	Paged        bool
 	HideDisabled bool
-	// Uncounted leaves the view out of the counters: a view off the rail, which the home and the queues read
-	// with Sets when they need it.
+	// Uncounted leaves the view out of the counters, unless the badge or a review step names it: a view off
+	// the rail, which the home and the queues read with Sets when they need it.
 	Uncounted bool
 }
 
@@ -408,7 +408,9 @@ func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep
 	keeps := keptOnce(ctx, keep)
 	vs := s.profileViews()
 	c := task.Counters{Area: area, Views: map[task.View]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
-	counted := slices.DeleteFunc(slices.Clone(vs.List), func(spec ViewSpec) bool { return spec.Uncounted })
+	counted := slices.DeleteFunc(slices.Clone(vs.List), func(spec ViewSpec) bool {
+		return spec.Uncounted && !slices.Contains(vs.Badge, spec.ID) && !slices.Contains(vs.Review, spec.ID)
+	})
 	sets, err := s.sets(ctx, counted, area, all, keeps, false)
 	if err != nil {
 		return task.Counters{}, err
