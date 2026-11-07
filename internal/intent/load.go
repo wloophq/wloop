@@ -126,6 +126,10 @@ type Loaded struct {
 	StringsStamp string
 	// Timeline is timeline.toml in Locale.
 	Timeline TimelineDef
+	// Decisions are decisions.toml in Locale: what maps to each decision kind, and its words.
+	Decisions Decisions
+	// Home is home.toml in Locale.
+	Home HomeDef
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -227,6 +231,13 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			var timelineProblems Problems
 			l.Timeline, timelineProblems = loadTimeline(layers, r)
 			stringProblems = append(stringProblems, timelineProblems...)
+			decisions, decisionProblems := loadDecisions(layers, r)
+			stringProblems = append(stringProblems, decisionProblems...)
+			stringProblems = append(stringProblems, decisions.check(views, gates, actions, l.offered)...)
+			l.Decisions = decisions.def
+			home, homeProblems := loadHome(layers, r)
+			stringProblems = append(append(stringProblems, homeProblems...), home.check(views)...)
+			l.Home = home.def
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, stringProblems, *r.problems)
 			l.Locale, l.reader = locale, r
@@ -469,6 +480,17 @@ func (l *Loaded) profileFacts(p dunit.ProviderID) expr.Env {
 		maps.Copy(env, l.Tasks.Facts())
 	}
 	return env
+}
+
+// offered are the catalog actions the intents serving p's units offer.
+func (l *Loaded) offered(p dunit.ProviderID) []string {
+	var out []string
+	for _, d := range l.Registry.ForProvider(p) {
+		if d.Action != nil {
+			out = append(out, string(d.Name))
+		}
+	}
+	return out
 }
 
 func (l *Loaded) turnProblem(name, runner string) (arg, msg string) {

@@ -1,0 +1,43 @@
+open = "Abrir na origem"
+
+[kinds.answer]
+noun   = { one = "pergunta", other = "perguntas" }
+clause = "o agente tem {counter} para você"
+queue  = "Perguntas do agente"
+empty  = "Nenhuma pergunta espera por você."
+
+[kinds.approve-plan]
+noun   = { one = "plano", other = "planos" }
+clause = { one = "{counter} espera sua aprovação", other = "{counter} esperam sua aprovação" }
+queue  = "Planos para aprovar"
+empty  = "Nenhum plano espera sua aprovação."
+
+[kinds.send-draft]
+noun   = { one = "rascunho", other = "rascunhos" }
+clause = { one = "{counter} está pronto para enviar", other = "{counter} estão prontos para enviar" }
+queue  = "Rascunhos para enviar"
+empty  = "Nenhum rascunho espera envio."
+
+[kinds.review-step]
+noun   = { one = "etapa", other = "etapas" }
+clause = { one = "{counter} espera sua revisão", other = "{counter} esperam sua revisão" }
+queue  = "Etapas para revisar"
+empty  = "Nenhuma etapa espera sua revisão."
+
+[kinds.last-step]
+noun   = { one = "item", other = "itens" }
+clause = { one = "{counter} só espera o último passo", other = "{counter} só esperam o último passo" }
+queue  = "Últimos passos"
+empty  = "Nada espera só o último passo."
+
+[kinds.pick-someone]
+noun   = { one = "item", other = "itens" }
+clause = { one = "{counter} espera você escolher alguém", other = "{counter} esperam você escolher alguém" }
+queue  = "Escolher alguém"
+empty  = "Nada espera você escolher alguém."
+
+[kinds.act]
+noun   = { one = "proposta", other = "propostas" }
+clause = { one = "{counter} espera uma ação sua", other = "{counter} esperam uma ação sua" }
+queue  = "Para agir"
+empty  = "Nada espera uma ação sua."

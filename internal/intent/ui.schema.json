@@ -3,6 +3,63 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "decisions": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One decision kind's words.",
+        "properties": {
+          "clause": {
+            "description": "The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, or a table of its CLDR plural forms, `other` required.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "few": {
+                    "description": "Its few form.",
+                    "type": "string"
+                  },
+                  "many": {
+                    "description": "Its many form.",
+                    "type": "string"
+                  },
+                  "one": {
+                    "description": "Its one form.",
+                    "type": "string"
+                  },
+                  "other": {
+                    "description": "Its other form.",
+                    "type": "string"
+                  },
+                  "two": {
+                    "description": "Its two form.",
+                    "type": "string"
+                  },
+                  "zero": {
+                    "description": "Its zero form.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "empty": {
+            "description": "What the kind's queue says when it holds nothing.",
+            "type": "string"
+          },
+          "queue": {
+            "description": "The title of the kind's queue, such as \"Ready to merge\".",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The plugin's words of the decisions its units wait on, by decision kind, which replace the kind's own when every unit counted is the plugin's.",
+      "type": "object"
+    },
     "detail": {
       "additionalProperties": {
         "additionalProperties": false,
@@ -389,6 +446,44 @@
       },
       "description": "The heading of each menu bar section, by section id.",
       "type": "object"
+    },
+    "noun": {
+      "description": "What one of the plugin's units is, which the briefing counts, such as \"pull request\". A string, or a table of its CLDR plural forms, `other` required.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "few": {
+              "description": "Its few form.",
+              "type": "string"
+            },
+            "many": {
+              "description": "Its many form.",
+              "type": "string"
+            },
+            "one": {
+              "description": "Its one form.",
+              "type": "string"
+            },
+            "other": {
+              "description": "Its other form.",
+              "type": "string"
+            },
+            "two": {
+              "description": "Its two form.",
+              "type": "string"
+            },
+            "zero": {
+              "description": "Its zero form.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      ]
     },
     "situations": {
       "additionalProperties": {

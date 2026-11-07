@@ -225,3 +225,17 @@ title = "Guidance waiting for the next round: given with no round pending, or ke
 
 [menubar]
 loop = "In loop"
+
+[noun]
+one = "pull request"
+other = "pull requests"
+
+[decisions.last-step]
+clause = { one = "{counter} only waits for the merge", other = "{counter} only wait for the merge" }
+queue = "Ready to merge"
+empty = "Nothing waits only for the merge."
+
+[decisions.pick-someone]
+clause = { one = "{counter} waits for a reviewer", other = "{counter} wait for a reviewer" }
+queue = "Pick a reviewer"
+empty = "No pull request waits for a reviewer."

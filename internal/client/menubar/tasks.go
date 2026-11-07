@@ -23,7 +23,7 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 	var loading []api.Loading
 	tasks := map[string][]api.TaskView{}
 	for _, v := range cat.Views {
-		if !v.Badge {
+		if !v.Badge || !v.Rail {
 			continue
 		}
 		page, err := c.cfg.Daemon.TasksSince(ctx, client.TaskQuery{View: v.ID}, api.Since{})

@@ -57,6 +57,8 @@ type Vocabulary struct {
 	languageFacts      map[unit.ProviderID]string
 	marks              []Mark
 	linkSignals        []string
+	situations         map[unit.ProviderID][]string
+	signalsOf          map[unit.ProviderID][]string
 }
 
 // DraftKinds are a plugin's draft kinds and the delivery of a draft whose
@@ -145,6 +147,7 @@ func Install(v *Vocabulary) {
 	pluginDeliveries = v.pluginDeliveries
 	Marks = v.marks
 	LinkSignals = v.linkSignals
+	PluginSituations, PluginSignals = v.situations, v.signalsOf
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -285,6 +288,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	languageFacts := map[unit.ProviderID]string{}
 	var marks []Mark
 	var signals []string
+	situations, signalsOf := map[unit.ProviderID][]string{}, map[unit.ProviderID][]string{}
 	for _, id := range ids {
 		src := all[id]
 		v := src.SourceVocabulary
@@ -362,7 +366,11 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				taskKinds = append(taskKinds, k)
 			}
 		}
+		for _, sit := range v.Situations {
+			situations[id] = append(situations[id], sit.Name)
+		}
 		for _, g := range v.Signals {
+			signalsOf[id] = append(signalsOf[id], g.Name)
 			if !slices.Contains(signals, g.Name) {
 				signals = append(signals, g.Name)
 				facts = append(facts, linkSignalFact(g))
@@ -384,7 +392,8 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, marks: marks, linkSignals: signals}
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, marks: marks, linkSignals: signals,
+		situations: situations, signalsOf: signalsOf}
 }
 
 // LinkSignals are the link signals the merged plugins declare, each read as
@@ -398,6 +407,12 @@ func linkSignalFact(g manifest.Named) Fact {
 	f.Untrusted = true
 	return f
 }
+
+// PluginSituations are the situations each merged plugin derives, by provider, in its manifest's order.
+var PluginSituations = map[unit.ProviderID][]string{}
+
+// PluginSignals are the link signals each merged plugin reports, by provider.
+var PluginSignals = map[unit.ProviderID][]string{}
 
 // PluginTaskKinds are the values of the task's kind property the merged
 // plugins' units give their tasks, which tasks.toml's kind takes besides

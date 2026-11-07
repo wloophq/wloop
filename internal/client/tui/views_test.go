@@ -19,9 +19,9 @@ import (
 )
 
 func viewsCatalog() api.ViewsCatalog {
-	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox", Over: "gates"},
-		{ID: "next", Label: "Next", Group: "task.prop.contexts"}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by"}, {ID: "projects", Label: "Projects"},
-		{ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus", Rail: true}, {ID: "inbox", Label: "Inbox", Rail: true}, {ID: "outbox", Label: "Outbox", Over: "gates", Rail: true},
+		{ID: "next", Label: "Next", Group: "task.prop.contexts", Rail: true}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by", Rail: true}, {ID: "projects", Label: "Projects", Rail: true},
+		{ID: "someday", Label: "Someday", Rail: true}, {ID: "logbook", Label: "Logbook", Rail: true}}
 	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Handler: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
 		{Verb: "schedule", Handler: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
 		{Verb: "reference", Handler: "finish", Label: "Reference", Key: "l"}, {Verb: "focus", Handler: "focus", Label: "Focus", Key: "f"},
@@ -114,6 +114,23 @@ func viewTasks() map[string][]api.TaskView {
 func viewCounters() api.Counters {
 	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
 		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
+}
+
+func TestTUIListsOnlyRailViews(t *testing.T) {
+	m := newModel(t)
+	c := viewsCatalog()
+	c.Views = append([]api.TaskViewSpec{{ID: "home-blocked", Label: "Blocked by you"}}, c.Views...)
+	m.SetViews(c)
+	var ids []string
+	for _, v := range m.taskViews {
+		ids = append(ids, v.ID)
+	}
+	if len(ids) == 0 || ids[0] != "focus" || slices.Contains(ids, "home-blocked") {
+		t.Fatalf("views %v: a view off the rail is listed or opened first", ids)
+	}
+	if got := m.viewKey(); got != "view:focus" {
+		t.Fatalf("opens on %q, want the first rail view", got)
+	}
 }
 
 // viewsModel is a model with the task views loaded, on Focus.

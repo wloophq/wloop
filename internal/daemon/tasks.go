@@ -165,7 +165,7 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean})
+			RemoveClean: v.RemoveClean, Rail: v.Rail})
 	}
 	return out
 }
@@ -762,27 +762,33 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
 		c, err = g.Counts(ctx, q.Get("area"))
 	} else {
-		specs := s.taskFacetSpecs()
-		query, now := lens.Parse(text, specs), s.deps.Now()
-		vs := s.taskViews(ctx, g, false)
-		preloaded := false
-		c, err = g.CountsWhere(ctx, q.Get("area"), func(ctx context.Context, e task.Task) (bool, error) {
-			if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
-				preloaded = true
-				vs.readRows(ctx, pass.Tasks)
-			}
-			v, err := vs.view(ctx, e)
-			if err != nil {
-				return false, err
-			}
-			return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
-		})
+		c, err = g.CountsWhere(ctx, q.Get("area"), s.lensKeep(ctx, g, text))
 	}
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	writeJSON(w, wireCounters(c))
+}
+
+// lensKeep keeps the tasks that lens query text matches, over the facets and texts of their views; it reads
+// the rows of every task of the pass at its first call.
+func (s *Server) lensKeep(ctx context.Context, g *coretasks.Service, text string) coretasks.Keep {
+	specs := s.taskFacetSpecs()
+	query, now := lens.Parse(text, specs), s.deps.Now()
+	vs := s.taskViews(ctx, g, false)
+	preloaded := false
+	return func(ctx context.Context, e task.Task) (bool, error) {
+		if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
+			preloaded = true
+			vs.readRows(ctx, pass.Tasks)
+		}
+		v, err := vs.view(ctx, e)
+		if err != nil {
+			return false, err
+		}
+		return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
+	}
 }
 
 // taskFacetSpecs are the facets a query over tasks can name: the plugins' and the profile's, one spec by id.

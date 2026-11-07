@@ -23,6 +23,9 @@ type ViewSpec struct {
 	Over         string
 	Paged        bool
 	HideDisabled bool
+	// Uncounted leaves the view out of the counters, unless the badge or a review step names it: a view off
+	// the rail, which the home and the queues read with Sets when they need it.
+	Uncounted bool
 }
 
 // Views are the profile's views that list something, in its order, and the views its badge and its review name.
@@ -401,47 +404,19 @@ func (s *Service) CountsWhere(ctx context.Context, area string, keep func(contex
 	return s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, keep)
 }
 
-func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
-	kept := map[task.ID]bool{}
-	keeps := func(e task.Task) (bool, error) {
-		if keep == nil {
-			return true, nil
-		}
-		k, seen := kept[e.ID]
-		if !seen {
-			var err error
-			if k, err = keep(ctx, e); err != nil {
-				return false, err
-			}
-			kept[e.ID] = k
-		}
-		return k, nil
-	}
+func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep Keep) (task.Counters, error) {
+	keeps := keptOnce(ctx, keep)
 	vs := s.profileViews()
 	c := task.Counters{Area: area, Views: map[task.View]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
-	for _, spec := range vs.List {
-		q := task.Query{View: spec.ID, Area: area}
-		var es []task.Task
-		var err error
-		if spec.Over == task.OverTasks {
-			es, err = s.listed(ctx, spec, q, all)
-		} else {
-			es, err = s.sourced(ctx, spec, q)
-		}
-		if err != nil {
-			return task.Counters{}, err
-		}
-		n := 0
-		for _, e := range es {
-			k, err := keeps(e)
-			if err != nil {
-				return task.Counters{}, err
-			}
-			if k {
-				n++
-			}
-		}
-		c.Views[spec.ID] = n
+	counted := slices.DeleteFunc(slices.Clone(vs.List), func(spec ViewSpec) bool {
+		return spec.Uncounted && !slices.Contains(vs.Badge, spec.ID) && !slices.Contains(vs.Review, spec.ID)
+	})
+	sets, err := s.sets(ctx, counted, area, all, keeps, false)
+	if err != nil {
+		return task.Counters{}, err
+	}
+	for v, es := range sets {
+		c.Views[v] = len(es)
 	}
 	hidden := s.hider()
 	for _, e := range all {

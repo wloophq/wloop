@@ -37,7 +37,7 @@ func defOf(g intentload.GateDef) gates.Def {
 }
 
 // withGates serves the gates of r's store, and opens a question on task id.
-func (r *tasksRig) withGates(t *testing.T, id task.ID) gate.Gate {
+func (r *tasksRig) withGates(t testing.TB, id task.ID) gate.Gate {
 	t.Helper()
 	st := r.db.Gates(func() time.Time { return tasksNow })
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: fixedClock(tasksNow)})

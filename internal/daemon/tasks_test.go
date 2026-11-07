@@ -101,8 +101,8 @@ func newTasksRig(t testing.TB, edit func(*Deps)) *tasksRig {
 			if !r.linked {
 				return facttask.Link{}, nil
 			}
-			signals, moved, _, err := r.s.LinkState(ctx, u)
-			return facttask.Link{Signals: signals, Moved: moved}, err
+			signals, situation, moved, _, err := r.s.LinkState(ctx, u)
+			return facttask.Link{Signals: signals, Situation: situation, Moved: moved}, err
 		})
 		r.g = coretasks.New(withLens(coretasks.Deps{States: loadedHandlers{taskstest.BundledStates, loaded}, Authority: taskstest.BundledStates.Authority, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
@@ -838,6 +838,12 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 				t.Fatalf("%v: %d", terms, code)
 			}
 			for _, view := range storedViews() {
+				if spec, _ := bundledLoaded().Views.View(view); !spec.Rail {
+					if _, counted := c.Views[view]; counted {
+						t.Errorf("%s is off the rail and counted", view)
+					}
+					continue
+				}
 				v := url.Values{"view": {view}, "area": {area}}
 				n := 0
 				query := lens.Parse(strings.Join(terms, " "), nil)
@@ -1410,5 +1416,17 @@ func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
 }
 
 func TestRailFalseViewsServedWithRail(t *testing.T) {
-	t.Skip("B2 GET /api/views serves each view's rail")
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	var cat api.ViewsCatalog
+	if code := get(t, r.s, api.ViewsPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	rail := map[string]bool{}
+	for _, v := range cat.Views {
+		rail[v.ID] = v.Rail
+	}
+	if rail["home-blocked"] || rail["decide-answer"] || !rail["needs-me"] || !rail["outbox"] {
+		t.Fatalf("rail = %v", rail)
+	}
 }

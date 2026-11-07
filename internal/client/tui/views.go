@@ -23,13 +23,15 @@ func taskUnit(id string) unit.Unit { return unit.Unit{Provider: taskProvider, Ke
 // the user moved to a view, it shows the first.
 func (m *Model) SetViews(c api.ViewsCatalog) {
 	current := m.viewKey()
-	if !m.navigated && len(c.Views) > 0 {
-		current = "view:" + c.Views[0].ID
-	}
 	m.viewsCat, m.taskViews, m.rowWords = c, nil, nil
 	m.refreshFacets()
 	for _, v := range c.Views {
-		m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})
+		if v.Rail {
+			m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})
+		}
+	}
+	if !m.navigated && len(m.taskViews) > 0 {
+		current = "view:" + m.taskViews[0].ID
 	}
 	m.goTo(current)
 }

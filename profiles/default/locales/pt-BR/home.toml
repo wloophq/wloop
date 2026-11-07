@@ -1,0 +1,30 @@
+join      = ", "
+last_join = " e "
+end       = "."
+count     = "{n} {noun}"
+empty     = "Nada espera por você. O loop cuida do resto."
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+
+[[counters]]
+noun   = { one = "tarefa", other = "tarefas" }
+clause = { other = "o loop cuida de {counter}" }
+
+[[counters]]
+noun   = { one = "tarefa", other = "tarefas" }
+clause = { one = "{counter} está com outras pessoas", other = "{counter} estão com outras pessoas" }
+
+[capture]
+hint = "Anote o que está na sua cabeça"

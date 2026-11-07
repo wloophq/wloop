@@ -566,6 +566,11 @@
             ],
             "type": "string"
           },
+          "rail": {
+            "default": true,
+            "description": "The rail lists the view; false keeps it for the home, a queue or search.",
+            "type": "boolean"
+          },
           "remove_clean": {
             "default": false,
             "description": "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.",

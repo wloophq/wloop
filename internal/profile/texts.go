@@ -34,7 +34,9 @@ type Problems []TextProblem
 //
 // For each text the walk goes from the highest layer down: a layer that holds the text in the locale wins;
 // a layer whose English text differs from the one below it wins with that text; the bottom layer ends with
-// its locale text, else its English one.
+// its locale text, else its English one. The keys of a plugin's file Localize reads in its own layer or in
+// the user's layer of it walk only the layers of no plugin and that plugin's: plugins share file names such as
+// ui.toml, never texts. Every other read, Text, Forms and the whole files, walks every layer.
 type Texts struct {
 	layers  []Layer
 	bundled fs.FS
@@ -88,7 +90,7 @@ func (t *Texts) Localize(l Layer, rel string, src []byte) ([]byte, Problems) {
 		if !t.keys(rel, s.path) {
 			continue
 		}
-		if v, ok := t.textAt(rel, s.path, at); ok && v != s.text {
+		if v, ok := t.textAt(rel, s.path, at, l.PluginID()); ok && v != s.text {
 			values[pathKey(s.path)] = v
 		}
 	}
@@ -124,15 +126,25 @@ func (t *Texts) index(l Layer) int {
 
 // Text is the text at path of rel in t's locale, by the layer rule; false when no layer holds it.
 func (t *Texts) Text(rel string, path []string) (string, bool) {
-	return t.textAt(rel, path, len(t.layers)-1)
+	return t.textAt(rel, path, len(t.layers)-1, "")
 }
 
-// textAt is Text as layer at's level reads it: a layer above at gives only a translation of a text it holds
-// no English of.
-func (t *Texts) textAt(rel string, path []string, at int) (string, bool) {
+// visible says whether layer j takes part in a walk of plugin scope's file: every layer for the scope of no
+// plugin, else the layers of no plugin and of that plugin.
+func (t *Texts) visible(scope string, j int) bool {
+	id := t.layers[j].PluginID()
+	return scope == "" || id == "" || id == scope
+}
+
+// textAt is Text as layer at's level reads it in plugin scope's chain: a layer above at gives only a
+// translation of a text it holds no English of.
+func (t *Texts) textAt(rel string, path []string, at int, scope string) (string, bool) {
 	f := t.file(rel)
 	k := pathKey(path)
 	for i := len(t.layers) - 1; i >= 0; i-- {
+		if !t.visible(scope, i) {
+			continue
+		}
 		s, own := f.base[i][k]
 		if loc, ok := f.loc[i][k]; ok && (i <= at || !own) {
 			return loc, true
@@ -140,7 +152,7 @@ func (t *Texts) textAt(rel string, path []string, at int) (string, bool) {
 		if !own || i > at {
 			continue
 		}
-		below, held := f.baseBelow(i, k)
+		below, held := t.baseBelow(f, i, k, scope)
 		if i == 0 || !held || below != s {
 			return s, true
 		}
@@ -148,9 +160,9 @@ func (t *Texts) textAt(rel string, path []string, at int) (string, bool) {
 	return "", false
 }
 
-func (f *fileTexts) baseBelow(i int, k string) (string, bool) {
+func (t *Texts) baseBelow(f *fileTexts, i int, k, scope string) (string, bool) {
 	for j := i - 1; j >= 0; j-- {
-		if s, ok := f.base[j][k]; ok {
+		if s, ok := f.base[j][k]; ok && t.visible(scope, j) {
 			return s, true
 		}
 	}
@@ -162,7 +174,8 @@ func (t *Texts) File(rel string) (Resolved, error) {
 	return t.FileAt(t.layers[len(t.layers)-1], rel)
 }
 
-// FileAt is File as layer l's level reads it, the way Localize reads a key.
+// FileAt is File as layer l's level reads it, the way Localize reads a key. A whole-file text lives under its
+// workflow's directory, whose name no two plugins share, so the walk reads every layer, whatever plugin l is.
 func (t *Texts) FileAt(l Layer, rel string) (Resolved, error) {
 	f := t.file(rel)
 	at := t.index(l)
@@ -335,9 +348,21 @@ func (f *fileTexts) value(i int, k string, loc bool) (map[string]string, bool) {
 // resolved as one: a translation may name forms its English text has not, or be plural where the English
 // text is a string; false when no layer holds it.
 func (t *Texts) Forms(rel string, path []string) (map[string]string, bool) {
+	return t.formsIn("", rel, path)
+}
+
+// PluginForms is Forms of plugin id's file rel, walking only the layers of no plugin and of id.
+func (t *Texts) PluginForms(id, rel string, path []string) (map[string]string, bool) {
+	return t.formsIn(id, rel, path)
+}
+
+func (t *Texts) formsIn(scope, rel string, path []string) (map[string]string, bool) {
 	f := t.file(rel)
 	k := pathKey(path)
 	for i := len(t.layers) - 1; i >= 0; i-- {
+		if !t.visible(scope, i) {
+			continue
+		}
 		if v, ok := f.value(i, k, true); ok {
 			return v, true
 		}
@@ -348,7 +373,9 @@ func (t *Texts) Forms(rel string, path []string) (map[string]string, bool) {
 		var below map[string]string
 		held := false
 		for j := i - 1; j >= 0 && !held; j-- {
-			below, held = f.value(j, k, false)
+			if t.visible(scope, j) {
+				below, held = f.value(j, k, false)
+			}
 		}
 		if i == 0 || !held || !maps.Equal(below, v) {
 			return v, true
@@ -365,8 +392,12 @@ func (t *Texts) checkLocale(f *fileTexts, i int, rel string, loc *Resolved) (map
 		f.problems = append(f.problems, TextProblem{File: loc.Path, Msg: err.Error()})
 		return nil, nil
 	}
+	scope := t.layers[i].PluginID()
 	english := func(k string) (string, bool) {
 		for j := i; j >= 0; j-- {
+			if !t.visible(scope, j) {
+				continue
+			}
 			if v, ok := f.value(j, k, false); ok {
 				var all []string
 				for _, s := range v {
@@ -436,6 +467,9 @@ func (t *Texts) near(f *fileTexts, i int, p []string) string {
 	prefix := pathKey(p[:len(p)-1])
 	var siblings []string
 	for j := i; j >= 0; j-- {
+		if !t.visible(t.layers[i].PluginID(), j) {
+			continue
+		}
 		for k := range f.base[j] {
 			if parent, last := cutLast(k); parent == prefix && !slices.Contains(siblings, last) {
 				siblings = append(siblings, last)

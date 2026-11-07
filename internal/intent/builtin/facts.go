@@ -224,6 +224,8 @@ var otherFacts = []Fact{
 	timeVarying(wf("task", "since_movement", expr.Duration, "Time since the task, or a unit linked to it, last moved: a state change, a source event, a run.")),
 	timeVarying(untrusted(wf("task", "check_on", expr.Time, "When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`."))),
 	wf("task", "gates_open", expr.Int, "The task's open gates."),
+	untrusted(enum(wf("task", "decisions", expr.List, "The decision kinds the task waits on the user for, as decisions.toml maps its open gates and its units' situations and link signals; the oldest first."), enumOf(decisionKindNames()...))),
+	untrusted(wf("task", "decision_since", expr.Time, "Since when the oldest of task.decisions waits; zero when none. Test with `> timestamp(0)`.")),
 	wf("task", "turns_open_by_hand", expr.Int, "The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names."),
 	wf("task", "turn_by_hand_at", expr.Time, "When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`."),
 	wf("task", "turns_running", expr.Int, "The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended."),

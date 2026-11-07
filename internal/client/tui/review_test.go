@@ -66,7 +66,7 @@ func reviewFixture() api.Review {
 
 func reviewCatalog() api.ViewsCatalog {
 	c := viewsCatalog()
-	c.Views = append(c.Views, api.TaskViewSpec{ID: "review", Label: "Review"})
+	c.Views = append(c.Views, api.TaskViewSpec{ID: "review", Label: "Review", Rail: true})
 	return c
 }
 

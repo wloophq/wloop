@@ -93,9 +93,11 @@ type ViewDef struct {
 	WhenText, SortText                          string
 	Sort                                        []SortKey
 	HideDisabled, RemoveClean                   bool
-	When                                        workflow.Predicate
-	ownEmpty                                    string
-	groupAt                                     *sheet
+	// Rail says that the rail lists the view; a view only the home, a queue or search reads has it false.
+	Rail     bool
+	When     workflow.Predicate
+	ownEmpty string
+	groupAt  *sheet
 }
 
 func (v ViewDef) groupProblem(format string, args ...any) Problem {
@@ -166,7 +168,11 @@ type mView struct {
 	Key          *string `toml:"key"`
 	HideDisabled *bool   `toml:"hide_disabled"`
 	RemoveClean  *bool   `toml:"remove_clean"`
+	Rail         *bool   `toml:"rail"`
 }
+
+// HomeView is the cockpit's home route, which no view may be named.
+const HomeView = "home"
 
 type mFacet struct {
 	Fact        *string            `toml:"fact"`
@@ -441,8 +447,12 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 	for _, id := range declared(s, "views", views) {
 		path, m := "views."+id, views[id]
+		if id == HomeView {
+			s.add(path, "%s is the cockpit's home route; name the view otherwise", HomeView)
+			continue
+		}
 		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })
-		v := ViewDef{ID: id, Over: task.OverTasks}
+		v := ViewDef{ID: id, Over: task.OverTasks, Rail: true}
 		if i >= 0 {
 			v = l.def.Views[i]
 		}
@@ -494,6 +504,9 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		}
 		if m.RemoveClean != nil {
 			v.RemoveClean = *m.RemoveClean
+		}
+		if m.Rail != nil {
+			v.Rail = *m.Rail
 		}
 		switch {
 		case len(s.problems) > n && i < 0:

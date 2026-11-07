@@ -335,6 +335,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.sort` (string): The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order.
 - `views.<name>.key` (string): The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary.
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
+- `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
@@ -879,6 +880,17 @@ The fields each notice reads besides `Name` and `Command`:
 - `detail.<name>.title` (string, localized): What the field means, as its tooltip shows it.
 - `menubar` (table): The heading of each menu bar section, by section id.
 - `menubar.<name>` (string, localized): One section's heading.
+- `decisions` (table): The plugin's words of the decisions its units wait on, by decision kind, which replace the kind's own when every unit counted is the plugin's.
+- `decisions.<name>` (table): One decision kind's words.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `decisions.<name>.queue` (string, localized): The title of the kind's queue, such as "Ready to merge".
+- `decisions.<name>.empty` (string, localized): What the kind's queue says when it holds nothing.
 - `lens.age_now` (template, localized): A row's age under a minute.
 - `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
 - `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
@@ -931,6 +943,20 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.show.kind` (list of strings): The values the facet shows in the kind part.
 - `facets.<name>.show.age` (list of strings): The values the facet shows in the age part.
 - `facets.<name>.show.aside` (list of strings): The values the facet shows in the aside part.
+- `noun` (string or table, localized): What one of the plugin's units is, which the briefing counts, such as "pull request". A string, or a table of its CLDR plural forms, `other` required.
+- `noun.zero` (string, localized): Its zero form.
+- `noun.one` (string, localized): Its one form.
+- `noun.two` (string, localized): Its two form.
+- `noun.few` (string, localized): Its few form.
+- `noun.many` (string, localized): Its many form.
+- `noun.other` (string, localized): Its other form.
+- `decisions.<name>.clause` (string or table, localized): The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, or a table of its CLDR plural forms, `other` required.
+- `decisions.<name>.clause.zero` (string, localized): Its zero form.
+- `decisions.<name>.clause.one` (string, localized): Its one form.
+- `decisions.<name>.clause.two` (string, localized): Its two form.
+- `decisions.<name>.clause.few` (string, localized): Its few form.
+- `decisions.<name>.clause.many` (string, localized): Its many form.
+- `decisions.<name>.clause.other` (string, localized): Its other form.
 
 ## Client strings (`strings.toml`)
 
@@ -986,6 +1012,103 @@ The fields each notice reads besides `Name` and `Command`:
   - `intake_guidance`: A request's guidance replaced.
   - `workflow_step_ran`: A workflow's step ran.
 - `events.<name>.label` (string, localized): What the timeline calls an event of the kind, such as "paused".
+
+## Decision kinds (`decisions.toml`)
+
+- `open` (string, localized): What a queue's button that opens a unit at its source says; only the default layer's file sets it.
+- `gates` (table): The decision kind of an open gate, by gate kind; only the default layer's file maps gates.
+- `gates.<name>` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): One gate kind's decision kind.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `situations` (table): The decision kind of a unit in a situation its plugin derives, by situation; only a plugin's layer maps them.
+- `situations.<name>` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): One situation's decision kind.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `signals` (table): The decision kind of a unit whose link signal is on, by signal; only a plugin's layer maps them.
+- `signals.<name>` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): One signal's decision kind.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `primary` (table): What a queue offers first on a unit of the plugin, by decision kind; only a plugin's layer sets it.
+- `primary.<name>` (string): A catalog action of the plugin's units, or `open`, which opens the unit at its source.
+- `kinds` (table): Each decision kind's view and words, by kind; only the default layer's file sets them.
+- `kinds.<name>` (table): One decision kind.
+- `kinds.<name>.view` (string): The view of views.toml that lists the kind's tasks, which its queue walks. Required.
+- `kinds.<name>.primary` (string): The gate intent a queue offers first on a gate of the kind; empty offers the gate's first.
+- `kinds.<name>.queue` (string, localized): The title of the kind's queue. Required.
+- `kinds.<name>.empty` (string, localized): What the kind's queue says when it holds nothing. Required.
+- `kinds.<name>.noun` (string or table, localized): What one of the kind's tasks is, which the briefing counts, such as "question". A string, or a table of its CLDR plural forms, `other` required.
+- `kinds.<name>.noun.zero` (string, localized): Its zero form.
+- `kinds.<name>.noun.one` (string, localized): Its one form.
+- `kinds.<name>.noun.two` (string, localized): Its two form.
+- `kinds.<name>.noun.few` (string, localized): Its few form.
+- `kinds.<name>.noun.many` (string, localized): Its many form.
+- `kinds.<name>.noun.other` (string, localized): Its other form.
+- `kinds.<name>.clause` (string or table, localized): The briefing's clause on the kind, `{counter}` where its count goes, such as "the agent has {counter} for you". A string, or a table of its CLDR plural forms, `other` required.
+- `kinds.<name>.clause.zero` (string, localized): Its zero form.
+- `kinds.<name>.clause.one` (string, localized): Its one form.
+- `kinds.<name>.clause.two` (string, localized): Its two form.
+- `kinds.<name>.clause.few` (string, localized): Its few form.
+- `kinds.<name>.clause.many` (string, localized): Its many form.
+- `kinds.<name>.clause.other` (string, localized): Its other form.
+
+## The cockpit's home (`home.toml`)
+
+- `template` (string, default `default`): The briefing's template, which a client may draw its own way.
+- `join` (string, localized): What goes between two clauses of a sentence, and between two plugins' counts, such as ", ".
+- `last_join` (string, localized): What goes before the last clause of a sentence, and the last plugin's count, such as " and ".
+- `end` (string, localized): What ends a sentence, such as ".".
+- `count` (string, localized): A counter's words, `{n}` its count and `{noun}` what it counts, such as "{n} {noun}".
+- `per_sentence` (integer, default `3`): The most clauses a sentence of the briefing holds.
+- `empty` (string, localized): What the briefing says when every counter is zero.
+- `counters[]` (table): The briefing's counters, in order; one with nothing to count says nothing. A user's list replaces the whole list.
+- `counters[].id` (string): The counter's id; a kind's counter defaults to the kind.
+- `counters[].kind` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): The decision kind the counter counts, whose view and words decisions.toml gives; set kind or view.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `counters[].view` (string): The view of views.toml whose tasks the counter counts; set kind or view.
+- `sections[]` (table): The home's sections, in order: the first rows of a view, which a link opens whole. A user's list replaces the whole list.
+- `sections[].id` (string): The section's id. Required.
+- `sections[].view` (string): The view of views.toml it shows the first rows of; its label titles the section. Required.
+- `sections[].limit` (integer, default `3`): The most rows it shows.
+- `sections[].time` (one of `owed`, `moved`, default `moved`): The time each row shows.
+  - `owed`: Since when the task's next step is owed.
+  - `moved`: When the task last moved.
+- `capture` (table): The capture field.
+- `capture.hint` (string, localized): What the empty field says.
+- `counters[].noun` (string or table, localized): What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, or a table of its CLDR plural forms, `other` required.
+- `counters[].noun.zero` (string, localized): Its zero form.
+- `counters[].noun.one` (string, localized): Its one form.
+- `counters[].noun.two` (string, localized): Its two form.
+- `counters[].noun.few` (string, localized): Its few form.
+- `counters[].noun.many` (string, localized): Its many form.
+- `counters[].noun.other` (string, localized): Its other form.
+- `counters[].clause` (string or table, localized): The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, or a table of its CLDR plural forms, `other` required.
+- `counters[].clause.zero` (string, localized): Its zero form.
+- `counters[].clause.one` (string, localized): Its one form.
+- `counters[].clause.two` (string, localized): Its two form.
+- `counters[].clause.few` (string, localized): Its few form.
+- `counters[].clause.many` (string, localized): Its many form.
+- `counters[].clause.other` (string, localized): Its other form.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

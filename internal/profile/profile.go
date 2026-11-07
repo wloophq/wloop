@@ -44,6 +44,17 @@ func (l Layer) Bundled() bool { return l.Dir == "" && l.FS == nil }
 // Plugin says whether l is a plugin's own layer, not the user's over it.
 func (l Layer) Plugin() bool { return strings.HasPrefix(l.Name, pluginLayer) }
 
+// PluginID is the plugin whose words l holds: its own layer's or the user's layer of it; "" for any other.
+func (l Layer) PluginID() string {
+	if id, ok := strings.CutPrefix(l.Name, pluginLayer); ok {
+		return id
+	}
+	if id, ok := strings.CutPrefix(l.Name, "user:"); ok {
+		return id
+	}
+	return ""
+}
+
 // Embedded says whether the binary holds l: the bundled layer or a bundled
 // plugin's.
 func (l Layer) Embedded() bool { return l.Dir == "" }

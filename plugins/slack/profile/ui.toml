@@ -40,3 +40,17 @@ new = "new"
 waits_on_others = "waits on others"
 fyi = "for your information"
 resolved = "resolved"
+
+[noun]
+one = "thread"
+other = "threads"
+
+[decisions.answer]
+clause = { one = "{counter} waits on your reply", other = "{counter} wait on your reply" }
+queue = "Threads to answer"
+empty = "No thread waits on your reply."
+
+[decisions.last-step]
+clause = { one = "{counter} needs closing", other = "{counter} need closing" }
+queue = "Threads to close"
+empty = "No thread needs closing."

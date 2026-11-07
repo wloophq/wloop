@@ -48,7 +48,10 @@ func TestEveryLocalizedRowIsTextOrTemplate(t *testing.T) {
 			continue
 		}
 		seen++
-		if !slices.Contains([]Kind{KindText, KindTemplate}, k.Kind) && (k.In != SurfaceStrings || k.Kind != KindAny) {
+		plural := k.Kind == KindAny && slices.ContainsFunc(Grammar, func(f Key) bool {
+			return f.In == k.In && f.Path == k.Path+".other" && f.Localized && f.Kind == KindText
+		})
+		if !slices.Contains([]Kind{KindText, KindTemplate}, k.Kind) && !plural {
 			t.Errorf("%s %s is localized but %s", k.In, k.Path, kindName(k.Kind))
 		}
 	}

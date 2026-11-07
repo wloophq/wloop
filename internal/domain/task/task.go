@@ -88,6 +88,17 @@ func (e Task) FirstUnit() (unit.Unit, bool) {
 	return unit.Unit{}, false
 }
 
+// LinkedUnits are the units the task links: its units, then its items' units, each once.
+func (e Task) LinkedUnits() []unit.Unit {
+	out := slices.Clone(e.Units)
+	for _, r := range e.Items {
+		if !slices.Contains(out, r.Unit) {
+			out = append(out, r.Unit)
+		}
+	}
+	return out
+}
+
 // CapturedByUser says whether the user made the task, rather than the loop
 // deriving it from a source's items or opening it for a gate.
 func (e Task) CapturedByUser() bool { return e.Origin == OriginUser }
