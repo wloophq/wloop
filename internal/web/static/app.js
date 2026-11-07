@@ -3250,5 +3250,14 @@ document.getElementById("explore-guidance").addEventListener("input", (e) => { s
 setupDetailResize();
 setInterval(render, 60000);
 setInterval(tickCountdowns, 1000);
-load();
-connect();
+loadStrings(getJSON).then(() => {
+  document.documentElement.lang = I18N.locale;
+  load();
+  connect();
+});
+
+// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them.
+function i18nChanged() {
+  document.documentElement.lang = I18N.locale;
+  render();
+}

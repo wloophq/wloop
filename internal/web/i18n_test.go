@@ -1,6 +1,11 @@
 package web
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/i18n"
+)
 
 func TestTFallsBackToTheKey(t *testing.T) {
 	var got struct{ Plain, Params, Missing, Plural string }
@@ -16,14 +21,106 @@ process.stdout.write(JSON.stringify({
 	}
 }
 
-func TestTAndTnInPtBR(t *testing.T) { t.Skip("D5 t and tn read pt-BR strings and CLDR plural forms") }
-
-func TestFmtDateAndNumberFollowTheLocale(t *testing.T) {
-	t.Skip("D5 fmtDate and fmtNumber format in the served locale")
+func TestTAndTnInPtBR(t *testing.T) {
+	var got struct{ Open, Zero, One, Many, ThroughT, Unknown, OnlyOther string }
+	nodeRun(t, staticJS(t, "i18n.js"), nil, `
+I18N.locale = "pt-BR";
+I18N.strings = {"Open cockpit": "Abrir o cockpit", "{n} drafts": {one: "{n} rascunho", other: "{n} rascunhos"}, "{n} items": {other: "{n} itens"}};
+process.stdout.write(JSON.stringify({
+  Open: t("Open cockpit"), Zero: tn("{n} drafts", 0), One: tn("{n} drafts", 1), Many: tn("{n} drafts", 1234),
+  ThroughT: t("{n} drafts"), Unknown: tn("{n} tasks", 2), OnlyOther: tn("{n} items", 1),
+}));`, nil, &got)
+	if got.Open != "Abrir o cockpit" || got.Zero != "0 rascunho" || got.One != "1 rascunho" || got.Many != "1.234 rascunhos" ||
+		got.ThroughT != "{n} rascunhos" || got.Unknown != "2 tasks" || got.OnlyOther != "1 itens" {
+		t.Fatalf("got %+v", got)
+	}
 }
 
-func TestPluralParityWithGo(t *testing.T) { t.Skip("D5 Intl.PluralRules agrees with i18n.Form") }
+func TestFmtDateAndNumberFollowTheLocale(t *testing.T) {
+	var got struct{ PtDate, PtTime, PtDateTime, PtLong, PtNum, EnDate, EnTime, EnNum, Bad string }
+	nodeScriptEnv(t, []string{"TZ=UTC"}, staticJS(t, "i18n.js")+`
+const iso = "2026-11-07T21:05:00Z";
+const out = {};
+I18N.locale = "pt-BR";
+Object.assign(out, {PtDate: fmtDate(iso, "date"), PtTime: fmtDate(iso, "time"), PtDateTime: fmtDate(iso, "datetime"), PtLong: fmtDate(iso, "long"), PtNum: fmtNumber(1234.5), Bad: fmtDate("bad", "date")});
+I18N.locale = "en-US";
+Object.assign(out, {EnDate: fmtDate(iso, "date"), EnTime: fmtDate(iso, "time"), EnNum: fmtNumber(1234.5)});
+process.stdout.write(JSON.stringify(out));`, nil, &got)
+	if got.PtDate != "07/11" || got.PtTime != "21:05" || !contains(got.PtDateTime, "07/11", "21:05") || !contains(got.PtLong, "2026", "nov") || got.PtNum != "1.234,5" ||
+		got.EnDate != "11/07" || !contains(got.EnTime, "09:05", "PM") || got.EnNum != "1,234.5" || got.Bad != "" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func contains(s string, parts ...string) bool {
+	for _, p := range parts {
+		if !strings.Contains(s, p) {
+			return false
+		}
+	}
+	return true
+}
+
+func TestPluralParityWithGo(t *testing.T) {
+	counts := []float64{0, 1, 2, 5, 1.5, 21, 101, 1000000}
+	locales := []string{"en", "pt-BR", "fr", "ru", "ar"}
+	var got map[string][]string
+	nodeRun(t, staticJS(t, "i18n.js"), nil, `
+const out = {};
+for (const l of input.locales) {
+  I18N.locale = l;
+  I18N.strings = {k: {one: "one", other: "other"}};
+  out[l] = input.counts.map((n) => [new Intl.PluralRules(l).select(n), tn("k", n)]).flat();
+}
+process.stdout.write(JSON.stringify(out));`, map[string]any{"locales": locales, "counts": counts}, &got)
+	forms := i18n.Forms{"one": "one", "other": "other"}
+	for _, l := range locales {
+		for i, n := range counts {
+			category, text := got[l][2*i], got[l][2*i+1]
+			if want := forms.For(l, n); text != want {
+				t.Errorf("%s %v: JS reads %q, Go %q", l, n, text, want)
+			}
+			// Intl's CLDR is newer than x/text's: it names millions "many" in pt and fr, which a text without
+			// a many form reads as other in both.
+			if want := i18n.Form(l, n); category != want && n < 1000000 {
+				t.Errorf("%s %v: JS %q, Go %q", l, n, category, want)
+			}
+		}
+	}
+}
 
 func TestBootRendersEnglishWhenStringsFail(t *testing.T) {
-	t.Skip("D5 the cockpit renders English when /api/strings fails or is slow")
+	var got struct {
+		FailLocale, FailText  string
+		SlowBefore, SlowAfter string
+		Changed               int
+		BadLocale             string
+		InTimeLocale          string
+		InTimeChanged         int
+	}
+	nodeRun(t, staticJS(t, "i18n.js"), nil, `
+let changed = 0;
+function i18nChanged() { changed++; }
+(async () => {
+  const out = {};
+  await loadStrings(() => Promise.reject(new Error("HTTP 500")), 10);
+  out.FailLocale = I18N.locale; out.FailText = t("Open cockpit");
+  let release;
+  const slow = new Promise((r) => { release = r; });
+  await loadStrings(() => slow, 10);
+  out.SlowBefore = t("Open cockpit");
+  release({locale: "pt-BR", strings: {"Open cockpit": "Abrir o cockpit"}});
+  await new Promise((r) => setTimeout(r, 20));
+  out.SlowAfter = t("Open cockpit"); out.Changed = changed;
+  await loadStrings(async () => ({locale: "not a locale!!", strings: {"Open cockpit": "x"}}), 10);
+  out.BadLocale = I18N.locale;
+  changed = 0;
+  await loadStrings(async () => ({locale: "en", strings: {}}), 1000);
+  out.InTimeLocale = I18N.locale; out.InTimeChanged = changed;
+  process.stdout.write(JSON.stringify(out));
+})();`, nil, &got)
+	if got.FailLocale != "en" || got.FailText != "Open cockpit" || got.SlowBefore != "Open cockpit" || got.SlowAfter != "Abrir o cockpit" ||
+		got.Changed != 1 || got.BadLocale != "pt-BR" || got.InTimeLocale != "en" || got.InTimeChanged != 0 {
+		t.Fatalf("got %+v", got)
+	}
 }

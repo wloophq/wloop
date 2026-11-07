@@ -561,6 +561,12 @@ func scriptFile(t *testing.T, script string) string {
 // its stdout into out.
 func nodeScript(t *testing.T, script string, in, out any) {
 	t.Helper()
+	nodeScriptEnv(t, nil, script, in, out)
+}
+
+// nodeScriptEnv is nodeScript with env added to node's environment.
+func nodeScriptEnv(t *testing.T, env []string, script string, in, out any) {
+	t.Helper()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
@@ -568,6 +574,9 @@ func nodeScript(t *testing.T, script string, in, out any) {
 	raw, _ := json.Marshal(in)
 	cmd := exec.Command(node, scriptFile(t, "const input = JSON.parse(require(\"fs\").readFileSync(0, \"utf8\"));\n"+script))
 	cmd.Stdin = strings.NewReader(string(raw))
+	if env != nil {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	got, err := cmd.Output()
 	if err != nil {
 		var stderr []byte
