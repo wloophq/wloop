@@ -570,6 +570,16 @@
 "run_conflict" = "Não rodou: mudou nesse meio-tempo"
 "run_unavailable" = "Não rodou: indisponível agora"
 "run_failed" = "Não rodou"
+# piece F
+"Back" = "Voltar"
+"Forward" = "Avançar"
+"Copy a link to this view" = "Copiar um link para esta visão"
+"Copied a link to this view" = "Link para esta visão copiado"
+"Open in a window of its own" = "Abrir numa janela própria"
+"Open the omnibox" = "Abrir a omnibox"
+"That link could not be read, so the default view opened" = "Não foi possível ler esse link, então a visão padrão abriu"
+"{action} ({key})" = "{action} ({key})"
+"In the detail" = "No detalhe"
 
 [formats]
 time = "15:04"

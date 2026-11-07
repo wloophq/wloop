@@ -48,9 +48,10 @@ const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () =
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\nfollowStrings = () => {};\n"
 
-// viewsScripts are markdown.js, routes.js, views.js, review.js, task.js and detail.js, in the page's order.
+// viewsScripts are markdown.js, routes.js, window.js, views.js, review.js, task.js and detail.js, in the page's
+// order.
 func viewsScripts(t *testing.T) string {
-	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
+	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "routes.js") + staticJS(t, "window.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
 }
 
 // viewsPrelude is viewsScripts, plugins.js and the lens the task views run, over a tree h.

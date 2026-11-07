@@ -53,6 +53,9 @@ func Run(name string, cat *texts.Catalog, ready func(window.Host)) {
 			go on()
 		}
 	})
+	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(e *application.ApplicationEvent) {
+		h.openURL(e.Context().URL())
+	})
 	_ = app.Run()
 	os.Exit(0)
 }
@@ -93,6 +96,7 @@ var wailsRole = map[role]application.Role{
 // waits on the main thread.
 type host struct {
 	app         *application.App
+	name        string
 	main, panel *application.WebviewWindow
 
 	mu        sync.Mutex
@@ -100,8 +104,15 @@ type host struct {
 	wake      chan struct{}
 	listening window.Handlers
 
+	// links orders the deep links handed to the controller; pending are
+	// those that came before it listened.
+	links   sync.Mutex
+	pending []string
+
 	// Touched only by the worker.
 	mainURL, panelURL string
+	mainShown         bool
+	detached          map[string]*detachedWindow
 	panelShown        bool
 	// panelKey says the panel became key since it was last shown, so a
 	// focus loss is the person leaving it, not a late event of an earlier
@@ -110,9 +121,10 @@ type host struct {
 }
 
 func newHost(app *application.App, name string) *host {
-	h := &host{app: app, wake: make(chan struct{}, 1)}
+	h := &host{app: app, name: name, wake: make(chan struct{}, 1), detached: map[string]*detachedWindow{}}
 	h.main = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "main", Title: name, URL: "about:blank", Width: 1280, Height: 820, Hidden: true,
+		Mac: insetTitleBar,
 	})
 	h.panel = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name: "panel", Title: name, URL: "about:blank", Width: 680, Height: 420, Hidden: true, Frameless: true,
@@ -180,16 +192,72 @@ func (h *host) handlers() window.Handlers {
 	return h.listening
 }
 
+// insetTitleBar draws the window controls over the page, which draws the
+// title bar around them (window.InsetTitleBar marks its URL).
+var insetTitleBar = application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}
+
 func (h *host) ShowMain(url string) {
 	h.do(func() {
-		navigate(h.main, &h.mainURL, url)
-		setActivationPolicy(activationPolicyRegular)
-		h.main.Show()
-		application.InvokeSync(func() {
-			nsApp().Send(objc.RegisterName("activateIgnoringOtherApps:"), true)
-			nsWindow(h.main).Send(objc.RegisterName("makeKeyAndOrderFront:"), objc.ID(0))
-		})
+		navigate(h.main, &h.mainURL, window.InsetTitleBar(url))
+		h.mainShown = true
+		bringForward(h.main)
 	})
+}
+
+// bringForward shows w, focused, with the app in the Dock and ⌘Tab.
+func bringForward(w *application.WebviewWindow) {
+	setActivationPolicy(activationPolicyRegular)
+	if w.IsMinimised() {
+		w.UnMinimise()
+	}
+	w.Show()
+	application.InvokeSync(func() {
+		nsApp().Send(objc.RegisterName("activateIgnoringOtherApps:"), true)
+		nsWindow(w).Send(objc.RegisterName("makeKeyAndOrderFront:"), objc.ID(0))
+	})
+}
+
+// detachedWindow is a secondary window and the URL it last loaded.
+type detachedWindow struct {
+	w   *application.WebviewWindow
+	url string
+}
+
+// ShowDetached focuses the window id, reloading it only when the daemon
+// moved to another port or token, or opens it at url. Closing it destroys it.
+func (h *host) ShowDetached(id, url string) {
+	h.do(func() {
+		url = window.InsetTitleBar(url)
+		d := h.detached[id]
+		if d == nil {
+			d = &detachedWindow{url: url, w: h.app.Window.NewWithOptions(application.WebviewWindowOptions{
+				Name: "detached " + id, Title: h.name, URL: url, Width: 760, Height: 860, Hidden: true,
+				InitialPosition: application.WindowCentered, Mac: insetTitleBar,
+			})}
+			h.detached[id] = d
+			d.w.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+				h.do(func() { h.closedDetached(id, d) })
+			})
+		} else if load, _ := window.Navigation(d.url, url); load {
+			d.w.SetURL(url)
+			d.url = url
+		}
+		bringForward(d.w)
+	})
+}
+
+func (h *host) closedDetached(id string, d *detachedWindow) {
+	if h.detached[id] == d {
+		delete(h.detached, id)
+	}
+	h.settlePolicy()
+}
+
+// settlePolicy leaves the Dock and ⌘Tab once no window shows.
+func (h *host) settlePolicy() {
+	if !h.mainShown && len(h.detached) == 0 {
+		setActivationPolicy(activationPolicyAccessory)
+	}
 }
 
 func (h *host) ShowPanel(url string) {
@@ -212,18 +280,40 @@ func (h *host) HidePanel() {
 // after the app launched, off the main thread, so a refused chord comes back
 // as the error.
 func (h *host) Listen(hs window.Handlers) error {
+	h.links.Lock()
 	h.mu.Lock()
 	h.listening = hs
 	h.mu.Unlock()
+	if hs.OnOpenURL != nil {
+		for _, link := range h.pending {
+			hs.OnOpenURL(link)
+		}
+		h.pending = nil
+	}
+	h.links.Unlock()
 	if hs.Hotkey == "" || hs.OnHotkey == nil {
 		return nil
 	}
 	return h.app.GlobalShortcut.Register(hs.Hotkey, hs.OnHotkey)
 }
 
+// openURL hands a deep link to the controller, or keeps it until the
+// controller listens: a link that launched the app arrives first.
+func (h *host) openURL(link string) {
+	h.links.Lock()
+	defer h.links.Unlock()
+	on := h.handlers().OnOpenURL
+	if on == nil {
+		h.pending = append(h.pending, link)
+		return
+	}
+	on(link)
+}
+
 func (h *host) hideMain() {
 	h.main.Hide()
-	setActivationPolicy(activationPolicyAccessory)
+	h.mainShown = false
+	h.settlePolicy()
 }
 
 // panelLeft hides a panel the person left; a focus loss counts only once the

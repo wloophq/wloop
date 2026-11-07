@@ -42,6 +42,8 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `?` | help |
 | `Tab` | next view of the group (terminal) |
 | `]` `[` | next and previous step of the Review |
+| `c` | copy a link to what shows, `{{command}}://open/#<route>` (web) |
+| `t` | open the detail in a window of its own, while the focus is in the detail; a new tab in a browser (web) |
 | `q`, `Ctrl+C` | quit (terminal) |
 
 ## Actions on a row

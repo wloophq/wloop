@@ -28,6 +28,7 @@ help = "ajuda"
 quit = "sair"
 "nav:cycle" = "próxima visão do grupo"
 "area:{n}" = "área {n}"
+"link:copy" = "copiar um link para esta visão"
 
 [help.review]
 "step:done" = "marcar o passo como feito"
@@ -36,6 +37,9 @@ quit = "sair"
 
 [help.plan]
 approve = "aplicar o passo do plano selecionado"
+
+[help.detail]
+"detail:detach" = "abrir numa janela própria"
 
 [help.question]
 "answer:{n}" = "a opção {n} da decisão"

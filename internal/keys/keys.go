@@ -26,6 +26,8 @@ const (
 	Question Context = "question"
 	Review   Context = "review"
 	Plan     Context = "plan"
+	// Detail is the detail panel of a task, where the focus is inside it.
+	Detail Context = "detail"
 )
 
 type Binding struct {

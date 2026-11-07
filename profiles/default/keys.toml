@@ -34,6 +34,7 @@ help = "help"
 quit = "quit"
 "nav:cycle" = "next view in the group"
 "area:{n}" = "area {n}"
+"link:copy" = "copy a link to this view"
 
 [help.review]
 "step:done" = "mark the step done"
@@ -42,6 +43,9 @@ quit = "quit"
 
 [help.plan]
 approve = "apply the selected plan step"
+
+[help.detail]
+"detail:detach" = "open in a window of its own"
 
 [help.question]
 "answer:{n}" = "the gate's intent {n}"

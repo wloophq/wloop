@@ -12,10 +12,11 @@ const (
 	WindowOpen      = "open"  // show the main window at Route, hide the panel
 	WindowPanel     = "panel" // show the panel
 	WindowHidePanel = "hide-panel"
+	WindowDetach    = "detach" // show the item Route names in a window of its own
 )
 
 // WindowActions are the actions a WindowRequest may name.
-var WindowActions = []string{WindowOpen, WindowPanel, WindowHidePanel}
+var WindowActions = []string{WindowOpen, WindowPanel, WindowHidePanel, WindowDetach}
 
 // WindowRequest asks the native window to act; Route is a cockpit route, a hash without "#".
 type WindowRequest struct {

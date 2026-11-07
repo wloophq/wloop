@@ -110,6 +110,9 @@ function harness(o = {}) {
     act: o.act,
     verbs: () => o.verbs || VERBS,
     verbSpecs: () => o.verbSpecs || VERB_SPECS,
+    detailAt: (el) => !!(el && el.inDetail),
+    detach: () => { log.detached = (log.detached || 0) + 1; },
+    copyLink: () => { log.copied = (log.copied || 0) + 1; },
   };
   const keys = createKeys(env);
   keys.setBindings(BINDINGS);
@@ -194,6 +197,23 @@ for (const key of ["j", "j", "k", "Enter", "Escape"]) await k.press(key);
 return k.log;`, taskFixture(), &got)
 	if !reflect.DeepEqual(got.Moves, []int{1, 1, -1}) || got.Detail != 1 || got.Closed != 1 {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestWindowKeysDetachInTheDetailAndCopyALinkEverywhere(t *testing.T) {
+	var got struct {
+		Detached int `json:"detached"`
+		Copied   int `json:"copied"`
+	}
+	keysRun(t, "", `
+const k = harness({ selected: input });
+await k.press("t");
+await k.press("t", { target: { tagName: "DIV", inDetail: true } });
+await k.press("c");
+await k.press("c", { target: { tagName: "DIV", inDetail: true } });
+return k.log;`, taskFixture(), &got)
+	if got.Detached != 1 || got.Copied != 2 {
+		t.Fatalf("detached %d times, want 1 (in the detail only); copied %d times, want 2", got.Detached, got.Copied)
 	}
 }
 

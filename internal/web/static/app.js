@@ -196,7 +196,7 @@ function readHash() {
     task: route.task,
     area: route.area,
     ctx: route.ctx,
-    layout: p.get("layout") === "board" ? "board" : "",
+    layout: route.layout,
     q: (p.get("q") || "").slice(0, QUERY_MAX),
     g: (p.get("g") || "").slice(0, QUERY_MAX),
     s: (p.get("s") || "").slice(0, QUERY_MAX),
@@ -2424,6 +2424,7 @@ function renderDetail() {
   const top = h("div", { class: "d-top" },
     h("div", { class: "d-head" },
       h("button", { type: "button", class: "close", "aria-label": t("Close detail"), "data-focus": "detail:close", onclick: closeDetail }, "×"),
+      detailWindowControls(),
       h("h1", {}, r.title || labelOf(r)),
       h("div", { class: "meta" },
         h("span", { class: "ref" }, labelOf(r)),
@@ -2948,6 +2949,7 @@ function render() {
   renderDash(readLens());
   renderRows();
   renderDetail();
+  syncWindowChrome();
   revealOpenRow(readHash().pr);
   restoreFocus();
 }

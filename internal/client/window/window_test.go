@@ -40,6 +40,9 @@ func (h *fakeHost) record(s string) {
 func (h *fakeHost) ShowMain(url string)  { h.record("main " + url) }
 func (h *fakeHost) ShowPanel(url string) { h.record("panel " + url) }
 func (h *fakeHost) HidePanel()           { h.record("hide-panel") }
+func (h *fakeHost) ShowDetached(id, url string) {
+	h.record("detached " + id + " " + url)
+}
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

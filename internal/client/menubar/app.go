@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
 	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -149,8 +150,24 @@ func New(cfg Config) *Controller {
 	}
 	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[string][]api.TaskView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
+	if links, ok := cfg.Tray.(LinkSource); ok {
+		links.OnLink(c.OpenLink)
+	}
 	c.loadSent()
 	return c
+}
+
+// OpenLink opens a deep link's route as the menu bar opens the cockpit; a
+// link it cannot read opens the default view, which says so.
+func (c *Controller) OpenLink(link string) {
+	route, ok := window.LinkRoute(link)
+	if !ok {
+		c.cfg.Log("menubar: %q is not a link the app opens", link)
+		route = window.MalformedLinkRoute
+	}
+	if err := c.open(route); err != nil {
+		c.cfg.Log("menubar: opening %q: %v", link, err)
+	}
 }
 
 func (c *Controller) runCtx() context.Context {

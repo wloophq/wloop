@@ -84,6 +84,8 @@ func core() []Binding {
 		{"]", "step:next", Review, screens},
 		{"[", "step:prev", Review, screens},
 		{"Enter", "approve", Plan, screens},
+		{"c", "link:copy", Global, webOnly},
+		{"t", "detail:detach", Detail, webOnly},
 	}
 	for n := 1; n <= 9; n++ {
 		b = append(b,

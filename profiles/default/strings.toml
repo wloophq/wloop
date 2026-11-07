@@ -577,6 +577,17 @@
 "run_conflict" = "It did not run: it changed meanwhile"
 "run_unavailable" = "It did not run: not available right now"
 "run_failed" = "It did not run"
+# piece F
+# The window's title bar, the detach of a detail and the links to a view.
+"Back" = "Back"
+"Forward" = "Forward"
+"Copy a link to this view" = "Copy a link to this view"
+"Copied a link to this view" = "Copied a link to this view"
+"Open in a window of its own" = "Open in a window of its own"
+"Open the omnibox" = "Open the omnibox"
+"That link could not be read, so the default view opened" = "That link could not be read, so the default view opened"
+"{action} ({key})" = "{action} ({key})"
+"In the detail" = "In the detail"
 
 [formats]
 time = "3:04 PM"

@@ -27,9 +27,10 @@ type recHost struct {
 	listened *window.Handlers
 }
 
-func (h *recHost) ShowMain(url string) { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
-func (h *recHost) ShowPanel(string)    {}
-func (h *recHost) HidePanel()          {}
+func (h *recHost) ShowMain(url string)         { h.mu.Lock(); h.shown = append(h.shown, url); h.mu.Unlock() }
+func (h *recHost) ShowPanel(string)            {}
+func (h *recHost) HidePanel()                  {}
+func (h *recHost) ShowDetached(string, string) {}
 func (h *recHost) Listen(hs window.Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
