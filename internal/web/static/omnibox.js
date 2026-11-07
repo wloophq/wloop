@@ -379,7 +379,7 @@ function omniboxKey(st, env, e, close) {
 }
 
 // OMNI_STOPS are the controls Tab moves through inside the omnibox.
-const OMNI_STOPS = 'input, button, a[href], [tabindex]:not([tabindex="-1"])';
+const OMNI_STOPS = ["input", "button", "a[href]", '[tabindex]:not([tabindex="-1"])'].join(",");
 
 // omniboxTrap is where Tab from active goes so the focus stays among stops: the other end past either end,
 // else null, leaving the move to the page.
