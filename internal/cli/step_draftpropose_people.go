@@ -93,7 +93,9 @@ func (s draftSubject) unitOwed(me task.Me, absorbed []string) ([]items.Person, [
 			pool = append(pool, it)
 		}
 	}
-	slices.SortStableFunc(pool, func(a, b items.Item) int { return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID)) })
+	slices.SortStableFunc(pool, func(a, b items.Item) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
+	})
 	var people []items.Person
 	for _, it := range pool {
 		for _, p := range it.WaitingOn {

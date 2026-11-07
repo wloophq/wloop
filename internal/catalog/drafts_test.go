@@ -14,12 +14,12 @@ func TestDraftStatesFollowTheDraft(t *testing.T) {
 		return out
 	}
 	cases := map[string]map[string]bool{
-		"held":    {"draft.edit": true, "draft.retry": false, "draft.close-silently": false, "draft.skip-workflow": false},
-		"failed":  {"draft.edit": true, "draft.retry": true, "draft.close-silently": false, "draft.skip-workflow": false},
-		"queued":  {"draft.edit": false, "draft.retry": false, "draft.close-silently": false, "draft.skip-workflow": false},
-		"sending": {"draft.edit": false, "draft.retry": false, "draft.close-silently": false, "draft.skip-workflow": false},
-		"sent":    {"draft.edit": false, "draft.retry": false, "draft.close-silently": false, "draft.skip-workflow": false},
-		"dropped": {"draft.edit": false, "draft.retry": false, "draft.close-silently": false, "draft.skip-workflow": false},
+		"held":    {"draft.edit": true, "draft.retry": false, "draft.close-silently": false},
+		"failed":  {"draft.edit": true, "draft.retry": true, "draft.close-silently": false},
+		"queued":  {"draft.edit": false, "draft.retry": false, "draft.close-silently": false},
+		"sending": {"draft.edit": false, "draft.retry": false, "draft.close-silently": false},
+		"sent":    {"draft.edit": false, "draft.retry": false, "draft.close-silently": false},
+		"dropped": {"draft.edit": false, "draft.retry": false, "draft.close-silently": false},
 	}
 	for state, want := range cases {
 		got := enabled(DraftFacts{State: state})
@@ -80,17 +80,25 @@ func TestDraftActionsOfferCloseSilentlyOnlyWhenItApplies(t *testing.T) {
 	}
 }
 
-func TestDraftActionsOfferSkipWorkflowOnWorkflowDrafts(t *testing.T) {
-	wf := DraftFacts{State: "held", Provider: "slack", Workflow: "slack-stalled-nudge"}
-	if on, why := draftActionState(t, wf, "draft.skip-workflow"); !on {
-		t.Errorf("a workflow's draft: disabled, %q", why)
+func TestDraftActionsOfferSkipWorkflowOnWorkflowNudges(t *testing.T) {
+	nudge := DraftFacts{State: "held", Provider: "slack", Workflow: "slack-stalled-nudge", Effects: []string{"task.nudged"}}
+	if on, why := draftActionState(t, nudge, "draft.skip-workflow"); !on {
+		t.Errorf("a workflow's nudge: disabled, %q", why)
 	}
-	if on, why := draftActionState(t, DraftFacts{State: "held", Provider: "slack"}, "draft.skip-workflow"); on || !strings.Contains(why, "no workflow") {
-		t.Errorf("a draft you wrote: %v %q", on, why)
+	mine := nudge
+	mine.Workflow = ""
+	if on, why := draftActionState(t, mine, "draft.skip-workflow"); on || !strings.Contains(why, "no workflow") {
+		t.Errorf("a nudge you wrote: %v %q", on, why)
 	}
-	skipped := wf
+	skipped := nudge
 	skipped.Skipped = true
 	if on, why := draftActionState(t, skipped, "draft.skip-workflow"); on || !strings.Contains(why, "already") {
 		t.Errorf("a skipped conversation: %v %q", on, why)
+	}
+	closure := DraftFacts{State: "held", Provider: "slack", Workflow: "slack-closure", Effects: []string{"unit.closed"}}
+	for _, st := range DraftStates(bundled(t), closure) {
+		if st.ID == "draft.skip-workflow" {
+			t.Errorf("a closure offers %+v", st)
+		}
 	}
 }

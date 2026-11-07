@@ -47,10 +47,6 @@
     {
       "id": "draft.close-silently",
       "enabled": true
-    },
-    {
-      "id": "draft.skip-workflow",
-      "enabled": true
     }
   ],
   "rev": 0,

@@ -318,6 +318,12 @@ type DraftFacts struct {
 	Skipped  bool
 }
 
+// draftOffers says whether draft action id is offered on a draft of f at all: stopping a workflow's drafts on a
+// conversation is offered on a draft that nudges someone (builtin.EffectTaskNudged), the one it names.
+func draftOffers(id string, f DraftFacts) bool {
+	return id != DraftSkipWorkflow || slices.Contains(f.Effects, builtin.EffectTaskNudged)
+}
+
 // DraftRefusal is why draft action id is disabled on a draft of f, as a code of builtin.DraftRefusals; "" when
 // it is enabled.
 func DraftRefusal(id string, f DraftFacts) string {
@@ -357,7 +363,7 @@ var postingDraftActions = []string{"draft.retry"}
 func DraftStates(l *intentload.Loaded, f DraftFacts) []api.ActionState {
 	out := []api.ActionState{}
 	for _, b := range builtinActions {
-		if b.spec.Scope != ScopeDraft {
+		if b.spec.Scope != ScopeDraft || !draftOffers(b.spec.ID, f) {
 			continue
 		}
 		refusal := DraftRefusal(b.spec.ID, f)

@@ -275,7 +275,7 @@ func TestDraftsListByState(t *testing.T) {
 	for _, d := range res.Drafts {
 		ids = append(ids, d.ID)
 		if d.State != "held" || d.Unit != "github/acme/api#7" || d.Gate == 0 || d.Deadline != nil || d.Intents["approved"] != "approve" ||
-			d.Intents["rejected"] != "discard" || len(d.Actions) != 4 {
+			d.Intents["rejected"] != "discard" || len(d.Actions) != 3 {
 			t.Errorf("draft %+v", d)
 		}
 	}
@@ -675,7 +675,7 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 	if code := r.getDraft(t, d.ID, &got); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
-	if len(got.Actions) != 4 {
+	if len(got.Actions) != 3 {
 		t.Fatalf("actions %+v", got.Actions)
 	}
 	for _, st := range got.Actions {
@@ -1250,7 +1250,7 @@ func TestADraftsActionsSayWhetherItsWorkflowIsSkipped(t *testing.T) {
 	r, _ := silentRig(t)
 	sk := memSkips{}
 	r.s.deps.Skips = sk
-	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	d := r.proposeWith(t, builtin.EffectTaskNudged)
 	state := func() api.ActionState {
 		t.Helper()
 		var one api.Draft
