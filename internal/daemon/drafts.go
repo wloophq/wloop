@@ -472,7 +472,7 @@ func (s *Server) draftFacts(ctx context.Context, d draft.Draft) catalog.DraftFac
 	return f
 }
 
-var mentionKey = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+var mentionKey = regexp.MustCompile(`@\{([^{}\n]+)\}`)
 
 // draftDetail is draftView with the names of the people the text mentions and the items it is about, read
 // from the unit's items, which only a draft with items or a mention reads, once per unit into byUnit (nil

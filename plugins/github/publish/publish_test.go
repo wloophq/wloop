@@ -216,12 +216,12 @@ func TestGitHubPublishIsAMutation(t *testing.T) {
 
 func TestGitHubPublishConvertsMentions(t *testing.T) {
 	p, f, _ := testPublisher(t, src.Person{Key: "slack:U000AAA", Name: "Ana"})
-	d := commentDraft("@{github:octocat} could you check what @{slack:U000AAA} asked? cc @{group:acme/core}")
+	d := commentDraft("@{github:octocat} could you check what @{slack:U000AAA} asked? cc @{group:acme/core} and @{group:Ana (outside)}")
 	if _, err := p.Publish(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}
 	got := f.posted(issue12)
-	want := "@octocat could you check what Ana asked? cc acme/core"
+	want := "@octocat could you check what Ana asked? cc acme/core and Ana (outside)"
 	if len(got) != 1 || got[0].Body != want {
 		t.Fatalf("posted %+v, want body %q", got, want)
 	}
