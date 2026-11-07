@@ -170,6 +170,15 @@ type Draft struct {
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
 
+// ReasonClosedSilently is the Reason of a draft the user discarded and closed without its message: its
+// effects apply as if it was sent.
+const ReasonClosedSilently = "closed_silently"
+
+// EffectsDue says whether d's effects are owed: it was sent, or closed without its message.
+func (d Draft) EffectsDue() bool {
+	return d.State == Sent || d.State == Dropped && d.Reason == ReasonClosedSilently
+}
+
 // ErrTransition is wrapped by Can.
 var ErrTransition = errors.New("draft: transition not allowed")
 

@@ -16,7 +16,8 @@ var _ outbox.AppliedStore = draftEffects{}
 func (db *DB) DraftEffects() outbox.AppliedStore { return draftEffects{db} }
 
 func (s draftEffects) Unapplied(ctx context.Context) ([]draft.Draft, error) {
-	rows, err := s.db.R().QueryContext(ctx, draftSelect+` WHERE state = 'sent' AND effects_applied_at = '' AND effects != '[]' ORDER BY id`)
+	rows, err := s.db.R().QueryContext(ctx, draftSelect+` WHERE (state = 'sent' OR state = 'dropped' AND reason = ?) AND effects_applied_at = '' AND effects != '[]' ORDER BY id`,
+		draft.ReasonClosedSilently)
 	if err != nil {
 		return nil, err
 	}

@@ -43,6 +43,14 @@
       "enabled": false,
       "reason": "the draft is held",
       "refusal": "draft.retry.why"
+    },
+    {
+      "id": "draft.close-silently",
+      "enabled": true
+    },
+    {
+      "id": "draft.skip-workflow",
+      "enabled": true
     }
   ],
   "rev": 0,

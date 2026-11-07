@@ -437,7 +437,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 			}
 		}
 	}
-	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(d))
+	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d))
 	v.Where = s.draftWhere(ctx, d)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
 	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link
@@ -445,10 +445,17 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 }
 
 // draftFacts are what d's actions depend on.
-func (s *Server) draftFacts(d draft.Draft) catalog.DraftFacts {
+func (s *Server) draftFacts(ctx context.Context, d draft.Draft) catalog.DraftFacts {
 	publisher := s.publisherOf(d)
 	f := catalog.DraftFacts{State: string(d.State), Provider: publisher, Disabled: !s.pluginEnabled(publisher),
-		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)}
+		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted),
+		Effects:           slices.Clone(d.Effects)}
+	if d.Origin.Kind == draft.OriginAuto {
+		f.Workflow = d.Origin.Workflow
+	}
+	if f.Workflow != "" {
+		f.Skipped = slices.Contains(s.skippedOn(ctx, d.Unit), f.Workflow)
+	}
 	if o := s.deps.Outbox; o != nil && o.Effects != nil {
 		_, err := o.Effects(publisher)
 		f.NoPublisher = err != nil
@@ -677,6 +684,69 @@ func originUnit(o draft.Origin) string {
 	return o.Unit.Label()
 }
 
+// handleDraftCloseSilently closes a held draft's conversation without its message: a person discards the draft
+// through its gate, then its effects, each of which applies without a post, run as if it was sent.
 func (s *Server) handleDraftCloseSilently(w http.ResponseWriter, r *http.Request) {
-	notImplemented("E11")(w, r)
+	id, ok := parseDraftID(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no draft "+strconv.Quote(r.PathValue("id")))
+		return
+	}
+	var req api.DraftCloseSilentlyRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, draftsBodyMax)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "close-silently takes the rev you saw: "+err.Error())
+		return
+	}
+	actor, ok := s.forUser(w, r, "closing a conversation without its message")
+	if !ok {
+		return
+	}
+	o := s.deps.Outbox
+	if o == nil {
+		writeActionError(w, errOutboxUnavailable)
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	got, err := s.closeSilently(ctx, id, req.Rev, actor)
+	switch {
+	case errors.Is(err, outbox.ErrNotFound):
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	case errors.Is(err, outbox.ErrConflict):
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	case err != nil:
+		writeActionError(w, err)
+		return
+	}
+	g, _, err := o.GateOf(ctx, got)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, s.draftDetail(ctx, got, g, nil))
+}
+
+// closeSilently discards held draft id at rev as actor and applies its effects, under draftMu; refused with the
+// close-silently action's refusal when that action is disabled on it.
+func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, actor requester) (draft.Draft, error) {
+	s.draftMu.Lock()
+	defer s.draftMu.Unlock()
+	o := s.deps.Outbox
+	d, err := o.Store.Get(ctx, id)
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	if rev != d.Rev {
+		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", outbox.ErrConflict, id, rev, d.Rev)
+	}
+	for _, st := range catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d)) {
+		if st.ID == catalog.DraftCloseSilently && !st.Enabled {
+			return draft.Draft{}, conflict{msg: st.Reason, refusal: catalog.DraftRefusal(catalog.DraftCloseSilently, s.draftFacts(ctx, d))}
+		}
+	}
+	if _, err := s.decideDraft(ctx, d, gate.Rejected, nil, actor); err != nil {
+		return draft.Draft{}, err
+	}
+	return o.CloseSilently(ctx, id)
 }

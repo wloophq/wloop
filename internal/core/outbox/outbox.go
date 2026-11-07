@@ -143,6 +143,9 @@ type Service struct {
 	Applier Applier
 	// Results attaches a sent post to its turn's task; nil attaches none.
 	Results Results
+	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
+	// none does.
+	Silent func(name string) bool
 }
 
 var (

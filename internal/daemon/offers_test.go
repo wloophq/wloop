@@ -415,8 +415,9 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 	for _, spec := range catalogOf(bundledActions()) {
 		ids[spec.ID] = true
 		if spec.Scope == catalog.ScopeDraft {
-			if _, ok := draftHandlers[spec.Verb]; !ok {
-				t.Errorf("%s runs no draft verb", spec.ID)
+			routes := map[string]string{"close-silently": api.DraftCloseSilently, "skip-workflow": api.UnitSkip}
+			if _, ok := draftHandlers[spec.Verb]; !ok && !slices.Contains(api.Operations, api.Operation{Method: "POST", Path: routes[spec.Verb]}) {
+				t.Errorf("%s runs no draft verb and no route", spec.ID)
 			}
 			continue
 		}

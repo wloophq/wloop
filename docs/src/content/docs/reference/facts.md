@@ -96,7 +96,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 |---|---|---|---|
 | `draft.state` | string | draft_action | The draft's state. |
 | `draft.provider` | string | draft_action | The provider of the draft's unit. |
-| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
+| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 
 ### An item proposal's gate (`proposal.*`; slot `proposal`)
@@ -419,8 +419,8 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `plan.cleared` | any | Drops the unit's pending plan items. |
 | `turn.guidance_handed` | any | Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent. |
 | `turn.round_sent` | any | Records the round-sent event on the unit when a person sends the turn. |
-| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. |
-| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. |
+| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post. |
+| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |

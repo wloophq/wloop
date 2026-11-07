@@ -12,9 +12,11 @@ import (
 const DraftActionSlot FactSlot = "draft_action"
 
 // DraftRefusals are why a draft's action is disabled: its plugin is off,
-// the draft is in a state the action does not move it from, or its plugin
-// posts nothing.
-var DraftRefusals = []string{"", "plugin_off", "state", "posts_nothing"}
+// the draft is in a state the action does not move it from, its plugin
+// posts nothing, it applies no effect without its message, one of its
+// effects needs its message, no workflow proposed it, or its workflow is
+// already stopped on its conversation.
+var DraftRefusals = []string{"", "plugin_off", "state", "posts_nothing", "no_effects", "effect_posts", "not_from_workflow", "skipped"}
 
 // RowKindFact is the row's situation kind, which each plugin's row_kinds
 // close on its units.
@@ -50,7 +52,7 @@ var rowActionFacts = []Fact{
 var draftActionFacts = []Fact{
 	fact("draft.state", expr.String, []FactSlot{DraftActionSlot}, "The draft's state."),
 	fact("draft.provider", expr.String, []FactSlot{DraftActionSlot}, "The provider of the draft's unit."),
-	enum(fact("draft.refusal", expr.String, []FactSlot{DraftActionSlot}, "Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled."),
+	enum(fact("draft.refusal", expr.String, []FactSlot{DraftActionSlot}, "Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled."),
 		enumOf(DraftRefusals...)),
 	fact("draft.maybe_posted", expr.Bool, []FactSlot{DraftActionSlot}, "The draft failed after its post may have reached its provider."),
 }

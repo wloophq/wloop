@@ -74,3 +74,18 @@ func TestMergeMapsAPluginsLanguageFact(t *testing.T) {
 		t.Errorf("language facts %v, want acme's alone", got)
 	}
 }
+
+func TestMergeKeepsWhetherAPluginsEffectIsSilent(t *testing.T) {
+	v, err := Merge(sourceOf(t, "acme", "acme", "[[source.effects]]\nname = \"acme.archived\"\napplies = [\"draft\"]\ndoc = \"d\"\nsilent = true\n"+
+		"[[source.effects]]\nname = \"acme.thanked\"\napplies = [\"draft\"]\ndoc = \"d\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	silent := map[string]bool{}
+	for _, e := range v.effects {
+		silent[e.Name] = e.Silent
+	}
+	if !silent["acme.archived"] || silent["acme.thanked"] || !silent[EffectUnitClosed] || silent[EffectTaskNudged] {
+		t.Errorf("silent %v", silent)
+	}
+}

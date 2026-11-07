@@ -103,6 +103,7 @@ every = "5m"
 | `name` | string | The effect's name, <slot>.<name>. Required. |
 | `applies` | list of `turn`, `draft` | What may carry it. Required. |
 | `doc` | string | What the effect does. Required. |
+| `silent` | bool | A draft effect that applies without the draft's post, so a person may close the conversation without the message. |
 
 ## `[[source.events]]`
 
