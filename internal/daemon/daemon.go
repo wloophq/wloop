@@ -283,7 +283,7 @@ type Deps struct {
 	Store *api.StoreStatus
 	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
-	ConfigWarning func() string
+	ConfigWarning func() config.Warning
 	// EffectWarnings are the turn effects that went unapplied after their
 	// turn went out; nil lists none.
 	EffectWarnings func() []string

@@ -336,10 +336,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 // the command that gets past it.
 func (c *Controller) storeMenu(st api.StoreStatus) []MenuItem {
 	w := c.words()
-	why := st.State
-	if key := storeWhy[st.State]; key != "" {
-		why = w.T(key, nil)
-	}
+	why := storeWhy(w, st.State)
 	items := []MenuItem{{Title: w.T("Store needs attention: {why}", map[string]any{"why": why})}, {Title: st.Message}}
 	if st.Fix != "" && c.cfg.Copy != nil {
 		fix := st.Fix
@@ -352,12 +349,19 @@ func (c *Controller) storeMenu(st api.StoreStatus) []MenuItem {
 	return append(items, MenuItem{Separator: true}, c.quitItem())
 }
 
-// storeWhy are the catalog keys of why a store needs attention, by its state.
-var storeWhy = map[string]string{
-	api.StoreBusy:           "a store command is running",
-	api.StoreNeedsMigration: "it needs a migration",
-	api.StoreTooNew:         "a newer release wrote it",
-	api.StoreFailed:         "its migration failed",
+// storeWhy is why a store in state needs attention, in w's words; the state itself when w has none for it.
+func storeWhy(w *texts.Catalog, state string) string {
+	switch state {
+	case api.StoreBusy:
+		return w.T("a store command is running", nil)
+	case api.StoreNeedsMigration:
+		return w.T("it needs a migration", nil)
+	case api.StoreTooNew:
+		return w.T("a newer release wrote it", nil)
+	case api.StoreFailed:
+		return w.T("its migration failed", nil)
+	}
+	return state
 }
 
 func (c *Controller) quitItem() MenuItem {
@@ -482,7 +486,7 @@ func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	}
 	title := r.Label + " · " + label(r)
 	if r.Stale {
-		title += " " + c.words().T(staleMark, nil)
+		title += " " + c.words().T("(stale)", nil)
 	}
 	return MenuItem{
 		Title:    title,
@@ -536,9 +540,6 @@ func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
 }
 
 func label(r api.Row) string { return r.Summary.Line }
-
-// staleMark marks a row its plugin last reported before it went down; it is the catalog's key.
-const staleMark = "(stale)"
 
 func (c *Controller) syncLine(h api.Health) string {
 	w := c.words()

@@ -12,7 +12,9 @@ type Text map[string]string
 // Strings are the client strings resolved for Locale, by key (the English text), and Formats the date and
 // number patterns Go clients format with (time, date, datetime as Go layouts; decimal and group separators).
 type Strings struct {
-	Locale  string            `json:"locale"`
+	Locale string `json:"locale"`
+	// Stamp is the same stamp Health.Strings carries, so a client knows which strings it holds.
+	Stamp   string            `json:"stamp"`
 	Strings map[string]Text   `json:"strings"`
 	Formats map[string]string `json:"formats"`
 }

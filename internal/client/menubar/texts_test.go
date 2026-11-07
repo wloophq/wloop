@@ -126,7 +126,7 @@ func TestTheMenuBarWordsItsOwnErrors(t *testing.T) {
 	if got := r.c.errorText(errors.New("daemon says no")); got != "daemon says no" {
 		t.Errorf("%q", got)
 	}
-	if r.c.words().T("more…", nil) != "mais…" || r.c.words().T(staleMark, nil) != "(desatualizado)" {
+	if r.c.words().T("more…", nil) != "mais…" || r.c.words().T("(stale)", nil) != "(desatualizado)" {
 		t.Error("more and stale are not the catalog's")
 	}
 }

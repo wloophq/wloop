@@ -1,0 +1,117 @@
+[gates.draft]
+label = "Enviar este rascunho?"
+
+[gates.draft.intents.approve]
+label = "Aprovar"
+
+[gates.draft.intents.discard]
+label = "Descartar"
+
+[gates.plan]
+label = "Executar isto?"
+
+[gates.plan.intents.run_now]
+label = "Executar agora"
+summary = "Executar agora o que espera, sem esperar o atraso nem o orçamento diário. Pular o descarta."
+confirm = "{{if and .row.capped (not .row.pending)}}Executar agora a rodada retida em {{.pr.slug}}? Ela não conta para o limite.{{end}}"
+
+[gates.plan.intents.skip]
+label = "Pular"
+summary = "Descartar o que espera sem executar. Executar agora o executa."
+
+[gates.plan.intents.guide]
+label = "Orientar"
+summary = "Dizer ao agente o que olhar; seu texto vai com o que espera agora, ou com a próxima execução quando nada espera."
+note = "{{if not .row.pending}}Guardado para a próxima rodada automática{{end}}"
+
+[gates.question]
+label = "O agente pergunta"
+
+[gates.question.intents.answer]
+label = "Responder"
+summary = "Responder à pergunta aberta do agente com seu texto; o agente retoma a partir da sua resposta."
+
+[gates.question.intents.continue]
+label = "Continuar"
+summary = "Deixar o agente retomar sem resposta, decidindo ele mesmo a pergunta aberta. Responder dá a ele a sua resposta."
+
+[gates.question.intents.dismiss]
+label = "Dispensar"
+summary = "Fechar a pergunta aberta do agente sem retomá-lo; o pull request volta para quem ele espera."
+note = "Fechar a pergunta; o pull request volta para quem ele espera"
+
+[gates.post]
+label = "O agente diz"
+
+[gates.post.intents.reply]
+label = "Responder"
+
+[gates.post.intents.dismiss]
+label = "Dispensar"
+
+[gates.proposal]
+label = "Aplicar esta proposta?"
+text = "Proposta de {{.proposal.op}} do item {{.proposal.item}} em {{.proposal.unit}}{{with .proposal.reason}}: {{.}}{{end}} (de {{.proposal.provenance}}; você confirmou o item)"
+
+[gates.proposal.intents.approve]
+label = "Aprovar"
+
+[gates.proposal.intents.reject]
+label = "Rejeitar"
+
+[gates.merge]
+label = "Juntar estas tarefas?"
+text = "Juntar \"{{.proposal.fold}}\" a \"{{.proposal.keep}}\"? Os itens, unidades, decisões e rascunhos dela passam para a outra; Separar devolve."
+
+[gates.merge.intents.approve]
+label = "Juntar"
+
+[gates.merge.intents.reject]
+label = "Manter separadas"
+
+[gates.relate]
+label = "Relacionar estas tarefas?"
+text = "Relacionar \"{{.proposal.task}}\" e \"{{.proposal.other}}\"? Cada uma lista a outra; Desfazer relação tira o vínculo."
+
+[gates.relate.intents.approve]
+label = "Relacionar"
+
+[gates.relate.intents.reject]
+label = "Manter sem relação"
+
+[gates.trust]
+label = "O agente bloqueou o início da rodada"
+
+[gates.trust.intents.trust_run]
+label = "Confiar na pasta e executar"
+summary = "Confiar, nas homes dos seus agentes, na pasta em que o agente foi bloqueado, e então executar a rodada. Dispensar bloqueio tira o bloqueio sem confiar nela."
+note = "Confiar em {{.row.trust_folder}} em {{join .row.trust_homes \", \"}} e então executar a rodada"
+
+[gates.trust.intents.unblock]
+label = "Dispensar bloqueio"
+summary = "Tirar o bloqueio sem confiar na pasta; a rodada espera o próximo gatilho. Confiar na pasta e executar confia nela e executa agora."
+note = "Tirar o bloqueio sem confiar; a rodada espera um novo gatilho"
+
+[gates.review-diff]
+label = "Revisar o diff"
+
+[gates.review-diff.intents.approve]
+label = "Está bom"
+
+[gates.review-diff.intents.dismiss]
+label = "Dispensar"
+
+[gates.missing-record]
+label = "A execução parou: falhou ou terminou sem o registro"
+
+[gates.missing-record.intents.answer]
+label = "Responder"
+summary = "Retomar a execução com seu texto."
+
+[gates.missing-record.intents.continue]
+label = "Continuar"
+summary = "Retomar a execução como estava, sem seu texto."
+
+[gates.missing-record.intents.dismiss]
+label = "Dispensar"
+summary = "Fechar a execução parada sem retomá-la."

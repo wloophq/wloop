@@ -46,7 +46,7 @@ var coreViewIDs = []string{"focus", "inbox", "outbox", "fits-now", "waiting", "p
 const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () => {};\n"
 
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
-const noUpdate = "const checkBuild = () => {};\nconst followStrings = () => {};\n"
+const noUpdate = "const checkBuild = () => {};\nfollowStrings = () => {};\n"
 
 // viewsScripts are markdown.js, routes.js, views.js, review.js, task.js and detail.js, in the page's order.
 func viewsScripts(t *testing.T) string {

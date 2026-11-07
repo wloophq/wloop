@@ -86,7 +86,13 @@ function questionOptions(q) {
 // keyContextOf is the key context a view adds before the list's.
 const keyContextOf = (view) => (view === "plan" || view === "review" ? view : "");
 
-const CONTEXT_HEADS = { global: "Everywhere", list: "On the selection", question: "In a question", plan: "In the plan", review: "In the review" };
+const CONTEXT_HEADS = {
+  get global() { return t("Everywhere"); },
+  get list() { return t("On the selection"); },
+  get question() { return t("In a question"); },
+  get plan() { return t("In the plan"); },
+  get review() { return t("In the review"); },
+};
 
 const HELP_ORDER = ["global", "list", "question", "plan", "review"];
 
@@ -134,7 +140,7 @@ function createKeys(env) {
       if (!res.ok || out.error) throw new Error(out.error || `HTTP ${res.status}`);
       return out.tasks || [];
     } catch (err) {
-      say(`Could not list the tasks: ${err.message}`, true);
+      say(t("Could not list the tasks: {error}", { error: err.message }), true);
       return [];
     }
   }
@@ -149,7 +155,7 @@ function createKeys(env) {
       if (env.changed) env.changed();
       return out;
     } catch (err) {
-      say(`${verb} ${task.title || task.id} failed: ${err.message}`, true);
+      say(t("{verb} {task} failed: {error}", { verb, task: task.title || task.id, error: err.message }), true);
     }
   }
 
@@ -158,7 +164,7 @@ function createKeys(env) {
     if (!task) return false;
     const st = (task.verbs || []).find((v) => v.verb === name);
     if (!st || !st.enabled) {
-      say(`${name}: ${(st && st.reason) || "not offered here"}`, true);
+      say(name + ": " + ((st && st.reason) || t("not offered here")), true);
       return true;
     }
     let args = {};
@@ -243,7 +249,7 @@ function createKeys(env) {
     try {
       return (await env.areas()) || [];
     } catch (err) {
-      say(`Could not load the areas: ${err.message}`, true);
+      say(t("Could not load the areas: {error}", { error: err.message }), true);
       return null;
     }
   }
@@ -260,20 +266,20 @@ function createKeys(env) {
   async function chooseArea() {
     const areas = await areaList();
     if (!areas) return true;
-    const items = [{ label: "No area", key: "", run: () => env.setArea("") }, ...areas.map((a, i) => ({ label: a, key: i < 9 ? `Shift+${i + 1}` : "", run: () => env.setArea(a) }))];
-    env.palette({ title: "Area", items });
+    const items = [{ label: t("No area"), key: "", run: () => env.setArea("") }, ...areas.map((a, i) => ({ label: a, key: i < 9 ? `Shift+${i + 1}` : "", run: () => env.setArea(a) }))];
+    env.palette({ title: t("Area"), items });
     return true;
   }
 
   async function capture() {
-    const title = await env.ask({ label: "Capture" });
+    const title = await env.ask({ label: t("Capture") });
     if (!title || !String(title).trim()) return true;
     try {
       await postJSON("/api/tasks", { title: String(title).trim() });
-      say(`captured: ${String(title).trim()}`);
+      say(t("captured: {title}", { title: String(title).trim() }));
       if (env.changed) env.changed();
     } catch (err) {
-      say(`capture failed: ${err.message}`, true);
+      say(t("capture failed: {error}", { error: err.message }), true);
     }
     return true;
   }
@@ -301,7 +307,7 @@ function createKeys(env) {
     }
     if (sourceLink(sel)) items.push(item(bindingOf("open-source", "list") || { key: "", action: "open-source", context: "list" }));
     for (const b of bindings.filter((x) => x.context === "global" && !/^(palette|area:)/.test(x.action))) items.push(item(b));
-    items.push({ label: "Area...", key: "", run: () => chooseArea() });
+    items.push({ label: t("Area..."), key: "", run: () => chooseArea() });
     for (const extra of (env.extraItems && env.extraItems()) || []) items.push(extra);
     return items;
   }
@@ -323,7 +329,7 @@ function createKeys(env) {
     if (a.startsWith("answer:")) return answer(Number(a.slice(7)), ctx.target);
     if (a.startsWith("step:")) return env.step ? env.step(a.slice(5)) !== false : false;
     if (a === "palette") {
-      env.palette({ title: "Actions", items: paletteItems() });
+      env.palette({ title: t("Actions"), items: paletteItems() });
       return true;
     }
     if (a === "help") {
@@ -529,7 +535,7 @@ function appEnv() {
     hint: (text) => setNotice(text),
     changed: () => scheduleLoad(),
     extraItems: () => ["group", "sort"].map((id) => ({
-      label: id === "group" ? "Group by..." : "Sort by...",
+      label: id === "group" ? t("Group by...") : t("Sort by..."),
       key: "",
       run: () => {
         const pick = document.querySelector(`[data-focus="lens:${id}"]`);
@@ -547,7 +553,7 @@ async function installKeys(env) {
     try {
       keys.setBindings((await getJSON("/api/keys?surface=web")).bindings);
     } catch (err) {
-      env.notice(`Could not load the keys: ${err.message}`, true);
+      env.notice(t("Could not load the keys: {error}", { error: err.message }), true);
     }
   };
   document.addEventListener("keydown", (e) => {

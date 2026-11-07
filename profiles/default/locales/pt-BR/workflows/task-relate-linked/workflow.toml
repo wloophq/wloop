@@ -1,0 +1,1 @@
+summary = "Relacionar uma tarefa à tarefa de cada pull request que os links de review ou de merge dos itens dela apontam, quando ela não é o pedido de merge de um único pull request: um pedido sobre vários pull requests, ou uma tarefa com pull request próprio"

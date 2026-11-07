@@ -944,6 +944,47 @@ The fields each notice reads besides `Name` and `Command`:
 - `formats` (table by name): How the Go clients write dates and numbers: Go time layouts (`time`, `date`, `datetime`) and number separators (`decimal`, `group`).
 - `formats.<name>` (string, localized): One format.
 
+## The core's event kinds (`timeline.toml`)
+
+- `events` (table by name): The core's event kinds, by kind, as the timeline names them.
+- `events.<name>` (table): One event kind.
+  - `held`: Automatic rounds paused on the unit.
+  - `released`: Automatic rounds resumed.
+  - `muted`: The unit's task deferred, out of the lists that wait on you.
+  - `unmuted`: The deferral lifted.
+  - `adopted`: Someone else's pull request taken over.
+  - `status`: The unit's board status changed.
+  - `removed`: The unit's workspace removed.
+  - `nudged`: A nudge posted.
+  - `tracked`: The unit followed.
+  - `untracked`: The unit no longer followed.
+  - `answered`: An agent's question answered.
+  - `turn_sent`: A turn sent to an agent session.
+  - `turn_started`: A turn started.
+  - `turn_ended`: A turn ended.
+  - `turn_resumed`: A turn resumed.
+  - `turn_withdrawn`: A turn withdrawn.
+  - `question_dismissed`: An agent's question dismissed.
+  - `turn_delivered`: A turn delivered to its session.
+  - `answer_routed`: An answer routed to its session.
+  - `late_record`: A record that arrived after its turn ended.
+  - `stop_blocked`: An agent's stop blocked for a reason the loop gave.
+  - `turn_stopped`: A turn stopped.
+  - `guide_trimmed`: A turn's guide trimmed to its limit.
+  - `dossier_restored`: A dossier file restored.
+  - `dossier_granted`: A dossier granted to a session.
+  - `dossier_call`: A dossier compaction call, with its cost.
+  - `brief_waiting`: A request waiting for its brief.
+  - `intake_accepted`: A request accepted.
+  - `intake_briefing`: A request waiting for its brief.
+  - `intake_starting`: A request starting.
+  - `intake_started`: A request started.
+  - `intake_failed`: A request that failed.
+  - `intake_canceled`: A request canceled.
+  - `intake_guidance`: A request's guidance replaced.
+  - `workflow_step_ran`: A workflow's step ran.
+- `events.<name>.label` (string, localized): What the timeline calls an event of the kind, such as "paused".
+
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
 - `override` (bool, default `false`): Drops the blocks before it whose path is an ancestor of its own.

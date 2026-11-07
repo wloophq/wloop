@@ -123,6 +123,9 @@ type Env struct {
 	Stdout func(ctx context.Context, name string, args ...string) ([]byte, error)
 
 	LoadConfig func() (config.Config, error)
+	// Languages are the system's preferred languages a serve shows its texts in when ui.locale is empty;
+	// nil detects none, so texts read in English.
+	Languages func() []string
 	// IntentRecheck is how long the intent registry trusts the profile's stamp; zero rechecks on every read.
 	IntentRecheck time.Duration
 	// ViewDebounce is how long serve's view sinks gather wakes before they flush; zero is views.FlushDebounce.
@@ -343,6 +346,7 @@ func NewEnv() *Env {
 		Executable:    exe,
 		Harness:       harnessOf(protocols, managers),
 
+		Languages:       preferredLanguages,
 		NativeAvailable: macos.Available,
 		RunNative:       macNative(filepath.Join(stateDir, "notify")).run,
 		QuitNative:      macos.Quit,

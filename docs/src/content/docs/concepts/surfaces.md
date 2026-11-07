@@ -37,6 +37,8 @@ Every list, of tasks or of a plugin's rows, has the same bar over the [facets](/
 
 A task's page shows, in order: its header (title, state, the properties your profile declares, and its links, each opening in the cockpit with the service's name beside it), the asks with the quotes they came from, the brief, the gates that wait on you, each with the intents of its gate in `gates.toml` (`1` to `9` pick one while the gate has the focus; an intent that takes an answer reads the box above it), the runs with Open workspace, Enter session and Transcript, the timeline as a chat you narrow by kind, the composer, and the task's children. **Send**, the default that Ctrl+Enter runs, writes to the task's agent (see [Chat](/concepts/tasks/#chat)); **Send reply** posts the text as a reply in the task's conversation at once and **Save as draft** holds it until you approve it, both through the verb whose handler is `reply`; the one its `send` in `tasks.toml` names comes first.
 
+The cockpit reads in the interface language (`ui.locale`, else the system's; see [Translate the interface](/guides/localization/)): its own words are the profile's `strings.toml`, the core's event kinds are `timeline.toml`'s, and dates and numbers follow the locale. It renders in English at once when the daemon does not serve the strings within a moment, and follows a language changed while it is open.
+
 ## The terminal client
 
 ```sh

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/meter"
 )
 
@@ -280,5 +282,17 @@ func (s *Server) noteConfigStale() {
 	if s.deps.ConfigWarning == nil {
 		return
 	}
-	s.warnings.set("config", s.deps.ConfigWarning())
+	s.warnings.set("config", s.worded(s.deps.ConfigWarning()))
+}
+
+// worded is w in the loaded registry's client strings, "" when w says nothing.
+func (s *Server) worded(w config.Warning) string {
+	if w.Key == "" {
+		return ""
+	}
+	text := w.Key
+	if forms, ok := s.loaded().Strings[w.Key]; ok && forms["other"] != "" {
+		text = forms["other"]
+	}
+	return i18n.Interpolate(text, w.Params)
 }

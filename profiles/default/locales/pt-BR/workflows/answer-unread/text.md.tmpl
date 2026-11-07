@@ -1,0 +1,1 @@
+{{$n := index .Facts "session.unread_gates"}}Um agente{{with index .Facts "session.repo"}} em {{.}}{{end}} não leu {{if eq $n 1}}sua resposta{{else}}{{$n}} das suas respostas{{end}} há {{index .Facts "session.unread_for"}}; a sessão dele pode estar travada.

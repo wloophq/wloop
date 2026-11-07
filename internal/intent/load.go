@@ -124,6 +124,8 @@ type Loaded struct {
 	Formats map[string]string
 	// StringsStamp changes when Locale, Strings or Formats do.
 	StringsStamp string
+	// Timeline is timeline.toml in Locale.
+	Timeline TimelineDef
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -222,6 +224,9 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			var stringProblems Problems
 			l.Strings, l.Formats, stringProblems = loadStrings(layers, r)
 			l.StringsStamp = stringsStamp(locale, l.Strings, l.Formats)
+			var timelineProblems Problems
+			l.Timeline, timelineProblems = loadTimeline(layers, r)
+			stringProblems = append(stringProblems, timelineProblems...)
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
 			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, stringProblems, *r.problems)
 			l.Locale, l.reader = locale, r

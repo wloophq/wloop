@@ -21,6 +21,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/i18n"
+	intentload "github.com/wloophq/wloop/internal/intent"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -1022,11 +1024,11 @@ func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	stale := false
-	s.deps.ConfigWarning = func() string {
+	s.deps.ConfigWarning = func() config.Warning {
 		if stale {
-			return "config.toml does not load"
+			return config.Warning{Key: config.WarningBroken, Params: map[string]any{"error": "line 3"}}
 		}
-		return ""
+		return config.Warning{}
 	}
 	warned := func() bool {
 		var h api.Health
@@ -1043,6 +1045,21 @@ func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
 	stale = false
 	if warned() {
 		t.Fatal("the warning did not clear")
+	}
+}
+
+func TestTheConfigWarningReadsInTheLoadedLocale(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Strings = map[string]i18n.Forms{config.WarningBroken: {"other": "o config.toml não carrega: {error}"}}
+	s := newServerWith(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	s.deps.ConfigWarning = func() config.Warning {
+		return config.Warning{Key: config.WarningBroken, Params: map[string]any{"error": "linha 3"}}
+	}
+	var h api.Health
+	get(t, s, "/api/health", &h)
+	if !slices.Contains(h.Warnings, "config: o config.toml não carrega: linha 3") {
+		t.Fatalf("%q", h.Warnings)
 	}
 }
 

@@ -57,6 +57,7 @@ function applyStrings(body) {
   }
   I18N.locale = body.locale;
   I18N.strings = body.strings || {};
+  I18N.stamp = body.stamp || "";
   return true;
 }
 
@@ -84,17 +85,22 @@ function loadStrings(getJSON, budgetMs = STRINGS_BUDGET_MS) {
   });
 }
 
-// followStrings reads the strings again when stamp, the health's stamp of them, differs from the last one
-// seen: a ui.locale or profile change while the cockpit is open.
+// followStrings reads the strings again when stamp, the health's stamp of them, differs from the stamp of the
+// strings applied: a ui.locale or profile change while the cockpit is open, or a boot read that failed. An answer
+// whose stamp is not the latest health's is dropped, and a failed read is retried on the next health.
 function followStrings(stamp, getJSON) {
   if (!stamp) return;
-  if (I18N.stamp && I18N.stamp !== stamp) {
-    Promise.resolve()
-      .then(() => getJSON("/api/strings"))
-      .then((body) => {
-        if (applyStrings(body) && typeof i18nChanged === "function") i18nChanged();
-      })
-      .catch(() => {});
-  }
-  I18N.stamp = stamp;
+  I18N.latest = stamp;
+  if (stamp === I18N.stamp || stamp === I18N.fetching) return;
+  I18N.fetching = stamp;
+  Promise.resolve()
+    .then(() => getJSON("/api/strings"))
+    .then((body) => {
+      if (body && body.stamp && body.stamp !== I18N.latest) return;
+      if (applyStrings(body) && typeof i18nChanged === "function") i18nChanged();
+    })
+    .catch(() => {})
+    .finally(() => {
+      if (I18N.fetching === stamp) I18N.fetching = "";
+    });
 }

@@ -71,26 +71,40 @@ func TestARevertedOverlayKeepsTheBundledIntentInEveryLocale(t *testing.T) {
 		"a broken action": startWith(t, `note = "`+startNote+`"`, `note = "Runs {{if}}"`),
 	} {
 		for _, locale := range []string{"en", "pt-BR"} {
+			plain, _ := loadIn(t, locale, bundled, nil)
+			want, _ := plain.Registry.Get("start")
 			l, problems := loadIn(t, locale, bundled, map[string]string{"intents/start/intent.toml": manifest})
 			d, ok := l.Registry.Get("start")
-			if !ok || d.Label != "Start" || len(l.Reverted["start"]) == 0 {
+			if !ok || d.Label != want.Label || len(l.Reverted["start"]) == 0 {
 				t.Errorf("%s, %s: start loaded %v, label %q, reverted %v: %v", name, locale, ok, d.Label, l.Reverted["start"], problems)
 			}
 		}
 	}
 }
 
+// startNoteOf is the start intent's action note as l renders it.
+func startNoteOf(t *testing.T, l *intentload.Loaded) string {
+	t.Helper()
+	var b strings.Builder
+	tm := l.Programs["start"].Action.ActionTexts["note"]
+	if tm == nil || tm.Execute(&b, intentload.SampleActionFacts()) != nil {
+		return ""
+	}
+	return b.String()
+}
+
 func TestATranslationCallsNothingItsEnglishTextDoesNot(t *testing.T) {
 	bundled := ptBundle(t)
+	plain, _ := loadIn(t, "pt-BR", bundled, nil)
+	bundledNote := startNoteOf(t, plain)
 	for _, note := range []string{`Roda {{nofunc}}`, `Roda {{template \"nope\"}}`, `Roda {{$.x.y}}`} {
 		l, problems := loadIn(t, "pt-BR", bundled, map[string]string{"locales/pt-BR/intents/start/intent.toml": "[action]\nnote = \"" + note + "\"\n"})
 		if _, ok := l.Registry.Get("start"); !ok {
 			t.Errorf("%s: start is gone: %v", note, problems)
 			continue
 		}
-		var b strings.Builder
-		if tm := l.Programs["start"].Action.ActionTexts["note"]; tm == nil || tm.Execute(&b, intentload.SampleActionFacts()) != nil || b.String() != startNote {
-			t.Errorf("%s: note %q", note, b.String())
+		if got := startNoteOf(t, l); got != bundledNote {
+			t.Errorf("%s: note %q, want the bundled %q", note, got, bundledNote)
 		}
 		var hit bool
 		for _, p := range problems {

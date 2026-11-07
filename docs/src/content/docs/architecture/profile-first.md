@@ -64,6 +64,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - A draft's text comes from a profile template or from whoever wrote it, and only `draft.propose` and the plugin rules its allowlist names propose drafts on their own (`TestDraftTextComesFromTheProfile`, `TestOnlyTheDraftStepProposes`).
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
+- The cockpit's words are `strings.toml`'s, through `t` and `tn` in `internal/web/static/i18n.js`, and the core's event kinds are `timeline.toml`'s; no script quotes a text a person reads outside them (`TestClientsQuoteNoProseOutsideTheCatalog`).
 - The menu bar's words, its items, the notes on what became of an answer and the app window's menus, are `strings.toml`'s, which the daemon serves at `/api/strings` in the interface language (`internal/client/texts`).
 
 ## What Go still owns today
@@ -72,7 +73,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 - the GitHub plugin's `github-nudge` rule (`plugins/github/nudge`), whose texts are its profile layer's `prompts/github-nudge.tmpl`;
 - the workflow providers, pull requests, sessions, workspaces, tasks and Slack units (`builtin.Slots`);
-- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles of the panes and the empty states of those that are not a view of `views.toml` (a plugin's views, the plan), the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
+- the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles of the panes and the empty states of those that are not a view of `views.toml` (a plugin's views, the plan), the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
 - the renderings of Slack messages that `slack_read` and `slack_search` return (the Slack plugin's `plugins/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction

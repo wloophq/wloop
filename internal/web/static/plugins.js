@@ -118,7 +118,7 @@ async function showPluginView(view, el, host, load = (url) => import(url)) {
   try {
     mod = await load(pluginModuleURL(spec.plugin, spec.module));
   } catch (err) {
-    if (seq === pluginMount.seq) el.replaceChildren(`Could not load the ${spec.plugin} view: ${err.message}`);
+    if (seq === pluginMount.seq) el.replaceChildren(t("Could not load the {plugin} view: {error}", { plugin: spec.plugin, error: err.message }));
     return;
   }
   if (seq !== pluginMount.seq) return;
@@ -181,14 +181,14 @@ function pluginList(el, rows, opts) {
 function pluginDetail(el, unit) {
   const r = rowByKey(unitKey(unit));
   if (!r) {
-    el.replaceChildren(h("p", { class: "empty" }, `${unit.key} is not in the rows.`));
+    el.replaceChildren(h("p", { class: "empty" }, t("{unit} is not in the rows.", { unit: unit.key })));
     return;
   }
   el.replaceChildren(h("div", { class: "plugin-detail" },
     h("h2", {}, r.title || labelOf(r)),
     h("div", { class: "meta" }, h("span", { class: "ref" }, labelOf(r)),
       " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext" }, providerName(unitOf(r).provider))),
-    h("div", {}, "Waiting on ", h("strong", {}, waitingLabel(r))),
+    h("div", {}, t("Waiting on"), " ", h("strong", {}, waitingLabel(r))),
     sm(r).reason ? h("div", { class: "why" }, sm(r).reason) : null,
     h("div", { class: "d-actions" }, actionButtons(r, "detail", { scope: "plugin-detail" }))));
 }
@@ -198,7 +198,7 @@ function pluginDetail(el, unit) {
 function renderPluginView(view) {
   let box = document.getElementById("plugin-view");
   if (!box) {
-    box = h("section", { id: "plugin-view", class: "plugin-view", "aria-label": "Plugin view", hidden: true });
+    box = h("section", { id: "plugin-view", class: "plugin-view", "aria-label": t("Plugin view"), hidden: true });
     document.getElementById("list").prepend(box);
   }
   const on = pluginViews.has(view);

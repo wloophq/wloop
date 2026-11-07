@@ -27,7 +27,7 @@ var profileUsage = `usage:
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
-  profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--config]
+  profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--timeline|--config]
   profile try <pr-url>
 conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
 
@@ -62,7 +62,7 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 		return runProfileCheck(e, args[1:])
 	case "schema":
 		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--tasks": intentload.TasksSchema,
-			"--views": intentload.ViewsSchema, "--gates": intentload.GatesSchema, "--records": intentload.RecordsSchema, "--keys": intentload.KeysSchema, "--strings": intentload.StringsSchema,
+			"--views": intentload.ViewsSchema, "--gates": intentload.GatesSchema, "--records": intentload.RecordsSchema, "--keys": intentload.KeysSchema, "--strings": intentload.StringsSchema, "--timeline": intentload.TimelineSchema,
 			"--config": intentload.ConfigSchema}
 		switch {
 		case len(args) == 2 && args[1] == "--gtd":

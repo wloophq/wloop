@@ -1,8 +1,14 @@
 package web
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/i18n"
 )
@@ -127,22 +133,111 @@ function i18nChanged() { changed++; }
 
 func TestTheCockpitFollowsALiveLocaleChange(t *testing.T) {
 	var got struct {
-		Reads, Changed int
-		Before, After  string
+		Reads, Changed         int
+		Before, After          string
+		FailedBootReads        int
+		FailedBootText         string
+		RetryReads, StaleReads int
+		RetryText, StaleText   string
 	}
 	nodeRun(t, staticJS(t, "i18n.js"), nil, `
-let changed = 0, reads = 0;
+let changed = 0, reads = 0, fail = false, answer = null;
 function i18nChanged() { changed++; }
-const getJSON = async () => { reads++; return {locale: "pt-BR", strings: {"Open cockpit": "Abrir o cockpit"}}; };
+const pt = (stamp) => ({locale: "pt-BR", stamp, strings: {"Open cockpit": "Abrir o cockpit " + stamp}});
+const getJSON = async () => { reads++; if (fail) throw new Error("HTTP 500"); return answer || pt("pt-2"); };
+const tick = () => new Promise((r) => setTimeout(r, 10));
 (async () => {
+  const out = {};
+  applyStrings({locale: "en", stamp: "en-1", strings: {}});
   followStrings("en-1", getJSON);
   followStrings("en-1", getJSON);
-  const before = t("Open cockpit");
-  followStrings("pt-BR-2", getJSON);
-  await new Promise((r) => setTimeout(r, 20));
-  process.stdout.write(JSON.stringify({Reads: reads, Changed: changed, Before: before, After: t("Open cockpit")}));
+  out.Before = t("Open cockpit");
+  followStrings("pt-2", getJSON);
+  await tick();
+  Object.assign(out, {Reads: reads, Changed: changed, After: t("Open cockpit")});
+
+  I18N.locale = "en"; I18N.strings = {}; I18N.stamp = ""; reads = 0;
+  followStrings("pt-2", getJSON);
+  await tick();
+  Object.assign(out, {FailedBootReads: reads, FailedBootText: t("Open cockpit")});
+
+  reads = 0; fail = true;
+  followStrings("pt-3", getJSON);
+  await tick();
+  fail = false; answer = pt("pt-3");
+  followStrings("pt-3", getJSON);
+  await tick();
+  Object.assign(out, {RetryReads: reads, RetryText: t("Open cockpit")});
+
+  reads = 0; answer = pt("pt-4");
+  followStrings("pt-5", getJSON);
+  await tick();
+  Object.assign(out, {StaleReads: reads, StaleText: t("Open cockpit")});
+  process.stdout.write(JSON.stringify(out));
 })();`, nil, &got)
-	if got.Reads != 1 || got.Changed != 1 || got.Before != "Open cockpit" || got.After != "Abrir o cockpit" {
-		t.Fatalf("got %+v", got)
+	if got.Reads != 1 || got.Changed != 1 || got.Before != "Open cockpit" || got.After != "Abrir o cockpit pt-2" {
+		t.Errorf("a live change: %+v", got)
+	}
+	if got.FailedBootReads != 1 || got.FailedBootText != "Abrir o cockpit pt-2" {
+		t.Errorf("after a failed boot read: %+v", got)
+	}
+	if got.RetryReads != 2 || got.RetryText != "Abrir o cockpit pt-3" {
+		t.Errorf("a failed read is retried: %+v", got)
+	}
+	if got.StaleReads != 1 || got.StaleText != "Abrir o cockpit pt-3" {
+		t.Errorf("an answer older than the latest health is dropped: %+v", got)
+	}
+}
+
+// stringsPrelude sets I18N to locale and the [strings] table of the strings.toml at path.
+func stringsPrelude(t *testing.T, locale, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Strings map[string]any `toml:"strings"`
+	}
+	if err := toml.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	js, err := json.Marshal(doc.Strings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("I18N.locale = %q;\nI18N.strings = %s;\n", locale, js)
+}
+
+func TestAppRendersPtBRChrome(t *testing.T) {
+	prelude := filterPrelude(t) + stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml") + `let activityLoopOnly = false;
+const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event: { kind: "push" } }], explore: { busy: false, error: "", result: null } };
+`
+	var got []string
+	nodeRun(t, prelude, append(slices.Clone(filterFuncs), "rowByKey", "emptyNote", "activityEmptyNote", "exploreStatus", "planWhen", "isSet", "age", "ago", "clearLens"), `
+const flat = (x) => (Array.isArray(x) ? x.map(flat).join("") : x && typeof x === "object" ? Object.values(x).map(flat).join("") : String(x));
+process.stdout.write(JSON.stringify([
+  flat(emptyNote("mine", "")),
+  flat(emptyNote("mine", "waits-on:bob zzz")),
+  flat(emptyNote("mine", "https://github.com/acme/web/pull/3")),
+  flat(activityEmptyNote("")),
+  exploreStatus(),
+  planWhen({ decision: "blocked" }),
+  planWhen({ decision: "pending", default: "wait" }),
+  ago(new Date(Date.now() - 5 * 60000).toISOString()),
+]));`, nil, &got)
+	want := []string{"Nada em My PRs agora.", "Nada em My PRs corresponde a \"waits-on:bob zzz\". Limpar filtros",
+		"acme/web#3 não está no inventário. Explorar Abrir no GitHub", "Nenhum evento do loop na atividade recente.",
+		"A busca só roda quando você aperta Enter ou Buscar; cada uma gasta cerca de 1 ponto da cota por hora do GitHub.",
+		"bloqueado", "espera você", "há 5 min"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	text := strings.Join(got, "\n")
+	for _, english := range []string{"Nothing in", "matches", "Clear filters", "is not in the inventory", "Explore it", "Open it on GitHub",
+		"No loop events", "A search runs only", "blocked", "waits for you", "min ago"} {
+		if strings.Contains(text, english) {
+			t.Errorf("the pt-BR chrome still says %q: %q", english, text)
+		}
 	}
 }

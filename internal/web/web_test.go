@@ -51,7 +51,7 @@ func TestCockpitHasTheRecentView(t *testing.T) {
 
 func TestCockpitOffersRemoveAllCleanOnAViewThatAsks(t *testing.T) {
 	for file, wants := range map[string][]string{
-		"app.js":   {`removed: "workspace removed"`, `h("details"`, "out.detail"},
+		"app.js":   {`h("details"`, "out.detail"},
 		"views.js": {"/api/workspaces/remove-clean", "spec.remove_clean", "Remove all clean", "k.detail"},
 	} {
 		rec := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 		Label string `json:"label"`
 		Loop  bool   `json:"loop"`
 	}
-	nodeRun(t, jsBlock(t, appJS(t), "EVENT_LABEL")+jsConst(t, appJS(t), "LOOP_EVENTS")+jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
+	nodeRun(t, jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
 		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true }] });
 process.stdout.write(JSON.stringify({ label: eventLabel("round_blocked"), loop: loopEvent("round_blocked") }));`, nil, &got)
 	if got.Label != "round blocked" || !got.Loop {
@@ -116,8 +116,8 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
-		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
-		`turn_sent: "turn sent"`, `turn_started: "turn started"`, `turn_ended: "turn ended"`, `turn_resumed: "turn resumed"`, "timelineEvents(d)"} {
+		`"continue", t("Continue")`, `"dismiss", t("Dismiss")`, `source: "cockpit"`, "body.option_id",
+		"timelineEvents(d)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -227,14 +227,15 @@ func TestGuidanceSitsAboveTheActions(t *testing.T) {
 
 func TestRefusalDetailIsNamedAfterTheWorkspaceManager(t *testing.T) {
 	src := appJS(t)
-	if want := `t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details"`; !strings.Contains(src, want) {
+	if want := `it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details")`; !strings.Contains(src, want) {
 		t.Fatalf("app.js lacks %s", want)
 	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
-	script := `const label = (state, t) => t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details";
+	script := `const t = (key, params) => key.replace("{source}", (params || {}).source);
+const label = (state, it) => it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details");
 process.stdout.write(JSON.stringify([label({ health: { workspace_manager: "Orca" } }, { source: "orca" }), label({}, { source: "orca" }), label({ health: {} }, {})]));`
 	out, err := exec.Command(node, "-e", script).Output()
 	if err != nil {

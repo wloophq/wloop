@@ -105,7 +105,7 @@ var taskLensFuncs = []string{"tokens", "unquote", "terms", "fieldById", "tagKeyF
 	"viewSource", "offeredFields", "viewGroupField", "defaultSortLabel", "lensOf", "lensPicks", "effectiveGroup", "cmp", "keyRank", "keyOrder", "compareItems",
 	"groupLabel", "groupItems", "pipelineOf", "groupedRows", "groupQualifier", "onlyThis", "multiCopy", "renderLens", "hideLens", "lensBar", "lensSelect",
 	"boardGroupField", "lensWords", "fillWord", "lane", "rowByKey",
-	"lensChips", "chip", "stripLegend", "viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "setGroup", "clearLens", "copyList", "lensResult", "sortLabel", "listYAML", "copyEntry", "yamlString", "inView"}
+	"lensChips", "chipWords", "chip", "stripLegend", "viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "setGroup", "clearLens", "copyList", "lensResult", "sortLabel", "listYAML", "copyEntry", "yamlString", "inView"}
 
 // taskLensJS declares the served GitHub catalog and the lens functions views.js calls, over a state with no rows.
 func taskLensJS(t *testing.T) string {

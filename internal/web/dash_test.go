@@ -31,7 +31,7 @@ func dashPrelude(t *testing.T) string {
 		b.WriteString(m)
 		b.WriteString("\n")
 	}
-	for _, c := range []string{"DASH_KPIS", "DASH_CAUSES"} {
+	for _, c := range []string{"DASH_KPIS", "DASH_NEXT", "DASH_CAUSES"} {
 		b.WriteString(jsBlock(t, src, c))
 	}
 	return b.String()

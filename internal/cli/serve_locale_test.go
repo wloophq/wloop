@@ -61,7 +61,7 @@ func TestALocaleChangedInTheConfigFileReloadsTheRegistry(t *testing.T) {
 	}
 	now = now.Add(config.StatEvery)
 	write(`ui = {locale = "pt-BR"}`, now)
-	if l := c.Get(); l.Locale != "pt-BR" || h.Warning() != "" {
+	if l := c.Get(); l.Locale != "pt-BR" || h.Warning().Key != "" {
 		t.Fatalf("%q, warning %q", l.Locale, h.Warning())
 	}
 }

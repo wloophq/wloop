@@ -1,0 +1,41 @@
+[help.list]
+"move:down" = "descer"
+"move:up" = "subir"
+"detail:open" = "abrir o detalhe"
+"detail:close" = "fechar o detalhe"
+next = "para Próximas"
+waiting = "para Aguardando"
+schedule = "agendar ou adiar"
+someday = "para Algum dia"
+reference = "para Referência"
+focus = "ligar ou desligar Foco"
+project = "criar um projeto ou anexar a um"
+approve = "aprovar o rascunho ou a proposta"
+delegate = "delegar a um agente"
+done = "concluir"
+dismiss = "dispensar"
+reply = "responder na conversa"
+edit = "editar o texto do rascunho"
+open-source = "abrir a origem"
+"group:cycle" = "agrupar pelo próximo campo"
+"sort:cycle" = "ordenar pelo próximo campo"
+
+[help.global]
+capture = "capturar"
+filter = "filtrar"
+palette = "todas as ações e suas teclas"
+help = "ajuda"
+quit = "sair"
+"nav:cycle" = "próxima visão do grupo"
+"area:{n}" = "área {n}"
+
+[help.review]
+"step:done" = "marcar o passo como feito"
+"step:next" = "próximo passo"
+"step:prev" = "passo anterior"
+
+[help.plan]
+approve = "aplicar o passo do plano selecionado"
+
+[help.question]
+"answer:{n}" = "a opção {n} da decisão"

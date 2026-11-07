@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,12 +118,12 @@ func TestHolderWarnsWhileTheFileIsBrokenAndClearsWhenItLoads(t *testing.T) {
 	r := newHolderRig(t)
 	r.write(`{`)
 	r.later()
-	if w := r.h.Warning(); w == "" {
+	if w := r.h.Warning(); w.Key == "" {
 		t.Fatal("a broken file raised no warning")
 	}
 	r.write(`sweep = {fast = "2m"}`)
 	r.later()
-	if w := r.h.Warning(); w != "" {
+	if w := r.h.Warning(); w.Key != "" {
 		t.Fatalf("warning after the file loads: %q", w)
 	}
 }
@@ -168,7 +169,7 @@ func TestUILocaleAppliesWithoutARestart(t *testing.T) {
 	r := newHolderRig(t)
 	r.write("sweep = {fast = \"2m\"}\nui = {locale = \"pt-BR\"}\n")
 	r.later()
-	if got := r.h.Config().UI.Locale; got != "pt-BR" || r.h.Stale() || r.h.Warning() != "" {
+	if got := r.h.Config().UI.Locale; got != "pt-BR" || r.h.Stale() || r.h.Warning().Key != "" {
 		t.Fatalf("locale %q, stale %v, warning %q", got, r.h.Stale(), r.h.Warning())
 	}
 	r.write("sweep = {fast = \"5m\"}\nui = {locale = \"en\"}\n")
@@ -176,7 +177,7 @@ func TestUILocaleAppliesWithoutARestart(t *testing.T) {
 	if got := r.h.Config().UI.Locale; got != "en" || !r.h.Stale() {
 		t.Fatalf("locale %q, stale %v", got, r.h.Stale())
 	}
-	if w := r.h.Warning(); !strings.Contains(w, "ui.locale") || !strings.Contains(w, "profile") {
+	if w := r.h.Warning(); w.Key != WarningStale || !strings.Contains(fmt.Sprint(w.Params["keys"]), "ui.locale") || !strings.Contains(fmt.Sprint(w.Params["keys"]), "profile") {
 		t.Fatalf("warning %q", w)
 	}
 }
@@ -201,7 +202,7 @@ func TestAWorkflowSwitchDoesNotTouchTheStartConfig(t *testing.T) {
 	r.h.Reload()
 	r.write("sweep = {fast = \"2m\"}\n")
 	r.h.Reload()
-	if r.h.Stale() || r.h.Warning() != "" {
+	if r.h.Stale() || r.h.Warning().Key != "" {
 		t.Fatalf("back to the start file: stale %v, warning %q", r.h.Stale(), r.h.Warning())
 	}
 }
@@ -226,5 +227,15 @@ func TestReloadReadsTheFileAtOnce(t *testing.T) {
 }
 
 func TestConfigWarningIsACodeNotEnglish(t *testing.T) {
-	t.Skip("D10 the config warning is served as a code plus the live key names, its words in strings.toml")
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"5m\"}\n")
+	r.later()
+	if w := r.h.Warning(); w.Key != WarningStale || !strings.HasPrefix(fmt.Sprint(w.Params["keys"]), "profile, ui.locale") {
+		t.Fatalf("%+v", w)
+	}
+	r.write("sweep = 3\n")
+	r.later()
+	if w := r.h.Warning(); w.Key != WarningBroken || w.Params["error"] == "" {
+		t.Fatalf("%+v", w)
+	}
 }

@@ -60,7 +60,7 @@ function palOverlay(box, closed) {
 // answer is in; Esc closes. empty is what an empty list says.
 function showPalette({ title, items, source, empty }) {
   const input = palEl("input", { type: "text", role: "combobox", "aria-label": title, "aria-controls": "pal-list", "aria-expanded": "true", "aria-autocomplete": "list",
-    placeholder: `${title}: type to narrow`, autocomplete: "off", spellcheck: "false" });
+    placeholder: t("{title}: type to narrow", { title }), autocomplete: "off", spellcheck: "false" });
   const list = palEl("ol", { id: "pal-list", role: "listbox", "aria-label": title });
   const none = palEl("p", { class: "pal-empty", "aria-live": "polite" });
   const box = palEl("div", { class: "pal", role: "dialog", "aria-label": title }, palEl("div", { class: "pal-head" }, title), input, list, none);
@@ -78,7 +78,7 @@ function showPalette({ title, items, source, empty }) {
       palEl("span", {}, it.label), it.meta ? palEl("span", { class: "pill" }, it.meta) : null, it.key ? palEl("kbd", {}, it.key) : null)));
     if (shown.length) input.setAttribute("aria-activedescendant", `pal-opt-${at}`);
     else input.removeAttribute("aria-activedescendant");
-    none.textContent = shown.length ? "" : empty || "Nothing matches";
+    none.textContent = shown.length ? "" : empty || t("Nothing matches");
   };
   let asked = 0;
   let pending = null;
@@ -142,13 +142,13 @@ async function pickRefs(pick, task, q, match) {
 async function taskPicker({ task, ask, match, palette, stateLabel, run }) {
   const items = (refs) => refs.map((r) => ({ label: r.title || r.id, meta: stateLabel ? stateLabel(r.state) : r.state || "", run: () => run(r.id) }));
   const source = async (q) => items(await pickRefs(ask.pick, task, q, match));
-  palette({ title: ask.label, items: await source(""), source, empty: "No task holds the text" });
+  palette({ title: ask.label, items: await source(""), source, empty: t("No task holds the text") });
 }
 
 // showHelp lists every binding by context.
 function showHelp(groups) {
   const dl = palEl("dl", {}, groups.map((g) => [palEl("dt", {}, g.head), g.bindings.map((b) => palEl("dd", {}, palEl("span", {}, b.help || b.action), palEl("kbd", {}, b.key)))]));
-  const box = palEl("div", { class: "pal", role: "dialog", "aria-label": "Keys", tabindex: "-1" }, palEl("div", { class: "pal-head" }, "Keys (Esc closes)"), dl);
+  const box = palEl("div", { class: "pal", role: "dialog", "aria-label": t("Keys"), tabindex: "-1" }, palEl("div", { class: "pal-head" }, t("Keys (Esc closes)")), dl);
   const close = palOverlay(box);
   box.addEventListener("keydown", (e) => {
     if (e.key === "Escape" || e.key === "?") {

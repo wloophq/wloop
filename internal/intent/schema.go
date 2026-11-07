@@ -51,3 +51,8 @@ var KeysSchema []byte
 //
 //go:embed strings.schema.json
 var StringsSchema []byte
+
+// TimelineSchema is the JSON Schema of timeline.toml, for editors.
+//
+//go:embed timeline.schema.json
+var TimelineSchema []byte

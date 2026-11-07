@@ -1,0 +1,11 @@
+label = "Começar"
+summary = "Começar trabalho novo a partir de um brief: num worktree novo de um repositório, ou sem checkout"
+
+[guidance]
+help = "o brief: o que construir ou dizer, e como saber que está pronto"
+
+[action]
+note = "Inicia uma sessão de agente com o brief da tarefa"
+
+[[action.refuse]]
+why = "Começar só roda numa tarefa que você capturou"

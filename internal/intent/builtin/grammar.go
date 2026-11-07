@@ -81,7 +81,7 @@ type Value struct {
 // Grammar is every reserved key of the language.
 var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
 	rowWordRows(SurfaceViews, true), rowWordRows(SurfaceUI, false), showRows(SurfaceViews), showRows(SurfaceUI),
-	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow), stringsGrammar)
+	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow), stringsGrammar, timelineGrammar)
 
 // Problem is a key Check refuses, at its dotted path in the document.
 type Problem struct {

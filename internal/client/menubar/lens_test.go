@@ -45,7 +45,7 @@ func TestMenubarSectionsComeFromTheProfile(t *testing.T) {
 	if index(got, "Loading acme: importing the threads") != 0 {
 		t.Fatalf("menu %q, want the loading plugin first", got)
 	}
-	if it, ok := find(r.tray.menu, "acme/api#9 · "); !ok || !strings.HasSuffix(it.Title, staleMark) {
+	if it, ok := find(r.tray.menu, "acme/api#9 · "); !ok || !strings.HasSuffix(it.Title, "(stale)") {
 		t.Fatalf("a stale row is not marked: %q", got)
 	}
 }

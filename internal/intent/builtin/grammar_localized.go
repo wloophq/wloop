@@ -20,7 +20,7 @@ var PersonNotices = []string{
 	NoticeNotifyProposal, NoticeNotifyPost, NoticeNotifyYes, NoticeNotifyNo, NoticeNotifyRecommended,
 	NoticeNotifyDraft, NoticeNotifyDraftFailed, NoticeNotifyOpen, NoticeNotifyDiscard,
 	NoticeDraftSent, NoticeDraftSaved, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
-	NoticeTaskMerged, NoticeNothingToPick,
+	NoticeTaskMerged, NoticeNothingToPick, NoticeWorkflowUnknown, NoticeConfigUnavailable, NoticeSkipsUnavailable,
 }
 
 // PluralForms are the CLDR plural categories a text's forms are named by.
@@ -70,7 +70,7 @@ func Localized(s Surface, path []string) bool {
 // surfaceFiles are the surfaces of the localizable files at a layer's root.
 var surfaceFiles = map[string]Surface{
 	"actions.toml": SurfaceActions, "views.toml": SurfaceViews, "tasks.toml": SurfaceTasks, "gates.toml": SurfaceGates,
-	"keys.toml": SurfaceKeys, "notices.toml": SurfaceNotices, "strings.toml": SurfaceStrings, "ui.toml": SurfaceUI,
+	"keys.toml": SurfaceKeys, "notices.toml": SurfaceNotices, "strings.toml": SurfaceStrings, "ui.toml": SurfaceUI, "timeline.toml": SurfaceTimeline,
 }
 
 // SurfaceOf is the surface of profile file rel when it may hold a text a person reads; false otherwise.

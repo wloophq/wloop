@@ -14,7 +14,9 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
 | `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports the GitHub plugin's API client or gh: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
+| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
+| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
@@ -73,6 +75,30 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/githubplugin_test.go` | ✅ | the test's forge reads the fake GitHub as the plugin does, standing in for its binary |
 | `internal/cli/harness_test.go` | ✅ | the harness reads a pull request the inventory lacks from the fake GitHub as the plugin does |
 | `internal/cli/plugin_binary_test.go` | ✅ | the test serves a fake GitHub to the plugin's binary |
+
+### `TestClientsQuoteNoProseOutsideTheCatalog`
+
+| `nonProse` entry | Status | Reason |
+|---|---|---|
+| `Accept` | ✅ | an HTTP header name |
+| `Alt` | ✅ | KeyboardEvent.key |
+| `Backspace` | ✅ | KeyboardEvent.key |
+| `Contents` | ✅ | a macOS bundle's directory |
+| `Control` | ✅ | KeyboardEvent.key |
+| `DELETE` | ✅ | an HTTP method |
+| `Delete` | ✅ | KeyboardEvent.key |
+| `End` | ✅ | KeyboardEvent.key |
+| `Enter` | ✅ | KeyboardEvent.key |
+| `Esc` | ✅ | the Escape key's name as the served bindings spell it |
+| `Escape` | ✅ | KeyboardEvent.key |
+| `GET` | ✅ | an HTTP method |
+| `Home` | ✅ | KeyboardEvent.key |
+| `Meta` | ✅ | KeyboardEvent.key |
+| `POST` | ✅ | an HTTP method |
+| `Shift` | ✅ | KeyboardEvent.key |
+| `Tab` | ✅ | KeyboardEvent.key |
+| `noopener noreferrer` | ✅ | a link's rel tokens |
+| `use strict` | ✅ | a script's directive |
 
 ### `TestNoIntentEnumerations`
 

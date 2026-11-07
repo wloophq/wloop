@@ -277,7 +277,7 @@ process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0
 	if !strings.HasPrefix(got.Countdown, "GitHub sends at ") {
 		t.Errorf("the countdown says %q, want its plugin's words", got.Countdown)
 	}
-	if !strings.HasSuffix(got.Count, "s: 2 of 2") {
+	if got.Count != "Item: 2 of 2" {
 		t.Errorf("the list summary reads %q", got.Count)
 	}
 }
