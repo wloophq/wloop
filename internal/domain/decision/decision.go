@@ -45,11 +45,14 @@ type Source struct {
 	Since     time.Time
 }
 
-// Found is one decision a task waits on: an open gate (Gate its id) or a linked unit (Unit, with the
-// Situation that made it, "" when a signal did).
+// Open is the primary action that opens a unit at its source.
+const Open = "open"
+
+// Found is one decision a task waits on: an open gate (Gate) or a linked unit (Unit, with the Situation that
+// made it, "" when a signal did).
 type Found struct {
 	Kind      Kind
-	Gate      int64
+	Gate      *gate.Gate
 	Unit      unit.Unit
 	Situation string
 	Since     time.Time
@@ -61,7 +64,8 @@ func (m Map) Of(gates []gate.Gate, links []Source) []Found {
 	var out []Found
 	for _, g := range gates {
 		if k, ok := m.Gates[g.Kind]; ok && g.Status == gate.Open {
-			out = append(out, Found{Kind: k, Gate: g.ID, Since: g.OpenedAt})
+			open := g
+			out = append(out, Found{Kind: k, Gate: &open, Since: g.OpenedAt})
 		}
 	}
 	for _, l := range links {

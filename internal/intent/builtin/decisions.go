@@ -9,9 +9,6 @@ import (
 // SurfaceDecisions is decisions.toml, of the default and the plugin layers.
 const SurfaceDecisions Surface = "decisions"
 
-// DecisionOpen is the primary of a unit's decision that opens the unit at its source.
-const DecisionOpen = "open"
-
 var decisionDocs = map[decision.Kind]string{
 	decision.Answer:      "An agent's question or a post waits for the user's answer.",
 	decision.ApprovePlan: "An agent's plan waits for the user's approval.",

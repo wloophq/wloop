@@ -7,7 +7,6 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -20,11 +19,6 @@ type Lists interface {
 // Decisions are the decisions a task waits on, as the profile maps its open gates and its units' states.
 type Decisions interface {
 	Of(ctx context.Context, e task.Task) ([]decision.Found, error)
-}
-
-// Gates reads gates by id (gates.Reader).
-type Gates interface {
-	Get(ctx context.Context, id int64) (gate.Gate, error)
 }
 
 // Words are the profile's and the plugins' words in the served locale.

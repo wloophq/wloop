@@ -1,6 +1,7 @@
 package decision
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -36,15 +37,16 @@ func alphaMap() Map {
 
 func TestOfMapsGatesSituationsAndSignals(t *testing.T) {
 	u := unit.Unit{Provider: "alpha", Key: "acme/api#8"}
+	question := gate.Gate{ID: 7, Kind: gate.KindQuestion, Status: gate.Open, OpenedAt: t0, Intents: []string{"answer"}}
 	got := alphaMap().Of(
-		[]gate.Gate{{ID: 7, Kind: gate.KindQuestion, Status: gate.Open, OpenedAt: t0}},
+		[]gate.Gate{question},
 		[]Source{{Unit: u, Situation: "merge", Signals: map[string]bool{"ready": true}, Since: t0.Add(time.Hour)}},
 	)
 	want := []Found{
-		{Kind: Answer, Gate: 7, Since: t0},
+		{Kind: Answer, Gate: &question, Since: t0},
 		{Kind: LastStep, Unit: u, Situation: "merge", Since: t0.Add(time.Hour)},
 	}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Of = %+v, want %+v", got, want)
 	}
 }
@@ -53,7 +55,7 @@ func TestOfSignalAloneFindsTheKind(t *testing.T) {
 	u := unit.Unit{Provider: "alpha", Key: "acme/api#9"}
 	got := alphaMap().Of(nil, []Source{{Unit: u, Situation: "review", Signals: map[string]bool{"ready": true, "stalled": true}, Since: t0}})
 	want := []Found{{Kind: LastStep, Unit: u, Since: t0}}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Of = %+v, want %+v", got, want)
 	}
 }
@@ -77,7 +79,7 @@ func TestOfOneFoundPerGateOrderedBySinceThenKind(t *testing.T) {
 	}, nil)
 	ids := []int64{}
 	for _, f := range got {
-		ids = append(ids, f.Gate)
+		ids = append(ids, f.Gate.ID)
 	}
 	if !slices.Equal(ids, []int64{4, 5, 3}) {
 		t.Fatalf("gates in order %v, want [4 5 3]", ids)

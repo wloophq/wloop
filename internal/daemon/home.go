@@ -73,12 +73,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 // home is the home service over g and the loaded profile.
 func (s *Server) home(g *coretasks.Service) home.Service {
 	l := s.loaded()
-	out := home.Service{Lists: g, Words: homeWords{l}, Decisions: &taskDecisions{s: s, m: l.Decisions.Map}}
+	d := &taskDecisions{s: s, m: l.Decisions.Map}
 	if s.deps.GateReader != nil {
-		out.Gates = s.deps.GateReader
-		out.Decisions.(*taskDecisions).gates = s.deps.GateReader
+		d.gates = s.deps.GateReader
 	}
-	return out
+	return home.Service{Lists: g, Words: homeWords{l}, Decisions: d}
 }
 
 // captureKey is the key the cockpit's capture action runs on; "" when none.

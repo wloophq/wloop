@@ -6,7 +6,6 @@ import (
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/decision"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -18,9 +17,6 @@ const (
 	ActionOpen   = "open"   // open the item's unit at its source
 )
 
-// open is the primary a plugin's layer names to open its unit at its source.
-const open = "open"
-
 // Queue is a decision kind's items, the oldest decision first.
 type Queue struct {
 	Kind         decision.Kind
@@ -28,12 +24,11 @@ type Queue struct {
 	Items        []Item
 }
 
-// Item is one decision: a task's open gate (Gate), or a state of one of its units (Found.Unit, with Situation
-// how the unit's situation reads).
+// Item is one decision: a task's open gate (Found.Gate), or a state of one of its units (Found.Unit, with
+// Situation how the unit's situation reads).
 type Item struct {
 	Task      task.Task
 	Found     decision.Found
-	Gate      *gate.Gate
 	Situation string
 	Primary   Action
 }
@@ -60,11 +55,7 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 			if f.Kind != k {
 				continue
 			}
-			it, err := s.item(ctx, kw, e, f)
-			if err != nil {
-				return Queue{}, err
-			}
-			q.Items = append(q.Items, it)
+			q.Items = append(q.Items, s.item(kw, e, f))
 		}
 	}
 	slices.SortStableFunc(q.Items, func(a, b Item) int { return a.Found.Since.Compare(b.Found.Since) })
@@ -77,18 +68,11 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 	return q, nil
 }
 
-func (s Service) item(ctx context.Context, kw KindWords, e task.Task, f decision.Found) (Item, error) {
+func (s Service) item(kw KindWords, e task.Task, f decision.Found) Item {
 	it := Item{Task: e, Found: f}
-	if f.Gate != 0 {
-		if s.Gates != nil {
-			g, err := s.Gates.Get(ctx, f.Gate)
-			if err != nil {
-				return Item{}, err
-			}
-			it.Gate = &g
-			it.Primary = Action{Kind: ActionGate, ID: primaryIntent(kw.Primary, g.Intents)}
-		}
-		return it, nil
+	if f.Gate != nil {
+		it.Primary = Action{Kind: ActionGate, ID: primaryIntent(kw.Primary, f.Gate.Intents)}
+		return it
 	}
 	pw := s.Words.Plugin(f.Unit.Provider)
 	it.Situation = pw.Situations[f.Situation]
@@ -96,12 +80,12 @@ func (s Service) item(ctx context.Context, kw KindWords, e task.Task, f decision
 		it.Situation = f.Situation
 	}
 	switch p := pw.Primary[f.Kind]; p {
-	case "", open:
+	case "", decision.Open:
 		it.Primary = Action{Kind: ActionOpen}
 	default:
 		it.Primary = Action{Kind: ActionAction, ID: p}
 	}
-	return it, nil
+	return it
 }
 
 // primaryIntent is want when the gate offers it, else the gate's first intent.

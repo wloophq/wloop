@@ -57,10 +57,10 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		qi := api.QueueItem{Task: v, Primary: api.QueueAction{Kind: it.Primary.Kind, ID: it.Primary.ID, Label: primaryLabel(l, it)}}
-		if it.Gate != nil {
-			gv := s.gateView(ctx, *it.Gate, byUnit)
+		if g := it.Found.Gate; g != nil {
+			gv := s.gateView(ctx, *g, byUnit)
 			qi.Gate = &gv
-		} else if it.Found.Gate == 0 {
+		} else {
 			qi.Situation = &api.QueueSituation{Provider: string(it.Found.Unit.Provider), Kind: it.Found.Situation, Label: it.Situation}
 		}
 		out.Items = append(out.Items, qi)
@@ -73,7 +73,7 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 func primaryLabel(l *intentload.Loaded, it home.Item) string {
 	switch it.Primary.Kind {
 	case home.ActionGate:
-		if def, ok := l.Gates.Gate(it.Gate.Name); ok {
+		if def, ok := l.Gates.Gate(it.Found.Gate.Name); ok {
 			if i := slices.IndexFunc(def.Intents, func(in intentload.GateIntent) bool { return in.Name == it.Primary.ID }); i >= 0 {
 				return def.Intents[i].Label
 			}

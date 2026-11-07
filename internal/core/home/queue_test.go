@@ -2,7 +2,6 @@ package home_test
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -14,16 +13,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
-
-type fakeGates map[int64]gate.Gate
-
-func (f fakeGates) Get(_ context.Context, id int64) (gate.Gate, error) {
-	g, ok := f[id]
-	if !ok {
-		return gate.Gate{}, fmt.Errorf("no gate %d", id)
-	}
-	return g, nil
-}
 
 func queueWords() fakeWords {
 	w := words()
@@ -38,19 +27,19 @@ func queueWords() fakeWords {
 func TestQueueOldestFirstOneItemPerDecision(t *testing.T) {
 	a := task.Task{ID: "t-a", Title: "a"}
 	b := task.Task{ID: "t-b", Title: "b"}
+	question := func(id int64) *gate.Gate { return &gate.Gate{ID: id, Intents: []string{"answer", "dismiss"}} }
 	d := fakeDecisions{
-		"t-a": {{Kind: decision.Answer, Gate: 1, Since: t0.Add(2 * time.Hour)}, {Kind: decision.Answer, Gate: 2, Since: t0.Add(3 * time.Hour)}},
-		"t-b": {{Kind: decision.Answer, Gate: 3, Since: t0.Add(time.Hour)}, {Kind: decision.LastStep, Unit: unit.Unit{Provider: "alpha", Key: "x"}, Since: t0}},
+		"t-a": {{Kind: decision.Answer, Gate: question(1), Since: t0.Add(2 * time.Hour)}, {Kind: decision.Answer, Gate: question(2), Since: t0.Add(3 * time.Hour)}},
+		"t-b": {{Kind: decision.Answer, Gate: question(3), Since: t0.Add(time.Hour)}, {Kind: decision.LastStep, Unit: unit.Unit{Provider: "alpha", Key: "x"}, Since: t0}},
 	}
-	g := fakeGates{1: {ID: 1, Intents: []string{"answer", "dismiss"}}, 2: {ID: 2, Intents: []string{"answer"}}, 3: {ID: 3, Intents: []string{"answer"}}}
-	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-answer": {a, b}}}, Decisions: d, Words: queueWords(), Gates: g}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-answer": {a, b}}}, Decisions: d, Words: queueWords()}
 	q, err := s.Queue(context.Background(), decision.Answer, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var gates []int64
 	for _, it := range q.Items {
-		gates = append(gates, it.Gate.ID)
+		gates = append(gates, it.Found.Gate.ID)
 	}
 	if !slices.Equal(gates, []int64{3, 1, 2}) {
 		t.Fatalf("gates in order %v, want [3 1 2]: one item per decision of the kind, the oldest first", gates)
@@ -59,10 +48,10 @@ func TestQueueOldestFirstOneItemPerDecision(t *testing.T) {
 
 func TestQueuePrimaryForGateIsFirstIntent(t *testing.T) {
 	e := task.Task{ID: "t-a"}
-	d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: 9, Since: t0}}}
 	for intents, want := range map[string]string{"approve,edit": "approve", "edit,send": "send"} {
-		g := fakeGates{9: {ID: 9, Kind: gate.KindDraft, Intents: strings.Split(intents, ",")}}
-		s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords(), Gates: g}
+		g := &gate.Gate{ID: 9, Kind: gate.KindDraft, Intents: strings.Split(intents, ",")}
+		d := fakeDecisions{"t-a": {{Kind: decision.SendDraft, Gate: g, Since: t0}}}
+		s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {e}}}, Decisions: d, Words: queueWords()}
 		q, _ := s.Queue(context.Background(), decision.SendDraft, nil)
 		if p := q.Items[0].Primary; p.Kind != "gate" || p.ID != want {
 			t.Errorf("intents %s: primary %+v, want gate %s", intents, p, want)

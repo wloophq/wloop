@@ -19,8 +19,6 @@ type Service struct {
 	Lists     Lists
 	Decisions Decisions
 	Words     Words
-	// Gates reads a queue item's gate; nil leaves items without their gate.
-	Gates Gates
 }
 
 // Home is the briefing, the sections and the capture hint.

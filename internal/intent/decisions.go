@@ -24,7 +24,7 @@ type Decisions struct {
 	Map   decision.Map
 	Kinds map[decision.Kind]KindTexts
 	// Primary is what a queue offers first on a plugin's unit, by provider and kind: a catalog action or
-	// builtin.DecisionOpen.
+	// decision.Open.
 	Primary map[dunit.ProviderID]map[decision.Kind]string
 	// Open is what a queue's button that opens a unit at its source says.
 	Open string
@@ -263,14 +263,14 @@ func (l *decisionsLoad) check(views ViewsDef, gates GatesDef, actions map[string
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(l.def.Primary)) {
-		allowed := append([]string{builtin.DecisionOpen}, slices.Sorted(maps.Keys(actions))...)
+		allowed := append([]string{decision.Open}, slices.Sorted(maps.Keys(actions))...)
 		allowed = append(allowed, offered(p)...)
 		for _, k := range decision.Kinds {
 			v, ok := l.def.Primary[p][k]
 			if !ok || slices.Contains(allowed, v) {
 				continue
 			}
-			out = append(out, l.primaryAt[p][k].problem("primary."+string(k), "%s is no catalog action of plugin %s's units, nor %s%s", v, p, builtin.DecisionOpen, expr.DidYouMean(v, allowed)))
+			out = append(out, l.primaryAt[p][k].problem("primary."+string(k), "%s is no catalog action of plugin %s's units, nor %s%s", v, p, decision.Open, expr.DidYouMean(v, allowed)))
 			delete(l.def.Primary[p], k)
 		}
 	}
