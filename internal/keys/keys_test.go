@@ -66,6 +66,10 @@ func spec92() []row {
 		{"k", "queue:back", Queue, []Surface{Web}},
 		{"o", "open-source", Queue, []Surface{Web}},
 		{"Esc", "queue:home", Queue, []Surface{Web}},
+		{"e", "queue:edit", Queue, []Surface{Web}},
+		{"x", "queue:discard", Queue, []Surface{Web}},
+		{"m", "queue:close-silently", Queue, []Surface{Web}},
+		{"n", "queue:skip-workflow", Queue, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,

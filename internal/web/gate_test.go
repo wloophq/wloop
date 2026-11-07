@@ -182,7 +182,7 @@ const box = await page("t-0123456789abcdef");
 const gates = cls(box, "d-gate");
 const keys = createKeys({
   selected: () => detailState.task,
-  questionAt: (el) => detailPane.gateAt(el),
+  questionAt: (el) => gateAt(el, [{ task: detailState.task, gates: detailState.task.gates }]),
   resolveGate: (task, gate, intent) => detailPane.resolve(task, gate, intent),
   verbs: () => [],
 });

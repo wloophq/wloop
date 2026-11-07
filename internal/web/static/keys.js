@@ -481,7 +481,8 @@ function appEnv() {
     copyLink: () => copyViewLink(),
     tab: (dir) => (readHash().task ? detailPane.tab(dir) : false),
     questionAt: (el) => {
-      if (readHash().task) return detailPane.gateAt(el);
+      const gate = pageQuestion(el);
+      if (gate || readHash().task) return gate;
       const d = state.detail;
       const q = answerableQuestion(d);
       if (!el || !el.closest || !el.closest(".d-question") || !q) return null;

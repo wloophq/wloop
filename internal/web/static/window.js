@@ -63,11 +63,22 @@ function installDrag(doc, win) {
   return true;
 }
 
-// keyHint is label with the key the served bindings give action.
-function keyHint(label, action) {
+// servedKey is the key the served bindings give action, "" when none is bound.
+function servedKey(action) {
   const keys = typeof cockpitKeys !== "undefined" ? cockpitKeys : null;
   const b = action && keys ? keys.bindings().find((x) => x.action === action) : null;
-  return b ? t("{action} ({key})", { action: label, key: b.key }) : label;
+  return b ? b.key : "";
+}
+
+// keyHint is label with the key the served bindings give action.
+function keyHint(label, action) {
+  const key = servedKey(action);
+  return key ? t("{action} ({key})", { action: label, key }) : label;
+}
+
+// keyCap is the served key of action as a key cap reads it, "" when none is bound.
+function keyCap(action) {
+  return servedKey(action).replace(/Cmd\+/g, "⌘").replace(/Ctrl\+/g, "⌃").replace(/Alt\+/g, "⌥").replace(/Shift\+/g, "⇧");
 }
 
 // iconButton draws the icon app.css names by data-icon.
@@ -125,18 +136,41 @@ function windowTitle(doc) {
   return view ? view.textContent.trim() : "";
 }
 
+// titleBarLabels word the title bar's buttons by their data-focus each time the chrome syncs, so strings that
+// arrive after the bar installs word them too.
+const titleBarLabels = {
+  "top:back": () => t("Back"),
+  "top:forward": () => t("Forward"),
+  "top:copy-link": () => t("Copy a link to this view"),
+  "top:omnibox": () => t("Open the omnibox"),
+};
+
+function titleBarButton(name, focus, run, action) {
+  return iconButton(name, titleBarLabels[focus](), focus, run, action);
+}
+
 function installTitleBar(doc) {
   const top = doc.getElementById("top");
   if (!top) return;
   doc.body.classList.add("titlebar");
   top.prepend(
     h("span", { class: "tb-nav" },
-      iconButton("back", t("Back"), "top:back", () => history.back()),
-      iconButton("forward", t("Forward"), "top:forward", () => history.forward())),
+      titleBarButton("back", "top:back", () => history.back()),
+      titleBarButton("forward", "top:forward", () => history.forward())),
     h("span", { id: "window-title", class: "tb-title" }));
   top.append(h("span", { class: "tb-tools" },
-    iconButton("link", t("Copy a link to this view"), "top:copy-link", () => copyViewLink(), "link:copy"),
-    iconButton("search", t("Open the omnibox"), "top:omnibox", () => openOmnibox())));
+    titleBarButton("link", "top:copy-link", () => copyViewLink(), "link:copy"),
+    titleBarButton("search", "top:omnibox", () => openOmnibox())));
+}
+
+// labelTitleBar words buttons in the current strings, each title with its key.
+function labelTitleBar(buttons) {
+  for (const b of buttons) {
+    const word = titleBarLabels[b.getAttribute("data-focus")];
+    const label = word ? word() : b.getAttribute("aria-label");
+    b.setAttribute("aria-label", label);
+    b.setAttribute("title", keyHint(label, b.getAttribute("data-key-action")));
+  }
 }
 
 // syncWindowChrome follows the route and the rendered page: the detail
@@ -151,7 +185,7 @@ function syncWindowChrome() {
     document.querySelector('[data-focus="top:back"]').disabled = !nav.canGoBack;
     document.querySelector('[data-focus="top:forward"]').disabled = !nav.canGoForward;
   }
-  for (const b of document.querySelectorAll("#top [data-key-action]")) b.title = keyHint(b.getAttribute("aria-label"), b.dataset.keyAction);
+  labelTitleBar(document.querySelectorAll("#top .icon-btn"));
 }
 
 function tellLinkNotice() {
@@ -168,7 +202,6 @@ if (typeof document !== "undefined" && document.readyState === "loading") {
   window.addEventListener("hashchange", tellLinkNotice);
   document.addEventListener("DOMContentLoaded", () => {
     if (insetTitleBar(location.search)) installTitleBar(document);
-    tellLinkNotice();
     syncWindowChrome();
   });
 }

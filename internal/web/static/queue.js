@@ -4,8 +4,9 @@
 // action, the progress through the queue and the decision next up. The daemon orders the items and names each
 // primary; this draws them and walks them.
 
-// queueState is where the queue screen stands: the queue it shows, the item at, and the last error.
-const queueState = { key: "", queue: null, at: 0, error: "", busy: false };
+// queueState is where the queue screen stands: the queue of key it shows, the item at, why its last action
+// failed and why its last load failed.
+const queueState = { key: "", queue: null, at: 0, error: "", loadError: "", busy: false };
 
 // queueKey names a queue route's items: a kind and its lens query, or the tasks a list names.
 function queueKey(route) {
@@ -25,11 +26,21 @@ function listQueue(tasks) {
   };
 }
 
+// queueDraft reports whether gate g is a draft's, which the daemon serves with its delivery and the draft.
+function queueDraft(g) {
+  return !!(g && g.delivery && g.subject && typeof g.subject === "object");
+}
+
+// queueDraftOf is the draft of gate g, which names its gate.
+function queueDraftOf(g) {
+  return { ...g.subject, gate: g.subject.gate || g.id };
+}
+
 // queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
 // daemon serves with its delivery), else its unit's row with the situation that makes it.
 function queueItemCard(item, env) {
   const g = item.gate;
-  if (g && g.delivery && g.subject && typeof g.subject === "object") return draftCard(item.task, g.subject, { scope: "queue" });
+  if (queueDraft(g)) return draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf });
   if (g) return gateCard(item.task, g, { scope: "queue" });
   return h("div", { class: "queue-unit" },
     env.row(item.task),
@@ -54,13 +65,20 @@ async function queueLoad(route, env) {
       ? listQueue((await Promise.all(route.ids.map((id) => env.get("/api/tasks/" + encodeURIComponent(id)).catch(() => null)))).filter(Boolean))
       : await env.get(queueURL(route));
     if (queueKey(env.route()) !== key) return;
-    queueState.key = key;
-    queueState.queue = queue;
-    if (!same) queueState.at = 0;
+    if (!same) Object.assign(queueState, { at: 0, error: "" });
+    Object.assign(queueState, { key, queue, loadError: "" });
     queueState.at = Math.min(queueState.at, Math.max((queue.items || []).length - 1, 0));
   } catch (err) {
-    queueState.error = t("Could not load the queue: {error}", { error: err.message });
+    if (queueKey(env.route()) !== key) return;
+    if (!same) Object.assign(queueState, { key, queue: null, at: 0, error: "" });
+    queueState.loadError = t("Could not load the queue: {error}", { error: err.message });
   }
+}
+
+// queueShown is the loaded queue when it is route's, else null: a queue loaded for another route never shows
+// nor runs.
+function queueShown(route) {
+  return queueState.key === queueKey(route) ? queueState.queue : null;
 }
 
 // queueUnit is the unit of item's task its situation is on: the first of its units of that provider.
@@ -78,10 +96,14 @@ async function queueAct(item, env) {
   queueState.busy = true;
   queueState.error = "";
   try {
-    if (p.kind === "gate") await resolveGate(item.task, item.gate, p.id);
+    const g = item.gate;
+    const card = p.kind === "gate" && queueDraft(g) ? queueDraftAction(item, "queue:primary") : null;
+    if (card && card.enabled) await card.run();
+    else if (p.kind === "gate" && queueDraft(g)) await resolveDraft(queueDraftOf(g), p.id, p.label || p.id, {});
+    else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
     else if (p.kind === "action") {
       const u = queueUnit(item);
-      if (u) await env.post(unitPath(u, p.id), { source: "cockpit" });
+      if (u) await env.act(u, p.id);
     } else if (p.kind === "open") env.openSource(item.task, queueUnit(item));
     else if (p.kind === "task") env.openTask(item.task.id);
   } catch (err) {
@@ -93,9 +115,33 @@ async function queueAct(item, env) {
   env.render();
 }
 
+// queueDraftAction is the action of item's draft card that key runs, null when the card offers none.
+function queueDraftAction(item, key) {
+  if (!item || !queueDraft(item.gate)) return null;
+  return draftActions(item.task, queueDraftOf(item.gate)).find((a) => a.key === key) || null;
+}
+
+// queueDraftKey runs the action of item's draft card that key names, then reloads the queue; false when the
+// card offers none, so the key goes on to its other bindings. A refused action says why.
+function queueDraftKey(item, key, env) {
+  const a = queueDraftAction(item, key);
+  if (!a) return false;
+  if (!a.enabled) {
+    detailEnv.notice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+    return true;
+  }
+  (async () => {
+    await a.run();
+    if (key !== "queue:edit") await queueLoad(env.route(), env);
+    env.render();
+  })();
+  return true;
+}
+
 // queueKeyAction runs a queue key's action: the primary, the next or the previous decision, its source, the home.
 function queueKeyAction(action, env) {
-  const items = (queueState.queue && queueState.queue.items) || [];
+  const queue = queueShown(env.route());
+  const items = (queue && queue.items) || [];
   const item = items[queueState.at];
   switch (action) {
     case "queue:primary":
@@ -106,6 +152,11 @@ function queueKeyAction(action, env) {
       queueState.at = Math.min(Math.max(queueState.at + (action === "queue:skip" ? 1 : -1), 0), Math.max(items.length - 1, 0));
       env.render();
       return true;
+    case "queue:edit":
+    case "queue:discard":
+    case "queue:close-silently":
+    case "queue:skip-workflow":
+      return queueDraftKey(item, action, env);
     case "open-source":
       if (item) env.openSource(item.task, queueUnit(item));
       return !!item;
@@ -119,10 +170,11 @@ function queueKeyAction(action, env) {
 // renderQueue is the queue screen's nodes for queue, at its item at.
 function renderQueue(queue, at, env) {
   const home = h("a", { class: "crumb", href: "#view=" + HOME, "data-focus": "queue:home" }, t("Home"));
-  if (!queue) return [h("div", { class: "queue" }, h("nav", { class: "crumbs" }, home), h("p", { class: "loading" }, t("Loading the queue...")))];
+  const why = queueState.key === queueKey(env.route()) ? [queueState.loadError, queueState.error].filter(Boolean) : [];
+  const err = why.length ? h("p", { class: "err", role: "alert" }, why.join(" ")) : null;
+  if (!queue) return [h("div", { class: "queue" }, h("nav", { class: "crumbs" }, home), err || h("p", { class: "loading" }, t("Loading the queue...")))];
   const items = queue.items || [];
   const head = h("nav", { class: "crumbs", "aria-label": t("Where you are") }, home, h("span", { class: "sep", "aria-hidden": "true" }, "/"), h("span", {}, queue.title));
-  const err = queueState.error ? h("p", { class: "err", role: "alert" }, queueState.error) : null;
   if (!items.length) {
     return [h("div", { class: "queue empty" }, head, err, h("p", { class: "empty" }, queue.empty || t("Nothing left in this queue.")),
       h("a", { class: "back-home", href: "#view=" + HOME }, t("Back to the home")))];

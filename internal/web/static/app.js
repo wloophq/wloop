@@ -197,6 +197,8 @@ function readHash() {
   const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
   return {
     view,
+    queue: view === QUEUE ? route.queue : "",
+    ids: view === QUEUE ? route.ids : [],
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
     task: route.task,
     area: route.area,
@@ -223,6 +225,9 @@ function lensPicks(view, route, g, s) {
 
 function hashString(next) {
   const p = new URLSearchParams();
+  const queue = next.view === QUEUE && next.queue;
+  if (queue) p.set("queue", next.queue);
+  if (queue && next.ids && next.ids.length) p.set("ids", next.ids.join(","));
   if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", [].concat(next.ctx).join(","));
@@ -233,7 +238,7 @@ function hashString(next) {
   if (next.x && next.view === "explore") p.set("x", next.x);
   if (next.tk && next.view === "dash") p.set("tk", next.tk);
   if (next.done && next.view === "dash") p.set("done", "1");
-  return routeHash(next.view, next.pr, p);
+  return routeHash(queue ? "" : next.view, next.pr, p);
 }
 
 function writeHash(change, replace) {
@@ -2649,9 +2654,9 @@ async function loadQueue() {
   if (route.view === QUEUE) await queueLoad(route, screenEnv());
 }
 
-// screenRow is task e's row as the list of view draws it.
+// screenRow is task e's row as the list of view draws it, the profile's first view when none is named.
 function screenRow(e, view) {
-  const lens = lensOf({ view: view || "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+  const lens = lensOf({ view: view || (coreViews()[0] || { id: "" }).id, q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
   return rowView(taskModel(e, "", "", lens), lens);
 }
 
@@ -2664,6 +2669,31 @@ function openTaskSource(e, u) {
   else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
 }
 
+// pageGates are the gates the page draws as cards, each with its task: the detail's, the queue's item's and
+// the gates list's.
+function pageGates() {
+  const out = [];
+  const e = detailState.task;
+  if (e) out.push({ task: e, gates: e.gates || [] });
+  const queue = queueShown(readRoute(location.hash));
+  const item = queue && (queue.items || [])[queueState.at];
+  if (item && item.gate) out.push({ task: item.task, gates: [item.gate] });
+  for (const g of tasksState.gates || []) out.push({ task: taskById(g.task), gates: [g] });
+  return out;
+}
+
+// pageQuestion is the gate a digit answers from el: the one whose card holds el, else, on a queue, its item's
+// gate when that is no draft's.
+function pageQuestion(el) {
+  const at = gateAt(el, pageGates());
+  if (at || (el && el.closest && el.closest(".d-gate"))) return at;
+  const route = readRoute(location.hash);
+  if (route.view !== QUEUE) return null;
+  const queue = queueShown(route);
+  const item = queue && (queue.items || [])[queueState.at];
+  return item && item.gate && !queueDraft(item.gate) ? { task: item.task, gate: item.gate } : null;
+}
+
 // screenEnv is what the home and the queue screens read and run through.
 function screenEnv() {
   return {
@@ -2673,6 +2703,10 @@ function screenEnv() {
     row: screenRow,
     openSource: openTaskSource,
     openTask: (id) => writeHash({ task: id, pr: "" }),
+    keyOf: (action) => (typeof cockpitKeys === "object" && cockpitKeys ? cockpitKeys.keyOf(action) : ""),
+    act: async (u, id) => {
+      if ((await omniboxAct(u, id)) === false) throw new Error(state.actionError || t("{action} failed", { action: id }));
+    },
     navigate: (view) => { location.hash = hashString({ view }); },
     render,
     capture: async (title) => {
@@ -2696,7 +2730,7 @@ function renderScreens(route) {
   home.hidden = route.view !== HOME;
   queue.hidden = route.view !== QUEUE;
   if (!home.hidden) home.replaceChildren(...(homeState.error ? [h("p", { class: "err" }, homeState.error)] : renderHome(homeState.home, screenEnv())));
-  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueState.queue, queueState.at, screenEnv()));
+  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueShown(readRoute(location.hash)), queueState.at, screenEnv()));
 }
 
 async function loadActivity() {
@@ -3019,23 +3053,46 @@ document.getElementById("explore-form").addEventListener("submit", (e) => {
 document.getElementById("explore-q").addEventListener("input", (e) => writeHash({ x: e.target.value.slice(0, 256) }, true));
 document.getElementById("explore-guidance").addEventListener("input", (e) => { state.guidance[e.target.dataset.key] = e.target.value; });
 
+// panelPage says the page is the floating panel's, which shows the omnibox alone and none of the cockpit.
+function panelPage() {
+  return readRoute(location.hash).panel === "omnibox";
+}
+
+// refreshClock re-renders the cockpit's relative times; the panel has none.
+function refreshClock() {
+  if (!panelPage()) render();
+}
+
 setupDetailResize();
-setInterval(render, 60000);
+setInterval(refreshClock, 60000);
 setInterval(tickCountdowns, 1000);
 loadStrings(getJSON).then(() => {
   document.documentElement.lang = I18N.locale;
   translateStatic(document);
-  if (readRoute(location.hash).panel === "omnibox") {
+  if (panelPage()) {
     showOmnibox({ panel: true });
+    panelFollow(window, document, {
+      reset: () => showOmnibox({ panel: true }),
+      health: () => getJSON("/api/health"),
+      strings: (stamp) => followStrings(stamp, getJSON),
+      build: checkPanelBuild,
+    });
     return;
   }
+  tellLinkNotice();
   load();
   connect();
 });
 
-// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them.
+// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them: the cockpit, or
+// the panel's omnibox with the text typed in it.
 function i18nChanged() {
   document.documentElement.lang = I18N.locale;
   translateStatic(document);
-  render();
+  if (!panelPage()) {
+    render();
+    return;
+  }
+  const field = document.querySelector(".omni-input");
+  showOmnibox({ panel: true, text: field ? field.value : "" });
 }

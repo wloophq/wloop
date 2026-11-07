@@ -2,6 +2,7 @@ package web
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -170,5 +171,37 @@ const second = takeLinkNotice(win);
 process.stdout.write(JSON.stringify({ First: first, Second: second, Hash: win.location.hash }));`, &got)
 	if !got.First || got.Second || got.Hash != "#view=inbox" {
 		t.Fatalf("first %v, second %v, hash %q", got.First, got.Second, got.Hash)
+	}
+}
+
+func TestTheTitleBarFollowsTheLocale(t *testing.T) {
+	var got map[string][2]string
+	nodeScript(t, treeJS+staticJS(t, "routes.js")+staticJS(t, "window.js")+`
+const top = { kids: [], prepend(...n) { this.kids.unshift(...n); }, append(...n) { this.kids.push(...n); } };
+installTitleBar({ getElementById: (id) => (id === "top" ? top : null), body: { classList: { add() {} } } });
+const buttons = all(top.kids, (x) => x.tag === "button");
+for (const b of buttons) {
+  b.getAttribute = (k) => b.attrs[k];
+  b.setAttribute = (k, v) => { b.attrs[k] = String(v); };
+}
+I18N.locale = "pt-BR";
+I18N.strings = { "Back": "Voltar", "Forward": "Avançar", "Copy a link to this view": "Copiar um link para esta visão", "Open the omnibox": "Abrir a omnibox" };
+labelTitleBar(buttons);
+process.stdout.write(JSON.stringify(Object.fromEntries(buttons.map((b) => [b.attrs["data-focus"], [b.attrs["aria-label"], b.attrs.title]]))));`, nil, &got)
+	want := map[string]string{"top:back": "Voltar", "top:forward": "Avançar", "top:copy-link": "Copiar um link para esta visão", "top:omnibox": "Abrir a omnibox"}
+	for focus, label := range want {
+		if got[focus][0] != label || !strings.HasPrefix(got[focus][1], label) {
+			t.Errorf("%s reads %q, title %q; want %q", focus, got[focus][0], got[focus][1], label)
+		}
+	}
+}
+
+func TestTheLinkNoticeWaitsForTheStrings(t *testing.T) {
+	app, win := appJS(t), staticJS(t, "window.js")
+	boot := app[strings.Index(app, "loadStrings(getJSON).then("):]
+	boot = boot[:strings.Index(boot, "\n});\n")]
+	loaded := win[strings.Index(win, `addEventListener("DOMContentLoaded"`):]
+	if !strings.Contains(boot, "tellLinkNotice()") || strings.Contains(loaded, "tellLinkNotice()") {
+		t.Fatalf("the notice of an unread link is told before the strings load, so it reads in English")
 	}
 }

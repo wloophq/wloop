@@ -1,6 +1,9 @@
 package web
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // panelHarness loads routes.js and panel.js with a fake window and document;
 // the cockpit's own hashchange listener is registered after the panel's, as
@@ -135,5 +138,66 @@ doc.dispatch("click", e);
 `+panelReport, &got)
 	if got.Installed || got.Closed || got.Prevented || len(got.Posted) != 0 {
 		t.Fatalf("outside the panel: installed %v, close replaced %v, prevented %v, posted %v", got.Installed, got.Closed, got.Prevented, got.Posted)
+	}
+}
+
+func TestThePanelFreshensEachTimeItShowsAgain(t *testing.T) {
+	var got struct{ Steps []string }
+	panelRun(t, staticJS(t, "omnibox.js")+`
+const steps = [];
+doc.visibilityState = "visible";
+panelFollow(win, doc, {
+  reset: () => steps.push("reset"),
+  health: async () => ({ strings: "pt-2", build: "b-2" }),
+  strings: (stamp) => steps.push("strings " + stamp),
+  build: (h) => steps.push("build " + h.build),
+});
+const tick = () => new Promise((r) => setTimeout(r, 5));
+(async () => {
+  win.dispatch("focus", event());
+  await tick();
+  steps.push("|");
+  win.dispatch("blur", event());
+  win.dispatch("focus", event());
+  doc.dispatch("visibilitychange", event());
+  await tick();
+  steps.push("|");
+  doc.visibilityState = "hidden";
+  doc.dispatch("visibilitychange", event());
+  doc.visibilityState = "visible";
+  doc.dispatch("visibilitychange", event());
+  await tick();
+  process.stdout.write(JSON.stringify({ Steps: steps }));
+})();`, &got)
+	want := []string{"|", "reset", "strings pt-2", "build b-2", "|", "reset", "strings pt-2", "build b-2"}
+	if !slices.Equal(got.Steps, want) {
+		t.Fatalf("steps %v, want %v: the panel freshens once each time it shows again, never while it stays", got.Steps, want)
+	}
+}
+
+func TestThePanelRendersItsOwnPage(t *testing.T) {
+	var got struct {
+		Renders int
+		Shown   []string
+		Lang    string
+	}
+	app := appJS(t)
+	nodeScript(t, jsFunction(t, app, "panelPage")+jsFunction(t, app, "i18nChanged")+jsFunction(t, app, "refreshClock")+staticJS(t, "routes.js")+`
+let renders = 0;
+const shown = [];
+function render() { renders++; }
+function translateStatic() {}
+function showOmnibox(opts) { shown.push(String(opts.panel) + " " + opts.text); }
+globalThis.location = { hash: "#panel=omnibox" };
+globalThis.document = { documentElement: {}, querySelector: (sel) => (sel === ".omni-input" ? { value: "retr" } : null) };
+I18N.locale = "pt-BR";
+i18nChanged();
+refreshClock();
+location.hash = "#view=inbox";
+i18nChanged();
+refreshClock();
+process.stdout.write(JSON.stringify({ Renders: renders, Shown: shown, Lang: document.documentElement.lang }));`, nil, &got)
+	if got.Renders != 2 || !slices.Equal(got.Shown, []string{"true retr"}) || got.Lang != "pt-BR" {
+		t.Fatalf("%+v: in the panel new strings redraw the omnibox, keeping its text, and the cockpit's render never runs", got)
 	}
 }

@@ -68,7 +68,7 @@ Only in answer to an action, short: the detail panel and the palette fade in as 
 
 ## Iconography
 
-There is no icon set in the cockpit. Use text and a few Unicode glyphs:
+The cockpit has five icons, and only on window controls that have no room for a word: back, forward, copy a link, open in a window of its own (detach) and the omnibox (search). Each is an `icon-btn`, a 26px button that draws a 16px SVG line icon as a CSS mask in `currentColor`: `muted` at rest, `ink` on a `rule` background when hovered, faded when disabled, its shape named by `data-icon`. An icon button always carries an `aria-label` and a `title` with its served key; a new one adds its SVG to the `icon-btn[data-icon=…]` rules of `app.css`. Everywhere else, use text and a few Unicode glyphs:
 
 - `▍` in `me` before the product name.
 - `★` in `late` for a starred task.

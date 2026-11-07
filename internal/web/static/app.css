@@ -951,6 +951,10 @@ body.layout-detail .d-window { right: 0; }
 .omni-op .why { margin: 0 0 0 var(--space-16); font-size: var(--text-meta); color: var(--muted); }
 .omni-edit { display: block; margin: var(--space-2) 0 0 var(--space-16); width: calc(100% - var(--space-16)); padding: var(--space-2) var(--space-6); font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--radius-sm); }
 .omni-question input { width: 100%; padding: var(--space-4) var(--space-6); font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--radius-sm); }
+.omni-results [role="option"] { border-radius: var(--radius-sm); }
+.omni-results [aria-selected="true"] { background: var(--sel); }
+.omni-keys { margin: 0; padding: var(--space-4) var(--space-12); border-top: 1px solid var(--rule); font-size: var(--text-meta); color: var(--muted); }
+.omni-keys kbd { font: var(--text-meta) var(--mono); }
 .omni-ran .ok { color: var(--ink); }
 .omni-ran .err, .omni-ask-error { color: var(--err); }
 body.panel-omnibox { margin: 0; background: var(--panel); }

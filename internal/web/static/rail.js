@@ -115,7 +115,8 @@ function railPeople(lens, route) {
 // railOmnibox labels the omnibox entry and binds it to railEnv.omnibox.
 function railOmnibox(box) {
   if (!box) return;
-  box.replaceChildren(h("span", { class: "label" }, t("Search or ask")), h("kbd", {}, "⌘K"));
+  const key = keyCap("palette");
+  box.replaceChildren(h("span", { class: "label" }, t("Search or ask")), key ? h("kbd", {}, key) : null);
   box.onclick = () => railEnv.omnibox();
 }
 

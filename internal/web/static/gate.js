@@ -127,6 +127,19 @@ function gateCard(e, g, opts = {}) {
       answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null)));
 }
 
+// gateAt is the gate whose card holds el, with its task, among sources: each a task and the gates the page
+// draws of it.
+function gateAt(el, sources) {
+  const card = el && el.closest ? el.closest(".d-gate") : null;
+  if (!card) return null;
+  const id = card.getAttribute("data-gate");
+  for (const s of sources) {
+    const g = (s.gates || []).find((x) => String(x.id) === id);
+    if (g) return { task: s.task, gate: g };
+  }
+  return null;
+}
+
 // DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
 // card offers on the draft's own task, the kind's own dismiss among them.
 const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
@@ -157,8 +170,8 @@ function unitSkipPath(d) {
 // DRAFT_OFFERS are the draft actions a card offers only when the draft serves them: their words, and the request
 // each sends.
 const DRAFT_OFFERS = {
-  "draft.close-silently": { label: () => t("Close without a message"), path: (d) => "/api/drafts/" + encodeURIComponent(d.id) + "/close-silently", body: (d) => ({ rev: d.rev }) },
-  "draft.skip-workflow": { label: () => t("Don't nudge this conversation"), path: unitSkipPath, body: () => ({ source: "cockpit" }) },
+  "draft.close-silently": { key: "queue:close-silently", label: () => t("Close without a message"), path: (d) => "/api/drafts/" + encodeURIComponent(d.id) + "/close-silently", body: (d) => ({ rev: d.rev }) },
+  "draft.skip-workflow": { key: "queue:skip-workflow", label: () => t("Don't nudge this conversation"), path: unitSkipPath, body: () => ({ source: "cockpit" }) },
 };
 
 async function runDraftOffer(d, label, offer) {
@@ -171,15 +184,13 @@ async function runDraftOffer(d, label, offer) {
   }
 }
 
-// draftOffers are the buttons of the offered draft actions d serves, each off with its reason where refused.
-function draftOffers(d, scope) {
+// offeredDraftActions are the offered draft actions d serves, each off with its reason where refused.
+function offeredDraftActions(d) {
   return (d.actions || []).filter((a) => DRAFT_OFFERS[a.id] && DRAFT_OFFERS[a.id].path(d)).map((a) => {
     const offer = DRAFT_OFFERS[a.id];
     const label = a.label || offer.label();
-    return h("button", {
-      type: "button", class: "act" + (a.enabled ? "" : " off"), disabled: !a.enabled, title: (a.enabled ? a.note : a.reason) || undefined,
-      "data-focus": `${scope}:${a.id}:draft:${d.id}`, onclick: () => runDraftOffer(d, label, offer),
-    }, label);
+    return { label, enabled: !!a.enabled, reason: a.reason, title: a.enabled ? a.note : a.reason, focus: `${a.id}:draft:${d.id}`, key: offer.key,
+      run: () => runDraftOffer(d, label, offer) };
   });
 }
 
@@ -256,46 +267,70 @@ async function resolveDraft(d, intent, label, args) {
   }
 }
 
-// ownDraftButtons are the actions of the draft e, its own task, carries: approve, edit and discard through
-// the task's verbs, retry for a draft whose delivery failed.
-function ownDraftButtons(e, d, scope, editing) {
+// draftActions are the actions draft d's card offers on task e, each with the queue key that runs it: approve
+// (retry for a failed delivery), edit and discard through d's own task's verbs when e is its task, else
+// through its gate's intents, then the offered draft actions d serves; while d is being edited, approve with
+// the text and cancel.
+function draftActions(e, d) {
+  const own = !!e && isDraftTask(e) && draftOf(e).id === d.id;
+  const key = own ? e.id : "draft:" + d.id;
+  const editing = detailState.editing.has(key);
+  const acts = own ? ownDraftActions(e, d, key, editing) : gateDraftActions(e, d, key, editing);
+  return [...acts, ...(editing ? [] : offeredDraftActions(d))].filter(Boolean);
+}
+
+const editDraft = (key, d) => () => { detailState.editing.set(key, d.text || ""); detailEnv.render(); };
+const cancelEdit = (key) => ({ label: t("Cancel"), enabled: true, focus: "cancel:" + key, run: () => { detailState.editing.delete(key); detailEnv.render(); } });
+
+// ownDraftActions are the actions of the draft e, its own task, carries, through the task's verbs.
+function ownDraftActions(e, d, key, editing) {
   const [approve, drop, edit, retry] = DRAFT_CARD_HANDLERS.map((x) => offeredVerb(e, x));
-  if (editing) {
-    return [
-      verbButton(e, approve, gateWord(e, d, "approved", approve), () => approveEdited(e), { scope, primary: true }),
-      h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, t("Cancel")),
-    ];
-  }
+  const verb = (v, label, run, extra) => {
+    const st = verbState(e, v);
+    if (!st) return null;
+    const title = [verbTask(v).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n");
+    return { label, run, enabled: st.enabled, reason: st.reason, title, focus: `${v}:${e.id}`, ...extra };
+  };
+  const primary = { primary: true, key: "queue:primary" };
+  if (editing) return [verb(approve, gateWord(e, d, "approved", approve), () => approveEdited(e), primary), cancelEdit(key)];
   return [
-    d.state === "failed" ? verbButton(e, retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), { scope, primary: true }),
-    verbButton(e, edit || approve, draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, drop, gateWord(e, d, "rejected", drop), () => taskAct(e, drop, {}), { scope }),
+    d.state === "failed" ? verb(retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), primary)
+      : verb(approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), primary),
+    verb(edit || approve, draftWord("draft.edit"), editDraft(key, d), { key: "queue:edit", focus: `open:${edit || approve}:${e.id}` }),
+    verb(drop, gateWord(e, d, "rejected", drop), () => taskAct(e, drop, {}), { key: "queue:discard" }),
   ];
 }
 
-// gateDraftButtons are the actions of a draft shown on another task: approve, edit and discard through its
-// gate's intents, retry through its own task for a draft whose delivery failed.
-function gateDraftButtons(e, d, scope, editing) {
-  const key = "draft:" + d.id;
+// gateDraftActions are the actions of a draft shown on another task, through its gate's intents; retry goes
+// through its own task.
+function gateDraftActions(e, d, key, editing) {
   const intents = (d.gate && d.intents) || {};
   const approve = verbFor("approve");
   const approveLabel = gateWord(e, d, "approved", approve);
-  const button = (label, focus, run, primary) => h("button", { type: "button", class: "act" + (primary ? " primary" : ""), "data-focus": `${scope}:${focus}:${key}`, onclick: run }, label);
+  const act = (label, focus, run, extra) => ({ label, run, enabled: true, focus: `${focus}:${key}`, ...extra });
+  const primary = { primary: true, key: "queue:primary" };
   if (editing) {
-    return [
-      intents.approved ? button(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, { text: detailState.editing.get(key) }), true) : null,
-      button(t("Cancel"), "cancel", () => { detailState.editing.delete(key); detailEnv.render(); }, false),
-    ];
+    return [intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, { text: detailState.editing.get(key) }), primary) : null,
+      cancelEdit(key)];
   }
   const retry = verbFor("retry");
   const drop = verbFor("drop");
+  const dropLabel = gateWord(e, d, "rejected", drop);
   return [
-    d.state === "failed" ? button(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), true)
-      : intents.approved ? button(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), true) : null,
-    intents.approved ? button(draftWord("draft.edit"), "open:" + approve, () => { detailState.editing.set(key, d.text || ""); detailEnv.render(); }, false) : null,
-    intents.rejected ? button(gateWord(e, d, "rejected", drop), drop, () => resolveDraft(d, intents.rejected, gateWord(e, d, "rejected", drop), {}), false) : null,
+    d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
+      : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null,
+    intents.approved ? act(draftWord("draft.edit"), "open:" + approve, editDraft(key, d), { key: "queue:edit" }) : null,
+    intents.rejected ? act(dropLabel, drop, () => resolveDraft(d, intents.rejected, dropLabel, {}), { key: "queue:discard" }) : null,
   ];
+}
+
+// draftActionButton is action a of a draft's card in scope, with the key keyOf gives its queue key, if any.
+function draftActionButton(a, scope, keyOf) {
+  const key = keyOf && a.key ? keyOf(a.key) : "";
+  return h("button", {
+    type: "button", class: "act" + (a.enabled ? "" : " off") + (a.primary ? " primary" : ""), disabled: !a.enabled, title: a.title || undefined,
+    "data-focus": `${scope}:${a.focus}`, "aria-keyshortcuts": key || undefined, onclick: a.run,
+  }, key ? [h("kbd", {}, key === "Enter" ? "↵" : key), " "] : null, a.label);
 }
 
 // draftCard is draft d on task e: where it posts and in what language, its text as posted, why it was drafted,
@@ -322,6 +357,6 @@ function draftCard(e, d, opts = {}) {
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,
     d.error ? h("p", { class: "err" }, d.error) : null,
     windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...(own ? ownDraftButtons(e, d, scope, editing) : gateDraftButtons(e, d, scope, editing)), ...(editing ? [] : draftOffers(d, scope))),
+    h("div", { class: "d-actions" }, ...draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf))),
     draftLinks(e, d, scope));
 }

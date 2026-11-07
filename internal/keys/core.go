@@ -95,6 +95,10 @@ func core() []Binding {
 		{"k", "queue:back", Queue, webOnly},
 		{"o", "open-source", Queue, webOnly},
 		{"Esc", "queue:home", Queue, webOnly},
+		{"e", "queue:edit", Queue, webOnly},
+		{"x", "queue:discard", Queue, webOnly},
+		{"m", "queue:close-silently", Queue, webOnly},
+		{"n", "queue:skip-workflow", Queue, webOnly},
 	}
 	for n := 1; n <= 9; n++ {
 		b = append(b,
