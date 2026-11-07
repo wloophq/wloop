@@ -368,7 +368,9 @@ func compactEnv(t *testing.T) (*turnsEnv, dossier.Dossier) {
 
 type panickingAsker struct{}
 
-func (panickingAsker) Ask(context.Context, turns.Ask) (turns.Answer, error) { panic("the agent adapter broke") }
+func (panickingAsker) Ask(context.Context, turns.Ask) (turns.Answer, error) {
+	panic("the agent adapter broke")
+}
 
 func TestAPanickingDossierCallReleasesItsReservation(t *testing.T) {
 	te, _ := compactEnv(t)

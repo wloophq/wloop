@@ -264,6 +264,9 @@ type Env struct {
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool
+	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
+	// never removes a snapshot a running call of this process reads.
+	omniboxSwept bool
 	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
 	dossierTurns *dossiers.Turns
 	dossierCalls *dossiers.Calls

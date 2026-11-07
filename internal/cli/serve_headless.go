@@ -62,16 +62,24 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		}
 	}
 	d.Headless = svc
-	d.OmniboxAsk = e.omniboxAsker(db, cfg)
+	d.OmniboxAsk = e.omniboxAsker(db, cfg, logf)
 	return d
 }
 
 // omniboxAsker is the omnibox's read-only agent call, booked on the calls' budget, its cost recorded as an
 // event on the empty unit. Its vocabulary is not wired yet, so it drops every operation it is proposed.
-func (e *Env) omniboxAsker(db *sqlite.DB, cfg config.Config) *omnibox.Asker {
+func (e *Env) omniboxAsker(db *sqlite.DB, cfg config.Config, logf func(string, ...any)) *omnibox.Asker {
 	dir := filepath.Join(e.StateDir, "omnibox")
+	snapshots := filepath.Join(dir, "snapshots")
+	if !e.omniboxSwept {
+		e.omniboxSwept = true
+		if err := omnibox.SweepSnapshots(snapshots); err != nil {
+			logf("omnibox: removing the snapshots a stop left: %v", err)
+		}
+	}
 	events := sqlite.New(db)
-	return &omnibox.Asker{Agent: lazyAsker{e: e, cfg: cfg, dir: dir}, Budget: e.callBudget, Tier: cfg.Headless.Tier, Dir: dir,
+	return &omnibox.Asker{Agent: lazyAsker{e: e, cfg: cfg, dir: filepath.Join(dir, "run")}, Budget: e.callBudget, Tier: cfg.Headless.Tier,
+		Dir: snapshots,
 		Record: func(ctx context.Context, cost float64) error {
 			return events.RecordEvents(ctx, port.Event{Kind: omnibox.KindCall, Key: randomKey(), At: e.Now(), Data: strconv.FormatFloat(cost, 'f', -1, 64)})
 		},

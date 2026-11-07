@@ -256,7 +256,9 @@ func TestAStalledAgentTimesOut(t *testing.T) {
 
 type panicking struct{}
 
-func (*panicking) Ask(context.Context, turns.Ask) (turns.Answer, error) { panic("the agent adapter broke") }
+func (*panicking) Ask(context.Context, turns.Ask) (turns.Answer, error) {
+	panic("the agent adapter broke")
+}
 
 func TestAPanickingAgentReleasesItsReservation(t *testing.T) {
 	r := newRig(t, "")
