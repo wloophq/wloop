@@ -123,7 +123,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 }
 
 func zeroLiteral(f Fact) string {
-	if vs := f.Enum[anyProvider]; len(vs) > 0 {
+	if vs := f.Enum[anyProvider]; len(vs) > 0 && f.Type != expr.List {
 		return strconv.Quote(vs[0])
 	}
 	switch f.Type {

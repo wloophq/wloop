@@ -42,3 +42,17 @@ new = "nova"
 waits_on_others = "espera por outros"
 fyi = "para sua informação"
 resolved = "resolvida"
+
+[noun]
+one = "thread"
+other = "threads"
+
+[decisions.answer]
+clause = { one = "{counter} espera sua resposta", other = "{counter} esperam sua resposta" }
+queue = "Threads para responder"
+empty = "Nenhuma thread espera sua resposta."
+
+[decisions.last-step]
+clause = { one = "{counter} precisa ser fechada", other = "{counter} precisam ser fechadas" }
+queue = "Threads para fechar"
+empty = "Nenhuma thread precisa ser fechada."

@@ -425,6 +425,80 @@ label         = "Review"
 summary       = "The weekly review: walk each step until the lists are clean."
 key           = "g r"
 
+# piece B: the home's sections and the decision queues. The rail leaves
+# them out; decisions.toml names each kind's view.
+[views.home-blocked]
+label         = "Blocked by you"
+summary       = "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first."
+when          = "task.owed_by == 'me' && (task.gates_open > 0 || size(task.askers) > 0) && !(task.category in ['inbox', 'deferred', 'done', 'dropped'])"
+sort          = "task.owed_since"
+rail          = false
+hide_disabled = true
+
+[views.home-stalled]
+label         = "Stalled the longest"
+summary       = "Open tasks that have not moved for the longest."
+when          = "task.category in ['ready', 'active', 'waiting']"
+sort          = "-task.since_movement"
+rail          = false
+hide_disabled = true
+
+[views.decide-answer]
+label         = "Agent questions"
+summary       = "Tasks with a question or a post that waits for your answer."
+when          = "'answer' in task.decisions"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-approve-plan]
+label         = "Plans to approve"
+summary       = "Tasks with a plan that waits for your approval."
+when          = "'approve-plan' in task.decisions"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-send-draft]
+label         = "Drafts to send"
+summary       = "Tasks with a draft that waits for you to send it."
+when          = "'send-draft' in task.decisions"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-review-step]
+label         = "Steps to review"
+summary       = "Tasks with a step that waits for your review."
+when          = "'review-step' in task.decisions"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-last-step]
+label         = "Last steps"
+summary       = "Your tasks whose work only waits for its last step at its source."
+when          = "'last-step' in task.decisions && task.owed_by == 'me'"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-pick-someone]
+label         = "Pick someone"
+summary       = "Your tasks that wait for you to pick who takes them next."
+when          = "'pick-someone' in task.decisions && task.owed_by == 'me'"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
+[views.decide-act]
+label         = "To act on"
+summary       = "Tasks with a proposal or a request that waits for you to act."
+when          = "'act' in task.decisions"
+sort          = "task.decision_since"
+rail          = false
+hide_disabled = true
+
 [review.inbox]
 label = "Inbox to zero"
 

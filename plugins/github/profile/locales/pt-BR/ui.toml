@@ -265,3 +265,17 @@ title = "Orientação esperando a próxima rodada: dada sem rodada pendente, ou 
 
 [menubar]
 loop = "No loop"
+
+[noun]
+one = "pull request"
+other = "pull requests"
+
+[decisions.last-step]
+clause = { one = "{counter} só espera o merge", other = "{counter} só esperam o merge" }
+queue = "Prontos para merge"
+empty = "Nada espera só o merge."
+
+[decisions.pick-someone]
+clause = { one = "{counter} espera um revisor", other = "{counter} esperam um revisor" }
+queue = "Escolher revisor"
+empty = "Nenhum pull request espera um revisor."

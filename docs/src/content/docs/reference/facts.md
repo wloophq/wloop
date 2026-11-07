@@ -215,6 +215,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
 | `task.check_on` | timestamp | When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.gates_open` | int | The task's open gates. |
+| `task.decisions` | list | The decision kinds the task waits on the user for, as decisions.toml maps its open gates and its units' situations and link signals; the oldest first. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.decision_since` | timestamp | Since when the oldest of task.decisions waits; zero when none. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.turns_open_by_hand` | int | The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names. |
 | `task.turn_by_hand_at` | timestamp | When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`. |
 | `task.turns_running` | int | The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended. |

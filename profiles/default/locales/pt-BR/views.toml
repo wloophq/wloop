@@ -254,6 +254,43 @@ empty = "Todo projeto tem uma próxima ação e está revisado."
 label = "Revisão"
 summary = "A revisão semanal: percorra cada passo até as listas ficarem limpas."
 
+# piece B
+[views.home-blocked]
+label = "Bloqueado por você"
+summary = "Tarefas que esperam por você: uma decisão a tomar ou um pedido de alguém, as devidas há mais tempo primeiro."
+
+[views.home-stalled]
+label = "Paradas há mais tempo"
+summary = "Tarefas abertas que não se movem há mais tempo."
+
+[views.decide-answer]
+label = "Perguntas do agente"
+summary = "Tarefas com uma pergunta ou um post que espera sua resposta."
+
+[views.decide-approve-plan]
+label = "Planos para aprovar"
+summary = "Tarefas com um plano que espera sua aprovação."
+
+[views.decide-send-draft]
+label = "Rascunhos para enviar"
+summary = "Tarefas com um rascunho que espera você enviar."
+
+[views.decide-review-step]
+label = "Etapas para revisar"
+summary = "Tarefas com uma etapa que espera sua revisão."
+
+[views.decide-last-step]
+label = "Últimos passos"
+summary = "Suas tarefas cujo trabalho só espera o último passo na origem."
+
+[views.decide-pick-someone]
+label = "Escolher alguém"
+summary = "Suas tarefas que esperam você escolher quem segue com elas."
+
+[views.decide-act]
+label = "Para agir"
+summary = "Tarefas com uma proposta ou um pedido que espera uma ação sua."
+
 [review.inbox]
 label = "Zerar a Inbox"
 

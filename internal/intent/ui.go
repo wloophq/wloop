@@ -6,6 +6,8 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -24,7 +26,20 @@ type UITexts struct {
 	Detail     map[string]UIField `toml:"detail"`
 	LensRaw    map[string]string  `toml:"lens"`
 	// Lens are the plugin's own row words, those it leaves out empty.
-	Lens RowWords `toml:"-"`
+	Lens    RowWords `toml:"-"`
+	NounRaw any      `toml:"noun"`
+	// Noun is what one of the plugin's units is, as the briefing counts it.
+	Noun i18n.Forms `toml:"-"`
+	// Decisions are the plugin's words of the decisions its units wait on, by decision kind.
+	Decisions map[string]UIDecision `toml:"decisions"`
+}
+
+// UIDecision is a plugin's words of a decision kind.
+type UIDecision struct {
+	ClauseRaw any        `toml:"clause"`
+	Clause    i18n.Forms `toml:"-"`
+	Queue     string     `toml:"queue"`
+	Empty     string     `toml:"empty"`
 }
 
 // UIField is how a field of a unit's detail shows.
@@ -140,6 +155,18 @@ func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems
 			}
 		}
 		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
+		if m.NounRaw != nil {
+			m.Noun, _ = formsOf(s, "noun", m.NounRaw)
+		}
+		for k, d := range m.Decisions {
+			if !decision.Valid(decision.Kind(k)) {
+				continue
+			}
+			if d.ClauseRaw != nil {
+				d.Clause, _ = formsOf(s, "decisions."+k+".clause", d.ClauseRaw)
+			}
+			m.Decisions[k] = d
+		}
 		if problems = append(problems, s.problems...); len(s.problems) > 0 {
 			continue
 		}
@@ -191,6 +218,21 @@ func mergeUI(into, over UITexts) UITexts {
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
+	if over.Noun != nil {
+		into.Noun = over.Noun
+	}
+	into.Decisions = mergeMap(into.Decisions, over.Decisions, func(a, b UIDecision) UIDecision {
+		if b.Clause != nil {
+			a.Clause = b.Clause
+		}
+		if b.Queue != "" {
+			a.Queue = b.Queue
+		}
+		if b.Empty != "" {
+			a.Empty = b.Empty
+		}
+		return a
+	})
 	return into
 }
 

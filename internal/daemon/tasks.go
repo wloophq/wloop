@@ -165,7 +165,7 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean})
+			RemoveClean: v.RemoveClean, Rail: v.Rail})
 	}
 	return out
 }

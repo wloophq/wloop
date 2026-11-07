@@ -51,6 +51,7 @@ var viewsGrammar = []Key{
 	{Path: "views.*.sort", In: SurfaceViews, Kind: KindText, Doc: "The facts the view sorts by, comma-separated; a leading - sorts one descending. A view's tasks start oldest first, a parent's children in their sibling order."},
 	{Path: "views.*.key", In: SurfaceViews, Kind: KindText, Doc: "The key that jumps to the view: `g`, a space and a key that no core key uses, such as `g i`. Its help is the view's label, and its help line the view's summary."},
 	{Path: "views.*.hide_disabled", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units."},
+	{Path: "views.*.rail", In: SurfaceViews, Kind: KindBool, Default: "true", Doc: "The rail lists the view; false keeps it for the home, a queue or search."},
 	{Path: "views.*.remove_clean", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why."},
 	{Path: "badge", In: SurfaceViews, Kind: KindTable, Doc: "The menu bar's badge."},
 	{Path: "badge.views", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The views whose counts the badge adds up, each a view of views."},

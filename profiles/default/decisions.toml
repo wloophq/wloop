@@ -1,0 +1,64 @@
+# The decisions a task waits on the user for. Each open gate counts as the
+# decision kind its gate kind maps to; each plugin's layer maps the
+# situations and link signals of its units the same way in its own
+# decisions.toml. Each kind names the view that lists its tasks, which its
+# queue walks, and the words the home's briefing and the queue use. A user
+# profile's decisions.toml replaces the keys it sets.
+
+[gates]
+question = "answer"
+post     = "answer"
+plan     = "approve-plan"
+draft    = "send-draft"
+step     = "review-step"
+proposal = "act"
+trust    = "act"
+
+[kinds.answer]
+view   = "decide-answer"
+noun   = { one = "question", other = "questions" }
+clause = "the agent has {counter} for you"
+queue  = "Agent questions"
+empty  = "No question waits for you."
+
+[kinds.approve-plan]
+view   = "decide-approve-plan"
+noun   = { one = "plan", other = "plans" }
+clause = { one = "{counter} waits for your approval", other = "{counter} wait for your approval" }
+queue  = "Plans to approve"
+empty  = "No plan waits for your approval."
+
+[kinds.send-draft]
+view   = "decide-send-draft"
+noun   = { one = "draft", other = "drafts" }
+clause = { one = "{counter} is ready to send", other = "{counter} are ready to send" }
+queue  = "Drafts to send"
+empty  = "No draft waits to be sent."
+
+[kinds.review-step]
+view   = "decide-review-step"
+noun   = { one = "step", other = "steps" }
+clause = { one = "{counter} waits for your review", other = "{counter} wait for your review" }
+queue  = "Steps to review"
+empty  = "No step waits for your review."
+
+[kinds.last-step]
+view   = "decide-last-step"
+noun   = { one = "item", other = "items" }
+clause = { one = "{counter} only waits for its last step", other = "{counter} only wait for their last step" }
+queue  = "Last steps"
+empty  = "Nothing waits only for its last step."
+
+[kinds.pick-someone]
+view   = "decide-pick-someone"
+noun   = { one = "item", other = "items" }
+clause = { one = "{counter} waits for you to pick someone", other = "{counter} wait for you to pick someone" }
+queue  = "Pick someone"
+empty  = "Nothing waits for you to pick someone."
+
+[kinds.act]
+view   = "decide-act"
+noun   = { one = "proposal", other = "proposals" }
+clause = { one = "{counter} waits for you to act", other = "{counter} wait for you to act" }
+queue  = "To act on"
+empty  = "Nothing waits for you to act."

@@ -1,0 +1,176 @@
+{
+  "$id": "https://github.com/wloophq/wloop/decisions.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "gates": {
+      "additionalProperties": {
+        "description": "One gate kind's decision kind.",
+        "enum": [
+          "answer",
+          "approve-plan",
+          "send-draft",
+          "review-step",
+          "last-step",
+          "pick-someone",
+          "act"
+        ],
+        "type": "string"
+      },
+      "description": "The decision kind of an open gate, by gate kind; only the default layer's file maps gates.",
+      "type": "object"
+    },
+    "kinds": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One decision kind.",
+        "properties": {
+          "clause": {
+            "description": "The briefing's clause on the kind, `{counter}` where its count goes, such as \"the agent has {counter} for you\". A string, or a table of its CLDR plural forms, `other` required.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "few": {
+                    "description": "Its few form.",
+                    "type": "string"
+                  },
+                  "many": {
+                    "description": "Its many form.",
+                    "type": "string"
+                  },
+                  "one": {
+                    "description": "Its one form.",
+                    "type": "string"
+                  },
+                  "other": {
+                    "description": "Its other form.",
+                    "type": "string"
+                  },
+                  "two": {
+                    "description": "Its two form.",
+                    "type": "string"
+                  },
+                  "zero": {
+                    "description": "Its zero form.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "empty": {
+            "description": "What the kind's queue says when it holds nothing. Required.",
+            "type": "string"
+          },
+          "noun": {
+            "description": "What one of the kind's tasks is, which the briefing counts, such as \"question\". A string, or a table of its CLDR plural forms, `other` required.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "few": {
+                    "description": "Its few form.",
+                    "type": "string"
+                  },
+                  "many": {
+                    "description": "Its many form.",
+                    "type": "string"
+                  },
+                  "one": {
+                    "description": "Its one form.",
+                    "type": "string"
+                  },
+                  "other": {
+                    "description": "Its other form.",
+                    "type": "string"
+                  },
+                  "two": {
+                    "description": "Its two form.",
+                    "type": "string"
+                  },
+                  "zero": {
+                    "description": "Its zero form.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "primary": {
+            "description": "The gate intent a queue offers first on a gate of the kind; empty offers the gate's first.",
+            "type": "string"
+          },
+          "queue": {
+            "description": "The title of the kind's queue. Required.",
+            "type": "string"
+          },
+          "view": {
+            "description": "The view of views.toml that lists the kind's tasks, which its queue walks. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "empty",
+          "queue",
+          "view"
+        ],
+        "type": "object"
+      },
+      "description": "Each decision kind's view and words, by kind; only the default layer's file sets them.",
+      "type": "object"
+    },
+    "primary": {
+      "additionalProperties": {
+        "description": "A catalog action of the plugin's units, or `open`, which opens the unit at its source.",
+        "type": "string"
+      },
+      "description": "What a queue offers first on a unit of the plugin, by decision kind; only a plugin's layer sets it.",
+      "type": "object"
+    },
+    "signals": {
+      "additionalProperties": {
+        "description": "One signal's decision kind.",
+        "enum": [
+          "answer",
+          "approve-plan",
+          "send-draft",
+          "review-step",
+          "last-step",
+          "pick-someone",
+          "act"
+        ],
+        "type": "string"
+      },
+      "description": "The decision kind of a unit whose link signal is on, by signal; only a plugin's layer maps them.",
+      "type": "object"
+    },
+    "situations": {
+      "additionalProperties": {
+        "description": "One situation's decision kind.",
+        "enum": [
+          "answer",
+          "approve-plan",
+          "send-draft",
+          "review-step",
+          "last-step",
+          "pick-someone",
+          "act"
+        ],
+        "type": "string"
+      },
+      "description": "The decision kind of a unit in a situation its plugin derives, by situation; only a plugin's layer maps them.",
+      "type": "object"
+    }
+  },
+  "title": "Decision kinds (decisions.toml)",
+  "type": "object"
+}

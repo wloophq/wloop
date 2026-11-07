@@ -56,3 +56,8 @@ var StringsSchema []byte
 //
 //go:embed timeline.schema.json
 var TimelineSchema []byte
+
+// DecisionsSchema is the JSON Schema of decisions.toml, for editors.
+//
+//go:embed decisions.schema.json
+var DecisionsSchema []byte

@@ -1,5 +1,7 @@
 package builtin
 
+import "slices"
+
 // uiGrammar is the keys of ui.toml, the words of a source plugin's views,
 // facets, situations and menu bar sections, by the ids its manifest's
 // [source.ui] and [[source.situations]] declare.
@@ -57,4 +59,22 @@ var uiGrammar = []Key{
 	{Path: "detail.*.title", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "What the field means, as its tooltip shows it."},
 	{Path: "menubar", In: SurfaceUI, Kind: KindTable, Doc: "The heading of each menu bar section, by section id."},
 	{Path: "menubar.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One section's heading."},
+	{Path: "decisions", In: SurfaceUI, Kind: KindTable, Doc: "The plugin's words of the decisions its units wait on, by decision kind, which replace the kind's own when every unit counted is the plugin's."},
+	{Path: "decisions.*", In: SurfaceUI, Kind: KindTable, Values: DecisionKinds, Doc: "One decision kind's words."},
+	{Path: "decisions.*.queue", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The title of the kind's queue, such as \"Ready to merge\"."},
+	{Path: "decisions.*.empty", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "What the kind's queue says when it holds nothing."},
+}
+
+var uiPluralGrammar = slices.Concat(
+	formsText(SurfaceUI, "noun", "What one of the plugin's units is, which the briefing counts, such as \"pull request\"."),
+	formsText(SurfaceUI, "decisions.*.clause", "The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes."))
+
+// formsText is a text a person reads at path of surface s, each of its CLDR plural forms translated on its
+// own: a plugin's layers share their file names, so its forms resolve one by one, layer by layer.
+func formsText(s Surface, path, doc string) []Key {
+	out := []Key{{Path: path, In: s, Kind: KindAny, Doc: doc + " A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form."}}
+	for _, f := range PluralForms {
+		out = append(out, Key{Path: path + "." + f, In: s, Kind: KindText, Localized: true, Doc: "Its " + f + " form."})
+	}
+	return out
 }
