@@ -162,6 +162,10 @@ type Draft struct {
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
+	// Why is why it was proposed, in the user's language when it was;
+	// Language is the locale Text is written in. Both "" for a draft no
+	// workflow step wrote.
+	Why, Language string
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
@@ -187,12 +191,14 @@ var transitions = map[State][]State{
 }
 
 // The reasons a draft is withdrawn, as Reason of the discarded draft: a
-// workflow's, its person was assigned the items or it is moot; or a verb
-// ended the task the draft served.
+// workflow's, its person was assigned the items or it is moot; a verb
+// ended the task the draft served; or the user skipped its workflow on its
+// unit.
 const (
 	WithdrawAssigned = "assigned"
 	WithdrawMoot     = "moot"
 	WithdrawEnded    = "ended"
+	WithdrawSkipped  = "skipped"
 )
 
 type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"

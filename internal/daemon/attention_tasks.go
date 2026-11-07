@@ -420,6 +420,26 @@ func (ev *taskViewer) openDrafts(ctx context.Context) []draft.Draft {
 	return ev.drafts
 }
 
+// pendingDrafts are the ids, ascending, of the held and failed drafts that serve task id, of enabled plugins;
+// empty, never nil, for none.
+func (ev *taskViewer) pendingDrafts(ctx context.Context, id task.ID) []int64 {
+	if ev.pending == nil {
+		ev.pending = map[string][]int64{}
+		for _, d := range ev.openDrafts(ctx) {
+			if d.Task != "" && ev.s.pluginEnabled(d.Unit.Provider) {
+				ev.pending[d.Task] = append(ev.pending[d.Task], int64(d.ID))
+			}
+		}
+		for _, ids := range ev.pending {
+			slices.Sort(ids)
+		}
+	}
+	if ids := ev.pending[string(id)]; ids != nil {
+		return slices.Clone(ids)
+	}
+	return []int64{}
+}
+
 // proposedFor is the newest proposed draft that serves task id.
 func (ev *taskViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft, bool) {
 	var best draft.Draft

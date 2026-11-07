@@ -268,6 +268,8 @@ type Env struct {
 	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error
 	// dossierMu serializes the dossiers' git work across serve passes.
 	dossierMu *sync.Mutex
+	// configMu serializes a serve's edits of the config file; nil outside a serve, whose one command edits once.
+	configMu *sync.Mutex
 	// started is the daemon's start-up reconcile, run once per daemon.
 	started *startedOnce
 	// interrupted is set once the brief runs a stopped daemon left running

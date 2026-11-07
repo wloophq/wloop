@@ -9,6 +9,7 @@ brief_subject = true
 kinds = ["thread"]
 
 default_delivery = "message"
+language_fact = "slack.language"
 config_reads = ["placement", "items.heat"]
 notify = ["tasks", "gates"]
 
@@ -117,6 +118,12 @@ doc = "The newest update of a settled draft the workflow proposed on the unit, w
 name = "slack.fingerprint"
 type = "string"
 doc = "The unit, its newest message and the update time of its items."
+untrusted = true
+
+[[source.facts]]
+name = "slack.language"
+type = "string"
+doc = "The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell."
 untrusted = true
 
 [[source.signals]]

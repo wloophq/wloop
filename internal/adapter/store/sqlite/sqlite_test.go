@@ -19,7 +19,7 @@ var golden = []string{
 	"classify_days: day, total",
 	"dossier_moves: seq, from_path, to_path",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
-	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state, evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced, origin_session",
+	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state, evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced, origin_session, why, language",
 	"events: id, provider, unit_key, kind, key, actor, at, data, anchor, session",
 	"fetches: workspace_id, at",
 	"gates: id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer, by_actor, rule, deadline, default_intent, opened_at, closed_at, applied_at, begun_at, session, by_session, text",
@@ -62,6 +62,7 @@ var golden = []string{
 	"wakes: task_id, until, on_kinds, actors, cond, expires, return_state",
 	"workflow_cursors: workflow, cursor, last_fire",
 	"workflow_runs: workflow, provider, unit_key, key_value, status, attempts, error, at",
+	"workflow_skips: provider, unit_key, workflow, at",
 	"worktree_units: path, provider, unit_key, at",
 	"worktrees: path, repo, manager, workspace_id, created_by, at",
 }

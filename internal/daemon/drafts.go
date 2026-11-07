@@ -411,7 +411,7 @@ func taskDraftError(err error) error {
 // draftView is d on the wire, with g, its gate, and its actions as they stand.
 func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
-		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
+		Target: d.Target, Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},
 		State: string(d.State), Error: d.Error, Reason: d.Reason, Permalink: d.Evidence.Permalink, Gate: g.ID,
@@ -459,18 +459,31 @@ func (s *Server) draftFacts(d draft.Draft) catalog.DraftFacts {
 var mentionKey = regexp.MustCompile(`@\{([^{}\s]+)\}`)
 
 // draftDetail is draftView with the names of the people the text mentions and the items it is about, read
-// from the unit's items; its is those items, nil to read them.
-func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, its []items.Item) api.Draft {
+// from the unit's items, which only a draft with items or a mention reads, once per unit into byUnit (nil
+// keeps none).
+func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.Draft {
 	v := s.draftView(ctx, d, g)
 	if s.deps.Items == nil || (len(d.Items) == 0 && !mentionKey.MatchString(d.Text)) {
 		return v
 	}
-	if its == nil {
-		var err error
-		if its, err = s.deps.Items.Items(ctx, d.Unit); err != nil {
-			s.logf("drafts: the items of %s: %v", d.Unit.Label(), err)
-			return v
+	its := s.itemsOnce(ctx, byUnit, d.Unit)
+	v.Names = mentionNames(d.Text, its)
+	for _, id := range d.Items {
+		iv := api.ItemView{Unit: d.Unit, ID: id}
+		if i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == id }); i >= 0 {
+			iv.Summary, iv.State, iv.Kind = its[i].Summary, string(its[i].State), string(its[i].Kind)
 		}
+		v.ItemDetails = append(v.ItemDetails, iv)
+	}
+	return v
+}
+
+// mentionNames are the names of the people text mentions, by the key it mentions them with, read from the
+// requesters, assignees and people waited on of its; nil when it names nobody.
+func mentionNames(text string, its []items.Item) map[string]string {
+	mentions := mentionKey.FindAllStringSubmatch(text, -1)
+	if len(mentions) == 0 {
+		return nil
 	}
 	names := map[string]string{}
 	for _, it := range its {
@@ -482,22 +495,16 @@ func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, it
 			}
 		}
 	}
-	for _, m := range mentionKey.FindAllStringSubmatch(d.Text, -1) {
+	var out map[string]string
+	for _, m := range mentions {
 		if n, ok := names[m[1]]; ok {
-			if v.Names == nil {
-				v.Names = map[string]string{}
+			if out == nil {
+				out = map[string]string{}
 			}
-			v.Names[m[1]] = n
+			out[m[1]] = n
 		}
 	}
-	for _, id := range d.Items {
-		iv := api.ItemView{Unit: d.Unit, ID: id}
-		if i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == id }); i >= 0 {
-			iv.Summary, iv.State, iv.Kind = its[i].Summary, string(its[i].State), string(its[i].Kind)
-		}
-		v.ItemDetails = append(v.ItemDetails, iv)
-	}
-	return v
+	return out
 }
 
 // draftDetails are the details of ps, each unit's items read once.
@@ -505,21 +512,27 @@ func (s *Server) draftDetails(ctx context.Context, ps []outbox.Pending) []api.Dr
 	byUnit := map[unit.Unit][]items.Item{}
 	out := make([]api.Draft, 0, len(ps))
 	for _, p := range ps {
-		d := p.Draft
-		its, ok := byUnit[d.Unit]
-		if !ok && s.deps.Items != nil {
-			var err error
-			if its, err = s.deps.Items.Items(ctx, d.Unit); err != nil {
-				s.logf("drafts: the items of %s: %v", d.Unit.Label(), err)
-			}
-			if its == nil {
-				its = []items.Item{}
-			}
-			byUnit[d.Unit] = its
-		}
-		out = append(out, s.draftDetail(ctx, d, p.Gate, its))
+		out = append(out, s.draftDetail(ctx, p.Draft, p.Gate, byUnit))
 	}
 	return out
+}
+
+// itemsOnce are u's items, read once into byUnit (nil keeps none); a failed read is logged and reads as none.
+func (s *Server) itemsOnce(ctx context.Context, byUnit map[unit.Unit][]items.Item, u unit.Unit) []items.Item {
+	if its, ok := byUnit[u]; ok {
+		return its
+	}
+	its, err := s.deps.Items.Items(ctx, u)
+	if err != nil {
+		s.logf("drafts: the items of %s: %v", u.Label(), err)
+	}
+	if its == nil {
+		its = []items.Item{}
+	}
+	if byUnit != nil {
+		byUnit[u] = its
+	}
+	return its
 }
 
 // draftWhere is where a draft still to be posted goes, best effort: "" when its publisher cannot tell.

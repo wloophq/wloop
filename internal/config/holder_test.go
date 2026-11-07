@@ -181,6 +181,50 @@ func TestUILocaleAppliesWithoutARestart(t *testing.T) {
 	}
 }
 
+func TestAWorkflowSwitchAppliesWithoutARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\n")
+	r.h.Reload()
+	if w := r.h.Config().Workflows["wf"]; w.Enabled == nil || *w.Enabled || r.h.Stale() {
+		t.Fatalf("workflow %+v, stale %v", w, r.h.Stale())
+	}
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\nobserve = true\n")
+	r.h.Reload()
+	if w := r.h.Config().Workflows["wf"]; w.Enabled == nil || *w.Enabled || w.Observe != nil || !r.h.Stale() {
+		t.Fatalf("observe beside the switch: workflow %+v, stale %v", w, r.h.Stale())
+	}
+}
+
+func TestAWorkflowSwitchDoesNotTouchTheStartConfig(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\n")
+	r.h.Reload()
+	r.write("sweep = {fast = \"2m\"}\n")
+	r.h.Reload()
+	if r.h.Stale() || r.h.Warning() != "" {
+		t.Fatalf("back to the start file: stale %v, warning %q", r.h.Stale(), r.h.Warning())
+	}
+}
+
+func TestAnotherChangeStillNeedsARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write(`sweep = {fast = "5m"}`)
+	r.h.Reload()
+	if !r.h.Stale() || r.h.Config().Sweep.Fast != Days(2*time.Minute) {
+		t.Fatalf("stale %v, fast %v", r.h.Stale(), r.h.Config().Sweep.Fast)
+	}
+}
+
+func TestReloadReadsTheFileAtOnce(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nui = {locale = \"pt-BR\"}\n")
+	loads := r.loads
+	r.h.Reload()
+	if r.loads != loads+1 || r.h.Config().UI.Locale != "pt-BR" {
+		t.Fatalf("%d loads, locale %q", r.loads-loads, r.h.Config().UI.Locale)
+	}
+}
+
 func TestConfigWarningIsACodeNotEnglish(t *testing.T) {
 	t.Skip("D10 the config warning is served as a code plus the live key names, its words in strings.toml")
 }

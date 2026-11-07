@@ -261,6 +261,7 @@ func (t *Texts) file(rel string) *fileTexts {
 				f.problems = append(f.problems, TextProblem{File: loc.Path, Msg: msg})
 				continue
 			}
+			loc.Locale = t.dir
 			f.wholeLoc[i] = loc
 			continue
 		}

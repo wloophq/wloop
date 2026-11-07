@@ -236,6 +236,28 @@ func TestSlackSettledAtIsTheHosts(t *testing.T) {
 	}
 }
 
+func TestSlackFactsCarryTheThreadsLanguage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newFactsFixture(t)
+	f.listed(t, factsThread)
+	if got, _ := f.facts(t, factsThread); got["slack.language"] != "" {
+		t.Errorf("a thread with no text: language %q, want empty", got["slack.language"])
+	}
+	k, _ := dslack.ParseUnit(factsThread)
+	o := store.ObjectFacts{Object: store.ObjectRow{Object: k.Conversation + "/" + k.TS, Conversation: k.Conversation, TS: k.TS, Kind: store.SlackThread}}
+	for i, text := range []string{"Oi, você consegue revisar o contrato até amanhã?", "Consigo sim, vou olhar ainda hoje à tarde"} {
+		o.Messages = append(o.Messages, store.MessageRow{Conversation: k.Conversation, TS: fmt.Sprintf("1700000000.00010%d", i), ThreadTS: k.TS,
+			User: "U0000000009", Text: text})
+	}
+	if _, err := f.db.Slack().Save(ctx, store.FactsRows{Team: k.Team, Objects: []store.ObjectFacts{o}}, monday); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := f.facts(t, factsThread); got["slack.language"] != "pt" {
+		t.Errorf("language %q, want pt", got["slack.language"])
+	}
+}
+
 func (f *fixture) messages(t *testing.T, tss ...string) {
 	t.Helper()
 	k, _ := dslack.ParseUnit(factsThread)

@@ -91,6 +91,21 @@ func seedWake(t *testing.T, e *noteEnv) {
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
 	{
+		method: "DB.SaveSkip",
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.SaveSkip(ctx, "nudge", u7, noteAt) },
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
+		method: "DB.DeleteSkip",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := e.db.SaveSkip(context.Background(), "nudge", u7, noteAt); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DeleteSkip(ctx, "nudge", u7) },
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
 		method: "WakeStore.Put",
 		seed:   func(t *testing.T, e *noteEnv) { applyTask(t, e.db, "t-01") },
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -484,7 +499,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
 	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
-	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
+	"DB.AllSkips", "DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
 	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",

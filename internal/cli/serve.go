@@ -187,9 +187,13 @@ func serveLocale(cfg config.Config, detected, available []string) string {
 	return i18n.Pick(cfg.UI.Locale, detected, available)
 }
 
-// configHolder holds cfg for a serve: the profile setting follows the config
-// file and any other change is reported stale.
+// configHolder holds cfg for a serve: the live keys follow the config file and
+// any other change is reported stale. The serve's own edits of the file take
+// turns from here on.
 func (e *Env) configHolder(cfg config.Config) *config.Holder {
+	if e.configMu == nil {
+		e.configMu = &sync.Mutex{}
+	}
 	return config.NewHolder(cfg, config.HolderOptions{Path: e.ConfigPath, Load: e.readConfig, Now: e.Now,
 		OnProfileChange: func(string) { e.noteConfig() }, OnWarningChange: e.noteConfig})
 }
@@ -314,7 +318,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
-		Timeline: taskTimeline(db),
+		Timeline:  taskTimeline(db),
+		ConfigSet: e.setConfig,
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,

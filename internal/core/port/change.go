@@ -14,7 +14,7 @@ const (
 	TopicFollow                         // pull_requests.reasons and ws_*: follow state (noted with TopicPRs)
 	TopicSourceEvents                   // events a source writes (GitHub timeline, Slack changes)
 	TopicLoopEvents                     // events the loop writes: rounds, turns, sessions, situations, views, briefs, would_*
-	TopicOverrides                      // overrides
+	TopicOverrides                      // overrides, workflow_skips
 	TopicTurns                          // turns, turn_records, turn_answers
 	TopicSessions                       // sessions, agent_sessions, turn_stops
 	TopicIntakes                        // intakes

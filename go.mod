@@ -6,6 +6,7 @@ toolchain go1.26.10
 
 require (
 	cel.dev/cel-go v0.32.0
+	github.com/abadojack/whatlanggo v1.0.1
 	github.com/clipperhouse/uax29/v2 v2.7.0
 	github.com/coder/websocket v1.8.15
 	github.com/ebitengine/purego v0.11.2

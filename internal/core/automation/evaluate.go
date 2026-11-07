@@ -344,6 +344,9 @@ func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, w
 // error says the candidate could not be decided: its facts, its match or
 // its run could not be read.
 func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]workflow.Item) error {
+	if p.skipped(w.Name, c.u) {
+		return nil
+	}
 	facts, err := p.unitFacts(w, c.u)
 	if err == nil {
 		facts, err = p.e.scoped(p.ctx, w.Name, c.u, facts)

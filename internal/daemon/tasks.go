@@ -237,7 +237,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if ok && listed[e.ID] {
-			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate))
+			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate, vs.unitItems()))
 		}
 	}
 	writeJSON(w, page)
@@ -844,7 +844,9 @@ type taskViewer struct {
 	detail   bool
 	children map[task.ID][]task.ID
 	drafts   []draft.Draft
-	status   map[task.ID]coretasks.ProjectState
+	// pending are the ids of openDrafts by the task they serve, read once per page.
+	pending map[string][]int64
+	status  map[task.ID]coretasks.ProjectState
 	// briefs are the brief records by unit, read once per page.
 	briefs map[unit.Unit]port.Event
 	// rows are the read model's rows of the units read, each read once: a page reads its tasks' in one
@@ -853,6 +855,8 @@ type taskViewer struct {
 	read map[unit.Unit]bool
 	// refs are the tasks a listed id reads as, the page's own and each one read once; ok false for none.
 	refs map[task.ID]taskRef
+	// items are the items of the units the page's drafts are on, each unit's read once.
+	items map[unit.Unit][]items.Item
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -912,6 +916,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.unitLabels(ctx, v.Units)
+	v.Drafts = ev.pendingDrafts(ctx, e.ID)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
 	} else if ok {
@@ -955,7 +960,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.s.withDraft(ctx, e, &v); err != nil {
+	if err := ev.withDraft(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil

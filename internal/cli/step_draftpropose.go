@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -9,7 +8,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
@@ -25,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 // draftProposeStep adapts draft.propose: Check renders the text and holds per
@@ -69,6 +68,16 @@ type draftDeps struct {
 	Codecs unit.KeyComparer
 	// Me is the user's identity; nil: nobody.
 	Me func() task.Me
+	// Languages are the facts that tell a unit's language, by provider; nil: builtin.LanguageFacts.
+	Languages map[unit.ProviderID]string
+}
+
+// languageFact is the fact that tells the language of p's units; "" for none.
+func (d *draftDeps) languageFact(p unit.ProviderID) string {
+	if d.Languages != nil {
+		return d.Languages[p]
+	}
+	return builtin.LanguageFacts[p]
 }
 
 // me is the user's identity, compared through the deps' codecs.
@@ -234,12 +243,16 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			return []draftCandidate{{refusal: fmt.Sprintf("%s applies to %s drafts only", name, builtin.Effects[i].Provider)}}, nil
 		}
 	}
-	tmpl, err := draftTemplate(deps.Config(), w.Name, a.text, a.delivery)
+	l := s.e.loadedIntents()
+	lang, err := s.draftLanguage(ctx, sub.unit, l.Locale)
+	if err != nil {
+		return nil, err
+	}
+	tmpl, written, err := draftTemplate(profile.Chain(deps.Config()), turn.BundledFS(), w.Name, a.text, a.delivery, lang)
 	if err != nil {
 		return nil, err
 	}
 	now := deps.Now()
-	l := s.e.loadedIntents()
 	policy := draftApproval(deps.Config(), w, briefExtrasOf(l), intentload.DefaultDraftApproval(l.Gates))
 	var subject *draft.Subject
 	if w.Withdraw != nil || len(policy.Rules) > 0 {
@@ -300,10 +313,28 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			if cd.p.Text, err = renderDraft(tmpl, draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts}, sub, person, its); err != nil {
 				return nil, err
 			}
+			cd.p.Language = written
 		}
 		out = append(out, cd)
 	}
 	return out, nil
+}
+
+// draftLanguage is the locale a draft posted on u is written in, through the fact u's plugin names as its
+// units' language; userLocale when the plugin names none or u is gone.
+func (s *stepSet) draftLanguage(ctx context.Context, u unit.Unit, userLocale string) (string, error) {
+	fact := s.d.Drafts.languageFact(u.Provider)
+	if fact == "" {
+		return userLocale, nil
+	}
+	facts, err := s.facts(ctx, u)
+	switch {
+	case errors.Is(err, automation.ErrUnitGone):
+		return userLocale, nil
+	case err != nil:
+		return "", err
+	}
+	return draftLanguage(facts, fact, userLocale, intentload.Locales(profile.Chain(s.d.Drafts.Config()), turn.BundledFS())), nil
 }
 
 // subject reads what a step's subject u holds: for a task, the unit its
@@ -625,59 +656,4 @@ func draftFactsOf(sub draftSubject, person string, ids []string, me task.Me) wor
 		"draft.unit_open":       sub.task == nil || sub.task.Open(),
 		"draft.person_asks_you": sub.asks(person, me),
 	}
-}
-
-// draftTextData is what a draft's template reads: item text is data, never
-// template code. Facts are the step's subject's facts by name, none once
-// the subject is gone.
-type draftTextData struct {
-	Workflow, Purpose, Unit, Task string
-	Person                        draftTextPerson
-	Items                         []draftTextItem
-	Facts                         workflow.Facts
-}
-
-type draftTextPerson struct{ Key, Name string }
-
-type draftTextItem struct {
-	ID, Summary, Line, Resolution, State, Permalink string
-}
-
-// draftTemplate is the workflow's text template through the profile layers;
-// nil for an emoji delivery that names no template of its own, so a
-// reaction carries no text even where the workflow's message text exists.
-func draftTemplate(cfg config.Config, workflowName, text string, d draft.Delivery) (*template.Template, error) {
-	if slices.Contains(builtin.DraftEmojiDeliveries, string(d)) && text == defaultDraftText {
-		return nil, nil
-	}
-	rel := path.Join("workflows", workflowName, text)
-	r, err := profile.Resolve(profile.Chain(cfg), rel)
-	if err != nil {
-		return nil, fmt.Errorf("draft.propose: %w", err)
-	}
-	t, err := template.New(rel).Option("missingkey=error").Parse(string(r.Body))
-	if err != nil {
-		return nil, fmt.Errorf("draft.propose: %s: %w", r.Path, err)
-	}
-	return t, nil
-}
-
-// renderDraft renders t over data, filled with sub's unit and task, person and its items.
-func renderDraft(t *template.Template, data draftTextData, sub draftSubject, person items.Person, its []items.Item) (string, error) {
-	if t == nil {
-		return "", nil
-	}
-	data.Unit, data.Person = sub.unit.String(), draftTextPerson{Key: person.Key, Name: person.Name}
-	if sub.task != nil {
-		data.Task = string(sub.task.ID)
-	}
-	for _, it := range its {
-		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),
-			Resolution: string(it.Resolution), State: string(it.State), Permalink: it.Origin.Permalink})
-	}
-	var b bytes.Buffer
-	if err := t.Execute(&b, data); err != nil {
-		return "", fmt.Errorf("draft.propose: rendering %s: %w", t.Name(), err)
-	}
-	return b.String(), nil
 }

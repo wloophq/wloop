@@ -16,6 +16,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -224,10 +225,19 @@ func draftTitle(d draft.Draft, where string) string {
 	return fmt.Sprintf("%s on %s: %s", d.Purpose, where, first)
 }
 
+// unitItems are the items the page read, by unit, for itemsOnce.
+func (ev *taskViewer) unitItems() map[unit.Unit][]items.Item {
+	if ev.items == nil {
+		ev.items = map[unit.Unit][]items.Item{}
+	}
+	return ev.items
+}
+
 // withDraft sets a draft task's gate on v, its subject the draft, and its verbs: approve and dismiss while its gate
 // is open, dismiss also while its delivery may still go, edit and retry as the draft's actions stand; the others
 // are refused.
-func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
+func (ev *taskViewer) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
+	s := ev.s
 	if e.Origin != task.OriginDraft || s.deps.Outbox == nil {
 		return nil
 	}
@@ -243,7 +253,7 @@ func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) er
 	if err != nil {
 		return err
 	}
-	dv := s.draftView(ctx, d, g)
+	dv := s.draftDetail(ctx, d, g, ev.unitItems())
 	if g.ID != 0 {
 		v.Gates = []api.GateView{s.draftGateView(g, dv)}
 	}

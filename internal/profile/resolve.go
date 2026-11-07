@@ -25,6 +25,8 @@ type Resolved struct {
 	Layer Layer
 	Path  string
 	Body  []byte
+	// Locale is the locale of the locales/<tag>/ mirror Texts served; "" for the file itself.
+	Locale string
 }
 
 // Resolve reads rel, a slash path such as partials/record.md.tmpl, from the
