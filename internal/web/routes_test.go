@@ -84,3 +84,26 @@ process.stdout.write(JSON.stringify({ Panel: p.panel, Q: p.q, None: readRoute("#
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestHashWritesKeepTheQueue(t *testing.T) {
+	var got []struct{ From, To, Before, After string }
+	nodeRun(t, routesPrelude(t)+staticJS(t, "queue.js"), nil, `
+tasksState.catalog = input;
+const out = [];
+for (const [from, change] of [["#queue=list&ids=t-1,t-2", { task: "t-1", pr: "" }], ["#queue=answer", { task: "t-3", pr: "" }],
+  ["#queue=send-draft&task=t-3", { task: "" }], ["#queue=list&ids=t-1,t-2&task=t-1", { q: "x" }]]) {
+  location.hash = from;
+  const before = queueKey(readRoute(location.hash));
+  location.hash = "#" + hashString({ ...readHash(), ...change });
+  out.push({ From: from, To: location.hash, Before: before, After: queueKey(readRoute(location.hash)) });
+}
+process.stdout.write(JSON.stringify(out));`, viewsCatalog(), &got)
+	if len(got) != 4 {
+		t.Fatalf("%+v", got)
+	}
+	for _, g := range got {
+		if g.Before != g.After {
+			t.Errorf("%s became %s: queue %q, then %q", g.From, g.To, g.Before, g.After)
+		}
+	}
+}

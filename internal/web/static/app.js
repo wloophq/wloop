@@ -197,6 +197,8 @@ function readHash() {
   const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
   return {
     view,
+    queue: view === QUEUE ? route.queue : "",
+    ids: view === QUEUE ? route.ids : [],
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
     task: route.task,
     area: route.area,
@@ -223,6 +225,9 @@ function lensPicks(view, route, g, s) {
 
 function hashString(next) {
   const p = new URLSearchParams();
+  const queue = next.view === QUEUE && next.queue;
+  if (queue) p.set("queue", next.queue);
+  if (queue && next.ids && next.ids.length) p.set("ids", next.ids.join(","));
   if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", [].concat(next.ctx).join(","));
@@ -233,7 +238,7 @@ function hashString(next) {
   if (next.x && next.view === "explore") p.set("x", next.x);
   if (next.tk && next.view === "dash") p.set("tk", next.tk);
   if (next.done && next.view === "dash") p.set("done", "1");
-  return routeHash(next.view, next.pr, p);
+  return routeHash(queue ? "" : next.view, next.pr, p);
 }
 
 function writeHash(change, replace) {
