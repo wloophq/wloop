@@ -20,7 +20,7 @@ import (
 
 var r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
-func bundled(t *testing.T) *intentload.Loaded {
+func bundled(t testing.TB) *intentload.Loaded {
 	t.Helper()
 	l, err := turn.Bundled()
 	if err != nil {
