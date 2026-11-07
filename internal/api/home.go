@@ -29,7 +29,7 @@ type BriefingPart struct {
 	Counter *int   `json:"counter,omitempty"`
 }
 
-// HomeCounter counts the tasks of a decision kind (Kind) or of a view; View is the view it opens.
+// HomeCounter counts the decisions of a kind (Kind), those its queue lists, or the tasks of a view; View is the view it opens.
 type HomeCounter struct {
 	ID    string       `json:"id"`
 	Kind  string       `json:"kind,omitempty"`

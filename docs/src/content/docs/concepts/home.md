@@ -20,7 +20,7 @@ The fact `task.decisions` lists the kinds a task waits on, the oldest first, and
 
 ## The briefing
 
-`home.toml` lists the counters in order. A counter counts a decision kind's view, or a view of its own with its noun and clause:
+`home.toml` lists the counters in order. A counter counts the decisions of a kind, one per decision as its queue lists them, or the tasks of a view of its own with its noun and clause:
 
 ```toml
 [[counters]]
@@ -33,7 +33,7 @@ noun   = { one = "task", other = "tasks" }
 clause = { other = "the loop handles {counter}" }
 ```
 
-Each counter with something to count is a clause, `{counter}` where its count goes; the clauses are joined into sentences of at most `per_sentence`, with `join`, `last_join` and `end`. A count reads as `count` (`{n} {noun}`). When every task a kind counts is one plugin's units, the count uses the plugin's noun and clause, from its `ui.toml` (`noun`, `[decisions.<kind>] clause`); when several plugins share it, each plugin's count is listed and the kind's own clause stands. When nothing counts, the briefing says `empty`.
+Each counter with something to count is a clause, `{counter}` where its count goes; the clauses are joined into sentences of at most `per_sentence`, with `join`, `last_join` and `end`. A count reads as `count` (`{n} {noun}`). When every decision a kind counts is of one plugin's units, the count uses the plugin's noun and clause, from its `ui.toml` (`noun`, `[decisions.<kind>] clause`); when several plugins share it, each plugin's count is listed and the kind's own clause stands. When nothing counts, the briefing says `empty`.
 
 ## Sections and capture
 

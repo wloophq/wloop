@@ -60,7 +60,7 @@ type Profile struct {
 	CaptureHint                                 string
 }
 
-// Counter counts a decision kind's tasks (Kind) or a view's (View, with its own Noun and Clause).
+// Counter counts a decision kind's decisions (Kind), one per item of its queue, or a view's tasks (View, with its own Noun and Clause).
 type Counter struct {
 	ID           string
 	Kind         decision.Kind

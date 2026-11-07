@@ -98,3 +98,31 @@ func TestQueueKeepNarrows(t *testing.T) {
 		t.Fatalf("items %+v", q.Items)
 	}
 }
+
+func TestHomeCounterCountsTheDecisionsItsQueueLists(t *testing.T) {
+	two, one, none := task.Task{ID: "t-two"}, task.Task{ID: "t-one"}, task.Task{ID: "t-none"}
+	draft := func(id int64, p unit.ProviderID) decision.Found {
+		return decision.Found{Kind: decision.SendDraft, Gate: &gate.Gate{ID: id, Intents: []string{"send"}}, Unit: unit.Unit{Provider: p, Key: "k"}, Since: t0}
+	}
+	d := fakeDecisions{"t-two": {draft(1, "alpha"), draft(2, "alpha")}, "t-one": {draft(3, "beta"), draft(4, "beta")}}
+	w := queueWords()
+	w.profile.Counters = []home.Counter{{ID: "send", Kind: decision.SendDraft}}
+	w.kinds[decision.SendDraft] = home.KindWords{View: "decide-send-draft", Noun: plural("draft", "drafts"), Clause: home.Forms{"other": "{counter} wait"}}
+	w.plugins["alpha"] = home.PluginWords{Noun: plural("alpha draft", "alpha drafts")}
+	w.plugins["beta"] = home.PluginWords{Noun: plural("beta draft", "beta drafts")}
+	s := home.Service{Lists: &fakeLists{sets: map[task.View][]task.Task{"decide-send-draft": {two, one, none}}}, Decisions: d, Words: w}
+	h, err := s.Home(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q, err := s.Queue(context.Background(), decision.SendDraft, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := h.Counts[0]; c.N != 4 || c.N != len(q.Items) {
+		t.Fatalf("counter %d, queue %d: the counter counts the decisions its queue lists", c.N, len(q.Items))
+	}
+	if c := h.Counts[0]; c.Label != "2 alpha drafts and 2 beta drafts" {
+		t.Fatalf("label %q: each plugin's share counts its decisions", c.Label)
+	}
+}

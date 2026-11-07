@@ -1,12 +1,14 @@
 package daemon
 
 import (
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -57,5 +59,36 @@ func TestQueueUnknownKind(t *testing.T) {
 	r.s.Handler().ServeHTTP(rec, apiRequest("GET", queuePath("merge"), nil))
 	if rec.Code != 404 || !strings.Contains(rec.Body.String(), "last-step") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestEveryHomeCounterCountsWhatItsQueueLists(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-0000000000000001", State: "next", Category: task.CategoryReady, Title: "ship the retries"},
+		task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "call Ada"})
+	r.withGates(t, "t-0000000000000001")
+	r.withGates(t, "t-0000000000000002")
+	if _, err := r.s.deps.Gates.Open(context.Background(), gate.Gate{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.KindQuestion, Subject: "8"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	var h api.Home
+	if code := get(t, r.s, api.HomePath, &h); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	for _, c := range h.Briefing.Counters {
+		if c.Kind == "" {
+			continue
+		}
+		var q api.Queue
+		if code := get(t, r.s, queuePath(string(c.Kind)), &q); code != 200 {
+			t.Fatalf("%s: %d", c.Kind, code)
+		}
+		if c.Count != q.Total {
+			t.Errorf("%s: the home counts %d, its queue lists %d", c.Kind, c.Count, q.Total)
+		}
+		if c.Kind == "answer" && c.Count != 3 {
+			t.Errorf("answer: %d, want the 3 open questions", c.Count)
+		}
 	}
 }
