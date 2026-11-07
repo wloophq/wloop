@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/client/window"
 )
 
 var errNotMacOS = errors.New("the menu bar needs macOS")
@@ -54,20 +55,22 @@ func runAppClient(ctx context.Context, e *Env) error {
 		case <-ctx.Done():
 		}
 	}()
-	digestAt := ""
+	digestAt, win := "", Defaults().Window
 	if cfg, err := e.loadConfig(); err != nil {
 		logf("reading the config: %v; the daily digest is off", err)
 	} else {
-		digestAt = cfg.Notifications.DigestAt
+		digestAt, win = cfg.Notifications.DigestAt, cfg.Window
 	}
-	e.RunNative(func(tray menubar.Tray, notes menubar.Notifier) {
+	e.RunNative(win, func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
 		dc := client.New(e.Socket)
+		cockpit := func(route string) (string, error) { return cockpitURL(e.StateDir, route) }
 		c := menubar.New(menubar.Config{
 			Daemon:     dc,
 			Tray:       tray,
 			Notifier:   notes,
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
-			CockpitURL: func(route string) (string, error) { return cockpitURL(e.StateDir, route) },
+			CockpitURL: cockpit,
+			Window:     windowShow(ctx, host, dc, cockpit, win, logf),
 			Quit:       cancel,
 			Copy:       copyToClipboard,
 			Now:        e.Now,

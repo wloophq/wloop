@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -164,7 +165,9 @@ type Env struct {
 
 	// The native menu bar and the process exit; tests replace them.
 	NativeAvailable func() bool
-	RunNative       func(setup func(menubar.Tray, menubar.Notifier))
+	// RunNative runs the app's native loop; setup's host is nil when the app
+	// shows no window of its own.
+	RunNative func(win config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host))
 	QuitNative      func()
 	Exit            func(code int)
 	// Reexec replaces this process with Executable, same arguments.
@@ -338,9 +341,7 @@ func NewEnv() *Env {
 		Harness:       harnessOf(protocols, managers),
 
 		NativeAvailable: macos.Available,
-		RunNative: func(setup func(menubar.Tray, menubar.Notifier)) {
-			macos.Run(filepath.Join(stateDir, "notify"), setup)
-		},
+		RunNative:       macNative(filepath.Join(stateDir, "notify")).run,
 		QuitNative: macos.Quit,
 		Exit:       os.Exit,
 		Reexec:     func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
