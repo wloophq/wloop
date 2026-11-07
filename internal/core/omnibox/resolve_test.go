@@ -23,12 +23,10 @@ type fakeRefs struct {
 	created   int
 }
 
-func (f *fakeRefs) Resolve(_ context.Context, address string) (unit.Unit, bool, error) {
-	u, ok := f.addresses[address]
-	return u, ok, nil
-}
-
 func (f *fakeRefs) Find(_ context.Context, token string) ([]omnibox.Ref, error) {
+	if u, ok := f.addresses[token]; ok {
+		return []omnibox.Ref{{Unit: &u}}, nil
+	}
 	return f.refs[token], nil
 }
 
@@ -59,6 +57,23 @@ func TestResolveUnclaimedAddressFallsToSearch(t *testing.T) {
 	got, _ := r.Resolve(context.Background(), "https://elsewhere.example/x/y/1")
 	if got.Kind != omnibox.KindSearch || got.Why != omnibox.WhyUnclaimed || got.Params["address"] != "https://elsewhere.example/x/y/1" || len(got.Operations) != 0 || f.created != 0 {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestResolveALoneRef(t *testing.T) {
+	r, _ := resolver()
+	ctx := context.Background()
+	if got, _ := r.Resolve(ctx, "acme/api#8"); got.Kind != omnibox.KindUnit || got.Unit == nil || *got.Unit != api8 {
+		t.Errorf("a unit's label: %+v", got)
+	}
+	if got, _ := r.Resolve(ctx, "t-3f9a"); got.Kind != omnibox.KindUnit || got.Unit == nil || *got.Unit != task.UnitOf("t-3f9a000000000000") {
+		t.Errorf("a task id with no unit: %+v", got)
+	}
+	if got, _ := r.Resolve(ctx, "api#5"); got.Kind != omnibox.KindAgent || got.Why != omnibox.WhyAmbiguous {
+		t.Errorf("an ambiguous short ref: %+v", got)
+	}
+	if got, _ := r.Resolve(ctx, "nope#1"); got.Kind != omnibox.KindSearch || got.Why != omnibox.WhyNoRef || got.Params["ref"] != "nope#1" {
+		t.Errorf("a ref naming nothing: %+v", got)
 	}
 }
 

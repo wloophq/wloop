@@ -54,6 +54,9 @@ func (s *Service) sets(ctx context.Context, specs []ViewSpec, area string, all [
 		}
 		kept := es[:0:0]
 		for _, e := range es {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			k, err := keeps(e)
 			if err != nil {
 				return nil, err

@@ -88,7 +88,7 @@ func TestRunStartStopsWhenTheCaptureFails(t *testing.T) {
 	r := resolveRig(t)
 	before := storedTasks(t, r)
 	got := run(t, r, api.OmniboxOperation{Op: "start", Brief: "add retries", Repo: "acme/api"})[0]
-	if got.OK || got.Task != "" || got.Error != api.OmniboxRunFailed || !strings.Contains(got.Params["error"], "brief") {
+	if got.OK || got.Task != "" || got.Error != api.OmniboxRunUnavailable || !strings.Contains(got.Params["detail"], "brief") {
 		t.Fatalf("%+v, want the capture's refusal", got)
 	}
 	if storedTasks(t, r) != before {
@@ -121,8 +121,28 @@ func TestRunKeepsTheHandlersRefusal(t *testing.T) {
 	got := run(t, r, api.OmniboxOperation{Op: "verb", Task: "t-00000000000000ff", Verb: "done"})[0]
 	var answer struct{ Error, Refusal string }
 	_ = json.Unmarshal(direct.Body.Bytes(), &answer)
-	if got.OK || got.Status != direct.Code || got.Error != api.OmniboxRunFailed || got.Params["error"] != answer.Error || got.Refusal != answer.Refusal {
+	if got.OK || got.Status != direct.Code || got.Error != api.OmniboxRunNotFound || got.Params["detail"] != answer.Error || got.Refusal != answer.Refusal {
 		t.Fatalf("%+v, want the handler's %d %+v", got, direct.Code, answer)
+	}
+}
+
+func TestRunWordsEachFailureByACode(t *testing.T) {
+	for status, want := range map[int]string{400: api.OmniboxRunInvalid, 403: api.OmniboxRunForbidden, 404: api.OmniboxRunNotFound,
+		409: api.OmniboxRunConflict, 503: api.OmniboxRunUnavailable, 500: api.OmniboxRunFailed, 502: api.OmniboxRunFailed} {
+		if got := runError(status); got != want {
+			t.Errorf("%d: %q, want %q", status, got, want)
+		}
+	}
+	strs := bundledLoaded().Strings
+	pt := loadedIn(t, "pt-BR").Strings
+	for _, code := range []string{api.OmniboxRunInvalid, api.OmniboxRunForbidden, api.OmniboxRunNotFound, api.OmniboxRunConflict, api.OmniboxRunUnavailable, api.OmniboxRunFailed} {
+		en, ok := strs[code]
+		if !ok || strings.Contains(en["other"], "{") {
+			t.Errorf("%s: %v, want English words naming no handler text", code, en)
+		}
+		if pt[code]["other"] == en["other"] {
+			t.Errorf("%s has no pt-BR words", code)
+		}
 	}
 }
 

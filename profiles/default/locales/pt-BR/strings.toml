@@ -564,7 +564,12 @@
 "no_unit_or_task" = "Nenhum item ou tarefa é {ref}"
 "ambiguous_ref" = "{ref} nomeia mais de um item ou tarefa"
 "nothing_named" = "Diga em que executar {verb}"
-"run_failed" = "Não rodou: {error}"
+"run_invalid" = "Não rodou: o pedido não era válido"
+"run_forbidden" = "Não rodou: não é permitido daqui"
+"run_not_found" = "Não rodou: isso não existe mais"
+"run_conflict" = "Não rodou: mudou nesse meio-tempo"
+"run_unavailable" = "Não rodou: indisponível agora"
+"run_failed" = "Não rodou"
 
 [formats]
 time = "15:04"

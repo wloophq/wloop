@@ -27,3 +27,7 @@ func OmniboxOps() []Value {
 // GateHandlers are the task verb handlers that resolve or act on a gate, which no omnibox verb runs: a gate is
 // resolved by the user on the gate itself.
 var GateHandlers = []string{"approve", "answer", "edit", "retry", "drop"}
+
+// GatedActions are the built-in actions that resolve a gate or post, which no omnibox verb runs: each is the
+// user's on the draft or the plan it acts on, behind its own confirmation.
+var GatedActions = []string{"draft.edit", "draft.retry", "draft.close-silently", "draft.skip-workflow", "plan_apply", "plan_dismiss"}

@@ -174,6 +174,12 @@ func (l *omniboxLoad) checkVerbs(tasks TasksDef, actions []string) Problems {
 	for _, v := range l.def.Verbs {
 		path := "verbs." + v.ID
 		switch {
+		case v.Action != "" && slices.Contains(builtin.GatedActions, v.Action):
+			out = append(out, v.actionAt.problem(path+".action", "%s resolves a gate or posts, which only the user does on its draft or plan", v.Action))
+			continue
+		case v.Action != "" && !slices.Contains(actions, v.Action) && v.actionAt.file == OmniboxFile:
+			// A bundled verb whose action no enabled plugin offers leaves the omnibox, as the plugin's rows do.
+			continue
 		case v.Action != "" && !slices.Contains(actions, v.Action):
 			out = append(out, v.actionAt.problem(path+".action", "%s is no catalog action%s", v.Action, expr.DidYouMean(v.Action, actions)))
 			continue

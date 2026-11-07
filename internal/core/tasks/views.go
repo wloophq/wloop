@@ -297,6 +297,9 @@ func (s *Service) listed(ctx context.Context, spec ViewSpec, q task.Query, all [
 	hidden := s.hiderFor(spec)
 	var out []task.Task
 	for _, e := range all {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		in, err := s.in(ctx, spec, q, e, hidden)
 		if err != nil {
 			return nil, err

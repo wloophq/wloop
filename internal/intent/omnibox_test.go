@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/profile"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 func TestOmniboxLoadsTheBundledGroupsInEachLocale(t *testing.T) {
@@ -66,6 +69,40 @@ func TestVerbRefusesGateResolvingTargets(t *testing.T) {
 	}
 	if slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "ok" }) {
 		t.Fatal("a gate-resolving verb loaded")
+	}
+}
+
+func TestVerbRefusesGateResolvingActions(t *testing.T) {
+	for _, action := range builtin.GatedActions {
+		t.Run(action, func(t *testing.T) {
+			l, problems := loadProfile(t, "en", map[string]string{"omnibox.toml": "[verbs.x]\nwords = [\"xx\"]\naction = \"" + action + "\"\n"})
+			if _, ok := problemAt(problems, "verbs.x.action", "resolves a gate or posts"); !ok {
+				t.Fatalf("problems %v", problems)
+			}
+			if slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "x" }) {
+				t.Fatal("the verb loaded")
+			}
+		})
+	}
+	if len(builtin.GatedActions) < 6 {
+		t.Fatalf("gated actions %v", builtin.GatedActions)
+	}
+}
+
+func TestABundledVerbWhosePluginIsAbsentIsLeftOutQuietly(t *testing.T) {
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, problems := intentload.Load([]profile.Layer{{Name: "bundled", Source: "embedded"}}, turn.BundledFS(), base, turn.CheckTemplate)
+	if len(problems) > 0 {
+		t.Fatalf("the bundled profile without plugins has problems: %v", problems)
+	}
+	if slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "review" }) {
+		t.Fatal("review loaded with no plugin offering it")
+	}
+	if !slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "capture" }) {
+		t.Fatal("capture left out")
 	}
 }
 

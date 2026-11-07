@@ -32,10 +32,8 @@ type Ref struct {
 
 // Refs resolve what a person types.
 type Refs interface {
-	// Resolve is the unit a plugin claims address is; false when none does.
-	Resolve(ctx context.Context, address string) (unit.Unit, bool, error)
-	// Find are the units and tasks token names: an address, a unit's label or short label, a task's id or its
-	// prefix.
+	// Find are the units and tasks token names: an address a plugin claims, a unit's label or short label, a
+	// task's id or its prefix.
 	Find(ctx context.Context, token string) ([]Ref, error)
 }
 
@@ -62,14 +60,7 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 		return Resolution{}, ErrNoText
 	}
 	if len(fields) == 1 && looksLikeRef(fields[0]) {
-		u, ok, err := r.Refs.Resolve(ctx, fields[0])
-		switch {
-		case err != nil:
-			return Resolution{}, err
-		case ok:
-			return Resolution{Kind: KindUnit, Unit: &u}, nil
-		}
-		return Resolution{Kind: KindSearch, Why: WhyUnclaimed, Params: map[string]string{"address": fields[0]}}, nil
+		return r.lone(ctx, fields[0])
 	}
 	verb, ok := r.Vocabulary().Match(fields[0])
 	if !ok {
@@ -101,6 +92,27 @@ func (r Resolver) Resolve(ctx context.Context, text string) (Resolution, error) 
 		ops = append(ops, op)
 	}
 	return Resolution{Kind: KindVerb, Operations: ops}, nil
+}
+
+// lone is what one pasted or typed ref names: its unit, or the task's own unit for a task with none; the
+// agent when it names more than one; search, saying why, when it names nothing.
+func (r Resolver) lone(ctx context.Context, token string) (Resolution, error) {
+	found, err := r.Refs.Find(ctx, token)
+	switch {
+	case err != nil:
+		return Resolution{}, err
+	case len(found) > 1:
+		return Resolution{Kind: KindAgent, Why: WhyAmbiguous, Params: map[string]string{"ref": token}}, nil
+	case len(found) == 0 && strings.Contains(token, "://"):
+		return Resolution{Kind: KindSearch, Why: WhyUnclaimed, Params: map[string]string{"address": token}}, nil
+	case len(found) == 0:
+		return Resolution{Kind: KindSearch, Why: WhyNoRef, Params: map[string]string{"ref": token}}, nil
+	}
+	u := task.UnitOf(found[0].Task)
+	if found[0].Unit != nil {
+		u = *found[0].Unit
+	}
+	return Resolution{Kind: KindUnit, Unit: &u}, nil
 }
 
 // onText is verb's op on text that names no unit or task.

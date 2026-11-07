@@ -61,6 +61,22 @@ func TestOmniboxResolveRoutePastedAddress(t *testing.T) {
 	}
 }
 
+func TestOmniboxResolveRouteLoneTaskID(t *testing.T) {
+	t.Parallel()
+	r := resolveRig(t)
+	r.put(t, task.Task{ID: "t-00000000000000c1", State: "next", Category: task.CategoryReady, Title: "call Ada"})
+	got := resolve(t, r, "t-00000000000000c1")
+	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != task.UnitOf("t-00000000000000c1") || len(got.Unit.Tasks) != 1 {
+		t.Fatalf("%+v", got)
+	}
+	if got := resolve(t, r, "t-0000000000000008"); got.Kind != "unit" || got.Unit.Unit != pastedPR {
+		t.Fatalf("a task of a unit: %+v", got)
+	}
+	if got := resolve(t, r, "t-ffff"); got.Kind != "search" || got.Why != "no_unit_or_task" {
+		t.Fatalf("an unknown id: %+v", got)
+	}
+}
+
 func TestOmniboxResolveRouteUnclaimedAddress(t *testing.T) {
 	t.Parallel()
 	r := resolveRig(t)

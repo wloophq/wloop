@@ -98,11 +98,11 @@ func (s *Server) start(r *http.Request, op api.OmniboxOperation) api.OmniboxResu
 func (s *Server) dispatch(r *http.Request, path string, body any) api.OmniboxResult {
 	b, err := json.Marshal(body)
 	if err != nil {
-		return api.OmniboxResult{Status: http.StatusInternalServerError, Error: api.OmniboxRunFailed, Params: map[string]string{"error": err.Error()}}
+		return api.OmniboxResult{Status: http.StatusInternalServerError, Error: api.OmniboxRunFailed, Params: map[string]string{"detail": err.Error()}}
 	}
 	sub, err := http.NewRequestWithContext(r.Context(), http.MethodPost, path, bytes.NewReader(b))
 	if err != nil {
-		return api.OmniboxResult{Status: http.StatusInternalServerError, Error: api.OmniboxRunFailed, Params: map[string]string{"error": err.Error()}}
+		return api.OmniboxResult{Status: http.StatusInternalServerError, Error: api.OmniboxRunFailed, Params: map[string]string{"detail": err.Error()}}
 	}
 	sub.Header = r.Header.Clone()
 	sub.Header.Set("Content-Type", "application/json")
@@ -122,8 +122,25 @@ func (s *Server) dispatch(r *http.Request, path string, body any) api.OmniboxRes
 		out.Output = answer.Lines
 	}
 	if !out.OK {
-		out.Error, out.Params, out.Refusal = api.OmniboxRunFailed, map[string]string{"error": answer.Error}, answer.Refusal
+		out.Error, out.Params, out.Refusal = runError(rec.Code), map[string]string{"detail": answer.Error}, answer.Refusal
 		out.Output, out.Task = nil, ""
 	}
 	return out
+}
+
+// runError is the code a handler's failure status reads as.
+func runError(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return api.OmniboxRunInvalid
+	case http.StatusForbidden:
+		return api.OmniboxRunForbidden
+	case http.StatusNotFound:
+		return api.OmniboxRunNotFound
+	case http.StatusConflict:
+		return api.OmniboxRunConflict
+	case http.StatusServiceUnavailable:
+		return api.OmniboxRunUnavailable
+	}
+	return api.OmniboxRunFailed
 }

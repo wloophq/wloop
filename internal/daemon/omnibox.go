@@ -88,7 +88,7 @@ func (s *Server) omniboxUnit(ctx context.Context, g *coretasks.Service, refs *ta
 	}
 	vs := s.taskViews(ctx, g, false)
 	for _, e := range open {
-		if slices.Contains(e.LinkedUnits(), u) {
+		if task.UnitOf(e.ID) == u || slices.Contains(e.LinkedUnits(), u) {
 			v, err := vs.view(ctx, e)
 			if err != nil {
 				return api.OmniboxUnit{}, err
@@ -119,7 +119,8 @@ func (t *taskRefs) open(ctx context.Context) ([]task.Task, error) {
 	return t.tasks, nil
 }
 
-func (t *taskRefs) Resolve(ctx context.Context, address string) (unit.Unit, bool, error) {
+// claim is the unit a plugin claims address is; false when none does.
+func (t *taskRefs) claim(ctx context.Context, address string) (unit.Unit, bool, error) {
 	if t.s.deps.Resolve == nil {
 		return unit.Unit{}, false, nil
 	}
@@ -139,7 +140,7 @@ func (t *taskRefs) Find(ctx context.Context, token string) ([]omnibox.Ref, error
 		}
 		return ""
 	}
-	if u, ok, err := t.Resolve(ctx, token); err != nil || ok {
+	if u, ok, err := t.claim(ctx, token); err != nil || ok {
 		return []omnibox.Ref{{Unit: &u, Task: holder(u)}}, err
 	}
 	var out []omnibox.Ref

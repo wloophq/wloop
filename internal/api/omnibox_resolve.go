@@ -9,7 +9,14 @@ const (
 	OmniboxWhyNothingNamed = "nothing_named"
 )
 
-// OmniboxRunFailed is the Error of an OmniboxResult whose handler refused or failed, worded with
-// Params["error"], the handler's own message; outside the vocabulary and incomplete operations take the drop
-// codes.
-const OmniboxRunFailed = "run_failed"
+// The Error of an OmniboxResult whose handler refused or failed, by its status: each is a key of the client
+// strings, whose words name no handler text; Params["detail"] keeps the handler's own message, in English.
+// Outside the vocabulary and incomplete operations take the drop codes.
+const (
+	OmniboxRunInvalid     = "run_invalid"     // 400
+	OmniboxRunForbidden   = "run_forbidden"   // 403
+	OmniboxRunNotFound    = "run_not_found"   // 404
+	OmniboxRunConflict    = "run_conflict"    // 409
+	OmniboxRunUnavailable = "run_unavailable" // 503
+	OmniboxRunFailed      = "run_failed"      // any other
+)
