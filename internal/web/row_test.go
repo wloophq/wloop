@@ -27,7 +27,7 @@ const lens = lensOf({ view: "inbox", q: "", g: "", s: "", layout: "", area: "", 
 const cls = (n) => (n.attrs.class === "facet" ? cls(n.children[0]) : String(n.attrs.class || n.tag));
 const slot = (n, name) => all(n, (x) => String(x.attrs.class || "").split(" ").includes(name))[0];
 const kids = (n) => (n ? n.children.filter((c) => c && c.attrs).map(cls) : []);
-const metaTexts = (row) => slot(row, "meta").children.filter((c) => c && c.attrs).map(text);
+const metaTexts = (row) => slot(row, "meta").children.filter((c) => c && c.attrs).flatMap((c) => (String(c.attrs.class).split(" ").includes("pieces") ? c.children.filter((x) => x && x.attrs) : [c])).map(text);
 function shape(row) {
   return { Children: kids(row), L1: kids(slot(row, "l1")), L2: kids(slot(row, "l2")), When: kids(slot(row, "when")),
     Title: text(slot(row, "t")), Date: text(slot(row, "age")), Meta: metaTexts(row), Tag: row.tag, Class: String(row.attrs.class || "") };
@@ -119,10 +119,17 @@ func TestARowsDateFollowsTheTimeRule(t *testing.T) {
 }
 
 func TestARowShowsTwoTagsAndTheRest(t *testing.T) {
-	var got rowShape
-	rowRun(t, `process.stdout.write(JSON.stringify(shape(rowOf(input.task))));`, map[string]any{"task": rowTask(nil)}, &got)
+	var got struct {
+		rowShape
+		More string
+	}
+	rowRun(t, `const row = rowOf(input.task);
+process.stdout.write(JSON.stringify({ ...shape(row), More: (all(row, (x) => "data-more" in x.attrs)[0] || { attrs: {} }).attrs.title }));`, map[string]any{"task": rowTask(nil)}, &got)
 	if n := len(got.Meta); n < 3 || !slices.Equal(got.Meta[n-3:], []string{"a", "b", "+1"}) {
 		t.Errorf("the meta pieces %q, want them to end a, b, +1", got.Meta)
+	}
+	if got.More != "c" {
+		t.Errorf("the +1 chip's tooltip %q does not name the tag it holds", got.More)
 	}
 }
 
@@ -215,7 +222,7 @@ func TestRowCSSKeepsEachLineOnOneLine(t *testing.T) {
 		}
 	}
 	row := cssRule(t, css, ".row")
-	for _, want := range []string{"min-height: var(--row-height)", "grid-template-columns: 16px minmax(min(50%, 18rem), 1fr) minmax(0, auto)"} {
+	for _, want := range []string{"min-height: var(--row-height)", "grid-template-columns: 16px minmax(min(40%, 30rem), 1fr) minmax(0, auto)"} {
 		if !strings.Contains(row, want) {
 			t.Errorf(".row lacks %s: %s", want, row)
 		}

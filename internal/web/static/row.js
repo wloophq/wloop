@@ -22,12 +22,19 @@ function pieceTitle(p, words) {
 // pieceButtons are a part's pieces, each a facet button whose label marks the search's hits; the piece that
 // counts the rest past show_max holds no value and stays text.
 function pieceButtons(m, lens, part) {
-  return (m.parts[part] || []).map((p) => {
+  const pieces = m.parts[part] || [];
+  return pieces.map((p) => {
+    if (!p.value) return h("span", { class: ROW_PART_CLASS[part] || part, "data-field": p.field, "data-more": "", title: restOf(m, pieces, p.field).join(", ") || undefined }, p.label);
     const span = h("span", { class: ROW_PART_CLASS[part] || part, "data-field": p.field, "data-value": p.value, title: agePart(part) ? pieceTitle(p, m.words) : undefined },
       marked(pieceLabel(p), lens.ts));
-    if (!p.value) return span;
     return facet(lens, p.field, p.value, span, `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true });
   });
+}
+
+// restOf are the values of field the model holds that pieces, a part's pieces, leave out past its show_max.
+function restOf(m, pieces, field) {
+  const shown = new Set(pieces.filter((p) => p.field === field && p.value).map((p) => p.raw));
+  return ((m.item.facets || {})[field] || []).filter((v) => !shown.has(v));
 }
 
 function joined(nodes) {
@@ -88,9 +95,8 @@ function rowLine1(m, lens, title, card) {
 // rowRight1 is the right side of a row's first line: its meta and flag pieces, then its actions.
 function rowRight1(m, lens, card) {
   return h("div", { class: "meta" },
-    pieceButtons(m, lens, "meta"), m.meta || null,
-    pieceButtons(m, lens, "flag"), m.flags || null,
-    card ? null : m.actions || null);
+    h("span", { class: "pieces" }, pieceButtons(m, lens, "meta"), m.meta || null, pieceButtons(m, lens, "flag"), m.flags || null),
+    card || !m.actions ? null : h("span", { class: "acts" }, m.actions));
 }
 
 // rowLine2 is a row's second line: its ref and why it waits.
