@@ -318,3 +318,34 @@ process.stdout.write(JSON.stringify({ Buttons: all(panel, (x) => x.tag === "butt
 		t.Errorf("the review step lacks the task's pieces: %s", got.Text)
 	}
 }
+
+func TestAFacetButtonNamesTheValueByItsWord(t *testing.T) {
+	pr := wireRow("me", time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC), tagRows()[0])
+	pr["views"] = []string{"all"}
+	pr["facets"].(map[string][]string)["risk"] = []string{"medium"}
+	var cat map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range cat["facets"].([]any) {
+		if spec := f.(map[string]any); spec["id"] == "risk" {
+			spec["labels"] = map[string]string{"medium": "médio"}
+		}
+	}
+	raw, err := json.Marshal(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct{ Labels, Titles []string }
+	rowViewRun(t, raw, `state.rows = [input.pr];
+const lens = lensOf({ ...readHash(), view: "all" });
+const tr = rowView(rowModel(input.pr, "", lens, ""), lens);
+const buttons = [];
+const walk = (n) => { if (n && n.tag === "button" && n.attrs.class === "facet" && String(n.attrs["data-focus"]).includes(":risk:")) buttons.push(n); for (const c of (n && n.children) || []) walk(c); };
+walk(tr);
+process.stdout.write(JSON.stringify({ Labels: buttons.map((b) => b.attrs["aria-label"]), Titles: buttons.map((b) => b.attrs.title) }));`,
+		map[string]any{"pr": pr, "now": 0}, &got)
+	if len(got.Labels) != 1 || !strings.Contains(got.Labels[0], "médio") || strings.Contains(got.Labels[0], "medium") || strings.Contains(got.Titles[0], "medium") {
+		t.Fatalf("%+v: a facet button names its value by the word the row shows", got)
+	}
+}
