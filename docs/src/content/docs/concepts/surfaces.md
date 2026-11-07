@@ -12,10 +12,17 @@ All three are clients of the daemon. They show the same views and offer the same
 {{command}} open --print                 # prints the URL with its token, for another browser
 {{command}} open --print --view stalled  # opens on one view
 {{command}} open '#task=<id>'            # opens a cockpit route; so does a URL of the cockpit itself
+{{command}} open '{{command}}://open/#task=<id>'  # opens a link copied from the cockpit
 {{command}} open <url>                   # focuses the pull request's workspace in its manager
 ```
 
 On macOS, while `{{app}}.app` runs, `open` and a notification's click show the cockpit in the app's own window. There is one window, and it reopens where you left it. It is in the Dock and ⌘Tab while it shows; closing it hides it. Without the app, with `window.enabled = false`, or on another system, `open` uses the browser, which always works.
+
+The window has no title strip: its controls sit over the cockpit's top strip, which becomes the title bar. You drag the window by it, and it holds back and forward, the title of what shows (the list, or the task or unit whose detail is open), the copy-link button and the omnibox button, which opens the floating panel. The app marks the page's address (`titlebar=inset`) so the cockpit draws this only in the app's window; in a browser tab the top strip stays as it is.
+
+**Detach.** The detail of a task or unit has a button, and the key `t` while the focus is in it, that opens the detail in a window of its own. There is one such window per task or unit: detaching it again brings its window forward. It follows changes as the main window does, a link in it to anything else opens in the main window, and closing it closes it for good; it is not reopened when the app starts again. In a browser, detach opens the detail in a new tab.
+
+**Links.** The copy-link button, in the title bar and in the detail, and the key `c` copy a link to what shows: `{{command}}://open/#<route>`, a list, a task or a unit. The link carries neither the daemon's port nor its token, so it works after a restart and is safe to paste in a chat. The app registers the `{{command}}` scheme: opening such a link (from a chat, a note or `open` in a terminal) shows its route in the main window and brings it forward, as `{{command}} open` does with the link. A link that cannot be read opens the default view, which says so. The cockpit in a browser copies the same link.
 
 The global shortcut `window.hotkey` (`ctrl+option+space`; `""` for none) opens a floating panel over whatever app you are in, without leaving it until you type, on the route `#panel=omnibox`. A link to any other route in the panel opens that route in the main window and brings it forward. Escape hides the panel, and so does clicking elsewhere. A shortcut that does not parse, or that the system refuses, is logged as `window.hotkey` with the chord; the window and the menu bar keep working. Another app holding the same chord through a system shortcut takes it without an error.
 
