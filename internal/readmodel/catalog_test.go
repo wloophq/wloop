@@ -104,3 +104,18 @@ func TestAMergedFacetKeepsEachProvidersBucketWords(t *testing.T) {
 		t.Errorf("github's buckets %+v, slack's %+v", g.Buckets, s.Buckets)
 	}
 }
+
+type reasonPresenter struct {
+	facetPresenter
+	words api.ProviderWords
+}
+
+func (p reasonPresenter) Reasons() api.ProviderWords { return p.words }
+
+func TestTheCatalogServesEachPluginsReasonWords(t *testing.T) {
+	words := api.ProviderWords{Provider: "alpha", Words: map[string]string{"asked_by": "{{.actor}} asked"}}
+	c := readmodel.BuildCatalog(reasonPresenter{words: words}, reasonPresenter{words: api.ProviderWords{Provider: "beta"}})
+	if len(c.Reasons) != 1 || c.Reasons[0].Provider != "alpha" || c.Reasons[0].Words["asked_by"] != "{{.actor}} asked" {
+		t.Fatalf("reasons %+v: each plugin that words its reasons serves them", c.Reasons)
+	}
+}

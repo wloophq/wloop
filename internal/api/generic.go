@@ -42,6 +42,8 @@ type CatalogResponse struct {
 	Details []DetailSpec `json:"details,omitempty"`
 	// Lens are the plugins' own row words, which replace the views catalog's for their rows.
 	Lens []ProviderWords `json:"lens,omitempty"`
+	// Reasons are the plugins' words of the reasons their rows name (Summary.ReasonKey), by key.
+	Reasons []ProviderWords `json:"reasons,omitempty"`
 }
 
 // ProviderWords are a provider's words, by key.

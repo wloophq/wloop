@@ -1,5 +1,5 @@
 {
-  "version": "fe90b28b0f24",
+  "version": "f55351381171",
   "views": [
     {
       "id": "mine",
@@ -752,6 +752,33 @@
       "field": "profile_chain",
       "label": "Review profile",
       "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+    }
+  ],
+  "reasons": [
+    {
+      "provider": "github",
+      "words": {
+        "agent_asked": "the agent asked you something",
+        "approved_checks_pending": "approved, checks pending",
+        "approved_green": "approved and green",
+        "changes_requested": "changes requested by {{.actor}}",
+        "checks_failing": "checks failing on the head",
+        "checks_failing_more": "checks failing: {{.checks}} and {{.more}} more",
+        "checks_failing_named": "checks failing: {{.checks}}",
+        "closed": "closed",
+        "commented_no_reply": "{{.actor}} commented, no reply",
+        "draft": "draft",
+        "merge_conflicts": "merge conflicts with {{.branch}}",
+        "merged": "merged",
+        "no_reviewer_requested": "no reviewer requested",
+        "review_requested": "review requested, no review on the head",
+        "review_requested_again": "review requested again after your review",
+        "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
+        "round_blocked": "round blocked: {{.why}}",
+        "round_held": "automatic round held: {{.why}}",
+        "round_in_progress": "review round in progress",
+        "to_address": "review to address, no workspace: {{.why}}"
+      }
     }
   ]
 }

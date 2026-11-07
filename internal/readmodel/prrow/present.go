@@ -23,6 +23,14 @@ func (p *Provider) Events() []api.EventSpec {
 	return nil
 }
 
+// Reasons are the GitHub plugin's words of the reasons its rows name.
+func (p *Provider) Reasons() api.ProviderWords {
+	if rp, ok := p.src.Catalog.(readmodel.ReasonPresenter); ok {
+		return rp.Reasons()
+	}
+	return api.ProviderWords{}
+}
+
 // Lens are the GitHub plugin's own row words.
 func (p *Provider) Lens() api.ProviderWords {
 	if lp, ok := p.src.Catalog.(readmodel.LensPresenter); ok {

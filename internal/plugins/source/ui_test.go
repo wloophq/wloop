@@ -101,3 +101,10 @@ func TestGitHubsFacetsWordTheirKnownValues(t *testing.T) {
 		}
 	}
 }
+
+func TestGitHubsReasonsAreWordedByItsLayer(t *testing.T) {
+	w := bundledCatalog(t, "github").Reasons()
+	if w.Provider != "github" || w.Words["no_reviewer_requested"] != "no reviewer requested" || w.Words["changes_requested"] != "changes requested by {{.actor}}" {
+		t.Fatalf("reasons %+v", w)
+	}
+}
