@@ -20,7 +20,7 @@ var PersonNotices = []string{
 	NoticeNotifyProposal, NoticeNotifyPost, NoticeNotifyYes, NoticeNotifyNo, NoticeNotifyRecommended,
 	NoticeNotifyDraft, NoticeNotifyDraftFailed, NoticeNotifyOpen, NoticeNotifyDiscard,
 	NoticeDraftSent, NoticeDraftSaved, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
-	NoticeTaskMerged, NoticeNothingToPick,
+	NoticeTaskMerged, NoticeNothingToPick, NoticeWorkflowUnknown, NoticeConfigUnavailable, NoticeSkipsUnavailable,
 }
 
 // PluralForms are the CLDR plural categories a text's forms are named by.
