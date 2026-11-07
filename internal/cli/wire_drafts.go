@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -118,8 +117,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		case err != nil:
 			return nil, err
 		default:
-			person := draftPerson(d.Origin.Key, d.Unit, subject)
-			pd.Facts = draftFactsOf(sub, person, d.Items, w.d.me())
+			pd.Facts = draftFactsOf(sub, draftPeople(d, subject), d.Items, w.d.me())
 		}
 		out = append(out, pd)
 	}
@@ -140,17 +138,6 @@ func (w draftWithdrawals) Withdraw(ctx context.Context, id int64, reason string)
 
 func proposedByAWorkflow(d draft.Draft) bool {
 	return d.Origin.Kind == draft.OriginAuto && d.Origin.Workflow != ""
-}
-
-// draftPerson is the person a per-person draft's key names after its unit, or, as drafts proposed before the
-// key named the unit, after its subject; "" for a draft of no person.
-func draftPerson(key string, u, subject unit.Unit) string {
-	for _, prefix := range []string{u.String() + ":", subject.Key + ":"} {
-		if p, ok := strings.CutPrefix(key, prefix); ok {
-			return p
-		}
-	}
-	return ""
 }
 
 // draftSubjectUnit is the subject a draft was proposed on: its task, else its unit.

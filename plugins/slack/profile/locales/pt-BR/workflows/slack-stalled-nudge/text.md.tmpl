@@ -1,4 +1,4 @@
-@{{"{"}}{{.Person.Key}}}, alguma novidade sobre {{if eq (len .Items) 1}}isto{{else}}estes{{end}}?
+{{range $i, $p := .People}}{{if $i}} {{end}}@{{"{"}}{{$p.Key}}}{{end}}, alguma novidade sobre {{plural (len .Items) "one" "isto" "other" "estes"}}?
 
 {{range $i, $it := .Items}}{{if $i}}
 {{end}}- {{$it.Line}}{{end -}}

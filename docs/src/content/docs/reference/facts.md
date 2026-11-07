@@ -338,11 +338,11 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 
 | `draft` fact | Type | Meaning |
 |---|---|---|
-| `draft.person_waited` | bool | The draft's person is still waited on by its task; true for a draft of no person. |
-| `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
+| `draft.person_waited` | bool | One of the draft's people, the person a per-person draft is to or those its text mentions, is still waited on by its task; true for a draft of no people. |
+| `draft.items_owed` | int | Items of the draft still open and held by any of its people, or unowned for a draft of no people. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
-| `draft.person_asks_you` | bool | The draft's person asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no person. |
+| `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
 
 ### Gates (`gate.*`)
 

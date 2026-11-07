@@ -121,3 +121,8 @@ func renderDraft(t *template.Template, data draftTextData) (string, error) {
 	}
 	return b.String(), nil
 }
+
+// readsFacts says whether t reads the subject's facts, which a draft then reads; false for no template.
+func readsFacts(t *template.Template) bool {
+	return t != nil && t.Tree != nil && strings.Contains(t.Tree.Root.String(), ".Facts")
+}

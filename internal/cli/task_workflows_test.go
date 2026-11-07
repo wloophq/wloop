@@ -60,7 +60,7 @@ func (r *replay) nudges(person items.Person) []draft.Draft {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.Origin.Key != d.Unit.String()+":"+person.Key })
+	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return !slices.Contains(draftPeople(d, draftSubjectUnit(d)), person.Key) })
 }
 
 // mine is an open item of the thread the user asked, created at created, due by deadline, waiting on on.
