@@ -1,0 +1,15 @@
+label = "Cutucar"
+summary = "Perguntar a quem o pull request espera qual é o próximo passo, num comentário; a orientação é o assunto"
+
+[[refuse]]
+why = "{{.pr.nudge.refusal}}"
+
+[guidance]
+help = "sobre o que perguntar"
+
+[action]
+note = "Cutucar {{join .pr.nudge.who \", \"}}"
+confirm = "Cutucar {{join .pr.nudge.who \", \"}} em {{.pr.slug}}? Um agente publica um comentário em seu nome."
+
+[[action.refuse]]
+why = "{{.pr.nudge.refusal}}"
