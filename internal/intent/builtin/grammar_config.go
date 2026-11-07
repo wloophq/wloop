@@ -163,7 +163,7 @@ var configGrammar = slices.Concat(
 		cfgKey("ui.locale", KindText, "", "The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart."),
 		cfgKey("notifications", KindTable, "", "The notifications."),
 		cfgKey("notifications.digest_at", KindText, "09:00", "The local HH:MM of the daily digest; empty for none."),
-		cfgKey("window", KindTable, "", "The app's own window on macOS."),
+		cfgKey("window", KindTable, "", "The app's own window on macOS, which the app reads when it starts."),
 		cfgKey("window.enabled", KindBool, "true", "Show the cockpit in the app's own window on macOS; false opens it in the browser."),
 		cfgKey("window.hotkey", KindText, "ctrl+option+space", "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none."),
 		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),

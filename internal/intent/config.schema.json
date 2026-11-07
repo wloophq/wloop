@@ -867,7 +867,7 @@
     },
     "window": {
       "additionalProperties": false,
-      "description": "The app's own window on macOS.",
+      "description": "The app's own window on macOS, which the app reads when it starts.",
       "properties": {
         "enabled": {
           "default": true,

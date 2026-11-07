@@ -1388,7 +1388,7 @@ The fields each notice reads besides `Name` and `Command`:
 
 ### Window
 
-- `window` (table): The app's own window on macOS.
+- `window` (table): The app's own window on macOS, which the app reads when it starts.
 - `window.enabled` (bool, default `true`): Show the cockpit in the app's own window on macOS; false opens it in the browser.
 - `window.hotkey` (string, default `ctrl+option+space`): The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.
 
