@@ -290,3 +290,19 @@ done({ Without: labels(draft(input.bare)), With: labels(c),
 		t.Errorf("posts %v, want %v", got.Posts, want)
 	}
 }
+
+func TestADraftCardNamesItsMentions(t *testing.T) {
+	var got []map[string]string
+	d := pendingDraft()
+	d.Text = "@{slack:UANA} and @{slack:UBRUNO}, any news? cc @{slack:UCAIO}"
+	d.Names = map[string]string{"slack:UANA": "Ana", "slack:UBRUNO": "Bruno"}
+	runGate(t, `done(cls(draft(input.draft), "mention").map((m) => ({ text: m.textContent, title: attr(m, "title") })));`, map[string]any{"draft": d}, &got)
+	want := []map[string]string{{"text": "@Ana", "title": "slack:UANA"}, {"text": "@Bruno", "title": "slack:UBRUNO"}, {"text": "@slack:UCAIO", "title": "slack:UCAIO"}}
+	if mustJS(t, got) != mustJS(t, want) {
+		t.Errorf("mentions %v, want %v", got, want)
+	}
+}
+
+func TestADraftCardNamesItsPurposeAndStateInWords(t *testing.T) {
+	t.Skip("C8 serve draft purpose and state words")
+}

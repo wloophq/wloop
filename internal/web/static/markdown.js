@@ -2,7 +2,7 @@
 
 // renderMarkdown draws agent prose as DOM nodes through h() and text nodes only, so no text ever becomes
 // markup: the subset agents write (paragraphs, emphasis, code, lists, links, headings, quotes), links only
-// to https:// through safeURL.
+// to https:// through safeURL. A mention @{<key>} reads as the name opts.names gives its key, else the key.
 
 // MD_OPEN holds the keys of folded texts the reader opened, so a re-render keeps them open.
 const MD_OPEN = new Set();
@@ -26,7 +26,8 @@ function renderMarkdown(text, opts) {
     const box = ev && ev.currentTarget && ev.currentTarget.closest ? ev.currentTarget.closest(".md") : null;
     if (box) box.replaceWith(renderMarkdown(text, { ...o, fold: 0 }));
   };
-  return h("div", { class: "md" }, shown.map(mdBlock), folded ? h("button", { type: "button", class: "md-more", onclick: open }, t("Read all")) : null);
+  const names = o.names || {};
+  return h("div", { class: "md" }, shown.map((b) => mdBlock(b, names)), folded ? h("button", { type: "button", class: "md-more", onclick: open }, t("Read all")) : null);
 }
 
 // mdBlocks splits lines into block descriptors without building nodes, so a folded text builds only what shows.
@@ -83,29 +84,30 @@ function mdBlocks(lines, depth = 0) {
   return out;
 }
 
-function mdBlock(b) {
+function mdBlock(b, names) {
   switch (b.kind) {
     case "code":
       return h("pre", {}, h("code", {}, b.text));
     case "heading":
-      return h("h4", {}, mdInline(b.text));
+      return h("h4", {}, mdInline(b.text, names));
     case "quote":
-      return h("blockquote", {}, b.blocks.map(mdBlock));
+      return h("blockquote", {}, b.blocks.map((x) => mdBlock(x, names)));
     case "ul":
     case "ol":
-      return h(b.kind, {}, b.items.map((it) => h("li", {}, mdInline(it))));
+      return h(b.kind, {}, b.items.map((it) => h("li", {}, mdInline(it, names))));
     default:
-      return h("p", {}, mdInline(b.text));
+      return h("p", {}, mdInline(b.text, names));
   }
 }
 
 // mdInline turns one block's text into strings and inline nodes; a marker without its closing pair stays text.
 // It runs in time linear in the text: closers and label ends are found once per text, not once per opener.
 // Inside a link label it makes no link; past MD_DEPTH nested emphases the markers stay text.
-function mdInline(s, depth = 0, links = true) {
+function mdInline(s, names, depth = 0, links = true) {
   const out = [];
   const closers = mdClosers(s);
   const labelEnd = links ? mdLabelEnds(s) : null;
+  const keyEnd = mdKeyEnds(s);
   let start = 0;
   const flush = (i) => {
     if (i > start) out.push(s.slice(start, i));
@@ -139,7 +141,7 @@ function mdInline(s, depth = 0, links = true) {
       const end = open ? closers.next(marker, i + marker.length) : -1;
       if (end > 0) {
         flush(i);
-        out.push(h(double ? "strong" : "em", {}, mdInline(s.slice(i + marker.length, end), depth + 1, links)));
+        out.push(h(double ? "strong" : "em", {}, mdInline(s.slice(i + marker.length, end), names, depth + 1, links)));
         start = i = end + marker.length;
         continue;
       }
@@ -152,12 +154,20 @@ function mdInline(s, depth = 0, links = true) {
       }
       if (target) {
         flush(i);
-        const label = mdInline(s.slice(i + 1, close), depth + 1, false);
+        const label = mdInline(s.slice(i + 1, close), names, depth + 1, false);
         const href = safeURL(target.url);
         out.push(href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label);
         start = i = target.end;
         continue;
       }
+    }
+    if (c === "@" && s[i + 1] === "{" && s[keyEnd[i + 2]] === "}" && keyEnd[i + 2] > i + 2) {
+      const end = keyEnd[i + 2];
+      const key = s.slice(i + 2, end);
+      flush(i);
+      out.push(h("span", { class: "mention", title: key }, "@" + (Object.hasOwn(names, key) ? names[key] : key)));
+      start = i = end + 1;
+      continue;
     }
     if (links && c === "h" && !mdWord(s, i - 1) && s.startsWith("https://", i)) {
       MD_BARE_URL.lastIndex = i;
@@ -234,5 +244,13 @@ function mdLabelEnds(s) {
   const end = new Int32Array(s.length + 1);
   end[s.length] = s.length;
   for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "]" || s[i] === "\n" ? i : end[i + 1];
+  return end;
+}
+
+// mdKeyEnds holds, for each position, where a mention key starting there would end: the next brace or space.
+function mdKeyEnds(s) {
+  const end = new Int32Array(s.length + 1);
+  end[s.length] = s.length;
+  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "{" || s[i] === "}" || /\s/.test(s[i]) ? i : end[i + 1];
   return end;
 }

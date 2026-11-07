@@ -203,6 +203,8 @@ func TestMarkdownInlineIsLinear(t *testing.T) {
 		"backticks":             {"` a ", "", ""},
 		"nested emphasis":       {"*a **b _c ", "", ""},
 		"openers sharing a url": {"[", "a](", "x"},
+		"open mentions":         {"@{a", "", ""},
+		"mentions ending late":  {"@{", "a", "}"},
 	}
 	var got map[string][2]int
 	nodeRun(t, markdownPrelude(t)+workCounterJS, nil, `
@@ -263,5 +265,29 @@ func TestMarkdownKeepsUnclosedMarkersAsText(t *testing.T) {
 		if n := got.all(func(x mdNode) bool { return x.Tag == "strong" || x.Tag == "em" || x.Tag == "code" || x.Tag == "a" }); len(n) != 0 {
 			t.Errorf("%q built %+v", raw, n)
 		}
+	}
+}
+
+func TestMarkdownNamesMentionsAsText(t *testing.T) {
+	got := renderMD(t, "Hi @{slack:UANA}, see [@{slack:UBRUNO}](https://a.test), `@{slack:UANA}` and @{x y} or @{<b>}", `, { names: { "slack:UANA": "Ana", "<b>": "<i>x</i>" } }`)
+	var mentions []string
+	for _, m := range got.all(func(n mdNode) bool { return n.Attrs["class"] == "mention" }) {
+		if len(m.Children) != 0 {
+			t.Errorf("a mention holds nodes: %+v", m)
+		}
+		mentions = append(mentions, m.Text+"|"+m.Attrs["title"])
+	}
+	want := []string{"@Ana|slack:UANA", "@slack:UBRUNO|slack:UBRUNO", "@<i>x</i>|<b>"}
+	if !slices.Equal(mentions, want) {
+		t.Errorf("mentions %q, want %q", mentions, want)
+	}
+	if links := got.tags("a"); len(links) != 1 || len(links[0].all(func(n mdNode) bool { return n.Attrs["class"] == "mention" })) != 1 {
+		t.Errorf("a mention in a link label: %+v", links)
+	}
+	if code := got.tags("code"); len(code) != 1 || code[0].Text != "@{slack:UANA}" {
+		t.Errorf("code %+v, want the mention kept as written", code)
+	}
+	if !strings.Contains(got.Text, "@{x y}") {
+		t.Errorf("text %q keeps a key with a space as written", got.Text)
 	}
 }

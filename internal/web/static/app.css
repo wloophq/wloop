@@ -795,6 +795,7 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .md pre code { padding: 0; background: none; white-space: pre; }
 .md a { color: var(--me-text); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
 .md a:hover { text-decoration-color: currentColor; }
+.md .mention { font-weight: 500; color: var(--ink); }
 .md-more { padding: 0; color: var(--me-text); background: none; border: 0; cursor: pointer; }
 .md-more:hover { text-decoration: underline; }
 
