@@ -2678,6 +2678,9 @@ function screenEnv() {
     row: screenRow,
     openSource: openTaskSource,
     openTask: (id) => writeHash({ task: id, pr: "" }),
+    act: async (u, id) => {
+      if ((await omniboxAct(u, id)) === false) throw new Error(state.actionError || t("{action} failed", { action: id }));
+    },
     navigate: (view) => { location.hash = hashString({ view }); },
     render,
     capture: async (title) => {
