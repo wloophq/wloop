@@ -1,0 +1,33 @@
+# The facts a pull request's events fold into on a task's timeline, beside the bundled profile's.
+
+[facts.review_requested]
+start = ["review_requested"]
+label = "{{.actor}} asked {{.sub}} for a review"
+tone  = "people"
+order = 50
+
+[facts.review]
+start  = ["review"]
+absorb = ["comment"]
+label  = "{{.actor}} reviewed: {{.sub}}"
+tone   = "people"
+order  = 51
+
+[facts.review.subs]
+APPROVED          = "approved"
+CHANGES_REQUESTED = "changes requested"
+COMMENTED         = "commented"
+DISMISSED         = "dismissed"
+
+[facts.push]
+start  = ["push"]
+absorb = ["push", "check"]
+label  = "{{.actor}} pushed"
+tone   = "people"
+order  = 52
+
+[facts.opened]
+start = ["opened"]
+label = "{{.actor}} opened the pull request"
+tone  = "people"
+order = 53

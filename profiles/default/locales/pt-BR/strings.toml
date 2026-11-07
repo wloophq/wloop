@@ -593,6 +593,7 @@
 "Remove filter {label}" = "Remover o filtro {label}"
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: não {values}"
+"{n} event" = { one = "{n} evento", other = "{n} eventos" }
 
 [formats]
 time = "15:04"

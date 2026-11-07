@@ -35,14 +35,14 @@ func TestGetStringsServesTheLoadedLocale(t *testing.T) {
 	}
 }
 
-func TestCatalogServesCoreEventLabels(t *testing.T) {
+func TestCatalogServesCoreEventLabelsAndTones(t *testing.T) {
 	t.Parallel()
 	var got api.CatalogResponse
 	get(t, newServer(t), api.Catalog, &got)
 	var sent, held bool
 	for _, e := range got.Events {
-		sent = sent || e == api.EventSpec{Kind: "turn_sent", Label: "turn sent", Loop: true}
-		held = held || e.Provider == "" && e.Kind == "held" && e.Label == "paused"
+		sent = sent || e == api.EventSpec{Kind: "turn_sent", Label: "turn sent", Loop: true, Tone: "loop"}
+		held = held || e == api.EventSpec{Kind: "held", Label: "paused", Tone: "me"}
 	}
 	if !sent || !held {
 		t.Fatalf("%+v", got.Events)

@@ -1,0 +1,17 @@
+[facts.review_requested]
+label = "{{.actor}} pediu review a {{.sub}}"
+
+[facts.review]
+label = "{{.actor}} fez review: {{.sub}}"
+
+[facts.review.subs]
+APPROVED          = "aprovado"
+CHANGES_REQUESTED = "mudanças pedidas"
+COMMENTED         = "comentado"
+DISMISSED         = "descartado"
+
+[facts.push]
+label = "{{.actor}} fez push"
+
+[facts.opened]
+label = "{{.actor}} abriu o pull request"

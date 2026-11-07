@@ -1,6 +1,6 @@
 "use strict";
 
-// taskState is what the task page holds beside the task: its timeline, the kinds it is narrowed to and every
+// taskState is what the task page holds beside the task: its timeline's facts, the kinds it is narrowed to and every
 // kind seen, the composer's text, a run's transcript, the drafts that wait on it and the tab picked.
 const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [], tab: "" };
 
@@ -17,9 +17,11 @@ function stateLabel(name) {
   return ((taskCatalog().states || []).find((s) => s.name === name) || {}).label || name;
 }
 
+// timelineURL is task id's timeline folded into facts, narrowed to kinds when any.
 function timelineURL(id, kinds) {
-  const q = kinds.length ? "?" + new URLSearchParams({ kinds: kinds.join(",") }).toString() : "";
-  return taskPath(id, "timeline") + q;
+  const q = new URLSearchParams({ as: "nodes" });
+  if (kinds.length) q.set("kinds", kinds.join(","));
+  return taskPath(id, "timeline") + "?" + q.toString();
 }
 
 // loadTaskPage reads the timeline of e, narrowed to the kinds picked, and the drafts that wait on e.
@@ -30,11 +32,11 @@ async function loadTaskPage(e) {
 
 async function loadTimeline(e) {
   try {
-    const events = await detailEnv.getJSON(timelineURL(e.id, taskState.kinds));
+    const nodes = await detailEnv.getJSON(timelineURL(e.id, taskState.kinds));
     if (taskState.id !== e.id) return;
-    taskState.timeline = events || [];
+    taskState.timeline = nodes || [];
     taskState.timelineError = "";
-    for (const ev of taskState.timeline) if (!taskState.kindsSeen.includes(ev.kind)) taskState.kindsSeen.push(ev.kind);
+    for (const n of taskState.timeline) for (const ev of n.events || []) if (!taskState.kindsSeen.includes(ev.kind)) taskState.kindsSeen.push(ev.kind);
   } catch (err) {
     if (taskState.id === e.id) taskState.timelineError = t("Could not load the timeline: {error}", { error: err.message });
   }
@@ -250,37 +252,34 @@ function taskRuns(e) {
   return h("section", { class: "d-runs", "aria-label": t("Runs") }, ...runs.map(runCard));
 }
 
-function eventText(ev) {
-  const d = ev.data && typeof ev.data === "object" ? ev.data : {};
-  return d.text || d.summary || d.title || d.line || "";
-}
-
 async function pickKinds(e, kinds) {
   taskState.kinds = kinds;
   await loadTaskPage(e);
   detailEnv.render();
 }
 
-// taskTimeline is the task's timeline as a chat, oldest first, narrowed to
-// the kinds picked.
+// taskTimeline is the task's timeline folded into facts, newest first, narrowed to the kinds picked.
 function taskTimeline(e) {
   const kinds = taskState.kinds;
   const chip = (kind) => {
     const on = kinds.includes(kind);
     return h("button", { type: "button", class: "chip" + (on ? " on" : ""), "aria-pressed": String(on), "data-focus": "timeline:kind:" + kind,
-      onclick: () => pickKinds(e, on ? kinds.filter((k) => k !== kind) : [...kinds, kind]) }, kind.replaceAll("_", " "));
+      onclick: () => pickKinds(e, on ? kinds.filter((k) => k !== kind) : [...kinds, kind]) }, eventLabel(kind));
   };
-  const events = (taskState.timeline || []).filter((ev) => !kinds.length || kinds.includes(ev.kind));
+  const nodes = taskState.timeline || [];
   return h("section", { class: "d-timeline", "aria-label": t("Timeline") },
     taskState.kindsSeen.length ? h("div", { class: "chips kinds", role: "group", "aria-label": t("Kinds") },
       h("button", { type: "button", class: "chip" + (kinds.length ? "" : " on"), "aria-pressed": String(!kinds.length), "data-focus": "timeline:kind:", onclick: () => pickKinds(e, []) }, t("all")),
       ...taskState.kindsSeen.map(chip)) : null,
     taskState.timelineError ? h("p", { class: "plan-error" }, taskState.timelineError) : null,
     !taskState.timeline && !taskState.timelineError ? h("p", { class: "empty" }, t("Loading the timeline.")) : null,
-    taskState.timeline && !events.length ? h("p", { class: "empty" }, t("Nothing here yet.")) : null,
-    events.length ? h("ol", { class: "chat" }, ...events.map((ev) => h("li", { class: `msg ev-${ev.kind} by-${String(ev.actor || "").replace(/[^a-z0-9-]/gi, "")}`, "data-seq": String(ev.seq) },
-      h("div", { class: "meta" }, ev.by || ev.actor ? h("strong", { title: ev.actor || "" }, ev.by || ev.actor) : null, " ", h("span", { class: "kind" }, String(ev.kind).replaceAll("_", " "), ev.sub ? " " + ev.sub : ""), " ", h("time", { datetime: ev.at }, stamp(ev.at))),
-      eventText(ev) ? h("p", {}, eventText(ev)) : null))) : null);
+    taskState.timeline && !nodes.length ? h("p", { class: "empty" }, t("Nothing here yet.")) : null,
+    nodes.length ? timelineNodes(nodes) : null);
+}
+
+// timelineCount is how many events the timeline's facts fold.
+function timelineCount() {
+  return (taskState.timeline || []).reduce((n, node) => n + (node.events || []).length, 0);
 }
 
 // sendChat writes the composer's text to the task's agent.
@@ -369,7 +368,7 @@ function relatedVerbs(e) {
 // the count its label carries, and its body. Timeline always shows.
 const TASK_TABS = [
   { id: "brief", label: () => t("Brief"), shows: (e) => !!e.brief, count: () => 0, body: (e) => [taskBrief(e)] },
-  { id: "timeline", label: () => t("Timeline"), shows: () => true, count: () => (taskState.timeline || []).length, body: (e) => [taskTimeline(e)] },
+  { id: "timeline", label: () => t("Timeline"), shows: () => true, count: timelineCount, body: (e) => [taskTimeline(e)] },
   { id: "asks", label: () => t("Asks"), shows: (e) => (e.asks || []).length > 0, count: (e) => (e.asks || []).length, body: (e) => [taskAsks(e)] },
   { id: "related", label: () => t("Related"), shows: (e) => relatedCount(e) > 0, count: relatedCount, body: (e) => [taskRelated(e), taskChildren(e), taskMerged(e), relatedVerbs(e)] },
   { id: "runs", label: () => t("Runs"), shows: (e) => (e.runs || []).length > 0, count: (e) => (e.runs || []).length, body: (e) => [taskRuns(e)] },

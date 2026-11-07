@@ -3,9 +3,11 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
@@ -144,5 +146,68 @@ func TestAListPageReadsTheBriefsOnce(t *testing.T) {
 	}
 	if got := recs.reads.Load(); got != 1 {
 		t.Fatalf("%d record reads for a page of %d tasks, want 1", got, n)
+	}
+}
+
+// fixedTimeline is a task's timeline of evs, newest first, narrowed by kind.
+type fixedTimeline []timeline.Event
+
+func (f fixedTimeline) Of(_ context.Context, _ task.ID, flt timeline.Filter) ([]timeline.Event, error) {
+	out := []timeline.Event{}
+	for _, ev := range f {
+		if len(flt.Kinds) == 0 || slices.Contains(flt.Kinds, ev.Kind) {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
+}
+
+func TestTheTimelineServesNodes(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	at := time.Date(2026, 10, 27, 9, 39, 0, 0, time.UTC)
+	own := task.UnitOf("t-0123456789abcdef")
+	e := func(seq int64, kind, actor, data string, after time.Duration) timeline.Event {
+		return timeline.Event{Seq: seq, Event: port.Event{Unit: own, Kind: kind, Actor: actor, Data: data, At: at.Add(after)}}
+	}
+	r.s.deps.Timeline = fixedTimeline{
+		e(8, "comment", "rui", "", 4*time.Hour),
+		e(7, "review", "rui", "APPROVED:abc123", 4*time.Hour),
+		e(6, "verb_done", "person", "", 3*time.Hour),
+		e(5, "gone_plugin_event", "dana", "", 2*time.Hour),
+		e(4, "turn_ended", "agent", "", 7*time.Minute),
+		e(3, "record", "agent", "", 2*time.Minute),
+		e(2, "turn_started", "agent", "", time.Minute),
+		e(1, "turn_sent", "loop", "", 0),
+	}
+	r.put(t, task.Task{ID: "t-0123456789abcdef", State: "next", Category: task.CategoryReady, Title: "Review the export"})
+	var nodes []api.TimelineNode
+	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline")+"?as=nodes", &nodes); code != 200 {
+		t.Fatalf("GET the nodes: %d", code)
+	}
+	if len(nodes) != 4 {
+		t.Fatalf("%d nodes: %+v", len(nodes), nodes)
+	}
+	review, done, gone, round := nodes[0], nodes[1], nodes[2], nodes[3]
+	if review.Rule != "review" || review.Label != "rui reviewed: approved" || review.Tone != "people" || len(review.Events) != 2 {
+		t.Errorf("the GitHub layer's review, its verdict in words: %+v", review)
+	}
+	if done.Rule != "moved" || done.Label != "Moved: Done" || done.Tone != "me" || len(done.Events) != 1 {
+		t.Errorf("a verb's move: %+v", done)
+	}
+	if gone.Rule != "" || gone.Label != "gone_plugin_event" || gone.Actor != "dana" || len(gone.Events) != 1 || gone.Events[0].Seq != 5 {
+		t.Errorf("an undeclared kind: %+v", gone)
+	}
+	if round.Rule != "round" || round.Label != "Agent round, 7m" || round.Tone != "loop" || round.Running || !round.At.Equal(at) || !round.End.Equal(at.Add(7*time.Minute)) ||
+		len(round.Events) != 4 || round.Events[0].Seq != 1 || round.Events[2].Sub != "record" && round.Events[2].Kind != "record" {
+		t.Errorf("an agent round: %+v", round)
+	}
+
+	var flat []api.TimelineEvent
+	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline"), &flat); code != 200 || len(flat) != 8 || flat[0].Seq != 8 || flat[0].Kind != "comment" {
+		t.Fatalf("without as, the flat timeline: %d %+v", code, flat)
+	}
+	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline")+"?as=tree", nil); code != 400 {
+		t.Fatalf("an unknown as: %d", code)
 	}
 }

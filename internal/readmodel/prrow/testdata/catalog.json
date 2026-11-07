@@ -1,5 +1,5 @@
 {
-  "version": "c8cb59e0b383",
+  "version": "72cd38bb6844",
   "views": [
     {
       "id": "mine",
@@ -613,35 +613,41 @@
     {
       "provider": "github",
       "kind": "opened",
-      "label": "opened"
+      "label": "opened",
+      "tone": "people"
     },
     {
       "provider": "github",
       "kind": "push",
-      "label": "pushed"
+      "label": "pushed",
+      "tone": "people"
     },
     {
       "provider": "github",
       "kind": "review_requested",
       "label": "review requested",
+      "tone": "people",
       "data": "requested"
     },
     {
       "provider": "github",
       "kind": "review_request_removed",
       "label": "review request removed",
+      "tone": "people",
       "data": "requested"
     },
     {
       "provider": "github",
       "kind": "review",
       "label": "reviewed",
+      "tone": "people",
       "data": "first_field"
     },
     {
       "provider": "github",
       "kind": "comment",
-      "label": "commented"
+      "label": "commented",
+      "tone": "people"
     },
     {
       "provider": "github",
@@ -651,65 +657,76 @@
     {
       "provider": "github",
       "kind": "ready",
-      "label": "ready for review"
+      "label": "ready for review",
+      "tone": "people"
     },
     {
       "provider": "github",
       "kind": "draft",
-      "label": "back to draft"
+      "label": "back to draft",
+      "tone": "people"
     },
     {
       "provider": "github",
       "kind": "merged",
       "label": "merged",
+      "tone": "people",
       "data": "short_sha"
     },
     {
       "provider": "github",
       "kind": "closed",
-      "label": "closed"
+      "label": "closed",
+      "tone": "people"
     },
     {
       "provider": "github",
       "kind": "round_sent",
       "label": "round sent",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "round_held",
       "label": "round held",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "round_pending",
       "label": "round pending",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "round_skipped",
       "label": "round skipped",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "guidance",
       "label": "guidance",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "round_blocked",
       "label": "round blocked",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     },
     {
       "provider": "github",
       "kind": "round_unblocked",
       "label": "round unblocked",
-      "loop": true
+      "loop": true,
+      "tone": "loop"
     }
   ],
   "details": [

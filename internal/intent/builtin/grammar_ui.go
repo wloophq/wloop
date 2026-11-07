@@ -52,7 +52,8 @@ var uiGrammar = []Key{
 	{Path: "events", In: SurfaceUI, Kind: KindTable, Doc: "How each event kind the plugin declares shows on a timeline, by kind."},
 	{Path: "events.*", In: SurfaceUI, Kind: KindTable, Doc: "One event kind's words."},
 	{Path: "events.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The event in a few words. Required."},
-	{Path: "events.*.loop", In: SurfaceUI, Kind: KindBool, Doc: "The event is the loop's doing, which the activity's loop filter keeps."},
+	{Path: "events.*.loop", In: SurfaceUI, Kind: KindBool, Doc: "The event is the loop's doing, which the activity's loop filter keeps; its tone is \"loop\" when it sets no other."},
+	{Path: "events.*.tone", In: SurfaceUI, Kind: KindEnum, Values: func() []Value { return Tones }, Doc: "The tone the timeline and the activity draw the event in."},
 	{Path: "events.*.data", In: SurfaceUI, Kind: KindEnum, Values: func() []Value {
 		return []Value{{Name: "", Doc: "Its data as it is."}, {Name: "none", Doc: "No data."}, {Name: "first_field", Doc: "Its data up to the first colon."},
 			{Name: "short_sha", Doc: "The first seven characters of a commit id."}, {Name: "requested", Doc: "Whom it asks or stops asking: shown as from that person or team, not as data."}}

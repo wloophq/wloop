@@ -880,7 +880,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
 - `events.<name>` (table): One event kind's words.
 - `events.<name>.label` (string, localized): The event in a few words. Required.
-- `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps.
+- `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps; its tone is "loop" when it sets no other.
+- `events.<name>.tone` (one of ``, `loop`, `me`, `people`): The tone the timeline and the activity draw the event in.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
 - `events.<name>.data` (one of ``, `none`, `first_field`, `short_sha`, `requested`): How the event's data shows on a timeline.
   - ``: Its data as it is.
   - `none`: No data.
@@ -1025,7 +1030,48 @@ The fields each notice reads besides `Name` and `Command`:
   - `intake_canceled`: A request canceled.
   - `intake_guidance`: A request's guidance replaced.
   - `workflow_step_ran`: A workflow's step ran.
+  - `session_started`: An agent session started.
+  - `session_launched`: An agent session launched.
+  - `session_abandoned`: An agent session abandoned before it started.
+  - `session_idle`: An agent session went idle.
+  - `session_active`: An agent session became active again.
+  - `session_closed`: An agent session closed.
+  - `session_typed`: Someone typed in an agent session.
+  - `session_prompted`: An agent session got a prompt.
+  - `session_unit`: An agent session tied to the unit.
+  - `session_adopted`: An agent session adopted.
+  - `session_dormant`: An agent session went dormant.
+  - `session_woken`: A dormant agent session woken.
+  - `session_merged`: An agent session merged into another.
+  - `mcp_seen`: An agent session reached the loop's tools.
+  - `turn_dismissed`: A turn dismissed by a rule.
+  - `answer_refused`: An answer refused.
+  - `answer_read`: An answer read by its session.
+  - `view_applied`: A view's change applied.
+  - `record`: A record written, such as a brief.
+  - `gate_resolved`: A decision that waited on you resolved.
+  - `message`: A message in the task's conversation with its agent.
 - `events.<name>.label` (string, localized): What the timeline calls an event of the kind, such as "paused".
+- `events.<name>.tone` (one of ``, `loop`, `me`, `people`): The tone the timeline and the activity draw an event of the kind in; "loop" is what the activity's loop filter keeps.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
+- `facts` (table by name): The facts a task's timeline folds its events into, by name; a later layer adds a fact or replaces one of the same name whole.
+- `facts.<name>` (table): One fact: the events that open it, close it and join it, and how it reads.
+- `facts.<name>.start` (list of strings): The event kinds that open the fact: a core kind, a plugin's declared kind or a task verb's verb_&lt;verb&gt;.
+- `facts.<name>.end` (list of strings): The event kinds that close it; when set the fact is a span, running until one comes, else each start is a fact of its own.
+- `facts.<name>.absorb` (list of strings): The event kinds that join the fact: its open span, or the fact just before them when it is this one.
+- `facts.<name>.label` (template, localized): How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent.
+- `facts.<name>.running` (template, localized): How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent.
+- `facts.<name>.tone` (one of ``, `loop`, `me`, `people`): The fact's tone; its first event's when absent.
+  - ``: No tone.
+  - `loop`: The loop's or an agent's doing.
+  - `me`: Your doing, or what waits on you.
+  - `people`: Someone else's doing.
+- `facts.<name>.order` (integer): Where the fact is tried among the others, lowest first; name order breaks a tie.
+- `facts.<name>.subs` (table by name): The words of the values {{.sub}} reads, by value; a value it leaves out reads as itself.
+- `facts.<name>.subs.<name>` (string, localized): One value's words.
 
 ## Decision kinds (`decisions.toml`)
 

@@ -29,7 +29,8 @@ const (
 )
 
 // A task's timeline, runs and chat, and the gates and runs as resources: TimelinePath serves a task's
-// []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit), RunsPath its []RunView,
+// []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit; as=nodes answers
+// []TimelineNode instead), RunsPath its []RunView,
 // ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task (it takes an AttachRequest
 // and answers a ByHandResult).
 // GatesPath lists []GateView (query parameter status as "a,b", open when absent), GatePath resolves gate id with intent (a TaskRequest's args carry an
@@ -402,6 +403,20 @@ type TimelineEvent struct {
 	At      time.Time       `json:"at"`
 	Unit    string          `json:"unit,omitempty"`
 	Data    json.RawMessage `json:"data,omitempty"`
+}
+
+// TimelineNode is one fact of a task's timeline, as GET TimelinePath?as=nodes serves it, newest first: the events
+// a profile's [facts.<name>] Rule folded, oldest first, or one event no fact took (Rule ""). Label and Tone are the
+// fact's words; End is zero for a single event and for a span still Running.
+type TimelineNode struct {
+	Rule    string          `json:"rule,omitempty"`
+	Label   string          `json:"label"`
+	Tone    string          `json:"tone,omitempty"`
+	At      time.Time       `json:"at"`
+	End     time.Time       `json:"end,omitzero"`
+	Running bool            `json:"running,omitempty"`
+	Actor   string          `json:"actor,omitempty"`
+	Events  []TimelineEvent `json:"events"`
 }
 
 // ChatRequest is a message to a task's agent; Intent picks the intent of the turn it starts when no session

@@ -70,6 +70,24 @@ func timelineEvents() []api.TimelineEvent {
 	}
 }
 
+// timelineNodes are timelineEvents as GET the timeline?as=nodes serves them, one node each, newest first.
+func timelineNodes() []api.TimelineNode {
+	var out []api.TimelineNode
+	for _, ev := range timelineEvents() {
+		out = append(out, api.TimelineNode{Label: ev.Kind, At: ev.At, Actor: ev.Actor, Events: []api.TimelineEvent{ev}})
+	}
+	return out
+}
+
+// nodesPath is task id's timeline as nodes, narrowed to kinds when any.
+func nodesPath(id, kinds string) string {
+	p := "/api/tasks/" + id + "/timeline?as=nodes"
+	if kinds != "" {
+		p += "&kinds=" + kinds
+	}
+	return p
+}
+
 // taskPageHarness drives the page over domShim: page(id) loads the task and
 // draws it into a box; walk, cls and focus read the drawn tree.
 const taskPageHarness = `
@@ -109,8 +127,8 @@ func runTaskPageOn(t *testing.T, cat api.ViewsCatalog, main string, answers map[
 func pageAnswers(t *testing.T) map[string]any {
 	e := pageTask(t)
 	return map[string]any{
-		"/api/tasks/" + e.ID:               e,
-		"/api/tasks/" + e.ID + "/timeline": timelineEvents(),
+		"/api/tasks/" + e.ID: e,
+		nodesPath(e.ID, ""):  timelineNodes(),
 	}
 }
 
@@ -235,11 +253,11 @@ func TestTheTimelineFiltersByKind(t *testing.T) {
 		Asked         string
 	}
 	answers := pageAnswers(t)
-	answers["/api/tasks/t-0123456789abcdef/timeline?kinds=message"] = timelineEvents()
+	answers[nodesPath("t-0123456789abcdef", "message")] = []api.TimelineNode{timelineNodes()[0], timelineNodes()[2]}
 	runTaskPage(t, `
 taskState.tab = "timeline";
 let box = await page("t-0123456789abcdef");
-const said = (b) => cls(b, "msg").map((m) => m.textContent);
+const said = (b) => cls(b, "ev").map((m) => m.textContent);
 const before = said(box);
 const chips = walk(cls(box, "kinds")[0], (x) => x.tag === "button").map((b) => b.textContent);
 await focus(box, "timeline:kind:message").on.click();
@@ -251,7 +269,7 @@ done({ Before: before, After: said(box), Chips: chips, Asked: asked.slice(-1)[0]
 	if !slices.Equal(got.Chips, []string{"all", "message", "verb"}) {
 		t.Errorf("kind chips %v", got.Chips)
 	}
-	if got.Asked != "/api/tasks/t-0123456789abcdef/timeline?kinds=message" || len(got.After) != 2 {
+	if got.Asked != nodesPath("t-0123456789abcdef", "message") || len(got.After) != 2 {
 		t.Errorf("filtered to messages: asked %q, shows %q", got.Asked, got.After)
 	}
 }

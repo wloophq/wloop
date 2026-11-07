@@ -150,40 +150,50 @@ done = "closed"
 
 [events.opened]
 label = "opened"
+tone = "people"
 
 [events.push]
 label = "pushed"
+tone = "people"
 
 [events.review_requested]
 label = "review requested"
+tone = "people"
 data = "requested"
 
 [events.review_request_removed]
 label = "review request removed"
+tone = "people"
 data = "requested"
 
 [events.review]
 label = "reviewed"
+tone = "people"
 data = "first_field"
 
 [events.comment]
 label = "commented"
+tone = "people"
 
 [events.check]
 label = "checks"
 
 [events.ready]
 label = "ready for review"
+tone = "people"
 
 [events.draft]
 label = "back to draft"
+tone = "people"
 
 [events.merged]
 label = "merged"
+tone = "people"
 data = "short_sha"
 
 [events.closed]
 label = "closed"
+tone = "people"
 
 [events.round_pending]
 label = "round pending"

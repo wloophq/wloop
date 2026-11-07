@@ -28,12 +28,12 @@ func (s *Server) rowsCatalog() api.CatalogResponse {
 	return b.cat
 }
 
-// coreEvents are the core's event kinds as the profile's timeline.toml words them, with no provider.
+// coreEvents are the core's event kinds as the profile's timeline.toml words and tones them, with no provider.
 func coreEvents(l *intentload.Loaded) []api.EventSpec {
 	var out []api.EventSpec
 	for _, k := range builtin.EventKinds {
 		if e, ok := l.Timeline.Events[k.Name]; ok {
-			out = append(out, api.EventSpec{Kind: k.Name, Label: e.Label, Loop: true})
+			out = append(out, api.EventSpec{Kind: k.Name, Label: e.Label, Loop: e.Tone == "loop", Tone: e.Tone})
 		}
 	}
 	return out

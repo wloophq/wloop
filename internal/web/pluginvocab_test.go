@@ -35,7 +35,7 @@ var scriptDebts = map[string]map[string]int{
 	"plugins.js": {"author": 1},
 	"rail.js":    {"waits-on": 4, "explore": 1, "plan": 1, "recent": 1},
 	"row.js":     {"age": 1, "kind": 1},
-	"task.js":    {"draft": 2, "merged": 1, "kind": 1, "all": 1},
+	"task.js":    {"draft": 2, "merged": 1, "all": 1},
 	"toolbar.js": {"kind": 1, "explore": 1, "recent": 1},
 	"views.js":   {"draft": 1, "where": 1, "review": 1, "plan": 1},
 }

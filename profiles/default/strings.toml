@@ -601,6 +601,7 @@
 "Remove filter {label}" = "Remove filter {label}"
 "{field}: {values}" = "{field}: {values}"
 "{field}: not {values}" = "{field}: not {values}"
+"{n} event" = { one = "{n} event", other = "{n} events" }
 
 [formats]
 time = "3:04 PM"

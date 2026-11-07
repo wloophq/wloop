@@ -131,7 +131,11 @@ func (c Catalog) Events() []api.EventSpec {
 	var out []api.EventSpec
 	for _, e := range c.Source.Events {
 		if w, ok := t.Events[e.Name]; ok {
-			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: w.Loop, Data: w.Data})
+			tone := w.Tone
+			if tone == "" && w.Loop {
+				tone = "loop"
+			}
+			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: tone == "loop", Tone: tone, Data: w.Data})
 		}
 	}
 	return out

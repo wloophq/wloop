@@ -231,7 +231,7 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			l.Strings, l.Formats, stringProblems = loadStrings(layers, r)
 			l.StringsStamp = stringsStamp(locale, l.Strings, l.Formats)
 			var timelineProblems Problems
-			l.Timeline, timelineProblems = loadTimeline(layers, r)
+			l.Timeline, timelineProblems = loadTimeline(layers, r, tasks.VerbKinds())
 			stringProblems = append(stringProblems, timelineProblems...)
 			decisions, decisionProblems := loadDecisions(layers, r)
 			stringProblems = append(stringProblems, decisionProblems...)
