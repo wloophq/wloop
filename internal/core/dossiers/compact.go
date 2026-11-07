@@ -48,8 +48,9 @@ func (c *Calls) ask(ctx context.Context, u unit.Unit, prompt, schema string, out
 	if tier == "" {
 		tier = turns.TierBalanced
 	}
+	var got turns.Answer
+	defer func() { c.settle(ctx, u, got.CostUSD) }()
 	got, err := c.Asker.Ask(ctx, turns.Ask{Tier: tier, Prompt: prompt, Schema: schema, MaxCostUSD: c.Budget.Caps.PerCallUSD})
-	c.settle(ctx, u, got.CostUSD)
 	if err != nil {
 		return err
 	}

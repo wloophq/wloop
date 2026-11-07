@@ -366,6 +366,22 @@ func compactEnv(t *testing.T) (*turnsEnv, dossier.Dossier) {
 	return te, d
 }
 
+type panickingAsker struct{}
+
+func (panickingAsker) Ask(context.Context, turns.Ask) (turns.Answer, error) { panic("the agent adapter broke") }
+
+func TestAPanickingDossierCallReleasesItsReservation(t *testing.T) {
+	te, _ := compactEnv(t)
+	te.calls.Asker = panickingAsker{}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = te.calls.Compact(context.Background(), thread)
+	}()
+	if te.calls.Budget.Reserved() != 0 || !slices.Equal(te.recorded, []float64{0.5}) {
+		t.Fatalf("reserved %v recorded %v after a panic", te.calls.Budget.Reserved(), te.recorded)
+	}
+}
+
 func TestCompactionRewritesNotes(t *testing.T) {
 	te, d := compactEnv(t)
 	logs := git(t, d.Path, "rev-parse", "HEAD:log")
