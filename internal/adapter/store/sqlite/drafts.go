@@ -146,29 +146,24 @@ func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, err
 	return normal(d), nil
 }
 
+// pendingDraft says a draft in state s is one of its task's pending drafts.
+func pendingDraft(s draft.State) bool { return s == draft.Held || s == draft.Failed }
+
 // touchDraftTask marks the stored task a draft serves changed at the next task position, so a page read since
-// an earlier one lists it with its drafts; nothing for no task or one not stored.
+// an earlier one lists it with its pending drafts; nothing for no task or one not stored. A stored task has
+// written the position.
 func touchDraftTask(ctx context.Context, tx *Tx, id string) error {
 	if id == "" {
 		return nil
 	}
-	epoch, rev, err := readPosition(ctx, tx)
-	if err != nil {
-		return err
-	}
-	rev++
-	res, err := tx.ExecContext(ctx, `UPDATE tasks SET rev = ? WHERE id = ?`, rev, id)
+	res, err := tx.ExecContext(ctx, `UPDATE task_position SET rev = rev + 1 WHERE only = 1 AND EXISTS (SELECT 1 FROM tasks WHERE id = ?)`, id)
 	if err != nil {
 		return err
 	}
 	if n, err := res.RowsAffected(); err != nil || n == 0 {
 		return err
 	}
-	if epoch == "" {
-		epoch = newEpoch()
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO task_position (only, epoch, rev) VALUES (1, ?, ?)
-		ON CONFLICT (only) DO UPDATE SET epoch = excluded.epoch, rev = excluded.rev`, epoch, rev); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET rev = (SELECT rev FROM task_position WHERE only = 1) WHERE id = ?`, id); err != nil {
 		return err
 	}
 	tx.Touch(port.TopicTasks, task.UnitOf(task.ID(id)))
@@ -261,6 +256,9 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 				return err
 			}
 			tx.Touch(port.TopicDrafts, d.Unit)
+			if pendingDraft(from) == pendingDraft(d.State) {
+				return nil
+			}
 			return touchDraftTask(ctx, tx, d.Task)
 		}
 		var state string
