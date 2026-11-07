@@ -136,7 +136,7 @@ func (h *hub) close() {
 func (sub *subscriber) add(c api.Change) {
 	sub.mu.Lock()
 	if sub.pending == nil {
-		c.Units, c.Notices = slices.Clone(c.Units), slices.Clone(c.Notices)
+		c.Units, c.Notices, c.Windows = slices.Clone(c.Units), slices.Clone(c.Notices), slices.Clone(c.Windows)
 		sub.pending = &c
 	} else {
 		sub.pending.Merge(c)

@@ -78,7 +78,8 @@ func New(cfg Config) *Controller {
 }
 
 // Run binds the host's handlers, then follows the window requests the daemon
-// relays until ctx ends, subscribing again whenever the daemon goes away.
+// relays until ctx ends, subscribing again whenever the daemon goes away; it
+// returns once the stream it follows has closed.
 func (c *Controller) Run(ctx context.Context) error {
 	err := c.cfg.Host.Listen(Handlers{
 		Hotkey:        c.cfg.Hotkey,
@@ -105,13 +106,15 @@ func (c *Controller) follow(ctx context.Context, changes <-chan api.Change) {
 	for {
 		select {
 		case <-ctx.Done():
+			for range changes {
+			}
 			return
 		case ch, open := <-changes:
 			if !open {
 				return
 			}
-			if ch.Window != nil {
-				c.handle(*ch.Window)
+			for _, req := range ch.Windows {
+				c.handle(req)
 			}
 		}
 	}

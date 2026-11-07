@@ -48,9 +48,7 @@ func (into *Change) Merge(c Change) {
 	if c.Counters != nil {
 		into.Counters = c.Counters
 	}
-	if c.Window != nil {
-		into.Window = c.Window
-	}
+	into.Windows = append(into.Windows, c.Windows...)
 	if into.All {
 		into.Units = nil
 		return

@@ -61,12 +61,39 @@ func (h *fakeHost) handlers() *Handlers {
 	return h.listened
 }
 
-// fakeEvents serves one stream per call from streams; a nil stream is an error.
+// fakeEvents serves one stream per call from streams; a nil stream is an
+// error. Like the events client, a served stream closes once its source
+// closes or the fake stops.
 type fakeEvents struct {
 	mu      sync.Mutex
 	streams []chan api.Change
 	clients []string
 	at      []time.Time
+	stop    chan struct{}
+	relays  sync.WaitGroup
+}
+
+func (e *fakeEvents) relay(src <-chan api.Change) <-chan api.Change {
+	out := make(chan api.Change)
+	e.relays.Go(func() {
+		defer close(out)
+		for {
+			select {
+			case c, open := <-src:
+				if !open {
+					return
+				}
+				select {
+				case out <- c:
+				case <-e.stop:
+					return
+				}
+			case <-e.stop:
+				return
+			}
+		}
+	})
+	return out
 }
 
 func (e *fakeEvents) Events(ctx context.Context, client string, _ api.Since) (<-chan api.Change, error) {
@@ -82,7 +109,7 @@ func (e *fakeEvents) Events(ctx context.Context, client string, _ api.Since) (<-
 	if ch == nil {
 		return nil, errors.New("the daemon is down")
 	}
-	return ch, nil
+	return e.relay(ch), nil
 }
 
 func (e *fakeEvents) calls() ([]string, []time.Time) {
@@ -116,7 +143,7 @@ type rig struct {
 }
 
 func newRig(streams ...chan api.Change) *rig {
-	r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: streams}, logs: &logs{}}
+	r := &rig{host: &fakeHost{}, events: &fakeEvents{streams: streams, stop: make(chan struct{})}, logs: &logs{}}
 	r.ctl = New(Config{Host: r.host, Daemon: r.events, CockpitURL: cockpitURL, Hotkey: "ctrl+option+space", Log: r.logs.logf})
 	return r
 }
@@ -128,7 +155,9 @@ func (r *rig) run(t *testing.T) {
 	go func() { done <- r.ctl.Run(ctx) }()
 	t.Cleanup(func() {
 		cancel()
+		close(r.events.stop)
 		<-done
+		r.events.relays.Wait()
 	})
 }
 
@@ -182,7 +211,7 @@ func TestPanelOpenShowsTheMainWindowAndHidesThePanel(t *testing.T) {
 		r.run(t)
 		synctest.Wait()
 		r.host.handlers().OnHotkey()
-		stream <- api.Change{Type: "window", Window: &api.WindowRequest{Action: api.WindowOpen, Route: "task=t-1"}}
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowOpen, Route: "task=t-1"}}}
 		synctest.Wait()
 		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute, "main "+base+"#task=t-1", "hide-panel")
 		r.host.handlers().OnHotkey()
@@ -196,7 +225,7 @@ func TestPanelRequestShowsThePanel(t *testing.T) {
 		r := newRig(stream)
 		r.run(t)
 		synctest.Wait()
-		stream <- api.Change{Type: "window", Window: &api.WindowRequest{Action: api.WindowPanel}}
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowPanel}}}
 		synctest.Wait()
 		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute)
 	})
@@ -209,11 +238,44 @@ func TestHidePanelRequestHidesThePanel(t *testing.T) {
 		r.run(t)
 		synctest.Wait()
 		r.host.handlers().OnHotkey()
-		stream <- api.Change{Type: "window", Window: &api.WindowRequest{Action: api.WindowHidePanel}}
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowHidePanel}}}
 		synctest.Wait()
 		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute, "hide-panel")
 		r.host.handlers().OnHotkey()
 		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute)
+	})
+}
+
+func TestEveryRequestOfAChangeRunsInOrder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		stream := make(chan api.Change)
+		r := newRig(stream)
+		r.run(t)
+		synctest.Wait()
+		r.host.handlers().OnHotkey()
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowOpen, Route: "task=t-1"}, {Action: api.WindowPanel}}}
+		synctest.Wait()
+		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute, "main "+base+"#task=t-1", "hide-panel", "panel "+base+"#"+PanelRoute)
+	})
+}
+
+func TestRunReturnsAfterTheStreamCloses(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		stream := make(chan api.Change)
+		r := newRig(stream)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() { r.ctl.Run(ctx); close(done) }()
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatal("Run returned while the events stream was still open")
+		default:
+		}
+		close(stream)
+		<-done
 	})
 }
 
@@ -250,7 +312,7 @@ func TestControllerKeepsRunningWhenTheHotkeyFails(t *testing.T) {
 		if got := r.logs.all(); !strings.Contains(got, "window.hotkey") || !strings.Contains(got, "hyper+x") {
 			t.Fatalf("the log %q names neither window.hotkey nor the chord", got)
 		}
-		stream <- api.Change{Type: "window", Window: &api.WindowRequest{Action: api.WindowOpen, Route: "view=needs-me"}}
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowOpen, Route: "view=needs-me"}}}
 		synctest.Wait()
 		want(t, r.host.taken(), "main "+base+"#view=needs-me", "hide-panel")
 	})
@@ -287,7 +349,7 @@ func TestControllerReconnectsAfterTheDaemonGoesAway(t *testing.T) {
 		if gap := at[2].Sub(at[1]); gap != reconnectAfter {
 			t.Errorf("retried %v after a failed subscribe, want %v", gap, reconnectAfter)
 		}
-		second <- api.Change{Type: "window", Window: &api.WindowRequest{Action: api.WindowOpen, Route: "task=t-2"}}
+		second <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowOpen, Route: "task=t-2"}}}
 		synctest.Wait()
 		want(t, r.host.taken(), "main "+base+"#task=t-2", "hide-panel")
 	})

@@ -64,8 +64,8 @@ type Change struct {
 	Notices []Notice    `json:"notices,omitempty"`
 	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
 	Counters *Counters `json:"counters,omitempty"`
-	// Window is a window request, sent only to the events client named WindowClient.
-	Window *WindowRequest `json:"window,omitempty"`
+	// Windows are window requests, in the order they came, sent only to the events client named WindowClient.
+	Windows []WindowRequest `json:"windows,omitempty"`
 }
 
 // Notice is a notification a workflow's notify.self step raised; ID is

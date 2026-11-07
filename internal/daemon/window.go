@@ -25,6 +25,6 @@ func (s *Server) handleWindow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "window action "+strconv.Quote(req.Action)+" is not one of "+strings.Join(api.WindowActions, ", "))
 		return
 	}
-	delivered := s.hub.send(api.WindowClient, api.Change{Type: "window", Window: &req})
+	delivered := s.hub.send(api.WindowClient, api.Change{Type: "window", Windows: []api.WindowRequest{req}})
 	writeJSON(w, api.WindowResult{Delivered: delivered})
 }
