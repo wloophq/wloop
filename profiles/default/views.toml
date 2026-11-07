@@ -437,8 +437,8 @@ hide_disabled = true
 
 [views.home-stalled]
 label         = "Stalled the longest"
-summary       = "Open tasks that have not moved for the longest."
-when          = "task.category in ['ready', 'active', 'waiting']"
+summary       = "Open tasks no agent is working on, the longest unmoved first."
+when          = "task.category in ['ready', 'active', 'waiting'] && task.turns_running == 0"
 sort          = "-task.since_movement"
 rail          = false
 hide_disabled = true

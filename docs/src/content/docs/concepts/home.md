@@ -37,7 +37,7 @@ Each counter with something to count is a clause, `{counter}` where its count go
 
 ## Sections and capture
 
-Each `[[sections]]` shows the first `limit` rows of a view, titled by the view's label, each with the time its `time` names (`owed` or `moved`); its link opens the whole view. The bundled sections are `home-blocked`, the tasks that wait on you the longest owed first, and `home-stalled`, the open tasks that have not moved for the longest.
+Each `[[sections]]` shows the first `limit` rows of a view, titled by the view's label, each with the time its `time` names (`owed` or `moved`); its link opens the whole view. The bundled sections are `home-blocked`, the tasks that wait on you the longest owed first, and `home-stalled`, the open tasks no agent is working on, those that have not moved for the longest first.
 
 ## Decision queues
 

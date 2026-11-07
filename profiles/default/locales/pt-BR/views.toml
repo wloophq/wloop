@@ -261,7 +261,7 @@ summary = "Tarefas que esperam por você: uma decisão a tomar ou um pedido de a
 
 [views.home-stalled]
 label = "Paradas há mais tempo"
-summary = "Tarefas abertas que não se movem há mais tempo."
+summary = "Tarefas abertas em que nenhum agente está trabalhando, as paradas há mais tempo primeiro."
 
 [views.decide-answer]
 label = "Perguntas do agente"
