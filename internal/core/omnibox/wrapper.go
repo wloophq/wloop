@@ -9,7 +9,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/headless"
 )
@@ -53,7 +52,7 @@ func ParseWrapper(src string) (Wrapper, error) {
 // Prompt is the omnibox call's prompt: the wrapper's before, the user's request and the questions already
 // answered between this call's markers, the wrapper's after, then the answer schema, last so nothing quoted
 // follows it.
-func (w Wrapper) Prompt(in api.OmniboxText, dir string) (string, error) {
+func (w Wrapper) Prompt(in AskRequest, dir string) (string, error) {
 	if w.t == nil {
 		return "", errors.New("no omnibox wrapper is loaded")
 	}

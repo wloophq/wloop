@@ -373,6 +373,8 @@ type Deps struct {
 	SendDrafts bool
 	// Headless starts headless turns; nil answers 503 to the act route.
 	Headless Headless
+	// OmniboxAsk runs the omnibox's read-only agent call; nil answers 503 to the ask route.
+	OmniboxAsk OmniboxAsker
 	// Placer says where a session on a unit of a provider other than GitHub runs; nil offers the
 	// session mode unchecked.
 	Placer Placer

@@ -551,6 +551,19 @@
 "{unit} is not in the inventory." = "{unit} is not in the inventory."
 # piece C
 "Read all" = "Read all"
+# piece B11
+# The omnibox agent call's errors.
+"Type what to ask the agent" = "Type what to ask the agent"
+"Today's spend cap for agent calls is reached; ask again tomorrow" = "Today's spend cap for agent calls is reached; ask again tomorrow"
+"No agent here can answer from the omnibox: {error}" = "No agent here can answer from the omnibox: {error}"
+"The agent could not answer: {error}" = "The agent could not answer: {error}"
+"This daemon runs no omnibox agent" = "This daemon runs no omnibox agent"
+# Why the omnibox dropped an operation the agent proposed, by its code.
+"unknown_operation" = "The omnibox does not run {op}"
+"incomplete_operation" = "The agent proposed {op} without what it needs"
+"unknown_task" = "No task {id} exists"
+"unknown_unit" = "No task holds {unit}"
+"outside_vocabulary" = "No omnibox verb runs {name}"
 
 [formats]
 time = "3:04 PM"

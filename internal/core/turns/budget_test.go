@@ -50,7 +50,10 @@ func TestBudgetRecordsTheReportedCost(t *testing.T) {
 	}
 	cost := 0.12
 	var recorded []float64
-	err := b.Settle(ctx, &cost, func(_ context.Context, c float64) error { recorded = append(recorded, c); return errors.New("disk full") })
+	err := b.Settle(ctx, &cost, func(_ context.Context, c float64) error {
+		recorded = append(recorded, c)
+		return errors.New("disk full")
+	})
 	if err == nil || !slices.Equal(recorded, []float64{0.12}) || b.Reserved() != 0 {
 		t.Fatalf("err %v, recorded %v, reserved %v; want the record's error, 0.12 and nothing held", err, recorded, b.Reserved())
 	}
