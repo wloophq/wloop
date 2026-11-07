@@ -36,7 +36,7 @@ func layoutOf(t *testing.T, rows string, viewport, width int, probe string) stri
 	}
 	dir := t.TempDir()
 	page := `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://` + css + `"><style>body { width: ` + itoa(width) + `px; margin: 0; }</style></head><body>` +
-		`<section id="list"><details id="list-box" class="list-box" open><div id="table"><div class="rows">` + rows + `</div></div></details></section>` +
+		`<section id="list"><details id="list-box" class="list-box" open><summary id="list-sum" class="list-sum"></summary><div id="table"><div class="rows">` + rows + `</div></div></details></section>` +
 		`<pre id="probe"></pre><script>document.getElementById("probe").textContent = (function () {` + probe + `})();</script></body></html>`
 	file := filepath.Join(dir, "page.html")
 	if err := os.WriteFile(file, []byte(page), 0o600); err != nil {
@@ -62,31 +62,58 @@ func itoa(n int) string {
 	return string(b)
 }
 
-// usersRow is the row a user saw lose its first line: a pull request of theirs, stalled, waiting on them,
-// with no reviewer, a long title, its brief's type, risk and size, a dozen tags and its actions, in pt-BR words.
-func usersRow(t *testing.T) string {
+// shotOf saves a screenshot of rows laid out as layoutOf lays them to path, when the run asks for shots.
+func shotOf(t *testing.T, rows string, viewport, width int, path string) {
 	t.Helper()
-	pr := lensRows()[1]
-	pr["kind"], pr["waiting_on"], pr["stalled"] = "no_reviewer", "me", true
-	pr["title"] = "Adicionar novas tentativas ao envio para que redes instáveis parem de derrubar o lote inteiro de exportação"
-	tags := []string{}
-	for _, tag := range []string{"lang:go", "lang:sql", "change:fix", "domain:billing", "area:uploads", "team:platform", "infra:queue", "infra:db", "kind:bug",
-		"prio:high", "customer:acme", "area:export", "risk:data"} {
-		tags = append(tags, tag)
+	dir := os.Getenv("LAYOUT_SHOTS")
+	if dir == "" {
+		return
 	}
-	pr["brief"] = map[string]any{"risk": "medium", "size": "m", "kind": "fix", "tags": tags}
-	pr["views"] = []string{"mine", "stalled"}
-	actions := []map[string]any{}
-	specs := map[string]any{}
-	for id, label := range map[string]string{"request-review": "Pedir revisão", "pause": "Pausar", "dismiss": "Dispensar", "open": "Abrir"} {
-		actions = append(actions, map[string]any{"id": id, "enabled": true})
-		specs[id] = map[string]any{"id": id, "label": label, "group": "control", "surfaces": []string{"row"}}
+	css, err := filepath.Abs("static/app.css")
+	if err != nil {
+		t.Fatal(err)
 	}
-	pr["actions"] = actions
+	tmp := t.TempDir()
+	page := `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://` + css + `"><style>body { width: ` + itoa(width) + `px; margin: 0; }</style></head><body>` +
+		`<section id="list"><details id="list-box" class="list-box" open><summary id="list-sum" class="list-sum"></summary><div id="table"><div class="rows">` + rows + `</div></div></details></section></body></html>`
+	file := filepath.Join(tmp, "page.html")
+	if err := os.WriteFile(file, []byte(page), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, headlessChrome(), "--headless=new", "--disable-gpu", "--allow-file-access-from-files", "--hide-scrollbars",
+		"--user-data-dir="+filepath.Join(tmp, "profile"), "--window-size="+itoa(viewport)+",140", "--screenshot="+filepath.Join(dir, path), "file://"+file).CombinedOutput(); err != nil {
+		t.Fatalf("chrome: %v: %s", err, out)
+	}
+}
+
+// rowHTML renders pr, a wire row, with the served catalog under change and the action specs given, as the
+// cockpit draws it in view.
+func rowHTML(t *testing.T, pr map[string]any, specs map[string]any, view string, change func(cat map[string]any)) string {
+	t.Helper()
 	var cat map[string]any
 	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
 		t.Fatal(err)
 	}
+	change(cat)
+	raw, err := json.Marshal(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct{ HTML string }
+	rowViewRun(t, raw, `state.rows = [input.pr];
+state.specs = { version: "", byId: input.specs };
+const lens = lensOf({ ...readHash(), view: input.view });
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const ser = (n) => n instanceof Text ? esc(n.data) : "<" + n.tag + Object.entries(n.attrs).map(([k, v]) => " " + k + "=\"" + esc(v) + "\"").join("") + ">" + n.children.map(ser).join("") + "</" + n.tag + ">";
+process.stdout.write(JSON.stringify({ HTML: ser(rowView(rowModel(input.pr, "", lens, ""), lens)) }));`,
+		map[string]any{"pr": pr, "specs": specs, "view": view, "now": pr["now"]}, &got)
+	return got.HTML
+}
+
+// ptBR words the served catalog's situation of no reviewer as the user's locale does.
+func ptBR(cat map[string]any) {
 	for _, s := range cat["situations"].([]any) {
 		if sit := s.(map[string]any); sit["kind"] == "no_reviewer" {
 			sit["label"] = "sem revisor"
@@ -102,59 +129,95 @@ func usersRow(t *testing.T) string {
 			labels["no_reviewer"] = "sem revisor"
 		}
 	}
-	raw, err := json.Marshal(cat)
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
-	var got struct{ HTML string }
-	rowViewRun(t, raw, `state.rows = [input.pr];
-state.specs = { version: "", byId: input.specs };
-const lens = lensOf({ ...readHash(), view: "mine" });
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-const ser = (n) => n instanceof Text ? esc(n.data) : "<" + n.tag + Object.entries(n.attrs).map(([k, v]) => " " + k + "=\"" + esc(v) + "\"").join("") + ">" + n.children.map(ser).join("") + "</" + n.tag + ">";
-process.stdout.write(JSON.stringify({ HTML: ser(rowView(rowModel(input.pr, "", lens, ""), lens)) }));`,
-		map[string]any{"pr": wireRow("me", now, pr), "specs": specs, "now": now.UnixMilli()}, &got)
-	for _, want := range []string{`class="row w-me mine late"`, ">sem revisor<", ">fix<", "risk medium", ">M<", "Pedir revisão"} {
-		if !strings.Contains(got.HTML, want) {
-			t.Fatalf("the user's row lacks %s: %s", want, got.HTML)
-		}
-	}
-	return got.HTML
 }
 
-// rowBoxes is a probe of the first row: its title's width, where its first line, situation and meta are, and
-// how many of its actions show whole inside the row.
+// usersRow is the row a user saw broken in My PRs: a pull request of theirs, stalled, waiting on them, with no
+// reviewer, a long title, its brief's type, risk and size, a dozen tags and eight actions, in pt-BR words.
+func usersRow(t *testing.T) string {
+	t.Helper()
+	pr := lensRows()[1]
+	pr["kind"], pr["waiting_on"], pr["stalled"] = "no_reviewer", "me", true
+	pr["title"] = "fix(parts): resolve messages delivered out of order by the unary ack consumer when the broker redelivers"
+	pr["brief"] = map[string]any{"risk": "medium", "size": "m", "kind": "fix", "open_questions": 2, "tags": []string{"area:messaging", "audience:developers",
+		"audience:operators", "change:fix", "concern:concurrency", "concern:reliability", "domain:parts-matching", "lang:python", "tool:gcp-pubsub",
+		"infra:queue", "infra:db", "prio:high", "customer:acme"}}
+	pr["views"] = []string{"mine", "stalled"}
+	actions := []map[string]any{}
+	specs := map[string]any{}
+	for _, a := range [][2]string{{"review", "Review"}, {"address", "Address"}, {"act", "Agir"}, {"nudge", "Cutucar"}, {"pause", "Pausar"}, {"mute", "Silenciar"},
+		{"open", "Abrir"}, {"remove", "Remover"}} {
+		actions = append(actions, map[string]any{"id": a[0], "enabled": true})
+		specs[a[0]] = map[string]any{"id": a[0], "label": a[1], "group": "control", "surfaces": []string{"row"}}
+	}
+	pr["actions"] = actions
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	row := wireRow("me", now, pr)
+	row["now"] = now.UnixMilli()
+	html := rowHTML(t, row, specs, "mine", ptBR)
+	for _, want := range []string{`class="row w-me mine late"`, ">sem revisor<", ">fix<", "risk medium", ">M<", ">Remover<"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("the user's row lacks %s: %s", want, html)
+		}
+	}
+	return html
+}
+
+// rowBoxes is a probe of the first row: its title's share of the row, where its first line, situation and
+// meta are, how many of its actions show whole, the pieces of its meta cut mid-word, and its +n chip.
 const rowBoxes = `
 const r = (el) => el.getBoundingClientRect();
 const row = document.querySelector(".row");
-const meta = r(row.querySelector(":scope > .meta"));
-const acts = [...row.querySelectorAll(":scope > .meta .act")];
-const shown = acts.filter((a) => getComputedStyle(a).display !== "none");
-const whole = shown.filter((a) => r(a).width > 0 && r(a).left >= meta.left - 0.5 && r(a).right <= Math.min(meta.right, r(row).right) + 0.5).length;
-return JSON.stringify({ Title: r(row.querySelector(".t")).width, L1Right: r(row.querySelector(".l1")).right, MetaLeft: meta.left,
-  VerbRight: r(row.querySelector(".l1 .verb")).right, Acts: shown.length, Whole: whole });`
+const metaEl = row.querySelector(":scope > .meta");
+const meta = r(metaEl);
+const inside = (b, c) => b.width > 0 && b.left >= c.left - 0.5 && b.right <= c.right + 0.5 && b.top >= c.top - 0.5 && b.bottom <= c.bottom + 0.5;
+const clipOf = (el) => { for (let p = el.parentElement; p && p !== row; p = p.parentElement) if (getComputedStyle(p).overflow !== "visible") return r(p); return r(row); };
+const seenIn = (b, c) => b.width > 0 && b.right > c.left && b.left < c.right && b.bottom > c.top && b.top < c.bottom;
+const acts = [...metaEl.querySelectorAll(".act")].filter((a) => getComputedStyle(a).display !== "none" && seenIn(r(a), clipOf(a)));
+const whole = acts.filter((a) => inside(r(a), clipOf(a)) && inside(r(a), r(row))).length;
+const pieces = [...metaEl.querySelectorAll(".pill, .flag")].filter((p) => getComputedStyle(p).display !== "none");
+const cut = pieces.filter((p) => {
+  const b = r(p), c = clipOf(p);
+  return seenIn(b, c) && (!inside(b, c) || p.scrollWidth > p.clientWidth + 1);
+}).map((p) => p.textContent);
+const more = [...metaEl.querySelectorAll("[data-more]")].map((m) => m.textContent + "|" + (m.getAttribute("title") || ""));
+return JSON.stringify({ Title: r(row.querySelector(".t")).width, Row: r(row).width, L1Right: r(row.querySelector(".l1")).right, MetaLeft: meta.left,
+  VerbRight: r(row.querySelector(".l1 .verb")).right, Acts: acts.length, Whole: whole, Cut: cut, More: more, TitleWhole: row.querySelector(".t").scrollWidth <= row.querySelector(".t").clientWidth + 1 });`
 
-// TestTheUsersRowKeepsItsFirstLineAndItsActions lays out the user's row in a narrow window, where the row
-// hides its actions, and in a wide window with a narrow list, where it shows them: either way its first line
-// keeps room for its situation and title, nothing of it paints under the meta, and every action it shows
+type rowBox struct {
+	Title, Row, L1Right, MetaLeft, VerbRight float64
+	Acts, Whole                              int
+	Cut, More                                []string
+	TitleWhole                               bool
+}
+
+// TestTheUsersRowReadsWholeAtEveryWidth lays out the user's row at the widths it is seen at: its title keeps a
+// fair share of the first line, nothing of the first line paints under the meta, no piece of the meta is cut
+// mid-word, the tags past the first two collapse into a +n chip that names them, and every action it shows
 // shows whole.
-func TestTheUsersRowKeepsItsFirstLineAndItsActions(t *testing.T) {
+func TestTheUsersRowReadsWholeAtEveryWidth(t *testing.T) {
 	html := usersRow(t)
-	for _, c := range []struct{ viewport, width int }{{480, 480}, {1280, 760}} {
-		var box struct {
-			Title, L1Right, MetaLeft, VerbRight float64
-			Acts, Whole                         int
-		}
+	for _, c := range []struct{ viewport, width int }{{1906, 1906}, {1280, 1280}, {1280, 760}, {480, 480}} {
+		shotOf(t, html, c.viewport, c.width, "row-"+itoa(c.width)+".png")
+		var box rowBox
 		raw := layoutOf(t, html, c.viewport, c.width, rowBoxes)
 		if err := json.Unmarshal([]byte(raw), &box); err != nil {
 			t.Fatalf("%v: %s", err, raw)
 		}
-		if box.Title < 120 || box.L1Right > box.MetaLeft || box.VerbRight > box.MetaLeft || box.Whole != box.Acts {
+		share := 0.3
+		if c.width < 900 {
+			share = 0.25
+		}
+		if c.width >= 1900 && !box.TitleWhole {
+			t.Errorf("%dpx: the title is cut although the row has room for it: %+v", c.width, box)
+		}
+		if box.Title < share*box.Row || box.L1Right > box.MetaLeft || box.VerbRight > box.MetaLeft || box.Whole != box.Acts || len(box.Cut) > 0 {
 			t.Errorf("%dpx list in a %dpx window: %+v", c.width, c.viewport, box)
 		}
 		if c.viewport > 900 && box.Acts == 0 {
 			t.Errorf("%dpx window: the row shows no action: %+v", c.viewport, box)
+		}
+		if c.width > 600 && (len(box.More) != 1 || !strings.HasPrefix(box.More[0], "+11|") || !strings.Contains(box.More[0], "customer:acme")) {
+			t.Errorf("%dpx: the tags past two collapse into one +n chip that names them: %v", c.width, box.More)
 		}
 	}
 }

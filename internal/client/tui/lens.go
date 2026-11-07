@@ -50,7 +50,7 @@ func (m *Model) indexRows() {
 func taskItem(e api.TaskView) lens.Item { return lens.Item{Facets: e.Facets, Texts: e.Texts()} }
 
 func (m *Model) rowItem(r api.Row) lens.Item {
-	texts := []string{r.Title, r.Label, r.Link, string(r.Kind), m.kindLabel(r), r.Summary.WaitsOn, r.Summary.Reason, r.Summary.Line}
+	texts := []string{r.Title, r.Label, r.Link, string(r.Kind), m.kindLabel(r), r.Summary.WaitsOn, r.Summary.Reason, m.catalog.ReasonOf(r), r.Summary.Line}
 	for _, id := range slices.Sorted(maps.Keys(r.Facets)) {
 		texts = append(texts, r.Facets[id]...)
 	}

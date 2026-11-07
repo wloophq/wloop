@@ -315,7 +315,8 @@
       "group": false,
       "match": "prefix",
       "menu": true,
-      "show": "meta"
+      "show": "meta",
+      "show_max": 2
     },
     {
       "id": "is",

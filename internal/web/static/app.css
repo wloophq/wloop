@@ -76,6 +76,8 @@
   --rail-width: 208px;
   --detail-width: 480px;
   --row-height: 44px;
+  --row-piece-height: 20px;
+  --row-action-height: 26px;
   --strip-row: 4px;
   --strip-card: 3px;
   --state-glyph: 14px;
@@ -282,7 +284,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 .row {
   display: grid;
-  grid-template-columns: 16px minmax(min(50%, 18rem), 1fr) minmax(0, auto);
+  grid-template-columns: 16px minmax(min(40%, 30rem), 1fr) minmax(0, auto);
   grid-template-areas: "glyph l1 r1" ". l2 r2";
   align-items: center;
   gap: var(--space-2) var(--space-10);
@@ -299,10 +301,13 @@ body.resizing { user-select: none; cursor: col-resize; }
 .row .l1 { grid-area: l1; display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
 .row .l1 > .facet, .row .ch, .row .draft-mark, .row .star { flex: none; }
 .row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-.row > .meta { grid-area: r1; display: flex; align-items: center; justify-content: safe flex-end; gap: var(--space-6); min-width: 0; overflow: hidden; white-space: nowrap; }
-.row > .meta > * { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.row > .meta > .facet > * { display: block; overflow: hidden; text-overflow: ellipsis; }
-.row > .meta > .act { flex: none; }
+.row > .meta { grid-area: r1; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-6); min-width: 0; white-space: nowrap; }
+/* The pieces and actions that do not fit wrap onto a line the row never shows, so none is cut mid-word; the
+   pieces give way first. */
+.row > .meta > .pieces, .row > .meta > .acts { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
+.row > .meta > .pieces { flex: 0 10 auto; max-height: var(--row-piece-height); }
+.row > .meta > .acts { flex: 0 1 auto; max-height: var(--row-action-height); }
+.card .pieces { display: contents; }
 .row .l2 { grid-area: l2; display: flex; align-items: baseline; gap: var(--space-8); min-width: 0; color: var(--muted); font-size: var(--text-meta); }
 .row .l2 .ref { flex: 0 1 auto; max-width: 60%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
 .row .why { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -409,8 +414,8 @@ body.resizing { user-select: none; cursor: col-resize; }
   .facet { min-height: 24px; padding: var(--space-2) 0; }
 }
 .meta .facet .flag, .row .flag, .card .flag { margin-left: 0; }
-.meta > .facet:has(.flag) { margin-left: var(--space-6); }
-.row .meta > .facet:has(.flag) { margin-left: 0; }
+.meta > .facet:has(.flag), .meta > .pieces > .facet:has(.flag) { margin-left: var(--space-6); }
+.row .meta .pieces > .facet:has(.flag) { margin-left: 0; }
 .ref .facet + .unit, .ref .unit + .unit { margin-left: var(--space-6); }
 .pill[data-field="risk"][data-value="high"] { color: var(--err); background: var(--err-bg); }
 .pill[data-field="risk"][data-value="medium"] { color: var(--late); background: var(--late-bg); }
@@ -612,7 +617,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
 .btags { display: inline-flex; gap: var(--space-4); margin-left: var(--space-6); vertical-align: baseline; }
 .brief-line .btags { margin-left: 0; }
 @media (max-width: 600px) {
-  .meta .btags, .row > .meta > .facet:has(.pill), .row > .meta > .pill { display: none; }
+  .meta .btags, .row > .meta .pieces > .facet:has(.pill), .row > .meta .pieces > .pill { display: none; }
 }
 .risk-high { color: var(--err); background: var(--err-bg); }
 .risk-medium { color: var(--late); background: var(--late-bg); }

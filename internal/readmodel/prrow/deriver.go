@@ -51,6 +51,8 @@ type Deriver struct {
 	// Asked is the action a request asks for, whose inputs an open intake
 	// joins on; zero for a row served to a client.
 	Asked catalog.Asked
+	// Reasons are the plugin's words of the reasons its rows name, by key, which a notification says.
+	Reasons map[string]string
 }
 
 // TurnFact is what a row reads of its pull request's turn book.

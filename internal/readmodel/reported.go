@@ -301,8 +301,8 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 		sit = pend.Over(sit)
 	}
 	r.Kind = api.Kind(sit.Kind)
-	r.Summary = api.Summary{WaitsOn: sit.WaitingOn, Since: sit.Since, Stalled: sit.Stalled, Reason: sit.Reason,
-		Closed: sit.Kind == overlay.KindDone, OpenItems: len(r.Items), Line: sit.Reason}
+	r.Summary = api.Summary{WaitsOn: sit.WaitingOn, Since: sit.Since, Stalled: sit.Stalled, Reason: sit.Reason, ReasonKey: sit.ReasonKey,
+		ReasonParams: sit.ReasonParams, Closed: sit.Kind == overlay.KindDone, OpenItems: len(r.Items), Line: sit.Reason}
 	switch sit.Kind {
 	case overlay.KindLoopWaiting, overlay.KindLoopWorking, overlay.KindLoopStopped:
 		if x.run != nil {
@@ -347,7 +347,8 @@ func (x *reported) situation(base Base, at time.Time) overlay.Situation {
 	var sit overlay.Situation
 	if rs := x.snap.Situation; rs != nil {
 		stalled, _ := value.Resolve(rs.Stalled, at).(bool)
-		sit = overlay.Situation{Kind: rs.Kind, WaitingOn: rs.WaitingOn, Since: rs.Since, Reason: overlay.Cut(rs.Reason), Stalled: stalled}
+		sit = overlay.Situation{Kind: rs.Kind, WaitingOn: rs.WaitingOn, Since: rs.Since, Reason: overlay.Cut(rs.Reason), ReasonKey: rs.ReasonKey,
+			ReasonParams: rs.ReasonParams, Stalled: stalled}
 	}
 	if x.run != nil && sit.Kind != overlay.KindDone {
 		if s, ok := x.run.Turn.Situation(x.sessionWaiting(base)); ok {

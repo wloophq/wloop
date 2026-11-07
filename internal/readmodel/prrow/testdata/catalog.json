@@ -1,5 +1,5 @@
 {
-  "version": "f55351381171",
+  "version": "1c06f381b44c",
   "views": [
     {
       "id": "mine",
@@ -316,7 +316,8 @@
       "group": false,
       "match": "prefix",
       "menu": true,
-      "show": "meta"
+      "show": "meta",
+      "show_max": 2
     },
     {
       "id": "is",

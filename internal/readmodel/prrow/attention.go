@@ -122,12 +122,12 @@ func (d Deriver) notice(r api.Row, started bool) (Notice, bool) {
 		}}, true
 	case situation.Kind(r.Kind) == situation.KindHeldByCap:
 		return Notice{Case: NoticeHeld, Token: d.Now.Local().Format(time.DateOnly), Attention: api.Attention{
-			Title: "Round held", Subtitle: prLabel(ref), Body: r.Summary.Reason + " · " + r.Title, Image: "held",
+			Title: "Round held", Subtitle: prLabel(ref), Body: d.reason(r) + " · " + r.Title, Image: "held",
 			Actions: d.notificationActions(r),
 		}}, true
 	case situation.Kind(r.Kind) == situation.KindBlocked:
 		return Notice{Case: NoticeBlocked, Token: reasonToken(r.Summary.Reason), Attention: api.Attention{
-			Title: "Round blocked", Subtitle: prLabel(ref), Body: r.Summary.Reason + " · " + r.Title, Image: "blocked",
+			Title: "Round blocked", Subtitle: prLabel(ref), Body: d.reason(r) + " · " + r.Title, Image: "blocked",
 			Actions: d.notificationActions(r),
 		}}, true
 	case (situation.Kind(r.Kind) == situation.KindLoopWaiting || situation.Kind(r.Kind) == situation.KindLoopStopped) && r.Question != nil:
@@ -138,11 +138,16 @@ func (d Deriver) notice(r api.Row, started bool) (Notice, bool) {
 			title = "Waiting for a permission"
 		}
 		return Notice{Case: NoticeWait, Token: r.Summary.Since.UTC().Format(stampToken) + "." + reasonToken(r.Summary.Reason), Attention: api.Attention{
-			Title: title, Subtitle: prLabel(ref), Body: r.Summary.Reason + " · " + r.Title, Image: "ask",
+			Title: title, Subtitle: prLabel(ref), Body: d.reason(r) + " · " + r.Title, Image: "ask",
 			Actions: d.notificationActions(r),
 		}}, true
 	}
 	return Notice{}, false
+}
+
+// reason is why r waits, in the plugin's words when they name its reason.
+func (d Deriver) reason(r api.Row) string {
+	return api.WordReason(d.Reasons, r.Summary)
 }
 
 func (d Deriver) questionNotice(r api.Row) Notice {
@@ -152,7 +157,7 @@ func (d Deriver) questionNotice(r api.Row) Notice {
 	if q.State != string(turn.Asked) {
 		title = "Agent stopped"
 	}
-	body := []string{r.Summary.Reason}
+	body := []string{d.reason(r)}
 	if q.Verdict != "" {
 		body = append(body, fmt.Sprintf("drafted %s, %d blocking, %d non-blocking", q.Verdict, q.Blocking, q.NonBlocking))
 	}

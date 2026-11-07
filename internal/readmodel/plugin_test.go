@@ -123,3 +123,38 @@ func TestAReportedRowOffersThePluginsActions(t *testing.T) {
 		t.Fatalf("actions %+v, want the plugin's offer once", got)
 	}
 }
+
+// acmeWords is the acme plugin's catalog, which words its reason asked_by.
+type acmeWords struct{}
+
+func (acmeWords) Views() []api.ViewSpec           { return nil }
+func (acmeWords) Facets() []api.FacetSpec         { return nil }
+func (acmeWords) Situations() []api.SituationSpec { return nil }
+func (acmeWords) Reasons() api.ProviderWords {
+	return api.ProviderWords{Provider: "acme", Words: map[string]string{"asked_by": "{{.actor}} pediu"}}
+}
+
+func TestAnyPluginsRowSaysWhyInItsWords(t *testing.T) {
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	snaps := psource.NewSnapshots(db.Snapshots())
+	ctx := context.Background()
+	one := unit.Unit{Provider: "acme", Key: "one"}
+	if err := snaps.Put(ctx, map[unit.Unit]src.Snapshot{one: {Unit: psource.Wire(one), Rev: 1,
+		Situation: &src.Situation{Kind: "waiting", WaitingOn: "me", Reason: "ana asked", ReasonKey: "asked_by", ReasonParams: map[string]string{"actor": "ana"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil,
+		readmodel.NewReported(readmodel.ReportedSource{ID: "acme", Reports: snaps, Catalog: acmeWords{}}))
+	page, err := m.Rows(ctx, api.Since{})
+	if err != nil || len(page.Rows) != 1 {
+		t.Fatalf("rows %+v, %v", page.Rows, err)
+	}
+	r := page.Rows[0]
+	if r.Summary.ReasonKey != "asked_by" || r.Summary.ReasonParams["actor"] != "ana" || m.Catalog().ReasonOf(r) != "ana pediu" {
+		t.Fatalf("summary %+v, worded %q: any plugin's row names its reason, which its words say", r.Summary, m.Catalog().ReasonOf(r))
+	}
+}

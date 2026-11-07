@@ -97,6 +97,7 @@ show = "aside"
 [facets.tag]
 label = "Tag"
 show = "meta"
+show_max = 2
 
 [facets.is]
 label = "Flags"

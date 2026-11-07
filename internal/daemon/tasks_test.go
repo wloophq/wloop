@@ -1108,9 +1108,10 @@ type liveRows struct {
 }
 
 type liveRow struct {
-	facets  map[string][]string
-	signals map[string]bool
-	reason  string
+	facets    map[string][]string
+	signals   map[string]bool
+	reason    string
+	reasonKey string
 }
 
 func (*liveRows) Provider() unit.ProviderID { return "fake" }
@@ -1133,7 +1134,7 @@ func (p *liveRows) Load(_ context.Context, units []unit.Unit) (map[unit.Unit]any
 
 func (*liveRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
 	r := in.(liveRow)
-	return api.Row{Title: "row", Facets: r.facets, Views: []string{}, Summary: api.Summary{Stalled: r.signals["stalled"], Reason: r.reason}}, nil
+	return api.Row{Title: "row", Facets: r.facets, Views: []string{}, Summary: api.Summary{Stalled: r.signals["stalled"], Reason: r.reason, ReasonKey: r.reasonKey}}, nil
 }
 
 func (*liveRows) Signals(_ readmodel.Base, _ api.Row, in any, _ time.Time) map[string]bool {
@@ -1239,6 +1240,32 @@ func TestATaskPageCarriesItsPrimaryUnitsReason(t *testing.T) {
 	}
 	if want := map[string]string{"t-pr": "checks failing", "t-gone": "", "t-own": ""}; !maps.Equal(got, want) {
 		t.Fatalf("reasons %v, want %v", got, want)
+	}
+}
+
+// wordedRows are liveRows whose catalog words the reason checks_failing for the units of the GitHub provider.
+type wordedRows struct{ *liveRows }
+
+func (wordedRows) Views() []api.ViewSpec           { return nil }
+func (wordedRows) Facets() []api.FacetSpec         { return nil }
+func (wordedRows) Situations() []api.SituationSpec { return nil }
+func (wordedRows) Reasons() api.ProviderWords {
+	return api.ProviderWords{Provider: string(unit.GitHub), Words: map[string]string{"checks_failing": "checks falhando no head"}}
+}
+
+func TestATaskPageWordsItsUnitsReason(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	p := &liveRows{rows: map[unit.Unit]liveRow{apiPR: {facets: map[string][]string{"where": {"acme/api"}}, reason: "checks failing on the head", reasonKey: "checks_failing"}}}
+	m := readmodel.New(r.log, nil, nil, nil, nil, wordedRows{p})
+	m.UseClock(r.s.deps.Now)
+	r.s.modelOnce.Do(func() { r.s.model = m })
+	r.s.deps.Row = catalog.RowOf(bundledLoaded, r.facts)
+	r.s.deps.TaskRecords = r.db
+	r.linked = true
+	r.put(t, task.Task{ID: "t-pr", State: "inbox", Category: task.CategoryInbox, Title: "Fix the checks", Units: []unit.Unit{apiPR}})
+	if got := r.page(t, "view=inbox").Tasks; len(got) != 1 || got[0].Reason != "checks falhando no head" {
+		t.Fatalf("tasks %+v: a task says why its unit waits in the unit's plugin's words", got)
 	}
 }
 

@@ -71,6 +71,23 @@ func TestTUISaysWhyInThePluginsWords(t *testing.T) {
 	}
 }
 
+func TestFilterFindsAReasonByItsWords(t *testing.T) {
+	m := newModel(t)
+	c := servedCatalog(t)
+	c.Reasons = []api.ProviderWords{{Provider: "thread", Words: map[string]string{"asked_by": "{{.actor}} perguntou a você"}}}
+	m.SetCatalog(c)
+	r := threadRow()
+	r.Summary.ReasonKey, r.Summary.ReasonParams = "asked_by", map[string]string{"actor": "ana"}
+	m.SetData([]api.Row{r}, api.Health{})
+	for _, text := range []string{"perguntou", "asked"} {
+		filterBy(m, text)
+		if got := m.visible(); len(got) != 1 {
+			t.Errorf("filter %q finds %v", text, got)
+		}
+		press(m, Key{Name: KeyEsc})
+	}
+}
+
 func TestFilterSearchesFacets(t *testing.T) {
 	m := newModel(t)
 	th := threadRow()

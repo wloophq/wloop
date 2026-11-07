@@ -57,3 +57,26 @@ process.stdout.write(JSON.stringify({ card: shown(unitBox), detail: shown(head),
 		t.Errorf("card links %+v, want the label to open %s", got["card"].Links, want.Href)
 	}
 }
+
+func TestAPluginsDetailSaysWhyInItsWords(t *testing.T) {
+	var catalog map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	catalog["reasons"] = []any{map[string]any{"provider": "github", "words": map[string]string{"review_requested": "revisão pedida"}}}
+	row := map[string]any{"unit": map[string]any{"provider": "github", "key": "acme/api#8"}, "link": "https://github.com/acme/api/pull/8", "label": "acme/api#8",
+		"title": "Retry flaky uploads", "kind": "review", "summary": map[string]any{"waits_on": "me", "reason": "review requested", "reason_key": "review_requested"},
+		"views": []string{"needs-me"}, "facets": map[string][]string{}, "actions": []any{}}
+	var got struct{ Text string }
+	nodeRun(t, cockpitScript(t), nil, `
+applyCatalog(input.catalog);
+applyPlugins([{ id: "github", name: "GitHub" }]);
+state.health = { viewer: "me" };
+state.rows = [input.row];
+const plugin = document.createElement("div");
+pluginDetail(plugin, input.row.unit);
+process.stdout.write(JSON.stringify({ Text: plugin.textContent }));`, map[string]any{"catalog": catalog, "row": row}, &got)
+	if !strings.Contains(got.Text, "revisão pedida") || strings.Contains(got.Text, "review requested") {
+		t.Fatalf("the plugin's detail reads %q, want its reason in its plugin's words", got.Text)
+	}
+}
