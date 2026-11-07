@@ -195,7 +195,7 @@ body.resizing { user-select: none; cursor: col-resize; }
 
 .row {
   display: grid;
-  grid-template-columns: 16px 1fr auto;
+  grid-template-columns: 16px minmax(min(50%, 18rem), 1fr) minmax(0, auto);
   grid-template-areas: "glyph l1 r1" ". l2 r2";
   align-items: center;
   gap: var(--space-2) var(--space-10);
@@ -209,14 +209,14 @@ body.resizing { user-select: none; cursor: col-resize; }
 .row:hover { background: var(--hover); }
 .row.outbox { cursor: default; }
 .row > .glyph, .row > .facet { grid-area: glyph; justify-self: center; }
-.row .l1 { grid-area: l1; display: flex; align-items: center; gap: var(--space-6); min-width: 0; }
+.row .l1 { grid-area: l1; display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
 .row .l1 > .facet, .row .ch, .row .draft-mark, .row .star { flex: none; }
 .row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-.row > .meta { grid-area: r1; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-6); white-space: nowrap; }
+.row > .meta { grid-area: r1; display: flex; align-items: center; justify-content: safe flex-end; gap: var(--space-6); min-width: 0; overflow: hidden; white-space: nowrap; }
 .row .l2 { grid-area: l2; display: flex; align-items: baseline; gap: var(--space-8); min-width: 0; color: var(--muted); font-size: var(--text-meta); }
 .row .l2 .ref { flex: 0 1 auto; max-width: 60%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--faint); }
 .row .why { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .r2 { grid-area: r2; display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-8); white-space: nowrap; color: var(--muted); font-size: var(--text-meta); }
+.row .r2 { grid-area: r2; display: flex; align-items: baseline; justify-content: safe flex-end; gap: var(--space-8); min-width: 0; overflow: hidden; white-space: nowrap; color: var(--muted); font-size: var(--text-meta); }
 .row .after { grid-column: 2 / 4; }
 .row .aside { display: inline-flex; gap: var(--space-6); align-items: baseline; }
 .row .aside .ws { font-weight: 600; }
