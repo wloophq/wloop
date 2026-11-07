@@ -196,6 +196,7 @@
 "Could not load the {step} step: {error}" = "Não foi possível carregar a etapa {step}: {error}"
 "Could not load the {view} list: {error}" = "Não foi possível carregar a lista {view}: {error}"
 "Counts" = "Contagens"
+"Also send to the conversation" = "Também enviar na conversa"
 "destination unknown" = "destino desconhecido"
 "Draft" = "Rascunho"
 "Draft text" = "Texto do rascunho"

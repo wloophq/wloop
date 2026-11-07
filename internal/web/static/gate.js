@@ -208,6 +208,18 @@ function draftWhere(d) {
   return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
 }
 
+// broadcastToggle is the checkbox that also posts thread reply d to its conversation, which d's publisher offers
+// by setting d.broadcast; it turns it through d's own task's edit verb while d may still change.
+function broadcastToggle(d, scope) {
+  if (!d.broadcast) return null;
+  const pending = ["held", "failed"].includes(d.state);
+  const id = "draft:" + d.id;
+  return h("label", { class: "meta broadcast" },
+    h("input", { type: "checkbox", checked: d.broadcast === "on", disabled: !pending, "data-focus": `${scope}:broadcast:${id}`,
+      onchange: (ev) => taskAct({ id, title: d.title || id }, verbFor("edit"), { broadcast: String(!!ev.target.checked) }) }),
+    " ", t("Also send to the conversation"));
+}
+
 // catalogWords is the served views catalog, which holds the profile's draft words; empty before it loads.
 function catalogWords() {
   return (typeof tasksState === "object" && tasksState.catalog) || {};
@@ -351,6 +363,7 @@ function draftCard(e, d, opts = {}) {
     h("div", { class: "d-sub" }, head),
     opts.context ? draftContextView(opts.context) : null,
     draftWhere(d),
+    broadcastToggle(d, scope),
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),
     d.why ? h("p", { class: "why" }, d.why) : null,

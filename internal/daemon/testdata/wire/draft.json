@@ -9,6 +9,7 @@
     "unit.closed"
   ],
   "target": "",
+  "broadcast": "",
   "where": "#general in the thread \"acme/api#7\"",
   "text": "Closing this out",
   "why": "",
