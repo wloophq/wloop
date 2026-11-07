@@ -2701,7 +2701,7 @@ function renderScreens(route) {
   home.hidden = route.view !== HOME;
   queue.hidden = route.view !== QUEUE;
   if (!home.hidden) home.replaceChildren(...(homeState.error ? [h("p", { class: "err" }, homeState.error)] : renderHome(homeState.home, screenEnv())));
-  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueState.queue, queueState.at, screenEnv()));
+  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueShown(readRoute(location.hash)), queueState.at, screenEnv()));
 }
 
 async function loadActivity() {

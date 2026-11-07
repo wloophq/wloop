@@ -179,3 +179,45 @@ process.stdout.write(JSON.stringify({ Gets: log.gets, Shown: s, Opened: log.task
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestQueueNeverShowsAnotherRoutesQueue(t *testing.T) {
+	gateItem := map[string]any{"task": map[string]any{"id": "t-9", "title": "ship", "units": []any{}},
+		"gate":    map[string]any{"id": 7, "kind": "question", "text": "Ship it?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}}},
+		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Approve"}}
+	var got struct {
+		Switched, Failed, Recovered []string
+		SwitchedText, FailedErr     string
+		RecoveredErr                string
+		Ran                         bool
+		Posts                       []string
+	}
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+const shownNow = () => all(renderQueue(queueShown(env.route()), queueState.at, env), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-task"]);
+globalThis.hash = "#queue=answer";
+await queueLoad(env.route(), env);
+globalThis.hash = "#queue=send-draft";
+const switched = shownNow();
+const switchedText = text(renderQueue(queueShown(env.route()), queueState.at, env));
+const ran = queueKeyAction("queue:primary", env);
+await queueLoad(env.route(), env);
+const failed = shownNow();
+const failedErr = text(byClass(renderQueue(queueShown(env.route()), queueState.at, env), "err"));
+queueKeyAction("queue:primary", env);
+await new Promise((r) => setTimeout(r, 5));
+globalThis.hash = "#queue=last-step";
+await queueLoad(env.route(), env);
+const recovered = shownNow();
+process.stdout.write(JSON.stringify({ Switched: switched, SwitchedText: switchedText, Ran: ran, Failed: failed, FailedErr: failedErr, Recovered: recovered,
+  RecoveredErr: text(byClass(view(), "err")), Posts: log.posts }));
+})();`, map[string]any{"queues": map[string]any{"answer": map[string]any{"kind": "answer", "title": "Agent questions", "total": 1, "items": []any{gateItem}}, "last-step": threeQueue()}}, &got)
+	if len(got.Switched) != 0 || strings.Contains(got.SwitchedText, "Agent questions") || got.Ran || len(got.Failed) != 0 || len(got.Posts) != 0 {
+		t.Errorf("another route's queue shows or acts: %+v", got)
+	}
+	if !strings.Contains(got.FailedErr, "Could not load the queue") {
+		t.Errorf("a failed load shows no error: %+v", got)
+	}
+	if !slices.Equal(got.Recovered, []string{"t-1", "t-2"}) || got.RecoveredErr != "" {
+		t.Errorf("a successful load keeps the last error: %+v", got)
+	}
+}

@@ -4,8 +4,9 @@
 // action, the progress through the queue and the decision next up. The daemon orders the items and names each
 // primary; this draws them and walks them.
 
-// queueState is where the queue screen stands: the queue it shows, the item at, and the last error.
-const queueState = { key: "", queue: null, at: 0, error: "", busy: false };
+// queueState is where the queue screen stands: the queue of key it shows, the item at, why its last action
+// failed and why its last load failed.
+const queueState = { key: "", queue: null, at: 0, error: "", loadError: "", busy: false };
 
 // queueKey names a queue route's items: a kind and its lens query, or the tasks a list names.
 function queueKey(route) {
@@ -54,13 +55,20 @@ async function queueLoad(route, env) {
       ? listQueue((await Promise.all(route.ids.map((id) => env.get("/api/tasks/" + encodeURIComponent(id)).catch(() => null)))).filter(Boolean))
       : await env.get(queueURL(route));
     if (queueKey(env.route()) !== key) return;
-    queueState.key = key;
-    queueState.queue = queue;
-    if (!same) queueState.at = 0;
+    if (!same) Object.assign(queueState, { at: 0, error: "" });
+    Object.assign(queueState, { key, queue, loadError: "" });
     queueState.at = Math.min(queueState.at, Math.max((queue.items || []).length - 1, 0));
   } catch (err) {
-    queueState.error = t("Could not load the queue: {error}", { error: err.message });
+    if (queueKey(env.route()) !== key) return;
+    if (!same) Object.assign(queueState, { key, queue: null, at: 0, error: "" });
+    queueState.loadError = t("Could not load the queue: {error}", { error: err.message });
   }
+}
+
+// queueShown is the loaded queue when it is route's, else null: a queue loaded for another route never shows
+// nor runs.
+function queueShown(route) {
+  return queueState.key === queueKey(route) ? queueState.queue : null;
 }
 
 // queueUnit is the unit of item's task its situation is on: the first of its units of that provider.
@@ -95,7 +103,8 @@ async function queueAct(item, env) {
 
 // queueKeyAction runs a queue key's action: the primary, the next or the previous decision, its source, the home.
 function queueKeyAction(action, env) {
-  const items = (queueState.queue && queueState.queue.items) || [];
+  const queue = queueShown(env.route());
+  const items = (queue && queue.items) || [];
   const item = items[queueState.at];
   switch (action) {
     case "queue:primary":
@@ -119,10 +128,11 @@ function queueKeyAction(action, env) {
 // renderQueue is the queue screen's nodes for queue, at its item at.
 function renderQueue(queue, at, env) {
   const home = h("a", { class: "crumb", href: "#view=" + HOME, "data-focus": "queue:home" }, t("Home"));
-  if (!queue) return [h("div", { class: "queue" }, h("nav", { class: "crumbs" }, home), h("p", { class: "loading" }, t("Loading the queue...")))];
+  const why = queueState.key === queueKey(env.route()) ? [queueState.loadError, queueState.error].filter(Boolean) : [];
+  const err = why.length ? h("p", { class: "err", role: "alert" }, why.join(" ")) : null;
+  if (!queue) return [h("div", { class: "queue" }, h("nav", { class: "crumbs" }, home), err || h("p", { class: "loading" }, t("Loading the queue...")))];
   const items = queue.items || [];
   const head = h("nav", { class: "crumbs", "aria-label": t("Where you are") }, home, h("span", { class: "sep", "aria-hidden": "true" }, "/"), h("span", {}, queue.title));
-  const err = queueState.error ? h("p", { class: "err", role: "alert" }, queueState.error) : null;
   if (!items.length) {
     return [h("div", { class: "queue empty" }, head, err, h("p", { class: "empty" }, queue.empty || t("Nothing left in this queue.")),
       h("a", { class: "back-home", href: "#view=" + HOME }, t("Back to the home")))];
