@@ -124,6 +124,8 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
+Each also has a `why.md.tmpl`, the line the Outbox shows above the draft, rendered in your language; `.Since` is when the oldest of its items was asked, in your time zone, and `.People` everyone the draft is to, each with `.Key` and `.Name`. Both files translate as every other text does: `<profile>/locales/pt-BR/workflows/slack-closure/text.md.tmpl` is the closure in a thread written in Portuguese, and a copy of the English file you left unchanged keeps the bundled translations. A translation names only the fields and functions its English text does, `plural` included (`{{plural (len .Items) "one" "this" "other" "these"}}`).
+
 Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
