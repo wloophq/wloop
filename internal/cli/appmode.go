@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api/client"
@@ -42,9 +43,13 @@ func runAppClient(ctx context.Context, e *Env) error {
 		return errRebuilt
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	var wg sync.WaitGroup
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
 	upgraded := watchBinary(ctx, e.bundleSource())
-	go func() {
+	wg.Go(func() {
 		select {
 		case <-upgraded:
 			// Exits for the LaunchAgent to start a fresh process: AppKit's
@@ -54,7 +59,7 @@ func runAppClient(ctx context.Context, e *Env) error {
 			e.Exit(exitRebuilt)
 		case <-ctx.Done():
 		}
-	}()
+	})
 	digestAt, win := "", Defaults().Window
 	if cfg, err := e.loadConfig(); err != nil {
 		logf("reading the config: %v; the daily digest is off", err)
@@ -70,7 +75,7 @@ func runAppClient(ctx context.Context, e *Env) error {
 			Notifier:   notes,
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
 			CockpitURL: cockpit,
-			Window:     windowShow(ctx, host, dc, cockpit, win, logf),
+			Window:     windowShow(ctx, &wg, host, dc, cockpit, win, logf),
 			Quit:       cancel,
 			Copy:       copyToClipboard,
 			Now:        e.Now,
@@ -78,13 +83,13 @@ func runAppClient(ctx context.Context, e *Env) error {
 			SentPath:   filepath.Join(e.StateDir, "notified.json"),
 			DigestAt:   digestAt,
 		})
-		go func() {
+		wg.Go(func() {
 			<-ctx.Done()
 			e.QuitNative()
-		}()
-		go func() {
+		})
+		wg.Go(func() {
 			_ = bootMenubar(ctx, dc.Ping, func(ctx context.Context) error { return waitForDaemon(ctx, dc) }, c)
-		}()
+		})
 	})
 	return nil
 }

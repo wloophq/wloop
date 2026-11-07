@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
@@ -42,13 +43,13 @@ func (n nativeRunners) run(win config.Window, setup func(menubar.Tray, menubar.N
 	n.runMenu(func(t menubar.Tray, notes menubar.Notifier) { setup(t, notes, nil) })
 }
 
-// windowShow starts the window controller on host until ctx ends and returns
-// how the menu bar shows a route in the window; nil without a host.
-func windowShow(ctx context.Context, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) func(string) error {
+// windowShow starts the window controller on host until ctx ends, in wg, and
+// returns how the menu bar shows a route in the window; nil without a host.
+func windowShow(ctx context.Context, wg *sync.WaitGroup, host window.Host, daemon window.Events, cockpit func(string) (string, error), win config.Window, logf func(string, ...any)) func(string) error {
 	if host == nil {
 		return nil
 	}
 	ctl := window.New(window.Config{Host: host, Daemon: daemon, CockpitURL: cockpit, Hotkey: win.Hotkey, Log: logf})
-	go func() { _ = ctl.Run(ctx) }()
+	wg.Go(func() { _ = ctl.Run(ctx) })
 	return ctl.Show
 }

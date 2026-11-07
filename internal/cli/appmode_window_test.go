@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -133,7 +134,45 @@ func TestWindowDisabledRunsNoHost(t *testing.T) {
 
 func TestAppModeWithoutAHostKeepsTheBrowser(t *testing.T) {
 	t.Parallel()
-	if show := windowShow(context.Background(), nil, nil, nil, config.Window{}, nil); show != nil {
+	var wg sync.WaitGroup
+	if show := windowShow(context.Background(), &wg, nil, nil, nil, config.Window{}, nil); show != nil {
 		t.Fatal("no host, yet the menu bar opens a window")
 	}
+	wg.Wait()
+}
+
+// heldEvents serves one stream that closes only when release is closed, as
+// the events client closes its stream only after its own goroutine ends.
+type heldEvents struct{ release chan struct{} }
+
+func (e heldEvents) Events(context.Context, string, api.Since) (<-chan api.Change, error) {
+	out := make(chan api.Change)
+	go func() {
+		<-e.release
+		close(out)
+	}()
+	return out, nil
+}
+
+func TestTheWindowControllerIsAwaitedByItsOwner(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		events := heldEvents{release: make(chan struct{})}
+		cockpit := func(string) (string, error) { return "http://127.0.0.1:1/", nil }
+		windowShow(ctx, &wg, &recHost{}, events, cockpit, config.Window{}, func(string, ...any) {})
+		synctest.Wait()
+		cancel()
+		waited := make(chan struct{})
+		go func() { wg.Wait(); close(waited) }()
+		synctest.Wait()
+		select {
+		case <-waited:
+			t.Fatal("the owner stopped waiting while the controller still followed the stream")
+		default:
+		}
+		close(events.release)
+		<-waited
+	})
 }
