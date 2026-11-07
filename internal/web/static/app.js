@@ -739,9 +739,17 @@ function lensWords() {
   return (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.lens) || {};
 }
 
-// fillWord fills a lens word's {{.name}} with vars.
+// fillWord fills a lens word's {{.name}} with vars, and its {{plural .name "one" "…" "other" "…"}} with the form
+// of vars[name] in the cockpit's locale.
 function fillWord(word, vars) {
-  return String(word || "").replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
+  return String(word || "")
+    .replace(/\{\{\s*plural\s+\.(\w+)((?:\s+"[^"]*")+)\s*\}\}/g, (_, k, pairs) => {
+      const words = [...pairs.matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+      const forms = {};
+      for (let i = 0; i + 1 < words.length; i += 2) forms[words[i]] = words[i + 1];
+      return forms[pluralForm(Number(vars[k]) || 0)] ?? forms.other ?? "";
+    })
+    .replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
 }
 
 // lensOf is the lens of route: its query read over the fields of its view, trimmed as the daemon counts it,

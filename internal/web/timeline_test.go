@@ -22,3 +22,18 @@ process.stdout.write(JSON.stringify({ label: eventLabel("held"), loop: loopEvent
 		}
 	}
 }
+
+func TestFillWordPicksThePluralForm(t *testing.T) {
+	var got []string
+	nodeRun(t, staticJS(t, "i18n.js"), []string{"fillWord"}, `
+const en = '{{.n}} open {{plural .n "one" "question" "other" "questions"}} in the brief';
+const pt = '{{.n}} {{plural .n "one" "pergunta aberta" "other" "perguntas abertas"}}';
+const out = [fillWord(en, {n: 1}), fillWord(en, {n: 2})];
+I18N.locale = "pt-BR";
+out.push(fillWord(pt, {n: 0}), fillWord(pt, {n: 3}), fillWord("{{.unit}}: {{.shown}}", {unit: "Item", shown: 2}));
+process.stdout.write(JSON.stringify(out));`, nil, &got)
+	want := []string{"1 open question in the brief", "2 open questions in the brief", "0 pergunta aberta", "3 perguntas abertas", "Item: 2"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("%q", got)
+	}
+}
