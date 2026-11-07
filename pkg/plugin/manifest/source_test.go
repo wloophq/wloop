@@ -274,7 +274,7 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"a mark without its doc", "[[source.marks]]\nname = \"acme.seen\"\n", "doc is required"},
 		{"a language fact not declared", "language_fact = \"acme.language\"\n", "language_fact"},
 		{"a language fact of another type", "language_fact = \"acme.language\"\n[[source.facts]]\nname = \"acme.language\"\ntype = \"int\"\ndoc = \"d\"\n", "language_fact"},
-		{"mixed ranks","[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},
+		{"mixed ranks", "[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			m, err := Parse([]byte(head + c.extra))

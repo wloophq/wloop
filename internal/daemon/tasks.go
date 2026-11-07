@@ -853,6 +853,8 @@ type taskViewer struct {
 	read map[unit.Unit]bool
 	// refs are the tasks a listed id reads as, the page's own and each one read once; ok false for none.
 	refs map[task.ID]taskRef
+	// items are the items of the units the page's drafts are on, each unit's read once.
+	items map[unit.Unit][]items.Item
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -955,7 +957,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.s.withDraft(ctx, e, &v); err != nil {
+	if err := ev.withDraft(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil

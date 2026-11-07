@@ -889,6 +889,81 @@ func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	}
 }
 
+// mentioning is a held nudge on r7u mentioning Ana and Bruno, each waited on by an item of the unit.
+func mentioning(t *testing.T, r *outboxRig) draft.Draft {
+	t.Helper()
+	r.s.deps.Items = unitItems{r7u: {
+		{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UANA", Name: "Ana Lima"}}},
+		{ID: "i2", Summary: "Sign the deal", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UBRUNO", Name: "Bruno Melo"}}},
+	}}
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Nudge,
+		Text: "@{slack:UANA} @{slack:UBRUNO}, any news?", Origin: draft.Origin{Kind: draft.OriginUser}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+var bothNamed = map[string]string{"slack:UANA": "Ana Lima", "slack:UBRUNO": "Bruno Melo"}
+
+func TestADraftTasksGateNamesItsMentions(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := mentioning(t, r)
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10)), &v); code != 200 || len(v.Gates) != 1 {
+		t.Fatalf("%d %+v", code, v.Gates)
+	}
+	var sub api.Draft
+	if err := json.Unmarshal(v.Gates[0].Subject, &sub); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(sub.Names, bothNamed) || len(sub.ItemDetails) != 2 {
+		t.Errorf("names %v, items %+v", sub.Names, sub.ItemDetails)
+	}
+}
+
+func TestAGateViewOfADraftNamesItsMentions(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	mentioning(t, r)
+	var gs []api.GateView
+	if code := get(t, r.s, api.GatesPath, &gs); code != 200 || len(gs) != 1 {
+		t.Fatalf("%d %+v", code, gs)
+	}
+	var sub api.Draft
+	if err := json.Unmarshal(gs[0].Subject, &sub); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(sub.Names, bothNamed) {
+		t.Errorf("names %v", sub.Names)
+	}
+}
+
+func TestEveryMentionedPersonIsNamed(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := mentioning(t, r)
+	var one api.Draft
+	if code := r.getDraft(t, d.ID, &one); code != 200 || !maps.Equal(one.Names, bothNamed) {
+		t.Fatalf("%d names %v", code, one.Names)
+	}
+}
+
+func TestMentionNamesReadsEveryPersonOfTheItems(t *testing.T) {
+	t.Parallel()
+	its := []items.Item{{Requester: items.Person{Key: "slack:UREQ", Name: "Rita"},
+		Assignees: []items.Person{{Key: "slack:UASG", Name: "Caio", Aliases: []string{"github:caio"}}},
+		WaitingOn: []items.Person{{Key: "slack:UWAIT", Name: "Duda"}, {Key: "slack:UNONAME"}}}}
+	got := mentionNames("@{slack:UREQ} @{github:caio} @{slack:UWAIT} @{slack:UNONAME} @{slack:UNOBODY}", its)
+	if want := map[string]string{"slack:UREQ": "Rita", "github:caio": "Caio", "slack:UWAIT": "Duda"}; !maps.Equal(got, want) {
+		t.Errorf("mentionNames = %v, want %v", got, want)
+	}
+	if got := mentionNames("no mention", its); got != nil {
+		t.Errorf("no mention: %v, want nil", got)
+	}
+}
+
 type takingFx struct{ *fakeFx }
 
 func (takingFx) Takes(target string) bool { return strings.HasPrefix(target, "#") }
