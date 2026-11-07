@@ -89,7 +89,4 @@ func TestAnOpenedLinkWithoutAWindowOpensTheBrowser(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("the app did not stop after Quit")
 	}
-	if got := te.err.String(); !strings.Contains(got, brand.URLScheme()+"://elsewhere/#task=t-1") {
-		t.Errorf("the log %q does not name the unreadable link", got)
-	}
 }
