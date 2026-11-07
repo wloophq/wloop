@@ -215,7 +215,7 @@ func TestRowCSSKeepsEachLineOnOneLine(t *testing.T) {
 		}
 	}
 	row := cssRule(t, css, ".row")
-	for _, want := range []string{"min-height: var(--row-height)", "grid-template-columns: 16px 1fr auto"} {
+	for _, want := range []string{"min-height: var(--row-height)", "grid-template-columns: 16px minmax(min(50%, 18rem), 1fr) minmax(0, auto)"} {
 		if !strings.Contains(row, want) {
 			t.Errorf(".row lacks %s: %s", want, row)
 		}

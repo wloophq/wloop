@@ -267,6 +267,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `attribution.via_workflow` (string): The name of a change a workflow made, by a verb its by lets it run or a gate its approval released; {workflow} is the workflow's name.
 - `detail` (table): What a task's detail panel offers.
 - `detail.verbs` (list of strings): The verbs the detail shows as buttons, in order, each a verb of verbs; those the task does not offer are left out, and every other verb it offers waits behind a More button that opens the palette. A user layer's list replaces the one below it.
+- `runs` (table): The words a task's runs read in its detail and its terminal page.
+- `runs.states` (table by name): Where a run's turn stands, by state, as its run card says it. A state with no word shows as it is named.
+- `runs.states.<name>` (string, localized): The state's word, such as "started"; the key is a turn state: sent, started, asked, done, settled, failed, unrecorded, dismissed, replaced or withdrawn.
+- `runs.sessions` (table by name): Where a run's agent session stands, by state, as its run card says it.
+- `runs.sessions.<name>` (string, localized): The session state's word, such as "dormant"; the key is a session state: active, dormant or closed.
 - `areas` (list of strings): The areas a task may be in, the values of the area property.
 - `contexts` (list of strings): The contexts the menu offers; a task may hold others.
 - `stale_waiting_days` (integer): Working days a task waits before it is stale.

@@ -194,7 +194,8 @@ const OMNI_DEBOUNCE_MS = 120;
 // omniboxNew is an empty omnibox; items are the selection's actions it lists while nothing is typed.
 function omniboxNew(panel, items) {
   return { panel: !!panel, items: items || [], text: "", seq: 0, askSeq: 0, abort: null, timer: null, search: null, resolved: null,
-    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "" };
+    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "",
+    answered: "", pending: Promise.resolve() };
 }
 
 // omniboxOps makes ops the operations to confirm, every one checked.
@@ -219,11 +220,13 @@ function omniboxType(st, text, env) {
   if (!text.trim()) {
     st.search = null;
     st.resolved = null;
+    st.answered = text;
     omniboxOps(st, []);
     env.render();
-    return Promise.resolve();
+    st.pending = Promise.resolve();
+    return st.pending;
   }
-  return new Promise((done) => {
+  st.pending = new Promise((done) => {
     st.timer = env.later(async () => {
       const ctl = new AbortController();
       st.abort = ctl;
@@ -234,6 +237,7 @@ function omniboxType(st, text, env) {
       if (seq === st.seq) {
         st.search = search;
         st.resolved = resolved;
+        st.answered = text;
         st.took = env.now() - started;
         omniboxOps(st, (resolved && resolved.preview && resolved.preview.operations) || []);
         env.render();
@@ -241,6 +245,7 @@ function omniboxType(st, text, env) {
       done();
     }, OMNI_DEBOUNCE_MS);
   });
+  return st.pending;
 }
 
 // omniboxAsk asks the read-only agent about the text, with the questions it asked and their answers; a reply
@@ -357,12 +362,16 @@ function omniboxMove(st, delta, env) {
   env.render();
 }
 
-// omniboxEnter is Enter in the field: run the selected choice; with Cmd it asks the agent.
-function omniboxEnter(st, env, ask) {
+// omniboxEnter is Enter in the field: run the selected choice once the answer to the text typed is in; with
+// Cmd it asks the agent.
+async function omniboxEnter(st, env, ask) {
   if (ask) return omniboxAsk(st, env);
+  const text = st.text;
+  if (st.answered !== text) await st.pending;
+  if (st.answered !== text || st.text !== text) return;
   const choices = omniboxChoices(st, env);
   const pick = choices.find((c) => c.id === omniboxSelected(st, choices));
-  return Promise.resolve(pick ? pick.run() : undefined);
+  return pick ? pick.run() : undefined;
 }
 
 // omniboxKey is a key in the omnibox's field: the arrows (and Ctrl+N, Ctrl+P) move the selection, Enter runs
@@ -477,11 +486,21 @@ function omniboxAnswer(st, env) {
 
 // omniboxSearch is the search's groups, each with its count and its results, each result linking its task
 // and naming the views it is in.
-function omniboxSearch(st, opt) {
+function omniboxSearch(st, opt, env) {
   const groups = (st.search && st.search.groups) || [];
   return groups.map((g) => h("section", { class: "omni-group", "data-group": g.id, role: "group", "aria-label": g.label },
-    h("h3", {}, g.label, " ", h("span", { class: "count" }, fmtNumber(g.count))),
-    h("ol", {}, ...(g.results || []).map((r) => h("li", opt("task:" + r.task.id), omniboxTaskLink(r.task, r.views && r.views.length ? h("span", { class: "views" }, r.views.join(" · ")) : null))))));
+    h("h3", { "aria-hidden": "true" }, g.label, " ", h("span", { class: "count" }, fmtNumber(g.count))),
+    h("ul", { role: "none" }, ...(g.results || []).map((r) => {
+      const href = "#task=" + encodeURIComponent(r.task.id);
+      return h("li", { ...opt("task:" + r.task.id, true), class: "omni-task", "data-href": href, onclick: () => env.open(href) },
+        r.task.title || r.task.id, r.views && r.views.length ? h("span", { class: "views" }, r.views.join(" · ")) : null);
+    }))));
+}
+
+// omniboxCount is how many results the search found, said politely as they arrive.
+function omniboxCount(st) {
+  const n = ((st.search && st.search.groups) || []).reduce((sum, g) => sum + (g.results || []).length, 0);
+  return h("output", { class: "omni-status", "aria-live": "polite" }, st.search ? tn("{n} results", n) : "");
 }
 
 // omniboxRan is each operation run and what came of it.
@@ -501,9 +520,11 @@ const omniboxOptionID = (i) => "omni-opt-" + i;
 function omniboxOption(st, env) {
   const choices = omniboxChoices(st, env);
   const sel = omniboxSelected(st, choices);
-  return (id) => {
+  return (id, option) => {
     const i = choices.findIndex((c) => c.id === id);
-    return i < 0 ? {} : { role: "option", id: omniboxOptionID(i), "data-choice": id, "aria-selected": String(id === sel) };
+    if (i < 0) return {};
+    const at = { id: omniboxOptionID(i), "data-choice": id };
+    return option ? { ...at, role: "option", "aria-selected": String(id === sel) } : { ...at, "data-selected": String(id === sel) };
   };
 }
 
@@ -521,8 +542,9 @@ function renderOmnibox(st, env) {
   const opt = omniboxOption(st, env);
   const out = [h("p", { class: "omni-badge" + (agent ? " agent" : "") }, agent ? t("agent") : t("instant"))];
   if (!st.text.trim()) {
-    out.push(h("ol", { class: "omni-items" }, ...st.items.map((it, i) => h("li", opt("item:" + i),
-      h("button", { type: "button", class: "omni-item", onclick: () => { env.close(); it.run(); } }, it.label, it.meta ? h("span", { class: "pill" }, it.meta) : null, it.key ? h("kbd", {}, it.key) : null)))));
+    out.push(h("ul", { class: "omni-items", role: "listbox", id: "omni-list", "aria-label": t("Search or ask") }, ...st.items.map((it, i) => h("li", {
+      ...opt("item:" + i, true), class: "omni-item", onclick: () => { env.close(); it.run(); },
+    }, it.label, it.meta ? h("span", { class: "pill" }, it.meta) : null, it.key ? h("kbd", {}, it.key) : null))));
     return out;
   }
   const r = st.resolved;
@@ -540,7 +562,7 @@ function renderOmnibox(st, env) {
   out.push(omniboxRan(st));
   if (st.asking) out.push(h("p", { class: "loading" }, t("Asking the agent...")));
   if (st.askError) out.push(h("p", { class: "err omni-ask-error" }, st.askError));
-  out.push(...omniboxSearch(st, opt));
+  out.push(omniboxCount(st), h("div", { class: "omni-list", role: "listbox", id: "omni-list", "aria-label": t("Search or ask") }, ...omniboxSearch(st, opt, env)));
   return out.filter(Boolean);
 }
 
@@ -607,8 +629,8 @@ function omniboxRedraw(st, env, input, results) {
 function showOmnibox(opts = {}) {
   const st = omniboxNew(opts.panel, opts.items);
   const input = h("input", { type: "text", class: "omni-input", role: "combobox", "aria-label": t("Search or ask"), "aria-expanded": "true", autocomplete: "off",
-    spellcheck: "false", placeholder: t("Search, paste a link, or ask"), "aria-controls": "omni-results", "aria-autocomplete": "list" });
-  const results = h("div", { class: "omni-results", id: "omni-results", role: "listbox", "aria-label": t("Search or ask"), "aria-live": "polite" });
+    spellcheck: "false", placeholder: t("Search, paste a link, or ask"), "aria-controls": "omni-list", "aria-autocomplete": "list" });
+  const results = h("div", { class: "omni-results" });
   const box = h("div", { class: "pal omni" + (st.panel ? " omni-panel" : ""), role: "dialog", "aria-modal": "true", "aria-label": t("Search or ask") },
     input, results, omniboxKeysHint());
   let close = () => {};

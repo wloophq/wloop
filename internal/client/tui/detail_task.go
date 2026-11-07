@@ -358,9 +358,9 @@ func (m *Model) gateFacts(e api.TaskView, card askCard, carded bool, fact func(l
 // the command that resumes its session.
 func (m *Model) runFacts(r api.RunView, fact func(label, text string, style func(string) string)) {
 	t := m.t
-	head := []string{r.Intent, r.State}
+	head := []string{r.Intent, servedWord(m.viewsCat.RunStates, r.State)}
 	if r.SessionState != "" {
-		head = append(head, m.w().T("session {state}", map[string]any{"state": r.SessionState}))
+		head = append(head, m.w().T("session {state}", map[string]any{"state": servedWord(m.viewsCat.SessionStates, r.SessionState)}))
 	}
 	fact(m.w().T("run", nil), strings.Join(slices.DeleteFunc(head, func(s string) bool { return s == "" }), " · "), plain)
 	if where := strings.Join(slices.DeleteFunc([]string{r.Manager, r.Workspace, r.Session}, func(s string) bool { return s == "" }), " · "); where != "" {
@@ -538,4 +538,12 @@ func (m *Model) refFacts(e api.TaskView, relatedName, mergedName string, fact fu
 		label = ""
 		within(r.Within, 1)
 	}
+}
+
+// servedWord is the word words serve for name, else name.
+func servedWord(words map[string]string, name string) string {
+	if w := words[name]; w != "" {
+		return w
+	}
+	return name
 }

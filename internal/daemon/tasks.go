@@ -160,6 +160,7 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 		cat.Effects = map[string]string{}
 	}
 	cat.DraftPurposes, cat.DraftStates = nonNilMap(l.Gates.Drafts.Purposes), nonNilMap(l.Gates.Drafts.States)
+	cat.RunStates, cat.SessionStates = nonNilMap(l.Tasks.RunStates), nonNilMap(l.Tasks.SessionStates)
 	cat.Version = api.VersionOf(cat)
 	return cat
 }

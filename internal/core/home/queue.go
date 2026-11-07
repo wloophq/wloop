@@ -17,9 +17,10 @@ const (
 	ActionOpen   = "open"   // open the item's unit at its source
 )
 
-// Queue is a decision kind's items, the oldest decision first.
+// Queue is a decision kind's items, the oldest decision first, and View, the view its items are drawn as rows of.
 type Queue struct {
 	Kind         decision.Kind
+	View         task.View
 	Title, Empty string
 	Items        []Item
 }
@@ -45,7 +46,7 @@ func (s Service) Queue(ctx context.Context, k decision.Kind, keep coretasks.Keep
 	if err != nil {
 		return Queue{}, err
 	}
-	q := Queue{Kind: k, Title: kw.Queue, Empty: kw.Empty}
+	q := Queue{Kind: k, View: kw.View, Title: kw.Queue, Empty: kw.Empty}
 	ds, err := s.decisions(ctx, k, sets[kw.View])
 	if err != nil {
 		return Queue{}, err

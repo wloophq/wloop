@@ -26,7 +26,7 @@ const env = {
   openSource: (e, u) => log.opened.push(u ? u.provider + ":" + u.key : ""),
   openTask: (id) => log.tasks.push(id),
   act: async (u, id) => { log.acts.push(unitPath(u, id)); if ((input.refuse || []).includes(unitPath(u, id))) throw new Error("it changed"); },
-  row: (e) => h("li", { "data-task": e.id }, e.title),
+  row: (e, view) => h("li", { "data-task": e.id, "data-view": view }, e.title),
   render: () => { log.renders++; },
   keyOf: (action) => ({ "queue:primary": "Enter", "queue:edit": "e", "queue:discard": "x", "queue:close-silently": "m", "queue:skip-workflow": "n" })[action] || "",
   navigate: (v) => log.nav.push(v),
@@ -267,8 +267,8 @@ process.stdout.write(JSON.stringify({ Switched: switched, SwitchedText: switched
 
 func TestDigitsAnswerAGateCardOutsideTheDetail(t *testing.T) {
 	var got struct {
-		Queue, List, Detail, None string
-		Unfocused                 int
+		Queue, List, Detail, None           string
+		Unfocused, OverDetail, BesideDetail int
 	}
 	nodeRun(t, queuePrelude(t)+jsFunction(t, appJS(t), "pageGates")+jsFunction(t, appJS(t), "pageQuestion"), nil, `
 const gate = (id) => ({ id, kind: "question", intents: [{ id: "answer" }, { id: "continue" }] });
@@ -282,8 +282,12 @@ tasksState.tasks = [{ id: "t-2" }];
 detailState.task = { id: "t-3", gates: [gate(9)] };
 const at = (id) => { const q = gateAt(inCard(id), pageGates()); return q ? q.task.id + ":" + q.gate.id : ""; };
 const unfocused = pageQuestion({ closest: () => null });
-process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10), Unfocused: unfocused ? unfocused.gate.id : 0 }));`, nil, &got)
-	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" || got.Unfocused != 7 {
+location.hash = "#queue=answer&task=t-9";
+const overDetail = pageQuestion({ closest: (sel) => (sel === "#detail" ? {} : null) });
+const besideDetail = pageQuestion({ closest: () => null });
+process.stdout.write(JSON.stringify({ Queue: at(7), List: at(8), Detail: at(9), None: at(10), Unfocused: unfocused ? unfocused.gate.id : 0,
+  OverDetail: overDetail ? overDetail.gate.id : 0, BesideDetail: besideDetail ? besideDetail.gate.id : 0 }));`, nil, &got)
+	if got.Queue != "t-1:7" || got.List != "t-2:8" || got.Detail != "t-3:9" || got.None != "" || got.Unfocused != 7 || got.OverDetail != 0 || got.BesideDetail != 0 {
 		t.Fatalf("%+v: a digit answers the focused gate card wherever the page draws it", got)
 	}
 }
@@ -353,5 +357,58 @@ process.stdout.write(JSON.stringify({ Took: took }));
 })();`, map[string]any{"queues": map[string]any{"last-step": threeQueue()}}, &got)
 	if !slices.Equal(got.Took, []bool{false, false, false, false}) {
 		t.Fatalf("%+v: with no draft the keys go on to their other bindings", got)
+	}
+}
+
+func TestQueueRowsAreDrawnAsTheServedView(t *testing.T) {
+	var got struct{ Views []string }
+	q := threeQueue()
+	q["view"] = "decide-last-step"
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=last-step";
+await queueLoad(env.route(), env);
+process.stdout.write(JSON.stringify({ Views: all(view(), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-view"]) }));
+})();`, map[string]any{"queues": map[string]any{"last-step": q}}, &got)
+	if !slices.Equal(got.Views, []string{"decide-last-step", "decide-last-step"}) {
+		t.Fatalf("rows drawn as %v: a queue's rows are its served view's", got.Views)
+	}
+}
+
+func TestAQueuedDraftShowsOnePrimary(t *testing.T) {
+	var got struct{ Enters, Primaries int }
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=send-draft";
+await queueLoad(env.route(), env);
+const n = view();
+process.stdout.write(JSON.stringify({ Enters: all(n, (x) => x.tag === "kbd" && text(x) === "↵").length,
+  Primaries: all(n, (x) => x.tag === "button" && String(x.attrs.class || "").split(" ").includes("primary")).length }));
+})();`, queuedDraft(), &got)
+	if got.Enters != 1 || got.Primaries != 1 {
+		t.Fatalf("%+v: a queued draft's card holds the queue's one primary", got)
+	}
+}
+
+func TestEnterOnAQueuedDraftWhosePrimaryIsOffSaysWhy(t *testing.T) {
+	var got struct {
+		Posts, Notices []string
+	}
+	d := map[string]any{"id": 4, "gate": 7, "rev": 3, "text": "Thanks.", "state": "held", "intents": map[string]string{"approved": "approve"}}
+	e := map[string]any{"id": "draft:4", "title": "reply", "units": []any{},
+		"gates": []any{map[string]any{"id": 7, "kind": "draft", "subject": d}},
+		"verbs": []any{map[string]any{"verb": "approve", "enabled": false, "reason": "the conversation is closed"}}}
+	item := map[string]any{"task": e, "gate": map[string]any{"id": 7, "kind": "draft", "delivery": "held", "subject": d, "intents": []map[string]any{{"id": "approve", "label": "Send"}}},
+		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Send"}}
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=send-draft";
+await queueLoad(env.route(), env);
+queueKeyAction("queue:primary", env);
+await new Promise((r) => setTimeout(r, 5));
+process.stdout.write(JSON.stringify({ Posts: log.posts, Notices: log.notices }));
+})();`, map[string]any{"queues": map[string]any{"send-draft": map[string]any{"kind": "send-draft", "title": "Send drafts", "total": 1, "items": []any{item}}}}, &got)
+	if len(got.Posts) != 0 || !slices.ContainsFunc(got.Notices, func(n string) bool { return strings.Contains(n, "the conversation is closed") }) {
+		t.Fatalf("%+v: Enter on an off primary runs nothing and says why", got)
 	}
 }

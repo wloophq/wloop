@@ -192,3 +192,21 @@ func TestTheCatalogServesTheDetailVerbsAndTheEffectWords(t *testing.T) {
 		t.Errorf("the bundled profile serves detail_verbs %q, effects %v", bundled.DetailVerbs, bundled.Effects)
 	}
 }
+
+func TestTheCatalogServesTheRunStateWords(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Tasks.RunStates = map[string]string{"started": "under way"}
+	l.Tasks.SessionStates = map[string]string{"dormant": "asleep"}
+	r := newTasksRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	var cat api.ViewsCatalog
+	get(t, r.s, api.ViewsPath, &cat)
+	if cat.RunStates["started"] != "under way" || cat.SessionStates["dormant"] != "asleep" {
+		t.Errorf("run_states %v, session_states %v, want the profile's", cat.RunStates, cat.SessionStates)
+	}
+	var bundled api.ViewsCatalog
+	get(t, newTasksRig(t, nil).s, api.ViewsPath, &bundled)
+	if bundled.RunStates["started"] == "" || bundled.SessionStates["dormant"] == "" {
+		t.Errorf("the bundled profile serves run_states %v, session_states %v", bundled.RunStates, bundled.SessionStates)
+	}
+}

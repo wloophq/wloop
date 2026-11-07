@@ -54,6 +54,7 @@ label = "Author"
 show = "meta"
 show_values = "first"
 label_prefix = "by "
+values = { me = "me" }
 row_class = { me = "mine" }
 
 [facets.wait]
@@ -63,6 +64,7 @@ colors = { author = "author", loop = "loop", me = "me", nobody = "nobody", revie
 
 [facets.waits-on]
 label = "Waits on (person)"
+values = { me = "me" }
 show = "who"
 
 [facets.kind]
@@ -79,6 +81,7 @@ label = "Risk"
 empty = "no brief"
 show = "meta"
 label_prefix = "risk "
+values = { high = "high", medium = "medium", low = "low" }
 
 [facets.size]
 label = "Size"

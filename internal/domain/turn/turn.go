@@ -39,6 +39,9 @@ const (
 	Withdrawn State = "withdrawn"
 )
 
+// States are every state a turn takes.
+var States = []State{Sent, Started, Asked, Done, Settled, Failed, Unrecorded, Dismissed, Replaced, Withdrawn}
+
 func (s State) Open() bool    { return s == Sent || s == Started || s == Asked }
 func (s State) Stopped() bool { return s == Failed || s == Unrecorded }
 

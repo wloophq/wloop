@@ -420,7 +420,8 @@ func TestARunAndABriefReadInTheLocale(t *testing.T) {
 		Strong           int
 	}
 	nodeRun(t, viewsPrelude(t)+stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml"), nil, `
-tasksState.catalog = { facets: [{ id: "risk", fact: "brief.risk", label: "Risco", labels: { high: "alto" } }] };
+tasksState.catalog = { facets: [{ id: "risk", fact: "brief.risk", label: "Risco", labels: { high: "alto" } }],
+  run_states: { started: "iniciado" }, session_states: { dormant: "dormente" } };
 taskState.transcript = { seq: 3, lines: ["assistant: **Done**; tests pass."] };
 const run = runCard({ seq: 3, intent: "start", state: "started", session: "s-1", session_state: "dormant", actions: [] });
 const brief = taskBrief({ id: "t-1", brief: { data: { risk: "high" } } });

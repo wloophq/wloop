@@ -37,20 +37,21 @@ function queueDraftOf(g) {
 }
 
 // queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
-// daemon serves with its delivery), else its unit's row with the situation that makes it.
-function queueItemCard(item, env) {
+// daemon serves with its delivery), else its unit's row, as view draws it, with the situation that makes it.
+function queueItemCard(item, env, view) {
   const g = item.gate;
   if (queueDraft(g)) return draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf });
   if (g) return gateCard(item.task, g, { scope: "queue" });
   return h("div", { class: "queue-unit" },
-    env.row(item.task),
+    env.row(item.task, view),
     item.situation && item.situation.label ? h("p", { class: "situation" }, item.situation.label) : null);
 }
 
-// queuePrimary is item's primary action as a button; Enter on the queue runs it too.
+// queuePrimary is item's primary action as a button, Enter on the queue running it too; none for a draft
+// whose card holds its primary.
 function queuePrimary(item, env) {
   const p = item.primary || {};
-  if (!p.kind) return null;
+  if (!p.kind || queueDraftAction(item, "queue:primary")) return null;
   return h("button", { type: "button", class: "act primary queue-primary", "data-focus": "queue:primary", "aria-keyshortcuts": "Enter", disabled: queueState.busy || undefined,
     onclick: () => env.primary(item) }, h("kbd", {}, "↵"), " ", p.label || p.id);
 }
@@ -98,7 +99,8 @@ async function queueAct(item, env) {
   try {
     const g = item.gate;
     const card = p.kind === "gate" && queueDraft(g) ? queueDraftAction(item, "queue:primary") : null;
-    if (card && card.enabled) await card.run();
+    if (card && !card.enabled) return queueRefused(card);
+    if (card) await card.run();
     else if (p.kind === "gate" && queueDraft(g)) await resolveDraft(queueDraftOf(g), p.id, p.label || p.id, {});
     else if (p.kind === "gate") await resolveGate(item.task, g, p.id);
     else if (p.kind === "action") {
@@ -121,13 +123,18 @@ function queueDraftAction(item, key) {
   return draftActions(item.task, queueDraftOf(item.gate)).find((a) => a.key === key) || null;
 }
 
+// queueRefused says why the card refuses action a.
+function queueRefused(a) {
+  detailEnv.notice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+}
+
 // queueDraftKey runs the action of item's draft card that key names, then reloads the queue; false when the
 // card offers none, so the key goes on to its other bindings. A refused action says why.
 function queueDraftKey(item, key, env) {
   const a = queueDraftAction(item, key);
   if (!a) return false;
   if (!a.enabled) {
-    detailEnv.notice(t("{action}: {reason}", { action: a.label, reason: a.reason || a.title || "" }), true);
+    queueRefused(a);
     return true;
   }
   (async () => {
@@ -187,7 +194,7 @@ function renderQueue(queue, at, env) {
     head,
     h("p", { class: "progress", "aria-live": "polite" }, t("{n} of {total}", { n: fmtNumber(i + 1), total: fmtNumber(items.length) })),
     err,
-    h("div", { class: "queue-item" }, queueItemCard(item, env), queuePrimary(item, env)),
-    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task),
+    h("div", { class: "queue-item" }, queueItemCard(item, env, queue.view), queuePrimary(item, env)),
+    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task, queue.view),
       more > 0 ? h("p", { class: "more" }, tn("+{n} more", more)) : null) : null)];
 }

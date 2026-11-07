@@ -65,6 +65,9 @@ label = "Onde"
 label = "Autor"
 label_prefix = "por "
 
+[facets.author.values]
+me = "mim"
+
 [facets.wait]
 label = "Espera por (papel)"
 
@@ -78,6 +81,9 @@ reviewer = "Esperando um revisor"
 [facets.waits-on]
 label = "Espera por (pessoa)"
 
+[facets.waits-on.values]
+me = "mim"
+
 [facets.kind]
 label = "Situação"
 
@@ -89,6 +95,11 @@ empty = "sem brief"
 label = "Risco"
 empty = "sem brief"
 label_prefix = "risco "
+
+[facets.risk.values]
+high = "alto"
+medium = "médio"
+low = "baixo"
 
 [facets.size]
 label = "Tamanho"

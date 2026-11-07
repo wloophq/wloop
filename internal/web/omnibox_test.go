@@ -64,7 +64,7 @@ func TestOmniboxSearchGroups(t *testing.T) {
 const st = omniboxNew(false, []);
 await omniboxType(st, "retries", env);
 const n = nodes(st);
-process.stdout.write(JSON.stringify({ Groups: groups(st), Links: all(n, (x) => x.tag === "a").map((a) => a.attrs.href), Views: text(byClass(n, "views")), Badge: text(byClass(n, "omni-badge")) }));
+process.stdout.write(JSON.stringify({ Groups: groups(st), Links: all(n, (x) => x.attrs.role === "option").map((o) => o.attrs["data-href"]), Views: text(byClass(n, "views")), Badge: text(byClass(n, "omni-badge")) }));
 })();`, map[string]any{"search": retriesSearch()}, &got)
 	if !slices.Equal(got.Groups, []string{"Needs you 1", "Waiting on others 1"}) || !slices.Equal(got.Links, []string{"#task=t-1", "#task=t-2"}) {
 		t.Fatalf("%+v", got)
@@ -223,8 +223,8 @@ func TestOmniboxEmptyListsSelectionActions(t *testing.T) {
 const ran = [];
 const st = omniboxNew(false, [{ label: "to Next", key: "x", run: () => ran.push("next") }, { label: "done", key: "e", run: () => ran.push("done") }]);
 const n = nodes(st);
-all(n, (x) => x.tag === "button")[1].attrs.onclick();
-process.stdout.write(JSON.stringify({ Items: all(n, (x) => x.tag === "button").map(text), Ran: ran }));`, nil, &got)
+all(n, (x) => x.attrs.role === "option")[1].attrs.onclick();
+process.stdout.write(JSON.stringify({ Items: all(n, (x) => x.attrs.role === "option").map(text), Ran: ran }));`, nil, &got)
 	if !slices.Equal(got.Items, []string{"to Nextx", "donee"}) || !slices.Equal(got.Ran, []string{"done"}) {
 		t.Fatalf("%+v", got)
 	}
@@ -345,6 +345,7 @@ func TestOmniboxPanelMode(t *testing.T) {
 		Shade   bool
 		Focused bool
 		Modal   string
+		Live    int
 	}
 	main := `
 let closed = 0;
@@ -352,9 +353,10 @@ window.close = () => { closed++; };
 const st = showOmnibox({ panel: true });
 const box = document.body.children[0];
 box.on.keydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
-process.stdout.write(JSON.stringify({ Class: box.attrs.class, Closed: closed, Shade: String(box.attrs.class).includes("pal-back"), Modal: box.attrs["aria-modal"] }));`
+process.stdout.write(JSON.stringify({ Class: box.attrs.class, Closed: closed, Shade: String(box.attrs.class).includes("pal-back"), Modal: box.attrs["aria-modal"],
+  Live: box.children.filter((c) => c.attrs && c.attrs["aria-live"]).length }));`
 	nodeScript(t, domShim+staticJS(t, "i18n.js")+jsFunction(t, appJS(t), "h")+jsConst(t, appJS(t), "API_VERSION")+strings.Replace(staticJS(t, "omnibox.js"), `"use strict";`, "", 1)+main, nil, &got)
-	if !strings.Contains(got.Class, "omni-panel") || got.Shade || got.Closed != 1 || got.Modal != "true" {
+	if !strings.Contains(got.Class, "omni-panel") || got.Shade || got.Closed != 1 || got.Modal != "true" || got.Live != 0 {
 		t.Fatalf("%+v: the panel is the omnibox alone, modal, with no backdrop, and Esc anywhere in it calls window.close", got)
 	}
 }
@@ -370,7 +372,7 @@ func TestOmniboxNeverOffersMerge(t *testing.T) {
 
 // omniSelected is the choice the rendered omnibox marks selected, by its data-choice, and how many it marks.
 const omniSelected = `
-const selected = (st) => all(nodes(st), (x) => x.attrs["aria-selected"] === "true").map((x) => x.attrs["data-choice"]);
+const selected = (st) => all(nodes(st), (x) => x.attrs["aria-selected"] === "true" || x.attrs["data-selected"] === "true").map((x) => x.attrs["data-choice"]);
 const press = (st, key, extra) => omniboxKey(st, env, { key, preventDefault() {}, stopPropagation() {}, ...(extra || {}) }, () => log.closed++);
 `
 
@@ -525,5 +527,58 @@ process.stdout.write(JSON.stringify(out));
 })();`, map[string]any{"search": retriesSearch()}, &got)
 	if got.Focused != "omni:op:1" || got.Asked != `[data-focus="omni:op:1"]` || got.Active != "omni-opt-0" || !got.Scrolled {
 		t.Fatalf("%+v: a redraw gives the focus back to its control, and the field points at the selected choice, scrolled into view", got)
+	}
+}
+
+func TestOmniboxEnterActsOnlyOnTheAnswerForTheCurrentText(t *testing.T) {
+	var got struct {
+		Before, After []string
+	}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "re", env);
+hold = true;
+const typed = omniboxType(st, "retries", env);
+const entered = omniboxEnter(st, env, false);
+await new Promise((r) => setTimeout(r, 5));
+const before = log.opened.slice();
+hold = false;
+held.splice(0).forEach((fn) => fn());
+await typed;
+await entered;
+process.stdout.write(JSON.stringify({ Before: before, After: log.opened }));
+})();`, map[string]any{"search": retriesSearch()}, &got)
+	if len(got.Before) != 0 || !slices.Equal(got.After, []string{"#task=t-1"}) {
+		t.Fatalf("%+v: Enter waits for the answer to the text typed, never runs the older text's first result", got)
+	}
+}
+
+func TestTheOmniboxListboxHoldsOnlyOptions(t *testing.T) {
+	var got struct {
+		Outside, Controls, Lists int
+		Status                   string
+		Opened                   []string
+	}
+	resolve := map[string]any{"done t-1": map[string]any{"kind": "verb", "preview": map[string]any{"operations": []any{
+		map[string]any{"op": "verb", "verb": "done", "task": "t-1"}}}}}
+	search := map[string]any{"done t-1": retriesSearch()["retries"]}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "done t-1", env);
+const n = nodes(st);
+const lists = all(n, (x) => x.attrs.role === "listbox");
+const inList = new Set(all(lists, (x) => x.attrs.role === "option"));
+const outside = all(n, (x) => x.attrs.role === "option").filter((o) => !inList.has(o)).length;
+const controls = all(lists, (x) => ["button", "input", "a", "textarea"].includes(x.tag)).length;
+all(lists, (x) => x.attrs.role === "option")[1].attrs.onclick();
+process.stdout.write(JSON.stringify({ Outside: outside, Controls: controls, Lists: lists.length, Status: text(all(n, (x) => x.tag === "output")), Opened: log.opened }));
+})();`, map[string]any{"resolve": resolve, "search": search}, &got)
+	if got.Lists != 1 || got.Outside != 0 || got.Controls != 0 {
+		t.Errorf("%+v: one listbox, holding every option and no other control", got)
+	}
+	if got.Status != "2 results" || !slices.Equal(got.Opened, []string{"#task=t-2"}) {
+		t.Errorf("%+v: a polite status counts the results, and an option opens its task", got)
 	}
 }

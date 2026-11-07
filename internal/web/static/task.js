@@ -227,16 +227,10 @@ function transcriptLines(out) {
   return list.map((x) => (typeof x === "string" ? x : [x.role || x.actor || "", x.text || ""].filter(Boolean).join(": ")));
 }
 
-// RUN_STATE_WORDS word a run's turn state and its session's state.
-const RUN_STATE_WORDS = {
-  sent: () => t("run_state_sent"), started: () => t("run_state_started"), asked: () => t("run_state_asked"), done: () => t("run_state_done"), settled: () => t("run_state_settled"),
-  failed: () => t("run_state_failed"), unrecorded: () => t("run_state_unrecorded"), dismissed: () => t("run_state_dismissed"), replaced: () => t("run_state_replaced"),
-  withdrawn: () => t("run_state_withdrawn"), active: () => t("run_state_active"), dormant: () => t("run_state_dormant"), closed: () => t("run_state_closed"),
-};
-
-// runStateWord is state in words, else as the daemon names it.
-function runStateWord(state) {
-  return Object.hasOwn(RUN_STATE_WORDS, state) ? RUN_STATE_WORDS[state]() : state;
+// runStateWord is state in the words the catalog serves from the profile's table, else as the daemon names it.
+function runStateWord(table, state) {
+  const words = taskCatalog()[table] || {};
+  return Object.hasOwn(words, state) ? words[state] : state;
 }
 
 // runCard is a run with where it ran and its session; its actions are the
@@ -249,9 +243,9 @@ function runCard(r) {
   }, label);
   const shown = taskState.transcript && taskState.transcript.seq === r.seq ? taskState.transcript : null;
   return h("article", { class: "d-run", "data-run": String(r.seq) },
-    h("div", { class: "meta" }, h("strong", {}, r.intent), " ", h("span", { class: "pill" }, runStateWord(r.state)),
+    h("div", { class: "meta" }, h("strong", {}, r.intent), " ", h("span", { class: "pill" }, runStateWord("run_states", r.state)),
       r.manager ? [" ", t("in {manager}", { manager: r.manager })] : null,
-      r.session ? [" ", t("session"), " ", h("code", {}, r.session), r.session_state ? ` (${runStateWord(r.session_state)})` : ""] : null),
+      r.session ? [" ", t("session"), " ", h("code", {}, r.session), r.session_state ? ` (${runStateWord("session_states", r.session_state)})` : ""] : null),
     r.worktree || r.workspace ? h("div", { class: "meta" }, h("code", {}, r.worktree || r.workspace)) : null,
     r.resume ? h("div", { class: "meta" }, t("Resume:"), " ", h("code", {}, r.resume)) : null,
     h("div", { class: "d-actions" }, button("open", t("Open workspace")), button("enter", t("Enter session")), button("transcript", t("Transcript"))),

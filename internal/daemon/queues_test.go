@@ -25,7 +25,7 @@ func TestQueueServesTheKindsItems(t *testing.T) {
 	if code := get(t, r.s, queuePath("answer"), &q); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	if q.Kind != "answer" || q.Title != "Agent questions" || q.Total != 1 || len(q.Items) != 1 {
+	if q.Kind != "answer" || q.Title != "Agent questions" || q.View != "decide-answer" || q.Total != 1 || len(q.Items) != 1 {
 		t.Fatalf("queue %+v", q)
 	}
 	it := q.Items[0]

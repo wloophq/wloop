@@ -130,7 +130,9 @@ func TestTUIVerbsComeFromTheCatalog(t *testing.T) {
 
 func TestTUIDetailShowsAsksGatesAndRuns(t *testing.T) {
 	m := newModel(t)
-	m.SetViews(lensCatalog())
+	cat := lensCatalog()
+	cat.RunStates, cat.SessionStates = map[string]string{"running": "under way"}, map[string]string{"working": "busy"}
+	m.SetViews(cat)
 	e := lensTask("t-1", "Answer Ana on the export", "doing")
 	e.Units = []unit.Unit{ref(7).Unit()}
 	e.Asks = []api.AskView{{Item: "i-1", Summary: "Can the export ship today?", Asker: "Ana", Permalink: "https://chat.example/p1",
@@ -147,7 +149,7 @@ func TestTUIDetailShowsAsksGatesAndRuns(t *testing.T) {
 	m.SetDetail("t-1", e, nil)
 	screen := screenOf(m, 120, 40)
 	for _, want := range []string{"Doing", "Can the export ship today? · Ana", "> we need it before the board meeting", "https://chat.example/p1",
-		"Run the follow-up round?", "1. Go", "2. Hold", "3. Steer", "follow-up · running · session working", "Orca · acme-api-7",
+		"Run the follow-up round?", "1. Go", "2. Hold", "3. Steer", "follow-up · under way · session busy", "Orca · acme-api-7",
 		"resume: agent --resume s-1"} {
 		if !strings.Contains(screen, want) {
 			t.Fatalf("detail lacks %q:\n%s", want, screen)

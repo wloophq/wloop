@@ -53,7 +53,7 @@ function rowGlyph(m, lens) {
   if (!g) return null;
   const shape = h("span", { class: "glyph", "data-category": g.category || "", "data-field": g.field || undefined, "data-value": g.value || undefined, title: g.label || undefined, "aria-label": g.label || undefined, role: "img" });
   if (!g.field) return shape;
-  return facet(lens, g.field, g.value, shape, `facet:${m.scope}:${g.field}:${g.value}`, { words: m.words, rove: true });
+  return facet(lens, g.field, g.value, shape, `facet:${m.scope}:${g.field}:${g.value}`, { words: m.words, label: g.label, rove: true });
 }
 
 // rowTitle is a model's title on its row, a link when the model opens from its title alone.
