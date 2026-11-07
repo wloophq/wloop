@@ -40,6 +40,7 @@ export default defineConfig({
             'concepts/turns',
             'concepts/daemon',
             'concepts/surfaces',
+            'concepts/home',
             'concepts/workflows',
             'concepts/approval',
             'concepts/security',

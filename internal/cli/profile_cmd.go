@@ -27,7 +27,7 @@ var profileUsage = `usage:
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
-  profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--timeline|--decisions|--config]
+  profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--timeline|--decisions|--home|--config]
   profile try <pr-url>
 conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
 
@@ -63,7 +63,7 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 	case "schema":
 		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--tasks": intentload.TasksSchema,
 			"--views": intentload.ViewsSchema, "--gates": intentload.GatesSchema, "--records": intentload.RecordsSchema, "--keys": intentload.KeysSchema, "--strings": intentload.StringsSchema, "--timeline": intentload.TimelineSchema,
-			"--decisions": intentload.DecisionsSchema, "--config": intentload.ConfigSchema}
+			"--decisions": intentload.DecisionsSchema, "--home": intentload.HomeSchema, "--config": intentload.ConfigSchema}
 		switch {
 		case len(args) == 2 && args[1] == "--gtd":
 			return usageError{usage: profileUsage, why: "--gtd is no longer a schema: gtd.toml split into tasks.toml, views.toml and gates.toml; use --tasks, --views or --gates"}

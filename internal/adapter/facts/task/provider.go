@@ -666,15 +666,7 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 
 // unitsOf are a task's units in order: those attached to it, the unit it
 // was captured or derived on first, then those only its items name.
-func unitsOf(e task.Task) []unit.Unit {
-	out := slices.Clone(e.Units)
-	for _, r := range e.Items {
-		if !slices.Contains(out, r.Unit) {
-			out = append(out, r.Unit)
-		}
-	}
-	return out
-}
+func unitsOf(e task.Task) []unit.Unit { return e.LinkedUnits() }
 
 // held are the open items of its that task e holds.
 func held(e task.Task, its []items.Item) []items.Item {

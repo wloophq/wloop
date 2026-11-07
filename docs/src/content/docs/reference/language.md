@@ -1065,6 +1065,50 @@ The fields each notice reads besides `Name` and `Command`:
 - `kinds.<name>.clause.many` (string, localized): Its many form.
 - `kinds.<name>.clause.other` (string, localized): Its other form.
 
+## The cockpit's home (`home.toml`)
+
+- `template` (string, default `default`): The briefing's template, which a client may draw its own way.
+- `join` (string, localized): What goes between two clauses of a sentence, and between two plugins' counts, such as ", ".
+- `last_join` (string, localized): What goes before the last clause of a sentence, and the last plugin's count, such as " and ".
+- `end` (string, localized): What ends a sentence, such as ".".
+- `count` (string, localized): A counter's words, `{n}` its count and `{noun}` what it counts, such as "{n} {noun}".
+- `per_sentence` (integer, default `3`): The most clauses a sentence of the briefing holds.
+- `empty` (string, localized): What the briefing says when every counter is zero.
+- `counters[]` (table): The briefing's counters, in order; one with nothing to count says nothing. A user's list replaces the whole list.
+- `counters[].id` (string): The counter's id; a kind's counter defaults to the kind.
+- `counters[].kind` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): The decision kind the counter counts, whose view and words decisions.toml gives; set kind or view.
+  - `answer`: An agent's question or a post waits for the user's answer.
+  - `approve-plan`: An agent's plan waits for the user's approval.
+  - `send-draft`: A draft waits for the user to send, edit or drop it.
+  - `review-step`: A step of a review waits for the user's look.
+  - `last-step`: A unit waits only for its last step at its source, such as a merge or a closure, which the user takes there.
+  - `pick-someone`: A unit waits for the user to pick who takes it next, such as a reviewer.
+  - `act`: A proposal or a trust request waits for the user to act on it.
+- `counters[].view` (string): The view of views.toml whose tasks the counter counts; set kind or view.
+- `sections[]` (table): The home's sections, in order: the first rows of a view, which a link opens whole. A user's list replaces the whole list.
+- `sections[].id` (string): The section's id. Required.
+- `sections[].view` (string): The view of views.toml it shows the first rows of; its label titles the section. Required.
+- `sections[].limit` (integer, default `3`): The most rows it shows.
+- `sections[].time` (one of `owed`, `moved`, default `moved`): The time each row shows.
+  - `owed`: Since when the task's next step is owed.
+  - `moved`: When the task last moved.
+- `capture` (table): The capture field.
+- `capture.hint` (string, localized): What the empty field says.
+- `counters[].noun` (string or table): What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `counters[].noun.zero` (string, localized): Its zero form.
+- `counters[].noun.one` (string, localized): Its one form.
+- `counters[].noun.two` (string, localized): Its two form.
+- `counters[].noun.few` (string, localized): Its few form.
+- `counters[].noun.many` (string, localized): Its many form.
+- `counters[].noun.other` (string, localized): Its other form.
+- `counters[].clause` (string or table): The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `counters[].clause.zero` (string, localized): Its zero form.
+- `counters[].clause.one` (string, localized): Its one form.
+- `counters[].clause.two` (string, localized): Its two form.
+- `counters[].clause.few` (string, localized): Its few form.
+- `counters[].clause.many` (string, localized): Its many form.
+- `counters[].clause.other` (string, localized): Its other form.
+
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
 - `override` (bool, default `false`): Drops the blocks before it whose path is an ancestor of its own.

@@ -277,6 +277,7 @@ var sections = []struct {
 	{builtin.SurfaceStrings, "Client strings (`strings.toml`)"},
 	{builtin.SurfaceTimeline, "The core's event kinds (`timeline.toml`)"},
 	{builtin.SurfaceDecisions, "Decision kinds (`decisions.toml`)"},
+	{builtin.SurfaceHome, "The cockpit's home (`home.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
@@ -451,6 +452,7 @@ var schemas = []struct {
 	{"strings.schema.json", "Client strings (strings.toml)", builtin.SurfaceStrings},
 	{"timeline.schema.json", "The core's event kinds (timeline.toml)", builtin.SurfaceTimeline},
 	{"decisions.schema.json", "Decision kinds (decisions.toml)", builtin.SurfaceDecisions},
+	{"home.schema.json", "The cockpit's home (home.toml)", builtin.SurfaceHome},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 

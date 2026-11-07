@@ -1,0 +1,193 @@
+{
+  "$id": "https://github.com/wloophq/wloop/home.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "capture": {
+      "additionalProperties": false,
+      "description": "The capture field.",
+      "properties": {
+        "hint": {
+          "description": "What the empty field says.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "count": {
+      "description": "A counter's words, `{n}` its count and `{noun}` what it counts, such as \"{n} {noun}\".",
+      "type": "string"
+    },
+    "counters": {
+      "description": "The briefing's counters, in order; one with nothing to count says nothing. A user's list replaces the whole list.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "clause": {
+            "description": "The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "few": {
+                    "description": "Its few form.",
+                    "type": "string"
+                  },
+                  "many": {
+                    "description": "Its many form.",
+                    "type": "string"
+                  },
+                  "one": {
+                    "description": "Its one form.",
+                    "type": "string"
+                  },
+                  "other": {
+                    "description": "Its other form.",
+                    "type": "string"
+                  },
+                  "two": {
+                    "description": "Its two form.",
+                    "type": "string"
+                  },
+                  "zero": {
+                    "description": "Its zero form.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "id": {
+            "description": "The counter's id; a kind's counter defaults to the kind.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "The decision kind the counter counts, whose view and words decisions.toml gives; set kind or view.",
+            "enum": [
+              "answer",
+              "approve-plan",
+              "send-draft",
+              "review-step",
+              "last-step",
+              "pick-someone",
+              "act"
+            ],
+            "type": "string"
+          },
+          "noun": {
+            "description": "What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "few": {
+                    "description": "Its few form.",
+                    "type": "string"
+                  },
+                  "many": {
+                    "description": "Its many form.",
+                    "type": "string"
+                  },
+                  "one": {
+                    "description": "Its one form.",
+                    "type": "string"
+                  },
+                  "other": {
+                    "description": "Its other form.",
+                    "type": "string"
+                  },
+                  "two": {
+                    "description": "Its two form.",
+                    "type": "string"
+                  },
+                  "zero": {
+                    "description": "Its zero form.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ]
+          },
+          "view": {
+            "description": "The view of views.toml whose tasks the counter counts; set kind or view.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "empty": {
+      "description": "What the briefing says when every counter is zero.",
+      "type": "string"
+    },
+    "end": {
+      "description": "What ends a sentence, such as \".\".",
+      "type": "string"
+    },
+    "join": {
+      "description": "What goes between two clauses of a sentence, and between two plugins' counts, such as \", \".",
+      "type": "string"
+    },
+    "last_join": {
+      "description": "What goes before the last clause of a sentence, and the last plugin's count, such as \" and \".",
+      "type": "string"
+    },
+    "per_sentence": {
+      "default": 3,
+      "description": "The most clauses a sentence of the briefing holds.",
+      "type": "integer"
+    },
+    "sections": {
+      "description": "The home's sections, in order: the first rows of a view, which a link opens whole. A user's list replaces the whole list.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The section's id. Required.",
+            "type": "string"
+          },
+          "limit": {
+            "default": 3,
+            "description": "The most rows it shows.",
+            "type": "integer"
+          },
+          "time": {
+            "default": "moved",
+            "description": "The time each row shows.",
+            "enum": [
+              "owed",
+              "moved"
+            ],
+            "type": "string"
+          },
+          "view": {
+            "description": "The view of views.toml it shows the first rows of; its label titles the section. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "view"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "template": {
+      "default": "default",
+      "description": "The briefing's template, which a client may draw its own way.",
+      "type": "string"
+    }
+  },
+  "title": "The cockpit's home (home.toml)",
+  "type": "object"
+}
