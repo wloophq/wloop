@@ -137,11 +137,11 @@ func (p pinnedEffects) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bo
 	return unit.Unit{}, false, nil
 }
 
-func (p pinnedEffects) Place(ctx context.Context, d draft.Draft) (string, error) {
+func (p pinnedEffects) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	if pl, ok := p.Effects.(port.Placer); ok {
 		return pl.Place(ctx, d)
 	}
-	return "", nil
+	return draft.Placed{}, nil
 }
 
 func (p pinnedEffects) Where(ctx context.Context, d draft.Draft) (string, error) {

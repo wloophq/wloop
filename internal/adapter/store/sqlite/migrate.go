@@ -94,6 +94,9 @@ var migrations = []migration{
   PRIMARY KEY (provider, unit_key, workflow)
 ) WITHOUT ROWID`,
 	)},
+	{to: 12, name: "draft_broadcast", compatible: 10, up: execAll(
+		`ALTER TABLE drafts ADD COLUMN broadcast TEXT NOT NULL DEFAULT ''`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

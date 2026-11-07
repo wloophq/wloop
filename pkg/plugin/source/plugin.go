@@ -165,8 +165,8 @@ func (s *server) Where(ctx context.Context, r *pb.WhereRequest) (*pb.WhereRespon
 
 func (s *server) Place(ctx context.Context, r *pb.PlaceRequest) (*pb.PlaceResponse, error) {
 	return serve[Publisher](ctx, s.src, "publisher", r.GetCall(), func(ctx context.Context, c Publisher) (*pb.PlaceResponse, error) {
-		t, err := c.Place(ctx, draftGo(r.GetDraft()))
-		return &pb.PlaceResponse{Target: t}, err
+		p, err := c.Place(ctx, draftGo(r.GetDraft()))
+		return &pb.PlaceResponse{Target: p.Target, Broadcast: p.Broadcast}, err
 	})
 }
 

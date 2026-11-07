@@ -45,8 +45,11 @@ type Publisher struct {
 	People func(ctx context.Context, u unit.Unit) ([]items.Person, error)
 	// Items are the unit's items, whose anchors place a draft on a DM segment.
 	Items func(ctx context.Context, u unit.Unit) ([]items.Item, error)
-	Now   func() time.Time
-	Log   func(format string, args ...any)
+	// NoDMBroadcast keeps a direct message's thread replies in their thread
+	// unless their proposer asked otherwise; plugins.slack.dm_broadcast false.
+	NoDMBroadcast bool
+	Now           func() time.Time
+	Log           func(format string, args ...any)
 }
 
 // plan is where and what a draft posts.
@@ -231,7 +234,53 @@ func (p *Publisher) Takes(target string) bool {
 // which a top-level message starts; a reaction goes on the newest message an
 // item started at, the counterpart's request. A message the user writes with
 // no items goes to the conversation, as typing in the DM does.
-func (p *Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
+//
+// A message that replies in a thread keeps the broadcast its proposer asked
+// for; asked none, it is also posted to a direct message's conversation,
+// where the person would not see a reply to an older thread, unless
+// plugins.slack.dm_broadcast is false, and not to a channel's.
+func (p *Publisher) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
+	var out draft.Placed
+	placed := d
+	if strings.TrimSpace(d.Target) == "" {
+		target, err := p.placeTarget(ctx, d)
+		if err != nil {
+			return draft.Placed{}, err
+		}
+		out.Target, placed.Target = target, target
+	}
+	b, err := p.broadcast(ctx, placed)
+	out.Broadcast = b
+	return out, err
+}
+
+func (p *Publisher) broadcast(ctx context.Context, d draft.Draft) (draft.Broadcast, error) {
+	if d.Delivery != draft.Message {
+		return draft.NoBroadcast, nil
+	}
+	if p.Send == nil || p.Send.Client == nil {
+		return draft.NoBroadcast, send.ErrNotLoggedIn
+	}
+	k, err := dslack.ParseUnit(d.Unit)
+	if err != nil && strings.TrimSpace(d.Target) == "" {
+		return draft.NoBroadcast, nil
+	}
+	var pl plan
+	if err := p.target(ctx, d, k, &pl); err != nil {
+		return draft.NoBroadcast, err
+	}
+	switch {
+	case pl.res.ThreadTS == "":
+		return draft.NoBroadcast, nil
+	case d.Broadcast == draft.BroadcastOn || d.Broadcast == draft.BroadcastOff:
+		return d.Broadcast, nil
+	case pl.res.Direct && !p.NoDMBroadcast:
+		return draft.BroadcastOn, nil
+	}
+	return draft.BroadcastOff, nil
+}
+
+func (p *Publisher) placeTarget(ctx context.Context, d draft.Draft) (string, error) {
 	k, err := dslack.ParseUnit(d.Unit)
 	if err != nil || k.Segment == "" {
 		return "", nil
@@ -429,7 +478,8 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
 		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), nil
 	}
-	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS})
+	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS,
+		Broadcast: pl.res.ThreadTS != "" && d.Broadcast == draft.BroadcastOn})
 	if err != nil {
 		return draft.Evidence{}, p.failed(pl, err)
 	}
@@ -721,5 +771,7 @@ func (p *plugin) publisher() (*Publisher, error) {
 		return nil, send.ErrNotLoggedIn
 	}
 	s := &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.db, p.log), Known: KnownOver(p.db, p.log)}
-	return PublisherOver(p.db, s, p.slack.Tokens.Load, p.host.Items, p.now, p.log), nil
+	pub := PublisherOver(p.db, s, p.slack.Tokens.Load, p.host.Items, p.now, p.log)
+	pub.NoDMBroadcast = p.cfg.DMBroadcast != nil && !*p.cfg.DMBroadcast
+	return pub, nil
 }

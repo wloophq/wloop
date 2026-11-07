@@ -119,11 +119,11 @@ func (c *Client) Where(ctx context.Context, d Draft) (string, error) {
 	return r.GetWhere(), err
 }
 
-func (c *Client) Place(ctx context.Context, d Draft) (string, error) {
+func (c *Client) Place(ctx context.Context, d Draft) (Placed, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.PlaceResponse, error) {
 		return c.c.Place(ctx, &pb.PlaceRequest{Call: call, Draft: draftPB(d)})
 	})
-	return r.GetTarget(), err
+	return Placed{Target: r.GetTarget(), Broadcast: r.GetBroadcast()}, err
 }
 
 func (c *Client) Publish(ctx context.Context, d Draft) (Evidence, error) {

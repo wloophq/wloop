@@ -26,6 +26,7 @@ type Resolved struct {
 	Conversation      string // "#name", "@handle" or "group DM"
 	Parent            string // first line of the thread parent, "" when not a reply
 	DMUser            string // the other party when Channel is an im
+	Direct            bool   // Channel is an im or an mpim
 }
 
 type Sent struct {
@@ -216,6 +217,7 @@ func (s *Service) conversationInfo(ctx context.Context, id string) (Resolved, sl
 	switch {
 	case info.IsIM:
 		res.DMUser = info.User
+		res.Direct = true
 		res.Conversation = "@" + info.User
 		if u, err := s.Client.UserInfo(ctx, info.User); err == nil {
 			if u.Deleted {
@@ -227,6 +229,7 @@ func (s *Service) conversationInfo(ctx context.Context, id string) (Resolved, sl
 		}
 	case info.IsMPIM:
 		res.Conversation = "group DM"
+		res.Direct = true
 	default:
 		if !info.IsMember {
 			return Resolved{}, info, fmt.Errorf("%w: not a member of #%s (%s)", ErrCannotPost, info.Name, id)
@@ -332,7 +335,7 @@ func (s *Service) openDM(ctx context.Context, u slack.UserInfo) (Resolved, error
 	if err != nil {
 		return Resolved{}, err
 	}
-	return Resolved{Channel: channel, Conversation: "@" + u.Name, DMUser: u.ID}, nil
+	return Resolved{Channel: channel, Conversation: "@" + u.Name, DMUser: u.ID, Direct: true}, nil
 }
 
 func matching[T any](items []T, keep func(T) bool) []T {

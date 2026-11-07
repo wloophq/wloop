@@ -256,13 +256,23 @@ type Draft struct {
 	Delivery string
 	Effects  []string
 	// Target is the plugin's target grammar; "" is the unit itself.
-	Target   string
-	Text     string
-	Reaction string
-	Replaced string
-	Origin   DraftOrigin
-	State    string
-	Evidence Evidence
+	Target string
+	// Broadcast is "on" or "off" for a thread reply also posted, or not, to
+	// its conversation; "" for a draft that replies in no thread.
+	Broadcast string
+	Text      string
+	Reaction  string
+	Replaced  string
+	Origin    DraftOrigin
+	State     string
+	Evidence  Evidence
+}
+
+// Placed is where a publisher puts a draft when it is proposed: the target a
+// draft with none posts to, "" for its unit, and its Broadcast.
+type Placed struct {
+	Target    string
+	Broadcast string
 }
 
 // DraftOrigin is who proposed a draft.

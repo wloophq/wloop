@@ -445,7 +445,9 @@ CREATE TABLE drafts (
   -- the session that proposed it; '' when none did
   origin_session TEXT NOT NULL DEFAULT '',
   -- why it was proposed, in the user's language when it was; the locale its text is written in
-  why TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT ''
+  why TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT '',
+  -- a thread reply's: 'on' or 'off' for also posting it to its conversation; '' when it replies in no thread
+  broadcast TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);

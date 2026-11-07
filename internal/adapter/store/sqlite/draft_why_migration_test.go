@@ -37,7 +37,7 @@ func TestVersion11AddsWhyAndLanguageToDrafts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if v := versionOf(t, path); v != 11 {
+	if v := versionOf(t, path); v != SchemaVersion {
 		t.Fatalf("version %d", v)
 	}
 	db, err := current.open(path, nil)

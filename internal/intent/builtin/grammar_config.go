@@ -194,6 +194,7 @@ var configGrammar = slices.Concat(
 		cfgKey("plugins.slack.redirect_port", KindInt, "", "The login callback port registered in the Slack app; 0 is 53682."),
 		cfgKey("plugins.slack.keychain_service", KindText, "", "The name of the Keychain items; empty is the brand's."),
 		cfgList("plugins.slack.post_allowlist", "When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to."),
+		cfgKey("plugins.slack.dm_broadcast", KindBool, "", "Also posts a draft that replies in a thread of a direct message to its conversation, until the person turns it off on the draft; left out, it does."),
 		cfgKey("plugins.slack.request_log", KindBool, "false", "Logs one line per Slack call: method and HTTP status."),
 		cfgKey("plugins.slack.ingest", KindTable, "", "What the Slack plugin admits and how it listens."),
 		cfgList("plugins.slack.ingest.terms", "A message that holds one of them as a word, in any case, is admitted."),

@@ -274,18 +274,18 @@ func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 
 type placingPublisher struct{ recordingPublisher }
 
-func (*placingPublisher) Place(context.Context, draft.Draft) (string, error) {
-	return "https://slack.com/archives/D0000000001/p1700000000000100", nil
+func (*placingPublisher) Place(context.Context, draft.Draft) (draft.Placed, error) {
+	return draft.Placed{Target: "https://slack.com/archives/D0000000001/p1700000000000100", Broadcast: draft.BroadcastOn}, nil
 }
 
 func TestAPinnedPublisherPlacesAsItsPluginPlaces(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	if got, err := (pinnedEffects{Effects: &placingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "https://slack.com/archives/D0000000001/p1700000000000100" {
-		t.Errorf("a placing publisher: %q %v", got, err)
+	if got, err := (pinnedEffects{Effects: &placingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != (draft.Placed{Target: "https://slack.com/archives/D0000000001/p1700000000000100", Broadcast: draft.BroadcastOn}) {
+		t.Errorf("a placing publisher: %+v %v", got, err)
 	}
-	if got, err := (pinnedEffects{Effects: &recordingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "" {
-		t.Errorf("a publisher that places nothing: %q %v", got, err)
+	if got, err := (pinnedEffects{Effects: &recordingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != (draft.Placed{}) {
+		t.Errorf("a publisher that places nothing: %+v %v", got, err)
 	}
 }
 

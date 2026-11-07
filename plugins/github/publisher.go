@@ -61,10 +61,10 @@ func (p *Plugin) Where(ctx context.Context, d src.Draft) (string, error) {
 	return pub.Where(ctx, d)
 }
 
-func (p *Plugin) Place(ctx context.Context, d src.Draft) (string, error) {
+func (p *Plugin) Place(ctx context.Context, d src.Draft) (src.Placed, error) {
 	pub, err := p.publisher()
 	if err != nil {
-		return "", err
+		return src.Placed{}, err
 	}
 	return pub.Place(ctx, d)
 }

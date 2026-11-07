@@ -2202,22 +2202,25 @@ func (x *DraftEvidence) GetAt() *timestamppb.Timestamp {
 // Draft is a post the loop proposes or sent. id is zero for a draft not yet
 // stored.
 type Draft struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Unit          *pb.Unit               `protobuf:"bytes,2,opt,name=unit,proto3" json:"unit,omitempty"`
-	Items         []string               `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
-	Task          string                 `protobuf:"bytes,4,opt,name=task,proto3" json:"task,omitempty"`
-	Kind          string                 `protobuf:"bytes,5,opt,name=kind,proto3" json:"kind,omitempty"`
-	Purpose       string                 `protobuf:"bytes,6,opt,name=purpose,proto3" json:"purpose,omitempty"`
-	Delivery      string                 `protobuf:"bytes,7,opt,name=delivery,proto3" json:"delivery,omitempty"`
-	Effects       []string               `protobuf:"bytes,8,rep,name=effects,proto3" json:"effects,omitempty"`
-	Target        string                 `protobuf:"bytes,9,opt,name=target,proto3" json:"target,omitempty"`
-	Text          string                 `protobuf:"bytes,10,opt,name=text,proto3" json:"text,omitempty"`
-	Reaction      string                 `protobuf:"bytes,11,opt,name=reaction,proto3" json:"reaction,omitempty"`
-	Replaced      string                 `protobuf:"bytes,12,opt,name=replaced,proto3" json:"replaced,omitempty"`
-	Origin        *DraftOrigin           `protobuf:"bytes,13,opt,name=origin,proto3" json:"origin,omitempty"`
-	State         string                 `protobuf:"bytes,14,opt,name=state,proto3" json:"state,omitempty"`
-	Evidence      *DraftEvidence         `protobuf:"bytes,15,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Unit     *pb.Unit               `protobuf:"bytes,2,opt,name=unit,proto3" json:"unit,omitempty"`
+	Items    []string               `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	Task     string                 `protobuf:"bytes,4,opt,name=task,proto3" json:"task,omitempty"`
+	Kind     string                 `protobuf:"bytes,5,opt,name=kind,proto3" json:"kind,omitempty"`
+	Purpose  string                 `protobuf:"bytes,6,opt,name=purpose,proto3" json:"purpose,omitempty"`
+	Delivery string                 `protobuf:"bytes,7,opt,name=delivery,proto3" json:"delivery,omitempty"`
+	Effects  []string               `protobuf:"bytes,8,rep,name=effects,proto3" json:"effects,omitempty"`
+	Target   string                 `protobuf:"bytes,9,opt,name=target,proto3" json:"target,omitempty"`
+	Text     string                 `protobuf:"bytes,10,opt,name=text,proto3" json:"text,omitempty"`
+	Reaction string                 `protobuf:"bytes,11,opt,name=reaction,proto3" json:"reaction,omitempty"`
+	Replaced string                 `protobuf:"bytes,12,opt,name=replaced,proto3" json:"replaced,omitempty"`
+	Origin   *DraftOrigin           `protobuf:"bytes,13,opt,name=origin,proto3" json:"origin,omitempty"`
+	State    string                 `protobuf:"bytes,14,opt,name=state,proto3" json:"state,omitempty"`
+	Evidence *DraftEvidence         `protobuf:"bytes,15,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	// broadcast is "on" or "off" for a thread reply also posted, or not, to its
+	// conversation, "" for a draft that replies in no thread.
+	Broadcast     string `protobuf:"bytes,16,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2355,6 +2358,13 @@ func (x *Draft) GetEvidence() *DraftEvidence {
 		return x.Evidence
 	}
 	return nil
+}
+
+func (x *Draft) GetBroadcast() string {
+	if x != nil {
+		return x.Broadcast
+	}
+	return ""
 }
 
 type Placement struct {
@@ -3597,8 +3607,11 @@ func (x *PlaceRequest) GetDraft() *Draft {
 }
 
 type PlaceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Target        string                 `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Target string                 `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	// broadcast is the draft's broadcast as proposed: "" when it replies in no
+	// thread, else "on" or "off".
+	Broadcast     string `protobuf:"bytes,2,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3636,6 +3649,13 @@ func (*PlaceResponse) Descriptor() ([]byte, []int) {
 func (x *PlaceResponse) GetTarget() string {
 	if x != nil {
 		return x.Target
+	}
+	return ""
+}
+
+func (x *PlaceResponse) GetBroadcast() string {
+	if x != nil {
+		return x.Broadcast
 	}
 	return ""
 }
@@ -10160,7 +10180,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\rDraftEvidence\x12\x10\n" +
 	"\x03ref\x18\x01 \x01(\tR\x03ref\x12\x1c\n" +
 	"\tpermalink\x18\x02 \x01(\tR\tpermalink\x12*\n" +
-	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\xbc\x03\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\xda\x03\n" +
 	"\x05Draft\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12)\n" +
 	"\x04unit\x18\x02 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12\x14\n" +
@@ -10177,7 +10197,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\breplaced\x18\f \x01(\tR\breplaced\x124\n" +
 	"\x06origin\x18\r \x01(\v2\x1c.wloop.source.v1.DraftOriginR\x06origin\x12\x14\n" +
 	"\x05state\x18\x0e \x01(\tR\x05state\x12:\n" +
-	"\bevidence\x18\x0f \x01(\v2\x1e.wloop.source.v1.DraftEvidenceR\bevidence\"g\n" +
+	"\bevidence\x18\x0f \x01(\v2\x1e.wloop.source.v1.DraftEvidenceR\bevidence\x12\x1c\n" +
+	"\tbroadcast\x18\x10 \x01(\tR\tbroadcast\"g\n" +
 	"\tPlacement\x12\x12\n" +
 	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
 	"\bcheckout\x18\x02 \x01(\tR\bcheckout\x12\x12\n" +
@@ -10249,9 +10270,10 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\x05where\x18\x01 \x01(\tR\x05where\"g\n" +
 	"\fPlaceRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12,\n" +
-	"\x05draft\x18\x02 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\"'\n" +
+	"\x05draft\x18\x02 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\"E\n" +
 	"\rPlaceResponse\x12\x16\n" +
-	"\x06target\x18\x01 \x01(\tR\x06target\"i\n" +
+	"\x06target\x18\x01 \x01(\tR\x06target\x12\x1c\n" +
+	"\tbroadcast\x18\x02 \x01(\tR\tbroadcast\"i\n" +
 	"\x0ePublishRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12,\n" +
 	"\x05draft\x18\x02 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\"M\n" +

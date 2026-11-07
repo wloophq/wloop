@@ -69,6 +69,24 @@ func ShapeOf(k Kind) (purpose string, d Delivery) {
 	return string(k), Message
 }
 
+// Broadcast says whether a thread reply is also posted to its conversation.
+// It is NoBroadcast when the draft replies in no thread, as its publisher
+// places it when it is proposed.
+type Broadcast string
+
+const (
+	NoBroadcast  Broadcast = ""
+	BroadcastOff Broadcast = "off"
+	BroadcastOn  Broadcast = "on"
+)
+
+// Placed is where its publisher puts a draft when it is proposed: the target
+// a draft with none posts to, "" for its unit, and its Broadcast.
+type Placed struct {
+	Target    string
+	Broadcast Broadcast
+}
+
 // KindOf is the kind readers of Kind see for a purpose and a delivery.
 func KindOf(purpose string, d Delivery) Kind {
 	switch d {
@@ -134,26 +152,27 @@ type Evidence struct {
 }
 
 type Draft struct {
-	ID       ID
-	Unit     unit.Unit
-	Items    []string // item ids of Unit; may be empty
-	Task     string   // the task it serves, "" none; its row in the Outbox view is its draft gate
-	Kind     Kind
-	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
-	Delivery Delivery // how it is posted
-	Effects  []string // applied when it is sent, such as "task.nudged"
-	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
-	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
-	Reaction string   // Kind "react" only: emoji name without colons
-	Replaced string   // Kind "edit" only: the text the edit replaced
-	Original string   // Text as proposed
-	Edited   bool     // Text != Original
-	Origin   Origin
-	State    State
-	Evidence Evidence // State "sent" only
-	Error    string   // State "failed" only, never a token
-	Reason   string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
-	Rev      int64    // the stored row's version; every Update bumps it
+	ID        ID
+	Unit      unit.Unit
+	Items     []string // item ids of Unit; may be empty
+	Task      string   // the task it serves, "" none; its row in the Outbox view is its draft gate
+	Kind      Kind
+	Purpose   string    // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
+	Delivery  Delivery  // how it is posted
+	Effects   []string  // applied when it is sent, such as "task.nudged"
+	Target    string    // plugin target grammar; "" means the unit itself (its thread, its PR)
+	Broadcast Broadcast // a thread reply also posted to its conversation; NoBroadcast when it replies in no thread
+	Text      string    // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
+	Reaction  string    // Kind "react" only: emoji name without colons
+	Replaced  string    // Kind "edit" only: the text the edit replaced
+	Original  string    // Text as proposed
+	Edited    bool      // Text != Original
+	Origin    Origin
+	State     State
+	Evidence  Evidence // State "sent" only
+	Error     string   // State "failed" only, never a token
+	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	Rev       int64    // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
