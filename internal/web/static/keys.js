@@ -1,8 +1,8 @@
 "use strict";
 
 const CHORD_MS = 1000;
-const KEY_CONTEXTS = ["question", "plan", "review", "list", "global"];
-const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|palette$|help$|filter$|open-source$|capture$|quit$)/;
+const KEY_CONTEXTS = ["detail", "question", "plan", "review", "list", "global"];
+const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|link:|palette$|help$|filter$|open-source$|capture$|quit$)/;
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
 // VERB_ASKS are, by handler, how a verb that asks for a value first turns
@@ -92,9 +92,10 @@ const CONTEXT_HEADS = {
   get question() { return t("In a question"); },
   get plan() { return t("In the plan"); },
   get review() { return t("In the review"); },
+  get detail() { return t("In the detail"); },
 };
 
-const HELP_ORDER = ["global", "list", "question", "plan", "review"];
+const HELP_ORDER = ["global", "list", "detail", "question", "plan", "review"];
 
 // helpGroups are every binding by context.
 function helpGroups(bindings) {
@@ -328,6 +329,8 @@ function createKeys(env) {
     if (a.startsWith("area:")) return pickArea(Number(a.slice(5)));
     if (a.startsWith("answer:")) return answer(Number(a.slice(7)), ctx.target);
     if (a.startsWith("step:")) return env.step ? env.step(a.slice(5)) !== false : false;
+    if (a === "detail:detach") return env.detach ? env.detach() !== false : false;
+    if (a === "link:copy") return env.copyLink ? env.copyLink() !== false : false;
     if (a === "palette") {
       env.palette({ title: t("Actions"), items: paletteItems() });
       return true;
@@ -379,6 +382,7 @@ function createKeys(env) {
     if (env.questionAt && env.questionAt(e.target)) contexts.unshift("question");
     const view = env.viewContext ? env.viewContext() : "";
     if (view) contexts.unshift(view);
+    if (env.detailAt && env.detailAt(e.target)) contexts.unshift("detail");
     const candidates = bindings.filter((b) => b.key === key && contexts.includes(b.context))
       .sort((x, y) => contexts.indexOf(x.context) - contexts.indexOf(y.context) || Number(servedAction(y)) - Number(servedAction(x)));
     if (!candidates.length && isPrefix(key)) {
@@ -458,6 +462,9 @@ function appEnv() {
     planAction: (it, id) => actOnPlan(it, id),
     viewContext: () => keyContextOf(readHash().view),
     step: (action) => reviewKey(action),
+    detailAt: (el) => detailFocused(el),
+    detach: () => detachView(),
+    copyLink: () => copyViewLink(),
     questionAt: (el) => {
       if (readHash().task) return detailPane.gateAt(el);
       const d = state.detail;
@@ -504,6 +511,7 @@ function appEnv() {
       return true;
     },
     close: () => {
+      if (detailOnly(location.hash)) return false;
       if (readHash().task) {
         writeHash({ task: "" });
         return true;
@@ -545,8 +553,12 @@ function appEnv() {
   };
 }
 
+// cockpitKeys is the page's dispatcher; the rail's omnibox entry opens its palette.
+let cockpitKeys = null;
+
 async function installKeys(env) {
   const keys = createKeys(env);
+  cockpitKeys = keys;
   let loadedAt = 0;
   const load = async () => {
     loadedAt = Date.now();

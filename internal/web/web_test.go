@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/brand"
 )
 
 func TestServesIndexAndAssets(t *testing.T) {
@@ -24,6 +26,14 @@ func TestServesIndexAndAssets(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/nope", nil))
 	if rec.Code != 404 {
 		t.Fatalf("%d", rec.Code)
+	}
+}
+
+func TestThePageNamesTheLinkScheme(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if want := `<meta name="link-scheme" content="` + brand.URLScheme() + `">`; !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("the page lacks %s", want)
 	}
 }
 
@@ -158,9 +168,10 @@ func TestCockpitShowsTheBrief(t *testing.T) {
 func TestCockpitHasTheStalledBoard(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
-		"/static/app.js":  {"function renderBoard", `layout: p.get("layout") === "board"`, `f.id === "lane"`, `"aria-pressed"`},
-		"/":               {`id="board"`},
-		"/static/app.css": {".board", ".card", ".lane-head"},
+		"/static/app.js":    {"function renderBoard", "layout: route.layout", `f.id === "lane"`, `"aria-pressed"`},
+		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "detail"]`},
+		"/":                 {`id="board"`},
+		"/static/app.css":   {".board", ".card", ".lane-head"},
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))

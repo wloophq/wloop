@@ -55,6 +55,8 @@ func spec92() []row {
 		{"]", "step:next", Review, screen},
 		{"[", "step:prev", Review, screen},
 		{"Enter", "approve", Plan, screen},
+		{"c", "link:copy", Global, []Surface{Web}},
+		{"t", "detail:detach", Detail, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,
@@ -92,6 +94,24 @@ func TestCoreMatchesTheSpec(t *testing.T) {
 		}
 		if len(b.Key) == 1 && b.Key >= "1" && b.Key <= "9" && b.Context != Question {
 			t.Errorf("digit %s outside the Question context", b.Key)
+		}
+	}
+}
+
+// The window's keys take no key another core binding holds on the web, in
+// any context, so they never shadow one.
+func TestTheWindowKeysAreFree(t *testing.T) {
+	for _, action := range []string{"link:copy", "detail:detach"} {
+		var mine Binding
+		for _, b := range Core {
+			if b.Action == action {
+				mine = b
+			}
+		}
+		for _, b := range Core {
+			if b.Action != action && b.Key == mine.Key && slices.Contains(b.Surfaces, Web) {
+				t.Errorf("%s's key %q is also %s's", action, mine.Key, b.Action)
+			}
 		}
 	}
 }

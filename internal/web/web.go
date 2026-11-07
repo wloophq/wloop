@@ -24,7 +24,7 @@ import (
 var files embed.FS
 
 func render(raw []byte) []byte {
-	return []byte(strings.NewReplacer("{{name}}", brand.Name, "{{command}}", brand.Command).Replace(string(raw)))
+	return []byte(strings.NewReplacer("{{name}}", brand.Name, "{{command}}", brand.Command, "{{scheme}}", brand.URLScheme()).Replace(string(raw)))
 }
 
 // asset is a static file as served: its body and the validator of that body.

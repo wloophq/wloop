@@ -188,6 +188,20 @@
       "help": "apply the selected plan step"
     },
     {
+      "key": "c",
+      "action": "link:copy",
+      "context": "global",
+      "owner": "core",
+      "help": "copy a link to this view"
+    },
+    {
+      "key": "t",
+      "action": "detail:detach",
+      "context": "detail",
+      "owner": "core",
+      "help": "open in a window of its own"
+    },
+    {
       "key": "1",
       "action": "answer:1",
       "context": "question",

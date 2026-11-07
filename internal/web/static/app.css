@@ -727,3 +727,51 @@ tbody tr.sel td:first-child, .card.sel, .cand.sel, .task-row.sel, .activity .a-e
 .md a:hover { text-decoration-color: currentColor; }
 .md-more { padding: 0; color: var(--me-text); background: none; border: 0; cursor: pointer; }
 .md-more:hover { text-decoration: underline; }
+
+/* The window: icon buttons, the title bar of a native window, the detail alone. */
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 26px; height: 26px; padding: 0;
+  color: var(--muted); background: none; border: 0; border-radius: var(--radius-md); cursor: pointer;
+}
+.icon-btn::before {
+  content: ""; width: 16px; height: 16px; background: currentColor;
+  -webkit-mask: var(--icon) center / 16px no-repeat; mask: var(--icon) center / 16px no-repeat;
+}
+.icon-btn:hover:not(:disabled) { color: var(--ink); background: var(--rule); }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.icon-btn[data-icon="back"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 3 5 8l5 5'/%3E%3C/svg%3E"); }
+.icon-btn[data-icon="forward"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 3 5 5-5 5'/%3E%3C/svg%3E"); }
+.icon-btn[data-icon="link"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-.9.9M9.5 6.5a3 3 0 0 0-4.2 0L3 8.8A3 3 0 0 0 7.2 13l.9-.9'/%3E%3C/svg%3E"); }
+.icon-btn[data-icon="detach"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 2.5h4v4M13.5 2.5 8 8M12 9.5V13a.5.5 0 0 1-.5.5h-8A.5.5 0 0 1 3 13V5a.5.5 0 0 1 .5-.5H7'/%3E%3C/svg%3E"); }
+.icon-btn[data-icon="search"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='m13.5 13.5-3.3-3.3'/%3E%3C/svg%3E"); }
+
+.d-head { padding-right: calc(var(--space-24) + 56px); }
+.d-window { position: absolute; top: calc(-1 * var(--space-2)); right: var(--space-24); display: flex; gap: var(--space-2); }
+
+/* The native window draws its controls over the page: the top strip is the
+   title bar, dragged by Wails' --wails-draggable, clear of the controls. */
+body.titlebar {
+  --titlebar-height: 52px;
+  --titlebar-inset: 84px;
+}
+body.titlebar #top {
+  --wails-draggable: drag;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-height: var(--titlebar-height);
+  padding: 0 var(--space-12) 0 var(--titlebar-inset);
+  gap: var(--space-12);
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.titlebar #top button, body.titlebar #top input, body.titlebar #top a { --wails-draggable: no-drag; }
+body.titlebar #top .mark { display: none; }
+.tb-nav, .tb-tools { display: flex; gap: var(--space-2); flex: none; }
+.tb-title { flex: 0 1 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+body.layout-detail #rail, body.layout-detail #list, body.layout-detail #detail-resize, body.layout-detail .d-head .close { display: none; }
+body.layout-detail #app, body.layout-detail.has-detail #app { grid-template-columns: minmax(0, 1fr); }
+body.layout-detail #detail { border-left: 0; }
+body.layout-detail .d-head { padding-right: 32px; }
+body.layout-detail .d-window { right: 0; }
