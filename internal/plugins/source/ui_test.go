@@ -88,3 +88,16 @@ func TestAFacetRankedBySituationsReadsAsTheSituationsDo(t *testing.T) {
 		}
 	}
 }
+
+// TestGitHubsFacetsWordTheirKnownValues checks that every value the GitHub plugin's rows show by a fixed id
+// is worded, so no row reads a raw id: the brief's risk and the viewer as author or waiter.
+func TestGitHubsFacetsWordTheirKnownValues(t *testing.T) {
+	want := map[string][]string{"risk": {"low", "medium", "high"}, "author": {"me"}, "waits-on": {"me"}}
+	for _, f := range bundledCatalog(t, "github").Facets() {
+		for _, v := range want[f.ID] {
+			if f.Labels[v] == "" {
+				t.Errorf("facet %s shows value %q raw", f.ID, v)
+			}
+		}
+	}
+}

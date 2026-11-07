@@ -141,6 +141,9 @@
       "rank": [
         "me"
       ],
+      "labels": {
+        "me": "me"
+      },
       "menu": true,
       "show": "meta",
       "show_values": "first",
@@ -184,6 +187,9 @@
       "label": "Waits on (person)",
       "provider": "github",
       "group": true,
+      "labels": {
+        "me": "me"
+      },
       "match": "team",
       "menu": true,
       "show": "who"
@@ -258,6 +264,11 @@
         "medium",
         "low"
       ],
+      "labels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium"
+      },
       "empty": "no brief",
       "menu": true,
       "show": "meta",
