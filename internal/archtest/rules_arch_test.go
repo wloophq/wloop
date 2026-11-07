@@ -374,6 +374,18 @@ func TestOnlyServeWritesTheStore(t *testing.T) {
 // when tests is set, and calls fn with its module-relative path.
 func forEachFile(t *testing.T, tests bool, fn func(fset *token.FileSet, file string, f *ast.File)) {
 	t.Helper()
+	walkFiles(t, tests, false, fn)
+}
+
+// forEachFileOfAnyBuild is forEachFile over the files a build tag leaves out of this build too, so a rule
+// that counts what it finds counts the same on every platform.
+func forEachFileOfAnyBuild(t *testing.T, tests bool, fn func(fset *token.FileSet, file string, f *ast.File)) {
+	t.Helper()
+	walkFiles(t, tests, true, fn)
+}
+
+func walkFiles(t *testing.T, tests, anyBuild bool, fn func(fset *token.FileSet, file string, f *ast.File)) {
+	t.Helper()
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
 		if !ok {
@@ -382,6 +394,13 @@ func forEachFile(t *testing.T, tests bool, fn func(fset *token.FileSet, file str
 		names := p.GoFiles
 		if tests {
 			names = slices.Concat(names, p.TestGoFiles, p.XTestGoFiles)
+		}
+		if anyBuild {
+			for _, name := range p.IgnoredGoFiles {
+				if tests || !strings.HasSuffix(name, "_test.go") {
+					names = append(names, name)
+				}
+			}
 		}
 		for _, name := range names {
 			fset, f := parseFile(t, filepath.Join(p.Dir, name))

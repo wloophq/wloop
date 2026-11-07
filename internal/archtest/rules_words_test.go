@@ -15,48 +15,52 @@ import (
 // clientTokens are the single words the Go clients quote that no person reads, such as a key's name or an id
 // the daemon's API takes: what each is, by literal. Every other single word a client quotes is a catalog key.
 var clientTokens = map[string]string{
-	"Backspace":   "a key's name as the served bindings spell it",
-	"Enter":       "a key's name as the served bindings spell it",
-	"Esc":         "a key's name as the served bindings spell it",
-	"Tab":         "a key's name as the served bindings spell it",
-	"app":         "the name the app subscribes to the daemon's events as",
-	"tui":         "the terminal client's name as an events subscriber and a surface",
-	"menubar":     "the menu bar's name as a surface",
-	"running":     "an app state the status API takes",
-	"sweep":       "a job the daemon triggers",
-	"true":        "a flag's value an action takes",
-	"draft":       "a reply's send mode an action takes",
-	"now":         "a reply's send mode an action takes",
-	"session":     "the delegate prompt's mode",
-	"open":        "an action's id",
-	"answer":      "an action's id",
-	"detail":      "a command's action id",
-	"match":       "a command's action id",
-	"review":      "a command's action id and the review's context",
-	"capture":     "a command's action id",
-	"filter":      "a core action's id",
-	"help":        "a core action's id",
-	"open-source": "a core action's id",
-	"palette":     "a core action's id",
-	"quit":        "a core action's id",
-	"edit":        "a draft verb's handler",
-	"retry":       "a draft verb's handler",
-	"apply":       "a plan action's handler",
-	"dismiss":     "a plan action's handler",
-	"guide":       "a plan action's handler",
-	"reviewed":    "a project verb's handler",
-	"sequential":  "a project verb's handler",
-	"pending":     "a plan decision the API serves",
-	"blocked":     "a plan decision the API serves",
-	"plan":        "the plan tab's key",
-	"vi":          "the editor run when $VISUAL and $EDITOR are unset",
-	"PR":          "the status item's mark before its first count, the same in every language",
-	"%.1f GiB":    "a size in a binary unit",
-	"%.1f MiB":    "a size in a binary unit",
+	"Backspace":     "a key's name as the served bindings spell it",
+	"Enter":         "a key's name as the served bindings spell it",
+	"Esc":           "a key's name as the served bindings spell it",
+	"Tab":           "a key's name as the served bindings spell it",
+	"app":           "the name the app subscribes to the daemon's events as",
+	"tui":           "the terminal client's name as an events subscriber and a surface",
+	"menubar":       "the menu bar's name as a surface",
+	"running":       "an app state the status API takes",
+	"sweep":         "a job the daemon triggers",
+	"true":          "a flag's value an action takes",
+	"draft":         "a reply's send mode an action takes",
+	"now":           "a reply's send mode an action takes",
+	"session":       "the delegate prompt's mode",
+	"open":          "an action's id",
+	"answer":        "an action's id",
+	"detail":        "a command's action id",
+	"match":         "a command's action id",
+	"review":        "a command's action id and the review's context",
+	"capture":       "a command's action id",
+	"filter":        "a core action's id",
+	"help":          "a core action's id",
+	"open-source":   "a core action's id",
+	"palette":       "a core action's id",
+	"quit":          "a core action's id",
+	"edit":          "a draft verb's handler",
+	"retry":         "a draft verb's handler",
+	"apply":         "a plan action's handler",
+	"dismiss":       "a plan action's handler",
+	"guide":         "a plan action's handler",
+	"reviewed":      "a project verb's handler",
+	"sequential":    "a project verb's handler",
+	"pending":       "a plan decision the API serves",
+	"blocked":       "a plan decision the API serves",
+	"plan":          "the plan tab's key",
+	"vi":            "the editor run when $VISUAL and $EDITOR are unset",
+	"PR":            "the status item's mark before its first count, the same in every language",
+	"%.1f GiB":      "a size in a binary unit",
+	"%.1f MiB":      "a size in a binary unit",
+	"main":          "a native window's internal name, never shown",
+	"panel":         "a native window's internal name, never shown",
+	"detached ":     "a native window's internal name prefix, never shown",
+	"makeKeyWindow": "an AppKit selector",
 }
 
 // clientTokenUses is how many literals clientTokens lets pass; a new one raises it on purpose, in review.
-const clientTokenUses = 62
+const clientTokenUses = 66
 
 var (
 	singleWord = regexp.MustCompile(`^[\s(·,;:—–-]*\pL[\pL'’…-]*\pL[\s.,:;!?…)·]*$`)
@@ -155,7 +159,7 @@ func clientWords(fset *token.FileSet, file string, f *ast.File) (flagged, tokens
 // `clientTokens`, which let exactly `clientTokenUses` literals pass.
 func TestClientsQuoteNoWordOutsideTheCatalog(t *testing.T) {
 	var flagged, tokens []string
-	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
+	forEachFileOfAnyBuild(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		if strings.HasPrefix(file, "internal/client/") && slices.Contains(proseClients, proseBucket(file)) {
 			got, toks := clientWords(fset, file, f)
 			flagged, tokens = append(flagged, got...), append(tokens, toks...)

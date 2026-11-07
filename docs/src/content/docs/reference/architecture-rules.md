@@ -120,6 +120,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `apply` | ✅ | a plan action's handler |
 | `blocked` | ✅ | a plan decision the API serves |
 | `capture` | ✅ | a command's action id |
+| `detached ` | ✅ | a native window's internal name prefix, never shown |
 | `detail` | ✅ | a command's action id |
 | `dismiss` | ✅ | a plan action's handler |
 | `draft` | ✅ | a reply's send mode an action takes |
@@ -127,12 +128,15 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `filter` | ✅ | a core action's id |
 | `guide` | ✅ | a plan action's handler |
 | `help` | ✅ | a core action's id |
+| `main` | ✅ | a native window's internal name, never shown |
+| `makeKeyWindow` | ✅ | an AppKit selector |
 | `match` | ✅ | a command's action id |
 | `menubar` | ✅ | the menu bar's name as a surface |
 | `now` | ✅ | a reply's send mode an action takes |
 | `open` | ✅ | an action's id |
 | `open-source` | ✅ | a core action's id |
 | `palette` | ✅ | a core action's id |
+| `panel` | ✅ | a native window's internal name, never shown |
 | `pending` | ✅ | a plan decision the API serves |
 | `plan` | ✅ | the plan tab's key |
 | `quit` | ✅ | a core action's id |

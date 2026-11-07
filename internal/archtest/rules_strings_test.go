@@ -290,7 +290,7 @@ func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	got["index.html"] = append(got["index.html"], ruleHTMLProse(webStatic+"/index.html", string(page))...)
-	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
+	forEachFileOfAnyBuild(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		if strings.HasPrefix(file, "internal/client/") && slices.Contains(proseClients, proseBucket(file)) {
 			got[proseBucket(file)] = append(got[proseBucket(file)], ruleGoClientProse(fset, file, f)...)
 		}
@@ -358,7 +358,7 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 		}
 	}
 	literals := map[string]bool{}
-	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
+	forEachFileOfAnyBuild(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		client := strings.HasPrefix(file, "internal/client/")
 		if !client && !strings.HasPrefix(file, "internal/api/") && !strings.HasPrefix(file, "internal/config/") {
 			return
@@ -451,7 +451,7 @@ const proseInternalMarks = 12
 // proseInternalMarks literals, so a mark is a reviewed exception.
 func TestProseInternalMarksStayFew(t *testing.T) {
 	n := 0
-	forEachFile(t, false, func(_ *token.FileSet, file string, f *ast.File) {
+	forEachFileOfAnyBuild(t, false, func(_ *token.FileSet, file string, f *ast.File) {
 		if !strings.HasPrefix(file, "internal/client/") || !slices.Contains(proseClients, proseBucket(file)) {
 			return
 		}
