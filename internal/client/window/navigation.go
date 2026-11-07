@@ -9,5 +9,5 @@ import "strings"
 func Navigation(current, next string) (load bool, hash string) {
 	curPage, _, _ := strings.Cut(current, "#")
 	nextPage, nextHash, _ := strings.Cut(next, "#")
-	return current == "" || curPage != nextPage, nextHash
+	return curPage != nextPage, nextHash
 }
