@@ -176,6 +176,35 @@ func TestShowLoadsTheCockpitAtTheRouteAndHidesThePanel(t *testing.T) {
 	want(t, r.host.taken(), "main "+base+"#task=t-1", "hide-panel")
 }
 
+func TestShowWithAPanelRouteShowsThePanel(t *testing.T) {
+	for _, route := range []string{"panel=omnibox", "q=ab&panel=omnibox"} {
+		r := newRig()
+		if err := r.ctl.Show(route); err != nil {
+			t.Fatal(err)
+		}
+		want(t, r.host.taken(), "panel "+base+"#"+PanelRoute)
+	}
+}
+
+// A main window loaded on a panel route would run the panel's page, whose
+// hand-over of every other route comes back to the main window: the loop
+// a panel route must never start.
+func TestAPanelRouteNeverLoadsTheMainWindow(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		stream := make(chan api.Change)
+		r := newRig(stream)
+		r.run(t)
+		synctest.Wait()
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowOpen, Route: "panel=omnibox"}}}
+		synctest.Wait()
+		for _, c := range r.host.taken() {
+			if strings.HasPrefix(c, "main ") {
+				t.Fatalf("the main window loaded %q", c)
+			}
+		}
+	})
+}
+
 func TestHotkeyTogglesThePanel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig(make(chan api.Change))

@@ -4,6 +4,7 @@ package window
 
 import (
 	"context"
+	"net/url"
 	"sync"
 	"time"
 
@@ -132,15 +133,20 @@ func (c *Controller) handle(req api.WindowRequest) {
 }
 
 // Show shows the main window at route ("" keeps where it was) and hides the
-// panel.
+// panel; a panel route shows the panel instead, since the panel's page in
+// the main window would hand every other route back to it.
 func (c *Controller) Show(route string) error {
-	url, err := c.url(route)
+	if panelRoute(route) {
+		c.showPanel()
+		return nil
+	}
+	u, err := c.url(route)
 	if err != nil {
 		return err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.cfg.Host.ShowMain(url)
+	c.cfg.Host.ShowMain(u)
 	c.cfg.Host.HidePanel()
 	c.panelShown = false
 	return nil
@@ -159,13 +165,13 @@ func (c *Controller) TogglePanel() {
 }
 
 func (c *Controller) showPanel() {
-	url, err := c.url(PanelRoute)
+	u, err := c.url(PanelRoute)
 	if err != nil {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.cfg.Host.ShowPanel(url)
+	c.cfg.Host.ShowPanel(u)
 	c.panelShown = true
 }
 
@@ -182,10 +188,15 @@ func (c *Controller) setPanel(shown bool) {
 	c.panelShown = shown
 }
 
+func panelRoute(route string) bool {
+	q, _ := url.ParseQuery(route)
+	return q.Get("panel") != ""
+}
+
 func (c *Controller) url(route string) (string, error) {
-	url, err := c.cfg.CockpitURL(route)
+	u, err := c.cfg.CockpitURL(route)
 	if err != nil {
 		c.cfg.Log("window: %v", err)
 	}
-	return url, err
+	return u, err
 }
