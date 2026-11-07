@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -296,6 +297,22 @@ func (a slowAgent) Ask(ctx context.Context, _ turns.Ask) (turns.Answer, error) {
 		return turns.Answer{}, ctx.Err()
 	}
 	return turns.Answer{JSON: []byte(`{"answer":{"text":"a","tasks":[]}}`)}, nil
+}
+
+func BenchmarkOmniboxSnapshot(b *testing.B) {
+	r := newTasksRig(b, nil)
+	es := make([]task.Task, 5000)
+	for i := range es {
+		es[i] = task.Task{ID: task.ID(fmt.Sprintf("t-%08x", i)), Title: fmt.Sprintf("Task %d", i), State: "next", Category: task.CategoryReady,
+			Units: []unit.Unit{{Provider: unit.GitHub, Key: fmt.Sprintf("acme/api#%d", i)}}}
+	}
+	r.put(b, es...)
+	ctx := context.Background()
+	for b.Loop() {
+		if snap, _, err := r.s.omniboxSnapshot(ctx, r.g); err != nil || len(snap.Tasks) != 5000 {
+			b.Fatalf("%d tasks: %v", len(snap.Tasks), err)
+		}
+	}
 }
 
 func TestAskDropCodesAreTheAPIs(t *testing.T) {
