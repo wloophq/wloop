@@ -46,7 +46,7 @@ var proseClients = []string{"menubar", "tui", "window"}
 // proseDebts are the prose literals each client still quotes outside the catalog, by script or by client
 // package. A count only shrinks: a count above or below the real one fails.
 var proseDebts = map[string]int{
-	"app.js": 164, "tui": 85,
+	"tui": 85,
 }
 
 var (

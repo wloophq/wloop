@@ -1,8 +1,14 @@
 package web
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/i18n"
 )
@@ -180,5 +186,58 @@ const tick = () => new Promise((r) => setTimeout(r, 10));
 	}
 	if got.StaleReads != 1 || got.StaleText != "Abrir o cockpit pt-3" {
 		t.Errorf("an answer older than the latest health is dropped: %+v", got)
+	}
+}
+
+// stringsPrelude sets I18N to locale and the [strings] table of the strings.toml at path.
+func stringsPrelude(t *testing.T, locale, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Strings map[string]any `toml:"strings"`
+	}
+	if err := toml.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	js, err := json.Marshal(doc.Strings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("I18N.locale = %q;\nI18N.strings = %s;\n", locale, js)
+}
+
+func TestAppRendersPtBRChrome(t *testing.T) {
+	prelude := filterPrelude(t) + stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml") + `let activityLoopOnly = false;
+const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event: { kind: "push" } }], explore: { busy: false, error: "", result: null } };
+`
+	var got []string
+	nodeRun(t, prelude, append(slices.Clone(filterFuncs), "rowByKey", "emptyNote", "activityEmptyNote", "exploreStatus", "planWhen", "isSet", "age", "ago", "clearLens"), `
+const flat = (x) => (Array.isArray(x) ? x.map(flat).join("") : x && typeof x === "object" ? Object.values(x).map(flat).join("") : String(x));
+process.stdout.write(JSON.stringify([
+  flat(emptyNote("mine", "")),
+  flat(emptyNote("mine", "waits-on:bob zzz")),
+  flat(emptyNote("mine", "https://github.com/acme/web/pull/3")),
+  flat(activityEmptyNote("")),
+  exploreStatus(),
+  planWhen({ decision: "blocked" }),
+  planWhen({ decision: "pending", default: "wait" }),
+  ago(new Date(Date.now() - 5 * 60000).toISOString()),
+]));`, nil, &got)
+	want := []string{"Nada em My PRs agora.", "Nada em My PRs corresponde a \"waits-on:bob zzz\". Limpar filtros",
+		"acme/web#3 não está no inventário. Explorar Abrir no GitHub", "Nenhum evento do loop na atividade recente.",
+		"A busca só roda quando você aperta Enter ou Buscar; cada uma gasta cerca de 1 ponto da cota por hora do GitHub.",
+		"bloqueado", "espera você", "há 5 min"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	text := strings.Join(got, "\n")
+	for _, english := range []string{"Nothing in", "matches", "Clear filters", "is not in the inventory", "Explore it", "Open it on GitHub",
+		"No loop events", "A search runs only", "blocked", "waits for you", "min ago"} {
+		if strings.Contains(text, english) {
+			t.Errorf("the pt-BR chrome still says %q: %q", english, text)
+		}
 	}
 }

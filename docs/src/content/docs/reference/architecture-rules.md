@@ -89,6 +89,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `Delete` | ✅ | KeyboardEvent.key |
 | `End` | ✅ | KeyboardEvent.key |
 | `Enter` | ✅ | KeyboardEvent.key |
+| `Esc` | ✅ | the Escape key's name as the served bindings spell it |
 | `Escape` | ✅ | KeyboardEvent.key |
 | `GET` | ✅ | an HTTP method |
 | `Home` | ✅ | KeyboardEvent.key |
@@ -96,6 +97,8 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `POST` | ✅ | an HTTP method |
 | `Shift` | ✅ | KeyboardEvent.key |
 | `Tab` | ✅ | KeyboardEvent.key |
+| `noopener noreferrer` | ✅ | a link's rel tokens |
+| `use strict` | ✅ | a script's directive |
 
 ### `TestNoIntentEnumerations`
 

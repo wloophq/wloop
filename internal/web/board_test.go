@@ -213,7 +213,7 @@ const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event
 ]));`, nil, &got)
 	want := [][]any{
 		{`Nothing in Recent matches "zzz".`},
-		{"acme/web#3 is not in the inventory. ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
+		{"acme/web#3 is not in the inventory.", " ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
 		{"No loop events in the recent activity."},
 		{"Nothing happened in the inventory yet."},
 		{`Nothing in My PRs matches "zzz".`},
@@ -316,7 +316,7 @@ func TestRowsShowTheBriefSizeRiskAndQuestions(t *testing.T) {
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }` + "\n" +
 		jsConst(t, appJS(t), "SIZES") + jsConst(t, appJS(t), "RISKS") + jsConst(t, appJS(t), "TAG_CHIPS")
 	var got []any
-	nodeRun(t, prelude, []string{"tagChips", "briefTags"}, `process.stdout.write(JSON.stringify(input.map((b) => briefTags(b))));`, []any{
+	nodeRun(t, prelude+stringsPrelude(t, "en", "../../profiles/default/strings.toml"), []string{"tagChips", "briefTags"}, `process.stdout.write(JSON.stringify(input.map((b) => briefTags(b))));`, []any{
 		map[string]any{"size": "m", "risk": "high", "goal": "g", "open_questions": 2},
 		map[string]any{"size": "xs", "risk": "low", "open_questions": 1},
 		map[string]any{"size": "huge", "risk": "x\" onmouseover=\"y", "open_questions": 0},
@@ -473,7 +473,7 @@ func TestCopiedExploreCandidatesSayWhatTheCardsSay(t *testing.T) {
 	var got string
 	nodeRun(t, keyJS(t)+catalogPrelude(t)+`const state = { rows: [] };
 const rowByKey = () => undefined;`,
-		[]string{"safeURL", "candidateURL", "yamlString", "candidatesYAML"},
+		[]string{"safeURL", "candidateURL", "yamlString", "yamlMap", "candidatesYAML"},
 		`process.stdout.write(JSON.stringify(candidatesYAML(input.meta, input.cands)));`, in, &got)
 	for _, want := range []string{
 		`query: "widgets"`, `read_as: "read \"widgets\" as repo:acme/widgets"`, "count: 1", "pull_requests:",

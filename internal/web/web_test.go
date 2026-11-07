@@ -116,7 +116,7 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
-		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
+		`"continue", t("Continue")`, `"dismiss", t("Dismiss")`, `source: "cockpit"`, "body.option_id",
 		"timelineEvents(d)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("app.js lacks %s", want)
@@ -227,14 +227,15 @@ func TestGuidanceSitsAboveTheActions(t *testing.T) {
 
 func TestRefusalDetailIsNamedAfterTheWorkspaceManager(t *testing.T) {
 	src := appJS(t)
-	if want := `t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details"`; !strings.Contains(src, want) {
+	if want := `it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details")`; !strings.Contains(src, want) {
 		t.Fatalf("app.js lacks %s", want)
 	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
-	script := `const label = (state, t) => t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details";
+	script := `const t = (key, params) => key.replace("{source}", (params || {}).source);
+const label = (state, it) => it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details");
 process.stdout.write(JSON.stringify([label({ health: { workspace_manager: "Orca" } }, { source: "orca" }), label({}, { source: "orca" }), label({ health: {} }, {})]));`
 	out, err := exec.Command(node, "-e", script).Output()
 	if err != nil {
