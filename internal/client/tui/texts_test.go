@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/pelletier/go-toml/v2"
 
@@ -64,4 +65,16 @@ func TestTerminalIsEnglishWithoutStrings(t *testing.T) {
 	if screen := emptyPlanScreen(t, nil); !strings.Contains(screen, "Nothing pending or blocked in the plan.") {
 		t.Errorf("%s", screen)
 	}
+}
+
+func TestRunReadsTheServedStrings(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), strings: &api.Strings{Locale: "pt-BR", Strings: map[string]api.Text{"Plan {n}": {"other": "Plano {n}"}}}}
+		term, done := start(t, d)
+		eventually(t, "the pt-BR plan tab", func() bool { return strings.Contains(term.screen(), "Plano 0") })
+		close(term.keys)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
 }
