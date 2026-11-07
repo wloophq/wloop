@@ -333,6 +333,10 @@
           },
           "type": "array"
         },
+        "language_fact": {
+          "description": "The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's.",
+          "type": "string"
+        },
         "marks": {
           "description": "The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character.",
           "items": {

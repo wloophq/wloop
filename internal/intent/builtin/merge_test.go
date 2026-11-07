@@ -63,3 +63,14 @@ func TestMergeRefusesWhatTheHostCannotRun(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeMapsAPluginsLanguageFact(t *testing.T) {
+	v, err := Merge(sourceOf(t, "acme", "acme", "language_fact = \"acme.language\"\n[[source.facts]]\nname = \"acme.language\"\ntype = \"string\"\ndoc = \"d\"\n"),
+		sourceOf(t, "wiki", "wiki", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v.languageFacts; len(got) != 1 || got["acme"] != "acme.language" {
+		t.Errorf("language facts %v, want acme's alone", got)
+	}
+}
