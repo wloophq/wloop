@@ -80,7 +80,7 @@ description = "Propose a Slack message, or a reaction, to be posted as the user 
 "reaction" = "the emoji name of a react draft, without colons"
 "effects" = "what sending it does besides posting, such as unit.closed for a closing post; empty for none, and none outside the turn's Slack unit"
 "effects[]" = "an effect name your intent lists in drafts.allowed_effects"
-"broadcast" = "a reply in a thread: true to also post it to the conversation, false not to; left out, on in a direct message, where a reply in an older thread does not show, and off in a channel. The user can turn it before approving"
+"broadcast" = "a reply in a thread: true to also post it to the conversation, false not to; left out, the user's default: on in a direct message, where a reply in an older thread does not show, and off in a channel. The user can turn it before approving"
 
 [slack_draft.answers]
 refused = "slack_draft refused: {{.Error}}."

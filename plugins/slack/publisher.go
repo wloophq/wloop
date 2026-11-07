@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/plugins/slack/auth"
@@ -45,8 +47,10 @@ type Publisher struct {
 	People func(ctx context.Context, u unit.Unit) ([]items.Person, error)
 	// Items are the unit's items, whose anchors place a draft on a DM segment.
 	Items func(ctx context.Context, u unit.Unit) ([]items.Item, error)
-	Now   func() time.Time
-	Log   func(format string, args ...any)
+	// Profile reads a file of the plugin's profile layer, DraftsFile among them.
+	Profile func(ctx context.Context, path string) ([]byte, error)
+	Now     func() time.Time
+	Log     func(format string, args ...any)
 }
 
 // plan is where and what a draft posts.
@@ -233,9 +237,8 @@ func (p *Publisher) Takes(target string) bool {
 // no items goes to the conversation, as typing in the DM does.
 //
 // A message that replies in a thread keeps the broadcast its proposer asked
-// for; asked none, it is also posted to a direct message's conversation,
-// where the person would not see a reply to an older thread, and not to a
-// channel's.
+// for; asked none, it takes the one DraftsFile gives a reply the person
+// writes, else the kind of conversation it is in.
 func (p *Publisher) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	var out draft.Placed
 	placed := d
@@ -271,10 +274,53 @@ func (p *Publisher) broadcast(ctx context.Context, d draft.Draft) (draft.Broadca
 		return draft.NoBroadcast, nil
 	case d.Broadcast == draft.BroadcastOn || d.Broadcast == draft.BroadcastOff:
 		return d.Broadcast, nil
-	case pl.res.Direct:
+	}
+	words, err := p.draftWords(ctx)
+	if err != nil {
+		return draft.NoBroadcast, err
+	}
+	on := words.Broadcast.Channel
+	switch {
+	case d.Origin.Kind == draft.OriginUser:
+		on = words.Broadcast.User
+	case pl.res.Kind == "im":
+		on = words.Broadcast.IM
+	case pl.res.Kind == "mpim":
+		on = words.Broadcast.MPIM
+	}
+	if on {
 		return draft.BroadcastOn, nil
 	}
 	return draft.BroadcastOff, nil
+}
+
+// DraftsFile is the plugin's profile file of draft defaults.
+const DraftsFile = "drafts.toml"
+
+type draftWords struct {
+	Broadcast struct {
+		IM      bool `toml:"im"`
+		MPIM    bool `toml:"mpim"`
+		Channel bool `toml:"channel"`
+		User    bool `toml:"user"`
+	} `toml:"broadcast"`
+}
+
+func (p *Publisher) draftWords(ctx context.Context) (draftWords, error) {
+	var w draftWords
+	if p.Profile == nil {
+		return w, fmt.Errorf("the profile layer that holds %s cannot be read", DraftsFile)
+	}
+	raw, err := p.Profile(ctx, DraftsFile)
+	if err != nil {
+		return w, fmt.Errorf("reading %s: %w", DraftsFile, err)
+	}
+	dec := toml.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&w); err != nil {
+		return w, fmt.Errorf("reading %s: %w", DraftsFile, err)
+	}
+	return w, nil
 }
 
 func (p *Publisher) placeTarget(ctx context.Context, d draft.Draft) (string, error) {
@@ -769,5 +815,6 @@ func (p *plugin) publisher() (*Publisher, error) {
 	}
 	s := &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.db, p.log), Known: KnownOver(p.db, p.log)}
 	pub := PublisherOver(p.db, s, p.slack.Tokens.Load, p.host.Items, p.now, p.log)
+	pub.Profile = p.host.Profile
 	return pub, nil
 }

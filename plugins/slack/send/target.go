@@ -96,12 +96,10 @@ func (c KnownConversation) resolved() (Resolved, error) {
 	res := Resolved{Channel: c.ID}
 	switch c.Kind {
 	case "im":
-		res.DMUser = c.DMUser
-		res.Direct = true
+		res.DMUser, res.Kind = c.DMUser, "im"
 		res.Conversation = "@" + cmp.Or(c.DMUserName, c.DMUser)
 	case "mpim":
-		res.Conversation = "group DM"
-		res.Direct = true
+		res.Conversation, res.Kind = "group DM", "mpim"
 	default:
 		if !c.IsMember {
 			return Resolved{}, fmt.Errorf("%w: not a member of #%s (%s)", ErrCannotPost, c.Name, c.ID)

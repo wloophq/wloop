@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/plugins/slack/draft"
@@ -137,5 +138,43 @@ func TestOnlyAThreadReplyHasABroadcast(t *testing.T) {
 	}
 	if post := ps.posted(t); post.Has("thread_ts") || post.Has("reply_broadcast") {
 		t.Fatalf("post %v", post)
+	}
+}
+
+func TestAReplyThePersonWritesInADMThreadDoesNotBroadcastByDefault(t *testing.T) {
+	ps := newPubSlack(t)
+	ps.dmThreads(nil)
+	seg := ps.segmentUnit(t)
+	d := placeAndPublish(t, ps.placing(anchored(seg, "i1", pubDM+"/"+dmTop)), segmentDraft(seg, draft.Reply, draft.OriginUser, "i1"))
+	if d.Broadcast != draft.BroadcastOff {
+		t.Fatalf("broadcast %q", d.Broadcast)
+	}
+	if post := ps.posted(t); post.Get("thread_ts") != dmTop || post.Has("reply_broadcast") {
+		t.Fatalf("post %v", post)
+	}
+}
+
+func TestTheProfileDecidesTheBroadcastDefault(t *testing.T) {
+	ps := newPubSlack(t)
+	ps.dmThreads(nil)
+	ps.f.host.ProfileFiles[DraftsFile] = []byte("[broadcast]\nchannel = true\nuser = true\n")
+	seg := ps.segmentUnit(t)
+	p := ps.placing(anchored(seg, "i1", pubDM+"/"+dmTop))
+	if d := placeOnly(t, p, segmentDraft(seg, draft.Reply, draft.OriginAuto, "i1")); d.Broadcast != draft.BroadcastOff {
+		t.Fatalf("a DM the profile leaves out: %q", d.Broadcast)
+	}
+	if d := placeOnly(t, p, threadDraft(draft.Reply, "on it")); d.Broadcast != draft.BroadcastOn {
+		t.Fatalf("a channel the profile turns on: %q", d.Broadcast)
+	}
+	if d := placeOnly(t, p, segmentDraft(seg, draft.Reply, draft.OriginUser, "i1")); d.Broadcast != draft.BroadcastOn {
+		t.Fatalf("the person's reply the profile turns on: %q", d.Broadcast)
+	}
+}
+
+func TestABadDraftsProfileRefusesToGuess(t *testing.T) {
+	ps := newPubSlack(t)
+	ps.f.host.ProfileFiles[DraftsFile] = []byte("[broadcast]\nim = \"yes\"\n")
+	if _, err := ps.publisher().Place(context.Background(), threadDraft(draft.Reply, "on it")); err == nil || !strings.Contains(err.Error(), DraftsFile) {
+		t.Fatalf("Place = %v", err)
 	}
 }
