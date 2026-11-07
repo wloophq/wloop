@@ -90,6 +90,14 @@ In Claude Desktop, {{name}} creates the session headlessly, imports it into the 
 
 A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout and its dossier, and proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
 
+The same caps count two kinds of calls that are not turns, so no turn row holds them: the dossiers' compaction and closing calls, and the omnibox's agent call. Each reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an event (`dossier_call`, `omnibox_call`); the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
+
+## The omnibox agent call
+
+A request the omnibox cannot resolve on its own (⌘↵, or a sentence no verb or address matches) runs one read-only headless call: no session, no MCP server, no shell and no checkout. The daemon writes a snapshot of the read model into a fresh directory under `<state>/omnibox/`, the open tasks with their units and properties (`tasks.json`), the views (`views.json`) and the repositories the workspace managers know (`repos.json`), and the call may read only that directory with `Read`, `Grep` and `Glob`; the directory is removed when the call returns. The prompt is the profile's `prompts/omnibox.md.tmpl`, around the user's request and the questions already answered, quoted between per-call markers as untrusted data.
+
+The call answers either a list (a text and the ids of the tasks it lists) or a proposal (operations, each with its reason, and one question when something is ambiguous). Tasks and units the snapshot lacks are dropped, and so is every operation the omnibox's vocabulary does not run, each with its reason. Nothing is stored but the call's cost: the proposal is not a gate and resolves none, the client carries a question's answer to the next call, and only the operations the user confirms run, through the same API calls a click makes. Over the day's cap the call answers 429; an agent that fails or answers out of shape, 502; an installed agent with no restricted mode, 503.
+
 ## Dossiers
 
 A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).

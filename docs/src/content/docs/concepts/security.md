@@ -53,6 +53,10 @@ The bundled `task-fold-linked`, `task-relate-linked`, `task-correlate-merge-link
 
 The residual risk is accepted: an injected brief can make an agent clone and trust a repository of an owner you listed. Two limits remain. Start runs only on tasks you captured (`task.captured_by_user`); a task derived from a Slack thread carries other people's text and is refused. And the trusted owners are the ones you list, your own organization.
 
+## The omnibox agent call
+
+A free-text request in the omnibox runs one read-only agent call (see [Turns](/concepts/turns/#the-omnibox-agent-call)). It reads a snapshot of your open tasks, views and repositories in a directory written for that call and removed after it, with `Read`, `Grep` and `Glob` only: no shell, no MCP server, no checkout. Task titles and notes in the snapshot are other people's text, and your request may quote some too, so the prompt marks both as untrusted data. The call writes nothing: its proposal is not a gate and resolves none, it is never stored, and what it proposes runs only when you confirm it in your client, through the same requests a click sends, so a proposed review is drafted and waits for your approval like any other. Proposed tasks and units the snapshot lacks, and operations the omnibox's vocabulary does not run, are dropped before you see them. Its cost counts against `headless.per_call_usd` and `headless.per_day_usd`.
+
 ## What agents read from Slack
 
 Every agent session the MCP server serves reads Slack as you, within what your user token can read:

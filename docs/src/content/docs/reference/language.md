@@ -975,6 +975,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `dossier_restored`: A dossier file restored.
   - `dossier_granted`: A dossier granted to a session.
   - `dossier_call`: A dossier compaction call, with its cost.
+  - `omnibox_call`: An omnibox agent call, with its cost.
   - `brief_waiting`: A request waiting for its brief.
   - `intake_accepted`: A request accepted.
   - `intake_briefing`: A request waiting for its brief.

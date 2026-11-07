@@ -78,6 +78,9 @@ label = "dossier granted to the session"
 [events.dossier_call]
 label = "dossier compaction, US$"
 
+[events.omnibox_call]
+label = "omnibox agent call, US$"
+
 [events.brief_waiting]
 label = "waiting for the brief"
 

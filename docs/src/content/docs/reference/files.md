@@ -32,6 +32,7 @@ description: Where the configuration, the state, the logs and the installed piec
 | `dossiers/` | the dossiers and their archives (mode 0700) |
 | `headless/` | the empty directory headless turns run in |
 | `brief/` | the empty directory brief calls run in |
+| `omnibox/` | the directory omnibox agent calls run in, holding each call's read-model snapshot (`ask-*/`) while it runs |
 | `worktrees/<repo>/<name>/` | the worktrees of the Claude Desktop workspaces, which {{name}} creates and removes |
 | `serve.out.log`, `serve.err.log` | the daemon's output under its LaunchAgent |
 | `app.out.log`, `app.err.log` | the menu bar's output |

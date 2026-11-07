@@ -32,6 +32,7 @@ var EventKinds = []Value{
 	{Name: "dossier_restored", Doc: "A dossier file restored."},
 	{Name: "dossier_granted", Doc: "A dossier granted to a session."},
 	{Name: "dossier_call", Doc: "A dossier compaction call, with its cost."},
+	{Name: "omnibox_call", Doc: "An omnibox agent call, with its cost."},
 	{Name: "brief_waiting", Doc: "A request waiting for its brief."},
 	{Name: "intake_accepted", Doc: "A request accepted."},
 	{Name: "intake_briefing", Doc: "A request waiting for its brief."},
