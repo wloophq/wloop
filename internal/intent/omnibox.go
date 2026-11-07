@@ -65,6 +65,8 @@ type mSearchGroup struct {
 type omniboxLoad struct {
 	def     OmniboxDef
 	viewsAt []ref
+	// vocabulary are the actions the bundled file's verbs name, which a plugin may offer or not.
+	vocabulary []string
 }
 
 // loadOmnibox reads omnibox.toml from bundled and the user's layers: a higher layer's key replaces a lower
@@ -79,6 +81,13 @@ func (l *omniboxLoad) merge(file string, src []byte) Problems {
 	m, problems, _, complete := decode[mOmnibox](file, src)
 	if !complete {
 		return problems
+	}
+	if file == OmniboxFile {
+		for _, v := range m.Verbs {
+			if v.Action != nil {
+				l.vocabulary = append(l.vocabulary, strings.TrimSpace(*v.Action))
+			}
+		}
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
 	if sr := m.Search; sr != nil {
@@ -177,8 +186,9 @@ func (l *omniboxLoad) checkVerbs(tasks TasksDef, actions []string) Problems {
 		case v.Action != "" && slices.Contains(builtin.GatedActions, v.Action):
 			out = append(out, v.actionAt.problem(path+".action", "%s resolves a gate or posts, which only the user does on its draft or plan", v.Action))
 			continue
-		case v.Action != "" && !slices.Contains(actions, v.Action) && v.actionAt.file == OmniboxFile:
-			// A bundled verb whose action no enabled plugin offers leaves the omnibox, as the plugin's rows do.
+		case v.Action != "" && !slices.Contains(actions, v.Action) && slices.Contains(l.vocabulary, v.Action):
+			// A verb on an action of the bundled vocabulary that no enabled plugin offers leaves the omnibox, as
+			// the plugin's rows do, whichever layer declares it.
 			continue
 		case v.Action != "" && !slices.Contains(actions, v.Action):
 			out = append(out, v.actionAt.problem(path+".action", "%s is no catalog action%s", v.Action, expr.DidYouMean(v.Action, actions)))

@@ -1,7 +1,10 @@
 package intent_test
 
 import (
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -103,6 +106,51 @@ func TestABundledVerbWhosePluginIsAbsentIsLeftOutQuietly(t *testing.T) {
 	}
 	if !slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "capture" }) {
 		t.Fatal("capture left out")
+	}
+}
+
+func TestAUserCopyOfTheBundledVerbsLoadsWithNoPlugin(t *testing.T) {
+	bundled, err := fs.ReadFile(turn.BundledFS(), intentload.OmniboxFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, intentload.OmniboxFile), bundled, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	user := "[verbs.mine]\nwords = [\"mine\"]\naction = \"revieww\"\n"
+	layers := []profile.Layer{{Name: "bundled", Source: "embedded"}, {Name: "user", Source: dir, Dir: dir}}
+	l, problems := intentload.Load(layers, turn.BundledFS(), base, turn.CheckTemplate)
+	if len(problems) > 0 {
+		t.Fatalf("an unchanged copy with no plugin enabled: %v", problems)
+	}
+	if slices.ContainsFunc(l.Omnibox.Verbs, func(v intentload.OmniboxVerbDef) bool { return v.ID == "review" }) {
+		t.Fatal("review loaded with no plugin offering it")
+	}
+	if err := os.WriteFile(filepath.Join(dir, intentload.OmniboxFile), append(bundled, "\n"+user...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, problems = intentload.Load(layers, turn.BundledFS(), base, turn.CheckTemplate)
+	if _, ok := problemAt(problems, "verbs.mine.action", "no catalog action"); !ok {
+		t.Fatalf("an action no plugin or vocabulary knows is not a problem: %v", problems)
+	}
+}
+
+func TestEveryBuiltinActionIsGatedOrSafe(t *testing.T) {
+	for _, id := range builtin.BuiltinActionIDs {
+		gated, safe := slices.Contains(builtin.GatedActions, id), slices.Contains(builtin.SafeActions, id)
+		if gated == safe {
+			t.Errorf("%s: gated %v, safe %v; classify it in exactly one of builtin.GatedActions and builtin.SafeActions", id, gated, safe)
+		}
+	}
+	for _, id := range slices.Concat(builtin.GatedActions, builtin.SafeActions) {
+		if !slices.Contains(builtin.BuiltinActionIDs, id) {
+			t.Errorf("%s is classified but is no built-in action", id)
+		}
 	}
 }
 

@@ -28,6 +28,12 @@ func OmniboxOps() []Value {
 // resolved by the user on the gate itself.
 var GateHandlers = []string{"approve", "answer", "edit", "retry", "drop"}
 
-// GatedActions are the built-in actions that resolve a gate or post, which no omnibox verb runs: each is the
-// user's on the draft or the plan it acts on, behind its own confirmation.
-var GatedActions = []string{"draft.edit", "draft.retry", "draft.close-silently", "draft.skip-workflow", "plan_apply", "plan_dismiss"}
+// GatedActions are the built-in actions that resolve a gate, post or discard unpublished work, which no
+// omnibox verb runs: each is the user's on the draft, plan or workspace it acts on, behind its own
+// confirmation.
+var GatedActions = []string{"draft.edit", "draft.retry", "draft.close-silently", "draft.skip-workflow", "plan_apply", "plan_dismiss", "remove_force"}
+
+// SafeActions are the other built-in actions, which an omnibox verb may run. Every built-in action is in
+// exactly one of GatedActions and SafeActions.
+var SafeActions = []string{"take_over", "pause", "resume", "mute", "unmute", "track", "untrack", "open", "remove",
+	"brief_refresh", "intake_without", "intake_cancel", "plan_guide", "run.open", "run.enter", "run.transcript"}
