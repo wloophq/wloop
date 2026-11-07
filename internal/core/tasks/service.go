@@ -312,7 +312,7 @@ func (s *Service) WakeOf(ctx context.Context, id task.ID) (wake.Wake, bool, erro
 	if s.d.Wakes == nil {
 		return wake.Wake{}, false, nil
 	}
-	return s.d.Wakes.Of(ctx, id)
+	return WakeIn(ctx, s.d.Wakes, id)
 }
 
 func (s *Service) applyWake(ctx context.Context, id task.ID, wc wakeChange) error {

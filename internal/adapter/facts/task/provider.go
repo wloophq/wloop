@@ -129,9 +129,7 @@ type Wakes interface {
 }
 
 // AllWakes is an optional capability of Wakes: every task's wake, which a pass reads once for all.
-type AllWakes interface {
-	All(ctx context.Context) ([]wake.Wake, error)
-}
+type AllWakes = coretasks.AllWakes
 
 // Provider is the task subject's facts provider. It names the task's own
 // unit as the subject's owner and wakes the sweep at the next check_on, or
@@ -816,18 +814,7 @@ func (p *Provider) gates(ctx context.Context, id task.ID) ([]gate.Gate, error) {
 
 // wake is task id's wake; in a pass, every task's is read once.
 func (p *Provider) wake(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
-	var all func() (map[task.ID]wake.Wake, error)
-	if a, ok := p.d.Wakes.(AllWakes); ok {
-		all = func() (map[task.ID]wake.Wake, error) {
-			ws, err := a.All(ctx)
-			out := make(map[task.ID]wake.Wake, len(ws))
-			for _, w := range ws {
-				out[w.Task] = w
-			}
-			return out, err
-		}
-	}
-	return coretasks.Lookup(ctx, passWakes, id, all, func() (wake.Wake, bool, error) { return p.d.Wakes.Of(ctx, id) })
+	return coretasks.WakeIn(ctx, p.d.Wakes, id)
 }
 
 // What every task's facts read of the store as a whole, once per pass.
@@ -836,7 +823,6 @@ const (
 	passTurns     = "facts.turns"
 	passGates     = "facts.gates"
 	passSettled   = "facts.settled."
-	passWakes     = "facts.wakes"
 	passTask      = "facts.task."
 )
 

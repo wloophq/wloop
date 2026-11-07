@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/wakes/wakestest"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -145,6 +146,56 @@ func BenchmarkScreen(b *testing.B) {
 				r.screen(b)
 			}
 		})
+	}
+}
+
+// countedWakes are wakes that count their reads, one by one and all at once.
+type countedWakes struct {
+	*wakestest.Store
+	ones, alls int
+}
+
+func (w *countedWakes) Of(ctx context.Context, id task.ID) (wake.Wake, bool, error) {
+	w.ones++
+	return w.Store.Of(ctx, id)
+}
+
+func (w *countedWakes) All(ctx context.Context) ([]wake.Wake, error) {
+	w.alls++
+	var out []wake.Wake
+	for _, id := range []task.ID{"in-1", "nx-1", "nx-2", "wt-1"} {
+		if got, ok, err := w.Store.Of(ctx, id); err != nil || ok {
+			out = append(out, got)
+		}
+	}
+	return out, nil
+}
+
+func TestTheWakesOfAPassAreReadOnce(t *testing.T) {
+	r := newSetsRig()
+	r.seed(t)
+	ws := &countedWakes{Store: wakestest.NewStore()}
+	until := t0.Add(48 * time.Hour)
+	if err := ws.Put(context.Background(), wake.Wake{Task: "nx-2", Until: until}); err != nil {
+		t.Fatal(err)
+	}
+	svc := coretasks.New(coretasks.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock,
+		States: taskstest.BundledStates, Wakes: ws, Views: r.lens.Views, ViewEval: r.lens.Eval})
+	keep := func(ctx context.Context, e task.Task) (bool, error) {
+		w, ok, err := svc.WakeOf(ctx, e.ID)
+		if err == nil && (ok != (e.ID == "nx-2") || ok && !w.Until.Equal(until)) {
+			t.Errorf("%s: %+v %v", e.ID, w, ok)
+		}
+		return true, err
+	}
+	if _, err := svc.Sets(context.Background(), []task.View{"inbox", "ready", "waiting"}, keep); err != nil {
+		t.Fatal(err)
+	}
+	if ws.alls != 1 || ws.ones != 0 {
+		t.Fatalf("read all %d times and one by one %d times, want all once", ws.alls, ws.ones)
+	}
+	if _, _, err := svc.WakeOf(context.Background(), "nx-2"); err != nil || ws.ones != 1 {
+		t.Fatalf("outside a pass: %v, %d reads", err, ws.ones)
 	}
 }
 
