@@ -844,7 +844,9 @@ type taskViewer struct {
 	detail   bool
 	children map[task.ID][]task.ID
 	drafts   []draft.Draft
-	status   map[task.ID]coretasks.ProjectState
+	// pending are the ids of openDrafts by the task they serve, read once per page.
+	pending map[string][]int64
+	status  map[task.ID]coretasks.ProjectState
 	// briefs are the brief records by unit, read once per page.
 	briefs map[unit.Unit]port.Event
 	// rows are the read model's rows of the units read, each read once: a page reads its tasks' in one
