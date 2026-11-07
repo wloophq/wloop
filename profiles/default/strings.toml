@@ -557,6 +557,7 @@
 "Today's spend cap for agent calls is reached; ask again tomorrow" = "Today's spend cap for agent calls is reached; ask again tomorrow"
 "No agent here can answer from the omnibox: {error}" = "No agent here can answer from the omnibox: {error}"
 "The agent could not answer: {error}" = "The agent could not answer: {error}"
+"The agent took too long to answer; nothing changed" = "The agent took too long to answer; nothing changed"
 "This daemon runs no omnibox agent" = "This daemon runs no omnibox agent"
 # Why the omnibox dropped an operation the agent proposed, by its code.
 "unknown_operation" = "The omnibox does not run {op}"

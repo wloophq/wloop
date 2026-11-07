@@ -166,6 +166,15 @@ func TestAskAgentFails(t *testing.T) {
 	assertOnlyTheCost(t, r, before)
 }
 
+func TestAskPastItsDeadlineIsAGatewayTimeout(t *testing.T) {
+	r := newAskRig(t, "")
+	r.agent.err = context.DeadlineExceeded
+	rec := post(t, r.s, api.OmniboxAskPath, `{"text":"x"}`)
+	if rec.Code != 504 || !strings.Contains(rec.Body.String(), api.OmniboxAskTimedOut) || callEvents(t, r.db) != 1 {
+		t.Fatalf("%d %s, %d cost events", rec.Code, rec.Body, callEvents(t, r.db))
+	}
+}
+
 func TestAskUnfitAnswerIsABadGateway(t *testing.T) {
 	r := newAskRig(t, `{"answer":{"text":"a","tasks":[]},"proposal":{"summary":"s","operations":[]}}`)
 	if rec := post(t, r.s, api.OmniboxAskPath, `{"text":"x"}`); rec.Code != 502 {

@@ -12,9 +12,10 @@ const (
 
 // The errors OmniboxAskPath answers, keys of the client strings the daemon words in the loaded locale.
 const (
-	OmniboxAskEmpty   = "Type what to ask the agent"
-	OmniboxAskOverCap = "Today's spend cap for agent calls is reached; ask again tomorrow"
-	OmniboxAskNoAgent = "No agent here can answer from the omnibox: {error}"
-	OmniboxAskFailed  = "The agent could not answer: {error}"
-	OmniboxAskUnwired = "This daemon runs no omnibox agent"
+	OmniboxAskEmpty    = "Type what to ask the agent"
+	OmniboxAskOverCap  = "Today's spend cap for agent calls is reached; ask again tomorrow"
+	OmniboxAskNoAgent  = "No agent here can answer from the omnibox: {error}"
+	OmniboxAskFailed   = "The agent could not answer: {error}"
+	OmniboxAskTimedOut = "The agent took too long to answer; nothing changed"
+	OmniboxAskUnwired  = "This daemon runs no omnibox agent"
 )

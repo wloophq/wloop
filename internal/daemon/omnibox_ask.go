@@ -51,6 +51,8 @@ func (s *Server) handleOmniboxAsk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusTooManyRequests, s.word(api.OmniboxAskOverCap, nil))
 	case errors.Is(err, turns.ErrNoRestricted), errors.Is(err, turns.ErrNoAgent):
 		writeError(w, http.StatusServiceUnavailable, s.word(api.OmniboxAskNoAgent, map[string]any{"error": err.Error()}))
+	case errors.Is(err, context.DeadlineExceeded):
+		writeError(w, http.StatusGatewayTimeout, s.word(api.OmniboxAskTimedOut, nil))
 	case err != nil:
 		writeError(w, http.StatusBadGateway, s.word(api.OmniboxAskFailed, map[string]any{"error": err.Error()}))
 	default:
