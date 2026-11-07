@@ -172,6 +172,15 @@ func TestNotifyTextResolvesPerLocale(t *testing.T) {
 	if _, err := l.ProfileFile("workflows/answer-unread/absent.md.tmpl"); err == nil {
 		t.Error("an absent file resolved")
 	}
+	drift := userDir(t, map[string]string{"locales/pt-BR/" + rel: "Oi {{.Bogus}}"})
+	_, problems := LoadIn("pt-BR", userLayer(drift), bundled, testBase(), nil)
+	var hit bool
+	for _, p := range problems {
+		hit = hit || strings.HasSuffix(p.File, filepath.FromSlash("locales/pt-BR/"+rel)) && strings.Contains(p.Msg, ".Bogus")
+	}
+	if !hit {
+		t.Errorf("a translation naming a field its English text does not: %v", problems)
+	}
 }
 
 func TestCacheReloadsWhenTheLocaleChanges(t *testing.T) {
