@@ -581,6 +581,16 @@
             "description": "The name people read in the list of views. Required.",
             "type": "string"
           },
+          "layout": {
+            "default": "list",
+            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists.",
+            "enum": [
+              "list",
+              "board",
+              "outbox"
+            ],
+            "type": "string"
+          },
           "over": {
             "default": "tasks",
             "description": "What the view lists: tasks, or gates.",

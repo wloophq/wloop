@@ -13,6 +13,7 @@ func routesPrelude(t *testing.T) string {
 	b.WriteString(`const window = { addEventListener() {} };` + "\n")
 	b.WriteString(staticJS(t, "row.js"))
 	b.WriteString(staticJS(t, "routes.js"))
+	b.WriteString(staticJS(t, "outbox.js"))
 	b.WriteString(staticJS(t, "views.js"))
 	b.WriteString(staticJS(t, "toolbar.js"))
 	b.WriteString(taskLensJS(t))

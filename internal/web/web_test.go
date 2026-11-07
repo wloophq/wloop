@@ -172,7 +172,7 @@ func TestCockpitHasTheStalledBoard(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js":    {"function renderBoard", "layout: route.layout", `f.id === "lane"`, `"aria-pressed"`},
-		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "detail"]`},
+		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "list", "detail"]`},
 		"/":                 {`id="board"`},
 		"/static/app.css":   {".board", ".card", ".lane-head"},
 	} {

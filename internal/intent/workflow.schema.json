@@ -143,6 +143,21 @@
       "description": "Evaluation order, lowest first.",
       "type": "integer"
     },
+    "outbox": {
+      "additionalProperties": false,
+      "description": "How the Outbox heads the group of the drafts the workflow proposed.",
+      "properties": {
+        "about": {
+          "description": "One line under the title on when the workflow drafts them, such as \"Drafted when a conversation where you asked something goes quiet.\"",
+          "type": "string"
+        },
+        "title": {
+          "description": "The group's title, what the drafts are for, such as \"Ask who hasn't answered\"; the summary when absent.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "provider": {
       "description": "The provider of the units it matches. Required.",
       "enum": [

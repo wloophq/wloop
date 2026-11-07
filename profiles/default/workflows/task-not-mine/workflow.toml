@@ -12,3 +12,7 @@ actors = ["person", "agent"]
 use = "draft.propose"
 purpose = "redirect"
 delivery = "message"
+
+[outbox]
+title = "Point the asker elsewhere"
+about = "Drafted when you say a task is not yours."

@@ -186,10 +186,35 @@ function draftWhere(d) {
   return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
 }
 
+// catalogWords is the served views catalog, which holds the profile's draft words; empty before it loads.
+function catalogWords() {
+  return (typeof tasksState === "object" && tasksState.catalog) || {};
+}
+
 // draftEffects are the profile's sentences for what sending d does besides posting it.
 function draftEffects(d) {
-  const words = (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.effects) || {};
+  const words = catalogWords().effects || {};
   return (d.effects || []).map((x) => words[x]).filter(Boolean);
+}
+
+// draftContextView is what a draft answers: its task's asks, each with the quotes its brief keeps, and the items
+// it is about, each with where it stands.
+function draftContextView(c) {
+  const asks = c.asks || [];
+  const items = c.items || [];
+  if (!asks.length && !items.length) return null;
+  return h("div", { class: "d-context" },
+    ...asks.map((a) => h("div", { class: "ask" },
+      h("div", { class: "ask-head" }, a.summary, a.asker ? h("span", { class: "who" }, " · " + a.asker) : null),
+      ...(a.quotes || []).map((q) => h("blockquote", { class: "quote" }, q)))),
+    ...items.map((it) => h("div", { class: "item" }, h("span", { class: "st st-" + it.state }, itemStateWord(it.state)), " ", it.summary || it.id)));
+}
+
+// itemStateWord is the word for an item's state, open or resolved.
+function itemStateWord(st) {
+  if (st === "open") return t("open");
+  if (st === "resolved") return t("resolved");
+  return st;
 }
 
 // draftLinks link d to its task, when the card is not on it, and to its unit at the source.
@@ -261,17 +286,21 @@ function gateDraftButtons(e, d, scope, editing) {
 
 // draftCard is draft d on task e: where it posts and in what language, its text as posted, why it was drafted,
 // what sending it does, its window, its actions and links to its task and its unit. On d's own task its
-// actions are the task's verbs, elsewhere its gate's intents.
+// actions are the task's verbs, elsewhere its gate's intents. opts.context, an Outbox draft's, adds what it
+// answers.
 function draftCard(e, d, opts = {}) {
   const scope = opts.scope || "detail";
   const own = !!e && isDraftTask(e) && draftOf(e).id === d.id;
   const key = own ? e.id : "draft:" + d.id;
   const editing = detailState.editing.has(key);
-  const purpose = (d.purpose || "").replaceAll("_", " ").trim();
-  const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (d.state && d.state !== "held" ? ` (${d.state})` : "");
+  const words = catalogWords();
+  const purpose = d.purpose ? (words.draft_purposes || {})[d.purpose] || d.purpose : "";
+  const st = d.state && d.state !== "held" ? (words.draft_states || {})[d.state] || d.state : "";
+  const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st})` : "");
   const effects = draftEffects(d);
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),
+    opts.context ? draftContextView(opts.context) : null,
     draftWhere(d),
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),

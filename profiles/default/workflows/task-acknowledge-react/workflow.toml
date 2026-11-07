@@ -14,3 +14,7 @@ purpose = "acknowledge"
 delivery = "reaction"
 reaction = "eyes"
 target = "item"
+
+[outbox]
+title = "Show you're on it"
+about = "Drafted when you acknowledge a task without a time: a reaction on its ask."

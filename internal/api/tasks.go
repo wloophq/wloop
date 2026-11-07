@@ -165,6 +165,10 @@ type ViewsCatalog struct {
 	// the sentence that says what each effect does when a draft is sent, by effect name (gates.toml's effects).
 	DetailVerbs []string          `json:"detail_verbs"`
 	Effects     map[string]string `json:"effects"`
+	// DraftPurposes name what a draft is for, by purpose, and DraftStates where its delivery stands, by state
+	// (gates.toml's drafts.purposes and drafts.states).
+	DraftPurposes map[string]string `json:"draft_purposes"`
+	DraftStates   map[string]string `json:"draft_states"`
 	// Version changes whenever anything above does.
 	Version string `json:"version,omitempty"`
 }
@@ -188,6 +192,8 @@ type TaskViewSpec struct {
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
 	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
 	Rail bool `json:"rail"`
+	// Layout is how the cockpit draws the view: list, board or outbox.
+	Layout string `json:"layout,omitempty"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.

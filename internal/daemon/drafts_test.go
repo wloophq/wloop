@@ -129,7 +129,7 @@ type outboxRig struct {
 
 // newOutboxRig serves the Outbox over the tasks rig: github publishes through fx, slack is a plugin with no
 // publisher, and off names the plugins that are disabled.
-func newOutboxRig(t *testing.T, off ...unit.ProviderID) *outboxRig {
+func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	t.Helper()
 	r := &outboxRig{fx: &fakeFx{}, clock: &moveClock{now: tasksNow}}
 	r.tasksRig = newTasksRig(t, func(d *Deps) {

@@ -1,1 +1,5 @@
 summary = "Cutucar quem o pull request aberto de outra pessoa espera depois de um longo silêncio"
+
+[outbox]
+title = "Cutucar depois de um longo silêncio"
+about = "Rascunhado quando o pull request aberto de outra pessoa fica quieto por semanas."

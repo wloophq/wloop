@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/fs"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -101,6 +102,13 @@ func nonNil[T any](v []T) []T {
 		return []T{}
 	}
 	return v
+}
+
+// nonNilMap is a copy of m, empty for nil.
+func nonNilMap[K comparable, V any](m map[K]V) map[K]V {
+	out := make(map[K]V, len(m))
+	maps.Copy(out, m)
+	return out
 }
 
 // bookUnit is the unit of the book k finds.

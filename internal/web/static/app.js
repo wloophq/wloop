@@ -775,9 +775,16 @@ function lensOf(route) {
   const provider = core ? "" : (catalog.views.find((v) => v.id === view) || {}).provider || "";
   const specs = core ? ((typeof tasksState === "object" && tasksState.catalog) || {}).facets || [] : catalog.specs;
   const strip = viewStrip(view);
-  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
+  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || servedLayout(view), tk, done,
     fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view),
     specs, provider, words: rowWords(provider), strip: (strip || {}).id || "", stripSpec: strip };
+}
+
+// servedLayout is the layout the profile draws a core view in when the hash names none: "board", or "" for
+// its list.
+function servedLayout(view) {
+  const spec = typeof viewSpec === "function" ? viewSpec(view) : null;
+  return spec && spec.layout === "board" ? "board" : "";
 }
 
 // rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.

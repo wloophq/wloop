@@ -102,7 +102,7 @@ func mixedTasks() []api.TaskView {
 // taskLensFuncs are app.js's lens functions a task view runs, with what they call.
 var taskLensFuncs = []string{"tokens", "unquote", "terms", "fieldById", "tagKeyField", "groupField", "tagKeys", "normValue", "qualifierOf", "qualifiers", "qualifierToken",
 	"toggledQualifier", "withoutQualifiers", "haystack", "matches", "itemValues", "itemKey", "filtersOf", "passesFilters", "parseSort", "lensFields", "fieldsFor",
-	"viewSource", "offeredFields", "viewGroupField", "defaultSortLabel", "lensOf", "lensPicks", "effectiveGroup", "cmp", "keyRank", "keyOrder", "compareItems",
+	"viewSource", "offeredFields", "viewGroupField", "defaultSortLabel", "lensOf", "servedLayout", "lensPicks", "effectiveGroup", "cmp", "keyRank", "keyOrder", "compareItems",
 	"groupLabel", "groupItems", "pipelineOf", "groupedRows", "groupQualifier", "onlyThis", "multiCopy",
 	"boardGroupField", "lensWords", "fillWord", "lane", "rowByKey", "hashString",
 	"viewStrip", "stripSpec", "stripColor", "stripOf", "stripDot", "listYAML", "copyEntry", "yamlString", "inView"}

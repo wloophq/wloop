@@ -547,6 +547,14 @@
 "{unit} is not in the inventory." = "{unit} is not in the inventory."
 # piece C
 "Read all" = "Read all"
+"Could not load the Outbox: {error}" = "Could not load the Outbox: {error}"
+"{n} draft" = { one = "{n} draft", other = "{n} drafts" }
+"Stop drafting these" = "Stop drafting these"
+"Stop this workflow" = "Stop this workflow"
+"Keep it" = "Keep it"
+"Stopped {workflow}" = "Stopped {workflow}"
+"open" = "open"
+"resolved" = "resolved"
 # piece B11
 # The omnibox agent call's errors.
 "Type what to ask the agent" = "Type what to ask the agent"

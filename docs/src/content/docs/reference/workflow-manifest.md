@@ -90,6 +90,9 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
 | `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
 | `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
+| `outbox` | table |  | How the Outbox heads the group of the drafts the workflow proposed. |
+| `outbox.title` | string, localized |  | The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent. |
+| `outbox.about` | string, localized |  | One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet." |
 
 ## Steps
 

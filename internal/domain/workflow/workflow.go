@@ -292,6 +292,14 @@ type Workflow struct {
 	WithdrawReason string
 	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
 	Ask *template.Template
+	// Outbox is how the Outbox names the group of the drafts the workflow proposed.
+	Outbox Outbox
+}
+
+// Outbox is the head of a workflow's group of drafts in the Outbox: its title and one line on why the
+// workflow drafts them.
+type Outbox struct {
+	Title, About string
 }
 
 // AskData is what a workflow's Ask renders: its unit as people read it and

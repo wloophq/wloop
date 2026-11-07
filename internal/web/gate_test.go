@@ -304,5 +304,17 @@ func TestADraftCardNamesItsMentions(t *testing.T) {
 }
 
 func TestADraftCardNamesItsPurposeAndStateInWords(t *testing.T) {
-	t.Skip("C8 serve draft purpose and state words")
+	var got []string
+	failed := pendingDraft()
+	failed.Purpose, failed.State = "nudge_once", "failed"
+	held := pendingDraft()
+	held.Purpose = "close_quietly"
+	cat := taskCatalog()
+	cat.DraftPurposes = map[string]string{"nudge_once": "Nudge once"}
+	cat.DraftStates = map[string]string{"failed": "failed to send", "held": "waiting for you"}
+	runGate(t, `done([input.failed, input.held].map((d) => cls(draft(d), "d-sub")[0].textContent));`,
+		map[string]any{"failed": failed, "held": held, "catalog": cat}, &got)
+	if want := []string{"Draft Nudge once (failed to send)", "Draft close_quietly"}; !slices.Equal(got, want) {
+		t.Errorf("draft heads %q, want %q: the profile's words, the purpose as named when it has none, and no state while held", got, want)
+	}
 }

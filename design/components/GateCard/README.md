@@ -15,12 +15,12 @@ An `article.ask.d-gate` on `raise`, `rule-strong` border, `radius-lg`:
 
 ## Draft
 
-A `section.d-draft` on `raise`: its purpose and state as the heading; where it posts and the language its text is written in (by name, `Intl.DisplayNames`); the text as it will be posted (markdown); why it was drafted; what sending it does besides posting, one sentence per effect from `gates.toml`'s `[effects]`; the window line when its gate has one; its actions; links to its task and to its unit at the source.
+A `section.d-draft` on `raise`: its purpose and, once it left your hands, its state as the heading, in the words of `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` (a purpose with no word shows as named); in the Outbox, what it answers (the [OutboxGroup](../OutboxGroup/README.md) context block); where it posts and the language its text is written in (by name, `Intl.DisplayNames`); the text as it will be posted (markdown); why it was drafted; what sending it does besides posting, one sentence per effect from `gates.toml`'s `[effects]`; the window line when its gate has one; its actions; links to its task and to its unit at the source.
 
 On a draft's own task its actions are the task's verbs (approve, edit, discard, retry); on any other task, its gate's intents. **Close without a message** and **Don't nudge this conversation** show only when the draft serves them among its actions, off with their reason when refused.
 
 ## Consumer provides
-The gate as the daemon serves it: kind, text, subject, delivery, deadline and default, and its intents with their labels, in the order of the profile's `gates.toml`. The draft as `GET /api/drafts` serves it, with its why, language, effects, gate, intents and actions; the catalog's `effects`.
+The gate as the daemon serves it: kind, text, subject, delivery, deadline and default, and its intents with their labels, in the order of the profile's `gates.toml`. The draft as `GET /api/drafts` serves it, with its why, language, effects, gate, intents and actions; the catalog's `effects`, `draft_purposes` and `draft_states`.
 
 ## Do / don't
 - Do take the intents, their labels and their order from the gate; never name a gate kind or an intent in the client.

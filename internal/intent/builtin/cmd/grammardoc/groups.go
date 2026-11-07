@@ -38,7 +38,7 @@ var groups = map[builtin.Surface][]group{
 		{"When it is planned", []string{"trigger", "observe", "limits"}},
 		{"Steps", []string{"step"}},
 		{"Gate approval", []string{"ask", "gates"}},
-		{"Drafts", []string{"drafts"}},
+		{"Drafts", []string{"drafts", "outbox"}},
 	},
 	builtin.SurfaceConfig: {
 		{"Agent and workspaces", []string{"profile", "agent", "agent_home", "agent_models", "projects_dir", "workspace_managers", "intents"}},

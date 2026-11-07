@@ -35,6 +35,9 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "drafts.withdraw", In: SurfaceWorkflow, Kind: KindTable, Doc: "When an open draft the workflow proposed is withdrawn."},
 	{Path: "drafts.withdraw.when", In: SurfaceWorkflow, Kind: KindPred, Doc: "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's."},
 	{Path: "drafts.withdraw.reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the withdrawn draft stores."},
+	{Path: "outbox", In: SurfaceWorkflow, Kind: KindTable, Doc: "How the Outbox heads the group of the drafts the workflow proposed."},
+	{Path: "outbox.title", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "The group's title, what the drafts are for, such as \"Ask who hasn't answered\"; the summary when absent."},
+	{Path: "outbox.about", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "One line under the title on when the workflow drafts them, such as \"Drafted when a conversation where you asked something goes quiet.\""},
 })
 
 func withdrawValues() []Value {

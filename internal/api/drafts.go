@@ -78,6 +78,42 @@ type Draft struct {
 	ItemDetails []ItemView `json:"item_details,omitempty"`
 }
 
+// OutboxPage is the Outbox's drafts in groups, the largest first, then by title.
+type OutboxPage struct {
+	Groups []OutboxGroup `json:"groups"`
+}
+
+// OutboxGroup is the drafts one workflow proposed (Workflow its name), else those of one Purpose no workflow
+// proposed, else those written by hand (both ""). Title and About are the profile's words for it, in the
+// served locale.
+type OutboxGroup struct {
+	Workflow string        `json:"workflow,omitempty"`
+	Purpose  string        `json:"purpose,omitempty"`
+	Title    string        `json:"title"`
+	About    string        `json:"about,omitempty"`
+	Drafts   []OutboxDraft `json:"drafts"`
+}
+
+// OutboxDraft is a draft with what a person reads to decide on it.
+type OutboxDraft struct {
+	Draft
+	Context DraftContext `json:"context"`
+}
+
+// DraftContext is what a draft answers: the asks of its task, with their quotes, and the items it is about,
+// with where each stands.
+type DraftContext struct {
+	Asks  []AskView    `json:"asks"`
+	Items []OutboxItem `json:"items"`
+}
+
+// OutboxItem is an item a draft is about.
+type OutboxItem struct {
+	ID      string `json:"id"`
+	Summary string `json:"summary"`
+	State   string `json:"state"`
+}
+
 type DraftOrigin struct {
 	Kind     string `json:"kind"`
 	TurnSeq  int64  `json:"turn_seq"`

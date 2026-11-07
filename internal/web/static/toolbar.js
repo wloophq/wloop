@@ -213,7 +213,7 @@ function lensToolbar(lens, res) {
     stripLegend(lens, offered),
     h("span", { class: "lens-count" }, res ? t("{shown} of {total}", { shown: fmtNumber(res.shown), total: fmtNumber(res.total) }) : ""),
     lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, t("Clear")) : null,
-    h("div", { class: "seg", role: "group", "aria-label": t("Layout") }, toggle("", t("List")), toggle("board", t("Board"))),
+    h("div", { class: "seg", role: "group", "aria-label": t("Layout") }, toggle(servedLayout(lens.view) === "board" ? "list" : "", t("List")), toggle("board", t("Board"))),
     h("button", {
       type: "button", class: "pill", "data-focus": "lens:copy-list", title: t("Copy the items shown here, in this order, as YAML, to paste for an agent"),
       onclick: () => copyList(lens),

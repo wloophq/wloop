@@ -144,9 +144,27 @@ Three operations sit on a draft's card beside approve and discard, as the draft'
 
 - **Close without a message** (`POST /api/drafts/{id}/close-silently`) discards a held draft through its gate, as you, and applies its effects as if it was sent, without posting it; only a draft whose every effect applies without a post may, such as `unit.closed` (an effect's `silent`, which a plugin's manifest may set on its own); a draft with `task.nudged`, which says someone was nudged, may not. Its reason becomes `closed_silently`, and an effect that fails is applied again at the next pass.
 - **Don't nudge this conversation** (`POST /api/units/{provider}/{key}/skip/{workflow}`, `DELETE` to undo), offered on a draft that nudges (`task.nudged`), stops the draft's workflow on its unit until you undo it, and withdraws the workflow's drafts held there as `skipped`; the task stays where it is. A workflow plans nothing on a skipped unit, nor on a task one of whose units is skipped, and a draft its workflow proposed on such a subject is withdrawn `skipped` at the next sweep. A unit's detail lists its `skipped_workflows`.
-- **Stop drafting these** (`POST /api/workflows/{name}/disable`) writes `workflows.<name>.enabled = false` to the configuration, with a backup, and applies it without a restart; the drafts it already holds stay in the Outbox.
+- **Stop drafting these** (`POST /api/workflows/{name}/disable`), on the head of a workflow's group in the Outbox, writes `workflows.<name>.enabled = false` to the configuration, with a backup, and applies it without a restart; the drafts it already holds stay in the Outbox.
 
 Only you run them, yourself or through a session you drive. A task lists its pending drafts, held or failed, in its `drafts`, and `GET /api/drafts?task=<id>` serves their cards.
+
+### The Outbox grouped by why
+
+The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `GET /api/outbox`: the same drafts `GET /api/drafts` lists, in groups by why they were drafted.
+
+```text
+draft ──> its workflow? ──yes──> the workflow's group: [outbox] title and about (summary, else its name)
+              │ no
+              v
+          you wrote it? ──yes──> written by hand: gates.toml's drafts.by_hand, by_hand_about
+              │ no
+              v
+          its purpose's group: gates.toml's drafts.purposes.<purpose> (the purpose as named when absent)
+```
+
+The largest group comes first, then by title; inside a group the drafts keep the Outbox's order, newest first. Every text is the profile's, in the interface language: a drafting workflow's `[outbox]` table (`title`, `about`) with its translation under `locales/<tag>/workflows/<name>/workflow.toml`, and `gates.toml`'s `[drafts]`. A workflow's group shows its name and **Stop drafting these**, which asks again inline before it disables the workflow.
+
+Each draft comes with its context: the asks of its task, each with the quotes its brief keeps, and the items it is about, each with its state. A draft's card names its purpose and, once it left your hands, its delivery state in `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` words, which the views catalog serves as `draft_purposes` and `draft_states`.
 
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose
