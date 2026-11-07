@@ -19,7 +19,7 @@ func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now tim
 		if d := draftOn(e); d != nil {
 			text = oneLine(d.Text)
 		}
-		l := listLine{label: draftTarget(m.w(), e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(e)}}}}
+		l := listLine{label: draftTarget(m.w(), e), title: text, changed: e.Changed, parts: map[string][]lens.Piece{"kind": {{Label: draftState(m.w(), e)}}}}
 		_, l.busy = m.busy[taskUnit(e.ID)]
 		if since := now.Sub(e.Updated); !e.Updated.IsZero() && since > 0 {
 			l.age, l.ageStyle = lens.Age(words, since), m.t.Dim
@@ -53,14 +53,14 @@ func draftTarget(w *texts.Catalog, e api.TaskView) string {
 }
 
 // draftState is the draft's state and how it is approved.
-func draftState(e api.TaskView) string {
+func draftState(w *texts.Catalog, e api.TaskView) string {
 	d := draftOn(e)
 	if d == nil {
 		return e.State
 	}
 	parts := []string{d.State}
 	if d.Deadline != nil {
-		parts = append(parts, "sends "+d.Deadline.Local().Format("15:04"))
+		parts = append(parts, w.T("sends {time}", map[string]any{"time": d.Deadline.Local().Format("15:04")}))
 	}
 	return strings.Join(parts, " · ")
 }
@@ -69,21 +69,21 @@ func draftState(e api.TaskView) string {
 // paragraphs, why it failed, and when its window sends it.
 func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
-	fact("to", draftTarget(m.w(), draftTask(api.ViewsCatalog{}, *d, "")), plain)
+	fact(m.w().T("to", nil), draftTarget(m.w(), draftTask(api.ViewsCatalog{}, *d, "")), plain)
 	head := d.Purpose
 	if d.Edited {
-		head += " · edited"
+		head += " · " + m.w().T("edited", nil)
 	}
 	if d.Origin.Kind != "" {
-		head += " · from " + d.Origin.Kind
+		head += " · " + m.w().T("from {origin}", map[string]any{"origin": d.Origin.Kind})
 	}
-	fact("draft", strings.Trim(head, " ·"), t.Dim)
-	para("text", d.Text)
+	fact(m.w().T("draft", nil), strings.Trim(head, " ·"), t.Dim)
+	para(m.w().T("text", nil), d.Text)
 	if d.Reaction != "" {
-		fact("reaction", d.Reaction, plain)
+		fact(m.w().T("reaction", nil), d.Reaction, plain)
 	}
 	if d.Error != "" {
-		fact("error", d.Error, t.Red)
+		fact(m.w().T("error", nil), d.Error, t.Red)
 	}
 	if d.Deadline != nil {
 		fact(m.w().T("sends", nil), m.w().T("{time} unless you decide first", map[string]any{"time": m.w().Time(d.Deadline.Local(), "datetime")}), t.Dim)

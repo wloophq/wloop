@@ -164,11 +164,11 @@ func (m *Model) timeLeft(it api.PlanItem, now time.Time) (string, func(string) s
 	t := m.t
 	switch {
 	case it.Decision == "blocked":
-		return "blocked", t.Red
+		return m.w().T("blocked", nil), t.Red
 	case it.Default != "run":
-		return "wait", t.Yellow
+		return m.w().T("wait", nil), t.Yellow
 	case it.Deadline.IsZero():
-		return "now", t.Cyan
+		return m.w().T("now", nil), t.Cyan
 	}
 	return fmt.Sprintf("%ds", max(0, int(it.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
 }
@@ -214,7 +214,7 @@ func (m *Model) closedLines(width int, now time.Time) []string {
 	for _, c := range m.closed {
 		out = append(out, "  "+termfmt.Cut(fmt.Sprintf("%s  %s  %s", span(now.Sub(c.At)), c.Session, oneLine(c.Reason)), width-2))
 		if c.Resume != "" {
-			out = append(out, "    "+t.Dim(termfmt.Cut("resume: "+oneLine(c.Resume), width-4)))
+			out = append(out, "    "+t.Dim(termfmt.Cut(m.w().T("resume: {command}", map[string]any{"command": oneLine(c.Resume)}), width-4)))
 		}
 	}
 	return out
@@ -303,32 +303,32 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	decision := it.Decision
 	switch left, _ := m.timeLeft(it, now); {
 	case it.Decision != "pending":
-	case left == "wait":
+	case it.Default != "run":
 		decision += " · " + m.w().T("waits for you", nil)
 	default:
 		decision += " · " + m.w().T("runs in {time}", map[string]any{"time": left})
 	}
 	if it.Observe {
-		decision += " · observe"
+		decision += " · " + m.w().T("observe", nil)
 	}
-	fact("workflow", it.Workflow, plain)
-	fact("decision", decision, plain)
+	fact(m.w().T("workflow", nil), it.Workflow, plain)
+	fact(m.w().T("decision", nil), decision, plain)
 	if it.Reason != "" {
-		fact("why", it.Reason, plain)
+		fact(m.w().T("why", nil), it.Reason, plain)
 	}
-	fact("steps", strings.Join(it.Steps, ", "), plain)
+	fact(m.w().T("steps", nil), strings.Join(it.Steps, ", "), plain)
 	var matched []string
 	for _, f := range it.Why.Matched {
 		matched = append(matched, f.Name+" = "+f.Value)
 	}
 	if len(matched) > 0 {
-		fact("matched", strings.Join(matched, ", "), t.Dim)
+		fact(m.w().T("matched", nil), strings.Join(matched, ", "), t.Dim)
 	}
 	if g := gain(m.w(), it.Gain); g != "" {
-		fact("frees", g, plain)
+		fact(m.w().T("frees", nil), g, plain)
 	}
 	if it.Error != "" {
-		fact("error", fmt.Sprintf("attempt %d: %s", it.Attempts, it.Error), t.Red)
+		fact(m.w().T("error", nil), m.w().T("attempt {n}: {error}", map[string]any{"n": it.Attempts, "error": it.Error}), t.Red)
 	}
 	for _, st := range it.Actions {
 		if st.Enabled && st.Note != "" {
@@ -346,7 +346,10 @@ func gain(w *texts.Catalog, g api.Gain) string {
 	if g.DiskBytes > 0 {
 		parts = append(parts, w.T("{size} of disk", map[string]any{"size": mib(g.DiskBytes)}))
 	}
-	return strings.Join(parts, " and ")
+	if len(parts) < 2 {
+		return strings.Join(parts, "")
+	}
+	return w.T("{list} and {last}", map[string]any{"list": strings.Join(parts[:len(parts)-1], ", "), "last": parts[len(parts)-1]})
 }
 
 func mib(n int64) string {
@@ -372,7 +375,7 @@ func (m *Model) itemKeys(it api.PlanItem, width, col int) []string {
 	t := m.t
 	on, off := m.planHelp(it)
 	var lines []string
-	head := "  " + t.Dim(termfmt.Fit("keys", factLabel)) + "  "
+	head := "  " + t.Dim(termfmt.Fit(m.w().T("keys", nil), factLabel)) + "  "
 	for _, l := range m.pack(on, width-col) {
 		lines = append(lines, head+l)
 		head = strings.Repeat(" ", col)

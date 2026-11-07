@@ -110,4 +110,9 @@ func TestStatusAndFooterInPtBR(t *testing.T) {
 	if !strings.Contains(screen, "filtro foo (Esc limpa)") {
 		t.Errorf("the filter footer is not in pt-BR:\n%s", screen)
 	}
+	for _, want := range []string{"↑↓ mover", "/ filtrar", "q sair"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("the keys footer lacks %q:\n%s", want, screen)
+		}
+	}
 }

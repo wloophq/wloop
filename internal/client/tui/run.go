@@ -380,7 +380,7 @@ func guard(crashed chan<- error, f func()) {
 		defer func() {
 			if p := recover(); p != nil {
 				select {
-				case crashed <- fmt.Errorf(brand.Command+" tui: %v", p):
+				case crashed <- fmt.Errorf(brand.Command+" tui: %v", p): //prose:internal the command line reports a crash in English
 				default:
 				}
 			}
@@ -398,7 +398,7 @@ func suspend(t Terminal, m *Model) error {
 		return nil
 	}
 	if err := s.Suspend(); err != nil {
-		return fmt.Errorf("suspend: %w", err)
+		return fmt.Errorf("suspend: %w", err) //prose:internal the command line reports a failed suspend in English
 	}
 	return nil
 }
@@ -918,7 +918,7 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 	if err := cfg.OpenURL(link); err != nil {
 		return nil, api.TaskView{}, err
 	}
-	return []string{"opened " + link}, api.TaskView{}, nil
+	return []string{link}, api.TaskView{}, nil
 }
 
 // carryAction takes a plan action to its item, any other to its unit.

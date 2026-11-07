@@ -530,7 +530,7 @@ func questionLabel(w *texts.Catalog, name string, q *api.QuestionView) string {
 	for i, o := range q.Options {
 		opt := fmt.Sprintf("%d. %s", i+1, o.Label)
 		if o.ID == q.Recommend {
-			opt += " (recommended)"
+			opt += " (" + w.T("recommended", nil) + ")"
 		}
 		opts = append(opts, opt)
 	}
@@ -590,7 +590,7 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		if k.Read > p.read && (k.Rune == 'y' || k.Rune == 'Y') {
 			return m.send(p.cmd)
 		}
-		m.status = p.action + " " + p.cmd.Label + " cancelled"
+		m.status = m.w().T("{verb} {task} cancelled", map[string]any{"verb": p.action, "task": p.cmd.Label})
 		if k.Read <= p.read {
 			m.status += ": " + m.w().T("a y typed together with the key before it does not confirm", nil)
 		}
@@ -750,7 +750,7 @@ func (m *Model) jump() {
 	for i, v := range m.views {
 		labels[i] = v.Label
 	}
-	m.status = m.w().T("{address} is not in {views}; {command} shows it", map[string]any{"address": addr, "views": orList(labels), "command": brand.Command + " open " + addr})
+	m.status = m.w().T("{address} is not in {views}; {command} shows it", map[string]any{"address": addr, "views": orList(m.w(), labels), "command": brand.Command + " open " + addr})
 }
 
 // links says whether addr is link or a page under it.
@@ -776,16 +776,16 @@ func (m *Model) Done(c Command, lines []string, err error) {
 	case len(lines) > 0:
 		m.status = fmt.Sprintf("%s %s: %s", c.Action, c.Label, lines[len(lines)-1])
 	default:
-		m.status = fmt.Sprintf("%s %s: done", c.Action, c.Label)
+		m.status = m.w().T("{action} {task}: done", map[string]any{"action": c.Action, "task": c.Label})
 	}
 }
 
 // orList joins names as "a, b or c".
-func orList(names []string) string {
+func orList(w *texts.Catalog, names []string) string {
 	if len(names) < 2 {
 		return strings.Join(names, "")
 	}
-	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	return w.T("{list} or {last}", map[string]any{"list": strings.Join(names[:len(names)-1], ", "), "last": names[len(names)-1]})
 }
 
 // w is the client strings the terminal reads its words in.

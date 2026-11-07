@@ -147,7 +147,7 @@ func (m *Model) reviewMove(delta int) bool {
 func (m *Model) renderReview(lines []string, width, body int, now time.Time) []string {
 	t := m.t
 	if m.rv.review == nil {
-		return append(lines, "  "+t.Dim("loading…"))
+		return append(lines, "  "+t.Dim(m.w().T("loading…", nil)))
 	}
 	start := len(lines)
 	if body < len(m.rv.review.Steps)+8 {

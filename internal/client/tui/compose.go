@@ -289,7 +289,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 	for i, d := range m.listedDrafts() {
 		head := fmt.Sprintf("%d. %s · %s", i+1, d.Purpose, d.State)
 		if d.Origin.Kind != "" {
-			head += " · from " + d.Origin.Kind
+			head += " · " + m.w().T("from {origin}", map[string]any{"origin": d.Origin.Kind})
 		}
 		style := t.Dim
 		if d.ID == m.picked {
@@ -297,7 +297,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 		}
 		label := ""
 		if i == 0 {
-			label = "drafts"
+			label = m.w().T("drafts", nil)
 		}
 		fact(label, head, style)
 		text := d.Text

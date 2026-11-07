@@ -17,6 +17,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the page's `data-i18n` attributes) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
 | `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts, its page and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
+| `TestClientsQuoteNoWordOutsideTheCatalog` | The Go clients quote no single word a person reads outside the string catalog (`strings.toml`, through `texts.Catalog`): a single word a client quotes is a catalog key, or is compared, switched on, a key, a constant, an Objective-C name, or one of the `clientTokens`, which let exactly `clientTokenUses` literals pass. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
@@ -78,6 +79,73 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/plugin_binary_test.go` | ✅ | the test serves a fake GitHub to the plugin's binary |
 
 ### `TestClientsQuoteNoProseOutsideTheCatalog`
+
+| `nonProse` entry | Status | Reason |
+|---|---|---|
+| `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `Accept` | ✅ | an HTTP header name |
+| `Alt` | ✅ | KeyboardEvent.key |
+| `Backspace` | ✅ | KeyboardEvent.key |
+| `Contents` | ✅ | a macOS bundle's directory |
+| `Control` | ✅ | KeyboardEvent.key |
+| `DELETE` | ✅ | an HTTP method |
+| `Delete` | ✅ | KeyboardEvent.key |
+| `End` | ✅ | KeyboardEvent.key |
+| `Enter` | ✅ | KeyboardEvent.key |
+| `Esc` | ✅ | the Escape key's name as the served bindings spell it |
+| `Escape` | ✅ | KeyboardEvent.key |
+| `GET` | ✅ | an HTTP method |
+| `Home` | ✅ | KeyboardEvent.key |
+| `Meta` | ✅ | KeyboardEvent.key |
+| `POST` | ✅ | an HTTP method |
+| `Plus` | ✅ | the + key's name in aria-keyshortcuts |
+| `Shift` | ✅ | KeyboardEvent.key |
+| `Tab` | ✅ | KeyboardEvent.key |
+| `noopener noreferrer` | ✅ | a link's rel tokens |
+| `use strict` | ✅ | a script's directive |
+
+### `TestClientsQuoteNoWordOutsideTheCatalog`
+
+| `clientTokens` entry | Status | Reason |
+|---|---|---|
+| `%.1f GiB` | ✅ | a size in a binary unit |
+| `%.1f MiB` | ✅ | a size in a binary unit |
+| `Backspace` | ✅ | a key's name as the served bindings spell it |
+| `Enter` | ✅ | a key's name as the served bindings spell it |
+| `Esc` | ✅ | a key's name as the served bindings spell it |
+| `PR` | ✅ | the status item's mark before its first count, the same in every language |
+| `Tab` | ✅ | a key's name as the served bindings spell it |
+| `answer` | ✅ | an action's id |
+| `app` | ✅ | the name the app subscribes to the daemon's events as |
+| `apply` | ✅ | a plan action's handler |
+| `blocked` | ✅ | a plan decision the API serves |
+| `capture` | ✅ | a command's action id |
+| `detail` | ✅ | a command's action id |
+| `dismiss` | ✅ | a plan action's handler |
+| `draft` | ✅ | a reply's send mode an action takes |
+| `edit` | ✅ | a draft verb's handler |
+| `filter` | ✅ | a core action's id |
+| `guide` | ✅ | a plan action's handler |
+| `help` | ✅ | a core action's id |
+| `match` | ✅ | a command's action id |
+| `menubar` | ✅ | the menu bar's name as a surface |
+| `now` | ✅ | a reply's send mode an action takes |
+| `open` | ✅ | an action's id |
+| `open-source` | ✅ | a core action's id |
+| `palette` | ✅ | a core action's id |
+| `pending` | ✅ | a plan decision the API serves |
+| `plan` | ✅ | the plan tab's key |
+| `quit` | ✅ | a core action's id |
+| `retry` | ✅ | a draft verb's handler |
+| `review` | ✅ | a command's action id and the review's context |
+| `reviewed` | ✅ | a project verb's handler |
+| `running` | ✅ | an app state the status API takes |
+| `sequential` | ✅ | a project verb's handler |
+| `session` | ✅ | the delegate prompt's mode |
+| `sweep` | ✅ | a job the daemon triggers |
+| `true` | ✅ | a flag's value an action takes |
+| `tui` | ✅ | the terminal client's name as an events subscriber and a surface |
+| `vi` | ✅ | the editor run when $VISUAL and $EDITOR are unset |
 
 | `nonProse` entry | Status | Reason |
 |---|---|---|

@@ -51,7 +51,7 @@ func pickedRefs(e api.TaskView, pick string) []api.TaskRef {
 // openPick opens the picker of verb on e; for the open tasks, the command asks the daemon for them.
 func (m *Model) openPick(e api.TaskView, verb, pick string) (Command, bool) {
 	e = m.shownDetail(e)
-	m.overlay = &overlay{title: m.verbQuestion(verb) + " for " + taskLabel(e), pick: &taskPick{task: e, verb: verb, pick: pick}}
+	m.overlay = &overlay{title: m.w().T("{question} for {task}", map[string]any{"question": m.verbQuestion(verb), "task": taskLabel(e)}), pick: &taskPick{task: e, verb: verb, pick: pick}}
 	return m.repick()
 }
 

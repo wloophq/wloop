@@ -445,7 +445,7 @@ func ruleHTMLProse(file, src string) []string {
 
 // proseInternalMarks is how many literals of the person-facing clients are marked proseInternal; a new mark
 // raises it on purpose, in review.
-const proseInternalMarks = 10
+const proseInternalMarks = 12
 
 // TestProseInternalMarksStayFew checks that the clients mark as no text a person reads exactly
 // proseInternalMarks literals, so a mark is a reviewed exception.

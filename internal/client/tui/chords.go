@@ -267,7 +267,7 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	case a == "quit":
 		m.quit = true
 	case a == "capture":
-		m.prompt = &prompt{action: "capture", label: "capture", read: k.Read, submit: func(text string) (Command, bool) {
+		m.prompt = &prompt{action: "capture", label: m.w().T("capture", nil), read: k.Read, submit: func(text string) (Command, bool) {
 			if text == "" {
 				m.status = m.w().T("capture cancelled: nothing typed", nil)
 				return Command{}, false
@@ -380,7 +380,7 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	if !asks {
 		return m.send(c)
 	}
-	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + taskLabel(e), read: read, submit: func(text string) (Command, bool) {
+	m.prompt = &prompt{action: verb, label: m.w().T("{question} for {task}", map[string]any{"question": m.verbQuestion(verb), "task": taskLabel(e)}), read: read, submit: func(text string) (Command, bool) {
 		args, ok := ask(text)
 		if !ok {
 			m.status = m.w().T("{verb} {task} cancelled: nothing usable typed", map[string]any{"verb": verb, "task": c.Label})
