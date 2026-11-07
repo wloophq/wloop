@@ -3037,6 +3037,7 @@ loadStrings(getJSON).then(() => {
     showOmnibox({ panel: true });
     return;
   }
+  tellLinkNotice();
   load();
   connect();
 });
