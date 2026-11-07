@@ -99,6 +99,38 @@ func TestOpenRoutesToTheWindow(t *testing.T) {
 	}
 }
 
+func TestOpenAURLOutsideTheCockpitIsNoRoute(t *testing.T) {
+	t.Parallel()
+	for _, arg := range []string{"http://127.0.0.1:9999/#view=x", "http://localhost:9999/#view=x", "https://example.com/#view=x", "http://example.com:4321/#view=x"} {
+		t.Run(arg, func(t *testing.T) {
+			te, opened := cockpitEnv(t)
+			got := listenAsWindow(t, te)
+			if code := te.run("open", arg); code == 0 {
+				t.Fatalf("exit 0 for %s: %s", arg, te.out)
+			}
+			select {
+			case w := <-got:
+				t.Fatalf("requested %+v", w)
+			default:
+			}
+			if len(*opened) != 0 {
+				t.Fatalf("the browser opened %v", *opened)
+			}
+		})
+	}
+}
+
+func TestOpenPrintPrintsACockpitRoute(t *testing.T) {
+	t.Parallel()
+	te, _ := cockpitEnv(t)
+	if code := te.run("open", "--print", "#task=t-1"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if want := "http://127.0.0.1:4321/?token=tok#task=t-1\n"; te.out.String() != want {
+		t.Fatalf("stdout %q, want %q", te.out, want)
+	}
+}
+
 func TestOpenACockpitRouteFallsBackToTheBrowserAtThatRoute(t *testing.T) {
 	t.Parallel()
 	te, opened := cockpitEnv(t)
