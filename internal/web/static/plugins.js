@@ -187,7 +187,7 @@ function pluginDetail(el, unit) {
     h("div", { class: "meta" }, h("span", { class: "ref" }, labelOf(r)),
       " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext" }, providerName(unitOf(r).provider))),
     h("div", {}, t("Waiting on"), " ", h("strong", {}, waitingLabel(r))),
-    sm(r).reason ? h("div", { class: "why" }, sm(r).reason) : null,
+    reasonText(r) ? h("div", { class: "why" }, reasonText(r)) : null,
     h("div", { class: "d-actions" }, actionButtons(r, "detail", { scope: "plugin-detail" }))));
 }
 

@@ -793,7 +793,6 @@ function servedLayout(view) {
   return spec && spec.layout === "board" ? "board" : "";
 }
 
-// rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
 // reasonText is why row r waits, in its plugin's words of the reason it names filled with the reason's values,
 // else as the plugin wrote it.
 function reasonText(r) {
@@ -803,6 +802,7 @@ function reasonText(r) {
   return word ? fillWord(word, s.reason_params || {}) : s.reason || "";
 }
 
+// rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
 function rowWords(provider) {
   const own = provider ? ((catalog.lens || []).find((w) => w.provider === provider) || {}).words : null;
   return own ? { ...lensWords(), ...own } : lensWords();
