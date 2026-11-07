@@ -27,11 +27,11 @@ const (
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced,
-	origin_session`
+	origin_session, why, language`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -62,7 +62,7 @@ func draftArgs(d draft.Draft) []any {
 		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(d.State),
 		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason,
 		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects),
-		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session}
+		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session, d.Why, d.Language}
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
@@ -87,7 +87,7 @@ func scanDraft(row scanner) (draft.Draft, error) {
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason,
 		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced,
-		&d.Origin.Session); err != nil {
+		&d.Origin.Session, &d.Why, &d.Language); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)

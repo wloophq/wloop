@@ -162,6 +162,10 @@ type Draft struct {
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
+	// Why is why it was proposed, in the user's language when it was;
+	// Language is the locale Text is written in. Both "" for a draft no
+	// workflow step wrote.
+	Why, Language string
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }

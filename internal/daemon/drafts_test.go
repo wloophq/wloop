@@ -288,6 +288,22 @@ func TestDraftsListByState(t *testing.T) {
 	}
 }
 
+func TestDraftsServeWhyAndLanguage(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Why: "w", Language: "pt",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})}); err != nil {
+		t.Fatal(err)
+	}
+	var res api.DraftsResponse
+	if code := get(t, r.s, api.Drafts, &res); code != 200 || len(res.Drafts) != 1 {
+		t.Fatalf("GET: %d %+v", code, res)
+	}
+	if d := res.Drafts[0]; d.Why != "w" || d.Language != "pt" {
+		t.Fatalf("why %q language %q", d.Why, d.Language)
+	}
+}
+
 func TestApproveWithEditedText(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)

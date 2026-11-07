@@ -411,7 +411,7 @@ func taskDraftError(err error) error {
 // draftView is d on the wire, with g, its gate, and its actions as they stand.
 func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
-		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
+		Target: d.Target, Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},
 		State: string(d.State), Error: d.Error, Reason: d.Reason, Permalink: d.Evidence.Permalink, Gate: g.ID,

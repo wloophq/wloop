@@ -84,6 +84,16 @@ var migrations = []migration{
 	{to: 10, name: "gate_text", compatible: 9, up: execAll(
 		`ALTER TABLE gates ADD COLUMN text TEXT NOT NULL DEFAULT ''`,
 	)},
+	{to: 11, name: "draft_why_and_skips", compatible: 10, up: execAll(
+		`ALTER TABLE drafts ADD COLUMN why TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE drafts ADD COLUMN language TEXT NOT NULL DEFAULT ''`,
+		`CREATE TABLE workflow_skips (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  workflow TEXT NOT NULL CHECK (workflow != ''),
+  at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key, workflow)
+) WITHOUT ROWID`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

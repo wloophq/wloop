@@ -48,6 +48,9 @@ type Proposal struct {
 	RepeatAfter time.Duration
 	// Tool is the tool that made a post RecordSent records.
 	Tool string
+	// Why is why the draft is proposed, in the user's language; Language
+	// is the locale Text is written in.
+	Why, Language string
 }
 
 type Filter struct {
@@ -171,7 +174,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	d := s.delivered(shaped(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
-		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
+		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
 	}))
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err
