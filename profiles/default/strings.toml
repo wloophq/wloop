@@ -619,6 +619,7 @@
 "to open" = "to open"
 "to ask the agent" = "to ask the agent"
 "to close" = "to close"
+"{n} results" = { one = "{n} result", other = "{n} results" }
 "{action}: {reason}" = "{action}: {reason}"
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Back"

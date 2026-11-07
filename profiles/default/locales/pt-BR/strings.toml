@@ -613,6 +613,7 @@
 "to open" = "para abrir"
 "to ask the agent" = "para perguntar ao agente"
 "to close" = "para fechar"
+"{n} results" = { one = "{n} resultado", other = "{n} resultados" }
 "{action}: {reason}" = "{action}: {reason}"
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Voltar"
