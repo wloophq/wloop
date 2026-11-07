@@ -1,5 +1,20 @@
 [strings]
 # piece D
+# The app window's menus.
+"Hide {name}" = "Ocultar o {name}"
+"Hide Others" = "Ocultar os outros"
+"Show All" = "Mostrar tudo"
+"Edit" = "Editar"
+"Undo" = "Desfazer"
+"Redo" = "Refazer"
+"Cut" = "Recortar"
+"Copy" = "Copiar"
+"Paste" = "Colar"
+"Select All" = "Selecionar tudo"
+"Window" = "Janela"
+"Minimize" = "Minimizar"
+"Zoom" = "Zoom"
+"Close" = "Fechar"
 # The menu bar.
 "more…" = "mais…"
 "(stale)" = "(desatualizado)"

@@ -4,6 +4,21 @@
 
 [strings]
 # piece D
+# The app window's menus.
+"Hide {name}" = "Hide {name}"
+"Hide Others" = "Hide Others"
+"Show All" = "Show All"
+"Edit" = "Edit"
+"Undo" = "Undo"
+"Redo" = "Redo"
+"Cut" = "Cut"
+"Copy" = "Copy"
+"Paste" = "Paste"
+"Select All" = "Select All"
+"Window" = "Window"
+"Minimize" = "Minimize"
+"Zoom" = "Zoom"
+"Close" = "Close"
 # The menu bar.
 "more…" = "more…"
 "(stale)" = "(stale)"
