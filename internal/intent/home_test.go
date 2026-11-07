@@ -1,9 +1,12 @@
 package intent_test
 
 import (
+	"io/fs"
+	"os"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 func TestHomeLoadsTheBundledBriefingInEachLocale(t *testing.T) {
@@ -22,6 +25,42 @@ func TestHomeLoadsTheBundledBriefingInEachLocale(t *testing.T) {
 	}
 	if h := pt.Home; h.LastJoin != " e " || h.CaptureHint != "Anote o que está na sua cabeça" || h.Counters[8].Clause["other"] != "{counter} estão com outras pessoas" {
 		t.Fatalf("pt-BR home = %+v", h)
+	}
+}
+
+func TestACopiedHomeAndDecisionsKeepTheirTranslation(t *testing.T) {
+	files := map[string]string{}
+	for _, name := range []string{"home.toml", "decisions.toml"} {
+		b, err := fs.ReadFile(turn.BundledFS(), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[name] = string(b)
+	}
+	ui, err := os.ReadFile("../../plugins/github/profile/ui.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files["plugins/github/ui.toml"] = string(ui)
+	l, problems := loadProfile(t, "pt-BR", files)
+	if gh := l.UI["github"]; gh.Decisions["pick-someone"].Clause["other"] != "{counter} esperam um revisor" || gh.Noun["other"] != "pull requests" {
+		t.Fatalf("github's copied words in pt-BR: %+v", gh.Decisions)
+	}
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	if l.Home.CaptureHint != "Anote o que está na sua cabeça" || l.Home.Counters[7].Noun["other"] != "tarefas" {
+		t.Fatalf("home %+v", l.Home)
+	}
+	if k := l.Decisions.Kinds[decision.Answer]; k.Queue != "Perguntas do agente" || k.Noun["one"] != "pergunta" {
+		t.Fatalf("answer %+v", k)
+	}
+}
+
+func TestAnUntranslatedUserTextShowsInEnglish(t *testing.T) {
+	l, _ := loadProfile(t, "pt-BR", map[string]string{"home.toml": "[capture]\nhint = \"Jot it down\"\n"})
+	if l.Home.CaptureHint != "Jot it down" || l.Home.LastJoin != " e " {
+		t.Fatalf("home %+v", l.Home)
 	}
 }
 

@@ -838,6 +838,12 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 				t.Fatalf("%v: %d", terms, code)
 			}
 			for _, view := range storedViews() {
+				if spec, _ := bundledLoaded().Views.View(view); !spec.Rail {
+					if _, counted := c.Views[view]; counted {
+						t.Errorf("%s is off the rail and counted", view)
+					}
+					continue
+				}
 				v := url.Values{"view": {view}, "area": {area}}
 				n := 0
 				query := lens.Parse(strings.Join(terms, " "), nil)

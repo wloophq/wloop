@@ -39,7 +39,7 @@ func withLens(d coretasks.Deps, loaded func() *intentload.Loaded, facts func(con
 		var out coretasks.Views
 		for _, v := range def.Views {
 			if catalog.Lists(def, v.ID) {
-				out.List = append(out.List, coretasks.ViewSpec{ID: task.View(v.ID), Over: v.Over, Paged: catalog.Paged(def, v.ID), HideDisabled: v.HideDisabled})
+				out.List = append(out.List, coretasks.ViewSpec{ID: task.View(v.ID), Over: v.Over, Paged: catalog.Paged(def, v.ID), HideDisabled: v.HideDisabled, Uncounted: !v.Rail})
 			}
 		}
 		for _, id := range def.Badge {

@@ -118,6 +118,23 @@ func TestSetsUnknownView(t *testing.T) {
 	}
 }
 
+func TestCountsLeaveOutUncountedViews(t *testing.T) {
+	r := newSetsRig()
+	r.lens.add(testView{coretasks.ViewSpec{ID: "home-ready", Over: task.OverTasks, Uncounted: true}, func(e task.Task) bool { return e.Category == task.CategoryReady }})
+	r.seed(t)
+	c, err := r.svc.Counts(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, counted := c.Views["home-ready"]; counted || c.Views["ready"] != 2 {
+		t.Fatalf("counts %v", c.Views)
+	}
+	sets, _ := r.svc.Sets(context.Background(), []task.View{"home-ready"}, nil)
+	if len(sets["home-ready"]) != 2 {
+		t.Fatalf("Sets of an uncounted view: %v", sets)
+	}
+}
+
 func TestCountsMatchSets(t *testing.T) {
 	ctx := context.Background()
 	r := newSetsRig()
