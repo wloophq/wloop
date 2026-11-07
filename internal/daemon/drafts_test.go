@@ -350,6 +350,13 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true}`); code != 400 || !strings.Contains(body, "no thread") {
 		t.Fatalf("broadcast on a draft in no thread: %d %s", code, body)
 	}
+	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true}`); code != 400 {
+		t.Fatalf("text and a refused broadcast: %d %s", code, body)
+	}
+	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Text != "hello" {
+		t.Fatalf("a refused edit saved its text: %+v", stored)
+	}
+	d, _ = r.o.Store.Get(ctx, d.ID)
 	d.Broadcast = draft.BroadcastOn
 	if _, err := r.o.Store.Update(ctx, d, draft.Held); err != nil {
 		t.Fatal(err)
@@ -524,6 +531,25 @@ func TestSenderRecoversBeforePublishing(t *testing.T) {
 	}
 	if got, _ := r.o.Store.Get(context.Background(), stuck.ID); got.State != draft.Sent {
 		t.Fatalf("the recovered draft is %s", got.State)
+	}
+}
+
+// broadcastingFx places every draft as a thread reply that broadcasts.
+type broadcastingFx struct{ *fakeFx }
+
+func (broadcastingFx) Place(context.Context, draft.Draft) (draft.Placed, error) {
+	return draft.Placed{Broadcast: draft.BroadcastOn}, nil
+}
+
+func TestSenderPlacesTheBroadcastOfDraftsHeldBeforeBroadcastsAtStart(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	held := r.propose(t, r7u, "from before", draft.Wait)
+	r.o.Effects = func(unit.ProviderID) (port.Effects, error) { return broadcastingFx{r.fx}, nil }
+	clock := r.startSender(t)
+	clock.next(t)
+	if got, _ := r.o.Store.Get(context.Background(), held.ID); got.Broadcast != draft.BroadcastOn || got.State != draft.Held {
+		t.Fatalf("held draft %+v", got)
 	}
 }
 

@@ -96,3 +96,72 @@ func TestApprovingAndSendingKeepTheBroadcastThePersonSet(t *testing.T) {
 		t.Fatalf("published %q, stored %q", published, e.get(d.ID).Broadcast)
 	}
 }
+
+func TestAHeldDraftStoredWithNoBroadcastIsPlacedOnceAtStart(t *testing.T) {
+	e := newEnv()
+	withPolicy(e, window(10*time.Minute))
+	old := e.propose(reply("done"))
+	firstGate := e.gate(old.ID)
+	reaction := e.propose(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
+	pl := withPlacer(e, "")
+	pl.broadcast = draft.BroadcastOn
+	if err := e.svc.PlaceBroadcasts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got := e.get(old.ID)
+	if got.Broadcast != draft.BroadcastOn || got.State != draft.Held {
+		t.Fatalf("placed %+v", got)
+	}
+	if g := e.gate(old.ID); g.ID != firstGate.ID || g.Status != gate.Open || g.Deadline != firstGate.Deadline {
+		t.Fatalf("the gate changed: %+v, was %+v", g, firstGate)
+	}
+	if e.get(reaction.ID).Broadcast != draft.NoBroadcast {
+		t.Fatalf("a reaction placed %q", e.get(reaction.ID).Broadcast)
+	}
+	if len(pl.asked) != 1 {
+		t.Fatalf("asked %d, want only the message", len(pl.asked))
+	}
+	if err := e.svc.PlaceBroadcasts(ctx); err != nil || len(pl.asked) != 1 {
+		t.Fatalf("a placed draft asked again: %d %v", len(pl.asked), err)
+	}
+}
+
+func TestADraftPlacedInNoThreadAtStartKeepsNone(t *testing.T) {
+	e := newEnv()
+	d := e.propose(reply("done"))
+	withPlacer(e, "")
+	if err := e.svc.PlaceBroadcasts(ctx); err != nil || e.get(d.ID).Broadcast != draft.NoBroadcast {
+		t.Fatalf("%q %v", e.get(d.ID).Broadcast, err)
+	}
+}
+
+func TestAPublisherThatCannotPlaceAtStartLeavesTheDraft(t *testing.T) {
+	e := newEnv()
+	d := e.propose(reply("done"))
+	withPlacer(e, "").refuse = errors.New("not logged in")
+	if err := e.svc.PlaceBroadcasts(ctx); err != nil || e.get(d.ID).Broadcast != draft.NoBroadcast || e.get(d.ID).State != draft.Held {
+		t.Fatalf("%+v %v", e.get(d.ID), err)
+	}
+}
+
+func TestAnAmendOfTextAndBroadcastChangesBothOrNeither(t *testing.T) {
+	e := newEnv()
+	d := e.propose(reply("done"))
+	text, on := "better", true
+	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("amend: %v", err)
+	}
+	if got := e.get(d.ID); got.Text != "done" || got.Rev != d.Rev {
+		t.Fatalf("a refused amend saved %+v", got)
+	}
+	withPlacer(e, "").broadcast = draft.BroadcastOff
+	d = e.propose(reply("again"))
+	first := e.gate(d.ID)
+	got, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on})
+	if err != nil || got.Text != "better" || got.Broadcast != draft.BroadcastOn || got.Rev != d.Rev+1 {
+		t.Fatalf("amend: %+v %v", got, err)
+	}
+	if old, _ := e.gates.Get(ctx, first.ID); old.Status != gate.Superseded {
+		t.Fatalf("the first gate %+v", old)
+	}
+}

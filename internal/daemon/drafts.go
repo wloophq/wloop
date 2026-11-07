@@ -210,13 +210,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Text == nil && a.Broadcast == nil {
 			return draft.Draft{}, badRequest{"edit takes the draft's new text or broadcast"}
 		}
-		got = d
-		if a.Text != nil {
-			got, err = o.Edit(ctx, id, *a.Text)
-		}
-		if err == nil && a.Broadcast != nil {
-			got, err = o.SetBroadcast(ctx, id, *a.Broadcast)
-		}
+		got, err = o.Amend(ctx, id, outbox.Amendment{Text: a.Text, Broadcast: a.Broadcast})
 	case "discard":
 		if d.State == draft.Held {
 			got, err = s.decideDraft(ctx, d, gate.Rejected, nil, actor)
@@ -643,6 +637,9 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	rctx, scope := meter.Start(ctx, meter.Loop("drafts"))
 	if err := o.Recover(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: recover: %v", err)
+	}
+	if err := o.PlaceBroadcasts(rctx); err != nil && ctx.Err() == nil {
+		s.logf("drafts: placing broadcasts: %v", err)
 	}
 	s.adoptDrafts(rctx)
 	scope.End()

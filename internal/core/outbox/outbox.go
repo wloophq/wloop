@@ -529,31 +529,42 @@ func setText(d *draft.Draft, text string) error {
 // person again: its gate is superseded first, so no window and no approval
 // given to the old text releases the new one, and a gate that waits opens.
 func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Draft, error) {
-	return s.amend(ctx, id, func(d *draft.Draft) error { return setText(d, text) })
+	return s.Amend(ctx, id, Amendment{Text: &text})
 }
 
 // SetBroadcast turns on or off whether held or failed draft id, a thread
 // reply, is also posted to its conversation; its gate is handled as Edit's.
 func (s *Service) SetBroadcast(ctx context.Context, id draft.ID, on bool) (draft.Draft, error) {
-	return s.amend(ctx, id, func(d *draft.Draft) error {
-		if d.Broadcast == draft.NoBroadcast {
-			return fmt.Errorf("%w: draft %d replies in no thread, so it has nothing to broadcast", ErrInvalid, id)
-		}
-		d.Broadcast = draft.BroadcastOff
-		if on {
-			d.Broadcast = draft.BroadcastOn
-		}
-		return nil
-	})
+	return s.Amend(ctx, id, Amendment{Broadcast: &on})
 }
 
-func (s *Service) amend(ctx context.Context, id draft.ID, change func(*draft.Draft) error) (draft.Draft, error) {
+// Amendment is what a person changes on a draft: its text, a thread reply's
+// broadcast, or both; nil leaves it.
+type Amendment struct {
+	Text      *string
+	Broadcast *bool
+}
+
+// Amend applies a to held or failed draft id at once, both changes or
+// neither; its gate is handled as Edit's.
+func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
 	d, err := s.load(ctx, id, "", draft.Held, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if err := change(&d); err != nil {
-		return draft.Draft{}, err
+	if a.Text != nil {
+		if err := setText(&d, *a.Text); err != nil {
+			return draft.Draft{}, err
+		}
+	}
+	if a.Broadcast != nil {
+		if d.Broadcast == draft.NoBroadcast {
+			return draft.Draft{}, fmt.Errorf("%w: draft %d replies in no thread, so it has nothing to broadcast", ErrInvalid, id)
+		}
+		d.Broadcast = draft.BroadcastOff
+		if *a.Broadcast {
+			d.Broadcast = draft.BroadcastOn
+		}
 	}
 	reopen := false
 	if d.State == draft.Held {
@@ -920,6 +931,45 @@ func (s *Service) Recover(ctx context.Context) error {
 	}
 	if err := s.ApplyPending(ctx); err != nil {
 		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
+// PlaceBroadcasts runs at daemon start: every held or failed message draft
+// stored with no broadcast, as a version before broadcasts left it, takes the
+// broadcast its publisher's Placer gives it now. Its gate stays as it is. A
+// draft placed in no thread, or whose publisher cannot place it now, keeps
+// none and is asked again at the next start.
+func (s *Service) PlaceBroadcasts(ctx context.Context) error {
+	ds, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held, draft.Failed}})
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range ds {
+		if d.Delivery != draft.Message || d.Broadcast != draft.NoBroadcast {
+			continue
+		}
+		fx, err := s.publisher(d)
+		if err != nil {
+			continue
+		}
+		pl, ok := fx.(port.Placer)
+		if !ok {
+			continue
+		}
+		got, err := pl.Place(ctx, d)
+		if err != nil {
+			s.logf("draft %d: its broadcast stays unplaced: %v", d.ID, err)
+			continue
+		}
+		if got.Broadcast == draft.NoBroadcast || !got.Broadcast.Valid() {
+			continue
+		}
+		d.Broadcast = got.Broadcast
+		if _, err := s.save(ctx, d, d.State); err != nil && !errors.Is(err, ErrConflict) {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }
