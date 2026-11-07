@@ -8,6 +8,7 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 	"github.com/wloophq/wloop/plugins/slack/items"
+	"github.com/wloophq/wloop/plugins/slack/language"
 	slackrows "github.com/wloophq/wloop/plugins/slack/rows"
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
@@ -62,7 +63,24 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 		{Name: "slack.items_unowned_age_days", Value: src.Int(int64(age))},
 		{Name: "slack.settled_at", Value: src.Time(time.Time{})},
 		{Name: "slack.fingerprint", Value: src.String(u.String() + "|" + newest + "|" + updated.UTC().Format(time.RFC3339Nano))},
+		{Name: "slack.language", Value: src.String(threadLanguage(in))},
 	}, next
+}
+
+// languageMessages is how many of a thread's newest messages tell its language.
+const languageMessages = 50
+
+// threadLanguage is the language its people write in, read from the newest languageMessages of in's
+// messages people wrote, the viewer's included.
+func threadLanguage(in *slackrows.Input) string {
+	msgs := in.Messages()
+	var texts []string
+	for _, m := range msgs[max(0, len(msgs)-languageMessages):] {
+		if in.Human(m) {
+			texts = append(texts, m.Text)
+		}
+	}
+	return language.Detect(texts)
 }
 
 // conversationOf is the kind of k's conversation: dm, group (a multi-person
