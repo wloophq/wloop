@@ -30,5 +30,5 @@ var homeGrammar = slices.Concat([]Key{
 	{Path: "sections[].time", In: SurfaceHome, Kind: KindEnum, Values: HomeTimes, Default: "moved", Doc: "The time each row shows."},
 	{Path: "capture", In: SurfaceHome, Kind: KindTable, Doc: "The capture field."},
 	{Path: "capture.hint", In: SurfaceHome, Kind: KindText, Localized: true, Doc: "What the empty field says."},
-}, formsText(SurfaceHome, "counters[].noun", "What one of the counter's tasks is; a kind's counter defaults to the kind's noun."),
-	formsText(SurfaceHome, "counters[].clause", "The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause."))
+}, pluralText(SurfaceHome, "counters[].noun", "What one of the counter's tasks is; a kind's counter defaults to the kind's noun."),
+	pluralText(SurfaceHome, "counters[].clause", "The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause."))

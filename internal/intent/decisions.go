@@ -96,7 +96,7 @@ func loadDecisions(layers []profile.Layer, r layerReader) (*decisionsLoad, Probl
 			problems = append(problems, Problem{File: res.Path, Msg: err.Error()})
 			continue
 		}
-		problems = append(problems, l.merge(dunit.ProviderID(uiPlugin(layer)), res.Path, res.Body, r)...)
+		problems = append(problems, l.merge(dunit.ProviderID(layer.PluginID()), res.Path, res.Body, r)...)
 	}
 	if r.texts != nil {
 		for k, t := range l.def.Kinds {

@@ -943,14 +943,14 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.show.kind` (list of strings): The values the facet shows in the kind part.
 - `facets.<name>.show.age` (list of strings): The values the facet shows in the age part.
 - `facets.<name>.show.aside` (list of strings): The values the facet shows in the aside part.
-- `noun` (string or table): What one of the plugin's units is, which the briefing counts, such as "pull request". A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `noun` (string or table, localized): What one of the plugin's units is, which the briefing counts, such as "pull request". A string, or a table of its CLDR plural forms, `other` required.
 - `noun.zero` (string, localized): Its zero form.
 - `noun.one` (string, localized): Its one form.
 - `noun.two` (string, localized): Its two form.
 - `noun.few` (string, localized): Its few form.
 - `noun.many` (string, localized): Its many form.
 - `noun.other` (string, localized): Its other form.
-- `decisions.<name>.clause` (string or table): The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `decisions.<name>.clause` (string or table, localized): The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, or a table of its CLDR plural forms, `other` required.
 - `decisions.<name>.clause.zero` (string, localized): Its zero form.
 - `decisions.<name>.clause.one` (string, localized): Its one form.
 - `decisions.<name>.clause.two` (string, localized): Its two form.
@@ -1095,14 +1095,14 @@ The fields each notice reads besides `Name` and `Command`:
   - `moved`: When the task last moved.
 - `capture` (table): The capture field.
 - `capture.hint` (string, localized): What the empty field says.
-- `counters[].noun` (string or table): What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `counters[].noun` (string or table, localized): What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, or a table of its CLDR plural forms, `other` required.
 - `counters[].noun.zero` (string, localized): Its zero form.
 - `counters[].noun.one` (string, localized): Its one form.
 - `counters[].noun.two` (string, localized): Its two form.
 - `counters[].noun.few` (string, localized): Its few form.
 - `counters[].noun.many` (string, localized): Its many form.
 - `counters[].noun.other` (string, localized): Its other form.
-- `counters[].clause` (string or table): The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.
+- `counters[].clause` (string or table, localized): The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, or a table of its CLDR plural forms, `other` required.
 - `counters[].clause.zero` (string, localized): Its zero form.
 - `counters[].clause.one` (string, localized): Its one form.
 - `counters[].clause.two` (string, localized): Its two form.

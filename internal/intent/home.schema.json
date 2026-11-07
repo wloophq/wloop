@@ -24,7 +24,7 @@
         "additionalProperties": false,
         "properties": {
           "clause": {
-            "description": "The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+            "description": "The briefing's clause on the counter, `{counter}` where its count goes; a kind's counter defaults to the kind's clause. A string, or a table of its CLDR plural forms, `other` required.",
             "oneOf": [
               {
                 "type": "string"
@@ -79,7 +79,7 @@
             "type": "string"
           },
           "noun": {
-            "description": "What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+            "description": "What one of the counter's tasks is; a kind's counter defaults to the kind's noun. A string, or a table of its CLDR plural forms, `other` required.",
             "oneOf": [
               {
                 "type": "string"

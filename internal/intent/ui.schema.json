@@ -9,7 +9,7 @@
         "description": "One decision kind's words.",
         "properties": {
           "clause": {
-            "description": "The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+            "description": "The briefing's clause on the kind when every unit counted is the plugin's, `{counter}` where its count goes. A string, or a table of its CLDR plural forms, `other` required.",
             "oneOf": [
               {
                 "type": "string"
@@ -448,7 +448,7 @@
       "type": "object"
     },
     "noun": {
-      "description": "What one of the plugin's units is, which the briefing counts, such as \"pull request\". A string, its `other` form, or a table of its CLDR plural forms, `other` required; a locale translates each form.",
+      "description": "What one of the plugin's units is, which the briefing counts, such as \"pull request\". A string, or a table of its CLDR plural forms, `other` required.",
       "oneOf": [
         {
           "type": "string"

@@ -29,6 +29,8 @@ type HomeCounterDef struct {
 	Kind         decision.Kind
 	View         string
 	Noun, Clause i18n.Forms
+	// at is the counter's index in the list of the file that set it.
+	at int
 }
 
 // HomeSectionDef is a section of the home: the first Limit rows of View, each showing Time.
@@ -78,6 +80,18 @@ type homeLoad struct {
 func loadHome(layers []profile.Layer, r layerReader) (*homeLoad, Problems) {
 	l := &homeLoad{def: HomeDef{Template: "default", PerSentence: 3}}
 	problems, _ := readLayered(layers, r, HomeFile, l.merge)
+	if r.texts != nil {
+		for i, c := range l.def.Counters {
+			for key, dst := range map[string]*i18n.Forms{"noun": &l.def.Counters[i].Noun, "clause": &l.def.Counters[i].Clause} {
+				if *dst == nil {
+					continue
+				}
+				if f, ok := r.texts.Forms(HomeFile, []string{"counters", fmt.Sprintf("[%d]", c.at), key}); ok && strings.TrimSpace(f["other"]) != "" {
+					*dst = f
+				}
+			}
+		}
+	}
 	return l, problems
 }
 
@@ -121,6 +135,7 @@ func (l *homeLoad) merge(file string, src []byte) Problems {
 		d.Counters = nil
 		for i, c := range m.Counters {
 			if def, ok := l.counter(s, fmt.Sprintf("counters[%d]", i), c); ok {
+				def.at = i
 				d.Counters = append(d.Counters, def)
 			}
 		}

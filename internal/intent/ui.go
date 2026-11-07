@@ -110,26 +110,13 @@ type UIFacet struct {
 	Show Show `toml:"-"`
 }
 
-// uiPlugin is the plugin whose words layer l holds: its own layer or the
-// user's layer of it; "" for a layer of no plugin.
-func uiPlugin(l profile.Layer) string {
-	if l.Plugin() {
-		return strings.TrimPrefix(l.Name, profile.PluginLayer(""))
-	}
-	id, ok := strings.CutPrefix(l.Name, "user:")
-	if !ok {
-		return ""
-	}
-	return id
-}
-
 // loadUI reads ui.toml from each plugin's layers, by plugin id: a higher
 // layer's text replaces a lower one's, key by key.
 func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems) {
 	out := map[string]UITexts{}
 	var problems Problems
 	for _, l := range layers {
-		id := uiPlugin(l)
+		id := l.PluginID()
 		if id == "" {
 			continue
 		}
@@ -172,7 +159,28 @@ func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems
 		}
 		out[id] = mergeUI(out[id], m)
 	}
+	if r.texts != nil {
+		for id, u := range out {
+			u.Noun = pluginForms(r, id, u.Noun, "noun")
+			for k, d := range u.Decisions {
+				d.Clause = pluginForms(r, id, d.Clause, "decisions", k, "clause")
+				u.Decisions[k] = d
+			}
+			out[id] = u
+		}
+	}
 	return out, problems
+}
+
+// pluginForms is the plural text at path of plugin id's ui.toml in r's locale, else in.
+func pluginForms(r layerReader, id string, in i18n.Forms, path ...string) i18n.Forms {
+	if in == nil {
+		return nil
+	}
+	if f, ok := r.texts.PluginForms(id, UIFile, path); ok && strings.TrimSpace(f["other"]) != "" {
+		return f
+	}
+	return in
 }
 
 func mergeUI(into, over UITexts) UITexts {
