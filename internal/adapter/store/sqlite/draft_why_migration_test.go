@@ -69,6 +69,19 @@ func TestVersion11AddsWhyAndLanguageToDrafts(t *testing.T) {
 	}
 }
 
+func TestAPlanToVersion11KeepsTheStoreReadableAtVersion10(t *testing.T) {
+	t.Parallel()
+	path := storeAtV10(t)
+	p, err := current.plan(path, t.TempDir(), migrateOpts(path).Now())
+	if err != nil || !p.Pending() || p.Compatible != 10 {
+		t.Fatalf("%+v %v, want compatible 10", p, err)
+	}
+	if p.ReadableAfter() {
+		return
+	}
+	t.Error("a release at version 10 reads a version 11 store, but the plan says it will not")
+}
+
 func TestVersion11CreatesWorkflowSkips(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

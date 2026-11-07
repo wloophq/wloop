@@ -450,7 +450,7 @@ func (e *Env) storeMigrate(ctx context.Context, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(e.Out, "store: version %d → %d (%s)\n", p.From, p.To, plural(len(p.Steps), "migration", "migrations"))
-	if !releaseBuild(Version) {
+	if !releaseBuild(Version) && !p.ReadableAfter() {
 		fmt.Fprintf(e.Out, "this build (%s) is not a release: a release at version %d will not read the store afterwards; `%s` goes back\n", Version, p.From, restoreCommand)
 	}
 	fmt.Fprintf(e.Out, "backup: %s (%s)\n", p.Backup, sqlite.Megabytes(p.Size))

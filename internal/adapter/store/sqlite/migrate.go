@@ -148,10 +148,15 @@ type Plan struct {
 	// Size is the store's size with its WAL, and Free the bytes free where
 	// the backup goes, -1 when unknown.
 	Size, Free int64
+	// Compatible is the oldest version a release must be at to read the store once migrated.
+	Compatible uint32
 }
 
 // Pending says the plan migrates anything.
 func (p Plan) Pending() bool { return len(p.Steps) > 0 }
+
+// ReadableAfter says a release at the store's version now still reads it once migrated.
+func (p Plan) ReadableAfter() bool { return p.Compatible <= p.From }
 
 // Short says the free space cannot hold the backup with room to spare.
 func (p Plan) Short() bool { return p.Free >= 0 && p.Free < 2*p.Size }
@@ -176,7 +181,7 @@ func (set schemaSet) plan(path, backups string, now time.Time) (Plan, error) {
 	default:
 		return p, SchemaError{path, s, set.version}
 	}
-	p.To = set.version
+	p.To, p.Compatible = set.version, set.compatibleAt(set.version)
 	for _, m := range set.pending(s.Version) {
 		p.Steps = append(p.Steps, m.label())
 	}
