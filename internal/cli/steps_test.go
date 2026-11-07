@@ -531,19 +531,20 @@ func (r *classifyRig) run(t *testing.T) (string, error) {
 func TestClassifyNeverBlocksTheSweep(t *testing.T) {
 	t.Parallel()
 	r := newClassifyRig(t, 5)
-	done := make(chan error, 1)
-	go func() {
-		_, err := r.run(t)
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		var deferred automation.Deferred
-		if !errors.As(err, &deferred) {
-			t.Fatalf("run: %v", err)
-		}
-	case <-time.After(5 * time.Second):
+	// The classifier answers only once released, so a Run that waits for it would hang; the watchdog only
+	// ends such a hang, and the test then fails whatever the machine's load.
+	hung := make(chan struct{})
+	watchdog := time.AfterFunc(time.Minute, func() {
+		close(r.asker.release)
+		close(hung)
+	})
+	_, err := r.run(t)
+	if !watchdog.Stop() {
+		<-hung
 		t.Fatal("Run waited for the classifier")
+	}
+	if !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("run: %v", err)
 	}
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
 		t.Fatalf("a second run while classifying: %v", err)
