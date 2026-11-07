@@ -145,9 +145,9 @@ func motionCSS(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pal := regexp.MustCompile("(?s)const PALETTE_CSS = `(.*?)`").FindStringSubmatch(staticJS(t, "palette.js"))
+	pal := regexp.MustCompile("(?s)const PALETTE_CSS = `(.*?)`").FindStringSubmatch(staticJS(t, "omnibox.js"))
 	if pal == nil {
-		t.Fatal("palette.js has no PALETTE_CSS")
+		t.Fatal("omnibox.js has no PALETTE_CSS")
 	}
 	return string(app) + "\n" + pal[1]
 }
