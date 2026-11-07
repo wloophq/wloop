@@ -723,7 +723,7 @@ tbody tr.sel td:first-child, .card.sel, .cand.sel, .task-row.sel, .activity .a-e
 .md code { padding: 1px var(--space-4); font: var(--text-meta)/1.4 var(--mono); color: var(--ink); background: var(--code-bg); border-radius: var(--radius-sm); }
 .md pre { padding: var(--space-8) var(--space-10); overflow-x: auto; background: var(--code-bg); border-radius: var(--radius-md); }
 .md pre code { padding: 0; background: none; white-space: pre; }
-.md a { color: var(--me-text); text-decoration: none; }
-.md a:hover { text-decoration: underline; }
+.md a { color: var(--me-text); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.md a:hover { text-decoration-color: currentColor; }
 .md-more { padding: 0; color: var(--me-text); background: none; border: 0; cursor: pointer; }
 .md-more:hover { text-decoration: underline; }

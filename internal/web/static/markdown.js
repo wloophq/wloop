@@ -11,9 +11,11 @@ const MD_FENCE = /^\s*(```|~~~)/;
 const MD_HEADING = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/;
 const MD_QUOTE = /^\s{0,3}>\s?/;
 const MD_ITEM = /^\s{0,3}([-*+]|\d{1,9}[.)])\s+/;
-const MD_LINK = /^\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/;
-const MD_BARE_URL = /^https:\/\/[^\s<>()[\]]+/;
+const MD_LINK_URL = /\(((?:[^()\s]|\([^()\s]*\))+)\)/y;
+const MD_BARE_URL = /https:\/\/[^\s<>()[\]]+/y;
 const MD_WORD = /[\p{L}\p{N}]/u;
+// MD_DEPTH caps nested quotes and emphases; deeper markers stay text in the innermost node.
+const MD_DEPTH = 8;
 
 function renderMarkdown(text, opts) {
   const o = opts || {};
@@ -29,8 +31,9 @@ function renderMarkdown(text, opts) {
 }
 
 // mdBlocks splits lines into block descriptors without building nodes, so a folded text builds only what shows.
-function mdBlocks(lines) {
+function mdBlocks(lines, depth = 0) {
   const out = [];
+  const quotes = depth < MD_DEPTH;
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
@@ -53,10 +56,10 @@ function mdBlocks(lines) {
       i++;
       continue;
     }
-    if (MD_QUOTE.test(line)) {
+    if (quotes && MD_QUOTE.test(line)) {
       const body = [];
       while (i < lines.length && MD_QUOTE.test(lines[i])) body.push(lines[i++].replace(MD_QUOTE, ""));
-      out.push({ kind: "quote", blocks: mdBlocks(body) });
+      out.push({ kind: "quote", blocks: mdBlocks(body, depth + 1) });
       continue;
     }
     const item = line.match(MD_ITEM);
@@ -73,7 +76,7 @@ function mdBlocks(lines) {
       continue;
     }
     const para = [];
-    while (i < lines.length && lines[i].trim() && !MD_FENCE.test(lines[i]) && !MD_HEADING.test(lines[i]) && !MD_QUOTE.test(lines[i]) && !(para.length && MD_ITEM.test(lines[i]))) {
+    while (i < lines.length && lines[i].trim() && !MD_FENCE.test(lines[i]) && !MD_HEADING.test(lines[i]) && !(quotes && MD_QUOTE.test(lines[i])) && !(para.length && MD_ITEM.test(lines[i]))) {
       para.push(lines[i++].trim());
     }
     out.push({ kind: "p", text: para.join("\n") });
@@ -98,89 +101,113 @@ function mdBlock(b) {
 }
 
 // mdInline turns one block's text into strings and inline nodes; a marker without its closing pair stays text.
-function mdInline(s) {
+// It runs in time linear in the text: closers and label ends are found once per text, not once per opener.
+// Inside a link label it makes no link; past MD_DEPTH nested emphases the markers stay text.
+function mdInline(s, depth = 0, links = true) {
   const out = [];
-  let plain = "";
-  const flush = () => {
-    if (plain) out.push(plain);
-    plain = "";
+  const closers = mdClosers(s);
+  const labelEnd = links ? mdLabelEnds(s) : null;
+  let start = 0;
+  const flush = (i) => {
+    if (i > start) out.push(s.slice(start, i));
   };
+  const nested = depth < MD_DEPTH;
   let i = 0;
   while (i < s.length) {
     const c = s[i];
-    const prev = i > 0 ? s[i - 1] : "";
     if (c === "\n") {
-      flush();
+      flush(i);
       out.push(h("br", {}));
-      i++;
+      start = ++i;
       continue;
     }
     if (c === "`") {
       const end = s.indexOf("`", i + 1);
       if (end > i + 1) {
-        flush();
+        flush(i);
         out.push(h("code", {}, s.slice(i + 1, end)));
-        i = end + 1;
+        start = i = end + 1;
         continue;
       }
     }
-    if ((c === "*" || c === "_") && s[i + 1] === c) {
-      const end = mdClose(s, c + c, i + 2);
+    if (nested && (c === "*" || c === "_")) {
+      const double = s[i + 1] === c;
+      const marker = double ? c + c : c;
+      const open = !mdSpace(s, i + marker.length) && (double || !(c === "_" && mdWord(s, i - 1)));
+      const end = open ? closers.next(marker, i + marker.length) : -1;
       if (end > 0) {
-        flush();
-        out.push(h("strong", {}, mdInline(s.slice(i + 2, end))));
-        i = end + 2;
+        flush(i);
+        out.push(h(double ? "strong" : "em", {}, mdInline(s.slice(i + marker.length, end), depth + 1, links)));
+        start = i = end + marker.length;
         continue;
       }
     }
-    if ((c === "*" || c === "_") && s[i + 1] !== c && !(c === "_" && MD_WORD.test(prev))) {
-      const end = mdClose(s, c, i + 1);
-      if (end > 0) {
-        flush();
-        out.push(h("em", {}, mdInline(s.slice(i + 1, end))));
-        i = end + 1;
-        continue;
-      }
-    }
-    if (c === "[") {
-      const m = s.slice(i).match(MD_LINK);
+    if (links && c === "[" && s[labelEnd[i + 1]] === "]" && labelEnd[i + 1] > i + 1) {
+      const close = labelEnd[i + 1];
+      MD_LINK_URL.lastIndex = close + 1;
+      const m = MD_LINK_URL.exec(s);
       if (m) {
-        flush();
-        const href = safeURL(m[2]);
-        out.push(href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, mdInline(m[1])) : mdInline(m[1]));
-        i += m[0].length;
+        flush(i);
+        const label = mdInline(s.slice(i + 1, close), depth + 1, false);
+        const href = safeURL(m[1]);
+        out.push(href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label);
+        start = i = close + 1 + m[0].length;
         continue;
       }
     }
-    if (c === "h" && !MD_WORD.test(prev)) {
-      const m = s.slice(i).match(MD_BARE_URL);
-      if (m) {
-        const url = m[0].replace(/[.,;:!?'"]+$/, "");
-        const href = safeURL(url);
-        if (href) {
-          flush();
-          out.push(h("a", { href, target: "_blank", rel: "noopener noreferrer" }, url));
-          i += url.length;
-          continue;
-        }
+    if (links && c === "h" && !mdWord(s, i - 1) && s.startsWith("https://", i)) {
+      MD_BARE_URL.lastIndex = i;
+      const m = MD_BARE_URL.exec(s);
+      const url = m ? m[0].replace(/[.,;:!?'"]+$/, "") : "";
+      const href = safeURL(url);
+      if (href) {
+        flush(i);
+        out.push(h("a", { href, target: "_blank", rel: "noopener noreferrer" }, url));
+        start = i = i + url.length;
+        continue;
       }
     }
-    plain += c;
     i++;
   }
-  flush();
+  flush(i);
   return out;
 }
 
-// mdClose finds the closing marker of an emphasis that opened right before from: it must hug text on both
-// sides, and a closing _ must not sit inside a word.
-function mdClose(s, marker, from) {
-  if (from >= s.length || /\s/.test(s[from])) return -1;
-  for (let at = s.indexOf(marker, from + 1); at > from; at = s.indexOf(marker, at + 1)) {
-    const hugs = !/\s/.test(s[at - 1]);
-    const free = marker[0] !== "_" || !MD_WORD.test(s[at + marker.length] || "");
-    const whole = marker.length === 2 || (s[at + 1] !== marker && s[at - 1] !== marker);
-    if (hugs && free && whole) return at;
+function mdSpace(s, i) {
+  return i < 0 || i >= s.length || /\s/.test(s[i]);
+}
+
+function mdWord(s, i) {
+  return i >= 0 && i < s.length && MD_WORD.test(s[i]);
+}
+
+// mdClosers lists, in one pass, every place an emphasis may close: the marker hugs text before it, a closing _
+// does not sit inside a word, and a single marker is not half of a double one. next(marker, from) answers the
+// first closer after from; openers ask in increasing order, so each list is walked once.
+function mdClosers(s) {
+  const at = { "**": [], __: [], "*": [], _: [] };
+  for (let i = 1; i < s.length; i++) {
+    const c = s[i];
+    if ((c !== "*" && c !== "_") || mdSpace(s, i - 1)) continue;
+    if (s[i + 1] === c && !(c === "_" && mdWord(s, i + 2))) at[c + c].push(i);
+    if (s[i + 1] !== c && s[i - 1] !== c && !(c === "_" && mdWord(s, i + 1))) at[c].push(i);
   }
-  return -1;
+  const seen = { "**": 0, __: 0, "*": 0, _: 0 };
+  return {
+    next(marker, from) {
+      const list = at[marker];
+      let k = seen[marker];
+      while (k < list.length && list[k] <= from) k++;
+      seen[marker] = k;
+      return k < list.length ? list[k] : -1;
+    },
+  };
+}
+
+// mdLabelEnds holds, for each position, where a link label starting there would end: the next ] or line end.
+function mdLabelEnds(s) {
+  const end = new Int32Array(s.length + 1);
+  end[s.length] = s.length;
+  for (let i = s.length - 1; i >= 0; i--) end[i] = s[i] === "]" || s[i] === "\n" ? i : end[i + 1];
+  return end;
 }

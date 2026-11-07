@@ -172,6 +172,84 @@ func TestMarkdownFoldsAHugeAnswerCheaply(t *testing.T) {
 	}
 }
 
+// workCounterJS counts the characters the string and regexp primitives may scan, so a test tells linear from
+// quadratic growth without a clock.
+const workCounterJS = `
+let work = 0;
+const indexOf0 = String.prototype.indexOf, slice0 = String.prototype.slice, exec0 = RegExp.prototype.exec;
+String.prototype.indexOf = function (x, from) { const r = indexOf0.call(this, x, from); work += (r < 0 ? this.length : r) - (from || 0) + 1; return r; };
+String.prototype.slice = function (a, b) { const r = slice0.call(this, a, b); work += r.length + 1; return r; };
+RegExp.prototype.exec = function (s) {
+  const from = this.sticky || this.global ? this.lastIndex : 0;
+  const m = exec0.call(this, s);
+  work += this.sticky ? (m ? m[0].length : 0) + 1 : String(s).length - from + 1;
+  return m;
+};
+function workOf(text) { work = 0; renderMarkdown(text); return work; }
+`
+
+func TestMarkdownInlineIsLinear(t *testing.T) {
+	shapes := map[string]string{
+		"lone stars":       "*a ",
+		"lone underscores": " _a",
+		"lone doubles":     "**a ",
+		"globs":            "*.go ",
+		"open brackets":    "[",
+		"open links":       "[a](b",
+		"labels":           "[a] ",
+		"bare h":           "h",
+		"backticks":        "` a ",
+		"nested emphasis":  "*a **b _c ",
+	}
+	var got map[string][2]int
+	nodeRun(t, markdownPrelude(t)+workCounterJS, nil, `
+const out = {};
+for (const [name, unit] of Object.entries(input)) out[name] = [workOf(unit.repeat(2000)), workOf(unit.repeat(4000))];
+process.stdout.write(JSON.stringify(out));`, shapes, &got)
+	for name := range shapes {
+		w := got[name]
+		if w[0] == 0 || float64(w[1]) > 2.5*float64(w[0]) {
+			t.Errorf("%s: work %d for 2000 repeats, %d for 4000; want at most 2.5x", name, w[0], w[1])
+		}
+	}
+}
+
+func TestMarkdownCapsNesting(t *testing.T) {
+	got := renderMD(t, strings.Repeat(">", 10000)+" x", "")
+	if q := got.tags("blockquote"); len(q) == 0 || len(q) > 8 {
+		t.Errorf("%d nested quotes, want 1 to 8", len(q))
+	}
+	if !strings.HasSuffix(got.Text, "x") {
+		t.Errorf("text ends %q", got.Text[max(0, len(got.Text)-10):])
+	}
+	deep := renderMD(t, strings.Repeat("*a ", 5000)+"b"+strings.Repeat(" a*", 5000), "")
+	if em := deep.tags("em"); len(em) > 8 {
+		t.Errorf("%d nested emphases, want at most 8", len(em))
+	}
+}
+
+func TestALinkLabelMakesNoLinkInside(t *testing.T) {
+	got := renderMD(t, "[https://a.test](https://b.test) and [x [y](https://c.test)](https://d.test)", "")
+	links := got.tags("a")
+	for _, a := range links {
+		if len(a.tags("a")) > 1 {
+			t.Errorf("an anchor inside an anchor: %+v", a)
+		}
+	}
+	if len(links) == 0 || links[0].Attrs["href"] != "https://b.test" || links[0].Text != "https://a.test" {
+		t.Errorf("links %+v", links)
+	}
+}
+
+func TestMarkdownLinksAreUnderlined(t *testing.T) {
+	css := string(appCSS(t))
+	_, rule, _ := strings.Cut(css, ".md a {")
+	rule, _, _ = strings.Cut(rule, "}")
+	if !strings.Contains(rule, "text-decoration: underline") && !strings.Contains(rule, "text-decoration-line: underline") {
+		t.Errorf(".md a { %s}: a link in prose must not be told by color alone", rule)
+	}
+}
+
 func TestMarkdownKeepsUnclosedMarkersAsText(t *testing.T) {
 	for _, raw := range []string{"a **b and `c", "2 * 3 * 4", "[label](no close", "_x"} {
 		got := renderMD(t, raw, "")
