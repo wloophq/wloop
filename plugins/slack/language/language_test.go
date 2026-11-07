@@ -1,6 +1,9 @@
 package language
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestDetectTellsPortugueseFromAThread(t *testing.T) {
 	t.Parallel()
@@ -87,6 +90,21 @@ func TestDetectAccuracyOnShortThreads(t *testing.T) {
 		{"es", []string{"El servidor se cayó otra vez, estoy investigando qué pasó"}},
 		{"es", []string{"Todavía estoy esperando la respuesta del cliente sobre la propuesta"}},
 		{"es", []string{"¿Puedes enviarme los números actualizados antes del viernes?", "Sí, te los envío"}},
+	}
+	mixed := []struct {
+		thread []string
+		either []string
+	}{
+		{[]string{"can you take a look at the PR?", "sim, já olho"}, []string{"en", "pt"}},
+		{[]string{"o deploy quebrou de novo", "yeah, rolling back now"}, []string{"en", "pt"}},
+		{[]string{"ok, merged", "valeu! vou testar no staging"}, []string{"en", "pt"}},
+		{[]string{"thanks!", "de nada, qualquer coisa me chama"}, []string{"en", "pt"}},
+		{[]string{"o job de backfill quebrou de novo no staging", "vou olhar o log"}, []string{"pt"}},
+	}
+	for _, c := range mixed {
+		if got := Detect(c.thread); got != "" && !slices.Contains(c.either, got) {
+			t.Errorf("Detect(%q) = %q, want one of %v or empty", c.thread, got, c.either)
+		}
 	}
 	right := 0
 	for _, c := range cases {
