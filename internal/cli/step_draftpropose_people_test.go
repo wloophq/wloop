@@ -136,6 +136,54 @@ func TestAnApprovedPerPersonNudgeHoldsTheConversationsOne(t *testing.T) {
 	}
 }
 
+// racingOutbox is the rig's Outbox, running before once before the first Withdraw, as a person who approves
+// a draft in that span.
+type racingOutbox struct {
+	draftOutbox
+	before func(id draft.ID)
+}
+
+func (o *racingOutbox) race(id draft.ID) {
+	if o.before != nil {
+		o.before(id)
+		o.before = nil
+	}
+}
+
+func (o *racingOutbox) Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	o.race(id)
+	return o.draftOutbox.Withdraw(ctx, id, reason)
+}
+
+func (o *racingOutbox) WithdrawHeld(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	o.race(id)
+	return o.draftOutbox.WithdrawHeld(ctx, id, reason)
+}
+
+func TestAnAbsorbedDraftApprovedMeanwhileIsKept(t *testing.T) {
+	t.Parallel()
+	r := nudgeRig(t)
+	ctx := context.Background()
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana))
+	r.run(draftThread)
+	first := r.drafts()
+	if len(first) != 1 {
+		t.Fatalf("%d drafts, want Ana's", len(first))
+	}
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-72*time.Hour), bruno))
+	race := &racingOutbox{draftOutbox: r.svc, before: func(draft.ID) {
+		if err := approveDraft(ctx, r.svc, first[0].ID); err != nil {
+			t.Fatal(err)
+		}
+	}}
+	r.deps.Outbox = func() draftOutbox { return race }
+	r.run(draftThread)
+	ds := r.drafts()
+	if len(ds) != 1 || ds[0].ID != first[0].ID || ds[0].State != draft.Queued {
+		t.Fatalf("drafts %+v, want Ana's approved draft alone, still queued", ds)
+	}
+}
+
 func TestTheWithdrawSweepReadsAPerUnitDraftsPeople(t *testing.T) {
 	t.Parallel()
 	r := nudgeRig(t)

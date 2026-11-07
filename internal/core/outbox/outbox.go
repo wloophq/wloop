@@ -565,7 +565,21 @@ func (s *Service) Discard(ctx context.Context, id draft.ID, reason string) (draf
 // Withdraw drops draft id, which its proposer no longer stands by, for
 // reason: a held draft's gate is superseded.
 func (s *Service) Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
-	d, err := s.load(ctx, id, draft.Dropped, draft.Held, draft.Queued, draft.Failed)
+	return s.withdraw(ctx, id, reason, false)
+}
+
+// WithdrawHeld is Withdraw of a draft still held alone: one its gate approved meanwhile is left as it is,
+// refused with ErrConflict.
+func (s *Service) WithdrawHeld(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	return s.withdraw(ctx, id, reason, true)
+}
+
+func (s *Service) withdraw(ctx context.Context, id draft.ID, reason string, heldOnly bool) (draft.Draft, error) {
+	from := []draft.State{draft.Held, draft.Queued, draft.Failed}
+	if heldOnly {
+		from = from[:1]
+	}
+	d, err := s.load(ctx, id, draft.Dropped, from...)
 	if err != nil {
 		return draft.Draft{}, err
 	}
@@ -579,8 +593,14 @@ func (s *Service) Withdraw(ctx context.Context, id draft.ID, reason string) (dra
 				return draft.Draft{}, err
 			}
 		}
-		if d, err = s.Store.Get(ctx, id); err != nil || d.State != draft.Held {
+		if d, err = s.Store.Get(ctx, id); err != nil {
 			return d, err
+		}
+		if d.State != draft.Held {
+			if heldOnly {
+				return d, fmt.Errorf("draft %d is %s: %w", id, d.State, ErrConflict)
+			}
+			return d, nil
 		}
 	}
 	return s.drop(ctx, d, reason)

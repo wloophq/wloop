@@ -99,3 +99,21 @@ func TestFailedSilentEffectsAreRetried(t *testing.T) {
 		t.Fatal("not marked applied")
 	}
 }
+
+func TestWithdrawHeldLeavesAnApprovedDraft(t *testing.T) {
+	e := newEnv()
+	d := e.propose(reply("x"))
+	if _, err := e.approve(d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.WithdrawHeld(context.Background(), d.ID, draft.WithdrawSuperseded); !errors.Is(err, ErrConflict) {
+		t.Fatalf("err %v, want a conflict", err)
+	}
+	if got := e.get(d.ID); got.State != draft.Queued {
+		t.Fatalf("draft %s, want still queued", got.State)
+	}
+	held := e.propose(reply("y"))
+	if got, err := e.svc.WithdrawHeld(context.Background(), held.ID, draft.WithdrawSuperseded); err != nil || got.State != draft.Dropped {
+		t.Fatalf("a held draft: %s %v", got.State, err)
+	}
+}

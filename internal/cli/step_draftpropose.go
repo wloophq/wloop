@@ -36,6 +36,7 @@ type draftOutbox interface {
 	Propose(ctx context.Context, p outbox.Proposal) (draft.Draft, error)
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
 	Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
+	WithdrawHeld(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
 }
 
 type draftTasks interface {
@@ -206,7 +207,7 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 			continue
 		}
 		for _, id := range cd.absorbs {
-			if _, err := ob.Withdraw(ctx, id, draft.WithdrawSuperseded); err != nil && !errors.Is(err, outbox.ErrConflict) {
+			if _, err := ob.WithdrawHeld(ctx, id, draft.WithdrawSuperseded); err != nil && !errors.Is(err, outbox.ErrConflict) {
 				return "", err
 			}
 		}
