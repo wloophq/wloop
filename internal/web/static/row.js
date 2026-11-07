@@ -24,17 +24,37 @@ function pieceTitle(p, words) {
 function pieceButtons(m, lens, part) {
   const pieces = m.parts[part] || [];
   return pieces.map((p) => {
-    if (!p.value) return h("span", { class: ROW_PART_CLASS[part] || part, "data-field": p.field, "data-more": "", title: restOf(m, pieces, p.field).join(", ") || undefined }, p.label);
+    if (!p.value) return h("span", { class: ROW_PART_CLASS[part] || part, "data-field": p.field, "data-more": "", title: restOf(m, lens, pieces, p.field).join(", ") || undefined }, p.label);
     const span = h("span", { class: ROW_PART_CLASS[part] || part, "data-field": p.field, "data-value": p.value, title: agePart(part) ? pieceTitle(p, m.words) : undefined },
       marked(pieceLabel(p), lens.ts));
     return facet(lens, p.field, p.value, span, `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true });
   });
 }
 
-// restOf are the values of field the model holds that pieces, a part's pieces, leave out past its show_max.
-function restOf(m, pieces, field) {
+// restOf are the words of the values of field the model holds that pieces, a part's pieces, leave out past its
+// show_max.
+function restOf(m, lens, pieces, field) {
   const shown = new Set(pieces.filter((p) => p.field === field && p.value).map((p) => p.raw));
-  return ((m.item.facets || {})[field] || []).filter((v) => !shown.has(v));
+  const labels = ((lens.specs || []).find((s) => s.id === field) || {}).labels || {};
+  return ((m.item.facets || {})[field] || []).filter((v) => !shown.has(v)).map((v) => labels[v] || v);
+}
+
+// markWrapped makes inert each child of box that wrapped below its first line, which the row never shows, so
+// neither Tab nor the row's arrows reach it.
+function markWrapped(box) {
+  const kids = [...box.children];
+  const top = kids.length ? kids[0].offsetTop : 0;
+  for (const k of kids) k.inert = k.offsetTop > top;
+}
+
+const wrapWatch = typeof ResizeObserver === "function" ? new ResizeObserver((es) => es.forEach((e) => markWrapped(e.target))) : null;
+
+// watchWrapped keeps the pieces and actions root's rows hide out of the focus order, as they wrap and unwrap.
+function watchWrapped(root) {
+  for (const box of root.querySelectorAll(".row > .meta > .pieces, .row > .meta > .acts")) {
+    markWrapped(box);
+    if (wrapWatch) wrapWatch.observe(box);
+  }
 }
 
 function joined(nodes) {

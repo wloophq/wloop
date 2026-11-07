@@ -221,3 +221,34 @@ func TestTheUsersRowReadsWholeAtEveryWidth(t *testing.T) {
 		}
 	}
 }
+
+// TestAHiddenPieceOrActionLeavesTheFocusOrder lays the user's row out where some of its pieces and actions
+// wrap out of sight: those are inert, so neither Tab nor the row's arrows reach them, and every one shown is not.
+func TestAHiddenPieceOrActionLeavesTheFocusOrder(t *testing.T) {
+	html := usersRow(t)
+	probe := jsFunction(t, "\n"+staticJS(t, "row.js"), "markWrapped") + `
+const row = document.querySelector(".row");
+row.querySelectorAll(".pieces, .acts").forEach(markWrapped);
+const r = (el) => el.getBoundingClientRect();
+const out = { Hidden: 0, Shown: 0, Wrong: [] };
+for (const box of row.querySelectorAll(".pieces, .acts")) {
+  const c = r(box);
+  for (const k of box.children) {
+    const b = r(k);
+    const seen = b.bottom <= c.bottom + 0.5 && b.top >= c.top - 0.5;
+    if (seen) out.Shown++; else out.Hidden++;
+    if (k.inert === seen) out.Wrong.push(k.textContent + (k.inert ? " inert" : " live"));
+  }
+}
+return JSON.stringify(out);`
+	var got struct {
+		Hidden, Shown int
+		Wrong         []string
+	}
+	if err := json.Unmarshal([]byte(layoutOf(t, html, 1280, 760, probe)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Hidden == 0 || got.Shown == 0 || len(got.Wrong) > 0 {
+		t.Fatalf("%+v: what wraps out of sight is inert, what shows is not", got)
+	}
+}

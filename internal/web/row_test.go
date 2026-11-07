@@ -123,12 +123,14 @@ func TestARowShowsTwoTagsAndTheRest(t *testing.T) {
 		rowShape
 		More string
 	}
-	rowRun(t, `const row = rowOf(input.task);
+	rowRun(t, `tasksState.catalog.facets = tasksState.catalog.facets.map((f) => (f.id === "tag" ? { ...f, labels: { c: "Cê" } } : f));
+const worded = lensOf({ view: "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+const row = rowView(taskModel(input.task, "", "", worded), worded);
 process.stdout.write(JSON.stringify({ ...shape(row), More: (all(row, (x) => "data-more" in x.attrs)[0] || { attrs: {} }).attrs.title }));`, map[string]any{"task": rowTask(nil)}, &got)
 	if n := len(got.Meta); n < 3 || !slices.Equal(got.Meta[n-3:], []string{"a", "b", "+1"}) {
 		t.Errorf("the meta pieces %q, want them to end a, b, +1", got.Meta)
 	}
-	if got.More != "c" {
+	if got.More != "Cê" {
 		t.Errorf("the +1 chip's tooltip %q does not name the tag it holds", got.More)
 	}
 }
@@ -250,5 +252,18 @@ process.stdout.write(JSON.stringify([marks(rowView(taskModel(input.task, "e-1", 
 	page := staticJS(t, "index.html")
 	if !strings.Contains(page, `<div id="table"></div>`) || strings.Contains(page, "<table") {
 		t.Error("index.html holds the row list in a table, which reads as a table without rows")
+	}
+}
+
+func TestTheRowsArrowsSkipWhatItHides(t *testing.T) {
+	var got []string
+	nodeRun(t, "", []string{"rowStops"}, `
+const el = (name, kids = [], extra = {}) => ({ name, children: kids, hidden: false, ...extra,
+  getAttribute: (k) => (k === "data-rove" ? "" : null) });
+const shown = el("Review"), hidden = el("Remover", [], { inert: true });
+const row = el("row", [el("l1", [el("title")]), el("meta", [el("acts", [shown, hidden])])]);
+process.stdout.write(JSON.stringify(rowStops(row).map((n) => n.name)));`, nil, &got)
+	if slices.Contains(got, "Remover") || !slices.Contains(got, "Review") {
+		t.Fatalf("stops %v: the row's arrows skip an action that wrapped out of sight", got)
 	}
 }
