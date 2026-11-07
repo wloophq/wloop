@@ -21,6 +21,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/keys"
@@ -124,6 +125,7 @@ type Loaded struct {
 	skipped  []dintent.Name // kinds whose blocks need what a reverted override declared
 	layers   []profile.Layer
 	loadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
+	reader   layerReader
 	treeOnce sync.Once
 	tree     profile.Tree
 	treeErr  error
@@ -186,27 +188,34 @@ func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 // when the result does not load, the bundled intent stays and the problems
 // name the user's files.
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
+	return LoadIn(i18n.Default, layers, bundled, base, check)
+}
+
+// LoadIn is Load with the texts a person reads in locale, each by the layer rule of profile.Texts.
+func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
+	r := newLayerReader(locale, layers, bundled)
 	reverted := brokenOverlays{}
 	partials := revertedPartials{}
-	gates, gateProblems := loadGates(layers, bundled)
-	views, tasks, listProblems := loadViews(layers, bundled, &gates)
-	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	gates, gateProblems := loadGates(layers, r)
+	views, tasks, listProblems := loadViews(layers, r, &gates)
+	records, recordProblems := loadRecords(layers, r, &tasks)
 	listProblems = append(listProblems, recordProblems...)
 	listProblems = append(listProblems, views.checkFacets(tasks, records)...)
 	for {
 		set, problems := withPartials(base, layers, partials)
-		l, broken := load(layers, bundled, set, check, reverted, declarations{tasks, gates, records})
+		l, broken := load(layers, r, set, check, reverted, declarations{tasks, gates, records})
 		if partials.breaking(layers, append(problems, l.Problems...)) {
 			continue
 		}
 		if len(broken) == 0 {
-			actions, actionProblems := loadActions(layers, bundled)
-			tools, toolProblems := loadTools(layers, bundled)
-			keyTexts, keyProblems := loadKeys(layers, bundled)
-			notices, noticeProblems := loadNotices(layers, bundled)
-			ui, uiProblems := loadUI(layers)
+			actions, actionProblems := loadActions(layers, r)
+			tools, toolProblems := loadTools(layers, r)
+			keyTexts, keyProblems := loadKeys(layers, r)
+			notices, noticeProblems := loadNotices(layers, r)
+			ui, uiProblems := loadUI(layers, r)
 			l.Actions, l.Tools, l.Views, l.Keys, l.Notices, l.Gates, l.UI = actions, tools, views, keyTexts, notices, gates, ui
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems)
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, gateProblems, keyProblems, noticeProblems, uiProblems, *r.problems)
+			l.Locale, l.reader = locale, r
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
@@ -320,7 +329,8 @@ type declarations struct {
 	records RecordsDef
 }
 
-func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays, decl declarations) (*Loaded, brokenOverlays) {
+func load(layers []profile.Layer, r layerReader, base *template.Template, check TemplateCheck, plain brokenOverlays, decl declarations) (*Loaded, brokenOverlays) {
+	bundled := r.bundled
 	tasks := decl.tasks
 	var units []*unit
 	var dirProblems Problems
@@ -335,7 +345,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 				name: dintent.Name(e.Name()), dir: path.Join("intents", e.Name()), bundled: true,
 				source: dintent.Source{Layer: "bundled"},
 			}
-			u.files = files{bundled: bundled, dir: u.dir}
+			u.files = files{bundled: bundled, dir: u.dir, rel: u.dir, r: r, layer: bundledLayer}
 			units = append(units, u)
 			bundledUnits[u.name] = u
 		}
@@ -351,14 +361,14 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 				continue
 			}
 			name := dintent.Name(e.Name())
-			fl, dir := layerFiles(l, path.Join("intents", e.Name()))
+			fl, dir := layerFiles(l, path.Join("intents", e.Name()), r)
 			if b := bundledUnits[name]; b != nil {
 				if l.Embedded() {
 					dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", name, b.files.base("intent.toml"))})
 					continue
 				}
 				if _, skip := plain[name]; !skip && len(overrides([]string{dir})) > 0 {
-					b.files.overlay = append(b.files.overlay, dir)
+					b.files.overlaid(l, dir)
 					b.source = dintent.Source{Layer: l.Name, Dir: dir, Overrides: overrides(b.files.overlay)}
 				}
 				continue
@@ -381,7 +391,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			units = append(units, u)
 		}
 	}
-	defaults, defaultProblems := readDefaults(layers, bundled)
+	defaults, defaultProblems := readDefaults(layers, r)
 	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
 		u.load(base, defaults, tasks.Facts(), decl.gates)
@@ -429,7 +439,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		}
 	}
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks, l.Gates)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, r, l.turnProblem, l.profileFacts, l.Tasks, l.Gates)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
@@ -486,7 +496,7 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 
 func (u *unit) load(base *template.Template, defaults manifestDefaults, taskFacts expr.Env, gates GatesDef) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts, gates: gates}
+	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts, gates: gates, funcs: u.files.r.funcs()}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})
@@ -796,6 +806,8 @@ type CacheOptions struct {
 	LoadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
 	// OnReload is called, holding no lock, after Get replaces the loaded registry with a changed one; the first load is not a reload.
 	OnReload func()
+	// Locale is the locale of the texts a person reads, asked on each walk; English when nil.
+	Locale func() string
 }
 
 // Shared loads one registry per chain of embedded layers over the installed
@@ -814,6 +826,7 @@ type Shared struct {
 // it to the synctest bubble of the test that made it.
 type sharedEntry struct {
 	layers []profile.Layer
+	locale string
 	tables *builtin.Vocabulary
 
 	mu       sync.Mutex
@@ -838,29 +851,34 @@ func (s *Shared) NewCache(layers func() []profile.Layer, opts CacheOptions) *Cac
 // Load is the registry over layers, loaded once while they are all embedded
 // and the installed tables stay the same; a layer on disk loads anew.
 func (s *Shared) Load(layers []profile.Layer) (*Loaded, Problems) {
+	return s.LoadIn(i18n.Default, layers)
+}
+
+// LoadIn is Load with the texts a person reads in locale, one registry per chain and locale.
+func (s *Shared) LoadIn(locale string, layers []profile.Layer) (*Loaded, Problems) {
 	if !embeddedOnly(layers) {
-		return Load(layers, s.bundled, s.base, s.check)
+		return LoadIn(locale, layers, s.bundled, s.base, s.check)
 	}
-	e := s.entry(layers)
+	e := s.entry(locale, layers)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.loaded == nil {
-		e.loaded, e.problems = Load(layers, s.bundled, s.base, s.check)
+		e.loaded, e.problems = LoadIn(locale, layers, s.bundled, s.base, s.check)
 	}
 	return e.loaded, e.problems
 }
 
-func (s *Shared) entry(layers []profile.Layer) *sharedEntry {
+func (s *Shared) entry(locale string, layers []profile.Layer) *sharedEntry {
 	tables := builtin.Installed()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.entries = slices.DeleteFunc(s.entries, func(e *sharedEntry) bool { return e.tables != tables })
 	for _, e := range s.entries {
-		if slices.Equal(e.layers, layers) {
+		if e.locale == locale && slices.Equal(e.layers, layers) {
 			return e
 		}
 	}
-	e := &sharedEntry{layers: slices.Clone(layers), tables: tables}
+	e := &sharedEntry{layers: slices.Clone(layers), locale: locale, tables: tables}
 	s.entries = append(s.entries, e)
 	return e
 }
@@ -912,25 +930,29 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 		return c.loaded, false
 	}
 	layers := c.layers()
-	stamp := stampOf(layers)
+	locale := i18n.Default
+	if c.opts.Locale != nil {
+		locale = c.opts.Locale()
+	}
+	stamp := locale + "\x00" + stampOf(layers)
 	c.walks++
 	c.checked = now
 	if c.loaded == nil || stamp != c.stamp {
 		reloaded = c.loaded != nil
-		c.loaded = c.load(layers)
+		c.loaded = c.load(locale, layers)
 		c.stamp = stamp
 	}
 	return c.loaded, reloaded
 }
 
 // load is the registry over layers, its tree read.
-func (c *Cache) load(layers []profile.Layer) *Loaded {
+func (c *Cache) load(locale string, layers []profile.Layer) *Loaded {
 	if c.shared != nil {
-		l, _ := c.shared.Load(layers)
+		l, _ := c.shared.LoadIn(locale, layers)
 		_, _ = l.Tree()
 		return l
 	}
-	l, _ := Load(layers, c.bundled, c.base, c.check)
+	l, _ := LoadIn(locale, layers, c.bundled, c.base, c.check)
 	l.loadTree = c.opts.LoadTree
 	_, _ = l.Tree()
 	return l

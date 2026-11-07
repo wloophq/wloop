@@ -2,8 +2,6 @@ package intent
 
 import (
 	"bytes"
-	"errors"
-	"io/fs"
 	"maps"
 	"slices"
 	"strings"
@@ -56,33 +54,11 @@ type mActionInput struct {
 // catalog id: a higher layer's key replaces a lower one's, and a user's
 // text that fails keeps the lower one. A bundled FS without the file, or
 // nil, words no built-in action.
-func loadActions(layers []profile.Layer, bundled fs.FS) (map[string]BuiltinAction, Problems) {
+func loadActions(layers []profile.Layer, r layerReader) (map[string]BuiltinAction, Problems) {
 	out := map[string]BuiltinAction{}
-	if bundled == nil {
-		return out, nil
-	}
-	src, err := fs.ReadFile(bundled, ActionsFile)
-	if errors.Is(err, fs.ErrNotExist) {
-		return out, nil
-	}
-	if err != nil {
-		return out, Problems{{File: ActionsFile, Msg: err.Error()}}
-	}
-	problems := mergeActions(out, ActionsFile, src)
-	for _, l := range layers {
-		if l.Bundled() {
-			continue
-		}
-		r, err := profile.ReadFile(l, ActionsFile)
-		file, src := r.Path, r.Body
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			problems = append(problems, Problem{File: file, Msg: err.Error()})
-			continue
-		}
-		problems = append(problems, mergeActions(out, file, src)...)
+	problems, read := readLayered(layers, r, ActionsFile, func(file string, src []byte) Problems { return mergeActions(out, file, src, r.funcs()) })
+	if !read {
+		return out, problems
 	}
 	for _, id := range builtin.BuiltinActionIDs {
 		a, ok := out[id]
@@ -99,12 +75,12 @@ func loadActions(layers []profile.Layer, bundled fs.FS) (map[string]BuiltinActio
 }
 
 // mergeActions lays the tables of file over out.
-func mergeActions(out map[string]BuiltinAction, file string, src []byte) Problems {
+func mergeActions(out map[string]BuiltinAction, file string, src []byte, funcs template.FuncMap) Problems {
 	m, problems, _, complete := decode[map[string]mBuiltinAction](file, src)
 	if !complete {
 		return problems
 	}
-	s := &sheet{file: file, at: positions(src), problems: problems}
+	s := &sheet{file: file, at: positions(src), problems: problems, funcs: funcs}
 	for _, id := range slices.Sorted(maps.Keys(m)) {
 		if to := builtin.RenamedTo(id); to != "" {
 			s.add(id, "names no built-in action: it is %s of %s now", to, GatesFile)
@@ -151,7 +127,7 @@ func (s *sheet) overAction(id string, a BuiltinAction, t mBuiltinAction) Builtin
 			delete(a.Texts, name)
 		default:
 			path := id + "." + name
-			tmpl, err := ActionText(path, *v, sample)
+			tmpl, err := ActionText(s.textFuncs(), path, *v, sample)
 			if err != nil {
 				_, msg := templateMsg(path, err)
 				s.add(path, "%s", msg)

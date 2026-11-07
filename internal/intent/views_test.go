@@ -95,12 +95,12 @@ func loadListsWith(t *testing.T, bundled, user string) (lists, string) {
 	for file, src := range splitLists(bundled) {
 		fsys[file] = &fstest.MapFile{Data: []byte(src)}
 	}
-	texts, tasks, problems := loadViews(layers, fsys, nil)
+	texts, tasks, problems := loadViews(layers, readerOf(fsys), nil)
 	return lists{texts, tasks.Verbs}, problems.Error()
 }
 
 func TestEveryVerbAndViewIsWorded(t *testing.T) {
-	views, tasks, problems := loadViews(nil, os.DirFS("../../profiles/default"), nil)
+	views, tasks, problems := loadViews(nil, readerOf(os.DirFS("../../profiles/default")), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -373,8 +373,8 @@ func loadFacets(t *testing.T, userViews string) (ViewsDef, Problems) {
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
 	bundled := os.DirFS("../../profiles/default")
-	views, tasks, problems := loadViews(layers, bundled, nil)
-	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	views, tasks, problems := loadViews(layers, readerOf(bundled), nil)
+	records, recordProblems := loadRecords(layers, readerOf(bundled), &tasks)
 	problems = append(problems, recordProblems...)
 	return views, append(problems, views.checkFacets(tasks, records)...)
 }
@@ -559,7 +559,7 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 	}
 	write(plugin, "[lens]\ncol_aside = \"Workspace\"\n\n[facets.author]\nlabel = \"Author\"\nshow = \"meta\"\nshow_values = \"first\"\nlabel_prefix = \"by \"\nrow_class = { me = \"mine\" }\n")
 	write(user, "[facets.author]\nshow = \"who\"\n")
-	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -571,12 +571,12 @@ func TestAPluginsUIShowsItsFacetsAndReplacesRowWords(t *testing.T) {
 		t.Errorf("row words %v", got)
 	}
 	write(user, "[facets.author]\nshow = \"\"\n")
-	texts, problems = loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	texts, problems = loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil))
 	if a := texts["acme"].Facets["author"]; len(problems) > 0 || a.Show.Part != "" || a.Show.Values != "first" {
 		t.Errorf("show = \"\" over a placed facet: %+v, problems %v", a.Show, problems)
 	}
 	write(user, "[facets.author]\nshow = \"corner\"\n\n[lens]\ncol_aside = \"{{.label}}\"\n")
-	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}})
+	_, problems = loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}, readerOf(nil))
 	if got := problems.Error(); !strings.Contains(got, "facets.author.show") || !strings.Contains(got, "lens.col_aside") {
 		t.Errorf("problems: %s", got)
 	}
@@ -599,7 +599,7 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}})
+	texts, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -609,7 +609,7 @@ func TestAStripFacetColorsEachValueWithAStripHue(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(user, UIFile), []byte("[facets.turn]\ncolors = { others = \"pink\" }\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.colors.others") {
+	if _, problems := loadUI([]profile.Layer{{Name: "user:acme", Dir: user}}, readerOf(nil)); len(problems) != 1 || !strings.Contains(problems.Error(), "facets.turn.colors.others") {
 		t.Errorf("an unknown hue in ui.toml, once: %v", problems)
 	}
 }

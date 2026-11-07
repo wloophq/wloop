@@ -12,7 +12,7 @@ import (
 )
 
 func TestEveryToolHasADescription(t *testing.T) {
-	tools, problems := loadTools(profile.BundledChain(), os.DirFS("../../profiles/default"))
+	tools, problems := loadTools(profile.BundledChain(), readerOf(os.DirFS("../../profiles/default")))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -33,7 +33,7 @@ func toolsProblems(t *testing.T, bundled, user string) (map[string]ToolText, str
 		}
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
-	tools, problems := loadTools(layers, fstest.MapFS{ToolsFile: {Data: []byte(bundled)}})
+	tools, problems := loadTools(layers, readerOf(fstest.MapFS{ToolsFile: {Data: []byte(bundled)}}))
 	return tools, problems.Error()
 }
 
@@ -91,7 +91,7 @@ func TestABundledFileMissingAToolFails(t *testing.T) {
 }
 
 func TestTheSlackSendToolTellsTheAgentToAskWhenUnsure(t *testing.T) {
-	tools, _ := loadTools(profile.BundledChain(), os.DirFS("../../profiles/default"))
+	tools, _ := loadTools(profile.BundledChain(), readerOf(os.DirFS("../../profiles/default")))
 	d := tools["slack_send_message"].Description
 	if !strings.Contains(d, "without their approval") || !strings.Contains(d, "ask them first") {
 		t.Fatalf("description %q", d)
@@ -135,10 +135,10 @@ func TestAPluginsToolsAreWordedByItsLayer(t *testing.T) {
 		t.Fatal(err)
 	}
 	bundled := fstest.MapFS{ToolsFile: {Data: []byte(core)}}
-	if _, problems := loadTools(nil, bundled); len(problems) > 0 {
+	if _, problems := loadTools(nil, readerOf(bundled)); len(problems) > 0 {
 		t.Errorf("a plugin left out of the chain needs no tables: %s", problems.Error())
 	}
-	tools, problems := loadTools([]profile.Layer{{Name: profile.PluginLayer("slack"), Dir: plugin}}, bundled)
+	tools, problems := loadTools([]profile.Layer{{Name: profile.PluginLayer("slack"), Dir: plugin}}, readerOf(bundled))
 	if tools["slack_read"].Description != "read it" {
 		t.Errorf("slack_read %+v", tools["slack_read"])
 	}

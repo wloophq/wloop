@@ -35,7 +35,7 @@ func loadTasksWith(t *testing.T, bundled, user string) (TasksDef, string) {
 		}
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
-	def, problems := loadTasks(layers, fstest.MapFS{TasksFile: {Data: []byte(bundled)}}, nil)
+	def, problems := loadTasks(layers, readerOf(fstest.MapFS{TasksFile: {Data: []byte(bundled)}}), nil)
 	return def, problems.Error()
 }
 

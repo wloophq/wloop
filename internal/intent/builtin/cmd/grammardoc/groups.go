@@ -58,6 +58,7 @@ var groups = map[builtin.Surface][]group{
 		{"Units and tasks", []string{"items", "tasks"}},
 		{"Cleanup", []string{"cleanup"}},
 		{"Dossiers", []string{"dossiers"}},
+		{"Interface", []string{"ui"}},
 		{"Daemon", []string{"sweep", "http", "mcp", "views"}},
 	},
 }

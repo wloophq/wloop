@@ -203,8 +203,8 @@ type mBadge struct {
 
 // BundledViews is the views of the bundled profile alone.
 func BundledViews(bundled fs.FS) (ViewsDef, Problems) {
-	out, tasks, problems := loadViews(nil, bundled, nil)
-	records, recordProblems := loadRecords(nil, bundled, &tasks)
+	out, tasks, problems := loadViews(nil, readerOf(bundled), nil)
+	records, recordProblems := loadRecords(nil, readerOf(bundled), &tasks)
 	return out, slices.Concat(problems, recordProblems, out.checkFacets(tasks, records))
 }
 
@@ -212,8 +212,9 @@ func BundledViews(bundled fs.FS) (ViewsDef, Problems) {
 // checks that need every layer's views and tasks.toml's properties wait in
 // refs, by path.
 type viewsLoad struct {
-	def  ViewsDef
-	refs map[string]ref
+	def   ViewsDef
+	refs  map[string]ref
+	funcs template.FuncMap
 }
 
 // loadViews reads tasks.toml and views.toml from bundled and the user's
@@ -221,15 +222,16 @@ type viewsLoad struct {
 // a file, or nil, declares nothing of it. A user's file the profile no longer
 // reads is a problem naming where its words go now. gates checks the gates a
 // verb names, nil none.
-func loadViews(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ViewsDef, TasksDef, Problems) {
+func loadViews(layers []profile.Layer, r layerReader, gates *GatesDef) (ViewsDef, TasksDef, Problems) {
+	bundled := r.bundled
 	problems := renamedFiles(layers)
 	if bundled == nil {
 		return ViewsDef{}, TasksDef{Verbs: map[string]VerbText{}}, problems
 	}
-	tasks, taskProblems := loadTasks(layers, bundled, gates)
+	tasks, taskProblems := loadTasks(layers, r, gates)
 	problems = append(problems, taskProblems...)
-	l := &viewsLoad{refs: map[string]ref{}}
-	views, read := readLayered(layers, bundled, ViewsFile, l.merge)
+	l := &viewsLoad{refs: map[string]ref{}, funcs: r.funcs()}
+	views, read := readLayered(layers, r, ViewsFile, l.merge)
 	problems = append(problems, views...)
 	if read {
 		problems = append(problems, l.check(tasks)...)
@@ -240,11 +242,11 @@ func loadViews(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (ViewsDef
 // readLayered calls merge on name in bundled, then in each user layer that
 // has it, and says whether bundled has it. A bundled FS without the file
 // reads no layer's.
-func readLayered(layers []profile.Layer, bundled fs.FS, name string, merge func(file string, src []byte) Problems) (Problems, bool) {
-	if bundled == nil {
+func readLayered(layers []profile.Layer, r layerReader, name string, merge func(file string, src []byte) Problems) (Problems, bool) {
+	if r.bundled == nil {
 		return nil, false
 	}
-	src, err := fs.ReadFile(bundled, name)
+	src, err := r.readBundled(name)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false
 	}
@@ -256,8 +258,8 @@ func readLayered(layers []profile.Layer, bundled fs.FS, name string, merge func(
 		if l.Bundled() {
 			continue
 		}
-		r, err := profile.ReadFile(l, name)
-		file, src := r.Path, r.Body
+		res, err := r.read(l, name)
+		file, src := res.Path, res.Body
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -292,9 +294,9 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 	if !complete {
 		return problems
 	}
-	s := &sheet{file: file, at: positions(src), problems: problems}
+	s := &sheet{file: file, at: positions(src), problems: problems, funcs: l.funcs}
 	if m.Empty != nil {
-		if t, err := template.New("empty").Option("missingkey=error").Parse(*m.Empty); err != nil {
+		if t, err := template.New("empty").Funcs(s.textFuncs()).Option("missingkey=error").Parse(*m.Empty); err != nil {
 			s.add("empty", "%s", err)
 		} else if err := t.Execute(io.Discard, map[string]any{"label": ""}); err != nil {
 			s.add("empty", "%s", err)
@@ -687,7 +689,7 @@ func word(s *sheet, path string, v *string, dst *string, vars ...string) {
 	for _, k := range vars {
 		data[k] = ""
 	}
-	t, err := template.New(path).Option("missingkey=error").Parse(*v)
+	t, err := template.New(path).Funcs(s.textFuncs()).Option("missingkey=error").Parse(*v)
 	if err == nil {
 		err = t.Execute(io.Discard, data)
 	}

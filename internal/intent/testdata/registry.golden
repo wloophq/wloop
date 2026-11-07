@@ -1467,3 +1467,4 @@ config.tasks.candidate_window = "14d"
 config.tasks.stale_waiting_days = 2
 config.turns.per_day = 20
 config.turns.per_unit_per_day = 5
+config.ui.locale = ""

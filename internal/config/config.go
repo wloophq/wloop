@@ -66,6 +66,14 @@ type Config struct {
 	Items         Items         `json:"items"`
 	Headless      Headless      `json:"headless"`
 	Turns         Turns         `json:"turns"`
+	UI            UI            `json:"ui"`
+}
+
+// UI holds the interface's settings.
+type UI struct {
+	// Locale is the interface language, a BCP 47 tag such as pt-BR; "" follows the system's preferred
+	// languages.
+	Locale string `json:"locale"`
 }
 
 // Turns caps the automated turns. PerUnitPerDay stops a runaway loop on one

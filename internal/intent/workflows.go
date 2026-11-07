@@ -91,7 +91,8 @@ type wUnit struct {
 // reverted and loads without it. turnProblem, when set, is why a
 // turn.start may not name an intent or run it under a runner, with the
 // argument at fault; "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+func loadWorkflows(layers []profile.Layer, r layerReader, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+	bundled := r.bundled
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -101,7 +102,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				continue
 			}
 			dir := path.Join("workflows", e.Name())
-			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir}}
+			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir, rel: dir, r: r, layer: bundledLayer}}
 			bundledUnits[u.name] = u
 			units = append(units, u)
 		}
@@ -116,7 +117,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 			if !e.IsDir() {
 				continue
 			}
-			fl, dir := layerFiles(l, path.Join("workflows", e.Name()))
+			fl, dir := layerFiles(l, path.Join("workflows", e.Name()), r)
 			if n := builtin.RenamedTo(e.Name()); n != "" && bundledUnits[n] != nil {
 				problems = append(problems, Problem{File: dir, Msg: e.Name() + " was renamed" + expr.DidYouMean(e.Name(), []string{n})})
 				continue
@@ -126,7 +127,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				case l.Embedded():
 					problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), b.files.base("workflow.toml"))})
 				case len(overrides([]string{dir})) > 0:
-					b.files.overlay = append(b.files.overlay, dir)
+					b.files.overlaid(l, dir)
 				}
 				continue
 			}
@@ -175,6 +176,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 			continue
 		}
 		loaded = append(loaded, u.wf)
+		r.used[u.files.rel] = u.files.top()
 		warnings = append(warnings, u.warnings...)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {

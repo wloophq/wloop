@@ -110,7 +110,7 @@ func uiPlugin(l profile.Layer) string {
 
 // loadUI reads ui.toml from each plugin's layers, by plugin id: a higher
 // layer's text replaces a lower one's, key by key.
-func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
+func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems) {
 	out := map[string]UITexts{}
 	var problems Problems
 	for _, l := range layers {
@@ -118,21 +118,21 @@ func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
 		if id == "" {
 			continue
 		}
-		r, err := profile.ReadFile(l, UIFile)
+		res, err := r.read(l, UIFile)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			problems = append(problems, Problem{File: r.Path, Msg: err.Error()})
+			problems = append(problems, Problem{File: res.Path, Msg: err.Error()})
 			continue
 		}
-		m, ps, _, complete := decode[UITexts](r.Path, r.Body)
+		m, ps, _, complete := decode[UITexts](res.Path, res.Body)
 		problems = append(problems, ps...)
 		if !complete {
 			continue
 		}
-		s := &sheet{file: r.Path, at: positions(r.Body)}
-		s.addGrammar(grammar(builtin.SurfaceUI, r.Body))
+		s := &sheet{file: res.Path, at: positions(res.Body), funcs: r.funcs()}
+		s.addGrammar(grammar(builtin.SurfaceUI, res.Body))
 		for id, f := range m.Facets {
 			if f.ShowRaw != nil || f.ShowValues != nil {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
@@ -209,4 +209,4 @@ func mergeMap[V any](into, over map[string]V, merge func(a, b V) V) map[string]V
 }
 
 // BundledUI is the words of the bundled plugins' own layers alone.
-func BundledUI() (map[string]UITexts, Problems) { return loadUI(profile.BundledChain()) }
+func BundledUI() (map[string]UITexts, Problems) { return loadUI(profile.BundledChain(), readerOf(nil)) }

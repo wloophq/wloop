@@ -835,6 +835,17 @@
       },
       "type": "object"
     },
+    "ui": {
+      "additionalProperties": false,
+      "description": "The interface.",
+      "properties": {
+        "locale": {
+          "description": "The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "views": {
       "additionalProperties": {
         "additionalProperties": false,

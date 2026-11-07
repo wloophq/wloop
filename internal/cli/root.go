@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/locale"
 	"github.com/wloophq/wloop/internal/catalog"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -63,6 +64,10 @@ func defaultAgents() map[string]agentEntry {
 		Protocol: claude.Protocol{},
 	}}
 }
+
+// preferredLanguages are the system's preferred languages, which a serve shows its texts in when ui.locale
+// is empty.
+func preferredLanguages() []string { return locale.Preferred() }
 
 func defaultUsage(userHome string) map[string]coreusage.Reader {
 	return map[string]coreusage.Reader{"claude": claude.Usage{UserHome: userHome}}

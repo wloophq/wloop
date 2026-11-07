@@ -58,6 +58,7 @@ export default defineConfig({
             'guides/take-over',
             'guides/nudge',
             'guides/review-profile',
+            'guides/localization',
             'guides/custom-intent',
             'guides/workflows',
             'guides/slack',

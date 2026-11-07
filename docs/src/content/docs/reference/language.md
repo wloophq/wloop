@@ -9,8 +9,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Identity and help
 
-- `label` (string): The name people read. Required.
-- `summary` (string): One line on what it does: its action's tooltip, its help line, its profile listing. Required.
+- `label` (string, localized): The name people read. Required.
+- `summary` (string, localized): One line on what it does: its action's tooltip, its help line, its profile listing. Required.
 - `shortcut` (string): One uppercase letter for its action, not a built-in action's.
 - `verb` (one of `approve`, `delegate`, `dismiss`): The verb its action fulfils.
 - `user_facing` (bool, default `true`): Offered as a command, a skill and an action.
@@ -90,10 +90,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### When a turn is due or refused
 
-- `why` (template): Why the turn is due, over the unit's workflow facts.
+- `why` (template, localized): Why the turn is due, over the unit's workflow facts.
 - `refuse[]` (table): A refusal of turn.start; the first whose when holds refuses with its why.
 - `refuse[].when` (predicate): When it refuses, over the unit's workflow facts.
-- `refuse[].why` (template): What the refusal says, over the unit's workflow facts.
+- `refuse[].why` (template, localized): What the refusal says, over the unit's workflow facts.
 
 ### Its action on a row
 
@@ -105,10 +105,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `action.primary.when` (predicate, default `false`): When the action is the row's primary one.
 - `action.refuse[]` (table): A case that offers the action disabled; the first that holds says why.
 - `action.refuse[].when` (predicate): When the action is offered disabled.
-- `action.refuse[].why` (template): Why the action is disabled, over the action facts.
-- `action.note` (template): What the action would do on this row, over the action facts.
-- `action.warning` (template): Shown under the action, over the action facts; empty shows nothing.
-- `action.confirm` (template): The dialog that confirms the action, over the action facts; empty asks nothing.
+- `action.refuse[].why` (template, localized): Why the action is disabled, over the action facts.
+- `action.note` (template, localized): What the action would do on this row, over the action facts.
+- `action.warning` (template, localized): Shown under the action, over the action facts; empty shows nothing.
+- `action.confirm` (template, localized): The dialog that confirms the action, over the action facts; empty asks nothing.
 
 ### What the prompt opens with
 
@@ -124,8 +124,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Guidance and brief
 
 - `guidance` (table): The guidance a person gives the turn.
-- `guidance.label` (string, default `Guidance`): The guidance's label.
-- `guidance.help` (string): What the guidance is for.
+- `guidance.label` (string, localized, default `Guidance`): The guidance's label.
+- `guidance.help` (string, localized): What the guidance is for.
 - `guidance.max` (integer, default `0`): The guidance's length cap in runes; 0 for none.
 - `brief` (table): How the turn reads the unit's brief.
 - `brief.render` (bool, default `true`): The instructions carry the brief.
@@ -186,22 +186,22 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ## Built-in actions (`actions.toml`)
 
 - `<name>` (table): A built-in action, by its id.
-- `<name>.label` (string): The name people read. Required.
-- `<name>.summary` (string): One line, what pressing it does: its tooltip and help line. Required.
-- `<name>.note` (template): What the action would do on this row, over the action facts.
-- `<name>.warning` (template): Shown under the action, over the action facts; empty shows nothing.
-- `<name>.confirm` (template): The dialog that confirms the action, over the action facts; empty asks nothing.
-- `<name>.why` (template): Why the action is disabled, over the action facts.
+- `<name>.label` (string, localized): The name people read. Required.
+- `<name>.summary` (string, localized): One line, what pressing it does: its tooltip and help line. Required.
+- `<name>.note` (template, localized): What the action would do on this row, over the action facts.
+- `<name>.warning` (template, localized): Shown under the action, over the action facts; empty shows nothing.
+- `<name>.confirm` (template, localized): The dialog that confirms the action, over the action facts; empty asks nothing.
+- `<name>.why` (template, localized): Why the action is disabled, over the action facts.
 - `<name>.input` (table): The text the action asks for.
-- `<name>.input.label` (string): The input's name.
-- `<name>.input.help` (string): What to write, shown in the empty input.
+- `<name>.input.label` (string, localized): The input's name.
+- `<name>.input.help` (string, localized): What to write, shown in the empty input.
 
 ## Tasks: properties, states and verbs (`tasks.toml`)
 
 - `verbs` (table): The verbs a task offers, by verb.
 - `verbs.<name>` (table): A verb, by its name: lowercase letters, digits and hyphens, starting with a letter. A user layer may set only some keys of an entry declared below it, and adds its own verbs, which record the event verb_&lt;name&gt;; a new entry sets the required ones.
-- `verbs.<name>.label` (string): The name people read on its button. Required.
-- `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
+- `verbs.<name>.label` (string, localized): The name people read on its button. Required.
+- `verbs.<name>.summary` (string, localized): One line, what pressing it does: its tooltip. Required.
 - `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.prop.kind, task.state, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first; required for a verb whose handler asks for one (waiting, schedule, project, context, area, delegate, reply, promise, merge, split, relate, unrelate); a verb that takes another task puts it over the list of tasks the person picks from.
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
@@ -257,7 +257,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `states` (table by name): The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.
 - `states.<name>` (table): A state, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it; required for a new state.
-- `states.<name>.label` (string): The name people read.
+- `states.<name>.label` (string, localized): The name people read.
 - `owed_by` (table): Who owes a task's next step.
 - `owed_by.expr` (string): An expression over the task's facts whose value, me or a person's key, is task.owed_by.
 - `chat` (table): The chat on a task.
@@ -271,30 +271,30 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Views and the review (`views.toml`)
 
-- `empty` (template): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
-- `default_sort` (string): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
+- `empty` (template, localized): What a view without its own empty shows when it lists nothing, over the view's label as `{{.label}}`. Required in the bundled profile; a user layer may replace it.
+- `default_sort` (string, localized): What clients call a view's own order in the sort menu, such as "View order". Required in the bundled profile; a user layer may replace it.
 - `lens` (table): What every list's lens bar says. Each is a template whose only actions are the `{{.name}}` its doc lists, which the clients fill in. Required in the bundled profile; a user layer may replace any.
-- `lens.default_group` (template): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
-- `lens.board_group` (template): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
-- `lens.no_group` (string): The group menu's entry that lists the view in one group.
-- `lens.copied` (template): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
-- `lens.copied_grouped` (template): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
-- `lens.tag_key` (template): The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.
-- `lens.tag_key_empty` (template): The group of the items with no tag of that key, over the `{{.key}}`.
-- `lens.grouped` (template): What the terminal says after a group pick, over the picked entry's `{{.label}}`.
-- `lens.sorted` (template): What the terminal says after a sort pick, over the picked entry's `{{.label}}`.
-- `lens.descending` (template): The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.
-- `lens.no_lens` (string): What the terminal says when a group or sort pick is asked where no list is on screen.
+- `lens.default_group` (template, localized): The group menu's entry for the field a view groups by on its own, over the field's label as `{{.label}}`.
+- `lens.board_group` (template, localized): The group menu's entry for the field a board groups by when nothing is picked, over the field's label as `{{.label}}`.
+- `lens.no_group` (string, localized): The group menu's entry that lists the view in one group.
+- `lens.copied` (template, localized): What Copy list says it copied, over `{{.count}}` items and the `{{.view}}` they came from.
+- `lens.copied_grouped` (template, localized): What Copy list says it copied from a grouped list, over `{{.count}}`, `{{.view}}` and the `{{.group}}` field's label.
+- `lens.tag_key` (template, localized): The name of the field that groups by one key of the tag facet's `key:value` values, over the tag facet's `{{.label}}` and the `{{.key}}`.
+- `lens.tag_key_empty` (template, localized): The group of the items with no tag of that key, over the `{{.key}}`.
+- `lens.grouped` (template, localized): What the terminal says after a group pick, over the picked entry's `{{.label}}`.
+- `lens.sorted` (template, localized): What the terminal says after a sort pick, over the picked entry's `{{.label}}`.
+- `lens.descending` (template, localized): The terminal's sort entry for a field in descending order, over the field's `{{.label}}`.
+- `lens.no_lens` (string, localized): What the terminal says when a group or sort pick is asked where no list is on screen.
 - `facets` (table by name): The task facets, by id: the fields every client filters, groups and sorts tasks by, in the order the file declares them, a user layer's new ones after the bundled. A plugin's row facet of the same id must agree on group, sort, rank, match and buckets.
 - `facets.<name>` (table): A facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `facets.<name>.fact` (fact): The fact the facet reads: a fact of a task (task.*, task.prop.*), or a field of a record kind, written &lt;kind&gt;.&lt;field&gt; (brief.risk). Required.
-- `facets.<name>.label` (string): The name people read. Required.
+- `facets.<name>.label` (string, localized): The name people read. Required.
 - `facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
 - `facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
 - `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
 - `facets.<name>.values` (table by name): The text people read for a value, by value.
-- `facets.<name>.values.<name>` (string): The text of one value.
-- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
+- `facets.<name>.values.<name>` (string, localized): The text of one value.
+- `facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
 - `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
   - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
   - `ref`: Beside the title, before the unit's own label: where it lives.
@@ -307,7 +307,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
   - `all`: Every value, in the item's order.
   - `first`: The first value alone.
-- `facets.<name>.empty` (string): What a group of tasks with no value shows.
+- `facets.<name>.empty` (string, localized): What a group of tasks with no value shows.
 - `facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
 - `facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
@@ -321,14 +321,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
 - `facets.<name>.buckets.<name>` (table): A bucket, by its id.
 - `facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
-- `facets.<name>.buckets.<name>.label` (string): The text people read; the id when absent.
+- `facets.<name>.buckets.<name>.label` (string, localized): The text people read; the id when absent.
 - `facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.
 - `facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `views` (table): The lists of tasks, by view.
 - `views.<name>` (table): A view, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
-- `views.<name>.label` (string): The name people read in the list of views. Required.
-- `views.<name>.summary` (string): One line on what the view lists: its tooltip in the list of views, its subtitle, and its key's help line. Required.
-- `views.<name>.empty` (string): What the view shows when it lists nothing; the top-level empty when absent. A filter that matches nothing says so in its own words.
+- `views.<name>.label` (string, localized): The name people read in the list of views. Required.
+- `views.<name>.summary` (string, localized): One line on what the view lists: its tooltip in the list of views, its subtitle, and its key's help line. Required.
+- `views.<name>.empty` (string, localized): What the view shows when it lists nothing; the top-level empty when absent. A filter that matches nothing says so in its own words.
 - `views.<name>.over` (one of `tasks`, `gates`, default `tasks`): What the view lists: tasks, or gates.
 - `views.<name>.when` (predicate): Which tasks or gates the view lists, over their facts: a task's, its properties' (task.prop.*), or a gate's. A view with none lists nothing: a place in the clients' list of views that a client draws itself, such as the review.
 - `views.<name>.group` (string): The fact the view groups by, such as task.owed_by.
@@ -340,52 +340,52 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
-- `review.<name>.label` (string): What the step asks of you, as the review lists it. Required.
-- `lens.age_now` (template): A row's age under a minute.
-- `lens.age_minutes` (template): A row's age under an hour, over its minutes as `{{.m}}`.
-- `lens.age_hours` (template): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
-- `lens.age_days` (template): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
-- `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
-- `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
-- `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
-- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
-- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
-- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
-- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
-- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
-- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
-- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
-- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
-- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
-- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
-- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
-- `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
-- `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
-- `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
-- `lens.col_age` (template): The head of the column of a row's age.
-- `lens.col_why` (template): The head of the column of why a row waits.
-- `lens.col_aside` (template): The head of the column of a row's workspace and links.
-- `lens.col_actions` (template): The head of the column of a row's actions, read only by a screen reader.
-- `lens.stale` (template): The flag of a row whose plugin is not reporting.
-- `lens.stale_title` (template): The stale flag's tooltip.
-- `lens.briefing` (template): The flag of a row whose intake waits for its brief.
-- `lens.briefing_title` (template): The briefing flag's tooltip, over the intake's `{{.seq}}`.
-- `lens.briefing_attempt` (template): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
-- `lens.briefing_error` (template): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
-- `lens.questions` (template): The pill of a brief's open questions, over their number `{{.n}}`.
-- `lens.questions_title` (template): That pill's tooltip, over `{{.n}}`.
-- `lens.changed` (template): The flag of a task that changed since you last opened it.
-- `lens.starred` (template): The tooltip of a starred task's star.
-- `lens.until` (template): The flag of a task asleep until a date, over the `{{.date}}`.
-- `lens.due` (template): The flag of a task's deadline, over the `{{.date}}`.
-- `lens.unread` (template): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
-- `lens.unread_title` (template): The unread flag's tooltip.
-- `lens.review_due` (template): The flag of a project past its review.
-- `lens.no_next_action` (template): The flag of a project with no open child.
-- `lens.open_children` (template): A project's open children, over their number `{{.n}}`.
-- `lens.sequential` (template): The flag of a project that takes its children one at a time.
-- `lens.every` (template): How often a project is reviewed, over the `{{.every}}`.
-- `lens.reviewed` (template): When a project was last reviewed, over the `{{.date}}`.
+- `review.<name>.label` (string, localized): What the step asks of you, as the review lists it. Required.
+- `lens.age_now` (template, localized): A row's age under a minute.
+- `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
+- `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
+- `lens.age_days` (template, localized): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
+- `lens.filter_label` (template, localized): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title` (template, localized): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title_group` (template, localized): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template, localized): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template, localized): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template, localized): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
+- `lens.countdown_title` (template, localized): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template, localized): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template, localized): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template, localized): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template, localized): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template, localized): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template, localized): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
+- `lens.legend_title` (template, localized): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
+- `lens.sort_by` (template, localized): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template, localized): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
+- `lens.col_who` (template, localized): The head of the column of whom a row waits on and its situation.
+- `lens.col_age` (template, localized): The head of the column of a row's age.
+- `lens.col_why` (template, localized): The head of the column of why a row waits.
+- `lens.col_aside` (template, localized): The head of the column of a row's workspace and links.
+- `lens.col_actions` (template, localized): The head of the column of a row's actions, read only by a screen reader.
+- `lens.stale` (template, localized): The flag of a row whose plugin is not reporting.
+- `lens.stale_title` (template, localized): The stale flag's tooltip.
+- `lens.briefing` (template, localized): The flag of a row whose intake waits for its brief.
+- `lens.briefing_title` (template, localized): The briefing flag's tooltip, over the intake's `{{.seq}}`.
+- `lens.briefing_attempt` (template, localized): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
+- `lens.briefing_error` (template, localized): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
+- `lens.questions` (template, localized): The pill of a brief's open questions, over their number `{{.n}}`.
+- `lens.questions_title` (template, localized): That pill's tooltip, over `{{.n}}`.
+- `lens.changed` (template, localized): The flag of a task that changed since you last opened it.
+- `lens.starred` (template, localized): The tooltip of a starred task's star.
+- `lens.until` (template, localized): The flag of a task asleep until a date, over the `{{.date}}`.
+- `lens.due` (template, localized): The flag of a task's deadline, over the `{{.date}}`.
+- `lens.unread` (template, localized): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
+- `lens.unread_title` (template, localized): The unread flag's tooltip.
+- `lens.review_due` (template, localized): The flag of a project past its review.
+- `lens.no_next_action` (template, localized): The flag of a project with no open child.
+- `lens.open_children` (template, localized): A project's open children, over their number `{{.n}}`.
+- `lens.sequential` (template, localized): The flag of a project that takes its children one at a time.
+- `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
+- `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
@@ -406,15 +406,15 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `proposal`: Proposed task or item operations: resolving it applies them.
   - `trust`: A repository's first run: resolving it unblocks the run.
   - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
-- `gates.<name>.label` (string): What the gate asks of you, as clients list it.
-- `gates.<name>.text` (template): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.
+- `gates.<name>.label` (string, localized): What the gate asks of you, as clients list it.
+- `gates.<name>.text` (template, localized): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.
 - `gates.<name>.closes_with` (string): The intent, one that refuses the gate, the gate closes with when you end the task it is on. While the gate is open, nothing else ends the task: its items resolving leave it open, and a workflow's verb that would end it is refused, until you settle the gate. The task's unit ending (a pull request merged or closed) supersedes the gate as moot. Empty or left out, the gate neither holds its task nor closes with it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
-- `gates.<name>.intents.<name>.label` (string): The name people read on its button.
-- `gates.<name>.intents.<name>.summary` (string): What resolving the gate with the intent does, as help and palettes show it.
-- `gates.<name>.intents.<name>.note` (template): What the intent would do on a row that offers it, over the action facts.
-- `gates.<name>.intents.<name>.confirm` (template): The dialog that confirms the intent on a row, over the action facts; empty asks nothing.
+- `gates.<name>.intents.<name>.label` (string, localized): The name people read on its button.
+- `gates.<name>.intents.<name>.summary` (string, localized): What resolving the gate with the intent does, as help and palettes show it.
+- `gates.<name>.intents.<name>.note` (template, localized): What the intent would do on a row that offers it, over the action facts.
+- `gates.<name>.intents.<name>.confirm` (template, localized): The dialog that confirms the intent on a row, over the action facts; empty asks nothing.
 - `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to; required for a new intent.
 - `gates.<name>.intents.<name>.answer` (bool, default `false`): The intent takes text, such as a question's answer.
 - `gates.<name>.ends_task` (table by name): What closing the gate does to a task the loop opened only to hold gates, by the status it closes with (superseded when its subject is withdrawn), once none of the task's gates is open; a status left out leaves the task open, and a user layer sets only the statuses it names.
@@ -440,13 +440,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`capture`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
 - `help.<name>` (table): The keys of one context, by action.
-- `help.<name>.<name>` (string): What the key does, as the help and the palette list it. Required.
+- `help.<name>.<name>` (string, localized): What the key does, as the help and the palette list it. Required.
 
 ## Workflow manifest (`workflows/<name>/workflow.toml`)
 
 ### What it matches
 
-- `summary` (string): One line, what the workflow does; its plan items' description. Required.
+- `summary` (string, localized): One line, what the workflow does; its plan items' description. Required.
 - `provider` (one of `github`, `session`, `slack`, `task`, `workspace`): The provider of the units it matches. Required.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
@@ -495,7 +495,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Gate approval
 
-- `ask` (string): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
+- `ask` (string, localized): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
 - `gates` (table): The gates its runs and drafts open.
 - `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
@@ -804,28 +804,28 @@ The fields each notice reads besides `Name` and `Command`:
 
 - `views` (table): The words of the plugin's views, by view id.
 - `views.<name>` (table): One view's words.
-- `views.<name>.label` (string): The view's name, as navigation lists it. Required.
-- `views.<name>.unit` (string): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
-- `views.<name>.default_sort` (string): What the sort menu calls a row view's own order, such as "Waiting longest".
+- `views.<name>.label` (string, localized): The view's name, as navigation lists it. Required.
+- `views.<name>.unit` (string, localized): What one of the view's rows is, such as "Pull request", the unit column's heading; empty for a view whose rows mix kinds.
+- `views.<name>.default_sort` (string, localized): What the sort menu calls a row view's own order, such as "Waiting longest".
 - `views.<name>.search` (table): A custom view's search: the queries it runs at a press, the terms it toggles and the orders it offers.
 - `views.<name>.search.default_sort` (string): The order a query with none is read in.
 - `views.<name>.search.presets[]` (table): A query run at a press.
 - `views.<name>.search.presets[].query` (string): The query, in the source's search syntax. Required.
-- `views.<name>.search.presets[].label` (string): Its words. Required.
+- `views.<name>.search.presets[].label` (string, localized): Its words. Required.
 - `views.<name>.search.filters[]` (table): A term the query toggles, or a window of recent activity.
 - `views.<name>.search.filters[].term` (string): The term toggled in the query.
 - `views.<name>.search.filters[].window` (integer): Days of recent activity the filter keeps, in place of a term.
-- `views.<name>.search.filters[].label` (string): Its words. Required.
+- `views.<name>.search.filters[].label` (string, localized): Its words. Required.
 - `views.<name>.search.sorts[]` (table): An order the search offers.
 - `views.<name>.search.sorts[].sort` (string): The order's value in the query. Required.
-- `views.<name>.search.sorts[].label` (string): Its words on its button. Required.
-- `views.<name>.search.sorts[].shown` (string): How a result names the order, such as "waiting longest".
+- `views.<name>.search.sorts[].label` (string, localized): Its words on its button. Required.
+- `views.<name>.search.sorts[].shown` (string, localized): How a result names the order, such as "waiting longest".
 - `views.<name>.search.decisions` (table): How a result's decision reads, by value.
-- `views.<name>.search.decisions.<name>` (string): One decision's words.
-- `views.<name>.search.no_decision` (string): What a result with no decision reads.
+- `views.<name>.search.decisions.<name>` (string, localized): One decision's words.
+- `views.<name>.search.no_decision` (string, localized): What a result with no decision reads.
 - `facets` (table): The words of the plugin's facets, by facet id.
 - `facets.<name>` (table): One facet's words.
-- `facets.<name>.label` (string): The facet's name, as the filter menu and the groups show it. Required.
+- `facets.<name>.label` (string, localized): The facet's name, as the filter menu and the groups show it. Required.
 - `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
   - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
   - `ref`: Beside the title, before the unit's own label: where it lives.
@@ -838,7 +838,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
   - `all`: Every value, in the item's order.
   - `first`: The first value alone.
-- `facets.<name>.label_prefix` (string): Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it.
+- `facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as `by ` before an author; a label that has it already keeps it.
 - `facets.<name>.row_class` (table): The class of a row that holds a value, by value, such as `{ me = "mine" }`, which the cockpit's stylesheet colors.
 - `facets.<name>.row_class.<name>` (string): One value's class.
 - `facets.<name>.colors` (table): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
@@ -848,17 +848,17 @@ The fields each notice reads besides `Name` and `Command`:
   - `reviewer`: Another person's, apart from the author, such as a reviewer.
   - `loop`: The loop's: an agent works on it or is due to.
   - `nobody`: Nobody's: a faint strip.
-- `facets.<name>.empty` (string): What a row with no value shows.
+- `facets.<name>.empty` (string, localized): What a row with no value shows.
 - `facets.<name>.values` (table): How each value shows, by value; a value it does not name shows as itself.
-- `facets.<name>.values.<name>` (string): One value's text.
+- `facets.<name>.values.<name>` (string, localized): One value's text.
 - `facets.<name>.buckets` (table): How each age bucket of a time facet shows, by bucket id.
-- `facets.<name>.buckets.<name>` (string): One bucket's text.
+- `facets.<name>.buckets.<name>` (string, localized): One bucket's text.
 - `lens` (table): The plugin's own words of its rows, replacing the row words of views.toml's [lens] by the same keys.
 - `situations` (table): How each situation the plugin derives shows, by kind, in a few words.
-- `situations.<name>` (string): One situation's words.
+- `situations.<name>` (string, localized): One situation's words.
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
 - `events.<name>` (table): One event kind's words.
-- `events.<name>.label` (string): The event in a few words. Required.
+- `events.<name>.label` (string, localized): The event in a few words. Required.
 - `events.<name>.loop` (bool): The event is the loop's doing, which the activity's loop filter keeps.
 - `events.<name>.data` (one of ``, `none`, `first_field`, `short_sha`, `requested`): How the event's data shows on a timeline.
   - ``: Its data as it is.
@@ -868,55 +868,55 @@ The fields each notice reads besides `Name` and `Command`:
   - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.
 - `detail.<name>` (table): One field's words.
-- `detail.<name>.label` (string): The field's name. Required.
-- `detail.<name>.title` (string): What the field means, as its tooltip shows it.
+- `detail.<name>.label` (string, localized): The field's name. Required.
+- `detail.<name>.title` (string, localized): What the field means, as its tooltip shows it.
 - `menubar` (table): The heading of each menu bar section, by section id.
-- `menubar.<name>` (string): One section's heading.
-- `lens.age_now` (template): A row's age under a minute.
-- `lens.age_minutes` (template): A row's age under an hour, over its minutes as `{{.m}}`.
-- `lens.age_hours` (template): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
-- `lens.age_days` (template): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
-- `lens.filter_label` (template): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
-- `lens.filter_title` (template): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
-- `lens.filter_title_group` (template): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
-- `lens.filter_group` (template): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
-- `lens.list_count` (template): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
-- `lens.list_empty` (template): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
-- `lens.countdown_title` (template): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
-- `lens.countdown_sending` (template): A pending round's countdown once its deadline passed.
-- `lens.countdown_seconds` (template): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
-- `lens.countdown_minutes` (template): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
-- `lens.tip_named` (template): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
-- `lens.tip_kind` (template): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
-- `lens.tip_why` (template): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
-- `lens.legend_title` (template): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
-- `lens.sort_by` (template): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
-- `lens.col_unit` (template): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
-- `lens.col_who` (template): The head of the column of whom a row waits on and its situation.
-- `lens.col_age` (template): The head of the column of a row's age.
-- `lens.col_why` (template): The head of the column of why a row waits.
-- `lens.col_aside` (template): The head of the column of a row's workspace and links.
-- `lens.col_actions` (template): The head of the column of a row's actions, read only by a screen reader.
-- `lens.stale` (template): The flag of a row whose plugin is not reporting.
-- `lens.stale_title` (template): The stale flag's tooltip.
-- `lens.briefing` (template): The flag of a row whose intake waits for its brief.
-- `lens.briefing_title` (template): The briefing flag's tooltip, over the intake's `{{.seq}}`.
-- `lens.briefing_attempt` (template): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
-- `lens.briefing_error` (template): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
-- `lens.questions` (template): The pill of a brief's open questions, over their number `{{.n}}`.
-- `lens.questions_title` (template): That pill's tooltip, over `{{.n}}`.
-- `lens.changed` (template): The flag of a task that changed since you last opened it.
-- `lens.starred` (template): The tooltip of a starred task's star.
-- `lens.until` (template): The flag of a task asleep until a date, over the `{{.date}}`.
-- `lens.due` (template): The flag of a task's deadline, over the `{{.date}}`.
-- `lens.unread` (template): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
-- `lens.unread_title` (template): The unread flag's tooltip.
-- `lens.review_due` (template): The flag of a project past its review.
-- `lens.no_next_action` (template): The flag of a project with no open child.
-- `lens.open_children` (template): A project's open children, over their number `{{.n}}`.
-- `lens.sequential` (template): The flag of a project that takes its children one at a time.
-- `lens.every` (template): How often a project is reviewed, over the `{{.every}}`.
-- `lens.reviewed` (template): When a project was last reviewed, over the `{{.date}}`.
+- `menubar.<name>` (string, localized): One section's heading.
+- `lens.age_now` (template, localized): A row's age under a minute.
+- `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
+- `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
+- `lens.age_days` (template, localized): A row's age from a day, over its days `{{.d}}` and the hours past them `{{.h}}`.
+- `lens.filter_label` (template, localized): What a facet button on a row says to a screen reader, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title` (template, localized): A facet button's tooltip, over the facet's `{{.label}}` and the `{{.value}}`.
+- `lens.filter_title_group` (template, localized): A facet button's tooltip when its facet groups, over `{{.label}}`, `{{.value}}` and the `{{.group}}` field's label.
+- `lens.filter_group` (template, localized): What a facet button calls whom a row waits on when the value is a group of people, such as a Slack user group, in place of the facet's label.
+- `lens.list_count` (template, localized): A row view's summary, over its `{{.unit}}`, how many rows the filter `{{.shown}}` and how many the view holds, `{{.total}}`.
+- `lens.list_empty` (template, localized): What a plugin view's list says when it holds no row and the plugin gives no words of its own.
+- `lens.countdown_title` (template, localized): The tooltip of a pending round's countdown, over the `{{.time}}` it sends at.
+- `lens.countdown_sending` (template, localized): A pending round's countdown once its deadline passed.
+- `lens.countdown_seconds` (template, localized): A pending round's countdown under 100 seconds, over the seconds `{{.s}}`.
+- `lens.countdown_minutes` (template, localized): A pending round's countdown from 100 seconds, over its minutes `{{.m}}` and the seconds past them, two digits, `{{.s}}`.
+- `lens.tip_named` (template, localized): A row's tooltip's start when it names whom the row waits on, over the `{{.strip}}` value's label and `{{.who}}`.
+- `lens.tip_kind` (template, localized): A row's tooltip with its situation, over the `{{.tip}}` so far and the `{{.kind}}` labels.
+- `lens.tip_why` (template, localized): A row's tooltip with why it waits, over the `{{.tip}}` so far and the `{{.why}}`.
+- `lens.legend_title` (template, localized): The tooltip of the legend of a view's strip, the colors of its strip facet's values.
+- `lens.sort_by` (template, localized): A column head's tooltip, over the `{{.label}}` of the facet it sorts by.
+- `lens.col_unit` (template, localized): The head of the column of a row's title, ref and flags in a view whose rows mix kinds.
+- `lens.col_who` (template, localized): The head of the column of whom a row waits on and its situation.
+- `lens.col_age` (template, localized): The head of the column of a row's age.
+- `lens.col_why` (template, localized): The head of the column of why a row waits.
+- `lens.col_aside` (template, localized): The head of the column of a row's workspace and links.
+- `lens.col_actions` (template, localized): The head of the column of a row's actions, read only by a screen reader.
+- `lens.stale` (template, localized): The flag of a row whose plugin is not reporting.
+- `lens.stale_title` (template, localized): The stale flag's tooltip.
+- `lens.briefing` (template, localized): The flag of a row whose intake waits for its brief.
+- `lens.briefing_title` (template, localized): The briefing flag's tooltip, over the intake's `{{.seq}}`.
+- `lens.briefing_attempt` (template, localized): What the briefing flag's tooltip adds of a retried intake, over the attempt `{{.n}}`.
+- `lens.briefing_error` (template, localized): What the briefing flag's tooltip adds of an intake's last error, over the `{{.error}}`.
+- `lens.questions` (template, localized): The pill of a brief's open questions, over their number `{{.n}}`.
+- `lens.questions_title` (template, localized): That pill's tooltip, over `{{.n}}`.
+- `lens.changed` (template, localized): The flag of a task that changed since you last opened it.
+- `lens.starred` (template, localized): The tooltip of a starred task's star.
+- `lens.until` (template, localized): The flag of a task asleep until a date, over the `{{.date}}`.
+- `lens.due` (template, localized): The flag of a task's deadline, over the `{{.date}}`.
+- `lens.unread` (template, localized): The flag of a task whose links hold messages the extraction has not read, over how long the oldest waited, `{{.lag}}`.
+- `lens.unread_title` (template, localized): The unread flag's tooltip.
+- `lens.review_due` (template, localized): The flag of a project past its review.
+- `lens.no_next_action` (template, localized): The flag of a project with no open child.
+- `lens.open_children` (template, localized): A project's open children, over their number `{{.n}}`.
+- `lens.sequential` (template, localized): The flag of a project that takes its children one at a time.
+- `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
+- `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
@@ -924,6 +924,19 @@ The fields each notice reads besides `Name` and `Command`:
 - `facets.<name>.show.kind` (list of strings): The values the facet shows in the kind part.
 - `facets.<name>.show.age` (list of strings): The values the facet shows in the age part.
 - `facets.<name>.show.aside` (list of strings): The values the facet shows in the aside part.
+
+## Client strings (`strings.toml`)
+
+- `strings` (table by name): The texts the clients show, by their English text, with `{name}` placeholders.
+- `strings.<name>` (string or table, localized): A text: a string, or a table of its CLDR plural forms (`zero`, `one`, `two`, `few`, `many`, `other`), `other` required.
+- `strings.<name>.zero` (string, localized): The text's zero form.
+- `strings.<name>.one` (string, localized): The text's one form.
+- `strings.<name>.two` (string, localized): The text's two form.
+- `strings.<name>.few` (string, localized): The text's few form.
+- `strings.<name>.many` (string, localized): The text's many form.
+- `strings.<name>.other` (string, localized): The text's other form.
+- `formats` (table by name): How the Go clients write dates and numbers: Go time layouts (`time`, `date`, `datetime`) and number separators (`decimal`, `group`).
+- `formats.<name>` (string, localized): One format.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 
@@ -1142,6 +1155,11 @@ The fields each notice reads besides `Name` and `Command`:
 - `dossiers.total_cap_mb` (integer, default `2048`): The size of dossiers and archives doctor reports.
 - `dossiers.max_file_mb` (integer, default `5`): The largest file a dossier keeps; a larger one is linked.
 - `dossiers.compact_at_kb` (integer, default `256`): The log size that triggers compaction.
+
+### Interface
+
+- `ui` (table): The interface.
+- `ui.locale` (string): The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart.
 
 ### Daemon
 

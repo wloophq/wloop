@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,15 +35,27 @@ type fileSig struct {
 	exists  bool
 }
 
+// liveKey is a setting a changed file applies at once: take copies its value from the file's config.
+type liveKey struct {
+	name string
+	take func(running *Config, file Config)
+}
+
+// liveKeys are the settings that follow the file while a serve runs.
+var liveKeys = []liveKey{
+	{"profile", func(r *Config, f Config) { r.Profile = f.Profile }},
+	{"ui.locale", func(r *Config, f Config) { r.UI.Locale = f.UI.Locale }},
+}
+
 // Holder is the one configuration a serve holds. Config is the config the
-// serve started with, except that the profile setting follows the file; every
+// serve started with, except that the live keys follow the file; every
 // other change makes Stale true until the serve restarts.
 type Holder struct {
 	opts HolderOptions
 
 	mu      sync.Mutex
 	start   Config
-	profile string
+	live    Config
 	stale   bool
 	broken  error
 	badFile error
@@ -74,7 +87,7 @@ func (h *Holder) Rebase(cfg Config) {
 }
 
 func (h *Holder) rebase(cfg Config) {
-	h.start, h.profile, h.stale, h.broken, h.badFile = cfg, cfg.Profile, false, nil, nil
+	h.start, h.live, h.stale, h.broken, h.badFile = cfg, cfg, false, nil, nil
 	h.sig, h.checked = h.statFile(), h.opts.Now()
 }
 
@@ -92,14 +105,12 @@ func (h *Holder) Err() error {
 	return h.broken
 }
 
-// Config is the config the serve runs with and the profile now in force.
+// Config is the config the serve runs with, its live keys as the file now sets them.
 func (h *Holder) Config() Config {
 	h.refresh()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	c := h.start
-	c.Profile = h.profile
-	return c
+	return h.live
 }
 
 // Warning is what a restart or a fix of config.toml would change: the load
@@ -117,7 +128,7 @@ func (h *Holder) warning() string {
 	case h.badFile != nil:
 		return "config.toml does not load, so the running config stays: " + h.badFile.Error()
 	case h.stale:
-		return "config.toml changed; only the profile applies live, restart the daemon to apply the rest"
+		return "config.toml changed; only " + liveNames() + " apply live, restart the daemon to apply the rest"
 	}
 	return ""
 }
@@ -163,9 +174,12 @@ func (h *Holder) reload() func() {
 	h.badFile = err
 	var calls []func()
 	if err == nil {
-		h.stale = !equalExceptProfile(h.start, next)
-		if next.Profile != h.profile {
-			h.profile = next.Profile
+		h.stale = !equalExceptLive(h.start, next)
+		was := h.live.Profile
+		for _, k := range liveKeys {
+			k.take(&h.live, next)
+		}
+		if next.Profile != was {
 			if on := h.opts.OnProfileChange; on != nil {
 				p := next.Profile
 				calls = append(calls, func() { on(p) })
@@ -185,7 +199,22 @@ func (h *Holder) reload() func() {
 	}
 }
 
-func equalExceptProfile(a, b Config) bool {
-	a.Profile, b.Profile = "", ""
+func equalExceptLive(a, b Config) bool {
+	for _, k := range liveKeys {
+		k.take(&a, Config{})
+		k.take(&b, Config{})
+	}
 	return reflect.DeepEqual(a, b)
+}
+
+// liveNames are the live keys as a warning names them: "profile, x and y".
+func liveNames() string {
+	names := make([]string, len(liveKeys))
+	for i, k := range liveKeys {
+		names[i] = k.name
+	}
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }

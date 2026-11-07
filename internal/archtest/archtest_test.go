@@ -259,3 +259,38 @@ func TestNoGateFlagsAPlantedImport(t *testing.T) {
 	t.Parallel()
 	flagged(t, "a planted import", ruleNoGate("internal/cli", []string{"context", module + "internal/gate"}), 1, "the workflows are the only automation")
 }
+
+// ruleI18n flags an import of internal/i18n that is neither the standard
+// library nor golang.org/x/text.
+func ruleI18n(self string, imports []string) []string {
+	if self != "internal/i18n" {
+		return nil
+	}
+	var out []string
+	for _, imp := range imports {
+		if !std(imp) && !under(imp, "golang.org/x/text") {
+			out = append(out, fmt.Sprintf("%s imports %s; i18n imports only the standard library and golang.org/x/text", self, imp))
+		}
+	}
+	return out
+}
+
+// TestI18nIsALeaf checks that `internal/i18n` imports only the standard
+// library and `golang.org/x/text`, so the loader and the clients may import it.
+func TestI18nIsALeaf(t *testing.T) {
+	t.Parallel()
+	seen := false
+	for _, p := range packages(t) {
+		self, ok := local(p.ImportPath)
+		if !ok {
+			continue
+		}
+		seen = seen || self == "internal/i18n"
+		for _, b := range ruleI18n(self, p.Imports) {
+			t.Error(b)
+		}
+	}
+	if !seen {
+		t.Error("internal/i18n is missing from the package list")
+	}
+}

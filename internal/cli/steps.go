@@ -28,7 +28,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/profile"
 )
 
 // kindNotifySelf is the event notify.self publishes: Key the workflow and
@@ -173,7 +172,7 @@ func (s *stepSet) file(c stepCall, name string) (string, error) { return stepFil
 func stepFile(e *Env, c stepCall, name string) (string, error) {
 	r, _ := builtin.StepArg(c.st.Use, name)
 	rel := path.Join("workflows", c.why.Workflow, cmp.Or(c.arg(name), r.Default))
-	f, err := profile.Resolve(profile.Chain(e.currentConfig()), rel)
+	f, err := e.loadedIntents().ProfileFile(rel)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", c.st.Use, err)
 	}

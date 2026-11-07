@@ -159,6 +159,8 @@ var configGrammar = slices.Concat(
 		cfgList("tasks.contexts", "The contexts a task is offered."),
 		cfgKey("tasks.candidate_window", KindDur, "14d", "How far apart two tasks' creations may be for task.candidates to pair them."),
 		cfgKey("tasks.candidate_cap", KindInt, "5", "The most tasks task.candidates lists; 0 lists none, so no correlation runs."),
+		cfgKey("ui", KindTable, "", "The interface."),
+		cfgKey("ui.locale", KindText, "", "The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart."),
 		cfgKey("notifications", KindTable, "", "The notifications."),
 		cfgKey("notifications.digest_at", KindText, "09:00", "The local HH:MM of the daily digest; empty for none."),
 		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),

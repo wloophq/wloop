@@ -42,10 +42,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
+	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
@@ -139,6 +141,11 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		e.cfg.Break(err)
 	}
+	detected := preferredLanguages()
+	e.intentState().useLocale(func() string {
+		cfg := e.cfg.Config()
+		return serveLocale(cfg, detected, intentload.Locales(profile.Chain(cfg), turn.BundledFS()))
+	})
 	vctx, stopViews := context.WithCancel(ctx)
 	e.serveTurns(vctx, db, store, startCfg, logf)
 	defer stopViews()
@@ -172,6 +179,12 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			return err
 		}
 	}
+}
+
+// serveLocale is the locale a serve shows its texts in: ui.locale when set, else the best of available for
+// the system's detected languages.
+func serveLocale(cfg config.Config, detected, available []string) string {
+	return i18n.Pick(cfg.UI.Locale, detected, available)
 }
 
 // configHolder holds cfg for a serve: the profile setting follows the config

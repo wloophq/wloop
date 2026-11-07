@@ -36,7 +36,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `summary` | string |  | One line, what the workflow does; its plan items' description. Required. |
+| `summary` | string, localized |  | One line, what the workflow does; its plan items' description. Required. |
 | `provider` | one of `github`, `session`, `slack`, `task`, `workspace` |  | The provider of the units it matches. Required. |
 | `when` | predicate |  | The match condition, over the unit's facts, the trigger's and config.*. Required. |
 | `order` | integer | `100` | Evaluation order, lowest first. |
@@ -72,7 +72,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `ask` | string |  | What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent. |
+| `ask` | string, localized |  | What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent. |
 | `gates` | table |  | The gates its runs and drafts open. |
 | `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
 | `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |

@@ -35,7 +35,7 @@ func TestPredicateHintCoversEveryPredKey(t *testing.T) {
 
 func TestDefaultsFileKeysFollowTheGrammar(t *testing.T) {
 	bundled := fstest.MapFS{DefaultsFile: {Data: []byte("provder = \"github\"\n")}}
-	_, problems := readDefaults(nil, bundled)
+	_, problems := readDefaults(nil, readerOf(bundled))
 	if !strings.Contains(problems.Error(), "defaults.toml:1:11: provder: unknown key; did you mean \"provider\"?") {
 		t.Errorf("%s", problems.Error())
 	}
@@ -43,7 +43,7 @@ func TestDefaultsFileKeysFollowTheGrammar(t *testing.T) {
 
 func TestDefaultsFileProviderIsAProvider(t *testing.T) {
 	bundled := fstest.MapFS{DefaultsFile: {Data: []byte("provider = \"githbu\"\n")}}
-	_, problems := readDefaults(nil, bundled)
+	_, problems := readDefaults(nil, readerOf(bundled))
 	if !strings.Contains(problems.Error(), `defaults.toml:1:12: provider: "githbu" is not one of`) || !strings.Contains(problems.Error(), `did you mean "github"?`) {
 		t.Errorf("%s", problems.Error())
 	}
