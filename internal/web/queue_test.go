@@ -26,7 +26,7 @@ const env = {
   openSource: (e, u) => log.opened.push(u ? u.provider + ":" + u.key : ""),
   openTask: (id) => log.tasks.push(id),
   act: async (u, id) => { log.acts.push(unitPath(u, id)); if ((input.refuse || []).includes(unitPath(u, id))) throw new Error("it changed"); },
-  row: (e) => h("li", { "data-task": e.id }, e.title),
+  row: (e, view) => h("li", { "data-task": e.id, "data-view": view }, e.title),
   render: () => { log.renders++; },
   keyOf: (action) => ({ "queue:primary": "Enter", "queue:edit": "e", "queue:discard": "x", "queue:close-silently": "m", "queue:skip-workflow": "n" })[action] || "",
   navigate: (v) => log.nav.push(v),
@@ -353,5 +353,20 @@ process.stdout.write(JSON.stringify({ Took: took }));
 })();`, map[string]any{"queues": map[string]any{"last-step": threeQueue()}}, &got)
 	if !slices.Equal(got.Took, []bool{false, false, false, false}) {
 		t.Fatalf("%+v: with no draft the keys go on to their other bindings", got)
+	}
+}
+
+func TestQueueRowsAreDrawnAsTheServedView(t *testing.T) {
+	var got struct{ Views []string }
+	q := threeQueue()
+	q["view"] = "decide-last-step"
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=last-step";
+await queueLoad(env.route(), env);
+process.stdout.write(JSON.stringify({ Views: all(view(), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-view"]) }));
+})();`, map[string]any{"queues": map[string]any{"last-step": q}}, &got)
+	if !slices.Equal(got.Views, []string{"decide-last-step", "decide-last-step"}) {
+		t.Fatalf("rows drawn as %v: a queue's rows are its served view's", got.Views)
 	}
 }

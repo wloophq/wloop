@@ -37,13 +37,13 @@ function queueDraftOf(g) {
 }
 
 // queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
-// daemon serves with its delivery), else its unit's row with the situation that makes it.
-function queueItemCard(item, env) {
+// daemon serves with its delivery), else its unit's row, as view draws it, with the situation that makes it.
+function queueItemCard(item, env, view) {
   const g = item.gate;
   if (queueDraft(g)) return draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf });
   if (g) return gateCard(item.task, g, { scope: "queue" });
   return h("div", { class: "queue-unit" },
-    env.row(item.task),
+    env.row(item.task, view),
     item.situation && item.situation.label ? h("p", { class: "situation" }, item.situation.label) : null);
 }
 
@@ -187,7 +187,7 @@ function renderQueue(queue, at, env) {
     head,
     h("p", { class: "progress", "aria-live": "polite" }, t("{n} of {total}", { n: fmtNumber(i + 1), total: fmtNumber(items.length) })),
     err,
-    h("div", { class: "queue-item" }, queueItemCard(item, env), queuePrimary(item, env)),
-    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task),
+    h("div", { class: "queue-item" }, queueItemCard(item, env, queue.view), queuePrimary(item, env)),
+    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task, queue.view),
       more > 0 ? h("p", { class: "more" }, tn("+{n} more", more)) : null) : null)];
 }
