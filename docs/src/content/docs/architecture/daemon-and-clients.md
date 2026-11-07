@@ -28,6 +28,8 @@ The daemon computes a task's facets when it serves the task: its own facts and i
 
 The home and the decision queues read the views the same way, in one pass over the tasks (`coretasks.Service.Sets`), which the counters share: `GET /api/home` serves the briefing, the home's sections and the capture hint, and `GET /api/queues/{kind}` a decision kind's items, the oldest first, narrowed by `q` as the counters are (see [The home and decision queues](/concepts/home/)).
 
+The reads that start while the change log's generation holds share one pass, its tasks and the facts read of each, for at most two seconds: a screen's tasks, counters, home and queues, and the tasks feed's publish before them, read every task's facts once. A write that notes a change starts a new pass, a page whose position is newer than the shared pass lists from the store, and a fact a write does not note, or one that moves with the clock, is late by two seconds at most.
+
 A page of the rows names the version of `GET /api/catalog` (`catalog`), and a page of the tasks that of `GET /api/views` (`specs`); a client holding another version reads it again, so a reloaded profile reaches it. A reload also moves every task in the next change (`all`), since it can change their facets, so a paged view reads its tasks again.
 
 ## The API
