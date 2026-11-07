@@ -96,6 +96,24 @@ func TestACopiedPluginLayerKeepsEveryTranslation(t *testing.T) {
 	}
 }
 
+func TestAnotherPluginsUserLayerLeavesSlackDraftTemplatesFound(t *testing.T) {
+	l, problems := loadProfile(t, "pt-BR", map[string]string{"plugins/github/ui.toml": "[noun]\none = \"pull request\"\nother = \"pull requests\"\n"})
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	for _, name := range []string{"text.md.tmpl", "why.md.tmpl"} {
+		rel := "workflows/slack-stalled-nudge/" + name
+		want, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "locales", "pt-BR", filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := l.ProfileFile(rel)
+		if err != nil || string(got.Body) != string(want) {
+			t.Fatalf("%s with a user plugins/github/: %q %v, want the pt-BR template", rel, got.Body, err)
+		}
+	}
+}
+
 func TestAnUntranslatedUserTextShowsInEnglish(t *testing.T) {
 	l, _ := loadProfile(t, "pt-BR", map[string]string{"home.toml": "[capture]\nhint = \"Jot it down\"\n"})
 	if l.Home.CaptureHint != "Jot it down" || l.Home.LastJoin != " e " {

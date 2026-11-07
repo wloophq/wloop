@@ -114,6 +114,24 @@ func BenchmarkADraftsLanguageAndTemplate(b *testing.B) {
 	}
 }
 
+func TestASlackDraftTemplateIsFoundUnderAUserGithubDirectory(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "plugins", "github"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gh := filepath.Join(dir, "plugins", "github")
+	layers := append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}, profile.Layer{Name: "user:github", Source: gh, Dir: gh})
+	for _, file := range []string{defaultDraftText, defaultDraftWhy} {
+		for _, locale := range []string{"en", "pt-BR"} {
+			tmpl, written, err := draftTemplate(layers, turn.BundledFS(), "slack-stalled-nudge", file, draft.Message, locale)
+			if err != nil || tmpl == nil || written != locale {
+				t.Errorf("%s in %s: %v %v %q", file, locale, tmpl, err, written)
+			}
+		}
+	}
+}
+
 func TestADraftTemplateNoLayerHoldsIsNotFound(t *testing.T) {
 	t.Parallel()
 	layers, bundled := templateLayers(t, nil)

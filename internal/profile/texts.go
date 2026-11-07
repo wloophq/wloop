@@ -34,8 +34,9 @@ type Problems []TextProblem
 //
 // For each text the walk goes from the highest layer down: a layer that holds the text in the locale wins;
 // a layer whose English text differs from the one below it wins with that text; the bottom layer ends with
-// its locale text, else its English one. A plugin's file, read in its own layer or in the user's layer of it,
-// walks only the layers of no plugin and that plugin's: plugins share file names, never texts.
+// its locale text, else its English one. The keys of a plugin's file Localize reads in its own layer or in
+// the user's layer of it walk only the layers of no plugin and that plugin's: plugins share file names such as
+// ui.toml, never texts. Every other read, Text, Forms and the whole files, walks every layer.
 type Texts struct {
 	layers  []Layer
 	bundled fs.FS
@@ -173,14 +174,12 @@ func (t *Texts) File(rel string) (Resolved, error) {
 	return t.FileAt(t.layers[len(t.layers)-1], rel)
 }
 
-// FileAt is File as layer l's level reads it, the way Localize reads a key.
+// FileAt is File as layer l's level reads it, the way Localize reads a key. A whole-file text lives under its
+// workflow's directory, whose name no two plugins share, so the walk reads every layer, whatever plugin l is.
 func (t *Texts) FileAt(l Layer, rel string) (Resolved, error) {
 	f := t.file(rel)
-	at, scope := t.index(l), l.PluginID()
+	at := t.index(l)
 	for i := len(t.layers) - 1; i >= 0; i-- {
-		if !t.visible(scope, i) {
-			continue
-		}
 		r := f.whole[i]
 		if loc := f.wholeLoc[i]; loc != nil && (i <= at || r == nil) {
 			return *loc, nil
@@ -190,9 +189,7 @@ func (t *Texts) FileAt(l Layer, rel string) (Resolved, error) {
 		}
 		var below *Resolved
 		for j := i - 1; j >= 0 && below == nil; j-- {
-			if t.visible(scope, j) {
-				below = f.whole[j]
-			}
+			below = f.whole[j]
 		}
 		if below == nil || !bytes.Equal(below.Body, r.Body) {
 			return *r, nil

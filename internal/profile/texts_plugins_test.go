@@ -45,6 +45,26 @@ func TestPluginLayersResolveInTheirOwnChain(t *testing.T) {
 	}
 }
 
+func TestAWholeFileResolvesWhateverPluginTheTopLayerIs(t *testing.T) {
+	alpha := map[string]string{
+		"workflows/alpha-nudge/text.md.tmpl":               "Hi",
+		"locales/pt-BR/workflows/alpha-nudge/text.md.tmpl": "Oi",
+	}
+	ua, ub := dir(t, map[string]string{"ui.toml": "[queue]\nlabel = \"x\"\n"}), dir(t, map[string]string{"ui.toml": "[queue]\nlabel = \"y\"\n"})
+	layers := []Layer{bundled(), {Name: PluginLayer("alpha"), Source: "alpha", FS: mapFS(alpha)}, {Name: PluginLayer("beta"), Source: "beta", FS: mapFS(map[string]string{})},
+		user(dir(t, map[string]string{})), {Name: "user:alpha", Source: ua, Dir: ua}, {Name: "user:beta", Source: ub, Dir: ub}}
+	x := NewTexts(layers, mapFS(bundledActions), "pt-BR", textKeys)
+	if r, err := x.File("workflows/alpha-nudge/text.md.tmpl"); err != nil || string(r.Body) != "Oi" {
+		t.Fatalf("alpha's template with the user's beta layer on top: %q %v", r.Body, err)
+	}
+	if r, err := x.FileAt(layers[5], "workflows/alpha-nudge/text.md.tmpl"); err != nil || string(r.Body) != "Oi" {
+		t.Fatalf("read at the user's beta layer: %q %v", r.Body, err)
+	}
+	if s, ok := x.Text("actions.toml", []string{"pause", "label"}); !ok || s != "Pausar" {
+		t.Fatalf("a bundled text with a plugin's user layer on top: %q %v", s, ok)
+	}
+}
+
 func TestAPluginUserTextOwnsItsKey(t *testing.T) {
 	layers := pluginChain(t, map[string]string{"ui.toml": "[queue]\nlabel = \"Ship\"\n"})
 	x := NewTexts(layers, mapFS(bundledActions), "pt-BR", textKeys)
