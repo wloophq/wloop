@@ -666,3 +666,25 @@ func TestTheTaskStripIsTheTasksOwnTurn(t *testing.T) {
 		t.Errorf("turn_of is no key: %v", problems)
 	}
 }
+
+func TestACopiedViewsFileFromTheLastReleaseLoads(t *testing.T) {
+	layers := []profile.Layer{{Name: "user", Dir: "testdata/lastrelease"}}
+	bundled := os.DirFS("../../profiles/default")
+	for _, locale := range []string{"en", "pt-BR"} {
+		r := newLayerReader(locale, layers, bundled)
+		_, _, problems := loadViews(layers, r, nil)
+		problems = append(problems, *r.problems...)
+		if len(problems) > 0 {
+			t.Errorf("%s: the last release's views.toml copied whole: %s", locale, problems.Error())
+		}
+	}
+	plugin, user := t.TempDir(), t.TempDir()
+	for dir, body := range map[string]string{plugin: "[lens]\nlist_empty = \"Workspace\"\n", user: "[lens]\ncol_aside = \"Workspace\"\n"} {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, problems := loadUI([]profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}, {Name: "user:acme", Dir: user}}, readerOf(nil)); len(problems) > 0 {
+		t.Errorf("a plugin's ui.toml with a retired row word: %s", problems.Error())
+	}
+}

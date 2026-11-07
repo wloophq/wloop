@@ -67,6 +67,9 @@ type Key struct {
 	// Localized says that the key holds a text a person reads, which a layer's locales/<tag>/ mirror
 	// translates.
 	Localized bool
+	// Retired says that a release stopped reading the key: a file that still sets it loads, and the key
+	// does nothing.
+	Retired bool
 }
 
 // Value is one value of an enum key.
@@ -80,7 +83,7 @@ type Value struct {
 
 // Grammar is every reserved key of the language.
 var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
-	rowWordRows(SurfaceViews, true), rowWordRows(SurfaceUI, false), showRows(SurfaceViews), showRows(SurfaceUI),
+	rowWordRows(SurfaceViews, true), rowWordRows(SurfaceUI, false), retiredRowWordRows(SurfaceViews), retiredRowWordRows(SurfaceUI), showRows(SurfaceViews), showRows(SurfaceUI),
 	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow), stringsGrammar, timelineGrammar,
 	decisionsGrammar, uiPluralGrammar, homeGrammar, omniboxGrammar)
 

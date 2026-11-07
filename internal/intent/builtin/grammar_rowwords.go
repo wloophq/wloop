@@ -52,6 +52,25 @@ var RowWords = []RowWord{
 	{Key: "more", Vars: []string{"n"}, Doc: "The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`."},
 }
 
+// RetiredRowWords are the row words a release stopped reading, each with what it named. A [lens] that still
+// sets one loads, so a profile that copied a whole file keeps working.
+var RetiredRowWords = []RowWord{
+	{Key: "col_who", Doc: "The head of the list column of whom a row waits on."},
+	{Key: "col_age", Doc: "The head of the list column of a row's age."},
+	{Key: "col_why", Doc: "The head of the list column of why a row waits."},
+	{Key: "col_aside", Doc: "The head of the list column of a row's workspace and links."},
+	{Key: "col_actions", Doc: "The head of the list column of a row's actions."},
+	{Key: "changed", Doc: "The flag of a task that changed since you last opened it."},
+}
+
+func retiredRowWordRows(in Surface) []Key {
+	out := make([]Key, len(RetiredRowWords))
+	for i, w := range RetiredRowWords {
+		out[i] = Key{Path: "lens." + w.Key, In: in, Kind: KindTemplate, Localized: true, Retired: true, Doc: w.Doc}
+	}
+	return out
+}
+
 func rowWordRows(in Surface, required bool) []Key {
 	out := make([]Key, len(RowWords))
 	for i, w := range RowWords {

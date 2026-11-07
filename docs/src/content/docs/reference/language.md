@@ -388,6 +388,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
 - `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
 - `lens.more` (template, localized): The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`.
+- `lens.col_who` (retired, not read): The head of the list column of whom a row waits on.
+- `lens.col_age` (retired, not read): The head of the list column of a row's age.
+- `lens.col_why` (retired, not read): The head of the list column of why a row waits.
+- `lens.col_aside` (retired, not read): The head of the list column of a row's workspace and links.
+- `lens.col_actions` (retired, not read): The head of the list column of a row's actions.
+- `lens.changed` (retired, not read): The flag of a task that changed since you last opened it.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.
@@ -938,6 +944,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `lens.every` (template, localized): How often a project is reviewed, over the `{{.every}}`.
 - `lens.reviewed` (template, localized): When a project was last reviewed, over the `{{.date}}`.
 - `lens.more` (template, localized): The piece that counts the values a facet's `show_max` leaves off a row, over their number `{{.n}}`.
+- `lens.col_who` (retired, not read): The head of the list column of whom a row waits on.
+- `lens.col_age` (retired, not read): The head of the list column of a row's age.
+- `lens.col_why` (retired, not read): The head of the list column of why a row waits.
+- `lens.col_aside` (retired, not read): The head of the list column of a row's workspace and links.
+- `lens.col_actions` (retired, not read): The head of the list column of a row's actions.
+- `lens.changed` (retired, not read): The flag of a task that changed since you last opened it.
 - `facets.<name>.show.ref` (list of strings): The values the facet shows in the ref part.
 - `facets.<name>.show.meta` (list of strings): The values the facet shows in the meta part.
 - `facets.<name>.show.flag` (list of strings): The values the facet shows in the flag part.

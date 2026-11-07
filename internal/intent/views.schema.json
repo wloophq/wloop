@@ -286,8 +286,38 @@
           "description": "The briefing flag's tooltip, over the intake's `{{.seq}}`.",
           "type": "string"
         },
+        "changed": {
+          "deprecated": true,
+          "description": "The flag of a task that changed since you last opened it.",
+          "type": "string"
+        },
+        "col_actions": {
+          "deprecated": true,
+          "description": "The head of the list column of a row's actions.",
+          "type": "string"
+        },
+        "col_age": {
+          "deprecated": true,
+          "description": "The head of the list column of a row's age.",
+          "type": "string"
+        },
+        "col_aside": {
+          "deprecated": true,
+          "description": "The head of the list column of a row's workspace and links.",
+          "type": "string"
+        },
         "col_unit": {
           "description": "What a row view whose rows mix kinds calls its unit, as `list_count`'s `{{.unit}}`.",
+          "type": "string"
+        },
+        "col_who": {
+          "deprecated": true,
+          "description": "The head of the list column of whom a row waits on.",
+          "type": "string"
+        },
+        "col_why": {
+          "deprecated": true,
+          "description": "The head of the list column of why a row waits.",
           "type": "string"
         },
         "copied": {
