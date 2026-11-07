@@ -87,6 +87,9 @@ func TestDecisionsReadInPtBR(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("problems: %v", problems)
 	}
+	if l.Decisions.Open != "Abrir na origem" {
+		t.Fatalf("open = %q", l.Decisions.Open)
+	}
 	k := l.Decisions.Kinds[decision.ApprovePlan]
 	if k.Queue != "Planos para aprovar" || k.Noun["other"] != "planos" || k.Clause["other"] != "{counter} esperam sua aprovação" {
 		t.Fatalf("approve-plan in pt-BR = %+v", k)

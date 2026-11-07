@@ -559,8 +559,6 @@
 "unknown_task" = "A tarefa {id} não existe"
 "unknown_unit" = "Nenhuma tarefa contém {unit}"
 "outside_vocabulary" = "Nenhum verbo da omnibox executa {name}"
-# piece B
-"Open at source" = "Abrir na origem"
 
 [formats]
 time = "15:04"

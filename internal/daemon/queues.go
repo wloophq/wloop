@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
@@ -85,15 +84,7 @@ func primaryLabel(l *intentload.Loaded, it home.Item) string {
 			return specs[i].Label
 		}
 	case home.ActionOpen:
-		return clientText(l, "Open at source")
+		return l.Decisions.Open
 	}
 	return it.Primary.ID
-}
-
-// clientText is strings.toml's text key in l's locale, the key itself when it holds none.
-func clientText(l *intentload.Loaded, key string) string {
-	if f, ok := l.Strings[key]; ok {
-		return i18n.Forms(f).For(l.Locale, 1)
-	}
-	return key
 }

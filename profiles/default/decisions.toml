@@ -5,6 +5,9 @@
 # queue walks, and the words the home's briefing and the queue use. A user
 # profile's decisions.toml replaces the keys it sets.
 
+# What a queue's button that opens a unit at its source says.
+open = "Open at source"
+
 [gates]
 question = "answer"
 post     = "answer"

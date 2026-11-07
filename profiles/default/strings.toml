@@ -565,8 +565,6 @@
 "unknown_task" = "No task {id} exists"
 "unknown_unit" = "No task holds {unit}"
 "outside_vocabulary" = "No omnibox verb runs {name}"
-# piece B
-"Open at source" = "Open at source"
 
 [formats]
 time = "3:04 PM"

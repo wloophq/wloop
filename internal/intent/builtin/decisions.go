@@ -51,6 +51,7 @@ func pluralText(s Surface, path, doc string) []Key {
 }
 
 var decisionsGrammar = slices.Concat([]Key{
+	{Path: "open", In: SurfaceDecisions, Kind: KindText, Localized: true, Doc: "What a queue's button that opens a unit at its source says; only the default layer's file sets it."},
 	{Path: "gates", In: SurfaceDecisions, Kind: KindTable, Doc: "The decision kind of an open gate, by gate kind; only the default layer's file maps gates."},
 	{Path: "gates.*", In: SurfaceDecisions, Kind: KindEnum, Values: DecisionKinds, Doc: "One gate kind's decision kind."},
 	{Path: "situations", In: SurfaceDecisions, Kind: KindTable, Doc: "The decision kind of a unit in a situation its plugin derives, by situation; only a plugin's layer maps them."},

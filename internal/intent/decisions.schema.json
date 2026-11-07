@@ -128,6 +128,10 @@
       "description": "Each decision kind's view and words, by kind; only the default layer's file sets them.",
       "type": "object"
     },
+    "open": {
+      "description": "What a queue's button that opens a unit at its source says; only the default layer's file sets it.",
+      "type": "string"
+    },
     "primary": {
       "additionalProperties": {
         "description": "A catalog action of the plugin's units, or `open`, which opens the unit at its source.",

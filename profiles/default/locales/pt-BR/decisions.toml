@@ -1,3 +1,5 @@
+open = "Abrir na origem"
+
 [kinds.answer]
 noun   = { one = "pergunta", other = "perguntas" }
 clause = "o agente tem {counter} para você"

@@ -1015,6 +1015,7 @@ The fields each notice reads besides `Name` and `Command`:
 
 ## Decision kinds (`decisions.toml`)
 
+- `open` (string, localized): What a queue's button that opens a unit at its source says; only the default layer's file sets it.
 - `gates` (table): The decision kind of an open gate, by gate kind; only the default layer's file maps gates.
 - `gates.<name>` (one of `answer`, `approve-plan`, `send-draft`, `review-step`, `last-step`, `pick-someone`, `act`): One gate kind's decision kind.
   - `answer`: An agent's question or a post waits for the user's answer.

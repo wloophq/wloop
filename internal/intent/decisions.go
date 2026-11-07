@@ -26,6 +26,8 @@ type Decisions struct {
 	// Primary is what a queue offers first on a plugin's unit, by provider and kind: a catalog action or
 	// builtin.DecisionOpen.
 	Primary map[dunit.ProviderID]map[decision.Kind]string
+	// Open is what a queue's button that opens a unit at its source says.
+	Open string
 }
 
 // KindTexts are a decision kind's view and words; Primary is the gate intent a queue offers first, "" the
@@ -39,6 +41,7 @@ type KindTexts struct {
 }
 
 type mDecisions struct {
+	Open       *string           `toml:"open"`
 	Gates      map[string]string `toml:"gates"`
 	Situations map[string]string `toml:"situations"`
 	Signals    map[string]string `toml:"signals"`
@@ -121,6 +124,7 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		return decision.Kind(v), len(s.problems) == n
 	}
 	if plugin == "" {
+		text(s, "open", m.Open, &l.def.Open)
 		for _, section := range []struct {
 			name string
 			set  bool
@@ -152,7 +156,7 @@ func (l *decisionsLoad) merge(plugin dunit.ProviderID, file string, src []byte, 
 		for _, section := range []struct {
 			name string
 			set  bool
-		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}} {
+		}{{"gates", m.Gates != nil}, {"kinds", m.Kinds != nil}, {"open", m.Open != nil}} {
 			if section.set {
 				s.add(section.name, "%s belong to the profile's own %s, not a plugin's layer", section.name, DecisionsFile)
 			}
