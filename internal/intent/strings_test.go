@@ -55,3 +55,15 @@ func TestStringsFormsWithoutOtherIsAProblem(t *testing.T) {
 		}
 	}
 }
+
+func TestTheBundledStringsLoadInPtBR(t *testing.T) {
+	l, problems := LoadIn("pt-BR", bundledOnly(), bundledDefault(t), testBase(), nil)
+	for _, p := range problems {
+		if strings.Contains(p.File, StringsFile) {
+			t.Errorf("%v", p)
+		}
+	}
+	if l.Strings["Sweep now"]["other"] != "Varrer agora" || l.Strings["Quit {name}"]["other"] != "Sair do {name}" || l.Formats["time"] != "15:04" {
+		t.Fatalf("%v %v", l.Strings["Sweep now"], l.Formats)
+	}
+}

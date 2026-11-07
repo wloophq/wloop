@@ -66,7 +66,7 @@ func runAppClient(ctx context.Context, e *Env) error {
 	} else {
 		digestAt, win = cfg.Notifications.DigestAt, cfg.Window
 	}
-	e.RunNative(win, func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
+	e.RunNative(win, appWords(ctx, client.New(e.Socket)), func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
 		dc := client.New(e.Socket)
 		cockpit := func(route string) (string, error) { return cockpitURL(e.StateDir, route) }
 		c := menubar.New(menubar.Config{

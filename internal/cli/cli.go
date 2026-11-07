@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -167,7 +168,7 @@ type Env struct {
 	NativeAvailable func() bool
 	// RunNative runs the app's native loop; setup's host is nil when the app
 	// shows no window of its own.
-	RunNative  func(win config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host))
+	RunNative  func(win config.Window, words *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host))
 	QuitNative func()
 	Exit       func(code int)
 	// Reexec replaces this process with Executable, same arguments.

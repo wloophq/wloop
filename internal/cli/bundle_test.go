@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -266,7 +267,7 @@ func TestAppRebuildsAStaleBundleAndRestartsInPlace(t *testing.T) {
 	mustBuild(t, te)
 	te.Executable = bundleExe(te.Home)
 	te.NativeAvailable = func() bool { return true }
-	te.RunNative = func(config.Window, func(menubar.Tray, menubar.Notifier, window.Host)) {
+	te.RunNative = func(config.Window, *texts.Catalog, func(menubar.Tray, menubar.Notifier, window.Host)) {
 		t.Error("the menu ran from a stale bundle")
 	}
 	reexecs := 0
