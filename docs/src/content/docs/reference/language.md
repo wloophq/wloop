@@ -1124,6 +1124,12 @@ The fields each notice reads besides `Name` and `Command`:
 - `notifications` (table): The notifications.
 - `notifications.digest_at` (string, default `09:00`): The local HH:MM of the daily digest; empty for none.
 
+### Window
+
+- `window` (table): The app's own window on macOS.
+- `window.enabled` (bool, default `true`): Show the cockpit in the app's own window on macOS; false opens it in the browser.
+- `window.hotkey` (string, default `ctrl+option+space`): The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.
+
 ### Units and tasks
 
 - `items` (table): The items.

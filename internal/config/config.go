@@ -61,6 +61,7 @@ type Config struct {
 	Tasks     Tasks           `json:"tasks"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
+	Window        Window        `json:"window"`
 	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
@@ -176,6 +177,14 @@ type Tasks struct {
 // Notifications: DigestAt is the local "HH:MM" of the daily digest, "" for none.
 type Notifications struct {
 	DigestAt string `json:"digest_at"`
+}
+
+// Window: Enabled shows the cockpit in the app's own window on macOS instead
+// of the browser; Hotkey is the global shortcut that opens the omnibox panel,
+// "" for none.
+type Window struct {
+	Enabled bool   `json:"enabled"`
+	Hotkey  string `json:"hotkey"`
 }
 
 // SinkConfig is one view sink's own settings.
@@ -454,6 +463,7 @@ func Defaults() Config {
 		Classify:      Classify{PerDay: 50},
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
+		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
 		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},

@@ -865,6 +865,23 @@
       "description": "Each view sink's own settings, by sink.",
       "type": "object"
     },
+    "window": {
+      "additionalProperties": false,
+      "description": "The app's own window on macOS.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Show the cockpit in the app's own window on macOS; false opens it in the browser.",
+          "type": "boolean"
+        },
+        "hotkey": {
+          "default": "ctrl+option+space",
+          "description": "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "workflows": {
       "additionalProperties": {
         "additionalProperties": false,
