@@ -39,6 +39,10 @@ Each counter with something to count is a clause, `{counter}` where its count go
 
 Each `[[sections]]` shows the first `limit` rows of a view, titled by the view's label, each with the time its `time` names (`owed` or `moved`); its link opens the whole view. The bundled sections are `home-blocked`, the tasks that wait on you the longest owed first, and `home-stalled`, the open tasks that have not moved for the longest.
 
+## Decision queues
+
+Each counter of a kind opens its queue (`#queue=<kind>`): the kind's decisions one at a time, the oldest first, one item per decision, so a task with two open questions is two items. An item is a task's open gate, offered with the gate's card, or a state of one of its units, offered with the unit's situation. Its primary action is, for a gate, the kind's `primary` intent when the gate offers it, else the gate's first; for a unit, the plugin layer's `[primary]` of the kind, a catalog action of its units or `open`, which opens the unit at its source. No queue merges: a unit that waits only for a merge opens where you merge it. The queue's title is the plugin's `[decisions.<kind>] queue` when every item is that plugin's, else the kind's. `GET /api/queues/<kind>?q=<lens query>` narrows a queue as the counters narrow, which the Outbox's groups use to review their drafts as a queue.
+
 ## Changing it
 
 A user profile's `home.toml` replaces the keys it sets, and a list of counters or sections the whole list; `decisions.toml` and a plugin's `plugins/<id>/decisions.toml` replace the mappings they name. The words are localized like every profile text: `locales/<tag>/home.toml` and `locales/<tag>/decisions.toml` translate them, a plural text form by form.

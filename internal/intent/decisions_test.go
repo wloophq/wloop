@@ -71,6 +71,17 @@ func TestDecisionsLoadsDefaultAndPluginLayers(t *testing.T) {
 	}
 }
 
+func TestQueueNoMergeAction(t *testing.T) {
+	l, _ := loadProfile(t, "en", nil)
+	for p, byKind := range l.Decisions.Primary {
+		for k, action := range byKind {
+			if strings.Contains(action, "merge") {
+				t.Errorf("%s's %s queue offers %s first: the loop never merges", p, k, action)
+			}
+		}
+	}
+}
+
 func TestDecisionsReadInPtBR(t *testing.T) {
 	l, problems := loadProfile(t, "pt-BR", nil)
 	if len(problems) > 0 {
