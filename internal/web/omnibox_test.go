@@ -254,6 +254,25 @@ process.stdout.write(JSON.stringify({ Acts: log.acts, Runs: log.posts.filter((p)
 	}
 }
 
+func TestOmniboxPanelUnitActionOpensTheUnit(t *testing.T) {
+	var got struct {
+		Opened []string
+		Acts   []string
+		Runs   int
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(true, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+const pause = all(nodes(st), (x) => x.tag === "button" && text(x).includes("Pause"))[0];
+await pause.attrs.onclick();
+process.stdout.write(JSON.stringify({ Opened: log.opened, Acts: log.acts, Runs: log.posts.filter((p) => p.url === "/api/omnibox/run").length }));
+})();`, map[string]any{"resolve": pastedUnit()}, &got)
+	if !slices.Equal(got.Opened, []string{"#unit=alpha/acme%2Fapi%238"}) || len(got.Acts) != 0 || got.Runs != 0 {
+		t.Fatalf("%+v: in the panel a unit's action opens the unit in the main window and runs nothing", got)
+	}
+}
+
 func TestOmniboxActRunsTheServedRowsAction(t *testing.T) {
 	var got struct {
 		Got  []string

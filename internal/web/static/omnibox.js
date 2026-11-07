@@ -294,8 +294,15 @@ function omniboxUnit(st) {
   return st.resolved && st.resolved.kind === "unit" ? st.resolved.unit : null;
 }
 
-// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes.
+// omniboxUnitHref is the route of a resolved unit's detail.
+function omniboxUnitHref(unit) {
+  return "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key);
+}
+
+// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes; the
+// floating panel, which holds no detail, hands the unit to the main window instead.
 async function omniboxUnitAction(st, env, id) {
+  if (st.panel) return env.open(omniboxUnitHref(omniboxUnit(st)));
   await env.act(omniboxUnit(st).unit, id);
   if (env.changed) env.changed();
   env.render();
@@ -324,7 +331,7 @@ function omniboxEnter(st, env, ask) {
   const unit = omniboxUnit(st);
   if (unit) {
     const first = (unit.tasks || [])[0];
-    env.open(first ? "#task=" + encodeURIComponent(first.id) : "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key));
+    env.open(first ? "#task=" + encodeURIComponent(first.id) : omniboxUnitHref(unit));
     return Promise.resolve();
   }
   if (st.resolved && st.resolved.kind === "agent") return omniboxAsk(st, env);
