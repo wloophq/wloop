@@ -44,7 +44,7 @@ Clicking a repository, author, person, situation, type, size, risk, tag or colum
 
 ## Grouping, sorting and boards
 
-The bar above the list groups (`g`), sorts (`s`, or a column header) and switches between list and board in any view, task views included; the menus offer only the fields some item of the view has. A task view groups by its `group` until you pick another field or None; a board with no grouping groups by whom a row waits on. Grouping offers one "Tag `<key>`" per tag key present; an item with two values of that key shows in both groups. Filters, grouping and order stay in the URL and follow you across views; a group or sort a view does not offer gives way to its default.
+The bar above the list groups (`g`), sorts (`s`) and switches between list and board in any view, task views included; the menus offer only the fields some item of the view has. A task view groups by its `group` until you pick another field or None; a board with no grouping groups by whom a row waits on. Grouping offers one "Tag `<key>`" per tag key present; an item with two values of that key shows in both groups. Filters, grouping and order stay in the URL and follow you across views; a group or sort a view does not offer gives way to its default.
 
 ## The Backlog view
 

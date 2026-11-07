@@ -35,35 +35,30 @@ func bundledCatalog(t *testing.T) json.RawMessage {
 }
 
 // stripJS reads back a rendered row's strip: the field and value of its dot's facet button, its strip classes
-// and the field its who column's head sorts by.
+// and the field the lens's sort menu offers for it.
 const stripJS = `
 function dotOf(n) {
   if (n && n.attrs && n.attrs.class === "dot") return n;
   for (const c of (n && n.children) || []) { const d = dotOf(c); if (d) return d; }
   return null;
 }
-function stripShown(m, tr, lens, cols, it) {
+function stripShown(tr, lens, it) {
   const dot = dotOf(tr);
   const walk = (n) => n && n.tag === "button" && n.attrs.class === "facet" && dotOf(n) ? n : ((n && n.children) || []).map(walk).find(Boolean);
   const button = walk(tr);
   const span = dot ? dot.attrs : {};
   const quals = button ? qualifiers(toggledQualifier("", span["data-field"], span["data-value"], false, lens.fields), lens.fields) : [];
-  const who = rowHead(cols, lens, "").children[0].children.find((th) => th.attrs.class === "c-wait");
-  const sort = who && who.children[0] && who.children[0].attrs ? who.children[0].attrs["data-sort"] || "" : "";
+  const f = lens.strip ? fieldById(lens.strip, lens.fields) : null;
   return { Field: span["data-field"] || "", Value: span["data-value"] || "", Button: !!button, Kept: quals.length === 1 && passesFilters(it, filtersOf(quals, lens.fields)),
-    Strip: tr.attrs.class.split(" ").filter((c) => c.startsWith("w-")), Sort: sort, Tip: tr.attrs.title || "" };
+    Strip: tr.attrs.class.split(" ").filter((c) => c.startsWith("w-")), Sort: f && f.sort ? f.id : "", Tip: tr.attrs.title || "" };
 }
 function rowStripShown(r, view) {
   const lens = lensOf({ ...readHash(), view });
-  const m = rowModel(r, "", lens, "");
-  const cols = rowColumns([m]);
-  return stripShown(m, rowTr(m, lens, cols), lens, cols, r);
+  return stripShown(rowView(rowModel(r, "", lens, ""), lens), lens, r);
 }
 function taskStripShown(e, view) {
   const lens = lensOf({ ...readHash(), view });
-  const m = taskModel(e, "", "", lens);
-  const cols = rowColumns([m]);
-  return stripShown(m, rowTr(m, lens, cols), lens, cols, taskItemOf(e));
+  return stripShown(rowView(taskModel(e, "", "", lens), lens), lens, taskItemOf(e));
 }
 `
 
@@ -75,7 +70,7 @@ type stripRow struct {
 
 // TestEachRowsStripIsItsOwnProviders renders a pull request, a Slack conversation, a row of a provider with no
 // strip and a task: each row's dot filters its own provider's strip facet and keeps the row, its strip class
-// is its value's hue, a row with no strip has neither, and the who column's head sorts by the view's strip.
+// is its value's hue, a row with no strip has neither, and the lens's sort menu offers the view's strip.
 func TestEachRowsStripIsItsOwnProviders(t *testing.T) {
 	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
 	pr := tagRows()[1]
@@ -94,28 +89,29 @@ func TestEachRowsStripIsItsOwnProviders(t *testing.T) {
 	var got struct {
 		PR, Slack, Other, Task, Theirs stripRow
 		SlackPieces                    []string
-		Head                           string
+		Head, WantAge                  string
 		Legend                         string
 	}
 	rowViewRun(t, bundledCatalog(t), stripJS+`state.rows = [input.pr, input.slack, input.other];
 const slackLens = lensOf({ ...readHash(), view: "slack" });
 const slackModel = rowModel(input.slack, "", slackLens, "");
-const head = rowTable({ group: "turn", groups: [{ field: "turn", key: "others", raw: "others", label: "Others' turn", rows: [input.slack] }] },
-  (r) => rowModel(r, "", slackLens, ""), slackLens, rowColumns([slackModel]))[0].children[0];
+const head = rowList({ group: "turn", groups: [{ field: "turn", key: "others", raw: "others", label: "Others' turn", rows: [input.slack] }] },
+  (r) => rowModel(r, "", slackLens, ""), slackLens).children[0].children[0];
 process.stdout.write(JSON.stringify({ PR: rowStripShown(input.pr, "mine"), Slack: rowStripShown(input.slack, "slack"), Other: rowStripShown(input.other, "slack"),
-  Task: taskStripShown(input.task, "inbox"), Theirs: taskStripShown(input.theirs, "inbox"), SlackPieces: Object.values(slackModel.parts).flat().map((p) => p.field + ":" + p.label), Head: head.attrs.class,
+  Task: taskStripShown(input.task, "inbox"), Theirs: taskStripShown(input.theirs, "inbox"), SlackPieces: Object.values(slackModel.parts).flat().map((p) => p.field + ":" + pieceLabel(p)), Head: head.attrs.class,
+  WantAge: "age:since " + fmtDate(input.slack.facets.age[0], "datetime"),
   Legend: JSON.stringify(stripLegend(slackLens, slackLens.fields)) }));`,
 		map[string]any{"pr": wireRow("me", now, pr), "slack": slack, "other": other, "task": e, "theirs": theirs, "now": now.UnixMilli()}, &got)
 	if got.PR.Field != "wait" || !got.PR.Button || !got.PR.Kept || len(got.PR.Strip) != 1 || got.PR.Strip[0] != "w-"+got.PR.Value || got.PR.Sort != "wait" {
-		t.Errorf("the pull request's strip %+v, want GitHub's wait, its hue, and the who head sorting by wait", got.PR)
+		t.Errorf("the pull request's strip %+v, want GitHub's wait, its hue, and a sort by wait", got.PR)
 	}
 	if got.Slack.Field != "turn" || got.Slack.Value != "others" || !got.Slack.Kept || !slices.Equal(got.Slack.Strip, []string{"w-author"}) || got.Slack.Sort != "turn" {
-		t.Errorf("the conversation's strip %+v, want Slack's turn, others in the author hue, and the who head sorting by turn", got.Slack)
+		t.Errorf("the conversation's strip %+v, want Slack's turn, others in the author hue, and a sort by turn", got.Slack)
 	}
 	if !strings.HasPrefix(got.Slack.Tip, "Others' turn (Ana): waits on others") {
 		t.Errorf("the conversation's tooltip %q", got.Slack.Tip)
 	}
-	for _, want := range []string{"situation:waits on others", "age:since {{.at}}"} {
+	for _, want := range []string{"situation:waits on others", got.WantAge} {
 		if !slices.Contains(got.SlackPieces, want) {
 			t.Errorf("the conversation lacks %s: %v", want, got.SlackPieces)
 		}

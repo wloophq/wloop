@@ -11,6 +11,7 @@ func routesPrelude(t *testing.T) string {
 	b.WriteString(noPlugins)
 	b.WriteString(`const location = { hash: "" }; const history = { replaceState: (_, __, h) => { location.hash = h; } };` + "\n")
 	b.WriteString(`const window = { addEventListener() {} };` + "\n")
+	b.WriteString(staticJS(t, "row.js"))
 	b.WriteString(staticJS(t, "routes.js"))
 	b.WriteString(staticJS(t, "views.js"))
 	b.WriteString(taskLensJS(t))

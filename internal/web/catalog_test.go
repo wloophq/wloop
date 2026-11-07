@@ -136,9 +136,8 @@ state.health = { viewer: "me" };
 const r = input.row;
 state.rows = [r];
 const lens = lensOf({ ...readHash(), view: "mine" });
-const m = rowModel(r, "", lens, "");
-const tr = rowTr(m, lens, rowColumns([m]));
-const c = rowCard(rowModel(r, "", lens, "", "card"), lens);
+const tr = rowView(rowModel(r, "", lens, ""), lens);
+const c = rowView(rowModel(r, "", lens, "", "card"), lens, { card: true });
 location.hash = "#" + routeHash("mine", keyOf(r));
 state.detail = { row: r, events: [] };
 renderDetail();
@@ -203,7 +202,7 @@ const filters = (el, out = []) => {
   for (const c of (el && el.children) || []) filters(c, out);
   return out;
 };
-const tr = (r) => { const m = rowModel(r, "", lens, ""); return rowTr(m, lens, rowColumns([m])); };
+const tr = (r) => rowView(rowModel(r, "", lens, ""), lens);
 process.stdout.write(JSON.stringify(input.rows.map((r) => filters(tr(r)))));`,
 		map[string]any{"catalog": catalog, "views": servedViews(t), "rows": []any{
 			row(map[string][]string{"waits-on": {"ana"}}),

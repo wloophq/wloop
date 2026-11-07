@@ -546,8 +546,8 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
-var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "holdsWhen", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
-	"columnSort", "sortPick", "rowHead", "rowTr", "rowMeta", "rowWho", "rowCard", "roveKey", "roveStop", "rowStops", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
+var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "holdsWhen", "rowParts", "rowClasses",
+	"roveKey", "roveStop", "rowStops", "refTail", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
@@ -748,7 +748,7 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"tbody tr.sel td:first-child, .card.sel", "box-shadow: inset var(--strip-card) 0 0 var(--me)", "--sel-unit: color-mix(in srgb, var(--me) 14%"} {
+	for _, want := range []string{".row.sel, .card.sel", "box-shadow: inset var(--strip-card) 0 0 var(--me)", "--sel-unit: color-mix(in srgb, var(--me) 14%"} {
 		if !strings.Contains(string(css), want) {
 			t.Errorf("app.css lacks %s", want)
 		}

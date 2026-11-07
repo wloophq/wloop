@@ -580,6 +580,9 @@
 "That link could not be read, so the default view opened" = "Não foi possível ler esse link, então a visão padrão abriu"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "No detalhe"
+# piece C
+"Changed since you saw it" = "Mudou desde que você viu"
+"{n} draft waits for you" = { one = "{n} rascunho espera por você", other = "{n} rascunhos esperam por você" }
 
 [formats]
 time = "15:04"

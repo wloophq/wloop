@@ -588,6 +588,9 @@
 "That link could not be read, so the default view opened" = "That link could not be read, so the default view opened"
 "{action} ({key})" = "{action} ({key})"
 "In the detail" = "In the detail"
+# piece C
+"Changed since you saw it" = "Changed since you saw it"
+"{n} draft waits for you" = { one = "{n} draft waits for you", other = "{n} drafts wait for you" }
 
 [formats]
 time = "3:04 PM"

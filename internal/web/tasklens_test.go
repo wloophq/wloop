@@ -366,7 +366,7 @@ func TestATaskInTwoGroupsHasTwoFocusSlotsAndTheKeysWalkBoth(t *testing.T) {
 	nodeRun(t, mixedPrelude(t), nil, `
 tasksState.tasks = input.tasks.map((e) => e.id === "g-1" ? { ...e, facets: { ...e.facets, tag: ["lang:go", "lang:rust"] } } : e);
 const p = viewPage(route({ g: "tag:lang" }), "");
-const focus = all(h("div", {}, ...p.body), (x) => x.tag === "tr" && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
+const focus = all(h("div", {}, ...p.body), (x) => x.attrs["data-row"] && String(x.attrs["data-focus"] || "").startsWith("task:")).map((x) => x.attrs["data-focus"]);
 const nodes = focus.map((f) => ({ dataset: { focus: f } }));
 const walk = [];
 let at = null;

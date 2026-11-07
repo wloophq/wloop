@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,15 +13,29 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
-// appJSDebts are the words of the GitHub plugin's vocabulary app.js still
-// quotes, and how often. Most collide with the host's own words (a DOM id,
-// a YAML key, a connection state, a built-in lens field); the view and
-// facet ids among them are custom views and lens fields not yet served. The
-// count only shrinks: a lower count fails until the entry is lowered.
-var appJSDebts = map[string]int{
-	"closed": 3, "draft": 2, "guidance": 5, "review": 1, "wait": 1,
-	"age": 4, "author": 3, "due": 6, "is": 5, "kind": 5, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 1, "tag": 5, "type": 1, "waits-on": 5,
-	"all": 1, "dash": 7, "explore": 14, "mine": 0, "plan": 9, "recent": 8,
+// scriptDebts are, by script of static/, the words of the GitHub plugin's
+// vocabulary it still quotes, and how often. Most collide with the host's
+// own words (a DOM id, a YAML key, a connection state, a built-in lens
+// field); the view and facet ids among them are custom views and lens fields
+// not yet served. A count only shrinks: a lower count fails until the entry
+// is lowered.
+var scriptDebts = map[string]map[string]int{
+	"app.js": {
+		"closed": 3, "draft": 2, "guidance": 5, "review": 1, "wait": 1,
+		"age": 2, "author": 3, "due": 6, "is": 5, "kind": 3, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 1, "tag": 5, "type": 1, "waits-on": 5,
+		"all": 1, "dash": 7, "explore": 14, "mine": 0, "plan": 9, "recent": 8,
+	},
+	"dash.js": {
+		"draft": 1, "dash": 5,
+		"author": 4, "ci": 4, "due": 2, "is": 5, "kind": 10, "opened": 5, "risk": 5, "size": 5, "tag": 8, "type": 2, "wait": 1, "waits-on": 2, "where": 3,
+	},
+	"detail.js":  {"draft": 2, "merged": 4, "all": 4},
+	"keys.js":    {"review": 3, "plan": 6},
+	"palette.js": {"merged": 1},
+	"plugins.js": {"author": 1},
+	"row.js":     {"age": 1, "kind": 1},
+	"task.js":    {"draft": 3, "merged": 1, "kind": 1, "all": 1},
+	"views.js":   {"draft": 1, "where": 1, "review": 1, "plan": 1},
 }
 
 // githubVocabulary is every event kind, intent, view id and facet id the
@@ -71,15 +86,30 @@ func strayWords(src string, vocab map[string]string, debts map[string]int) []str
 	return out
 }
 
-func TestAppJSNamesNoneOfTheGitHubPluginsVocabulary(t *testing.T) {
-	for _, s := range strayWords(appJS(t), githubVocabulary(t), appJSDebts) {
-		t.Error(s)
+func TestNoScriptNamesTheGitHubPluginsVocabulary(t *testing.T) {
+	scripts, err := fs.Glob(files, "static/*.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vocab := githubVocabulary(t)
+	seen := map[string]bool{}
+	for _, path := range scripts {
+		name := strings.TrimPrefix(path, "static/")
+		seen[name] = true
+		for _, s := range strayWords(staticJS(t, name), vocab, scriptDebts[name]) {
+			t.Errorf("%s: %s", name, s)
+		}
+	}
+	for name := range scriptDebts {
+		if !seen[name] {
+			t.Errorf("scriptDebts names %s, which static/ does not hold", name)
+		}
 	}
 }
 
 func TestAPlantedGitHubEventKindIsCaught(t *testing.T) {
 	planted := appJS(t) + `\nconst X = new Set(["review_requested"]);`
-	got := strings.Join(strayWords(planted, githubVocabulary(t), appJSDebts), "\n")
+	got := strings.Join(strayWords(planted, githubVocabulary(t), scriptDebts["app.js"]), "\n")
 	if !strings.Contains(got, "event kind review_requested") {
 		t.Errorf("a planted event kind went unseen: %s", got)
 	}

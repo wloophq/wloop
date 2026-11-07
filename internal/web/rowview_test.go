@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19,12 +20,14 @@ type shownPiece struct {
 type shownRow struct {
 	Pieces  []shownPiece
 	Classes []string
-	Heads   []string
+	Slots   []string
+	Unit    string
 	Text    string
 }
 
 // rowViewJS renders a row or a task with the row renderer and reads back each facet button: the qualifier
-// its click adds, whether the item still passes that filter, and the row's classes and column heads.
+// its click adds, whether the item still passes that filter, and the row's classes and the optional slots it
+// fills.
 const rowViewJS = `
 function shown(tr, it, lens) {
   const out = [];
@@ -33,29 +36,33 @@ function shown(tr, it, lens) {
       const span = n.children[0];
       const f = span.attrs["data-field"], v = span.attrs["data-value"];
       const quals = qualifiers(toggledQualifier("", f, v, false, lens.fields), lens.fields);
-      out.push({ Field: f, Value: v, Label: span.textContent, Kept: quals.length === 1 && passesFilters(it, filtersOf(quals, lens.fields)) });
+      out.push({ Field: f, Value: v, Label: span.textContent || span.attrs.title, Kept: quals.length === 1 && passesFilters(it, filtersOf(quals, lens.fields)) });
     }
     for (const c of (n && n.children) || []) walk(c);
   };
   walk(tr);
   return out;
 }
-function heads(head) {
-  return head.children[0].children.map((th) => th.textContent);
+const ROW_SLOTS = ["glyph", "why", "aside", "who", "age", "act"];
+function slots(row) {
+  const out = new Set();
+  const walk = (n) => {
+    if (!n || !n.attrs) return;
+    for (const c of String(n.attrs.class || "").split(" ")) if (ROW_SLOTS.includes(c) && (c !== "who" || (n.children || []).length)) out.add(c);
+    (n.children || []).forEach(walk);
+  };
+  walk(row);
+  return ROW_SLOTS.filter((s) => out.has(s));
 }
 function rowShown(r, view) {
   const lens = lensOf({ ...readHash(), view });
-  const m = rowModel(r, "", lens, "");
-  const cols = rowColumns([m]);
-  const tr = rowTr(m, lens, cols);
-  return { Pieces: shown(tr, r, lens), Classes: tr.attrs.class.split(" "), Heads: heads(rowHead(cols, lens, unitTitle(view, lens))), Text: tr.textContent };
+  const tr = rowView(rowModel(r, "", lens, ""), lens);
+  return { Pieces: shown(tr, r, lens), Classes: tr.attrs.class.split(" "), Slots: slots(tr), Unit: unitTitle(view, lens), Text: tr.textContent };
 }
 function taskShown(e, view) {
   const lens = lensOf({ ...readHash(), view });
-  const m = taskModel(e, "", "", lens);
-  const cols = rowColumns([m]);
-  const tr = rowTr(m, lens, cols);
-  return { Pieces: shown(tr, taskItemOf(e), lens), Classes: tr.attrs.class.split(" "), Heads: heads(rowHead(cols, lens, "")), Text: tr.textContent };
+  const tr = rowView(taskModel(e, "", "", lens), lens);
+  return { Pieces: shown(tr, taskItemOf(e), lens), Classes: tr.attrs.class.split(" "), Slots: slots(tr), Text: tr.textContent };
 }
 `
 
@@ -134,8 +141,8 @@ process.stdout.write(JSON.stringify({ PR: rowShown(input.pr, "mine"), Slack: row
 	if !slices.Contains(got.PR.Classes, "mine") || !slices.Contains(got.PR.Classes, "late") {
 		t.Errorf("the pull request's classes %v, want mine and late from its author and is facets", got.PR.Classes)
 	}
-	if want := []string{"Pull request", "Waiting on", "For", "Why", "Workspace"}; !slices.Equal(got.PR.Heads, want) {
-		t.Errorf("the pull request's heads %q, want %q: a row view without actions draws no Actions column", got.PR.Heads, want)
+	if want := []string{"why", "aside", "who", "age"}; !slices.Equal(got.PR.Slots, want) {
+		t.Errorf("the pull request fills %q, want %q: a unit has no state glyph and a row without actions draws none", got.PR.Slots, want)
 	}
 	if want := []string{"where:#general", "waits-on:Ana"}; !slices.Equal(labelsOf(got.Slack), want) {
 		t.Errorf("the conversation shows %v, want %v", labelsOf(got.Slack), want)
@@ -143,43 +150,51 @@ process.stdout.write(JSON.stringify({ PR: rowShown(input.pr, "mine"), Slack: row
 	if strings.Count(got.Slack.Text, "general") != 1 {
 		t.Errorf("the conversation repeats its channel: %s", got.Slack.Text)
 	}
-	for _, want := range []string{"source:Slack", "contexts:@calls", "waits-on:bia", "state:Next", "moved:moved {{.at}}"} {
+	for _, want := range []string{"source:Slack", "contexts:@calls", "waits-on:bia", "state:Next"} {
 		if !slices.Contains(labelsOf(got.Task), want) {
 			t.Errorf("the task lacks %s: %v", want, labelsOf(got.Task))
 		}
+	}
+	moved := func(l string) bool { return strings.HasPrefix(l, "moved:moved ") && !strings.Contains(l, "{{") }
+	if !slices.ContainsFunc(labelsOf(got.Task), moved) {
+		t.Errorf("the task lacks its moved date with its label: %v", labelsOf(got.Task))
 	}
 	for _, p := range got.Task.Pieces {
 		if p.Field == "where" {
 			t.Errorf("the task shows a plugin's facet its profile places nowhere: %v", labelsOf(got.Task))
 		}
 	}
-	if want := []string{"Item", "Waiting on", "For"}; !slices.Equal(got.Task.Heads, want) {
-		t.Errorf("the task's heads %q, want %q: no reason, aside or actions draws no column", got.Task.Heads, want)
+	if want := []string{"glyph", "who", "age"}; !slices.Equal(got.Task.Slots, want) {
+		t.Errorf("the task fills %q, want %q: no reason, aside or actions draws none", got.Task.Slots, want)
 	}
 }
 
-// TestATaskTableDrawsAColumnSomeTaskFills checks that a task list's columns are those some task of the view
-// has a piece for, before the filter, and that a group's head spans them.
-func TestATaskTableDrawsAColumnSomeTaskFills(t *testing.T) {
+// TestAGroupedTaskListHeadsEachGroupWithItsCount groups a task list: each group is a section under a head
+// that toggles it, counts its rows and names it, and a task's reason shows on its own row alone.
+func TestAGroupedTaskListHeadsEachGroupWithItsCount(t *testing.T) {
 	var got struct {
-		Heads   [][]string
-		Colspan []any
+		Groups []struct {
+			Label, Count, Controls, ID string
+			Rows                       int
+		}
+		Whys []string
 	}
 	nodeRun(t, mixedPrelude(t), nil, `
-const page = (q) => viewPage(route({ q, g: "source" }), "");
-const table = (p) => all(h("div", {}, ...p.body), (x) => x.tag === "table")[0];
-const heads = (tb) => all(tb, (x) => x.tag === "thead")[0].children[0].children.map(text);
-const spans = (tb) => all(tb, (x) => x.tag === "th" && x.attrs.scope === "rowgroup").map((x) => x.attrs.colspan);
 tasksState.tasks = input.tasks.map((e) => e.id === "g-1" ? { ...e, reason: "checks failing" } : e);
-const all1 = table(page("")), narrow = table(page("where:general"));
-process.stdout.write(JSON.stringify({ Heads: [heads(all1), heads(narrow)], Colspan: [...spans(all1), ...spans(narrow)] }));`, mixedInput(t, nil), &got)
-	if len(got.Heads) != 2 || !slices.Contains(got.Heads[0], "Why") || !slices.Equal(got.Heads[0], got.Heads[1]) {
-		t.Errorf("heads %q: the filter must not drop the Why column a filtered-out task fills", got.Heads)
+const list = byClass(h("div", {}, ...viewPage(route({ q: "", g: "source" }), "").body), "rows")[0];
+const groups = list.children.map((s) => { const head = byClass(s, "g-head")[0]; return { Label: text(byClass(head, "g-toggle")[0]), Count: text(byClass(head, "count")[0]),
+  Controls: byClass(head, "g-toggle")[0].attrs["aria-controls"], ID: s.attrs.id, Rows: byClass(s, "row").length }; });
+process.stdout.write(JSON.stringify({ Groups: groups, Whys: byClass(list, "why").map(text) }));`, mixedInput(t, nil), &got)
+	if len(got.Groups) < 2 {
+		t.Fatalf("groups %+v, want one per source", got.Groups)
 	}
-	for _, c := range got.Colspan {
-		if c != float64(len(got.Heads[0])) {
-			t.Errorf("a group head spans %v of %d columns", c, len(got.Heads[0]))
+	for _, g := range got.Groups {
+		if g.Label == "" || g.Count != strconv.Itoa(g.Rows) || g.Rows == 0 || g.Controls != g.ID {
+			t.Errorf("group %+v: its head names it, counts its rows and toggles its section", g)
 		}
+	}
+	if !slices.Equal(got.Whys, []string{"checks failing"}) {
+		t.Errorf("reasons %q, want the one task's alone", got.Whys)
 	}
 }
 
@@ -204,8 +219,8 @@ process.stdout.write(JSON.stringify(rowShown(input.slack, "slack")));`, map[stri
 	if want := []string{"where:general", "waits-on:Ana"}; !slices.Equal(labelsOf(got), want) {
 		t.Errorf("pieces %v, want %v", labelsOf(got), want)
 	}
-	if got.Heads[0] != "Conversation" {
-		t.Errorf("heads %q", got.Heads)
+	if got.Unit != "Conversation" {
+		t.Errorf("the view names its unit %q", got.Unit)
 	}
 }
 
@@ -230,7 +245,7 @@ func TestARowShowsWhatItsOwnPluginSays(t *testing.T) {
 	}
 	var got struct {
 		Class, Selected, AgeTitle string
-		Heads                     []string
+		Actions                   []string
 		Labels                    [][]string
 		SlackClass                []string
 		Count, Countdown          string
@@ -242,23 +257,21 @@ state.roundGates.clear();
 state.specs = { version: "", byId: { open: { id: "open", label: "Open", group: "control", surfaces: ["row"] } } };
 const lens = lensOf({ ...readHash(), view: "all" });
 const key = keyOf(input.pr);
-const models = state.rows.map((r) => rowModel(r, key, lens, ""));
-const cols = rowColumns(models);
-const trs = models.map((m) => rowTr(m, lens, cols));
+const trs = state.rows.map((r) => rowView(rowModel(r, key, lens, ""), lens));
 const labels = (n, out = []) => { if (n && n.tag === "button" && n.attrs.class === "facet") out.push(n.attrs["aria-label"]); for (const c of (n && n.children) || []) labels(c, out); return out; };
 const agePiece = (n) => { if (n && n.attrs && n.attrs["data-field"] === "age") return n; for (const c of (n && n.children) || []) { const a = agePiece(c); if (a) return a; } return null; };
 location.hash = "#" + hashString({ view: "all" });
 state.loaded = true;
 renderRows();
 process.stdout.write(JSON.stringify({ Class: trs[0].attrs.class, Selected: trs[0].attrs["aria-selected"], AgeTitle: (agePiece(trs[0]) || { attrs: {} }).attrs.title || "",
-  Heads: heads(rowHead(cols, lens, unitTitle("all", lens))), Labels: trs.map((tr) => labels(tr)), SlackClass: trs[1].attrs.class.split(" "),
+  Actions: (function acts(n, out = []) { if (n && n.attrs && String(n.attrs.class || "").split(" ").includes("act")) out.push(n.textContent); for (const c of (n && n.children) || []) acts(c, out); return out; })(trs[0]), Labels: trs.map((tr) => labels(tr)), SlackClass: trs[1].attrs.class.split(" "),
   Count: document.getElementById("list-sum").textContent, Countdown: countdownTitle }));`,
 		map[string]any{"pr": wireRow("me", now, pr), "slack": slack, "now": now.UnixMilli()}, &got)
 	if !strings.Contains(" "+got.Class+" ", " sel ") || got.Selected != "true" {
 		t.Errorf("the open row is %q, aria-selected %q", got.Class, got.Selected)
 	}
-	if !slices.Contains(got.Heads, "Actions") {
-		t.Errorf("heads %q lack the Actions a row serves", got.Heads)
+	if !slices.Equal(got.Actions, []string{"Open"}) {
+		t.Errorf("the row's actions %q, want the Open it serves", got.Actions)
 	}
 	if got.AgeTitle == "" {
 		t.Error("the age piece does not tell its exact time")

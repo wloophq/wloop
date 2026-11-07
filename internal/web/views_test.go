@@ -48,10 +48,10 @@ const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () =
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\nfollowStrings = () => {};\n"
 
-// viewsScripts are markdown.js, routes.js, window.js, views.js, review.js, task.js and detail.js, in the page's
-// order.
+// viewsScripts are markdown.js, row.js, routes.js, window.js, views.js, review.js, task.js and detail.js, in the
+// page's order.
 func viewsScripts(t *testing.T) string {
-	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "routes.js") + staticJS(t, "window.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
+	return jsFunction(t, appJS(t), "fold") + staticJS(t, "markdown.js") + staticJS(t, "row.js") + staticJS(t, "routes.js") + staticJS(t, "window.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
 }
 
 // viewsPrelude is viewsScripts, plugins.js and the lens the task views run, over a tree h.
@@ -63,8 +63,7 @@ func viewsPrelude(t *testing.T) string {
 const taskRowJS = `
 function taskRow(e, view) {
   const lens = lensOf({ view: view || "inbox", q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
-  const m = taskModel(e, "", "", lens);
-  return rowTr(m, lens, rowColumns([m]));
+  return rowView(taskModel(e, "", "", lens), lens);
 }
 `
 
@@ -237,7 +236,7 @@ func TestFakeProviderRowRenders(t *testing.T) {
 		`state.busy = new Set(); state.openSlot = ""; state.specs = { version: "v", byId: {} };
 const CSS = { escape: (s) => s }; const document = { querySelector: () => null };
 const providerName = (id) => id;
-`
+` + staticJS(t, "row.js")
 	row := fakesource.Row(fakesource.Thread{Key: "T1/C1", Channel: "general thread", Title: "Can someone look at the deploy?",
 		Kind: fakesource.KindWaiting, WaitsOn: "me", Reason: "a question waits on you"})
 	row.Views = append(row.Views, "all")
@@ -248,9 +247,8 @@ const providerName = (id) => id;
 	nodeRun(t, prelude, slices.Concat(lensFuncs, rowFuncs, []string{"fieldById", "rowModel", "countdown", "age",
 		"intakeWaiting", "intakeChip", "actionStates", "actionTitle", "actionButton", "actionButtons", "openRow", "openSlot"}), `
 const lens = { view: "all", q: "", ts: [], quals: [], filters: new Map(), group: "", sort: "", layout: "", fields: catalog.fields, specs: catalog.specs, words: lensWords() };
-const m = rowModel(input, "", lens, "");
-const tr = rowTr(m, lens, rowColumns([m]));
-const c = rowCard(rowModel(input, "", lens, "", "card"), lens);
+const tr = rowView(rowModel(input, "", lens, ""), lens);
+const c = rowView(rowModel(input, "", lens, "", "card"), lens, { card: true });
 process.stdout.write(JSON.stringify({ Row: text(tr), Card: text(c), Keys: Object.keys(input.payload || {}) }));`, row, &got)
 	for _, s := range []string{got.Row, got.Card} {
 		if !strings.Contains(s, "Can someone look at the deploy?") || !strings.Contains(s, "#general thread") {
