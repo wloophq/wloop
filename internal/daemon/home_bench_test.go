@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -64,6 +65,23 @@ func benchHome(b *testing.B, n int) {
 		}
 	})
 }
+
+func benchSearch(b *testing.B, n int) {
+	r := homeRig(b, n)
+	for _, q := range []string{"task", "task 42"} {
+		b.Run(q, func(b *testing.B) {
+			for b.Loop() {
+				var s api.Search
+				if code := getB(b, r.s, api.SearchPath+"?q="+url.QueryEscape(q), &s); code != 200 {
+					b.Fatal(code)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkSearch150(b *testing.B)  { benchSearch(b, 150) }
+func BenchmarkSearch5000(b *testing.B) { benchSearch(b, 5000) }
 
 func BenchmarkHome150(b *testing.B)  { benchHome(b, 150) }
 func BenchmarkHome5000(b *testing.B) { benchHome(b, 5000) }

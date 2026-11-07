@@ -40,7 +40,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			views = append(views, task.View(grp.View))
 		}
 	}
-	sets, err := g.Sets(ctx, views, s.lensKeep(ctx, g, q))
+	kept := map[task.ID]api.TaskView{}
+	sets, err := g.Sets(ctx, views, s.lensKeepIn(s.taskViews(ctx, g, false), q, kept))
 	if err != nil {
 		writeTasksError(w, err)
 		return
@@ -71,25 +72,19 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	take(otherGroup, def.Other, rail)
 	out := api.Search{Query: q, Total: len(placed), Groups: []api.SearchGroup{}}
 	terms := words(api.Fold(q))
-	vs := s.taskViews(ctx, g, false)
+	inViews := map[task.ID][]string{}
+	for _, rv := range rail {
+		for _, e := range sets[rv] {
+			inViews[e.ID] = append(inViews[e.ID], string(rv))
+		}
+	}
 	for _, grp := range groups {
-		shown := grp.tasks[:min(len(grp.tasks), def.Limit)]
-		vs.readRows(ctx, shown)
 		sg := api.SearchGroup{ID: grp.id, Label: grp.label, Count: len(grp.tasks), Results: []api.SearchResult{}}
 		for _, e := range grp.tasks {
-			v, err := vs.view(ctx, e)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, err.Error())
-				return
-			}
-			res := api.SearchResult{Task: v, Views: []string{}}
+			v := kept[e.ID]
+			res := api.SearchResult{Task: v, Views: append([]string{}, inViews[e.ID]...)}
 			if len(v.UnitLabels) > 0 {
 				res.UnitLabel = v.UnitLabels[0]
-			}
-			for _, rv := range rail {
-				if slices.ContainsFunc(sets[rv], func(x task.Task) bool { return x.ID == e.ID }) {
-					res.Views = append(res.Views, string(rv))
-				}
 			}
 			sg.Results = append(sg.Results, res)
 		}

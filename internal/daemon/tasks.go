@@ -774,9 +774,14 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 // lensKeep keeps the tasks that lens query text matches, over the facets and texts of their views; it reads
 // the rows of every task of the pass at its first call.
 func (s *Server) lensKeep(ctx context.Context, g *coretasks.Service, text string) coretasks.Keep {
+	return s.lensKeepIn(s.taskViews(ctx, g, false), text, nil)
+}
+
+// lensKeepIn is lensKeep building each task's view with vs, and keeping in kept the view of each task it keeps
+// when kept is not nil.
+func (s *Server) lensKeepIn(vs *taskViewer, text string, kept map[task.ID]api.TaskView) coretasks.Keep {
 	specs := s.taskFacetSpecs()
 	query, now := lens.Parse(text, specs), s.deps.Now()
-	vs := s.taskViews(ctx, g, false)
 	preloaded := false
 	return func(ctx context.Context, e task.Task) (bool, error) {
 		if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
@@ -787,7 +792,11 @@ func (s *Server) lensKeep(ctx context.Context, g *coretasks.Service, text string
 		if err != nil {
 			return false, err
 		}
-		return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
+		ok := query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now)
+		if ok && kept != nil {
+			kept[e.ID] = v
+		}
+		return ok, nil
 	}
 }
 
