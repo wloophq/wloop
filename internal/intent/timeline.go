@@ -32,8 +32,10 @@ type TimelineFact struct {
 	Name                 string
 	Start, End, Absorb   []string
 	Label, Running, Tone string
-	Order                int
-	Subs                 map[string]string
+	// Unfinished is how a span reads that its start kind came to again before its end.
+	Unfinished string
+	Order      int
+	Subs       map[string]string
 }
 
 type mTimeline struct {
@@ -47,14 +49,15 @@ type mTimelineEvent struct {
 }
 
 type mTimelineFact struct {
-	Start   []string          `toml:"start"`
-	End     []string          `toml:"end"`
-	Absorb  []string          `toml:"absorb"`
-	Label   string            `toml:"label"`
-	Running string            `toml:"running"`
-	Tone    string            `toml:"tone"`
-	Order   int               `toml:"order"`
-	Subs    map[string]string `toml:"subs"`
+	Start      []string          `toml:"start"`
+	End        []string          `toml:"end"`
+	Absorb     []string          `toml:"absorb"`
+	Label      string            `toml:"label"`
+	Running    string            `toml:"running"`
+	Unfinished string            `toml:"unfinished"`
+	Tone       string            `toml:"tone"`
+	Order      int               `toml:"order"`
+	Subs       map[string]string `toml:"subs"`
 }
 
 // factValues are the values a fact's label and running text read.
@@ -145,7 +148,7 @@ func timelineFact(s *sheet, known []string, name string, m mTimelineFact) (Timel
 			}
 		}
 	}
-	for _, l := range [][2]string{{"label", m.Label}, {"running", m.Running}} {
+	for _, l := range [][2]string{{"label", m.Label}, {"running", m.Running}, {"unfinished", m.Unfinished}} {
 		key, text := l[0], l[1]
 		if text == "" {
 			continue
@@ -153,7 +156,7 @@ func timelineFact(s *sheet, known []string, name string, m mTimelineFact) (Timel
 		t, err := template.New(key).Option("missingkey=error").Parse(text)
 		if err == nil {
 			values := maps.Clone(factValues)
-			if key == "running" {
+			if key != "label" {
 				delete(values, "duration")
 			}
 			err = t.Execute(&strings.Builder{}, values)
@@ -169,5 +172,5 @@ func timelineFact(s *sheet, known []string, name string, m mTimelineFact) (Timel
 		return TimelineFact{}, false
 	}
 	return TimelineFact{Name: name, Start: m.Start, End: m.End, Absorb: m.Absorb, Label: strings.TrimSpace(m.Label), Running: strings.TrimSpace(m.Running),
-		Tone: m.Tone, Order: m.Order, Subs: m.Subs}, true
+		Unfinished: strings.TrimSpace(m.Unfinished), Tone: m.Tone, Order: m.Order, Subs: m.Subs}, true
 }

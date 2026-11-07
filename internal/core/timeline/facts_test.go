@@ -50,6 +50,33 @@ func TestASpanWithoutItsEndIsRunning(t *testing.T) {
 	}
 }
 
+func TestARoundThatNeverEndedDoesNotSwallowTheNext(t *testing.T) {
+	unended := round
+	unended.Unfinished = "Agent round, no end recorded"
+	later := nine.Add(72 * time.Hour)
+	evs := []timeline.Event{
+		ev(1, "turn_started", "agent", nine),
+		ev(2, "turn_started", "agent", later),
+		ev(3, "turn_ended", "agent", later.Add(7*time.Minute)),
+		ev(4, "turn_started", "agent", later.Add(time.Hour)),
+		ev(5, "turn_ended", "agent", later.Add(time.Hour+3*time.Minute)),
+	}
+	got := timeline.Group(evs, []timeline.Rule{unended}, words())
+	if len(got) != 3 {
+		t.Fatalf("%d nodes, want three rounds: %+v", len(got), got)
+	}
+	if got[0].Label != "Agent round, 3m" || len(got[0].Events) != 2 || got[1].Label != "Agent round, 7m" || len(got[1].Events) != 2 {
+		t.Errorf("the two later rounds read %q (%d events) and %q (%d events)", got[0].Label, len(got[0].Events), got[1].Label, len(got[1].Events))
+	}
+	if old := got[2]; old.Running || !old.End.IsZero() || old.Label != "Agent round, no end recorded" || len(old.Events) != 1 {
+		t.Errorf("the round that never ended %+v, want unfinished, not running, with no end", old)
+	}
+	unended.Unfinished = ""
+	if old := timeline.Group(evs, []timeline.Rule{unended}, words())[2]; old.Label != "turn_started" {
+		t.Errorf("without an unfinished text the round reads %q, want its event's words", old.Label)
+	}
+}
+
 func TestAnUndeclaredKindKeepsItsOwnNode(t *testing.T) {
 	evs := []timeline.Event{
 		ev(1, "turn_started", "agent", nine),

@@ -86,6 +86,7 @@ var timelineGrammar = []Key{
 	{Path: "facts.*.absorb", In: SurfaceTimeline, Kind: KindList, Elem: KindText, Doc: "The event kinds that join the fact: its open span, or the fact just before them when it is this one."},
 	{Path: "facts.*.label", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent."},
 	{Path: "facts.*.running", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent."},
+	{Path: "facts.*.unfinished", In: SurfaceTimeline, Kind: KindTemplate, Localized: true, Doc: "How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent."},
 	{Path: "facts.*.tone", In: SurfaceTimeline, Kind: KindEnum, Values: func() []Value { return Tones }, Doc: "The fact's tone; its first event's when absent."},
 	{Path: "facts.*.order", In: SurfaceTimeline, Kind: KindInt, Doc: "Where the fact is tried among the others, lowest first; name order breaks a tie."},
 	{Path: "facts.*.subs", In: SurfaceTimeline, Kind: KindMap, Doc: "The words of the values {{.sub}} reads, by value; a value it leaves out reads as itself."},

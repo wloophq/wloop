@@ -86,6 +86,10 @@
               "people"
             ],
             "type": "string"
+          },
+          "unfinished": {
+            "description": "How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent.",
+            "type": "string"
           }
         },
         "required": [

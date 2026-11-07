@@ -1075,6 +1075,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `facts.<name>.absorb` (list of strings): The event kinds that join the fact: its open span, or the fact just before them when it is this one.
 - `facts.<name>.label` (template, localized): How the fact reads, over {{.actor}}, {{.duration}} (a closed span's), {{.count}} (its events), {{.sub}} (its first event's short value, such as a review's verdict) and {{.event}} (its first event's label); its first event's label when absent.
 - `facts.<name>.running` (template, localized): How a span with no end yet reads, over the label's values but {{.duration}}; the label when absent.
+- `facts.<name>.unfinished` (template, localized): How a span reads that never ended: its start kind came again before any end (the daemon stopped mid-turn, a session vanished), over the label's values but {{.duration}}; the first event's words when absent.
 - `facts.<name>.tone` (one of ``, `loop`, `me`, `people`): The fact's tone; its first event's when absent.
   - ``: No tone.
   - `loop`: The loop's or an agent's doing.

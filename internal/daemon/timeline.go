@@ -86,7 +86,7 @@ func (s *Server) timelineNodes(evs []timeline.Event, shown func(timeline.Event) 
 	l := s.loaded()
 	rules := make([]timeline.Rule, len(l.Timeline.Facts))
 	for i, f := range l.Timeline.Facts {
-		rules[i] = timeline.Rule{Name: f.Name, Start: f.Start, End: f.End, Absorb: f.Absorb, Label: f.Label, Running: f.Running, Tone: f.Tone, Subs: f.Subs}
+		rules[i] = timeline.Rule{Name: f.Name, Start: f.Start, End: f.End, Absorb: f.Absorb, Label: f.Label, Running: f.Running, Unfinished: f.Unfinished, Tone: f.Tone, Subs: f.Subs}
 	}
 	oldest := slices.Clone(evs)
 	slices.Reverse(oldest)

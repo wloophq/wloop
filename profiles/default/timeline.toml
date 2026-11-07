@@ -234,6 +234,7 @@ end     = ["turn_ended", "turn_stopped", "turn_withdrawn"]
 absorb  = ["turn_delivered", "turn_resumed", "stop_blocked", "guide_trimmed", "late_record", "dossier_restored", "dossier_granted", "dossier_call", "record", "session_prompted", "session_typed", "session_idle", "session_active", "mcp_seen"]
 label   = "Agent round, {{.duration}}"
 running = "Agent round running"
+unfinished = "Agent round, no end recorded"
 tone    = "loop"
 order   = 10
 

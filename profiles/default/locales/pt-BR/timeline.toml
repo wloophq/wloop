@@ -172,6 +172,7 @@ label = "mensagem"
 [facts.round]
 label   = "Round do agente, {{.duration}}"
 running = "Round do agente em andamento"
+unfinished = "Round do agente, sem fim registrado"
 
 [facts.answer]
 label = "Você respondeu ao agente"

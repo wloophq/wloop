@@ -49,6 +49,7 @@ order   = 10
 - `absorb`: the kinds that join the open span, or the fact just before them when it is this one, as a comment joins the review it follows. A start kind that comes while the span is open joins it too.
 - `label`: how the fact reads, over `{{.actor}}` (who did its first event), `{{.duration}}` (a closed span's, in the row words' `age_*`), `{{.count}}` (its events), `{{.event}}` (its first event's words) and `{{.sub}}` (its first event's short value: a record's kind, else its data as its kind's `data` shows it, such as a review's verdict). Its first event's words when absent.
 - `running`: how a span with no end yet reads; the label when absent. A running span has no duration.
+- `unfinished`: how a span reads that never ended, because its start kind came again before any end (the daemon stopped mid-turn, a session vanished); that start opens a new span, so one lost end never folds later rounds into it. No duration; the first event's words when absent.
 - `subs`: the words of the values `{{.sub}}` reads, such as `APPROVED = "approved"`; a value it leaves out reads as itself.
 - `tone`: the fact's tone, its first event's when absent.
 - `order`: where the fact is tried among the others, lowest first, name order breaking a tie. An event goes to the first open span that ends or takes it, then to the fact just before it, then opens the first fact that starts with it.
@@ -57,4 +58,4 @@ Every kind a fact names is a core kind, a kind a registered plugin declares in i
 
 No event is dropped: an event no fact takes is a fact of its own, labeled by its kind's words, or by the kind itself when no layer words it, as a plugin's kind once the plugin is removed.
 
-The labels, the running texts and the `subs` words are texts a person reads, translated under `locales/<tag>/timeline.toml` (see [Translate the interface](/guides/localization/)).
+The labels, the running and unfinished texts and the `subs` words are texts a person reads, translated under `locales/<tag>/timeline.toml` (see [Translate the interface](/guides/localization/)).
