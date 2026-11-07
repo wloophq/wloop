@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -71,7 +70,10 @@ const (
 func (c *Controller) loadingItems() []MenuItem {
 	var items []MenuItem
 	for _, l := range append(slices.Clone(c.tasksLoading), c.rowsLoading...) {
-		title := strings.TrimSuffix("Loading "+l.Plugin+": "+l.Reason, ": ")
+		title := c.words().T("Loading {plugin}", map[string]any{"plugin": l.Plugin})
+		if l.Reason != "" {
+			title = c.words().T("Loading {plugin}: {reason}", map[string]any{"plugin": l.Plugin, "reason": l.Reason})
+		}
 		if !slices.ContainsFunc(items, func(it MenuItem) bool { return it.Title == title }) {
 			items = append(items, MenuItem{Title: title})
 		}
@@ -97,7 +99,7 @@ func (c *Controller) title() string {
 	if c.counters != nil {
 		badge = c.counters.Badge
 	}
-	return fmt.Sprintf("PR %d", badge)
+	return c.words().T("PR {n}", map[string]any{"n": badge})
 }
 
 func (c *Controller) taskSection(label string, view string) []MenuItem {

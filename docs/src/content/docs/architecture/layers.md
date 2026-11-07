@@ -38,7 +38,7 @@ Dependencies point down and inward. An adapter imports the port it implements an
 | Domain | `internal/domain/...` | the standard library and the domain; no adapter, manager or `internal/github` |
 | Core | `internal/core/...` | the standard library, the core, the domain and `internal/meter`; never `os/exec`, `net/http` or `database/sql` |
 | API | `internal/api` | the domain |
-| Clients | `internal/client/...` | `internal/api`, `internal/api/client`, the domain and `internal/termfmt` |
+| Clients | `internal/client/...` | `internal/api`, `internal/api/client`, the domain, `internal/termfmt` and `internal/i18n` |
 | Read model | `internal/readmodel`, `internal/readmodel/cards` | ports; no adapter, GitHub, brief queue, situation deriver or Orca client |
 | Daemon | `internal/daemon` | anything but the adapters, `internal/github` and the Orca client, which it reaches through ports `serve.go` wires |
 | Adapters | `internal/adapter/...`, `internal/workspace/...`, `internal/gitx` | the ports they implement and the domain |

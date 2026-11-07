@@ -2,6 +2,7 @@ package texts
 
 import (
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 )
@@ -34,4 +35,26 @@ func TestTNPicksOneForOneElseOther(t *testing.T) {
 	}
 }
 
-func TestCatalogTAndTN(t *testing.T) { t.Skip("D11 Catalog T and TN read the served strings") }
+func TestCatalogTAndTN(t *testing.T) {
+	c := New(api.Strings{Locale: "pt-BR", Strings: map[string]api.Text{"Sweep now": {"other": "Varrer agora"}, "{n} drafts": {"one": "{n} rascunho", "other": "{n} rascunhos"}},
+		Formats: map[string]string{"time": "15:04", "date": "02/01", "group": "."}})
+	at := time.Date(2026, 11, 7, 21, 5, 0, 0, time.UTC)
+	for _, tc := range []struct{ got, want string }{
+		{c.T("Sweep now", nil), "Varrer agora"},
+		{c.T("Unknown key", nil), "Unknown key"},
+		{c.TN("{n} drafts", 0, nil), "0 rascunho"},
+		{c.TN("{n} drafts", 1500, nil), "1.500 rascunhos"},
+		{c.Time(at, "time"), "21:05"},
+		{c.Time(at, "date"), "07/11"},
+		{c.Time(at, "datetime"), "Nov 7 9:05 PM"},
+		{c.Number(-1234567), "-1.234.567"},
+		{c.Locale(), "pt-BR"},
+		{English().Time(at, "time"), "9:05 PM"},
+		{English().Number(1234), "1,234"},
+		{English().Locale(), "en"},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("got %q, want %q", tc.got, tc.want)
+		}
+	}
+}

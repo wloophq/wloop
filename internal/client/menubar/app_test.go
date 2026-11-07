@@ -74,6 +74,22 @@ type fakeDaemon struct {
 	digests     map[string]api.Digest
 	digestDays  []string
 	digestErr   error
+	strings     *api.Strings // nil: English
+	stringsErr  error
+	stringsN    int
+}
+
+func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stringsN++
+	if f.stringsErr != nil {
+		return api.Strings{}, f.stringsErr
+	}
+	if f.strings == nil {
+		return api.Strings{Locale: "en"}, nil
+	}
+	return *f.strings, nil
 }
 
 func (f *fakeDaemon) RowsSince(_ context.Context, since api.Since) (api.RowsPage, error) {
@@ -573,7 +589,7 @@ func TestBreakerHeader(t *testing.T) {
 	since := time.Date(2026, 10, 14, 13, 40, 0, 0, time.Local)
 	r.d.health = api.Health{Briefs: &api.BriefsHealth{Open: true, Since: since, Error: "claude is rate limited", Next: since.Add(15 * time.Minute)}}
 	r.c.Refresh(context.Background())
-	if got := titles(r.tray.menu); got[0] != "briefs unavailable since 13:40: claude is rate limited" || got[1] != "---" {
+	if got := titles(r.tray.menu); got[0] != "briefs unavailable since 1:40 PM: claude is rate limited" || got[1] != "---" {
 		t.Fatalf("menu %q", got)
 	}
 	r.d.health = api.Health{Briefs: &api.BriefsHealth{}}

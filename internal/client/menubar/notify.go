@@ -206,11 +206,11 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	}
 	res, err := c.cfg.Daemon.TaskDo(ctx, tk, c.verbOf(handlerAnswer), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, tk, "Answer not sent", err.Error())
+		c.notifyNote(r.ID, tk, c.words().T("Answer not sent", nil), err.Error())
 		return err
 	}
 	if slices.Contains(res.Lines, api.AnswerQueued) {
-		c.notifyNote(r.ID, tk, "Answer queued", api.AnswerQueued)
+		c.notifyNote(r.ID, tk, c.words().T("Answer queued", nil), c.words().T(api.AnswerQueued, nil))
 	}
 	return nil
 }
@@ -218,17 +218,17 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 // reply writes the notification's text as a reply on its task's unit, and says where it went.
 func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if strings.TrimSpace(r.Text) == "" {
-		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
+		c.notifyNote(r.ID, task, c.words().T("Reply not saved", nil), c.words().T("Nothing was typed.", nil))
 		return nil
 	}
 	args := map[string]string{"text": r.Text, "send": "draft"}
-	title := "Reply saved to the Outbox"
+	title := c.words().T("Reply saved to the Outbox", nil)
 	if r.Send {
-		args["send"], title = "now", "Reply sent"
+		args["send"], title = "now", c.words().T("Reply sent", nil)
 	}
 	res, err := c.cfg.Daemon.TaskDo(ctx, task, c.verbOf(handlerReply), api.TaskRequest{Args: args, Source: AnswerSource})
 	if err != nil {
-		c.notifyNote(r.ID, task, "Reply not saved", err.Error())
+		c.notifyNote(r.ID, task, c.words().T("Reply not saved", nil), err.Error())
 		return err
 	}
 	body := ""
@@ -257,7 +257,7 @@ func (c *Controller) served(ctx context.Context, r Response, cat Category, task 
 		}
 	}
 	if err != nil {
-		c.notifyNote(r.ID, task, "Action not sent", err.Error())
+		c.notifyNote(r.ID, task, c.words().T("Action not sent", nil), err.Error())
 	}
 	return err
 }
