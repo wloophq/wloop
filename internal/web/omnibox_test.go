@@ -344,18 +344,18 @@ func TestOmniboxPanelMode(t *testing.T) {
 		Closed  int
 		Shade   bool
 		Focused bool
+		Modal   string
 	}
 	main := `
 let closed = 0;
 window.close = () => { closed++; };
 const st = showOmnibox({ panel: true });
 const box = document.body.children[0];
-const field = box.children[0];
-field.on.keydown({ key: "Escape", preventDefault() {} });
-process.stdout.write(JSON.stringify({ Class: box.attrs.class, Closed: closed, Shade: String(box.attrs.class).includes("pal-back") }));`
+box.on.keydown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
+process.stdout.write(JSON.stringify({ Class: box.attrs.class, Closed: closed, Shade: String(box.attrs.class).includes("pal-back"), Modal: box.attrs["aria-modal"] }));`
 	nodeScript(t, domShim+staticJS(t, "i18n.js")+jsFunction(t, appJS(t), "h")+jsConst(t, appJS(t), "API_VERSION")+strings.Replace(staticJS(t, "omnibox.js"), `"use strict";`, "", 1)+main, nil, &got)
-	if !strings.Contains(got.Class, "omni-panel") || got.Shade || got.Closed != 1 {
-		t.Fatalf("%+v: the panel is the omnibox alone, with no backdrop, and Esc calls window.close", got)
+	if !strings.Contains(got.Class, "omni-panel") || got.Shade || got.Closed != 1 || got.Modal != "true" {
+		t.Fatalf("%+v: the panel is the omnibox alone, modal, with no backdrop, and Esc anywhere in it calls window.close", got)
 	}
 }
 
@@ -365,5 +365,165 @@ func TestOmniboxNeverOffersMerge(t *testing.T) {
 		if strings.Contains(src, word) {
 			t.Errorf("omnibox.js names %s", word)
 		}
+	}
+}
+
+// omniSelected is the choice the rendered omnibox marks selected, by its data-choice, and how many it marks.
+const omniSelected = `
+const selected = (st) => all(nodes(st), (x) => x.attrs["aria-selected"] === "true").map((x) => x.attrs["data-choice"]);
+const press = (st, key, extra) => omniboxKey(st, env, { key, preventDefault() {}, stopPropagation() {}, ...(extra || {}) }, () => log.closed++);
+`
+
+func TestOmniboxArrowsMoveTheSelection(t *testing.T) {
+	var got struct {
+		First, Down, Past, Up, CtrlN, CtrlP []string
+		Options                             int
+		Handled                             bool
+	}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "retries", env);
+const out = { First: selected(st), Options: all(nodes(st), (x) => x.attrs.role === "option").length };
+out.Handled = press(st, "ArrowDown");
+out.Down = selected(st);
+press(st, "ArrowDown");
+out.Past = selected(st);
+press(st, "ArrowUp");
+out.Up = selected(st);
+press(st, "n", { ctrlKey: true });
+out.CtrlN = selected(st);
+press(st, "p", { ctrlKey: true });
+out.CtrlP = selected(st);
+process.stdout.write(JSON.stringify(out));
+})();`, map[string]any{"search": retriesSearch()}, &got)
+	want := map[string][]string{"First": {"task:t-1"}, "Down": {"task:t-2"}, "Past": {"task:t-2"}, "Up": {"task:t-1"}, "CtrlN": {"task:t-2"}, "CtrlP": {"task:t-1"}}
+	have := map[string][]string{"First": got.First, "Down": got.Down, "Past": got.Past, "Up": got.Up, "CtrlN": got.CtrlN, "CtrlP": got.CtrlP}
+	for k, w := range want {
+		if !slices.Equal(have[k], w) {
+			t.Errorf("%s selects %v, want %v", k, have[k], w)
+		}
+	}
+	if got.Options != 2 || !got.Handled {
+		t.Errorf("%+v: every result is an option, and the arrows are the omnibox's", got)
+	}
+}
+
+func TestOmniboxEnterOpensTheSelectedResult(t *testing.T) {
+	var got struct {
+		Opened []string
+		Asks   int
+	}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "retries", env);
+press(st, "ArrowDown");
+press(st, "Enter");
+await new Promise((r) => setTimeout(r, 5));
+press(st, "Enter", { metaKey: true });
+await new Promise((r) => setTimeout(r, 5));
+process.stdout.write(JSON.stringify({ Opened: log.opened, Asks: log.posts.filter((p) => p.url === "/api/omnibox/ask").length }));
+})();`, map[string]any{"search": retriesSearch(), "ask": []any{map[string]any{"answer": map[string]any{"text": "none"}}}}, &got)
+	if !slices.Equal(got.Opened, []string{"#task=t-2"}) || got.Asks != 1 {
+		t.Fatalf("%+v: Enter opens the selected result, Cmd+Enter asks the agent", got)
+	}
+}
+
+func TestOmniboxSelectionResetsOnANewQueryAndKeepsAcrossRedraws(t *testing.T) {
+	var got struct{ Kept, Reordered, Reset []string }
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "retries", env);
+press(st, "ArrowDown");
+const kept = selected(st);
+st.search = { groups: [{ id: "others", label: "Waiting on others", count: 1, results: [{ task: { id: "t-2", title: "retries review" } }] },
+  { id: "you", label: "Needs you", count: 1, results: [{ task: { id: "t-1", title: "add retries" } }] }] };
+const reordered = selected(st);
+await omniboxType(st, "re", env);
+process.stdout.write(JSON.stringify({ Kept: kept, Reordered: reordered, Reset: selected(st) }));
+})();`, map[string]any{"search": retriesSearch()}, &got)
+	if !slices.Equal(got.Kept, []string{"task:t-2"}) || !slices.Equal(got.Reordered, []string{"task:t-2"}) || !slices.Equal(got.Reset, []string{"task:t-9"}) {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestOmniboxEnterRunsTheSelectedUnit(t *testing.T) {
+	var got struct {
+		First  []string
+		Opened []string
+	}
+	nodeRun(t, omniPrelude(t)+omniSelected, nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+const first = selected(st);
+press(st, "Enter");
+process.stdout.write(JSON.stringify({ First: first, Opened: log.opened }));
+})();`, map[string]any{"resolve": pastedUnit()}, &got)
+	if !slices.Equal(got.First, []string{"unit"}) || len(got.Opened) != 1 {
+		t.Fatalf("%+v: a resolved unit is the first choice and Enter opens it", got)
+	}
+}
+
+func TestOmniboxKeysHintIsWorded(t *testing.T) {
+	var got struct{ Hint string }
+	nodeRun(t, omniPrelude(t)+stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml"), nil, `
+process.stdout.write(JSON.stringify({ Hint: text(omniboxKeysHint()) }));`, nil, &got)
+	for _, w := range []string{"para navegar", "para abrir", "para perguntar ao agente", "para fechar"} {
+		if !strings.Contains(got.Hint, w) {
+			t.Errorf("the keys hint %q lacks %q", got.Hint, w)
+		}
+	}
+}
+
+func TestOmniboxTabStaysInside(t *testing.T) {
+	var got struct{ Wrapped, Back, Inside string }
+	nodeRun(t, omniPrelude(t), nil, `
+const stops = [{ name: "input" }, { name: "first" }, { name: "last" }];
+const at = (el, shift) => { const to = omniboxTrap({ key: "Tab", shiftKey: !!shift }, stops, el); return to ? to.name : ""; };
+process.stdout.write(JSON.stringify({ Wrapped: at(stops[2]), Back: at(stops[0], true), Inside: at(stops[1]) }));`, nil, &got)
+	if got.Wrapped != "input" || got.Back != "last" || got.Inside != "" {
+		t.Fatalf("%+v: Tab wraps inside the omnibox and leaves a move inside it alone", got)
+	}
+}
+
+func TestOmniboxAnswerRendersMarkdown(t *testing.T) {
+	var got struct{ Strong, Raw int }
+	nodeRun(t, omniPrelude(t), nil, `
+const st = omniboxNew(false, []);
+st.text = "what waits";
+st.answer = { answer: { text: "Two **tasks** wait", tasks: [] } };
+const n = nodes(st);
+process.stdout.write(JSON.stringify({ Strong: all(n, (x) => x.tag === "strong").length, Raw: text(n).includes("**") ? 1 : 0 }));`, nil, &got)
+	if got.Strong != 1 || got.Raw != 0 {
+		t.Fatalf("%+v: the agent's answer renders as markdown", got)
+	}
+}
+
+func TestOmniboxRedrawKeepsTheFocusAndPointsAtTheSelection(t *testing.T) {
+	var got struct {
+		Focused, Active, Asked string
+		Scrolled               bool
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(false, []);
+await omniboxType(st, "retries", env);
+const out = {};
+const box = { focus() { out.Focused = "omni:op:1"; } };
+const was = { getAttribute: () => "omni:op:1" };
+globalThis.CSS = { escape: (s) => s };
+globalThis.document = { activeElement: was, getElementById: (id) => ({ scrollIntoView() { out.Scrolled = id; } }) };
+const results = { contains: (el) => el === was, replaceChildren() {}, querySelector: (sel) => { out.Asked = sel; return box; } };
+const input = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; } };
+omniboxRedraw(st, env, input, results);
+out.Active = input.attrs["aria-activedescendant"];
+out.Scrolled = out.Scrolled === out.Active;
+process.stdout.write(JSON.stringify(out));
+})();`, map[string]any{"search": retriesSearch()}, &got)
+	if got.Focused != "omni:op:1" || got.Asked != `[data-focus="omni:op:1"]` || got.Active != "omni-opt-0" || !got.Scrolled {
+		t.Fatalf("%+v: a redraw gives the focus back to its control, and the field points at the selected choice, scrolled into view", got)
 	}
 }

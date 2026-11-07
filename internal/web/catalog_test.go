@@ -73,6 +73,8 @@ class El extends Node {
   replaceChildren(...c) { this.children = []; this.append(...c); }
   setAttribute(k, v) { this.attrs[k] = v; }
   getAttribute(k) { return this.attrs[k]; }
+  removeAttribute(k) { delete this.attrs[k]; }
+  contains() { return false; }
   addEventListener(type, fn) { this.on[type] = fn; }
   querySelector() { return null; }
   querySelectorAll() { return []; }

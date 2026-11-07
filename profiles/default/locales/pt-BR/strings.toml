@@ -609,6 +609,10 @@
 "Capture: {title}" = "Capturar: {title}"
 "Start: {brief}" = "Iniciar: {brief}"
 "Start in {repo}: {brief}" = "Iniciar em {repo}: {brief}"
+"to navigate" = "para navegar"
+"to open" = "para abrir"
+"to ask the agent" = "para perguntar ao agente"
+"to close" = "para fechar"
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Voltar"
 "Forward" = "Avançar"

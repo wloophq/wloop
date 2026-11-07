@@ -194,7 +194,7 @@ const OMNI_DEBOUNCE_MS = 120;
 // omniboxNew is an empty omnibox; items are the selection's actions it lists while nothing is typed.
 function omniboxNew(panel, items) {
   return { panel: !!panel, items: items || [], text: "", seq: 0, askSeq: 0, abort: null, timer: null, search: null, resolved: null,
-    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "" };
+    answer: null, askError: "", asking: false, follow: [], reply: "", ops: [], checked: [], ran: null, runError: "", sel: "" };
 }
 
 // omniboxOps makes ops the operations to confirm, every one checked.
@@ -207,6 +207,7 @@ function omniboxOps(st, ops) {
 // text older than the newest is dropped, and the request the newer text replaces is aborted.
 function omniboxType(st, text, env) {
   st.text = text;
+  st.sel = "";
   st.answer = null;
   st.askError = "";
   st.ran = null;
@@ -323,22 +324,79 @@ async function omniboxAct(u, id) {
   return act(d.row, id, extra);
 }
 
-// omniboxEnter is Enter in the field: run the operations to confirm, else open a pasted address's task or
-// unit, else ask the agent where only it would help, else open the first result; with Cmd it asks the agent.
-function omniboxEnter(st, env, ask) {
-  if (ask) return omniboxAsk(st, env);
-  if (st.ops.some((_, i) => st.checked[i])) return omniboxRun(st, env);
+// omniboxChoices are what Enter may run, in the order the arrows walk them: the operations to confirm, a
+// pasted address's unit, the agent where only it would help, each search result, and the selection's actions
+// while nothing is typed.
+function omniboxChoices(st, env) {
+  if (!st.text.trim()) return st.items.map((it, i) => ({ id: "item:" + i, run: () => { env.close(); it.run(); } }));
+  const out = [];
+  if (st.ops.some((_, i) => st.checked[i])) out.push({ id: "ops", run: () => omniboxRun(st, env) });
   const unit = omniboxUnit(st);
   if (unit) {
     const first = (unit.tasks || [])[0];
-    env.open(first ? "#task=" + encodeURIComponent(first.id) : omniboxUnitHref(unit));
-    return Promise.resolve();
+    out.push({ id: "unit", run: () => env.open(first ? "#task=" + encodeURIComponent(first.id) : omniboxUnitHref(unit)) });
   }
-  if (st.resolved && st.resolved.kind === "agent") return omniboxAsk(st, env);
-  const first = st.search && (st.search.groups || []).flatMap((g) => g.results || [])[0];
-  if (first) env.open("#task=" + encodeURIComponent(first.task.id));
-  else if (!st.text.trim() && st.items.length) st.items[0].run();
-  return Promise.resolve();
+  if (st.resolved && st.resolved.kind === "agent" && !st.answer) out.push({ id: "ask", run: () => omniboxAsk(st, env) });
+  for (const g of (st.search && st.search.groups) || []) {
+    for (const r of g.results || []) out.push({ id: "task:" + r.task.id, run: () => env.open("#task=" + encodeURIComponent(r.task.id)) });
+  }
+  return out;
+}
+
+// omniboxSelected is the id of the choice selected: the one picked while it is still offered, else the first.
+function omniboxSelected(st, choices) {
+  return (choices.find((c) => c.id === st.sel) || choices[0] || { id: "" }).id;
+}
+
+// omniboxMove moves the selection by delta choices, stopping at either end.
+function omniboxMove(st, delta, env) {
+  const choices = omniboxChoices(st, env);
+  if (!choices.length) return;
+  const at = choices.findIndex((c) => c.id === omniboxSelected(st, choices));
+  st.sel = choices[Math.min(Math.max(at + delta, 0), choices.length - 1)].id;
+  env.render();
+}
+
+// omniboxEnter is Enter in the field: run the selected choice; with Cmd it asks the agent.
+function omniboxEnter(st, env, ask) {
+  if (ask) return omniboxAsk(st, env);
+  const choices = omniboxChoices(st, env);
+  const pick = choices.find((c) => c.id === omniboxSelected(st, choices));
+  return Promise.resolve(pick ? pick.run() : undefined);
+}
+
+// omniboxKey is a key in the omnibox's field: the arrows (and Ctrl+N, Ctrl+P) move the selection, Enter runs
+// it, Cmd+Enter asks the agent, Escape closes; true when the omnibox took the key.
+function omniboxKey(st, env, e, close) {
+  const ctrl = e.ctrlKey && !e.metaKey && !e.altKey;
+  if (e.key === "Escape") close();
+  else if (e.key === "Enter" && !e.isComposing) omniboxEnter(st, env, e.metaKey || e.ctrlKey);
+  else if (e.key === "ArrowDown" || (ctrl && e.key === "n")) omniboxMove(st, 1, env);
+  else if (e.key === "ArrowUp" || (ctrl && e.key === "p")) omniboxMove(st, -1, env);
+  else return false;
+  e.preventDefault();
+  return true;
+}
+
+// OMNI_STOPS are the controls Tab moves through inside the omnibox.
+const OMNI_STOPS = 'input, button, a[href], [tabindex]:not([tabindex="-1"])';
+
+// omniboxTrap is where Tab from active goes so the focus stays among stops: the other end past either end,
+// else null, leaving the move to the page.
+function omniboxTrap(e, stops, active) {
+  if (e.key !== "Tab" || !stops.length) return null;
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  if (e.shiftKey && active === first) return last;
+  if (!e.shiftKey && active === last) return first;
+  return null;
+}
+
+// omniboxKeysHint names the omnibox's keys.
+function omniboxKeysHint() {
+  const key = (k, what) => [h("kbd", {}, k), " ", what];
+  return h("p", { class: "omni-keys" }, key("↑↓", t("to navigate")), " · ", key("↵", t("to open")), " · ", key("⌘↵", t("to ask the agent")), " · ",
+    key("esc", t("to close")));
 }
 
 // omniboxOpLabel is an operation in words.
@@ -370,7 +428,7 @@ function omniboxEdits(st, i, env) {
 
 // omniboxChecklist is the operations to confirm, each with a box to leave it out and its reason, and the
 // button that runs the checked ones.
-function omniboxChecklist(st, env, editable) {
+function omniboxChecklist(st, env, editable, opt) {
   if (!st.ops.length) return null;
   const n = st.checked.filter(Boolean).length;
   return h("section", { class: "omni-ops", "aria-label": t("To confirm") },
@@ -381,7 +439,7 @@ function omniboxChecklist(st, env, editable) {
         " ", omniboxOpLabel(op)),
       op.reason && op.op !== "action" ? h("p", { class: "why" }, op.reason) : null,
       ...(editable ? omniboxEdits(st, i, env) : [])))),
-    h("button", { type: "button", class: "act primary", disabled: n === 0 || undefined, "data-focus": "omni:run", onclick: () => omniboxRun(st, env) },
+    h("button", { type: "button", class: "act primary", disabled: n === 0 || undefined, "data-focus": "omni:run", ...(opt ? opt("ops") : {}), onclick: () => omniboxRun(st, env) },
       h("kbd", {}, "↵"), " ", tn("Run {n}", n)));
 }
 
@@ -394,15 +452,15 @@ function omniboxAnswer(st, env) {
   if (a.answer) {
     const ids = (a.answer.tasks || []).map((e) => e.id);
     out.push(h("section", { class: "omni-answer" },
-      h("p", {}, a.answer.text),
+      renderMarkdown(a.answer.text || "", { fold: 12, key: "omni:answer" }),
       ids.length ? h("ol", {}, ...a.answer.tasks.map((e) => h("li", {}, omniboxTaskLink(e)))) : null,
       ids.length ? h("a", { class: "omni-queue", href: "#queue=list&ids=" + ids.map(encodeURIComponent).join(",") }, t("Open as a queue")) : null));
   }
   if (a.proposal) {
-    out.push(h("p", { class: "omni-summary" }, a.proposal.summary || ""));
+    out.push(h("div", { class: "omni-summary" }, renderMarkdown(a.proposal.summary || "", { fold: 12, key: "omni:summary" })));
     if (a.proposal.question) {
       out.push(h("div", { class: "omni-question" },
-        h("p", {}, a.proposal.question),
+        renderMarkdown(a.proposal.question, { fold: 0 }),
         h("input", { type: "text", "aria-label": t("Your answer"), value: st.reply, "data-focus": "omni:reply",
           oninput: (ev) => { st.reply = ev.target.value; },
           onkeydown: (ev) => {
@@ -419,11 +477,11 @@ function omniboxAnswer(st, env) {
 
 // omniboxSearch is the search's groups, each with its count and its results, each result linking its task
 // and naming the views it is in.
-function omniboxSearch(st) {
+function omniboxSearch(st, opt) {
   const groups = (st.search && st.search.groups) || [];
-  return groups.map((g) => h("section", { class: "omni-group", "data-group": g.id },
+  return groups.map((g) => h("section", { class: "omni-group", "data-group": g.id, role: "group", "aria-label": g.label },
     h("h3", {}, g.label, " ", h("span", { class: "count" }, fmtNumber(g.count))),
-    h("ol", {}, ...(g.results || []).map((r) => h("li", {}, omniboxTaskLink(r.task, r.views && r.views.length ? h("span", { class: "views" }, r.views.join(" · ")) : null))))));
+    h("ol", {}, ...(g.results || []).map((r) => h("li", opt("task:" + r.task.id), omniboxTaskLink(r.task, r.views && r.views.length ? h("span", { class: "views" }, r.views.join(" · ")) : null))))));
 }
 
 // omniboxRan is each operation run and what came of it.
@@ -436,32 +494,53 @@ function omniboxRan(st) {
   }));
 }
 
+// omniboxOptionID is the element id of the choice at i.
+const omniboxOptionID = (i) => "omni-opt-" + i;
+
+// omniboxOption is, for a choice's id, the attributes that make its element an option, selected or not.
+function omniboxOption(st, env) {
+  const choices = omniboxChoices(st, env);
+  const sel = omniboxSelected(st, choices);
+  return (id) => {
+    const i = choices.findIndex((c) => c.id === id);
+    return i < 0 ? {} : { role: "option", id: omniboxOptionID(i), "data-choice": id, "aria-selected": String(id === sel) };
+  };
+}
+
+// omniboxActiveID is the element id of the selected choice, "" when there is none.
+function omniboxActiveID(st, env) {
+  const choices = omniboxChoices(st, env);
+  const i = choices.findIndex((c) => c.id === omniboxSelected(st, choices));
+  return i < 0 ? "" : omniboxOptionID(i);
+}
+
 // renderOmnibox is the omnibox below its field: the path answering, then the selection's actions while
 // nothing is typed, the unit, the operations to confirm, the agent's answer and the search.
 function renderOmnibox(st, env) {
   const agent = st.asking || !!st.answer || !!st.askError;
+  const opt = omniboxOption(st, env);
   const out = [h("p", { class: "omni-badge" + (agent ? " agent" : "") }, agent ? t("agent") : t("instant"))];
   if (!st.text.trim()) {
-    out.push(h("ol", { class: "omni-items" }, ...st.items.map((it) => h("li", {},
+    out.push(h("ol", { class: "omni-items" }, ...st.items.map((it, i) => h("li", opt("item:" + i),
       h("button", { type: "button", class: "omni-item", onclick: () => { env.close(); it.run(); } }, it.label, it.meta ? h("span", { class: "pill" }, it.meta) : null, it.key ? h("kbd", {}, it.key) : null)))));
     return out;
   }
   const r = st.resolved;
   if (r && r.why) out.push(h("p", { class: "omni-why" }, t(r.why, r.params || {})));
   if (r && r.kind === "unit" && r.unit) {
-    out.push(h("section", { class: "omni-unit" },
+    out.push(h("section", { class: "omni-unit", ...opt("unit") },
       h("h3", {}, r.unit.permalink ? h("a", { href: r.unit.permalink, target: "_blank", rel: "noopener" }, r.unit.label) : r.unit.label),
       h("ol", {}, ...(r.unit.tasks || []).map((e) => h("li", {}, omniboxTaskLink(e)))),
       h("div", { class: "d-actions" }, ...(r.unit.actions || []).map((a) => h("button", { type: "button", class: "act",
         onclick: () => omniboxUnitAction(st, env, a.id) }, a.label || a.id)))));
   }
-  if (r && r.kind === "agent" && !agent) out.push(h("p", { class: "omni-hint" }, t("Press ⌘↵ to ask the agent")));
+  if (r && r.kind === "agent" && !agent) out.push(h("p", { class: "omni-hint", ...opt("ask") }, t("Press ⌘↵ to ask the agent")));
   out.push(...omniboxAnswer(st, env));
-  out.push(omniboxChecklist(st, env, !!(st.answer && st.answer.proposal)));
+  out.push(omniboxChecklist(st, env, !!(st.answer && st.answer.proposal), opt));
   out.push(omniboxRan(st));
   if (st.asking) out.push(h("p", { class: "loading" }, t("Asking the agent...")));
   if (st.askError) out.push(h("p", { class: "err omni-ask-error" }, st.askError));
-  out.push(...omniboxSearch(st));
+  out.push(...omniboxSearch(st, opt));
   return out.filter(Boolean);
 }
 
@@ -505,14 +584,33 @@ function openOmnibox() {
   else showOmnibox();
 }
 
+// omniboxRedraw draws the omnibox's results, keeps the focus on the control of the same data-focus it was on,
+// and points the field at the selected choice, scrolled into view.
+function omniboxRedraw(st, env, input, results) {
+  const at = document.activeElement;
+  const slot = at && results.contains(at) ? at.getAttribute("data-focus") : "";
+  results.replaceChildren(...renderOmnibox(st, env));
+  const again = slot ? results.querySelector(`[data-focus="${CSS.escape(slot)}"]`) : null;
+  if (again) again.focus();
+  const id = omniboxActiveID(st, env);
+  if (!id) {
+    input.removeAttribute("aria-activedescendant");
+    return;
+  }
+  input.setAttribute("aria-activedescendant", id);
+  const sel = document.getElementById(id);
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "nearest" });
+}
+
 // showOmnibox opens the omnibox over the page, or, in the floating panel, as the whole page; items are the
 // selection's actions it lists while nothing is typed. Esc closes it, and in the panel hides the panel.
 function showOmnibox(opts = {}) {
   const st = omniboxNew(opts.panel, opts.items);
   const input = h("input", { type: "text", class: "omni-input", role: "combobox", "aria-label": t("Search or ask"), "aria-expanded": "true", autocomplete: "off",
-    spellcheck: "false", placeholder: t("Search, paste a link, or ask") });
-  const results = h("div", { class: "omni-results", "aria-live": "polite" });
-  const box = h("div", { class: "pal omni" + (st.panel ? " omni-panel" : ""), role: "dialog", "aria-label": t("Search or ask") }, input, results);
+    spellcheck: "false", placeholder: t("Search, paste a link, or ask"), "aria-controls": "omni-results", "aria-autocomplete": "list" });
+  const results = h("div", { class: "omni-results", id: "omni-results", role: "listbox", "aria-label": t("Search or ask"), "aria-live": "polite" });
+  const box = h("div", { class: "pal omni" + (st.panel ? " omni-panel" : ""), role: "dialog", "aria-modal": "true", "aria-label": t("Search or ask") },
+    input, results, omniboxKeysHint());
   let close = () => {};
   const env = {
     get: (url, signal) => omniFetch(url, undefined, signal),
@@ -524,7 +622,7 @@ function showOmnibox(opts = {}) {
     act: (u, id) => omniboxAct(u, id),
     close: () => close(),
     changed: () => { if (typeof scheduleLoad === "function") scheduleLoad({ tasks: true }); },
-    render: () => results.replaceChildren(...renderOmnibox(st, env)),
+    render: () => omniboxRedraw(st, env, input, results),
   };
   if (st.panel) {
     document.body.classList.add("panel-omnibox");
@@ -534,12 +632,20 @@ function showOmnibox(opts = {}) {
     close = palOverlay(box);
   }
   input.addEventListener("input", () => omniboxType(st, input.value, env));
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") close();
-    else if (e.key === "Enter" && !e.isComposing) omniboxEnter(st, env, e.metaKey || e.ctrlKey);
-    else return;
-    e.preventDefault();
-  });
+  input.addEventListener("keydown", (e) => omniboxKey(st, env, e, () => close()));
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      return;
+    }
+    const to = omniboxTrap(e, [...box.querySelectorAll(OMNI_STOPS)].filter((el) => !el.disabled), document.activeElement);
+    if (to) {
+      e.preventDefault();
+      to.focus();
+    }
+  }, true);
   env.render();
   input.focus();
   if (opts.text) {
