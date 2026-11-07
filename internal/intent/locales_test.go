@@ -62,41 +62,11 @@ func texts(t *testing.T, rel string, src []byte) map[string]string {
 	return out
 }
 
-// draftTexts are the text files of fsys's workflows whose step proposes a draft, which piece E translates.
-func draftTexts(t *testing.T, fsys fs.FS) map[string]bool {
-	t.Helper()
-	out := map[string]bool{}
-	dirs, _ := fs.ReadDir(fsys, "workflows")
-	for _, d := range dirs {
-		b, err := fs.ReadFile(fsys, path.Join("workflows", d.Name(), "workflow.toml"))
-		if err != nil {
-			continue
-		}
-		var m struct{ Step []map[string]any }
-		_ = toml.Unmarshal(b, &m)
-		for _, st := range m.Step {
-			if st["use"] == builtin.StepDraftPropose {
-				name, _ := st["text"].(string)
-				out[path.Join("workflows", d.Name(), cmpOr(name, "text.md.tmpl"))] = true
-			}
-		}
-	}
-	return out
-}
-
-func cmpOr(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
-}
-
 // bundledTextGaps are the texts of layer, as "<file>: <key>", that its locales/<locale>/ mirror lacks;
 // strings.toml is left out when skipStrings.
 func bundledTextGaps(t *testing.T, l profile.Layer, locale string, skipStrings bool) []string {
 	t.Helper()
 	fsys := layerFS(t, l)
-	drafts := draftTexts(t, fsys)
 	var gaps []string
 	err := fs.WalkDir(fsys, ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || strings.HasPrefix(rel, profile.LocalesDir+"/") {
@@ -107,7 +77,7 @@ func bundledTextGaps(t *testing.T, l profile.Layer, locale string, skipStrings b
 		}
 		mirror := path.Join(profile.LocalesDir, locale, rel)
 		if dir, name := path.Split(rel); slices.Contains(builtin.LocalizedFiles, name) && strings.HasPrefix(dir, "workflows/") {
-			if _, err := fs.Stat(fsys, mirror); err != nil && !drafts[rel] {
+			if _, err := fs.Stat(fsys, mirror); err != nil {
 				gaps = append(gaps, rel+": the whole file")
 			}
 			return nil

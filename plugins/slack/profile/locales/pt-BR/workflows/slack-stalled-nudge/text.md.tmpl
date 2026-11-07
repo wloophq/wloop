@@ -1,0 +1,4 @@
+@{{"{"}}{{.Person.Key}}}, alguma novidade sobre {{if eq (len .Items) 1}}isto{{else}}estes{{end}}?
+
+{{range $i, $it := .Items}}{{if $i}}
+{{end}}- {{$it.Line}}{{end -}}
