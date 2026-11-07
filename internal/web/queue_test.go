@@ -302,12 +302,12 @@ func queuedDraft() map[string]any {
 
 func TestQueueKeysRunTheDraftCardsActions(t *testing.T) {
 	var got struct {
-		Posts            []string
-		Bodies           []map[string]any
-		Hints            []string
-		Took             []bool
-		Notices          []string
-		EditedText, Rev  string
+		Posts           []string
+		Bodies          []map[string]any
+		Hints           []string
+		Took            []bool
+		Notices         []string
+		EditedText, Rev string
 	}
 	nodeRun(t, queuePrelude(t), nil, `
 (async () => {
