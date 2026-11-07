@@ -602,6 +602,23 @@
 "Results" = "Results"
 "Nothing left in this list." = "Nothing left in this list."
 "Open" = "Open"
+# The omnibox.
+"instant" = "instant"
+"agent" = "agent"
+"Search, paste a link, or ask" = "Search, paste a link, or ask"
+"Press ⌘↵ to ask the agent" = "Press ⌘↵ to ask the agent"
+"Asking the agent..." = "Asking the agent..."
+"To confirm" = "To confirm"
+"Run {n}" = { one = "Run {n}", other = "Run {n}" }
+"Your answer" = "Your answer"
+"Open as a queue" = "Open as a queue"
+"Title" = "Title"
+"Repository" = "Repository"
+"{action} on {unit}" = "{action} on {unit}"
+"{verb} task {task}" = "{verb} task {task}"
+"Capture: {title}" = "Capture: {title}"
+"Start: {brief}" = "Start: {brief}"
+"Start in {repo}: {brief}" = "Start in {repo}: {brief}"
 # piece F
 # The window's title bar, the detach of a detail and the links to a view.
 "Back" = "Back"

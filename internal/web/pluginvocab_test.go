@@ -31,7 +31,7 @@ var scriptDebts = map[string]map[string]int{
 	},
 	"detail.js":  {"draft": 1, "merged": 4, "all": 4},
 	"keys.js":    {"review": 3, "plan": 6},
-	"palette.js": {"merged": 1},
+	"omnibox.js": {"merged": 1},
 	"plugins.js": {"author": 1},
 	"rail.js":    {"waits-on": 4, "explore": 1, "plan": 1, "recent": 1},
 	"row.js":     {"age": 1, "kind": 1},

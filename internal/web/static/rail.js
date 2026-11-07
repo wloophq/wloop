@@ -1,11 +1,7 @@
 "use strict";
 
-// railEnv is what the rail's omnibox entry runs: the actions palette, until the omnibox takes its place.
-const railEnv = {
-  omnibox: () => {
-    if (typeof cockpitKeys === "object" && cockpitKeys) cockpitKeys.openPalette();
-  },
-};
+// railEnv is what the rail's omnibox entry runs.
+const railEnv = { omnibox: () => openOmnibox() };
 
 const railState = { emptiesOpen: false };
 

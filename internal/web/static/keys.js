@@ -314,6 +314,12 @@ function createKeys(env) {
     return items;
   }
 
+  // openPalette opens the omnibox over the selection's actions, or the actions palette where none is wired.
+  function openPalette() {
+    if (env.omnibox) env.omnibox(paletteItems());
+    else env.palette({ title: t("Actions"), items: paletteItems() });
+  }
+
   async function run(b, ctx) {
     const a = b.action;
     if (b.context === "queue") return env.queue ? env.queue(a) !== false : false;
@@ -335,7 +341,7 @@ function createKeys(env) {
     if (a === "link:copy") return env.copyLink ? env.copyLink() !== false : false;
     if (a.startsWith("tab:")) return env.tab ? env.tab(a.slice(4)) !== false : false;
     if (a === "palette") {
-      env.palette({ title: t("Actions"), items: paletteItems() });
+      openPalette();
       return true;
     }
     if (a === "help") {
@@ -414,7 +420,7 @@ function createKeys(env) {
   return {
     handle,
     paletteItems,
-    openPalette() { env.palette({ title: t("Actions"), items: paletteItems() }); },
+    openPalette,
     setBindings(list) { bindings = (list || []).map((b) => ({ ...b })); },
     bindings: () => bindings,
     keyOf: (action) => (bindings.find((b) => b.action === action) || {}).key || "",
@@ -547,6 +553,7 @@ function appEnv() {
     leave: (el) => el.blur(),
     ask: (o) => askInput(o),
     palette: (o) => showPalette(o),
+    omnibox: (items) => showOmnibox({ items }),
     stateLabel: (name) => stateLabel(name),
     help: (groups) => showHelp(groups),
     notice: (text, err) => setNotice(text, err),

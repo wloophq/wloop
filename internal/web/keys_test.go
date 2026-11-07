@@ -64,7 +64,7 @@ func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
 	}
 }
 
-// keysHarness is palette.js and keys.js with a recording environment:
+// keysHarness is omnibox.js and keys.js with a recording environment:
 // harness(o) returns { keys, log, press, tick }.
 const keysHarness = `
 function harness(o = {}) {
@@ -125,7 +125,7 @@ function harness(o = {}) {
 }
 `
 
-// keysRun runs main, an async body, after keys.js, palette.js, the fixture
+// keysRun runs main, an async body, after keys.js, omnibox.js, the fixture
 // bindings and the harness; main returns the JSON result. prelude comes
 // first, for app.js functions the test drives through the keys.
 func keysRun(t *testing.T, prelude, main string, in, out any) {
@@ -143,7 +143,7 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	if !strings.Contains(prelude, "const QUEUE ") {
 		b.WriteString(`const QUEUE = "queue";` + "\n")
 	}
-	b.WriteString(staticJS(t, "palette.js"))
+	b.WriteString(staticJS(t, "omnibox.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))
 	b.WriteString(keysHarness)
@@ -555,9 +555,9 @@ func TestKeysMoveOutOfAppJS(t *testing.T) {
 		}
 	}
 	page := staticJS(t, "index.html")
-	app, pal, k := strings.Index(page, "/static/app.js"), strings.Index(page, "/static/palette.js"), strings.Index(page, "/static/keys.js")
+	app, pal, k := strings.Index(page, "/static/app.js"), strings.Index(page, "/static/omnibox.js"), strings.Index(page, "/static/keys.js")
 	if app < 0 || pal < app || k < pal {
-		t.Fatalf("index.html loads app.js, palette.js, keys.js in that order: %d %d %d", app, pal, k)
+		t.Fatalf("index.html loads app.js, omnibox.js, keys.js in that order: %d %d %d", app, pal, k)
 	}
 }
 

@@ -144,7 +144,7 @@ func TestTheCockpitTaskPageShowsRelatedTasksAndAMergedFromTraceWithSplit(t *test
 			Body map[string]any
 		}
 	}
-	nodeRun(t, cockpitScript(t)+strings.Replace(staticJS(t, "palette.js"), `"use strict";`, "", 1)+taskPageHarness, nil, "(async () => {\n"+`
+	nodeRun(t, cockpitScript(t)+strings.Replace(staticJS(t, "omnibox.js"), `"use strict";`, "", 1)+taskPageHarness, nil, "(async () => {\n"+`
 tasksState.tasks = [{ id: "t-2", title: "Book the launch hall", state: "doing", units: [] }, { id: "t-4", title: "Stale copy", state: "doing", units: [] }];
 let picker = null;
 detailEnv.palette = (o) => { picker = o; };
@@ -286,7 +286,7 @@ c.type("zz");
 await c.answer("zz", []);
 process.stdout.write(JSON.stringify({ ...facts, Latest: latest, BeforeAnswer: before, Runs: runs, Empty: c.empty.textContent, EmptyLive: c.empty.attrs["aria-live"] }));
 })().catch((e) => { console.error(e); process.exit(1); });`
-	nodeScript(t, domShim+strings.Replace(staticJS(t, "palette.js"), `"use strict";`, "", 1)+paletteShim+main, nil, &got)
+	nodeScript(t, domShim+strings.Replace(staticJS(t, "omnibox.js"), `"use strict";`, "", 1)+paletteShim+main, nil, &got)
 
 	if got.Role != "combobox" || got.Controls == "" || got.Controls != got.ListID || got.Active == "" || got.Active != got.FirstID {
 		t.Errorf("the input is not a combobox over its list: role %q controls %q list %q active %q first %q", got.Role, got.Controls, got.ListID, got.Active, got.FirstID)

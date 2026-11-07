@@ -3025,6 +3025,10 @@ setInterval(tickCountdowns, 1000);
 loadStrings(getJSON).then(() => {
   document.documentElement.lang = I18N.locale;
   translateStatic(document);
+  if (readRoute(location.hash).panel === "omnibox") {
+    showOmnibox({ panel: true });
+    return;
+  }
   load();
   connect();
 });
