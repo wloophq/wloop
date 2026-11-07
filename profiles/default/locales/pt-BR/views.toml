@@ -279,7 +279,7 @@ empty = "Todo projeto tem uma próxima ação e está revisado."
 label = "Revisão"
 summary = "A revisão semanal: percorra cada passo até as listas ficarem limpas."
 
-# piece B
+# The home's sections and the decision queues.
 [views.home-blocked]
 label = "Bloqueado por você"
 summary = "Tarefas que esperam por você: uma decisão a tomar ou um pedido de alguém, as devidas há mais tempo primeiro."
