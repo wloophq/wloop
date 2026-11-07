@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -137,12 +138,41 @@ func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, err
 		}
 		d.ID, d.Rev = draft.ID(id), 0
 		tx.Touch(port.TopicDrafts, d.Unit)
-		return nil
+		return touchDraftTask(ctx, tx, d.Task)
 	})
 	if err != nil {
 		return draft.Draft{}, fmt.Errorf("insert draft: %w", err)
 	}
 	return normal(d), nil
+}
+
+// touchDraftTask marks the stored task a draft serves changed at the next task position, so a page read since
+// an earlier one lists it with its drafts; nothing for no task or one not stored.
+func touchDraftTask(ctx context.Context, tx *Tx, id string) error {
+	if id == "" {
+		return nil
+	}
+	epoch, rev, err := readPosition(ctx, tx)
+	if err != nil {
+		return err
+	}
+	rev++
+	res, err := tx.ExecContext(ctx, `UPDATE tasks SET rev = ? WHERE id = ?`, rev, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		return err
+	}
+	if epoch == "" {
+		epoch = newEpoch()
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO task_position (only, epoch, rev) VALUES (1, ?, ?)
+		ON CONFLICT (only) DO UPDATE SET epoch = excluded.epoch, rev = excluded.rev`, epoch, rev); err != nil {
+		return err
+	}
+	tx.Touch(port.TopicTasks, task.UnitOf(task.ID(id)))
+	return nil
 }
 
 func (s draftStore) Get(ctx context.Context, id draft.ID) (draft.Draft, error) {
@@ -227,10 +257,11 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 			return err
 		}
 		if n, err := res.RowsAffected(); err != nil || n == 1 {
-			if err == nil {
-				tx.Touch(port.TopicDrafts, d.Unit)
+			if err != nil {
+				return err
 			}
-			return err
+			tx.Touch(port.TopicDrafts, d.Unit)
+			return touchDraftTask(ctx, tx, d.Task)
 		}
 		var state string
 		var rev int64

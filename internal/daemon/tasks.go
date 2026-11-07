@@ -914,6 +914,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.unitLabels(ctx, v.Units)
+	v.Drafts = ev.pendingDrafts(ctx, e.ID)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
 	} else if ok {

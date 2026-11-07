@@ -1412,7 +1412,3 @@ func TestARowsChangeAndATasksChangeMergeForASubscriber(t *testing.T) {
 func TestRailFalseViewsServedWithRail(t *testing.T) {
 	t.Skip("B2 GET /api/views serves each view's rail")
 }
-
-func TestATaskWithNoDraftsListsNone(t *testing.T) {
-	t.Skip("E8 a task with no drafts lists none, never null")
-}
