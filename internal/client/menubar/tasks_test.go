@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -72,7 +73,7 @@ func TestMenuListsFiveAndMore(t *testing.T) {
 	if n != 6 {
 		t.Fatalf("%d listed, want 5 of the Inbox + 1 in loop: %q", n, got)
 	}
-	for _, want := range []string{"Outbox (0)", "In loop (1)", "Open cockpit", "Sweep now", "Pause automatic rounds", "Synced " + now.Add(-2*time.Minute).Local().Format("15:04")} {
+	for _, want := range []string{"Outbox (0)", "In loop (1)", "Open cockpit", "Sweep now", "Pause automatic rounds", "Synced " + texts.English().Time(now.Add(-2*time.Minute).Local(), "time")} {
 		if _, ok := find(r.tray.menu, want); !ok {
 			t.Errorf("menu lacks %q: %q", want, got)
 		}
