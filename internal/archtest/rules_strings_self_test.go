@@ -41,3 +41,10 @@ func f() { panic("the window needs macOS") }
 		}
 	}
 }
+
+func TestHTMLProseFlagsAPlantedText(t *testing.T) {
+	page := `<header><button>Do it</button><button data-i18n="Reload">Reload</button>
+<input aria-label="Filter the list"><input aria-label="Views" data-i18n-aria-label="Views">
+<span class="mark">{{name}}</span><script>const x = "Some words";</script><h2 data-i18n="Waiting on">Waiting on</h2></header>`
+	flagged(t, "html", ruleHTMLProse("internal/web/static/index.html", page), 2, "data-i18n")
+}

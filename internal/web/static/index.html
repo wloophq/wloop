@@ -11,51 +11,51 @@
 <body>
 <header id="top">
   <span class="mark">{{name}}</span>
-  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
+  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" data-i18n-aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-i18n-placeholder="Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
   <span id="sync" class="sync">connecting</span>
   <span id="notice" class="notice" role="status" aria-live="polite"></span>
 </header>
 <div id="warnings" class="warnings" role="alert" hidden></div>
-<div id="update" class="update" role="status" hidden>A new version is running. <button id="update-reload" type="button" class="act" data-focus="update:reload">Reload</button></div>
+<div id="update" class="update" role="status" hidden><span data-i18n="A new version is running.">A new version is running.</span> <button id="update-reload" type="button" class="act" data-focus="update:reload" data-i18n="Reload">Reload</button></div>
 <main id="app">
-  <nav id="rail" aria-label="Views">
+  <nav id="rail" aria-label="Views" data-i18n-aria-label="Views">
     <ul id="views" class="views"></ul>
-    <h2 class="rail-head">Waiting on</h2>
+    <h2 class="rail-head" data-i18n="Waiting on">Waiting on</h2>
     <ul id="people" class="views people"></ul>
   </nav>
-  <section id="list" aria-label="Pull requests">
-    <section id="explore" class="explore" aria-label="Explore pull requests" hidden>
+  <section id="list" aria-label="Pull requests" data-i18n-aria-label="Pull requests">
+    <section id="explore" class="explore" aria-label="Explore pull requests" data-i18n-aria-label="Explore pull requests" hidden>
       <form id="explore-form" class="explore-form" role="search">
-        <input id="explore-q" type="search" maxlength="256" autocomplete="off" spellcheck="false" data-focus="explore:q" aria-label="Pull request URL, owner/repo, a repository or login, @org/team or a GitHub search" placeholder="PR URL, owner/repo, repo, login, @org/team or a search">
-        <button id="explore-go" type="submit" class="act primary" data-focus="explore:go">Search</button>
+        <input id="explore-q" type="search" maxlength="256" autocomplete="off" spellcheck="false" data-focus="explore:q" aria-label="Pull request URL, owner/repo, a repository or login, @org/team or a search" data-i18n-aria-label="Pull request URL, owner/repo, a repository or login, @org/team or a search" placeholder="PR URL, owner/repo, repo, login, @org/team or a search" data-i18n-placeholder="PR URL, owner/repo, repo, login, @org/team or a search">
+        <button id="explore-go" type="submit" class="act primary" data-focus="explore:go" data-i18n="Search">Search</button>
       </form>
       <div id="explore-chips" class="chips"></div>
       <p id="explore-status" class="explore-status" role="status" aria-live="polite"></p>
       <div id="explore-act" class="explore-act" hidden>
         <div id="explore-act-head" class="meta"></div>
-        <textarea id="explore-guidance" rows="2" aria-label="Guidance" data-focus="explore:guidance" placeholder="Guidance for the action you pick (optional)"></textarea>
+        <textarea id="explore-guidance" rows="2" aria-label="Guidance" data-i18n-aria-label="Guidance" data-focus="explore:guidance" placeholder="Guidance for the action you pick (optional)" data-i18n-placeholder="Guidance for the action you pick (optional)"></textarea>
         <div id="explore-act-buttons" class="d-actions"></div>
       </div>
-      <ol id="explore-results" class="cands" aria-label="Candidates"></ol>
+      <ol id="explore-results" class="cands" aria-label="Candidates" data-i18n-aria-label="Candidates"></ol>
     </section>
-    <section id="plan" class="plan" aria-label="The workflows' plan" hidden></section>
-    <section id="dash" class="dash" aria-label="Backlog dashboard" hidden></section>
+    <section id="plan" class="plan" aria-label="The workflows' plan" data-i18n-aria-label="The workflows' plan" hidden></section>
+    <section id="dash" class="dash" aria-label="Backlog dashboard" data-i18n-aria-label="Backlog dashboard" hidden></section>
     <section id="tasks" class="tasks" hidden>
       <div id="tasks-head"></div>
-      <div id="task-tools" class="tools" role="toolbar" aria-label="Filter, group and sort the tasks" hidden></div>
+      <div id="task-tools" class="tools" role="toolbar" aria-label="Filter, group and sort the tasks" data-i18n-aria-label="Filter, group and sort the tasks" hidden></div>
       <div id="tasks-body"></div>
     </section>
     <details id="list-box" class="list-box" open>
       <summary id="list-sum" class="list-sum"></summary>
-      <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" hidden></div>
+      <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" data-i18n-aria-label="Filter, group and sort" hidden></div>
       <table id="table"></table>
       <div id="board" class="board" hidden></div>
-      <ol id="activity" class="activity" aria-label="Recent activity" hidden></ol>
+      <ol id="activity" class="activity" aria-label="Recent activity" data-i18n-aria-label="Recent activity" hidden></ol>
       <p id="empty" class="empty" hidden></p>
     </details>
   </section>
-  <div id="detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize the detail panel" tabindex="0"></div>
-  <aside id="detail" aria-label="Detail" hidden></aside>
+  <div id="detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize the detail panel" data-i18n-aria-label="Resize the detail panel" tabindex="0"></div>
+  <aside id="detail" aria-label="Detail" data-i18n-aria-label="Detail" hidden></aside>
 </main>
 <script src="/static/vendor/echarts.min.js?v={{build}}"></script>
 <script src="/static/i18n.js?v={{build}}"></script>

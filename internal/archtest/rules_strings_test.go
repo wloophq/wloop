@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
+	"golang.org/x/net/html"
 )
 
 // nonProse are literals that read like prose and are not: what each is, by literal.
@@ -272,7 +273,7 @@ func cockpitScripts(t *testing.T) map[string]string {
 	return out
 }
 
-// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts and the Go clients quote no text
+// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts, its page and the Go clients quote no text
 // a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for
 // the debts `proseDebts` counts, which only shrink.
 func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
@@ -283,6 +284,11 @@ func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
 		}
 		got[proseBucket(file)] = append(got[proseBucket(file)], ruleClientProse(file, src)...)
 	}
+	page, err := os.ReadFile(filepath.Join("..", "..", webStatic, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got["index.html"] = append(got["index.html"], ruleHTMLProse(webStatic+"/index.html", string(page))...)
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		if strings.HasPrefix(file, "internal/client/") && slices.Contains(proseClients, proseBucket(file)) {
 			got[proseBucket(file)] = append(got[proseBucket(file)], ruleGoClientProse(fset, file, f)...)
@@ -318,9 +324,13 @@ func catalogKeys(t *testing.T) map[string]bool {
 	return out
 }
 
-var jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
+var (
+	jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
+	pageKey   = regexp.MustCompile(`data-i18n(?:-[a-z-]+)?="([^"]*)"`)
+)
 
-// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is
+// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the
+// page's `data-i18n` attributes) is
 // a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves.
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	keys := catalogKeys(t)
@@ -333,6 +343,17 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 					t.Errorf("%s:%d reads %q, which strings.toml lacks", file, l.line, l.text)
 				}
 			}
+		}
+	}
+	page, err := os.ReadFile(filepath.Join("..", "..", webStatic, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range pageKey.FindAllStringSubmatch(string(page), -1) {
+		k := html.UnescapeString(m[1])
+		used[k] = true
+		if !keys[k] {
+			t.Errorf("%s/index.html reads %q, which strings.toml lacks", webStatic, k)
 		}
 	}
 	literals := map[string]bool{}
@@ -367,5 +388,56 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 		if !used[k] && !literals[k] {
 			t.Errorf("strings.toml's %q is read by no client", k)
 		}
+	}
+}
+
+// htmlTextAttrs are the attributes whose value a person reads, each worded by its data-i18n-<attr> key.
+var htmlTextAttrs = []string{"title", "placeholder", "aria-label"}
+
+// ruleHTMLProse flags each prose text node or text attribute of the page file whose element carries no
+// data-i18n key for it.
+func ruleHTMLProse(file, src string) []string {
+	var out []string
+	z := html.NewTokenizer(strings.NewReader(src))
+	var open []html.Token
+	line := 1
+	for {
+		tt := z.Next()
+		raw := string(z.Raw())
+		switch tt {
+		case html.ErrorToken:
+			return out
+		case html.StartTagToken, html.SelfClosingTagToken:
+			tok := z.Token()
+			attrs := map[string]string{}
+			for _, a := range tok.Attr {
+				attrs[a.Key] = a.Val
+			}
+			for _, name := range htmlTextAttrs {
+				if v, ok := attrs[name]; ok && isProse(v) && attrs["data-i18n-"+name] == "" {
+					out = append(out, fmt.Sprintf("%s:%d: <%s %s=%q>; a text a person reads carries a data-i18n-%s key in strings.toml", file, line, tok.Data, name, v, name))
+				}
+			}
+			if tt == html.StartTagToken {
+				open = append(open, tok)
+			}
+		case html.EndTagToken:
+			if len(open) > 0 {
+				open = open[:len(open)-1]
+			}
+		case html.TextToken:
+			text := strings.TrimSpace(html.UnescapeString(raw))
+			if len(open) == 0 || !isProse(text) {
+				break
+			}
+			el := open[len(open)-1]
+			if el.Data == "script" || el.Data == "style" {
+				break
+			}
+			if !slices.ContainsFunc(el.Attr, func(a html.Attribute) bool { return a.Key == "data-i18n" }) {
+				out = append(out, fmt.Sprintf("%s:%d: <%s> says %q; a text a person reads carries a data-i18n key in strings.toml", file, line, el.Data, text))
+			}
+		}
+		line += strings.Count(raw, "\n")
 	}
 }

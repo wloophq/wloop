@@ -199,6 +199,7 @@ func TestFilterMatchesEveryTermAndAPastedLinkFindsItsRow(t *testing.T) {
 
 func TestEmptyNotesNameTheFilter(t *testing.T) {
 	prelude := filterPrelude(t) + `let activityLoopOnly = false;
+const searchService = () => "GitHub";
 const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event: { kind: "push" } }] };
 `
 	var got [][]any

@@ -211,6 +211,7 @@ func stringsPrelude(t *testing.T, locale, path string) string {
 
 func TestAppRendersPtBRChrome(t *testing.T) {
 	prelude := filterPrelude(t) + stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml") + `let activityLoopOnly = false;
+const searchService = () => "GitHub";
 const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event: { kind: "push" } }], explore: { busy: false, error: "", result: null } };
 `
 	var got []string
@@ -234,10 +235,32 @@ process.stdout.write(JSON.stringify([
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 	text := strings.Join(got, "\n")
-	for _, english := range []string{"Nothing in", "matches", "Clear filters", "is not in the inventory", "Explore it", "Open it on GitHub",
+	for _, english := range []string{"Nothing in", "matches", "Clear filters", "is not in the inventory", "Explore it", "Open it on",
 		"No loop events", "A search runs only", "blocked", "waits for you", "min ago"} {
 		if strings.Contains(text, english) {
 			t.Errorf("the pt-BR chrome still says %q: %q", english, text)
 		}
+	}
+}
+
+func TestThePageReadsInTheServedLocale(t *testing.T) {
+	var got struct{ Reload, Label, Untouched string }
+	nodeRun(t, staticJS(t, "i18n.js"), nil, `
+const el = (attrs, text) => ({ textContent: text, dataset: { i18n: attrs["data-i18n"] }, attrs,
+  getAttribute(k) { return this.attrs[k]; }, setAttribute(k, v) { this.attrs[k] = v; } });
+const reload = el({ "data-i18n": "Reload" }, "Reload");
+const rail = el({ "aria-label": "Views", "data-i18n-aria-label": "Views" }, "");
+const plain = el({ "aria-label": "Views" }, "");
+const all = [reload, rail, plain];
+const root = { querySelectorAll(sel) {
+  const attr = sel.slice(1, -1);
+  return all.filter((e) => e.attrs[attr] !== undefined);
+} };
+I18N.locale = "pt-BR";
+I18N.strings = { Reload: "Recarregar", Views: "Visões" };
+translateStatic(root);
+process.stdout.write(JSON.stringify({ Reload: reload.textContent, Label: rail.attrs["aria-label"], Untouched: plain.attrs["aria-label"] }));`, nil, &got)
+	if got.Reload != "Recarregar" || got.Label != "Visões" || got.Untouched != "Views" {
+		t.Fatalf("got %+v", got)
 	}
 }

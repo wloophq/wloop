@@ -14,9 +14,9 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
 | `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports the GitHub plugin's API client or gh: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
-| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
+| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the page's `data-i18n` attributes) is a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
-| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
+| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts, its page and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |

@@ -104,3 +104,14 @@ function followStrings(stamp, getJSON) {
       if (I18N.fetching === stamp) I18N.fetching = "";
     });
 }
+
+const STATIC_ATTRS = ["title", "placeholder", "aria-label"];
+
+// translateStatic words the page's own markup: an element's text by its data-i18n key, and its title,
+// placeholder and aria-label by their data-i18n-* keys.
+function translateStatic(root) {
+  for (const el of root.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const attr of STATIC_ATTRS) {
+    for (const el of root.querySelectorAll(`[data-i18n-${attr}]`)) el.setAttribute(attr, t(el.getAttribute(`data-i18n-${attr}`)));
+  }
+}
