@@ -47,12 +47,14 @@ type OmniboxTurn struct {
 }
 
 // OmniboxResolved is how typed text resolves, by Kind: "unit", "verb" (a known verb's operations), "search",
-// or "agent" (the agent would help); Why says why it fell to search or agent.
+// or "agent" (the agent would help); Why is the code, snake_case, of why it fell to search or agent, and
+// Params the values its words name.
 type OmniboxResolved struct {
-	Kind    string           `json:"kind"`
-	Why     string           `json:"why,omitempty"`
-	Unit    *OmniboxUnit     `json:"unit,omitempty"`
-	Preview *OmniboxProposal `json:"preview,omitempty"`
+	Kind    string            `json:"kind"`
+	Why     string            `json:"why,omitempty"`
+	Params  map[string]string `json:"params,omitempty"`
+	Unit    *OmniboxUnit      `json:"unit,omitempty"`
+	Preview *OmniboxProposal  `json:"preview,omitempty"`
 }
 
 // OmniboxUnit is a resolved unit: its tasks and actions.
@@ -96,14 +98,17 @@ type OmniboxRan struct {
 	Results []OmniboxResult `json:"results"`
 }
 
-// OmniboxResult is an operation's outcome as its handler answered it; Task is the task it created, if any.
+// OmniboxResult is an operation's outcome as its handler answered it: Error is the code, snake_case, of why
+// it failed and Params the values its words name, Refusal the handler's refusal code; Task is the task it
+// created, if any.
 type OmniboxResult struct {
-	OK      bool     `json:"ok"`
-	Status  int      `json:"status"`
-	Error   string   `json:"error,omitempty"`
-	Refusal string   `json:"refusal,omitempty"`
-	Output  []string `json:"output,omitempty"`
-	Task    string   `json:"task,omitempty"`
+	OK      bool              `json:"ok"`
+	Status  int               `json:"status"`
+	Error   string            `json:"error,omitempty"`
+	Params  map[string]string `json:"params,omitempty"`
+	Refusal string            `json:"refusal,omitempty"`
+	Output  []string          `json:"output,omitempty"`
+	Task    string            `json:"task,omitempty"`
 }
 
 // OmniboxAnswer is the read-only agent's answer, a list or a proposal, with what it proposed that was
@@ -121,8 +126,10 @@ type OmniboxList struct {
 	Tasks []TaskView `json:"tasks"`
 }
 
-// OmniboxDropped is a proposed operation refused, and why.
+// OmniboxDropped is a proposed operation refused: Why is the code, snake_case, of why, and Params the values
+// its words name.
 type OmniboxDropped struct {
-	Operation OmniboxOperation `json:"operation"`
-	Why       string           `json:"why"`
+	Operation OmniboxOperation  `json:"operation"`
+	Why       string            `json:"why"`
+	Params    map[string]string `json:"params,omitempty"`
 }

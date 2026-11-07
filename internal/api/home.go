@@ -23,10 +23,10 @@ type Briefing struct {
 	Empty     string           `json:"empty,omitempty"`
 }
 
-// BriefingPart is text, or with Counter >= 0 the counter of that index in Briefing.Counters.
+// BriefingPart is text, or with Counter set the counter of that index in Briefing.Counters.
 type BriefingPart struct {
 	Text    string `json:"text,omitempty"`
-	Counter int    `json:"counter"`
+	Counter *int   `json:"counter,omitempty"`
 }
 
 // HomeCounter counts the tasks of a decision kind (Kind) or of a view; View is the view it opens.
