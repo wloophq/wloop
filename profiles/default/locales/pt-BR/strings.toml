@@ -559,6 +559,11 @@
 "unknown_task" = "A tarefa {id} não existe"
 "unknown_unit" = "Nenhuma tarefa contém {unit}"
 "outside_vocabulary" = "Nenhum verbo da omnibox executa {name}"
+# piece B
+"unclaimed_address" = "Nenhum plugin reconhece {address}"
+"no_unit_or_task" = "Nenhum item ou tarefa é {ref}"
+"ambiguous_ref" = "{ref} nomeia mais de um item ou tarefa"
+"nothing_named" = "Diga em que executar {verb}"
 
 [formats]
 time = "15:04"

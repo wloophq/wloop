@@ -67,7 +67,7 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 }
 
 // omniboxAsker is the omnibox's read-only agent call, booked on the calls' budget, its cost recorded as an
-// event on the empty unit. Its vocabulary is not wired yet, so it drops every operation it is proposed.
+// event on the empty unit; it drops every proposed operation no verb of the loaded omnibox.toml targets.
 func (e *Env) omniboxAsker(db *sqlite.DB, cfg config.Config, logf func(string, ...any)) *omnibox.Asker {
 	dir := filepath.Join(e.StateDir, "omnibox")
 	snapshots := filepath.Join(dir, "snapshots")
@@ -83,7 +83,10 @@ func (e *Env) omniboxAsker(db *sqlite.DB, cfg config.Config, logf func(string, .
 		Record: func(ctx context.Context, cost float64) error {
 			return events.RecordEvents(ctx, port.Event{Kind: omnibox.KindCall, Key: randomKey(), At: e.Now(), Data: strconv.FormatFloat(cost, 'f', -1, 64)})
 		},
-		Repos: e.omniboxRepos}
+		Repos: e.omniboxRepos,
+		Allowed: func(op omnibox.AskOp) (string, map[string]string) {
+			return daemon.OmniboxVocabulary(e.loadedIntents()).Allowed(op)
+		}}
 }
 
 // omniboxRepos are the repositories the workspace managers know, each as owner/name when it has a remote.

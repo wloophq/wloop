@@ -1119,6 +1119,14 @@ The fields each notice reads besides `Name` and `Command`:
 - `search.groups[].id` (string): The group's id. Required.
 - `search.groups[].label` (string, localized): The group's label. Required.
 - `search.groups[].view` (string): The view of views.toml whose tasks the group holds. Required.
+- `verbs` (table): The verbs the omnibox knows, by id: typed first, a verb's word runs its target on what the rest names. No operation runs, from a verb or from the agent, that no verb targets.
+- `verbs.<name>` (table): One verb: its words and one target, action or verb, with op when nothing is named.
+- `verbs.<name>.words` (list of strings): The words that name the verb in every language, in one list, such as ["review", "revisar"]: vocabulary, not a text a locale translates. Required.
+- `verbs.<name>.action` (string): The catalog action it runs on each unit named.
+- `verbs.<name>.verb` (string): The task verb of tasks.toml it runs on each task named; never one that resolves a gate.
+- `verbs.<name>.op` (one of `capture`, `start`): What it runs on the text when it names no unit or task.
+  - `capture`: Captures a task titled with the text.
+  - `start`: Captures a task briefed with the text and starts it.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

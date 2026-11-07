@@ -540,6 +540,11 @@ func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
 	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
 }
 
+// Open are n's open tasks, in the store's order.
+func (n Snapshot) Open() []task.Task {
+	return slices.DeleteFunc(slices.Clone(n.pass.Tasks), func(e task.Task) bool { return !e.Open() })
+}
+
 // Held are those of units a task of n holds, as its own or an item's, in their order.
 func (n Snapshot) Held(units []unit.Unit) []unit.Unit {
 	return slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { return !n.pass.Holds(u) })

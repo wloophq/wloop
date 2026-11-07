@@ -47,6 +47,22 @@ Each counter of a kind opens its queue (`#queue=<kind>`): the kind's decisions o
 
 `GET /api/search?q=<lens query>` finds every task the query matches in the rail's views, accents and case aside, and groups them by `omnibox.toml`'s `[[search.groups]]`: a result goes to the first group whose view holds it, else to the last group (`search.other`). A group shows its first `search.limit` results, those whose title or unit holds the query as whole words first, then the view's order, and counts them all; each result lists the rail views it appears in.
 
+## Typed text
+
+`POST /api/omnibox/resolve` classifies what you type and runs nothing:
+
+```
+one token a plugin claims (a pasted address)    -> unit: its tasks and the actions its row offers
+first word one of a verb's words:
+  each ref names one unit or task                -> verb: one operation per ref, to confirm
+  a ref names more than one                       -> agent (never guessed)
+  a ref names nothing                             -> search
+  no ref, and the verb has an op                  -> verb: capture or start the rest of the text
+anything else                                     -> search
+```
+
+`omnibox.toml`'s `[verbs.<id>]` list each verb's `words`, in every language in one list (vocabulary, not a translated text), and its target: a catalog `action` on each unit named, a task `verb` on each task named, and an `op` (`capture` or `start`) for text that names nothing. A verb whose task verb resolves a gate (approve, answer, edit, retry, dismiss) does not load: a gate is resolved on the gate itself. No operation runs, typed or proposed by the omnibox's agent, that no verb targets.
+
 ## Changing it
 
 A user profile's `home.toml` replaces the keys it sets, and a list of counters or sections the whole list; `decisions.toml` and a plugin's `plugins/<id>/decisions.toml` replace the mappings they name. The words are localized like every profile text: `locales/<tag>/home.toml` and `locales/<tag>/decisions.toml` translate them, a plural text form by form.

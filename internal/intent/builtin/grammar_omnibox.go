@@ -11,4 +11,19 @@ var omniboxGrammar = []Key{
 	{Path: "search.groups[].id", In: SurfaceOmnibox, Kind: KindText, Required: true, Doc: "The group's id. Required."},
 	{Path: "search.groups[].label", In: SurfaceOmnibox, Kind: KindText, Localized: true, Required: true, Doc: "The group's label. Required."},
 	{Path: "search.groups[].view", In: SurfaceOmnibox, Kind: KindText, Required: true, Doc: "The view of views.toml whose tasks the group holds. Required."},
+	{Path: "verbs", In: SurfaceOmnibox, Kind: KindTable, Doc: "The verbs the omnibox knows, by id: typed first, a verb's word runs its target on what the rest names. No operation runs, from a verb or from the agent, that no verb targets."},
+	{Path: "verbs.*", In: SurfaceOmnibox, Kind: KindTable, Doc: "One verb: its words and one target, action or verb, with op when nothing is named."},
+	{Path: "verbs.*.words", In: SurfaceOmnibox, Kind: KindList, Elem: KindText, Required: true, Doc: "The words that name the verb in every language, in one list, such as [\"review\", \"revisar\"]: vocabulary, not a text a locale translates. Required."},
+	{Path: "verbs.*.action", In: SurfaceOmnibox, Kind: KindText, Doc: "The catalog action it runs on each unit named."},
+	{Path: "verbs.*.verb", In: SurfaceOmnibox, Kind: KindText, Doc: "The task verb of tasks.toml it runs on each task named; never one that resolves a gate."},
+	{Path: "verbs.*.op", In: SurfaceOmnibox, Kind: KindEnum, Values: OmniboxOps, Doc: "What it runs on the text when it names no unit or task."},
 }
+
+// OmniboxOps are what an omnibox verb runs on text that names no unit or task.
+func OmniboxOps() []Value {
+	return []Value{{Name: "capture", Doc: "Captures a task titled with the text."}, {Name: "start", Doc: "Captures a task briefed with the text and starts it."}}
+}
+
+// GateHandlers are the task verb handlers that resolve or act on a gate, which no omnibox verb runs: a gate is
+// resolved by the user on the gate itself.
+var GateHandlers = []string{"approve", "answer", "edit", "retry", "drop"}

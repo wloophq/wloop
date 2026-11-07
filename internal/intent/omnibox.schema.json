@@ -45,6 +45,43 @@
         }
       },
       "type": "object"
+    },
+    "verbs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One verb: its words and one target, action or verb, with op when nothing is named.",
+        "properties": {
+          "action": {
+            "description": "The catalog action it runs on each unit named.",
+            "type": "string"
+          },
+          "op": {
+            "description": "What it runs on the text when it names no unit or task.",
+            "enum": [
+              "capture",
+              "start"
+            ],
+            "type": "string"
+          },
+          "verb": {
+            "description": "The task verb of tasks.toml it runs on each task named; never one that resolves a gate.",
+            "type": "string"
+          },
+          "words": {
+            "description": "The words that name the verb in every language, in one list, such as [\"review\", \"revisar\"]: vocabulary, not a text a locale translates. Required.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "type": "object"
+      },
+      "description": "The verbs the omnibox knows, by id: typed first, a verb's word runs its target on what the rest names. No operation runs, from a verb or from the agent, that no verb targets.",
+      "type": "object"
     }
   },
   "title": "The omnibox (omnibox.toml)",
