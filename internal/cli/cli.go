@@ -167,9 +167,9 @@ type Env struct {
 	NativeAvailable func() bool
 	// RunNative runs the app's native loop; setup's host is nil when the app
 	// shows no window of its own.
-	RunNative func(win config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host))
-	QuitNative      func()
-	Exit            func(code int)
+	RunNative  func(win config.Window, setup func(menubar.Tray, menubar.Notifier, window.Host))
+	QuitNative func()
+	Exit       func(code int)
 	// Reexec replaces this process with Executable, same arguments.
 	Reexec func() error
 	// Agents are the supported agents by name.
@@ -342,13 +342,13 @@ func NewEnv() *Env {
 
 		NativeAvailable: macos.Available,
 		RunNative:       macNative(filepath.Join(stateDir, "notify")).run,
-		QuitNative: macos.Quit,
-		Exit:       os.Exit,
-		Reexec:     func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
-		Agents:     agents,
-		Homes:      homes,
-		Usage:      defaultUsage(home),
-		Managers:   managers,
+		QuitNative:      macos.Quit,
+		Exit:            os.Exit,
+		Reexec:          func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
+		Agents:          agents,
+		Homes:           homes,
+		Usage:           defaultUsage(home),
+		Managers:        managers,
 	}).owning()
 	e.intents = newEnvIntents(e)
 	return e

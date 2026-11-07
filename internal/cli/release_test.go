@@ -18,9 +18,9 @@ type goreleaserOverride struct {
 }
 
 type goreleaserBuild struct {
-	ID        string            `yaml:"id"`
-	Env       []string          `yaml:"env"`
-	Tags      []string          `yaml:"tags"`
+	ID        string               `yaml:"id"`
+	Env       []string             `yaml:"env"`
+	Tags      []string             `yaml:"tags"`
 	Overrides []goreleaserOverride `yaml:"overrides"`
 }
 
