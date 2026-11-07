@@ -252,7 +252,7 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 		text := m.viewSpec(v.ID).Empty
 		switch {
 		case !m.tasksLoaded:
-			text = "loading…"
+			text = m.w().T("loading…", nil)
 		case len(m.filter) > 0:
 			text = m.w().T("Nothing in {view} matches \"{filter}\".", map[string]any{"view": v.Label, "filter": string(m.filter)})
 		}
@@ -294,7 +294,7 @@ func (m *Model) loadingLine(ls []api.Loading, width int) (string, bool) {
 	for i, l := range ls {
 		parts[i] = strings.TrimSuffix(l.Plugin+": "+l.Reason, ": ")
 	}
-	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean("loading "+strings.Join(parts, " · ")), width-2)), true
+	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean(m.w().T("loading {parts}", map[string]any{"parts": strings.Join(parts, " · ")})), width-2)), true
 }
 
 // taskList lays the tasks out as lines, with a head line before each group, and shows the height of them

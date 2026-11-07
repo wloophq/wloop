@@ -116,7 +116,7 @@ func TestThePlanViewAppliesAndDismisses(t *testing.T) {
 		}
 		eventually(t, "the status and the reload", func() bool {
 			s := term.screen()
-			return strings.Contains(s, "plan_apply review-follow-up acme/api#7: run") && strings.Contains(s, "Plan 2")
+			return strings.Contains(s, "apply review-follow-up acme/api#7: run") && strings.Contains(s, "Plan 2")
 		})
 		term.press(Key{Rune: 'X'})
 		eventually(t, "the dismiss", func() bool {
