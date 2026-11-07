@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -92,6 +93,34 @@ func TestDisablingAWorkflowStopsItsDraftsWithoutARestart(t *testing.T) {
 	}
 	if running() || te.Env.cfg.Stale() {
 		t.Fatalf("task-check-on still runs (stale %v)", te.Env.cfg.Stale())
+	}
+}
+
+func TestStoppingWorkflowsAtOnceKeepsEveryStop(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeFile(t, te.ConfigPath, acmeConfig)
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
+	cfg, err := te.readConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.Env.cfg = te.configHolder(cfg)
+	names := []string{"wf-a", "wf-b", "wf-c", "wf-d", "wf-e", "wf-f", "wf-g", "wf-h"}
+	var wg sync.WaitGroup
+	errs := make([]error, len(names))
+	for i, name := range names {
+		wg.Go(func() { errs[i] = te.setConfig([]string{"workflows", name, "enabled"}, false) })
+	}
+	wg.Wait()
+	got, err := config.LoadFile(te.ConfigPath, Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, name := range names {
+		if w := got.Workflows[name]; errs[i] != nil || w.Enabled == nil || *w.Enabled {
+			t.Errorf("%s: %+v %v, want enabled = false", name, w, errs[i])
+		}
 	}
 }
 

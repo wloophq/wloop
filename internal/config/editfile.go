@@ -37,7 +37,9 @@ type Edited struct {
 
 // EditFile edits the config file at file: it applies e.Edit, refuses a result that does not load (unless the
 // file did not load before and the edit removed the key), keeps the previous file through e.Backup and
-// writes the result through e.Write. A missing file reads as empty and is not backed up.
+// writes the result through e.Write. A missing file reads as empty and is not backed up. EditFile takes no
+// lock: its caller serializes its own edits, and an edit by another process in between is lost to the later
+// write.
 func EditFile(file string, e FileEdit) (Edited, error) {
 	raw, err := os.ReadFile(file)
 	exists := err == nil

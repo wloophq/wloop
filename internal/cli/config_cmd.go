@@ -111,12 +111,14 @@ func runConfigGet(e *Env, key string) error {
 	return err
 }
 
-// runConfigEdit applies edit to key in the config file and writes the
-// result, after a backup of the file, when the result loads. A file that
-// does not load may still lose a key, so unset can remove the keys it names.
 // editConfig edits key path of the config file through config.EditFile: a result that does not load with
 // the defaults is refused, the previous file is backed up beside it and the new one written atomically.
+// Edits through one Env take turns, so two at once both land.
 func (e *Env) editConfig(path []string, edit func(*config.Doc, []string) error) (config.Edited, error) {
+	if e.configMu != nil {
+		e.configMu.Lock()
+		defer e.configMu.Unlock()
+	}
 	return config.EditFile(e.ConfigPath, config.FileEdit{Path: path, Edit: edit,
 		Load: func(raw []byte) error {
 			_, err := config.LoadBytes(e.ConfigPath, raw, Defaults())
@@ -140,6 +142,9 @@ func (e *Env) setConfig(path []string, v any) error {
 	return nil
 }
 
+// runConfigEdit applies edit to key in the config file and writes the
+// result, after a backup of the file, when the result loads. A file that
+// does not load may still lose a key, so unset can remove the keys it names.
 func runConfigEdit(e *Env, key string, edit func(*config.Doc, []string) error) error {
 	path, err := config.ParseKey(key)
 	if err != nil {
