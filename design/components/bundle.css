@@ -626,6 +626,21 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 tbody tr.sel, .card.sel, .cand.sel, .task-row.sel, .activity .a-ev.sel { background: var(--sel-unit); }
 tbody tr.sel td:first-child, .card.sel, .cand.sel, .task-row.sel, .activity .a-ev.sel { box-shadow: inset var(--strip-card) 0 0 var(--me); }
 
+.md { line-height: 1.55; overflow-wrap: anywhere; }
+.md > * { margin: 0 0 var(--space-8); }
+.md > :last-child { margin-bottom: 0; }
+.md h4 { font-size: var(--text-body); font-weight: 600; }
+.md ul, .md ol { padding-left: var(--space-16); }
+.md li + li { margin-top: var(--space-2); }
+.md blockquote { padding-left: var(--space-10); border-left: 2px solid var(--rule-strong); color: var(--muted); }
+.md code { padding: 1px var(--space-4); font: var(--text-meta)/1.4 var(--mono); color: var(--ink); background: var(--code-bg); border-radius: var(--radius-sm); }
+.md pre { padding: var(--space-8) var(--space-10); overflow-x: auto; background: var(--code-bg); border-radius: var(--radius-md); }
+.md pre code { padding: 0; background: none; white-space: pre; }
+.md a { color: var(--me-text); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md-more { padding: 0; color: var(--me-text); background: none; border: 0; cursor: pointer; }
+.md-more:hover { text-decoration: underline; }
+
 :root { --mono: var(--font-mono); --sans: var(--font-sans); }
 html, body { height: auto; }
 body { display: block; }
