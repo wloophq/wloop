@@ -105,24 +105,29 @@ func (d *draftDeps) outbox() (draftOutbox, error) {
 
 // draftArgs are draft.propose's arguments with their defaults.
 type draftArgs struct {
-	purpose, text, reaction, items, per, target string
-	delivery                                    draft.Delivery
-	effects                                     []string
-	repeatAfter, repeatAfterSent                time.Duration
-	forever, holdEnded                          bool
+	purpose, text, why, reaction, items, per, target string
+	delivery                                         draft.Delivery
+	effects                                          []string
+	repeatAfter, repeatAfterSent                     time.Duration
+	forever, holdEnded                               bool
 }
 
-const defaultDraftText = "text.md.tmpl"
+const (
+	defaultDraftText = "text.md.tmpl"
+	defaultDraftWhy  = "why.md.tmpl"
+)
 
 func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 	a := draftArgs{purpose: strings.TrimSpace(c.arg("purpose")), delivery: draft.Delivery(cmp.Or(c.arg("delivery"), builtin.DraftDeliveries[0])),
-		text: cmp.Or(c.arg("text"), defaultDraftText), reaction: strings.Trim(strings.TrimSpace(c.arg("reaction")), ":"),
+		text: cmp.Or(c.arg("text"), defaultDraftText), why: cmp.Or(c.arg("why"), defaultDraftWhy), reaction: strings.Trim(strings.TrimSpace(c.arg("reaction")), ":"),
 		items: cmp.Or(c.arg("items"), "all"), per: cmp.Or(c.arg("per"), builtin.DraftPer[0]), target: cmp.Or(c.arg("target"), builtin.DraftTargets[0])}
 	if a.purpose == "" {
 		return a, errors.New("draft.propose names no purpose")
 	}
-	if a.text != path.Base(a.text) || strings.HasPrefix(a.text, ".") {
-		return a, fmt.Errorf("draft.propose's text %q is not a file of the workflow's directory", a.text)
+	for _, f := range []struct{ key, name string }{{"text", a.text}, {"why", a.why}} {
+		if f.name != path.Base(f.name) || strings.HasPrefix(f.name, ".") {
+			return a, fmt.Errorf("draft.propose's %s %q is not a file of the workflow's directory", f.key, f.name)
+		}
 	}
 	a.effects = c.list("effects")
 	a.holdEnded = cmp.Or(c.arg("ended"), builtin.DraftEnded[0]) == builtin.DraftEnded[0]
@@ -248,7 +253,12 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	if err != nil {
 		return nil, err
 	}
-	tmpl, written, err := draftTemplate(profile.Chain(deps.Config()), turn.BundledFS(), w.Name, a.text, a.delivery, lang)
+	layers := profile.Chain(deps.Config())
+	tmpl, written, err := draftTemplate(layers, turn.BundledFS(), w.Name, a.text, a.delivery, lang)
+	if err != nil {
+		return nil, err
+	}
+	whyTmpl, err := draftWhy(layers, w.Name, a.why, l.Locale)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +274,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		subject = &read
 	}
 	var facts workflow.Facts
-	if tmpl != nil {
+	if tmpl != nil || whyTmpl != nil {
 		switch facts, err = s.facts(ctx, c.u); {
 		case errors.Is(err, automation.ErrUnitGone):
 			facts = workflow.Facts{}
@@ -310,10 +320,15 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			if cd.p.Text, err = renderDraft(tmpl, draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts}, sub, person, its); err != nil {
+			data := draftData(draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts}, sub, person, its, now.Location())
+			if cd.p.Text, err = renderDraft(tmpl, data); err != nil {
 				return nil, err
 			}
-			cd.p.Language = written
+			why, err := renderDraft(whyTmpl, data)
+			if err != nil {
+				return nil, err
+			}
+			cd.p.Language, cd.p.Why = written, strings.TrimSpace(why)
 		}
 		out = append(out, cd)
 	}

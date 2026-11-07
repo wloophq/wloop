@@ -11,7 +11,8 @@ var stepGrammar = []Key{
 
 	required(stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required.")),
 	{Path: "delivery", In: SurfaceStep, Step: StepDraftPropose, Kind: KindEnum, Values: func() []Value { return names(DraftDeliveries) }, Default: DraftDeliveries[0], Doc: "How the draft posts: the core's message or reaction, or a delivery a plugin declares."},
-	stepKey(StepDraftPropose, "text", KindFile, "text.md.tmpl", "The template of the draft's text, beside the manifest."),
+	stepKey(StepDraftPropose, "text", KindFile, "text.md.tmpl", "The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation."),
+	stepKey(StepDraftPropose, "why", KindFile, "why.md.tmpl", "The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why."),
 	stepKey(StepDraftPropose, "reaction", KindText, "", "The emoji name, with delivery reaction."),
 	stepEnum(StepDraftPropose, "items", DraftItems, "all", "Which of the unit's items the draft lists."),
 	stepEnum(StepDraftPropose, "per", DraftPer, DraftPer[0], "One draft per unit, or one per person it waits on."),

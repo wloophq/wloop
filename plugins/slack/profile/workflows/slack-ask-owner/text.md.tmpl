@@ -1,4 +1,4 @@
-Who owns {{if eq (len .Items) 1}}this{{else}}these{{end}}?
+Who owns {{plural (len .Items) "one" "this" "other" "these"}}?
 
 {{range $i, $it := .Items}}{{if $i}}
 {{end}}- {{$it.Line}}{{end -}}

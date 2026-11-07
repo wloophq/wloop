@@ -526,7 +526,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
   - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `delete`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
-  - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest.
+  - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.
+  - `why` (file, default `why.md.tmpl`): The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
