@@ -1211,7 +1211,7 @@ function roveStop(on) {
 function rowStops(row) {
   const out = [];
   const walk = (n) => {
-    if (!n || !n.getAttribute || n.hidden || n.getAttribute("disabled") != null) return;
+    if (!n || !n.getAttribute || n.hidden || n.inert || n.getAttribute("disabled") != null) return;
     if (n.getAttribute("data-rove") != null) out.push(n);
     for (const c of n.children || []) walk(c);
   };
@@ -2629,6 +2629,7 @@ function render() {
   renderDetail();
   syncWindowChrome();
   revealOpenRow(readHash().pr);
+  watchWrapped(document);
   restoreFocus();
 }
 
