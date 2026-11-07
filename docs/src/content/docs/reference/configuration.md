@@ -121,7 +121,6 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `plugins.slack.redirect_port` | integer |  | The login callback port registered in the Slack app; 0 is 53682. |
 | `plugins.slack.keychain_service` | string |  | The name of the Keychain items; empty is the brand's. |
 | `plugins.slack.post_allowlist` | list of strings |  | When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to. |
-| `plugins.slack.dm_broadcast` | bool |  | Also posts a draft that replies in a thread of a direct message to its conversation, until the person turns it off on the draft; left out, it does. |
 | `plugins.slack.request_log` | bool | `false` | Logs one line per Slack call: method and HTTP status. |
 | `plugins.slack.ended_after` | duration | `7d` | How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended). |
 | `plugins.slack.turns` | table |  | What a turn on a Slack unit reads. |

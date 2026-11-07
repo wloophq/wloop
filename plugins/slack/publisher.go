@@ -45,11 +45,8 @@ type Publisher struct {
 	People func(ctx context.Context, u unit.Unit) ([]items.Person, error)
 	// Items are the unit's items, whose anchors place a draft on a DM segment.
 	Items func(ctx context.Context, u unit.Unit) ([]items.Item, error)
-	// NoDMBroadcast keeps a direct message's thread replies in their thread
-	// unless their proposer asked otherwise; plugins.slack.dm_broadcast false.
-	NoDMBroadcast bool
-	Now           func() time.Time
-	Log           func(format string, args ...any)
+	Now   func() time.Time
+	Log   func(format string, args ...any)
 }
 
 // plan is where and what a draft posts.
@@ -237,8 +234,8 @@ func (p *Publisher) Takes(target string) bool {
 //
 // A message that replies in a thread keeps the broadcast its proposer asked
 // for; asked none, it is also posted to a direct message's conversation,
-// where the person would not see a reply to an older thread, unless
-// plugins.slack.dm_broadcast is false, and not to a channel's.
+// where the person would not see a reply to an older thread, and not to a
+// channel's.
 func (p *Publisher) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	var out draft.Placed
 	placed := d
@@ -274,7 +271,7 @@ func (p *Publisher) broadcast(ctx context.Context, d draft.Draft) (draft.Broadca
 		return draft.NoBroadcast, nil
 	case d.Broadcast == draft.BroadcastOn || d.Broadcast == draft.BroadcastOff:
 		return d.Broadcast, nil
-	case pl.res.Direct && !p.NoDMBroadcast:
+	case pl.res.Direct:
 		return draft.BroadcastOn, nil
 	}
 	return draft.BroadcastOff, nil
@@ -772,6 +769,5 @@ func (p *plugin) publisher() (*Publisher, error) {
 	}
 	s := &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.db, p.log), Known: KnownOver(p.db, p.log)}
 	pub := PublisherOver(p.db, s, p.slack.Tokens.Load, p.host.Items, p.now, p.log)
-	pub.NoDMBroadcast = p.cfg.DMBroadcast != nil && !*p.cfg.DMBroadcast
 	return pub, nil
 }

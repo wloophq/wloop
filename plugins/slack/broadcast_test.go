@@ -113,17 +113,6 @@ func TestAnExplicitDMMessageTargetRepliesInItsThreadAndBroadcasts(t *testing.T) 
 	}
 }
 
-func TestDMBroadcastOffInTheConfigLeavesDMRepliesInTheirThread(t *testing.T) {
-	ps := newPubSlack(t)
-	ps.dmThreads(nil)
-	seg := ps.segmentUnit(t)
-	p := ps.placing(anchored(seg, "i1", pubDM+"/"+dmTop))
-	p.NoDMBroadcast = true
-	if d := placeOnly(t, p, segmentDraft(seg, draft.Reply, draft.OriginAuto, "i1")); d.Broadcast != draft.BroadcastOff {
-		t.Fatalf("broadcast %q", d.Broadcast)
-	}
-}
-
 func TestOnlyAThreadReplyHasABroadcast(t *testing.T) {
 	ps := newPubSlack(t)
 	ps.dmThreads(nil)

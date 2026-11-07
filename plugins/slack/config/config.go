@@ -60,9 +60,6 @@ type Slack struct {
 	// PostAllowlist, when not empty, holds the only channel ids, or user ids naming
 	// the DM with that user, a post may go to.
 	PostAllowlist []string `json:"post_allowlist"`
-	// DMBroadcast, left out, also posts a direct message's thread reply to its
-	// conversation unless its proposer or the person turned it off.
-	DMBroadcast *bool `json:"dm_broadcast,omitempty"`
 	// RequestLog logs one line per Slack call: method and HTTP status.
 	RequestLog bool            `json:"request_log"`
 	Ingest     SlackIngest     `json:"ingest"`

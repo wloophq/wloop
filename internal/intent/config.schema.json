@@ -516,10 +516,6 @@
               "description": "The Slack app's client id; empty leaves Slack unconfigured.",
               "type": "string"
             },
-            "dm_broadcast": {
-              "description": "Also posts a draft that replies in a thread of a direct message to its conversation, until the person turns it off on the draft; left out, it does.",
-              "type": "boolean"
-            },
             "enabled": {
               "description": "Switches the Slack plugin; left out, it is on.",
               "type": "boolean"
