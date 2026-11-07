@@ -40,7 +40,7 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		Default: e.headlessDefault,
 		Caps:    headless.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
 		Context: ctx,
-		Spent:   e.withDossierSpend(db),
+		Spent:   e.withCallSpend(db),
 		Dossier: e.headlessDossier,
 		Logged:  e.headlessLogged,
 		Clock:   clockFunc(e.Now),

@@ -267,6 +267,9 @@ type Env struct {
 	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
 	dossierTurns *dossiers.Turns
 	dossierCalls *dossiers.Calls
+	// callBudget books the headless calls that are not turns, the dossiers' and the omnibox's, against
+	// the headless caps; rebuilt by each serve pass.
+	callBudget *turns.Budget
 	// dossierGrants reads, and recordGrant writes, the sessions launched with their unit's dossier.
 	dossierGrants func(ctx context.Context, u unit.Unit) (map[string]time.Time, error)
 	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error
