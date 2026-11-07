@@ -293,7 +293,7 @@ func gateTexted(in intentload.GateIntent, st api.ActionState, facts map[string]a
 // draft's workflow on its conversation.
 const (
 	DraftCloseSilently = "draft.close-silently"
-	DraftSkipWorkflow  = "draft.skip-workflow"
+	DraftSkipWorkflow  = "draft.skip-workflow" //nolint:gosec // G101: an action id, no credential
 )
 
 // draftFrom are the draft states each draft action moves a draft from; an action absent moves any.
