@@ -1,8 +1,11 @@
 package intent
 
 import (
+	"fmt"
+	"hash/fnv"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/i18n"
@@ -25,6 +28,13 @@ func loadStrings(layers []profile.Layer, r layerReader) (map[string]i18n.Forms, 
 	problems, _ := readLayered(layers, r, StringsFile, func(file string, src []byte) Problems {
 		return mergeStrings(texts, formats, file, src)
 	})
+	if r.texts != nil {
+		for key := range texts {
+			if f, ok := r.texts.Forms(StringsFile, []string{"strings", key}); ok && strings.TrimSpace(f["other"]) != "" {
+				texts[key] = f
+			}
+		}
+	}
 	return texts, formats, problems
 }
 
@@ -79,4 +89,20 @@ func formsOf(s *sheet, path string, v any) (i18n.Forms, bool) {
 	}
 	s.add(path, "must be a string or a table of plural forms, such as { one = \"{n} draft\", other = \"{n} drafts\" }")
 	return nil, false
+}
+
+// stringsStamp is a digest of the client strings in locale.
+func stringsStamp(locale string, texts map[string]i18n.Forms, formats map[string]string) string {
+	h := fnv.New64a()
+	fmt.Fprintf(h, "%s\x00", locale)
+	for _, k := range slices.Sorted(maps.Keys(texts)) {
+		fmt.Fprintf(h, "%s\x00", k)
+		for _, form := range slices.Sorted(maps.Keys(texts[k])) {
+			fmt.Fprintf(h, "%s=%s\x00", form, texts[k][form])
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(formats)) {
+		fmt.Fprintf(h, "%s=%s\x00", k, formats[k])
+	}
+	return locale + "-" + strconv.FormatUint(h.Sum64(), 36)
 }

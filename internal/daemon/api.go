@@ -240,6 +240,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
 		Viewer:             s.cachedLogin(),
+		Strings:            s.loaded().StringsStamp,
 		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,

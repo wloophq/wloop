@@ -1,6 +1,10 @@
 [strings]
 # piece D
 # The menu bar.
+"more…" = "mais…"
+"(stale)" = "(desatualizado)"
+"Task {task} has no unit to act on" = "A tarefa {task} não tem unidade para agir"
+"This notification offers no {action}" = "Esta notificação não oferece {action}"
 "PR {n}" = "PR {n}"
 "PR !" = "PR !"
 "PR ?" = "PR ?"

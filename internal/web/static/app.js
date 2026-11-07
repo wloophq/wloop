@@ -3003,6 +3003,7 @@ async function load() {
   if (health.status === "fulfilled") {
     state.health = health.value;
     checkBuild(state.health);
+    followStrings(state.health.strings, getJSON);
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
   // A daemon that cannot open its store says why in its health's warnings.
@@ -3117,6 +3118,7 @@ async function applyChange(c) {
     if (c.health) {
       state.health = await getJSON("/api/health");
       checkBuild(state.health);
+      followStrings(state.health.strings, getJSON);
     }
   } catch {
     return load();

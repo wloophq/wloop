@@ -107,7 +107,7 @@ func (c *Controller) taskSection(label string, view string) []MenuItem {
 	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(tasks))}}
 	for i, e := range tasks {
 		if i == perSection {
-			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
+			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
 			break
 		}
 		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})

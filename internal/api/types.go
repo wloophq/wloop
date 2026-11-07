@@ -373,16 +373,19 @@ type Health struct {
 	Version string `json:"version"`
 	// Build names the cockpit the daemon serves; a page that loaded another
 	// reloads.
-	Build     string       `json:"build"`
-	Jobs      []JobStatus  `json:"jobs"`
-	Warnings  []string     `json:"warnings"`
-	RateLimit RateLimit    `json:"rate_limit"`
-	SlowSync  bool         `json:"slow_sync"`
-	Viewer    string       `json:"viewer"`
-	Paused    bool         `json:"paused"`
-	PausedAt  time.Time    `json:"paused_at,omitzero"`
-	App       *AppStatus   `json:"app,omitempty"`
-	Brief     *BriefStatus `json:"brief,omitempty"`
+	Build     string      `json:"build"`
+	Jobs      []JobStatus `json:"jobs"`
+	Warnings  []string    `json:"warnings"`
+	RateLimit RateLimit   `json:"rate_limit"`
+	SlowSync  bool        `json:"slow_sync"`
+	Viewer    string      `json:"viewer"`
+	// Strings is a stamp of the client strings /api/strings serves, which changes with their locale and
+	// words, so a client reads them again only then.
+	Strings  string       `json:"strings,omitempty"`
+	Paused   bool         `json:"paused"`
+	PausedAt time.Time    `json:"paused_at,omitzero"`
+	App      *AppStatus   `json:"app,omitempty"`
+	Brief    *BriefStatus `json:"brief,omitempty"`
 	// Briefs is the brief breaker; nil when briefs are off.
 	Briefs *BriefsHealth `json:"briefs,omitempty"`
 	// Notifier is whether the menu bar follows the daemon's events.

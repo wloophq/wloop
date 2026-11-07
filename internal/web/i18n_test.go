@@ -124,3 +124,25 @@ function i18nChanged() { changed++; }
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestTheCockpitFollowsALiveLocaleChange(t *testing.T) {
+	var got struct {
+		Reads, Changed int
+		Before, After  string
+	}
+	nodeRun(t, staticJS(t, "i18n.js"), nil, `
+let changed = 0, reads = 0;
+function i18nChanged() { changed++; }
+const getJSON = async () => { reads++; return {locale: "pt-BR", strings: {"Open cockpit": "Abrir o cockpit"}}; };
+(async () => {
+  followStrings("en-1", getJSON);
+  followStrings("en-1", getJSON);
+  const before = t("Open cockpit");
+  followStrings("pt-BR-2", getJSON);
+  await new Promise((r) => setTimeout(r, 20));
+  process.stdout.write(JSON.stringify({Reads: reads, Changed: changed, Before: before, After: t("Open cockpit")}));
+})();`, nil, &got)
+	if got.Reads != 1 || got.Changed != 1 || got.Before != "Open cockpit" || got.After != "Abrir o cockpit" {
+		t.Fatalf("got %+v", got)
+	}
+}

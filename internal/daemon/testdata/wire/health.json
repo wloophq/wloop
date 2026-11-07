@@ -34,6 +34,7 @@
   },
   "slow_sync": false,
   "stalled_review_hours": 48,
+  "strings": "\u003cstrings\u003e",
   "version": "test",
   "viewer": "me",
   "warnings": [

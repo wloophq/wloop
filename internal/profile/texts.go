@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"text/template/parse"
 
 	"github.com/wloophq/wloop/internal/i18n"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -47,9 +49,12 @@ type Texts struct {
 
 // fileTexts are one profile file's texts in every layer.
 type fileTexts struct {
-	base, loc       []map[string]string // by layer, then by path key
-	whole, wholeLoc []*Resolved         // by layer, of a whole-file text
-	problems        Problems
+	base, loc []map[string]string // by layer, then by path key
+	// baseForms and locForms are the texts written as a table of CLDR plural forms, by layer, then by the
+	// path key of the table.
+	baseForms, locForms []map[string]map[string]string
+	whole, wholeLoc     []*Resolved // by layer, of a whole-file text
+	problems            Problems
 }
 
 // NewTexts resolves the texts keys names across layers, the bundled layer reading bundled, in locale.
@@ -233,7 +238,8 @@ func (t *Texts) file(rel string) *fileTexts {
 		return f
 	}
 	n := len(t.layers)
-	f := &fileTexts{base: make([]map[string]string, n), loc: make([]map[string]string, n), whole: make([]*Resolved, n), wholeLoc: make([]*Resolved, n)}
+	f := &fileTexts{base: make([]map[string]string, n), loc: make([]map[string]string, n), whole: make([]*Resolved, n), wholeLoc: make([]*Resolved, n),
+		baseForms: make([]map[string]map[string]string, n), locForms: make([]map[string]map[string]string, n)}
 	toml := path.Ext(rel) == ".toml"
 	for i, l := range t.layers {
 		base, err := t.read(l, rel)
@@ -243,7 +249,7 @@ func (t *Texts) file(rel string) *fileTexts {
 		if !toml {
 			f.whole[i] = base
 		} else if base != nil {
-			f.base[i] = t.flatten(rel, base.Body)
+			f.base[i], f.baseForms[i] = t.flatten(rel, base.Body)
 		}
 		if t.dir == "" {
 			continue
@@ -264,7 +270,7 @@ func (t *Texts) file(rel string) *fileTexts {
 			f.wholeLoc[i] = loc
 			continue
 		}
-		f.loc[i] = t.checkLocale(f, i, rel, loc)
+		f.loc[i], f.locForms[i] = t.checkLocale(f, i, rel, loc)
 	}
 	t.files[rel] = f
 	return f
@@ -279,52 +285,149 @@ func baseOf(whole []*Resolved) []byte {
 	return nil
 }
 
-// flatten is the text keys of the TOML document src of rel; a document that does not parse holds none, its
-// loader reports why.
-func (t *Texts) flatten(rel string, src []byte) map[string]string {
+// flatten is the text keys of the TOML document src of rel, and its texts written as a table of plural forms;
+// a document that does not parse holds none, its loader reports why.
+func (t *Texts) flatten(rel string, src []byte) (map[string]string, map[string]map[string]string) {
 	strs, err := tomlStrings(src)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	out := map[string]string{}
+	out, forms := map[string]string{}, map[string]map[string]string{}
 	for _, s := range strs {
-		if t.keys(rel, s.path) {
+		if unit, form, ok := t.formOf(rel, s.path); ok {
+			if forms[unit] == nil {
+				forms[unit] = map[string]string{}
+			}
+			forms[unit][form] = s.text
+		} else if t.keys(rel, s.path) {
 			out[pathKey(s.path)] = s.text
 		}
 	}
-	return out
+	return out, forms
+}
+
+// formOf says whether path is a form of a text written as a table: a key whose parent is itself a text.
+func (t *Texts) formOf(rel string, path []string) (unit, form string, ok bool) {
+	if len(path) < 2 || !t.keys(rel, path[:len(path)-1]) {
+		return "", "", false
+	}
+	return pathKey(path[:len(path)-1]), path[len(path)-1], true
+}
+
+// value is the text at key k of layer i's base, or of its locale file when loc, as plural forms: a string is
+// its "other" form.
+func (f *fileTexts) value(i int, k string, loc bool) (map[string]string, bool) {
+	scalars, forms := f.base, f.baseForms
+	if loc {
+		scalars, forms = f.loc, f.locForms
+	}
+	if v, ok := forms[i][k]; ok {
+		return v, true
+	}
+	if s, ok := scalars[i][k]; ok {
+		return map[string]string{"other": s}, true
+	}
+	return nil, false
+}
+
+// Forms is the text at path of rel in t's locale as its CLDR plural forms, by the layer rule, the whole text
+// resolved as one: a translation may name forms its English text has not, or be plural where the English
+// text is a string; false when no layer holds it.
+func (t *Texts) Forms(rel string, path []string) (map[string]string, bool) {
+	f := t.file(rel)
+	k := pathKey(path)
+	for i := len(t.layers) - 1; i >= 0; i-- {
+		if v, ok := f.value(i, k, true); ok {
+			return v, true
+		}
+		v, own := f.value(i, k, false)
+		if !own {
+			continue
+		}
+		var below map[string]string
+		held := false
+		for j := i - 1; j >= 0 && !held; j-- {
+			below, held = f.value(j, k, false)
+		}
+		if i == 0 || !held || !maps.Equal(below, v) {
+			return v, true
+		}
+	}
+	return nil, false
 }
 
 // checkLocale is the texts of layer i's locale file of rel that name a text and only the fields its English
-// text names; each other key is a problem.
-func (t *Texts) checkLocale(f *fileTexts, i int, rel string, loc *Resolved) map[string]string {
+// text names, and its texts written as plural forms; each other key is a problem.
+func (t *Texts) checkLocale(f *fileTexts, i int, rel string, loc *Resolved) (map[string]string, map[string]map[string]string) {
 	strs, err := tomlStrings(loc.Body)
 	if err != nil {
 		f.problems = append(f.problems, TextProblem{File: loc.Path, Msg: err.Error()})
-		return nil
+		return nil, nil
 	}
-	out := map[string]string{}
+	english := func(k string) (string, bool) {
+		for j := i; j >= 0; j-- {
+			if v, ok := f.value(j, k, false); ok {
+				var all []string
+				for _, s := range v {
+					all = append(all, s)
+				}
+				return strings.Join(all, "\n"), true
+			}
+		}
+		return "", false
+	}
+	out, forms := map[string]string{}, map[string]map[string]string{}
+	refused := map[string]bool{}
 	for _, s := range strs {
 		k := pathKey(s.path)
-		var base string
-		var held bool
-		for j := i; j >= 0 && !held; j-- {
-			base, held = f.base[j][k]
+		problem := func(msg string) {
+			f.problems = append(f.problems, TextProblem{File: loc.Path, Key: keyString(s.path), Msg: msg})
 		}
+		if unit, form, ok := t.formOf(rel, s.path); ok {
+			base, held := english(unit)
+			switch {
+			case !held:
+				problem("no layer at or below this one holds its English text")
+			case !slices.Contains(builtin.PluralForms, form):
+				problem(fmt.Sprintf("%q is no plural form; the forms are %s", form, builtin.OrList(builtin.PluralForms)))
+			default:
+				if msg := fieldsProblem(s.text, base); msg != "" {
+					problem(msg)
+				} else {
+					if forms[unit] == nil {
+						forms[unit] = map[string]string{}
+					}
+					forms[unit][form] = s.text
+					continue
+				}
+			}
+			refused[unit] = true
+			continue
+		}
+		base, held := english(k)
 		switch {
 		case !t.keys(rel, s.path):
-			f.problems = append(f.problems, TextProblem{File: loc.Path, Key: keyString(s.path), Msg: "names no text a person reads" + t.near(f, i, s.path)})
+			problem("names no text a person reads" + t.near(f, i, s.path))
 		case !held:
-			f.problems = append(f.problems, TextProblem{File: loc.Path, Key: keyString(s.path), Msg: "no layer at or below this one holds its English text"})
+			problem("no layer at or below this one holds its English text")
 		default:
 			if msg := fieldsProblem(s.text, base); msg != "" {
-				f.problems = append(f.problems, TextProblem{File: loc.Path, Key: keyString(s.path), Msg: msg})
+				problem(msg)
 				continue
 			}
 			out[k] = s.text
 		}
 	}
-	return out
+	for unit, v := range forms {
+		if _, ok := v["other"]; ok && !refused[unit] {
+			continue
+		}
+		if _, ok := v["other"]; !ok {
+			f.problems = append(f.problems, TextProblem{File: loc.Path, Key: keyString(strings.Split(unit, "\x00")), Msg: "needs other: the text of every count no other form names"})
+		}
+		delete(forms, unit)
+	}
+	return out, forms
 }
 
 // near is the did-you-mean of a locale key among its siblings' English texts.

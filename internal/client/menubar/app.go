@@ -110,6 +110,8 @@ type Controller struct {
 	cat api.ViewsCatalog
 	// catalog is the served client strings; English until the daemon serves them.
 	catalog atomic.Pointer[texts.Catalog]
+	// stringsStamp is the health's stamp of the strings catalog holds, under refreshMu.
+	stringsStamp string
 }
 
 // words is the client strings the menu and the notes read.
@@ -120,14 +122,19 @@ func (c *Controller) words() *texts.Catalog {
 	return texts.English()
 }
 
-// loadStrings reads the client strings again; a daemon that fails to serve them leaves the last ones.
-func (c *Controller) loadStrings(ctx context.Context) {
+// loadStrings reads the client strings when the health's stamp differs from the one held; a daemon that
+// fails to serve them leaves the last ones, read again on the next health.
+func (c *Controller) loadStrings(ctx context.Context, stamp string) {
+	if c.catalog.Load() != nil && stamp == c.stringsStamp {
+		return
+	}
 	s, err := c.cfg.Daemon.Strings(ctx)
 	if err != nil {
 		c.cfg.Log("client strings: %v", err)
 		return
 	}
 	c.catalog.Store(texts.New(s))
+	c.stringsStamp = stamp
 }
 
 func New(cfg Config) *Controller {
@@ -293,7 +300,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		var h api.Health
 		if h, err = c.cfg.Daemon.Health(ctx); err == nil {
 			c.health = h
-			c.loadStrings(ctx)
+			c.loadStrings(ctx, h.Strings)
 			err = c.loadSections(ctx)
 		}
 		c.hasHealth = c.hasHealth || err == nil
@@ -460,7 +467,7 @@ func (c *Controller) section(name, view string, rows []api.Row, open string) []M
 	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", name, len(rows))}}
 	for i, r := range rows {
 		if i == perSection {
-			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
+			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
 			break
 		}
 		items = append(items, c.rowItem(view, r, open))
@@ -475,7 +482,7 @@ func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	}
 	title := r.Label + " · " + label(r)
 	if r.Stale {
-		title += " " + staleMark
+		title += " " + c.words().T(staleMark, nil)
 	}
 	return MenuItem{
 		Title:    title,
@@ -530,7 +537,7 @@ func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
 
 func label(r api.Row) string { return r.Summary.Line }
 
-// staleMark marks a row its plugin last reported before it went down.
+// staleMark marks a row its plugin last reported before it went down; it is the catalog's key.
 const staleMark = "(stale)"
 
 func (c *Controller) syncLine(h api.Health) string {
