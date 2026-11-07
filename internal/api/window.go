@@ -14,6 +14,9 @@ const (
 	WindowHidePanel = "hide-panel"
 )
 
+// WindowActions are the actions a WindowRequest may name.
+var WindowActions = []string{WindowOpen, WindowPanel, WindowHidePanel}
+
 // WindowRequest asks the native window to act; Route is a cockpit route, a hash without "#".
 type WindowRequest struct {
 	Action string `json:"action"`

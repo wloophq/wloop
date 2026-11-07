@@ -105,6 +105,21 @@ func (h *hub) publish(c api.Change) {
 	}
 }
 
+// send adds c to every subscriber named client and reports whether there
+// was one; it never moves the rows' position.
+func (h *hub) send(client string, c api.Change) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	sent := false
+	for sub := range h.subs {
+		if sub.client == client {
+			sub.add(c)
+			sent = true
+		}
+	}
+	return sent
+}
+
 func (h *hub) close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()

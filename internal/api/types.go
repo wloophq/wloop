@@ -55,7 +55,7 @@ type Since struct {
 // the previous change, or All when too much moved to list. A "notify"
 // change carries the notices a workflow raised for the user.
 type Change struct {
-	Type    string      `json:"type"` // "changed" or "notify"
+	Type    string      `json:"type"` // "changed", "notify" or "window"
 	Epoch   string      `json:"epoch"`
 	Rev     uint64      `json:"rev"`
 	Units   []unit.Unit `json:"units,omitempty"`
