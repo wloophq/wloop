@@ -76,6 +76,7 @@ func runAppClient(ctx context.Context, e *Env) error {
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
 			CockpitURL: cockpit,
 			Window:     windowShow(ctx, &wg, host, dc, cockpit, win, logf),
+			Reword:     rewordOf(host),
 			Quit:       cancel,
 			Copy:       copyToClipboard,
 			Now:        e.Now,
