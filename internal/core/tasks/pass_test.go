@@ -40,8 +40,8 @@ func TestAPassLoadsOnceWhatEveryTaskReads(t *testing.T) {
 	if _, err := Once(ctx, "gates", func() (int, error) { return 0, errors.New("down") }); err == nil {
 		t.Fatal("the error was lost")
 	}
-	if _, err := Once(ctx, "gates", func() (int, error) { t.Fatal("loaded again after an error"); return 0, nil }); err == nil {
-		t.Fatal("the error was not kept")
+	if got, err := Once(ctx, "gates", func() (int, error) { return 3, nil }); err != nil || got != 3 {
+		t.Fatalf("after a failed load the next reader got %v, %v; want a fresh load", got, err)
 	}
 	if got, err := Once(context.Background(), "sessions", read); err != nil || got["open"] != 2 {
 		t.Fatalf("outside a pass: %v, %v", got, err)

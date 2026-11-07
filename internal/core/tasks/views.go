@@ -95,7 +95,8 @@ func (p *Pass) Facts(id task.ID, read func() (workflow.Facts, error)) (workflow.
 }
 
 // Once is what load returns under key, loaded once per pass and shared by every task of it: what a fact reads
-// of the store as a whole, such as the open sessions, rather than once per task.
+// of the store as a whole, such as the open sessions, rather than once per task. A load that fails is loaded
+// again by the next reader.
 func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
 	p.mu.Lock()
 	if p.once == nil {
@@ -108,7 +109,7 @@ func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
 	}
 	p.mu.Unlock()
 	l.once.Do(func() { l.v, l.err = load() })
-	if l.err != nil && cancelled(l.err) {
+	if l.err != nil {
 		p.mu.Lock()
 		if p.once[key] == l {
 			delete(p.once, key)
