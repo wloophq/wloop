@@ -104,6 +104,7 @@ func TestAStandInSourcePluginRunsWithNoEditOutsideItsDirectory(t *testing.T) {
 		t.Errorf("the stand-in opened no store of its own: %v", err)
 	}
 
+	waitForServing(root, iso)
 	plan := isolatedScript(t, root, "run", iso, filepath.Join(iso, "bin", brand.Name), "plan", "--unit", m.ID+":attic/1")
 	if !strings.Contains(plan, "standin-shelved  "+m.ID+":attic/1") {
 		t.Errorf("the plan of the stand-in's unit lacks its layer's workflow over its reported facts:\n%s", plan)
@@ -257,6 +258,16 @@ func freePort(t *testing.T) int {
 
 // waitForLog polls log until it holds every line of want; the deadline only
 // guards a hang.
+// waitForServing waits, up to a deadline that only guards a hang, until the
+// daemon in iso answers a client: it loads its plugins before it listens.
+func waitForServing(root, iso string) {
+	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		if !strings.Contains(isolatedRun(root, "run", iso, filepath.Join(iso, "bin", brand.Name), "status"), "daemon is not running") {
+			return
+		}
+	}
+}
+
 func waitForLog(t *testing.T, log string, want []string) string {
 	t.Helper()
 	var got string
