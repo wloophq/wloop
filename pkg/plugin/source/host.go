@@ -114,6 +114,10 @@ type Services interface {
 	// Profile reads path in the plugin's profile layer, the user's
 	// plugins/<id>/ over the plugin's own.
 	Profile(ctx context.Context, path string) ([]byte, error)
+	// Holds says whether predicate, one the plugin's manifest declares, as
+	// its profile layer sets it, holds over each of facts, one verdict per
+	// set in order. A fact a set lacks reads as its type's zero value.
+	Holds(ctx context.Context, predicate string, facts [][]Fact) ([]bool, error)
 }
 
 // History reads the events the host keeps: the plugin's own recorded

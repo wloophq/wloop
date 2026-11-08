@@ -103,6 +103,7 @@ service HostService {
   rpc Meter(MeterRequest) returns (MeterResponse);
   rpc Config(ConfigRequest) returns (ConfigResponse);
   rpc Profile(ProfileRequest) returns (ProfileResponse);
+  rpc Holds(HoldsRequest) returns (HoldsResponse);
 
   // History.
   rpc Events(EventsRequest) returns (EventsResponse);
@@ -1211,6 +1212,23 @@ message ProfileRequest {
 
 message ProfileResponse {
   bytes content = 1;
+}
+
+// HoldsRequest asks whether a predicate the plugin's manifest declares, as
+// its profile layer sets it, holds over each set of facts.
+message HoldsRequest {
+  string predicate = 1;
+  repeated FactSet facts = 2;
+}
+
+// FactSet is one unit's facts.
+message FactSet {
+  repeated Fact facts = 1;
+}
+
+message HoldsResponse {
+  // holds has one verdict per fact set, in order.
+  repeated bool holds = 1;
 }
 
 message EventsRequest {

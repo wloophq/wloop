@@ -674,6 +674,10 @@ func (h *Host) Samples() []src.Sample {
 
 func (h *Host) Config(context.Context) (src.Config, error) { return h.Configured, nil }
 
+func (*Host) Holds(context.Context, string, [][]src.Fact) ([]bool, error) {
+	return nil, src.ErrUnsupported
+}
+
 func (h *Host) Profile(_ context.Context, path string) ([]byte, error) {
 	if b, ok := h.ProfileFiles[path]; ok {
 		return slices.Clone(b), nil

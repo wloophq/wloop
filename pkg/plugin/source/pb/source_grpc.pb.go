@@ -1245,6 +1245,7 @@ const (
 	HostService_Meter_FullMethodName        = "/wloop.source.v1.HostService/Meter"
 	HostService_Config_FullMethodName       = "/wloop.source.v1.HostService/Config"
 	HostService_Profile_FullMethodName      = "/wloop.source.v1.HostService/Profile"
+	HostService_Holds_FullMethodName        = "/wloop.source.v1.HostService/Holds"
 	HostService_Events_FullMethodName       = "/wloop.source.v1.HostService/Events"
 )
 
@@ -1285,6 +1286,7 @@ type HostServiceClient interface {
 	Meter(ctx context.Context, in *MeterRequest, opts ...grpc.CallOption) (*MeterResponse, error)
 	Config(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
 	Profile(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*ProfileResponse, error)
+	Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error)
 	// History.
 	Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*EventsResponse, error)
 }
@@ -1517,6 +1519,16 @@ func (c *hostServiceClient) Profile(ctx context.Context, in *ProfileRequest, opt
 	return out, nil
 }
 
+func (c *hostServiceClient) Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HoldsResponse)
+	err := c.cc.Invoke(ctx, HostService_Holds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *hostServiceClient) Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*EventsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EventsResponse)
@@ -1564,6 +1576,7 @@ type HostServiceServer interface {
 	Meter(context.Context, *MeterRequest) (*MeterResponse, error)
 	Config(context.Context, *ConfigRequest) (*ConfigResponse, error)
 	Profile(context.Context, *ProfileRequest) (*ProfileResponse, error)
+	Holds(context.Context, *HoldsRequest) (*HoldsResponse, error)
 	// History.
 	Events(context.Context, *EventsRequest) (*EventsResponse, error)
 	mustEmbedUnimplementedHostServiceServer()
@@ -1641,6 +1654,9 @@ func (UnimplementedHostServiceServer) Config(context.Context, *ConfigRequest) (*
 }
 func (UnimplementedHostServiceServer) Profile(context.Context, *ProfileRequest) (*ProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Profile not implemented")
+}
+func (UnimplementedHostServiceServer) Holds(context.Context, *HoldsRequest) (*HoldsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Holds not implemented")
 }
 func (UnimplementedHostServiceServer) Events(context.Context, *EventsRequest) (*EventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Events not implemented")
@@ -2062,6 +2078,24 @@ func _HostService_Profile_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HostService_Holds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HoldsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HostServiceServer).Holds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HostService_Holds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HostServiceServer).Holds(ctx, req.(*HoldsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _HostService_Events_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EventsRequest)
 	if err := dec(in); err != nil {
@@ -2174,6 +2208,10 @@ var HostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Profile",
 			Handler:    _HostService_Profile_Handler,
+		},
+		{
+			MethodName: "Holds",
+			Handler:    _HostService_Holds_Handler,
 		},
 		{
 			MethodName: "Events",
