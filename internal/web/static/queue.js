@@ -174,6 +174,13 @@ function queueKeyAction(action, env) {
   return false;
 }
 
+// queueStep is a button that moves the queue as its key does, with that key; off at the queue's end.
+function queueStep(action, label, off, env) {
+  const key = env.keyOf ? env.keyOf(action) : "";
+  return h("button", { type: "button", class: "act queue-step", "data-focus": action, "aria-keyshortcuts": key || undefined, disabled: off || undefined,
+    onclick: () => queueKeyAction(action, env) }, label, key ? [" ", h("kbd", {}, key)] : null);
+}
+
 // renderQueue is the queue screen's nodes for queue, at its item at.
 function renderQueue(queue, at, env) {
   const home = h("a", { class: "crumb", href: "#view=" + HOME, "data-focus": "queue:home" }, t("Home"));
@@ -192,7 +199,9 @@ function renderQueue(queue, at, env) {
   const more = items.length - i - 2;
   return [h("div", { class: "queue", "data-item": String(i) },
     head,
-    h("p", { class: "progress", "aria-live": "polite" }, t("{n} of {total}", { n: fmtNumber(i + 1), total: fmtNumber(items.length) })),
+    h("div", { class: "queue-nav" },
+      h("p", { class: "progress", "aria-live": "polite" }, t("{n} of {total}", { n: fmtNumber(i + 1), total: fmtNumber(items.length) })),
+      queueStep("queue:back", t("Previous"), i === 0, env), queueStep("queue:skip", t("Next"), i === items.length - 1, env)),
     err,
     h("div", { class: "queue-item" }, queueItemCard(item, env, queue.view), queuePrimary(item, env)),
     next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task, queue.view),

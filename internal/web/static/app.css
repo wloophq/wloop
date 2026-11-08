@@ -952,6 +952,8 @@ body.layout-detail .d-window { right: 0; }
 .queue .crumbs { display: flex; gap: var(--space-6); font-size: var(--text-meta); color: var(--muted); }
 .queue .crumbs a { color: var(--muted); }
 .queue .progress { margin: 0; font: var(--text-meta) var(--mono); color: var(--faint); }
+.queue-nav { display: flex; align-items: center; gap: var(--space-6); }
+.queue-nav .progress { margin-right: auto; }
 .queue-item { display: flex; flex-direction: column; gap: var(--space-8); }
 .queue-item .situation { margin: 0; font-size: var(--text-meta); color: var(--late); }
 .queue-primary { align-self: flex-start; }

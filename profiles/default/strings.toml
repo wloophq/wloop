@@ -657,6 +657,8 @@
 "Could not load the queue: {error}" = "Could not load the queue: {error}"
 "{n} of {total}" = "{n} of {total}"
 "Next up" = "Next up"
+"Previous" = "Previous"
+"Next" = "Next"
 "+{n} more" = { one = "+{n} more", other = "+{n} more" }
 "Nothing left in this queue." = "Nothing left in this queue."
 "Back to the home" = "Back to the home"

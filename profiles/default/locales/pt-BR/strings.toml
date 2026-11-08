@@ -648,6 +648,8 @@
 "Could not load the queue: {error}" = "Não foi possível carregar a fila: {error}"
 "{n} of {total}" = "{n} de {total}"
 "Next up" = "A seguir"
+"Previous" = "Anterior"
+"Next" = "Próximo"
 "+{n} more" = { one = "+{n} outra", other = "+{n} outras" }
 "Nothing left in this queue." = "Nada mais nesta fila."
 "Back to the home" = "Voltar ao início"

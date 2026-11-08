@@ -28,7 +28,7 @@ const env = {
   act: async (u, id) => { log.acts.push(unitPath(u, id)); if ((input.refuse || []).includes(unitPath(u, id))) throw new Error("it changed"); },
   row: (e, view) => h("li", { "data-task": e.id, "data-view": view }, e.title),
   render: () => { log.renders++; },
-  keyOf: (action) => ({ "queue:primary": "Enter", "queue:edit": "e", "queue:discard": "x", "queue:close-silently": "m", "queue:skip-workflow": "n" })[action] || "",
+  keyOf: (action) => ({ "queue:primary": "Enter", "queue:edit": "e", "queue:discard": "x", "queue:close-silently": "m", "queue:skip-workflow": "n", "queue:skip": "j", "queue:back": "k" })[action] || "",
   navigate: (v) => log.nav.push(v),
 };
 detailEnv.post = env.post;
@@ -125,6 +125,38 @@ process.stdout.write(JSON.stringify({ AfterSkip: afterSkip, AfterBack: afterBack
 })();`, map[string]any{"queues": map[string]any{"last-step": threeQueue()}}, &got)
 	if got.AfterSkip != "2 of 3" || got.AfterBack != "1 of 3" || got.AtEnd != "3 of 3" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// TestQueueOffersSkipAndBackAsButtons draws the queue's previous and next as buttons beside its progress, each
+// with its key, off at either end, and a click moves as the key does.
+func TestQueueOffersSkipAndBackAsButtons(t *testing.T) {
+	var got struct {
+		First, Last         [][2]string
+		AfterClick, Labels string
+	}
+	nodeRun(t, queuePrelude(t), nil, `
+const navOf = () => all(view(), (x) => ["queue:back", "queue:skip"].includes(x.attrs["data-focus"]));
+const stepState = () => navOf().map((b) => [b.attrs["data-focus"], b.attrs.disabled ? "off" : "on"]);
+(async () => {
+globalThis.hash = "#queue=list&ids=t-1,t-2,t-3";
+await queueLoad(env.route(), env);
+const first = stepState();
+const labels = navOf().map(text).join("|");
+navOf().find((b) => b.attrs["data-focus"] === "queue:skip").attrs.onclick();
+const afterClick = text(byClass(view(), "progress"));
+queueKeyAction("queue:skip", env);
+process.stdout.write(JSON.stringify({ First: first, Last: stepState(), AfterClick: afterClick, Labels: labels }));
+})();`, map[string]any{"tasks": map[string]any{"t-1": map[string]any{"id": "t-1", "title": "one"}, "t-2": map[string]any{"id": "t-2", "title": "two"},
+		"t-3": map[string]any{"id": "t-3", "title": "three"}}, "keys": map[string]string{}}, &got)
+	if !slices.Equal(got.First, [][2]string{{"queue:back", "off"}, {"queue:skip", "on"}}) || !slices.Equal(got.Last, [][2]string{{"queue:back", "on"}, {"queue:skip", "off"}}) {
+		t.Errorf("the buttons at the first item %v and the last %v", got.First, got.Last)
+	}
+	if got.AfterClick != "2 of 3" {
+		t.Errorf("a click on next shows %q, want 2 of 3", got.AfterClick)
+	}
+	if !strings.Contains(got.Labels, "k") || !strings.Contains(got.Labels, "j") {
+		t.Errorf("the buttons %q do not show their keys", got.Labels)
 	}
 }
 
