@@ -39,7 +39,7 @@ func countedGitHub(builds *atomic.Int32) compiledPlugin {
 		builds.Add(1)
 		m, err := githubHostModule(cfg, sd)
 		m.Run = func(ctx context.Context) error { <-ctx.Done(); return ctx.Err() }
-		m.Jobs = []pluginJob{{Name: "extract:github", Every: time.Hour, Run: func(context.Context) (string, string, error) { return "", "", nil }}}
+		m.Jobs = []pluginJob{{Name: "extract:github", Every: time.Hour, Run: func(context.Context) (string, string, time.Time, error) { return "", "", time.Time{}, nil }}}
 		m.Health = func(context.Context) (api.SourceHealth, error) { return api.SourceHealth{}, nil }
 		return m, err
 	}}

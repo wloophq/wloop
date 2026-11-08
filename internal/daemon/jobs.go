@@ -81,6 +81,25 @@ func (j *job) at(t time.Time) {
 	}
 }
 
+// wakeAt schedules a run at t, now when t is zero, unless an earlier one is due.
+func (j *job) wakeAt(t time.Time) {
+	if t.IsZero() {
+		t = j.clock.Now()
+	}
+	t = t.Round(0)
+	j.mu.Lock()
+	if !j.due.IsZero() && !t.Before(j.due) {
+		j.mu.Unlock()
+		return
+	}
+	j.due = t
+	j.mu.Unlock()
+	select {
+	case j.reset <- struct{}{}:
+	default:
+	}
+}
+
 func (j *job) status() api.JobStatus {
 	j.mu.Lock()
 	defer j.mu.Unlock()

@@ -357,9 +357,11 @@ type IngestRequest struct {
 	Now time.Time
 }
 
-// IngestResult is a job run's outcome, for the job log.
+// IngestResult is a job run's outcome, for the job log, and Next, when the
+// job next has work; zero leaves the job to its interval.
 type IngestResult struct {
 	Summary, Skipped string
+	Next             time.Time
 }
 
 // TrackRequest reads a unit, and follows it when Follow is set.

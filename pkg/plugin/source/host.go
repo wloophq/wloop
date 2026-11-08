@@ -24,6 +24,14 @@ type Host struct {
 	Wakes
 	Services
 	History
+	Jobs
+}
+
+// Jobs schedules the plugin's manifest jobs.
+type Jobs interface {
+	// WakeJob runs the plugin's manifest job named job at at, or now when
+	// at is zero or past; an earlier wake already set keeps.
+	WakeJob(ctx context.Context, job string, at time.Time) error
 }
 
 // Reporter takes what a plugin observed. Report replaces each unit's

@@ -72,6 +72,9 @@ type Broker struct {
 	Workspaces func(ctx context.Context, repo string) (src.Listing, error)
 	// Books are the turn books of units; nil serves no Reader.Books.
 	Books func(ctx context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error)
+	// WakeJob runs the host job named name, a [JobName], at at, or now when at is zero; false when the host
+	// runs no such job. nil serves no Jobs.
+	WakeJob func(name string, at time.Time) bool
 }
 
 // BriefStore keeps the briefs a plugin writes. PutUnitBrief keeps body, the
@@ -113,5 +116,5 @@ type DraftHome interface {
 // Host is b as the SDK serves it to the plugin.
 func (b *Broker) Host() src.Host {
 	return src.Host{Reporter: reporter{b}, Ledger: ledger{b}, Reader: reader{b}, Gates: gates{b}, Recorder: recorder{b},
-		Wakes: wakes{b}, Services: services{b}, History: history{b}}
+		Wakes: wakes{b}, Services: services{b}, History: history{b}, Jobs: jobs{b}}
 }

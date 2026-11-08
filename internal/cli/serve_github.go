@@ -481,7 +481,7 @@ func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, erro
 		return p, skip, err
 	}}
 	m.Slow = func(ctx context.Context) (string, string, error) {
-		summary, skipped, err := r.ingest(ctx, githubJobSlow)
+		summary, skipped, _, err := r.ingest(ctx, githubJobSlow)
 		if errors.Is(err, src.ErrUnavailable) {
 			return "skipped", err.Error(), nil
 		}

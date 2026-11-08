@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -183,6 +184,12 @@ func (s *hostServer) ClearWake(ctx context.Context, r *pb.ClearWakeRequest) (*pb
 	})
 }
 
+func (s *hostServer) WakeJob(ctx context.Context, r *pb.WakeJobRequest) (*pb.WakeJobResponse, error) {
+	return hostCall(ctx, s.h.Jobs, "jobs", func(h Jobs) (*pb.WakeJobResponse, error) {
+		return &pb.WakeJobResponse{}, h.WakeJob(ctx, r.GetJob(), tm(r.GetAt()))
+	})
+}
+
 func (s *hostServer) Ask(ctx context.Context, r *pb.AskRequest) (*pb.AskResponse, error) {
 	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.AskResponse, error) {
 		res, err := h.Ask(ctx, AskRequest{Prompt: r.GetPrompt(), Schema: raw(r.GetSchemaJson()), Tier: r.GetTier(), MaxCostUSD: r.GetMaxCostUsd(), MeterScope: r.GetMeterScope()})
@@ -242,7 +249,7 @@ type hostClient struct {
 	c pb.HostServiceClient
 }
 
-func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h, h} }
+func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h, h, h} }
 
 func viaHost[Resp any](h *hostClient, f func(pb.HostServiceClient) (Resp, error)) (Resp, error) {
 	var zero Resp
@@ -380,6 +387,13 @@ func (h *hostClient) SetWake(ctx context.Context, w Wake) error {
 func (h *hostClient) ClearWake(ctx context.Context, u plugin.Unit, task string) error {
 	_, err := viaHost(h, func(c pb.HostServiceClient) (*pb.ClearWakeResponse, error) {
 		return c.ClearWake(ctx, &pb.ClearWakeRequest{Unit: unitPB(u), Task: task})
+	})
+	return err
+}
+
+func (h *hostClient) WakeJob(ctx context.Context, job string, at time.Time) error {
+	_, err := viaHost(h, func(c pb.HostServiceClient) (*pb.WakeJobResponse, error) {
+		return c.WakeJob(ctx, &pb.WakeJobRequest{Job: job, At: ts(at)})
 	})
 	return err
 }

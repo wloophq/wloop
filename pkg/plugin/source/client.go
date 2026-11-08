@@ -52,7 +52,7 @@ func (c *Client) Ingest(ctx context.Context, req IngestRequest) (IngestResult, e
 	r, err := via(ctx, func(call *pb.Call) (*pb.IngestResponse, error) {
 		return c.c.Ingest(ctx, &pb.IngestRequest{Call: call, Job: req.Job, Now: ts(req.Now)})
 	})
-	return IngestResult{Summary: r.GetSummary(), Skipped: r.GetSkipped()}, err
+	return IngestResult{Summary: r.GetSummary(), Skipped: r.GetSkipped(), Next: tm(r.GetNext())}, err
 }
 
 func (c *Client) Track(ctx context.Context, req TrackRequest) (Tracked, error) {

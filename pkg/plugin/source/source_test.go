@@ -455,7 +455,7 @@ func TestEveryCapabilityHasAtMostFiveMethods(t *testing.T) {
 	brokers := []reflect.Type{
 		reflect.TypeFor[source.Reporter](), reflect.TypeFor[source.Ledger](), reflect.TypeFor[source.Reader](),
 		reflect.TypeFor[source.Gates](), reflect.TypeFor[source.Recorder](), reflect.TypeFor[source.Wakes](),
-		reflect.TypeFor[source.Services](), reflect.TypeFor[source.History](), reflect.TypeFor[source.Source](),
+		reflect.TypeFor[source.Services](), reflect.TypeFor[source.History](), reflect.TypeFor[source.Jobs](), reflect.TypeFor[source.Source](),
 	}
 	for _, i := range append(slices.Clone(capabilities), brokers...) {
 		if n := i.NumMethod(); n > 5 {

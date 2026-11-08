@@ -110,9 +110,9 @@ func TestPluginJobsRegistered(t *testing.T) {
 	t.Parallel()
 	var n atomic.Int32
 	s := newServerWith(t, func(d *Deps) {
-		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{{Name: "extract:thread", Every: 20 * time.Millisecond, Run: func(context.Context) (string, string, error) {
+		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{{Name: "extract:thread", Every: 20 * time.Millisecond, Run: func(context.Context) (string, string, time.Time, error) {
 			n.Add(1)
-			return "extracted", "", nil
+			return "extracted", "", time.Time{}, nil
 		}}}}}
 	})
 	var h api.Health
@@ -176,7 +176,7 @@ func TestPluginsServed(t *testing.T) {
 
 func TestPluginJobTimeout(t *testing.T) {
 	t.Parallel()
-	run := func(context.Context) (string, string, error) { return "", "", nil }
+	run := func(context.Context) (string, string, time.Time, error) { return "", "", time.Time{}, nil }
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{
 			{Name: "long", Every: time.Minute, Timeout: 25 * time.Minute, Run: run},
@@ -195,7 +195,7 @@ func TestNegativePluginJobTimeoutIsTheDefault(t *testing.T) {
 	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{{Name: "neg", Every: time.Minute, Timeout: -time.Second,
-			Run: func(context.Context) (string, string, error) { return "", "", nil }}}}}
+			Run: func(context.Context) (string, string, time.Time, error) { return "", "", time.Time{}, nil }}}}}
 	})
 	if got := s.jobs["neg"].timeout; got != pluginTimeout {
 		t.Fatalf("timeout %v", got)
