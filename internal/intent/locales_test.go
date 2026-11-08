@@ -193,6 +193,9 @@ func TestBundledProfileLoadsInPtBR(t *testing.T) {
 // dottedName is a configuration key or a step's name, as `plugins.slack.ended_after` or `items.resolve`.
 var dottedName = regexp.MustCompile(`\b[a-z_]+(\.[a-z_]+)+\b`)
 
+// postsNothing is a summary saying its workflow posts nothing, in English or Portuguese.
+var postsNothing = regexp.MustCompile(`(?i)posts nothing|não publica nada`)
+
 // TestBundledWorkflowSummariesAreForPeople says no bundled workflow's summary, which the cockpit shows as what
 // running it does, names a configuration key or a step.
 func TestBundledWorkflowSummariesAreForPeople(t *testing.T) {
@@ -205,6 +208,9 @@ func TestBundledWorkflowSummariesAreForPeople(t *testing.T) {
 		for _, w := range l.Workflows {
 			if m := dottedName.FindString(w.Summary); m != "" {
 				t.Errorf("%s (%s): the summary names %q: %s", w.Name, locale, m, w.Summary)
+			}
+			if postsNothing.MatchString(w.Summary) {
+				t.Errorf("%s (%s): the summary says it posts nothing, which the cockpit says from its steps: %s", w.Name, locale, w.Summary)
 			}
 		}
 	}

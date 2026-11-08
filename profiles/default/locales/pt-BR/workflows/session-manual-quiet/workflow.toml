@@ -1,2 +1,2 @@
-summary = "Oferecer fechar uma sessão que você iniciou e que ficou quieta por um tempo, como a sua configuração de limpeza define; não publica nada"
+summary = "Oferecer fechar uma sessão que você iniciou e que ficou quieta por um tempo, como a sua configuração de limpeza define"
 ask = "Fechar a sessão quieta {{index .Facts \"session.name\"}}?"
