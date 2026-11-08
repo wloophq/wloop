@@ -227,3 +227,20 @@ func TestTheCardsAreTheRowsCardsOfBefore(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkCardOfAStalledRow(b *testing.B) {
+	var r api.Row
+	for _, c := range ghsourcetest.Cases() {
+		if c.Row.Summary.Stalled && c.Row.Kind != "done" {
+			r = c.Row
+			break
+		}
+	}
+	rep, _ := ghsourcetest.ReportOf(r)
+	now := ghsourcetest.Now.Add(60 * 24 * time.Hour)
+	for b.Loop() {
+		if _, err := CardOf(r, rep, now); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
