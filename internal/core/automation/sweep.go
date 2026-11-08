@@ -75,7 +75,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		return "", "", err
 	}
 	write := PlanWrite{Workflows: append(slices.Clone(ev.workflows), gone...), Items: ev.plan.Items}
-	if err := e.save(ctx, write, append(plannedEvents(ev, e.now()), ev.passed...)); err != nil {
+	if err := e.save(ctx, write, slices.Concat(plannedEvents(ev, e.now()), ev.passed, ev.withdrawn)); err != nil {
 		return "", "", err
 	}
 	for _, b := range ev.batches {
