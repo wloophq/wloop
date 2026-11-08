@@ -56,3 +56,29 @@ func findWebView(v objc.ID) objc.ID {
 	}
 	return 0
 }
+
+type point struct{ X, Y float64 }
+type size struct{ Width, Height float64 }
+type rect struct {
+	Origin point
+	Size   size
+}
+
+// centeredIn is the origin that centers a window of size s in area, in
+// AppKit's bottom-left coordinates.
+func centeredIn(area rect, s size) point {
+	return point{X: area.Origin.X + (area.Size.Width-s.Width)/2, Y: area.Origin.Y + (area.Size.Height-s.Height)/2}
+}
+
+// centerOnFocusedScreen moves w to the middle of the screen whose window has
+// the keyboard focus, whichever app owns it; it runs on the main thread.
+func centerOnFocusedScreen(w *application.WebviewWindow) {
+	screen := class("NSScreen").Send(sel("mainScreen"))
+	if screen == 0 {
+		return
+	}
+	win := nsWindow(w)
+	area := objc.Send[rect](screen, sel("visibleFrame"))
+	frame := objc.Send[rect](win, sel("frame"))
+	win.Send(sel("setFrameOrigin:"), centeredIn(area, frame.Size))
+}

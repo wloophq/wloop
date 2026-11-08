@@ -269,6 +269,7 @@ func (h *host) ShowPanel(url string) {
 	h.do(func() {
 		navigate(h.panel, &h.panelURL, url)
 		h.panelShown, h.panelKey = true, false
+		application.InvokeSync(func() { centerOnFocusedScreen(h.panel) })
 		h.panel.Show()
 		application.InvokeSync(func() { nsWindow(h.panel).Send(objc.RegisterName("makeKeyWindow")) })
 	})

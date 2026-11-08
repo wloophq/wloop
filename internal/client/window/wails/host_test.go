@@ -28,3 +28,12 @@ func TestALinkBeforeListenIsHandedOverOnListen(t *testing.T) {
 		t.Fatalf("handed over %q, want %q", got, links)
 	}
 }
+
+// The panel opens in the middle of the focused screen's visible area, which
+// on a second screen starts away from the origin.
+func TestThePanelCentersInTheFocusedScreen(t *testing.T) {
+	right := rect{Origin: point{X: 1512, Y: -200}, Size: size{Width: 2560, Height: 1415}}
+	if got, want := centeredIn(right, size{Width: 680, Height: 420}), (point{X: 1512 + 940, Y: -200 + 497.5}); got != want {
+		t.Fatalf("origin %+v, want %+v", got, want)
+	}
+}
