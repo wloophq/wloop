@@ -42,6 +42,8 @@ type GatesDef struct {
 type DraftWords struct {
 	ByHand, ByHandAbout       string
 	Purposes, States, Reasons map[string]string
+	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
+	Quoted string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -200,6 +202,7 @@ type mGatesFile struct {
 type mDraftWords struct {
 	ByHand      *string           `toml:"by_hand"`
 	ByHandAbout *string           `toml:"by_hand_about"`
+	Quoted      *string           `toml:"quoted"`
 	Purposes    map[string]string `toml:"purposes"`
 	States      map[string]string `toml:"states"`
 	Reasons     map[string]string `toml:"reasons"`
@@ -353,6 +356,9 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	}
 	if m.ByHandAbout != nil {
 		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
+	}
+	if m.Quoted != nil {
+		w.Quoted = strings.TrimSpace(*m.Quoted)
 	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
 	states := make([]string, len(draft.States))

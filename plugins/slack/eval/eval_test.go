@@ -71,7 +71,7 @@ func extraction(f Fixture) map[string]any {
 	if len(f.Messages) > 0 {
 		origin = f.Messages[0].TS
 	}
-	item := map[string]any{"ref": "n1", "kind": "request", "summary": "summary of " + f.ID, "ask": "", "origin_ts": origin,
+	item := map[string]any{"ref": "n1", "kind": "request", "summary": "summary of " + f.ID, "ask": "ask of " + f.ID, "origin_ts": origin,
 		"requester": map[string]any{"id": "U0000000002", "name": ""}, "assignees": []any{map[string]any{"id": "U0000000001", "name": ""}}, "assignment_ts": origin, "assignment_basis": "explicit_mention",
 		"waiting_on": []any{map[string]any{"id": "U0000000001", "name": ""}}, "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
 		"confidence": "high", "ambiguity": "", "links": []any{}, "context": "", "options": []any{}, "deadline": "",

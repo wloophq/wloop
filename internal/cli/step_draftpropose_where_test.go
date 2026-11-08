@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -116,6 +117,18 @@ func (l *lines) has(s string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return slices.ContainsFunc(l.all, func(x string) bool { return strings.Contains(x, s) })
+}
+
+func (l *lines) count(s string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := 0
+	for _, x := range l.all {
+		if strings.Contains(x, s) {
+			n++
+		}
+	}
+	return n
 }
 
 func writeFileOf(t testing.TB, r *draftRig, workflowName, name, body string) {
@@ -287,17 +300,94 @@ func TestAHeldDraftInBrunosDMIsNotWithdrawnAsOutside(t *testing.T) {
 	}
 }
 
-func TestAnUnknownMembershipAddressesNobodyItCannotPlace(t *testing.T) {
+func TestAnUnknownMembershipNudgesInTheConversationAsBefore(t *testing.T) {
 	t.Parallel()
 	r, log := whereRig(t)
-	r.units.Put(dmWithAna, workflow.Facts{"slack.ended": false})
-	r.items.set(dmWithAna, dmItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), dmItem("i2", "The study", r.now.Add(-72*time.Hour), carla))
-	r.sweepSteps(dmWithAna)
-	for _, d := range r.allDrafts() {
-		t.Errorf("draft %d to %q: %q, want none while who reads the DM is unknown", d.ID, d.Target, d.Text)
+	r.units.Put(draftThread, workflow.Facts{"slack.ended": false})
+	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The study", r.now.Add(-72*time.Hour), carla))
+	r.sweepSteps(draftThread)
+	ds := held(r.allDrafts())
+	if len(ds) != 1 || ds[0].Target != "" || !strings.Contains(ds[0].Text, ana.Key) || !strings.Contains(ds[0].Text, carla.Key) {
+		t.Fatalf("drafts %+v, want the one nudge to Ana and Carla in the thread, nobody written to elsewhere", ds)
 	}
-	if !log.has("who can read " + dmWithAna.String() + " is unknown") {
-		t.Errorf("log %q, want the unknown membership logged", log.all)
+	pds, err := draftWithdrawals{d: r.deps}.Proposed(context.Background(), "")
+	if err != nil || len(pds) != 1 || pds[0].Facts["draft.people_outside"] != 0 {
+		t.Fatalf("proposed %+v %v, want nobody counted outside while membership is unknown", pds, err)
+	}
+	r.sweepSteps(draftThread)
+	if n := log.count("who can read " + draftThread.String() + " is unknown"); n != 1 {
+		t.Errorf("logged %d times over two sweeps, want once: %q", n, log.all)
+	}
+}
+
+func TestAGroupIsNudgedInTheChannelAsBefore(t *testing.T) {
+	t.Parallel()
+	r, _ := whereRig(t)
+	oncall := items.Person{Key: "group:S000ONCALL1", Name: "oncall"}
+	team := items.Person{Key: "group:the data team", Name: "the data team"}
+	r.items.set(draftThread, openItem("i1", "The budget", r.now.Add(-72*time.Hour), oncall), openItem("i2", "The table", r.now.Add(-48*time.Hour), team))
+	r.sweepSteps(draftThread)
+	ds := held(r.allDrafts())
+	if len(ds) != 1 || ds[0].Target != "" || !strings.Contains(ds[0].Text, oncall.Key) || !strings.Contains(ds[0].Text, team.Key) {
+		t.Fatalf("drafts %+v, want one nudge in the thread to both groups and no DM", ds)
+	}
+	pds, err := draftWithdrawals{d: r.deps}.Proposed(context.Background(), "")
+	if err != nil || len(pds) != 1 || pds[0].Facts["draft.people_outside"] != 0 {
+		t.Fatalf("proposed %+v %v, want the groups never counted outside", pds, err)
+	}
+}
+
+func TestADMNudgeIsWithdrawnOnceItsPersonJoinsTheConversation(t *testing.T) {
+	t.Parallel()
+	r, _ := whereRig(t)
+	r.units.Put(draftThread, workflow.Facts{"slack.ended": false, membersFact: []string{meP.Key, ana.Key}})
+	r.items.set(draftThread, openItem("i1", "The study", r.now.Add(-72*time.Hour), bruno))
+	r.sweepSteps(draftThread)
+	ds := held(r.allDrafts())
+	if len(ds) != 1 || ds[0].Target != bruno.Key {
+		t.Fatalf("drafts %+v, want the one to Bruno's DM", ds)
+	}
+	joined := func() any {
+		pds, err := draftWithdrawals{d: r.deps}.Proposed(context.Background(), "")
+		if err != nil || len(pds) != 1 {
+			t.Fatalf("proposed %+v %v", pds, err)
+		}
+		return pds[0].Facts["draft.target_joined"]
+	}
+	if got := joined(); got != false {
+		t.Fatalf("target_joined %v before Bruno joins", got)
+	}
+	r.units.Put(draftThread, workflow.Facts{"slack.ended": false, membersFact: []string{meP.Key, ana.Key, bruno.Key}})
+	if got := joined(); got != true {
+		t.Fatalf("target_joined %v once Bruno joined, want true", got)
+	}
+}
+
+// refusingEffects publish as okEffects, refusing at validation any draft to refused, as a post allowlist that
+// leaves them out does.
+type refusingEffects struct {
+	okEffects
+	refused string
+}
+
+func (r refusingEffects) Validate(_ context.Context, d draft.Draft) error {
+	if d.Target == r.refused {
+		return errors.New("not on the post allowlist")
+	}
+	return nil
+}
+
+func TestADMNudgeThePublisherRefusesIsNotProposed(t *testing.T) {
+	t.Parallel()
+	r, log := whereRig(t)
+	r.svc.Effects = func(unit.ProviderID) (port.Effects, error) { return refusingEffects{refused: bruno.Key}, nil }
+	r.items.set(dmWithAna, dmItem("i1", "The study", r.now.Add(-96*time.Hour), bruno))
+	r.sweepSteps(dmWithAna)
+	if ds := r.allDrafts(); len(ds) != 0 {
+		t.Fatalf("drafts %+v, want none to a person the publisher refuses", ds)
+	}
+	if !log.has("not writing to " + bruno.Key) {
+		t.Errorf("log %q, want the refusal logged", log.all)
 	}
 }
 

@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"fmt"
 	"maps"
 	"reflect"
 	"slices"
@@ -71,6 +72,20 @@ func pathOf(t reflect.Type, path string, out map[string]builtin.Kind) {
 	default:
 		out[path] = builtin.KindText
 	}
+}
+
+type selfHolding struct {
+	Name *string       `toml:"name"`
+	Rule []selfHolding `toml:"rule"`
+}
+
+func TestAManifestStructThatHoldsItselfStopsTheWalk(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "holds itself") {
+			t.Fatalf("recovered %v, want the depth guard's panic", r)
+		}
+	}()
+	structPaths(reflect.TypeOf(selfHolding{}), "", map[string]builtin.Kind{})
 }
 
 // refines says a row of kind row may hold a key decoded as kind field.

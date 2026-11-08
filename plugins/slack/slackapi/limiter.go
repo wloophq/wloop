@@ -31,6 +31,7 @@ var defaultPerMinute = map[string]int{
 	"reactions.add":         tier3,
 	"auth.revoke":           tier3,
 	"users.info":            tier4,
+	"conversations.members": tier4,
 	"oauth.v2.access":       tier4,
 	"auth.test":             tier4,
 	"chat.getPermalink":     tier4,

@@ -4,7 +4,7 @@
   "started_by_viewer": true,
   "items": [
     {
-      "ref": "i1", "kind": "request", "summary": "Bob reviews the release notes draft", "ask": "",
+      "ref": "i1", "kind": "request", "summary": "Bob reviews the release notes draft", "ask": "review the release notes draft I wrote",
       "origin_ts": "1700000000.000100", "requester": {"id": "U0000000001", "name": ""}, "assignees": [{"id": "U0000000002", "name": ""}],
       "assignment_ts": "1700000000.000100", "assignment_basis": "explicit_mention", "waiting_on": [],
       "state": "resolved", "resolution": "done", "evidence_ts": "1700003600.000300", "evidence_kind": "message",
@@ -13,7 +13,7 @@
       "mode": "none", "place": {"context": "", "why": "Settled."}
     },
     {
-      "ref": "i3", "kind": "decision", "summary": "Ship the widget toggle on by default?", "ask": "",
+      "ref": "i3", "kind": "decision", "summary": "Ship the widget toggle on by default?", "ask": "ship the widget toggle on by default?",
       "origin_ts": "1700000300.000200", "requester": {"id": "U0000000002", "name": ""}, "assignees": [{"id": "U0000000003", "name": ""}],
       "assignment_ts": "1700000300.000200", "assignment_basis": "explicit_mention", "waiting_on": [],
       "state": "resolved", "resolution": "answered", "evidence_ts": "1700007200.000400", "evidence_kind": "message",
@@ -22,7 +22,7 @@
       "deadline": "", "mode": "none", "place": {"context": "", "why": "Settled."}
     },
     {
-      "ref": "n1", "kind": "request", "summary": "Ann takes over the widget rollout after pull request 527 is reviewed", "ask": "",
+      "ref": "n1", "kind": "request", "summary": "Ann takes over the widget rollout after pull request 527 is reviewed", "ask": "take over the widget rollout after pull request 527 is reviewed",
       "origin_ts": "1700007200.000400", "requester": {"id": "U0000000003", "name": ""}, "assignees": [{"id": "U0000000001", "name": ""}],
       "assignment_ts": "1700007200.000400", "assignment_basis": "explicit_mention", "waiting_on": [{"id": "U0000000001", "name": ""}],
       "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",

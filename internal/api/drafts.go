@@ -58,6 +58,9 @@ type Draft struct {
 	State  string `json:"state"`
 	Error  string `json:"error"`
 	Reason string `json:"reason"`
+	// Quoted says, in the profile's words (gates.toml's drafts.quoted), which conversation a draft posted in
+	// the direct conversation of the person it is to quotes; "" for any other draft.
+	Quoted string `json:"quoted,omitempty"`
 	// ReasonText is Reason in the profile's words (gates.toml's drafts.reasons) for a dropped draft; "" when
 	// it words none.
 	ReasonText string `json:"reason_text,omitempty"`

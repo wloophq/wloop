@@ -419,6 +419,12 @@ func taskDraftError(err error) error {
 }
 
 // draftView is d on the wire, with g, its gate, and its actions as they stand.
+// quotes says whether d, a per-person draft of a workflow posted in the direct conversation of the person it
+// is to, quotes items of its unit, a conversation that person does not read.
+func quotes(d draft.Draft) bool {
+	return d.Target != "" && d.Origin.Kind == draft.OriginAuto && d.Origin.Key == d.Unit.String()+":"+d.Target
+}
+
 func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
 		Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
@@ -454,6 +460,9 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 	v.Where = s.draftWhere(ctx, d)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
 	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link
+	if quotes(d) {
+		v.Quoted = strings.ReplaceAll(s.loaded().Gates.Drafts.Quoted, "{conversation}", cmp.Or(p.Title, p.Label, d.Unit.String()))
+	}
 	return v
 }
 

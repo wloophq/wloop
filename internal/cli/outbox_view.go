@@ -305,6 +305,9 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		field("Mentions", strings.Join(ms, ", "))
 	}
 	field("To", cmp.Or(d.Where, d.Target, "destination unknown"))
+	if d.Quoted != "" {
+		field("Quotes", d.Quoted)
+	}
 	field("Origin", draftOrigin(d)+", "+draftAge(d, now)+" ago")
 	field("Approval", approvalOf(d))
 	if d.Deadline != nil {

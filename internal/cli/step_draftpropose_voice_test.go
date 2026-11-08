@@ -40,8 +40,12 @@ func TestANudgeReadsTheAskSaidToItsOwner(t *testing.T) {
 		person                 items.Person
 		it                     items.Item
 	}{
-		{"slack-stalled-nudge-dm", "dm.md.tmpl", "en", bruno, study},
-		{"slack-stalled-nudge-dm", "dm.md.tmpl", "pt-BR", bruno, study},
+		{"slack-stalled-nudge-dm", defaultDraftText, "en", bruno, study},
+		{"slack-stalled-nudge-dm", defaultDraftText, "pt-BR", bruno, study},
+		{"slack-ask-owner", defaultDraftText, "en", items.Person{}, review},
+		{"slack-ask-owner", defaultDraftText, "pt-BR", items.Person{}, review},
+		{"slack-closure", defaultDraftText, "en", items.Person{}, review},
+		{"slack-closure", defaultDraftText, "pt-BR", items.Person{}, review},
 		{"slack-stalled-nudge", defaultDraftText, "en", ana, review},
 		{"slack-stalled-nudge", defaultDraftText, "pt-BR", ana, review},
 	} {
@@ -55,7 +59,7 @@ func TestANudgeReadsTheAskSaidToItsOwner(t *testing.T) {
 func TestANudgeOverAnItemWithNoAskReadsItsSummary(t *testing.T) {
 	t.Parallel()
 	old := dmItem("i1", "Bruno to do a study of the queue", time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC), bruno)
-	for _, wf := range []struct{ name, file string }{{"slack-stalled-nudge-dm", "dm.md.tmpl"}, {"slack-stalled-nudge", defaultDraftText}} {
+	for _, wf := range []struct{ name, file string }{{"slack-stalled-nudge-dm", defaultDraftText}, {"slack-stalled-nudge", defaultDraftText}} {
 		if body := renderBundled(t, wf.name, wf.file, "en", bruno, old); !strings.Contains(body, old.Summary) {
 			t.Errorf("%s: %q, want the summary of an item extracted before asks", wf.name, body)
 		}

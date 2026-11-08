@@ -43,8 +43,14 @@ type wManifest struct {
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
 	Drafts   *wDrafts          `toml:"drafts"`
-	Gates    *mGates           `toml:"gates"`
+	Gates    *wGates           `toml:"gates"`
 	Outbox   *wOutbox          `toml:"outbox"`
+}
+
+// wGates is a workflow's [gates]: an intent's, and whether its drafts always wait.
+type wGates struct {
+	Approval   *mApproval `toml:"approval"`
+	DraftsWait bool       `toml:"drafts_wait"`
 }
 
 type wOutbox struct {
@@ -794,10 +800,10 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 // defineApproval loads the workflow's [gates.approval]: the approval of its
 // runs' plan gates, of the drafts its steps and turns propose, and of the
 // gates its gate.open steps open, each laid over gates.toml's default.
-func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
+func (s *sheet) defineApproval(w *workflow.Workflow, g *wGates, slot string) {
 	var m *mApproval
 	if g != nil {
-		m = g.Approval
+		m, w.DraftsWait = g.Approval, g.DraftsWait
 	}
 	draftEnv := s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot)
 	var unitEnv expr.Env

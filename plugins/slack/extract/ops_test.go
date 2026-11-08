@@ -166,6 +166,30 @@ func TestOpsUpdateOnlyChangedFields(t *testing.T) {
 	}
 }
 
+func TestAConfirmedItemGetsItsAskOnceAndKeepsIt(t *testing.T) {
+	in := loadInput(t)
+	in.Ledger[0].Confirmed = true
+	i1 := item("i1")
+	i1.Summary = "a rewording the confirmed item keeps out"
+	i1.Ask = "review the release notes draft I wrote"
+	i1.Requester = PersonOut{ID: "U0000000001"}
+	i1.Assignees = []PersonOut{{ID: "U0000000002"}}
+	i1.AssignmentBasis = "explicit_mention"
+	i1.WaitingOn = []PersonOut{{ID: "U0000000002"}}
+	ops, _, err := Ops(in, Result{Items: []ItemOut{i1}}, "T0001", parseTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ops) != 1 || ops[0].Fields.Ask == nil || *ops[0].Fields.Ask != i1.Ask || ops[0].Fields.Summary != nil {
+		t.Fatalf("ops = %+v, want the ask alone filled on the confirmed item", ops)
+	}
+	in.Ledger[0].Ask = i1.Ask
+	i1.Ask = "a rewording of the ask"
+	if ops, _, _ := Ops(in, Result{Items: []ItemOut{i1}}, "T0001", parseTarget); len(ops) != 0 {
+		t.Errorf("ops = %+v, want a confirmed item's ask kept", ops)
+	}
+}
+
 func TestOmittedItemsStay(t *testing.T) {
 	in := loadInput(t)
 	ops, dropped, err := Ops(in, Result{}, "T0001", parseTarget)

@@ -394,6 +394,7 @@ function draftCard(e, d, opts = {}) {
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),
     d.why ? h("p", { class: "why" }, d.why) : null,
+    d.quoted ? h("p", { class: "why" }, d.quoted) : null,
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,
     d.error ? h("p", { class: "err" }, d.error) : null,
     windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,

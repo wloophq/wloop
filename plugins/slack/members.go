@@ -35,7 +35,7 @@ func unitMembers(in *slackrows.Input) ([]string, bool) {
 		return []string{keyOf(in.Viewer()), keyOf(conv.DMUser)}, true
 	}
 	m, ok := in.Members()
-	if !ok {
+	if !ok || m.Failed {
 		return nil, false
 	}
 	out := make([]string, len(m.Members))
@@ -46,8 +46,9 @@ func unitMembers(in *slackrows.Input) ([]string, bool) {
 }
 
 // refreshMembers reads the members of the group DMs and channels whose units hold an open item waiting on
-// someone, those never read or read more than membersTTL ago, at most membersPerRun of them, and marks their
-// units to be reported again. A conversation whose read fails is logged and stays as it was.
+// someone, those never read or read more than membersTTL ago, the least recently read first, at most
+// membersPerRun of them, and marks their units to be reported again. A read that fails is logged and stored as
+// failed, so its conversation waits membersTTL like a read one and stays unknown.
 func (p *plugin) refreshMembers(ctx context.Context) error {
 	if p.slack.Client == nil {
 		return nil
@@ -84,6 +85,7 @@ func (p *plugin) refreshMembers(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	slices.SortStableFunc(ids, func(a, b string) int { return stored[a].Fetched.Compare(stored[b].Fetched) })
 	now, read := p.now(), 0
 	for _, id := range ids {
 		if read == membersPerRun {
@@ -96,15 +98,17 @@ func (p *plugin) refreshMembers(ctx context.Context) error {
 			continue
 		}
 		read++
-		members, err := p.conversationMembers(ctx, id)
-		if err != nil {
+		row := store.MembersRow{Conversation: id, Fetched: now}
+		if row.Members, err = p.conversationMembers(ctx, id); err != nil {
 			p.logf("slack: reading who is in %s: %v", id, err)
-			continue
+			row.Failed = true
 		}
-		if err := db.PutMembers(ctx, store.MembersRow{Conversation: id, Members: members, Fetched: now}); err != nil {
+		if err := db.PutMembers(ctx, row); err != nil {
 			return err
 		}
-		p.reports.mark(units[id]...)
+		if !row.Failed {
+			p.reports.mark(units[id]...)
+		}
 	}
 	return nil
 }

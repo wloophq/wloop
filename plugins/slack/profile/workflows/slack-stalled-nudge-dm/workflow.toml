@@ -4,6 +4,10 @@ when = '"slack" in task.unit_providers && task.owed_by != "me" && task.owed_by !
 order = 51
 key = ["task.settled_at", "task.owed_by"]
 
+# The draft quotes an item of another conversation the person cannot read: it always waits for you.
+[gates]
+drafts_wait = true
+
 [[step]]
 use = "draft.propose"
 purpose = "nudge"
@@ -11,14 +15,16 @@ items = "owed"
 per = "person"
 to = "non_members"
 target = "person"
-text = "dm.md.tmpl"
-why = "dm_why.md.tmpl"
 effects = ["task.nudged"]
 repeat_after = "config.drafts.repeat_after"
 
 [drafts.withdraw]
 when = '!draft.person_waited || draft.items_owed == 0 || draft.person_asks_you'
 reason = "moot"
+
+[[drafts.withdraw.rule]]
+when = 'draft.target_joined'
+reason = "joined"
 
 [outbox]
 title = "Ask who is not in the conversation"

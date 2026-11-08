@@ -1,4 +1,4 @@
 Closing this out:
 
 {{range $i, $it := .Items}}{{if $i}}
-{{end}}- {{$it.Line}}: {{$r := print $it.Resolution}}{{if eq $r "done"}}done{{else if eq $r "answered"}}answered{{else if eq $r "fixed"}}fixed{{else if eq $r "delegated"}}delegated{{else if eq $r "declined"}}declined{{else if eq $r "dismissed"}}dismissed{{else if eq $r "superseded"}}superseded{{else if eq $r "moot"}}moot{{else}}resolved{{end}}{{end -}}
+{{end}}- {{or $it.Ask $it.Line}}: {{$r := print $it.Resolution}}{{if eq $r "done"}}done{{else if eq $r "answered"}}answered{{else if eq $r "fixed"}}fixed{{else if eq $r "delegated"}}delegated{{else if eq $r "declined"}}declined{{else if eq $r "dismissed"}}dismissed{{else if eq $r "superseded"}}superseded{{else if eq $r "moot"}}moot{{else}}resolved{{end}}{{end -}}

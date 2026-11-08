@@ -171,6 +171,8 @@ type draftCandidate struct {
 	absorbs []draft.ID
 	// timed says the refusal is a hold that ends with time.
 	timed bool
+	// theirs says the draft posts in the direct conversation of the person it is to.
+	theirs bool
 }
 
 // draftSubject is a step's subject as its drafts see it: the unit they post
@@ -223,6 +225,9 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 		d, err := ob.Propose(ctx, cd.p)
 		switch {
 		case errors.Is(err, outbox.ErrDuplicate):
+			continue
+		case cd.theirs && errors.Is(err, outbox.ErrInvalid):
+			s.logf("draft.propose %s: not writing to %s in their own conversation: %v", c.why.Workflow, cd.person, err)
 			continue
 		case errors.Is(err, outbox.ErrDisabled):
 			return "", automation.Refused{Reason: err.Error()}
@@ -279,17 +284,15 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	}
 	lang := s.draftLanguage(unitFacts, sub.unit, l.Locale)
 	rd := deps.readersOf(sub.unit, unitFacts)
-	var unplaced []string
+	unplaced := false
 	keep := func(p items.Person) bool {
 		ok, unknown := rd.addressed(a.to, p, deps.Codecs)
-		if unknown && !slices.Contains(unplaced, p.Key) {
-			unplaced = append(unplaced, p.Key)
-		}
+		unplaced = unplaced || unknown && p.Key != "" && strings.HasPrefix(p.Key, string(sub.unit.Provider)+":")
 		return ok
 	}
 	defer func() {
-		if len(unplaced) > 0 {
-			s.logf("draft.propose %s: who can read %s is unknown; leaving out %s", w.Name, sub.unit, strings.Join(unplaced, ", "))
+		if a.to == builtin.DraftTo[1] {
+			s.logUnplaced(w.Name, sub.unit, unplaced)
 		}
 	}()
 	layers := profile.Chain(deps.Config())
@@ -378,7 +381,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 				cd.refusal = "its item has no permalink to react to"
 			}
 		case a.target == builtin.DraftTargetPerson:
-			cd.p.Target = person.Key
+			cd.p.Target, cd.theirs = person.Key, true
 		}
 		if cd.refusal == "" {
 			ps, err := prior()
@@ -390,7 +393,8 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" && withdraws {
-			drafted := draftFactsOf(sub, personKeys(to), cd.p.Items, deps.me(), rd.outside(personKeys(to), cd.p.Target, deps.Codecs))
+			keys := personKeys(to)
+			drafted := draftFactsOf(sub, keys, cd.p.Items, deps.me(), rd.outside(keys, cd.p.Target, deps.Codecs), rd.joined(keys, cd.p.Target, deps.Codecs))
 			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, drafted, deps.Config, now)
 			if err != nil {
 				return nil, err
@@ -612,8 +616,12 @@ func draftApproval(cfg config.Config, w workflow.Workflow, extras func(unit.Prov
 // workflowApproval is the approval policy of w's drafts and of the turns it
 // starts of an intent whose block is intent: the config's
 // workflows.<name>.gates.approval laid over the manifest's, else over
-// intent, else over def, field by field; nil when none is set.
+// intent, else over def, field by field; nil when none is set. A workflow whose drafts always wait gets a
+// fixed wait.
 func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy, extras func(unit.ProviderID) expr.Env, def draft.Approval) *draft.Policy {
+	if w.DraftsWait {
+		return draft.Fixed(draft.Approval{Mode: draft.Wait})
+	}
 	base := cmp.Or(w.DraftApproval, intent)
 	if p, _ := configPolicy(w, base, cfg.Workflows[w.Name].GateApproval(), extras, def); p != nil {
 		return p

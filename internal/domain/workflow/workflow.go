@@ -283,6 +283,9 @@ type Workflow struct {
 	// propose, from its [gates.approval]; nil when that names none for a
 	// draft gate.
 	DraftApproval *draft.Policy
+	// DraftsWait pins every draft the workflow proposes to wait for a person, whatever the configuration's
+	// approval says.
+	DraftsWait bool
 	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.

@@ -261,7 +261,8 @@ func (b *opBuilder) fields(out ItemOut) items.Fields {
 }
 
 // diffFields keeps only the fields of want that differ from cur. On a confirmed item the
-// free-text fields are left out: a rewording would become a new proposal on every run.
+// free-text fields are left out: a rewording would become a new proposal on every run. Its ask is filled
+// once, when it has none.
 func diffFields(cur items.Item, want items.Fields) (items.Fields, bool) {
 	var f items.Fields
 	if *want.Kind != cur.Kind {
@@ -270,7 +271,7 @@ func diffFields(cur items.Item, want items.Fields) (items.Fields, bool) {
 	if !cur.Confirmed && *want.Summary != cur.Summary {
 		f.Summary = want.Summary
 	}
-	if !cur.Confirmed && *want.Ask != cur.Ask {
+	if *want.Ask != cur.Ask && (cur.Ask == "" || !cur.Confirmed) {
 		f.Ask = want.Ask
 	}
 	if !cur.Confirmed && oneLine(*want.Context) != oneLine(cur.Context) {

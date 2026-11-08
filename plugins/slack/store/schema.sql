@@ -92,7 +92,8 @@ CREATE TABLE slack_cursors (
   name TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL
 ) WITHOUT ROWID;
 
--- members is the JSON list of a group DM's or a channel's member user ids as conversations.members last read them
+-- members is the JSON list of a group DM's or a channel's member user ids as conversations.members last read them,
+-- null when that read, at fetched_at, failed
 CREATE TABLE slack_members (
   conversation TEXT PRIMARY KEY, members TEXT NOT NULL DEFAULT '[]', fetched_at TEXT NOT NULL
 ) WITHOUT ROWID;

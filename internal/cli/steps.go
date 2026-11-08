@@ -118,6 +118,10 @@ type stepSet struct {
 	// held is, per unit, the refusal an open question last gave its round
 	// and the head that round was planned on.
 	held map[unit.Unit]questionHold
+
+	unplacedMu sync.Mutex
+	// unplaced is, per workflow and unit, whether who can read the unit was last unknown.
+	unplaced map[string]bool
 }
 
 var _ automation.Steps = (*stepSet)(nil)

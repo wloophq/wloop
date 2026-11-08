@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -14,9 +15,11 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
 
-func waitingItem(f *fixture, id string) {
+func waitingItem(f *fixture, id string) { waitingItemOn(f, factsThread, id) }
+
+func waitingItemOn(f *fixture, u unit.Unit, id string) {
 	at := monday.Add(-72 * time.Hour)
-	f.host.Put(items.Item{ID: id, Unit: factsThread, Kind: items.Request, Summary: "s " + id, Origin: unit.Anchor{Unit: factsThread, Ref: "m:" + id},
+	f.host.Put(items.Item{ID: id, Unit: u, Kind: items.Request, Summary: "s " + id, Origin: unit.Anchor{Unit: u, Ref: "m:" + id},
 		Requester: items.Person{Key: "slack:" + me}, Basis: items.NoBasis, State: items.Open, Confidence: items.High,
 		Provenance: items.Extracted, WaitingOn: []items.Person{{Key: "slack:" + other}}, CreatedAt: at, UpdatedAt: at})
 }
@@ -97,5 +100,54 @@ func TestAFailedMembersReadLeavesThemUnknownAndIsLogged(t *testing.T) {
 	}
 	if logs := f.logs.String(); !strings.Contains(logs, "reading who is in C0001") {
 		t.Errorf("logs %q, want the failed read", logs)
+	}
+	f.now = f.now.Add(membersTTL - time.Minute)
+	if err := f.p.refreshMembers(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if calls := f.api.Calls("conversations.members"); len(calls) != 1 {
+		t.Fatalf("%d calls within a day of a failed read, want it backed off", len(calls))
+	}
+	f.now = f.now.Add(2 * time.Minute)
+	if err := f.p.refreshMembers(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if calls := f.api.Calls("conversations.members"); len(calls) != 2 {
+		t.Fatalf("%d calls a day after a failed read, want it tried again", len(calls))
+	}
+}
+
+func TestAFailingConversationStarvesNoOther(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newFactsFixture(t)
+	f.login(t)
+	var convs []store.ConversationRow
+	for i := range membersPerRun + 1 {
+		id := fmt.Sprintf("C%04d", i+1)
+		convs = append(convs, store.ConversationRow{ID: id, Team: "T0001", Name: "c" + id, Kind: string(dslack.KindChannel)})
+		waitingItemOn(f, dslack.ThreadUnit("T0001", id, "1700000000.000100"), "i1")
+	}
+	if err := f.db.Slack().PutConversations(ctx, convs); err != nil {
+		t.Fatal(err)
+	}
+	f.api.Handle("conversations.members", func(v url.Values) any {
+		if v.Get("channel") == "C0001" {
+			return map[string]any{"ok": false, "error": "not_in_channel"}
+		}
+		return map[string]any{"members": []string{me}}
+	})
+	for range 2 {
+		if err := f.p.refreshMembers(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var read []string
+	for _, c := range f.api.Calls("conversations.members") {
+		read = append(read, c.Get("channel"))
+	}
+	slices.Sort(read)
+	if want := []string{"C0001", "C0002", "C0003", "C0004", "C0005", "C0006", "C0007", "C0008", "C0009", "C0010", "C0011"}; !slices.Equal(read, want) {
+		t.Fatalf("read %v over two jobs, want each conversation once, the failing one not again", read)
 	}
 }

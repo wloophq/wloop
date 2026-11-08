@@ -427,6 +427,29 @@ func TestADroppedDraftCarriesItsReasonInWords(t *testing.T) {
 	}
 }
 
+func TestADraftInAPersonsOwnConversationSaysWhichConversationItQuotes(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	person := "github:octocat"
+	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Target: person,
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: r7u.String() + ":" + person}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := r.propose(t, r7u, "hello", draft.Wait)
+	var got api.Draft
+	if code := r.getDraft(t, quoting.ID, &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	if !strings.HasPrefix(got.Quoted, "Quotes an item of ") || !strings.Contains(got.Quoted, cmp.Or(got.Label, r7u.String())) {
+		t.Fatalf("quoted %q, want the catalog's words naming %q", got.Quoted, cmp.Or(got.Label, r7u.String()))
+	}
+	if code := r.getDraft(t, plain.ID, &got); code != 200 || got.Quoted != "" {
+		t.Fatalf("a draft on its own conversation says %q", got.Quoted)
+	}
+}
+
 func TestEnabledPluginWithoutPublisherAnswers409(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)

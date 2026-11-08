@@ -35,4 +35,16 @@ func TestAConversationsMembersRoundTripAndAreReplaced(t *testing.T) {
 	if len(got) != 1 || !ok || !slices.Equal(m.Members, []string{"U0000000003"}) || !m.Fetched.Equal(at.Add(time.Hour)) {
 		t.Fatalf("members %+v, want the second read of C0001 alone", got)
 	}
+	for _, r := range []MembersRow{{Conversation: "C0002", Fetched: at}, {Conversation: "C0003", Fetched: at, Failed: true}} {
+		if err := db.Slack().PutMembers(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err = db.Slack().Members(ctx, []string{"C0002", "C0003"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["C0002"].Failed || got["C0002"].Members == nil || !got["C0003"].Failed {
+		t.Fatalf("members %+v, want C0002 read with nobody and C0003's read failed", got)
+	}
 }

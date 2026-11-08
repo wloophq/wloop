@@ -117,8 +117,9 @@ func (s draftSubject) unitOwed(me task.Me, absorbed []string, keep func(items.Pe
 
 // draftFactsOf are the draft slot's facts of a draft on sub to people over the items ids: whether any of
 // people is still waited on, the draft's items still held by any of them (unowned ones for no people),
-// whether every one of them asks you, and outside, how many cannot read where it posts.
-func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, outside int) workflow.Facts {
+// whether every one of them asks you, outside, how many cannot read where it posts, and joined, whether the
+// person it was written to in their own conversation now reads the one it came from.
+func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, outside int, joined bool) workflow.Facts {
 	var mine []items.Item
 	for _, it := range sub.items {
 		if slices.Contains(ids, it.ID) {
@@ -153,6 +154,7 @@ func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, o
 		"draft.unit_open":       sub.task == nil || sub.task.Open(),
 		"draft.person_asks_you": asks,
 		"draft.people_outside":  outside,
+		"draft.target_joined":   joined,
 	}
 }
 
