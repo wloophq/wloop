@@ -57,9 +57,9 @@ func (e *Env) hostedFor(db *sqlite.DB, cfg config.Config, logf func(string, ...a
 
 func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedger) *psource.Hosted {
 	return &psource.Hosted{
-		Items:   items,
-		Ask:     e.pluginAsk(id),
-		Profile: pluginProfile(id, e.currentConfig),
+		Items:    items,
+		Ask:      e.pluginAsk(id),
+		Profile:  pluginProfile(id, e.currentConfig),
 		Holds:    e.pluginHolds(id),
 		Sessions: sessionBooks{sqlite.New(db)},
 		Intents: func() *dintent.Registry {
