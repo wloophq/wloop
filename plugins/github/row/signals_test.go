@@ -128,13 +128,12 @@ func TestAStalledCardSaysSoOnItsSituationLine(t *testing.T) {
 		t.Errorf("a separate stalled signal: %+v", sigs)
 	}
 	want := src.CardSignal{Key: SignalSituation, Value: string(situation.KindChanges), Tone: ToneNeutral,
-		Detail: &src.SignalDetail{Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": "7"}}}}}
-	if !reflect.DeepEqual(sigs[0], want) {
+		Detail: &src.SignalDetail{Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Since: r.Situation.Since}}}}
+	if !reflect.DeepEqual(sigs[0], want) || r.Situation.Since.IsZero() {
 		t.Errorf("situation signal %+v, want %+v", sigs[0], want)
 	}
-	want2 := src.CardSignal{Key: SignalReview, Value: ReviewChangesRequested, Tone: ToneWarn}
-	if !slices.ContainsFunc(sigs, func(s src.CardSignal) bool { return reflect.DeepEqual(s, want2) }) {
-		t.Errorf("signals %+v, want %+v among them", sigs, want2)
+	if slices.ContainsFunc(sigs, func(s src.CardSignal) bool { return s.Key == SignalReview }) {
+		t.Errorf("signals %+v repeat the situation's changes asked in a review signal", sigs)
 	}
 }
 
@@ -160,22 +159,6 @@ func TestEachCardSignalIsACode(t *testing.T) {
 		}
 		if !slices.Equal(got, w) {
 			t.Errorf("%s: signals %q, want %q", f.name, got, w)
-		}
-	}
-}
-
-func TestStalledDaysAreWholeWorkingDaysAtLeastOne(t *testing.T) {
-	monday := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
-	for _, c := range []struct {
-		now  time.Time
-		want string
-	}{
-		{monday.Add(6 * time.Hour), "1"},
-		{monday.Add(4 * 24 * time.Hour), "4"},
-		{monday.Add(7 * 24 * time.Hour), "5"},
-	} {
-		if got := stalledDays(monday, c.now); got != c.want {
-			t.Errorf("at %v: %s working days, want %s", c.now, got, c.want)
 		}
 	}
 }

@@ -189,7 +189,7 @@ values = { passing = "passing", pending = "pending", failing = "failing", failin
 
 [signals.review]
 label = "review"
-values = { approved = "approved", changes_requested = "changes requested" }
+values = { approved = "approved" }
 
 [signals.merge]
 label = "merge"

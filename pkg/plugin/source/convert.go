@@ -150,7 +150,7 @@ func cardPB(c *Card) *pb.Card {
 			out := &pb.CardSignal{Key: s.Key, Value: s.Value, Tone: s.Tone, At: ts(s.At)}
 			if d := s.Detail; d != nil {
 				out.Params = d.Params
-				out.Notes = mapSlice(d.Notes, func(n SignalNote) *pb.SignalNote { return &pb.SignalNote{Code: n.Code, Tone: n.Tone, Params: n.Params} })
+				out.Notes = mapSlice(d.Notes, func(n SignalNote) *pb.SignalNote { return &pb.SignalNote{Code: n.Code, Tone: n.Tone, Params: n.Params, Since: ts(n.Since)} })
 			}
 			return out
 		}),
@@ -173,7 +173,7 @@ func cardGo(c *pb.Card) *Card {
 			out := CardSignal{Key: s.GetKey(), Value: s.GetValue(), Tone: s.GetTone(), At: tm(s.GetAt())}
 			if len(s.GetParams()) > 0 || len(s.GetNotes()) > 0 {
 				out.Detail = &SignalDetail{Params: s.GetParams(), Notes: mapSlice(s.GetNotes(), func(n *pb.SignalNote) SignalNote {
-					return SignalNote{Code: n.GetCode(), Tone: n.GetTone(), Params: n.GetParams()}
+					return SignalNote{Code: n.GetCode(), Tone: n.GetTone(), Params: n.GetParams(), Since: tm(n.GetSince())}
 				})}
 			}
 			return out

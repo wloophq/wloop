@@ -16,7 +16,7 @@ import (
 // reports'. The job runs under --no-jobs too: it reads and writes only the
 // store.
 func (e *Env) withCards(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) daemon.Deps {
-	d.Cards = cardsjob.Served(db.Cards(), e.cardsFresh(d.PluginEnabled))
+	d.Cards = cardsjob.Served(db.Cards(), e.cardsFresh(d.PluginEnabled), clockFunc(e.Now))
 	providers := map[unit.ProviderID]cardsjob.Provider{}
 	for _, m := range mods {
 		if m.Card != nil || m.Items != nil {

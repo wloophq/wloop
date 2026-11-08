@@ -127,7 +127,6 @@ func TestGitHubsCardSignalsAreWordedByItsLayer(t *testing.T) {
 		{"situation", "loop_working", "agent working"},
 		{"checks", "passing", "passing"},
 		{"checks", "failing_named", "failing: {{.names}}"},
-		{"review", "changes_requested", "changes requested"},
 		{"merge", "conflicts", "conflicts"},
 	} {
 		if got := by[c.key].Values[c.code]; got != c.want {

@@ -403,7 +403,7 @@ func TestDisabledCardsAreStale(t *testing.T) {
 	if _, err := e.store.Save(context.Background(), card.Card{Unit: off, Title: "kept"}, at); err != nil {
 		t.Fatal(err)
 	}
-	served := Served(e.store, func(p unit.ProviderID) bool { return p != "off" })
+	served := Served(e.store, func(p unit.ProviderID) bool { return p != "off" }, nil)
 	got, err := served.Get(context.Background(), []unit.Unit{t1, off})
 	if err != nil {
 		t.Fatal(err)
@@ -414,7 +414,7 @@ func TestDisabledCardsAreStale(t *testing.T) {
 	if got[t1].Stale {
 		t.Errorf("enabled snapshot %+v is stale", got[t1])
 	}
-	if all := Served(e.store, nil); all != e.store {
+	if all := Served(e.store, nil, nil); all != e.store {
 		t.Error("Served with no switch wraps the store")
 	}
 }
@@ -492,4 +492,35 @@ func TestCardsJobResolvesItemsOfAGoneUnit(t *testing.T) {
 			t.Errorf("a listed unit lost its row's items: %+v", c)
 		}
 	})
+}
+
+// TestAServedNoteCountsItsWorkingDaysAtTheRead holds that a note counting from an instant reads the whole
+// working days since it when the card is read, at least one, so a stored card's count moves with the clock with
+// no new card saved.
+func TestAServedNoteCountsItsWorkingDaysAtTheRead(t *testing.T) {
+	monday := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
+	store := &fakeStore{}
+	note := card.Note{Code: "stalled", Tone: "warn", Since: monday}
+	if _, err := store.Save(context.Background(), card.Card{Unit: t1, Signals: []card.Signal{{Key: "situation", Value: "review", Notes: []card.Note{note}}}}, monday); err != nil {
+		t.Fatal(err)
+	}
+	now := monday
+	served := Served(store, nil, func() time.Time { return now })
+	for _, c := range []struct {
+		at   time.Time
+		days string
+	}{{monday.Add(2 * time.Hour), "1"}, {monday.Add(2 * 24 * time.Hour), "2"}, {monday.Add(3 * 24 * time.Hour), "3"}, {monday.Add(7 * 24 * time.Hour), "5"}} {
+		now = c.at
+		got, err := served.Get(context.Background(), []unit.Unit{t1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if d := got[t1].Card.Signals[0].Notes[0].Params["days"]; d != c.days {
+			t.Errorf("at %v the note reads %q working days, want %s", c.at, d, c.days)
+		}
+	}
+	stored, _ := store.Get(context.Background(), []unit.Unit{t1})
+	if p := stored[t1].Card.Signals[0].Notes[0].Params; p != nil {
+		t.Errorf("serving wrote %v into the stored card", p)
+	}
 }

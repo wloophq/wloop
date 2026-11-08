@@ -243,8 +243,8 @@ label = "checks"
 values = { passing = "passando", pending = "pendentes", failing = "falhando", failing_named = "falhando: {{.names}}" }
 
 [signals.review]
-label = "review"
-values = { approved = "aprovada", changes_requested = "mudanças pedidas" }
+label = "revisão"
+values = { approved = "aprovada" }
 
 [signals.merge]
 label = "merge"

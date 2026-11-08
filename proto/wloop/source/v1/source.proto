@@ -231,6 +231,9 @@ message SignalNote {
   string code = 1;
   string tone = 2;
   map<string, string> params = 3;
+  // since is the instant the note counts from: each read of the card fills
+  // its "days" param with the whole working days since it, at least one.
+  google.protobuf.Timestamp since = 4;
 }
 
 message Human {

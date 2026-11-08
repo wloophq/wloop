@@ -35,7 +35,6 @@ func signalCards() []api.CardView {
 		{Card: card.Card{Unit: prUnit, Label: "acme/api#8", Signals: []card.Signal{
 			{Key: "situation", Value: "changes", Tone: "neutral", Notes: stalled},
 			{Key: "checks", Value: "failing_named", Tone: "bad", Params: map[string]string{"names": "lint, test"}},
-			{Key: "review", Value: "changes_requested", Tone: "warn"},
 			{Key: "merge", Value: "conflicts", Tone: "bad"},
 		}}},
 		{Card: card.Card{Unit: prUnit, Label: "acme/api#9", Signals: []card.Signal{
@@ -78,7 +77,6 @@ func TestCardSignalsReadInTheCatalogsWords(t *testing.T) {
 		{"en", [][]string{
 			{"situation", "changes asked · stalled for 3 working days", "tone-neutral", "tone-warn:stalled for 3 working days"},
 			{"checks", "failing: lint, test", "tone-bad"},
-			{"review", "changes requested", "tone-warn"},
 			{"merge", "conflicts", "tone-bad"},
 			{"checks", "passing", "tone-good"},
 			{"review", "approved", "tone-good"},
@@ -88,10 +86,9 @@ func TestCardSignalsReadInTheCatalogsWords(t *testing.T) {
 		{"pt-BR", [][]string{
 			{"situação", "mudanças pedidas · parado há 3 dias úteis", "tone-neutral", "tone-warn:parado há 3 dias úteis"},
 			{"checks", "falhando: lint, test", "tone-bad"},
-			{"review", "mudanças pedidas", "tone-warn"},
 			{"merge", "conflitos", "tone-bad"},
 			{"checks", "passando", "tone-good"},
-			{"review", "aprovada", "tone-good"},
+			{"revisão", "aprovada", "tone-good"},
 			{"checks", "pendentes", "tone-warn"},
 			{"lane", "fast_track · odd", "tone-info", "tone-warn:odd"},
 		}},
@@ -119,13 +116,14 @@ func TestCardSignalsReadInTheCatalogsWords(t *testing.T) {
 func TestACardSignalWithNoCatalogShowsItsCodes(t *testing.T) {
 	e := pageTask(t)
 	e.Cards = signalCards()[:1]
+	e.Cards[0].Card.Signals = append(e.Cards[0].Card.Signals, card.Signal{Key: "draft", Tone: "neutral"})
 	var got signalsShown
 	runTaskPageOn(t, taskCatalog(), signalsShownJS, map[string]any{"task": e, "catalog": api.CatalogResponse{}}, &got)
 	want := [][]string{
 		{"situation", "changes · stalled", "tone-neutral", "tone-warn:stalled"},
 		{"checks", "failing_named", "tone-bad"},
-		{"review", "changes_requested", "tone-warn"},
 		{"merge", "conflicts", "tone-bad"},
+		{"draft", "draft", "tone-neutral"},
 	}
 	if mustJS(t, got.Grid) != mustJS(t, want) {
 		t.Errorf("props grid\n got %v\nwant %v", got.Grid, want)

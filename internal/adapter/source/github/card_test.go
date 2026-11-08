@@ -55,39 +55,37 @@ func TestCardFromRow(t *testing.T) {
 
 func samePerson(a, b items.Person) bool { return a.Key == b.Key && a.Name == b.Name }
 
-// TestAStalledCardsSituationSaysForHowLongOnTheHostsClock holds that the host words a stall on the situation's
-// line as a note of the working days since the row's situation began, counted at the host's now, and adds no
+// TestAStalledCardsSituationCountsFromItsStart holds that the host notes a stall on the situation's line,
+// counting from when the row's situation began, whose working days a read of the card counts, and adds no
 // separate stalled signal.
-func TestAStalledCardsSituationSaysForHowLongOnTheHostsClock(t *testing.T) {
+func TestAStalledCardsSituationCountsFromItsStart(t *testing.T) {
 	r := stalledRow(t)
 	rep, ok := ghsourcetest.ReportOf(r)
 	if !ok {
 		t.Fatal("no report")
 	}
-	since := r.Summary.Since
-	for _, c := range []struct {
-		now  time.Time
-		days string
-	}{{workday.Add(since, 3*24*time.Hour), "3"}, {workday.Add(since, 5*24*time.Hour+time.Hour), "5"}} {
-		got, err := CardOf(r, rep, c.now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if slices.ContainsFunc(got.Signals, func(s card.Signal) bool { return s.Key == "stalled" }) {
-			t.Errorf("a separate stalled signal: %+v", got.Signals)
-		}
-		want := []card.Note{{Code: "stalled", Tone: "warn", Params: map[string]string{"days": c.days}}}
-		if s := got.Signals[0]; s.Key != "situation" || s.Value != string(r.Kind) || !reflect.DeepEqual(s.Notes, want) {
-			t.Errorf("at %v the situation signal %+v, want %s with notes %+v", c.now, s, r.Kind, want)
-		}
-	}
-	r.Summary.Stalled = false
-	got, err := CardOf(r, rep, ghsourcetest.Now)
+	got, err := CardOf(r, rep)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := got.Signals[0].Notes; n != nil {
-		t.Errorf("a row the host does not see stalled keeps the plugin's note %+v", n)
+	if slices.ContainsFunc(got.Signals, func(s card.Signal) bool { return s.Key == "stalled" }) {
+		t.Errorf("a separate stalled signal: %+v", got.Signals)
+	}
+	want := []card.Note{{Code: "stalled", Tone: "warn", Since: r.Summary.Since}}
+	if s := got.Signals[0]; s.Key != "situation" || s.Value != string(r.Kind) || !reflect.DeepEqual(s.Notes, want) {
+		t.Errorf("the situation signal %+v, want %s with notes %+v", s, r.Kind, want)
+	}
+	for _, c := range []struct {
+		now  time.Time
+		days string
+	}{{workday.Add(r.Summary.Since, 3*24*time.Hour), "3"}, {workday.Add(r.Summary.Since, 5*24*time.Hour+time.Hour), "5"}} {
+		if d := got.CountedAt(c.now).Signals[0].Notes[0].Params["days"]; d != c.days {
+			t.Errorf("read at %v the stall reads %q working days, want %s", c.now, d, c.days)
+		}
+	}
+	r.Summary.Stalled = false
+	if got, _ = CardOf(r, rep); got.Signals[0].Notes != nil {
+		t.Errorf("a row the host does not see stalled keeps the plugin's note %+v", got.Signals[0].Notes)
 	}
 }
 
@@ -195,7 +193,7 @@ func TestTheCardsAreTheRowsCardsOfBefore(t *testing.T) {
 	if *update {
 		want = want[:0]
 		for _, c := range cases {
-			got, err := CardOf(c.Row, c.Report, ghsourcetest.Now)
+			got, err := CardOf(c.Row, c.Report)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -216,7 +214,7 @@ func TestTheCardsAreTheRowsCardsOfBefore(t *testing.T) {
 		t.Fatalf("%d cases, the golden holds %d", len(cases), len(want))
 	}
 	for i, c := range cases {
-		got, err := CardOf(c.Row, c.Report, ghsourcetest.Now)
+		got, err := CardOf(c.Row, c.Report)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,9 +235,8 @@ func BenchmarkCardOfAStalledRow(b *testing.B) {
 		}
 	}
 	rep, _ := ghsourcetest.ReportOf(r)
-	now := ghsourcetest.Now.Add(60 * 24 * time.Hour)
 	for b.Loop() {
-		if _, err := CardOf(r, rep, now); err != nil {
+		if _, err := CardOf(r, rep); err != nil {
 			b.Fatal(err)
 		}
 	}

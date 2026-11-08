@@ -431,7 +431,7 @@ function unitRef(u, label, link) {
 
 // signalWords are a card signal in its plugin's words (the catalog's card_signals): its name, and its value
 // filled with its params followed by each note in its tone; value is how an instant value shows. A code with no
-// words shows as itself.
+// words shows as itself, and an empty one as its key.
 function signalWords(provider, g, value) {
   const spec = (catalog.cardSignals || []).find((s) => s.provider === provider && s.key === g.key) || {};
   const word = (spec.values || {})[g.value];
@@ -439,7 +439,7 @@ function signalWords(provider, g, value) {
     const w = (spec.notes || {})[n.code];
     return [" · ", h("span", { class: "tone-" + (n.tone || "neutral") }, w ? fillWord(w, n.params || {}) : n.code)];
   });
-  return { label: spec.label || g.key, value: [g.at ? value(g.at) : word ? fillWord(word, g.params || {}) : g.value, ...notes] };
+  return { label: spec.label || g.key, value: [g.at ? value(g.at) : word ? fillWord(word, g.params || {}) : g.value || g.key, ...notes] };
 }
 
 // unitCard is a unit's stored card (#unit-card); opts.signals false leaves its signals to a grid that shows them.

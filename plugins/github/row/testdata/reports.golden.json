@@ -1015,9 +1015,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "2"
-                  }
+                  "since": "2026-10-12T11:00:00Z"
                 }
               ]
             }
@@ -1676,9 +1674,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "2"
-                  }
+                  "since": "2026-10-11T09:00:00Z"
                 }
               ]
             }
@@ -2036,9 +2032,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "7"
-                  }
+                  "since": "2026-10-05T15:00:00Z"
                 }
               ]
             }
@@ -2047,11 +2041,6 @@
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "review",
-            "value": "changes_requested",
-            "tone": "warn"
           }
         ],
         "last_human": {
@@ -3083,9 +3072,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "3"
-                  }
+                  "since": "2026-10-09T15:00:00Z"
                 }
               ]
             }
@@ -3421,9 +3408,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "3"
-                  }
+                  "since": "2026-10-08T16:00:00Z"
                 }
               ]
             }
@@ -5560,9 +5545,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "10"
-                  }
+                  "since": "2026-09-30T13:00:00Z"
                 }
               ]
             }
@@ -5895,9 +5878,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "10"
-                  }
+                  "since": "2026-09-30T00:00:00Z"
                 }
               ]
             }
@@ -6511,9 +6492,7 @@
                 {
                   "code": "stalled",
                   "tone": "warn",
-                  "params": {
-                    "days": "42"
-                  }
+                  "since": "2026-08-15T15:00:00Z"
                 }
               ]
             }

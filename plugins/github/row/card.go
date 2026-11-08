@@ -1,14 +1,11 @@
 package row
 
 import (
-	"strconv"
 	"strings"
-	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
-	"github.com/wloophq/wloop/plugins/github/workday"
 )
 
 // The tones of a card's signals.
@@ -28,16 +25,15 @@ const (
 	SignalReview    = "review"
 	SignalMerge     = "merge"
 
-	ChecksFailing          = "failing"
-	ChecksFailingNamed     = "failing_named"
-	ChecksPending          = "pending"
-	ChecksPassing          = "passing"
-	ReviewApproved         = "approved"
-	ReviewChangesRequested = "changes_requested"
-	MergeConflicts         = "conflicts"
+	ChecksFailing      = "failing"
+	ChecksFailingNamed = "failing_named"
+	ChecksPending      = "pending"
+	ChecksPassing      = "passing"
+	ReviewApproved     = "approved"
+	MergeConflicts     = "conflicts"
 
-	// NoteStalled is the situation's note once it is stalled; its days param
-	// is how many working days it has waited.
+	// NoteStalled is the situation's note once it is stalled, counting from
+	// when the situation began.
 	NoteStalled = "stalled"
 )
 
@@ -84,7 +80,7 @@ func (r Row) signals() []src.CardSignal {
 		return []src.CardSignal{sit}
 	}
 	if r.Stalled() {
-		sit.Detail = &src.SignalDetail{Notes: []src.SignalNote{stalledNote(r.Situation.Stalled.Time, r.in.Now)}}
+		sit.Detail = &src.SignalDetail{Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Since: r.Situation.Since}}}
 	}
 	out := []src.CardSignal{sit}
 	if f := r.Payload.Facts; f != nil {
@@ -101,27 +97,13 @@ func (r Row) signals() []src.CardSignal {
 			out = append(out, src.CardSignal{Key: SignalChecks, Value: ChecksPassing, Tone: ToneGood})
 		}
 	}
-	switch {
-	case r.Payload.Approved || kind == situation.KindMerge:
+	if r.Payload.Approved || kind == situation.KindMerge {
 		out = append(out, src.CardSignal{Key: SignalReview, Value: ReviewApproved, Tone: ToneGood})
-	case kind == situation.KindChanges:
-		out = append(out, src.CardSignal{Key: SignalReview, Value: ReviewChangesRequested, Tone: ToneWarn})
 	}
 	if kind == situation.KindConflicts {
 		out = append(out, src.CardSignal{Key: SignalMerge, Value: MergeConflicts, Tone: ToneBad})
 	}
 	return out
-}
-
-// stalledNote is the situation's note of a stall that began waiting at since, as of now.
-func stalledNote(since, now time.Time) src.SignalNote {
-	return src.SignalNote{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": stalledDays(since, now)}}
-}
-
-// stalledDays is the whole working days from since to now, at least one: a
-// stall under a day's threshold still reads as a day.
-func stalledDays(since, now time.Time) string {
-	return strconv.Itoa(max(1, int(workday.Between(since, now)/(24*time.Hour))))
 }
 
 // Person is a GitHub login, or the group of a "team:<org>/<slug>" request.

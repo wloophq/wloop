@@ -433,7 +433,7 @@ func CardSignal(s src.CardSignal) card.Signal {
 	if d := s.Detail; d != nil {
 		out.Params = maps.Clone(d.Params)
 		for _, n := range d.Notes {
-			out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params)})
+			out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params), Since: n.Since})
 		}
 	}
 	return out

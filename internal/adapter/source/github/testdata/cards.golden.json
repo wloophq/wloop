@@ -2410,9 +2410,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "2"
-              }
+              "since": "2026-10-20T15:00:00Z"
             }
           ]
         },
@@ -2493,9 +2491,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "2"
-              }
+              "since": "2026-10-20T15:00:00Z"
             }
           ]
         },
@@ -2576,9 +2572,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "2"
-              }
+              "since": "2026-10-20T15:00:00Z"
             }
           ]
         },
@@ -2659,9 +2653,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "2"
-              }
+              "since": "2026-10-20T15:00:00Z"
             }
           ]
         },
@@ -2743,11 +2735,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -2785,11 +2772,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -2821,11 +2803,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -2863,11 +2840,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -2899,11 +2871,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -2941,11 +2908,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -2977,11 +2939,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -3019,11 +2976,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -3055,11 +3007,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3106,11 +3053,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3151,11 +3093,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3202,11 +3139,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3247,11 +3179,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3298,11 +3225,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3343,11 +3265,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -3394,11 +3311,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "last_human": {
@@ -6490,9 +6402,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "8"
-              }
+              "since": "2026-10-12T15:00:00Z"
             }
           ]
         },
@@ -6567,9 +6477,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "8"
-              }
+              "since": "2026-10-12T15:00:00Z"
             }
           ]
         },
@@ -6644,9 +6552,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "8"
-              }
+              "since": "2026-10-12T15:00:00Z"
             }
           ]
         },
@@ -6721,9 +6627,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "8"
-              }
+              "since": "2026-10-12T15:00:00Z"
             }
           ]
         },
@@ -6798,9 +6702,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "6"
-              }
+              "since": "2026-10-14T15:00:00Z"
             }
           ]
         },
@@ -6808,11 +6710,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -6850,11 +6747,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -6885,9 +6777,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "6"
-              }
+              "since": "2026-10-14T15:00:00Z"
             }
           ]
         },
@@ -6895,11 +6785,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -6937,11 +6822,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -6972,9 +6852,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "6"
-              }
+              "since": "2026-10-14T15:00:00Z"
             }
           ]
         },
@@ -6982,11 +6860,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -7024,11 +6897,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",
@@ -7059,9 +6927,7 @@
             {
               "code": "stalled",
               "tone": "warn",
-              "params": {
-                "days": "6"
-              }
+              "since": "2026-10-14T15:00:00Z"
             }
           ]
         },
@@ -7069,11 +6935,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "changes requested by octocat",
@@ -7111,11 +6972,6 @@
           "key": "checks",
           "value": "passing",
           "tone": "good"
-        },
-        {
-          "key": "review",
-          "value": "changes_requested",
-          "tone": "warn"
         }
       ],
       "why": "muted",

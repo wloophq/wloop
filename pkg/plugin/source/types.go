@@ -154,6 +154,10 @@ type SignalNote struct {
 	Code   string            `json:"code,omitempty"`
 	Tone   string            `json:"tone,omitempty"`
 	Params map[string]string `json:"params,omitempty"`
+	// Since is the instant the note counts from: each read of the card fills
+	// its "days" param with the whole working days since it, at least one,
+	// Saturdays and Sundays in UTC left out.
+	Since time.Time `json:"since,omitzero"`
 }
 
 // Human is the last thing a person did on a unit.
