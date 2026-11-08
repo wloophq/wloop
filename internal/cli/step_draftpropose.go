@@ -169,8 +169,8 @@ type draftCandidate struct {
 	perUnit bool
 	// absorbs are the held drafts to the whole conversation whose items this one lists too, which it replaces.
 	absorbs []draft.ID
-	// timed says the refusal is a hold that ends with time.
-	timed bool
+	// hold is the refusal's hold when earlier drafts or the withdraw when hold the proposal.
+	hold draftHold
 	// theirs says the draft posts in the direct conversation of the person it is to.
 	theirs bool
 }
@@ -189,16 +189,30 @@ func (s *stepSet) draftProposeCheck(ctx context.Context, c stepCall, _ automatio
 		return "", err
 	}
 	var refusals []string
+	forGood, ends := true, true
+	var until time.Time
 	for _, cd := range cands {
 		if cd.refusal == "" {
 			return "", nil
 		}
 		refusals = append(refusals, cd.refusal)
+		forGood = forGood && cd.hold.forGood
+		ends = ends && (cd.hold.forGood || cd.hold.timed)
+		if cd.hold.until.After(until) {
+			until = cd.hold.until
+		}
 	}
 	if len(refusals) == 0 {
 		return "nothing to propose", nil
 	}
-	return strings.Join(slices.Compact(refusals), "; "), nil
+	why := strings.Join(slices.Compact(refusals), "; ")
+	switch {
+	case forGood:
+		return "", automation.Moot{Reason: why}
+	case ends:
+		return "", automation.Held{Reason: why, Until: until}
+	}
+	return why, nil
 }
 
 func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
@@ -214,7 +228,7 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 	timed := false
 	for _, cd := range cands {
 		if cd.refusal != "" {
-			timed = timed || cd.timed
+			timed = timed || cd.hold.timed
 			continue
 		}
 		for _, id := range cd.absorbs {
@@ -388,9 +402,10 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			if err != nil {
 				return nil, err
 			}
-			if cd.refusal, cd.timed, err = holdOf(ctx, ps, deps.Tasks, cd.p, person.Key, a, now, cd.absorbs); err != nil {
+			if cd.hold, err = holdOf(ctx, ps, deps.Tasks, cd.p, person.Key, a, now, cd.absorbs); err != nil {
 				return nil, err
 			}
+			cd.refusal = cd.hold.reason
 		}
 		if cd.refusal == "" && withdraws {
 			keys := personKeys(to)
@@ -399,6 +414,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			if err != nil {
 				return nil, err
 			}
+			cd.hold = draftHold{reason: cd.refusal, forGood: cd.refusal != ""}
 		}
 		if cd.refusal == "" {
 			data := draftData(draftTextData{Workflow: w.Name, Purpose: a.purpose, Facts: facts, People: textPeople(to)}, sub, person, its, now.Location())
@@ -650,8 +666,10 @@ func configPolicy(w workflow.Workflow, base *draft.Policy, a *config.ApprovalCon
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing, but one withdrawn as its task ended: with ended
 // hold, while that task stays ended it holds a proposal of no task or of that task; otherwise as a settled one.
-func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time, absorbs []draft.ID) (string, bool, error) {
-	refusal, timed := "", false
+// The hold is for good while its task stays ended and for a draft sent with forever; a timed one ends at until,
+// when the last of the drafts that hold it for a while lets go.
+func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox.Proposal, person string, a draftArgs, now time.Time, absorbs []draft.ID) (draftHold, error) {
+	var h draftHold
 	for _, d := range prior {
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
 			continue
@@ -660,7 +678,7 @@ func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox
 		perConversation := person == "" && a.per != "person" && a.items == "owed"
 		if perConversation && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != "" {
 			if d.Target == "" && (d.State == draft.Queued || d.State == draft.Sending) {
-				return held, false, nil
+				return draftHold{reason: held}, nil
 			}
 			continue
 		}
@@ -672,20 +690,42 @@ func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox
 		}
 		if a.holdEnded && d.State == draft.Dropped && d.Reason == draft.WithdrawEnded && (p.Task == "" || p.Task == d.Task) {
 			if ended, err := taskEnded(ctx, tasks, task.ID(d.Task)); err != nil || ended {
-				return held, false, err
+				return draftHold{reason: held, forGood: true}, err
 			}
 		}
 		switch {
-		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
-			return held, false, nil
+		case d.State == draft.Sent && a.forever:
+			return draftHold{reason: held, forGood: true}, nil
+		case slices.Contains(draft.Open, d.State), d.State == draft.Failed:
+			return draftHold{reason: held}, nil
 		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot || d.Reason == draft.WithdrawSuperseded):
-		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
-			if refusal == "" {
-				refusal, timed = held, true
-			}
+		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent:
+			h = h.heldTo(held, d.UpdatedAt.Add(a.repeatAfterSent))
+		case d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
+			h = h.heldTo(held, d.UpdatedAt.Add(a.repeatAfter))
 		}
 	}
-	return refusal, timed, nil
+	return h, nil
+}
+
+// draftHold is why earlier drafts hold a proposal: for good, for a while
+// (timed, until a time), or until the user settles one of them.
+type draftHold struct {
+	reason  string
+	timed   bool
+	forGood bool
+	until   time.Time
+}
+
+// heldTo is h held for a while by a draft whose hold ends at end too.
+func (h draftHold) heldTo(reason string, end time.Time) draftHold {
+	if h.reason == "" {
+		h.reason, h.timed = reason, true
+	}
+	if end.After(h.until) {
+		h.until = end
+	}
+	return h
 }
 
 // taskEnded says whether task id is done or dropped; a task no longer stored has ended too.
