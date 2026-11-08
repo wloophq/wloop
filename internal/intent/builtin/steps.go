@@ -130,6 +130,16 @@ var StepSays = map[string]string{
 // StepSaysWithTask is the catalog key of what a step that names another task does, by step.
 var StepSaysWithTask = map[string]string{StepTaskVerb: "Run {verb} on the task, with “{task}”"}
 
+// The refusals of items.resolve, which a plan item shows as its reason.
+const (
+	RefusalNoOpenItem = "the task holds no open item"
+	RefusalNotDerived = "the task is not derived from items: its items do not close it"
+)
+
+// StepRefusals are the refusals of the core steps a plan item shows as its reason, each a key of strings.toml and
+// of api.PlanReasons, which the clients word it by.
+var StepRefusals = []string{RefusalNoOpenItem, RefusalNotDerived}
+
 // StepDrafts are the steps whose message posts once you approve its draft: a plan item running one may post.
 var StepDrafts = []string{StepDraftPropose}
 

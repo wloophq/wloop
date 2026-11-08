@@ -330,7 +330,7 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	}
 	var matched []string
 	for _, f := range it.Why.Matched {
-		matched = append(matched, f.Name+" = "+f.Value)
+		matched = append(matched, m.planFactText(f))
 	}
 	if len(matched) > 0 {
 		fact(m.w().T("matched", nil), strings.Join(matched, ", "), t.Dim)

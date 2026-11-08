@@ -7,6 +7,14 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
+// PlanReasons are the plan item reasons strings.toml words, by their English
+// text, which a client reads through its catalog; any other reason reads as
+// the daemon gives it.
+var PlanReasons = []string{
+	"the task holds no open item",
+	"the task is not derived from items: its items do not close it",
+}
+
 // PlanItem is one item of the workflows' plan.
 type PlanItem struct {
 	ID       string `json:"id"`

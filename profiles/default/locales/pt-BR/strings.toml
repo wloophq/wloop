@@ -329,6 +329,8 @@
 "it waits for you since it was planned" = "espera você desde que foi planejado"
 "it no longer matches since it was planned" = "não casa mais desde que foi planejado"
 "its unit changed since it was planned" = "o que ele afeta mudou desde que foi planejado"
+"the task holds no open item" = "a tarefa não tem item aberto"
+"the task is not derived from items: its items do not close it" = "a tarefa não veio de itens: os itens dela não a fecham"
 "runs when its window ends" = "roda quando a janela acabar"
 "guided by you" = "orientado por você"
 "waits for you while {facts}" = "espera você enquanto {facts}"
