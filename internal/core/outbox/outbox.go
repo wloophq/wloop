@@ -443,6 +443,24 @@ func (s *Service) PublisherOf(d draft.Draft) unit.ProviderID {
 	return own
 }
 
+// BroadcastOf is the broadcast the draft p proposes would take: the one its publisher's Placer places, NoBroadcast
+// when it replies in no thread or its publisher places nothing. It stores nothing and opens no gate.
+func (s *Service) BroadcastOf(ctx context.Context, p Proposal) (draft.Broadcast, error) {
+	if err := checkKind(p.Kind); err != nil {
+		return draft.NoBroadcast, err
+	}
+	d := s.delivered(shaped(draft.Draft{Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target,
+		Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction, Origin: p.Origin, Purpose: p.Purpose, Delivery: p.Delivery}))
+	fx, err := s.publisher(d)
+	if err != nil {
+		return draft.NoBroadcast, err
+	}
+	if err := place(ctx, fx, &d, true); err != nil {
+		return draft.NoBroadcast, err
+	}
+	return d.Broadcast, nil
+}
+
 func (s *Service) publisher(d draft.Draft) (port.Effects, error) {
 	return s.effects(s.PublisherOf(d))
 }

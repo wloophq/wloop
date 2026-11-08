@@ -148,8 +148,11 @@ type DraftCreate struct {
 	// Target is the message a reply answers or a reaction goes on, when it is
 	// not the unit's own.
 	Target string `json:"target,omitempty"`
-	Send   bool   `json:"send,omitempty"`
-	Source string `json:"source"`
+	// Broadcast asks, "on" or "off", that a reply in a thread also post to its conversation, or not; "" leaves it
+	// to the publisher, which also ignores it on a reply in no thread.
+	Broadcast string `json:"broadcast,omitempty"`
+	Send      bool   `json:"send,omitempty"`
+	Source    string `json:"source"`
 }
 
 // DraftOf is the draft of e's first draft gate, its subject; false when e has none.

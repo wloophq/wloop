@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -81,14 +82,13 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeTasksError(w, err)
 		return
 	}
-	u := e.Units[0]
-	c := api.DraftCreate{Unit: u, Task: string(e.ID), Kind: req.Args["kind"], Text: req.Args["text"], Reaction: req.Args["reaction"],
-		Send: send, Source: req.Source}
-	for _, ref := range e.Items {
-		if ref.Unit == u {
-			c.Items = append(c.Items, ref.Item)
-		}
+	broadcast, err := broadcastArg(req.Args)
+	if err != nil {
+		writeTasksError(w, err)
+		return
 	}
+	c := replyDraft(e)
+	c.Kind, c.Text, c.Reaction, c.Broadcast, c.Send, c.Source = req.Args["kind"], req.Args["text"], req.Args["reaction"], broadcast, send, req.Source
 	d, err := s.writeUserDraft(ctx, c, q)
 	if err != nil {
 		writeTasksError(w, taskDraftError(err))
@@ -105,6 +105,72 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		return
 	}
 	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(d)}})
+}
+
+// replyDraft is the draft a reply on e writes: on its first unit, for the task and its items there.
+func replyDraft(e task.Task) api.DraftCreate {
+	u := e.Units[0]
+	c := api.DraftCreate{Unit: u, Task: string(e.ID)}
+	for _, ref := range e.Items {
+		if ref.Unit == u {
+			c.Items = append(c.Items, ref.Item)
+		}
+	}
+	return c
+}
+
+// replyBroadcast is the broadcast a reply the user writes on e would take, as its publisher's Placer places it: "on"
+// or "off" in a thread that can also post to its conversation, "" otherwise or when the publisher cannot tell. Each
+// answer, a failure included, is kept for draftWhereRetry by the draft's unit and items, so a detail refreshed
+// often asks the publisher once a minute; one lookup is bounded as a draft's destination is.
+func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
+	if s.replyRefusal(e) != "" || s.replyVerb() == "" {
+		return ""
+	}
+	c := replyDraft(e)
+	key := c.Unit.String() + "\x00" + strings.Join(c.Items, "\x00")
+	now := time.Now()
+	if v, ok := s.replyBroadcasts.Load(key); ok {
+		if seen := v.(broadcastSeen); now.Sub(seen.at) < draftWhereRetry {
+			return string(seen.broadcast)
+		}
+	}
+	by := now.Add(s.whereTimeout())
+	if page, ok := ctx.Value(whereByKey{}).(time.Time); ok && page.Before(by) {
+		by = page
+	}
+	if !now.Before(by) {
+		return ""
+	}
+	ctx, cancel := context.WithDeadline(ctx, by)
+	defer cancel()
+	b, err := s.deps.Outbox.BroadcastOf(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: draft.Reply,
+		Origin: draft.Origin{Kind: draft.OriginUser}})
+	if err != nil {
+		b = draft.NoBroadcast
+	}
+	s.replyBroadcasts.Store(key, broadcastSeen{broadcast: b, at: now})
+	return string(b)
+}
+
+type broadcastSeen struct {
+	broadcast draft.Broadcast
+	at        time.Time
+}
+
+// broadcastArg is the broadcast a reply's broadcast argument asks for, "" when it names none.
+func broadcastArg(args map[string]string) (string, error) {
+	raw, ok := args["broadcast"]
+	if !ok {
+		return "", nil
+	}
+	switch raw {
+	case "true":
+		return string(draft.BroadcastOn), nil
+	case "false":
+		return string(draft.BroadcastOff), nil
+	}
+	return "", fmt.Errorf("%w: broadcast is true or false, not %q", coretasks.ErrArgs, raw)
 }
 
 func sendArg(raw string) (bool, error) {
@@ -189,6 +255,10 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	if err != nil {
 		return draft.Draft{}, err
 	}
+	broadcast := draft.Broadcast(c.Broadcast)
+	if !broadcast.Valid() {
+		return draft.Draft{}, badRequest{fmt.Sprintf("broadcast is %q or %q, not %q", draft.BroadcastOn, draft.BroadcastOff, c.Broadcast)}
+	}
 	if err := s.targetIn(ctx, strings.TrimSpace(c.Target), c.Unit); err != nil {
 		return draft.Draft{}, err
 	}
@@ -200,7 +270,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	}
 	o := s.deps.Outbox
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
-		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: origin, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Broadcast: broadcast, Origin: origin, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}

@@ -443,6 +443,8 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
+	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
+	replyBroadcasts sync.Map
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
 	// pauseMu serializes every read-modify-write of the pause.
