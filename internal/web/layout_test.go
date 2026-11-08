@@ -317,6 +317,48 @@ return JSON.stringify({ Panel: r(".omni-panel").width, Field: r(".omni-input").w
 	}
 }
 
+// TestAPlanGateCardReadsWithinTheQueue lays a plan gate's card out at the queue's width and at a detail's: its
+// summary reads as body text, its target and why as meta lines, the why folded behind a styled toggle, and a long
+// fact value cut with an ellipsis rather than widening the card. On the plan page a workflow's summary is not bold.
+func TestAPlanGateCardReadsWithinTheQueue(t *testing.T) {
+	long := strings.Repeat("acme/api#7-retry-uploads-", 20)
+	card := `<article class="ask d-gate" data-kind="plan"><header class="hd"><i class="dot"></i><h3 class="d-sub">Run this?</h3></header><div class="bd">` +
+		`<div class="gate-plan"><p class="plan-summary">Close the task once its asker checked the answer; posts nothing</p>` +
+		`<p class="meta plan-on">Acts on <a href="https://chat.example/c1">Retry flaky uploads</a></p>` +
+		`<details class="plan-why" open><summary>Why it fired</summary><ul><li>task.link_signal = ` + long + `</li><li>Category: Active</li></ul></details></div>` +
+		`</div></article>`
+	plan := `<ol class="plan-items"><li class="plan-item pending"><div class="plan-line"><span class="plan-when">waits</span><span class="plan-wf">Close the task once its asker checked the answer; posts nothing</span></div></li></ol>`
+	const probe = `const q = (s) => document.querySelector(s);
+const cs = (s) => getComputedStyle(q(s));
+const li = q(".plan-why li");
+return JSON.stringify({ Card: q(".d-gate").getBoundingClientRect().width, Scroll: q(".d-gate").scrollWidth, Client: q(".d-gate").clientWidth,
+  Li: li.getBoundingClientRect().width, Ellipsis: cs(".plan-why li").textOverflow, Wrap: cs(".plan-why li").whiteSpace,
+  Toggle: cs(".plan-why summary").cursor, ToggleSize: parseFloat(cs(".plan-why summary").fontSize), OnSize: parseFloat(cs(".plan-on").fontSize),
+  Body: parseFloat(cs(".plan-summary").fontSize), Margin: parseFloat(cs(".plan-summary").marginTop), WF: cs(".plan-wf").fontWeight });`
+	for _, width := range []int{768, 360} {
+		page := `<body style="margin: 0"><div class="queue-screen" style="width: ` + itoa(width) + `px; box-sizing: border-box"><div class="queue">` + card + `</div>` + plan + `</div>`
+		var got struct {
+			Card, Scroll, Client, Li, ToggleSize, OnSize, Body, Margin float64
+			Ellipsis, Wrap, Toggle, WF                                 string
+		}
+		if err := json.Unmarshal([]byte(pageProbe(t, page, width+40, probe)), &got); err != nil {
+			t.Fatal(err)
+		}
+		switch {
+		case got.Scroll > got.Client || got.Li > got.Card:
+			t.Errorf("%dpx: %+v, want the card no wider than the queue and the fact cut", width, got)
+		case got.Ellipsis != "ellipsis" || got.Wrap != "nowrap":
+			t.Errorf("%dpx: a fact value overflows as %q/%q, want one line cut with an ellipsis", width, got.Ellipsis, got.Wrap)
+		case got.Toggle != "pointer" || got.ToggleSize >= got.Body || got.OnSize >= got.Body:
+			t.Errorf("%dpx: %+v, want the why's toggle and the target as meta under the body-sized summary", width, got)
+		case got.Margin > 8:
+			t.Errorf("%dpx: the summary's margin %v, want the card's own rhythm", width, got.Margin)
+		case got.WF != "400":
+			t.Errorf("%dpx: the plan page's workflow summary weighs %s, want regular", width, got.WF)
+		}
+	}
+}
+
 // TestTheHomeSpansTheList lays the home out in a wide list: it takes the list's whole width, which only the
 // detail opening beside it narrows.
 func TestTheHomeSpansTheList(t *testing.T) {

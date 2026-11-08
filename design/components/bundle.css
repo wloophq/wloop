@@ -593,7 +593,7 @@ button.kpi:hover { border-color: var(--muted); }
 .plan-when, .plan-item time { font-family: var(--mono); color: var(--muted); white-space: nowrap; min-width: 9ch; }
 .plan-item.pending .plan-left { color: var(--loop-text); }
 .plan-item.blocked .plan-when { color: var(--err); }
-.plan-wf { font-weight: 600; }
+.plan-wf { flex: 1 1 24ch; min-width: 0; font-weight: 400; overflow-wrap: anywhere; }
 .plan-unit { color: var(--muted); overflow-wrap: anywhere; }
 .plan-title { overflow-wrap: anywhere; }
 .plan-mode { color: var(--late); font-size: var(--text-meta); }
@@ -672,6 +672,16 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .ask .hd time { margin-left: auto; font-family: var(--mono); color: var(--faint); }
 .ask .bd { padding: var(--space-10) var(--space-12); }
 .ask .bd > .md { margin-bottom: var(--space-8); }
+.gate-plan { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-8); min-width: 0; }
+.gate-plan p { margin: 0; }
+.plan-summary { color: var(--ink); line-height: 1.45; }
+.plan-on, .plan-steps { font-size: var(--text-meta); color: var(--muted); }
+.plan-on a { color: var(--ink); }
+.plan-why { font-size: var(--text-meta); color: var(--muted); min-width: 0; }
+.plan-why summary { width: fit-content; cursor: pointer; color: var(--faint); }
+.plan-why summary:hover { color: var(--muted); }
+.plan-why ul { margin: var(--space-4) 0 0; padding-left: var(--space-12); }
+.plan-why li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
 .opts { display: flex; flex-direction: column; gap: var(--space-6); margin: var(--space-8) 0; }
 .opt { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-8); align-items: start; padding: var(--space-8) var(--space-10); font: inherit; color: inherit; text-align: left; background: var(--panel); border: 1px solid var(--rule-strong); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease); }
 .opt:hover { background: var(--hover); }

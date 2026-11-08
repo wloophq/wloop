@@ -66,7 +66,7 @@ func TestHomeEndpoint(t *testing.T) {
 }
 
 // loadedIn is the bundled profile and plugins loaded in locale.
-func loadedIn(t *testing.T, locale string) *intentload.Loaded {
+func loadedIn(t testing.TB, locale string) *intentload.Loaded {
 	t.Helper()
 	base, err := turn.Base()
 	if err != nil {

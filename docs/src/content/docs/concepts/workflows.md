@@ -23,7 +23,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `workspace-idle-no-pr` | offers to remove a workspace with no pull request and no open session, idle for `cleanup.stale_workspace` | waits for you |
 | `hygiene-turn-on-finished-pr`, `hygiene-orphan-answer`, `hygiene-session-dormant` | keep the turn and session records consistent; a session whose process its manager stopped listing turns dormant | runs |
 
-A run that waits for you or for its window is a plan gate on its unit. It asks what the workflow's `ask` renders over the unit's facts (`.Unit`, the unit as people read it, and `.Facts`, by name), else its `summary`; the Inbox, the cockpit and the terminal show those words, and a task opened for the gate takes them as its title. The gate is withdrawn when its item stops waiting: the unit left its plugin's inventory, the workflow's `when` no longer holds on it, or its key moved.
+A run that waits for you or for its window is a plan gate on its unit. It asks what the workflow's `ask` renders over the unit's facts (`.Unit`, the unit as people read it, and `.Facts`, by name), else its `summary`; the Inbox, the cockpit and the terminal show those words, and a task opened for the gate takes them as its title. While the item waits, the gate carries it too: the cockpit's card for the gate reads the workflow's `summary` (what running it does, what it posts or not), the unit it acts on, linked, and, folded, the facts that fired it, each in the words of the task facet that reads it, else as `name = value`; the item's steps show only when the workflow has no `summary`. The gate is withdrawn when its item stops waiting: the unit left its plugin's inventory, the workflow's `when` no longer holds on it, or its key moved.
 
 An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{command}} plan` shows what each would do. The four workspace removals ship that way because a removal cannot be undone. [Tune workflows](/guides/workflows/) says when and how to switch them on.
 
@@ -85,7 +85,7 @@ Evaluating the workflows yields **plan items**, each with a decision:
 {{command}} plan dismiss 91c0e5d2                 # drop it until something new happens
 ```
 
-`plan` writes nothing and asks GitHub nothing. `plan --unit` lists every workflow that gives the unit no item, with the facts its condition read, such as `pr.first.reason`. The cockpit and the terminal client show the same items with the same actions.
+`plan` writes nothing and asks GitHub nothing. `plan --unit` lists every workflow that gives the unit no item, with the facts its condition read, such as `pr.first.reason`. The cockpit and the terminal client show the same items with the same actions; the cockpit names each item's workflow by its `summary`, in the interface language, with the workflow's name in the tooltip.
 
 ## Pause
 

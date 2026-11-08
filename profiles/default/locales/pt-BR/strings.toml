@@ -155,6 +155,7 @@
 "Views" = "Visões"
 # The cockpit's scripts.
 "Actions" = "Ações"
+"Acts on" = "Age sobre"
 "Agent asks" = "O agente pergunta"
 "Agent stopped" = "Agente parado"
 "Aging work in progress" = "Trabalho em andamento envelhecendo"
@@ -297,6 +298,7 @@
 "Sorted by" = "Ordenada por"
 "source" = "fonte"
 "Stalled" = "Parados"
+"Steps: {steps}" = "Passos: {steps}"
 "Tag concentration" = "Concentração de tags"
 "Tag key" = "Chave da tag"
 "Tags over-represented among stalled" = "Tags super-representadas entre os parados"
@@ -316,6 +318,7 @@
 "waits {time} on {who}" = "espera {time} por {who}"
 "wakes {time}" = "acorda em {time}"
 "What blocks" = "O que bloqueia"
+"Why it fired" = "Por que disparou"
 "Why these tasks?" = "Por que estas tarefas?"
 "working days" = "dias úteis"
 "Write a message first" = "Escreva uma mensagem antes"

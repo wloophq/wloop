@@ -1803,6 +1803,9 @@ func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
 		Unit  string `json:"unit"`
 		Title string `json:"title"`
 		Href  string `json:"href"`
+		WF    string `json:"wf"`
+		WFTip string `json:"wf_tip"`
+		Bare  string `json:"bare"`
 	}
 	src := appJS(t)
 	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
@@ -1811,12 +1814,19 @@ const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () =
 `
 	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
 const li = planItem({ id: "slack-follow-up/slack/T1%2FC1%2F171.1/ee", workflow: "slack-follow-up", decision: "pending", default: "wait",
+  summary: "Nudge a thread that waits on someone; posts after you approve",
   unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan for the export", link: "https://chat.example/T1/C1/171.1", actions: [] });
+const bare = planItem({ id: "fake/x", workflow: "fake-close", decision: "pending", unit: { provider: "task", key: "t-1" }, actions: [] });
 const unit = byClass(li, "plan-unit")[0];
 const link = all(unit, (x) => x.tag === "a")[0];
-process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "" }));`, nil, &got)
+const wf = byClass(li, "plan-wf")[0];
+process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "",
+  wf: text(wf), wf_tip: wf.attrs.title || "", bare: text(byClass(bare, "plan-wf")[0]) }));`, nil, &got)
 	if got.Unit != "#general" || got.Title != "Launch plan for the export" || got.Href != "https://chat.example/T1/C1/171.1" {
 		t.Fatalf("%+v", got)
+	}
+	if got.WF != "Nudge a thread that waits on someone; posts after you approve" || got.WFTip != "slack-follow-up" || got.Bare != "fake-close" {
+		t.Errorf("workflow shown %q titled %q, without a summary %q: want its summary, its id in the title", got.WF, got.WFTip, got.Bare)
 	}
 }
 
