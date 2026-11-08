@@ -26,6 +26,14 @@ func headlessChrome() string {
 // returns what probe, a script over the page, writes.
 func layoutOf(t *testing.T, rows string, viewport, width int, probe string) string {
 	t.Helper()
+	return pageProbe(t, `<body><style>body { width: `+itoa(width)+`px; margin: 0; }</style>`+
+		`<section id="list"><details id="list-box" class="list-box" open><summary id="list-sum" class="list-sum"></summary><div id="table"><div class="rows">`+rows+`</div></div></details></section>`, viewport, probe)
+}
+
+// pageProbe lays body, a page's body opening tag and content, out with the cockpit's stylesheet in a window
+// viewport px wide, and returns what probe, a script over the page, writes.
+func pageProbe(t *testing.T, body string, viewport int, probe string) string {
+	t.Helper()
 	chrome := headlessChrome()
 	if chrome == "" {
 		t.Skip("no Chrome to lay the page out")
@@ -35,8 +43,7 @@ func layoutOf(t *testing.T, rows string, viewport, width int, probe string) stri
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	page := `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://` + css + `"><style>body { width: ` + itoa(width) + `px; margin: 0; }</style></head><body>` +
-		`<section id="list"><details id="list-box" class="list-box" open><summary id="list-sum" class="list-sum"></summary><div id="table"><div class="rows">` + rows + `</div></div></details></section>` +
+	page := `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="file://` + css + `"></head>` + body +
 		`<pre id="probe"></pre><script>document.getElementById("probe").textContent = (function () {` + probe + `})();</script></body></html>`
 	file := filepath.Join(dir, "page.html")
 	if err := os.WriteFile(file, []byte(page), 0o600); err != nil {
@@ -55,6 +62,31 @@ func layoutOf(t *testing.T, rows string, viewport, width int, probe string) stri
 		t.Fatalf("no probe in %s", out)
 	}
 	return string(m[1])
+}
+
+// TestTheDetailOfANarrowWindowLeavesItsTitleBarClear lays a native window's page out at widths where the
+// detail covers the window: the detail starts below the title bar, whose controls the window draws over the
+// page, and fills the rest; a browser's detail still covers the whole page.
+func TestTheDetailOfANarrowWindowLeavesItsTitleBarClear(t *testing.T) {
+	const page = `<header id="top"><span class="tb-title">A task</span></header><main id="app"><section id="detail"><div class="d-head"><h1>A task</h1></div></section></main>`
+	const probe = `const r = (el) => el.getBoundingClientRect();
+return JSON.stringify({ Top: r(document.getElementById("top")).bottom, Detail: r(document.getElementById("detail")).top, Height: r(document.getElementById("detail")).bottom });`
+	for _, c := range []struct {
+		body     string
+		viewport int
+		clear    bool
+	}{{`<body class="titlebar has-detail">`, 600, true}, {`<body class="titlebar has-detail layout-detail">`, 480, true}, {`<body class="has-detail">`, 600, false}} {
+		var got struct{ Top, Detail, Height float64 }
+		if err := json.Unmarshal([]byte(pageProbe(t, c.body+page, c.viewport, probe)), &got); err != nil {
+			t.Fatal(err)
+		}
+		if c.clear && (got.Top <= 0 || got.Detail < got.Top) {
+			t.Errorf("%s at %dpx: the detail starts at %v, over the title bar that ends at %v", c.body, c.viewport, got.Detail, got.Top)
+		}
+		if !c.clear && got.Detail != 0 {
+			t.Errorf("%s at %dpx: the detail starts at %v, want the whole page", c.body, c.viewport, got.Detail)
+		}
+	}
 }
 
 func itoa(n int) string {

@@ -601,6 +601,7 @@ label.d-sub { display: block; margin-top: var(--space-12); }
   .views .nav .count { margin-left: var(--space-6); }
   #detail-resize, body.has-detail #detail-resize { display: none; }
   #detail { position: fixed; inset: 0; z-index: 10; border-left: 0; }
+  body.titlebar #detail { top: var(--titlebar-height); border-top: 1px solid var(--rule); }
   .row .aside, .row > .meta .act { display: none; }
   .row > .meta { max-width: 40vw; overflow: hidden; }
   .search { flex-basis: 100%; }
