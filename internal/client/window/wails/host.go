@@ -275,6 +275,12 @@ func (h *host) ShowPanel(url string) {
 	})
 }
 
+func (h *host) OpenExternal(url string) {
+	if err := h.app.Browser.OpenURL(url); err != nil {
+		h.app.Logger.Warn("window: opening an outside link", "error", err)
+	}
+}
+
 func (h *host) HidePanel() {
 	h.do(func() {
 		h.panelShown, h.panelKey = false, false

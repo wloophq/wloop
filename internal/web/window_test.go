@@ -205,3 +205,36 @@ func TestTheLinkNoticeWaitsForTheStrings(t *testing.T) {
 		t.Fatalf("the notice of an unread link is told before the strings load, so it reads in English")
 	}
 }
+
+// In the native window a link to another site, or a window.open of one, asks the app to open it in the
+// default browser, which the web view would otherwise drop; the cockpit's own links and a browser's are left alone.
+func TestAnOutsideLinkInTheNativeWindowOpensInTheBrowser(t *testing.T) {
+	var got struct {
+		Installed, Browser bool
+		Posted             []map[string]any
+		Prevented          []bool
+		Opened             []string
+	}
+	windowRun(t, `
+const out = [];
+const opened = [];
+const anchor = (href, tgt) => ({ closest: (sel) => (sel === "a[href]" ? { href, target: tgt || "" } : null) });
+const page = target();
+const host = { webkit: { messageHandlers: { external: { postMessage() {} } } }, location: { origin: "http://127.0.0.1:5000" }, open: (u) => { opened.push(u); return null; } };
+const installed = installExternalLinks(page, host, (b) => out.push(b));
+const clicks = [anchor("https://github.com/acme/api/pull/7", "_blank"), anchor("http://127.0.0.1:5000/#task=t-1", "_blank"), anchor("javascript:alert(1)", "_blank"), anchor("https://example.com/doc")];
+const prevented = clicks.map((a) => { const e = event({ target: a, button: 0 }); page.dispatch("click", e); return e.defaultPrevented; });
+host.open("https://slack.com/archives/C1", "_blank", "noopener");
+host.open("#view=inbox", "_blank");
+const browser = installExternalLinks(target(), { location: { origin: "http://127.0.0.1:5000" } }, () => {});
+process.stdout.write(JSON.stringify({ Installed: installed, Browser: browser, Posted: out, Prevented: prevented, Opened: opened }));`, &got)
+	want := []map[string]any{
+		{"action": "external", "url": "https://github.com/acme/api/pull/7"},
+		{"action": "external", "url": "https://example.com/doc"},
+		{"action": "external", "url": "https://slack.com/archives/C1"},
+	}
+	if !got.Installed || got.Browser || !reflect.DeepEqual(got.Posted, want) || !reflect.DeepEqual(got.Prevented, []bool{true, false, false, true}) ||
+		!reflect.DeepEqual(got.Opened, []string{"#view=inbox"}) {
+		t.Fatalf("%+v", got)
+	}
+}

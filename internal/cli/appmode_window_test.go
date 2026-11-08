@@ -33,6 +33,7 @@ func (h *recHost) ShowPanel(string)            {}
 func (h *recHost) HidePanel()                  {}
 func (h *recHost) Reword(*texts.Catalog)       { h.mu.Lock(); h.reworded++; h.mu.Unlock() }
 func (h *recHost) ShowDetached(string, string) {}
+func (h *recHost) OpenExternal(string)         {}
 func (h *recHost) Listen(hs window.Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -63,6 +63,36 @@ function installDrag(doc, win) {
   return true;
 }
 
+// installExternalLinks hands a link to another site, or a window.open of one,
+// to post, which opens it in the default browser: the native window's web
+// view drops both. False, and nothing installed, in a browser.
+function installExternalLinks(doc, win, post) {
+  if (!(win.webkit && win.webkit.messageHandlers && win.webkit.messageHandlers.external)) return false;
+  const outside = (href) => {
+    try {
+      const u = new URL(String(href), win.location.origin);
+      return (u.protocol === "http:" || u.protocol === "https:") && u.origin !== win.location.origin ? u.href : "";
+    } catch {
+      return "";
+    }
+  };
+  doc.addEventListener("click", (e) => {
+    const a = e.button === 0 && e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    const url = a ? outside(a.href) : "";
+    if (!url) return;
+    e.preventDefault();
+    post({ action: "external", url });
+  }, true);
+  const open = win.open;
+  win.open = (href, ...rest) => {
+    const url = outside(href);
+    if (!url) return open.call(win, href, ...rest);
+    post({ action: "external", url });
+    return null;
+  };
+  return true;
+}
+
 // servedKey is the key the served bindings give action, "" when none is bound.
 function servedKey(action) {
   const keys = typeof cockpitKeys !== "undefined" ? cockpitKeys : null;
@@ -197,6 +227,7 @@ function tellLinkNotice() {
 if (typeof document !== "undefined" && document.readyState === "loading") {
   if (insetTitleBar(location.search)) detailWindowInstall(window, document, postWindow);
   installDrag(document, window);
+  installExternalLinks(document, window, postWindow);
   window.addEventListener("hashchange", tellLinkNotice);
   document.addEventListener("DOMContentLoaded", () => {
     if (insetTitleBar(location.search)) installTitleBar(document);

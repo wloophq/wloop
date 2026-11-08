@@ -13,15 +13,18 @@ const (
 	WindowPanel     = "panel" // show the panel
 	WindowHidePanel = "hide-panel"
 	WindowDetach    = "detach" // show the item Route names in a window of its own
+	WindowExternal  = "external" // open URL, a web address, in the default browser
 )
 
 // WindowActions are the actions a WindowRequest may name.
-var WindowActions = []string{WindowOpen, WindowPanel, WindowHidePanel, WindowDetach}
+var WindowActions = []string{WindowOpen, WindowPanel, WindowHidePanel, WindowDetach, WindowExternal}
 
 // WindowRequest asks the native window to act; Route is a cockpit route, a hash without "#".
 type WindowRequest struct {
 	Action string `json:"action"`
 	Route  string `json:"route,omitempty"`
+	// URL is the http or https address an external request opens.
+	URL string `json:"url,omitempty"`
 }
 
 // WindowResult says whether a window client took the request.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,6 +26,16 @@ func (s *Server) handleWindow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "window action "+strconv.Quote(req.Action)+" is not one of "+strings.Join(api.WindowActions, ", "))
 		return
 	}
+	if req.Action == api.WindowExternal && !webAddress(req.URL) {
+		writeError(w, http.StatusBadRequest, "an external window request takes an http or https url")
+		return
+	}
 	delivered := s.hub.send(api.WindowClient, api.Change{Type: "window", Windows: []api.WindowRequest{req}})
 	writeJSON(w, api.WindowResult{Delivered: delivered})
+}
+
+// webAddress says u is an absolute http or https address with a host.
+func webAddress(u string) bool {
+	p, err := url.Parse(u)
+	return err == nil && (p.Scheme == "http" || p.Scheme == "https") && p.Host != ""
 }

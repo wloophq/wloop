@@ -105,3 +105,21 @@ func TestWindowRequestLeavesTheRowPositionAlone(t *testing.T) {
 		t.Fatalf("the window change carries epoch %q; a client would resume from it", c.Epoch)
 	}
 }
+
+func TestAnExternalRequestCarriesOnlyAWebAddress(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	win := s.hub.subscribe(api.WindowClient)
+	t.Cleanup(func() { s.hub.unsubscribe(win) })
+	if res := windowResult(t, s, `{"action":"external","url":"https://github.com/acme/api/pull/7"}`); !res.Delivered {
+		t.Fatal("not delivered with a window client listening")
+	}
+	if c, ok := win.take(); !ok || !slices.Equal(c.Windows, []api.WindowRequest{{Action: api.WindowExternal, URL: "https://github.com/acme/api/pull/7"}}) {
+		t.Fatalf("the window client took %+v (%v)", c, ok)
+	}
+	for _, body := range []string{`{"action":"external","url":"file:///etc/passwd"}`, `{"action":"external","url":"javascript:alert(1)"}`, `{"action":"external"}`, `{"action":"external","url":"https://"}`} {
+		if rec := post(t, s, api.WindowPath, body); rec.Code != http.StatusBadRequest {
+			t.Errorf("POST %s: %d, want 400", body, rec.Code)
+		}
+	}
+}

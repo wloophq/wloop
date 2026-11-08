@@ -43,6 +43,7 @@ func (h *fakeHost) HidePanel()           { h.record("hide-panel") }
 func (h *fakeHost) ShowDetached(id, url string) {
 	h.record("detached " + id + " " + url)
 }
+func (h *fakeHost) OpenExternal(url string) { h.record("external " + url) }
 func (h *fakeHost) Listen(hs Handlers) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -399,4 +400,16 @@ func TestCockpitURLErrorIsLoggedAndShowsNothing(t *testing.T) {
 	if !strings.Contains(r.logs.all(), "no cockpit address") {
 		t.Fatalf("the log %q does not carry the error", r.logs.all())
 	}
+}
+
+func TestAnExternalRequestOpensTheAddressInTheBrowser(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		stream := make(chan api.Change)
+		r := newRig(stream)
+		r.run(t)
+		synctest.Wait()
+		stream <- api.Change{Type: "window", Windows: []api.WindowRequest{{Action: api.WindowExternal, URL: "https://github.com/acme/api/pull/7"}}}
+		synctest.Wait()
+		want(t, r.host.taken(), "external https://github.com/acme/api/pull/7")
+	})
 }

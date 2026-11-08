@@ -33,6 +33,8 @@ type Host interface {
 	// url when none is open; it closes for good and is not restored at
 	// relaunch.
 	ShowDetached(id, url string)
+	// OpenExternal opens url, a web address, in the default browser.
+	OpenExternal(url string)
 	// Listen binds the hotkey, the reopen and opened links; an error leaves
 	// the reopen and the links bound.
 	Listen(h Handlers) error
@@ -141,6 +143,8 @@ func (c *Controller) handle(req api.WindowRequest) {
 		c.hidePanel()
 	case api.WindowDetach:
 		c.detach(req.Route)
+	case api.WindowExternal:
+		c.cfg.Host.OpenExternal(req.URL)
 	}
 }
 
