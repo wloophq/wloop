@@ -72,6 +72,22 @@ process.stdout.write(JSON.stringify({ Progress: text(byClass(nodes, "progress"))
 	}
 }
 
+func TestQueueDrawsAStepGatesCardWithWhatToReview(t *testing.T) {
+	var got stepCard
+	q := map[string]any{"kind": "review-step", "title": "Steps to review", "empty": "None.", "total": 1, "items": []any{map[string]any{
+		"task": map[string]any{"id": "t-1", "title": "ship the export"}, "gate": stepGate(), "primary": map[string]string{"kind": "gate", "id": "approve", "label": "Looks good"},
+	}}}
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=review-step";
+await queueLoad(env.route(), env);
+const drawn = queueItemCard(queueState.queue.items[0], env);
+const c = (Array.isArray(drawn) ? drawn : [drawn]).find((n) => n && n.attrs && n.attrs["data-gate"]);
+process.stdout.write(JSON.stringify(`+stepCardJS+`));
+})();`, map[string]any{"queues": map[string]any{"review-step": q}}, &got)
+	wantStepCard(t, "queue", got)
+}
+
 func TestQueueEnterRunsPrimaryGate(t *testing.T) {
 	gateItem := map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []any{}},
 		"gate":    map[string]any{"id": 7, "kind": "question", "text": "Ship it?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}, {"id": "dismiss", "label": "Dismiss"}}},

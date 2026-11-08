@@ -22,6 +22,75 @@ func questionGate(t *testing.T, text, recommend string, options ...record.Option
 		Intents: []api.IntentView{{ID: "answer", Label: "Answer", Answer: true}, {ID: "dismiss", Label: "Dismiss"}}}
 }
 
+// stepGate is an open review-diff step of task t-1 about its change acme/api#9.
+func stepGate() api.GateView {
+	return api.GateView{ID: 5, Task: "t-1", Kind: "step", Name: "review-diff", Status: "open", Text: "Review the diff of acme/api#9, 3 files changed",
+		Units: []api.PlanUnit{{Label: "acme/api#9", Title: "Batch export", Link: "https://forge.example/acme/api/changes/9"}},
+		Intents: []api.IntentView{{ID: "approve", Label: "Looks good", Summary: "Mark the diff reviewed; posts nothing."},
+			{ID: "dismiss", Label: "Dismiss", Summary: "Close this step without reviewing; the task stays as it is."}}}
+}
+
+// stepCard is what a step gate's card shows: its title, each unit it is about with where it links, and what each
+// answer does.
+type stepCard struct {
+	Title   string
+	About   []string
+	Links   []string
+	Says    []string
+	Buttons []string
+}
+
+// stepCardJS reads a drawn card c as a stepCard.
+const stepCardJS = `(() => {
+  const nodes = (n, pred, out = []) => {
+    if (n && Array.isArray(n.children)) { if (pred(n)) out.push(n); n.children.forEach((k) => nodes(k, pred, out)); }
+    return out;
+  };
+  const of = (n, k) => nodes(n, (x) => String(x.attrs.class || "").split(" ").includes(k));
+  const words = (n) => (n == null || n === false ? "" : typeof n !== "object" ? String(n)
+    : typeof n.textContent === "string" ? n.textContent : (n.children || []).map(words).join(""));
+  return {
+    Title: of(c, "d-sub").map(words).join(""),
+    About: of(c, "gate-about").map(words),
+    Links: nodes(c, (x) => x.tag === "a").map((a) => a.attrs.href),
+    Says: of(c, "gate-says").flatMap((x) => nodes(x, (y) => y.tag === "li").map(words)),
+    Buttons: nodes(c, (x) => x.tag === "button").map(words),
+  };
+})()`
+
+func wantStepCard(t *testing.T, where string, got stepCard) {
+	t.Helper()
+	if got.Title != "Review the diff of acme/api#9, 3 files changed" {
+		t.Errorf("%s: title %q", where, got.Title)
+	}
+	if len(got.About) != 1 || !strings.Contains(got.About[0], "Batch export") || !strings.Contains(got.About[0], "acme/api#9") {
+		t.Errorf("%s: about %q, want the change's title and reference", where, got.About)
+	}
+	if !slices.Contains(got.Links, "https://forge.example/acme/api/changes/9") {
+		t.Errorf("%s: links %q, want the change's link", where, got.Links)
+	}
+	want := []string{"Looks good: Mark the diff reviewed; posts nothing.", "Dismiss: Close this step without reviewing; the task stays as it is."}
+	if !slices.Equal(got.Says, want) {
+		t.Errorf("%s: says %q, want %q", where, got.Says, want)
+	}
+	if len(got.Buttons) != 2 {
+		t.Errorf("%s: buttons %q", where, got.Buttons)
+	}
+}
+
+func TestAStepGatesCardSaysWhatToReviewAndWhatEachAnswerDoes(t *testing.T) {
+	var got stepCard
+	runGate(t, "const c = card(input.gate);\ndone("+stepCardJS+");", map[string]any{"gate": stepGate()}, &got)
+	wantStepCard(t, "detail", got)
+
+	var plain stepCard
+	g := questionGate(t, "Which one?", "")
+	runGate(t, "const c = card(input.gate);\ndone("+stepCardJS+");", map[string]any{"gate": g}, &plain)
+	if len(plain.About) != 0 || len(plain.Says) != 0 {
+		t.Errorf("a gate with no units nor summaries: about %q, says %q", plain.About, plain.Says)
+	}
+}
+
 // gateHarness draws gate cards and draft cards over the cockpit's scripts; card(g) and draft(d) draw one.
 const gateHarness = `
 const card = (g) => gateCard({ id: "t-1", title: "Retry flaky uploads" }, g);

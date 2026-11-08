@@ -183,6 +183,17 @@ function planReason(p) {
   return t(p.reason_key, params);
 }
 
+// gateAbout is a unit a gate is about: its title and reference, linked to it at its source when it has a link.
+function gateAbout(u) {
+  return h("p", { class: "meta gate-about" }, outLink(u.link, u.title ? `${u.title} · ${u.label}` : u.label));
+}
+
+// gateSays is what each of a gate's intents does, as the profile words it; null when none says.
+function gateSays(intents) {
+  const said = intents.filter((x) => x.summary);
+  return said.length ? h("ul", { class: "meta gate-says" }, ...said.map((x) => h("li", {}, h("b", {}, x.label), ": ", x.summary))) : null;
+}
+
 // gateCard is an open gate of task e: what it asks, the agent's message as markdown folded after its first
 // blocks, its option cards, the free-text answer when an intent takes one, then its intents in the profile's
 // order, the first primary, each with the digit that picks it while the card has the focus.
@@ -201,6 +212,8 @@ function gateCard(e, g, opts = {}) {
     h("div", { class: "bd" },
       subject.text ? renderMarkdown(subject.text, { fold: 4, key: `${scope}:${g.id}` }) : null,
       gatePlan(g),
+      ...(g.units || []).map(gateAbout),
+      gateSays(intents),
       g.delivery ? h("p", { class: "meta" }, g.delivery) : null,
       g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: fmtDate(g.deadline, "datetime") })
         : t("Until {time}", { time: fmtDate(g.deadline, "datetime") })) : null,

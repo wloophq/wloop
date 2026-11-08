@@ -190,10 +190,40 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit
 	if m, ok := s.messageOf(ctx, g); ok {
 		v.Subject, _ = json.Marshal(s.messageView(ctx, m))
 	}
-	if g.Kind == gate.KindPlan {
+	switch g.Kind {
+	case gate.KindPlan:
 		v.Plan = s.gatePlan(ctx, g)
+	case gate.KindStep:
+		v.Units = s.stepUnits(ctx, g)
 	}
 	return v
+}
+
+// stepUnits are the units step gate g's task holds, as their rows present them; none for a gate of no task. The
+// task comes from the pass ctx carries, else from a read of it alone.
+func (s *Server) stepUnits(ctx context.Context, g gate.Gate) []api.PlanUnit {
+	if s.deps.Tasks == nil || g.Task == "" {
+		return nil
+	}
+	var e task.Task
+	if _, ok := coretasks.PassOf(ctx); ok {
+		tasks, err := s.deps.Tasks.Stored(ctx, []task.ID{g.Task})
+		if err != nil {
+			s.logf("step gate %d: its task: %v", g.ID, err)
+		}
+		e = tasks[g.Task]
+	} else {
+		var err error
+		if e, err = s.deps.Tasks.Task(ctx, g.Task); err != nil {
+			s.logf("step gate %d: its task: %v", g.ID, err)
+		}
+	}
+	shown := s.presentations(e.Units)
+	var out []api.PlanUnit
+	for _, u := range e.Units {
+		out = append(out, api.PlanUnit{Label: shown[u].Label, Title: shown[u].Title, Link: shown[u].Link})
+	}
+	return out
 }
 
 // gatePlan is the pending plan item plan gate g holds, as the plan page serves it without its actions, which are
@@ -280,7 +310,7 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 		iv := api.IntentView{ID: name, Label: name}
 		for _, in := range def.Intents {
 			if in.Name == name {
-				iv.Label, iv.Answer = in.Label, in.Answer
+				iv.Label, iv.Summary, iv.Answer = in.Label, in.Summary, in.Answer
 			}
 		}
 		v.Intents = append(v.Intents, iv)

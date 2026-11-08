@@ -65,9 +65,10 @@ type PlanTarget struct {
 	Units []PlanUnit `json:"units,omitempty"`
 }
 
-// PlanUnit is a unit as a person reads it, with its link when it has one.
+// PlanUnit is a unit as a person reads it, with its title and link when it has them.
 type PlanUnit struct {
 	Label string `json:"label"`
+	Title string `json:"title,omitempty"`
 	Link  string `json:"link,omitempty"`
 }
 
