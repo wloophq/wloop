@@ -36,11 +36,13 @@ type Deliverer interface {
 	Delivers(k draft.Kind) draft.Delivery
 }
 
-// Placer is optional: an Effects value that implements it names, when a draft
-// is proposed, or sent, with no target, where it posts, which the draft then
-// stores as its Target; "" keeps the unit itself. An error refuses the draft.
+// Placer is optional: an Effects value that implements it places a draft when
+// it is proposed: where a draft with no target posts, which the draft then
+// stores as its Target ("" keeps the unit itself), and its Broadcast, which
+// says whether it replies in a thread. A draft approved before it was placed
+// takes only its Target when it is sent. An error refuses the draft.
 type Placer interface {
-	Place(ctx context.Context, d draft.Draft) (string, error)
+	Place(ctx context.Context, d draft.Draft) (draft.Placed, error)
 }
 
 // Lander is optional: an Effects value that implements it names the unit the

@@ -1,0 +1,5 @@
+summary = "Quando você diz que uma tarefa não é sua, propor uma resposta indicando outro caminho a quem pediu, para você editar e aprovar"
+
+[outbox]
+title = "Indicar outro caminho a quem pediu"
+about = "Rascunhado quando você diz que uma tarefa não é sua."

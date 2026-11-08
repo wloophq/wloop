@@ -131,7 +131,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -331,7 +331,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -396,7 +396,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: no workspace",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "no workspace"
+      }
     },
     "views": [],
     "facets": {
@@ -499,7 +503,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -554,7 +558,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: could not start: /src/api is not trusted in /home/.claude-work",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "could not start: /src/api is not trusted in /home/.claude-work"
+      }
     },
     "views": [],
     "facets": {
@@ -668,7 +676,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -723,7 +731,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -827,7 +836,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -882,7 +891,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal",
-      "line": "round blocked"
+      "line": "round blocked",
+      "reason_key": "round_blocked",
+      "reason_params": {
+        "why": "could not start: /src/api/wt is not trusted in the agent home of its terminal"
+      }
     },
     "views": [],
     "facets": {
@@ -996,7 +1009,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1051,7 +1064,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1156,7 +1170,7 @@
         "refusal": "brief_refresh.why"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1211,7 +1225,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "merged",
-      "line": "merged"
+      "line": "merged",
+      "reason_key": "merged"
     },
     "views": [],
     "facets": {
@@ -1274,7 +1289,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1332,7 +1347,8 @@
       "closed": true,
       "open_items": 0,
       "reason": "merged",
-      "line": "merged"
+      "line": "merged",
+      "reason_key": "merged"
     },
     "views": [],
     "facets": {
@@ -1390,7 +1406,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1514,7 +1530,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1549,7 +1565,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1665,7 +1682,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1723,7 +1740,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -1822,7 +1840,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1877,7 +1895,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "automatic round held: daily cap",
-      "line": "held (cap)"
+      "line": "held (cap)",
+      "reason_key": "round_held",
+      "reason_params": {
+        "why": "daily cap"
+      }
     },
     "views": [],
     "facets": {
@@ -1988,7 +2010,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2043,7 +2065,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -2155,7 +2178,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2219,7 +2242,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -2333,7 +2357,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2397,7 +2421,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [
       "mine"
@@ -2501,7 +2526,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2550,7 +2575,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "no reviewer requested",
-      "line": "no reviewer requested"
+      "line": "no reviewer requested",
+      "reason_key": "no_reviewer_requested"
     },
     "views": [],
     "facets": {
@@ -2653,7 +2679,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2708,7 +2734,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [
       "mine"
@@ -2807,7 +2834,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2868,7 +2895,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -2972,7 +3000,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3142,7 +3170,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3316,7 +3344,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3387,7 +3415,11 @@
       "closed": false,
       "open_items": 0,
       "reason": "automatic round held: daily cap",
-      "line": "briefing… (attempt 1)"
+      "line": "briefing… (attempt 1)",
+      "reason_key": "round_held",
+      "reason_params": {
+        "why": "daily cap"
+      }
     },
     "views": [],
     "facets": {
@@ -3503,7 +3535,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3683,7 +3715,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -3747,7 +3779,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -3853,7 +3886,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3988,7 +4021,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4023,7 +4056,8 @@
       "closed": false,
       "open_items": 0,
       "reason": "review requested, no review on the head",
-      "line": "review requested, no review on the head"
+      "line": "review requested, no review on the head",
+      "reason_key": "review_requested"
     },
     "views": [],
     "facets": {
@@ -4128,7 +4162,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "payload": {
       "author": "ana",
       "repo": "acme/api",

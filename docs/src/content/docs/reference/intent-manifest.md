@@ -28,8 +28,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `label` | string |  | The name people read. Required. |
-| `summary` | string |  | One line on what it does: its action's tooltip, its help line, its profile listing. Required. |
+| `label` | string, localized |  | The name people read. Required. |
+| `summary` | string, localized |  | One line on what it does: its action's tooltip, its help line, its profile listing. Required. |
 | `shortcut` | string |  | One uppercase letter for its action, not a built-in action's. |
 | `verb` | one of `approve`, `delegate`, `dismiss` |  | The verb its action fulfils. |
 | `user_facing` | bool | `true` | Offered as a command, a skill and an action. |
@@ -102,10 +102,10 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `why` | template |  | Why the turn is due, over the unit's workflow facts. |
+| `why` | template, localized |  | Why the turn is due, over the unit's workflow facts. |
 | `refuse[]` | table |  | A refusal of turn.start; the first whose when holds refuses with its why. |
 | `refuse[].when` | predicate |  | When it refuses, over the unit's workflow facts. |
-| `refuse[].why` | template |  | What the refusal says, over the unit's workflow facts. |
+| `refuse[].why` | template, localized |  | What the refusal says, over the unit's workflow facts. |
 
 ### Its action on a row
 
@@ -119,10 +119,10 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `action.primary.when` | predicate | `false` | When the action is the row's primary one. |
 | `action.refuse[]` | table |  | A case that offers the action disabled; the first that holds says why. |
 | `action.refuse[].when` | predicate |  | When the action is offered disabled. |
-| `action.refuse[].why` | template |  | Why the action is disabled, over the action facts. |
-| `action.note` | template |  | What the action would do on this row, over the action facts. |
-| `action.warning` | template |  | Shown under the action, over the action facts; empty shows nothing. |
-| `action.confirm` | template |  | The dialog that confirms the action, over the action facts; empty asks nothing. |
+| `action.refuse[].why` | template, localized |  | Why the action is disabled, over the action facts. |
+| `action.note` | template, localized |  | What the action would do on this row, over the action facts. |
+| `action.warning` | template, localized |  | Shown under the action, over the action facts; empty shows nothing. |
+| `action.confirm` | template, localized |  | The dialog that confirms the action, over the action facts; empty asks nothing. |
 
 ### What the prompt opens with
 
@@ -142,8 +142,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `guidance` | table |  | The guidance a person gives the turn. |
-| `guidance.label` | string | `Guidance` | The guidance's label. |
-| `guidance.help` | string |  | What the guidance is for. |
+| `guidance.label` | string, localized | `Guidance` | The guidance's label. |
+| `guidance.help` | string, localized |  | What the guidance is for. |
 | `guidance.max` | integer | `0` | The guidance's length cap in runes; 0 for none. |
 | `brief` | table |  | How the turn reads the unit's brief. |
 | `brief.render` | bool | `true` | The instructions carry the brief. |

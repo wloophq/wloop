@@ -26,6 +26,10 @@ const (
 	Question Context = "question"
 	Review   Context = "review"
 	Plan     Context = "plan"
+	// Detail is the detail panel of a task, where the focus is inside it.
+	Detail Context = "detail"
+	// Queue is a decision queue, which shows one decision at a time.
+	Queue Context = "queue"
 )
 
 type Binding struct {

@@ -1,0 +1,11 @@
+# The decision kind of a conversation in each situation, and what a queue
+# offers first on it. A user profile's plugins/slack/decisions.toml replaces
+# the keys it sets.
+
+[situations]
+waits_on_viewer = "answer"
+needs_closure   = "last-step"
+
+[primary]
+answer    = "open"
+last-step = "open"

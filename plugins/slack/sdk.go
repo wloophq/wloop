@@ -118,6 +118,7 @@ func (s *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	s.p, s.cancel = p, cancel
 	s.mu.Unlock()
 	s.wg.Go(func() { p.reports.run(life, RestartAfter) })
+	s.wg.Go(func() { p.wake.run(life) })
 	s.wg.Go(func() {
 		for {
 			if err := p.run(life); err != nil && life.Err() == nil {
@@ -186,16 +187,17 @@ func (s *Plugin) Ingest(ctx context.Context, req src.IngestRequest) (src.IngestR
 	if err != nil {
 		return src.IngestResult{}, err
 	}
-	var summary, skipped string
+	var res src.IngestResult
 	switch req.Job {
 	case JobIngest:
-		summary, skipped, err = p.ingestJob(ctx)
+		res.Summary, res.Skipped, err = p.ingestJob(ctx)
 	case JobExtract:
-		summary, skipped, err = p.job.Run(ctx)
+		res.Summary, res.Skipped, err = p.job.Run(ctx)
+		res.Next = p.job.Next()
 	default:
 		return src.IngestResult{}, fmt.Errorf("slack: no job %q", req.Job)
 	}
-	return src.IngestResult{Summary: summary, Skipped: skipped}, err
+	return res, err
 }
 
 func (s *Plugin) Track(ctx context.Context, req src.TrackRequest) (src.Tracked, error) {
@@ -285,12 +287,13 @@ func (s *Plugin) Where(ctx context.Context, d src.Draft) (string, error) {
 	return pub.Where(ctx, DraftOf(d))
 }
 
-func (s *Plugin) Place(ctx context.Context, d src.Draft) (string, error) {
+func (s *Plugin) Place(ctx context.Context, d src.Draft) (src.Placed, error) {
 	pub, err := s.publisher()
 	if err != nil {
-		return "", err
+		return src.Placed{}, err
 	}
-	return pub.Place(ctx, DraftOf(d))
+	pl, err := pub.Place(ctx, DraftOf(d))
+	return src.Placed{Target: pl.Target, Broadcast: string(pl.Broadcast)}, err
 }
 
 func (s *Plugin) Publish(ctx context.Context, d src.Draft) (src.Evidence, error) {
@@ -361,10 +364,11 @@ func (s *Plugin) BriefWant(_ context.Context, u sdk.Unit) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if p.job == nil {
+	if p.job == nil || !p.job.Want(unit.Of(u)) {
 		return false, nil
 	}
-	return p.job.Want(unit.Of(u)), nil
+	p.wake.at(p.now())
+	return true, nil
 }
 
 // Plan plans no round: Slack units have no automatic rounds.
@@ -415,7 +419,7 @@ func (s *Plugin) Placement(ctx context.Context, u sdk.Unit, item string) (src.Pl
 // DraftOf is the plugin's draft of what the host carries.
 func DraftOf(d src.Draft) draft.Draft {
 	return draft.Draft{ID: draft.ID(d.ID), Unit: unit.Of(d.Unit), Items: d.Items, Task: d.Task, Kind: draft.Kind(d.Kind), Purpose: d.Purpose,
-		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
+		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: draft.Origin{Kind: draft.OriginKind(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Key: d.Origin.Key, Unit: unit.Of(d.Origin.Unit)},
 		State: draft.State(d.State), Evidence: draft.Evidence(d.Evidence)}
@@ -424,7 +428,7 @@ func DraftOf(d src.Draft) draft.Draft {
 // WireDraft is d as the host carries it.
 func WireDraft(d draft.Draft) src.Draft {
 	out := src.Draft{ID: int64(d.ID), Unit: d.Unit.Wire(), Items: d.Items, Task: d.Task, Kind: string(d.Kind), Purpose: d.Purpose,
-		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
+		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: src.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent, Workflow: d.Origin.Workflow,
 			Rule: d.Origin.Rule, Key: d.Origin.Key},
 		State: string(d.State), Evidence: src.Evidence(d.Evidence)}

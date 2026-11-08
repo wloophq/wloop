@@ -14,17 +14,6 @@
       "default_sort": "Waiting longest"
     },
     {
-      "id": "plan",
-      "label": "Plan",
-      "provider": "github",
-      "rows": false,
-      "order": 4,
-      "surfaces": [
-        "web",
-        "tui"
-      ]
-    },
-    {
       "id": "dash",
       "label": "Backlog",
       "provider": "github",
@@ -109,16 +98,6 @@
         },
         "no_decision": "no review required"
       }
-    },
-    {
-      "id": "recent",
-      "label": "Recent",
-      "provider": "github",
-      "rows": false,
-      "order": 10,
-      "surfaces": [
-        "web"
-      ]
     }
   ],
   "facets": [
@@ -141,6 +120,9 @@
       "rank": [
         "me"
       ],
+      "labels": {
+        "me": "me"
+      },
       "menu": true,
       "show": "meta",
       "show_values": "first",
@@ -184,6 +166,9 @@
       "label": "Waits on (person)",
       "provider": "github",
       "group": true,
+      "labels": {
+        "me": "me"
+      },
       "match": "team",
       "menu": true,
       "show": "who"
@@ -258,6 +243,11 @@
         "medium",
         "low"
       ],
+      "labels": {
+        "high": "high",
+        "low": "low",
+        "medium": "medium"
+      },
       "empty": "no brief",
       "menu": true,
       "show": "meta",
@@ -304,7 +294,8 @@
       "group": false,
       "match": "prefix",
       "menu": true,
-      "show": "meta"
+      "show": "meta",
+      "show_max": 2
     },
     {
       "id": "is",
@@ -448,7 +439,8 @@
           "within": ""
         }
       ],
-      "show": "age"
+      "show": "age",
+      "show_label": "since {{.at}}"
     },
     {
       "id": "lane",

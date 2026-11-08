@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -27,11 +28,11 @@ const (
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced,
-	origin_session`
+	origin_session, why, language, broadcast`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -62,7 +63,7 @@ func draftArgs(d draft.Draft) []any {
 		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(d.State),
 		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason,
 		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects),
-		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session}
+		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session, d.Why, d.Language, string(d.Broadcast)}
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
@@ -82,16 +83,16 @@ func shaped(d draft.Draft) draft.Draft {
 func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
 	var provider, list, kind, originKind, state, delivery, effects, originProvider string
-	var evAt, created, updated, sending, applied string
+	var evAt, created, updated, sending, applied, broadcast string
 	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Task, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason,
 		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced,
-		&d.Origin.Session); err != nil {
+		&d.Origin.Session, &d.Why, &d.Language, &broadcast); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)
-	d.Delivery, d.Origin.Unit.Provider = draft.Delivery(delivery), unit.ProviderID(originProvider)
+	d.Delivery, d.Origin.Unit.Provider, d.Broadcast = draft.Delivery(delivery), unit.ProviderID(originProvider), draft.Broadcast(broadcast)
 	if err := json.Unmarshal([]byte(list), &d.Items); err != nil {
 		return draft.Draft{}, fmt.Errorf("the items of draft %d: %w", d.ID, err)
 	}
@@ -137,12 +138,36 @@ func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, err
 		}
 		d.ID, d.Rev = draft.ID(id), 0
 		tx.Touch(port.TopicDrafts, d.Unit)
-		return nil
+		return touchDraftTask(ctx, tx, d.Task)
 	})
 	if err != nil {
 		return draft.Draft{}, fmt.Errorf("insert draft: %w", err)
 	}
 	return normal(d), nil
+}
+
+// pendingDraft says a draft in state s is one of its task's pending drafts.
+func pendingDraft(s draft.State) bool { return s == draft.Held || s == draft.Failed }
+
+// touchDraftTask marks the stored task a draft serves changed at the next task position, so a page read since
+// an earlier one lists it with its pending drafts; nothing for no task or one not stored. A stored task has
+// written the position.
+func touchDraftTask(ctx context.Context, tx *Tx, id string) error {
+	if id == "" {
+		return nil
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE task_position SET rev = rev + 1 WHERE only = 1 AND EXISTS (SELECT 1 FROM tasks WHERE id = ?)`, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET rev = (SELECT rev FROM task_position WHERE only = 1) WHERE id = ?`, id); err != nil {
+		return err
+	}
+	tx.Touch(port.TopicTasks, task.UnitOf(task.ID(id)))
+	return nil
 }
 
 func (s draftStore) Get(ctx context.Context, id draft.ID) (draft.Draft, error) {
@@ -227,10 +252,14 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 			return err
 		}
 		if n, err := res.RowsAffected(); err != nil || n == 1 {
-			if err == nil {
-				tx.Touch(port.TopicDrafts, d.Unit)
+			if err != nil {
+				return err
 			}
-			return err
+			tx.Touch(port.TopicDrafts, d.Unit)
+			if pendingDraft(from) == pendingDraft(d.State) {
+				return nil
+			}
+			return touchDraftTask(ctx, tx, d.Task)
 		}
 		var state string
 		var rev int64

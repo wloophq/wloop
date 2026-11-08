@@ -1,7 +1,6 @@
 package intent
 
 import (
-	"errors"
 	"io/fs"
 	"maps"
 	"regexp"
@@ -53,39 +52,17 @@ type mKeys struct {
 }
 
 // BundledKeys is the key help of the bundled profile alone.
-func BundledKeys(bundled fs.FS) (KeyTexts, Problems) { return loadKeys(nil, bundled) }
+func BundledKeys(bundled fs.FS) (KeyTexts, Problems) { return loadKeys(nil, readerOf(bundled)) }
 
 // loadKeys reads keys.toml from bundled and the user's layers: a higher
 // layer's line replaces a lower one's, and an empty line or one naming no
 // action keeps the lower one. A bundled FS without the file words nothing.
-func loadKeys(layers []profile.Layer, bundled fs.FS) (KeyTexts, Problems) {
+func loadKeys(layers []profile.Layer, r layerReader) (KeyTexts, Problems) {
 	out := KeyTexts{}
-	if bundled == nil {
-		return out, nil
-	}
-	src, err := fs.ReadFile(bundled, KeysFile)
-	if errors.Is(err, fs.ErrNotExist) {
-		return out, nil
-	}
-	if err != nil {
-		return out, Problems{{File: KeysFile, Msg: err.Error()}}
-	}
 	actions := KeyActions()
-	problems := mergeKeys(out, KeysFile, src, actions)
-	for _, l := range layers {
-		if l.Bundled() {
-			continue
-		}
-		r, err := profile.ReadFile(l, KeysFile)
-		file, src := r.Path, r.Body
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			problems = append(problems, Problem{File: file, Msg: err.Error()})
-			continue
-		}
-		problems = append(problems, mergeKeys(out, file, src, actions)...)
+	problems, read := readLayered(layers, r, KeysFile, func(file string, src []byte) Problems { return mergeKeys(out, file, src, actions) })
+	if !read {
+		return out, problems
 	}
 	for _, c := range slices.Sorted(maps.Keys(actions)) {
 		for _, a := range actions[c] {

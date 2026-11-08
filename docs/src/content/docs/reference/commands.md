@@ -297,11 +297,11 @@ See [Cockpit, terminal client and menu bar](/concepts/surfaces/).
 The cockpit, a workspace or a pull request.
 
 ```sh
-{{command}} open [<url>]
-{{command}} open [<url>] --print [--view <view>]
+{{command}} open [<pr-url> | #<route> | <cockpit-url> | {{command}}://open/#<route>]
+{{command}} open [<pr-url> | #<route>] --print [--view <view>]
 ```
 
-Open the workspace of a pull request in Claude Desktop or Orca, or the pull request itself when it has none. With no URL, open the cockpit. With `--print`, print the cockpit URL with its token instead of opening it.
+Open the workspace of a pull request in Claude Desktop or Orca, or the pull request itself when it has none. With no argument, open the cockpit; with a route (#queue=answer), a URL of this cockpit or a {{name}}:// link, open the cockpit there. The cockpit opens in the app's window when the app runs, else in the browser. With `--print`, print the cockpit URL with its token instead of opening it.
 
 | Flag | Description |
 | --- | --- |
@@ -313,6 +313,8 @@ Examples:
 ```sh
 {{command}} open
 {{command}} open https://github.com/acme/api/pull/7
+{{command}} open '#queue=answer'
+{{command}} open {{command}}://open/#view=needs-me
 {{command}} open --print --view needs-me
 ```
 
@@ -645,7 +647,7 @@ See [Write your review profile](/guides/review-profile/).
 The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]
+{{command}} profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--timeline|--decisions|--home|--omnibox|--config]
 ```
 
 Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
@@ -659,6 +661,11 @@ Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.t
 | `--gates` | The schema of gates.toml |
 | `--records` | The schema of records.toml |
 | `--keys` | The schema of keys.toml |
+| `--strings` | The schema of strings.toml |
+| `--timeline` | The schema of timeline.toml |
+| `--decisions` | The schema of decisions.toml |
+| `--home` | The schema of home.toml |
+| `--omnibox` | The schema of omnibox.toml |
 | `--config` | The schema of config.toml |
 
 Examples:

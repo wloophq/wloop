@@ -21,8 +21,11 @@ import (
 )
 
 const (
-	JobName  = "extract:slack"
-	JobEvery = 30 * time.Second
+	JobName = "extract:slack"
+	// JobEvery is the backstop for a lost wake: a landing and each run say when the job next has work.
+	JobEvery = 5 * time.Minute
+	// JobRetry is the first wait after a failed pass.
+	JobRetry = time.Minute
 	// PassBudget is how long a pass starts new calls; a started call runs on, up to CallTimeout.
 	PassBudget = 10 * time.Minute
 	// CallTimeout bounds one extraction call.
@@ -98,6 +101,7 @@ type Job struct {
 	wantMu  sync.Mutex
 	wants   map[unit.Unit]bool
 	waiting map[unit.Unit]bool
+	next    time.Time
 
 	mu     sync.Mutex
 	loaded bool
@@ -180,6 +184,7 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 		return "", SkipRunning, nil
 	}
 	defer j.mu.Unlock()
+	j.setNext(time.Time{})
 	cfg := j.Cfg()
 	ec := cfg.Slack.Extraction
 	switch {
@@ -275,6 +280,8 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 			// this one last failed; in an outage nothing does.
 			healthy := p.retries > 0 && j.oks > p.oksAtFail
 			j.backOff(k, p, ec, j.now(), failed, unfit || errors.As(o.err, &bad) || timedOut && healthy)
+		} else if !o.called && o.err != nil && ctx.Err() == nil {
+			j.backOff(k, p, ec, j.now(), o.err, false)
 		}
 		if o.done {
 			done++
@@ -284,6 +291,7 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	if err := j.saveScan(ctx, now); err != nil {
 		errs = append(errs, err)
 	}
+	j.setNext(j.nextRun(ctx, ec, j.now()))
 	if len(due) > 0 || unwatched > 0 {
 		summary = fmt.Sprintf("extracted %d of %d due units, %d ops, %d unwatched", done, len(due), ops, unwatched)
 	}

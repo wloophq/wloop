@@ -1,0 +1,240 @@
+package web
+
+import (
+	"reflect"
+	"strings"
+	"testing"
+)
+
+// windowRun runs main after routes.js, panel.js and window.js, with no
+// document: window.js installs nothing then.
+func windowRun(t *testing.T, main string, out any) {
+	t.Helper()
+	nodeScript(t, staticJS(t, "routes.js")+staticJS(t, "panel.js")+staticJS(t, "window.js")+panelHarness+main, nil, out)
+}
+
+func TestALinkCarriesTheRouteWithoutWhatOnlyAWindowShows(t *testing.T) {
+	var got []string
+	windowRun(t, `
+process.stdout.write(JSON.stringify([
+  deepLink("loop", "#view=inbox&task=t-1"),
+  deepLink("loop", "#task=t-1&layout=detail"),
+  deepLink("loop", "#view=inbox&layout=board"),
+  deepLink("loop", "#panel=omnibox&q=ab"),
+  deepLink("loop", "#link=malformed"),
+  deepLink("loop", ""),
+]));`, &got)
+	want := []string{
+		"loop://open/#view=inbox&task=t-1",
+		"loop://open/#task=t-1",
+		"loop://open/#view=inbox&layout=board",
+		"loop://open/#q=ab",
+		"loop://open/#",
+		"loop://open/#",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("links %q, want %q", got, want)
+	}
+}
+
+func TestDetachAsksTheWindowNativelyAndOpensATabInABrowser(t *testing.T) {
+	var got []any
+	windowRun(t, `
+process.stdout.write(JSON.stringify([
+  detachTarget("#view=inbox&task=t-1", true),
+  detachTarget("#view=inbox&task=t-1", false),
+  detachTarget("#task=t-1&layout=detail", false),
+]));`, &got)
+	want := []any{
+		map[string]any{"post": map[string]any{"action": "detach", "route": "view=inbox&task=t-1"}},
+		map[string]any{"open": "#view=inbox&task=t-1&layout=detail"},
+		map[string]any{"open": "#task=t-1&layout=detail"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("targets %v, want %v", got, want)
+	}
+}
+
+func TestOnlyTheHostMarksTheInsetTitleBar(t *testing.T) {
+	var got []bool
+	windowRun(t, `
+process.stdout.write(JSON.stringify([insetTitleBar("?titlebar=inset"), insetTitleBar("?x=1&titlebar=inset"), insetTitleBar(""), insetTitleBar("?titlebar=other")]));`, &got)
+	if want := []bool{true, true, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// dragHarness is a page whose elements carry the drag property as Wails'
+// runtime reads it, and the bridge the native window injects.
+const dragHarness = `
+const sent = [];
+const bridge = { webkit: { messageHandlers: { external: { postMessage: (m) => sent.push(m) } } } };
+const el = (drag) => ({ drag });
+const host = { ...bridge, getComputedStyle: (n) => ({ getPropertyValue: (p) => (p === "--wails-draggable" ? (n.drag || "") : "") }) };
+const page = target();
+`
+
+func TestTheTitleBarDragsTheWindowAndItsControlsDoNot(t *testing.T) {
+	var got struct {
+		Installed bool
+		Sent      []string
+	}
+	windowRun(t, dragHarness+`
+const installed = installDrag(page, host);
+page.dispatch("mousedown", event({ button: 0, detail: 1, target: el("no-drag") }));
+page.dispatch("mousemove", event({ buttons: 1, target: el("no-drag") }));
+page.dispatch("mousedown", event({ button: 0, detail: 1, target: el("drag") }));
+page.dispatch("mousemove", event({ buttons: 1, target: el("drag") }));
+page.dispatch("mousemove", event({ buttons: 1, target: el("drag") }));
+page.dispatch("mousedown", event({ button: 2, detail: 1, target: el("drag") }));
+page.dispatch("mousemove", event({ buttons: 2, target: el("drag") }));
+page.dispatch("dblclick", event({ target: el("drag") }));
+page.dispatch("dblclick", event({ target: el("") }));
+process.stdout.write(JSON.stringify({ Installed: installed, Sent: sent }));`, &got)
+	if !got.Installed || !reflect.DeepEqual(got.Sent, []string{"wails:drag", "wails:drag:doubleclick"}) {
+		t.Fatalf("installed %v, sent %q", got.Installed, got.Sent)
+	}
+}
+
+func TestWithoutTheNativeBridgeNothingDrags(t *testing.T) {
+	var got bool
+	windowRun(t, dragHarness+`
+process.stdout.write(JSON.stringify(installDrag(page, { getComputedStyle: host.getComputedStyle })));`, &got)
+	if got {
+		t.Fatal("installed a drag with no native bridge")
+	}
+}
+
+func TestADetachedWindowHandsAnotherItemToTheMainWindow(t *testing.T) {
+	var got panelResult
+	windowRun(t, `
+win.location.hash = "#task=t-1&layout=detail";
+const installed = detailWindowInstall(win, doc, (body) => posted.push(body));
+win.addEventListener("hashchange", () => { appSaw++; });
+const e = event({ target: link("#task=t-2&layout=detail") });
+doc.dispatch("click", e);
+win.location.hash = "#unit=github/acme%2Fapi%238&layout=detail";
+win.dispatch("hashchange", event({}));
+win.location.hash = "#view=inbox";
+win.dispatch("hashchange", event({}));
+`+panelReport, &got)
+	if !got.Installed || !got.Prevented {
+		t.Fatalf("installed %v, the link's default prevented %v", got.Installed, got.Prevented)
+	}
+	if len(got.Posted) != 3 || got.Posted[0]["route"] != "task=t-2&layout=detail" || got.Posted[1]["route"] != "unit=github/acme%2Fapi%238&layout=detail" || got.Posted[2]["route"] != "view=inbox" || got.Posted[0]["action"] != "open" {
+		t.Fatalf("posted %v", got.Posted)
+	}
+	if got.Hash != "#task=t-1&layout=detail" || got.AppSaw != 0 {
+		t.Errorf("the window moved to %q, the cockpit saw %d changes", got.Hash, got.AppSaw)
+	}
+}
+
+func TestADetachedWindowKeepsMovesWithinItsItem(t *testing.T) {
+	var got panelResult
+	windowRun(t, `
+win.location.hash = "#task=t-1&layout=detail";
+const installed = detailWindowInstall(win, doc, (body) => posted.push(body));
+win.addEventListener("hashchange", () => { appSaw++; });
+const e = event({ target: link("#task=t-1&layout=detail&ctx=home") });
+doc.dispatch("click", e);
+win.location.hash = "#task=t-1&layout=detail&ctx=home";
+win.dispatch("hashchange", event({}));
+`+panelReport, &got)
+	if got.Prevented || len(got.Posted) != 0 || got.AppSaw != 1 {
+		t.Fatalf("prevented %v, posted %v, the cockpit saw %d changes", got.Prevented, got.Posted, got.AppSaw)
+	}
+}
+
+func TestOnlyADetailLayoutRouteIsADetachedWindow(t *testing.T) {
+	var got []bool
+	windowRun(t, `
+const out = [];
+for (const h of ["#task=t-1", "#view=inbox&layout=detail", "#view=inbox&layout=board"]) {
+  win.location.hash = h;
+  out.push(detailWindowInstall(win, target(), () => {}));
+}
+process.stdout.write(JSON.stringify(out));`, &got)
+	if want := []bool{false, false, false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("installed %v, want %v", got, want)
+	}
+}
+
+func TestAMalformedLinkNoticeIsTakenOnce(t *testing.T) {
+	var got struct {
+		First, Second bool
+		Hash          string
+	}
+	windowRun(t, `
+win.location.hash = "#link=malformed&view=inbox";
+const first = takeLinkNotice(win);
+const second = takeLinkNotice(win);
+process.stdout.write(JSON.stringify({ First: first, Second: second, Hash: win.location.hash }));`, &got)
+	if !got.First || got.Second || got.Hash != "#view=inbox" {
+		t.Fatalf("first %v, second %v, hash %q", got.First, got.Second, got.Hash)
+	}
+}
+
+func TestTheTitleBarFollowsTheLocale(t *testing.T) {
+	var got map[string][2]string
+	nodeScript(t, treeJS+staticJS(t, "routes.js")+staticJS(t, "window.js")+`
+const top = { kids: [], prepend(...n) { this.kids.unshift(...n); }, append(...n) { this.kids.push(...n); } };
+installTitleBar({ getElementById: (id) => (id === "top" ? top : null), body: { classList: { add() {} } } });
+const buttons = all(top.kids, (x) => x.tag === "button");
+for (const b of buttons) {
+  b.getAttribute = (k) => b.attrs[k];
+  b.setAttribute = (k, v) => { b.attrs[k] = String(v); };
+}
+I18N.locale = "pt-BR";
+I18N.strings = { "Back": "Voltar", "Forward": "Avançar", "Copy a link to this view": "Copiar um link para esta visão", "Open the omnibox": "Abrir a omnibox" };
+labelTitleBar(buttons);
+process.stdout.write(JSON.stringify(Object.fromEntries(buttons.map((b) => [b.attrs["data-focus"], [b.attrs["aria-label"], b.attrs.title]]))));`, nil, &got)
+	want := map[string]string{"top:back": "Voltar", "top:forward": "Avançar", "top:copy-link": "Copiar um link para esta visão", "top:omnibox": "Abrir a omnibox"}
+	for focus, label := range want {
+		if got[focus][0] != label || !strings.HasPrefix(got[focus][1], label) {
+			t.Errorf("%s reads %q, title %q; want %q", focus, got[focus][0], got[focus][1], label)
+		}
+	}
+}
+
+func TestTheLinkNoticeWaitsForTheStrings(t *testing.T) {
+	app, win := appJS(t), staticJS(t, "window.js")
+	boot := app[strings.Index(app, "loadStrings(getJSON).then("):]
+	boot = boot[:strings.Index(boot, "\n});\n")]
+	loaded := win[strings.Index(win, `addEventListener("DOMContentLoaded"`):]
+	if !strings.Contains(boot, "tellLinkNotice()") || strings.Contains(loaded, "tellLinkNotice()") {
+		t.Fatalf("the notice of an unread link is told before the strings load, so it reads in English")
+	}
+}
+
+// In the native window a link to another site, or a window.open of one, asks the app to open it in the
+// default browser, which the web view would otherwise drop; the cockpit's own links and a browser's are left alone.
+func TestAnOutsideLinkInTheNativeWindowOpensInTheBrowser(t *testing.T) {
+	var got struct {
+		Installed, Browser bool
+		Posted             []map[string]any
+		Prevented          []bool
+		Opened             []string
+	}
+	windowRun(t, `
+const out = [];
+const opened = [];
+const anchor = (href, tgt) => ({ closest: (sel) => (sel === "a[href]" ? { href, target: tgt || "" } : null) });
+const page = target();
+const host = { webkit: { messageHandlers: { external: { postMessage() {} } } }, location: { origin: "http://127.0.0.1:5000" }, open: (u) => { opened.push(u); return null; } };
+const installed = installExternalLinks(page, host, (b) => out.push(b));
+const clicks = [anchor("https://github.com/acme/api/pull/7", "_blank"), anchor("http://127.0.0.1:5000/#task=t-1", "_blank"), anchor("javascript:alert(1)", "_blank"), anchor("https://example.com/doc")];
+const prevented = clicks.map((a) => { const e = event({ target: a, button: 0 }); page.dispatch("click", e); return e.defaultPrevented; });
+host.open("https://slack.com/archives/C1", "_blank", "noopener");
+host.open("#view=inbox", "_blank");
+const browser = installExternalLinks(target(), { location: { origin: "http://127.0.0.1:5000" } }, () => {});
+process.stdout.write(JSON.stringify({ Installed: installed, Browser: browser, Posted: out, Prevented: prevented, Opened: opened }));`, &got)
+	want := []map[string]any{
+		{"action": "external", "url": "https://github.com/acme/api/pull/7"},
+		{"action": "external", "url": "https://example.com/doc"},
+		{"action": "external", "url": "https://slack.com/archives/C1"},
+	}
+	if !got.Installed || got.Browser || !reflect.DeepEqual(got.Posted, want) || !reflect.DeepEqual(got.Prevented, []bool{true, false, false, true}) ||
+		!reflect.DeepEqual(got.Opened, []string{"#view=inbox"}) {
+		t.Fatalf("%+v", got)
+	}
+}

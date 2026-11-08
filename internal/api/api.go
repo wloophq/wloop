@@ -72,6 +72,35 @@ const UnitDetail = "/api/units/{provider}/{key}"
 // UnitTasks serves the open tasks that hold the unit or one of its items, as []TaskView.
 const UnitTasks = UnitDetail + "/tasks"
 
+// UnitSkip stops (POST) or lets again (DELETE) a workflow on one unit, answering a UnitSkipState.
+const UnitSkip = UnitDetail + "/skip/{workflow}"
+
+// UnitSkipState is whether a workflow is skipped on a unit ("<provider>/<key>").
+type UnitSkipState struct {
+	Unit     string `json:"unit"`
+	Workflow string `json:"workflow"`
+	Skipped  bool   `json:"skipped"`
+}
+
+// WorkflowDisable turns a workflow off in the configuration, applied without a restart, answering a
+// WorkflowSwitch.
+const WorkflowDisable = "/api/workflows/{name}/disable"
+
+// WorkflowDisablePath is WorkflowDisable for workflow name.
+func WorkflowDisablePath(name string) string {
+	return "/api/workflows/" + url.PathEscape(name) + "/disable"
+}
+
+// OutboxPath serves the Outbox's drafts as an OutboxPage: grouped by why they were drafted, each with its
+// context.
+const OutboxPath = "/api/outbox"
+
+// WorkflowSwitch is whether a workflow is enabled.
+type WorkflowSwitch struct {
+	Workflow string `json:"workflow"`
+	Enabled  bool   `json:"enabled"`
+}
+
 // UnitPath is the path of u's detail, followed by the segments of rest.
 func UnitPath(u unit.Unit, rest ...string) string {
 	p := "/api/units/" + url.PathEscape(string(u.Provider)) + "/" + url.PathEscape(u.Key)
@@ -137,6 +166,19 @@ var Operations = []Operation{
 	{"GET", DigestPath},
 	{"GET", ReviewPath},
 	{"POST", ReviewStepDone},
+	{"GET", StringsPath},
+	{"GET", HomePath},
+	{"GET", QueuePath},
+	{"GET", SearchPath},
+	{"POST", OmniboxResolvePath},
+	{"POST", OmniboxAskPath},
+	{"POST", OmniboxRunPath},
+	{"POST", WindowPath},
+	{"POST", WorkflowDisable},
+	{"POST", UnitSkip},
+	{"DELETE", UnitSkip},
+	{"POST", DraftCloseSilently},
+	{"GET", OutboxPath},
 
 	{"POST", AgentTurnsStart},
 	{"POST", AgentTurnsByHand},

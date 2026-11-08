@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -171,13 +172,15 @@ type noPublisher struct {
 func (n noPublisher) Error() string { return n.err.Error() }
 func (n noPublisher) Unwrap() error { return n.err }
 
-// draftAction is what a draft verb takes: Text an approval posts or an edit sets, Reason a discard's, Confirm a
-// retry's of a draft that may have been posted, Rev the draft's version the caller showed.
+// draftAction is what a draft verb takes: Text an approval posts or an edit sets, Broadcast an edit's turn of a
+// thread reply's broadcast, Reason a discard's, Confirm a retry's of a draft that may have been posted, Rev the
+// draft's version the caller showed.
 type draftAction struct {
-	Text    *string
-	Reason  string
-	Confirm bool
-	Rev     *int64
+	Text      *string
+	Broadcast *bool
+	Reason    string
+	Confirm   bool
+	Rev       *int64
 }
 
 // draftDo runs action on draft id as actor: refused with pluginOff when the draft's plugin is disabled, but for
@@ -205,10 +208,10 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		}
 		got, err = s.decideDraft(ctx, d, gate.Approved, a.Text, actor)
 	case "edit":
-		if a.Text == nil {
-			return draft.Draft{}, badRequest{"edit takes the draft's new text"}
+		if a.Text == nil && a.Broadcast == nil {
+			return draft.Draft{}, badRequest{"edit takes the draft's new text or broadcast"}
 		}
-		got, err = o.Edit(ctx, id, *a.Text)
+		got, err = o.Amend(ctx, id, outbox.Amendment{Text: a.Text, Broadcast: a.Broadcast})
 	case "discard":
 		if d.State == draft.Held {
 			got, err = s.decideDraft(ctx, d, gate.Rejected, nil, actor)
@@ -362,6 +365,13 @@ func (s *Server) draftVerb(handler string) coretasks.VerbHandler {
 			a.Text = &text
 		}
 		a.Reason = req.Args["reason"]
+		if raw, ok := req.Args["broadcast"]; ok {
+			b, err := strconv.ParseBool(raw)
+			if err != nil {
+				return coretasks.Result{}, fmt.Errorf("%w: broadcast is true or false, not %q", coretasks.ErrArgs, raw)
+			}
+			a.Broadcast = &b
+		}
 		if raw, ok := req.Args["confirm"]; ok {
 			b, err := strconv.ParseBool(raw)
 			if err != nil {
@@ -409,9 +419,15 @@ func taskDraftError(err error) error {
 }
 
 // draftView is d on the wire, with g, its gate, and its actions as they stand.
+// quotes says whether d, a per-person draft of a workflow posted in the direct conversation of the person it
+// is to, quotes items of its unit, a conversation that person does not read.
+func quotes(d draft.Draft) bool {
+	return d.Target != "" && d.Origin.Kind == draft.OriginAuto && d.Origin.Key == d.Unit.String()+":"+d.Target
+}
+
 func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Task: d.Task, Kind: string(d.Kind),
-		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
+		Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Why: d.Why, Language: d.Language, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},
 		State: string(d.State), Error: d.Error, Reason: d.Reason, Permalink: d.Evidence.Permalink, Gate: g.ID,
@@ -437,18 +453,31 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 			}
 		}
 	}
-	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(d))
+	if d.State == draft.Dropped {
+		v.ReasonText = s.loaded().Gates.Drafts.Reasons[d.Reason]
+	}
+	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d))
 	v.Where = s.draftWhere(ctx, d)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
 	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link
+	if quotes(d) {
+		v.Quoted = strings.ReplaceAll(s.loaded().Gates.Drafts.Quoted, "{conversation}", cmp.Or(p.Title, p.Label, d.Unit.String()))
+	}
 	return v
 }
 
 // draftFacts are what d's actions depend on.
-func (s *Server) draftFacts(d draft.Draft) catalog.DraftFacts {
+func (s *Server) draftFacts(ctx context.Context, d draft.Draft) catalog.DraftFacts {
 	publisher := s.publisherOf(d)
 	f := catalog.DraftFacts{State: string(d.State), Provider: publisher, Disabled: !s.pluginEnabled(publisher),
-		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)}
+		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted),
+		Effects:           slices.Clone(d.Effects)}
+	if d.Origin.Kind == draft.OriginAuto {
+		f.Workflow = d.Origin.Workflow
+	}
+	if f.Workflow != "" {
+		f.Skipped = slices.Contains(s.skippedOn(ctx, d.Unit), f.Workflow)
+	}
 	if o := s.deps.Outbox; o != nil && o.Effects != nil {
 		_, err := o.Effects(publisher)
 		f.NoPublisher = err != nil
@@ -456,21 +485,34 @@ func (s *Server) draftFacts(d draft.Draft) catalog.DraftFacts {
 	return f
 }
 
-var mentionKey = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+var mentionKey = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 
 // draftDetail is draftView with the names of the people the text mentions and the items it is about, read
-// from the unit's items; its is those items, nil to read them.
-func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, its []items.Item) api.Draft {
+// from the unit's items, which only a draft with items or a mention reads, once per unit into byUnit (nil
+// keeps none).
+func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.Draft {
 	v := s.draftView(ctx, d, g)
 	if s.deps.Items == nil || (len(d.Items) == 0 && !mentionKey.MatchString(d.Text)) {
 		return v
 	}
-	if its == nil {
-		var err error
-		if its, err = s.deps.Items.Items(ctx, d.Unit); err != nil {
-			s.logf("drafts: the items of %s: %v", d.Unit.Label(), err)
-			return v
+	its := s.itemsOnce(ctx, byUnit, d.Unit)
+	v.Names = mentionNames(d.Text, its)
+	for _, id := range d.Items {
+		iv := api.ItemView{Unit: d.Unit, ID: id}
+		if i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == id }); i >= 0 {
+			iv.Summary, iv.State, iv.Kind = its[i].Summary, string(its[i].State), string(its[i].Kind)
 		}
+		v.ItemDetails = append(v.ItemDetails, iv)
+	}
+	return v
+}
+
+// mentionNames are the names of the people text mentions, by the key it mentions them with, read from the
+// requesters, assignees and people waited on of its; nil when it names nobody.
+func mentionNames(text string, its []items.Item) map[string]string {
+	mentions := mentionKey.FindAllStringSubmatch(text, -1)
+	if len(mentions) == 0 {
+		return nil
 	}
 	names := map[string]string{}
 	for _, it := range its {
@@ -482,22 +524,16 @@ func (s *Server) draftDetail(ctx context.Context, d draft.Draft, g gate.Gate, it
 			}
 		}
 	}
-	for _, m := range mentionKey.FindAllStringSubmatch(d.Text, -1) {
+	var out map[string]string
+	for _, m := range mentions {
 		if n, ok := names[m[1]]; ok {
-			if v.Names == nil {
-				v.Names = map[string]string{}
+			if out == nil {
+				out = map[string]string{}
 			}
-			v.Names[m[1]] = n
+			out[m[1]] = n
 		}
 	}
-	for _, id := range d.Items {
-		iv := api.ItemView{Unit: d.Unit, ID: id}
-		if i := slices.IndexFunc(its, func(it items.Item) bool { return it.ID == id }); i >= 0 {
-			iv.Summary, iv.State, iv.Kind = its[i].Summary, string(its[i].State), string(its[i].Kind)
-		}
-		v.ItemDetails = append(v.ItemDetails, iv)
-	}
-	return v
+	return out
 }
 
 // draftDetails are the details of ps, each unit's items read once.
@@ -505,26 +541,32 @@ func (s *Server) draftDetails(ctx context.Context, ps []outbox.Pending) []api.Dr
 	byUnit := map[unit.Unit][]items.Item{}
 	out := make([]api.Draft, 0, len(ps))
 	for _, p := range ps {
-		d := p.Draft
-		its, ok := byUnit[d.Unit]
-		if !ok && s.deps.Items != nil {
-			var err error
-			if its, err = s.deps.Items.Items(ctx, d.Unit); err != nil {
-				s.logf("drafts: the items of %s: %v", d.Unit.Label(), err)
-			}
-			if its == nil {
-				its = []items.Item{}
-			}
-			byUnit[d.Unit] = its
-		}
-		out = append(out, s.draftDetail(ctx, d, p.Gate, its))
+		out = append(out, s.draftDetail(ctx, p.Draft, p.Gate, byUnit))
 	}
 	return out
 }
 
+// itemsOnce are u's items, read once into byUnit (nil keeps none); a failed read is logged and reads as none.
+func (s *Server) itemsOnce(ctx context.Context, byUnit map[unit.Unit][]items.Item, u unit.Unit) []items.Item {
+	if its, ok := byUnit[u]; ok {
+		return its
+	}
+	its, err := s.deps.Items.Items(ctx, u)
+	if err != nil {
+		s.logf("drafts: the items of %s: %v", u.Label(), err)
+	}
+	if its == nil {
+		its = []items.Item{}
+	}
+	if byUnit != nil {
+		byUnit[u] = its
+	}
+	return its
+}
+
 // draftWhere is where a draft still to be posted goes, best effort: "" when its publisher cannot tell.
-// A unit and target never change, so a resolved destination is kept for the daemon's life; a failed lookup, or one
-// the page had no time left for, is kept for draftWhereRetry.
+// A unit and target never change, so a resolved destination is kept while pages keep reading it; a failed lookup,
+// or one the page had no time left for, is kept for draftWhereRetry. keepLookup forgets what went unread that long.
 func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 	if !slices.Contains(draft.Open, d.State) && d.State != draft.Failed {
 		return ""
@@ -532,8 +574,12 @@ func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 	now := time.Now()
 	if c, ok := s.draftWheres.Load(d.ID); ok {
 		w := c.(whereSeen)
-		if w.where != "" || now.Sub(w.failedAt) < draftWhereRetry {
+		if w.where != "" {
+			s.keepLookup(&s.draftWheres, d.ID, whereSeen{where: w.where, at: now}, now)
 			return w.where
+		}
+		if now.Sub(w.at) < draftWhereRetry {
+			return ""
 		}
 	}
 	loc := s.locator(s.publisherOf(d))
@@ -545,23 +591,50 @@ func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 		by = page
 	}
 	if !now.Before(by) {
-		s.draftWheres.Store(d.ID, whereSeen{failedAt: now})
+		s.keepLookup(&s.draftWheres, d.ID, whereSeen{at: now}, now)
 		return ""
 	}
 	ctx, cancel := context.WithDeadline(ctx, by)
 	defer cancel()
 	w, err := loc.Where(ctx, d)
 	if err != nil || w == "" {
-		s.draftWheres.Store(d.ID, whereSeen{failedAt: time.Now()})
+		s.keepLookup(&s.draftWheres, d.ID, whereSeen{at: time.Now()}, now)
 		return ""
 	}
-	s.draftWheres.Store(d.ID, whereSeen{where: w})
+	s.keepLookup(&s.draftWheres, d.ID, whereSeen{where: w, at: now}, now)
 	return w
 }
 
+// whereSeen is a destination its publisher resolved and when a page last read it, or, with no where, when the
+// lookup failed.
 type whereSeen struct {
-	where    string
-	failedAt time.Time
+	where string
+	at    time.Time
+}
+
+// keepLookup stores v under key in m, and at most once each draftWhereRetry forgets every draft destination and
+// reply broadcast older than that, so neither cache outgrows what pages read.
+func (s *Server) keepLookup(m *sync.Map, key, v any, now time.Time) {
+	m.Store(key, v)
+	last := s.lookupsSwept.Load()
+	if now.UnixNano()-last < int64(draftWhereRetry) || !s.lookupsSwept.CompareAndSwap(last, now.UnixNano()) {
+		return
+	}
+	for _, c := range []*sync.Map{&s.draftWheres, &s.replyBroadcasts} {
+		c.Range(func(k, v any) bool {
+			var at time.Time
+			switch v := v.(type) {
+			case whereSeen:
+				at = v.at
+			case broadcastSeen:
+				at = v.at
+			}
+			if now.Sub(at) >= draftWhereRetry {
+				c.Delete(k)
+			}
+			return true
+		})
+	}
 }
 
 type whereByKey struct{}
@@ -608,6 +681,9 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	rctx, scope := meter.Start(ctx, meter.Loop("drafts"))
 	if err := o.Recover(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: recover: %v", err)
+	}
+	if err := o.PlaceBroadcasts(rctx); err != nil && ctx.Err() == nil {
+		s.logf("drafts: placing broadcasts: %v", err)
 	}
 	s.adoptDrafts(rctx)
 	scope.End()
@@ -662,4 +738,71 @@ func originUnit(o draft.Origin) string {
 		return ""
 	}
 	return o.Unit.Label()
+}
+
+// handleDraftCloseSilently closes a held draft's conversation without its message: a person discards the draft
+// through its gate, then its effects, each of which applies without a post, run as if it was sent.
+func (s *Server) handleDraftCloseSilently(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseDraftID(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no draft "+strconv.Quote(r.PathValue("id")))
+		return
+	}
+	var req api.DraftCloseSilentlyRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, draftsBodyMax)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "close-silently takes the rev you saw: "+err.Error())
+		return
+	}
+	actor, ok := s.forUser(w, r, "closing a conversation without its message")
+	if !ok {
+		return
+	}
+	o := s.deps.Outbox
+	if o == nil {
+		writeActionError(w, errOutboxUnavailable)
+		return
+	}
+	ctx := context.WithoutCancel(r.Context())
+	got, err := s.closeSilently(ctx, id, req.Rev, actor)
+	switch {
+	case errors.Is(err, outbox.ErrNotFound):
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	case errors.Is(err, outbox.ErrConflict):
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	case err != nil:
+		writeActionError(w, err)
+		return
+	}
+	g, _, err := o.GateOf(ctx, got)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, s.draftDetail(ctx, got, g, nil))
+}
+
+// closeSilently discards held draft id at rev as actor and applies its effects, under draftMu; refused with the
+// close-silently action's refusal when that action is disabled on it.
+func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, actor requester) (draft.Draft, error) {
+	s.draftMu.Lock()
+	defer s.draftMu.Unlock()
+	o := s.deps.Outbox
+	d, err := o.Store.Get(ctx, id)
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	if rev != d.Rev {
+		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", outbox.ErrConflict, id, rev, d.Rev)
+	}
+	for _, st := range catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d)) {
+		if st.ID == catalog.DraftCloseSilently && !st.Enabled {
+			return draft.Draft{}, conflict{msg: st.Reason, refusal: catalog.DraftRefusal(catalog.DraftCloseSilently, s.draftFacts(ctx, d))}
+		}
+	}
+	if _, err := s.decideDraft(ctx, d, gate.Rejected, nil, actor); err != nil {
+		return draft.Draft{}, err
+	}
+	return o.CloseSilently(ctx, id)
 }

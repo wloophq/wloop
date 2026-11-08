@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -23,6 +24,10 @@ const StepTurnStart = "turn.start"
 // StepDraftPropose is the step that proposes a draft in the Outbox.
 const StepDraftPropose = "draft.propose"
 
+// DraftTargetPerson is draft.propose's target that posts each per-person draft in the direct conversation
+// between the user and the person it is to.
+const DraftTargetPerson = "person"
+
 // The steps whose arguments the grammar names.
 const (
 	StepTurnDismiss  = "turn.dismiss"
@@ -43,7 +48,10 @@ var (
 	DraftEmojiDeliveries = []string{"reaction"}
 	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
 	DraftPer             = []string{"unit", "person"}
-	DraftTargets         = []string{"unit", "item"}
+	DraftTargets         = []string{"unit", "item", DraftTargetPerson}
+	// DraftTo are whom of the people a draft would address it addresses: all of them, those who can read the
+	// conversation it posts on, or those who cannot.
+	DraftTo = []string{"all", "members", "non_members"}
 	// DraftEnded is what a draft withdrawn as its task ended does to draft.propose while that task stays ended:
 	// hold the workflow's proposals of no task or of that task, or hold them only for repeat_after.
 	DraftEnded = []string{"hold", "repeat"}
@@ -81,7 +89,9 @@ var coreSteps = []StepDef{
 	{StepAnswerRefuse, nil, workflow.ReachLocal, nil,
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil,
-		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
+		"Marks dormant an active session whose process its manager's census no longer lists, or has listed orphaned with no agent for a fast job (`session.process_orphaned`) when no turn is sent or started in it, its agent neither works nor waits for permission, its workspace is not focused and you did not prompt it since the loop's last turn: the session stays open, and the next turn, or a census that shows its process in a window again, wakes it. It records the state and ends no process."},
+	{"session.close_orphan", providers(unit.Session), workflow.ReachLocal, nil,
+		"Side effect: ends the process of an active session that the census proved a durable orphan (`session.orphan_durable`), a terminal no window of the app shows with no agent in it. It runs under `session.close`'s guards (no turn sent or started, the agent neither working nor waiting for permission, the workspace not focused, no prompt of yours since the loop's last turn) and records nothing on the session: the censuses that then miss the process mark it dormant. Refused for good on a session gone, closed or dormant."},
 	{StepTurnStart, nil, "", nil,
 		"Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`."},
 	{StepDraftPropose, nil, workflow.ReachLocal, nil,
@@ -98,6 +108,48 @@ var coreSteps = []StepDef{
 		"Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing."},
 	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
 		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
+}
+
+// StepSays are the catalog keys of what each core step does to a plan item's unit, as strings.toml words them for
+// a person; a {name} is a step argument as the clients read it.
+var StepSays = map[string]string{
+	"session.close":        "Close the agent session",
+	"workspace.remove":     "Remove the workspace",
+	"workspace.unregister": "Forget the workspace whose folder is gone",
+	StepTurnDismiss:        "Dismiss the agent's open turn",
+	StepAnswerRefuse:       "Refuse a queued answer whose route is gone",
+	"session.mark_dormant": "Mark the agent session dormant",
+	StepTurnStart:          "Start an agent turn: {intent}",
+	StepDraftPropose:       "Draft a message you approve before it posts",
+	StepClassify:           "Classify it with an agent call",
+	StepNotifySelf:         "Notify you",
+	StepTaskVerb:           "Run {verb} on the task",
+	StepGateOpen:           "Ask you to decide",
+	StepItemsResolve:       "Resolve its open items as {resolution}",
+	StepTaskSet:            "Set {prop} to {value}",
+}
+
+// StepSaysWithTask is the catalog key of what a step that names another task does, by step.
+var StepSaysWithTask = map[string]string{StepTaskVerb: "Run {verb} on the task, with “{task}”"}
+
+// The refusals of items.resolve, which a plan item shows as its reason.
+const (
+	RefusalNoOpenItem = "the task holds no open item"
+	RefusalNotDerived = "the task is not derived from items: its items do not close it"
+)
+
+// StepRefusals are the refusals of the core steps a plan item shows as its reason, each a key of strings.toml and
+// of api.PlanReasons, which the clients word it by.
+var StepRefusals = []string{RefusalNoOpenItem, RefusalNotDerived}
+
+// StepDrafts are the steps whose message posts once you approve its draft: a plan item running one may post.
+var StepDrafts = []string{StepDraftPropose}
+
+// ResolutionSays are the catalog keys of how an item resolves, by resolution, as items.resolve's resolution reads.
+var ResolutionSays = map[items.Resolution]string{
+	items.Done: "resolved as done", items.Answered: "resolved as answered", items.Fixed: "resolved as fixed",
+	items.Delegated: "resolved as delegated", items.Declined: "resolved as declined", items.Dismissed: "resolved as dismissed",
+	items.Superseded: "resolved as superseded", items.Moot: "resolved as moot",
 }
 
 // StepArg is the grammar row of step use's argument k.

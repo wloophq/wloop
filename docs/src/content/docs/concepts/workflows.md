@@ -21,9 +21,11 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `workspace-review-finished`, `workspace-author-finished`, `workspace-temporary`, `workspace-duplicate` | remove workspaces of finished pull requests, under temporary paths, or duplicated | **observe** |
 | `workspace-path-gone` | unregisters a workspace whose path no longer exists | runs |
 | `workspace-idle-no-pr` | offers to remove a workspace with no pull request and no open session, idle for `cleanup.stale_workspace` | waits for you |
-| `hygiene-turn-on-finished-pr`, `hygiene-orphan-answer`, `hygiene-session-dormant` | keep the turn and session records consistent; a session whose process its manager stopped listing turns dormant | runs |
+| `hygiene-turn-on-finished-pr`, `hygiene-orphan-answer`, `hygiene-session-dormant` | keep the turn and session records consistent; a session whose process its manager stopped listing turns dormant, which ends no process | runs |
+| `hygiene-session-orphaned` | marks dormant a session whose terminal you closed in the app, its process left orphaned with no agent, when no turn runs in it and you did not prompt it; it ends no process, and the session wakes when a window shows the process again | runs |
+| `session-orphan-close` | ends the process such a session left behind, once the census proves the orphan durable, under `session.close`'s guards | **off** (`enabled = false`); `workflows.session-orphan-close.enabled = true` turns it on |
 
-A run that waits for you or for its window is a plan gate on its unit. It asks what the workflow's `ask` renders over the unit's facts (`.Unit`, the unit as people read it, and `.Facts`, by name), else its `summary`; the Inbox, the cockpit and the terminal show those words, and a task opened for the gate takes them as its title. The gate is withdrawn when its item stops waiting: the unit left its plugin's inventory, the workflow's `when` no longer holds on it, or its key moved.
+A run that waits for you or for its window is a plan gate on its unit. It asks what the workflow's `ask` renders over the unit's facts (`.Unit`, the unit as people read it, and `.Facts`, by name), else its `summary`; the Inbox, the cockpit and the terminal show those words, and a task opened for the gate takes them as its title. While the item waits, the gate carries it too: the cockpit's card for the gate reads the workflow's `summary` (what running it does, what it posts or not), the unit it acts on, linked, and, folded, the facts that fired it, each in the words of the task facet that reads it, else as `name = value`; the item's steps show only when the workflow has no `summary`. The gate is withdrawn when its item stops waiting: the unit left its plugin's inventory, the workflow's `when` no longer holds on it, or its key moved.
 
 An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{command}} plan` shows what each would do. The four workspace removals ship that way because a removal cannot be undone. [Tune workflows](/guides/workflows/) says when and how to switch them on.
 
@@ -76,7 +78,17 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - **pending**: waits for you, with a window. `runs in 41s` runs when the window ends; `waits for you` stays until you act.
 - **blocked**: a guard refused it (a workspace holds unpushed commits, say), with the reason and the command that backs the work up.
 - **run**: the next sweep runs it.
-- **skipped**: the workflow matched and its rules say not now, with the reason.
+- **skipped**: the workflow matched and its rules say not now, with the reason. A guard whose refusal ends at a known time skips the item until then: a draft proposal held by an earlier draft for `repeat_after` waits out that window off the list of blocked items.
+
+A guard that refuses for good withdraws the item: its subject is gone or its step can never run on it again, such as a session close whose session is already closed, a draft proposal held while its task stays ended or by a draft sent with `repeat_after_sent = "forever"`, or one its own `[drafts.withdraw] when` would withdraw at once. The item leaves the plan with a `workflow_dropped` event that records the reason, and nothing asks you to dismiss it; the workflow plans it again when its unit matches on facts the guard passes. A blocked item is left for you only when you can act on it, and its reason says how.
+
+The same holds for a gate a workflow's `gate.open` step opened: its `[gates.withdraw] when`, over the unit's facts, says when the gate's subject is gone. At the start of each sweep the engine supersedes every open step gate whose workflow's withdraw holds, before it evaluates, so a task the gate held open can close in the same sweep, and records `gate_withdrawn` on the task with the workflow's `reason`, which the timeline shows as "Step withdrawn: …". The bundled `start-review-diff` withdraws Review the diff once no pull request of its task is open.
+
+```toml
+[gates.withdraw]
+when = '!("pull-request" in task.open_unit_kinds)'
+reason = "its pull request merged or closed, nothing is left to review"
+```
 
 ```sh
 {{command}} plan                                  # what the next sweep would do
@@ -85,7 +97,7 @@ Evaluating the workflows yields **plan items**, each with a decision:
 {{command}} plan dismiss 91c0e5d2                 # drop it until something new happens
 ```
 
-`plan` writes nothing and asks GitHub nothing. `plan --unit` lists every workflow that gives the unit no item, with the facts its condition read, such as `pr.first.reason`. The cockpit and the terminal client show the same items with the same actions.
+`plan` writes nothing and asks GitHub nothing. `plan --unit` lists every workflow that gives the unit no item, with the facts its condition read, such as `pr.first.reason`. The cockpit and the terminal client show the same items with the same actions; the cockpit names each item's workflow by its `summary`, in the interface language, with the workflow's name in the tooltip. A task's item names the task by its title, linked to its detail, with the conversations it came from; says what applying does, each step in the words of `strings.toml` (an `items.resolve` with the open items it resolves and the resolution in words), and that it posts nothing when no step may post; and folds the facts that fired it. An item's reason reads through `strings.toml` in both clients: the engine gives each of its own reasons from a template the plan serves as `reason_key`, with the values it carries (a wait rule's held facts worded as the gate card words them), and any other reason, a guard's or a step's refusal, reads as its text where `strings.toml` has no words for it. A summary is for people: it says what running does, and names no configuration key or step; whether it posts the cockpit says from its steps.
 
 ## Pause
 
@@ -102,5 +114,9 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - a live session that closing would refuse.
 
 `session.close` refuses while a turn is sent or started, the agent works or waits for permission, the workspace is focused in its manager, or you typed in the session after the loop's last turn. A dormant session has no process, so the checks on the agent's work and permission prompts do not apply to it.
+
+A session whose terminal the app shows with no agent in it refuses too, since your own shell may run there: close that terminal, or dismiss the item; so does one with no workspace to find its terminal in. One whose terminal is closed refuses only until the census marks it dormant. A terminal you closed in Orca can leave its process behind, listed orphaned with no agent. Once two complete censuses a fast job apart list it so, `hygiene-session-orphaned` marks the session dormant without ending the process, under the guards of `session.close` that need no shown terminal: no turn sent or started in it, its agent neither working nor waiting for permission (read by its pane, else by any agent of its workspace), its workspace not the one focused, and no prompt of yours since the loop's last turn. `session-manual-quiet`, which offers only active sessions, then leaves the plan. A close of the dormant session waits, skipped and off the list of blocked items, while the census still lists its process orphaned and has not proven it a lasting orphan; it runs once the process is gone or proven so, or once the process has stayed listed orphaned for `cleanup.orphan_hold` (1d) with the app showing some terminal at every reading, whatever its last output. Such a close records the session closed and ends no process. A workspace removal does not wait on it: it closes the dormant session's record the same way. If a window shows the process meanwhile, the next census wakes the session. A turn that would wake a dormant session whose process the census still lists, or cannot tell about, starts a new session instead, so two processes never resume one agent session; while Orca cannot list its terminals completely, every such wake starts a new session. Enter on such a run refuses and asks you to show its terminal. A session already closed, or no longer known, withdraws its close.
+
+`session-orphan-close` ends the leftover process itself. It ships off: ending a process risks a pane the app has not reattached yet. Turned on, it acts only once the census proves the orphan durable, in readings of the same runtime whose windows showed some terminal and whose window graph held for a fast job: the orphan outlived a restart of the app's windows after it stayed orphaned for a fast job in windows that showed some terminal, or it stayed orphaned two hours, every reading showing some terminal, with a known last output from before. A restart that shows processes orphaned until the windows reclaim them, or two restarts in a row, prove nothing. One case the proof cannot tell apart: a pane the windows leave unreclaimed through a whole epoch while other tabs show, say of a worktree you never open, counts as an orphan once the windows restart again. It reads a fresh census before ending the process and refuses when the process is no longer orphaned in that runtime and window graph, and it keeps the guards above.
 
 Your own workflows go in your profile; see the [workflow manifest](/reference/workflow-manifest/).

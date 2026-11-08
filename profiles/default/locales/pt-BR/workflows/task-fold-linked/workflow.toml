@@ -1,0 +1,1 @@
+summary = "Juntar uma tarefa à tarefa do único pull request que os links de review ou de merge dos itens dela apontam, como um pedido no Slack para revisá-lo, quando ela não tem pull request próprio"

@@ -177,6 +177,10 @@
               "name": {
                 "description": "The effect's name, \u003cslot\u003e.\u003cname\u003e. Required.",
                 "type": "string"
+              },
+              "silent": {
+                "description": "A draft effect that applies without the draft's post, so a person may close the conversation without the message.",
+                "type": "boolean"
               }
             },
             "required": [
@@ -313,6 +317,10 @@
                 "description": "The job's name, which Ingest receives. Required.",
                 "type": "string"
               },
+              "retry": {
+                "description": "The first wait after a failed run, as a Go duration, doubling up to every; empty backs off from every.",
+                "type": "string"
+              },
               "timeout": {
                 "description": "A run's limit, as a Go duration; empty is the host's default.",
                 "type": "string"
@@ -332,6 +340,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "language_fact": {
+          "description": "The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's.",
+          "type": "string"
         },
         "marks": {
           "description": "The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character.",
@@ -354,6 +366,10 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "members_fact": {
+          "description": "The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells.",
+          "type": "string"
         },
         "name": {
           "description": "How a person reads the plugin's service, such as \"GitHub\". Required.",
@@ -383,6 +399,36 @@
         "payload": {
           "description": "The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read.",
           "type": "string"
+        },
+        "predicates": {
+          "description": "The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "doc": {
+                "description": "What the predicate decides. Required.",
+                "type": "string"
+              },
+              "facts": {
+                "description": "The facts of facts the plugin hands with each question, the only ones the predicate may read. Required.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "description": "The predicate's name, its key in predicates.toml. Required.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "doc",
+              "facts"
+            ],
+            "type": "object"
+          },
+          "type": "array"
         },
         "roles": {
           "description": "The roles an intent of the plugin may take, each naming host mechanisms.",

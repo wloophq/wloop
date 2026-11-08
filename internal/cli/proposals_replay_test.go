@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -85,11 +87,10 @@ type replay struct {
 	// purpose and event, for a store whose texts stay out of any output.
 	counts map[string]int
 
-	lines   []string
-	known   map[draft.ID]draft.State
-	settle  []draft.ID
-	settled int
-	byKey   map[string]int
+	lines  []string
+	known  map[draft.ID]draft.State
+	settle []draft.ID
+	byKey  map[string]int
 	// slack are the Slack units' facts, which every proposer of the replay
 	// reads.
 	slack *slackFacts
@@ -111,6 +112,8 @@ func newReplay(t *testing.T) *replay {
 func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
+	// The job the golden records re-proposed a settled draft after a day.
+	te.cfg.Drafts.RepeatAfter = config.Days(24 * time.Hour)
 	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
@@ -311,9 +314,17 @@ func (r *replay) record() {
 	}
 }
 
+// settleChoice is d's fate in the replay, 0 send, 1 discard, 2 leave, from its purpose, key and proposal day.
+func settleChoice(d draft.Draft) int {
+	h := fnv.New32a()
+	h.Write([]byte(d.Purpose + "\x00" + d.Origin.Key + "\x00" + d.CreatedAt.Format("2006-01-02")))
+	return int(h.Sum32() % 3)
+}
+
 // settleQueued settles the drafts proposed at the last tick that are still
-// proposed: the n-th is sent, discarded or left open as n mod 3, except
-// thread k's: each person's first is discarded, the next left open.
+// proposed: each is sent, discarded or left open by a hash of its purpose, key
+// and proposal day, so a change to one draft moves no other's fate, except
+// thread k's: each key's first is discarded, the next left open.
 func (r *replay) settleQueued() {
 	r.t.Helper()
 	ctx := context.Background()
@@ -321,8 +332,6 @@ func (r *replay) settleQueued() {
 	r.settle = nil
 	sent := false
 	for _, id := range queued {
-		n := r.settled
-		r.settled++
 		ds, err := r.svc.List(ctx, outbox.Filter{})
 		if err != nil {
 			r.t.Fatal(err)
@@ -332,7 +341,8 @@ func (r *replay) settleQueued() {
 			continue
 		}
 		d := ds[i]
-		if strings.HasPrefix(d.Origin.Key, rpK.String()+":") {
+		n := settleChoice(d)
+		if d.Origin.Key == rpK.String() || strings.HasPrefix(d.Origin.Key, rpK.String()+":") {
 			r.byKey[d.Origin.Key]++
 			n = 2
 			if r.byKey[d.Origin.Key] == 1 {

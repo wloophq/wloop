@@ -36,7 +36,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `summary` | string |  | One line, what the workflow does; its plan items' description. Required. |
+| `summary` | string, localized |  | One line, what the workflow does; its plan items' description. Required. |
 | `provider` | one of `github`, `session`, `slack`, `task`, `workspace` |  | The provider of the units it matches. Required. |
 | `when` | predicate |  | The match condition, over the unit's facts, the trigger's and config.*. Required. |
 | `order` | integer | `100` | Evaluation order, lowest first. |
@@ -54,6 +54,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent. |
 | `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
+| `enabled` | bool | `true` | false ships the workflow off: it plans nothing until workflows.&lt;name&gt;.enabled = true in the config turns it on. |
 | `limits` | table |  | How many runs the workflow may take. |
 | `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
 | `limits.per_day` | integer | `0` | Runs per local day; 0 is no limit. |
@@ -65,14 +66,18 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Gate approval
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `ask` | string |  | What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent. |
+| `ask` | string, localized |  | What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent. |
+| `gates.drafts_wait` | bool | `false` | Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it. |
+| `gates.withdraw` | table |  | When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it. |
+| `gates.withdraw.when` | predicate |  | When an open gate the workflow opened is withdrawn, over its unit's facts; it may read no untrusted fact, since a withdrawal closes a gate that waits on you. Required. |
+| `gates.withdraw.reason` | string, localized |  | Why the gate was withdrawn, as its task's timeline shows it. |
 | `gates` | table |  | The gates its runs and drafts open. |
 | `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
 | `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |
@@ -89,7 +94,13 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `drafts` | table |  | The drafts the workflow's steps and turns propose. |
 | `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
 | `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
-| `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
+| `drafts.withdraw.reason` | one of `assigned`, `moot`, `outside`, `joined` | `moot` | The reason the withdrawn draft stores. |
+| `drafts.withdraw.rule[]` | table |  | A rule tried before when, in order, that withdraws with a reason of its own. |
+| `drafts.withdraw.rule[].when` | predicate |  | When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required. |
+| `drafts.withdraw.rule[].reason` | one of `assigned`, `moot`, `outside`, `joined` | `moot` | The reason the draft the rule withdraws stores. |
+| `outbox` | table |  | How the Outbox heads the group of the drafts the workflow proposed. |
+| `outbox.title` | string, localized |  | The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent. |
+| `outbox.about` | string, localized |  | One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet." |
 
 ## Steps
 
@@ -105,11 +116,13 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.start` | `open_question` | one of `hold`, `replace_if_moved` | `hold` | What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
 | `draft.propose` | `delivery` | one of `message`, `reaction`, `comment`, `edit`, `delete` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
-| `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest. |
+| `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation. |
+| `draft.propose` | `why` | file | `why.md.tmpl` | The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why. |
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |
 | `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
-| `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item; an intent's help.target is free text. |
+| `draft.propose` | `target` | one of `unit`, `item`, `person` | `unit` | Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text. |
+| `draft.propose` | `to` | one of `all`, `members`, `non_members` | `all` | Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both. |
 | `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |

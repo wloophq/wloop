@@ -1,12 +1,13 @@
 <!-- @dsCard group="Task page" height=300 -->
 <!doctype html><html><body>
 <style>body{padding:16px}</style>
-<div style="max-width:380px">
-<div class="chips kinds" role="group" aria-label="Kinds"><button class="chip" type="button" aria-pressed="false">all</button><button class="chip on" type="button" aria-pressed="true">chat</button><button class="chip" type="button" aria-pressed="false">verb done</button><button class="chip on" type="button" aria-pressed="true">turn ended</button></div>
-<ol class="chat">
-<li class="msg ev-chat by-agent"><div class="meta"><strong>agent</strong> <span class="kind">chat</span> <time datetime="2026-10-27T13:02:00Z">Oct 27 13:02</time></div><p>Two threads are resolved. The last one asks whether the TTL can stay at 30 days.</p></li>
-<li class="msg ev-chat by-person"><div class="meta"><strong>person</strong> <span class="kind">chat</span> <time datetime="2026-10-27T13:10:00Z">Oct 27 13:10</time></div><p>Keep it at 30 days and answer Bruno with the numbers from the load test.</p></li>
-<li class="msg ev-turn_ended by-agent"><div class="meta"><strong>agent</strong> <span class="kind">turn ended</span> <time datetime="2026-10-27T13:24:00Z">Oct 27 13:24</time></div></li>
+<div style="max-width:420px">
+<div class="chips kinds" role="group" aria-label="Kinds"><button class="chip on" type="button" aria-pressed="true">all</button><button class="chip" type="button" aria-pressed="false">turn started</button><button class="chip" type="button" aria-pressed="false">reviewed</button></div>
+<ol class="tl">
+<li class="ev people"><time class="tm">10:42</time><span class="ln" aria-hidden="true"><i></i></span><div class="bd"><div class="lb">dana reviewed: approved</div></div></li>
+<li class="ev loop running"><time class="tm">10:30</time><span class="ln" aria-hidden="true"><i></i></span><div class="bd"><div class="lb">Agent round running</div></div></li>
+<li class="ev loop"><time class="tm">27/10 09:39</time><span class="ln" aria-hidden="true"><i></i></span><div class="bd"><div class="lb">Agent round, 7m</div><div class="dim"><div class="md"><p>Checked the four threads and found the pool lock.</p></div></div><details><summary>11 events</summary><ol class="raw"><li><time class="tm">09:39</time> <span class="what">turn started</span><span class="who"> agent</span></li></ol></details></div></li>
+<li class="ev me"><time class="tm">27/10 09:12</time><span class="ln" aria-hidden="true"><i></i></span><div class="bd"><div class="lb">Moved: Next</div></div></li>
 </ol>
 </div>
 </body></html>

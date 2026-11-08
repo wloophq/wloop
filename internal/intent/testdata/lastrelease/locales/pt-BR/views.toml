@@ -1,0 +1,273 @@
+empty = "Nada em {{.label}} agora."
+default_sort = "Ordem da visão"
+
+[lens]
+default_group = "{{.label}} (padrão)"
+board_group = "{{.label}} (quadro)"
+no_group = "Nenhum"
+copied = "Itens copiados de {{.view}} como YAML: {{.count}}."
+copied_grouped = "Itens copiados de {{.view}}, agrupados por {{.group}}, como YAML: {{.count}}."
+tag_key = "{{.label}} {{.key}}"
+tag_key_empty = "sem {{.key}}"
+grouped = "grupo: {{.label}}"
+sorted = "ordem: {{.label}}"
+descending = "{{.label}} (decrescente)"
+no_lens = "nada para agrupar ou ordenar aqui"
+age_now = "agora"
+age_minutes = "{{.m}}min"
+age_hours = "{{.h}}h {{.m}}min"
+age_days = "{{.d}}d {{.h}}h"
+filter_label = "Filtrar por {{.label}} {{.value}}"
+filter_title = "Filtrar por {{.label}} {{.value}} · Alt+clique deixa de fora"
+filter_title_group = "Filtrar por {{.label}} {{.value}} · Shift+clique agrupa por {{.group}} · Alt+clique deixa de fora"
+filter_group = "espera por (grupo)"
+list_count = "{{.unit}}: {{.shown}} de {{.total}}"
+list_empty = "Nada aqui agora."
+countdown_title = "envia às {{.time}}"
+countdown_sending = "enviando"
+countdown_seconds = "em {{.s}} s"
+countdown_minutes = "em {{.m}}min {{.s}}s"
+tip_named = "{{.strip}} ({{.who}})"
+tip_kind = "{{.tip}}: {{.kind}}"
+tip_why = "{{.tip}}. {{.why}}"
+legend_title = "A faixa à esquerda de cada linha tem a cor de quem ela espera"
+sort_by = "Ordenar por {{.label}}"
+col_unit = "Item"
+col_who = "Esperando"
+col_age = "Há"
+col_why = "Por quê"
+col_aside = "Links"
+col_actions = "Ações"
+stale = "desatualizado"
+stale_title = "O plugin não está reportando; este é o último relato dele"
+briefing = "preparando brief"
+briefing_title = "a entrada {{.seq}} espera o brief"
+briefing_attempt = "tentativa {{.n}}"
+briefing_error = "último erro: {{.error}}"
+questions = "? {{.n}}"
+questions_title = "{{.n}} {{plural .n \"one\" \"pergunta aberta\" \"other\" \"perguntas abertas\"}} no brief"
+changed = "mudou"
+starred = "Com estrela"
+until = "até {{.date}}"
+due = "prazo {{.date}}"
+unread = "não lido há {{.lag}}"
+unread_title = "A mensagem mais antiga dos links dele que a extração ainda não leu"
+review_due = "revisão pendente"
+no_next_action = "sem próxima ação"
+open_children = "abertas: {{.n}}"
+sequential = "sequencial"
+every = "a cada {{.every}}"
+reviewed = "revisado em {{.date}}"
+
+[facets.source]
+label = "Origem"
+
+[facets.source.values]
+github = "GitHub"
+slack = "Slack"
+session = "Sessão"
+workspace = "Workspace"
+task = "Tarefa"
+
+[facets.state]
+label = "Estado"
+
+[facets.category]
+label = "Categoria"
+
+[facets.contexts]
+label = "Contexto"
+empty = "sem contexto"
+label_prefix = "@"
+
+[facets.waits-on]
+label = "Espera por (pessoa)"
+
+[facets.turn]
+label = "De quem é a vez"
+
+[facets.turn.values]
+me = "Sua vez"
+others = "Vez dos outros"
+nobody = "Vez de ninguém"
+
+[facets.asked-by]
+label = "Pedido por"
+
+[facets.placement]
+label = "Posição"
+empty = "sem posição"
+
+[facets.where]
+label = "Onde"
+
+[facets.moved]
+label = "Movimentada"
+empty = "nunca movimentada"
+
+[facets.moved.buckets.1d]
+label = "0-1 dia"
+
+[facets.moved.buckets.3d]
+label = "1-3 dias"
+
+[facets.moved.buckets.7d]
+label = "3-7 dias"
+
+[facets.moved.buckets.2w]
+label = "1-2 semanas"
+
+[facets.moved.buckets.4w]
+label = "2-4 semanas"
+
+[facets.moved.buckets.older]
+label = "mais de 4 semanas"
+
+[facets.gates]
+label = "Decisões abertas"
+
+[facets.signal]
+label = "Sinais"
+
+[facets."prop.kind"]
+label = "Tipo"
+
+[facets."prop.area"]
+label = "Área"
+
+[facets."prop.risk"]
+label = "Risco da tarefa"
+
+[facets."prop.focus"]
+label = "Foco"
+
+[facets."prop.priority"]
+label = "Prioridade"
+
+[facets.type]
+label = "Tipo"
+empty = "sem brief"
+
+[facets.risk]
+label = "Risco"
+empty = "sem brief"
+label_prefix = "risco "
+
+[facets.size]
+label = "Tamanho"
+empty = "sem brief"
+
+[facets.size.values]
+xs = "XS"
+s = "S"
+m = "M"
+l = "L"
+xl = "XL"
+
+[facets.tag]
+label = "Tag"
+
+[views.inbox]
+label = "Inbox"
+summary = "O que ninguém esclareceu ainda; depois de esclarecida, a tarefa sai de vez."
+empty = "Inbox zerada: tudo está esclarecido."
+
+[views.needs-me]
+label = "Precisa de mim"
+summary = "Tarefas cujo próximo passo é seu: uma decisão a tomar ou uma próxima ação sua."
+empty = "Nada espera por você."
+
+[views.waiting]
+label = "Aguardando"
+summary = "Tarefas cujo próximo passo é de outra pessoa, agrupadas por quem deve."
+empty = "Ninguém deve nada a você."
+
+[views.chase]
+label = "Cobrar"
+summary = "Tarefas que outra pessoa deve e cuja data de checagem passou sem nada andar: hora de cutucar."
+empty = "Nada a cobrar: ninguém está atrasado."
+
+[views.fits-now]
+label = "Cabe agora"
+summary = "Seus próximos passos que levam meia hora ou menos."
+empty = "Nada seu cabe em meia hora."
+
+[views.blocked-by-me]
+label = "Bloqueado por mim"
+summary = "Pedidos que esperam por você, agrupados por quem pediu, os mais antigos primeiro."
+empty = "Ninguém está bloqueado por você."
+
+[views.stalled]
+label = "Paradas"
+summary = "Tarefas esperando demais: uma origem diz que pararam, ou a data de checagem passou sem nada andar."
+empty = "Nada está parado."
+
+[views.in-loop]
+label = "No loop"
+summary = "Tarefas em que um agente está trabalhando agora."
+empty = "Nenhum agente está trabalhando em nada."
+
+[views.approved]
+label = "Aprovadas"
+summary = "Trabalho que uma origem diz estar aprovado e pronto para entrar."
+
+[views.snoozed]
+label = "Adiadas"
+summary = "Tarefas dormindo até uma data, um evento ou uma condição."
+empty = "Nada está adiado."
+
+[views.focus]
+label = "Foco"
+summary = "As tarefas que você marcou para focar."
+empty = "Nada em foco: marque uma tarefa para focar nela."
+
+[views.projects]
+label = "Projetos"
+summary = "Seus projetos abertos."
+empty = "Nenhum projeto aberto."
+
+[views.someday]
+label = "Algum dia"
+summary = "Tarefas que você talvez faça algum dia, fora do caminho até lá."
+
+[views.logbook]
+label = "Histórico"
+summary = "O que você terminou, o mais recente primeiro."
+empty = "Nada terminado ainda."
+
+[views.done]
+label = "Concluídas"
+summary = "Tarefas terminadas que ainda têm um workspace em disco, para remover."
+empty = "Nenhuma tarefa terminada tem workspace."
+
+[views.outbox]
+label = "Outbox"
+summary = "Rascunhos esperando sua aprovação, e os aprovados que ainda estão sendo enviados ou que falharam no envio."
+empty = "Nenhum rascunho espera por você."
+
+[views.review-projects]
+label = "Projetos a revisar"
+summary = "Projetos com a revisão vencida, ou sem próxima ação sua e fora de Algum dia."
+empty = "Todo projeto tem uma próxima ação e está revisado."
+
+[views.review]
+label = "Revisão"
+summary = "A revisão semanal: percorra cada passo até as listas ficarem limpas."
+
+[review.inbox]
+label = "Zerar a Inbox"
+
+[review.outbox]
+label = "Outbox"
+
+[review.waiting]
+label = "Aguardando: cutucar?"
+
+[review.review-projects]
+label = "Projetos sem próxima ação ou com revisão vencida"
+
+[review.someday]
+label = "Algum dia"
+
+[review.focus]
+label = "Podar o Foco"

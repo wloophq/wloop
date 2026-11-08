@@ -24,7 +24,7 @@ var githubBuiltins = map[string]bool{
 	"brief_refresh": true, "intake_without": true, "intake_cancel": true,
 }
 
-var draftVerbs = []string{"approve", "dismiss", "edit", "retry"}
+var draftVerbs = []string{"approve", "dismiss", "edit", "retry", "close-silently", "skip-workflow"}
 
 // checkScope refuses a spec of an unknown scope, and a draft action with a
 // key or without a draft verb: the core task keys reach drafts.

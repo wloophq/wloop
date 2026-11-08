@@ -126,6 +126,25 @@ type Refused struct{ Reason string }
 
 func (r Refused) Error() string { return r.Reason }
 
+// Moot is a guard refusing for good, at check or at run time: the item's
+// subject is gone or its step can never run on it again. The item leaves the
+// plan, a stored one with a workflow_dropped event that records the reason,
+// and no run is recorded, so the item comes back only if its unit matches
+// again on facts the guard passes.
+type Moot struct{ Reason string }
+
+func (m Moot) Error() string { return m.Reason }
+
+// Held is a guard refusing until a hold ends on its own: the item is skipped
+// with the reason, and the sweep is due again by Until; a zero Until is a
+// hold no time ends, checked again on each sweep.
+type Held struct {
+	Reason string
+	Until  time.Time
+}
+
+func (h Held) Error() string { return h.Reason }
+
 // Transient is a failure worth retrying (manager unreachable, context ended,
 // GitHub budget): attempts untouched.
 type Transient struct{ Err error }
@@ -219,9 +238,11 @@ type Pause struct {
 }
 
 // Gates are the plan gates the pending items wait on, each naming its
-// item's id as its Subject: the gates service, which alone resolves them.
+// item's id as its Subject, and the step gates a workflow's gate.open
+// opened, naming the workflow: the gates service, which alone resolves them.
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
+	Withdraw(ctx context.Context, id int64, reason string) error
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

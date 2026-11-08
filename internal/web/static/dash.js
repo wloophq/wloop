@@ -7,42 +7,47 @@ const DASH_LIFT_MIN = 3;
 const DASH_DIM = 0.35;
 
 const DASH_KPIS = [
-  { id: "pending", label: "Pending" },
-  { id: "needs-me", label: "Need me", flag: "needs-me" },
-  { id: "stalled", label: "Stalled", flag: "stalled" },
-  { id: "in-loop", label: "In loop", flag: "in-loop" },
-  { id: "approved", label: "Approved", flag: "approved" },
-  { id: "due", label: "Due in 24h", flag: "due" },
+  { id: "pending", get label() { return t("Pending"); } },
+  { id: "needs-me", get label() { return t("Need me"); }, flag: "needs-me" },
+  { id: "stalled", get label() { return t("Stalled"); }, flag: "stalled" },
+  { id: "in-loop", get label() { return t("In loop"); }, flag: "in-loop" },
+  { id: "approved", get label() { return t("Approved"); }, flag: "approved" },
+  { id: "due", get label() { return t("Due in 24h"); }, flag: "due" },
 ];
 
-const DASH_NEXT = [["gate", "Round sends"], ["unmute", "Mute ends"], ["brief_retry", "Brief retry"], ["quota", "Brief quota resets"]];
+const DASH_NEXT = [
+  { id: "gate", get label() { return t("Round sends"); } },
+  { id: "unmute", get label() { return t("Mute ends"); } },
+  { id: "brief_retry", get label() { return t("Brief retry"); } },
+  { id: "quota", get label() { return t("Brief quota resets"); } },
+];
 
 const DASH_CAUSES = [
-  { label: "CI failing", field: "ci", value: "failure" },
-  { label: "Merge conflicts", field: "kind", value: "conflicts" },
-  { label: "Changes asked", field: "kind", value: "changes" },
-  { label: "Agent asks", field: "kind", value: "loop_waiting" },
-  { label: "Agent stopped", field: "kind", value: "loop_stopped" },
-  { label: "Round blocked", field: "kind", value: "blocked" },
-  { label: "Held by the cap", field: "kind", value: "held" },
-  { label: "Draft", field: "kind", value: "draft" },
+  { get label() { return t("CI failing"); }, field: "ci", value: "failure" },
+  { get label() { return t("Merge conflicts"); }, field: "kind", value: "conflicts" },
+  { get label() { return t("Changes asked"); }, field: "kind", value: "changes" },
+  { get label() { return t("Agent asks"); }, field: "kind", value: "loop_waiting" },
+  { get label() { return t("Agent stopped"); }, field: "kind", value: "loop_stopped" },
+  { get label() { return t("Round blocked"); }, field: "kind", value: "blocked" },
+  { get label() { return t("Held by the cap"); }, field: "kind", value: "held" },
+  { get label() { return t("Draft"); }, field: "kind", value: "draft" },
 ];
 
 const DASH_PANELS = [
-  { id: "wait", title: "Waiting on whom", build: (c) => dashWaitOption(c.rows, c.lens, c.pal) },
-  { id: "people", title: "People holding the backlog", build: (c) => dashPeopleOption(c.rows, c.lens, c.pal) },
-  { id: "authors", title: "Authors", build: (c) => dashAuthorsOption(c.rows, c.lens, c.pal) },
-  { id: "repos", title: "Repositories (color: share stalled)", build: (c) => dashReposOption(c.rows, c.lens, c.pal) },
-  { id: "kind", title: "Flow stage", build: (c) => dashKindOption(c.rows, c.lens, c.pal) },
-  { id: "shape", title: "Size × risk, and type", build: (c) => dashShapeOption(c.rows, c.lens, c.pal) },
-  { id: "tags", title: "Tag concentration", build: (c) => dashTagsOption(c.rows, c.lens, c.pal, c.tk), tags: true, wide: true },
-  { id: "aging", title: "Aging work in progress", build: (c) => dashAgingOption(c.rows, c.lens, c.pal, c.now, c.stalledHours), wide: true },
-  { id: "next", title: "Next 72 hours", build: (c) => dashNextOption(c.rows, c.lens, c.pal, c.now, c.health), wide: true },
-  { id: "opened", title: "Pull request age", build: (c) => dashOpenedOption(c.rows, c.lens, c.pal) },
-  { id: "cost", title: "Load and spend", build: (c) => dashCostOption(c.rows, c.lens, c.pal) },
-  { id: "blockers", title: "What blocks", build: (c) => dashBlockersOption(c.rows, c.lens, c.pal) },
-  { id: "lift", title: "Tags over-represented among stalled", build: (c) => dashLiftOption(c.rows, c.lens, c.pal) },
-  { id: "box", title: "Waiting time by size and risk", build: (c) => dashAgeBoxOption(c.rows, c.lens, c.pal, c.now), wide: true },
+  { id: "wait", get title() { return t("Waiting on whom"); }, build: (c) => dashWaitOption(c.rows, c.lens, c.pal) },
+  { id: "people", get title() { return t("People holding the backlog"); }, build: (c) => dashPeopleOption(c.rows, c.lens, c.pal) },
+  { id: "authors", get title() { return t("Authors"); }, build: (c) => dashAuthorsOption(c.rows, c.lens, c.pal) },
+  { id: "repos", get title() { return t("Repositories (color: share stalled)"); }, build: (c) => dashReposOption(c.rows, c.lens, c.pal) },
+  { id: "kind", get title() { return t("Flow stage"); }, build: (c) => dashKindOption(c.rows, c.lens, c.pal) },
+  { id: "shape", get title() { return t("Size × risk, and type"); }, build: (c) => dashShapeOption(c.rows, c.lens, c.pal) },
+  { id: "tags", get title() { return t("Tag concentration"); }, build: (c) => dashTagsOption(c.rows, c.lens, c.pal, c.tk), tags: true, wide: true },
+  { id: "aging", get title() { return t("Aging work in progress"); }, build: (c) => dashAgingOption(c.rows, c.lens, c.pal, c.now, c.stalledHours), wide: true },
+  { id: "next", get title() { return t("Next 72 hours"); }, build: (c) => dashNextOption(c.rows, c.lens, c.pal, c.now, c.health), wide: true },
+  { id: "opened", get title() { return t("Pull request age"); }, build: (c) => dashOpenedOption(c.rows, c.lens, c.pal) },
+  { id: "cost", get title() { return t("Load and spend"); }, build: (c) => dashCostOption(c.rows, c.lens, c.pal) },
+  { id: "blockers", get title() { return t("What blocks"); }, build: (c) => dashBlockersOption(c.rows, c.lens, c.pal) },
+  { id: "lift", get title() { return t("Tags over-represented among stalled"); }, build: (c) => dashLiftOption(c.rows, c.lens, c.pal) },
+  { id: "box", get title() { return t("Waiting time by size and risk"); }, build: (c) => dashAgeBoxOption(c.rows, c.lens, c.pal, c.now), wide: true },
 ];
 
 function dashPalette(read) {
@@ -58,12 +63,12 @@ function dashSeries(pal) {
   return [pal.me, pal.reviewer, pal.loop, pal.late, pal.author, pal.err, pal.mine];
 }
 
-function dashTheme(pal) {
+function dashTheme(pal, font) {
   const axis = { axisLine: { lineStyle: { color: pal.rule } }, axisTick: { lineStyle: { color: pal.rule } }, axisLabel: { color: pal.muted }, splitLine: { lineStyle: { color: pal.rule } }, nameTextStyle: { color: pal.muted } };
   return {
     color: dashSeries(pal),
     backgroundColor: "transparent",
-    textStyle: { color: pal.ink, fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif" },
+    textStyle: { color: pal.ink, fontFamily: font },
     categoryAxis: axis, valueAxis: axis, logAxis: axis, timeAxis: axis,
     tooltip: { backgroundColor: pal.panel, borderColor: pal.rule, textStyle: { color: pal.ink } },
     legend: { textStyle: { color: pal.muted } },
@@ -71,9 +76,9 @@ function dashTheme(pal) {
   };
 }
 
-function dashMix(a, b, t) {
+function dashMix(a, b, f) {
   const c = (hex, i) => parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16);
-  return "#" + [0, 1, 2].map((i) => Math.round(c(a, i) + (c(b, i) - c(a, i)) * Math.min(1, Math.max(0, t))).toString(16).padStart(2, "0")).join("");
+  return "#" + [0, 1, 2].map((i) => Math.round(c(a, i) + (c(b, i) - c(a, i)) * Math.min(1, Math.max(0, f))).toString(16).padStart(2, "0")).join("");
 }
 
 function dashDim(lens, field, raw) {
@@ -175,7 +180,7 @@ function dashReposOption(rows, lens, pal) {
     name: org,
     children: [...repos.entries()].sort(cmp).map(([repo, c]) => ({
       ...dashItem(lens, "where", repo, c.n, dashMix(pal.panel, pal.late, 0.6 * c.stalled / c.n), repo.slice(org.length + 1)),
-      tooltip: { formatter: `${dashEsc(repo)}: ${c.n} pending, ${c.stalled} stalled` },
+      tooltip: { formatter: dashEsc(repo) + ": " + dashEsc(t("{pending} pending, {stalled} stalled", { pending: c.n, stalled: c.stalled })) },
     })),
   }));
   return {
@@ -200,22 +205,22 @@ function dashKindOption(rows, lens, pal) {
 function dashTagsOption(rows, lens, pal, key) {
   const counts = dashTally(rows, lens, "tag");
   if (key) {
-    const of = new Map([...counts].filter(([t]) => t.startsWith(key + ":")));
-    return dashBars(dashRanked(of, 15).map(([t, n]) => dashItem(lens, "tag", t, n, pal.me, t.slice(key.length + 1))), pal);
+    const of = new Map([...counts].filter(([tag]) => tag.startsWith(key + ":")));
+    return dashBars(dashRanked(of, 15).map(([tag, n]) => dashItem(lens, "tag", tag, n, pal.me, tag.slice(key.length + 1))), pal);
   }
   const keys = new Map();
-  for (const [t, n] of counts) {
-    const k = t.split(":")[0];
+  for (const [tag, n] of counts) {
+    const k = tag.split(":")[0];
     if (!keys.has(k)) keys.set(k, []);
-    keys.get(k).push([t, n]);
+    keys.get(k).push([tag, n]);
   }
   if (!keys.size) return null;
   const colors = dashSeries(pal);
   const data = [...keys.entries()].sort(cmp).map(([k, ts], i) => ({
     name: k, q: [["tag", k]],
-    children: ts.sort((a, b) => b[1] - a[1] || cmp(a[0], b[0])).map(([t, n]) => ({
-      ...dashItem(lens, "tag", t, n, colors[i % colors.length], t.slice(k.length + 1)),
-      tooltip: { formatter: `${dashEsc(t)}: ${n}` },
+    children: ts.sort((a, b) => b[1] - a[1] || cmp(a[0], b[0])).map(([tag, n]) => ({
+      ...dashItem(lens, "tag", tag, n, colors[i % colors.length], tag.slice(k.length + 1)),
+      tooltip: { formatter: `${dashEsc(tag)}: ${n}` },
     })),
   }));
   return {
@@ -245,9 +250,9 @@ function dashShapeOption(rows, lens, pal) {
   const data = [...cells.entries()].map(([k, n]) => {
     const [s, rk] = k.split("|");
     const dim = dashDim(lens, "size", s) || dashDim(lens, "risk", rk);
-    return { value: [sizes.indexOf(s), risks.indexOf(rk), n], q: [["size", s], ["risk", rk]], itemStyle: { opacity: dim ? DASH_DIM : 1 }, tooltip: { formatter: dashEsc(`size ${s === "none" ? "unknown" : s.toUpperCase()}, risk ${rk === "none" ? "unknown" : rk}: ${n}`) } };
+    return { value: [sizes.indexOf(s), risks.indexOf(rk), n], q: [["size", s], ["risk", rk]], itemStyle: { opacity: dim ? DASH_DIM : 1 }, tooltip: { formatter: dashEsc(t("size {size}, risk {risk}: {n}", { size: s === "none" ? t("unknown") : s.toUpperCase(), risk: rk === "none" ? t("unknown") : rk, n })) } };
   });
-  const typeItems = dashRanked(types, 8).map(([t, n]) => dashItem(lens, "type", t, n, pal.reviewer, t === "none" ? "no brief" : t));
+  const typeItems = dashRanked(types, 8).map(([type, n]) => dashItem(lens, "type", type, n, pal.reviewer, type === "none" ? t("no brief") : type));
   return {
     ...dashBase(),
     grid: [{ left: 8, top: 8, bottom: 8, width: "48%", containLabel: true }, { left: "60%", right: 32, top: 8, bottom: 8, containLabel: true }],
@@ -304,11 +309,12 @@ function dashAgingOption(rows, lens, pal, now, stalledHours) {
   const points = shown.map((r) => {
     const n = [...keyOf(r)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 1000003, 0);
     const days = dashDays(r, now);
+    const time = days < 1 ? tn("{n} working hours", Math.round(days * 24)) : tn("{n} working days", dashRound(days));
     return {
       value: [kinds.indexOf(r.kind) + (((n * 0.618034) % 1) - 0.5) * 0.6, dashRound(days)],
       pr: keyOf(r), name: labelOf(r),
       itemStyle: { color: pal[waitColor(r)] },
-      tooltip: { formatter: `${dashEsc(labelOf(r))} ${dashEsc(r.title || "")}: waits ${days < 1 ? Math.round(days * 24) + " working hours" : dashRound(days) + " working days"} on ${waitCat(r)}` },
+      tooltip: { formatter: `${dashEsc(labelOf(r))} ${dashEsc(r.title || "")}: ` + dashEsc(t("waits {time} on {who}", { time, who: waitCat(r) })) },
     };
   });
   const ages = shown.map((r) => dashDays(r, now)).sort((a, b) => a - b);
@@ -321,7 +327,7 @@ function dashAgingOption(rows, lens, pal, now, stalledHours) {
       { type: "category", data: kinds.map((k) => kindLabel(k)), axisLabel: { interval: 0, rotate: kinds.length > 6 ? 30 : 0 } },
       { type: "value", min: -0.5, max: kinds.length - 0.5, show: false },
     ],
-    yAxis: { type: "log", logBase: 10, name: "working days", min: 0.01 },
+    yAxis: { type: "log", logBase: 10, name: t("working days"), min: 0.01 },
     series: [{
       type: "scatter", xAxisIndex: 1, symbolSize: 9, data: points,
       markLine: { silent: true, symbol: "none", lineStyle: { type: "dashed", color: pal.muted }, label: { formatter: "{b}", position: "end" }, data: lines },
@@ -331,28 +337,29 @@ function dashAgingOption(rows, lens, pal, now, stalledHours) {
 
 function dashNextOption(rows, lens, pal, now, health) {
   const end = now + DASH_HORIZON_HOURS * 3600000;
-  const lanes = DASH_NEXT.map(([id]) => id);
+  const lanes = DASH_NEXT.map((lane) => lane.id);
   const within = (at) => {
-    const t = Date.parse(at);
-    return t >= now && t <= end ? t : null;
+    const ms = Date.parse(at);
+    return ms >= now && ms <= end ? ms : null;
   };
   const data = [];
   for (const r of rows) {
     if (!passesFilters(r, lens.filters)) continue;
     for (const e of upcoming(r)) {
-      const t = within(e.at);
-      if (t === null || !lanes.includes(e.what)) continue;
-      data.push({ value: [t, lanes.indexOf(e.what)], pr: keyOf(r), name: labelOf(r), itemStyle: { color: pal[waitColor(r)] }, tooltip: { formatter: `${dashEsc(labelOf(r))}: ${DASH_NEXT[lanes.indexOf(e.what)][1].toLowerCase()} at ${stamp(new Date(t).toISOString())}` } });
+      const ms = within(e.at);
+      if (ms === null || !lanes.includes(e.what)) continue;
+      const what = DASH_NEXT[lanes.indexOf(e.what)].label.toLowerCase();
+      data.push({ value: [ms, lanes.indexOf(e.what)], pr: keyOf(r), name: labelOf(r), itemStyle: { color: pal[waitColor(r)] }, tooltip: { formatter: dashEsc(labelOf(r)) + ": " + dashEsc(t("{what} at {time}", { what, time: stamp(new Date(ms).toISOString()) })) } });
     }
   }
   const quota = health && health.brief && within(health.brief.paused_until);
-  if (quota) data.push({ value: [quota, lanes.indexOf("quota")], name: "brief quota", itemStyle: { color: pal.late }, tooltip: { formatter: "Briefs resume" } });
+  if (quota) data.push({ value: [quota, lanes.indexOf("quota")], name: t("brief quota"), itemStyle: { color: pal.late }, tooltip: { formatter: dashEsc(t("Briefs resume")) } });
   if (!data.length) return null;
   return {
     ...dashBase(),
     grid: { left: 8, right: 24, top: 8, bottom: 8, containLabel: true },
     xAxis: { type: "time", min: now, max: end },
-    yAxis: { type: "category", data: DASH_NEXT.map(([, label]) => label) },
+    yAxis: { type: "category", data: DASH_NEXT.map((lane) => lane.label) },
     series: [{ type: "scatter", symbolSize: 11, data }],
   };
 }
@@ -366,7 +373,7 @@ function dashOpenedOption(rows, lens, pal) {
     grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
     xAxis: { type: "category", data: items.map((i) => i.name) },
     yAxis: { type: "value", minInterval: 1 },
-    series: [{ type: "bar", barMaxWidth: 36, data: items, label: { show: true, position: "top", color: pal.muted }, tooltip: { formatter: "opened {b} ago: {c}" } }],
+    series: [{ type: "bar", barMaxWidth: 36, data: items, label: { show: true, position: "top", color: pal.muted }, tooltip: { formatter: dashEsc(t("opened {b} ago: {c}")) } }],
   };
 }
 
@@ -384,17 +391,17 @@ function dashCostOption(rows, lens, pal) {
   const spend = shown.filter((r) => (turns(r)[metric] || 0) > 0)
     .sort((a, b) => turns(b)[metric] - turns(a)[metric] || cmp(labelOf(a), labelOf(b))).slice(0, DASH_TOP);
   if (!files.size && !spend.length) return null;
-  const load = fieldRank(s.id).filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, s.id, k, files.get(k), pal[stripColor(s, k)], fieldShow(s.id, k)), tooltip: { formatter: `${fieldShow(s.id, k)}: ${files.get(k)} changed files` } }));
+  const load = fieldRank(s.id).filter((k) => files.get(k)).map((k) => ({ ...dashItem(lens, s.id, k, files.get(k), pal[stripColor(s, k)], fieldShow(s.id, k)), tooltip: { formatter: dashEsc(tn("{label}: {n} changed files", files.get(k), { label: fieldShow(s.id, k) })) } }));
   const cost = spend.map((r) => {
-    const t = turns(r);
-    return { name: labelOf(r), value: metric === "cost_usd" ? dashRound(t.cost_usd) : t.tokens, pr: keyOf(r), itemStyle: { color: pal[waitColor(r)] },
-      tooltip: { formatter: `${dashEsc(labelOf(r))}: ${metric === "cost_usd" ? `US$ ${t.cost_usd.toFixed(2)}, ` : ""}${t.tokens || 0} tokens over ${t.count || 0} turns` } };
+    const tr = turns(r);
+    return { name: labelOf(r), value: metric === "cost_usd" ? dashRound(tr.cost_usd) : tr.tokens, pr: keyOf(r), itemStyle: { color: pal[waitColor(r)] },
+      tooltip: { formatter: `${dashEsc(labelOf(r))}: ${metric === "cost_usd" ? `US$ ${tr.cost_usd.toFixed(2)}, ` : ""}` + dashEsc(tn("{tokens} tokens over {n} turns", tr.count || 0, { tokens: tr.tokens || 0 })) } };
   });
-  const spendTitle = metric === "cost_usd" ? "US$ spent per pull request" : "Tokens per pull request\nno US$ cost recorded";
+  const spendTitle = metric === "cost_usd" ? t("US$ spent per pull request") : t("Tokens per pull request") + "\n" + t("no US$ cost recorded");
   const top = metric === "cost_usd" ? 22 : 36;
   return {
     ...dashBase(),
-    title: [{ text: "Changed files by whom it waits on", left: 8, top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } },
+    title: [{ text: t("Changed files by whom it waits on"), left: 8, top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } },
       { text: spendTitle, left: "52%", top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } }],
     grid: [{ left: 8, top, bottom: 8, width: "40%", containLabel: true }, { left: "52%", right: 40, top, bottom: 8, containLabel: true }],
     xAxis: [dashCountAxis(0), { ...dashCountAxis(1), minInterval: 0, axisLabel: { hideOverlap: true, formatter: dashCompact } }],
@@ -433,8 +440,8 @@ function dashBlockersOption(rows, lens, pal) {
   if (!causes.length && !failing.length) return null;
   return {
     ...dashBase(),
-    title: [{ text: "Cause", left: 8, top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } },
-      { text: "Failing checks", left: "52%", top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } }],
+    title: [{ text: t("Cause"), left: 8, top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } },
+      { text: t("Failing checks"), left: "52%", top: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: pal.muted } }],
     grid: [{ left: 8, top: 22, bottom: 8, width: "40%", containLabel: true }, { left: "52%", right: 32, top: 22, bottom: 8, containLabel: true }],
     xAxis: [dashCountAxis(0), dashCountAxis(1)],
     yAxis: [
@@ -456,7 +463,7 @@ function dashLift(rows, lens) {
   if (!stalled.length || stalled.length === base.length) return [];
   const count = (rs) => {
     const m = new Map();
-    for (const r of rs) for (const t of new Set(facetValues(r, "tag"))) m.set(t, (m.get(t) || 0) + 1);
+    for (const r of rs) for (const tag of new Set(facetValues(r, "tag"))) m.set(tag, (m.get(tag) || 0) + 1);
     return m;
   };
   const all = count(base);
@@ -479,7 +486,7 @@ function dashLiftOption(rows, lens, pal) {
   const items = shown.map((l) => ({
     name: l.tag, value: l.lift, q: [["tag", l.tag], ["is", "stalled"]],
     itemStyle: { color: l.lift > 0 ? pal.late : pal.loop, opacity: dashDim(lens, "tag", l.tag) ? DASH_DIM : 1 },
-    tooltip: { formatter: `${dashEsc(l.tag)}: ${l.stalled} of ${l.n} stalled, ${l.lift > 0 ? "+" : ""}${l.lift}% against the backlog` },
+    tooltip: { formatter: dashEsc(l.tag) + ": " + dashEsc(t("{stalled} of {n} stalled, {lift}% against the backlog", { stalled: l.stalled, n: l.n, lift: (l.lift > 0 ? "+" : "") + l.lift })) },
   }));
   return {
     ...dashBase(),
@@ -501,18 +508,18 @@ function dashAgeBoxOption(rows, lens, pal, now) {
       boxes.push({
         name: label(k), value: v, q: [[field, k]],
         itemStyle: { color: pal.panel, borderColor: color, opacity: dashDim(lens, field, k) ? DASH_DIM : 1 },
-        tooltip: { formatter: `${dashEsc(label(k))}: ${ages.length} pull requests, median ${v[2]} working days, middle half ${v[1]}-${v[3]}` },
+        tooltip: { formatter: dashEsc(label(k)) + ": " + dashEsc(tn("{n} pull requests, median {median} working days, middle half {low}-{high}", ages.length, { median: fmtNumber(v[2]), low: fmtNumber(v[1]), high: fmtNumber(v[3]) })) },
       });
     }
   };
-  add("size", SIZES, (k) => `size ${k.toUpperCase()}`, pal.me);
-  add("risk", RISKS, (k) => `${k} risk`, pal.reviewer);
+  add("size", SIZES, (k) => t("size {size}", { size: k.toUpperCase() }), pal.me);
+  add("risk", RISKS, (k) => t("{risk} risk", { risk: k }), pal.reviewer);
   if (!boxes.length) return null;
   return {
     ...dashBase(),
     grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
     xAxis: { type: "category", data: boxes.map((b) => b.name), axisLabel: { interval: 0, rotate: boxes.length > 6 ? 30 : 0 } },
-    yAxis: { type: "value", name: "working days" },
+    yAxis: { type: "value", name: t("working days") },
     series: [{ type: "boxplot", data: boxes }],
   };
 }
@@ -525,7 +532,7 @@ function dashClickQuery(q, pairs, neg) {
   return todo.reduce((acc, [field, raw]) => toggledQualifier(acc, field, raw, neg), q);
 }
 
-const dash = { charts: new Map(), theme: "", built: false };
+const dash = { charts: new Map(), theme: "", built: false, strings: null };
 
 function dashThemeName() {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "loop-dark" : "loop-light";
@@ -569,24 +576,25 @@ function dashBuild(box) {
   dashDispose();
   box.replaceChildren(
     h("div", { class: "dash-head" },
-      h("ul", { id: "dash-kpis", class: "kpis", "aria-label": "Counts" }),
-      h("button", { id: "dash-done", type: "button", class: "act", "data-focus": "dash:done", onclick: () => writeHash({ done: !readHash().done }) }, "Include done"),
-      h("span", { class: "dash-hint" }, "Click a chart to filter; Alt+click to exclude.")),
+      h("ul", { id: "dash-kpis", class: "kpis", "aria-label": t("Counts") }),
+      h("button", { id: "dash-done", type: "button", class: "act", "data-focus": "dash:done", onclick: () => writeHash({ done: !readHash().done }) }, t("Include done")),
+      h("span", { class: "dash-hint" }, t("Click a chart to filter; Alt+click to exclude."))),
     h("div", { class: "dash-grid" }, DASH_PANELS.map((p) => h("section", { class: "panel" + (p.wide ? " wide" : ""), "aria-label": p.title },
       h("h3", { class: "panel-head" }, h("span", {}, p.title), p.tags ? h("select", {
-        id: "dash-tk", "data-focus": "dash:tk", "aria-label": "Tag key",
+        id: "dash-tk", "data-focus": "dash:tk", "aria-label": t("Tag key"),
         onchange: (e) => writeHash({ tk: e.target.value }),
       }) : null),
       h("div", { id: `dash-${p.id}`, class: "chart", role: "img", "aria-label": p.title }),
-      h("p", { id: `dash-${p.id}-none`, class: "nodata", hidden: true }, "No data for this filter yet.")))));
+      h("p", { id: `dash-${p.id}-none`, class: "nodata", hidden: true }, t("No data for this filter yet."))))));
   dash.built = true;
+  dash.strings = I18N.strings;
 }
 
 function renderDashKpis(lens, rows) {
   document.getElementById("dash-kpis").replaceChildren(...dashKpis(rows, lens).map((k) => h("li", {},
     k.flag ? h("button", {
       type: "button", class: "kpi" + (k.id === "stalled" ? " late" : ""), "aria-pressed": String(k.on), "data-focus": `dash:kpi:${k.id}`,
-      title: `Filter is:${k.flag}; Alt+click excludes`,
+      title: t("Filter is:{flag}; Alt+click excludes", { flag: k.flag }),
       onclick: (e) => writeHash({ q: dashClickQuery(readHash().q, [["is", k.flag]], e.altKey) }),
     }, h("span", { class: "n" }, k.n), h("span", { class: "label" }, k.label))
       : h("span", { class: "kpi" }, h("span", { class: "n" }, k.n), h("span", { class: "label" }, k.label)))));
@@ -598,7 +606,7 @@ function renderDashTagKeys(lens, rows) {
   const sig = JSON.stringify([keys, lens.tk]);
   if (sel.dataset.sig === sig) return;
   sel.dataset.sig = sig;
-  sel.replaceChildren(h("option", { value: "", selected: !lens.tk }, "All keys"), ...keys.map((k) => h("option", { value: k, selected: k === lens.tk }, k)));
+  sel.replaceChildren(h("option", { value: "", selected: !lens.tk }, t("All keys")), ...keys.map((k) => h("option", { value: k, selected: k === lens.tk }, k)));
 }
 
 function renderDash(lens) {
@@ -612,13 +620,14 @@ function renderDash(lens) {
     return;
   }
   if (typeof echarts === "undefined") {
-    box.replaceChildren(h("p", { class: "empty" }, "The charts library did not load; reload the page."));
+    box.replaceChildren(h("p", { class: "empty" }, t("The charts library did not load; reload the page.")));
     return;
   }
   const theme = dashThemeName();
-  if (theme !== dash.theme || !dash.built) {
-    const pal = dashPalette((name) => getComputedStyle(document.documentElement).getPropertyValue(name));
-    echarts.registerTheme(theme, dashTheme(pal));
+  if (theme !== dash.theme || !dash.built || dash.strings !== I18N.strings) {
+    const read = (name) => getComputedStyle(document.documentElement).getPropertyValue(name);
+    const pal = dashPalette(read);
+    echarts.registerTheme(theme, dashTheme(pal, read("--sans").trim()));
     dash.theme = theme;
     dash.pal = pal;
     dashBuild(box);

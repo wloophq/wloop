@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/lens"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -97,6 +98,8 @@ type EditRequest struct {
 
 type Model struct {
 	view int
+	// words are the client strings the daemon served; English until it serves them.
+	words *texts.Catalog
 	// facets are the fields a query of a task view names: the plugins' and the profile's, one by id.
 	facets    []api.FacetSpec
 	facetByID map[string]api.FacetSpec
@@ -275,7 +278,9 @@ func (m *Model) kindLabel(r api.Row) string { return m.catalog.KindLabel(r) }
 func (m *Model) SetSpecs(specs []api.ActionSpec) { m.specs = specs }
 
 // SetError keeps the last rows on screen while the daemon does not answer.
-func (m *Model) SetError(err error) { m.err = "daemon not answering: " + err.Error() }
+func (m *Model) SetError(err error) {
+	m.err = m.w().T("Daemon not answering: {error}", map[string]any{"error": err.Error()})
+}
 
 // in are the rows of view id the filter keeps, in the order the list shows
 // them, and beside each the head of the group it opens.
@@ -417,12 +422,12 @@ func (m *Model) action(k Key) (Command, bool) {
 		return Command{}, false
 	}
 	if running, busy := m.busy[r.Unit]; busy {
-		m.status = fmt.Sprintf("%s %s still running", running, r.Label)
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(running), "task": r.Label})
 		return Command{}, false
 	}
 	switch {
 	case !offered:
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(spec.Label), r.Label)
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(spec.Label), "task": r.Label})
 	case !st.Enabled:
 		m.status = st.Reason
 	default:
@@ -454,13 +459,13 @@ func (m *Model) begin(r api.Row, spec api.ActionSpec, st api.ActionState, read u
 	if spec.Input == nil {
 		return m.finish(c, st, read)
 	}
-	label := inputLabel(r.Label, spec, st)
+	label := inputLabel(m.w(), r.Label, spec, st)
 	if spec.Input.Kind == "answer" {
 		if r.Question == nil {
-			m.status = "no open question on " + r.Label
+			m.status = m.w().T("no open question on {task}", map[string]any{"task": r.Label})
 			return Command{}, false
 		}
-		label = questionLabel(r.Label, r.Question)
+		label = questionLabel(m.w(), r.Label, r.Question)
 	}
 	m.ask(spec, st, c, label, read)
 	m.prompt.question = r.Question
@@ -476,14 +481,14 @@ func (m *Model) finish(c Command, st api.ActionState, read uint64) (Command, boo
 	return m.send(c)
 }
 
-func inputLabel(name string, spec api.ActionSpec, st api.ActionState) string {
+func inputLabel(w *texts.Catalog, name string, spec api.ActionSpec, st api.ActionState) string {
 	in := spec.Input
 	var hints []string
 	if in.Placeholder != "" {
 		hints = append(hints, in.Placeholder)
 	}
 	if in.UntilState {
-		hints = append(hints, "empty: until it changes")
+		hints = append(hints, w.T("empty: until it changes", nil))
 	}
 	hint := strings.Join(hints, "; ")
 	label := strings.ToLower(cmp.Or(st.Label, spec.Label)) + " " + name
@@ -496,24 +501,27 @@ func inputLabel(name string, spec api.ActionSpec, st api.ActionState) string {
 	return label
 }
 
-const queuedAnswer = "your answer is queued until the agent's session is free; an answer now replaces it"
+// queuedAnswer says that an answer waits for the agent's session, in w's words.
+func queuedAnswer(w *texts.Catalog) string {
+	return w.T("your answer is queued until the agent's session is free; an answer now replaces it", nil)
+}
 
 // questionLabel is the question's summary, with the drafted verdict and
 // the numbered options of a choice.
-func questionLabel(name string, q *api.QuestionView) string {
+func questionLabel(w *texts.Catalog, name string, q *api.QuestionView) string {
 	if q.Queued {
-		return name + ": " + queuedAnswer
+		return name + ": " + queuedAnswer(w)
 	}
 	text := q.Text
 	if text == "" {
 		text = q.LastMessage
 	}
 	if text == "" {
-		text = "the agent stopped"
+		text = w.T("the agent stopped", nil)
 	}
 	label := name + ": " + text
 	if q.Verdict != "" {
-		label += fmt.Sprintf(" (drafted %s, %d blocking, %d non-blocking)", q.Verdict, q.Blocking, q.NonBlocking)
+		label += " (" + w.T("drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking", map[string]any{"verdict": q.Verdict, "blocking": q.Blocking, "nonblocking": q.NonBlocking}) + ")"
 	}
 	if q.Kind == "confirm" {
 		return label + " y/n"
@@ -522,7 +530,7 @@ func questionLabel(name string, q *api.QuestionView) string {
 	for i, o := range q.Options {
 		opt := fmt.Sprintf("%d. %s", i+1, o.Label)
 		if o.ID == q.Recommend {
-			opt += " (recommended)"
+			opt += " (" + w.T("recommended", nil) + ")"
 		}
 		opts = append(opts, opt)
 	}
@@ -582,9 +590,9 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		if k.Read > p.read && (k.Rune == 'y' || k.Rune == 'Y') {
 			return m.send(p.cmd)
 		}
-		m.status = p.action + " " + p.cmd.Label + " cancelled"
+		m.status = m.w().T("{verb} {task} cancelled", map[string]any{"verb": m.actionWord(p.action), "task": p.cmd.Label})
 		if k.Read <= p.read {
-			m.status += ": a y typed together with the key before it does not confirm"
+			m.status += ": " + m.w().T("a y typed together with the key before it does not confirm", nil)
 		}
 		return Command{}, false
 	}
@@ -611,14 +619,14 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		switch {
 		case in.Kind == "answer":
 			if text == "" {
-				m.status = "answer " + p.cmd.Label + " cancelled: nothing typed"
+				m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord("answer"), "task": p.cmd.Label})
 				return Command{}, false
 			}
 			c.Req = answerRequest(p.question, text)
 		case in.Kind == "duration":
 			c.Req.Until, c.Req.UntilState = text, text == "" && in.UntilState
 		case text == "" && in.Required:
-			m.status = p.action + " " + p.cmd.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(p.action), "task": p.cmd.Label})
 			return Command{}, false
 		default:
 			c.Req.Guidance = text
@@ -642,7 +650,7 @@ func (m *Model) TakeEdit() *EditRequest {
 // Edited submits what the editor returned for e; an empty text cancels.
 func (m *Model) Edited(e *EditRequest, text string, err error) (Command, bool) {
 	if err != nil {
-		m.status = e.Label + ": the editor failed: " + err.Error()
+		m.status = m.w().T("{task}: the editor failed: {error}", map[string]any{"task": e.Label, "error": err.Error()})
 		return Command{}, false
 	}
 	return e.submit(editedText(text))
@@ -742,7 +750,7 @@ func (m *Model) jump() {
 	for i, v := range m.views {
 		labels[i] = v.Label
 	}
-	m.status = addr + " is not in " + orList(labels) + "; " + brand.Command + " open " + addr + " shows it"
+	m.status = m.w().T("{address} is not in {views}; {command} shows it", map[string]any{"address": addr, "views": orList(m.w(), labels), "command": brand.Command + " open " + addr})
 }
 
 // links says whether addr is link or a page under it.
@@ -762,20 +770,51 @@ func (m *Model) send(c Command) (Command, bool) {
 // Done reports a finished action on the status line.
 func (m *Model) Done(c Command, lines []string, err error) {
 	delete(m.busy, c.Unit)
+	action := m.actionWord(c.Action)
 	switch {
 	case err != nil:
-		m.status = fmt.Sprintf("%s %s failed: %v", c.Action, c.Label, err)
+		m.status = m.w().T("{action} {task} failed: {error}", map[string]any{"action": action, "task": c.Label, "error": m.errorText(err)})
 	case len(lines) > 0:
-		m.status = fmt.Sprintf("%s %s: %s", c.Action, c.Label, lines[len(lines)-1])
+		m.status = m.w().T("{action} {task}: {result}", map[string]any{"action": action, "task": c.Label, "result": lines[len(lines)-1]})
 	default:
-		m.status = fmt.Sprintf("%s %s: done", c.Action, c.Label)
+		m.status = m.w().T("{action} {task}: done", map[string]any{"action": action, "task": c.Label})
 	}
 }
 
+// actionWord is how the status line names an action id: the served label of its action, plan action or verb, the
+// catalog's word for the client's own actions, else the id.
+func (m *Model) actionWord(id string) string {
+	switch id {
+	case "capture":
+		return m.w().T("capture", nil)
+	case "open-source":
+		return m.w().T("open the source", nil)
+	case "detail":
+		return m.w().T("load the detail", nil)
+	}
+	for _, specs := range [][]api.ActionSpec{m.specs, m.planSpecs} {
+		if i := slices.IndexFunc(specs, func(s api.ActionSpec) bool { return s.ID == id }); i >= 0 && specs[i].Label != "" {
+			return strings.ToLower(specs[i].Label)
+		}
+	}
+	if l := m.verbLabel(id); l != "" {
+		return strings.ToLower(l)
+	}
+	return id
+}
+
 // orList joins names as "a, b or c".
-func orList(names []string) string {
+func orList(w *texts.Catalog, names []string) string {
 	if len(names) < 2 {
 		return strings.Join(names, "")
 	}
-	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	return w.T("{list} or {last}", map[string]any{"list": strings.Join(names[:len(names)-1], ", "), "last": names[len(names)-1]})
+}
+
+// w is the client strings the terminal reads its words in.
+func (m *Model) w() *texts.Catalog {
+	if m.words == nil {
+		return texts.English()
+	}
+	return m.words
 }

@@ -68,10 +68,11 @@ type mRecordKind struct {
 // loadRecords reads records.toml from bundled and the user's layers, a
 // higher layer's key replacing a lower one's, then compiles each kind's
 // schema from the highest layer that holds its file.
-func loadRecords(layers []profile.Layer, bundled fs.FS, tasks *TasksDef) (RecordsDef, Problems) {
+func loadRecords(layers []profile.Layer, r layerReader, tasks *TasksDef) (RecordsDef, Problems) {
+	bundled := r.bundled
 	var d RecordsDef
 	where := map[string]*sheet{}
-	problems, _ := readLayered(layers, bundled, RecordsFile, func(file string, src []byte) Problems {
+	problems, _ := readLayered(layers, r, RecordsFile, func(file string, src []byte) Problems {
 		m, problems, _, complete := decode[mRecordsFile](file, src)
 		if !complete {
 			return problems

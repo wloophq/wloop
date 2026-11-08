@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
@@ -60,6 +61,9 @@ type Deps struct {
 	GateText GateText
 	// TakenApart holds the pairs the user took apart; nil holds none.
 	TakenApart TakenApart
+	// Gen is the store's change generation; with it, the reads that start while it holds share one pass for
+	// up to passReuse. nil: every read has a pass of its own.
+	Gen func() port.Generation
 }
 
 type handlerKey struct {
@@ -93,6 +97,9 @@ type Service struct {
 	runs ProjectStore
 	// review serializes the review's read-modify-write of its run.
 	review sync.Mutex
+	shared sharedPass
+	// me is d.Me for readers that must not wait on mu, such as a read under a store snapshot.
+	me atomic.Pointer[task.Me]
 }
 
 func New(d Deps) *Service {
@@ -100,6 +107,8 @@ func New(d Deps) *Service {
 	if s.authority == nil {
 		s.authority = userOnly
 	}
+	me := d.Me
+	s.me.Store(&me)
 	s.serveMerges()
 	return s
 }
@@ -308,7 +317,7 @@ func (s *Service) WakeOf(ctx context.Context, id task.ID) (wake.Wake, bool, erro
 	if s.d.Wakes == nil {
 		return wake.Wake{}, false, nil
 	}
-	return s.d.Wakes.Of(ctx, id)
+	return WakeIn(ctx, s.d.Wakes, id)
 }
 
 func (s *Service) applyWake(ctx context.Context, id task.ID, wc wakeChange) error {
@@ -1057,6 +1066,28 @@ func (s *Service) OpenTasksOf(ctx context.Context, u unit.Unit) ([]task.Task, er
 	hidden := s.hider()
 	es = slices.DeleteFunc(es, func(e task.Task) bool { return !e.Open() || hidden != nil && hidden(e) })
 	baseOrder(es)
+	return es, nil
+}
+
+// HoldersOf are the tasks, open or closed, that hold u or one of its items, held or resolved, but those a view
+// hides for a disabled plugin, the open ones first.
+func (s *Service) HoldersOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	es, err := s.d.Store.TasksOf(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	if hidden := s.hider(); hidden != nil {
+		es = slices.DeleteFunc(es, hidden)
+	}
+	slices.SortStableFunc(es, func(a, b task.Task) int {
+		switch {
+		case a.Open() == b.Open():
+			return 0
+		case a.Open():
+			return -1
+		}
+		return 1
+	})
 	return es, nil
 }
 

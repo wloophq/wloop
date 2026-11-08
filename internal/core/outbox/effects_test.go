@@ -20,7 +20,7 @@ func (a memApplied) Unapplied(context.Context) ([]draft.Draft, error) {
 	defer a.m.mu.Unlock()
 	var out []draft.Draft
 	for _, d := range a.m.drafts {
-		if d.State == draft.Sent && d.EffectsAppliedAt.IsZero() && len(d.Effects) > 0 {
+		if d.EffectsDue() && d.EffectsAppliedAt.IsZero() && len(d.Effects) > 0 {
 			out = append(out, d)
 		}
 	}

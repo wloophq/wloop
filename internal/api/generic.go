@@ -13,6 +13,10 @@ type Summary struct {
 	OpenItems int       `json:"open_items"`
 	Reason    string    `json:"reason"` // one sentence: why it waits
 	Line      string    `json:"line"`   // the short status every client shows (menu bar, TUI list)
+	// ReasonKey names Reason in its plugin's words (CatalogResponse.Reasons), which ReasonParams fill; empty
+	// for a reason no plugin words.
+	ReasonKey    string            `json:"reason_key,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
 }
 
 type RowItem struct {
@@ -38,6 +42,29 @@ type CatalogResponse struct {
 	Details []DetailSpec `json:"details,omitempty"`
 	// Lens are the plugins' own row words, which replace the views catalog's for their rows.
 	Lens []ProviderWords `json:"lens,omitempty"`
+	// Reasons are the plugins' words of the reasons their rows name (Summary.ReasonKey), by key.
+	Reasons []ProviderWords `json:"reasons,omitempty"`
+	// CardSignals are the plugins' words of their cards' signals, by key.
+	CardSignals []SignalSpec `json:"card_signals,omitempty"`
+}
+
+// CardSignal is the words of provider's card signal key; ok is false when no plugin words it.
+func (c CatalogResponse) CardSignal(provider, key string) (SignalSpec, bool) {
+	i := slices.IndexFunc(c.CardSignals, func(s SignalSpec) bool { return s.Provider == provider && s.Key == key })
+	if i < 0 {
+		return SignalSpec{}, false
+	}
+	return c.CardSignals[i], true
+}
+
+// SignalSpec is how a card signal of a provider shows: its name, its values'
+// and its notes' words by code, `{{.name}}` where a value the signal gives goes.
+type SignalSpec struct {
+	Provider string            `json:"provider"`
+	Key      string            `json:"key"`
+	Label    string            `json:"label"`
+	Values   map[string]string `json:"values,omitempty"`
+	Notes    map[string]string `json:"notes,omitempty"`
 }
 
 // ProviderWords are a provider's words, by key.
@@ -84,13 +111,14 @@ type SearchSort struct {
 	Shown string `json:"shown,omitempty"`
 }
 
-// EventSpec is how a plugin's event kind shows on a timeline; Loop says
-// it is the loop's doing.
+// EventSpec is how an event kind, a plugin's or the core's (Provider ""), shows on a timeline; Loop says it is
+// the loop's doing, and Tone is what it is drawn in: "loop", "me", "people" or "".
 type EventSpec struct {
 	Provider string `json:"provider"`
 	Kind     string `json:"kind"`
 	Label    string `json:"label"`
 	Loop     bool   `json:"loop,omitempty"`
+	Tone     string `json:"tone,omitempty"`
 	// Data is how its data shows: "" as it is, "none", "first_field",
 	// "short_sha" or "requested".
 	Data string `json:"data,omitempty"`
@@ -138,6 +166,14 @@ type FacetSpec struct {
 	ShowValues string `json:"show_values,omitempty"`
 	// LabelPrefix goes before each shown value's label on a row, never in a group's head.
 	LabelPrefix string `json:"label_prefix,omitempty"`
+	// ShowWhen names, by facet id, the values a row must hold in that facet for this facet to show; empty
+	// shows it always.
+	ShowWhen map[string][]string `json:"show_when,omitempty"`
+	// ShowMax is how many of the values the part shows at most; the rest count into one piece. 0 shows all.
+	ShowMax int `json:"show_max,omitempty"`
+	// ShowLabel is an age part's label, a template over `{{.age}}`, which Parts fills, and `{{.at}}`, the
+	// raw time a client writes in its own locale.
+	ShowLabel string `json:"show_label,omitempty"`
 	// RowClass is the class of a row that holds a value, by value.
 	RowClass map[string]string `json:"row_class,omitempty"`
 	// Displays are, on a facet merged across providers, each provider's display keys, by provider: a row
@@ -150,21 +186,25 @@ type FacetSpec struct {
 // FacetDisplay is where and how one provider shows a facet's values on its rows: FacetSpec's keys of the
 // same names.
 type FacetDisplay struct {
-	Show        string            `json:"show,omitempty"`
-	ShowOnly    []string          `json:"show_only,omitempty"`
-	ShowValues  string            `json:"show_values,omitempty"`
-	LabelPrefix string            `json:"label_prefix,omitempty"`
-	RowClass    map[string]string `json:"row_class,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Strip       bool              `json:"strip,omitempty"`
-	Colors      map[string]string `json:"colors,omitempty"`
+	Show        string              `json:"show,omitempty"`
+	ShowOnly    []string            `json:"show_only,omitempty"`
+	ShowValues  string              `json:"show_values,omitempty"`
+	LabelPrefix string              `json:"label_prefix,omitempty"`
+	ShowWhen    map[string][]string `json:"show_when,omitempty"`
+	ShowMax     int                 `json:"show_max,omitempty"`
+	ShowLabel   string              `json:"show_label,omitempty"`
+	RowClass    map[string]string   `json:"row_class,omitempty"`
+	Labels      map[string]string   `json:"labels,omitempty"`
+	Strip       bool                `json:"strip,omitempty"`
+	Colors      map[string]string   `json:"colors,omitempty"`
 	// BucketLabels are the words of the facet's buckets, by bucket id.
 	BucketLabels map[string]string `json:"bucket_labels,omitempty"`
 }
 
 // Display is the facet's own display keys.
 func (f FacetSpec) Display() FacetDisplay {
-	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix, RowClass: f.RowClass, Labels: f.Labels,
+	return FacetDisplay{Show: f.Show, ShowOnly: f.ShowOnly, ShowValues: f.ShowValues, LabelPrefix: f.LabelPrefix,
+		ShowWhen: f.ShowWhen, ShowMax: f.ShowMax, ShowLabel: f.ShowLabel, RowClass: f.RowClass, Labels: f.Labels,
 		Strip: f.Strip, Colors: f.Colors, BucketLabels: f.bucketLabels()}
 }
 
@@ -176,6 +216,7 @@ func (f FacetSpec) For(provider string) FacetSpec {
 		return f
 	}
 	f.Show, f.ShowOnly, f.ShowValues, f.LabelPrefix, f.RowClass = d.Show, d.ShowOnly, d.ShowValues, d.LabelPrefix, d.RowClass
+	f.ShowWhen, f.ShowMax, f.ShowLabel = d.ShowWhen, d.ShowMax, d.ShowLabel
 	f.Strip, f.Colors = d.Strip, d.Colors
 	if len(d.BucketLabels) > 0 {
 		f.Buckets = slices.Clone(f.Buckets)

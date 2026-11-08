@@ -51,8 +51,8 @@ func (e *Env) relayModule(id unit.ProviderID, d moduleDeps) (pluginModule, error
 	}
 	r := relay{id: id, kind: e.pluginKind, now: e.Now}
 	for _, j := range s.Jobs[1:] {
-		m.Jobs = append(m.Jobs, pluginJob{Name: j.Name + ":" + string(id), Every: time.Duration(j.Every), Timeout: time.Duration(j.Timeout),
-			Run: func(ctx context.Context) (string, string, error) { return r.ingest(ctx, j.Name) }})
+		m.Jobs = append(m.Jobs, pluginJob{Name: psource.JobName(string(id), j.Name), Every: time.Duration(j.Every), Timeout: time.Duration(j.Timeout),
+			Retry: time.Duration(j.Retry), Run: func(ctx context.Context) (string, string, time.Time, error) { return r.ingest(ctx, j.Name) }})
 	}
 	rp := reportedPlugin{id: id, src: s}
 	m.Rows = func(rd readmodel.RowDeps) readmodel.Provider {
@@ -148,15 +148,15 @@ func (r relay) call(ctx context.Context, priority src.Priority) (context.Context
 	return r.kind.Meters.Call(ctx, priority)
 }
 
-func (r relay) ingest(ctx context.Context, job string) (summary, skipped string, err error) {
+func (r relay) ingest(ctx context.Context, job string) (summary, skipped string, next time.Time, err error) {
 	c, err := r.client()
 	if err != nil {
-		return "", "", err
+		return "", "", time.Time{}, err
 	}
 	ctx, done := r.call(ctx, src.PriorityBackground)
 	defer done()
 	res, err := c.Ingest(ctx, src.IngestRequest{Job: job, Now: r.now()})
-	return res.Summary, res.Skipped, err
+	return res.Summary, res.Skipped, res.Next, err
 }
 
 // prepare runs the plugin's job, which reports what it read itself: the
@@ -164,7 +164,7 @@ func (r relay) ingest(ctx context.Context, job string) (summary, skipped string,
 // that is not running skips the pass.
 func (r relay) prepare(job string, c unit.Codec) func(ctx context.Context, now time.Time) (ingest.Plan, string, error) {
 	return func(ctx context.Context, _ time.Time) (ingest.Plan, string, error) {
-		summary, skipped, err := r.ingest(ctx, job)
+		summary, skipped, _, err := r.ingest(ctx, job)
 		if errors.Is(err, src.ErrUnavailable) {
 			return ingest.Plan{}, err.Error(), nil
 		}

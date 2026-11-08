@@ -6,14 +6,15 @@ import (
 	"testing"
 )
 
-const deltaPrelude = `const state = { specs: { version: "", byId: {} }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), answered: new Map(), conn: "" };
+const deltaPrelude = `const state = { specs: { version: "", byId: {} }, plan: { items: [], closed: [] }, rows: [], epoch: "", rev: 0, detail: null, health: null, error: "", busy: new Set(), answered: new Map(), conn: "" };
 const API_VERSION = "1";
 const requests = [], timers = [], sources = [];
 let pending, queued = null, chain = Promise.resolve(), retries = 0, opened = false, hash = { view: "needs-me", pr: "" };
 const setTimeout = (f) => timers.push(f);
 const clearTimeout = () => {};
 const readHash = () => hash;
-const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {}, loadPlan = async () => {}, loadRoundGates = async () => {};
+const render = () => {}, refreshSpecs = async () => {}, loadExploreRecent = async () => {};
+const loadPlan = async () => { requests.push("plan"); }, loadRoundGates = async () => { requests.push("gates"); };
 const catalog = { version: "" };
 const applyCatalog = (c) => { catalog.version = c.version || ""; };
 const loadActivity = async () => { requests.push("activity"); };
@@ -23,7 +24,7 @@ EventSource.CLOSED = 2;
 const unit = (k) => ({ provider: "github", key: k });
 const row = (k, title) => ({ unit: unit(k), label: k, title });
 let pages = {};
-` + noPlugins + noViews + noUpdate + `const getJSON = async (url) => {
+` + noPlugins + noViews + noUpdate + noScreens + `const getJSON = async (url) => {
   requests.push(url);
   if (url === "/api/health") return { viewer: "me" };
   if (url === "/api/catalog") return { version: "c1", views: [], facets: [], situations: [] };
@@ -151,9 +152,38 @@ func TestCockpitReopenPullsFromTheRev(t *testing.T) {
   pages[since("e1", 1)] = { epoch: "e1", rev: 1, full: false, rows: [], removed: [] };
   sources[0].onopen();
   await flush();`)
-	want := []string{"/api/rows?since=e1%3A1", "/api/health"}
+	want := []string{"/api/rows?since=e1%3A1", "/api/health", "plan", "gates"}
 	if !slices.Equal(got.Requests, want) {
-		t.Errorf("requests %v, want %v", got.Requests, want)
+		t.Errorf("requests %v, want %v: a reconnect reloads everything the cockpit holds", got.Requests, want)
+	}
+}
+
+// fetched are the requests of a delta run that read the plan, the round gates or the health.
+func fetched(reqs []string) []string {
+	return slices.DeleteFunc(slices.Clone(reqs), func(u string) bool { return u != "plan" && u != "gates" && u != "/api/health" })
+}
+
+func TestCockpitFetchesOnlyWhatAChangeNames(t *testing.T) {
+	for _, c := range []struct {
+		name, message string
+		want          []string
+	}{
+		{"health", `message({ rev: 1, health: true });`, []string{"/api/health"}},
+		{"rows", `pages[since("e1", 1)] = { epoch: "e1", rev: 2, full: false, rows: [row("a/b#2", "two")], removed: [] };
+  message({ rev: 2, units: [unit("a/b#2")] });`, nil},
+		{"plan", `message({ rev: 1, plan: true });`, []string{"plan"}},
+		{"gates", `message({ rev: 1, gates: true });`, []string{"gates"}},
+		{"notify", `sources[0].onmessage({ data: JSON.stringify({ type: "notify", epoch: "e1", rev: 1, notices: [{ id: "n1", text: "hi" }] }) });`, nil},
+		{"a row the plan holds", `state.plan.items = [{ id: "i1", unit: unit("a/b#2") }];
+  pages[since("e1", 1)] = { epoch: "e1", rev: 2, full: false, rows: [row("a/b#2", "two")], removed: [] };
+  message({ rev: 2, units: [unit("a/b#2")] });`, []string{"plan"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := runDelta(t, "\n  "+c.message+"\n  await flush();")
+			if f := fetched(got.Requests); !slices.Equal(f, c.want) {
+				t.Errorf("fetched %v, want %v (requests %v)", f, c.want, got.Requests)
+			}
+		})
 	}
 }
 

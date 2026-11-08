@@ -1,0 +1,3 @@
+# What sending a GitHub draft does besides posting it, by effect.
+[effects]
+"pr.nudged" = "The pull request is marked as nudged."

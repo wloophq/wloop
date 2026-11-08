@@ -13,14 +13,19 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var navHelp = []helpItem{{"↑↓", "move"}, {"g", "view"}, {"/", "filter"}, {"^K", "actions"}}
+func (m *Model) navHelp() []helpItem {
+	w := m.w()
+	return []helpItem{{"↑↓", w.T("move", nil)}, {"g", w.T("view", nil)}, {"/", w.T("filter", nil)}, {"^K", w.T("actions", nil)}}
+}
 
 // lensHelp are the keys of the lens, which follow the filter on the lists.
-var lensHelp = []helpItem{{"=", "group"}, {"-", "sort"}}
+func (m *Model) lensHelp() []helpItem {
+	return []helpItem{{"=", m.w().T("group", nil)}, {"-", m.w().T("sort", nil)}}
+}
 
-var quitHelp = helpItem{"q", "quit"}
+func (m *Model) quitHelp() helpItem { return helpItem{"q", m.w().T("quit", nil)} }
 
-var keysHelp = helpItem{"?", "keys"}
+func (m *Model) keysHelp() helpItem { return helpItem{"?", m.w().T("keys", nil)} }
 
 // staleMark marks a row its plugin last reported before it went down.
 const staleMark = "(stale)"
@@ -34,7 +39,7 @@ const factLabel = 9
 func (m *Model) Render(width, height int, now time.Time) []string {
 	m.now = now
 	if width < 20 || height < 5 {
-		return pad([]string{termfmt.Fit(brand.Name+": terminal too small", width)}, height)
+		return pad([]string{termfmt.Fit(m.w().T("{name}: terminal too small", map[string]any{"name": brand.Name}), width)}, height)
 	}
 	lines := []string{m.tabs(width)}
 	if height >= 7 {
@@ -126,7 +131,7 @@ func (m *Model) tabs(width int) string {
 		shown, _ := m.in(v.ID)
 		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(shown)), i})
 	}
-	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
+	add(first, tab{m.w().T("Plan {n}", map[string]any{"n": len(m.plan)}), m.planView()})
 	mine := 0
 	for i, g := range groups {
 		if slices.ContainsFunc(g, func(x tab) bool { return x.view == m.view }) {
@@ -170,13 +175,13 @@ func (m *Model) tabs(width int) string {
 	}
 	var flags []string
 	if m.area != "" {
-		flags = append(flags, "area "+m.area)
+		flags = append(flags, m.w().T("area {area}", map[string]any{"area": m.area}))
 	}
 	if m.health.Paused {
-		flags = append(flags, "automatic rounds paused")
+		flags = append(flags, m.w().T("automatic rounds paused", nil))
 	}
 	if m.health.SlowSync {
-		flags = append(flags, "slow sync")
+		flags = append(flags, m.w().T("slow sync", nil))
 	}
 	if right := strings.Join(flags, " · "); right != "" {
 		if gap := width - cells - termfmt.Cells(right); gap >= 3 {
@@ -302,32 +307,32 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 	_, pending := m.roundGate(r)
 	switch {
 	case pending:
-		waiting += " · round in " + age
+		waiting += " · " + m.w().T("round in {time}", map[string]any{"time": age})
 	case r.Summary.Stalled:
-		waiting += " · " + strings.TrimPrefix(age, "!") + ", stalled"
+		waiting += " · " + strings.TrimPrefix(age, "!") + ", " + m.w().T("stalled", nil)
 	case age != "-":
 		waiting += " · " + age
 	}
-	fact("waiting", waiting, plain)
+	fact(m.w().T("waiting", nil), waiting, plain)
 	if s := r.Summary; s.Line != "" && s.Line != s.Reason && s.Line != kind {
-		fact("status", s.Line, plain)
+		fact(m.w().T("status", nil), s.Line, plain)
 	}
-	if r.Summary.Reason != "" {
-		fact("why", r.Summary.Reason, plain)
+	if why := m.catalog.ReasonOf(r); why != "" {
+		fact(m.w().T("why", nil), why, plain)
 	}
 	p := prOf(r)
 	if b := p.Brief; b != nil {
 		parts := []string{strings.ToUpper(b.Size)}
 		if b.Risk != "" {
-			parts = append(parts, b.Risk+" risk")
+			parts = append(parts, m.w().T("{risk} risk", map[string]any{"risk": b.Risk}))
 		}
-		fact("brief", strings.Join(slices.DeleteFunc(append(parts, b.Goal), func(s string) bool { return s == "" }), " · "), plain)
+		fact(m.w().T("brief", nil), strings.Join(slices.DeleteFunc(append(parts, b.Goal), func(s string) bool { return s == "" }), " · "), plain)
 	}
 	if f := p.Facts; f != nil && len(f.Checks.Failing) > 0 {
-		fact("checks", "failing: "+strings.Join(f.Checks.Failing, ", "), t.Red)
+		fact(m.w().T("checks", nil), m.w().T("failing: {checks}", map[string]any{"checks": strings.Join(f.Checks.Failing, ", ")}), t.Red)
 	}
 	if where := strings.Join(slices.DeleteFunc([]string{p.Workspace.DisplayName, p.Workspace.Status}, func(s string) bool { return s == "" }), " · "); where != "" {
-		fact("workspace", where, plain)
+		fact(m.w().T("workspace", nil), where, plain)
 	}
 	if q := r.Question; q != nil {
 		m.question(q, fact)
@@ -339,26 +344,26 @@ func (m *Model) detail(r api.Row, width int, now time.Time) []string {
 func (m *Model) question(q *api.QuestionView, fact func(label, text string, style func(string) string)) {
 	t := m.t
 	if q.Queued {
-		fact("answer", queuedAnswer, t.Dim)
+		fact(m.w().T("answer", nil), queuedAnswer(m.w()), t.Dim)
 		return
 	}
-	text := cmp.Or(q.Text, q.LastMessage, "the agent stopped")
-	label := "asks"
+	text := cmp.Or(q.Text, q.LastMessage, m.w().T("the agent stopped", nil))
+	label := m.w().T("asks", nil)
 	if q.Text == "" {
-		label = "stopped"
+		label = m.w().T("stopped", nil)
 	}
 	fact(label, text, t.Yellow)
 	if q.Verdict != "" {
-		fact("", fmt.Sprintf("drafted %s, %d blocking, %d non-blocking", q.Verdict, q.Blocking, q.NonBlocking), t.Dim)
+		fact("", m.w().T("drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking", map[string]any{"verdict": q.Verdict, "blocking": q.Blocking, "nonblocking": q.NonBlocking}), t.Dim)
 	}
 	if q.Kind == "confirm" {
-		fact("", "y yes · n no", plain)
+		fact("", m.w().T("y yes · n no", nil), plain)
 		return
 	}
 	for i, o := range q.Options {
 		opt := fmt.Sprintf("%d. %s", i+1, o.Label)
 		if o.ID == q.Recommend {
-			opt += " (recommended)"
+			opt += " (" + m.w().T("recommended", nil) + ")"
 		}
 		fact("", opt, plain)
 	}
@@ -386,13 +391,13 @@ func (m *Model) offered(r api.Row, width, col int) []string {
 		}
 	}
 	var lines []string
-	head := "  " + t.Dim(termfmt.Fit("keys", factLabel)) + "  "
+	head := "  " + t.Dim(termfmt.Fit(m.w().T("keys", nil), factLabel)) + "  "
 	for _, l := range m.pack(on, width-col) {
 		lines = append(lines, head+l)
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }
@@ -430,11 +435,11 @@ func (m *Model) pack(items []helpItem, room int) []string {
 // fill is a plain lead and as many items as fit in width, then ? keys
 // when it fits and q quit.
 func (m *Model) fill(lead string, items []helpItem, width int) string {
-	tail := []helpItem{keysHelp, quitHelp}
-	reserve := termfmt.Cells(keysHelp.String()) + 2 + termfmt.Cells(quitHelp.String())
+	tail := []helpItem{m.keysHelp(), m.quitHelp()}
+	reserve := termfmt.Cells(tail[0].String()) + 2 + termfmt.Cells(tail[1].String())
 	used := termfmt.Cells(lead)
 	if used+reserve > width {
-		tail, reserve = tail[1:], termfmt.Cells(quitHelp.String())
+		tail, reserve = tail[1:], termfmt.Cells(tail[1].String())
 	}
 	if used+reserve > width {
 		return termfmt.Cut(lead, width)
@@ -464,7 +469,7 @@ func (m *Model) who(r api.Row) []string {
 		}
 		who[i] = author
 		if m.health.Viewer != "" && strings.EqualFold(author, m.health.Viewer) {
-			who[i] = "me"
+			who[i] = m.w().T("me", nil)
 		}
 	}
 	return who
@@ -491,11 +496,11 @@ func oneLine(s string) string { return strings.Join(strings.Fields(termfmt.Clean
 func (m *Model) empty() string {
 	switch {
 	case !m.loaded:
-		return "loading…"
+		return m.w().T("loading…", nil)
 	case len(m.filter) > 0:
-		return "Nothing in " + m.views[m.view].Label + " matches \"" + string(m.filter) + "\"."
+		return m.w().T("Nothing in {view} matches \"{filter}\".", map[string]any{"view": m.views[m.view].Label, "filter": string(m.filter)})
 	}
-	return "Nothing in " + m.views[m.view].Label + " right now."
+	return m.w().T("Nothing in {view} right now.", map[string]any{"view": m.views[m.view].Label})
 }
 
 // statusLine is the last message: an error red, a warning yellow.
@@ -508,9 +513,9 @@ func (m *Model) statusLine(width int) string {
 	case m.status != "":
 		text = m.status
 	case len(m.health.Warnings) > 1:
-		text, style = fmt.Sprintf("warning: %s (+%d more)", m.health.Warnings[0], len(m.health.Warnings)-1), t.Yellow
+		text, style = m.w().T("warning: {warning} (+{n} more)", map[string]any{"warning": m.health.Warnings[0], "n": len(m.health.Warnings) - 1}), t.Yellow
 	case len(m.health.Warnings) == 1:
-		text, style = "warning: "+m.health.Warnings[0], t.Yellow
+		text, style = m.w().T("warning: {warning}", map[string]any{"warning": m.health.Warnings[0]}), t.Yellow
 	}
 	if text = termfmt.Cut(text, width); text == "" {
 		return ""
@@ -522,7 +527,7 @@ func (m *Model) bottom(width int) string {
 	p := m.prompt
 	switch {
 	case p == nil && m.filtering:
-		head, tail, text := "/", "  Enter keeps, Esc clears", string(m.filter)+"_"
+		head, tail, text := "/", "  "+m.w().T("Enter keeps, Esc clears", nil), string(m.filter)+"_"
 		room := width - termfmt.Cells(head) - termfmt.Cells(tail)
 		if termfmt.Cells(text) > room && room < 8 {
 			tail, room = "", width-termfmt.Cells(head)
@@ -532,13 +537,13 @@ func (m *Model) bottom(width int) string {
 		}
 		return termfmt.Cut(head+text+tail, width)
 	case p == nil && len(m.filter) > 0:
-		return m.fill("filter "+termfmt.Clean(string(m.filter))+" (Esc clears)  ", m.helpItems(), width)
+		return m.fill(m.w().T("filter {text} (Esc clears)", map[string]any{"text": termfmt.Clean(string(m.filter))})+"  ", m.helpItems(), width)
 	case p == nil:
 		return m.fill("", m.helpItems(), width)
 	case p.confirm:
-		return termfmt.Cut(p.label+" y confirms, any other key cancels", width)
+		return termfmt.Cut(p.label+" "+m.w().T("y confirms, any other key cancels", nil), width)
 	}
-	head := p.label + " (Enter sends, Esc cancels): "
+	head := p.label + " (" + m.w().T("Enter sends, Esc cancels", nil) + "): "
 	text := string(p.text) + "_"
 	if room := width - termfmt.Cells(head); termfmt.Cells(text) > room && room > 1 {
 		text = termfmt.Ellipsis + termfmt.Suffix(text, room-termfmt.Cells(termfmt.Ellipsis))
@@ -558,13 +563,13 @@ func (m *Model) helpItems() []helpItem {
 			verbs, _ := m.verbHelp(e)
 			items = append(items, verbs...)
 		}
-		return append(items, withLens(navHelp)...)
+		return append(items, m.withLens(m.navHelp())...)
 	}
 	if m.view == m.planView() {
 		if it, ok := m.selectedItem(); ok {
 			items, _ = m.planHelp(it)
 		}
-		return append(items, navHelp...)
+		return append(items, m.navHelp()...)
 	}
 	if r, ok := m.selected(); ok {
 		for _, s := range m.specs {
@@ -573,19 +578,19 @@ func (m *Model) helpItems() []helpItem {
 			}
 		}
 	}
-	return append(items, withLens(navHelp)...)
+	return append(items, m.withLens(m.navHelp())...)
 }
 
 // withLens is nav with the lens keys after the filter's.
-func withLens(nav []helpItem) []helpItem {
+func (m *Model) withLens(nav []helpItem) []helpItem {
 	i := slices.IndexFunc(nav, func(h helpItem) bool { return h.key == "/" }) + 1
-	return slices.Concat(nav[:i], lensHelp, nav[i:])
+	return slices.Concat(nav[:i], m.lensHelp(), nav[i:])
 }
 
 // help is the help line unstyled and uncut.
 func (m *Model) help() string {
 	var parts []string
-	for _, h := range append(m.helpItems(), keysHelp, quitHelp) {
+	for _, h := range append(m.helpItems(), m.keysHelp(), m.quitHelp()) {
 		parts = append(parts, h.String())
 	}
 	return strings.Join(parts, "  ")

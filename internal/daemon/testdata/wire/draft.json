@@ -9,8 +9,11 @@
     "unit.closed"
   ],
   "target": "",
+  "broadcast": "",
   "where": "#general in the thread \"acme/api#7\"",
   "text": "Closing this out",
+  "why": "",
+  "language": "",
   "reaction": "",
   "original": "Closing this out",
   "edited": false,
@@ -41,6 +44,10 @@
       "enabled": false,
       "reason": "the draft is held",
       "refusal": "draft.retry.why"
+    },
+    {
+      "id": "draft.close-silently",
+      "enabled": true
     }
   ],
   "rev": 0,

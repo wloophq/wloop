@@ -11,12 +11,15 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
+	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -45,6 +48,7 @@ type Daemon interface {
 	Trigger(ctx context.Context, job string) error
 	SetPause(ctx context.Context, req api.PauseRequest) error
 	ReportApp(ctx context.Context, st api.AppStatus) error
+	Strings(ctx context.Context) (api.Strings, error)
 	Events(ctx context.Context, client string, since api.Since) (<-chan api.Change, error)
 	Actions(ctx context.Context) (api.ActionsResponse, error)
 	Plugins(ctx context.Context) ([]api.Plugin, error)
@@ -59,7 +63,13 @@ type Config struct {
 	// CockpitURL is the cockpit's address at a hash route such as
 	// "task=<id>" or "view=inbox".
 	CockpitURL func(route string) (string, error)
-	Quit       func()
+	// Window shows the cockpit's own window at a route; nil opens the
+	// browser at CockpitURL instead.
+	Window func(route string) error
+	// Reword gets each catalog of client strings the daemon serves, as the
+	// strings change; nil rewords nothing.
+	Reword func(*texts.Catalog)
+	Quit   func()
 	// Copy puts text on the clipboard; nil offers no copy.
 	Copy func(text string) error
 	Now  func() time.Time
@@ -102,6 +112,37 @@ type Controller struct {
 	tasksLoading, rowsLoading []api.Loading
 	// cat is the served catalog of views and verbs, under mu.
 	cat api.ViewsCatalog
+	// catalog is the served client strings; English until the daemon serves them.
+	catalog atomic.Pointer[texts.Catalog]
+	// stringsStamp is the health's stamp of the strings catalog holds, under refreshMu.
+	stringsStamp string
+}
+
+// words is the client strings the menu and the notes read.
+func (c *Controller) words() *texts.Catalog {
+	if w := c.catalog.Load(); w != nil {
+		return w
+	}
+	return texts.English()
+}
+
+// loadStrings reads the client strings when the health's stamp differs from the one held; a daemon that
+// fails to serve them leaves the last ones, read again on the next health.
+func (c *Controller) loadStrings(ctx context.Context, stamp string) {
+	if c.catalog.Load() != nil && stamp == c.stringsStamp {
+		return
+	}
+	s, err := c.cfg.Daemon.Strings(ctx)
+	if err != nil {
+		c.cfg.Log("client strings: %v", err)
+		return
+	}
+	cat := texts.New(s)
+	c.catalog.Store(cat)
+	c.stringsStamp = stamp
+	if c.cfg.Reword != nil {
+		c.cfg.Reword(cat)
+	}
 }
 
 func New(cfg Config) *Controller {
@@ -116,8 +157,24 @@ func New(cfg Config) *Controller {
 	}
 	c := &Controller{cfg: cfg, ctx: context.Background(), sent: map[string]bool{}, daily: map[string]bool{}, tasks: map[string][]api.TaskView{}}
 	cfg.Notifier.OnResponse(func(r Response) { c.Respond(c.runCtx(), r) })
+	if links, ok := cfg.Tray.(LinkSource); ok {
+		links.OnLink(c.OpenLink)
+	}
 	c.loadSent()
 	return c
+}
+
+// OpenLink opens a deep link's route as the menu bar opens the cockpit; a
+// link it cannot read opens the default view, which says so.
+func (c *Controller) OpenLink(link string) {
+	route, ok := window.LinkRoute(link)
+	if !ok {
+		c.cfg.Log("menubar: %q is not a link the app opens", link)
+		route = window.MalformedLinkRoute
+	}
+	if err := c.open(route); err != nil {
+		c.cfg.Log("menubar: opening %q: %v", link, err)
+	}
 }
 
 func (c *Controller) runCtx() context.Context {
@@ -267,6 +324,7 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		var h api.Health
 		if h, err = c.cfg.Daemon.Health(ctx); err == nil {
 			c.health = h
+			c.loadStrings(ctx, h.Strings)
 			err = c.loadSections(ctx)
 		}
 		c.hasHealth = c.hasHealth || err == nil
@@ -280,15 +338,16 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	}
 	if err != nil {
 		if h, herr := c.cfg.Daemon.Health(ctx); herr == nil && h.Store != nil && h.Store.State != api.StoreOK {
-			c.cfg.Tray.SetTitle("PR !")
+			c.cfg.Tray.SetTitle(c.words().T("PR !", nil))
 			c.cfg.Tray.SetMenu(c.storeMenu(*h.Store))
 			return
 		}
-		c.cfg.Tray.SetTitle("PR ?")
+		w := c.words()
+		c.cfg.Tray.SetTitle(w.T("PR ?", nil))
 		c.cfg.Tray.SetMenu([]MenuItem{
-			{Title: "Daemon not answering: " + err.Error()},
+			{Title: w.T("Daemon not answering: {error}", map[string]any{"error": err.Error()})},
 			{Separator: true},
-			{Title: "Quit " + brand.Name, Enabled: true, Action: c.cfg.Quit},
+			c.quitItem(),
 		})
 		return
 	}
@@ -300,22 +359,37 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 // storeMenu is the menu of a daemon that cannot open its store: why, and
 // the command that gets past it.
 func (c *Controller) storeMenu(st api.StoreStatus) []MenuItem {
-	why := map[string]string{
-		api.StoreBusy:           "a store command is running",
-		api.StoreNeedsMigration: "it needs a migration",
-		api.StoreTooNew:         "a newer release wrote it",
-		api.StoreFailed:         "its migration failed",
-	}[st.State]
-	items := []MenuItem{{Title: "Store needs attention: " + cmp.Or(why, st.State)}, {Title: st.Message}}
+	w := c.words()
+	why := storeWhy(w, st.State)
+	items := []MenuItem{{Title: w.T("Store needs attention: {why}", map[string]any{"why": why})}, {Title: st.Message}}
 	if st.Fix != "" && c.cfg.Copy != nil {
 		fix := st.Fix
-		items = append(items, MenuItem{Title: "Copy command: " + fix, Enabled: true, Action: func() {
+		items = append(items, MenuItem{Title: w.T("Copy command: {command}", map[string]any{"command": fix}), Enabled: true, Action: func() {
 			if err := c.cfg.Copy(fix); err != nil {
 				c.cfg.Log("copying %q: %v", fix, err)
 			}
 		}})
 	}
-	return append(items, MenuItem{Separator: true}, MenuItem{Title: "Quit " + brand.Name, Enabled: true, Action: c.cfg.Quit})
+	return append(items, MenuItem{Separator: true}, c.quitItem())
+}
+
+// storeWhy is why a store in state needs attention, in w's words; the state itself when w has none for it.
+func storeWhy(w *texts.Catalog, state string) string {
+	switch state {
+	case api.StoreBusy:
+		return w.T("a store command is running", nil)
+	case api.StoreNeedsMigration:
+		return w.T("it needs a migration", nil)
+	case api.StoreTooNew:
+		return w.T("a newer release wrote it", nil)
+	case api.StoreFailed:
+		return w.T("its migration failed", nil)
+	}
+	return state
+}
+
+func (c *Controller) quitItem() MenuItem {
+	return MenuItem{Title: c.words().T("Quit {name}", map[string]any{"name": brand.Name}), Enabled: true, Action: c.cfg.Quit}
 }
 
 // loadSections reads the menu bar sections of the enabled plugins, in the
@@ -385,15 +459,16 @@ func (c *Controller) spec(id string) (api.ActionSpec, bool) {
 
 func (c *Controller) menu(h api.Health) []MenuItem {
 	var items []MenuItem
+	w := c.words()
 	if b := h.Briefs; b != nil && b.Unavailable != "" {
-		items = append(items, MenuItem{Title: "briefs unavailable: " + b.Unavailable}, MenuItem{Separator: true})
+		items = append(items, MenuItem{Title: w.T("briefs unavailable: {why}", map[string]any{"why": b.Unavailable})}, MenuItem{Separator: true})
 	}
 	if b := h.Briefs; b != nil && b.Open {
-		items = append(items, MenuItem{Title: fmt.Sprintf("briefs unavailable since %s: %s", b.Since.Local().Format("15:04"), b.Error)}, MenuItem{Separator: true})
+		items = append(items, MenuItem{Title: w.T("briefs unavailable since {time}: {error}", map[string]any{"time": w.Time(b.Since.Local(), "time"), "error": b.Error})}, MenuItem{Separator: true})
 	}
-	open := "Open workspace"
+	open := w.T("Open workspace", nil)
 	if len(h.WorkspaceManagers) == 1 {
-		open = "Open in " + h.WorkspaceManagers[0]
+		open = w.T("Open in {manager}", map[string]any{"manager": h.WorkspaceManagers[0]})
 	}
 	items = append(items, c.loadingItems()...)
 	for _, v := range c.taskViews {
@@ -405,15 +480,14 @@ func (c *Controller) menu(h api.Health) []MenuItem {
 		items = append(items, MenuItem{Separator: true})
 	}
 	items = append(items,
-		MenuItem{Title: "Open cockpit", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(c.firstView()) })},
-		MenuItem{Title: "Sweep now", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
+		MenuItem{Title: w.T("Open cockpit", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.open(c.firstView()) })},
+		MenuItem{Title: w.T("Sweep now", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.Trigger(ctx, "sweep") })},
 	)
-	pause := MenuItem{Title: "Pause automatic rounds", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}
+	pause := MenuItem{Title: w.T("Pause automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: true}) })}
 	if h.Paused {
-		pause = MenuItem{Title: "Resume automatic rounds", Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: false}) })}
+		pause = MenuItem{Title: w.T("Resume automatic rounds", nil), Enabled: true, Action: c.later(func(ctx context.Context) error { return c.cfg.Daemon.SetPause(ctx, api.PauseRequest{Paused: false}) })}
 	}
-	items = append(items, pause, MenuItem{Title: c.syncLine(h)}, MenuItem{Separator: true},
-		MenuItem{Title: "Quit " + brand.Name, Enabled: true, Action: c.cfg.Quit})
+	items = append(items, pause, MenuItem{Title: c.syncLine(h)}, MenuItem{Separator: true}, c.quitItem())
 	return items
 }
 
@@ -421,7 +495,7 @@ func (c *Controller) section(name, view string, rows []api.Row, open string) []M
 	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", name, len(rows))}}
 	for i, r := range rows {
 		if i == perSection {
-			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
+			items = append(items, MenuItem{Title: c.words().T("more…", nil), Enabled: true, Action: c.later(func(context.Context) error { return c.open(viewRoute(view)) })})
 			break
 		}
 		items = append(items, c.rowItem(view, r, open))
@@ -436,7 +510,7 @@ func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	}
 	title := r.Label + " · " + label(r)
 	if r.Stale {
-		title += " " + staleMark
+		title += " " + c.words().T("(stale)", nil)
 	}
 	return MenuItem{
 		Title:    title,
@@ -491,13 +565,11 @@ func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
 
 func label(r api.Row) string { return r.Summary.Line }
 
-// staleMark marks a row its plugin last reported before it went down.
-const staleMark = "(stale)"
-
 func (c *Controller) syncLine(h api.Health) string {
-	line := "Not synced yet"
+	w := c.words()
+	line := w.T("Not synced yet", nil)
 	if at := syncedAt(h.Jobs); !at.IsZero() {
-		line = "Synced " + at.Local().Format("15:04")
+		line = w.T("Synced {time}", map[string]any{"time": w.Time(at.Local(), "time")})
 	}
 	if h.RateLimit.Limit > 0 {
 		line += fmt.Sprintf(" · %d/%d", h.RateLimit.Remaining, h.RateLimit.Limit)
@@ -532,6 +604,9 @@ func (c *Controller) later(fn func(ctx context.Context) error) func() {
 }
 
 func (c *Controller) open(route string) error {
+	if c.cfg.Window != nil {
+		return c.cfg.Window(route)
+	}
 	u, err := c.cfg.CockpitURL(route)
 	if err != nil {
 		return err

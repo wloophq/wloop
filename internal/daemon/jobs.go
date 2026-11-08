@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/meter"
 )
 
@@ -72,6 +74,25 @@ func (j *job) wakeOn(c <-chan struct{}) { j.wake = c }
 func (j *job) at(t time.Time) {
 	j.mu.Lock()
 	j.due = t.Round(0)
+	j.mu.Unlock()
+	select {
+	case j.reset <- struct{}{}:
+	default:
+	}
+}
+
+// wakeAt schedules a run at t, now when t is zero, unless an earlier one is due.
+func (j *job) wakeAt(t time.Time) {
+	if t.IsZero() {
+		t = j.clock.Now()
+	}
+	t = t.Round(0)
+	j.mu.Lock()
+	if !j.due.IsZero() && !t.Before(j.due) {
+		j.mu.Unlock()
+		return
+	}
+	j.due = t
 	j.mu.Unlock()
 	select {
 	case j.reset <- struct{}{}:
@@ -280,5 +301,23 @@ func (s *Server) noteConfigStale() {
 	if s.deps.ConfigWarning == nil {
 		return
 	}
-	s.warnings.set("config", s.deps.ConfigWarning())
+	s.warnings.set("config", s.worded(s.deps.ConfigWarning()))
+}
+
+// worded is w in the loaded registry's client strings, "" when w says nothing.
+func (s *Server) worded(w config.Warning) string {
+	if w.Key == "" {
+		return ""
+	}
+	return s.word(w.Key, w.Params)
+}
+
+// word is the client string key in the loaded locale, filled with params; the key itself when the catalog
+// lacks it.
+func (s *Server) word(key string, params map[string]any) string {
+	text := key
+	if forms, ok := s.loaded().Strings[key]; ok && forms["other"] != "" {
+		text = forms["other"]
+	}
+	return i18n.Interpolate(text, params)
 }

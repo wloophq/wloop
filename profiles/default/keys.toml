@@ -23,6 +23,7 @@ dismiss = "dismiss"
 reply = "reply in the conversation"
 edit = "edit the draft's text"
 open-source = "open the source"
+"filter:add" = "add a filter by a field and a value"
 "group:cycle" = "group by the next field"
 "sort:cycle" = "sort by the next field"
 
@@ -34,6 +35,8 @@ help = "help"
 quit = "quit"
 "nav:cycle" = "next view in the group"
 "area:{n}" = "area {n}"
+"link:copy" = "copy a link to this view"
+"nav:home" = "go to the home"
 
 [help.review]
 "step:done" = "mark the step done"
@@ -43,5 +46,21 @@ quit = "quit"
 [help.plan]
 approve = "apply the selected plan step"
 
+[help.detail]
+"detail:detach" = "open in a window of its own"
+"tab:next" = "next tab"
+"tab:prev" = "previous tab"
+
 [help.question]
 "answer:{n}" = "the gate's intent {n}"
+
+[help.queue]
+"queue:primary" = "run the decision's primary action"
+"queue:skip" = "next decision, without acting"
+"queue:back" = "previous decision"
+open-source = "open the source"
+"queue:home" = "back to the home"
+"queue:edit" = "edit the draft before it goes"
+"queue:discard" = "discard the draft"
+"queue:close-silently" = "close without a message"
+"queue:skip-workflow" = "stop drafting nudges in this conversation"

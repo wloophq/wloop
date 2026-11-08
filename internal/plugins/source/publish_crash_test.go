@@ -50,7 +50,12 @@ type hangingPoster struct {
 
 func (p hangingPoster) Validate(context.Context, src.Draft) error        { return nil }
 func (p hangingPoster) Where(context.Context, src.Draft) (string, error) { return "", nil }
-func (p hangingPoster) Place(context.Context, src.Draft) (string, error) { return "", nil }
+func (p hangingPoster) Place(context.Context, src.Draft) (src.Placed, error) {
+	return src.Placed{}, nil
+}
+
+var _ src.Publisher = hangingPoster{}
+
 func (p hangingPoster) Verify(context.Context, src.Draft, time.Time) (src.Evidence, bool, error) {
 	return src.Evidence{}, false, nil
 }

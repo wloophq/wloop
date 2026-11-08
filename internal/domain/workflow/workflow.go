@@ -265,8 +265,11 @@ type Workflow struct {
 	Limits        Limits
 	// Observe plans items pending and never runs them by itself.
 	Observe bool
-	Order   int
-	Key     []string // fact names; empty means the slot's fingerprint fact
+	// Off ships the workflow switched off: it plans nothing until the config's
+	// workflows.<name>.enabled turns it on.
+	Off   bool
+	Order int
+	Key   []string // fact names; empty means the slot's fingerprint fact
 	// Marks are the facts whose values a done or dismissed item records as
 	// the unit's marks, by the mark's name under the workflow (mark.Of).
 	Marks map[string]string
@@ -283,6 +286,9 @@ type Workflow struct {
 	// propose, from its [gates.approval]; nil when that names none for a
 	// draft gate.
 	DraftApproval *draft.Policy
+	// DraftsWait pins every draft the workflow proposes to wait for a person, whatever the configuration's
+	// approval says.
+	DraftsWait bool
 	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.
@@ -290,8 +296,22 @@ type Workflow struct {
 	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
 	// or moot.
 	WithdrawReason string
+	// WithdrawRules are the manifest's [[drafts.withdraw.rule]], tried in order before Withdraw, each
+	// withdrawing with its own reason.
+	WithdrawRules []WithdrawRule
+	// GateWithdraw is the manifest's [gates.withdraw]: when an open gate its gate.open steps opened on a unit
+	// no longer stands, over the unit's facts, with the reason the withdrawal records. Nil withdraws none.
+	GateWithdraw *WithdrawRule
 	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
 	Ask *template.Template
+	// Outbox is how the Outbox names the group of the drafts the workflow proposed.
+	Outbox Outbox
+}
+
+// Outbox is the head of a workflow's group of drafts in the Outbox: its title and one line on why the
+// workflow drafts them.
+type Outbox struct {
+	Title, About string
 }
 
 // AskData is what a workflow's Ask renders: its unit as people read it and
@@ -312,6 +332,22 @@ func (w Workflow) Asks(label string, facts Facts) (string, error) {
 		return w.Summary, err
 	}
 	return strings.TrimSpace(b.String()), nil
+}
+
+// WithdrawRule withdraws an open draft that matches When, with Reason.
+type WithdrawRule struct {
+	When   Predicate
+	Reason string
+}
+
+// Withdrawals are the rules w withdraws its open drafts by, in the order they are tried: its WithdrawRules,
+// then Withdraw with WithdrawReason; none when it withdraws none.
+func (w Workflow) Withdrawals() []WithdrawRule {
+	out := slices.Clone(w.WithdrawRules)
+	if w.Withdraw != nil {
+		out = append(out, WithdrawRule{When: w.Withdraw, Reason: w.WithdrawReason})
+	}
+	return out
 }
 
 // Visible says whether a step of the workflow acts in the user's name where others see it.
@@ -393,6 +429,17 @@ type Why struct {
 }
 
 type Gain struct{ MemoryBytes, DiskBytes int64 }
+
+// Shown is g at the precision a client shows a size: tenths of a MiB under a GiB, tenths of a GiB from there.
+func (g Gain) Shown() Gain { return Gain{shownSize(g.MemoryBytes), shownSize(g.DiskBytes)} }
+
+func shownSize(n int64) int64 {
+	step := int64(1<<20) / 10
+	if n >= 1<<30 {
+		step = int64(1<<30) / 10
+	}
+	return (n + step/2) / step * step
+}
 
 type Item struct {
 	ID       string

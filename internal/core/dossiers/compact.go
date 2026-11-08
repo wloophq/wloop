@@ -6,11 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -23,84 +21,36 @@ import (
 type Calls struct {
 	Turns *Turns
 	Asker turns.Asker
-	Caps  Caps
-	// Spent is the day's headless spend as stored, the dossier calls Record wrote included; nil counts none.
-	Spent func(ctx context.Context, day time.Time) (float64, error)
-	// Record stores a call's cost, the reported one or else the per-call cap, so Spent counts it; nil stores none.
+	// Budget books each call against the headless caps, shared with the other calls that are not turns.
+	Budget *turns.Budget
+	// Tier is the model tier of the calls; "" is balanced.
+	Tier turns.Tier
+	// Record stores a call's cost, the reported one or else the per-call cap, so the budget's Spent counts
+	// it; nil stores none.
 	Record func(ctx context.Context, u unit.Unit, cost float64) error
-
-	mu       sync.Mutex
-	reserved float64 // the per-call caps of the calls running
 }
 
 // KindCall is the loop event of one dossier call; its Data is the cost in USD.
 const KindCall = "dossier_call"
 
-type Caps struct {
-	PerCallUSD, PerDayUSD float64
-	// Tier is the model tier of the calls; "" is balanced.
-	Tier turns.Tier
-}
-
 // ErrOverCap is a call the day's headless spend leaves no room for; it is retried on a later day.
-var ErrOverCap = errors.New("the headless spend cap is reached")
+var ErrOverCap = turns.ErrOverCap
 
 // MaxNotes is the largest notes.md body a call may write.
 const MaxNotes = 32 * dossier.KB
 
-// Reserved is the per-call caps of the calls running, which no store holds yet.
-func (c *Calls) Reserved() float64 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.reserved
-}
-
-// reserve books a call's cap, refusing it when the day's spend and the running calls reach PerDayUSD.
-func (c *Calls) reserve(ctx context.Context) error {
-	var store float64
-	if c.Spent != nil {
-		s, err := c.Spent(ctx, c.Turns.now())
-		if err != nil {
-			return fmt.Errorf("reading the day's headless spend: %w", err)
-		}
-		store = s
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.Caps.PerDayUSD > 0 && store+c.reserved >= c.Caps.PerDayUSD {
-		return fmt.Errorf("%w: $%.2f of $%.2f today", ErrOverCap, store+c.reserved, c.Caps.PerDayUSD)
-	}
-	c.reserved += c.Caps.PerCallUSD
-	return nil
-}
-
-// spent stores a call's cost, the per-call cap when none was reported, and releases its reservation.
-func (c *Calls) spent(ctx context.Context, u unit.Unit, cost *float64) {
-	paid := c.Caps.PerCallUSD
-	if cost != nil {
-		paid = *cost
-	}
-	if c.Record != nil {
-		if err := c.Record(context.WithoutCancel(ctx), u, paid); err != nil {
-			c.Turns.logf("dossier of %s: recording a call's $%.4f: %v", u.Label(), paid, err)
-		}
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.reserved -= c.Caps.PerCallUSD
-}
-
 // ask runs one call on u's dossier and decodes its answer into out, refusing unknown fields.
 func (c *Calls) ask(ctx context.Context, u unit.Unit, prompt, schema string, out any) error {
-	if err := c.reserve(ctx); err != nil {
+	if err := c.Budget.Reserve(ctx); err != nil {
 		return err
 	}
-	tier := c.Caps.Tier
+	tier := c.Tier
 	if tier == "" {
 		tier = turns.TierBalanced
 	}
-	got, err := c.Asker.Ask(ctx, turns.Ask{Tier: tier, Prompt: prompt, Schema: schema, MaxCostUSD: c.Caps.PerCallUSD})
-	c.spent(ctx, u, got.CostUSD)
+	var got turns.Answer
+	defer func() { c.settle(ctx, u, got.CostUSD) }()
+	got, err := c.Asker.Ask(ctx, turns.Ask{Tier: tier, Prompt: prompt, Schema: schema, MaxCostUSD: c.Budget.Caps.PerCallUSD})
 	if err != nil {
 		return err
 	}
@@ -110,6 +60,16 @@ func (c *Calls) ask(ctx context.Context, u unit.Unit, prompt, schema string, out
 		return fmt.Errorf("%w: %v", turns.ErrUnfit, err)
 	}
 	return nil
+}
+
+func (c *Calls) settle(ctx context.Context, u unit.Unit, cost *float64) {
+	var record func(context.Context, float64) error
+	if c.Record != nil {
+		record = func(ctx context.Context, paid float64) error { return c.Record(ctx, u, paid) }
+	}
+	if err := c.Budget.Settle(ctx, cost, record); err != nil {
+		c.Turns.logf("dossier of %s: recording a call's cost: %v", u.Label(), err)
+	}
 }
 
 const compactSchema = `{"type":"object","additionalProperties":false,"required":["notes"],"properties":{"notes":{"type":"string","minLength":1,"maxLength":32768,"description":"the whole new notes.md body, Markdown, without frontmatter"}}}`

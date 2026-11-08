@@ -31,6 +31,8 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/client/window"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -121,6 +123,9 @@ type Env struct {
 	Stdout func(ctx context.Context, name string, args ...string) ([]byte, error)
 
 	LoadConfig func() (config.Config, error)
+	// Languages are the system's preferred languages a serve shows its texts in when ui.locale is empty;
+	// nil detects none, so texts read in English.
+	Languages func() []string
 	// IntentRecheck is how long the intent registry trusts the profile's stamp; zero rechecks on every read.
 	IntentRecheck time.Duration
 	// ViewDebounce is how long serve's view sinks gather wakes before they flush; zero is views.FlushDebounce.
@@ -164,9 +169,11 @@ type Env struct {
 
 	// The native menu bar and the process exit; tests replace them.
 	NativeAvailable func() bool
-	RunNative       func(setup func(menubar.Tray, menubar.Notifier))
-	QuitNative      func()
-	Exit            func(code int)
+	// RunNative runs the app's native loop; setup's host is nil when the app
+	// shows no window of its own.
+	RunNative  func(win config.Window, words *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host))
+	QuitNative func()
+	Exit       func(code int)
 	// Reexec replaces this process with Executable, same arguments.
 	Reexec func() error
 	// Agents are the supported agents by name.
@@ -196,6 +203,8 @@ type Env struct {
 	// briefsHeard holds the brief queue that hears of each brief a plugin
 	// writes through its broker; nil outside serve.
 	briefsHeard *atomic.Pointer[brief.Queue]
+	// jobRunner holds the server whose jobs a plugin wakes through its broker; nil outside serve.
+	jobRunner *atomic.Pointer[daemon.Server]
 	// pluginEffects applies a provider's plugin effects in place of its
 	// running plugin; nil asks the plugin.
 	pluginEffects func(p unit.ProviderID) (effectApplier, bool)
@@ -257,14 +266,22 @@ type Env struct {
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool
+	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
+	// never removes a snapshot a running call of this process reads.
+	omniboxSwept bool
 	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
 	dossierTurns *dossiers.Turns
 	dossierCalls *dossiers.Calls
+	// callBudget books the headless calls that are not turns, the dossiers' and the omnibox's, against
+	// the headless caps; rebuilt by each serve pass.
+	callBudget *turns.Budget
 	// dossierGrants reads, and recordGrant writes, the sessions launched with their unit's dossier.
 	dossierGrants func(ctx context.Context, u unit.Unit) (map[string]time.Time, error)
 	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error
 	// dossierMu serializes the dossiers' git work across serve passes.
 	dossierMu *sync.Mutex
+	// configMu serializes a serve's edits of the config file; nil outside a serve, whose one command edits once.
+	configMu *sync.Mutex
 	// started is the daemon's start-up reconcile, run once per daemon.
 	started *startedOnce
 	// interrupted is set once the brief runs a stopped daemon left running
@@ -337,17 +354,16 @@ func NewEnv() *Env {
 		Executable:    exe,
 		Harness:       harnessOf(protocols, managers),
 
+		Languages:       preferredLanguages,
 		NativeAvailable: macos.Available,
-		RunNative: func(setup func(menubar.Tray, menubar.Notifier)) {
-			macos.Run(filepath.Join(stateDir, "notify"), setup)
-		},
-		QuitNative: macos.Quit,
-		Exit:       os.Exit,
-		Reexec:     func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
-		Agents:     agents,
-		Homes:      homes,
-		Usage:      defaultUsage(home),
-		Managers:   managers,
+		RunNative:       macNative(filepath.Join(stateDir, "notify")).run,
+		QuitNative:      macos.Quit,
+		Exit:            os.Exit,
+		Reexec:          func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
+		Agents:          agents,
+		Homes:           homes,
+		Usage:           defaultUsage(home),
+		Managers:        managers,
 	}).owning()
 	e.intents = newEnvIntents(e)
 	return e

@@ -2,10 +2,12 @@ package daemon
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,9 @@ const (
 	// healthQuiet folds a burst of health notes, such as a job's meta
 	// writes and its end, into one message.
 	healthQuiet = 2 * time.Second
+	// healthRecheck is how stale a health field no note announces may get
+	// while a client listens.
+	healthRecheck = 30 * time.Second
 )
 
 // notifierClient is the subscriber that posts the notifications.
@@ -73,6 +78,13 @@ func (h *hub) has(client string) bool {
 	return false
 }
 
+// listened says a client follows the stream.
+func (h *hub) listened() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.subs) > 0
+}
+
 func (h *hub) unsubscribe(sub *subscriber) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -94,15 +106,29 @@ func (h *hub) moveTo(pos api.Since) {
 	h.pos = pos
 }
 
+// publish adds c to every subscriber; it never moves the rows' position,
+// which only publishRows moves.
 func (h *hub) publish(c api.Change) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !c.Health && len(c.Notices) == 0 {
-		h.pos = api.Since{Epoch: c.Epoch, Rev: c.Rev}
-	}
 	for sub := range h.subs {
 		sub.add(c)
 	}
+}
+
+// send adds c to every subscriber named client and reports whether there
+// was one; it never moves the rows' position.
+func (h *hub) send(client string, c api.Change) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	sent := false
+	for sub := range h.subs {
+		if sub.client == client {
+			sub.add(c)
+			sent = true
+		}
+	}
+	return sent
 }
 
 func (h *hub) close() {
@@ -121,7 +147,7 @@ func (h *hub) close() {
 func (sub *subscriber) add(c api.Change) {
 	sub.mu.Lock()
 	if sub.pending == nil {
-		c.Units, c.Notices = slices.Clone(c.Units), slices.Clone(c.Notices)
+		c.Units, c.Notices, c.Windows = slices.Clone(c.Units), slices.Clone(c.Notices), slices.Clone(c.Windows)
 		sub.pending = &c
 	} else {
 		sub.pending.Merge(c)
@@ -156,8 +182,8 @@ func (s *Server) publishRows(ctx context.Context) {
 		s.logf("events: %v", err)
 		return
 	}
+	s.hub.moveTo(api.Since{Epoch: c.Epoch, Rev: c.Rev})
 	if pos == (api.Since{}) || (!c.All && len(c.Units) == 0) {
-		s.hub.moveTo(api.Since{Epoch: c.Epoch, Rev: c.Rev})
 		return
 	}
 	s.hub.publish(c)
@@ -225,29 +251,76 @@ func (s *Server) feedRows(ctx context.Context) {
 	})
 }
 
-// feedHealth publishes one health message per burst of health notes, until
-// ctx ends.
+// feedHealth publishes a health message when the health a client shows
+// moved: after a burst of health notes or a menu bar connecting or leaving,
+// and on each recheck while a client listens, for the fields no note
+// announces (plugin status, git access, cut and effect warnings, the brief
+// breaker's words, the viewer), until ctx ends.
 func (s *Server) feedHealth(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
 	poke, cancel := change.Poke(s.deps.Changes, port.HealthInputs)
 	defer cancel()
+	shown := visibleHealth(s.health(ctx))
+	check := func() {
+		if now := visibleHealth(s.health(ctx)); now != shown {
+			shown = now
+			pos := s.hub.position()
+			s.hub.publish(api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Health: true})
+		}
+	}
+	recheck := time.NewTicker(healthRecheck)
+	defer recheck.Stop()
 	var due <-chan time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-poke:
-			if due == nil {
-				due = time.After(healthQuiet)
+		case <-s.healthWake:
+		case <-recheck.C:
+			if s.hub.listened() {
+				check()
 			}
+			continue
 		case <-due:
 			due = nil
-			pos := s.hub.position()
-			s.hub.publish(api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, Health: true})
+			check()
+			continue
+		}
+		if due == nil {
+			due = time.After(healthQuiet)
 		}
 	}
+}
+
+// pokeHealth asks the health feed to compare the health with what it last published.
+func (s *Server) pokeHealth() {
+	select {
+	case s.healthWake <- struct{}{}:
+	default:
+	}
+}
+
+// visibleHealth digests h as a client shows it: without the times of runs nobody reads, a job's last run and
+// whether it runs, the last success of a job other than an ingestion, which only the sync labels read, and the
+// brief queue's counts, which only doctor reads.
+func visibleHealth(h api.Health) [sha256.Size]byte {
+	jobs := make([]api.JobStatus, len(h.Jobs))
+	for i, j := range h.Jobs {
+		j.LastRun, j.Running = time.Time{}, false
+		if !strings.HasPrefix(j.Name, ingestJobName("")) {
+			j.LastOK = time.Time{}
+		}
+		jobs[i] = j
+	}
+	h.Jobs = jobs
+	if h.Brief != nil {
+		h.Brief = &api.BriefStatus{LastError: h.Brief.LastError, PausedUntil: h.Brief.PausedUntil}
+	}
+	b, _ := json.Marshal(h)
+	return sha256.Sum256(b)
 }
 
 // Notices are the notifications the workflows raise for the user.
@@ -302,8 +375,17 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	sub := s.hub.subscribe(r.URL.Query().Get("client"))
-	defer s.hub.unsubscribe(sub)
+	client := r.URL.Query().Get("client")
+	sub := s.hub.subscribe(client)
+	defer func() {
+		s.hub.unsubscribe(sub)
+		if client == notifierClient {
+			s.pokeHealth()
+		}
+	}()
+	if client == notifierClient {
+		s.pokeHealth()
+	}
 	if s.hub.position() == (api.Since{}) {
 		s.publishRows(r.Context())
 	}

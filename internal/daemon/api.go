@@ -128,6 +128,19 @@ func (s *Server) routes() []route {
 		{"GET " + api.DigestPath, s.handleDigest},
 		{"GET " + api.ReviewPath, s.handleReview},
 		{"POST " + api.ReviewStepDone, s.handleReviewStepDone},
+		{"GET " + api.StringsPath, s.handleStrings},
+		{"GET " + api.HomePath, s.handleHome},
+		{"GET " + api.QueuePath, s.handleQueue},
+		{"GET " + api.SearchPath, s.handleSearch},
+		{"POST " + api.OmniboxResolvePath, s.handleOmniboxResolve},
+		{"POST " + api.OmniboxAskPath, s.handleOmniboxAsk},
+		{"POST " + api.OmniboxRunPath, s.handleOmniboxRun},
+		{"POST " + api.WindowPath, s.handleWindow},
+		{"POST " + api.WorkflowDisable, s.handleWorkflowDisable},
+		{"POST " + api.UnitSkip, s.handleUnitSkip},
+		{"DELETE " + api.UnitSkip, s.handleUnitUnskip},
+		{"POST " + api.DraftCloseSilently, s.handleDraftCloseSilently},
+		{"GET " + api.OutboxPath, s.handleOutbox},
 
 		{"POST " + api.AgentTurnsStart, s.handleTurnStart},
 		{"POST " + api.AgentTurnsByHand, s.handleTurnByHand},
@@ -214,6 +227,11 @@ func writeRefusal(w http.ResponseWriter, r Refusal) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.health(r.Context()))
+}
+
+// health is the daemon's health as GET /api/health serves it.
+func (s *Server) health(ctx context.Context) api.Health {
 	s.noteConfigStale()
 	h := api.Health{
 		Version:            s.deps.Version,
@@ -221,12 +239,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
 		Viewer:             s.cachedLogin(),
+		Strings:            s.loaded().StringsStamp,
 		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
+	plugins, sources := s.pluginsHealth(ctx)
 	if s.deps.PluginHealth != nil {
-		h.Plugins = s.deps.PluginHealth(r.Context())
+		h.Plugins = plugins
 	}
 	if s.deps.Budget != nil {
 		h.RateLimit = s.graphQLBudget()
@@ -234,12 +254,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.deps.GitAccess != nil {
 		var err error
-		if h.GitAccess, err = s.deps.GitAccess.Hosts(r.Context()); err != nil {
+		if h.GitAccess, err = s.deps.GitAccess.Hosts(ctx); err != nil {
 			s.logf("health: git access: %v", err)
 		}
 	}
 	if s.deps.Pauses != nil {
-		p, err := s.deps.Pauses.Pause(r.Context())
+		p, err := s.deps.Pauses.Pause(ctx)
 		if err != nil {
 			s.logf("health: pause: %v", err)
 		}
@@ -261,7 +281,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		h.Warnings = append(h.Warnings, "menu bar not running: notifications are off; "+s.deps.NotifierStart)
 	}
 	if s.deps.BriefStatus != nil {
-		st, err := s.deps.BriefStatus.Status(r.Context())
+		st, err := s.deps.BriefStatus.Status(ctx)
 		if err != nil {
 			s.logf("health: brief: %v", err)
 		} else {
@@ -286,10 +306,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if w := profileWarning(l, append(s.heldProblems(l), s.facetProblems(l)...)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
-	for _, src := range s.sourceHealth(r.Context()) {
+	for _, src := range sources {
 		h.Warnings = append(h.Warnings, sourceWarnings(src)...)
 	}
-	writeJSON(w, h)
+	return h
 }
 
 func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
@@ -586,6 +606,7 @@ func (s *Server) handleDetail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, u.Label()+" is not in the inventory")
 		return
 	}
+	d.SkippedWorkflows = s.skippedOn(ctx, u)
 	writeJSON(w, d)
 }
 

@@ -40,7 +40,7 @@ func purposeName(purpose string) string {
 	return strings.ReplaceAll(purpose, "_", " ")
 }
 
-var mentionToken = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+var mentionToken = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 
 // mentionName is how a mention key reads: the name the unit's items know, else the id after the provider.
 func mentionName(d api.Draft, key string) string {
@@ -305,6 +305,9 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		field("Mentions", strings.Join(ms, ", "))
 	}
 	field("To", cmp.Or(d.Where, d.Target, "destination unknown"))
+	if d.Quoted != "" {
+		field("Quotes", d.Quoted)
+	}
 	field("Origin", draftOrigin(d)+", "+draftAge(d, now)+" ago")
 	field("Approval", approvalOf(d))
 	if d.Deadline != nil {
@@ -314,7 +317,7 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		field("Error", d.Error)
 	}
 	if d.State == string(draft.Dropped) && d.Reason != "" {
-		field("Dropped", d.Reason)
+		field("Dropped", cmp.Or(d.ReasonText, d.Reason))
 	}
 	if d.Permalink != "" {
 		field("Posted", d.Permalink)

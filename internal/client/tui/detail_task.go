@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dtask "github.com/wloophq/wloop/internal/domain/task"
@@ -56,7 +58,7 @@ func (m *Model) SetDetail(id string, e api.TaskView, err error) {
 		return
 	}
 	if err != nil {
-		m.status = "detail of " + id + " not loaded: " + err.Error()
+		m.status = m.w().T("detail of {task} not loaded: {error}", map[string]any{"task": id, "error": err.Error()})
 		return
 	}
 	m.opened, m.detailStale = &e, false
@@ -88,7 +90,7 @@ func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 	}
 	for _, u := range e.Units {
 		if r, ok := m.rowOf(u); ok && r.Question != nil {
-			c := rowCard(r)
+			c := m.rowCard(r)
 			return c, true
 		}
 	}
@@ -109,10 +111,10 @@ func gateText(g api.GateView) string {
 	return cmp.Or(g.Text, g.Name, g.Kind)
 }
 
-func rowCard(r api.Row) askCard {
+func (m *Model) rowCard(r api.Row) askCard {
 	q := r.Question
 	if q.Queued {
-		return askCard{text: queuedAnswer, row: &r}
+		return askCard{text: queuedAnswer(m.w()), row: &r}
 	}
 	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r}
 }
@@ -131,31 +133,31 @@ func (m *Model) activeCard() (askCard, bool) {
 		return askCard{}, false
 	}
 	if r, ok := m.selected(); ok && r.Question != nil {
-		return rowCard(r), true
+		return m.rowCard(r), true
 	}
 	return askCard{}, false
 }
 
 // answers are the card's answers in the order its digits pick them.
-func (c askCard) answers() []string {
+func (c askCard) answers(w *texts.Catalog) []string {
 	if c.gate != nil {
 		out := make([]string, len(c.gate.Intents))
 		for i, x := range c.gate.Intents {
 			out[i] = cmp.Or(x.Label, x.ID)
 			if x.ID == c.gate.Default && !c.gate.Deadline.IsZero() {
-				out[i] += " (at " + c.gate.Deadline.Local().Format("15:04") + ")"
+				out[i] += " (" + w.T("at {time}", map[string]any{"time": c.gate.Deadline.Local().Format("15:04")}) + ")"
 			}
 		}
 		return out
 	}
 	if c.confirm {
-		return []string{"yes", "no"}
+		return []string{w.T("yes", nil), w.T("no", nil)}
 	}
 	out := make([]string, len(c.options))
 	for i, o := range c.options {
 		out[i] = o.Label
 		if o.ID == c.recommend {
-			out[i] += " (recommended)"
+			out[i] += " (" + w.T("recommended", nil) + ")"
 		}
 	}
 	return out
@@ -167,8 +169,8 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	if inViews && read <= m.detailRead {
 		return Command{}, false
 	}
-	if n < 1 || n > len(c.answers()) {
-		m.status = fmt.Sprintf("no option %d", n)
+	if n < 1 || n > len(c.answers(m.w())) {
+		m.status = m.w().T("no option {n}", map[string]any{"n": n})
 		return Command{}, false
 	}
 	if c.row != nil {
@@ -176,7 +178,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		st, ok := actionState(r, "answer")
 		switch {
 		case !ok:
-			m.status = "no answer on " + r.Label
+			m.status = m.w().T("no answer on {task}", map[string]any{"task": r.Label})
 			return Command{}, false
 		case !st.Enabled:
 			m.status = st.Reason
@@ -189,7 +191,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 		req.Basis = st.Basis
 		cmd := Command{Unit: r.Unit, Label: r.Label, Action: "answer", Req: req}
 		if !inViews {
-			m.confirm(cmd, fmt.Sprintf("answer %s: %d. %s?", r.Label, n, c.answers()[n-1]), read)
+			m.confirm(cmd, m.w().T("answer {task}: {n}. {answer}?", map[string]any{"task": r.Label, "n": n, "answer": c.answers(m.w())[n-1]}), read)
 			return Command{}, false
 		}
 		return m.finish(cmd, st, read)
@@ -223,7 +225,7 @@ func (m *Model) resolveGate(c askCard, x api.IntentView, read uint64) (Command, 
 	}
 	m.prompt = &prompt{action: x.ID, label: label + ": " + c.text, read: read, editor: true, submit: func(text string) (Command, bool) {
 		if text == "" {
-			m.status = label + " " + cmd.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": label, "task": cmd.Label})
 			return Command{}, false
 		}
 		cmd.args = map[string]string{"answer": text}
@@ -265,15 +267,15 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		state = append(state, star.Name)
 	}
 	if e.Changed {
-		state = append(state, "changed")
+		state = append(state, m.w().T("changed", nil))
 	}
 	if w := e.Wake; w != nil && !w.Until.IsZero() {
-		state = append(state, "until "+w.Until.In(now.Location()).Format("2006-01-02 15:04"))
+		state = append(state, m.w().T("until {time}", map[string]any{"time": w.Until.In(now.Location()).Format("2006-01-02 15:04")}))
 	}
 	if w := e.Wake; w != nil && w.When != "" {
-		state = append(state, "until "+w.When)
+		state = append(state, m.w().T("until {time}", map[string]any{"time": w.When}))
 	}
-	fact("state", strings.Join(state, " · "), plain)
+	fact(m.w().T("state", nil), strings.Join(state, " · "), plain)
 	related, _ := m.viewsCat.PropOf(string(dtask.RoleRelated))
 	merged, _ := m.viewsCat.PropOf(string(dtask.RoleMerged))
 	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
@@ -282,30 +284,30 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		}
 	}
 	if e.Parent != "" {
-		fact("parent", e.Parent, plain)
+		fact(m.w().T("parent", nil), e.Parent, plain)
 	}
 	m.refFacts(e, related.Name, merged.Name, fact)
 	if e.OwedBy != "" {
-		fact("owed by", e.OwedBy, plain)
+		fact(m.w().T("owed by", nil), e.OwedBy, plain)
 	}
 	if e.Notes != "" {
-		para("notes", e.Notes)
+		para(m.w().T("notes", nil), e.Notes)
 	}
 	card, carded := m.questionCard(e)
 	if carded && card.gate == nil {
-		fact("asks", cmp.Or(card.text, "the agent stopped"), t.Yellow)
-		for i, a := range card.answers() {
+		fact(m.w().T("asks", nil), cmp.Or(card.text, m.w().T("the agent stopped", nil)), t.Yellow)
+		for i, a := range card.answers(m.w()) {
 			fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
 		}
 	} else if msg, _, ok := e.MessageOf(); ok && !carded {
-		fact("message", msg.Text, plain)
+		fact(m.w().T("message", nil), msg.Text, plain)
 	}
 	if d := draftOn(e); d != nil {
 		m.draftFacts(d, fact, para)
 	}
 	m.draftLines(fact, para)
 	for _, a := range e.Asks {
-		fact("ask", strings.TrimSuffix(a.Summary+" · "+a.Asker, " · "), plain)
+		fact(m.w().T("ask", nil), strings.TrimSuffix(a.Summary+" · "+a.Asker, " · "), plain)
 		for _, q := range a.Quotes {
 			fact("", "> "+q, t.Dim)
 		}
@@ -321,7 +323,7 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		m.unitCard(s, fact, now.Location())
 	}
 	if len(e.Cards) == 0 && m.opened == nil {
-		fact("", "loading…", t.Dim)
+		fact("", m.w().T("loading…", nil), t.Dim)
 	}
 	return append(lines, m.taskKeys(e, width, col)...)
 }
@@ -336,9 +338,9 @@ func (m *Model) gateFacts(e api.TaskView, card askCard, carded bool, fact func(l
 		if g.Status != string(gate.Open) || g.Kind == string(gate.KindDraft) || (isMsg && carded && card.gate == nil && g.ID == asked.ID) {
 			continue
 		}
-		fact("gate", gateText(g), t.Yellow)
+		fact(m.w().T("gate", nil), gateText(g), t.Yellow)
 		if carded && card.gate != nil && card.gate.ID == g.ID {
-			for i, a := range card.answers() {
+			for i, a := range card.answers(m.w()) {
 				fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
 			}
 			continue
@@ -357,16 +359,16 @@ func (m *Model) gateFacts(e api.TaskView, card askCard, carded bool, fact func(l
 // the command that resumes its session.
 func (m *Model) runFacts(r api.RunView, fact func(label, text string, style func(string) string)) {
 	t := m.t
-	head := []string{r.Intent, r.State}
+	head := []string{r.Intent, servedWord(m.viewsCat.RunStates, r.State)}
 	if r.SessionState != "" {
-		head = append(head, "session "+r.SessionState)
+		head = append(head, m.w().T("session {state}", map[string]any{"state": servedWord(m.viewsCat.SessionStates, r.SessionState)}))
 	}
-	fact("run", strings.Join(slices.DeleteFunc(head, func(s string) bool { return s == "" }), " · "), plain)
+	fact(m.w().T("run", nil), strings.Join(slices.DeleteFunc(head, func(s string) bool { return s == "" }), " · "), plain)
 	if where := strings.Join(slices.DeleteFunc([]string{r.Manager, r.Workspace, r.Session}, func(s string) bool { return s == "" }), " · "); where != "" {
 		fact("", where, t.Dim)
 	}
 	if r.Resume != "" {
-		fact("", "resume: "+r.Resume, t.Dim)
+		fact("", m.w().T("resume: {command}", map[string]any{"command": r.Resume}), t.Dim)
 	}
 }
 
@@ -386,13 +388,13 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 	if c.Title != "" {
 		head += "  " + c.Title
 	}
-	fact("unit", head, t.Bold)
+	fact(m.w().T("unit", nil), head, t.Bold)
 	state := []string{c.State}
 	if c.Outcome != "" {
 		state = append(state, string(c.Outcome))
 	}
 	if s.Stale {
-		state = append(state, "plugin disabled, read-only")
+		state = append(state, m.w().T("plugin disabled, read-only", nil))
 	}
 	fact("", strings.Join(slices.DeleteFunc(state, func(s string) bool { return s == "" }), " · "), t.Dim)
 	if c.Why != "" {
@@ -400,17 +402,13 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 	}
 	var sig []string
 	for _, x := range c.Signals {
-		v := x.Value
-		if !x.At.IsZero() {
-			v = x.At.In(zone).Format("2006-01-02 15:04")
-		}
-		sig = append(sig, x.Key+" "+v)
+		sig = append(sig, m.signalLine(string(c.Unit.Provider), x, zone))
 	}
 	if len(sig) > 0 {
 		fact("", strings.Join(sig, " · "), t.Dim)
 	}
 	if h := c.LastHuman; h != nil {
-		fact("", "last: "+h.Who.Name+" "+h.What, t.Dim)
+		fact("", m.w().T("last: {who} {what}", map[string]any{"who": h.Who.Name, "what": h.What}), t.Dim)
 	}
 }
 
@@ -420,13 +418,13 @@ func (m *Model) taskKeys(e api.TaskView, width, col int) []string {
 	t := m.t
 	on, off := m.verbHelp(e)
 	var lines []string
-	head := "  " + t.Dim(termfmt.Fit("keys", factLabel)) + "  "
+	head := "  " + t.Dim(termfmt.Fit(m.w().T("keys", nil), factLabel)) + "  "
 	for _, l := range m.pack(on, width-col) {
 		lines = append(lines, head+l)
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }
@@ -492,6 +490,28 @@ func (m *Model) verbSummary(verb string) string {
 	return ""
 }
 
+// signalLine is a card signal in its plugin's words: its name, its value filled with its params, an instant in
+// zone, then each note; a code with no words reads as itself, and an empty value as the key.
+func (m *Model) signalLine(provider string, s card.Signal, zone *time.Location) string {
+	spec, _ := m.catalog.CardSignal(provider, s.Key)
+	v := cmp.Or(s.Value, s.Key)
+	if w := spec.Values[s.Value]; w != "" {
+		v = m.w().Fill(w, s.Params)
+	}
+	if !s.At.IsZero() {
+		v = s.At.In(zone).Format("2006-01-02 15:04")
+	}
+	parts := []string{cmp.Or(spec.Label, s.Key) + " " + v}
+	for _, n := range s.Notes {
+		text := n.Code
+		if w := spec.Notes[n.Code]; w != "" {
+			text = m.w().Fill(w, n.Params)
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, " · ")
+}
+
 func (m *Model) verbLabel(verb string) string {
 	for _, v := range m.viewsCat.Verbs {
 		if v.Verb == verb {
@@ -537,4 +557,12 @@ func (m *Model) refFacts(e api.TaskView, relatedName, mergedName string, fact fu
 		label = ""
 		within(r.Within, 1)
 	}
+}
+
+// servedWord is the word words serve for name, else name.
+func servedWord(words map[string]string, name string) string {
+	if w := words[name]; w != "" {
+		return w
+	}
+	return name
 }

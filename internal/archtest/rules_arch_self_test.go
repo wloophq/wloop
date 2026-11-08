@@ -112,3 +112,12 @@ var ro, _ = store.OpenReadOnly("store.db")
 	flagged(t, "store test support", ruleStoreWriter(fset, "internal/adapter/store/storetest/storetest.go", f), 0, "")
 	flagged(t, "a test file", ruleStoreWriter(fset, "internal/cli/slackeval_test.go", f), 0, "")
 }
+
+func TestI18nRuleFlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
+	ok := []string{"strings", "golang.org/x/text/language", "golang.org/x/text/feature/plural"}
+	flagged(t, "allowed", ruleI18n("internal/i18n", ok), 0, "")
+	bad := append(ok, module+"internal/profile", module+"internal/api", "github.com/x/y")
+	flagged(t, "i18n", ruleI18n("internal/i18n", bad), 3, "golang.org/x/text")
+	flagged(t, "not i18n", ruleI18n("internal/intent", bad), 0, "")
+}

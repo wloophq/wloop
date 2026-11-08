@@ -5,7 +5,7 @@ description: Every key of config.toml, with its default.
 
 The configuration is `$XDG_CONFIG_HOME/{{name}}/config.toml`, by default `~/.config/{{name}}/config.toml`, a [TOML](https://toml.io) file like the profile's manifests; `#` starts a comment. Every key is optional; a key the loop does not read is an error that names it, and a close key when one exists, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way: a duration or a date written without quotes, a number where a string goes, `inf` or `nan`. A key left out keeps its default. A former `config.json` is not read; when it is the only file, every command that loads the configuration fails, naming `config.toml`. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key). `{{command}} config set <key> <value>` writes one key, keeping the file's comments and layout, and `{{command}} config unset <key>` removes one, or a whole table (`workflows.<name>`); a table an unset leaves with no key, comment or sub-table loses its header too, so an unset undoes a set. Set refuses a key no setting reads, a `workflows.<name>` key whose name is none of the profile's workflows (`{{command}} doctor` lists them) nor a disabled plugin's, which can be switched before the plugin is enabled, and a result the loop would refuse; unset removes any key, one no setting reads too, and refuses only a result that would no longer load. Each keeps the previous file as `config.toml.loop-<stamp>.bak`.
 
-The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are strings: `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON Schema, for an editor whose TOML support reads one.
+The daemon reads the file when it starts. It follows a change of `profile`, `ui.locale` and `workflows.<name>.enabled` live, the keys its stale warning lists; any other change takes effect after a restart of the daemon, and until then the daemon reports its configuration as stale. The `window` keys are the app's: a change applies when the app restarts, and the daemon does not report it. Durations are strings: `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON Schema, for an editor whose TOML support reads one.
 
 ## Settings
 
@@ -166,7 +166,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 |---|---|---|---|
 | `workflows` | table by name |  | Overrides of each workflow's manifest, by workflow name. |
 | `workflows.&lt;name&gt;` | table |  | One workflow's overrides. |
-| `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. |
+| `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. Off, it proposes no draft, and the drafts it holds stay. |
 | `workflows.&lt;name&gt;.observe` | bool |  | Plans the workflow's items pending, for you to run; left out, the manifest's. |
 | `workflows.&lt;name&gt;.only_when` | predicate |  | A condition ANDed with the workflow's when. |
 
@@ -206,9 +206,17 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
 | `drafts` | table |  | The settings every proposer's drafts share. |
-| `drafts.repeat_after` | duration | `1d` | The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again. |
+| `drafts.repeat_after` | duration | `7d` | The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again. |
 | `notifications` | table |  | The notifications. |
 | `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
+
+### Window
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `window` | table |  | The app's own window on macOS, which the app reads when it starts. |
+| `window.enabled` | bool | `true` | Show the cockpit in the app's own window on macOS; false opens it in the browser. |
+| `window.hotkey` | string | `ctrl+option+space` | The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none. |
 
 ### Units and tasks
 
@@ -234,6 +242,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `cleanup.workspace_grace` | duration | `1d` | How long, in working time, a workspace stays after its unit finished. |
 | `cleanup.manual_idle` | duration | `1d` | How long a session you started stays idle before it closes. |
 | `cleanup.stale_workspace` | duration | `14d` | How long an untouched workspace stays. |
+| `cleanup.orphan_hold` | duration | `1d` | How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process. |
 | `cleanup.disposable` | list of strings |  | Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing. |
 
 ### Dossiers
@@ -247,6 +256,13 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `dossiers.total_cap_mb` | integer | `2048` | The size of dossiers and archives doctor reports. |
 | `dossiers.max_file_mb` | integer | `5` | The largest file a dossier keeps; a larger one is linked. |
 | `dossiers.compact_at_kb` | integer | `256` | The log size that triggers compaction. |
+
+### Interface
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `ui` | table |  | The interface. |
+| `ui.locale` | string |  | The interface language, a BCP 47 tag such as pt-BR; empty follows the system's preferred languages. Applies without a restart. |
 
 ### Daemon
 

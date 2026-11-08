@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/fs"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,7 +34,10 @@ type PluginJob struct {
 	Name    string
 	Every   time.Duration
 	Timeout time.Duration // a run's limit; 0 is pluginTimeout
-	Run     func(ctx context.Context) (summary, skipped string, err error)
+	// Retry is the first backoff after a failed run, doubling up to Every; 0 backs off from Every.
+	Retry time.Duration
+	// Run is one run; next is when the job next has work, zero to wait for Every or a wake.
+	Run func(ctx context.Context) (summary, skipped string, next time.Time, err error)
 }
 
 const (
@@ -103,6 +107,13 @@ func nonNil[T any](v []T) []T {
 	return v
 }
 
+// nonNilMap is a copy of m, empty for nil.
+func nonNilMap[K comparable, V any](m map[K]V) map[K]V {
+	out := make(map[K]V, len(m))
+	maps.Copy(out, m)
+	return out
+}
+
 // bookUnit is the unit of the book k finds.
 func (s *Server) bookUnit(ctx context.Context, k turns.Key) (unit.Unit, bool) {
 	if s.deps.Turns == nil {
@@ -159,9 +170,28 @@ func (s *Server) registerPluginJobs() {
 			if timeout <= 0 {
 				timeout = pluginTimeout
 			}
-			s.jobs[pj.Name] = newJob(pj.Name, pj.Every, timeout, pj.Run)
+			var j *job
+			j = newJob(pj.Name, pj.Every, timeout, func(ctx context.Context) (string, string, error) {
+				summary, skipped, next, err := pj.Run(ctx)
+				if err == nil && !next.IsZero() {
+					j.wakeAt(next)
+				}
+				return summary, skipped, err
+			})
+			j.retry = pj.Retry
+			s.jobs[pj.Name] = j
 		}
 	}
+}
+
+// WakeJob runs the job named name at at, or now when at is zero or past, unless an earlier run is already due;
+// false when no such job.
+func (s *Server) WakeJob(name string, at time.Time) bool {
+	j, ok := s.jobs[name]
+	if ok {
+		j.wakeAt(at)
+	}
+	return ok
 }
 
 // startStreams runs each enabled plugin's stream on wg, once the start-up

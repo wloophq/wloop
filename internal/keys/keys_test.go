@@ -41,6 +41,7 @@ func spec92() []row {
 		{"r", "reply", List, screen},
 		{"i", "edit", List, []Surface{TUI}},
 		{"o", "open-source", List, all},
+		{"+", "filter:add", List, []Surface{Web}},
 		{"=", "group:cycle", List, []Surface{TUI}},
 		{"-", "sort:cycle", List, []Surface{TUI}},
 		{"n", "capture", Global, screen},
@@ -55,6 +56,20 @@ func spec92() []row {
 		{"]", "step:next", Review, screen},
 		{"[", "step:prev", Review, screen},
 		{"Enter", "approve", Plan, screen},
+		{"c", "link:copy", Global, []Surface{Web}},
+		{"t", "detail:detach", Detail, []Surface{Web}},
+		{"]", "tab:next", Detail, []Surface{Web}},
+		{"[", "tab:prev", Detail, []Surface{Web}},
+		{"g h", "nav:home", Global, []Surface{Web}},
+		{"Enter", "queue:primary", Queue, []Surface{Web}},
+		{"j", "queue:skip", Queue, []Surface{Web}},
+		{"k", "queue:back", Queue, []Surface{Web}},
+		{"o", "open-source", Queue, []Surface{Web}},
+		{"Esc", "queue:home", Queue, []Surface{Web}},
+		{"e", "queue:edit", Queue, []Surface{Web}},
+		{"x", "queue:discard", Queue, []Surface{Web}},
+		{"m", "queue:close-silently", Queue, []Surface{Web}},
+		{"n", "queue:skip-workflow", Queue, []Surface{Web}},
 	}
 	for n := 1; n <= 9; n++ {
 		rows = append(rows,
@@ -92,6 +107,24 @@ func TestCoreMatchesTheSpec(t *testing.T) {
 		}
 		if len(b.Key) == 1 && b.Key >= "1" && b.Key <= "9" && b.Context != Question {
 			t.Errorf("digit %s outside the Question context", b.Key)
+		}
+	}
+}
+
+// The window's keys take no key another core binding holds on the web, in
+// any context, so they never shadow one.
+func TestTheWindowKeysAreFree(t *testing.T) {
+	for _, action := range []string{"link:copy", "detail:detach"} {
+		var mine Binding
+		for _, b := range Core {
+			if b.Action == action {
+				mine = b
+			}
+		}
+		for _, b := range Core {
+			if b.Action != action && b.Key == mine.Key && slices.Contains(b.Surfaces, Web) {
+				t.Errorf("%s's key %q is also %s's", action, mine.Key, b.Action)
+			}
 		}
 	}
 }
@@ -235,9 +268,18 @@ func TestViewKeysComeFromTheCatalog(t *testing.T) {
 		t.Fatalf("Views = %v, want %v", got, want)
 	}
 	for _, b := range Core {
-		if strings.HasPrefix(b.Action, "nav:") && b.Action != "nav:cycle" {
+		if strings.HasPrefix(b.Action, "nav:") && b.Action != "nav:cycle" && b.Action != "nav:home" {
 			t.Errorf("core binds %s to %s: a view's key comes from the catalog", b.Key, b.Action)
 		}
+	}
+}
+
+func TestHomeKeyIsCore(t *testing.T) {
+	if !slices.ContainsFunc(Core, func(b Binding) bool { return b.Key == "g h" && b.Action == "nav:home" && b.Context == Global }) {
+		t.Fatal("no core g h for the home")
+	}
+	if err := CheckView("g h"); err == nil {
+		t.Fatal("a view may take g h, the home's key")
 	}
 }
 

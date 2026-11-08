@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -24,6 +25,51 @@ func TestEveryCockpitResponseCarriesTheCSP(t *testing.T) {
 		if got := rec.Header().Get("X-Frame-Options"); got != "DENY" {
 			t.Errorf("%s: X-Frame-Options %q", p, got)
 		}
+	}
+}
+
+func TestTheCSPAllowsOnlyOwnFonts(t *testing.T) {
+	h := Handler("")
+	for _, p := range []string{"/", "/static/app.css", "/static/fonts/Geist-Variable.woff2", "/nowhere"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
+		csp := rec.Header().Get("Content-Security-Policy")
+		if !strings.Contains(csp, "font-src 'self'") {
+			t.Errorf("%s: CSP %q lacks font-src 'self'", p, csp)
+		}
+		for _, bad := range []string{"fonts.googleapis", "fonts.gstatic", "data:", "http"} {
+			if strings.Contains(csp, bad) {
+				t.Errorf("%s: CSP %q allows %s", p, csp, bad)
+			}
+		}
+	}
+}
+
+var fontURL = regexp.MustCompile(`url\("([^"]+)"\) format\("woff2"\)`)
+
+func TestEveryFontTheStylesheetNamesIsServed(t *testing.T) {
+	_, faces, _ := strings.Cut(string(appCSS(t)), "@font-face")
+	urls := fontURL.FindAllStringSubmatch(faces, -1)
+	if len(urls) < 2 {
+		t.Fatalf("app.css names %d fonts, want Geist and Geist Mono", len(urls))
+	}
+	h := Handler("")
+	for _, u := range urls {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, u[1], nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "font/woff2" {
+			t.Errorf("%s: %d %q", u[1], rec.Code, rec.Header().Get("Content-Type"))
+		}
+		if !strings.HasPrefix(rec.Body.String(), "wOF2") {
+			t.Errorf("%s is no woff2 file", u[1])
+		}
+	}
+}
+
+func TestTheFontsShipTheirLicence(t *testing.T) {
+	b, err := files.ReadFile("static/fonts/OFL.txt")
+	if err != nil || !strings.Contains(string(b), "SIL Open Font License") {
+		t.Fatalf("static/fonts/OFL.txt: %v", err)
 	}
 }
 

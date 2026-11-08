@@ -1,0 +1,4 @@
+summary = "Pedir que você revise o diff quando um turno de início numa tarefa que você capturou abre um pull request"
+
+[gates.withdraw]
+reason = "o pull request foi mesclado ou fechado, não há mais o que revisar"

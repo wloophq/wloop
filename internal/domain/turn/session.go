@@ -48,6 +48,9 @@ const (
 	SessionClosed SessionState = "closed"
 )
 
+// SessionStates are every state a session takes.
+var SessionStates = []SessionState{SessionActive, SessionDormant, SessionClosed}
+
 func (s Session) State() SessionState {
 	switch {
 	case !s.ClosedAt.IsZero():

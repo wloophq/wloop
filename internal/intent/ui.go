@@ -4,8 +4,11 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
+	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/decision"
+	"github.com/wloophq/wloop/internal/i18n"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -16,15 +19,30 @@ const UIFile = "ui.toml"
 
 // UITexts are one plugin's words of its manifest's ids.
 type UITexts struct {
-	Views      map[string]UIView  `toml:"views"`
-	Facets     map[string]UIFacet `toml:"facets"`
-	Situations map[string]string  `toml:"situations"`
-	Events     map[string]UIEvent `toml:"events"`
-	Menubar    map[string]string  `toml:"menubar"`
-	Detail     map[string]UIField `toml:"detail"`
-	LensRaw    map[string]string  `toml:"lens"`
+	Views      map[string]UIView   `toml:"views"`
+	Facets     map[string]UIFacet  `toml:"facets"`
+	Situations map[string]string   `toml:"situations"`
+	Reasons    map[string]string   `toml:"reasons"`
+	Signals    map[string]UISignal `toml:"signals"`
+	Events     map[string]UIEvent  `toml:"events"`
+	Menubar    map[string]string   `toml:"menubar"`
+	Detail     map[string]UIField  `toml:"detail"`
+	LensRaw    map[string]string   `toml:"lens"`
 	// Lens are the plugin's own row words, those it leaves out empty.
-	Lens RowWords `toml:"-"`
+	Lens    RowWords `toml:"-"`
+	NounRaw any      `toml:"noun"`
+	// Noun is what one of the plugin's units is, as the briefing counts it.
+	Noun i18n.Forms `toml:"-"`
+	// Decisions are the plugin's words of the decisions its units wait on, by decision kind.
+	Decisions map[string]UIDecision `toml:"decisions"`
+}
+
+// UIDecision is a plugin's words of a decision kind.
+type UIDecision struct {
+	ClauseRaw any        `toml:"clause"`
+	Clause    i18n.Forms `toml:"-"`
+	Queue     string     `toml:"queue"`
+	Empty     string     `toml:"empty"`
 }
 
 // UIField is how a field of a unit's detail shows.
@@ -73,79 +91,126 @@ type UIView struct {
 	Search      *UISearch `toml:"search"`
 }
 
+// UISignal is a card signal's words: its name, its values' and its notes'
+// by code, and where else its values take words from.
+type UISignal struct {
+	Label      string            `toml:"label"`
+	Values     map[string]string `toml:"values"`
+	ValuesFrom string            `toml:"values_from"`
+	Notes      map[string]string `toml:"notes"`
+}
+
 // UIEvent is an event kind's words.
 type UIEvent struct {
 	Label string `toml:"label"`
 	Loop  bool   `toml:"loop"`
+	Tone  string `toml:"tone"`
 	Data  string `toml:"data"`
 }
 
 // UIFacet is a facet's words.
 type UIFacet struct {
-	Label       string            `toml:"label"`
-	Empty       string            `toml:"empty"`
-	Values      map[string]string `toml:"values"`
-	Buckets     map[string]string `toml:"buckets"`
-	ShowRaw     any               `toml:"show"`
-	ShowValues  *string           `toml:"show_values"`
-	LabelPrefix *string           `toml:"label_prefix"`
-	RowClass    map[string]string `toml:"row_class"`
-	Colors      map[string]string `toml:"colors"`
+	Label       string              `toml:"label"`
+	Empty       string              `toml:"empty"`
+	Values      map[string]string   `toml:"values"`
+	Buckets     map[string]string   `toml:"buckets"`
+	ShowRaw     any                 `toml:"show"`
+	ShowValues  *string             `toml:"show_values"`
+	ShowWhen    map[string][]string `toml:"show_when"`
+	ShowMax     *int                `toml:"show_max"`
+	ShowLabel   *string             `toml:"show_label"`
+	LabelPrefix *string             `toml:"label_prefix"`
+	RowClass    map[string]string   `toml:"row_class"`
+	Colors      map[string]string   `toml:"colors"`
 	// Show is where the facet's values show on the plugin's rows, read from ShowRaw and ShowValues.
 	Show Show `toml:"-"`
 }
 
-// uiPlugin is the plugin whose words layer l holds: its own layer or the
-// user's layer of it; "" for a layer of no plugin.
-func uiPlugin(l profile.Layer) string {
-	if l.Plugin() {
-		return strings.TrimPrefix(l.Name, profile.PluginLayer(""))
-	}
-	id, ok := strings.CutPrefix(l.Name, "user:")
-	if !ok {
-		return ""
-	}
-	return id
+func (f UIFacet) placement() placement {
+	return placement{When: f.ShowWhen, Max: f.ShowMax, Label: f.ShowLabel}
 }
 
 // loadUI reads ui.toml from each plugin's layers, by plugin id: a higher
 // layer's text replaces a lower one's, key by key.
-func loadUI(layers []profile.Layer) (map[string]UITexts, Problems) {
+func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems) {
 	out := map[string]UITexts{}
 	var problems Problems
 	for _, l := range layers {
-		id := uiPlugin(l)
+		id := l.PluginID()
 		if id == "" {
 			continue
 		}
-		r, err := profile.ReadFile(l, UIFile)
+		res, err := r.read(l, UIFile)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			problems = append(problems, Problem{File: r.Path, Msg: err.Error()})
+			problems = append(problems, Problem{File: res.Path, Msg: err.Error()})
 			continue
 		}
-		m, ps, _, complete := decode[UITexts](r.Path, r.Body)
+		m, ps, _, complete := decode[UITexts](res.Path, res.Body)
 		problems = append(problems, ps...)
 		if !complete {
 			continue
 		}
-		s := &sheet{file: r.Path, at: positions(r.Body)}
-		s.addGrammar(grammar(builtin.SurfaceUI, r.Body))
+		s := &sheet{file: res.Path, at: positions(res.Body), funcs: r.funcs()}
+		s.addGrammar(grammar(builtin.SurfaceUI, res.Body))
+		for _, id := range slices.Sorted(maps.Keys(coreRoutes)) {
+			if _, ok := m.Views[id]; !ok {
+				continue
+			}
+			notice := &sheet{file: res.Path, at: s.at}
+			notice.add("views."+id, `%s is the core's view now, which this key no longer words: its label is %q in %s`, id, coreRoutes[id], StringsFile)
+			problems = append(problems, notice.problems...)
+			delete(m.Views, id)
+		}
 		for id, f := range m.Facets {
 			if f.ShowRaw != nil || f.ShowValues != nil {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)
-				m.Facets[id] = f
 			}
+			readPlacement(s, "facets."+id, f.placement(), &f.Show)
+			m.Facets[id] = f
 		}
 		mergeRowWords(s, "lens", m.LensRaw, &m.Lens)
+		if m.NounRaw != nil {
+			m.Noun, _ = formsOf(s, "noun", m.NounRaw)
+		}
+		for k, d := range m.Decisions {
+			if !decision.Valid(decision.Kind(k)) {
+				continue
+			}
+			if d.ClauseRaw != nil {
+				d.Clause, _ = formsOf(s, "decisions."+k+".clause", d.ClauseRaw)
+			}
+			m.Decisions[k] = d
+		}
 		if problems = append(problems, s.problems...); len(s.problems) > 0 {
 			continue
 		}
 		out[id] = mergeUI(out[id], m)
 	}
+	if r.texts != nil {
+		for id, u := range out {
+			u.Noun = pluginForms(r, id, u.Noun, "noun")
+			for k, d := range u.Decisions {
+				d.Clause = pluginForms(r, id, d.Clause, "decisions", k, "clause")
+				u.Decisions[k] = d
+			}
+			out[id] = u
+		}
+	}
 	return out, problems
+}
+
+// pluginForms is the plural text at path of plugin id's ui.toml in r's locale, else in.
+func pluginForms(r layerReader, id string, in i18n.Forms, path ...string) i18n.Forms {
+	if in == nil {
+		return nil
+	}
+	if f, ok := r.texts.PluginForms(id, UIFile, path); ok && strings.TrimSpace(f["other"]) != "" {
+		return f
+	}
+	return in
 }
 
 func mergeUI(into, over UITexts) UITexts {
@@ -184,13 +249,50 @@ func mergeUI(into, over UITexts) UITexts {
 		if b.LabelPrefix != nil {
 			a.LabelPrefix = b.LabelPrefix
 		}
+		a.Show = a.Show.over(b.placement(), b.Show)
+		if b.ShowWhen != nil {
+			a.ShowWhen = b.ShowWhen
+		}
+		if b.ShowMax != nil {
+			a.ShowMax = b.ShowMax
+		}
+		if b.ShowLabel != nil {
+			a.ShowLabel = b.ShowLabel
+		}
 		return a
 	})
 	into.Lens = into.Lens.Over(over.Lens)
 	into.Events = mergeMap(into.Events, over.Events, func(_, y UIEvent) UIEvent { return y })
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
+	into.Reasons = mergeMap(into.Reasons, over.Reasons, func(_, y string) string { return y })
+	into.Signals = mergeMap(into.Signals, over.Signals, func(a, b UISignal) UISignal {
+		if b.Label != "" {
+			a.Label = b.Label
+		}
+		if b.ValuesFrom != "" {
+			a.ValuesFrom = b.ValuesFrom
+		}
+		a.Values = mergeMap(a.Values, b.Values, func(_, y string) string { return y })
+		a.Notes = mergeMap(a.Notes, b.Notes, func(_, y string) string { return y })
+		return a
+	})
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
+	if over.Noun != nil {
+		into.Noun = over.Noun
+	}
+	into.Decisions = mergeMap(into.Decisions, over.Decisions, func(a, b UIDecision) UIDecision {
+		if b.Clause != nil {
+			a.Clause = b.Clause
+		}
+		if b.Queue != "" {
+			a.Queue = b.Queue
+		}
+		if b.Empty != "" {
+			a.Empty = b.Empty
+		}
+		return a
+	})
 	return into
 }
 
@@ -209,4 +311,4 @@ func mergeMap[V any](into, over map[string]V, merge func(a, b V) V) map[string]V
 }
 
 // BundledUI is the words of the bundled plugins' own layers alone.
-func BundledUI() (map[string]UITexts, Problems) { return loadUI(profile.BundledChain()) }
+func BundledUI() (map[string]UITexts, Problems) { return loadUI(profile.BundledChain(), readerOf(nil)) }

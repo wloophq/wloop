@@ -23,6 +23,9 @@ func StateDir() string { return Name }
 
 func SkillName(verb string) string { return Name + "-" + verb }
 
+// URLScheme is the scheme of the app's deep links, such as wloop://open/#task=<id>.
+func URLScheme() string { return Name }
+
 // DocsURL is the documentation site's root, with its trailing slash.
 func DocsURL() string { return "https://" + Org + ".github.io/" + Name + "/" }
 

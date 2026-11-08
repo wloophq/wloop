@@ -116,13 +116,15 @@ A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted*
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while a `dry_run` rule over a draft's facts proposes each draft and stores it as what would have been sent, without sending it.
 
-Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
+Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line and `.Ask` the item as you would post it, empty for an item its source wrote none for, so a posted text reads `{{or .Ask .Line}}`. The summary is written for your task list, where "you" is you; the Slack extraction writes the ask in the first person for you and the second person for whom it waits on, naming neither, so a post never speaks of you or its reader in the third person. An item extracted before asks existed has none until the extraction reads its conversation again, and its summary predates the "you" rule. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
 
 ```
 Encerrando:
 {{range .Items}}
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
+
+Each also has a `why.md.tmpl`, the line the Outbox shows above the draft, rendered in your language; `.Since` is when the oldest of its items was asked, in your time zone, and `.People` everyone the draft is to, each with `.Key` and `.Name`. Both files translate as every other text does: `<profile>/locales/pt-BR/workflows/slack-closure/text.md.tmpl` is the closure in a thread written in Portuguese, and a copy of the English file you left unchanged keeps the bundled translations. A translation names only the fields and functions its English text does, `plural` included (`{{plural (len .Items) "one" "this" "other" "these"}}`).
 
 Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 

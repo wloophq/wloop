@@ -156,12 +156,12 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	want := []struct {
 		id, label string
 		order     int
-	}{{"mine", "My PRs", 2}, {"plan", "Plan", 4}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}, {"recent", "Recent", 10}}
+	}{{"mine", "My PRs", 2}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}}
 	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Views) != len(want) {
 		t.Fatalf("%d views: %+v", len(c.Views), c.Views)
 	}
-	custom := []string{"plan", "dash", "explore", "recent"}
+	custom := []string{"dash", "explore"}
 	for i, v := range c.Views {
 		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != want[i].order || v.Rows == slices.Contains(custom, v.ID) ||
 			!slices.Contains(v.Surfaces, "web") {
@@ -172,7 +172,7 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	for _, v := range c.ViewsOn("tui") {
 		tui = append(tui, v.ID)
 	}
-	if !slices.Equal(tui, []string{"mine", "plan"}) {
+	if !slices.Equal(tui, []string{"mine"}) {
 		t.Errorf("terminal views %v", tui)
 	}
 	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})).Version {
@@ -370,4 +370,28 @@ func readTestdata(t *testing.T, path string) []byte {
 		t.Fatalf("%v; run go test -run TestFacetValuesMatchTheCockpit -update", err)
 	}
 	return []byte(brandtest.Expand(string(raw)))
+}
+
+// TestARowNamesItsSituationsReason checks that a row carries the key and the values of the reason its
+// plugin's situation gives, for the plugin's words, and none for a reason the host's overlays wrote.
+func TestARowNamesItsSituationsReason(t *testing.T) {
+	keyed := 0
+	for _, r := range deriveCases(t, fixtureNow) {
+		s := r.Summary
+		if situation.Kind(r.Kind) == situation.KindMuted && s.ReasonKey != "" {
+			t.Errorf("%s: a muted row names the reason %q", r.Label, s.ReasonKey)
+		}
+		if s.ReasonKey == "" {
+			continue
+		}
+		keyed++
+		for k, v := range s.ReasonParams {
+			if !strings.Contains(s.Reason, v) {
+				t.Errorf("%s: the reason %q lacks its %s %q", r.Label, s.Reason, k, v)
+			}
+		}
+	}
+	if keyed == 0 {
+		t.Fatal("no row names its reason")
+	}
 }

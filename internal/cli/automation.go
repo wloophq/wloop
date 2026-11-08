@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -66,6 +67,8 @@ type engineDeps struct {
 	TurnStart turnStartDeps
 	// Drafts are what draft.propose reads; nil refuses it.
 	Drafts *draftDeps
+	// Skips are the workflows the user stopped on a unit; nil skips none.
+	Skips automation.Skipper
 }
 
 // newEngine assembles the engine over the store, the facts providers and
@@ -103,6 +106,13 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	codecs = append(codecs, sessionAndWorkspaceCodecs()...)
 	units := newUnitSet(providers)
 	units.blocks = &startBlocks{e: e}
+	units.skips = d.Skips
+	if d.Drafts != nil {
+		units.taskOf = d.Drafts.task
+		if d.Drafts.Facts == nil {
+			d.Drafts.Facts = units.Facts
+		}
+	}
 	if d.Planners == nil {
 		d.Planners = e.planners()
 	}
@@ -146,6 +156,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	eng := &automation.Engine{
 		Workflows: workflows,
 		Broken:    e.brokenWorkflows,
+		Disabled:  func() []string { return disabledWorkflows(e.currentConfig(), e.loadedIntents().Workflows) },
 		Units:     units,
 		Keep:      unitKeeping{units},
 		Steps:     steps,
@@ -183,6 +194,33 @@ func (e *Env) brokenWorkflows() []string {
 	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
 }
 
+// disabledWorkflows are the workflows of ws, or named in cfg, that cfg turns
+// off or that ship off and cfg does not turn on.
+func disabledWorkflows(cfg config.Config, ws []workflow.Workflow) []string {
+	var out []string
+	for name, wc := range cfg.Workflows {
+		if wc.Enabled != nil && !*wc.Enabled {
+			out = append(out, name)
+		}
+	}
+	for _, w := range ws {
+		if off(w, cfg) && !slices.Contains(out, w.Name) {
+			out = append(out, w.Name)
+		}
+	}
+	return out
+}
+
+// off says whether cfg leaves w off: it turns it off, or w ships off and cfg
+// does not turn it on.
+func off(w workflow.Workflow, cfg config.Config) bool {
+	wc := cfg.Workflows[w.Name]
+	if wc.Enabled != nil {
+		return !*wc.Enabled
+	}
+	return w.Off
+}
+
 func (e *Env) currentConfig() config.Config {
 	cfg, _ := e.loadConfig()
 	return cfg
@@ -211,7 +249,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 	out := make([]workflow.Workflow, 0, len(ws))
 	for _, w := range ws {
 		wc := cfg.Workflows[w.Name]
-		if wc.Enabled != nil && !*wc.Enabled {
+		if off(w, cfg) {
 			continue
 		}
 		if wc.Observe != nil {
@@ -530,6 +568,10 @@ type unitSet struct {
 	// snapshot runs a pass in one read transaction of the store; nil reads
 	// each statement on its own.
 	snapshot func(ctx context.Context, fn func(context.Context) error) error
+	// skips are the workflows the user stopped on a unit; nil skips none.
+	skips automation.Skipper
+	// taskOf reads a task subject, whose units' skips it takes; nil reads none.
+	taskOf func(ctx context.Context, id task.ID) (task.Task, error)
 }
 
 var (
@@ -554,6 +596,7 @@ var (
 	_ automation.Seener     = unitKeeping{}
 	_ automation.Scoper     = unitKeeping{}
 	_ automation.EventFacts = unitKeeping{}
+	_ automation.Skipper    = unitKeeping{}
 )
 
 // Prepare runs fn in the set's snapshot, with ctx as each provider that
@@ -691,6 +734,35 @@ func (k unitKeeping) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, erro
 		return g.Gain(ctx, u)
 	}
 	return workflow.Gain{}, nil
+}
+
+// Skipped says whether the user stopped workflow on u, or on a unit of u when u is a task; a task no longer
+// stored skips nothing.
+func (k unitKeeping) Skipped(ctx context.Context, workflow string, u unit.Unit) (bool, error) {
+	s := k.s
+	if s.skips == nil {
+		return false, nil
+	}
+	if skip, err := s.skips.Skipped(ctx, workflow, u); err != nil || skip {
+		return skip, err
+	}
+	id, ok := task.IDOf(u)
+	if !ok || s.taskOf == nil {
+		return false, nil
+	}
+	e, err := s.taskOf(ctx, id)
+	if errors.Is(err, coretasks.ErrNoTask) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for _, tu := range e.Units {
+		if skip, err := s.skips.Skipped(ctx, workflow, tu); err != nil || skip {
+			return skip, err
+		}
+	}
+	return false, nil
 }
 
 func (k unitKeeping) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {

@@ -1,0 +1,1 @@
+summary = "Fechar uma sessão do loop cujo turno mais recente terminou e que ficou quieta por um tempo, como a sua configuração de limpeza define"

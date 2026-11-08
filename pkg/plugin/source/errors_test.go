@@ -24,7 +24,9 @@ func (p publishing) Validate(context.Context, source.Draft) error { return nil }
 
 func (p publishing) Where(context.Context, source.Draft) (string, error) { return "", nil }
 
-func (p publishing) Place(context.Context, source.Draft) (string, error) { return "", nil }
+func (p publishing) Place(context.Context, source.Draft) (source.Placed, error) {
+	return source.Placed{}, nil
+}
 
 func (p publishing) Verify(context.Context, source.Draft, time.Time) (source.Evidence, bool, error) {
 	return source.Evidence{}, false, nil

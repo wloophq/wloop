@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/skips"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -29,6 +29,30 @@ func (e *Env) wireDrafts(w *serveWiring) {
 	d.Me = e.me
 	w.Engine.Drafts = d
 	w.Engine.Withdrawals = draftWithdrawals{d: d}
+	sk := &skips.Service{Store: w.DB, Drafts: servedDrafts{d}, Clock: clockFunc(e.Now)}
+	w.Engine.Skips = sk
+	if w.Deps != nil {
+		w.Deps.Skips = sk
+	}
+}
+
+// servedDrafts are the Outbox's drafts once it is served; none before.
+type servedDrafts struct{ d *draftDeps }
+
+func (s servedDrafts) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error) {
+	ob, err := s.d.outbox()
+	if err != nil {
+		return nil, nil
+	}
+	return ob.List(ctx, f)
+}
+
+func (s servedDrafts) Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	ob, err := s.d.outbox()
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	return ob.Withdraw(ctx, id, reason)
 }
 
 func (e *Env) draftDeps(tasks draftTasks, its draftItems) *draftDeps {
@@ -89,12 +113,16 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		switch {
 		case err != nil && d.Task != "" && errors.Is(err, coretasks.ErrNoTask):
 			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false,
-				"draft.person_asks_you": false}
+				"draft.person_asks_you": false, "draft.people_outside": 0, "draft.target_joined": false}
 		case err != nil:
 			return nil, err
 		default:
-			person := draftPerson(d.Origin.Key, d.Unit, subject)
-			pd.Facts = draftFactsOf(sub, person, d.Items, w.d.me())
+			rd, err := w.d.unitReaders(ctx, d.Unit)
+			if err != nil {
+				return nil, err
+			}
+			people := draftPeople(d, subject)
+			pd.Facts = draftFactsOf(sub, people, d.Items, w.d.me(), rd.outside(people, d.Target, w.d.Codecs), rd.joined(people, d.Target, w.d.Codecs))
 		}
 		out = append(out, pd)
 	}
@@ -115,17 +143,6 @@ func (w draftWithdrawals) Withdraw(ctx context.Context, id int64, reason string)
 
 func proposedByAWorkflow(d draft.Draft) bool {
 	return d.Origin.Kind == draft.OriginAuto && d.Origin.Workflow != ""
-}
-
-// draftPerson is the person a per-person draft's key names after its unit, or, as drafts proposed before the
-// key named the unit, after its subject; "" for a draft of no person.
-func draftPerson(key string, u, subject unit.Unit) string {
-	for _, prefix := range []string{u.String() + ":", subject.Key + ":"} {
-		if p, ok := strings.CutPrefix(key, prefix); ok {
-			return p
-		}
-	}
-	return ""
 }
 
 // draftSubjectUnit is the subject a draft was proposed on: its task, else its unit.

@@ -107,6 +107,22 @@ func (r *recorder) Profile(_ context.Context, path string) ([]byte, error) {
 	return []byte("profile " + path), nil
 }
 
+// Holds holds where a set's pull.owner fact is "acme", and fails on a set with none.
+func (r *recorder) Holds(_ context.Context, predicate string, facts [][]source.Fact) ([]source.Holding, error) {
+	if predicate != "reviewer_required" {
+		return nil, fmt.Errorf("no predicate %s", predicate)
+	}
+	out := make([]source.Holding, len(facts))
+	for i, fs := range facts {
+		if len(fs) == 0 {
+			out[i].Err = "no owner"
+			continue
+		}
+		out[i].Holds = slices.ContainsFunc(fs, func(f source.Fact) bool { return f.Name == "pull.owner" && f.Value.String == "acme" })
+	}
+	return out, nil
+}
+
 func (r *recorder) Events(_ context.Context, q source.EventQuery) ([]source.Event, error) {
 	return []source.Event{{Unit: q.Units[0], Kind: q.Kinds[0], Actor: "pulls:ana", At: q.Since, Key: "review:9"}}, nil
 }
@@ -137,11 +153,14 @@ func snapshot() source.Snapshot {
 	anchor := source.Anchor{Unit: pr, Ref: "review:9", Permalink: "https://pulls.example/acme/api/pull/12#r9", At: t0}
 	return source.Snapshot{
 		Unit: pr, Rev: 42, At: t0,
-		Data:      json.RawMessage(`{"title":"Add retries","draft":false}`),
-		Situation: &source.Situation{Kind: "to_review", WaitingOn: "pulls:bruno", Since: t0, Reason: "Ana asked", Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
+		Data: json.RawMessage(`{"title":"Add retries","draft":false}`),
+		Situation: &source.Situation{Kind: "to_review", WaitingOn: "pulls:bruno", Since: t0, Reason: "Ana asked", ReasonKey: "asked_by", ReasonParams: map[string]string{"actor": "Ana"},
+			Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
 		Card: &source.Card{
 			Label: "api#12", Title: "Add retries", State: "open", Outcome: "",
-			Signals:   []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0}},
+			Signals: []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0},
+				{Key: "situation", Value: "to_review", Tone: "neutral", Detail: &source.SignalDetail{Params: map[string]string{"actor": "Ana"},
+					Notes: []source.SignalNote{{Code: "stalled", Tone: "warn", Params: map[string]string{"days": "3"}, Since: t0}}}}},
 			LastHuman: &source.Human{Who: ana, What: "commented", At: t0, Link: "https://pulls.example/c/1"},
 			Why:       "Ana asked for your review", WaitsOn: []source.Person{bru}, Since: t0,
 			Link: "https://pulls.example/acme/api/pull/12", TurnsLink: "/turns/12", StartedByMe: true, ClosurePosted: true, Cares: true,
@@ -154,7 +173,7 @@ func snapshot() source.Snapshot {
 			WaitingOn: []source.Person{bru}, State: "open", Resolution: "done",
 			Evidence: source.ItemEvidence{Kind: "message", Anchor: anchor}, Trail: []source.ItemEvidence{{Kind: "unit_event", Anchor: anchor}},
 			Confidence: "high", Ambiguity: "none", Provenance: "derived", Confirmed: true, TaskKey: pr.Key,
-			UserAt: t0, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour),
+			UserAt: t0, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour), Ask: "review the retries I wrote",
 		}},
 		Facts:       []source.Fact{{Name: "pull.state", Value: source.String("OPEN")}, {Name: "pull.waiting", Value: source.Since(t0)}},
 		Signals:     []source.Signal{{Name: "stalled", On: true, Since: t0}, {Name: "ready"}},
@@ -169,6 +188,9 @@ func snapshot() source.Snapshot {
 		FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
 	}
 }
+
+// A plugin compares its card signals with ==; a field that breaks that breaks every plugin that does.
+var _ = source.CardSignal{} == source.CardSignal{}
 
 func TestSourceRoundTripsASnapshot(t *testing.T) {
 	rec := &recorder{}
@@ -203,7 +225,7 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		return source.ToolResult{}, err
 	}
 	res, err := h.ApplyItems(ctx, []source.ItemOp{{Op: "create", Unit: se.Unit, Anchor: source.Anchor{Unit: se.Unit, Ref: "turn:" + call.Turn},
-		Fields: &source.ItemFields{Kind: ptr("todo"), Summary: ptr("Answer Ana"), WaitingOn: &[]source.Person{ana}}}})
+		Fields: &source.ItemFields{Kind: ptr("todo"), Summary: ptr("Answer Ana"), Ask: ptr("answer me"), WaitingOn: &[]source.Person{ana}}}})
 	if err != nil {
 		return source.ToolResult{}, err
 	}
@@ -217,6 +239,10 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		return source.ToolResult{}, err
 	}
 	prompt, err := h.Profile(ctx, "prompts/extract.md")
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	holds, err := h.Holds(ctx, "reviewer_required", [][]source.Fact{{{Name: "pull.owner", Value: source.String("acme")}}, {{Name: "pull.owner", Value: source.String("solo")}}, nil})
 	if err != nil {
 		return source.ToolResult{}, err
 	}
@@ -239,7 +265,7 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		"effects": se.AllowedEffects, "answer": ans.Text, "model": ans.Model, "cost": *ans.CostUSD, "item": res[0].Item,
 		"priority": source.CallOf(ctx).Priority, "wake": errors.Is(wakeErr, source.ErrUnsupported),
 		"event": evs[0].Key, "host": string(cfg.Host), "prompt": string(prompt),
-		"gate": gate.Gate, "draft": gate.Draft, "state": gate.State, "moved": moved, "written": written,
+		"gate": gate.Gate, "draft": gate.Draft, "state": gate.State, "moved": moved, "written": written, "holds": holds,
 	})
 	return source.ToolResult{Answer: "read", Fields: out}, nil
 }
@@ -286,7 +312,8 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	}
 	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "model": "small-1", "cost": 0.02, "item": "icreate",
 		"priority": float64(source.PriorityBackground), "wake": true, "event": "review:9", "host": `{"sweep":{"fast":"1m"}}`, "prompt": "profile prompts/extract.md",
-		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false}
+		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false,
+		"holds": []any{map[string]any{"Holds": true, "Err": ""}, map[string]any{"Holds": false, "Err": ""}, map[string]any{"Holds": false, "Err": "no owner"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tool result %v, want %v", got, want)
 	}
@@ -301,7 +328,8 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	if !reflect.DeepEqual(rec.asks, []source.AskRequest{{Prompt: "Is it done?", Tier: "small", MaxCostUSD: 0.5, MeterScope: "mcp/pull_read/ask"}}) {
 		t.Errorf("asks %+v", rec.asks)
 	}
-	if len(rec.ops) != 1 || *rec.ops[0].Fields.Summary != "Answer Ana" || !reflect.DeepEqual(*rec.ops[0].Fields.WaitingOn, []source.Person{ana}) ||
+	if len(rec.ops) != 1 || *rec.ops[0].Fields.Summary != "Answer Ana" || rec.ops[0].Fields.Ask == nil || *rec.ops[0].Fields.Ask != "answer me" ||
+		!reflect.DeepEqual(*rec.ops[0].Fields.WaitingOn, []source.Person{ana}) ||
 		rec.ops[0].Fields.Context != nil || rec.ops[0].Fields.URLs != nil {
 		t.Errorf("ops %+v", rec.ops)
 	}
@@ -427,7 +455,7 @@ func TestEveryCapabilityHasAtMostFiveMethods(t *testing.T) {
 	brokers := []reflect.Type{
 		reflect.TypeFor[source.Reporter](), reflect.TypeFor[source.Ledger](), reflect.TypeFor[source.Reader](),
 		reflect.TypeFor[source.Gates](), reflect.TypeFor[source.Recorder](), reflect.TypeFor[source.Wakes](),
-		reflect.TypeFor[source.Services](), reflect.TypeFor[source.History](), reflect.TypeFor[source.Source](),
+		reflect.TypeFor[source.Services](), reflect.TypeFor[source.History](), reflect.TypeFor[source.Jobs](), reflect.TypeFor[source.Source](),
 	}
 	for _, i := range append(slices.Clone(capabilities), brokers...) {
 		if n := i.NumMethod(); n > 5 {

@@ -25,6 +25,12 @@ type Tray interface {
 	SetMenu(items []MenuItem)
 }
 
+// LinkSource is a tray that receives the deep links the system hands the
+// app, as the menu bar running without a window does.
+type LinkSource interface {
+	OnLink(func(link string))
+}
+
 // Category is a notification's category, the first part of its id
 // (api.NotificationID).
 type Category = api.Category

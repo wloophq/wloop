@@ -54,8 +54,13 @@ type Vocabulary struct {
 	toolAnswers        []ToolAnswer
 	toolProviders      map[string]unit.ProviderID
 	draftKinds         map[unit.ProviderID]DraftKinds
+	languageFacts      map[unit.ProviderID]string
+	membersFacts       map[unit.ProviderID]string
 	marks              []Mark
 	linkSignals        []string
+	situations         map[unit.ProviderID][]string
+	signalsOf          map[unit.ProviderID][]string
+	predicates         map[unit.ProviderID][]manifest.Predicate
 }
 
 // DraftKinds are a plugin's draft kinds and the delivery of a draft whose
@@ -68,6 +73,15 @@ type DraftKinds struct {
 // PluginDraftKinds are each merged plugin's draft kinds, by provider; the
 // host derives a draft's delivery from its kind through them.
 var PluginDraftKinds = map[unit.ProviderID]DraftKinds{}
+
+// LanguageFacts are, by provider, the fact that tells the language a unit's
+// people write in, as a plugin's language_fact names it; a provider absent
+// writes its drafts in the user's locale.
+var LanguageFacts = map[unit.ProviderID]string{}
+
+// MembersFacts are, by provider, the list fact that holds who can read a unit's conversation, as a plugin's
+// members_fact names it; a provider absent never tells.
+var MembersFacts = map[unit.ProviderID]string{}
 
 // pluginDeliveries are the deliveries the merged plugins declare, each
 // with whether a draft of it reaches people, as a manifest's posts says.
@@ -135,9 +149,12 @@ func Install(v *Vocabulary) {
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
+	LanguageFacts, MembersFacts = v.languageFacts, v.membersFacts
 	pluginDeliveries = v.pluginDeliveries
 	Marks = v.marks
 	LinkSignals = v.linkSignals
+	PluginSituations, PluginSignals = v.situations, v.signalsOf
+	PluginPredicates = v.predicates
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -275,8 +292,11 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	tools, answers := slices.Clone(coreTools), slices.Clone(coreToolAnswers)
 	toolProviders := map[string]unit.ProviderID{}
 	draftKinds := map[unit.ProviderID]DraftKinds{}
+	languageFacts, membersFacts := map[unit.ProviderID]string{}, map[unit.ProviderID]string{}
 	var marks []Mark
 	var signals []string
+	situations, signalsOf := map[unit.ProviderID][]string{}, map[unit.ProviderID][]string{}
+	predicates := map[unit.ProviderID][]manifest.Predicate{}
 	for _, id := range ids {
 		src := all[id]
 		v := src.SourceVocabulary
@@ -297,6 +317,12 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		}
 		if len(v.DraftKinds) > 0 || v.DefaultDelivery != "" {
 			draftKinds[id] = DraftKinds{Kinds: slices.Clone(v.DraftKinds), Default: v.DefaultDelivery}
+		}
+		if v.LanguageFact != "" {
+			languageFacts[id] = v.LanguageFact
+		}
+		if v.MembersFact != "" {
+			membersFacts[id] = v.MembersFact
 		}
 		for _, m := range v.Marks {
 			marks = append(marks, Mark{Name: m.Name, Doc: m.Doc, Provider: string(id)})
@@ -351,7 +377,14 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				taskKinds = append(taskKinds, k)
 			}
 		}
+		if len(v.Predicates) > 0 {
+			predicates[id] = slices.Clone(v.Predicates)
+		}
+		for _, sit := range v.Situations {
+			situations[id] = append(situations[id], sit.Name)
+		}
 		for _, g := range v.Signals {
+			signalsOf[id] = append(signalsOf[id], g.Name)
 			if !slices.Contains(signals, g.Name) {
 				signals = append(signals, g.Name)
 				facts = append(facts, linkSignalFact(g))
@@ -373,7 +406,29 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, marks: marks, linkSignals: signals}
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, membersFacts: membersFacts, marks: marks, linkSignals: signals,
+		situations: situations, signalsOf: signalsOf, predicates: predicates}
+}
+
+// PluginPredicates are the predicates each merged plugin's profile layer sets in predicates.toml, by
+// provider.
+var PluginPredicates = map[unit.ProviderID][]manifest.Predicate{}
+
+// PredicateEnv is the env of plugin p's predicate name: the facts its manifest says p hands with the
+// question; false when p declares no such predicate.
+func PredicateEnv(p unit.ProviderID, name string) (expr.Env, bool) {
+	i := slices.IndexFunc(PluginPredicates[p], func(x manifest.Predicate) bool { return x.Name == name })
+	if i < 0 {
+		return nil, false
+	}
+	env := expr.Env{}
+	for _, f := range Facts {
+		if f.Provider == p && slices.Contains(f.Slots, WorkflowSlot) && slices.Contains(PluginPredicates[p][i].Facts, f.Name) {
+			put(env, f)
+		}
+	}
+	Narrow(env, []unit.ProviderID{p})
+	return env, true
 }
 
 // LinkSignals are the link signals the merged plugins declare, each read as
@@ -387,6 +442,12 @@ func linkSignalFact(g manifest.Named) Fact {
 	f.Untrusted = true
 	return f
 }
+
+// PluginSituations are the situations each merged plugin derives, by provider, in its manifest's order.
+var PluginSituations = map[unit.ProviderID][]string{}
+
+// PluginSignals are the link signals each merged plugin reports, by provider.
+var PluginSignals = map[unit.ProviderID][]string{}
 
 // PluginTaskKinds are the values of the task's kind property the merged
 // plugins' units give their tasks, which tasks.toml's kind takes besides
@@ -422,7 +483,7 @@ func effectRow(p unit.ProviderID, e manifest.Effect) Effect {
 			a |= AppliesDraft
 		}
 	}
-	return Effect{Name: e.Name, Provider: p, Applies: a, Doc: e.Doc, Plugin: true}
+	return Effect{Name: e.Name, Provider: p, Applies: a, Doc: e.Doc, Plugin: true, Silent: e.Silent}
 }
 
 func roleRow(p unit.ProviderID, r manifest.Role) Role {

@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http/httptest"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -27,6 +29,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -126,7 +129,7 @@ type outboxRig struct {
 
 // newOutboxRig serves the Outbox over the tasks rig: github publishes through fx, slack is a plugin with no
 // publisher, and off names the plugins that are disabled.
-func newOutboxRig(t *testing.T, off ...unit.ProviderID) *outboxRig {
+func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	t.Helper()
 	r := &outboxRig{fx: &fakeFx{}, clock: &moveClock{now: tasksNow}}
 	r.tasksRig = newTasksRig(t, func(d *Deps) {
@@ -210,10 +213,11 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 func (r *outboxRig) act(t *testing.T, id draft.ID, action, body string) (int, api.Draft, string) {
 	t.Helper()
 	var a struct {
-		Rev     *int64  `json:"rev"`
-		Text    *string `json:"text"`
-		Reason  string  `json:"reason"`
-		Confirm bool    `json:"confirm"`
+		Rev       *int64  `json:"rev"`
+		Text      *string `json:"text"`
+		Reason    string  `json:"reason"`
+		Confirm   bool    `json:"confirm"`
+		Broadcast *bool   `json:"broadcast"`
 	}
 	if err := json.Unmarshal([]byte(cmp.Or(body, "{}")), &a); err != nil {
 		t.Fatal(err)
@@ -230,6 +234,9 @@ func (r *outboxRig) act(t *testing.T, id draft.ID, action, body string) (int, ap
 	}
 	if a.Confirm {
 		args["confirm"] = "true"
+	}
+	if a.Broadcast != nil {
+		args["broadcast"] = strconv.FormatBool(*a.Broadcast)
 	}
 	req, _ := json.Marshal(api.TaskRequest{Args: args, Source: "cli"})
 	var path string
@@ -272,7 +279,7 @@ func TestDraftsListByState(t *testing.T) {
 	for _, d := range res.Drafts {
 		ids = append(ids, d.ID)
 		if d.State != "held" || d.Unit != "github/acme/api#7" || d.Gate == 0 || d.Deadline != nil || d.Intents["approved"] != "approve" ||
-			d.Intents["rejected"] != "discard" || len(d.Actions) != 2 {
+			d.Intents["rejected"] != "discard" || len(d.Actions) != 3 {
 			t.Errorf("draft %+v", d)
 		}
 	}
@@ -285,6 +292,22 @@ func TestDraftsListByState(t *testing.T) {
 	var one api.DraftsResponse
 	if code := get(t, r.s, api.Drafts+"?id="+strconv.FormatInt(int64(second.ID), 10), &one); code != 200 || len(one.Drafts) != 1 || one.Drafts[0].Text != "second\nmore" {
 		t.Fatalf("GET one: %d %+v", code, one)
+	}
+}
+
+func TestDraftsServeWhyAndLanguage(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Why: "w", Language: "pt",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})}); err != nil {
+		t.Fatal(err)
+	}
+	var res api.DraftsResponse
+	if code := get(t, r.s, api.Drafts, &res); code != 200 || len(res.Drafts) != 1 {
+		t.Fatalf("GET: %d %+v", code, res)
+	}
+	if d := res.Drafts[0]; d.Why != "w" || d.Language != "pt" {
+		t.Fatalf("why %q language %q", d.Why, d.Language)
 	}
 }
 
@@ -316,6 +339,40 @@ func TestApproveAnswers409WhenPluginDisabled(t *testing.T) {
 	}
 	if got, _ := r.o.Store.Get(context.Background(), d.ID); got.State != draft.Held {
 		t.Fatalf("state %s", got.State)
+	}
+}
+
+func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	d := r.propose(t, r7u, "hello", draft.Wait)
+	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true}`); code != 400 || !strings.Contains(body, "no thread") {
+		t.Fatalf("broadcast on a draft in no thread: %d %s", code, body)
+	}
+	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true}`); code != 400 {
+		t.Fatalf("text and a refused broadcast: %d %s", code, body)
+	}
+	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Text != "hello" {
+		t.Fatalf("a refused edit saved its text: %+v", stored)
+	}
+	d, _ = r.o.Store.Get(ctx, d.ID)
+	d.Broadcast = draft.BroadcastOn
+	if _, err := r.o.Store.Update(ctx, d, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	code, got, body := r.act(t, d.ID, "edit", `{"broadcast":false}`)
+	if code != 200 || got.Broadcast != "off" {
+		t.Fatalf("broadcast off: %d %s", code, body)
+	}
+	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOff || stored.Text != "hello" {
+		t.Fatalf("stored %+v", stored)
+	}
+	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"text":"hello there"}`); code != 200 {
+		t.Fatalf("text and broadcast: %d %s", code, body)
+	}
+	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOn || stored.Text != "hello there" {
+		t.Fatalf("stored %+v", stored)
 	}
 }
 
@@ -351,6 +408,45 @@ func TestDraftActionStatuses(t *testing.T) {
 	}
 	if code := get(t, r.s, api.Drafts+"?id=x", nil); code != 400 {
 		t.Fatalf("GET a bad id: %d", code)
+	}
+}
+
+func TestADroppedDraftCarriesItsReasonInWords(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := r.propose(t, r7u, "hello", draft.Wait)
+	if _, err := r.o.Withdraw(context.Background(), d.ID, draft.WithdrawOutside); err != nil {
+		t.Fatal(err)
+	}
+	var got api.Draft
+	if code := r.getDraft(t, d.ID, &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	if got.Reason != draft.WithdrawOutside || got.ReasonText != "it addressed someone who cannot read that conversation" {
+		t.Fatalf("reason %q in words %q", got.Reason, got.ReasonText)
+	}
+}
+
+func TestADraftInAPersonsOwnConversationSaysWhichConversationItQuotes(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	person := "github:octocat"
+	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Target: person,
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: r7u.String() + ":" + person}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := r.propose(t, r7u, "hello", draft.Wait)
+	var got api.Draft
+	if code := r.getDraft(t, quoting.ID, &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	if !strings.HasPrefix(got.Quoted, "Quotes an item of ") || !strings.Contains(got.Quoted, cmp.Or(got.Label, r7u.String())) {
+		t.Fatalf("quoted %q, want the catalog's words naming %q", got.Quoted, cmp.Or(got.Label, r7u.String()))
+	}
+	if code := r.getDraft(t, plain.ID, &got); code != 200 || got.Quoted != "" {
+		t.Fatalf("a draft on its own conversation says %q", got.Quoted)
 	}
 }
 
@@ -474,6 +570,25 @@ func TestSenderRecoversBeforePublishing(t *testing.T) {
 	}
 	if got, _ := r.o.Store.Get(context.Background(), stuck.ID); got.State != draft.Sent {
 		t.Fatalf("the recovered draft is %s", got.State)
+	}
+}
+
+// broadcastingFx places every draft as a thread reply that broadcasts.
+type broadcastingFx struct{ *fakeFx }
+
+func (broadcastingFx) Place(context.Context, draft.Draft) (draft.Placed, error) {
+	return draft.Placed{Broadcast: draft.BroadcastOn}, nil
+}
+
+func TestSenderPlacesTheBroadcastOfDraftsHeldBeforeBroadcastsAtStart(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	held := r.propose(t, r7u, "from before", draft.Wait)
+	r.o.Effects = func(unit.ProviderID) (port.Effects, error) { return broadcastingFx{r.fx}, nil }
+	clock := r.startSender(t)
+	clock.next(t)
+	if got, _ := r.o.Store.Get(context.Background(), held.ID); got.Broadcast != draft.BroadcastOn || got.State != draft.Held {
+		t.Fatalf("held draft %+v", got)
 	}
 }
 
@@ -656,7 +771,7 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 	if code := r.getDraft(t, d.ID, &got); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
-	if len(got.Actions) != 2 {
+	if len(got.Actions) != 3 {
 		t.Fatalf("actions %+v", got.Actions)
 	}
 	for _, st := range got.Actions {
@@ -841,6 +956,36 @@ type unitItems map[unit.Unit][]items.Item
 
 func (u unitItems) Items(_ context.Context, x unit.Unit) ([]items.Item, error) { return u[x], nil }
 
+// countedItems counts its item reads.
+type countedItems struct {
+	unitItems
+	n *atomic.Int32
+}
+
+func (c countedItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
+	c.n.Add(1)
+	return c.unitItems.Items(ctx, u)
+}
+
+func TestADraftWithNoItemsAndNoMentionReadsNoItems(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	n := &atomic.Int32{}
+	r.s.deps.Items = countedItems{unitItems{r7u: {{ID: "i1", Summary: "s", State: items.Open}}}, n}
+	r.propose(t, r7u, "no mention here", draft.Wait)
+	var gs []api.GateView
+	if code := get(t, r.s, api.GatesPath, &gs); code != 200 || len(gs) != 1 {
+		t.Fatalf("%d %+v", code, gs)
+	}
+	var res api.DraftsResponse
+	if code := get(t, r.s, api.Drafts, &res); code != 200 || len(res.Drafts) != 1 {
+		t.Fatalf("%d %+v", code, res)
+	}
+	if got := n.Load(); got != 0 {
+		t.Errorf("%d item reads, want none", got)
+	}
+}
+
 func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
@@ -870,6 +1015,93 @@ func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	var list api.DraftsResponse
 	if code := get(t, r.s, api.Drafts, &list); code != 200 || len(list.Drafts) != 1 || list.Drafts[0].Names["github:ana"] != "Ana Lima" {
 		t.Fatalf("list: %d %+v", code, list)
+	}
+}
+
+// mentioning is a held nudge on r7u mentioning Ana and Bruno, each waited on by an item of the unit.
+func mentioning(t *testing.T, r *outboxRig) draft.Draft {
+	t.Helper()
+	r.s.deps.Items = unitItems{r7u: {
+		{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UANA", Name: "Ana Lima"}}},
+		{ID: "i2", Summary: "Sign the deal", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UBRUNO", Name: "Bruno Melo"}}},
+	}}
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Nudge,
+		Text: "@{slack:UANA} @{slack:UBRUNO}, any news?", Origin: draft.Origin{Kind: draft.OriginUser}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+var bothNamed = map[string]string{"slack:UANA": "Ana Lima", "slack:UBRUNO": "Bruno Melo"}
+
+func TestADraftTasksGateNamesItsMentions(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := mentioning(t, r)
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10)), &v); code != 200 || len(v.Gates) != 1 {
+		t.Fatalf("%d %+v", code, v.Gates)
+	}
+	var sub api.Draft
+	if err := json.Unmarshal(v.Gates[0].Subject, &sub); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(sub.Names, bothNamed) || len(sub.ItemDetails) != 2 {
+		t.Errorf("names %v, items %+v", sub.Names, sub.ItemDetails)
+	}
+}
+
+func TestAGateViewOfADraftNamesItsMentions(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	mentioning(t, r)
+	var gs []api.GateView
+	if code := get(t, r.s, api.GatesPath, &gs); code != 200 || len(gs) != 1 {
+		t.Fatalf("%d %+v", code, gs)
+	}
+	var sub api.Draft
+	if err := json.Unmarshal(gs[0].Subject, &sub); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(sub.Names, bothNamed) {
+		t.Errorf("names %v", sub.Names)
+	}
+}
+
+func TestEveryMentionedPersonIsNamed(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := mentioning(t, r)
+	var one api.Draft
+	if code := r.getDraft(t, d.ID, &one); code != 200 || !maps.Equal(one.Names, bothNamed) {
+		t.Fatalf("%d names %v", code, one.Names)
+	}
+}
+
+func TestMentionNamesReadsEveryPersonOfTheItems(t *testing.T) {
+	t.Parallel()
+	its := []items.Item{{Requester: items.Person{Key: "slack:UREQ", Name: "Rita"},
+		Assignees: []items.Person{{Key: "slack:UASG", Name: "Caio", Aliases: []string{"github:caio"}}},
+		WaitingOn: []items.Person{{Key: "slack:UWAIT", Name: "Duda"}, {Key: "slack:UNONAME"}}}}
+	got := mentionNames("@{slack:UREQ} @{github:caio} @{slack:UWAIT} @{slack:UNONAME} @{slack:UNOBODY}", its)
+	if want := map[string]string{"slack:UREQ": "Rita", "github:caio": "Caio", "slack:UWAIT": "Duda"}; !maps.Equal(got, want) {
+		t.Errorf("mentionNames = %v, want %v", got, want)
+	}
+	if got := mentionNames("no mention", its); got != nil {
+		t.Errorf("no mention: %v, want nil", got)
+	}
+}
+
+func BenchmarkMentionNamesOfAThreadsItems(b *testing.B) {
+	its := make([]items.Item, 40)
+	for i := range its {
+		its[i] = items.Item{Requester: items.Person{Key: fmt.Sprintf("slack:UREQ%d", i), Name: "R"},
+			WaitingOn: []items.Person{{Key: fmt.Sprintf("slack:UW%d", i), Name: "W", Aliases: []string{fmt.Sprintf("github:w%d", i)}}}}
+	}
+	text := "@{slack:UW1} @{slack:UW2} @{github:w3}, any news on these?\n- one\n- two\n- three"
+	for b.Loop() {
+		mentionNames(text, its)
 	}
 }
 
@@ -1014,5 +1246,126 @@ func TestTheSenderSettlesDraftsAndHeldTasksAtStart(t *testing.T) {
 	}
 	if d, _ := r.o.Store.Get(ctx, taskless.ID); d.Task != string(g.Task) {
 		t.Errorf("the held draft of no task names %q, want its gate's task %s", d.Task, g.Task)
+	}
+}
+
+// silentRig is an outbox rig whose drafts apply unit.closed and task.nudged, recorded in applied.
+func silentRig(t *testing.T) (*outboxRig, *[]string) {
+	t.Helper()
+	r := newOutboxRig(t)
+	var applied []string
+	r.o.Silent = builtin.SilentEffect
+	r.o.Applier = outbox.EffectApplier{Store: r.db.DraftEffects(), Clock: r.clock, Effects: func(_ unit.ProviderID, name string) (outbox.Effect, bool) {
+		return func(context.Context, draft.Draft) error { applied = append(applied, name); return nil }, true
+	}}
+	return r, &applied
+}
+
+func (r *outboxRig) proposeWith(t *testing.T, effects ...string) draft.Draft {
+	t.Helper()
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "Closing this out", Effects: effects,
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "wf", Rule: "wf", Key: strings.Join(effects, ",")}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func (r *outboxRig) closeSilently(t *testing.T, d draft.Draft, session string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := apiRequest("POST", strings.Replace(api.DraftCloseSilently, "{id}", strconv.FormatInt(int64(d.ID), 10), 1),
+		strings.NewReader(fmt.Sprintf(`{"rev":%d}`, d.Rev)))
+	if session != "" {
+		req.Header.Set(api.SessionHeader, session)
+	}
+	rec := httptest.NewRecorder()
+	r.s.Handler().ServeHTTP(rec, req)
+	return rec
+}
+
+func TestCloseSilentlyAppliesTheEffectsWithoutPosting(t *testing.T) {
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	rec := r.closeSilently(t, d, "")
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var got api.Draft
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || got.State != "dropped" || got.Reason != draft.ReasonClosedSilently {
+		t.Fatalf("%s %v", rec.Body, err)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if !slices.Equal(*applied, []string{builtin.EffectUnitClosed}) || stored.EffectsAppliedAt.IsZero() || len(r.fx.calls) != 0 {
+		t.Fatalf("applied %v at %v, publisher calls %v", *applied, stored.EffectsAppliedAt, r.fx.calls)
+	}
+	if g, _, _ := r.o.GateOf(context.Background(), stored); g.Status != gate.Rejected {
+		t.Errorf("gate %s, want rejected", g.Status)
+	}
+}
+
+func TestCloseSilentlyRefusesADraftWhoseEffectsAreNotSilent(t *testing.T) {
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectTaskNudged)
+	rec := r.closeSilently(t, d, "")
+	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "effect_posts") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if g, _, _ := r.o.GateOf(context.Background(), stored); stored.State != draft.Held || g.Status != gate.Open || len(*applied) != 0 {
+		t.Fatalf("draft %s, gate %s, applied %v", stored.State, g.Status, *applied)
+	}
+}
+
+func TestCloseSilentlyNeedsAPersonsClient(t *testing.T) {
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	if rec := r.closeSilently(t, d, "term_agent1"); rec.Code != 403 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if stored.State != draft.Held || len(*applied) != 0 {
+		t.Fatalf("draft %s, applied %v", stored.State, *applied)
+	}
+}
+
+func TestCloseSilentlyRefusesAStaleRev(t *testing.T) {
+	t.Parallel()
+	r, applied := silentRig(t)
+	d := r.proposeWith(t, builtin.EffectUnitClosed)
+	d.Rev++
+	if rec := r.closeSilently(t, d, ""); rec.Code != 409 || len(*applied) != 0 {
+		t.Fatalf("%d %s, applied %v", rec.Code, rec.Body, *applied)
+	}
+}
+
+func TestADraftsActionsSayWhetherItsWorkflowIsSkipped(t *testing.T) {
+	t.Parallel()
+	r, _ := silentRig(t)
+	sk := memSkips{}
+	r.s.deps.Skips = sk
+	d := r.proposeWith(t, builtin.EffectTaskNudged)
+	state := func() api.ActionState {
+		t.Helper()
+		var one api.Draft
+		if code := r.getDraft(t, d.ID, &one); code != 200 {
+			t.Fatalf("GET %d", code)
+		}
+		for _, a := range one.Actions {
+			if a.ID == catalog.DraftSkipWorkflow {
+				return a
+			}
+		}
+		t.Fatal("no skip-workflow action")
+		return api.ActionState{}
+	}
+	if st := state(); !st.Enabled {
+		t.Fatalf("before the skip: %+v", st)
+	}
+	sk[r7u] = []string{"wf"}
+	if st := state(); st.Enabled {
+		t.Fatalf("after the skip: %+v", st)
 	}
 }

@@ -1,0 +1,324 @@
+[views.mine]
+label = "Meus PRs"
+unit = "Pull request"
+default_sort = "Esperando há mais tempo"
+
+[views.dash]
+label = "Backlog"
+default_sort = "Esperando há mais tempo"
+
+[views.all]
+label = "Todos"
+default_sort = "Esperando há mais tempo"
+
+[views.explore]
+label = "Explorar"
+
+[views.explore.search]
+no_decision = "review não exigida"
+
+[[views.explore.search.presets]]
+label = "Pedidos a mim"
+
+[[views.explore.search.presets]]
+label = "Pedidos aos meus times"
+
+[[views.explore.search.filters]]
+label = "Não revisados por mim"
+
+[[views.explore.search.filters]]
+label = "Prontos para review"
+
+[[views.explore.search.filters]]
+label = "Pedidos a mim ou aos meus times"
+
+[[views.explore.search.filters]]
+label = "Ativos nos últimos 30 dias"
+
+[[views.explore.search.sorts]]
+label = "Esperando há mais tempo"
+shown = "esperando há mais tempo"
+
+[[views.explore.search.sorts]]
+label = "Abertos há mais tempo"
+shown = "abertos há mais tempo"
+
+[[views.explore.search.sorts]]
+label = "Atualizados recentemente"
+shown = "atualizados mais recentemente"
+
+[views.explore.search.decisions]
+APPROVED = "aprovado"
+CHANGES_REQUESTED = "mudanças pedidas"
+REVIEW_REQUIRED = "review exigida"
+
+[facets.where]
+label = "Onde"
+
+[facets.author]
+label = "Autor"
+label_prefix = "por "
+
+[facets.author.values]
+me = "mim"
+
+[facets.wait]
+label = "Espera por (papel)"
+
+[facets.wait.values]
+author = "Esperando o autor"
+loop = "No loop"
+me = "Esperando por mim"
+nobody = "Esperando ninguém"
+reviewer = "Esperando um revisor"
+
+[facets.waits-on]
+label = "Espera por (pessoa)"
+
+[facets.waits-on.values]
+me = "mim"
+
+[facets.kind]
+label = "Situação"
+
+[facets.type]
+label = "Tipo"
+empty = "sem brief"
+
+[facets.risk]
+label = "Risco"
+empty = "sem brief"
+label_prefix = "risco "
+
+[facets.risk.values]
+high = "alto"
+medium = "médio"
+low = "baixo"
+
+[facets.size]
+label = "Tamanho"
+empty = "sem brief"
+
+[facets.size.values]
+l = "L"
+m = "M"
+s = "S"
+xl = "XL"
+xs = "XS"
+
+[facets.status]
+label = "Workspace"
+empty = "sem workspace"
+
+[facets.tag]
+label = "Tag"
+
+[facets.is]
+label = "Marcadores"
+
+[facets.is.values]
+adopted = "assumido"
+approved = "aprovado"
+due = "vencido"
+in-loop = "no loop"
+muted = "silenciado"
+needs-me = "precisa de mim"
+paused = "pausado"
+stalled = "parado"
+tracked = "acompanhado"
+
+[facets.ci]
+label = "Checks"
+empty = "sem dados de checks"
+
+[facets.opened]
+label = "Aberto"
+empty = "sem data de abertura"
+
+[facets.opened.values]
+1d = "0-1 dia"
+2w = "1-2 semanas"
+3d = "1-3 dias"
+4w = "2-4 semanas"
+7d = "3-7 dias"
+older = "mais de 4 semanas"
+
+[facets.opened.buckets]
+1d = "0-1 dia"
+3d = "1-3 dias"
+7d = "3-7 dias"
+2w = "1-2 semanas"
+4w = "2-4 semanas"
+older = "mais de 4 semanas"
+
+[facets.scope]
+label = "No escopo como"
+
+[facets.age]
+label = "Esperando há"
+show_label = "desde {{.at}}"
+
+[facets.age.buckets]
+1d = "0-1 dia"
+3d = "1-3 dias"
+7d = "3-7 dias"
+2w = "1-2 semanas"
+4w = "2-4 semanas"
+older = "mais de 4 semanas"
+
+[facets.lane]
+label = "Coluna do quadro"
+
+[facets.lane.values]
+author = "Esperando o autor"
+loop = "No loop"
+me = "Precisa de mim"
+merge = "Pode fazer merge"
+reviewer = "Esperando o revisor"
+
+[facets.due]
+label = "Prazo"
+
+[facets.due.buckets]
+later = "depois"
+due = "vence agora"
+past = "vencido"
+
+[situations]
+round_pending = "rodada em breve"
+loop_waiting = "agente pergunta"
+loop_stopped = "agente parou"
+blocked = "rodada bloqueada"
+to_address = "para address"
+held = "retida (limite)"
+loop_working = "agente trabalhando"
+changes = "mudanças pedidas"
+checks = "checks falhando"
+conflicts = "conflitos de merge"
+reply = "resposta pendente"
+reviewer_back = "revisor pendente"
+review = "review"
+no_reviewer = "sem revisor"
+merge = "pode fazer merge"
+draft = "draft"
+muted = "silenciado"
+done = "fechado"
+
+[reasons]
+merged = "mesclado"
+closed = "fechado"
+round_blocked = "rodada bloqueada: {{.why}}"
+round_held = "rodada automática retida: {{.why}}"
+to_address = "review a atender, sem workspace: {{.why}}"
+agent_asked = "o agente perguntou algo a você"
+round_in_progress = "rodada de review em andamento"
+draft = "rascunho"
+checks_failing = "checks falhando no head"
+checks_failing_named = "checks falhando: {{.checks}}"
+checks_failing_more = "checks falhando: {{.checks}} e mais {{.more}}"
+changes_requested = "mudanças pedidas por {{.actor}}"
+merge_conflicts = "conflitos de merge com {{.branch}}"
+approved_green = "aprovado e verde"
+approved_checks_pending = "aprovado, checks pendentes"
+review_requested = "review pedida, nenhuma review no head"
+review_requested_again = "review pedida de novo depois da sua"
+reviewer_not_back = "{{.author}} respondeu, {{.reviewer}} não voltou"
+commented_no_reply = "{{.actor}} comentou, sem resposta"
+no_reviewer_requested = "nenhum revisor pedido"
+no_review_required = "verde, sem review exigida"
+no_review_required_checks_pending = "sem review exigida, checks pendentes"
+
+[signals.situation]
+label = "situação"
+notes = { stalled = 'parado há {{.days}} {{plural .days "one" "dia útil" "other" "dias úteis"}}' }
+
+[signals.checks]
+label = "checks"
+values = { passing = "passando", pending = "pendentes", failing = "falhando", failing_named = "falhando: {{.names}}" }
+
+[signals.review]
+label = "revisão"
+values = { approved = "aprovada" }
+
+[signals.merge]
+label = "merge"
+values = { conflicts = "conflitos" }
+
+[events.opened]
+label = "aberto"
+
+[events.push]
+label = "push"
+
+[events.review_requested]
+label = "review pedida"
+
+[events.review_request_removed]
+label = "pedido de review removido"
+
+[events.review]
+label = "revisado"
+
+[events.comment]
+label = "comentado"
+
+[events.check]
+label = "checks"
+
+[events.ready]
+label = "pronto para review"
+
+[events.draft]
+label = "voltou a draft"
+
+[events.merged]
+label = "merge feito"
+
+[events.closed]
+label = "fechado"
+
+[events.round_pending]
+label = "rodada pendente"
+
+[events.round_sent]
+label = "rodada enviada"
+
+[events.round_skipped]
+label = "rodada pulada"
+
+[events.round_held]
+label = "rodada retida"
+
+[events.round_blocked]
+label = "rodada bloqueada"
+
+[events.round_unblocked]
+label = "rodada desbloqueada"
+
+[events.guidance]
+label = "orientação"
+
+[detail.profile_chain]
+label = "Perfil de review"
+title = "As camadas do perfil de review que uma rodada aqui lê, da mais baixa para a mais alta; o comando profile show lista os arquivos"
+
+[detail.next_guidance]
+label = "Orientação da próxima rodada"
+title = "Orientação esperando a próxima rodada: dada sem rodada pendente, ou guardada de uma rodada que não saiu ou cujo prompt não se viu chegar. A próxima rodada, inclusive Review ou Address, a usa a menos que você dê outra orientação"
+
+[menubar]
+loop = "No loop"
+
+[noun]
+one = "pull request"
+other = "pull requests"
+
+[decisions.last-step]
+clause = { one = "{counter} só espera o merge", other = "{counter} só esperam o merge" }
+queue = "Prontos para merge"
+empty = "Nada espera só o merge."
+
+[decisions.pick-someone]
+clause = { one = "{counter} espera um revisor", other = "{counter} esperam um revisor" }
+queue = "Escolher revisor"
+empty = "Nenhum pull request espera um revisor."

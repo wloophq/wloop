@@ -23,21 +23,55 @@ type files struct {
 	// plugin's layer.
 	shown   string
 	overlay []string
+	// rel is dir relative to the profile, such as workflows/answer-unread, which r localizes by.
+	rel string
+	r   layerReader
+	// layer is the layer of dir; layers are those of overlay, one each.
+	layer  profile.Layer
+	layers []profile.Layer
+}
+
+// top is the highest layer whose files f reads: its last overlay's, else its own.
+func (f files) top() profile.Layer {
+	if n := len(f.overlay); n > 0 && n <= len(f.layers) {
+		return f.layers[n-1]
+	}
+	return f.layer
+}
+
+// overlaid is f with dir, a directory of layer l, over its other files.
+func (f *files) overlaid(l profile.Layer, dir string) {
+	f.overlay = append(f.overlay, dir)
+	f.layers = append(f.layers, l)
 }
 
 // layerFiles are the files of dir, a slash path in l, a layer other than
 // the bundled one, and where they are as problems name them.
-func layerFiles(l profile.Layer, dir string) (files, string) {
+func layerFiles(l profile.Layer, dir string, r layerReader) (files, string) {
 	shown := l.FileName(dir)
 	if l.FS == nil {
-		return files{dir: shown}, shown
+		return files{dir: shown, rel: dir, r: r, layer: l}, shown
 	}
-	return files{bundled: l.FS, dir: dir, shown: shown}, shown
+	return files{bundled: l.FS, dir: dir, shown: shown, rel: dir, r: r, layer: l}, shown
 }
 
-// read falls through to the next layer only when name is absent; an
-// override that cannot be read is an error.
+// read is name with its texts in the reader's locale: a whole-file text resolved across the layers, any
+// other file as raw reads it.
 func (f files) read(name string) ([]byte, error) {
+	rel := path.Join(f.rel, name)
+	if res, ok, err := f.r.file(f.top(), rel); ok {
+		return res.Body, err
+	}
+	b, err := f.raw(name)
+	if err != nil {
+		return b, err
+	}
+	return f.r.localize(f.top(), rel, b), nil
+}
+
+// raw falls through to the next layer only when name is absent; an
+// override that cannot be read is an error.
+func (f files) raw(name string) ([]byte, error) {
 	for _, d := range slices.Backward(f.overlay) {
 		if b, err := os.ReadFile(filepath.Join(d, name)); !errors.Is(err, fs.ErrNotExist) {
 			return b, err

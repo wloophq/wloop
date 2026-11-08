@@ -1,0 +1,9 @@
+label = "Review"
+summary = "Começar ou continuar uma rodada de review no pull request de outra pessoa, num workspace dedicado"
+why = "{{.pr.review.reason}}"
+
+[guidance]
+help = "o que a rodada deve olhar"
+
+[action]
+warning = "{{if .row.question}}Começa uma rodada nova; a pergunta aberta do agente é substituída{{end}}"

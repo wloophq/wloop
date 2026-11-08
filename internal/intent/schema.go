@@ -46,3 +46,28 @@ var RecordsSchema []byte
 //
 //go:embed keys.schema.json
 var KeysSchema []byte
+
+// StringsSchema is the JSON Schema of strings.toml, for editors.
+//
+//go:embed strings.schema.json
+var StringsSchema []byte
+
+// TimelineSchema is the JSON Schema of timeline.toml, for editors.
+//
+//go:embed timeline.schema.json
+var TimelineSchema []byte
+
+// DecisionsSchema is the JSON Schema of decisions.toml, for editors.
+//
+//go:embed decisions.schema.json
+var DecisionsSchema []byte
+
+// HomeSchema is the JSON Schema of home.toml, for editors.
+//
+//go:embed home.schema.json
+var HomeSchema []byte
+
+// OmniboxSchema is the JSON Schema of omnibox.toml, for editors.
+//
+//go:embed omnibox.schema.json
+var OmniboxSchema []byte

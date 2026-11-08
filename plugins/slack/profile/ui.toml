@@ -32,6 +32,19 @@ show = "kind"
 label = "Waiting for"
 buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2 weeks", "4w" = "2-4 weeks", older = "over 4 weeks" }
 show = "age"
+show_label = "since {{.at}}"
+
+# How each line of a conversation's card shows, by the signal's key; {{.name}} is a value the plugin fills.
+[signals.items]
+label = "items"
+values = { none = "none open", open = '{{.n}} open {{plural .n "one" "item" "other" "items"}}' }
+
+[signals.replies]
+label = "replies"
+values = { count = "{{.n}}" }
+
+[signals.last_activity]
+label = "last activity"
 
 [situations]
 waits_on_viewer = "waits on you"
@@ -40,3 +53,17 @@ new = "new"
 waits_on_others = "waits on others"
 fyi = "for your information"
 resolved = "resolved"
+
+[noun]
+one = "thread"
+other = "threads"
+
+[decisions.answer]
+clause = { one = "{counter} waits on your reply", other = "{counter} wait on your reply" }
+queue = "Threads to answer"
+empty = "No thread waits on your reply."
+
+[decisions.last-step]
+clause = { one = "{counter} needs closing", other = "{counter} need closing" }
+queue = "Threads to close"
+empty = "No thread needs closing."

@@ -26,7 +26,7 @@ func userWorkflowProblems(t *testing.T, name, manifest string) string {
 	t.Helper()
 	root := t.TempDir()
 	writeWorkflow(t, root, name, manifest)
-	_, broken, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t), bundledGates(t))
+	_, broken, _, problems, _ := loadWorkflows(userLayer(root), readerOf(bundledDefault(t)), nil, nil, bundledTasks(t), bundledGates(t))
 	out := problems.Error()
 	for _, ps := range broken {
 		out += "\n" + ps.Error()
@@ -75,7 +75,7 @@ func TestAnEntryResultsEndedOverrideNamesTaskResultsEnded(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeWorkflow(t, root, "entry-results-ended", string(b))
-	loaded, _, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t), bundledGates(t))
+	loaded, _, _, problems, _ := loadWorkflows(userLayer(root), readerOf(bundledDefault(t)), nil, nil, bundledTasks(t), bundledGates(t))
 	if !strings.Contains(problems.Error(), `entry-results-ended was renamed; did you mean "task-results-ended"?`) {
 		t.Fatal(problems.Error())
 	}
@@ -105,7 +105,7 @@ func TestAUserGtdTomlNamesItsNewFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "gtd.toml"), []byte("[views.next]\nlabel = \"Now\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	texts, _, problems := loadViews(userLayer(root), bundledDefault(t), nil)
+	texts, _, problems := loadViews(userLayer(root), readerOf(bundledDefault(t)), nil)
 	got := problems.Error()
 	if !strings.Contains(got, filepath.Join(root, "gtd.toml")) || !strings.Contains(got, "tasks.toml") || !strings.Contains(got, "views.toml") {
 		t.Fatal(got)

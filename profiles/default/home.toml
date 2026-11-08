@@ -1,0 +1,62 @@
+# The cockpit's home: a briefing of counters, each a clause of a sentence,
+# then the first rows of a few views, then the capture field. A counter
+# counts a decision kind, worded by decisions.toml and the plugins' ui.toml,
+# or a view, worded here; one with nothing to count says nothing. A user
+# profile's home.toml replaces the keys it sets, and a list of counters or
+# sections the whole list.
+
+template     = "default"
+join         = ", "
+last_join    = " and "
+end          = "."
+count        = "{n} {noun}"
+per_sentence = 3
+empty        = "Nothing waits on you. The loop handles the rest."
+
+[[counters]]
+kind = "answer"
+
+[[counters]]
+kind = "last-step"
+
+[[counters]]
+kind = "send-draft"
+
+[[counters]]
+kind = "approve-plan"
+
+[[counters]]
+kind = "review-step"
+
+[[counters]]
+kind = "pick-someone"
+
+[[counters]]
+kind = "act"
+
+[[counters]]
+id     = "loop"
+view   = "in-loop"
+noun   = { one = "task", other = "tasks" }
+clause = { other = "the loop handles {counter}" }
+
+[[counters]]
+id     = "others"
+view   = "waiting"
+noun   = { one = "task", other = "tasks" }
+clause = { one = "{counter} is with other people", other = "{counter} are with other people" }
+
+[[sections]]
+id    = "blocked"
+view  = "home-blocked"
+limit = 3
+time  = "owed"
+
+[[sections]]
+id    = "stalled"
+view  = "home-stalled"
+limit = 3
+time  = "moved"
+
+[capture]
+hint = "Capture what's on your mind"

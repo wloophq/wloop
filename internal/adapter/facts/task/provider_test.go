@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/card"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -61,6 +62,8 @@ type env struct {
 	repos map[unit.Unit]string
 	open  map[unit.Unit][]turn.Turn
 	links map[unit.Unit]facttask.Link
+	// decisions maps gates, situations and signals to decision kinds.
+	decisions decision.Map
 	// unextracted are when each unit's oldest message not yet extracted arrived.
 	unextracted map[unit.Unit]time.Time
 	// reads counts the store reads by what they read.
@@ -147,6 +150,9 @@ func newEnv(t *testing.T) *env {
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() facttask.Settings { return e.s },
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
+		UnitKind: func(p unit.ProviderID) string {
+			return map[unit.ProviderID]string{"chat": "thread", "doc": "document"}[p]
+		},
 		Turns: func(_ context.Context, us []unit.Unit) (map[unit.Unit]int, error) {
 			e.reads["turns"]++
 			out := map[unit.Unit]int{}
@@ -172,6 +178,7 @@ func newEnv(t *testing.T) *env {
 		Links: func(_ context.Context, u unit.Unit) (facttask.Link, error) {
 			return e.links[u], nil
 		},
+		Decisions: func() decision.Map { return e.decisions },
 		Extraction: func(_ context.Context, us []unit.Unit) (time.Time, error) {
 			var oldest time.Time
 			for _, u := range us {
@@ -584,6 +591,46 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e.ended[chatB] = true
 	if f := e.facts("t-02"); f["task.link_ended"] != true {
 		t.Error("a task whose every unit ended has not")
+	}
+}
+
+func TestTaskOpenUnitKindsAreTheKindsOfItsUnitsNotEnded(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "t-02", State: "next", Category: task.CategoryReady, Title: "three", Units: []unit.Unit{docY, chatA, chatB}})
+	if got := e.facts("t-01")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{}) {
+		t.Errorf("a task with no unit: %v", got)
+	}
+	e.ended[chatA] = true
+	if got := e.facts("t-02")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{"document", "thread"}) {
+		t.Errorf("one thread ended, another open: %v, want each kind with a unit open once, in order", got)
+	}
+	e.ended[chatB], e.ended[docY] = true, true
+	if got := e.facts("t-02")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{}) {
+		t.Errorf("every unit ended: %v", got)
+	}
+}
+
+func TestTaskOpenUnitKindsIsLeftOutWhenNothingSaysWhetherAUnitEnded(t *testing.T) {
+	t.Parallel()
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "s.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	p := facttask.New(facttask.Deps{Tasks: db.Tasks(), Items: db.Items(), Clock: &clock{now: monday},
+		UnitKind: func(unit.ProviderID) string { return "thread" }})
+	if err := db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-01", State: "next",
+		Category: task.CategoryReady, Title: "one", Units: []unit.Unit{chatA}, Created: monday, Updated: monday}}}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := p.Facts(context.Background(), task.UnitOf("t-01"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := f["task.open_unit_kinds"]; ok {
+		t.Errorf("open_unit_kinds %v with no Ended wired, want it left out so no withdraw reads every unit as ended", got)
 	}
 }
 

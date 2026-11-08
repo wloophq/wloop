@@ -79,3 +79,19 @@ func TestASurvivorReadsTheFactsItNames(t *testing.T) {
 		t.Fatalf("survives t-2 = %v, %v; want false", holds, err)
 	}
 }
+
+// BenchmarkLensEval places a task in each bundled view, its facts already read, as a pass does for every task.
+func BenchmarkLensEval(b *testing.B) {
+	l := bundled(b)
+	facts := workflow.Facts{}
+	lens := Lens{Loaded: func() *intentload.Loaded { return l }, Now: func() time.Time { return time.Time{} },
+		Facts: func(context.Context, task.Task) (workflow.Facts, error) { return facts, nil }}
+	ctx, e := context.Background(), task.Task{ID: "t-1", State: "next", Category: task.CategoryReady}
+	for range b.N {
+		for _, v := range l.Views.Views {
+			if v.Over == task.OverTasks {
+				_, _ = lens.Eval(ctx, v.ID, e)
+			}
+		}
+	}
+}

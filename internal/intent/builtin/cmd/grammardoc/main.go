@@ -172,8 +172,18 @@ func hasKeys(k builtin.Key) bool {
 	return false
 }
 
-// kind is what a row's value is, with its values.
+// kind is what a row's value is, with its values, and whether a locale translates it.
 func kind(k builtin.Key) string {
+	if k.Retired {
+		return "retired, not read"
+	}
+	if k.Localized {
+		return kindOf(k) + ", localized"
+	}
+	return kindOf(k)
+}
+
+func kindOf(k builtin.Key) string {
 	vs := values(k)
 	quoted := make([]string, len(vs))
 	for i, v := range vs {
@@ -267,6 +277,12 @@ var sections = []struct {
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
+	{builtin.SurfacePreds, "A plugin's predicates (`predicates.toml`)"},
+	{builtin.SurfaceStrings, "Client strings (`strings.toml`)"},
+	{builtin.SurfaceTimeline, "The core's event kinds (`timeline.toml`)"},
+	{builtin.SurfaceDecisions, "Decision kinds (`decisions.toml`)"},
+	{builtin.SurfaceHome, "The cockpit's home (`home.toml`)"},
+	{builtin.SurfaceOmnibox, "The omnibox (`omnibox.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
@@ -438,6 +454,11 @@ var schemas = []struct {
 	{"records.schema.json", "Record kinds (records.toml)", builtin.SurfaceRecords},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
 	{"ui.schema.json", "A plugin's views, facets and situations (ui.toml)", builtin.SurfaceUI},
+	{"strings.schema.json", "Client strings (strings.toml)", builtin.SurfaceStrings},
+	{"timeline.schema.json", "The core's event kinds (timeline.toml)", builtin.SurfaceTimeline},
+	{"decisions.schema.json", "Decision kinds (decisions.toml)", builtin.SurfaceDecisions},
+	{"home.schema.json", "The cockpit's home (home.toml)", builtin.SurfaceHome},
+	{"omnibox.schema.json", "The omnibox (omnibox.toml)", builtin.SurfaceOmnibox},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 
@@ -552,6 +573,9 @@ func schemaOfNode(n *node) map[string]any {
 	}
 	if n.row != nil {
 		s["description"] = n.row.Doc
+		if n.row.Retired {
+			s["deprecated"] = true
+		}
 		if d, ok := typedDefault(*n.row); ok {
 			s["default"] = d
 		}

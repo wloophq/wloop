@@ -9,10 +9,10 @@ import (
 )
 
 func TestDraftsRepeatAfterDefaultsAndParsing(t *testing.T) {
-	if d := Defaults(); time.Duration(d.Drafts.RepeatAfter) != 24*time.Hour {
+	if d := Defaults(); time.Duration(d.Drafts.RepeatAfter) != 7*24*time.Hour {
 		t.Fatalf("default %v", time.Duration(d.Drafts.RepeatAfter))
 	}
-	if c := loadRaw(t, `turns = {per_day = 3}`); time.Duration(c.Drafts.RepeatAfter) != 24*time.Hour {
+	if c := loadRaw(t, `turns = {per_day = 3}`); time.Duration(c.Drafts.RepeatAfter) != 7*24*time.Hour {
 		t.Fatalf("drafts.repeat_after left out lost its default: %v", time.Duration(c.Drafts.RepeatAfter))
 	}
 	if c := loadRaw(t, `drafts = {repeat_after = "2d"}`); time.Duration(c.Drafts.RepeatAfter) != 48*time.Hour {

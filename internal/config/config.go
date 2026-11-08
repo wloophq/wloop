@@ -61,11 +61,20 @@ type Config struct {
 	Tasks     Tasks           `json:"tasks"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
+	Window        Window        `json:"window"`
 	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
 	Headless      Headless      `json:"headless"`
 	Turns         Turns         `json:"turns"`
+	UI            UI            `json:"ui"`
+}
+
+// UI holds the interface's settings.
+type UI struct {
+	// Locale is the interface language, a BCP 47 tag such as pt-BR; "" follows the system's preferred
+	// languages.
+	Locale string `json:"locale"`
 }
 
 // Turns caps the automated turns. PerUnitPerDay stops a runaway loop on one
@@ -168,6 +177,14 @@ type Tasks struct {
 // Notifications: DigestAt is the local "HH:MM" of the daily digest, "" for none.
 type Notifications struct {
 	DigestAt string `json:"digest_at"`
+}
+
+// Window: Enabled shows the cockpit in the app's own window on macOS instead
+// of the browser; Hotkey is the global shortcut that opens the omnibox panel,
+// "" for none.
+type Window struct {
+	Enabled bool   `json:"enabled"`
+	Hotkey  string `json:"hotkey"`
 }
 
 // SinkConfig is one view sink's own settings.
@@ -273,6 +290,10 @@ type Cleanup struct {
 	WorkspaceGrace Days `json:"workspace_grace"` // counted in working time
 	ManualIdle     Days `json:"manual_idle"`
 	StaleWorkspace Days `json:"stale_workspace"`
+	// OrphanHold is how long the close of a dormant session waits on its
+	// process lingering orphaned, the app attached throughout, before it
+	// closes the record anyway; it ends no process.
+	OrphanHold Days `json:"orphan_hold"`
 	// Disposable names ignored files and directories a tool recreates, so
 	// removing a workspace that holds them loses nothing.
 	Disposable []string `json:"disposable"`
@@ -437,6 +458,7 @@ func Defaults() Config {
 			WorkspaceGrace: Days(24 * time.Hour),
 			ManualIdle:     Days(24 * time.Hour),
 			StaleWorkspace: Days(14 * 24 * time.Hour),
+			OrphanHold:     Days(24 * time.Hour),
 			Disposable: []string{
 				"node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
 				"dist", "build", "target", "bin", ".terraform", ".next", "coverage", ".gradle", "_build", ".docusaurus",
@@ -446,9 +468,10 @@ func Defaults() Config {
 		Classify:      Classify{PerDay: 50},
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
+		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
+		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour)},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
 	}
@@ -650,6 +673,7 @@ func (c Config) validateWorkflows() error {
 		{"cleanup.workspace_grace", c.Cleanup.WorkspaceGrace},
 		{"cleanup.manual_idle", c.Cleanup.ManualIdle},
 		{"cleanup.stale_workspace", c.Cleanup.StaleWorkspace},
+		{"cleanup.orphan_hold", c.Cleanup.OrphanHold},
 	}
 	for _, d := range durations {
 		if d.v <= 0 {

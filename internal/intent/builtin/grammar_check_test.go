@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -188,6 +189,19 @@ func TestRequireAndRequiresNameEachOther(t *testing.T) {
 		ps := Check(SurfaceIntent, c.doc)
 		if len(ps) != 1 || !strings.Contains(ps[0].Msg, c.want) {
 			t.Errorf("%v: %+v", c.doc, ps)
+		}
+	}
+}
+
+func TestARetiredRowWordLoadsAndIsNoRowWord(t *testing.T) {
+	for _, w := range RetiredRowWords {
+		if slices.ContainsFunc(RowWords, func(r RowWord) bool { return r.Key == w.Key }) {
+			t.Errorf("%s is retired and a row word", w.Key)
+		}
+		for _, s := range []Surface{SurfaceViews, SurfaceUI} {
+			if ps := Check(s, map[string]any{"lens": map[string]any{w.Key: "x"}}); len(ps) > 0 {
+				t.Errorf("%s lens.%s: %v", s, w.Key, ps)
+			}
 		}
 	}
 }

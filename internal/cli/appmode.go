@@ -7,12 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/client/window"
 )
 
 var errNotMacOS = errors.New("the menu bar needs macOS")
@@ -41,9 +43,13 @@ func runAppClient(ctx context.Context, e *Env) error {
 		return errRebuilt
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	var wg sync.WaitGroup
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
 	upgraded := watchBinary(ctx, e.bundleSource())
-	go func() {
+	wg.Go(func() {
 		select {
 		case <-upgraded:
 			// Exits for the LaunchAgent to start a fresh process: AppKit's
@@ -53,21 +59,24 @@ func runAppClient(ctx context.Context, e *Env) error {
 			e.Exit(exitRebuilt)
 		case <-ctx.Done():
 		}
-	}()
-	digestAt := ""
+	})
+	digestAt, win := "", Defaults().Window
 	if cfg, err := e.loadConfig(); err != nil {
 		logf("reading the config: %v; the daily digest is off", err)
 	} else {
-		digestAt = cfg.Notifications.DigestAt
+		digestAt, win = cfg.Notifications.DigestAt, cfg.Window
 	}
-	e.RunNative(func(tray menubar.Tray, notes menubar.Notifier) {
+	e.RunNative(win, appWords(ctx, client.New(e.Socket)), func(tray menubar.Tray, notes menubar.Notifier, host window.Host) {
 		dc := client.New(e.Socket)
+		cockpit := func(route string) (string, error) { return cockpitURL(e.StateDir, route) }
 		c := menubar.New(menubar.Config{
 			Daemon:     dc,
 			Tray:       tray,
 			Notifier:   notes,
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
-			CockpitURL: func(route string) (string, error) { return cockpitURL(e.StateDir, route) },
+			CockpitURL: cockpit,
+			Window:     windowShow(ctx, &wg, host, dc, cockpit, win, logf),
+			Reword:     rewordOf(host),
 			Quit:       cancel,
 			Copy:       copyToClipboard,
 			Now:        e.Now,
@@ -75,13 +84,13 @@ func runAppClient(ctx context.Context, e *Env) error {
 			SentPath:   filepath.Join(e.StateDir, "notified.json"),
 			DigestAt:   digestAt,
 		})
-		go func() {
+		wg.Go(func() {
 			<-ctx.Done()
 			e.QuitNative()
-		}()
-		go func() {
+		})
+		wg.Go(func() {
 			_ = bootMenubar(ctx, dc.Ping, func(ctx context.Context) error { return waitForDaemon(ctx, dc) }, c)
-		}()
+		})
 	})
 	return nil
 }

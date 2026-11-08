@@ -342,8 +342,19 @@ func (e *Env) wake(ctx context.Context, cfg config.Config, m workspace.Manager, 
 
 // wakeSession gives the dormant session sess of u in ws a live process again
 // through its manager m; woke is false when the wake failed and a new
-// session should start instead.
+// session should start instead, and when a process of sess still runs, or
+// the census cannot tell, so that two never resume one agent session.
 func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Manager, w workspace.Waker, ws wsdomain.Workspace, u unit.Unit, opts roundOptions, sess dturn.Session) (proc, bool, error) {
+	if e.Turns != nil {
+		lingers, err := e.Turns.ProcessLingers(ctx, sess.ID)
+		if err != nil {
+			return proc{}, false, err
+		}
+		if lingers {
+			fmt.Fprintf(e.Err, "%s the session %s still has a process, out of view or orphaned, starting a new one\n", e.stamp(), sess.ID)
+			return proc{}, false, nil
+		}
+	}
 	opts.unit = u
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {

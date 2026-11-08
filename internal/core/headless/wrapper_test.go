@@ -58,6 +58,16 @@ func TestTheHeadlessWrapperComesFromTheProfile(t *testing.T) {
 	}
 }
 
+func TestMarkersCarryAFreshCode(t *testing.T) {
+	begin, end, nonce := headless.Markers("USER TEXT")
+	if len(nonce) != 12 || begin != "<<<USER TEXT "+nonce+">>>" || end != "<<<END OF USER TEXT "+nonce+">>>" {
+		t.Fatalf("%q %q %q", begin, end, nonce)
+	}
+	if _, _, again := headless.Markers("USER TEXT"); again == nonce {
+		t.Fatalf("two calls share the code %s", nonce)
+	}
+}
+
 func TestAWrapperWithoutBeforeOrAfterIsRefused(t *testing.T) {
 	for _, src := range []string{`{{define "before"}}x{{end}}`, `{{define "after"}}x{{end}}`, `{{define "before"}}{{if}}{{end}}`} {
 		if _, err := headless.ParseWrapper(src); err == nil {

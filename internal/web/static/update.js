@@ -32,7 +32,7 @@ function reloadBlocked(doc) {
     texts.push(detailState.answer, detailState.guidance, detailState.compose.text, detailState.compose.reaction);
     if (detailState.editing.size) return true;
   }
-  return texts.some((t) => String(t || "").trim() !== "");
+  return texts.some((text) => String(text || "").trim() !== "");
 }
 
 const RELOADED_KEY = "reloaded-for";
@@ -45,18 +45,29 @@ function reloadedFor() {
   }
 }
 
+function reloadForBuild(served) {
+  try {
+    sessionStorage.setItem(RELOADED_KEY, served);
+  } catch {
+    // Without the session storage a second mismatch reloads again.
+  }
+  location.reload();
+}
+
+// checkPanelBuild reloads the floating panel once health names a build other than the page's; the panel holds
+// nothing a reload would lose once it shows again.
+function checkPanelBuild(health) {
+  const served = (health && health.build) || "";
+  if (buildAction(pageBuild(document), served, false, reloadedFor()) === "reload") reloadForBuild(served);
+}
+
 // checkBuild reloads the page, or offers to, once health names a build
 // other than the page's.
 function checkBuild(health) {
   const served = (health && health.build) || "";
   const action = buildAction(pageBuild(document), served, reloadBlocked(document), reloadedFor());
   if (action === "reload") {
-    try {
-      sessionStorage.setItem(RELOADED_KEY, served);
-    } catch {
-      // Without the session storage a second mismatch reloads again.
-    }
-    location.reload();
+    reloadForBuild(served);
     return;
   }
   const box = document.getElementById("update");

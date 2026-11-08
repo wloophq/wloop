@@ -69,6 +69,26 @@ func ShapeOf(k Kind) (purpose string, d Delivery) {
 	return string(k), Message
 }
 
+// Broadcast says whether a thread reply is also posted to its conversation.
+// It is NoBroadcast when the draft replies in no thread, as its publisher
+// places it when it is proposed.
+type Broadcast string
+
+const (
+	NoBroadcast  Broadcast = ""
+	BroadcastOff Broadcast = "off"
+	BroadcastOn  Broadcast = "on"
+)
+
+func (b Broadcast) Valid() bool { return b == NoBroadcast || b == BroadcastOff || b == BroadcastOn }
+
+// Placed is where its publisher puts a draft when it is proposed: the target
+// a draft with none posts to, "" for its unit, and its Broadcast.
+type Placed struct {
+	Target    string
+	Broadcast Broadcast
+}
+
 // KindOf is the kind readers of Kind see for a purpose and a delivery.
 func KindOf(purpose string, d Delivery) Kind {
 	switch d {
@@ -139,31 +159,45 @@ type Evidence struct {
 }
 
 type Draft struct {
-	ID       ID
-	Unit     unit.Unit
-	Items    []string // item ids of Unit; may be empty
-	Task     string   // the task it serves, "" none; the Outbox row of the draft itself is "draft:<ID>"
-	Kind     Kind
-	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
-	Delivery Delivery // how it is posted
-	Effects  []string // applied when it is sent, such as "task.nudged"
-	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
-	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
-	Reaction string   // Kind "react" only: emoji name without colons
-	Replaced string   // Kind "edit" only: the text the edit replaced
-	Original string   // Text as proposed
-	Edited   bool     // Text != Original
-	Origin   Origin
-	State    State
-	Evidence Evidence // State "sent" only
-	Error    string   // State "failed" only, never a token
-	Reason   string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
-	Rev      int64    // the stored row's version; every Update bumps it
+	ID        ID
+	Unit      unit.Unit
+	Items     []string // item ids of Unit; may be empty
+	Task      string   // the task it serves, "" none; the Outbox row of the draft itself is "draft:<ID>"
+	Kind      Kind
+	Purpose   string    // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
+	Delivery  Delivery  // how it is posted
+	Effects   []string  // applied when it is sent, such as "task.nudged"
+	Target    string    // plugin target grammar; "" means the unit itself (its thread, its PR)
+	Broadcast Broadcast // a thread reply also posted to its conversation; NoBroadcast when it replies in no thread
+	Text      string    // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
+	Reaction  string    // Kind "react" only: emoji name without colons
+	Replaced  string    // Kind "edit" only: the text the edit replaced
+	Original  string    // Text as proposed
+	Edited    bool      // Text != Original
+	Origin    Origin
+	State     State
+	Evidence  Evidence // State "sent" only
+	Error     string   // State "failed" only, never a token
+	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	Rev       int64    // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
+	// Why is why it was proposed, in the user's language when it was;
+	// Language is the locale Text is written in. Both "" for a draft no
+	// workflow step wrote.
+	Why, Language string
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
+}
+
+// ReasonClosedSilently is the Reason of a draft the user discarded and closed without its message: its
+// effects apply as if it was sent.
+const ReasonClosedSilently = "closed_silently"
+
+// EffectsDue says whether d's effects are owed: it was sent, or closed without its message.
+func (d Draft) EffectsDue() bool {
+	return d.State == Sent || d.State == Dropped && d.Reason == ReasonClosedSilently
 }
 
 // ErrTransition is wrapped by Can.
@@ -187,13 +221,23 @@ var transitions = map[State][]State{
 }
 
 // The reasons a draft is withdrawn, as Reason of the discarded draft: a
-// workflow's, its person was assigned the items or it is moot; or a verb
-// ended the task the draft served.
+// workflow's, its person was assigned the items or it is moot; a verb
+// ended the task the draft served; the user skipped its workflow on its
+// unit; or one draft to the whole conversation replaced it. Outside: it addresses someone who cannot read
+// the conversation it posts in. Joined: the person it was written to in their own conversation joined the
+// one it came from.
 const (
-	WithdrawAssigned = "assigned"
-	WithdrawMoot     = "moot"
-	WithdrawEnded    = "ended"
+	WithdrawAssigned   = "assigned"
+	WithdrawMoot       = "moot"
+	WithdrawOutside    = "outside"
+	WithdrawJoined     = "joined"
+	WithdrawEnded      = "ended"
+	WithdrawSkipped    = "skipped"
+	WithdrawSuperseded = "superseded"
 )
+
+// WithdrawReasons are every reason a draft is withdrawn with.
+var WithdrawReasons = []string{WithdrawAssigned, WithdrawMoot, WithdrawOutside, WithdrawJoined, WithdrawEnded, WithdrawSkipped, WithdrawSuperseded}
 
 type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"
 

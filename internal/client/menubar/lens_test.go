@@ -12,7 +12,22 @@ import (
 
 // lensViews are a profile's views the menu bar knows nothing of beforehand: two badged, one not.
 func lensViews() []api.TaskViewSpec {
-	return []api.TaskViewSpec{{ID: "stalled", Label: "Stalled"}, {ID: "mine", Label: "Mine", Badge: true}, {ID: "asks", Label: "Asks", Badge: true}}
+	return []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Rail: true}, {ID: "mine", Label: "Mine", Badge: true, Rail: true}, {ID: "asks", Label: "Asks", Badge: true, Rail: true}}
+}
+
+func TestMenubarLeavesOutViewsOffTheRail(t *testing.T) {
+	r := newRig(t)
+	r.d.views = append(lensViews(), api.TaskViewSpec{ID: "home-blocked", Label: "Blocked by you", Badge: true})
+	r.d.tasks["home-blocked"] = []api.TaskView{plainTask(5)}
+	r.c.Refresh(context.Background())
+	if got := titles(r.tray.menu); index(got, "Blocked by you (1)") >= 0 {
+		t.Fatalf("menu %q lists a view off the rail", got)
+	}
+	r.d.mu.Lock()
+	defer r.d.mu.Unlock()
+	if _, read := r.d.taskSinces["home-blocked"]; read {
+		t.Fatal("the menu bar read a view off the rail")
+	}
 }
 
 func TestMenubarSectionsComeFromTheProfile(t *testing.T) {
@@ -45,7 +60,7 @@ func TestMenubarSectionsComeFromTheProfile(t *testing.T) {
 	if index(got, "Loading acme: importing the threads") != 0 {
 		t.Fatalf("menu %q, want the loading plugin first", got)
 	}
-	if it, ok := find(r.tray.menu, "acme/api#9 · "); !ok || !strings.HasSuffix(it.Title, staleMark) {
+	if it, ok := find(r.tray.menu, "acme/api#9 · "); !ok || !strings.HasSuffix(it.Title, "(stale)") {
 		t.Fatalf("a stale row is not marked: %q", got)
 	}
 }
@@ -59,7 +74,7 @@ func TestBadgeTitleCountsBadgeViews(t *testing.T) {
 		t.Fatalf("title %q, want the count of the badge views", got)
 	}
 	r.d.mu.Lock()
-	r.d.views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Badge: true}}
+	r.d.views = []api.TaskViewSpec{{ID: "stalled", Label: "Stalled", Badge: true, Rail: true}}
 	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 9}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())

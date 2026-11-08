@@ -1,0 +1,59 @@
+{
+  "$id": "https://github.com/wloophq/wloop/strings.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "formats": {
+      "additionalProperties": {
+        "description": "One format.",
+        "type": "string"
+      },
+      "description": "How the Go clients write dates and numbers: Go time layouts (`time`, `date`, `datetime`) and number separators (`decimal`, `group`).",
+      "type": "object"
+    },
+    "strings": {
+      "additionalProperties": {
+        "description": "A text: a string, or a table of its CLDR plural forms (`zero`, `one`, `two`, `few`, `many`, `other`), `other` required.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "few": {
+                "description": "The text's few form.",
+                "type": "string"
+              },
+              "many": {
+                "description": "The text's many form.",
+                "type": "string"
+              },
+              "one": {
+                "description": "The text's one form.",
+                "type": "string"
+              },
+              "other": {
+                "description": "The text's other form.",
+                "type": "string"
+              },
+              "two": {
+                "description": "The text's two form.",
+                "type": "string"
+              },
+              "zero": {
+                "description": "The text's zero form.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "description": "The texts the clients show, by their English text, with `{name}` placeholders.",
+      "type": "object"
+    }
+  },
+  "title": "Client strings (strings.toml)",
+  "type": "object"
+}

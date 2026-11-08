@@ -21,6 +21,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/i18n"
+	intentload "github.com/wloophq/wloop/internal/intent"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -1022,11 +1024,11 @@ func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	stale := false
-	s.deps.ConfigWarning = func() string {
+	s.deps.ConfigWarning = func() config.Warning {
 		if stale {
-			return "config.toml does not load"
+			return config.Warning{Key: config.WarningBroken, Params: map[string]any{"error": "line 3"}}
 		}
-		return ""
+		return config.Warning{}
 	}
 	warned := func() bool {
 		var h api.Health
@@ -1043,6 +1045,21 @@ func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
 	stale = false
 	if warned() {
 		t.Fatal("the warning did not clear")
+	}
+}
+
+func TestTheConfigWarningReadsInTheLoadedLocale(t *testing.T) {
+	t.Parallel()
+	l := *bundledLoaded()
+	l.Strings = map[string]i18n.Forms{config.WarningBroken: {"other": "o config.toml não carrega: {error}"}}
+	s := newServerWith(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &l } })
+	s.deps.ConfigWarning = func() config.Warning {
+		return config.Warning{Key: config.WarningBroken, Params: map[string]any{"error": "linha 3"}}
+	}
+	var h api.Health
+	get(t, s, "/api/health", &h)
+	if !slices.Contains(h.Warnings, "config: o config.toml não carrega: linha 3") {
+		t.Fatalf("%q", h.Warnings)
 	}
 }
 
@@ -1068,6 +1085,7 @@ func TestANoticeStreamsAsANotifyMessage(t *testing.T) {
 	if line, _ := r.ReadString('\n'); !strings.HasPrefix(line, ": connected") {
 		t.Fatalf("first line %q", line)
 	}
+	s.hub.moveTo(api.Since{Epoch: "e", Rev: 2})
 	s.hub.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2})
 	s.notify(api.Notice{ID: "n1", Workflow: "ping", Text: "look at it"})
 	deadline := time.Now().Add(2 * time.Second)
@@ -1116,7 +1134,7 @@ func TestCatalogRouteServesTheProviders(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil || rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(c.Views) != 6 || c.Views[0].ID != "mine" || len(c.Situations) != 18 || c.Version == "" {
+	if len(c.Views) != 4 || c.Views[0].ID != "mine" || slices.ContainsFunc(c.Views, func(v api.ViewSpec) bool { return v.ID == "plan" || v.ID == "recent" }) || len(c.Situations) != 18 || c.Version == "" {
 		t.Fatalf("catalog %+v", c)
 	}
 }

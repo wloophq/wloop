@@ -18,6 +18,12 @@ func (p *Program) Eval(f Facts) bool {
 	return ok
 }
 
+// Holds evaluates the predicate over facts, a fact facts lacks reading as its type's zero value; a runtime
+// error, such as a fact of another Go type, is the error.
+func (p *Program) Holds(facts map[string]any) (bool, error) {
+	return p.run(activation{env: p.env, get: func(name string) any { return facts[name] }})
+}
+
 // Text evaluates a program CompileString compiled over facts; a fact facts
 // lacks reads as its type's zero value.
 func (p *Program) Text(facts map[string]any) (string, error) {

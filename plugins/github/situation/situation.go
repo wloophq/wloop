@@ -5,8 +5,9 @@
 package situation
 
 import (
-	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,9 @@ type Input struct {
 	// AskedAt is when the newest turn of an intent on the pull request asked
 	// the user something no answer reached yet; zero without one.
 	AskedAt time.Time
+	// ReviewerOptional says the profile's reviewer_required does not hold for
+	// the pull request: with no reviewer asked, it is ready as an approved one.
+	ReviewerOptional bool
 }
 
 type Result struct {
@@ -77,6 +81,10 @@ type Result struct {
 	WaitingOn string // login(s), "me", "author", "nobody"
 	Since     time.Time
 	Reason    string
+	// ReasonKey names Reason among Reasons, which ReasonParams fill; the plugin's profile layer words it
+	// for the rows.
+	ReasonKey    string
+	ReasonParams map[string]string
 	// Stalled is when the situation stalls: true once its threshold has
 	// passed since Since, in working days; zero never stalls.
 	Stalled src.Value
@@ -84,7 +92,62 @@ type Result struct {
 
 // Situation is r as the snapshot reports it.
 func (r Result) Situation() *src.Situation {
-	return &src.Situation{Kind: string(r.Kind), WaitingOn: r.WaitingOn, Since: r.Since, Reason: r.Reason, Stalled: r.Stalled}
+	return &src.Situation{Kind: string(r.Kind), WaitingOn: r.WaitingOn, Since: r.Since, Reason: r.Reason, ReasonKey: r.ReasonKey, ReasonParams: r.ReasonParams,
+		Stalled: r.Stalled}
+}
+
+// Reasons are the reasons Derive gives, by key, each as the English sentence agents and logs read; ui.toml's
+// [reasons] words each for people, {{.name}} where a value goes.
+var Reasons = map[string]string{
+	"merged":                  "merged",
+	"closed":                  "closed",
+	"round_blocked":           "round blocked: {{.why}}",
+	"round_held":              "automatic round held: {{.why}}",
+	"to_address":              "review to address, no workspace: {{.why}}",
+	"agent_asked":             "the agent asked you something",
+	"round_in_progress":       "review round in progress",
+	"draft":                   "draft",
+	"checks_failing":          "checks failing on the head",
+	"checks_failing_named":    "checks failing: {{.checks}}",
+	"checks_failing_more":     "checks failing: {{.checks}} and {{.more}} more",
+	"changes_requested":       "changes requested by {{.actor}}",
+	"merge_conflicts":         "merge conflicts with {{.branch}}",
+	"approved_green":          "approved and green",
+	"approved_checks_pending": "approved, checks pending",
+	"review_requested":        "review requested, no review on the head",
+	"review_requested_again":  "review requested again after your review",
+	"reviewer_not_back":       "{{.author}} replied, {{.reviewer}} has not returned",
+	"commented_no_reply":      "{{.actor}} commented, no reply",
+	"no_reviewer_requested":   "no reviewer requested",
+
+	"no_review_required":                "green, no review required",
+	"no_review_required_checks_pending": "no review required, checks pending",
+}
+
+var reasonParam = regexp.MustCompile(`\{\{\.(\w+)\}\}`)
+
+// reasonParams are the names of the values reason's sentence holds.
+func reasonParams(sentence string) []string {
+	var out []string
+	for _, m := range reasonParam.FindAllStringSubmatch(sentence, -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+// because is r with the reason key names, its values kv given as name and value pairs, and its English
+// sentence cut to ReasonMax.
+func (r Result) because(key string, kv ...string) Result {
+	sentence := Reasons[key]
+	if len(kv) > 0 {
+		r.ReasonParams = map[string]string{}
+	}
+	for i := 0; i+1 < len(kv); i += 2 {
+		r.ReasonParams[kv[i]] = Cut(kv[i+1])
+		sentence = strings.ReplaceAll(sentence, "{{."+kv[i]+"}}", kv[i+1])
+	}
+	r.ReasonKey, r.Reason = key, Cut(sentence)
+	return r
 }
 
 // StalledAt says whether r is stalled at now.
@@ -111,7 +174,7 @@ func Derive(in Input) Result {
 		if !ok {
 			since = firstNonZero(p.MergedAt, p.ClosedAt)
 		}
-		return Result{Kind: KindDone, WaitingOn: "nobody", Since: since, Reason: strings.ToLower(p.State)}
+		return Result{Kind: KindDone, WaitingOn: "nobody", Since: since}.because(doneReason(p.State))
 	}
 	var pushedAt time.Time
 	if e, ok := last(pr.KindPush); ok {
@@ -123,33 +186,33 @@ func Derive(in Input) Result {
 	}
 	sent, hasSent := last(pr.KindRoundSent)
 	if b, ok := ActiveBlock(evs, in.Viewer); ok {
-		return Result{Kind: KindBlocked, WaitingOn: "me", Since: b.At, Reason: "round blocked: " + b.Data}
+		return Result{Kind: KindBlocked, WaitingOn: "me", Since: b.At}.because("round_blocked", "why", b.Data)
 	}
 	if held, ok := last(pr.KindRoundHeld); ok && (!hasSent || held.At.After(sent.At)) && sameDay(held.At, in.Now) {
-		return Result{Kind: KindHeldByCap, WaitingOn: "me", Since: held.At, Reason: "automatic round held: " + held.Data}
+		return Result{Kind: KindHeldByCap, WaitingOn: "me", Since: held.At}.because("round_held", "why", held.Data)
 	}
 	if w, ok := last(pr.KindWouldAddress); ok && p.Workspace.ID == "" && !addressedSince(in, evs, w.At) {
-		return Result{Kind: KindToAddress, WaitingOn: "me", Since: w.At, Reason: Cut("review to address, no workspace: " + w.Data)}
+		return Result{Kind: KindToAddress, WaitingOn: "me", Since: w.At}.because("to_address", "why", w.Data)
 	}
 	if !in.AskedAt.IsZero() {
-		return Result{Kind: KindLoopWaiting, WaitingOn: "me", Since: in.AskedAt, Reason: "the agent asked you something"}
+		return Result{Kind: KindLoopWaiting, WaitingOn: "me", Since: in.AskedAt}.because("agent_asked")
 	}
 	if p.Workspace.IsReview {
 		if slices.Contains(p.Workspace.AgentStates, agentWaiting) {
-			return Result{Kind: KindLoopWaiting, WaitingOn: "me", Since: sent.At, Reason: "the agent asked you something"}
+			return Result{Kind: KindLoopWaiting, WaitingOn: "me", Since: sent.At}.because("agent_asked")
 		}
 		if slices.Contains(p.Workspace.AgentStates, agentWorking) {
-			return Result{Kind: KindLoopWorking, WaitingOn: "me", Since: sent.At, Reason: "review round in progress"}
+			return Result{Kind: KindLoopWorking, WaitingOn: "me", Since: sent.At}.because("round_in_progress")
 		}
 	}
 	ignored := func(actor string) bool {
 		return strings.HasSuffix(actor, "[bot]") || slices.ContainsFunc(in.Ignore, func(s string) bool { return strings.EqualFold(s, actor) })
 	}
 	if p.IsDraft {
-		return stalled(Result{Kind: KindDraft, WaitingOn: "author", Since: pushedAt, Reason: "draft"}, 0)
+		return stalled(Result{Kind: KindDraft, WaitingOn: "author", Since: pushedAt}.because("draft"), 0)
 	}
 	if p.ChecksState == "FAILURE" {
-		return stalled(Result{Kind: KindChecks, WaitingOn: "author", Since: pushedAt, Reason: failingReason(p.FailingChecks)}, in.Stalled.Reply)
+		return stalled(failing(Result{Kind: KindChecks, WaitingOn: "author", Since: pushedAt}, p.FailingChecks), in.Stalled.Reply)
 	}
 	// Newest decisive review per actor on the current head, oldest first. A
 	// COMMENTED review does not replace an earlier approval or change request,
@@ -171,7 +234,7 @@ func Derive(in Input) Result {
 	}
 	for _, e := range headReviews {
 		if strings.HasPrefix(e.Data, "CHANGES_REQUESTED:") {
-			return stalled(Result{Kind: KindChanges, WaitingOn: "author", Since: e.At, Reason: "changes requested by " + e.Actor}, in.Stalled.Reply)
+			return stalled(Result{Kind: KindChanges, WaitingOn: "author", Since: e.At}.because("changes_requested", "actor", e.Actor), in.Stalled.Reply)
 		}
 	}
 	var approval pr.Event
@@ -193,24 +256,14 @@ func Derive(in Input) Result {
 				}
 			}
 		}
-		if p.Mergeable == "CONFLICTING" {
-			if p.MergeableAt.After(since) {
-				since = p.MergeableAt
-			}
-			return stalled(Result{Kind: KindConflicts, WaitingOn: "author", Since: since, Reason: "merge conflicts with " + p.BaseBranch}, in.Stalled.Reply)
-		}
-		reason := "approved and green"
-		if p.ChecksState == "PENDING" {
-			reason = "approved, checks pending"
-		}
-		return stalled(Result{Kind: KindMerge, WaitingOn: "author", Since: since, Reason: reason}, in.Stalled.Merge)
+		return ready(in, since, "approved_green", "approved_checks_pending")
 	}
 	if at, again, ok := requestedOfMe(in, evs); ok {
-		reason := "review requested, no review on the head"
+		reason := "review_requested"
 		if again {
-			reason = "review requested again after your review"
+			reason = "review_requested_again"
 		}
-		return stalled(Result{Kind: KindReview, WaitingOn: "me", Since: latest(at, pushedAt), Reason: reason}, in.Stalled.Review)
+		return stalled(Result{Kind: KindReview, WaitingOn: "me", Since: latest(at, pushedAt)}.because(reason), in.Stalled.Review)
 	}
 	nudgeComment := nudgeComments(evs, in.Viewer, ignored)
 	approvedAt := map[string]time.Time{}
@@ -244,10 +297,10 @@ func Derive(in Input) Result {
 	}
 	if !lastReviewer.At.IsZero() && lastReviewer.At.After(pushedAt) && !(in.ThreadsSettledAt.After(lastReviewer.At) && approvedAfter(evs, p, lastReviewer.At)) {
 		if lastAuthor.At.After(lastReviewer.At) {
-			return stalled(Result{Kind: KindReviewerBack, WaitingOn: me(lastReviewer.Actor), Since: lastAuthor.At,
-				Reason: p.Author + " replied, " + lastReviewer.Actor + " has not returned"}, in.Stalled.Reply)
+			return stalled(Result{Kind: KindReviewerBack, WaitingOn: me(lastReviewer.Actor), Since: lastAuthor.At}.
+				because("reviewer_not_back", "author", p.Author, "reviewer", lastReviewer.Actor), in.Stalled.Reply)
 		}
-		return stalled(Result{Kind: KindReply, WaitingOn: "author", Since: lastReviewer.At, Reason: lastReviewer.Actor + " commented, no reply"}, in.Stalled.Reply)
+		return stalled(Result{Kind: KindReply, WaitingOn: "author", Since: lastReviewer.At}.because("commented_no_reply", "actor", lastReviewer.Actor), in.Stalled.Reply)
 	}
 	var pending []string
 	for _, r := range p.ReviewRequests {
@@ -262,9 +315,29 @@ func Derive(in Input) Result {
 				since = e.At
 			}
 		}
-		return stalled(Result{Kind: KindReview, WaitingOn: waitingOn(in, pending), Since: since, Reason: "review requested, no review on the head"}, in.Stalled.Review)
+		return stalled(Result{Kind: KindReview, WaitingOn: waitingOn(in, pending), Since: since}.because("review_requested"), in.Stalled.Review)
 	}
-	return stalled(Result{Kind: KindNoReviewer, WaitingOn: "author", Since: pushedAt, Reason: "no reviewer requested"}, in.Stalled.Review)
+	if in.ReviewerOptional {
+		return ready(in, pushedAt, "no_review_required", "no_review_required_checks_pending")
+	}
+	return stalled(Result{Kind: KindNoReviewer, WaitingOn: "author", Since: pushedAt}.because("no_reviewer_requested"), in.Stalled.Review)
+}
+
+// ready is a pull request nothing but its merge waits on since since, or
+// its conflicts with its base; green and pending word why it may merge.
+func ready(in Input, since time.Time, green, pending string) Result {
+	p := in.PR
+	if p.Mergeable == "CONFLICTING" {
+		if p.MergeableAt.After(since) {
+			since = p.MergeableAt
+		}
+		return stalled(Result{Kind: KindConflicts, WaitingOn: "author", Since: since}.because("merge_conflicts", "branch", p.BaseBranch), in.Stalled.Reply)
+	}
+	reason := green
+	if p.ChecksState == "PENDING" {
+		reason = pending
+	}
+	return stalled(Result{Kind: KindMerge, WaitingOn: "author", Since: since}.because(reason), in.Stalled.Merge)
 }
 
 // requestedOfMe is when the viewer's review was last requested by name,
@@ -429,19 +502,27 @@ func Cut(s string) string {
 	return s
 }
 
-func failingReason(checks []pr.FailingCheck) string {
+// failing is r failing checks, naming the first three.
+func failing(r Result, checks []pr.FailingCheck) Result {
 	if len(checks) == 0 {
-		return "checks failing on the head"
+		return r.because("checks_failing")
 	}
 	var names []string
 	for _, c := range checks[:min(3, len(checks))] {
 		names = append(names, c.Name)
 	}
-	s := "checks failing: " + strings.Join(names, ", ")
 	if n := len(checks) - 3; n > 0 {
-		s += fmt.Sprintf(" and %d more", n)
+		return r.because("checks_failing_more", "checks", strings.Join(names, ", "), "more", strconv.Itoa(n))
 	}
-	return Cut(s)
+	return r.because("checks_failing_named", "checks", strings.Join(names, ", "))
+}
+
+// doneReason is the reason of a pull request in state, which GitHub names MERGED or CLOSED.
+func doneReason(state string) string {
+	if strings.EqualFold(state, "MERGED") {
+		return "merged"
+	}
+	return "closed"
 }
 
 // NudgeWindow bounds how long after a nudge is asked for its comment can

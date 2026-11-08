@@ -737,3 +737,23 @@ func TestLoadBytesNamesTheFileItDidNotRead(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestUILocaleKey(t *testing.T) {
+	for body, want := range map[string]string{`ui = {locale = "pt-BR"}`: "pt-BR", `[ui]`: "", ``: ""} {
+		file := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		c, err := LoadFile(file, tools())
+		if err != nil || c.UI.Locale != want {
+			t.Errorf("%q: %q %v", body, c.UI.Locale, err)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte(`ui = {lang = "x"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "ui.lang") {
+		t.Fatalf("an unknown ui key: %v", err)
+	}
+}

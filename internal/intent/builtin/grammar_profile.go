@@ -1,5 +1,12 @@
 package builtin
 
+// predsGrammar is the keys of a plugin layer's predicates.toml.
+var predsGrammar = []Key{
+	{Path: "*", In: SurfacePreds, Kind: KindPred, Doc: "A predicate the plugin's manifest declares in [[source.predicates]], by name, over the facts its facts list names, the ones the plugin hands with the question; " +
+		"a higher layer's replaces a lower one's, and one that does not compile leaves the lower one in force. The plugin asks whether it holds for a unit with the unit's facts, " +
+		"such as the GitHub plugin's reviewer_required: `!(pr.owner in ['acme'])`."},
+}
+
 // profileGrammar is the keys of defaults.toml, labels.toml and a judgment
 // block's front matter.
 var profileGrammar = []Key{

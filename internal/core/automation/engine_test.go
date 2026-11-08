@@ -369,6 +369,83 @@ func TestAGuardRefusalIsReevaluatedAndRunsWhenItPasses(t *testing.T) {
 	}
 }
 
+func withdrawals(r *rig) []port.Event {
+	var out []port.Event
+	for _, ev := range r.ledger.Events() {
+		if ev.Kind == workflow.KindItemDropped {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+func TestAMootCheckWithdrawsABlockedItemWithItsReason(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	r.put(s1, "a")
+	r.steps.Refuse("session.close", s1, "its turn is started")
+	r.sweep()
+	if it := r.mustItem("close", s1); it.Decision != workflow.DecisionBlocked {
+		t.Fatalf("item = %+v", it)
+	}
+	r.steps.CheckErr("session.close", s1, automation.Moot{Reason: "the session is closed"})
+	r.sweep()
+	if _, ok := r.item("close", s1); ok {
+		t.Fatalf("a moot item stays in the plan: %+v", r.items())
+	}
+	evs := withdrawals(r)
+	if len(evs) != 1 || evs[0].Data != "withdrawn: the session is closed" || evs[0].Unit != s1 {
+		t.Fatalf("withdrawals %+v", evs)
+	}
+	r.sweep()
+	if n := len(withdrawals(r)); n != 1 {
+		t.Fatalf("%d withdrawals after a second sweep, want the one", n)
+	}
+	if len(r.steps.Ran()) != 0 {
+		t.Fatalf("ran %+v", r.steps.Ran())
+	}
+}
+
+func TestAMootCheckOnANewItemPlansNothing(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	r.put(s1, "a")
+	r.steps.CheckErr("session.close", s1, automation.Moot{Reason: "no session s1"})
+	r.sweep()
+	if len(r.items()) != 0 || len(withdrawals(r)) != 0 {
+		t.Fatalf("items %+v, withdrawals %+v", r.items(), withdrawals(r))
+	}
+}
+
+func TestAMootRunWithdrawsTheItemWithoutAnAttempt(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	r.put(s1, "a")
+	r.steps.Fail("session.close", s1, automation.Moot{Reason: "the session is closed"})
+	r.sweep()
+	if _, ok := r.item("close", s1); ok {
+		t.Fatalf("a moot run left %+v", r.items())
+	}
+	if evs := withdrawals(r); len(evs) != 1 || evs[0].Data != "withdrawn: the session is closed" {
+		t.Fatalf("withdrawals %+v", evs)
+	}
+	if _, ok, _ := r.ledger.Run(context.Background(), workflow.Key{Workflow: "close", Unit: s1}); ok {
+		t.Error("a moot run recorded a run")
+	}
+}
+
+func TestAHeldCheckSkipsTheItemUntilItsHoldEnds(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	r.put(s1, "a")
+	until := r.clock.Now().Add(time.Hour)
+	r.steps.CheckErr("session.close", s1, automation.Held{Reason: "held by draft 7 (dropped)", Until: until})
+	r.sweep()
+	it := r.mustItem("close", s1)
+	if it.Decision != workflow.DecisionSkipped || it.Reason != "held by draft 7 (dropped)" {
+		t.Fatalf("item = %+v", it)
+	}
+	if next := r.e.Due(); next.IsZero() || next.After(until) {
+		t.Fatalf("next sweep at %v, want by %v", next, until)
+	}
+}
+
 func TestACheckErrorBlocksWithoutConsumingAttempts(t *testing.T) {
 	r := newRig(t, sweepWF("close", idle, "session.close"))
 	r.put(s1, "a")
@@ -558,7 +635,7 @@ func TestAWaitRuleMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
 	r.steps.Refuse("workspace.remove", s1, refusal)
 	r.steps.Refuse("workspace.remove", s2, refusal)
 	r.sweep()
-	if it := r.mustItem("finished", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
+	if it := r.mustItem("finished", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "waits for you while session.dirty true: "+refusal {
 		t.Errorf("wait rule item = %+v", it)
 	}
 	if it := r.mustItem("finished", s2); it.Decision != workflow.DecisionBlocked {
@@ -585,10 +662,10 @@ func TestAWaitNamesWhatItWaitsOn(t *testing.T) {
 	refusal := "3 commits not pushed in /w; back them up with: git push origin HEAD:refs/heads/me/backup-b"
 	r.steps.Refuse("workspace.remove", s2, refusal)
 	r.sweep()
-	if it := r.mustItem("finished", s1); it.Reason != "session.pendency [turn asked unanswered]" {
+	if it := r.mustItem("finished", s1); it.Reason != "waits for you while session.pendency [turn asked unanswered]" {
 		t.Errorf("a wait with no refusal: %q", it.Reason)
 	}
-	if it := r.mustItem("finished", s2); it.Reason != "session.pendency [modified files, commits on no remote], session.dirty 1: "+refusal {
+	if it := r.mustItem("finished", s2); it.Reason != "waits for you while session.pendency [modified files, commits on no remote], session.dirty 1: "+refusal {
 		t.Errorf("a wait over a refusal: %q", it.Reason)
 	}
 }
@@ -630,7 +707,7 @@ func TestRunRulesAreFirstMatch(t *testing.T) {
 	if it := r.mustItem("shadowed", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {
 		t.Errorf("a run rule before a wait rule shadows it: %+v", it)
 	}
-	if it := r.mustItem("waits", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
+	if it := r.mustItem("waits", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "waits for you while session.dirty true: "+refusal {
 		t.Errorf("a matched wait rule holds a refused item: %+v", it)
 	}
 	if it := r.mustItem("table-wait", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {

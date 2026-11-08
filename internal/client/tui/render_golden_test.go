@@ -87,7 +87,7 @@ func viewsGolden(t *testing.T, color bool, view string) *Model {
 func groupedGolden(t *testing.T, color bool) *Model {
 	m := newModel(t)
 	c := viewsCatalog()
-	c.Views = []api.TaskViewSpec{{ID: "needs-me", Label: "Needs me"}}
+	c.Views = []api.TaskViewSpec{{ID: "needs-me", Label: "Needs me", Rail: true}}
 	m.SetViews(c)
 	m.SetTasks("needs-me", []api.TaskView{task("e1", "Reply on the batch export review", "next", "computer"), task("e2", "Deploy window tonight?", "inbox"),
 		waitingOn(task("e3", "Contract signature", "waiting"), "bob"), task("e4", "Call the bank", "next", "calls"), task("e5", "Buy cables", "inbox")},

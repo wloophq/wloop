@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/locale"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/domain/decision"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -63,6 +65,10 @@ func defaultAgents() map[string]agentEntry {
 		Protocol: claude.Protocol{},
 	}}
 }
+
+// preferredLanguages are the system's preferred languages, which a serve shows its texts in when ui.locale
+// is empty.
+func preferredLanguages() []string { return locale.Preferred() }
 
 func defaultUsage(userHome string) map[string]coreusage.Reader {
 	return map[string]coreusage.Reader{"claude": claude.Usage{UserHome: userHome}}
@@ -380,6 +386,7 @@ func (e *Env) taskFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (b
 		OwedBy:     catalog.OwedByOf(e.loadedIntents),
 		Wakes:      db.Wakes(),
 		Links:      e.linkState,
+		Decisions:  func() decision.Map { return e.loadedIntents().Decisions.Map },
 		Extraction: psource.NewSnapshots(db.Snapshots()).Unextracted,
 		RoleProp: func(r task.Role) string {
 			name, _ := e.loadedIntents().Tasks.PropOf(r)
@@ -407,8 +414,8 @@ func (e *Env) linkState(ctx context.Context, u unit.Unit) (facttask.Link, error)
 	if srv == nil {
 		return facttask.Link{}, nil
 	}
-	signals, moved, _, err := srv.LinkState(ctx, u)
-	return facttask.Link{Signals: signals, Moved: moved}, err
+	signals, situation, moved, _, err := srv.LinkState(ctx, u)
+	return facttask.Link{Signals: signals, Situation: situation, Moved: moved}, err
 }
 
 // me is the user's identity the tasks reconcile with; nobody before the tasks service is built.

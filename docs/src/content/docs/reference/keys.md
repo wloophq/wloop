@@ -29,6 +29,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `-` | sort by the next field the view offers (terminal): the view's own order, then each field ascending and descending |
 | `n` | capture |
 | `1`-`9` | the gate's intent of that number, in the order the gate lists them, while a gate is focused; in the terminal, pick a draft the open detail lists when it asks no question |
+| `Cmd+Enter` | in a gate's answer box (web), send the answer with the option picked |
 
 ## Navigation
 
@@ -38,11 +39,24 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `g g` | the GitHub views: a plugin's own chord, which its UI declares (`key`), served while the plugin is enabled; a view's key in `views.toml` takes it first |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
-| `Cmd+K` (web), `Ctrl+K` (terminal) | the palette, with every action and its key |
+| `+` | add a filter (web): a palette of the list's fields, then the values its items hold of the one picked |
+| `g h` | the home (web) |
+| `Cmd+K` (web), `Ctrl+K` (terminal) | the omnibox (web): search, a pasted link, a known verb or the agent, and every action of the selection with its key while nothing is typed; the palette with every action in the terminal |
 | `?` | help |
 | `Tab` | next view of the group (terminal) |
-| `]` `[` | next and previous step of the Review |
+| `]` `[` | next and previous step of the Review; while the focus is in a task's detail panel (web), the next and previous tab |
+| `c` | copy a link to what shows, `{{command}}://open/#<route>` (web) |
+| `t` | open the detail in a window of its own, while the focus is in the detail; a new tab in a browser (web) |
 | `q`, `Ctrl+C` | quit (terminal) |
+
+## In a decision queue (web)
+
+| Key | Action |
+|---|---|
+| `Enter` | run the decision's primary action |
+| `j` / `k` | next / previous decision, without acting |
+| `o` | open the source |
+| `Esc` | back to the home |
 
 ## Actions on a row
 

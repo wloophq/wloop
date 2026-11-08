@@ -80,7 +80,7 @@ func (p *Publisher) Where(ctx context.Context, d src.Draft) (string, error) {
 }
 
 // Place keeps a draft on its own pull request.
-func (p *Publisher) Place(context.Context, src.Draft) (string, error) { return "", nil }
+func (p *Publisher) Place(context.Context, src.Draft) (src.Placed, error) { return src.Placed{}, nil }
 
 func (p *Publisher) prepare(ctx context.Context, d src.Draft) (pr.Ref, string, error) {
 	if d.Unit.Provider != pr.Provider {
@@ -112,7 +112,7 @@ func (p *Publisher) prepare(ctx context.Context, d src.Draft) (pr.Ref, string, e
 	return ref, body, nil
 }
 
-var mentionRE = regexp.MustCompile(`@\{([^{}\s]+)\}`)
+var mentionRE = regexp.MustCompile(`@\{(group:[^{}\n]+|[^{}\s]+)\}`)
 
 // body is d's text as GitHub takes it: a github mention as @login, any
 // other person by name.

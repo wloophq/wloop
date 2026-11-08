@@ -1,0 +1,5 @@
+summary = "Quando você confirma o recebimento de uma tarefa sem prazo, propor uma reação no pedido, para quem pediu ver que você está cuidando"
+
+[outbox]
+title = "Mostrar que está cuidando"
+about = "Rascunhado quando você confirma o recebimento de uma tarefa sem prazo: uma reação no pedido."

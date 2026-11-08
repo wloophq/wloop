@@ -119,6 +119,20 @@ func (p *Reported) Details() []api.DetailSpec {
 	return nil
 }
 
+func (p *Reported) Reasons() api.ProviderWords {
+	if rp, ok := p.src.Catalog.(ReasonPresenter); ok {
+		return rp.Reasons()
+	}
+	return api.ProviderWords{}
+}
+
+func (p *Reported) CardSignals() []api.SignalSpec {
+	if sp, ok := p.src.Catalog.(SignalPresenter); ok {
+		return sp.CardSignals()
+	}
+	return nil
+}
+
 func (p *Reported) Lens() api.ProviderWords {
 	if lp, ok := p.src.Catalog.(LensPresenter); ok {
 		return lp.Lens()
@@ -294,8 +308,8 @@ func (p *Reported) Derive(base Base, in any, at time.Time) (api.Row, error) {
 		sit = pend.Over(sit)
 	}
 	r.Kind = api.Kind(sit.Kind)
-	r.Summary = api.Summary{WaitsOn: sit.WaitingOn, Since: sit.Since, Stalled: sit.Stalled, Reason: sit.Reason,
-		Closed: sit.Kind == overlay.KindDone, OpenItems: len(r.Items), Line: sit.Reason}
+	r.Summary = api.Summary{WaitsOn: sit.WaitingOn, Since: sit.Since, Stalled: sit.Stalled, Reason: sit.Reason, ReasonKey: sit.ReasonKey,
+		ReasonParams: sit.ReasonParams, Closed: sit.Kind == overlay.KindDone, OpenItems: len(r.Items), Line: sit.Reason}
 	switch sit.Kind {
 	case overlay.KindLoopWaiting, overlay.KindLoopWorking, overlay.KindLoopStopped:
 		if x.run != nil {
@@ -340,7 +354,8 @@ func (x *reported) situation(base Base, at time.Time) overlay.Situation {
 	var sit overlay.Situation
 	if rs := x.snap.Situation; rs != nil {
 		stalled, _ := value.Resolve(rs.Stalled, at).(bool)
-		sit = overlay.Situation{Kind: rs.Kind, WaitingOn: rs.WaitingOn, Since: rs.Since, Reason: overlay.Cut(rs.Reason), Stalled: stalled}
+		sit = overlay.Situation{Kind: rs.Kind, WaitingOn: rs.WaitingOn, Since: rs.Since, Reason: overlay.Cut(rs.Reason), ReasonKey: rs.ReasonKey,
+			ReasonParams: rs.ReasonParams, Stalled: stalled}
 	}
 	if x.run != nil && sit.Kind != overlay.KindDone {
 		if s, ok := x.run.Turn.Situation(x.sessionWaiting(base)); ok {
@@ -387,7 +402,7 @@ func (p *Reported) Card(ctx context.Context, row api.Row) (card.Card, error) {
 		Why: c.Why, WaitsOn: people(c.WaitsOn), Since: c.Since, Link: c.Link, TurnsLink: c.TurnsLink, StartedByMe: c.StartedByMe,
 		ClosurePosted: c.ClosurePosted, Cares: c.Cares, Signals: []card.Signal{}}
 	for _, sig := range c.Signals {
-		out.Signals = append(out.Signals, card.Signal{Key: sig.Key, Value: sig.Value, Tone: card.Tone(sig.Tone), At: sig.At})
+		out.Signals = append(out.Signals, CardSignal(sig))
 	}
 	if h := c.LastHuman; h != nil {
 		out.LastHuman = &card.Human{Who: person(h.Who), What: h.What, At: h.At, Link: h.Link}
@@ -408,6 +423,18 @@ func people(ps []src.Person) []items.Person {
 	var out []items.Person
 	for _, p := range ps {
 		out = append(out, person(p))
+	}
+	return out
+}
+
+// CardSignal is a plugin's card signal as a card holds it.
+func CardSignal(s src.CardSignal) card.Signal {
+	out := card.Signal{Key: s.Key, Value: s.Value, Tone: card.Tone(s.Tone), At: s.At}
+	if d := s.Detail; d != nil {
+		out.Params = maps.Clone(d.Params)
+		for _, n := range d.Notes {
+			out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params), Since: n.Since})
+		}
 	}
 	return out
 }

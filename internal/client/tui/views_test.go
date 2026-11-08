@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -18,9 +19,9 @@ import (
 )
 
 func viewsCatalog() api.ViewsCatalog {
-	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox", Over: "gates"},
-		{ID: "next", Label: "Next", Group: "task.prop.contexts"}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by"}, {ID: "projects", Label: "Projects"},
-		{ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus", Rail: true}, {ID: "inbox", Label: "Inbox", Rail: true}, {ID: "outbox", Label: "Outbox", Over: "gates", Rail: true},
+		{ID: "next", Label: "Next", Group: "task.prop.contexts", Rail: true}, {ID: "waiting", Label: "Waiting", Group: "task.owed_by", Rail: true}, {ID: "projects", Label: "Projects", Rail: true},
+		{ID: "someday", Label: "Someday", Rail: true}, {ID: "logbook", Label: "Logbook", Rail: true}}
 	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Handler: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
 		{Verb: "schedule", Handler: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
 		{Verb: "reference", Handler: "finish", Label: "Reference", Key: "l"}, {Verb: "focus", Handler: "focus", Label: "Focus", Key: "f"},
@@ -113,6 +114,23 @@ func viewTasks() map[string][]api.TaskView {
 func viewCounters() api.Counters {
 	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
 		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
+}
+
+func TestTUIListsOnlyRailViews(t *testing.T) {
+	m := newModel(t)
+	c := viewsCatalog()
+	c.Views = append([]api.TaskViewSpec{{ID: "home-blocked", Label: "Blocked by you"}}, c.Views...)
+	m.SetViews(c)
+	var ids []string
+	for _, v := range m.taskViews {
+		ids = append(ids, v.ID)
+	}
+	if len(ids) == 0 || ids[0] != "focus" || slices.Contains(ids, "home-blocked") {
+		t.Fatalf("views %v: a view off the rail is listed or opened first", ids)
+	}
+	if got := m.viewKey(); got != "view:focus" {
+		t.Fatalf("opens on %q, want the first rail view", got)
+	}
 }
 
 // viewsModel is a model with the task views loaded, on Focus.
@@ -448,7 +466,7 @@ func TestCaptureAndOpenSourceInTUI(t *testing.T) {
 		t.Fatalf("capture %+v %v", c, ok)
 	}
 	d := &fakeDaemon{tasks: map[string][]api.TaskView{}}
-	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || !slices.Equal(d.captures, []string{"Buy cables"}) || len(got.lines) != 1 {
+	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || !slices.Equal(d.captures, []string{"Buy cables"}) || got.note == nil || !strings.HasPrefix(got.note(texts.English()), "in the Inbox as ") {
 		t.Fatalf("captured %v: %v", d.captures, err)
 	}
 
@@ -650,6 +668,30 @@ func TestTaskDetail(t *testing.T) {
 	press(m, Key{Name: KeyEsc})
 	if m.detailID != "" || strings.Contains(screenOf(m, 120, 40), "answer the reviewer") {
 		t.Fatal("Esc left the detail open")
+	}
+}
+
+// TestTaskDetailWordsTheCardSignals holds that the detail reads each card signal in its plugin's words in the
+// served locale, a stall's working days on the situation's line, and a code with no words as itself.
+func TestTaskDetailWordsTheCardSignals(t *testing.T) {
+	m := viewsModel(t, row(7, "Batch export", "review", "needs-me"))
+	m.words = ptBR(t)
+	m.catalog.CardSignals = []api.SignalSpec{
+		{Provider: "github", Key: "situation", Label: "situação", Values: map[string]string{"changes": "mudanças pedidas"},
+			Notes: map[string]string{"stalled": `parado há {{.days}} {{plural .days "one" "dia útil" "other" "dias úteis"}}`}},
+		{Provider: "github", Key: "checks", Label: "checks", Values: map[string]string{"failing_named": "falhando: {{.names}}"}},
+	}
+	press(m, Key{Name: KeyEnter})
+	e := viewTasks()["focus"][0]
+	e.Cards = []api.CardView{{Card: card.Card{Unit: ref(7).Unit(), Title: "Batch export", State: "open", Signals: []card.Signal{
+		{Key: "situation", Value: "changes", Notes: []card.Note{{Code: "stalled", Tone: "warn", Params: map[string]string{"days": "1"}}}},
+		{Key: "checks", Value: "failing_named", Params: map[string]string{"names": "lint, test"}},
+		{Key: "lane", Value: "fast_track"},
+	}}}}
+	m.SetDetail("e1", e, nil)
+	screen := screenOf(m, 160, 40)
+	if want := "situação mudanças pedidas · parado há 1 dia útil · checks falhando: lint, test · lane fast_track"; !strings.Contains(screen, want) {
+		t.Errorf("detail lacks %q:\n%s", want, screen)
 	}
 }
 

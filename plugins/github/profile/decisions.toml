@@ -1,0 +1,14 @@
+# The decision kind of a pull request in each situation, or with each link
+# signal on, and what a queue offers first on it. A user profile's
+# plugins/github/decisions.toml replaces the keys it sets.
+
+[situations]
+merge       = "last-step"
+no_reviewer = "pick-someone"
+
+[signals]
+ready = "last-step"
+
+[primary]
+last-step    = "open"
+pick-someone = "open"

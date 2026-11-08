@@ -9,6 +9,8 @@ brief_subject = true
 kinds = ["thread"]
 
 default_delivery = "message"
+language_fact = "slack.language"
+members_fact = "slack.members"
 config_reads = ["placement", "items.heat"]
 notify = ["tasks", "gates"]
 
@@ -68,7 +70,7 @@ untrusted = true
 [[source.facts]]
 name = "slack.closure_posted"
 type = "bool"
-doc = "A closure was posted on the unit, by the extraction or a sent draft's unit.closed."
+doc = "A closure was posted on the unit, or closed without a message, by the extraction or a draft's unit.closed."
 untrusted = true
 
 [[source.facts]]
@@ -119,6 +121,17 @@ type = "string"
 doc = "The unit, its newest message and the update time of its items."
 untrusted = true
 
+[[source.facts]]
+name = "slack.language"
+type = "string"
+doc = "The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell."
+untrusted = true
+
+[[source.facts]]
+name = "slack.members"
+type = "list"
+doc = "The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one."
+
 [[source.signals]]
 name = "asked_reacted"
 doc = "Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask."
@@ -133,7 +146,8 @@ every = "1m"
 
 [[source.jobs]]
 name = "extract"
-every = "30s"
+every = "5m"
+retry = "1m"
 timeout = "22m"
 
 [[source.situations]]
@@ -340,7 +354,7 @@ fields = [{ name = "Text" }]
 [[source.tools]]
 name = "slack_draft"
 doc = "Proposes a Slack message or reaction for the user's approval."
-input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}}},"additionalProperties":false}'
+input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"}},"additionalProperties":false}'
 
 [[source.tools.answers]]
 name = "not_logged_in"

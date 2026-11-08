@@ -1,0 +1,5 @@
+label = "Conversar"
+summary = "Conversar com um agente sobre uma tarefa: na última sessão da tarefa quando ela pode ser retomada, senão numa nova, num worktree do repositório da tarefa ou sem checkout"
+
+[guidance]
+help = "o que você escreve para o agente"

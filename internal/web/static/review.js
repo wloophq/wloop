@@ -56,7 +56,7 @@ async function loadReview() {
     reviewState.review = await reviewEnv.getJSON("/api/review");
     reviewState.error = "";
   } catch (err) {
-    reviewState.error = `Could not load the review: ${err.message}`;
+    reviewState.error = t("Could not load the review: {error}", { error: err.message });
     return;
   }
   if (!reviewCurrent()) reviewState.step = reviewFirstOpen(reviewSteps());
@@ -74,7 +74,7 @@ async function loadReviewStep() {
     if (page.counters) tasksState.counters = page.counters;
     tasksState.error = "";
   } catch (err) {
-    tasksState.error = `Could not load the ${step.label} step: ${err.message}`;
+    tasksState.error = t("Could not load the {step} step: {error}", { step: step.label, error: err.message });
   }
 }
 
@@ -90,17 +90,17 @@ async function reviewKey(action) {
     reviewState.step = next.id;
   } else if (action === "done") {
     if (steps[at].done) {
-      reviewEnv.notice(`${steps[at].label} is already done`);
+      reviewEnv.notice(t("{step} is already done", { step: steps[at].label }));
       return true;
     }
     try {
       reviewState.review = await reviewEnv.post(`/api/review/steps/${encodeURIComponent(reviewState.step)}/done`, {});
     } catch (err) {
-      reviewEnv.notice(`marking ${steps[at].label} done failed: ${err.message}`, true);
+      reviewEnv.notice(t("marking {step} done failed: {error}", { step: steps[at].label, error: err.message }), true);
       return true;
     }
     reviewState.step = reviewState.review.done ? reviewState.step : reviewFirstOpen(reviewSteps(), at);
-    reviewEnv.notice(reviewState.review.done ? "Review done." : `${steps[at].label}: done`);
+    reviewEnv.notice(reviewState.review.done ? t("Review done.") : t("{step}: done", { step: steps[at].label }));
   } else {
     return false;
   }
@@ -127,24 +127,24 @@ function reviewStepItem(s) {
 // reviewPanel is the review: its steps with their counts, then the step
 // shown with its tasks.
 function reviewPanel(open) {
-  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, REVIEW_TITLE)), viewIntro(viewSpec(REVIEW))];
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, reviewTitle())), viewIntro(viewSpec(REVIEW))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
   const steps = reviewSteps();
   if (!reviewState.review) {
-    parts.push(h("p", { class: "empty" }, "Loading."));
+    parts.push(h("p", { class: "empty" }, t("Loading.")));
     return parts;
   }
-  parts.push(h("ol", { class: "review-steps", "aria-label": "Review steps" }, ...steps.map(reviewStepItem)));
-  if (reviewState.review.done) parts.push(h("p", { class: "empty review-done" }, "Review done. A new one starts the next time you open it."));
+  parts.push(h("ol", { class: "review-steps", "aria-label": t("Review steps") }, ...steps.map(reviewStepItem)));
+  if (reviewState.review.done) parts.push(h("p", { class: "empty review-done" }, t("Review done. A new one starts the next time you open it.")));
   const step = reviewCurrent();
   if (!step) return parts;
   parts.push(h("div", { class: "review-head" },
-    h("h3", { class: "plan-head", tabindex: 0, "data-focus": "review:step:" + step.id, title: "Enter marks the step done; ] and [ move between steps" },
+    h("h3", { class: "plan-head", tabindex: 0, "data-focus": "review:step:" + step.id, title: t("Enter marks the step done; ] and [ move between steps") },
       `${step.label} (${step.count})`, step.done ? " ✓" : ""),
-    step.done ? null : h("button", { type: "button", class: "act", "data-focus": "review:done:" + step.id, onclick: () => reviewKey("done") }, "Mark done")));
+    step.done ? null : h("button", { type: "button", class: "act", "data-focus": "review:done:" + step.id, onclick: () => reviewKey("done") }, t("Mark done"))));
   if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
   if (tasksState.key !== "review|" + step.id) {
-    parts.push(h("p", { class: "empty" }, "Loading."));
+    parts.push(h("p", { class: "empty" }, t("Loading.")));
     return parts;
   }
   if (!tasksState.tasks.length) {
@@ -153,6 +153,6 @@ function reviewPanel(open) {
   }
   const lens = { ...lensOf({ view: step.view, q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false }), static: true };
   const items = tasksState.tasks.map(taskItemOf);
-  parts.push(taskTable({ groups: [{ field: "", key: "", raw: "", label: "", rows: items }], group: "" }, lens, open, items));
+  parts.push(taskList({ groups: [{ field: "", key: "", raw: "", label: "", rows: items }], group: "" }, lens, open));
   return parts;
 }

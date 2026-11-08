@@ -1,4 +1,4 @@
-summary = "Close a loop session whose newest turn ended and that stayed quiet for cleanup.idle"
+summary = "Close a loop session whose newest turn ended and that stayed quiet for a while, as your cleanup settings set"
 provider = "session"
 when = 'session.managed && session.newest_state in ["done", "settled", "failed"] && session.idle_for > config.cleanup.idle'
 order = 13

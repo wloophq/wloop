@@ -91,6 +91,21 @@ func seedWake(t *testing.T, e *noteEnv) {
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
 	{
+		method: "DB.SaveSkip",
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.SaveSkip(ctx, "nudge", u7, noteAt) },
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
+		method: "DB.DeleteSkip",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := e.db.SaveSkip(context.Background(), "nudge", u7, noteAt); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DeleteSkip(ctx, "nudge", u7) },
+		topics: port.TopicOverrides, units: []unit.Unit{u7},
+	},
+	{
 		method: "WakeStore.Put",
 		seed:   func(t *testing.T, e *noteEnv) { applyTask(t, e.db, "t-01") },
 		call: func(ctx context.Context, e *noteEnv) error {
@@ -208,6 +223,32 @@ var writes = []writeCase{
 			return New(e.db).SaveSession(ctx, turn.Session{ID: "term_1"}, loopEvent("session_launched"))
 		},
 		topics: port.TopicSessions | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+	},
+	{
+		method: "Store.SaveSession",
+		name:   "close",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := New(e.db).SaveSession(context.Background(), turn.Session{ID: "term_1"}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			return New(e.db).SaveSession(ctx, turn.Session{ID: "term_1", ClosedAt: noteAt}, loopEvent("session_closed"))
+		},
+		topics: port.TopicSessions | port.TopicPlan | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+	},
+	{
+		method: "Store.SaveSession",
+		name:   "closed again",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := New(e.db).SaveSession(context.Background(), turn.Session{ID: "term_1", ClosedAt: noteAt}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			return New(e.db).SaveSession(ctx, turn.Session{ID: "term_1", ClosedAt: noteAt})
+		},
+		topics: port.TopicSessions, units: []unit.Unit{term1},
 	},
 	{
 		method: "Store.LogStop",
@@ -345,7 +386,7 @@ var writes = []writeCase{
 			it := noteItem(workflow.DecisionPending)
 			return e.db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{it.Workflow}, Items: []workflow.Item{it}}, loopEvent(workflow.KindPlanned))
 		},
-		topics: port.TopicPending | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+		topics: port.TopicPending | port.TopicPlan | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
 	},
 	{
 		method: "ledger.Record",
@@ -483,8 +524,8 @@ func noteItem(d workflow.Decision) workflow.Item {
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
-	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
-	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
+	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.CallSpent", "DB.UnitEventKeys", "DB.DossierMoves",
+	"DB.AllSkips", "DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
 	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",

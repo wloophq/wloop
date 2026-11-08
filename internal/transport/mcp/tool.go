@@ -134,6 +134,7 @@ func ledgerOp() *schema {
 	fields := object(map[string]*schema{
 		"kind":       enumOf(items.Request, items.Question, items.Decision, items.Todo),
 		"summary":    str(items.MaxSummary),
+		"ask":        str(items.MaxSummary),
 		"context":    str(items.MaxContext),
 		"deadline":   str(100),
 		"ambiguity":  str(items.MaxSummary),

@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -29,6 +30,20 @@ type GatesDef struct {
 	// Approval is gates.toml's [approval]: how a gate is decided when no
 	// manifest or configuration says, the default of each kind.
 	Approval GateApproval
+	// Effects are the sentences that say what each effect does when a draft is sent, by effect name.
+	Effects map[string]string
+	// Drafts are the words a draft's card and the Outbox read: gates.toml's [drafts].
+	Drafts DraftWords
+}
+
+// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts no
+// workflow proposed and no purpose names, Purposes name a purpose, States a delivery state and Reasons why a
+// dropped draft was withdrawn, by its id.
+type DraftWords struct {
+	ByHand, ByHandAbout       string
+	Purposes, States, Reasons map[string]string
+	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
+	Quoted string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -112,8 +127,10 @@ type GateDef struct {
 	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.
 	EndsTask map[gate.Status]task.Category
+	// CardSays makes the gate's card list what each intent does, its Summary.
+	CardSays bool
 	// Text words the gate's subject when the loop writes it, a template
-	// over the proposal facts; nil writes nothing.
+	// over the proposal facts, or a step gate's over StepFacts; nil writes nothing.
 	Text *template.Template
 }
 
@@ -130,6 +147,20 @@ func (g GateDef) Words(facts map[string]any) (string, error) {
 // ProposalFacts are the proposal facts, each value got by its name.
 func ProposalFacts(get func(name string) any) map[string]any {
 	return factMap(builtin.ProposalSlot, get)
+}
+
+// StepFacts are the facts a step gate's text reads: the workflow facts of its unit and of the units its task
+// holds, each value got by its name.
+func StepFacts(get func(name string) any) map[string]any {
+	return factMap(builtin.WorkflowSlot, get)
+}
+
+// textSample is the facts gate kind k's text is checked over.
+func textSample(k gate.Kind) map[string]any {
+	if k == gate.KindStep {
+		return sampleFacts(builtin.WorkflowSlot)
+	}
+	return sampleFacts(builtin.ProposalSlot)
 }
 
 // GateIntent is what a gate is resolved with: the status it resolves the
@@ -178,14 +209,26 @@ func (d GatesDef) names() []string {
 }
 
 type mGatesFile struct {
-	Gates    map[string]mGate `toml:"gates"`
-	Approval *mApproval       `toml:"approval"`
+	Gates    map[string]mGate  `toml:"gates"`
+	Approval *mApproval        `toml:"approval"`
+	Effects  map[string]string `toml:"effects"`
+	Drafts   *mDraftWords      `toml:"drafts"`
+}
+
+type mDraftWords struct {
+	ByHand      *string           `toml:"by_hand"`
+	ByHandAbout *string           `toml:"by_hand_about"`
+	Quoted      *string           `toml:"quoted"`
+	Purposes    map[string]string `toml:"purposes"`
+	States      map[string]string `toml:"states"`
+	Reasons     map[string]string `toml:"reasons"`
 }
 
 type mGate struct {
 	Kind       *string                `toml:"kind"`
 	Label      *string                `toml:"label"`
 	Text       *string                `toml:"text"`
+	CardSays   *bool                  `toml:"card_says"`
 	ClosesWith *string                `toml:"closes_with"`
 	Intents    map[string]mGateIntent `toml:"intents"`
 	EndsTask   map[string]string      `toml:"ends_task"`
@@ -201,24 +244,26 @@ type mGateIntent struct {
 }
 
 // BundledGates is the gates.toml of bundled alone.
-func BundledGates(bundled fs.FS) (GatesDef, Problems) { return loadGates(nil, bundled) }
+func BundledGates(bundled fs.FS) (GatesDef, Problems) { return loadGates(nil, readerOf(bundled)) }
 
 // loadGates reads gates.toml from bundled and the user's layers: a higher
 // layer's key replaces a lower one's.
-func loadGates(layers []profile.Layer, bundled fs.FS) (GatesDef, Problems) {
+func loadGates(layers []profile.Layer, r layerReader) (GatesDef, Problems) {
 	var d GatesDef
-	problems, read := readLayered(layers, bundled, GatesFile, func(file string, src []byte) Problems {
+	problems, read := readLayered(layers, r, GatesFile, func(file string, src []byte) Problems {
 		m, problems, _, complete := decode[mGatesFile](file, src)
 		if !complete {
 			return problems
 		}
-		s := &sheet{file: file, at: positions(src), problems: problems}
+		s := &sheet{file: file, at: positions(src), problems: problems, funcs: r.funcs()}
 		for _, name := range declared(s, "gates", m.Gates) {
 			mergeGate(s, &d, name, m.Gates[name])
 		}
 		if m.Approval != nil {
 			s.profileApproval(&d, m.Approval)
 		}
+		mergeEffects(s, &d, m.Effects)
+		mergeDraftWords(s, &d.Drafts, m.Drafts)
 		s.addGrammar(grammar(builtin.SurfaceGates, src))
 		return s.problems
 	})
@@ -295,6 +340,83 @@ func pinnedKinds(p workflow.Predicate) []gate.Kind {
 	return out
 }
 
+// mergeEffects lays a file's effect words over d's: each key names an effect of builtin.Effects, and an
+// empty sentence takes a lower layer's off.
+func mergeEffects(s *sheet, d *GatesDef, m map[string]string) {
+	for _, name := range declared(s, "effects", m) {
+		if _, ok := builtin.EffectOf(name); !ok {
+			names := make([]string, len(builtin.Effects))
+			for i, e := range builtin.Effects {
+				names[i] = e.Name
+			}
+			s.add("effects."+name, "names no effect%s; the effects are %s", expr.DidYouMean(name, names), strings.Join(names, ", "))
+			continue
+		}
+		if d.Effects == nil {
+			d.Effects = map[string]string{}
+		}
+		if v := strings.TrimSpace(m[name]); v != "" {
+			d.Effects[name] = v
+		} else {
+			delete(d.Effects, name)
+		}
+	}
+}
+
+// mergeDraftWords lays a file's [drafts] over w: a key set replaces a lower layer's, an empty word takes it off.
+func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
+	if m == nil {
+		return
+	}
+	if m.ByHand != nil {
+		w.ByHand = strings.TrimSpace(*m.ByHand)
+	}
+	if m.ByHandAbout != nil {
+		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
+	}
+	if m.Quoted != nil {
+		w.Quoted = strings.TrimSpace(*m.Quoted)
+	}
+	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
+	states := make([]string, len(draft.States))
+	for i, st := range draft.States {
+		states[i] = string(st)
+	}
+	var known []string
+	for _, name := range declared(s, "drafts.states", m.States) {
+		if !slices.Contains(states, name) {
+			s.add("drafts.states."+name, "names no draft state%s; the states are %s", expr.DidYouMean(name, states), strings.Join(states, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.States = mergeWords(w.States, m.States, known)
+	known = nil
+	for _, name := range declared(s, "drafts.reasons", m.Reasons) {
+		if !slices.Contains(draft.WithdrawReasons, name) {
+			s.add("drafts.reasons."+name, "names no withdraw reason%s; the reasons are %s", expr.DidYouMean(name, draft.WithdrawReasons), strings.Join(draft.WithdrawReasons, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.Reasons = mergeWords(w.Reasons, m.Reasons, known)
+}
+
+// mergeWords is into with the words of names in m laid over it, an empty word taking one off.
+func mergeWords(into, m map[string]string, names []string) map[string]string {
+	for _, name := range names {
+		if into == nil {
+			into = map[string]string{}
+		}
+		if v := strings.TrimSpace(m[name]); v != "" {
+			into[name] = v
+		} else {
+			delete(into, name)
+		}
+	}
+	return into
+}
+
 func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	path := "gates." + name
 	i := slices.IndexFunc(d.Gates, func(g GateDef) bool { return g.Name == name })
@@ -312,12 +434,15 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 		s.add(path+".kind", "is required: what the gate decides")
 	}
 	text(s, path+".label", m.Label, &g.Label)
+	if m.CardSays != nil {
+		g.CardSays = *m.CardSays
+	}
 	switch {
 	case m.Text == nil:
 	case *m.Text == "":
 		g.Text = nil
 	default:
-		tmpl, err := ActionText(path+".text", *m.Text, sampleFacts(builtin.ProposalSlot))
+		tmpl, err := ActionText(s.textFuncs(), path+".text", *m.Text, textSample(g.Kind))
 		if err != nil {
 			_, msg := templateMsg(path+".text", err)
 			s.add(path+".text", "%s", msg)
@@ -389,7 +514,7 @@ func mergeIntent(s *sheet, g *GateDef, path, name string, m mGateIntent) {
 		case *v == "":
 			delete(in.Texts, name)
 		default:
-			tmpl, err := ActionText(path+"."+name, *v, SampleActionFacts())
+			tmpl, err := ActionText(s.textFuncs(), path+"."+name, *v, SampleActionFacts())
 			if err != nil {
 				_, msg := templateMsg(path+"."+name, err)
 				s.add(path+"."+name, "%s", msg)

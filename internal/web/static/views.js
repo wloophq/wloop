@@ -1,9 +1,13 @@
 "use strict";
 
 // REVIEW is the route and the key context of the review, a mode of the cockpit that walks the catalog's review
-// views; REVIEW_TITLE is its title.
+// views; reviewTitle is its title.
 const REVIEW = "review";
-const REVIEW_TITLE = "Review";
+
+function reviewTitle() {
+  return t("Review");
+}
+
 const tasksState = { catalog: null, catalogError: "", key: "", page: null, units: [], tasks: [], gates: [], loading: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
@@ -22,42 +26,10 @@ function viewSpec(id, cat = tasksState.catalog) {
 // view or a plugin's own web view; the catalog's first view otherwise.
 // Before anything is loaded every view stands.
 function resolveView(view, cat, served, plugin) {
-  if (view && ((!cat && !served.length) || isCoreView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
+  if (view === HOME || view === QUEUE || view === PLAN || view === RECENT) return view;
+  if (view &&((!cat && !served.length) || isCoreView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
   if (!cat && served.length) return served[0].id;
   return (coreViews(cat)[0] || served[0] || { id: "" }).id;
-}
-
-// viewNav is the rail: the core views with their counters, then each plugin
-// view (count left to the caller).
-function viewNav(cat, served, plugin, counters) {
-  const views = (counters && counters.views) || {};
-  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true }));
-  const taken = new Set(out.map((v) => v.id));
-  for (const v of served) {
-    if (taken.has(v.id)) continue;
-    taken.add(v.id);
-    out.push({ id: v.id, label: v.label, provider: v.provider || "", core: false });
-  }
-  for (const id of plugin) {
-    if (!taken.has(id)) out.push({ id, label: id, provider: (typeof pluginViews !== "undefined" && (pluginViews.get(id) || {}).plugin) || "", core: false });
-  }
-  return out;
-}
-
-// railSections splits viewNav's list: the core views untitled, then one
-// section per provider, titled by name(provider), in the order they first
-// appear.
-function railSections(nav, name) {
-  const out = [{ title: "", views: nav.filter((v) => v.core) }];
-  const by = new Map();
-  for (const v of nav.filter((x) => !x.core)) {
-    if (!by.has(v.provider)) {
-      by.set(v.provider, { title: v.provider ? name(v.provider) : "Plugins", views: [] });
-      out.push(by.get(v.provider));
-    }
-    by.get(v.provider).views.push(v);
-  }
-  return out.filter((sec) => sec.views.length);
 }
 
 // tasksURL lists view, narrowed to area; a page since a position also
@@ -205,9 +177,10 @@ async function loadTaskList(route) {
     tasksState.units = tasksState.units.filter((u) => !units.includes(u));
     tasksState.error = "";
   } catch (err) {
-    tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
+    tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: err.message });
     return;
   }
+  if ((viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT) await loadOutbox();
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -215,8 +188,8 @@ function unitLabel(u) {
   return !u ? "" : `${u.provider}:${u.key}`;
 }
 
-function shortDate(t) {
-  const d = new Date(t);
+function shortDate(at) {
+  const d = new Date(at);
   return isNaN(d) ? "" : d.toISOString().slice(0, 10);
 }
 
@@ -247,19 +220,27 @@ function taskModel(e, open, copy, lens) {
   const draft = isDraftTask(e);
   const due = roleValue(e, "deadline");
   const scope = taskSlot(e.id, copy);
+  const labels = (e.units || []).map((u, i) => (e.unit_labels || [])[i] || unitLabel(u));
+  const stateSpec = (lens.specs || []).find((s) => s.fact === "task.state" && !s.provider);
+  const statePiece = stateSpec && (parts.kind || []).find((p) => p.field === stateSpec.id);
+  if (statePiece) parts.kind = parts.kind.filter((p) => p !== statePiece);
   return {
     key: e.id, scope, item, parts, words: w, selected: e.id === open,
     open: draft ? null : () => writeHash({ task: e.id, pr: "" }),
     href: draft ? "#" + viewHash({ task: e.id, pr: "" }) : "",
-    title: e.title || e.id,
+    title: titleWithoutRef(e.title || e.id, labels),
+    glyph: statePiece ? { category: e.category || "", label: statePiece.label, field: statePiece.field, value: statePiece.value }
+      : { category: e.category || "", label: stateLabel(e.state) },
+    changed: !!e.changed,
+    drafts: e.drafts || [],
+    draftMark: draftMark(e),
     pre: starred(e) ? h("span", { class: "star", title: w.starred }, "★ ") : null,
-    ref: (e.units || []).map((u, i) => whereRef((e.unit_labels || [])[i] || unitLabel(u), item, lens, scope, w)),
+    ref: labels.map((label) => whereRef(label, item, lens, scope, w)),
     flags: [
-      e.changed ? h("span", { class: "flag" }, w.changed) : null,
       due ? h("span", { class: "flag due" }, fillWord(w.due, { date: shortDate(due) })) : null,
       e.wake && e.wake.until ? h("span", { class: "flag due" }, fillWord(w.until, { date: shortDate(e.wake.until) })) : null,
       e.extraction_lag ? h("span", { class: "flag due", title: w.unread_title }, fillWord(w.unread, { lag: shortLag(e.extraction_lag) })) : null],
-    after: [projectFacts(e, w), draft ? draftCard(e, "outbox") : null],
+    after: [projectFacts(e, w), draft ? draftCard(e, draftOf(e), { scope: "outbox" }) : null],
     lead: stripDot(strip, lens, scope, w),
     why: e.reason || "",
     cls: ["task-row", strip ? "w-" + strip.color : "", e.changed ? "changed" : "", draft ? "outbox" : "", ...rowClasses(item, lens.specs)],
@@ -275,11 +256,9 @@ function whereRef(label, item, lens, scope, w) {
   return named ? facet(lens, "where", named, text, `facet:${scope}:where:${named}`, { words: w, rove: true }) : text;
 }
 
-// taskTable is a table of the lens's groups of tasks, its columns those some task of all has a piece for.
-function taskTable(res, lens, open, all) {
-  const model = (it, copy) => taskModel(it.task, open, copy, lens);
-  const cols = rowColumns(all.map((it) => model(it, "")));
-  return h("table", { class: "task-table" }, rowHead(cols, lens, ""), ...rowTable(res, model, lens, cols));
+// taskList is the lens's groups of tasks as rows.
+function taskList(res, lens, open) {
+  return rowList(res, (it, copy) => taskModel(it.task, open, copy, lens), lens, "task-list");
 }
 
 // shortLag reads a Go duration as its largest unit: 2h, 12m, 30s.
@@ -313,8 +292,8 @@ function projectFacts(e, w) {
 }
 
 // localDate is an instant's day where the browser is, unlike shortDate's UTC day for deadlines.
-function localDate(t) {
-  const d = new Date(t);
+function localDate(at) {
+  const d = new Date(at);
   return isNaN(d) ? "" : d.toLocaleDateString("en-CA");
 }
 
@@ -359,9 +338,9 @@ function areaPicker(route) {
   if (!areas.length) return null;
   const counts = (viewCounters(route) || {}).areas || {};
   return h("label", { class: "lens-pick" },
-    h("span", { class: "lens-label" }, "Area"),
+    h("span", { class: "lens-label" }, t("Area")),
     h("select", { "data-focus": "view:area", onchange: (ev) => writeHash({ area: ev.target.value }) },
-      h("option", { value: "", selected: !route.area }, "All areas"),
+      h("option", { value: "", selected: !route.area }, t("All areas")),
       ...areas.map((a) => h("option", { value: a, selected: route.area === a }, counts[a] === undefined ? a : `${a} (${counts[a]})`))));
 }
 
@@ -408,8 +387,8 @@ function taskLensItems() {
   return tasksState.tasks.map(taskItemOf);
 }
 
-// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads
-// or for a list of gates), and its body. The lens counts what the filter shows of the view, as a pull
+// viewPage is a core view's page: its head, the lens over its tasks with what it shows (null while it loads,
+// for a list of gates or the Outbox), and its body, drawn in the view's served layout. The lens counts what the filter shows of the view, as a pull
 // request list's bar does.
 function viewPage(route, open) {
   const label = viewLabel(route.view);
@@ -419,15 +398,21 @@ function viewPage(route, open) {
   const head = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, label), areaPicker(route), contextChips(route),
     spec && spec.remove_clean ? h("button", {
       type: "button", class: "act", "data-focus": "tasks:remove-clean", disabled: n === 0 || removeState.busy,
-      title: "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
+      title: t("Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished"),
       onclick: () => removeAllClean(n, route.view),
-    }, "Remove all clean") : null), viewIntro(spec)];
+    }, t("Remove all clean")) : null), viewIntro(spec)];
   const page = { head, lens: lensOf(route), res: null, body: [] };
   const body = page.body;
   if (tasksState.error) body.push(h("p", { class: "plan-error" }, tasksState.error));
   if (loaded) body.push(...loadingNotes(tasksState.loading));
   if (!loaded) {
-    body.push(h("p", { class: "empty" }, "Loading."));
+    body.push(h("p", { class: "empty" }, t("Loading.")));
+    return page;
+  }
+  if (spec && spec.layout === OUTBOX_LAYOUT) {
+    if (outboxState.error) body.push(h("p", { class: "plan-error" }, outboxState.error));
+    const groups = (outboxState.page && outboxState.page.groups) || [];
+    body.push(groups.length ? outboxPage(outboxState.page) : h("p", { class: "empty" }, outboxState.page ? spec.empty : t("Loading.")));
     return page;
   }
   if (spec && spec.over === "gates") {
@@ -440,35 +425,35 @@ function viewPage(route, open) {
     return page;
   }
   if (!page.res.shown) {
-    body.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
+    body.push(h("p", { class: "empty" }, t("Nothing here matches \"{query}\".", { query: route.q })));
     return page;
   }
   if (page.lens.layout === "board") body.push(taskBoard(page.res, page.lens, open));
-  else body.push(taskTable(page.res, page.lens, open, taskLensItems()));
+  else body.push(taskList(page.res, page.lens, open));
   return page;
 }
 
 // taskBoard is a lane per group of the lens, each holding its tasks' cards.
 function taskBoard(res, lens, open) {
   return h("div", { class: "board task-board" }, ...res.groups.filter((g) => g.rows.length)
-    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => rowCard(taskModel(it.task, open, copy, lens), lens))));
+    .map((g) => lane(g, lens, viewLabel(lens.view), (it, copy) => rowView(taskModel(it.task, open, copy, lens), lens, { card: true }))));
 }
 
 // viewIntro is a view's summary under its heading, and the rule its profile lists it by behind a toggle.
 function viewIntro(spec) {
   if (!spec || !spec.summary) return null;
-  const rule = [["Lists", spec.when], ["Sorted by", spec.sort], ["Grouped by", spec.group]].filter(([, v]) => v);
+  const rule = [[t("Lists"), spec.when], [t("Sorted by"), spec.sort], [t("Grouped by"), spec.group]].filter(([, v]) => v);
   return h("div", { class: "view-intro" },
     h("p", { class: "view-summary" }, spec.summary),
     rule.length ? h("details", { class: "view-rule" },
-      h("summary", {}, "Why these tasks?"),
+      h("summary", {}, t("Why these tasks?")),
       h("dl", {}, ...rule.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, h("code", {}, v))]))) : null);
 }
 
 // loadingNotes say which plugins have not reported all their units yet, and why, so a short list reads as
 // incomplete rather than empty.
 function loadingNotes(loading) {
-  return (loading || []).map((l) => h("p", { class: "loading", "data-plugin": l.plugin }, `Loading ${l.plugin}${l.reason ? ": " + l.reason : ""}`));
+  return (loading || []).map((l) => h("p", { class: "loading", "data-plugin": l.plugin }, l.reason ? t("Loading {plugin}: {reason}", { plugin: l.plugin, reason: l.reason }) : t("Loading {plugin}", { plugin: l.plugin })));
 }
 
 // viewLabel is the profile's word for a core view.
@@ -491,7 +476,7 @@ const removeState = { busy: false };
 // removeAllClean removes the clean workspaces the n tasks of a view that offers it hold, and says what it removed
 // and what it kept, with why.
 async function removeAllClean(n, view) {
-  if (!confirm(`Remove the workspaces of the ${n} task${n === 1 ? "" : "s"} in ${viewLabel(view)}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.`)) return;
+  if (!confirm(tn("Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.", n, { view: viewLabel(view) }))) return;
   removeState.busy = true;
   state.actionError = "";
   state.actionDetail = "";
@@ -508,18 +493,18 @@ async function removeAllClean(n, view) {
     const kept = (out.kept || []).map((k) => `${labelOf(k)} (${k.reason})`);
     const details = (out.kept || []).filter((k) => k.detail).map((k) => `${labelOf(k)}: ${k.detail}`);
     const text = [
-      `Removed ${removed.length}${removed.length ? ": " + removed.join(", ") : ""}.`,
-      kept.length ? `Kept ${kept.length}: ${kept.join("; ")}.` : "",
+      removed.length ? tn("Removed {n}: {list}.", removed.length, { list: removed.join(", ") }) : tn("Removed {n}.", 0),
+      kept.length ? tn("Kept {n}: {list}.", kept.length, { list: kept.join("; ") }) : "",
     ].filter(Boolean).join(" ");
     setNotice(text);
     document.getElementById("notice").title = text;
     if (details.length) {
-      state.actionError = `Kept ${details.length} with details`;
+      state.actionError = tn("Kept {n} with details", details.length);
       state.actionSource = "";
       state.actionDetail = details.join("\n");
     }
   } catch (err) {
-    state.actionError = `remove all clean failed: ${err.message}`;
+    state.actionError = t("remove all clean failed: {error}", { error: err.message });
   }
   removeState.busy = false;
   scheduleLoad({ all: true, tasks: true });
@@ -537,7 +522,7 @@ function renderTasks(route) {
     head.replaceChildren();
     hideLens(tools);
     body.replaceChildren(...(on ? reviewPanel(route.task) : []));
-    if (on) box.setAttribute("aria-label", REVIEW_TITLE);
+    if (on) box.setAttribute("aria-label", reviewTitle());
     return;
   }
   box.setAttribute("aria-label", viewLabel(route.view));

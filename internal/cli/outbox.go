@@ -180,7 +180,7 @@ func outboxShow(ctx context.Context, e *Env, c *client.Client, args []string) er
 	return nil
 }
 
-var mentionPattern = regexp.MustCompile(`@\{[^}\s]+\}|(?:^|[^\w@{])@[A-Za-z0-9][\w./-]*`)
+var mentionPattern = regexp.MustCompile(`@\{(?:group:[^{}\n]+|[^{}\s]+)\}|(?:^|[^\w@{])@[A-Za-z0-9][\w./-]*`)
 
 // mentionsOf are the people text names: structured mentions and raw @handles.
 func mentionsOf(text string) []string {
@@ -200,6 +200,9 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	fmt.Fprintf(w, "target:   %s\n", draftTarget(d))
 	if d.Permalink == "" {
 		fmt.Fprintf(w, "to:       %s\n", draftWhere(d))
+	}
+	if d.Broadcast != "" {
+		fmt.Fprintf(w, "broadcast: %s\n", d.Broadcast)
 	}
 	origin := d.Origin.Kind
 	switch {

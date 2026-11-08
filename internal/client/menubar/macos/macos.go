@@ -16,7 +16,8 @@ const activationPolicyAccessory = 1
 
 func Available() bool { return true }
 
-// Run starts AppKit and calls setup once it has launched; notification
+// Run starts AppKit and calls setup once it has launched, with a tray that
+// takes the app's deep links (menubar.LinkSource); notification
 // images are written under imageDir. AppKit only works
 // on the process's main thread, so Run must be called from the main
 // goroutine, which the main package pins to that thread in init. It never
@@ -27,9 +28,19 @@ func Run(imageDir string, setup func(tray menubar.Tray, notes menubar.Notifier))
 	setupPump()
 	nsApp := class("NSApplication").Send(sel("sharedApplication"))
 	nsApp.Send(sel("setActivationPolicy:"), activationPolicyAccessory)
-	launched = func() { setup(newTray(), newNotifier(imageDir)) }
+	listenForLinks()
+	launched = func() { setup(linkTray{newTray()}, newNotifier(imageDir)) }
 	nsApp.Send(sel("setDelegate:"), pump)
 	nsApp.Send(sel("run"))
+}
+
+// Attach starts the tray and notifier inside a run loop another host owns,
+// as Run's setup does, without taking the run loop or the app's delegate;
+// the caller is on the main thread.
+func Attach(imageDir string, setup func(tray menubar.Tray, notes menubar.Notifier)) {
+	loadFrameworks()
+	setupPump()
+	setup(newTray(), newNotifier(imageDir))
 }
 
 // Quit ends the process through AppKit; before Run it does nothing.

@@ -22,22 +22,24 @@ func init() {
 	)
 }
 
-func TestUnappliedAreTheSentDraftsThatDeclareEffects(t *testing.T) {
+func TestUnappliedAreTheDraftsOwingTheirDeclaredEffects(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	for _, c := range []struct {
 		state   draft.State
+		reason  string
 		effects []string
-	}{{draft.Sent, []string{"task.nudged"}}, {draft.Sent, nil}, {draft.Held, []string{"unit.closed"}}, {draft.Sent, []string{"unit.closed"}}} {
+	}{{draft.Sent, "", []string{"task.nudged"}}, {draft.Sent, "", nil}, {draft.Held, "", []string{"unit.closed"}}, {draft.Sent, "", []string{"unit.closed"}},
+		{draft.Dropped, "user", []string{"unit.closed"}}, {draft.Dropped, draft.ReasonClosedSilently, []string{"unit.closed"}}} {
 		d := sampleDraft(slackThread, noteAt)
-		d.State, d.Effects = c.state, c.effects
+		d.State, d.Reason, d.Effects = c.state, c.reason, c.effects
 		if _, err := db.Drafts().Insert(ctx, d); err != nil {
 			t.Fatal(err)
 		}
 	}
 	got, err := db.DraftEffects().Unapplied(ctx)
-	if err != nil || len(got) != 2 || got[0].ID != 1 || got[1].ID != 4 {
+	if err != nil || len(got) != 3 || got[0].ID != 1 || got[1].ID != 4 || got[2].ID != 6 {
 		t.Fatalf("unapplied %+v %v", got, err)
 	}
 	if err := db.DraftEffects().MarkApplied(ctx, 1, noteAt); err != nil {
@@ -49,7 +51,7 @@ func TestUnappliedAreTheSentDraftsThatDeclareEffects(t *testing.T) {
 	if d, _ := db.Drafts().Get(ctx, 1); !d.EffectsAppliedAt.Equal(noteAt.UTC()) {
 		t.Fatalf("applied at %v", d.EffectsAppliedAt)
 	}
-	if got, _ := db.DraftEffects().Unapplied(ctx); len(got) != 1 || got[0].ID != 4 {
+	if got, _ := db.DraftEffects().Unapplied(ctx); len(got) != 2 || got[0].ID != 4 {
 		t.Fatalf("unapplied after the mark %+v", got)
 	}
 }

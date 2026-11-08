@@ -66,7 +66,7 @@ func reviewFixture() api.Review {
 
 func reviewCatalog() api.ViewsCatalog {
 	c := viewsCatalog()
-	c.Views = append(c.Views, api.TaskViewSpec{ID: "review", Label: "Review"})
+	c.Views = append(c.Views, api.TaskViewSpec{ID: "review", Label: "Review", Rail: true})
 	return c
 }
 
@@ -232,4 +232,13 @@ func TestProjectFactsCountTheOpenChildren(t *testing.T) {
 	if got := strings.Join(projectFacts(p, testLensWords.RowWords), " "); got != "2 open" {
 		t.Errorf("facts %q", got)
 	}
+}
+
+func (f *fakeDaemon) Strings(context.Context) (api.Strings, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.strings == nil {
+		return api.Strings{Locale: "en"}, nil
+	}
+	return *f.strings, nil
 }

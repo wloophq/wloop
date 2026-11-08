@@ -1,6 +1,7 @@
 package automation
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -11,17 +12,21 @@ import (
 
 // withdraw discards every proposed draft whose applying workflow's
 // [drafts.withdraw] when matches it on fresh facts, with the workflow's reason,
-// and every draft of a workflow no longer loaded as moot; a draft of a
-// disabled plugin's unit, or of a workflow that failed to load, is left as
-// it is.
+// every draft of a workflow no longer loaded as moot, and every draft of a
+// workflow the Keep skips on its subject as skipped; a draft of a
+// disabled plugin's unit, of a workflow that failed to load or of one the
+// configuration turns off, is left as it is.
 func (e *Engine) withdraw(ctx context.Context) error {
 	if e.Withdrawals == nil {
 		return nil
 	}
 	live := e.live()
-	var broken []string
+	var kept []string
 	if e.Broken != nil {
-		broken = e.Broken()
+		kept = e.Broken()
+	}
+	if e.Disabled != nil {
+		kept = append(kept, e.Disabled()...)
 	}
 	vars := workflow.Vars{Now: e.now()}
 	if e.Config != nil {
@@ -41,7 +46,7 @@ func (e *Engine) withdraw(ctx context.Context) error {
 				return err
 			}
 			for _, c := range ds {
-				if judged[c.ID] || c.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(c.Subject.Provider) || slices.Contains(broken, c.Workflow) {
+				if judged[c.ID] || c.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(c.Subject.Provider) || slices.Contains(kept, c.Workflow) {
 					continue
 				}
 				judged[c.ID] = true
@@ -73,10 +78,17 @@ func (e *Engine) withdraw(ctx context.Context) error {
 
 func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workflow, d ProposedDraft, vars workflow.Vars) (string, error) {
 	w, ok := live[d.Workflow]
-	switch {
-	case !ok:
+	if !ok {
 		return draft.WithdrawMoot, nil
-	case w.Withdraw == nil || w.Observe:
+	}
+	if skip, err := e.skipped(ctx, d.Workflow, d.Subject); err != nil || skip {
+		if skip {
+			return draft.WithdrawSkipped, nil
+		}
+		return "", err
+	}
+	rules := w.Withdrawals()
+	if len(rules) == 0 || w.Observe {
 		return "", nil
 	}
 	facts, err := e.factsFor(ctx, w, d.Subject)
@@ -92,11 +104,13 @@ func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workfl
 			vars.Facts[k] = v
 		}
 	}
-	if ok, err := match(w.Withdraw, vars); err != nil || !ok {
-		return "", err
+	for _, r := range rules {
+		switch ok, err := match(r.When, vars); {
+		case err != nil:
+			return "", err
+		case ok:
+			return cmp.Or(r.Reason, draft.WithdrawMoot), nil
+		}
 	}
-	if w.WithdrawReason != "" {
-		return w.WithdrawReason, nil
-	}
-	return draft.WithdrawMoot, nil
+	return "", nil
 }

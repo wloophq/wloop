@@ -29,7 +29,8 @@ const (
 )
 
 // A task's timeline, runs and chat, and the gates and runs as resources: TimelinePath serves a task's
-// []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit), RunsPath its []RunView,
+// []TimelineEvent, newest first (query parameters kinds as "a,b", before a Seq and limit; as=nodes answers
+// []TimelineNode instead), RunsPath its []RunView,
 // ChatPath takes a ChatRequest, AttachPath makes the caller's session, from SessionHeader, a run of the task (it takes an AttachRequest
 // and answers a ByHandResult).
 // GatesPath lists []GateView (query parameter status as "a,b", open when absent), GatePath resolves gate id with intent (a TaskRequest's args carry an
@@ -101,8 +102,8 @@ type LensWords struct {
 	RowWords
 }
 
-// RowWords are the words of a row: its age, its facet buttons' title and aria-label, its columns' heads and
-// the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
+// RowWords are the words of a row: its age, its facet buttons' title and aria-label, the head of a mixed list's
+// unit, the flags and tooltips no facet carries. A plugin's ui.toml may replace any for its own rows.
 type RowWords struct {
 	AgeNow           string `json:"age_now"`
 	AgeMinutes       string `json:"age_minutes"`
@@ -124,11 +125,6 @@ type RowWords struct {
 	LegendTitle      string `json:"legend_title"`
 	SortBy           string `json:"sort_by"`
 	ColUnit          string `json:"col_unit"`
-	ColWho           string `json:"col_who"`
-	ColAge           string `json:"col_age"`
-	ColWhy           string `json:"col_why"`
-	ColAside         string `json:"col_aside"`
-	ColActions       string `json:"col_actions"`
 	Stale            string `json:"stale"`
 	StaleTitle       string `json:"stale_title"`
 	Briefing         string `json:"briefing"`
@@ -137,7 +133,6 @@ type RowWords struct {
 	BriefingError    string `json:"briefing_error"`
 	Questions        string `json:"questions"`
 	QuestionsTitle   string `json:"questions_title"`
-	Changed          string `json:"changed"`
 	Starred          string `json:"starred"`
 	Until            string `json:"until"`
 	Due              string `json:"due"`
@@ -149,6 +144,7 @@ type RowWords struct {
 	Sequential       string `json:"sequential"`
 	Every            string `json:"every"`
 	Reviewed         string `json:"reviewed"`
+	More             string `json:"more"`
 }
 
 type ViewsCatalog struct {
@@ -165,6 +161,17 @@ type ViewsCatalog struct {
 	Facets      []FacetSpec `json:"facets,omitempty"`
 	DefaultSort string      `json:"default_sort,omitempty"`
 	Lens        LensWords   `json:"lens"`
+	// DetailVerbs are the verbs a task's detail shows as buttons, in order (tasks.toml's detail.verbs); Effects
+	// the sentence that says what each effect does when a draft is sent, by effect name (gates.toml's effects).
+	DetailVerbs []string          `json:"detail_verbs"`
+	Effects     map[string]string `json:"effects"`
+	// DraftPurposes name what a draft is for, by purpose, and DraftStates where its delivery stands, by state
+	// (gates.toml's drafts.purposes and drafts.states).
+	DraftPurposes map[string]string `json:"draft_purposes"`
+	DraftStates   map[string]string `json:"draft_states"`
+	// RunStates word a run's turn state and SessionStates its session's, by state (tasks.toml's runs).
+	RunStates     map[string]string `json:"run_states"`
+	SessionStates map[string]string `json:"session_states"`
 	// Version changes whenever anything above does.
 	Version string `json:"version,omitempty"`
 }
@@ -186,6 +193,10 @@ type TaskViewSpec struct {
 	Badge        bool   `json:"badge,omitempty"`
 	HideDisabled bool   `json:"hide_disabled,omitempty"`
 	RemoveClean  bool   `json:"remove_clean,omitempty"`
+	// Rail says whether the rail lists the view; a view only the home, a queue or search reads does not.
+	Rail bool `json:"rail"`
+	// Layout is how the cockpit draws the view: list, board or outbox.
+	Layout string `json:"layout,omitempty"`
 }
 
 // StateSpec is a state of tasks.toml and the category Go reads of it.
@@ -292,6 +303,12 @@ type TaskView struct {
 	// tasks merged into it, in merge order, each as its merge record keeps it: the ones split gives back.
 	Related    []TaskRef `json:"related,omitempty"`
 	MergedFrom []TaskRef `json:"merged_from,omitempty"`
+	// Drafts are the ids of the task's pending drafts (held or failed), ascending.
+	Drafts []int64 `json:"drafts"`
+	// ReplyBroadcast is "on" or "off" when a reply the user writes on the task would reply in a thread that can
+	// also post to its conversation, as its publisher would place it, which the reply verb's broadcast argument
+	// turns; "" otherwise. Detail only.
+	ReplyBroadcast string `json:"reply_broadcast,omitempty"`
 }
 
 // TaskRef is another task as a task's page names it: its id, title and state; Merged says it is merged
@@ -317,7 +334,8 @@ type AskView struct {
 // GateView is a gate as clients offer it: Task and Unit what it is on ("" when none), Text its words from
 // gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
 // with, Delivery a draft gate's delivery state (held, queued, sending, sent, failed, dropped), Subject its subject as
-// its kind serves it: a draft gate's is its Draft.
+// its kind serves it: a draft gate's is its Draft, a plan gate's its plan item's id. Plan is a plan gate's item while
+// it waits.
 type GateView struct {
 	ID       int64           `json:"id"`
 	Task     string          `json:"task,omitempty"`
@@ -331,13 +349,18 @@ type GateView struct {
 	Default  string          `json:"default,omitempty"`
 	Delivery string          `json:"delivery,omitempty"`
 	Subject  json.RawMessage `json:"subject,omitempty"`
+	Plan     *PlanItem       `json:"plan,omitempty"`
+	// Units are what a step gate is about: the units its task holds, as a person finds them.
+	Units []PlanUnit `json:"units,omitempty"`
 }
 
-// IntentView is an intent a gate offers; Answer says it takes text, as a question's answer.
+// IntentView is an intent a gate offers: Summary says what resolving with it does, for the card of a gate whose
+// gates.toml sets card_says, Answer that it takes text, as a question's answer.
 type IntentView struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Answer bool   `json:"answer,omitempty"`
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Summary string `json:"summary,omitempty"`
+	Answer  bool   `json:"answer,omitempty"`
 }
 
 // RunView is a run of a task: the turn Seq of Intent in State, where it ran, its session and that session's
@@ -399,6 +422,20 @@ type TimelineEvent struct {
 	At      time.Time       `json:"at"`
 	Unit    string          `json:"unit,omitempty"`
 	Data    json.RawMessage `json:"data,omitempty"`
+}
+
+// TimelineNode is one fact of a task's timeline, as GET TimelinePath?as=nodes serves it, newest first: the events
+// a profile's [facts.<name>] Rule folded, oldest first, or one event no fact took (Rule ""). Label and Tone are the
+// fact's words; End is zero for a single event and for a span still Running.
+type TimelineNode struct {
+	Rule    string          `json:"rule,omitempty"`
+	Label   string          `json:"label"`
+	Tone    string          `json:"tone,omitempty"`
+	At      time.Time       `json:"at"`
+	End     time.Time       `json:"end,omitzero"`
+	Running bool            `json:"running,omitempty"`
+	Actor   string          `json:"actor,omitempty"`
+	Events  []TimelineEvent `json:"events"`
 }
 
 // ChatRequest is a message to a task's agent; Intent picks the intent of the turn it starts when no session

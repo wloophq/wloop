@@ -1,9 +1,14 @@
 summary = "Ask you to review the diff when a start turn on a task you captured opens a pull request"
 provider = "task"
-when = 'task.captured_by_user && task.turns > 0 && "github" in task.unit_providers && !(task.category in ["done", "dropped"])'
+when = 'task.captured_by_user && task.turns > 0 && "pull-request" in task.open_unit_kinds && !(task.category in ["done", "dropped"])'
 key = ["task.units"]
 order = 56
 
 [[step]]
 use = "gate.open"
 name = "review-diff"
+
+# Once no pull request of the task is open, there is no diff left to review.
+[gates.withdraw]
+when = '!("pull-request" in task.open_unit_kinds)'
+reason = "its pull request merged or closed, nothing is left to review"

@@ -1,0 +1,274 @@
+# What the timeline calls each of the core's event kinds and the tone it draws them in; a plugin words its own
+# kinds in its ui.toml. The [facts] below fold a task's events into the few facts a person reads; a plugin's layer
+# adds its own, and a higher layer replaces a fact of the same name whole.
+
+[events.held]
+label = "paused"
+tone = "me"
+
+[events.released]
+label = "resumed"
+tone = "me"
+
+[events.muted]
+label = "muted"
+tone = "me"
+
+[events.unmuted]
+label = "unmuted"
+tone = "me"
+
+[events.adopted]
+label = "adopted"
+tone = "me"
+
+[events.status]
+label = "board"
+tone = "me"
+
+[events.removed]
+label = "workspace removed"
+tone = "loop"
+
+[events.nudged]
+label = "nudged"
+tone = "loop"
+
+[events.tracked]
+label = "tracked"
+tone = "me"
+
+[events.untracked]
+label = "untracked"
+tone = "me"
+
+[events.answered]
+label = "answered"
+tone = "me"
+
+[events.turn_sent]
+label = "turn sent"
+tone = "loop"
+
+[events.turn_started]
+label = "turn started"
+tone = "loop"
+
+[events.turn_ended]
+label = "turn ended"
+tone = "loop"
+
+[events.turn_resumed]
+label = "turn resumed"
+tone = "loop"
+
+[events.turn_withdrawn]
+label = "turn withdrawn"
+tone = "loop"
+
+[events.question_dismissed]
+label = "question dismissed"
+tone = "me"
+
+[events.turn_delivered]
+label = "turn delivered"
+tone = "loop"
+
+[events.answer_routed]
+label = "answer routed"
+tone = "loop"
+
+[events.late_record]
+label = "late record"
+tone = "loop"
+
+[events.stop_blocked]
+label = "stop blocked"
+tone = "loop"
+
+[events.turn_stopped]
+label = "turn stopped"
+tone = "loop"
+
+[events.guide_trimmed]
+label = "guide trimmed"
+tone = "loop"
+
+[events.dossier_restored]
+label = "dossier file restored"
+tone = "loop"
+
+[events.dossier_granted]
+label = "dossier granted to the session"
+tone = "loop"
+
+[events.dossier_call]
+label = "dossier compaction, US$"
+tone = "loop"
+
+[events.omnibox_call]
+label = "omnibox agent call, US$"
+
+[events.brief_waiting]
+label = "waiting for the brief"
+tone = "loop"
+
+[events.intake_accepted]
+label = "request accepted"
+tone = "loop"
+
+[events.intake_briefing]
+label = "request waits for the brief"
+tone = "loop"
+
+[events.intake_starting]
+label = "request starting"
+tone = "loop"
+
+[events.intake_started]
+label = "request started"
+tone = "loop"
+
+[events.intake_failed]
+label = "request failed"
+tone = "loop"
+
+[events.intake_canceled]
+label = "request canceled"
+tone = "loop"
+
+[events.intake_guidance]
+label = "request guidance replaced"
+tone = "loop"
+
+[events.workflow_step_ran]
+label = "step ran"
+tone = "loop"
+
+[events.session_started]
+label = "agent session started"
+tone = "loop"
+
+[events.session_launched]
+label = "agent session launched"
+tone = "loop"
+
+[events.session_abandoned]
+label = "agent session abandoned"
+tone = "loop"
+
+[events.session_idle]
+label = "agent session idle"
+tone = "loop"
+
+[events.session_active]
+label = "agent session active"
+tone = "loop"
+
+[events.session_closed]
+label = "agent session closed"
+tone = "loop"
+
+[events.session_typed]
+label = "typed in the agent session"
+tone = "loop"
+
+[events.session_prompted]
+label = "agent session prompted"
+tone = "loop"
+
+[events.session_unit]
+label = "agent session tied"
+tone = "loop"
+
+[events.session_adopted]
+label = "agent session adopted"
+tone = "loop"
+
+[events.session_dormant]
+label = "agent session dormant"
+tone = "loop"
+
+[events.session_woken]
+label = "agent session woken"
+tone = "loop"
+
+[events.session_merged]
+label = "agent session merged"
+tone = "loop"
+
+[events.mcp_seen]
+label = "agent reached the loop"
+tone = "loop"
+
+[events.turn_dismissed]
+label = "turn dismissed by a rule"
+tone = "loop"
+
+[events.answer_refused]
+label = "answer refused"
+tone = "loop"
+
+[events.answer_read]
+label = "answer read"
+tone = "loop"
+
+[events.view_applied]
+label = "view applied"
+tone = "loop"
+
+[events.record]
+label = "record written"
+tone = "loop"
+
+[events.gate_resolved]
+label = "decision resolved"
+tone = "me"
+
+[events.gate_withdrawn]
+label = "step withdrawn"
+tone = "loop"
+
+[events.message]
+label = "message"
+
+[facts.round]
+start   = ["turn_sent", "turn_started"]
+end     = ["turn_ended", "turn_stopped", "turn_withdrawn"]
+absorb  = ["turn_delivered", "round_sent", "intake_started", "turn_resumed", "stop_blocked", "guide_trimmed", "late_record", "dossier_restored", "dossier_granted", "dossier_call", "record", "session_prompted", "session_typed", "session_idle", "session_active", "mcp_seen"]
+label   = "Agent round, {{.duration}}"
+running = "Agent round running"
+unfinished = "Agent round, no end recorded"
+tone    = "loop"
+order   = 10
+
+[facts.answer]
+start  = ["answered"]
+absorb = ["answer_routed", "answer_read"]
+label  = "You answered the agent"
+tone   = "me"
+order  = 20
+
+[facts.decision]
+start = ["gate_resolved"]
+label = "Decision resolved"
+tone  = "me"
+order = 30
+
+[facts.withdrawn]
+start = ["gate_withdrawn"]
+label = "Step withdrawn: {{.sub}}"
+tone  = "loop"
+order = 31
+
+[facts.moved]
+start = ["verb_next", "verb_waiting", "verb_schedule", "verb_someday", "verb_reference", "verb_done", "verb_dismiss", "verb_acknowledge", "verb_not-mine", "verb_hand-to"]
+label = "Moved: {{.event}}"
+tone  = "me"
+order = 40
+
+[facts.board]
+start = ["status"]
+label = "Board: {{.sub}}"
+tone  = "me"
+order = 41

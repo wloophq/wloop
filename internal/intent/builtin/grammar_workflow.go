@@ -9,8 +9,8 @@ import (
 
 // workflowGrammar is the workflow manifest's keys.
 var workflowGrammar = slices.Concat([]Key{
-	{Path: "summary", In: SurfaceWorkflow, Kind: KindText, Required: true, Doc: "One line, what the workflow does; its plan items' description. Required."},
-	{Path: "ask", In: SurfaceWorkflow, Kind: KindText, Doc: "What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts \"session.name\"}}`); its summary when absent."},
+	{Path: "summary", In: SurfaceWorkflow, Localized: true, Kind: KindText, Required: true, Doc: "One line, what the workflow does; its plan items' description. Required."},
+	{Path: "ask", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts \"session.name\"}}`); its summary when absent."},
 	{Path: "provider", In: SurfaceWorkflow, Kind: KindEnum, Values: providerValues, Required: true, Doc: "The provider of the units it matches. Required."},
 	{Path: "when", In: SurfaceWorkflow, Kind: KindPred, Required: true, Doc: "The match condition, over the unit's facts, the trigger's and config.*. Required."},
 	{Path: "order", In: SurfaceWorkflow, Kind: KindInt, Default: "100", Doc: "Evaluation order, lowest first."},
@@ -18,6 +18,7 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "marks", In: SurfaceWorkflow, Kind: KindMap, Doc: "Mark name to fact, stored when a run is done or dismissed, which handled() reads."},
 	{Path: "marks.*", In: SurfaceWorkflow, Kind: KindFact, Doc: "The fact whose value the mark stores."},
 	{Path: "observe", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Plans items pending and never runs them by itself; a person applies an item by hand."},
+	{Path: "enabled", In: SurfaceWorkflow, Kind: KindBool, Default: "true", Doc: "false ships the workflow off: it plans nothing until workflows.<name>.enabled = true in the config turns it on."},
 	{Path: "trigger", In: SurfaceWorkflow, Kind: KindTable, Doc: "What plans the workflow: on or schedule; absent, every sweep."},
 	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindText, Doc: "The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_<verb>, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task."},
 	{Path: "trigger.schedule", In: SurfaceWorkflow, Kind: KindText, Doc: "A cron schedule, in local time."},
@@ -35,12 +36,24 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "drafts.withdraw", In: SurfaceWorkflow, Kind: KindTable, Doc: "When an open draft the workflow proposed is withdrawn."},
 	{Path: "drafts.withdraw.when", In: SurfaceWorkflow, Kind: KindPred, Doc: "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's."},
 	{Path: "drafts.withdraw.reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the withdrawn draft stores."},
+	{Path: "gates.drafts_wait", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it."},
+	{Path: "gates.withdraw", In: SurfaceWorkflow, Kind: KindTable, Doc: "When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it."},
+	{Path: "gates.withdraw.when", In: SurfaceWorkflow, Kind: KindPred, Required: true, Doc: "When an open gate the workflow opened is withdrawn, over its unit's facts; it may read no untrusted fact, since a withdrawal closes a gate that waits on you. Required."},
+	{Path: "gates.withdraw.reason", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "Why the gate was withdrawn, as its task's timeline shows it."},
+	{Path: "drafts.withdraw.rule[]", In: SurfaceWorkflow, Kind: KindTable, Doc: "A rule tried before when, in order, that withdraws with a reason of its own."},
+	{Path: "drafts.withdraw.rule[].when", In: SurfaceWorkflow, Kind: KindPred, Required: true, Doc: "When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required."},
+	{Path: "drafts.withdraw.rule[].reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the draft the rule withdraws stores."},
+	{Path: "outbox", In: SurfaceWorkflow, Kind: KindTable, Doc: "How the Outbox heads the group of the drafts the workflow proposed."},
+	{Path: "outbox.title", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "The group's title, what the drafts are for, such as \"Ask who hasn't answered\"; the summary when absent."},
+	{Path: "outbox.about", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "One line under the title on when the workflow drafts them, such as \"Drafted when a conversation where you asked something goes quiet.\""},
 })
 
 func withdrawValues() []Value {
 	return []Value{
 		{Name: draft.WithdrawAssigned, Doc: "Its items got an owner."},
 		{Name: draft.WithdrawMoot, Doc: "It no longer applies."},
+		{Name: draft.WithdrawOutside, Doc: "It addresses someone who cannot read the conversation it posts in."},
+		{Name: draft.WithdrawJoined, Doc: "The person it was written to in their own conversation joined the one it came from."},
 	}
 }
 

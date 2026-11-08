@@ -191,7 +191,7 @@
       "r2 held",
       "Export in batches"
     ],
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -293,12 +293,13 @@
         "status": ""
       }
     },
-    "specs_version": "9373394a48af",
+    "specs_version": "8ad46135340f",
     "summary": {
       "closed": true,
       "line": "merged",
       "open_items": 0,
       "reason": "merged",
+      "reason_key": "merged",
       "since": "0001-01-01T00:00:00Z",
       "stalled": false,
       "waits_on": "nobody"

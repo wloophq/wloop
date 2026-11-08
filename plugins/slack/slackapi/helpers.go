@@ -208,6 +208,26 @@ func (c *Client) ListConversations(ctx context.Context, types, cursor string) (C
 	return ConversationsPage{Conversations: out.Channels, NextCursor: out.ResponseMetadata.NextCursor}, nil
 }
 
+// MembersPage is a page of conversations.members: the member user ids.
+type MembersPage struct {
+	Members    []string
+	NextCursor string
+}
+
+// ConversationMembers pages conversations.members of the conversation id, 1000 ids a page.
+func (c *Client) ConversationMembers(ctx context.Context, id, cursor string) (MembersPage, error) {
+	args := url.Values{"channel": {id}, "limit": {"1000"}}
+	setIf(args, "cursor", cursor)
+	var out struct {
+		Members []string `json:"members"`
+		cursorMeta
+	}
+	if err := c.Call(ctx, "conversations.members", args, &out); err != nil {
+		return MembersPage{}, err
+	}
+	return MembersPage{Members: out.Members, NextCursor: out.ResponseMetadata.NextCursor}, nil
+}
+
 type wireUser struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`

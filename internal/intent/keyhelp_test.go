@@ -36,7 +36,7 @@ func TestKeyHelpComesFromTheProfile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, KeysFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	texts, problems := loadKeys([]profile.Layer{{Name: "user", Dir: dir}}, fstest.MapFS{KeysFile: {Data: bundled}})
+	texts, problems := loadKeys([]profile.Layer{{Name: "user", Dir: dir}}, readerOf(fstest.MapFS{KeysFile: {Data: bundled}}))
 	if texts.Help("global", "capture") != "capture a task" || texts.Help("list", "move:up") != "move up" {
 		t.Errorf("help %q, %q", texts.Help("global", "capture"), texts.Help("list", "move:up"))
 	}

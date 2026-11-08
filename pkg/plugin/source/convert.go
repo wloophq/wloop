@@ -147,7 +147,14 @@ func cardPB(c *Card) *pb.Card {
 		WaitsOn: peoplePB(c.WaitsOn), Since: ts(c.Since), Link: c.Link, TurnsLink: c.TurnsLink,
 		StartedByMe: c.StartedByMe, ClosurePosted: c.ClosurePosted, Cares: c.Cares,
 		Signals: mapSlice(c.Signals, func(s CardSignal) *pb.CardSignal {
-			return &pb.CardSignal{Key: s.Key, Value: s.Value, Tone: s.Tone, At: ts(s.At)}
+			out := &pb.CardSignal{Key: s.Key, Value: s.Value, Tone: s.Tone, At: ts(s.At)}
+			if d := s.Detail; d != nil {
+				out.Params = d.Params
+				out.Notes = mapSlice(d.Notes, func(n SignalNote) *pb.SignalNote {
+					return &pb.SignalNote{Code: n.Code, Tone: n.Tone, Params: n.Params, Since: ts(n.Since)}
+				})
+			}
+			return out
 		}),
 	}
 	if h := c.LastHuman; h != nil {
@@ -165,7 +172,13 @@ func cardGo(c *pb.Card) *Card {
 		WaitsOn: peopleGo(c.GetWaitsOn()), Since: tm(c.GetSince()), Link: c.GetLink(), TurnsLink: c.GetTurnsLink(),
 		StartedByMe: c.GetStartedByMe(), ClosurePosted: c.GetClosurePosted(), Cares: c.GetCares(),
 		Signals: mapSlice(c.GetSignals(), func(s *pb.CardSignal) CardSignal {
-			return CardSignal{Key: s.GetKey(), Value: s.GetValue(), Tone: s.GetTone(), At: tm(s.GetAt())}
+			out := CardSignal{Key: s.GetKey(), Value: s.GetValue(), Tone: s.GetTone(), At: tm(s.GetAt())}
+			if len(s.GetParams()) > 0 || len(s.GetNotes()) > 0 {
+				out.Detail = &SignalDetail{Params: s.GetParams(), Notes: mapSlice(s.GetNotes(), func(n *pb.SignalNote) SignalNote {
+					return SignalNote{Code: n.GetCode(), Tone: n.GetTone(), Params: n.GetParams(), Since: tm(n.GetSince())}
+				})}
+			}
+			return out
 		}),
 	}
 	if h := c.GetLastHuman(); h != nil {
@@ -202,7 +215,7 @@ func itemPB(it Item) *pb.Item {
 		WaitingOn: peoplePB(it.WaitingOn), State: it.State, Resolution: it.Resolution,
 		Evidence: evidencePB(it.Evidence), Trail: mapSlice(it.Trail, evidencePB), Confidence: it.Confidence,
 		Ambiguity: it.Ambiguity, Provenance: it.Provenance, Confirmed: it.Confirmed, TaskKey: it.TaskKey,
-		UserAt: ts(it.UserAt), CreatedAt: ts(it.CreatedAt), UpdatedAt: ts(it.UpdatedAt),
+		UserAt: ts(it.UserAt), CreatedAt: ts(it.CreatedAt), UpdatedAt: ts(it.UpdatedAt), Ask: it.Ask,
 	}
 }
 
@@ -215,7 +228,7 @@ func itemGo(it *pb.Item) Item {
 		WaitingOn: peopleGo(it.GetWaitingOn()), State: it.GetState(), Resolution: it.GetResolution(),
 		Evidence: evidenceGo(it.GetEvidence()), Trail: mapSlice(it.GetTrail(), evidenceGo), Confidence: it.GetConfidence(),
 		Ambiguity: it.GetAmbiguity(), Provenance: it.GetProvenance(), Confirmed: it.GetConfirmed(), TaskKey: it.GetTaskKey(),
-		UserAt: tm(it.GetUserAt()), CreatedAt: tm(it.GetCreatedAt()), UpdatedAt: tm(it.GetUpdatedAt()),
+		UserAt: tm(it.GetUserAt()), CreatedAt: tm(it.GetCreatedAt()), UpdatedAt: tm(it.GetUpdatedAt()), Ask: it.GetAsk(),
 	}
 }
 
@@ -300,7 +313,7 @@ func draftPB(d Draft) *pb.Draft {
 	o := d.Origin
 	return &pb.Draft{
 		Id: d.ID, Unit: unitPB(d.Unit), Items: d.Items, Task: d.Task, Kind: d.Kind, Purpose: d.Purpose,
-		Delivery: d.Delivery, Effects: d.Effects, Target: d.Target, Text: d.Text, Reaction: d.Reaction,
+		Delivery: d.Delivery, Effects: d.Effects, Target: d.Target, Broadcast: d.Broadcast, Text: d.Text, Reaction: d.Reaction,
 		Replaced: d.Replaced, State: d.State, Evidence: draftEvidencePB(d.Evidence),
 		Origin: &pb.DraftOrigin{Kind: o.Kind, TurnSeq: o.TurnSeq, Intent: o.Intent, Workflow: o.Workflow, Rule: o.Rule, Key: o.Key, Unit: unitPB(o.Unit)},
 	}
@@ -310,7 +323,7 @@ func draftGo(d *pb.Draft) Draft {
 	o := d.GetOrigin()
 	return Draft{
 		ID: d.GetId(), Unit: unitGo(d.GetUnit()), Items: d.GetItems(), Task: d.GetTask(), Kind: d.GetKind(), Purpose: d.GetPurpose(),
-		Delivery: d.GetDelivery(), Effects: d.GetEffects(), Target: d.GetTarget(), Text: d.GetText(), Reaction: d.GetReaction(),
+		Delivery: d.GetDelivery(), Effects: d.GetEffects(), Target: d.GetTarget(), Broadcast: d.GetBroadcast(), Text: d.GetText(), Reaction: d.GetReaction(),
 		Replaced: d.GetReplaced(), State: d.GetState(), Evidence: draftEvidenceGo(d.GetEvidence()),
 		Origin: DraftOrigin{Kind: o.GetKind(), TurnSeq: o.GetTurnSeq(), Intent: o.GetIntent(), Workflow: o.GetWorkflow(), Rule: o.GetRule(), Key: o.GetKey(), Unit: unitGo(o.GetUnit())},
 	}
@@ -397,7 +410,7 @@ func itemOpPB(o ItemOp) *pb.ItemOp {
 	if f := o.Fields; f != nil {
 		out.Fields = &pb.ItemFields{
 			Kind: optString(f.Kind), Summary: optString(f.Summary), Context: optString(f.Context), Deadline: optString(f.Deadline),
-			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence),
+			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence), Ask: optString(f.Ask),
 		}
 		if f.Options != nil {
 			out.Fields.Options = &pb.ItemOptionList{Options: mapSlice(*f.Options, optionPB)}
@@ -434,7 +447,7 @@ func itemOpGo(o *pb.ItemOp) ItemOp {
 	if f := o.GetFields(); f != nil {
 		out.Fields = &ItemFields{
 			Kind: optString(f.Kind), Summary: optString(f.Summary), Context: optString(f.Context), Deadline: optString(f.Deadline),
-			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence),
+			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence), Ask: optString(f.Ask),
 		}
 		if f.GetOptions() != nil {
 			opts := mapSlice(f.GetOptions().GetOptions(), optionGo)
@@ -543,7 +556,7 @@ func situationPB(s *Situation) *pb.Situation {
 	if s == nil {
 		return nil
 	}
-	out := &pb.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: ts(s.Since), Reason: s.Reason}
+	out := &pb.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: ts(s.Since), Reason: s.Reason, ReasonKey: s.ReasonKey, ReasonParams: s.ReasonParams}
 	if s.Stalled.Kind != KindNone {
 		out.Stalled = factPB(Fact{Value: s.Stalled})
 	}
@@ -554,7 +567,7 @@ func situationGo(s *pb.Situation) *Situation {
 	if s == nil {
 		return nil
 	}
-	out := &Situation{Kind: s.GetKind(), WaitingOn: s.GetWaitingOn(), Since: tm(s.GetSince()), Reason: s.GetReason()}
+	out := &Situation{Kind: s.GetKind(), WaitingOn: s.GetWaitingOn(), Since: tm(s.GetSince()), Reason: s.GetReason(), ReasonKey: s.GetReasonKey(), ReasonParams: s.GetReasonParams()}
 	if s.GetStalled() != nil {
 		out.Stalled = factGo(s.GetStalled()).Value
 	}

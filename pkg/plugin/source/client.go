@@ -52,7 +52,7 @@ func (c *Client) Ingest(ctx context.Context, req IngestRequest) (IngestResult, e
 	r, err := via(ctx, func(call *pb.Call) (*pb.IngestResponse, error) {
 		return c.c.Ingest(ctx, &pb.IngestRequest{Call: call, Job: req.Job, Now: ts(req.Now)})
 	})
-	return IngestResult{Summary: r.GetSummary(), Skipped: r.GetSkipped()}, err
+	return IngestResult{Summary: r.GetSummary(), Skipped: r.GetSkipped(), Next: tm(r.GetNext())}, err
 }
 
 func (c *Client) Track(ctx context.Context, req TrackRequest) (Tracked, error) {
@@ -119,11 +119,11 @@ func (c *Client) Where(ctx context.Context, d Draft) (string, error) {
 	return r.GetWhere(), err
 }
 
-func (c *Client) Place(ctx context.Context, d Draft) (string, error) {
+func (c *Client) Place(ctx context.Context, d Draft) (Placed, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.PlaceResponse, error) {
 		return c.c.Place(ctx, &pb.PlaceRequest{Call: call, Draft: draftPB(d)})
 	})
-	return r.GetTarget(), err
+	return Placed{Target: r.GetTarget(), Broadcast: r.GetBroadcast()}, err
 }
 
 func (c *Client) Publish(ctx context.Context, d Draft) (Evidence, error) {

@@ -59,6 +59,7 @@ var mergeColumns = map[string]mergeHandling{
 	"drafts.unit_key":          mergeKeeps,
 	"drafts.rule_key":          mergeKeeps,
 	"drafts.origin_unit_key":   mergeKeeps,
+	"workflow_skips.unit_key":  mergeKeeps,
 	"events.unit_key":          mergeKeeps,
 	"events.key":               mergeKeeps,
 	"events.data":              mergeKeeps,

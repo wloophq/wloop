@@ -34,8 +34,24 @@ func loadGatesWith(t *testing.T, user string) (GatesDef, string) {
 		}
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
-	d, problems := loadGates(layers, fstest.MapFS{GatesFile: {Data: b}})
+	d, problems := loadGates(layers, readerOf(fstest.MapFS{GatesFile: {Data: b}}))
 	return d, problems.Error()
+}
+
+func TestGatesTomlWordsEveryWithdrawReason(t *testing.T) {
+	t.Parallel()
+	d, problems := loadGatesWith(t, "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	for _, r := range draft.WithdrawReasons {
+		if d.Drafts.Reasons[r] == "" {
+			t.Errorf("reason %s has no words", r)
+		}
+	}
+	if _, problems := loadGatesWith(t, "[drafts.reasons]\nlater = \"Later\"\n"); !strings.Contains(problems, "drafts.reasons.later: names no withdraw reason") {
+		t.Errorf("problems %q, want the unknown reason refused", problems)
+	}
 }
 
 func TestGatesTomlDeclaresKindsAndIntents(t *testing.T) {
@@ -115,7 +131,7 @@ func TestAVerbsGateNamesADeclaredGate(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, TasksFile), []byte(user), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		_, problems := loadTasks([]profile.Layer{{Name: "user", Dir: dir}}, bundled, &gates)
+		_, problems := loadTasks([]profile.Layer{{Name: "user", Dir: dir}}, readerOf(bundled), &gates)
 		if got := !strings.Contains(problems.Error(), "verbs.done.gate: names no gate"); got != want {
 			t.Errorf("gate %s: problems %q", gateName, problems.Error())
 		}
@@ -173,13 +189,13 @@ func TestEveryGateKindHasAProfileGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, problems := loadGates(nil, fstest.MapFS{GatesFile: {Data: b}}); len(problems) > 0 {
+	if _, problems := loadGates(nil, readerOf(fstest.MapFS{GatesFile: {Data: b}})); len(problems) > 0 {
 		t.Fatalf("the bundled gates.toml: %s", problems.Error())
 	}
 	src := string(b)
 	start := strings.Index(src, "[gates.trust]")
 	end := strings.Index(src, "[gates.review-diff]")
-	_, problems := loadGates(nil, fstest.MapFS{GatesFile: {Data: []byte(src[:start] + src[end:])}})
+	_, problems := loadGates(nil, readerOf(fstest.MapFS{GatesFile: {Data: []byte(src[:start] + src[end:])}}))
 	if !strings.Contains(problems.Error(), "declares no gate of kind trust: the loop opens one by its kind") {
 		t.Fatalf("a profile with no trust gate: %s", problems.Error())
 	}
@@ -215,7 +231,7 @@ func TestAWorkflowWithNoApprovalStillRunsAtOnce(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", quietSession)
-	loaded, broken, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t), bundledGates(t))
+	loaded, broken, _, problems, _ := loadWorkflows(userLayer(root), readerOf(bundledDefault(t)), nil, nil, bundledTasks(t), bundledGates(t))
 	if len(problems) > 0 || len(broken) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -354,5 +370,26 @@ func TestAGateNamesWhatItsClosingDoesToATaskHeldForGates(t *testing.T) {
 	}
 	if _, problems := loadGatesWith(t, "[gates.draft]\nends_task = { opened = \"done\", approved = \"later\" }\n"); !strings.Contains(problems, "ends_task.opened") || !strings.Contains(problems, "ends_task.approved") {
 		t.Errorf("an unknown status or category loads: %q", problems)
+	}
+}
+
+func TestEffectWordsNameKnownEffects(t *testing.T) {
+	t.Parallel()
+	d, problems := loadGatesWith(t, "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.Effects["task.nudged"] == "" {
+		t.Errorf("the bundled gates.toml words no task.nudged: %v", d.Effects)
+	}
+	d, problems = loadGatesWith(t, "[effects]\n\"task.nudged\" = \"Marked as nudged.\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.Effects["task.nudged"] != "Marked as nudged." || d.Effects["unit.closed"] == "" {
+		t.Errorf("a user layer's effect words give %v", d.Effects)
+	}
+	if _, problems := loadGatesWith(t, "[effects]\nnope = \"x\"\n"); !strings.Contains(problems, "effects.nope") {
+		t.Errorf("an effect no effect is loads: %q", problems)
 	}
 }

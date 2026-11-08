@@ -11,9 +11,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -22,8 +24,11 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 )
@@ -85,15 +90,16 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 			q.Statuses = append(q.Statuses, gate.Status(strings.TrimSpace(st)))
 		}
 	}
-	ctx := whereBy(r.Context(), time.Now().Add(s.whereBudget()))
+	ctx := withPlanReads(whereBy(r.Context(), time.Now().Add(s.whereBudget())))
 	gs, err := rd.Where(ctx, q)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	out := make([]api.GateView, len(gs))
+	byUnit := map[unit.Unit][]items.Item{}
 	for i, g := range gs {
-		out[i] = s.gateView(ctx, g)
+		out[i] = s.gateView(ctx, g, byUnit)
 	}
 	writeJSON(w, out)
 }
@@ -147,7 +153,7 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		writeGateError(w, err)
 		return
 	}
-	writeJSON(w, s.gateView(ctx, g))
+	writeJSON(w, s.gateView(ctx, g, map[unit.Unit][]items.Item{}))
 }
 
 func writeGateError(w http.ResponseWriter, err error) {
@@ -171,12 +177,12 @@ func writeGateError(w http.ResponseWriter, err error) {
 }
 
 // gateView is g as clients offer it: a draft gate with its draft as its subject and its delivery, a question,
-// post or proposal gate with its message.
-func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
+// post or proposal gate with its message. A draft's items are read once into byUnit.
+func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit][]items.Item) api.GateView {
 	if o := s.deps.Outbox; o != nil && g.Kind == gate.KindDraft {
 		if id, err := strconv.ParseInt(g.Subject, 10, 64); err == nil {
 			if d, err := o.Store.Get(ctx, draft.ID(id)); err == nil {
-				return s.draftGateView(g, s.draftView(ctx, d, g))
+				return s.draftGateView(g, s.draftDetail(ctx, d, g, byUnit))
 			}
 		}
 	}
@@ -184,7 +190,119 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate) api.GateView {
 	if m, ok := s.messageOf(ctx, g); ok {
 		v.Subject, _ = json.Marshal(s.messageView(ctx, m))
 	}
+	switch g.Kind {
+	case gate.KindPlan:
+		v.Plan = s.gatePlan(ctx, g)
+	case gate.KindStep:
+		v.Units = s.stepUnits(ctx, g)
+	}
 	return v
+}
+
+// stepUnits are the units step gate g's task holds, as their rows present them, those not ended first; none for
+// a gate of no task. The task comes from the pass ctx carries, else from a read of it alone.
+func (s *Server) stepUnits(ctx context.Context, g gate.Gate) []api.PlanUnit {
+	if s.deps.Tasks == nil || g.Task == "" {
+		return nil
+	}
+	var e task.Task
+	if _, ok := coretasks.PassOf(ctx); ok {
+		tasks, err := s.deps.Tasks.Stored(ctx, []task.ID{g.Task})
+		if err != nil {
+			s.logf("step gate %d: its task: %v", g.ID, err)
+		}
+		e = tasks[g.Task]
+	} else {
+		var err error
+		if e, err = s.deps.Tasks.Task(ctx, g.Task); err != nil {
+			s.logf("step gate %d: its task: %v", g.ID, err)
+		}
+	}
+	shown := s.presentations(e.Units)
+	var open, ended []api.PlanUnit
+	for _, u := range e.Units {
+		v := api.PlanUnit{Label: shown[u].Label, Title: shown[u].Title, Link: shown[u].Link}
+		if s.unitEnded(ctx, u) {
+			ended = append(ended, v)
+		} else {
+			open = append(open, v)
+		}
+	}
+	return slices.Concat(open, ended)
+}
+
+// unitEnded says whether u has ended as its plugin says; false when nothing says.
+func (s *Server) unitEnded(ctx context.Context, u unit.Unit) bool {
+	if s.deps.UnitEnded == nil {
+		return false
+	}
+	ended, err := s.deps.UnitEnded(ctx, u)
+	if err != nil {
+		s.logf("whether %s ended: %v", u, err)
+	}
+	return ended
+}
+
+// gatePlan is the pending plan item plan gate g holds, as the plan page serves it without its actions, which are
+// the gate's intents; nil when the item no longer waits. A request that reads the plan once for its gates, a
+// page's pass or a withPlanReads context, looks every gate up in one read of the pending items.
+func (s *Server) gatePlan(ctx context.Context, g gate.Gate) *api.PlanItem {
+	p := s.deps.Plan
+	if p == nil || g.Subject == "" {
+		return nil
+	}
+	v, found, err := s.pendingView(ctx, p, g.Subject)
+	if err != nil {
+		s.logf("plan gate %d: its item: %v", g.ID, err)
+		return nil
+	}
+	if !found {
+		return nil
+	}
+	return &v
+}
+
+// pendingView is the pending plan item id as the API serves it without its actions, built with every other
+// pending item once per request when ctx asks for it, else on its own.
+func (s *Server) pendingView(ctx context.Context, p Plan, id string) (api.PlanItem, bool, error) {
+	views := func(f automation.Filter) (map[string]api.PlanItem, error) {
+		its, err := p.Items(ctx, f)
+		out := make(map[string]api.PlanItem, len(its))
+		for _, v := range s.planViews(ctx, its, s.presentations(itemUnits(its))) {
+			out[v.ID] = v
+		}
+		return out, err
+	}
+	pending := automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}}
+	var got map[string]api.PlanItem
+	var err error
+	if r, ok := ctx.Value(planReadsKey{}).(*planReads); ok {
+		r.once.Do(func() { r.pending, r.err = views(pending) })
+		got, err = r.pending, r.err
+	} else if _, ok := coretasks.PassOf(ctx); ok {
+		got, err = coretasks.Once(ctx, passPendingItems, func() (map[string]api.PlanItem, error) { return views(pending) })
+	} else {
+		pending.ID = id
+		got, err = views(pending)
+	}
+	v, ok := got[id]
+	return v, ok, err
+}
+
+const passPendingItems = "daemon.pending_items"
+
+type planReadsKey struct{}
+
+// planReads are the pending plan items one request read, once, as the API serves them.
+type planReads struct {
+	once    sync.Once
+	pending map[string]api.PlanItem
+	err     error
+}
+
+// withPlanReads is ctx whose plan gates read the pending plan items once for all of them.
+func withPlanReads(ctx context.Context) context.Context {
+	return context.WithValue(ctx, planReadsKey{}, &planReads{})
 }
 
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
@@ -210,6 +328,9 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 		for _, in := range def.Intents {
 			if in.Name == name {
 				iv.Label, iv.Answer = in.Label, in.Answer
+				if def.CardSays {
+					iv.Summary = in.Summary
+				}
 			}
 		}
 		v.Intents = append(v.Intents, iv)
@@ -257,7 +378,7 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 	}
 	for _, g := range gs {
 		if g.Status == gate.Open {
-			v.Gates = append(v.Gates, ev.s.gateView(ctx, g))
+			v.Gates = append(v.Gates, ev.s.gateView(ctx, g, ev.unitItems()))
 		}
 	}
 	return nil

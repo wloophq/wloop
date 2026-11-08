@@ -20,7 +20,7 @@ import (
 
 var r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
-func bundled(t *testing.T) *intentload.Loaded {
+func bundled(t testing.TB) *intentload.Loaded {
 	t.Helper()
 	l, err := turn.Bundled()
 	if err != nil {
@@ -48,7 +48,7 @@ func TestKeysAreUniqueAndAvoidNavigation(t *testing.T) {
 
 func TestBuiltinVerbs(t *testing.T) {
 	want := map[string]string{"run_now": "approve", "skip": "dismiss", "dismiss": "dismiss", "answer": "answer",
-		"draft.edit": "edit", "draft.retry": "retry"}
+		"draft.edit": "edit", "draft.retry": "retry", "draft.close-silently": "close-silently", "draft.skip-workflow": "skip-workflow"}
 	for _, b := range builtinActions {
 		if b.spec.Verb != want[b.spec.ID] {
 			t.Errorf("%s: verb %q, want %q", b.spec.ID, b.spec.Verb, want[b.spec.ID])

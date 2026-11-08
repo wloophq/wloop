@@ -71,16 +71,16 @@ const pr = keyOf(input.pr);
 function rowCardShown(r, view, sel) {
   const lens = lensOf({ ...readHash(), view });
   const m = rowModel(r, sel, lens, "", "card");
-  return cardShown(m, rowCard(m, lens), rowTr(rowModel(r, sel, lens, ""), lens, rowColumnDefs()), m.parts.aside);
+  return cardShown(m, rowView(m, lens, { card: true }), rowView(rowModel(r, sel, lens, ""), lens), m.parts.aside);
 }
 function taskCardShown(e, view) {
   const lens = lensOf({ ...readHash(), view });
   const m = taskModel(e, "", "", lens);
-  return cardShown(m, rowCard(m, lens), rowTr(m, lens, rowColumnDefs()), m.parts.aside);
+  return cardShown(m, rowView(m, lens, { card: true }), rowView(m, lens), m.parts.aside);
 }
 const out = { PR: rowCardShown(input.pr, "mine", pr), Slack: rowCardShown(input.slack, "slack", ""), Task: taskCardShown(input.task, "inbox"), Draft: taskCardShown(input.draft, "outbox") };
 const lens = lensOf({ ...readHash(), view: "mine" });
-walk(rowCard(rowModel(input.pr, "", lens, "", "card"), lens), (n) => n.attrs.class === "open")[0].n.on.click();
+walk(rowView(rowModel(input.pr, "", lens, "", "card"), lens, { card: true }), (n) => n.attrs.class === "open")[0].n.on.click();
 out.OpenedSlot = state.openSlot;
 out.Hash = location.hash;
 process.stdout.write(JSON.stringify(out));`,
@@ -134,10 +134,10 @@ El.prototype.focus = function () { focused = this; };
 const name = (n) => n.attrs["data-focus"] || n.attrs.class || n.tag;
 const lens = lensOf({ ...readHash(), view: "mine" });
 const m = rowModel(input.pr, "", lens, "");
-const tr = rowTr(m, lens, rowColumns([m]));
-const card = rowCard(rowModel(input.pr, "", lens, "", "card"), lens);
+const tr = rowView(m, lens);
+const card = rowView(rowModel(input.pr, "", lens, "", "card"), lens, { card: true });
 const stops = rowStops(tr), cardStops = rowStops(card);
-const tabbable = (root) => { const out = []; const w = (n) => { if (!n || !n.attrs) return; if (["button", "a", "tr"].includes(n.tag) && n.attrs.tabindex !== "-1" && !("disabled" in n.attrs)) out.push(name(n)); (n.children || []).forEach(w); }; w(root); return out; };
+const tabbable = (root) => { const out = []; const w = (n) => { if (!n || !n.attrs) return; if ((["button", "a"].includes(n.tag) || n.attrs.tabindex === "0") && n.attrs.tabindex !== "-1" && !("disabled" in n.attrs)) out.push(name(n)); (n.children || []).forEach(w); }; w(root); return out; };
 const press = (row, target, key, mods = {}) => { focused = null; const e = { key, currentTarget: row, target, preventDefault() {}, ...mods }; const took = roveKey(e); return { took, to: focused ? name(focused) : "" }; };
 const moves = [press(tr, tr, "ArrowRight").to, press(tr, stops[1], "ArrowLeft").to, press(tr, tr, "End").to, press(tr, stops[stops.length - 1], "Home").to,
   press(card, cardStops[0], "ArrowRight").to];

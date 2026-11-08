@@ -33,6 +33,14 @@ doc = "The work on the pull request is approved: my review approved its head, or
 name = "workspace"
 doc = "A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state."
 
+[[source.predicates]]
+name = "reviewer_required"
+facts = ["pr.repo", "pr.repo_name", "pr.owner", "pr.slug", "pr.author", "pr.state", "pr.ended", "pr.merged_at", "pr.closed_at",
+  "pr.draft", "pr.changed_files", "pr.head", "pr.conflicting_for", "pr.mine", "pr.base", "pr.cross_repository", "pr.requested_teams",
+  "pr.review_requested_me", "pr.checks", "pr.age", "pr.adopted", "pr.stale", "pr.visibility", "pr.association", "pr.labels",
+  "pr.last_review.exists", "pr.last_review.verdict", "pr.last_review.decision", "pr.last_interaction_at", "pr.silent_days"]
+doc ="An open pull request waits for a reviewer before its merge. Where it does not hold, a pull request nobody was asked to review is never no_reviewer: with checks green and no conflict it is merge, as an approved one is, and no nudge asks for a reviewer."
+
 [[source.marks]]
 name = "addressed.reviews"
 doc = "The newest review an address round triaged on a pull request you develop, a time: `handled(\"addressed.reviews\", <time>)`."
@@ -472,6 +480,11 @@ type = "bool"
 doc = "The pull request merged or closed: the GitHub plugin's word that the unit has ended."
 
 [[source.facts]]
+name = "pr.changed_files"
+type = "int"
+doc = "How many files the pull request changes, as GitHub last reported it; 0 when not read."
+
+[[source.facts]]
 name = "pr.head"
 type = "string"
 doc = "The head commit's oid."
@@ -605,11 +618,6 @@ order = 2
 surfaces = ["web", "tui"]
 
 [[source.ui.views]]
-id = "plan"
-order = 4
-surfaces = ["web", "tui"]
-
-[[source.ui.views]]
 id = "dash"
 order = 6
 surfaces = ["web"]
@@ -623,11 +631,6 @@ surfaces = ["web"]
 [[source.ui.views]]
 id = "explore"
 order = 9
-surfaces = ["web"]
-
-[[source.ui.views]]
-id = "recent"
-order = 10
 surfaces = ["web"]
 
 [[source.ui.facets]]

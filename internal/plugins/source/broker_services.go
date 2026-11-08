@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/source/value"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -79,6 +81,27 @@ func (s services) Profile(ctx context.Context, path string) ([]byte, error) {
 		return nil, src.ErrUnsupported
 	}
 	return s.b.Hosted.Profile(ctx, path)
+}
+
+// Holds evaluates the plugin's predicate over each set of facts, a temporal one at the host's now.
+func (s services) Holds(ctx context.Context, predicate string, facts [][]src.Fact) ([]src.Holding, error) {
+	h := s.b.Hosted
+	if h == nil || h.Holds == nil {
+		return nil, src.ErrUnsupported
+	}
+	now := time.Now()
+	if h.Now != nil {
+		now = h.Now()
+	}
+	sets := make([]map[string]any, len(facts))
+	for i, set := range facts {
+		m := make(map[string]any, len(set))
+		for _, f := range set {
+			m[f.Name] = value.Resolve(f.Value, now)
+		}
+		sets[i] = m
+	}
+	return h.Holds(ctx, predicate, sets)
 }
 
 // tree is cfg as config get reads it: its keys by their names in the file.

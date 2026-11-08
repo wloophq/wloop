@@ -82,7 +82,7 @@ From a terminal, an intent that serves Slack takes a message ref (`<conversation
 
 The drafts made for a task are its draft gates, listed in its detail, where you approve, edit or discard them. In the terminal, a digit picks one (when the task asks no question), then `a`, `i` or `Backspace` acts on it.
 
-**Reply yourself.** `r` on the task, **Save as draft** in the task page's composer, the Reply composer in the thread detail, or the Reply field of its notification writes a reply in the thread (or, in the cockpit, a reaction such as `eyes`). **Save to Outbox** keeps it there for your approval; **Send now** (Tab in the terminal prompt, then `y`; **Send reply** in the notification) approves it at once. Either way it goes out through the Outbox like any draft, and counts as your reply for the thread's items. Ctrl+E in the terminal prompt writes it in `$EDITOR`.
+**Reply yourself.** `r` on the task, **Save as draft** in the task page's composer, the Reply composer in the thread detail, or the Reply field of its notification writes a reply in the thread (or, in the cockpit, a reaction such as `eyes`). **Save to Outbox** keeps it there for your approval; **Send now** (Tab in the terminal prompt, then `y`; **Send reply** in the notification) approves it at once. The task page's composer also shows **Also send to the conversation**, checked as `drafts.toml` places a reply you write, and both buttons honor it. Either way it goes out through the Outbox like any draft, and counts as your reply for the thread's items. Ctrl+E in the terminal prompt writes it in `$EDITOR`.
 
 Write one, approve one with `a`, or from a terminal:
 
@@ -93,7 +93,7 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} outbox approve <id>
 ```
 
-`slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook. To a channel, a person, or with `--thread=false` or `--broadcast`, it posts directly:
+`slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook; `--broadcast` asks that draft to also post to the conversation. To a channel, a person, or with `--thread=false`, it posts directly:
 
 ```sh
 {{command}} slack send https://acme.slack.com/archives/C000/p1700000000000100 'On it.'

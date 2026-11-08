@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/brand"
 )
 
 func TestServesIndexAndAssets(t *testing.T) {
@@ -27,6 +29,14 @@ func TestServesIndexAndAssets(t *testing.T) {
 	}
 }
 
+func TestThePageNamesTheLinkScheme(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if want := `<meta name="link-scheme" content="` + brand.URLScheme() + `">`; !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("the page lacks %s", want)
+	}
+}
+
 func TestCockpitKnowsThePendingRound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
@@ -39,19 +49,22 @@ func TestCockpitKnowsThePendingRound(t *testing.T) {
 }
 
 func TestCockpitHasTheRecentView(t *testing.T) {
-	rec := httptest.NewRecorder()
-	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
-	body := rec.Body.String()
-	for _, want := range []string{`v.id === "recent"`, "/api/activity", "renderActivity"} {
+	var body string
+	for _, name := range []string{"app.js", "rail.js"} {
+		rec := httptest.NewRecorder()
+		Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/"+name, nil))
+		body += rec.Body.String()
+	}
+	for _, want := range []string{"out.push({ id: RECENT", "/api/activity", "renderActivity"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("app.js lacks %s", want)
+			t.Errorf("app.js and rail.js lack %s", want)
 		}
 	}
 }
 
 func TestCockpitOffersRemoveAllCleanOnAViewThatAsks(t *testing.T) {
 	for file, wants := range map[string][]string{
-		"app.js":   {`removed: "workspace removed"`, `h("details"`, "out.detail"},
+		"app.js":   {`h("details"`, "out.detail"},
 		"views.js": {"/api/workspaces/remove-clean", "spec.remove_clean", "Remove all clean", "k.detail"},
 	} {
 		rec := httptest.NewRecorder()
@@ -80,8 +93,8 @@ func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 		Label string `json:"label"`
 		Loop  bool   `json:"loop"`
 	}
-	nodeRun(t, jsBlock(t, appJS(t), "EVENT_LABEL")+jsConst(t, appJS(t), "LOOP_EVENTS")+jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "loopEvent"},
-		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true }] });
+	nodeRun(t, jsConst(t, appJS(t), "catalog"), []string{"applyCatalog", "fieldOf", "eventLabel", "eventTone", "loopEvent"},
+		`applyCatalog({ events: [{ provider: "github", kind: "round_blocked", label: "round blocked", loop: true, tone: "loop" }] });
 process.stdout.write(JSON.stringify({ label: eventLabel("round_blocked"), loop: loopEvent("round_blocked") }));`, nil, &got)
 	if got.Label != "round blocked" || !got.Loop {
 		t.Fatalf("%+v", got)
@@ -116,8 +129,8 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
-		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
-		`turn_sent: "turn sent"`, `turn_started: "turn started"`, `turn_ended: "turn ended"`, `turn_resumed: "turn resumed"`, "timelineEvents(d)"} {
+		`"continue", t("Continue")`, `"dismiss", t("Dismiss")`, `source: "cockpit"`, "body.option_id",
+		"timelineEvents(d)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("app.js lacks %s", want)
 		}
@@ -158,9 +171,10 @@ func TestCockpitShowsTheBrief(t *testing.T) {
 func TestCockpitHasTheStalledBoard(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
-		"/static/app.js":  {"function renderBoard", `layout: p.get("layout") === "board"`, `f.id === "lane"`, `"aria-pressed"`},
-		"/":               {`id="board"`},
-		"/static/app.css": {".board", ".card", ".lane-head"},
+		"/static/app.js":    {"function renderBoard", "layout: route.layout", `f.id === "lane"`, `"aria-pressed"`},
+		"/static/routes.js": {`ROUTE_LAYOUTS = ["board", "list", "detail"]`},
+		"/":                 {`id="board"`},
+		"/static/app.css":   {".board", ".card", ".lane-head"},
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
@@ -227,14 +241,15 @@ func TestGuidanceSitsAboveTheActions(t *testing.T) {
 
 func TestRefusalDetailIsNamedAfterTheWorkspaceManager(t *testing.T) {
 	src := appJS(t)
-	if want := `t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details"`; !strings.Contains(src, want) {
+	if want := `it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details")`; !strings.Contains(src, want) {
 		t.Fatalf("app.js lacks %s", want)
 	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
-	script := `const label = (state, t) => t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details";
+	script := `const t = (key, params) => key.replace("{source}", (params || {}).source);
+const label = (state, it) => it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details");
 process.stdout.write(JSON.stringify([label({ health: { workspace_manager: "Orca" } }, { source: "orca" }), label({}, { source: "orca" }), label({ health: {} }, {})]));`
 	out, err := exec.Command(node, "-e", script).Output()
 	if err != nil {
@@ -250,7 +265,7 @@ func TestTheScriptsParse(t *testing.T) {
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
-	for _, name := range []string{"app.js", "dash.js", "keys.js", "palette.js", "routes.js", "views.js", "task.js", "review.js", "detail.js"} {
+	for _, name := range []string{"i18n.js", "app.js", "dash.js", "keys.js", "omnibox.js", "routes.js", "views.js", "task.js", "review.js", "detail.js"} {
 		if out, err := exec.Command(node, "--check", "static/"+name).CombinedOutput(); err != nil {
 			t.Errorf("%s: %v: %s", name, err, out)
 		}

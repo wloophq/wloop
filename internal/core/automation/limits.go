@@ -1,8 +1,8 @@
 package automation
 
 import (
-	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -38,7 +38,7 @@ func (p *planner) limit(w workflow.Workflow, u unit.Unit) (string, error) {
 	l := w.Limits
 	planned := p.perRun[w.Name]
 	if l.PerRun > 0 && planned >= l.PerRun {
-		return fmt.Sprintf("limit per_run %d reached", l.PerRun), nil
+		return workflow.Reason(workflow.ReasonPerRun, map[string]string{"n": strconv.Itoa(l.PerRun)}), nil
 	}
 	day := startOfDay(p.now)
 	if l.PerDay > 0 {
@@ -47,7 +47,7 @@ func (p *planner) limit(w workflow.Workflow, u unit.Unit) (string, error) {
 			return "", err
 		}
 		if n+planned >= l.PerDay {
-			return fmt.Sprintf("limit per_day %d reached", l.PerDay), nil
+			return workflow.Reason(workflow.ReasonPerDay, map[string]string{"n": strconv.Itoa(l.PerDay)}), nil
 		}
 	}
 	if l.PerUnitPerDay > 0 {
@@ -56,7 +56,7 @@ func (p *planner) limit(w workflow.Workflow, u unit.Unit) (string, error) {
 			return "", err
 		}
 		if n+p.perUnit[unitOf{w.Name, u}] >= l.PerUnitPerDay {
-			return fmt.Sprintf("limit per_unit_per_day %d reached", l.PerUnitPerDay), nil
+			return workflow.Reason(workflow.ReasonPerUnitDay, map[string]string{"n": strconv.Itoa(l.PerUnitPerDay)}), nil
 		}
 	}
 	if l.Cooldown > 0 {
@@ -65,7 +65,7 @@ func (p *planner) limit(w workflow.Workflow, u unit.Unit) (string, error) {
 			return "", err
 		}
 		if n > 0 {
-			return fmt.Sprintf("cooling down for %s", l.Cooldown), nil
+			return workflow.Reason(workflow.ReasonCooling, map[string]string{"duration": l.Cooldown.String()}), nil
 		}
 	}
 	return "", nil

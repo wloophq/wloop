@@ -412,6 +412,16 @@ func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (dra
 	return f.p, nil
 }
 
+func TestProposeKeepsWhyAndLanguage(t *testing.T) {
+	e := newEnv()
+	p := reply("x")
+	p.Why, p.Language = "w", "pt-BR"
+	d := e.propose(p)
+	if got := e.get(d.ID); got.Why != "w" || got.Language != "pt-BR" {
+		t.Fatalf("stored why %q language %q", got.Why, got.Language)
+	}
+}
+
 func TestProposeDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))

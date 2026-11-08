@@ -1,0 +1,89 @@
+{
+  "$id": "https://github.com/wloophq/wloop/omnibox.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "search": {
+      "additionalProperties": false,
+      "description": "How a search groups the tasks it finds.",
+      "properties": {
+        "groups": {
+          "description": "A group, in order: a result goes to the first group whose view holds it. A user's list replaces the whole list.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "description": "The group's id. Required.",
+                "type": "string"
+              },
+              "label": {
+                "description": "The group's label. Required.",
+                "type": "string"
+              },
+              "view": {
+                "description": "The view of views.toml whose tasks the group holds. Required.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "view"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "default": 5,
+          "description": "The most results a group shows; its count counts them all.",
+          "type": "integer"
+        },
+        "other": {
+          "description": "The label of the last group, which holds what no group's view holds.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "verbs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One verb: its words and one target, action or verb, with op when nothing is named.",
+        "properties": {
+          "action": {
+            "description": "The catalog action it runs on each unit named.",
+            "type": "string"
+          },
+          "op": {
+            "description": "What it runs on the text when it names no unit or task.",
+            "enum": [
+              "capture",
+              "start"
+            ],
+            "type": "string"
+          },
+          "verb": {
+            "description": "The task verb of tasks.toml it runs on each task named; never one that resolves a gate.",
+            "type": "string"
+          },
+          "words": {
+            "description": "The words that name the verb in every language, in one list, such as [\"review\", \"revisar\"]: vocabulary, not a text a locale translates. Required.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "type": "object"
+      },
+      "description": "The verbs the omnibox knows, by id: typed first, a verb's word runs its target on what the rest names. No operation runs, from a verb or from the agent, that no verb targets.",
+      "type": "object"
+    }
+  },
+  "title": "The omnibox (omnibox.toml)",
+  "type": "object"
+}

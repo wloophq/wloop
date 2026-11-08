@@ -44,10 +44,13 @@ func (into *Change) Merge(c Change) {
 	}
 	into.All = into.All || c.All
 	into.Health = into.Health || c.Health
+	into.Plan = into.Plan || c.Plan
+	into.Gates = into.Gates || c.Gates
 	into.Notices = append(into.Notices, c.Notices...)
 	if c.Counters != nil {
 		into.Counters = c.Counters
 	}
+	into.Windows = append(into.Windows, c.Windows...)
 	if into.All {
 		into.Units = nil
 		return

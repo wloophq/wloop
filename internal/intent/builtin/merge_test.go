@@ -63,3 +63,40 @@ func TestMergeRefusesWhatTheHostCannotRun(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeMapsAPluginsLanguageFact(t *testing.T) {
+	v, err := Merge(sourceOf(t, "acme", "acme", "language_fact = \"acme.language\"\n[[source.facts]]\nname = \"acme.language\"\ntype = \"string\"\ndoc = \"d\"\n"),
+		sourceOf(t, "wiki", "wiki", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v.languageFacts; len(got) != 1 || got["acme"] != "acme.language" {
+		t.Errorf("language facts %v, want acme's alone", got)
+	}
+}
+
+func TestMergeMapsAPluginsMembersFact(t *testing.T) {
+	v, err := Merge(sourceOf(t, "acme", "acme", "members_fact = \"acme.members\"\n[[source.facts]]\nname = \"acme.members\"\ntype = \"list\"\ndoc = \"d\"\n"),
+		sourceOf(t, "wiki", "wiki", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v.membersFacts; len(got) != 1 || got["acme"] != "acme.members" {
+		t.Errorf("members facts %v, want acme's alone", got)
+	}
+}
+
+func TestMergeKeepsWhetherAPluginsEffectIsSilent(t *testing.T) {
+	v, err := Merge(sourceOf(t, "acme", "acme", "[[source.effects]]\nname = \"acme.archived\"\napplies = [\"draft\"]\ndoc = \"d\"\nsilent = true\n"+
+		"[[source.effects]]\nname = \"acme.thanked\"\napplies = [\"draft\"]\ndoc = \"d\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	silent := map[string]bool{}
+	for _, e := range v.effects {
+		silent[e.Name] = e.Silent
+	}
+	if !silent["acme.archived"] || silent["acme.thanked"] || !silent[EffectUnitClosed] || silent[EffectTaskNudged] {
+		t.Errorf("silent %v", silent)
+	}
+}

@@ -39,11 +39,31 @@ type wManifest struct {
 	Step     []map[string]any  `toml:"step"`
 	Limits   *wLimits          `toml:"limits"`
 	Observe  bool              `toml:"observe"`
+	Enabled  *bool             `toml:"enabled"`
 	Order    *int              `toml:"order"`
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
 	Drafts   *wDrafts          `toml:"drafts"`
-	Gates    *mGates           `toml:"gates"`
+	Gates    *wGates           `toml:"gates"`
+	Outbox   *wOutbox          `toml:"outbox"`
+}
+
+// wGates is a workflow's [gates]: an intent's, and whether its drafts always wait.
+type wGates struct {
+	Approval   *mApproval     `toml:"approval"`
+	DraftsWait bool           `toml:"drafts_wait"`
+	Withdraw   *wGateWithdraw `toml:"withdraw"`
+}
+
+// wGateWithdraw is a workflow's [gates.withdraw]: when the gates its gate.open steps opened no longer stand.
+type wGateWithdraw struct {
+	When   *string `toml:"when"`
+	Reason *string `toml:"reason"`
+}
+
+type wOutbox struct {
+	Title *string `toml:"title"`
+	About *string `toml:"about"`
 }
 
 // wDrafts is the [drafts] table: when the open drafts the workflow's steps
@@ -53,6 +73,12 @@ type wDrafts struct {
 }
 
 type wWithdraw struct {
+	When   *string         `toml:"when"`
+	Reason *string         `toml:"reason"`
+	Rule   []wWithdrawRule `toml:"rule"`
+}
+
+type wWithdrawRule struct {
 	When   *string `toml:"when"`
 	Reason *string `toml:"reason"`
 }
@@ -91,7 +117,8 @@ type wUnit struct {
 // reverted and loads without it. turnProblem, when set, is why a
 // turn.start may not name an intent or run it under a runner, with the
 // argument at fault; "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+func loadWorkflows(layers []profile.Layer, r layerReader, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env, tasks TasksDef, gates GatesDef) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+	bundled := r.bundled
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -101,7 +128,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				continue
 			}
 			dir := path.Join("workflows", e.Name())
-			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir}}
+			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir, rel: dir, r: r, layer: bundledLayer}}
 			bundledUnits[u.name] = u
 			units = append(units, u)
 		}
@@ -116,7 +143,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 			if !e.IsDir() {
 				continue
 			}
-			fl, dir := layerFiles(l, path.Join("workflows", e.Name()))
+			fl, dir := layerFiles(l, path.Join("workflows", e.Name()), r)
 			if n := builtin.RenamedTo(e.Name()); n != "" && bundledUnits[n] != nil {
 				problems = append(problems, Problem{File: dir, Msg: e.Name() + " was renamed" + expr.DidYouMean(e.Name(), []string{n})})
 				continue
@@ -126,7 +153,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 				case l.Embedded():
 					problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), b.files.base("workflow.toml"))})
 				case len(overrides([]string{dir})) > 0:
-					b.files.overlay = append(b.files.overlay, dir)
+					b.files.overlaid(l, dir)
 				}
 				continue
 			}
@@ -175,6 +202,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(inten
 			continue
 		}
 		loaded = append(loaded, u.wf)
+		r.used[u.files.rel] = u.files.top()
 		warnings = append(warnings, u.warnings...)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {
@@ -289,7 +317,7 @@ func providerNames() []string {
 }
 
 func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent, runner string) (arg, msg string)) workflow.Workflow {
-	w := workflow.Workflow{Name: name, Observe: m.Observe, Order: 100}
+	w := workflow.Workflow{Name: name, Observe: m.Observe, Off: m.Enabled != nil && !*m.Enabled, Order: 100}
 	if m.Summary == nil || strings.TrimSpace(*m.Summary) == "" {
 		s.add("summary", "is required: one line saying what the workflow does")
 	} else {
@@ -339,8 +367,19 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Gates, slot)
+	if g := m.Gates; g != nil {
+		s.defineGateWithdraw(&w, g.Withdraw, slot)
+	}
 	if d := m.Drafts; d != nil {
 		s.defineWithdraw(&w, d.Withdraw, slot)
+	}
+	if o := m.Outbox; o != nil {
+		if o.Title != nil {
+			w.Outbox.Title = strings.TrimSpace(*o.Title)
+		}
+		if o.About != nil {
+			w.Outbox.About = strings.TrimSpace(*o.About)
+		}
 	}
 	s.turnBudget(w, m.Limits)
 	return w
@@ -350,20 +389,66 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 	if m == nil {
 		return
 	}
-	if m.When == nil {
-		s.add("drafts.withdraw.when", "is required: a predicate over the unit's facts and draft.* that withdraws an open draft the workflow proposed")
+	const need = "is required: a predicate over the unit's facts and draft.* that withdraws an open draft the workflow proposed"
+	if m.When == nil && len(m.Rule) == 0 {
+		s.add("drafts.withdraw.when", need)
 		return
 	}
 	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepDraftPropose }) {
 		s.add("drafts.withdraw", "withdraws drafts the workflow proposed; it has no %s step", builtin.StepDraftPropose)
 	}
+	rule := func(path string, when string, reason *string) workflow.WithdrawRule {
+		r := workflow.WithdrawRule{Reason: draft.WithdrawMoot}
+		if slot != "" {
+			r.When = s.predicate(path, when, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
+		}
+		if reason != nil {
+			r.Reason = *reason
+		}
+		return r
+	}
+	for i, r := range m.Rule {
+		path := fmt.Sprintf("drafts.withdraw.rule[%d]", i)
+		if r.When == nil {
+			s.add(path+".when", need)
+			continue
+		}
+		w.WithdrawRules = append(w.WithdrawRules, rule(path+".when", *r.When, r.Reason))
+	}
+	if m.When != nil {
+		r := rule("drafts.withdraw.when", *m.When, m.Reason)
+		w.Withdraw, w.WithdrawReason = r.When, r.Reason
+	}
+}
+
+func (s *sheet) defineGateWithdraw(w *workflow.Workflow, m *wGateWithdraw, slot string) {
+	if m == nil {
+		return
+	}
+	if m.When == nil {
+		s.add("gates.withdraw.when", "is required: a predicate over the unit's facts that withdraws an open gate the workflow opened")
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepGateOpen }) {
+		s.add("gates.withdraw", "withdraws gates the workflow opened; it has no %s step", builtin.StepGateOpen)
+	}
+	r := workflow.WithdrawRule{}
 	if slot != "" {
-		w.Withdraw = s.predicate("drafts.withdraw.when", *m.When, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
+		env := s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+		r.When = s.predicate("gates.withdraw.when", *m.When, env)
+		if r.When == nil {
+			return
+		}
+		// A withdrawal closes a gate that waits on you, so no third party's text may decide it.
+		if f := untrustedRead(r.When, env); f != "" {
+			s.add("gates.withdraw.when", "%s", (&builtin.UntrustedError{Fact: f}).Error())
+			return
+		}
 	}
-	w.WithdrawReason = draft.WithdrawMoot
 	if m.Reason != nil {
-		w.WithdrawReason = *m.Reason
+		r.Reason = strings.TrimSpace(*m.Reason)
 	}
+	w.GateWithdraw = &r
 }
 
 // turnBudget refuses a workflow that starts turns on units outside
@@ -679,6 +764,11 @@ func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.Provi
 	if r, _ := arg("reaction"); slices.Contains(builtin.DraftEmojiDeliveries, delivery) && r == "" {
 		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
 	}
+	if t, _ := arg("target"); t == builtin.DraftTargetPerson {
+		if per, _ := arg("per"); per != "person" {
+			s.add(p+".target", "person needs per = \"person\": each draft posts in the direct conversation of the person it is to")
+		}
+	}
 	if v, ok := arg("repeat_after"); ok {
 		s.repeatAfter(p+".repeat_after", v)
 	}
@@ -751,10 +841,10 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 // defineApproval loads the workflow's [gates.approval]: the approval of its
 // runs' plan gates, of the drafts its steps and turns propose, and of the
 // gates its gate.open steps open, each laid over gates.toml's default.
-func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
+func (s *sheet) defineApproval(w *workflow.Workflow, g *wGates, slot string) {
 	var m *mApproval
 	if g != nil {
-		m = g.Approval
+		m, w.DraftsWait = g.Approval, g.DraftsWait
 	}
 	draftEnv := s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot)
 	var unitEnv expr.Env

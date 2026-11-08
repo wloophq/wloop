@@ -53,6 +53,16 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | 
 const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks |
 	port.TopicPlacements | port.TopicConfig
 
+// planInputs are the notes after which a change says the plan moved: its items as served, the pending items, the
+// closed sessions it lists, and a reloaded profile, whose words and actions it shows.
+const planInputs = port.TopicPlan | port.TopicPending | port.TopicConfig
+
+// gateInputs are the notes after which a change says the gates moved: a gate, and what one shows of its subject,
+// a draft and its items, a message (whose writes note TopicTasks) or a pending plan item.
+const gateInputs = port.TopicGates | port.TopicDrafts | port.TopicItems | port.TopicTasks | port.TopicPlan | port.TopicPending
+
+const flagInputs = planInputs | gateInputs
+
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
 
@@ -155,6 +165,12 @@ func (s *Server) buildViewsCatalog(l *intentload.Loaded) api.ViewsCatalog {
 			To: t.To})
 	}
 	cat.Facets, cat.DefaultSort, cat.Lens = catalog.TaskFacets(l.Views.Facets, l.Tasks, cat.Contexts), l.Views.DefaultSort, catalog.LensWords(l.Views.Lens)
+	cat.DetailVerbs, cat.Effects = nonNil(slices.Clone(l.Tasks.DetailVerbs)), maps.Clone(l.Gates.Effects)
+	if cat.Effects == nil {
+		cat.Effects = map[string]string{}
+	}
+	cat.DraftPurposes, cat.DraftStates = nonNilMap(l.Gates.Drafts.Purposes), nonNilMap(l.Gates.Drafts.States)
+	cat.RunStates, cat.SessionStates = nonNilMap(l.Tasks.RunStates), nonNilMap(l.Tasks.SessionStates)
 	cat.Version = api.VersionOf(cat)
 	return cat
 }
@@ -165,7 +181,7 @@ func (s *Server) servedViews() []api.TaskViewSpec {
 	out := []api.TaskViewSpec{}
 	for _, v := range def.Views {
 		out = append(out, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Key: v.Key, Badge: def.Badged(v.ID), HideDisabled: v.HideDisabled,
-			RemoveClean: v.RemoveClean})
+			RemoveClean: v.RemoveClean, Rail: v.Rail, Layout: v.Layout})
 	}
 	return out
 }
@@ -237,7 +253,7 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if ok && listed[e.ID] {
-			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate))
+			page.Gates = append(page.Gates, s.gateView(whereBy(ctx, vs.whereBy), g.gate, vs.unitItems()))
 		}
 	}
 	writeJSON(w, page)
@@ -762,27 +778,42 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	if text := strings.TrimSpace(q.Get(api.CountersQuery)); text == "" {
 		c, err = g.Counts(ctx, q.Get("area"))
 	} else {
-		specs := s.taskFacetSpecs()
-		query, now := lens.Parse(text, specs), s.deps.Now()
-		vs := s.taskViews(ctx, g, false)
-		preloaded := false
-		c, err = g.CountsWhere(ctx, q.Get("area"), func(ctx context.Context, e task.Task) (bool, error) {
-			if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
-				preloaded = true
-				vs.readRows(ctx, pass.Tasks)
-			}
-			v, err := vs.view(ctx, e)
-			if err != nil {
-				return false, err
-			}
-			return query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now), nil
-		})
+		c, err = g.CountsWhere(ctx, q.Get("area"), s.lensKeep(ctx, g, text))
 	}
 	if err != nil {
 		writeTasksError(w, err)
 		return
 	}
 	writeJSON(w, wireCounters(c))
+}
+
+// lensKeep keeps the tasks that lens query text matches, over the facets and texts of their views; it reads
+// the rows of every task of the pass at its first call.
+func (s *Server) lensKeep(ctx context.Context, g *coretasks.Service, text string) coretasks.Keep {
+	return s.lensKeepIn(s.taskViews(ctx, g, false), text, nil)
+}
+
+// lensKeepIn is lensKeep building each task's view with vs, and keeping in kept the view of each task it keeps
+// when kept is not nil.
+func (s *Server) lensKeepIn(vs *taskViewer, text string, kept map[task.ID]api.TaskView) coretasks.Keep {
+	specs := s.taskFacetSpecs()
+	query, now := lens.Parse(text, specs), s.deps.Now()
+	preloaded := false
+	return func(ctx context.Context, e task.Task) (bool, error) {
+		if pass, ok := coretasks.PassOf(ctx); ok && !preloaded {
+			preloaded = true
+			vs.readRows(ctx, pass.Tasks)
+		}
+		v, err := vs.view(ctx, e)
+		if err != nil {
+			return false, err
+		}
+		ok := query.Match(lens.Item{Facets: v.Facets, Texts: v.Texts()}, specs, now)
+		if ok && kept != nil {
+			kept[e.ID] = v
+		}
+		return ok, nil
+	}
 }
 
 // taskFacetSpecs are the facets a query over tasks can name: the plugins' and the profile's, one spec by id.
@@ -844,7 +875,9 @@ type taskViewer struct {
 	detail   bool
 	children map[task.ID][]task.ID
 	drafts   []draft.Draft
-	status   map[task.ID]coretasks.ProjectState
+	// pending are the ids of openDrafts by the task they serve, read once per page.
+	pending map[string][]int64
+	status  map[task.ID]coretasks.ProjectState
 	// briefs are the brief records by unit, read once per page.
 	briefs map[unit.Unit]port.Event
 	// rows are the read model's rows of the units read, each read once: a page reads its tasks' in one
@@ -853,6 +886,8 @@ type taskViewer struct {
 	read map[unit.Unit]bool
 	// refs are the tasks a listed id reads as, the page's own and each one read once; ok false for none.
 	refs map[task.ID]taskRef
+	// items are the items of the units the page's drafts are on, each unit's read once.
+	items map[unit.Unit][]items.Item
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.
@@ -912,6 +947,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		v.Units = []unit.Unit{}
 	}
 	v.UnitLabels = ev.unitLabels(ctx, v.Units)
+	v.Drafts = ev.pendingDrafts(ctx, e.ID)
 	if w, ok, err := ev.g.WakeOf(ctx, e.ID); err != nil {
 		return api.TaskView{}, err
 	} else if ok {
@@ -941,6 +977,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 			return api.TaskView{}, err
 		}
 		v.Runs = runs
+		v.ReplyBroadcast = ev.s.replyBroadcast(ctx, e)
 	}
 	v.Attention = ev.attention(ctx, e)
 	v.Verbs = ev.verbs(ctx, e)
@@ -955,7 +992,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.openGates(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
-	if err := ev.s.withDraft(ctx, e, &v); err != nil {
+	if err := ev.withDraft(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil
@@ -996,7 +1033,7 @@ func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) e
 }
 
 // facets sets the task's facets: those of its facts row set, its brief's, and its units' rows', joined as
-// the profile's facets say, and its reason, its primary unit's row's.
+// the profile's facets say, and its reason, its primary unit's row's in the words of that row's plugin.
 func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) {
 	defs := ev.s.loaded().Views.Facets
 	own := map[string][]string{}
@@ -1014,7 +1051,7 @@ func (ev *taskViewer) facets(ctx context.Context, e task.Task, v *api.TaskView) 
 		v.Facets = nil
 	}
 	if len(e.Units) > 0 {
-		v.Reason = rows[e.Units[0]].Row.Summary.Reason
+		v.Reason = ev.s.rowsCatalog().ReasonOf(rows[e.Units[0]].Row)
 	}
 }
 
@@ -1142,7 +1179,7 @@ func (ev *taskViewer) asks(ctx context.Context, e task.Task, v *api.TaskView) er
 		return nil
 	}
 	quotes := briefQuotes(v.Brief)
-	byUnit := map[unit.Unit][]items.Item{}
+	byUnit := ev.unitItems()
 	for _, ref := range e.Items {
 		its, ok := byUnit[ref.Unit]
 		if !ok {
@@ -1404,13 +1441,13 @@ func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
 	return k.out
 }
 
-// feedTasks publishes a change with the counters after each burst of task and draft notes and of row changes
-// whose units a task holds, naming the units they moved, until ctx ends.
+// feedTasks publishes a change after each burst of notes of what a view, the plan or the gates read and of row
+// changes whose units a task holds, until ctx ends.
 func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
-	poke, cancel := change.Poke(s.deps.Changes, taskInputs)
+	poke, cancel := change.Poke(s.deps.Changes, taskInputs|flagInputs)
 	defer cancel()
 	s.moved.attach()
 	from := s.deps.Changes.Gen()
@@ -1424,9 +1461,10 @@ func (s *Server) feedTasks(ctx context.Context) {
 		case <-quiet:
 			quiet = nil
 			c := s.deps.Changes.Since(from, taskInputs)
-			from = c.Gen
+			flags := s.deps.Changes.Since(from, flagInputs)
+			from = min(c.Gen, flags.Gen)
 			pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
-			s.publishTasks(pctx, c)
+			s.publishTasks(pctx, c, flags)
 			scope.End()
 			continue
 		}
@@ -1437,28 +1475,36 @@ func (s *Server) feedTasks(ctx context.Context) {
 }
 
 // publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
-// nothing moved but rows no task holds; a reloaded profile moves every task, since it can change their facets.
-func (s *Server) publishTasks(ctx context.Context, c port.Change) {
+// nothing moved but rows no task holds, and says whether the plan and the gates moved by the topics of flags. A
+// reloaded profile moves every task, since it can change their facets.
+func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	rows, all := s.moved.take()
-	held := rows
-	snap, err := s.deps.Tasks.Snapshot(ctx)
-	if err != nil {
+	var held []unit.Unit
+	var snap coretasks.Snapshot
+	err := errTasksUnavailable
+	if s.deps.Tasks == nil {
+		all = false
+	} else if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
 		s.logf("tasks feed: %v", err)
+		held = rows
 	} else {
 		held = snap.Held(rows)
 	}
-	if c.Empty() && !all && len(held) == 0 {
-		return
-	}
 	pos := s.hub.position()
-	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all || c.Has(port.TopicConfig)}
-	if err == nil {
-		ch.Counters = s.countersOf(snap.Counts(ctx, ""))
-	}
-	if !ch.All {
-		units := slices.Concat(c.Units, held)
-		slices.SortFunc(units, api.CompareUnits)
-		ch.Units = slices.Compact(units)
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev,
+		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs)}
+	if !c.Empty() || all || len(held) > 0 {
+		ch.All = c.All || all || c.Has(port.TopicConfig)
+		if err == nil {
+			ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+		}
+		if !ch.All {
+			units := slices.Concat(c.Units, held)
+			slices.SortFunc(units, api.CompareUnits)
+			ch.Units = slices.Compact(units)
+		}
+	} else if !ch.Plan && !ch.Gates {
+		return
 	}
 	s.hub.publish(ch)
 }

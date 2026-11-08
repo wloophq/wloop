@@ -65,8 +65,9 @@ func turnsOver(e *env) *turnsEnv {
 		te.events = append(te.events, ev)
 		return nil
 	}}
-	te.calls = &dossiers.Calls{Turns: te.turns, Asker: te.asker, Caps: dossiers.Caps{PerCallUSD: 0.5, PerDayUSD: 5},
-		Spent: func(context.Context, time.Time) (float64, error) { return te.spent, nil },
+	te.calls = &dossiers.Calls{Turns: te.turns, Asker: te.asker,
+		Budget: &turns.Budget{Caps: turns.BudgetCaps{PerCallUSD: 0.5, PerDayUSD: 5}, Clock: te.svc.Clock,
+			Spent: func(context.Context, time.Time) (float64, error) { return te.spent, nil }},
 		Record: func(_ context.Context, _ unit.Unit, cost float64) error {
 			te.recorded = append(te.recorded, cost)
 			return nil
@@ -365,6 +366,24 @@ func compactEnv(t *testing.T) (*turnsEnv, dossier.Dossier) {
 	return te, d
 }
 
+type panickingAsker struct{}
+
+func (panickingAsker) Ask(context.Context, turns.Ask) (turns.Answer, error) {
+	panic("the agent adapter broke")
+}
+
+func TestAPanickingDossierCallReleasesItsReservation(t *testing.T) {
+	te, _ := compactEnv(t)
+	te.calls.Asker = panickingAsker{}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = te.calls.Compact(context.Background(), thread)
+	}()
+	if te.calls.Budget.Reserved() != 0 || !slices.Equal(te.recorded, []float64{0.5}) {
+		t.Fatalf("reserved %v recorded %v after a panic", te.calls.Budget.Reserved(), te.recorded)
+	}
+}
+
 func TestCompactionRewritesNotes(t *testing.T) {
 	te, d := compactEnv(t)
 	logs := git(t, d.Path, "rev-parse", "HEAD:log")
@@ -412,7 +431,7 @@ func TestDossierCallsRespectTheDailyCap(t *testing.T) {
 	te, _ := compactEnv(t)
 	ctx := context.Background()
 	day1 := te.clock.now
-	te.calls.Spent = func(_ context.Context, day time.Time) (float64, error) {
+	te.calls.Budget.Spent = func(_ context.Context, day time.Time) (float64, error) {
 		if day.Format(time.DateOnly) == day1.Format(time.DateOnly) {
 			return 5, nil
 		}
@@ -439,8 +458,8 @@ func TestDossierCallsRespectTheDailyCap(t *testing.T) {
 	if len(te.asker.asked) != 1 || te.get(t, thread).Status != dossier.Resolved {
 		t.Fatalf("the next day: %d calls, %+v", len(te.asker.asked), te.get(t, thread))
 	}
-	if !slices.Equal(te.recorded, []float64{0.1}) || te.calls.Reserved() != 0 {
-		t.Errorf("recorded %v, reserved %v; want the reported 0.1 and nothing held", te.recorded, te.calls.Reserved())
+	if !slices.Equal(te.recorded, []float64{0.1}) || te.calls.Budget.Reserved() != 0 {
+		t.Errorf("recorded %v, reserved %v; want the reported 0.1 and nothing held", te.recorded, te.calls.Budget.Reserved())
 	}
 }
 
@@ -592,7 +611,7 @@ func TestADeferredCompactionRunsTheNextDay(t *testing.T) {
 	te, d := compactEnv(t)
 	ctx := context.Background()
 	day1 := te.clock.now
-	te.calls.Spent = func(_ context.Context, day time.Time) (float64, error) {
+	te.calls.Budget.Spent = func(_ context.Context, day time.Time) (float64, error) {
 		if day.Format(time.DateOnly) == day1.Format(time.DateOnly) {
 			return 5, nil
 		}

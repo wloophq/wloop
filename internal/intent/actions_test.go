@@ -20,7 +20,7 @@ func defaultProfile() []byte {
 }
 
 func TestEveryActionHasASummary(t *testing.T) {
-	actions, problems := loadActions(nil, os.DirFS("../../profiles/default"))
+	actions, problems := loadActions(nil, readerOf(os.DirFS("../../profiles/default")))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -42,7 +42,7 @@ func actionsProblems(t *testing.T, bundled, user string) string {
 		}
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
-	_, problems := loadActions(layers, fstest.MapFS{ActionsFile: {Data: []byte(bundled)}})
+	_, problems := loadActions(layers, readerOf(fstest.MapFS{ActionsFile: {Data: []byte(bundled)}}))
 	return problems.Error()
 }
 
@@ -106,7 +106,7 @@ func TestAUserActionTableLaysItsKeysOverTheBundledOnes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ActionsFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got, problems := loadActions([]profile.Layer{{Name: "user", Dir: dir}}, fstest.MapFS{ActionsFile: {Data: defaultProfile()}})
+	got, problems := loadActions([]profile.Layer{{Name: "user", Dir: dir}}, readerOf(fstest.MapFS{ActionsFile: {Data: defaultProfile()}}))
 	if len(problems) != 1 || !strings.Contains(problems.Error(), "mute.note") {
 		t.Fatalf("%v", problems)
 	}
@@ -118,7 +118,7 @@ func TestAUserActionTableLaysItsKeysOverTheBundledOnes(t *testing.T) {
 
 func TestActionsFileKeysFollowTheGrammar(t *testing.T) {
 	bundled := fstest.MapFS{ActionsFile: {Data: []byte("[skip]\nlabel = \"Skip\"\nsummari = \"Skips\"\n")}}
-	_, problems := loadActions(nil, bundled)
+	_, problems := loadActions(nil, readerOf(bundled))
 	if !strings.Contains(problems.Error(), "skip.summari: unknown key; did you mean \"summary\"?") {
 		t.Errorf("%s", problems.Error())
 	}

@@ -1,0 +1,60 @@
+[help.list]
+"move:down" = "descer"
+"move:up" = "subir"
+"detail:open" = "abrir o detalhe"
+"detail:close" = "fechar o detalhe"
+next = "para Próximas"
+waiting = "para Aguardando"
+schedule = "agendar ou adiar"
+someday = "para Algum dia"
+reference = "para Referência"
+focus = "ligar ou desligar Foco"
+project = "criar um projeto ou anexar a um"
+approve = "aprovar o rascunho ou a proposta"
+delegate = "delegar a um agente"
+done = "concluir"
+dismiss = "dispensar"
+reply = "responder na conversa"
+edit = "editar o texto do rascunho"
+open-source = "abrir a origem"
+"filter:add" = "adicionar um filtro por campo e valor"
+"group:cycle" = "agrupar pelo próximo campo"
+"sort:cycle" = "ordenar pelo próximo campo"
+
+[help.global]
+capture = "capturar"
+filter = "filtrar"
+palette = "todas as ações e suas teclas"
+help = "ajuda"
+quit = "sair"
+"nav:cycle" = "próxima visão do grupo"
+"area:{n}" = "área {n}"
+"link:copy" = "copiar um link para esta visão"
+"nav:home" = "ir para o início"
+
+[help.review]
+"step:done" = "marcar o passo como feito"
+"step:next" = "próximo passo"
+"step:prev" = "passo anterior"
+
+[help.plan]
+approve = "aplicar o passo do plano selecionado"
+
+[help.detail]
+"detail:detach" = "abrir numa janela própria"
+"tab:next" = "próxima aba"
+"tab:prev" = "aba anterior"
+
+[help.question]
+"answer:{n}" = "a opção {n} da decisão"
+
+[help.queue]
+"queue:primary" = "executar a ação principal da decisão"
+"queue:skip" = "próxima decisão, sem agir"
+"queue:back" = "decisão anterior"
+open-source = "abrir na origem"
+"queue:home" = "voltar ao início"
+"queue:edit" = "editar o rascunho antes de enviar"
+"queue:discard" = "descartar o rascunho"
+"queue:close-silently" = "encerrar sem mensagem"
+"queue:skip-workflow" = "não cobrar nesta conversa"

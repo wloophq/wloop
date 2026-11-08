@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 )
@@ -82,11 +83,11 @@ func (m *Model) pickDraft(k Key) bool {
 		return false
 	}
 	if n > len(ds) {
-		m.status = fmt.Sprintf("no draft %d", n)
+		m.status = m.w().T("no draft {n}", map[string]any{"n": n})
 		return true
 	}
 	m.picked = ds[n-1].ID
-	m.status = fmt.Sprintf("draft %d picked: a approves, i edits, Backspace discards, Esc lets go", n)
+	m.status = m.w().T("draft {n} picked: a approves, i edits, {back} discards, {esc} lets go", map[string]any{"n": n, "back": "Backspace", "esc": "Esc"})
 	return true
 }
 
@@ -137,7 +138,7 @@ func reasonUnless(enabled bool, why string) string {
 func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64) (Command, bool) {
 	de := draftTask(m.viewsCat, d, e.Title)
 	if i := slices.IndexFunc(de.Verbs, func(v api.VerbState) bool { return v.Verb == verb }); i < 0 || !de.Verbs[i].Enabled {
-		reason := "not offered on a draft"
+		reason := m.w().T("not offered on a draft", nil)
 		if i >= 0 {
 			reason = de.Verbs[i].Reason
 		}
@@ -145,18 +146,18 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 		return Command{}, false
 	}
 	c := Command{Unit: taskUnit(de.ID), Label: taskLabel(e), Action: verb, task: de.ID, verb: verb}
-	target := draftTarget(de)
+	target := draftTarget(m.w(), de)
 	switch m.viewsCat.HandlerOf(verb) {
 	case handlerEdit:
 		return m.editPrompt(c, d, read)
 	case ownDismiss:
-		m.confirm(c, "discard the draft to "+target+"?", read)
+		m.confirm(c, m.w().T("discard the draft to {target}?", map[string]any{"target": target}), read)
 	case handlerRetry:
 		c.args = map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}
-		m.confirm(c, "post again to "+target+"?", read)
+		m.confirm(c, m.w().T("post again to {target}?", map[string]any{"target": target}), read)
 	default:
 		c.args = map[string]string{"rev": strconv.FormatInt(d.Rev, 10), "text": d.Text}
-		m.confirm(c, "post to "+target+"?", read)
+		m.confirm(c, m.w().T("post to {target}?", map[string]any{"target": target}), read)
 	}
 	return Command{}, false
 }
@@ -166,7 +167,7 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) {
 	submit := func(text string) (Command, bool) {
 		if text == "" {
-			m.status = "edit " + c.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text}
@@ -176,7 +177,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 		m.edit = &EditRequest{Label: "edit", Text: d.Text, submit: submit}
 		return Command{}, false
 	}
-	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(draftTask(api.ViewsCatalog{}, d, "")) + " (Ctrl+E: editor)", text: []rune(d.Text),
+	m.prompt = &prompt{action: "edit", label: m.w().T("edit the draft to {target} ({key}: editor)", map[string]any{"target": draftTarget(m.w(), draftTask(api.ViewsCatalog{}, d, "")), "key": "Ctrl+E"}), text: []rune(d.Text),
 		read: read, submit: submit, editor: true}
 	return Command{}, false
 }
@@ -187,12 +188,12 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read uint64) (Command, bool) {
 	name, q := taskLabel(e), m.verbQuestion(c.verb)
 	labels := map[string]string{
-		"":        "delegate " + name + ": " + q + " (Tab: hand to an agent)",
-		"session": "hand " + name + " to an agent: " + q + " (Tab: draft for me)",
+		"":        m.w().T("delegate {task}: {question} ({key}: hand to an agent)", map[string]any{"task": name, "question": q, "key": "Tab"}),
+		"session": m.w().T("hand {task} to an agent: {question} ({key}: draft for me)", map[string]any{"task": name, "question": q, "key": "Tab"}),
 	}
-	off := sessionOff(e, c.verb)
+	off := sessionOff(m.w(), e, c.verb)
 	if off != "" {
-		labels[""] = "delegate " + name + ": " + q + " (no agent session: " + off + ")"
+		labels[""] = m.w().T("delegate {task}: {question} (no agent session: {reason})", map[string]any{"task": name, "question": q, "reason": off})
 	}
 	p := &prompt{action: c.verb, label: labels[""], read: read, editor: true}
 	mode := ""
@@ -226,7 +227,7 @@ func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read u
 
 // sessionOff is why the task's delegate cannot hand it to an agent in a session, "" when it can or the
 // daemon says nothing of its modes.
-func sessionOff(e api.TaskView, verb string) string {
+func sessionOff(w *texts.Catalog, e api.TaskView, verb string) string {
 	for _, v := range e.Verbs {
 		if v.Verb != verb {
 			continue
@@ -237,7 +238,7 @@ func sessionOff(e api.TaskView, verb string) string {
 			}
 		}
 		if len(v.Runners) > 0 && !slices.ContainsFunc(v.Runners, func(md api.RunnerState) bool { return md.Runner == "session" }) {
-			return "the action does not run a session"
+			return w.T("the action does not run a session", nil)
 		}
 	}
 	return ""
@@ -248,8 +249,8 @@ func sessionOff(e api.TaskView, verb string) string {
 func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bool) {
 	name := taskLabel(e)
 	labels := map[bool]string{
-		false: m.verbQuestion(c.verb) + ", on " + name + ", held for approval (Tab: send now; Ctrl+E: editor)",
-		true:  m.verbQuestion(c.verb) + ", on " + name + ", sent now (Tab: hold for approval; Ctrl+E: editor)",
+		false: m.w().T("{question}, on {task}, held for approval ({tab}: send now; {editor}: editor)", map[string]any{"question": m.verbQuestion(c.verb), "task": name, "tab": "Tab", "editor": "Ctrl+E"}),
+		true:  m.w().T("{question}, on {task}, sent now ({tab}: hold for approval; {editor}: editor)", map[string]any{"question": m.verbQuestion(c.verb), "task": name, "tab": "Tab", "editor": "Ctrl+E"}),
 	}
 	send := m.verbSend(c.verb) == "now"
 	p := &prompt{action: c.verb, label: labels[send], read: read, editor: true}
@@ -259,7 +260,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 	}
 	p.submit = func(text string) (Command, bool) {
 		if text == "" {
-			m.status = "reply " + c.Label + " cancelled: nothing typed"
+			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
 		c.args = map[string]string{"text": text, "send": "draft"}
@@ -267,7 +268,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 			return m.send(c)
 		}
 		c.args["send"] = "now"
-		m.confirm(c, "post to "+replyTarget(e)+" now?", read)
+		m.confirm(c, m.w().T("post to {target} now?", map[string]any{"target": replyTarget(e)}), read)
 		return Command{}, false
 	}
 	m.prompt = p
@@ -288,7 +289,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 	for i, d := range m.listedDrafts() {
 		head := fmt.Sprintf("%d. %s · %s", i+1, d.Purpose, d.State)
 		if d.Origin.Kind != "" {
-			head += " · from " + d.Origin.Kind
+			head += " · " + m.w().T("from {origin}", map[string]any{"origin": d.Origin.Kind})
 		}
 		style := t.Dim
 		if d.ID == m.picked {
@@ -296,7 +297,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 		}
 		label := ""
 		if i == 0 {
-			label = "drafts"
+			label = m.w().T("drafts", nil)
 		}
 		fact(label, head, style)
 		text := d.Text

@@ -238,6 +238,9 @@ type Deps struct {
 	// Facts reads what a pull request's guide is matched against, for
 	// profile show <pr-url>; nil answers 503.
 	Facts func(ctx context.Context, u unit.Unit) (api.Facts, error)
+	// UnitEnded says whether u has ended as its plugin says, which a step gate's card reads to show the open
+	// units it is about first; nil keeps the task's order.
+	UnitEnded func(ctx context.Context, u unit.Unit) (bool, error)
 	// SessionWait is how long a turn by hand waits for its brief; 0 is
 	// brief.SessionWait.
 	SessionWait time.Duration
@@ -283,7 +286,7 @@ type Deps struct {
 	Store *api.StoreStatus
 	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
-	ConfigWarning func() string
+	ConfigWarning func() config.Warning
 	// EffectWarnings are the turn effects that went unapplied after their
 	// turn went out; nil lists none.
 	EffectWarnings func() []string
@@ -355,6 +358,11 @@ type Deps struct {
 	Placements   placement.Overrides
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts
+	// ConfigSet sets key path of the config file to v and applies the keys that apply live; nil: the
+	// daemon changes no configuration.
+	ConfigSet func(path []string, v any) error
+	// Skips are the workflows the user stopped on one unit; nil refuses a skip and lists none.
+	Skips Skips
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;
 	// the Sync worker calls it before each batch until it succeeds. nil: Tasks' identity stands.
 	TasksMe func(ctx context.Context) (grew bool, err error)
@@ -368,6 +376,8 @@ type Deps struct {
 	SendDrafts bool
 	// Headless starts headless turns; nil answers 503 to the act route.
 	Headless Headless
+	// OmniboxAsk runs the omnibox's read-only agent call; nil answers 503 to the ask route.
+	OmniboxAsk OmniboxAsker
 	// Placer says where a session on a unit of a provider other than GitHub runs; nil offers the
 	// session mode unchecked.
 	Placer Placer
@@ -425,6 +435,8 @@ type Server struct {
 	warnings *warnings
 	grace    time.Duration
 	hub      *hub
+	// healthWake holds at most one ask of the health feed to compare.
+	healthWake chan struct{}
 	// moved holds the units of the row changes published, for the tasks feed.
 	moved     *rowMoves
 	model     *readmodel.Model
@@ -436,6 +448,10 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
+	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
+	replyBroadcasts sync.Map
+	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.
+	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
 	// pauseMu serializes every read-modify-write of the pause.
@@ -446,6 +462,7 @@ type Server struct {
 	readRows     func(ctx context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error)
 	reconcile    reconcileState
 	homes        homeCache
+	healths      pluginHealths
 	mutesFailing atomic.Bool
 	// intakesExpiredAt is the minute the read model's keeper last expired
 	// the session intakes; only the keeper touches it.
@@ -503,7 +520,7 @@ func New(d Deps) *Server {
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
-	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), moved: newRowMoves(), app: d.App,
+	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), healthWake: make(chan struct{}, 1), moved: newRowMoves(), app: d.App,
 		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}
@@ -905,8 +922,8 @@ func (s *Server) Run(ctx context.Context) error {
 		case <-jctx.Done():
 		}
 	})
+	wg.Go(func() { s.feedTasks(jctx) })
 	if d.Tasks != nil {
-		wg.Go(func() { s.feedTasks(jctx) })
 		wg.Go(func() {
 			select {
 			case <-s.reconcile.ready:

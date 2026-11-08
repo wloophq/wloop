@@ -948,8 +948,27 @@ func TestCleanupWorkflowsLoad(t *testing.T) {
 			names = append(names, w.Name)
 		}
 	}
-	if len(names) != 16 {
+	if len(names) != 18 {
 		t.Fatalf("%d cleanup workflows: %v; problems %v %v", len(names), names, l.Problems, l.BrokenWorkflows)
+	}
+}
+
+func TestEndingAnOrphansProcessShipsOffAndTheConfigTurnsItOn(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	applied := func() bool {
+		return slices.ContainsFunc(applyConfig(te.loadedIntents().Workflows, te.cfg), func(w workflow.Workflow) bool { return w.Name == "session-orphan-close" })
+	}
+	if applied() {
+		t.Fatal("session-orphan-close runs by default")
+	}
+	if !slices.Contains(disabledWorkflows(te.cfg, te.loadedIntents().Workflows), "session-orphan-close") {
+		t.Error("an off workflow's drafts are not kept as a disabled one's")
+	}
+	on := true
+	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-orphan-close": {Enabled: &on}}
+	if !applied() {
+		t.Fatal("workflows.session-orphan-close.enabled = true does not turn it on")
 	}
 }
 
@@ -1364,6 +1383,117 @@ func TestManualSessionsWaitForTheUser(t *testing.T) {
 	}
 }
 
+// orphanTab closes the tab of handle's terminal in the app as a person does:
+// the manager lists its process orphaned with no agent identity, and the app
+// shows no terminal. The agent's pane state the app reported stays, as Orca's
+// lingers.
+func (f *fixtureEnv) orphanTab(t *testing.T, handle string) {
+	t.Helper()
+	i := slices.IndexFunc(f.snap.terms, func(tm wsdomain.Terminal) bool { return tm.Handle == handle })
+	if i < 0 {
+		t.Fatalf("no terminal %s", handle)
+	}
+	f.snap.terms[i].Usable, f.snap.terms[i].Orphaned, f.snap.terms[i].Agent = false, true, ""
+	f.sessions.Orphan(handle)
+}
+
+func TestAQuietManualSessionWhoseTabWasClosedEndsOnItsOwnAndItsProcessLives(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := loadFixture(t, cleanupFixture, clockA)
+	eng := f.engine(t)
+	f.now = f.laterClock(t, eng)
+	quiet := f.quietManual(t, eng)
+	f.orphanTab(t, quiet.Key)
+	if it := itemOf(t, evaluate(t, eng), quiet, "session-manual-quiet"); it.Decision != workflow.DecisionBlocked || it.Reason != turns.RefusalTerminalClosed {
+		t.Fatalf("with its tab closed: %s (%s)", it.Decision, it.Reason)
+	}
+	f.sessions.SetReading("e1", time.Time{})
+	for i := range 6 {
+		sweepOnce(t, eng)
+		f.now = f.now.Add(3 * time.Minute)
+		if i == 2 {
+			f.sessions.SetReading("e2", time.Time{})
+		}
+	}
+	row, ok, err := f.te.repo.Session(ctx, quiet.Key)
+	if err != nil || !ok || row.State() != turn.SessionDormant {
+		t.Fatalf("session %+v %v %v, want dormant", row, ok, err)
+	}
+	if slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatalf("a process was ended with session-orphan-close off: closed %v", f.sessions.Closed())
+	}
+	for _, it := range evaluate(t, eng) {
+		if it.Unit == quiet && (it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionPending) {
+			t.Errorf("%s still asks the user: %s (%s)", it.Workflow, it.Decision, it.Reason)
+		}
+	}
+	f.sessions.Unorphan(quiet.Key)
+	sweepOnce(t, eng)
+	if row, _, _ := f.te.repo.Session(ctx, quiet.Key); row.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want woken once a window shows its process again", row)
+	}
+}
+
+// quietManual is a session session-manual-quiet offers to close.
+func (f *fixtureEnv) quietManual(t *testing.T, eng *automation.Engine) unit.Unit {
+	t.Helper()
+	for _, it := range evaluate(t, eng) {
+		if it.Workflow == "session-manual-quiet" {
+			return it.Unit
+		}
+	}
+	t.Fatal("no quiet manual session in the fixture")
+	return unit.Unit{}
+}
+
+func TestWithOrphanCloseOnADurableOrphansProcessEnds(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := loadFixture(t, cleanupFixture, clockA)
+	on := true
+	f.te.cfg.Workflows = map[string]config.WorkflowConfig{"session-orphan-close": {Enabled: &on}, "hygiene-session-orphaned": {Enabled: new(bool)}}
+	eng := f.engine(t)
+	f.now = f.laterClock(t, eng)
+	var quiet unit.Unit
+	for _, it := range evaluate(t, eng) {
+		if it.Workflow == "session-manual-quiet" {
+			quiet = it.Unit
+			break
+		}
+	}
+	if quiet.Key == "" {
+		t.Fatal("no quiet manual session in the fixture")
+	}
+	f.orphanTab(t, quiet.Key)
+	if it := itemOf(t, evaluate(t, eng), quiet, "session-manual-quiet"); it.Decision != workflow.DecisionBlocked || it.Reason != turns.RefusalTerminalClosed {
+		t.Fatalf("with its tab closed: %s (%s)", it.Decision, it.Reason)
+	}
+	sweepOnce(t, eng)
+	f.now = f.now.Add(3 * time.Minute)
+	sweepOnce(t, eng)
+	if slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatal("an orphan was ended before anything proved it durable")
+	}
+	f.sessions.SetReading("e2", time.Time{})
+	for range 4 {
+		f.now = f.now.Add(3 * time.Minute)
+		sweepOnce(t, eng)
+	}
+	row, ok, err := f.te.repo.Session(ctx, quiet.Key)
+	if err != nil || !ok || row.State() != turn.SessionDormant {
+		t.Fatalf("session %+v %v %v, want dormant", row, ok, err)
+	}
+	if !slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatalf("its orphaned process was not closed: closed %v", f.sessions.Closed())
+	}
+	for _, it := range evaluate(t, eng) {
+		if it.Unit == quiet && (it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionPending) {
+			t.Errorf("%s still asks the user: %s (%s)", it.Workflow, it.Decision, it.Reason)
+		}
+	}
+}
+
 // cleanupRig is one bundled workflow, overridden to apply when apply is set, over
 // fake facts and steps.
 func cleanupRig(t *testing.T, name string, apply bool) (*automation.Engine, *automationtest.Units, *automationtest.Steps) {
@@ -1446,7 +1576,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 		units.Put(finishedWorkspace, f)
 		steps.Refuse("workspace.remove", finishedWorkspace, c.refusal)
 		items := planOf(t, eng)
-		if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != c.fact+" 1: "+c.refusal {
+		if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "waits for you while "+c.fact+" 1: "+c.refusal {
 			t.Errorf("%s: %+v", c.fact, items)
 		}
 		sweepOnce(t, eng)
@@ -1466,7 +1596,7 @@ func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 	refusal := "3 commits not pushed in /w/ws1; back them up with: git push origin HEAD:refs/heads/me/backup-b"
 	steps.Refuse("workspace.remove", finishedWorkspace, refusal)
 	items := planOf(t, eng)
-	if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "workspace.pendency [commits on no remote]: "+refusal {
+	if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "waits for you while workspace.pendency [commits on no remote]: "+refusal {
 		t.Fatalf("items %+v", items)
 	}
 	f["workspace.sessions"] = 1
@@ -1504,7 +1634,7 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 		f := workspaceFactsOf("author", "CLOSED", 25*time.Hour)
 		f["workspace.pendency"] = []string{c.pendency}
 		units.Put(finishedWorkspace, f)
-		reason := "workspace.pendency [" + c.pendency + "]"
+		reason := "waits for you while workspace.pendency [" + c.pendency + "]"
 		if c.refusal != "" {
 			steps.Refuse("workspace.remove", finishedWorkspace, c.refusal)
 			reason += ": " + c.refusal

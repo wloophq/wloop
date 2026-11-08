@@ -15,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -84,6 +85,145 @@ func TestASessionCloseRefusedAtRunIsAGuardRefusal(t *testing.T) {
 	var refused automation.Refused
 	if !asRefused(err, &refused) || refused.Reason != refusal {
 		t.Fatalf("run: %v, check refused %q", err, refusal)
+	}
+}
+
+func TestASessionCloseOfASessionGoneOrClosedIsMoot(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", StartedAt: testNow, ClosedAt: testNow})
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	for _, key := range []string{"term-1", "term-absent"} {
+		u := unit.Unit{Provider: unit.Session, Key: key}
+		var moot automation.Moot
+		if _, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{}); !errors.As(err, &moot) || moot.Reason == "" {
+			t.Fatalf("%s: check %v, want moot", key, err)
+		}
+		_, err := s.Run(context.Background(), wfStep("session.close"), u, workflow.Why{Workflow: "session-done"}, automation.RunOpts{})
+		if !errors.As(err, &moot) {
+			t.Fatalf("%s: run %v, want moot", key, err)
+		}
+	}
+}
+
+func TestTheOrphanCloseStepEndsOnlyADurableOrphanAndIsMootOnceTheSessionIsGone(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	u := unit.Unit{Provider: unit.Session, Key: "term-1"}
+	step := wfStep("session.close_orphan")
+	if why, err := s.Check(ctx, step, u, workflow.Why{}, automation.CheckOpts{}); err != nil || why != turns.RefusalOrphanUnproven {
+		t.Fatalf("before the census proves it: %q %v", why, err)
+	}
+	for i, epoch := range []string{"e1", "e1", "e2", "e2"} {
+		sess.SetReading(epoch, testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if why, err := s.Check(ctx, step, u, workflow.Why{}, automation.CheckOpts{}); err != nil || why != "" {
+		t.Fatalf("a durable orphan: %q %v", why, err)
+	}
+	if _, err := s.Run(ctx, step, u, workflow.Why{Workflow: "session-orphan-close"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if closed := sess.Closed(); len(closed) != 1 || closed[0] != "term-1" {
+		t.Fatalf("closed %v", closed)
+	}
+	var moot automation.Moot
+	if _, err := s.Check(ctx, step, unit.Unit{Provider: unit.Session, Key: "term-absent"}, workflow.Why{}, automation.CheckOpts{}); !errors.As(err, &moot) {
+		t.Fatalf("an absent session: %v, want moot", err)
+	}
+}
+
+func TestACloseOfADormantSessionWhoseOrphanLingersIsHeldNotBlocked(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	for i := range 2 {
+		sess.SetReading("", testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := te.Turns.MarkDormant(ctx, "term-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	_, err := s.Check(ctx, wfStep("session.close"), unit.Unit{Provider: unit.Session, Key: "term-1"}, workflow.Why{}, automation.CheckOpts{})
+	var held automation.Held
+	if !errors.As(err, &held) || held.Reason != turns.RefusalOrphanLingers {
+		t.Fatalf("check %v, want the close held while the orphan lingers", err)
+	}
+}
+
+func TestARemovalIsNotBlockedByADormantSessionWhoseOrphanLingers(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	for i := range 2 {
+		sess.SetReading("", testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := te.Turns.MarkDormant(ctx, "term-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if why, _ := te.Turns.CloseRefusal(ctx, "term-1"); why != turns.RefusalOrphanLingers {
+		t.Fatalf("the session's close is not held: %q", why)
+	}
+	g := turnsGuard{e: te.Env}
+	if why, err := g.Refusal(ctx, "ws1"); err != nil || why != "" {
+		t.Fatalf("removal refused %q %v", why, err)
+	}
+	if n, err := g.closeCount(ctx, "ws1", "removed"); err != nil || n != 1 {
+		t.Fatalf("closed %d %v, want the dormant session's record", n, err)
+	}
+	if got, _, _ := te.repo.Session(ctx, "term-1"); got.State() != dturn.SessionClosed || len(sess.Closed()) != 0 {
+		t.Fatalf("session %+v, processes ended %v", got, sess.Closed())
+	}
+}
+
+func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
+	t.Parallel()
+	l := newTestEnv(t, &fake.Manager{}).loadedIntents()
+	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace, turns.RefusalOrphanUnproven, turns.RefusalOrphanMoved, turns.RefusalOrphanLingers, turns.RefusalCloseRaced} {
+		if _, ok := l.Strings[key]; !ok {
+			t.Errorf("strings.toml does not word %q", key)
+		}
+		if !slices.Contains(api.PlanReasons, key) {
+			t.Errorf("api.PlanReasons lacks %q, so no client reads it through its catalog", key)
+		}
+	}
+}
+
+func TestASessionCloseOfATerminalOpenWithNoAgentSaysWhatToDo(t *testing.T) {
+	t.Parallel()
+	te, _ := noAgentSession(t, true)
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	refusal, err := s.Check(context.Background(), wfStep("session.close"), unit.Unit{Provider: unit.Session, Key: "term-1"}, workflow.Why{}, automation.CheckOpts{})
+	if err != nil || refusal != turns.RefusalNoAgent {
+		t.Fatalf("check %q %v", refusal, err)
 	}
 }
 
@@ -257,7 +397,7 @@ func noAgentSession(t *testing.T, listed bool) (*testEnv, turnsGuard) {
 func TestARemovalRefusesAListedTerminalWithNoAgent(t *testing.T) {
 	t.Parallel()
 	_, g := noAgentSession(t, true)
-	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "session term-1: no agent" {
+	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "session term-1: "+turns.RefusalNoAgent {
 		t.Fatalf("refusal %q %v", why, err)
 	}
 }
@@ -531,19 +671,20 @@ func (r *classifyRig) run(t *testing.T) (string, error) {
 func TestClassifyNeverBlocksTheSweep(t *testing.T) {
 	t.Parallel()
 	r := newClassifyRig(t, 5)
-	done := make(chan error, 1)
-	go func() {
-		_, err := r.run(t)
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		var deferred automation.Deferred
-		if !errors.As(err, &deferred) {
-			t.Fatalf("run: %v", err)
-		}
-	case <-time.After(5 * time.Second):
+	// The classifier answers only once released, so a Run that waits for it would hang; the watchdog only
+	// ends such a hang, and the test then fails whatever the machine's load.
+	hung := make(chan struct{})
+	watchdog := time.AfterFunc(time.Minute, func() {
+		close(r.asker.release)
+		close(hung)
+	})
+	_, err := r.run(t)
+	if !watchdog.Stop() {
+		<-hung
 		t.Fatal("Run waited for the classifier")
+	}
+	if !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("run: %v", err)
 	}
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
 		t.Fatalf("a second run while classifying: %v", err)

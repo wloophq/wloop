@@ -2,7 +2,9 @@ package source
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -182,6 +184,12 @@ func (s *hostServer) ClearWake(ctx context.Context, r *pb.ClearWakeRequest) (*pb
 	})
 }
 
+func (s *hostServer) WakeJob(ctx context.Context, r *pb.WakeJobRequest) (*pb.WakeJobResponse, error) {
+	return hostCall(ctx, s.h.Jobs, "jobs", func(h Jobs) (*pb.WakeJobResponse, error) {
+		return &pb.WakeJobResponse{}, h.WakeJob(ctx, r.GetJob(), tm(r.GetAt()))
+	})
+}
+
 func (s *hostServer) Ask(ctx context.Context, r *pb.AskRequest) (*pb.AskResponse, error) {
 	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.AskResponse, error) {
 		res, err := h.Ask(ctx, AskRequest{Prompt: r.GetPrompt(), Schema: raw(r.GetSchemaJson()), Tier: r.GetTier(), MaxCostUSD: r.GetMaxCostUsd(), MeterScope: r.GetMeterScope()})
@@ -210,6 +218,24 @@ func (s *hostServer) Profile(ctx context.Context, r *pb.ProfileRequest) (*pb.Pro
 	})
 }
 
+func (s *hostServer) Holds(ctx context.Context, r *pb.HoldsRequest) (*pb.HoldsResponse, error) {
+	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.HoldsResponse, error) {
+		sets := make([][]Fact, len(r.GetFacts()))
+		for i, set := range r.GetFacts() {
+			sets[i] = factsGo(set.GetFacts())
+		}
+		holds, err := h.Holds(ctx, r.GetPredicate(), sets)
+		if err == nil && len(holds) != len(sets) {
+			err = fmt.Errorf("holds %s: %d verdicts for %d fact sets", r.GetPredicate(), len(holds), len(sets))
+		}
+		out := make([]*pb.PredicateVerdict, len(holds))
+		for i, x := range holds {
+			out[i] = &pb.PredicateVerdict{Holds: x.Holds, Error: x.Err}
+		}
+		return &pb.HoldsResponse{Verdicts: out}, err
+	})
+}
+
 func (s *hostServer) Events(ctx context.Context, r *pb.EventsRequest) (*pb.EventsResponse, error) {
 	return hostCall(ctx, s.h.History, "history", func(h History) (*pb.EventsResponse, error) {
 		evs, err := h.Events(ctx, EventQuery{Units: unitsGo(r.GetUnits()), Kinds: r.GetKinds(), Since: tm(r.GetSince())})
@@ -223,7 +249,7 @@ type hostClient struct {
 	c pb.HostServiceClient
 }
 
-func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h, h} }
+func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h, h, h} }
 
 func viaHost[Resp any](h *hostClient, f func(pb.HostServiceClient) (Resp, error)) (Resp, error) {
 	var zero Resp
@@ -365,6 +391,13 @@ func (h *hostClient) ClearWake(ctx context.Context, u plugin.Unit, task string) 
 	return err
 }
 
+func (h *hostClient) WakeJob(ctx context.Context, job string, at time.Time) error {
+	_, err := viaHost(h, func(c pb.HostServiceClient) (*pb.WakeJobResponse, error) {
+		return c.WakeJob(ctx, &pb.WakeJobRequest{Job: job, At: ts(at)})
+	})
+	return err
+}
+
 func (h *hostClient) Ask(ctx context.Context, req AskRequest) (AskResult, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.AskResponse, error) {
 		return c.Ask(ctx, &pb.AskRequest{Prompt: req.Prompt, SchemaJson: req.Schema, Tier: req.Tier, MaxCostUsd: req.MaxCostUSD, MeterScope: req.MeterScope})
@@ -395,6 +428,27 @@ func (h *hostClient) Profile(ctx context.Context, path string) ([]byte, error) {
 		return c.Profile(ctx, &pb.ProfileRequest{Path: path})
 	})
 	return r.GetContent(), err
+}
+
+func (h *hostClient) Holds(ctx context.Context, predicate string, facts [][]Fact) ([]Holding, error) {
+	sets := make([]*pb.FactSet, len(facts))
+	for i, fs := range facts {
+		sets[i] = &pb.FactSet{Facts: factsPB(fs)}
+	}
+	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.HoldsResponse, error) {
+		return c.Holds(ctx, &pb.HoldsRequest{Predicate: predicate, Facts: sets})
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(r.GetVerdicts()) != len(facts) {
+		return nil, fmt.Errorf("holds %s: %d verdicts for %d fact sets", predicate, len(r.GetVerdicts()), len(facts))
+	}
+	out := make([]Holding, len(facts))
+	for i, v := range r.GetVerdicts() {
+		out[i] = Holding{Holds: v.GetHolds(), Err: v.GetError()}
+	}
+	return out, nil
 }
 
 func (h *hostClient) Events(ctx context.Context, q EventQuery) ([]Event, error) {

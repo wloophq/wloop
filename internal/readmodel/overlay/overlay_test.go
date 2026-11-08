@@ -1,6 +1,7 @@
 package overlay
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -89,7 +90,7 @@ func TestAPendingRoundWaitsOnTheUserButOnADoneOrMutedUnit(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	for _, s := range []Situation{{Kind: KindDone}, {Kind: KindMuted}} {
-		if p.Over(s) != s {
+		if !reflect.DeepEqual(p.Over(s), s) {
 			t.Errorf("a pending round over %s", s.Kind)
 		}
 	}

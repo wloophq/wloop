@@ -508,7 +508,9 @@ func (p *Provider) Notice(base readmodel.Base, row api.Row, in any, at time.Time
 	if !ok {
 		return readmodel.Notice{}, false
 	}
-	n, ok := DeriverAt(base, x.set.RowSettings, x.set.briefOn, at).Notice(row, in)
+	d := DeriverAt(base, x.set.RowSettings, x.set.briefOn, at)
+	d.Reasons = p.Reasons().Words
+	n, ok := d.Notice(row, in)
 	return readmodel.Notice{Gate: n.Case.Gate(), Held: n.Case == NoticeHeld, Question: n.Case == NoticeQuestion, Record: n.Record,
 		Token: n.Token, Attention: n.Attention}, ok
 }

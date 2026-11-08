@@ -414,12 +414,13 @@ var errNoDraftTurn = errors.New("this session has no turn; slack_draft drafts on
 
 func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	var a struct {
-		Text     *string  `json:"text"`
-		Kind     string   `json:"kind"`
-		Target   string   `json:"target"`
-		Items    []string `json:"items"`
-		Reaction string   `json:"reaction"`
-		Effects  []string `json:"effects"`
+		Text      *string  `json:"text"`
+		Kind      string   `json:"kind"`
+		Target    string   `json:"target"`
+		Items     []string `json:"items"`
+		Reaction  string   `json:"reaction"`
+		Effects   []string `json:"effects"`
+		Broadcast *bool    `json:"broadcast"`
 	}
 	if err := decodeStrict(raw, &a); err != nil {
 		return badArguments(err)
@@ -429,6 +430,12 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	}
 	d := draft.Draft{Kind: draft.Kind(cmp.Or(strings.TrimSpace(a.Kind), draftKinds[0])), Target: strings.TrimSpace(a.Target), Items: a.Items,
 		Reaction: strings.TrimSpace(a.Reaction), Effects: a.Effects}
+	if a.Broadcast != nil {
+		d.Broadcast = draft.BroadcastOff
+		if *a.Broadcast {
+			d.Broadcast = draft.BroadcastOn
+		}
+	}
 	if a.Text != nil {
 		d.Text = *a.Text
 	}

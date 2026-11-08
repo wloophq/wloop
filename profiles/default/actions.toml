@@ -87,6 +87,16 @@ summary = "Send this draft again after its post failed."
 why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
 confirm = "{{if .draft.maybe_posted}}This draft may have been posted already. Check its conversation first: retrying may post it twice.{{end}}"
 
+["draft.close-silently"]
+label   = "Close without a message"
+summary = "Close the conversation as this draft would, without posting it."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}; only a held draft closes without its message{{else if eq .draft.refusal \"no_effects\"}}this draft applies nothing without its message{{else}}what this draft does needs its message: it posts{{end}}"
+
+["draft.skip-workflow"]
+label   = "Don't nudge this conversation"
+summary = "Stop this kind of draft on this conversation; the task stays where it is."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"not_from_workflow\"}}no workflow proposed this draft{{else}}this kind of draft is already stopped on this conversation{{end}}"
+
 [plan_apply]
 label   = "Apply"
 summary = "Run this plan item now, with the same guards as the sweep. Dismiss drops it instead."

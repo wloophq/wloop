@@ -1,8 +1,11 @@
 package config
 
 import (
+	"fmt"
+	"maps"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 )
@@ -34,15 +37,54 @@ type fileSig struct {
 	exists  bool
 }
 
+// liveKey is a setting a changed file applies at once: take copies its value from the file's config.
+type liveKey struct {
+	name string
+	take func(running *Config, file Config)
+}
+
+// liveKeys are the settings that follow the file while a serve runs.
+var liveKeys = []liveKey{
+	{"profile", func(r *Config, f Config) { r.Profile = f.Profile }},
+	{"ui.locale", func(r *Config, f Config) { r.UI.Locale = f.UI.Locale }},
+	{"workflows.<name>.enabled", takeWorkflowSwitches},
+}
+
+// takeWorkflowSwitches sets each workflow's enabled in r to f's, on a copy of r's workflows, since the
+// running and start configs share theirs; a workflow left with no setting drops out.
+func takeWorkflowSwitches(r *Config, f Config) {
+	out := maps.Clone(r.Workflows)
+	for name := range f.Workflows {
+		if _, ok := out[name]; !ok {
+			if out == nil {
+				out = map[string]WorkflowConfig{}
+			}
+			out[name] = WorkflowConfig{}
+		}
+	}
+	for name, w := range out {
+		w.Enabled = f.Workflows[name].Enabled
+		if reflect.ValueOf(w).IsZero() {
+			delete(out, name)
+			continue
+		}
+		out[name] = w
+	}
+	if len(out) == 0 {
+		out = nil
+	}
+	r.Workflows = out
+}
+
 // Holder is the one configuration a serve holds. Config is the config the
-// serve started with, except that the profile setting follows the file; every
+// serve started with, except that the live keys follow the file; every
 // other change makes Stale true until the serve restarts.
 type Holder struct {
 	opts HolderOptions
 
 	mu      sync.Mutex
 	start   Config
-	profile string
+	live    Config
 	stale   bool
 	broken  error
 	badFile error
@@ -74,7 +116,7 @@ func (h *Holder) Rebase(cfg Config) {
 }
 
 func (h *Holder) rebase(cfg Config) {
-	h.start, h.profile, h.stale, h.broken, h.badFile = cfg, cfg.Profile, false, nil, nil
+	h.start, h.live, h.stale, h.broken, h.badFile = cfg, cfg, false, nil, nil
 	h.sig, h.checked = h.statFile(), h.opts.Now()
 }
 
@@ -92,34 +134,49 @@ func (h *Holder) Err() error {
 	return h.broken
 }
 
-// Config is the config the serve runs with and the profile now in force.
+// Config is the config the serve runs with, its live keys as the file now sets them.
 func (h *Holder) Config() Config {
 	h.refresh()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	c := h.start
-	c.Profile = h.profile
-	return c
+	return h.live
 }
 
 // Warning is what a restart or a fix of config.toml would change: the load
-// failure of a file that broke, else that a changed file needs a restart; ""
+// failure of a file that broke, else that a changed file needs a restart; none
 // when the running config matches the file.
-func (h *Holder) Warning() string {
+func (h *Holder) Warning() Warning {
 	h.refresh()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return h.warning()
 }
 
-func (h *Holder) warning() string {
+// Warning is what a restart or a fix of config.toml would change, as a key of the client strings
+// (strings.toml) and its {name} params; Key is "" when there is nothing to say.
+type Warning struct {
+	Key    string
+	Params map[string]any
+}
+
+// The keys of the config warnings, which strings.toml words.
+const (
+	WarningBroken = "config.toml does not load, so the running config stays: {error}"
+	WarningStale  = "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest"
+)
+
+func (w Warning) same(o Warning) bool {
+	return w.Key == o.Key && fmt.Sprint(w.Params) == fmt.Sprint(o.Params)
+}
+
+func (h *Holder) warning() Warning {
 	switch {
 	case h.badFile != nil:
-		return "config.toml does not load, so the running config stays: " + h.badFile.Error()
+		return Warning{Key: WarningBroken, Params: map[string]any{"error": h.badFile.Error()}}
 	case h.stale:
-		return "config.toml changed; only the profile applies live, restart the daemon to apply the rest"
+		return Warning{Key: WarningStale, Params: map[string]any{"keys": liveNames()}}
 	}
-	return ""
+	return Warning{}
 }
 
 // Stale reports that the file changed in a way only a restart applies.
@@ -139,6 +196,20 @@ func (h *Holder) statFile() fileSig {
 		return fileSig{}
 	}
 	return fileSig{modTime: fi.ModTime(), size: fi.Size(), exists: true}
+}
+
+// Reload reads the file now, whatever the stat interval, as a change the serve just made to it asks.
+func (h *Holder) Reload() {
+	var changed func()
+	h.mu.Lock()
+	if h.opts.Path != "" && h.opts.Load != nil {
+		h.checked, h.sig = h.opts.Now(), h.statFile()
+		changed = h.reload()
+	}
+	h.mu.Unlock()
+	if changed != nil {
+		changed()
+	}
 }
 
 func (h *Holder) refresh() {
@@ -163,16 +234,19 @@ func (h *Holder) reload() func() {
 	h.badFile = err
 	var calls []func()
 	if err == nil {
-		h.stale = !equalExceptProfile(h.start, next)
-		if next.Profile != h.profile {
-			h.profile = next.Profile
+		h.stale = !equalExceptLive(h.start, next)
+		was := h.live.Profile
+		for _, k := range liveKeys {
+			k.take(&h.live, next)
+		}
+		if next.Profile != was {
 			if on := h.opts.OnProfileChange; on != nil {
 				p := next.Profile
 				calls = append(calls, func() { on(p) })
 			}
 		}
 	}
-	if on := h.opts.OnWarningChange; on != nil && h.warning() != before {
+	if on := h.opts.OnWarningChange; on != nil && !h.warning().same(before) {
 		calls = append(calls, on)
 	}
 	if len(calls) == 0 {
@@ -185,7 +259,21 @@ func (h *Holder) reload() func() {
 	}
 }
 
-func equalExceptProfile(a, b Config) bool {
-	a.Profile, b.Profile = "", ""
+func equalExceptLive(a, b Config) bool {
+	for _, k := range liveKeys {
+		k.take(&a, Config{})
+		k.take(&b, Config{})
+	}
+	// The app reads window.* when it starts; no restart of the daemon applies them.
+	a.Window, b.Window = Window{}, Window{}
 	return reflect.DeepEqual(a, b)
+}
+
+// liveNames are the live keys as a warning lists them.
+func liveNames() string {
+	names := make([]string, len(liveKeys))
+	for i, k := range liveKeys {
+		names[i] = k.name
+	}
+	return strings.Join(names, ", ")
 }

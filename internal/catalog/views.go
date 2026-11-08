@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -193,9 +194,28 @@ func (l Lens) facts(ctx context.Context, view string, t task.Task) (workflow.Fac
 	if OwnFacts(in.Views, view) || l.Facts == nil {
 		return TaskFacts(t, in.Tasks), nil
 	}
+	return l.Facts(workflow.WithReads(ctx, allViewReads(in)...), t)
+}
+
+// lastReads are the facts the views of the last profile loaded read.
+var lastReads atomic.Pointer[profileReads]
+
+type profileReads struct {
+	in    *intentload.Loaded
+	reads []string
+}
+
+// allViewReads are the facts in's views read, each once, read from in's views once per profile loaded.
+func allViewReads(in *intentload.Loaded) []string {
+	if r := lastReads.Load(); r != nil && r.in == in {
+		return r.reads
+	}
 	var reads []string
 	for _, v := range in.Views.Views {
 		reads = append(reads, viewReads(v)...)
 	}
-	return l.Facts(workflow.WithReads(ctx, reads...), t)
+	slices.Sort(reads)
+	reads = slices.Compact(reads)
+	lastReads.Store(&profileReads{in: in, reads: reads})
+	return reads
 }

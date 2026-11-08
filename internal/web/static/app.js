@@ -6,9 +6,9 @@ const API_VERSION = "1";
 // apiError reads a daemon error; a 426 means the daemon is newer than this
 // page, which only a reload brings up to date.
 function apiError(out, fallback, status) {
-  if (status === 426) return "this page is older than {{name}}'s daemon; reload this page";
+  if (status === 426) return t("this page is older than {name}'s daemon; reload this page", { name: "{{name}}" });
   const msg = out.error || fallback;
-  return out.fix ? `${msg}; run: ${out.fix}` : msg;
+  return out.fix ? t("{error}; run: {fix}", { error: msg, fix: out.fix }) : msg;
 }
 
 const SIZES = ["xs", "s", "m", "l", "xl"];
@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], specs: [], fields: [], lens: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), loopEvents: new Set(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], reasons: [], cardSignals: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -36,11 +36,20 @@ function applyCatalog(c) {
   catalog.specs = c.facets || [];
   catalog.fields = catalog.specs.map(fieldOf);
   catalog.lens = c.lens || [];
+  catalog.reasons = c.reasons || [];
+  catalog.cardSignals = c.card_signals || [];
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
-  catalog.loopEvents = new Set((c.events || []).filter((e) => e.loop).map((e) => e.kind));
+  catalog.eventTones = new Map((c.events || []).filter((e) => e.tone).map((e) => [e.kind, e.tone]));
   catalog.details = c.details || [];
-  catalog.search = ((c.views || []).find((v) => v.search) || {}).search || null;
+  const searching = (c.views || []).find((v) => v.search) || {};
+  catalog.search = searching.search || null;
+  catalog.searchProvider = searching.provider || "";
+}
+
+// searchService is the service the served search runs on, as its plugin names it.
+function searchService() {
+  return providerName(catalog.searchProvider || "");
 }
 
 // exploreSearch is the served Explore search: its presets, filters, sorts
@@ -54,14 +63,19 @@ function reviewDecision(decision) {
   return (s.decisions || {})[decision] || s.no_decision || "";
 }
 
-// eventLabel is an event kind in a few words: its plugin's, else the core's.
+// eventLabel is an event kind in a few words, as the catalog serves it: a plugin's kinds and the core's.
 function eventLabel(kind) {
-  return catalog.events.get(kind) || EVENT_LABEL[kind] || kind.replaceAll("_", " ");
+  return catalog.events.get(kind) || kind.replaceAll("_", " ");
 }
 
-// loopEvent says whether an event kind is the loop's doing.
+// eventTone is the tone the catalog draws an event kind in, "" for none.
+function eventTone(kind) {
+  return catalog.eventTones.get(kind) || "";
+}
+
+// loopEvent says whether an event kind is the loop's doing: its tone is the loop's.
 function loopEvent(kind) {
-  return LOOP_EVENTS.has(kind) || catalog.loopEvents.has(kind);
+  return eventTone(kind) === "loop";
 }
 
 function kindLabel(kind, provider) {
@@ -104,8 +118,8 @@ function bucketsOf(f, r) {
 }
 
 function facetTime(r, id) {
-  const t = Date.parse(facetValues(r, id)[0] || "");
-  return Number.isNaN(t) ? -Infinity : t;
+  const ms = Date.parse(facetValues(r, id)[0] || "");
+  return Number.isNaN(ms) ? -Infinity : ms;
 }
 
 // goDuration reads a Go duration such as "72h", "-24h" or "1h30m" in ms.
@@ -119,9 +133,9 @@ function goDuration(s) {
 }
 
 // bucketOf is the first bucket whose within is above now - t, the one
-// without within catching the rest; "" when no bucket takes t.
-function bucketOf(buckets, t, now = Date.now()) {
-  const at = Date.parse(t);
+// without within catching the rest; "" when no bucket takes iso.
+function bucketOf(buckets, iso, now = Date.now()) {
+  const at = Date.parse(iso);
   if (Number.isNaN(at)) return "";
   const delta = now - at;
   const b = buckets.find((x) => !x.within || delta < goDuration(x.within));
@@ -132,7 +146,7 @@ function bucketOf(buckets, t, now = Date.now()) {
 // in its "due" bucket now.
 function dueNow(r, now = Date.now()) {
   const f = fieldById("due");
-  return !!f && !!f.buckets && facetValues(r, "due").some((t) => bucketOf(f.buckets, t, now) === "due");
+  return !!f && !!f.buckets && facetValues(r, "due").some((iso) => bucketOf(f.buckets, iso, now) === "due");
 }
 
 // pl is a row's provider payload, empty for a row that has none.
@@ -144,23 +158,12 @@ function sm(r) {
   return r.summary || {};
 }
 
-const EVENT_LABEL = {
-  held: "paused", released: "resumed", muted: "muted", unmuted: "unmuted", adopted: "adopted", status: "board",
-  removed: "workspace removed", nudged: "nudged", tracked: "tracked", untracked: "untracked", answered: "answered",
-  turn_sent: "turn sent", turn_started: "turn started", turn_ended: "turn ended", turn_resumed: "turn resumed",
-  turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
-  turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
-  stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
-  workflow_step_ran: "step ran",
-};
-const LOOP_EVENTS = new Set(["held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_MIN = 300;
 const DETAIL_WIDTH_STEP = 16;
 
 const UNIT_KEY = /^[a-z][a-z0-9-]*:\S{1,300}$/;
-const DISCONNECTED = "disconnected: run `{{command}} open`";
 const QUERY_MAX = 200;
 const REQUEST_TIMEOUT_MS = 15000;
 const ARTIFACT_LINES = 40;
@@ -196,11 +199,13 @@ function readHash() {
   const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
   return {
     view,
+    queue: view === QUEUE ? route.queue : "",
+    ids: view === QUEUE ? route.ids : [],
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
     task: route.task,
     area: route.area,
     ctx: route.ctx,
-    layout: p.get("layout") === "board" ? "board" : "",
+    layout: route.layout,
     q: (p.get("q") || "").slice(0, QUERY_MAX),
     g: (p.get("g") || "").slice(0, QUERY_MAX),
     s: (p.get("s") || "").slice(0, QUERY_MAX),
@@ -222,6 +227,9 @@ function lensPicks(view, route, g, s) {
 
 function hashString(next) {
   const p = new URLSearchParams();
+  const queue = next.view === QUEUE && next.queue;
+  if (queue) p.set("queue", next.queue);
+  if (queue && next.ids && next.ids.length) p.set("ids", next.ids.join(","));
   if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", [].concat(next.ctx).join(","));
@@ -232,7 +240,7 @@ function hashString(next) {
   if (next.x && next.view === "explore") p.set("x", next.x);
   if (next.tk && next.view === "dash") p.set("tk", next.tk);
   if (next.done && next.view === "dash") p.set("done", "1");
-  return routeHash(next.view, next.pr, p);
+  return routeHash(queue ? "" : next.view, next.pr, p);
 }
 
 function writeHash(change, replace) {
@@ -269,7 +277,7 @@ function unquote(s) {
 
 // terms are the free words of a query over fields, the text every field is searched for.
 function terms(q, fields = catalog.fields) {
-  return tokens(q).filter((t) => !qualifierOf(t, fields)).map((t) => fold(unquote(t))).filter(Boolean);
+  return tokens(q).filter((tok) => !qualifierOf(tok, fields)).map((tok) => fold(unquote(tok))).filter(Boolean);
 }
 
 function fieldById(id, fields = catalog.fields) {
@@ -287,7 +295,7 @@ function tagKeyField(id, fields = catalog.fields) {
   const w = lensWords();
   return {
     id, label: fillWord(w.tag_key, { label: tag.label, key }), empty: fillWord(w.tag_key_empty, { key }), group: true, tagKey: key,
-    keys: (r) => facetValues(r, tag.id).filter((t) => t.startsWith(key + ":")),
+    keys: (r) => facetValues(r, tag.id).filter((v) => v.startsWith(key + ":")),
   };
 }
 
@@ -298,9 +306,9 @@ function groupField(id, fields = catalog.fields) {
 function tagKeys(rows) {
   const keys = new Set();
   for (const r of rows) {
-    for (const t of facetValues(r, "tag")) {
-      const at = t.indexOf(":");
-      if (at > 0) keys.add(t.slice(0, at));
+    for (const tag of facetValues(r, "tag")) {
+      const at = tag.indexOf(":");
+      if (at > 0) keys.add(tag.slice(0, at));
     }
   }
   return [...keys].filter((k) => /^[a-z-]+$/.test(k)).sort();
@@ -322,7 +330,7 @@ function qualifierOf(token, fields = catalog.fields) {
 }
 
 function qualifiers(q, fields = catalog.fields) {
-  return tokens(q).map((t) => qualifierOf(t, fields)).filter(Boolean);
+  return tokens(q).map((tok) => qualifierOf(tok, fields)).filter(Boolean);
 }
 
 function qualifierToken(field, raw, neg) {
@@ -334,8 +342,8 @@ function qualifierToken(field, raw, neg) {
 function toggledQualifier(q, field, raw, neg, fields = catalog.fields) {
   const v = normValue(field, raw);
   let on = false;
-  const kept = tokens(q).filter((t) => {
-    const x = qualifierOf(t, fields);
+  const kept = tokens(q).filter((tok) => {
+    const x = qualifierOf(tok, fields);
     if (!x || x.field !== field || x.value !== v) return true;
     if (x.neg === !!neg) on = true;
     return false;
@@ -344,15 +352,15 @@ function toggledQualifier(q, field, raw, neg, fields = catalog.fields) {
 }
 
 function withoutQualifiers(q, field, neg, fields = catalog.fields) {
-  return tokens(q).filter((t) => {
-    const x = qualifierOf(t, fields);
+  return tokens(q).filter((tok) => {
+    const x = qualifierOf(tok, fields);
     return !x || x.field !== field || x.neg !== neg;
   }).join(" ");
 }
 
 // rowTexts are the texts a free word searches in a row.
 function rowTexts(r) {
-  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, sm(r).line,
+  return [r.title, labelOf(r), r.link, r.kind, rowKindLabel(r), sm(r).waits_on, sm(r).reason, reasonText(r), sm(r).line,
     ...(r.search || []), ...Object.values(r.facets || {}).flat()];
 }
 
@@ -367,13 +375,13 @@ function haystack(it) {
 }
 
 function matches(it, ts) {
-  return ts.every((t) => haystack(it).some((f) => f.includes(t)));
+  return ts.every((term) => haystack(it).some((f) => f.includes(term)));
 }
 
 function matchesActivity(it, ts) {
   const e = it.event;
   const fields = [it.title, eventRef(it), it.author, e.actor, eventLabel(e.kind), e.data].map(fold);
-  return ts.every((t) => fields.some((f) => f.includes(t)));
+  return ts.every((term) => fields.some((f) => f.includes(term)));
 }
 
 // Recent applies the filters an event can answer: its repository and the
@@ -411,8 +419,8 @@ function marked(text, ts) {
   if (!ts.length || !s) return s;
   const { out, at } = foldMap(s);
   const hits = [];
-  for (const t of ts) {
-    for (let i = out.indexOf(t); i >= 0; i = out.indexOf(t, i + 1)) hits.push([at[i], at[i + t.length]]);
+  for (const term of ts) {
+    for (let i = out.indexOf(term); i >= 0; i = out.indexOf(term, i + 1)) hits.push([at[i], at[i + term.length]]);
   }
   if (!hits.length) return s;
   hits.sort((a, b) => a[0] - b[0]);
@@ -451,18 +459,18 @@ function typing(el) {
   return el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || !!(el && el.isContentEditable);
 }
 
-function isSet(t) {
-  return t && !t.startsWith("0001-01-01");
+function isSet(iso) {
+  return iso && !iso.startsWith("0001-01-01");
 }
 
 function age(since, now = Date.now()) {
   if (!isSet(since)) return "";
   const mins = Math.max(0, Math.floor((now - Date.parse(since)) / 60000));
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins} min`;
+  if (mins < 1) return t("now");
+  if (mins < 60) return t("{minutes} min", { minutes: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ${mins % 60}m`;
-  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  if (hours < 24) return t("{hours}h {minutes}m", { hours, minutes: mins % 60 });
+  return t("{days}d {hours}h", { days: Math.floor(hours / 24), hours: hours % 24 });
 }
 
 // left is a pending round's countdown to deadline in the row words w.
@@ -490,10 +498,9 @@ function tickCountdowns() {
   for (const el of document.querySelectorAll(".plan-left[data-deadline]")) el.textContent = planWhen({ decision: "pending", default: "run", deadline: el.dataset.deadline });
 }
 
-function stamp(t) {
-  if (!isSet(t)) return "";
-  const d = new Date(t);
-  return d.toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+function stamp(iso) {
+  if (!isSet(iso)) return "";
+  return fmtDate(iso, "datetime");
 }
 
 function resolveWho(row, w) {
@@ -576,7 +583,7 @@ function isMuted(p) {
 
 // The backlog is every pull request still open; done joins it on request.
 function inView(row, view, withDone) {
-  if (view === "recent" || view === "explore" || view === "plan") return false;
+  if (view === RECENT || view === "explore" || view === PLAN) return false;
   if (view === "dash") return (row.unit || {}).provider === (catalog.views.find((v) => v.id === view) || {}).provider && (withDone || !sm(row).closed);
   return view === "all" || (row.views || []).includes(view);
 }
@@ -591,8 +598,8 @@ function rowFlags(r) {
 }
 
 function sinceTime(r) {
-  const t = Date.parse(sm(r).since);
-  return Number.isNaN(t) ? -Infinity : t;
+  const ms = Date.parse(sm(r).since);
+  return Number.isNaN(ms) ? -Infinity : ms;
 }
 
 // upcoming are a row's next instants: the daemon's list, or else the
@@ -673,6 +680,7 @@ const lensMemo = { tasks: null, fields: null, viewsCat: null, offered: null };
 // lensFields are the fields a query over view names: a task view's are the profile's task facets and the
 // plugins' facets, one by id as the daemon counts with them; a row view's are the plugins'.
 function lensFields(view) {
+  if (view === PLAN) return [];
   if (typeof isCoreView !== "function" || !isCoreView(view)) return catalog.fields;
   const cat = tasksState.catalog;
   if (lensMemo.fields !== catalog.fields || lensMemo.viewsCat !== cat) {
@@ -749,9 +757,17 @@ function lensWords() {
   return (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.lens) || {};
 }
 
-// fillWord fills a lens word's {{.name}} with vars.
+// fillWord fills a lens word's {{.name}} with vars, and its {{plural .name "one" "…" "other" "…"}} with the form
+// of vars[name] in the cockpit's locale.
 function fillWord(word, vars) {
-  return String(word || "").replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
+  return String(word || "")
+    .replace(/\{\{\s*plural\s+\.(\w+)((?:\s+"[^"]*")+)\s*\}\}/g, (_, k, pairs) => {
+      const words = [...pairs.matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+      const forms = {};
+      for (let i = 0; i + 1 < words.length; i += 2) forms[words[i]] = words[i + 1];
+      return forms[pluralForm(Number(vars[k]) || 0)] ?? forms.other ?? "";
+    })
+    .replace(/\{\{\s*\.(\w+)\s*\}\}/g, (_, k) => String(vars[k] ?? ""));
 }
 
 // lensOf is the lens of route: its query read over the fields of its view, trimmed as the daemon counts it,
@@ -767,9 +783,25 @@ function lensOf(route) {
   const provider = core ? "" : (catalog.views.find((v) => v.id === view) || {}).provider || "";
   const specs = core ? ((typeof tasksState === "object" && tasksState.catalog) || {}).facets || [] : catalog.specs;
   const strip = viewStrip(view);
-  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || "", tk, done,
+  return { view, q, ts: terms(q.trim(), fields), quals, filters: filtersOf(quals, fields), group: g, sort: s, layout: route.layout || servedLayout(view), tk, done,
     fields, offered, defaultGroup: viewGroupField(view), boardGroup: boardGroupField(view, offered), defaultSort: defaultSortLabel(view),
     specs, provider, words: rowWords(provider), strip: (strip || {}).id || "", stripSpec: strip };
+}
+
+// servedLayout is the layout the profile draws a core view in when the hash names none: "board", or "" for
+// its list.
+function servedLayout(view) {
+  const spec = typeof viewSpec === "function" ? viewSpec(view) : null;
+  return spec && spec.layout === "board" ? "board" : "";
+}
+
+// reasonText is why row r waits, in its plugin's words of the reason it names filled with the reason's values,
+// else as the plugin wrote it.
+function reasonText(r) {
+  const s = r.summary || {};
+  const words = ((catalog.reasons || []).find((w) => w.provider === unitOf(r).provider) || {}).words || {};
+  const word = s.reason_key ? words[s.reason_key] : "";
+  return word ? fillWord(word, s.reason_params || {}) : s.reason || "";
 }
 
 // rowWords are the row words of a provider's rows: the profile's, the plugin's own over them.
@@ -828,7 +860,8 @@ function compareItems(f, desc, byDefault) {
 }
 
 function groupLabel(f, raw) {
-  return !raw || raw === "none" ? f.empty || "none" : f.show ? f.show(raw) : raw;
+  return !raw || raw === "none" ? f.empty || t("none") : f.show ? f.show(raw) : raw;
+
 }
 
 function groupItems(f, items) {
@@ -887,7 +920,7 @@ function renderWarnings() {
   const items = [];
   const hl = state.health;
   if (hl) {
-    if (hl.slow_sync) items.push(`Slow sync: GitHub budget low until ${stamp(hl.rate_limit.reset_at)}`);
+    if (hl.slow_sync) items.push(t("Slow sync: the API budget is low until {time}", { time: stamp(hl.rate_limit.reset_at) }));
     for (const w of hl.warnings || []) items.push(w);
     for (const j of hl.jobs || []) if (j.last_error) items.push(`${j.name}: ${j.last_error}`);
   }
@@ -895,11 +928,11 @@ function renderWarnings() {
   if (state.activityError) items.unshift(state.activityError);
   if (state.error) items.unshift(state.error);
   if (state.actionError) items.unshift({ text: state.actionError, detail: state.actionDetail, source: state.actionSource });
-  if (state.authLost || state.conn === "closed") items.unshift(DISCONNECTED);
-  const text = items.map((t) => (typeof t === "string" ? t : `${t.text}\n${t.detail || ""}`)).join("\n");
+  if (state.authLost || state.conn === "closed") items.unshift(t("disconnected: run `{command} open`", { command: "{{command}}" }));
+  const text = items.map((it) => (typeof it === "string" ? it : `${it.text}\n${it.detail || ""}`)).join("\n");
   if (box.dataset.text !== text) {
-    box.replaceChildren(...items.map((t) => typeof t === "string" ? h("div", {}, t)
-      : h("div", {}, t.text, t.detail ? h("details", {}, h("summary", {}, t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details"), t.detail) : null)));
+    box.replaceChildren(...items.map((it) => typeof it === "string" ? h("div", {}, it)
+      : h("div", {}, it.text, it.detail ? h("details", {}, h("summary", {}, it.source ? t("{source}'s message", { source: (state.health && state.health.workspace_manager) || it.source }) : t("Details")), it.detail) : null)));
     box.dataset.text = text;
   }
   box.hidden = items.length === 0;
@@ -909,22 +942,32 @@ function renderSync() {
   const el = document.getElementById("sync");
   const hl = state.health;
   if (state.conn !== "open" || !hl) {
-    el.textContent = state.conn === "closed" ? "disconnected" : state.conn;
+    el.textContent = connWord(state.conn);
     el.classList.remove("slow", "paused");
     return;
   }
   const ingest = (hl.jobs || []).filter((j) => j.name.startsWith("ingest:"));
   const sync = ingest.find((j) => j.running) || ingest.find((j) => !isSet(j.last_ok)) || ingest.sort((a, b) => Date.parse(a.last_ok) - Date.parse(b.last_ok))[0];
   const parts = [];
-  if (hl.paused) parts.push("automatic rounds paused");
-  if (sync) parts.push(sync.running ? "syncing" : isSet(sync.last_ok) ? `synced ${age(sync.last_ok) === "now" ? "just now" : age(sync.last_ok) + " ago"}` : "not synced yet");
+  if (hl.paused) parts.push(t("automatic rounds paused"));
+  if (sync) parts.push(sync.running ? t("syncing") : isSet(sync.last_ok) ? t("synced {ago}", { ago: ago(sync.last_ok) }) : t("not synced yet"));
   const rl = hl.rate_limit;
-  if (rl && rl.limit) parts.push(`GitHub budget ${rl.remaining} of ${rl.limit} left`);
+  if (rl && rl.limit) parts.push(t("API budget {remaining} of {limit} left", { remaining: fmtNumber(rl.remaining), limit: fmtNumber(rl.limit) }));
   if (hl.version) parts.push(hl.version);
   el.textContent = parts.join(" · ");
   el.classList.toggle("slow", !!hl.slow_sync);
   el.classList.toggle("paused", !!hl.paused);
 }
+
+function connWord(conn) {
+  switch (conn) {
+    case "connecting": return t("connecting");
+    case "reconnecting": return t("reconnecting");
+    case "closed": return t("disconnected");
+    default: return conn;
+  }
+}
+
 
 function renderPause() {
   const hl = state.health;
@@ -935,11 +978,15 @@ function renderPause() {
   }
   b.hidden = !hl;
   b.disabled = !!state.pausing;
-  b.textContent = hl && hl.paused ? "Resume automatic rounds" : "Pause automatic rounds";
+  b.textContent = hl && hl.paused ? t("Resume automatic rounds") : t("Pause automatic rounds");
 }
 
 function yamlString(v) {
   return JSON.stringify(String(v ?? ""));
+}
+
+function yamlMap(fields) {
+  return `{${Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join(", ")}}`;
 }
 
 // listYAML writes the items a view shows as YAML whose scalars are JSON strings, so an agent reads it without
@@ -1000,8 +1047,8 @@ function candidatesYAML(meta, cands) {
       ["my_review", c.my_review ? yamlString(c.my_review.toLowerCase()) : ""],
       ["created_at", yamlString(c.created_at)],
       ["updated_at", yamlString(c.updated_at)],
-      ["in_loop", row ? yamlString(`${row.kind}, waiting on ${sm(row).waits_on}`) : "false"],
-      ["brief", b ? `{size: ${yamlString(b.size)}, risk: ${yamlString(b.risk)}, open_questions: ${(b.open_questions || []).length}, goal: ${yamlString(b.goal)}}` : ""],
+      ["in_loop", row ? yamlMap({ kind: yamlString(row.kind), waits_on: yamlString(sm(row).waits_on) }) : "false"],
+      ["brief", b ? yamlMap({ size: yamlString(b.size), risk: yamlString(b.risk), open_questions: (b.open_questions || []).length, goal: yamlString(b.goal) }) : ""],
     ].filter(([, v]) => v);
     fields.forEach(([k, v], i) => out.push(`${i ? "    " : "  - "}${k}: ${v}`));
   }
@@ -1013,161 +1060,10 @@ async function copyCandidates() {
   const cands = (ex.result && ex.result.candidates) || [];
   try {
     await navigator.clipboard.writeText(candidatesYAML({ query: readHash().x, read: ex.result && ex.result.read, at: new Date().toISOString() }, cands));
-    setNotice(`Copied ${cands.length} candidate${cands.length === 1 ? "" : "s"} as YAML.`);
+    setNotice(tn("Copied {n} candidates as YAML.", cands.length));
   } catch (err) {
-    setNotice(`Could not copy: ${err.message}`, true);
+    setNotice(t("Could not copy: {error}", { error: err.message }), true);
   }
-}
-
-function sortLabel(sort, fields = catalog.fields) {
-  const { field, desc } = parseSort(sort, fields);
-  return field ? `${fieldById(field, fields).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
-}
-
-// lensResult is what lens shows of its view: a task view's tasks in the daemon's order, a row view's rows.
-function lensResult(lens) {
-  if (typeof isCoreView === "function" && isCoreView(lens.view)) return pipelineOf(taskLensItems(), lens, null);
-  return pipeline(state.rows, lens);
-}
-
-async function copyList(lens) {
-  const res = lensResult(lens);
-  const items = groupedRows(res.groups);
-  const grouped = res.group ? groupField(res.group, lens.fields).label.toLowerCase() : "";
-  const w = lensWords();
-  try {
-    await navigator.clipboard.writeText(listYAML({ view: lens.view, filter: lens.q, group_by: grouped, sort: sortLabel(lens.sort, lens.fields), at: new Date().toISOString() }, items));
-    setNotice(fillWord(grouped ? w.copied_grouped : w.copied, { count: items.length, view: lens.view, group: grouped }));
-  } catch (err) {
-    setNotice(`Could not copy: ${err.message}`, true);
-  }
-}
-
-function chip(attrs, label) {
-  return h("button", { type: "button", class: "chip", ...attrs }, label);
-}
-
-function setGroup(g) {
-  const lens = { ...readLens(), group: g };
-  const res = lensResult(lens);
-  writeHash({ g });
-  if (res.group) setNotice(`Grouped by ${groupField(res.group, lens.fields).label.toLowerCase()}: ${res.groups.filter((x) => x.rows.length).length} groups`);
-}
-
-function clearLens() {
-  lastFocus = "top:search";
-  writeHash({ q: "", g: "", s: "" });
-}
-
-// lensChips are one chip per filtered field and sign, which takes it out.
-function lensChips(lens, applied) {
-  const by = new Map();
-  for (const x of lens.quals) {
-    const k = `${x.field}:${x.neg ? "-" : ""}`;
-    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
-    by.get(k).values.push(x.field === "kind" ? kindLabel(x.value) : x.raw);
-  }
-  const list = [...by.values()];
-  return list.map((c, i) => {
-    const f = fieldById(c.field, lens.fields);
-    const off = applied && !applied.includes(c.field);
-    const next = list[i + 1] || list[i - 1];
-    return chip({
-      class: off ? "chip on off" : "chip on", "data-focus": `lens:chip:${c.field}:${c.neg ? "-" : ""}`,
-      title: off ? "Not applied in Recent" : `Remove this filter (${c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ")})`,
-      onclick: () => {
-        lastFocus = next ? `lens:chip:${next.field}:${next.neg ? "-" : ""}` : "lens:group";
-        writeHash({ q: withoutQualifiers(lens.q, c.field, c.neg, lens.fields) });
-      },
-    }, `${f.label}: ${c.neg ? "not " : ""}${c.values.join(" or ")} ×`);
-  });
-}
-
-// stripLegend is the hues of lens's strip facet, in its rank, when fields offer it.
-function stripLegend(lens, fields) {
-  const s = lens.stripSpec;
-  if (!s || !s.rank || (fields && !fields.some((x) => x.id === s.id))) return null;
-  return h("span", { class: "legend", title: (lens.words || lensWords()).legend_title || undefined },
-    h("span", { class: "lens-label" }, `${s.label}:`),
-    s.rank.map((v) => h("span", { class: "lg w-" + stripColor(s, v) }, h("span", { class: "sw", "aria-hidden": "true" }), (s.labels || {})[v] || v)));
-}
-
-function lensSelect(id, label, value, options, onchange) {
-  return h("label", { class: "lens-pick" }, h("span", { class: "lens-label" }, label),
-    h("select", { "data-focus": `lens:${id}`, onchange: (e) => onchange(e.target.value) },
-      options.map(([v, text]) => h("option", { value: v, selected: v === value }, text))));
-}
-
-// renderLens draws the bar of filters, grouping and order in tools, #tools by default. It rebuilds only when
-// what it shows changed, so an open select survives live updates.
-function renderLens(lens, res, tools = document.getElementById("tools")) {
-  const recent = lens.view === "recent";
-  if (lens.view === "explore" || (recent && !lens.quals.length)) {
-    hideLens(tools);
-    return;
-  }
-  tools.hidden = false;
-  const offered = (lens.offered || catalog.fields).map((f) => f.id);
-  const sig = JSON.stringify([lens.view, lens.q, lens.group, lens.sort, lens.layout, res && res.shown, res && res.total, state.health && state.health.viewer, offered,
-    lens.defaultGroup, lens.boardGroup, lens.defaultSort, lensWords()]);
-  if (tools.dataset.sig === sig) return;
-  tools.dataset.sig = sig;
-  const clear = h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, "Clear");
-  tools.replaceChildren(...(recent ? [...lensChips(lens, ACTIVITY_FIELDS), clear] : lensBar(lens, res)));
-}
-
-function hideLens(tools) {
-  tools.hidden = true;
-  tools.replaceChildren();
-  tools.dataset.sig = "";
-}
-
-// lensBar is the bar's controls: the group and sort menus over the fields lens offers, the layout, the chips of
-// what it filters by, the count and Copy list.
-function lensBar(lens, res) {
-  const offered = lens.offered || catalog.fields;
-  const fields = lens.fields || catalog.fields;
-  const current = tagKeyField(lens.group, fields);
-  const groups = offered.filter((f) => f.group && f.menu !== false);
-  if (current && !groups.some((f) => f.id === current.id)) groups.push(current);
-  const board = lens.layout === "board";
-  const w = lensWords();
-  const own = lens.defaultGroup || (board ? lens.boardGroup : "");
-  const ownField = own ? groupField(own, fields) : null;
-  const { field, desc } = parseSort(lens.sort, fields);
-  const sortWord = lens.defaultSort;
-  const picked = lens.group && lens.group !== NO_GROUP ? groupField(lens.group, fields) : null;
-  const toggle = (layout, label) => h("button", {
-    type: "button", class: "act", "aria-pressed": String(board === (layout === "board")), "data-focus": `lens:${layout || "list"}`,
-    onclick: () => writeHash({ layout }),
-  }, label);
-  const items = [
-    lensSelect("group", "Group", lens.group, [
-      ["", ownField ? fillWord(lens.defaultGroup ? w.default_group : w.board_group, { label: ownField.label }) : w.no_group],
-      ...(ownField ? [[NO_GROUP, w.no_group]] : []),
-      ...groups.map((f) => [f.id, f.label])], setGroup),
-    lensSelect("sort", "Sort", field, [["", sortWord], ...offered.filter((f) => f.sort).map((f) => [f.id, f.label])],
-      (v) => writeHash({ s: v })),
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:dir", disabled: !field, "aria-label": desc ? "Descending" : "Ascending",
-      title: field ? `Sorted ${desc ? "descending" : "ascending"}; click to flip` : "Pick a sort to choose its direction",
-      onclick: () => writeHash({ s: field + (desc ? "" : "-desc") }),
-    }, desc ? "↓" : "↑"),
-    h("div", { class: "toggle", role: "group", "aria-label": "Layout" }, toggle("", "List"), toggle("board", "Board")),
-    stripLegend(lens, offered),
-    ...lensChips(lens),
-    picked ? chip({ class: "chip on", "data-focus": "lens:chip:group", title: "Stop grouping", onclick: () => { lastFocus = "lens:group"; writeHash({ g: "" }); } },
-      `Grouped by ${picked.label.toLowerCase()} ×`) : null,
-    field ? chip({ class: "chip on", "data-focus": "lens:chip:sort", title: `Back to ${sortWord.toLowerCase()}`, onclick: () => { lastFocus = "lens:sort"; writeHash({ s: "" }); } },
-      `Sorted by ${fieldById(field, fields).label.toLowerCase()} ${desc ? "↓" : "↑"} ×`) : null,
-    h("span", { class: "lens-count" }, res ? `${res.shown} of ${res.total}` : ""),
-    lens.q.trim() || lens.group || field ? h("button", { type: "button", class: "act", "data-focus": "lens:clear", onclick: clearLens }, "Clear") : null,
-    h("button", {
-      type: "button", class: "act", "data-focus": "lens:copy-list", title: "Copy the items shown here, in this order, as YAML, to paste for an agent",
-      onclick: () => copyList(lens),
-    }, "Copy list"),
-  ];
-  return items.filter(Boolean);
 }
 
 async function setPaused(paused) {
@@ -1183,50 +1079,12 @@ async function setPaused(paused) {
       body: JSON.stringify({ paused }),
     });
     if (!res.ok) throw new Error(apiError(await res.json().catch(() => ({})), `HTTP ${res.status}`, res.status));
-    setNotice(paused ? "Automatic rounds paused" : "Automatic rounds resumed");
+    setNotice(paused ? t("Automatic rounds paused") : t("Automatic rounds resumed"));
   } catch (err) {
-    state.actionError = `${paused ? "pause" : "resume"} failed: ${err.message}`;
+    state.actionError = paused ? t("pause failed: {error}", { error: err.message }) : t("resume failed: {error}", { error: err.message });
   }
   state.pausing = false;
   scheduleLoad({ health: true });
-}
-
-function railItem(label, count, active, hash, cls, tip) {
-  const tipID = tip ? "rail-tip-" + hash.replace(/[^A-Za-z0-9_-]/g, "-") : undefined;
-  return h("li", {},
-    h("a", { href: "#" + hash, class: (active ? "on " : "") + (cls || ""), "aria-current": active ? "page" : undefined, "aria-describedby": tipID, "data-focus": "rail:" + hash },
-      h("span", { class: "label", title: tip ? undefined : label }, label),
-      h("span", { class: "count" }, count),
-      tip ? h("span", { class: "rail-tip", role: "tooltip", id: tipID }, tip) : null));
-}
-
-function lensHash(change) {
-  const { q, g, s: sort, layout, view, area } = readHash();
-  return hashString({ view, q, g, s: sort, layout, area, ...change });
-}
-
-function renderRail() {
-  const lens = readLens();
-  const nav = viewNav(tasksState.catalog, catalog.views, [...pluginViews.keys()], viewCounters(readHash()));
-  const views = railSections(nav, providerName).flatMap((sec) => [
-    sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
-    ...sec.views.map((v) => {
-      const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
-      const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"), v.summary);
-    })]).filter(Boolean);
-  document.getElementById("views").replaceChildren(...views);
-
-  const counts = new Map();
-  for (const r of state.rows) {
-    if (!passes(r, lens.view, lens, "waits-on")) continue;
-    for (const w of waitingWho(r)) counts.set(w, (counts.get(w) || 0) + 1);
-  }
-  const people = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  document.getElementById("people").replaceChildren(...people.map(([who, n]) => {
-    const on = lens.quals.some((x) => x.field === "waits-on" && !x.neg && x.value === normValue("waits-on", who));
-    return railItem(who, n, on, lensHash({ q: toggledQualifier(lens.q, "waits-on", who, false) }));
-  }));
 }
 
 // focusSlot is the slot an action keeps focus in when a render swaps it for
@@ -1257,7 +1115,7 @@ async function refreshSpecs(rows) {
   try {
     await loadSpecs();
   } catch (err) {
-    state.error = `Could not load the actions: ${err.message}`;
+    state.error = t("Could not load the actions: {error}", { error: err.message });
   }
 }
 
@@ -1298,7 +1156,7 @@ function actionNotes(subject, surface) {
 // facet is a value on screen that filters by itself: a click filters by it,
 // Shift groups by its field and Alt leaves it out. A field the lens does not
 // know, or a lens that does not filter, shows its content alone. opts may
-// give the words to say it in, the noun that names the field, and rove for
+// give the words to say it in, the noun that names the field, the word the value shows as, and rove for
 // a stop of a row's roving focus.
 function facet(lens, field, raw, content, slot, opts = {}) {
   const fields = lens.fields || catalog.fields;
@@ -1308,7 +1166,7 @@ function facet(lens, field, raw, content, slot, opts = {}) {
   const w = opts.words || lens.words || lensWords();
   const by = f.groupBy ? f.groupBy(raw) : f.group ? field : "";
   const group = by ? groupField(by, fields) : null;
-  const vars = { label: opts.noun || f.label.toLowerCase(), value: raw, group: group ? group.label.toLowerCase() : "" };
+  const vars = { label: opts.noun || f.label.toLowerCase(), value: opts.label || (f.show ? f.show(raw) : raw), group: group ? group.label.toLowerCase() : "" };
   const pick = (e) => {
     e.stopPropagation();
     if (e.shiftKey && by) return setGroup(by);
@@ -1355,7 +1213,7 @@ function roveStop(on) {
 function rowStops(row) {
   const out = [];
   const walk = (n) => {
-    if (!n || !n.getAttribute || n.hidden || n.getAttribute("disabled") != null) return;
+    if (!n || !n.getAttribute || n.hidden || n.inert || n.getAttribute("disabled") != null) return;
     if (n.getAttribute("data-rove") != null) out.push(n);
     for (const c of n.children || []) walk(c);
   };
@@ -1407,6 +1265,7 @@ function specFor(spec, provider) {
   const d = (spec.displays || {})[provider];
   if (!d) return spec;
   return { ...spec, show: d.show || "", show_only: d.show_only, show_values: d.show_values, label_prefix: d.label_prefix, row_class: d.row_class,
+    show_when: d.show_when, show_max: d.show_max, show_label: d.show_label,
     strip: !!d.strip, colors: d.colors,
     buckets: d.bucket_labels ? (spec.buckets || []).map((b) => (b.id in d.bucket_labels ? { ...b, label: d.bucket_labels[b.id] } : b)) : spec.buckets,
     labels: d.labels && Object.keys(d.labels).length ? d.labels : spec.labels };
@@ -1433,7 +1292,10 @@ function partPiece(spec, raw, words, now) {
       const b = spec.buckets.find((x) => x.id === p.value);
       if (b) p.label = b.label || p.value;
     }
-    if (agePart(spec.show)) p.label = ageText(words, now - at);
+    if (agePart(spec.show)) {
+      p.label = ageText(words, now - at);
+      if (spec.show_label) [p.label, p.template] = [spec.show_label.replaceAll("{{.age}}", p.label), spec.show_label];
+    }
   }
   if (spec.label_prefix && !p.label.startsWith(spec.label_prefix)) p.label = spec.label_prefix + p.label;
   return p;
@@ -1449,6 +1311,11 @@ function agePart(part) {
   return part === "age";
 }
 
+// holdsWhen mirrors lens's holds: whether it holds, in each facet when names, one of its values.
+function holdsWhen(it, when) {
+  return Object.entries(when || {}).every(([facet, values]) => ((it.facets || {})[facet] || []).some((v) => values.some((w) => fold(v) === fold(w))));
+}
+
 // rowParts mirrors lens.Parts: the pieces of item it each part of a row shows, by part, from the specs
 // that show in one, in their order, none from another provider's spec.
 function rowParts(it, specs, words, now = Date.now()) {
@@ -1456,14 +1323,20 @@ function rowParts(it, specs, words, now = Date.now()) {
   for (const s of specs || []) {
     if (s.provider && it.provider && s.provider !== it.provider) continue;
     const spec = specFor(s, it.provider || "");
-    if (!spec.show || (agePart(spec.show) && out[spec.show])) continue;
+    if (!spec.show || (agePart(spec.show) && out[spec.show]) || !holdsWhen(it, spec.show_when)) continue;
     const pieces = [];
+    let rest = 0;
     for (const raw of (it.facets || {})[spec.id] || []) {
       const p = partPiece(spec, raw, words, now);
       if (!p || ((spec.show_only || []).length && !spec.show_only.some((v) => fold(v) === fold(raw)))) continue;
+      if (spec.show_max > 0 && pieces.length === spec.show_max) {
+        rest++;
+        continue;
+      }
       pieces.push(p);
       if (spec.show_values === "first" || agePart(spec.show)) break;
     }
+    if (rest) pieces.push({ field: spec.id, value: "", raw: "", label: fillWord(words.more, { n: rest }) });
     if (pieces.length) out[spec.show] = [...(out[spec.show] || []), ...pieces];
   }
   return out;
@@ -1478,141 +1351,6 @@ function rowClasses(it, specs) {
     for (const v of (it.facets || {})[spec.id] || []) if ((spec.row_class || {})[v]) out.push(spec.row_class[v]);
   }
   return [...new Set(out)];
-}
-
-// partClass is the class a part's pieces read in.
-function partClass(part) {
-  return { meta: "pill", flag: "flag", kind: "pill", aside: "col" }[part] || part;
-}
-
-// pieceButtons are a part's pieces, each a facet button whose label marks the search's hits.
-function pieceButtons(m, lens, part) {
-  return (m.parts[part] || []).map((p) => facet(lens, p.field, p.value,
-    h("span", { class: partClass(part), "data-field": p.field, "data-value": p.value, title: agePart(part) ? stamp(p.raw) : undefined }, marked(p.label, lens.ts)),
-    `facet:${m.scope}:${p.field}:${p.value}`, { words: m.words, noun: (m.nouns || {})[`${p.field}:${p.value}`], rove: true }));
-}
-
-// rowColumnDefs are a row's columns: the parts each shows, and whether a row has anything for it.
-function rowColumnDefs() {
-  return [
-    { id: "unit", cls: "c-pr", parts: ["ref"], has: () => true },
-    { id: "who", cls: "c-wait", parts: ["strip", "who", "kind"], has: (m) => !!(m.parts.who || m.parts.kind || m.lead) },
-    { id: "since", cls: "c-for", parts: ["age"], has: (m) => !!(m.parts.age || m.age) },
-    { id: "why", cls: "c-why", parts: [], has: (m) => !!m.why },
-    { id: "aside", cls: "c-where", parts: ["aside"], has: (m) => !!(m.parts.aside || (m.aside || []).some(Boolean)) },
-    { id: "actions", cls: "c-act", parts: [], has: (m) => (m.actions || []).some(Boolean) },
-  ];
-}
-
-// rowColumns are the columns some of the models has a piece for.
-function rowColumns(models) {
-  return rowColumnDefs().filter((c) => models.some((m) => c.has(m)));
-}
-
-// columnSort is the field a column's head sorts by: the first sortable facet of its parts, the strip's the
-// view's strip facet.
-function columnSort(col, lens) {
-  for (const part of col.parts) {
-    if (part === "strip") {
-      const f = lens.strip ? fieldById(lens.strip, lens.fields) : null;
-      if (f && f.sort) return f;
-      continue;
-    }
-    for (const s of lens.specs || []) {
-      const f = fieldById(s.id, lens.fields);
-      if (f && f.sort && specFor(s, lens.provider || "").show === part) return f;
-    }
-  }
-  return null;
-}
-
-// sortPick cycles a column head's sort: ascending, descending, then the default.
-function sortPick(id) {
-  const { field, desc } = parseSort(readHash().s, readLens().fields);
-  writeHash({ s: field !== id ? id : desc ? "" : id + "-desc" });
-}
-
-// rowHead is the head of a table of rows: one cell per column, each that sorts a button.
-function rowHead(cols, lens, unit) {
-  const w = lens.words || {};
-  const { field, desc } = parseSort(lens.sort, lens.fields);
-  const heads = { unit: unit || w.col_unit, who: w.col_who, since: w.col_age, why: w.col_why, aside: w.col_aside };
-  return h("thead", {}, h("tr", {}, cols.map((c) => {
-    if (c.id === "actions") return h("th", { scope: "col", class: c.cls }, h("span", { class: "sr" }, w.col_actions));
-    const f = lens.static ? null : columnSort(c, lens);
-    if (!f) return h("th", { scope: "col", class: c.cls }, heads[c.id]);
-    return h("th", { scope: "col", class: c.cls, "aria-sort": f.id === field ? (desc ? "descending" : "ascending") : "none" },
-      h("button", { type: "button", class: "th-sort", "data-sort": f.id, "data-focus": "th:" + f.id, title: fillWord(w.sort_by, { label: f.label.toLowerCase() }), onclick: () => sortPick(f.id) }, heads[c.id]));
-  })));
-}
-
-// rowTr is one table row of a model, its cells those of cols: the title with its ref, meta and flags; who it
-// waits on with its kind; its age; why; its aside; its actions.
-function rowTr(m, lens, cols) {
-  const open = m.open;
-  const cells = {
-    unit: () => [
-      h("div", { class: "title", title: m.titleTip || undefined }, m.pre || null,
-        m.href ? h("a", { href: m.href, "data-focus": m.scope + ":title", ...roveStop(true), onclick: (e) => e.stopPropagation() }, marked(m.title, lens.ts)) : marked(m.title, lens.ts)),
-      rowMeta(m, lens),
-      m.after || null],
-    who: () => rowWho(m, lens),
-    since: (c) => m.age || pieceButtons(m, lens, c.parts[0]),
-    why: () => m.why || "",
-    aside: () => [m.asideLead || null, pieceButtons(m, lens, "aside"), m.aside || null],
-    actions: () => m.actions || null,
-  };
-  return h("tr", {
-    class: [...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    title: m.tip || undefined,
-    tabindex: 0,
-    "aria-selected": m.selected ? "true" : "false",
-    "data-focus": m.scope,
-    "data-row": m.scope,
-    "data-rove": "",
-    onclick: open || undefined,
-    onkeydown: (e) => {
-      if (roveKey(e) || !open) return;
-      if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-        e.preventDefault();
-        open();
-      }
-    },
-  }, cols.map((c) => h("td", { class: c.cls }, cells[c.id](c))));
-}
-
-// rowMeta is a model's ref, meta and flag parts, with what no facet carries after each.
-function rowMeta(m, lens) {
-  return h("div", { class: "meta" },
-    h("span", { class: "ref" }, pieceButtons(m, lens, "ref"), (m.ref || []).map((x) => typeof x === "string" ? marked(x, lens.ts) : x)),
-    pieceButtons(m, lens, "meta"), m.meta || null,
-    pieceButtons(m, lens, "flag"), m.flags || null);
-}
-
-// rowWho is whom a model waits on: its strip's dot and its who pieces, then its kind.
-function rowWho(m, lens) {
-  return [h("div", { class: "who" }, m.lead || null, m.lead ? " " : null, joined(pieceButtons(m, lens, "who"))), pieceButtons(m, lens, "kind")];
-}
-
-// rowCard is a model as a board's card: an li whose title is the control that opens it, stretched over the
-// card, with the pieces its row shows as siblings, the arrows moving between them.
-function rowCard(m, lens) {
-  const label = h("span", { title: m.titleTip || undefined }, marked(m.title, lens.ts));
-  const at = { class: "open", "data-focus": m.scope, "data-rove": "", title: m.tip || undefined, "aria-current": m.selected ? "true" : undefined };
-  const title = m.open ? h("button", { type: "button", ...at, onclick: m.open }, label) : m.href ? h("a", { ...at, href: m.href }, label) : label;
-  return h("li", {
-    class: ["card", ...(m.cls || []), m.selected ? "sel" : ""].filter(Boolean).join(" "),
-    "data-row": m.scope,
-    onkeydown: roveKey,
-  },
-    h("div", { class: "title" }, m.pre || null, title),
-    rowMeta(m, lens),
-    h("div", { class: "card-who" }, rowWho(m, lens), m.age || pieceButtons(m, lens, "age")),
-    m.after || null);
-}
-
-function joined(nodes) {
-  return nodes.flatMap((n, i) => (i ? [", ", n] : [n]));
 }
 
 // refTail is a unit's label after the first ref piece's label, when the label starts with it.
@@ -1633,15 +1371,15 @@ function rowModel(r, pr, lens, copy, kind = "row") {
   const n = Number.isInteger((p.brief || {}).open_questions) ? p.brief.open_questions : 0;
   const ws = p.workspace || {};
   const strip = stripOf(item, lens.specs);
-  const why = sm(r).reason || "";
+  const why = reasonText(r);
   const groups = new Set((p.waits_on || []).filter((x) => String(x.key || "").startsWith("group:")).map((x) => fold(x.name || "")));
   const nouns = Object.fromEntries((parts.who || []).filter((x) => groups.has(fold(x.raw))).map((x) => [`${x.field}:${x.value}`, w.filter_group]));
   return {
     key, scope, item, parts, words: w, nouns, selected: key === pr, open: () => openRow(scope, key),
-    title: r.title || labelOf(r), titleTip: (p.brief || {}).goal,
+    title: titleWithoutRef(r.title || labelOf(r), [labelOf(r)]), titleTip: (p.brief || {}).goal,
     ref: [refTail(labelOf(r), parts.ref)],
     meta: [
-      p.head && lens.ts.some((t) => fold(p.head).includes(t)) ? h("span", { class: "head" }, marked(p.head, lens.ts)) : null,
+      p.head && lens.ts.some((term) => fold(p.head).includes(term)) ? h("span", { class: "head" }, marked(p.head, lens.ts)) : null,
       n > 0 ? h("span", { class: "pill qs", title: fillWord(w.questions_title, { n }) }, fillWord(w.questions, { n })) : null],
     flags: [r.stale ? h("span", { class: "flag stale", title: w.stale_title }, w.stale) : null, intakeChip(r, w)],
     lead: stripDot(strip, lens, scope, w),
@@ -1678,9 +1416,9 @@ function onlyThis(g, lens) {
   const on = lens.quals.some((x) => x.field === q.field && x.value === v && x.neg === q.neg);
   return h("button", {
     type: "button", class: "facet only", "aria-pressed": String(on), "data-focus": `group:${g.field}:${g.key}:only`,
-    "aria-label": on ? `Show all, not only ${g.label}` : `Only ${g.label}`,
+    "aria-label": on ? t("Show all, not only {group}", { group: g.label }) : t("Only {group}", { group: g.label }),
     onclick: (e) => { e.stopPropagation(); writeHash({ q: toggledQualifier(lens.q, q.field, q.raw, q.neg, lens.fields) }); },
-  }, on ? "show all" : "only this");
+  }, on ? t("show all") : t("only this"));
 }
 
 function toggleCollapsed(key) {
@@ -1690,48 +1428,13 @@ function toggleCollapsed(key) {
   render();
 }
 
-// rowTable is the body of a table of models: a tbody per group of res, each under its head when the lens
-// groups, the head a collapse toggle with an "only this" filter.
-function rowTable(res, model, lens, cols) {
-  const grouped = !!res.group;
-  const multi = grouped && multiCopy(res.group);
-  return res.groups.filter((g) => g.rows.length).map((g, i) => {
-    const key = `${g.field}:${g.key}`;
-    const collapsed = grouped && state.collapsed.has(key);
-    const rows = g.rows.map((it) => {
-      const tr = rowTr(model(it, multi ? g.key : ""), lens, cols);
-      tr.hidden = collapsed;
-      return tr;
-    });
-    if (!grouped) return h("tbody", {}, rows);
-    const id = `g-${lens.view}-${i}`;
-    return h("tbody", { id },
-      h("tr", { class: "g-head" + (g.field && g.field === lens.strip ? " w-" + stripColor(lens.stripSpec, g.key) : "") },
-        h("th", { scope: "rowgroup", colspan: cols.length },
-          h("button", { type: "button", class: "g-toggle", "aria-expanded": String(!collapsed), "aria-controls": id, "data-focus": `group:${key}`, onclick: () => toggleCollapsed(key) },
-            `${collapsed ? "▸" : "▾"} ${g.label}`),
-          h("span", { class: "count" }, g.rows.length),
-          onlyThis(g, lens))),
-      rows);
-  });
-}
-
-// unitTitle names a row view's unit column: the view's unit, else the lens's word for a mixed view.
+// unitTitle names a row view's unit in its count line: the view's unit, else the lens's word for a mixed view.
 function unitTitle(view, lens) {
   return (catalog.views.find((x) => x.id === view) || {}).unit || (lens.words || {}).col_unit || "";
 }
 
 function renderTable(res, pr, lens) {
-  const table = document.getElementById("table");
-  const inView = state.rows.filter((r) => inViewOf(r, lens));
-  const models = new Map();
-  const model = (r, copy) => {
-    const k = copy ? `${keyOf(r)}@${copy}` : keyOf(r);
-    if (!models.has(k)) models.set(k, rowModel(r, pr, lens, copy));
-    return models.get(k);
-  };
-  const cols = rowColumns(inView.map((r) => model(r, "")));
-  table.replaceChildren(rowHead(cols, lens, unitTitle(lens.view, lens)), ...rowTable(res, model, lens, cols));
+  document.getElementById("table").replaceChildren(rowList(res, (r, copy) => rowModel(r, pr, lens, copy), lens));
 }
 
 function inViewOf(r, lens) {
@@ -1742,14 +1445,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isCoreView(view);
+  const listless = view === RECENT || view === "explore" || view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || pluginViews.has(view) || isCoreView(view);
+  listBox.hidden = view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     if (isCoreView(view)) hideLens(document.getElementById("tools"));
@@ -1783,27 +1486,27 @@ function renderRows() {
 }
 
 function emptyNote(view, q) {
-  if (!state.loaded) return ["Loading the inventory."];
-  const label = (catalog.views.find((v) => v.id === view) || {}).label;
+  if (!state.loaded) return [t("Loading the inventory.")];
+  const label = view === RECENT ? t("Recent") : (catalog.views.find((v) => v.id === view) || {}).label;
   const row = rowByURL(q);
   if (row) {
-    return [`${labelOf(row)} is in the inventory. `, h("button", {
+    return [t("{unit} is in the inventory.", { unit: labelOf(row) }), " ", h("button", {
       type: "button", class: "act", "data-focus": "empty:open", onclick: () => writeHash({ q: "", pr: keyOf(row) }),
-    }, "Open it")];
+    }, t("Open it"))];
   }
   const pull = PR_URL.exec(String(q || "").trim());
   if (pull && !/^\.\.?$/.test(pull[2])) {
     const [, owner, repo, number] = pull;
     const typed = q.trim();
-    return [`${refLabel({ owner, repo, number })} is not in the inventory. `,
-      h("button", { type: "button", class: "act", "data-focus": "empty:explore", onclick: () => { writeHash({ view: "explore", q: "", x: q.trim() }); explore(q); } }, "Explore it"),
+    return [t("{unit} is not in the inventory.", { unit: refLabel({ owner, repo, number }) }), " ",
+      h("button", { type: "button", class: "act", "data-focus": "empty:explore", onclick: () => { writeHash({ view: "explore", q: "", x: q.trim() }); explore(q); } }, t("Explore it")),
       " ",
-      h("a", { href: typed, target: "_blank", rel: "noopener noreferrer", "data-focus": "empty:gh" }, "Open it on GitHub")];
+      h("a", { href: typed, target: "_blank", rel: "noopener noreferrer", "data-focus": "empty:gh" }, t("Open it on {provider}", { provider: searchService() }))];
   }
-  if (!q) return [`Nothing in ${label} right now.`];
-  const note = `Nothing in ${label} matches "${q}".`;
+  if (!q) return [t("Nothing in {view} right now.", { view: label })];
+  const note = t("Nothing in {view} matches \"{query}\".", { view: label, query: q });
   if (!qualifiers(q).length) return [note];
-  return [note, " ", h("button", { type: "button", class: "act", "data-focus": "empty:clear", onclick: () => clearLens() }, "Clear filters")];
+  return [note, " ", h("button", { type: "button", class: "act", "data-focus": "empty:clear", onclick: () => clearLens() }, t("Clear filters"))];
 }
 
 // lane is a board's column for group g of lens, its items drawn by item; an ungrouped board's one lane is
@@ -1818,7 +1521,7 @@ function lane(g, lens, title, item) {
 
 function renderBoard(groups, pr, lens) {
   const title = (catalog.views.find((v) => v.id === lens.view) || {}).label || lens.view;
-  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowCard(rowModel(r, pr, lens, copy, "card"), lens))));
+  document.getElementById("board").replaceChildren(...groups.map((g) => lane(g, lens, title, (r, copy) => rowView(rowModel(r, pr, lens, copy, "card"), lens, { card: true }))));
 }
 
 function loopOnly() {
@@ -1842,17 +1545,17 @@ function setLoopOnly(on) {
 let activityLoopOnly = loopOnly();
 let activitySelected = "";
 
-function dayLabel(t) {
-  const d = new Date(t);
+function dayLabel(iso) {
+  const d = new Date(iso);
   const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  if (days === 0) return t("Today");
+  if (days === 1) return t("Yesterday");
+  return fmtDate(iso, "long");
 }
 
-function clock(t) {
-  return new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+function clock(iso) {
+  return fmtDate(iso, "time");
 }
 
 function actorLabel(actor) {
@@ -1892,7 +1595,7 @@ function renderActivity(lens) {
   const out = [h("li", { class: "a-tools" },
     h("label", {},
       h("input", { type: "checkbox", checked: activityLoopOnly, "data-focus": "activity:loop-only", onchange: (e) => setLoopOnly(e.target.checked) }),
-      " Loop only"))];
+      " ", t("Loop only")))];
   let day = "";
   for (const it of items) {
     const e = it.event;
@@ -1910,7 +1613,7 @@ function renderActivity(lens) {
     const data = eventData(e);
     const requested = catalog.eventData.get(e.kind) === "requested" && e.data;
     out.push(h("li", {
-      class: `a-ev ev-${e.kind}` + (loopEvent(e.kind) ? " loop" : "") + (key === pr && id === activitySelected ? " sel" : ""),
+      class: ["a-ev", "ev-" + e.kind, eventTone(e.kind), key === pr && id === activitySelected ? "sel" : ""].filter(Boolean).join(" "),
       tabindex: 0,
       "data-focus": id,
       onclick: open,
@@ -1924,10 +1627,12 @@ function renderActivity(lens) {
       h("time", { datetime: e.at, title: stamp(e.at) }, clock(e.at)),
       h("div", {},
         h("span", { class: "kind" }, eventLabel(e.kind)),
-        requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
-        e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
+        requested ? h("span", { class: "who" }, " " + t("from {who}", { who: requestedFrom(e.data) })) : null,
+        e.actor ? h("span", { class: "who" }, " " + (requested ? t("by {who}", { who: actorLabel(e.actor) }) : actorLabel(e.actor))) : null,
         " ", h("span", { class: "ref" }, eventRef(it)),
-        " ", h("span", { class: "title" }, it.title)),
+        " ", h("span", { class: "title" }, it.title),
+        safeURL(it.url) ? [" ", h("a", { href: safeURL(it.url), target: "_blank", rel: "noopener noreferrer", class: "ext", onclick: (ev) => ev.stopPropagation() },
+          providerName(e.unit.provider))] : null),
       data ? h("span", { class: "data" }, data) : null));
   }
   if (!items.length) out.push(h("li", { class: "empty" }, activityEmptyNote(readHash().q)));
@@ -1935,19 +1640,19 @@ function renderActivity(lens) {
 }
 
 function activityEmptyNote(q) {
-  if (!state.activityLoaded) return ["Loading the activity."];
-  if (state.activityError && !state.activity.length) return ["The recent activity could not be loaded."];
-  if (!state.activity.length) return ["Nothing happened in the inventory yet."];
-  if (tokens(q).length) return emptyNote("recent", q);
-  return ["No loop events in the recent activity."];
+  if (!state.activityLoaded) return [t("Loading the activity.")];
+  if (state.activityError && !state.activity.length) return [t("The recent activity could not be loaded.")];
+  if (!state.activity.length) return [t("Nothing happened in the inventory yet.")];
+  if (tokens(q).length) return emptyNote(RECENT, q);
+  return [t("No loop events in the recent activity.")];
 }
 
 function guidanceLabel(r) {
-  if (r.question && r.question.queued) return "Replace the queued answer";
-  if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ?"Or answer in your own words" : "Answer in your own words";
+  if (r.question && r.question.queued) return t("Replace the queued answer");
+  if (r.question) return r.question.state === "asked" && questionChoices(r, r.question).length ? t("Or answer in your own words") : t("Answer in your own words");
   const start = Object.values(state.specs.byId).find((sp) => sp.group === "start" && sp.verb === "approve");
-  if (!roundGate(r)) return "Guidance for the next round (optional)";
-  return start ? `Guidance for the pending round; ${start.label} sends it at once` : "Guidance for the pending round";
+  if (!roundGate(r)) return t("Guidance for the next round (optional)");
+  return start ? t("Guidance for the pending round; {action} sends it at once", { action: start.label }) : t("Guidance for the pending round");
 }
 
 function guidanceBox(key, placeholder) {
@@ -1981,9 +1686,9 @@ function tagChips(tags, lens, slot, all) {
   const shown = all ? tags : tags.slice(0, TAG_CHIPS);
   const rest = tags.slice(shown.length);
   return [
-    ...shown.map((t) => {
-      const pill = h("span", { class: "pill tag" }, t);
-      return lens ? facet(lens, "tag", t, pill, slot + "tag:" + t) : pill;
+    ...shown.map((tag) => {
+      const pill = h("span", { class: "pill tag" }, tag);
+      return lens ? facet(lens, "tag", tag, pill, slot + "tag:" + tag) : pill;
     }),
     rest.length ? h("span", { class: "pill tag", title: rest.join(", ") }, `+${rest.length}`) : null,
   ];
@@ -1999,10 +1704,10 @@ function briefTags(b) {
   const type = b.kind || "";
   if (!type && !size && !risk && !n && !tags.length) return null;
   return h("span", { class: "btags" },
-    type ? h("span", { class: "pill", title: `type ${type}` }, type) : null,
-    size ? h("span", { class: "pill", title: `size ${size}` }, size.toUpperCase()) : null,
-    risk ? h("span", { class: `pill risk-${risk}` }, `risk ${risk}`) : null,
-    n ? h("span", { class: "pill qs", title: `${n} open question${n === 1 ? "" : "s"} in the brief` }, `? ${n}`) : null,
+    type ? h("span", { class: "pill", title: t("type {type}", { type }) }, type) : null,
+    size ? h("span", { class: "pill", title: t("size {size}", { size }) }, size.toUpperCase()) : null,
+    risk ? h("span", { class: `pill risk-${risk}` }, t("risk {risk}", { risk })) : null,
+    n ? h("span", { class: "pill qs", title: tn("{n} open questions in the brief", n) }, `? ${n}`) : null,
     tagChips(tags));
 }
 
@@ -2021,21 +1726,21 @@ function briefBlock(b, r, lens) {
     const refresh = refreshBriefButton(r);
     return refresh && refresh.length ? h("div", { class: "d-brief muted" }, refresh) : null;
   }
-  if (b.state === "pending" && !b.brief) return h("div", { class: "d-brief muted" }, "Brief pending", " ", refreshBriefButton(r));
-  if (!b.brief) return h("div", { class: "d-brief muted" }, b.error ? `Brief failed: ${b.error}. It is tried again later.` : "Brief failed. It is tried again later.", " ", refreshBriefButton(r));
+  if (b.state === "pending" && !b.brief) return h("div", { class: "d-brief muted" }, t("Brief pending"), " ", refreshBriefButton(r));
+  if (!b.brief) return h("div", { class: "d-brief muted" }, b.error ? t("Brief failed: {error}. It is tried again later.", { error: b.error }) : t("Brief failed. It is tried again later."), " ", refreshBriefButton(r));
   const x = b.brief;
   const failed = b.state === "failed";
-  const notes = [b.model, stamp(b.at), b.stale && !failed ? "refreshing" : "", failed ? `last refresh failed: ${b.error || "unknown error"}` : ""].filter(Boolean).join(" · ");
+  const notes = [b.model, stamp(b.at), b.stale && !failed ? t("refreshing") : "", failed ? t("last refresh failed: {error}", { error: b.error || t("unknown error") }) : ""].filter(Boolean).join(" · ");
   const risk = ["low", "medium", "high"].includes(x.risk) ? x.risk : "";
-  return h("section", { class: "d-brief", "aria-label": "Brief" },
+  return h("section", { class: "d-brief", "aria-label": t("Brief") },
     h("div", { class: "d-brief-tags" },
       briefFacet(lens, "type", x.kind, h("span", { class: "pill" }, x.kind)),
-      briefFacet(lens, "size", SIZES.includes(x.size) ? x.size : "", h("span", { class: "pill" }, `size ${x.size}`)),
-      risk ? briefFacet(lens, "risk", risk, h("span", { class: `pill risk-${risk}` }, `${risk} risk`)) : null,
+      briefFacet(lens, "size", SIZES.includes(x.size) ? x.size : "", h("span", { class: "pill" }, t("size {size}", { size: x.size }))),
+      risk ? briefFacet(lens, "risk", risk, h("span", { class: `pill risk-${risk}` }, t("{risk} risk", { risk }))) : null,
       tagChips(Array.isArray(x.tags) ? x.tags : [], lens, "detail:facet:", true)),
     h("p", { class: "goal" }, x.goal),
     x.context ? h("p", {}, x.context) : null,
-    x.risk_why ? h("p", { class: "muted" }, `Risk: ${x.risk_why}`) : null,
+    x.risk_why ? h("p", { class: "muted" }, t("Risk: {risk}", { risk: x.risk_why })) : null,
     (x.open_questions || []).length ? h("ul", { class: "questions" }, x.open_questions.map((q) => h("li", {}, q))) : null,
     h("div", { class: "muted small" }, notes, " ", refreshBriefButton(r)));
 }
@@ -2046,7 +1751,7 @@ function trimmedNote(d) {
   const id = d.turn && d.turn.turn && d.turn.turn.id;
   const e = id && (d.events || []).find((x) => x.kind === "guide_trimmed" && x.key === id);
   if (!e) return null;
-  return h("div", { class: "d-trimmed muted small" }, `Guide trimmed over the judgment limit: ${e.data}`);
+  return h("div", { class: "d-trimmed muted small" }, t("Guide trimmed over the judgment limit: {blocks}", { blocks: e.data }));
 }
 
 function intakeWaiting(r) {
@@ -2066,17 +1771,17 @@ function intakeChip(r, w) {
 // error and the next attempt's time.
 function intakeLines(i) {
   return [
-    `Intake ${i.seq} (${i.intent}) waits for the brief${i.attempt ? `, attempt ${i.attempt}` : ""}`,
-    i.last_error ? `Last error: ${i.last_error}` : "",
-    isSet(i.next) ? `Next attempt at ${stamp(i.next)}` : "",
+    i.attempt ? t("Intake {seq} ({intent}) waits for the brief, attempt {attempt}", { seq: i.seq, intent: i.intent, attempt: i.attempt }) : t("Intake {seq} ({intent}) waits for the brief", { seq: i.seq, intent: i.intent }),
+    i.last_error ? t("Last error: {error}", { error: i.last_error }) : "",
+    isSet(i.next) ? t("Next attempt at {time}", { time: stamp(i.next) }) : "",
   ].filter(Boolean);
 }
 
 function intakeBlock(r) {
   if (!intakeWaiting(r)) return null;
   const i = pl(r).intake;
-  return h("section", { class: "d-intake", "aria-label": "Briefing" },
-    h("h2", { class: "d-sub" }, "Briefing"),
+  return h("section", { class: "d-intake", "aria-label": t("Briefing") },
+    h("h2", { class: "d-sub" }, t("Briefing")),
     intakeLines(i).map((l) => h("div", {}, l)),
     h("div", { class: "q-turn" }, actionButtons(r, "detail", { scope: "detail", groups: ["intake"] })));
 }
@@ -2085,20 +1790,20 @@ function intakeBlock(r) {
 // address or a run as an intake.
 function acceptedNote(name, ref, i) {
   if (!i) return "";
-  if (!i.joined) return `${name} ${ref}: accepted as intake ${i.seq}`;
-  if (i.state === "starting") return `${name} ${ref}: intake ${i.seq} is already starting the turn; this request changed nothing`;
-  return `${name} ${ref}: joined intake ${i.seq}`;
+  if (!i.joined) return t("{action} {unit}: accepted as intake {seq}", { action: name, unit: ref, seq: i.seq });
+  if (i.state === "starting") return t("{action} {unit}: intake {seq} is already starting the turn; this request changed nothing", { action: name, unit: ref, seq: i.seq });
+  return t("{action} {unit}: joined intake {seq}", { action: name, unit: ref, seq: i.seq });
 }
 
 function checksBlock(r) {
   const list = state.checks[keyOf(r)];
   if (r.kind !== "checks" || !list || !list.length) return null;
-  return h("section", { class: "d-checks", "aria-label": "Failing checks" },
-    h("h2", { class: "d-sub" }, "Failing checks"),
+  return h("section", { class: "d-checks", "aria-label": t("Failing checks") },
+    h("h2", { class: "d-sub" }, t("Failing checks")),
     h("ul", {}, list.map((c) => h("li", {},
       safeURL(c.url) ? h("a", { href: safeURL(c.url), target: "_blank", rel: "noopener noreferrer" }, c.name) : c.name,
       c.summary ? h("span", { class: "muted" }, ` · ${c.summary}`) : null,
-      (c.steps || []).length ? h("span", { class: "muted" }, ` · failed at ${c.steps.join(", ")}`) : null))));
+      (c.steps || []).length ? h("span", { class: "muted" }, " · " + t("failed at {steps}", { steps: c.steps.join(", ") })) : null))));
 }
 
 function escapeHTML(s) {
@@ -2110,12 +1815,13 @@ function reviewRequest(r, b) {
   const ref = labelOf(r);
   const title = r.title.replaceAll("`", "'");
   const x = b && b.brief;
-  const sections = x ? [["Goal:", [x.goal]], ["Context:", [x.context]], ["Risk:", [x.risk_why]]]
+  const sections = x ? [[t("Goal:"), [x.goal]], [t("Context:"), [x.context]], [t("Risk:"), [x.risk_why]]]
     .map(([label, lines]) => [label, lines.filter(Boolean)]).filter(([, lines]) => lines.length) : [];
-  const text = [`review, pls? \`${title}\``, url || ref,
+  const ask = t("review, pls?");
+  const text = [`${ask} \`${title}\``, url || ref,
     ...sections.flatMap(([label, lines]) => ["", `*${label}*`, ...lines])].join("\n");
   const link = url ? `<a href="${escapeHTML(url)}">${escapeHTML(ref)}</a>` : escapeHTML(ref);
-  const html = [`review, pls? <code>${escapeHTML(title)}</code>`, link,
+  const html = [`${escapeHTML(ask)} <code>${escapeHTML(title)}</code>`, link,
     ...sections.flatMap(([label, lines]) => ["", `<b>${label}</b>`, ...lines.map(escapeHTML)])].join("<br>");
   return { text, html };
 }
@@ -2131,9 +1837,9 @@ async function copyReviewRequest(r, b) {
     } else {
       await navigator.clipboard.writeText(text);
     }
-    setNotice(`Copied the review request for ${labelOf(r)}; paste it in Slack.`);
+    setNotice(t("Copied the review request for {unit}; paste it in a chat.", { unit: labelOf(r) }));
   } catch (err) {
-    setNotice(`Could not copy: ${err.message}`, true);
+    setNotice(t("Could not copy: {error}", { error: err.message }), true);
   }
 }
 
@@ -2183,11 +1889,12 @@ function answerSent(r) {
 // answerBlock is the card's free answer: the box and the button that sends
 // its text alone, off while the box is empty.
 function answerBlock(r, choices) {
-  const send = turnButton(r, "answer", "Send answer", "answer", {}, {
-    title: "Send the text as your answer: typed in the agent's session when it is there, else a new session resumes the turn with it",
+  const send = turnButton(r, "answer", t("Send answer"), "answer", {}, {
+    title: t("Send the text as your answer: typed in the agent's session when it is there, else a new session resumes the turn with it"),
     disabled: !answerNote(r),
   });
-  const placeholder = choices ? "Ask for something else, or add a note to the choice above" : "Tell the agent what to do next";
+  const placeholder = choices ? t("Ask for something else, or add a note to the choice above") : t("Tell the agent what to do next");
+
   return h("div", { class: "q-answer" },
     h("label", { class: "d-sub", for: "guidance" }, guidanceLabel(r)),
     guidanceBox(keyOf(r), placeholder),
@@ -2195,7 +1902,7 @@ function answerBlock(r, choices) {
 }
 
 function recommendedLabel(label, recommended) {
-  return recommended ? [label, h("span", { class: "rec" }, " recommended")] : label;
+  return recommended ? [label, h("span", { class: "rec" }, " " + t("recommended"))] : label;
 }
 
 function optionButton(r, o, recommended) {
@@ -2206,8 +1913,8 @@ function optionButton(r, o, recommended) {
 function questionChoices(r, q) {
   if (q.kind === "confirm") {
     return [
-      turnButton(r, "yes", recommendedLabel("Yes", q.recommend === "yes"), "answer", { yes: true }, { primary: q.recommend === "yes" }),
-      turnButton(r, "no", recommendedLabel("No", q.recommend === "no"), "answer", { no: true }, { primary: q.recommend === "no" }),
+      turnButton(r, "yes", recommendedLabel(t("Yes"), q.recommend === "yes"), "answer", { yes: true }, { primary: q.recommend === "yes" }),
+      turnButton(r, "no", recommendedLabel(t("No"), q.recommend === "no"), "answer", { no: true }, { primary: q.recommend === "no" }),
     ];
   }
   if (q.kind !== "choice") return [];
@@ -2221,11 +1928,11 @@ function artifactBlock(a) {
   const items = (a.items || []).map((it) => `${it.path}:${it.line}\n${it.body}`);
   const text = [a.body, ...items].filter(Boolean).join("\n\n").replace(/\n+$/, "");
   if (!text) return null;
-  const kind = (a.kind || "artifact").replaceAll("_", " ");
+  const kind = a.kind ? a.kind.replaceAll("_", " ") : t("artifact");
   const lines = text.split("\n").length;
   const body = h("pre", { class: "artifact-body" }, text);
   if (lines <= ARTIFACT_LINES) return h("section", { class: "d-artifact", "aria-label": kind }, h("div", { class: "d-sub" }, kind), body);
-  return h("details", { class: "d-artifact" }, h("summary", { class: "d-sub" }, `${kind}, ${lines} lines`), body);
+  return h("details", { class: "d-artifact" }, h("summary", { class: "d-sub" }, tn("{kind}, {n} lines", lines, { kind })), body);
 }
 
 // answerableQuestion is the detail's question whose options the keys pick:
@@ -2243,22 +1950,22 @@ function questionBlock(d) {
   if (!q) return null;
   const rec = questionRecord(d);
   const asked = q.state === "asked" && !q.queued;
-  const head = q.queued ? "Your answer is queued" : asked ? "Agent asks" : "Agent stopped";
+  const head = q.queued ? t("Your answer is queued") : asked ? t("Agent asks") : t("Agent stopped");
   const last = q.last_message || (d.turn && d.turn.last_message) || "";
   const choices = asked ? questionChoices(r, q) : [];
   return h("section", { class: "d-question", "aria-label": head },
     h("h2", { class: "d-sub" }, head),
-    q.queued ? h("p", { class: "muted small" }, "The agent gets it once its session is free. An answer sent now replaces it.") : null,
+    q.queued ? h("p", { class: "muted small" }, t("The agent gets it once its session is free. An answer sent now replaces it.")) : null,
     rec.summary ? h("p", { class: "summary" }, rec.summary) : null,
-    q.verdict ? h("p", { class: "verdict" }, `drafted ${q.verdict}, ${q.blocking} blocking, ${q.non_blocking} non-blocking`) : null,
+    q.verdict ? h("p", { class: "verdict" }, t("drafted {verdict}, {blocking} blocking, {nonBlocking} non-blocking", { verdict: q.verdict, blocking: q.blocking, nonBlocking: q.non_blocking })) : null,
     asked && q.text ? h("pre", { class: "q-text" }, q.text) : null,
-    !asked && !q.queued && last ? [h("div", { class: "muted small" }, "Last message"), h("pre", { class: "q-text" }, last)] : null,
-    asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, `Agent recommends: ${q.recommend}`) : null,
+    !asked && !q.queued && last ? [h("div", { class: "muted small" }, t("Last message")), h("pre", { class: "q-text" }, last)] : null,
+    asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, t("Agent recommends: {answer}", { answer: q.recommend })) : null,
     choices.length ? h("div", { class: "q-options" }, choices) : null,
     answerBlock(r, choices.length > 0),
     h("div", { class: "q-turn" },
-      turnButton(r, "continue", "Continue", "continue", {}, { title: "The agent goes on with the turn without an answer" }),
-      turnButton(r, "dismiss", "Dismiss", "dismiss", {}, { title: "Close the question; the pull request goes back to whoever it waits on" })),
+      turnButton(r, "continue", t("Continue"), "continue", {}, { title: t("The agent goes on with the turn without an answer") }),
+      turnButton(r, "dismiss", t("Dismiss"), "dismiss", {}, { title: t("Close the question; the pull request goes back to whoever it waits on") })),
     artifactBlock(rec.artifact));
 }
 
@@ -2273,13 +1980,14 @@ function answerSaid(a) {
 // timelineEvents shows the current turn's answers from the turn, which knows
 // where each came from, in place of their one-line events.
 function timelineEvents(d) {
-  const t = d.turn;
-  const answers = t ? (t.answers || []).filter((a) => a.turn_seq === t.turn.seq) : [];
-  const since = t ? Date.parse(t.turn.sent_at) || 0 : 0;
+  const turn = d.turn;
+  const answers = turn ? (turn.answers || []).filter((a) => a.turn_seq === turn.turn.seq) : [];
+  const since = turn ? Date.parse(turn.turn.sent_at) || 0 : 0;
   const events = (d.events || []).filter((e) => !(answers.length && e.kind === "answered" && Date.parse(e.at) >= since));
   for (const a of answers) {
-    const queued = a.route === "queued" ? ", queued until the agent stops" : "";
-    events.push({ kind: "answered", at: a.at, actor: "", data: `${answerSaid(a)} (from ${a.source}${queued})` });
+    const vars = { answer: answerSaid(a), source: a.source };
+    const data = a.route === "queued" ? t("{answer} (from {source}, queued until the agent stops)", vars) : t("{answer} (from {source})", vars);
+    events.push({ kind: "answered", at: a.at, actor: "", data });
   }
   return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
@@ -2390,29 +2098,30 @@ function renderDetail() {
   const opening = box.hidden || box.dataset.key !== key;
   const inCard = !!r.question;
   const guidance = inCard ? null : guidanceBox(key, guidanceLabel(r));
-  const muteState = (p.mute || {}).until_state_change ? "muted until who it waits on changes"
-    : isMuted(p) ? `muted until ${stamp(p.mute.until)}` : "";
+  const muteState = (p.mute || {}).until_state_change ? t("muted until who it waits on changes")
+    : isMuted(p) ? t("muted until {time}", { time: stamp(p.mute.until) }) : "";
   const events = timelineEvents(d);
 
   const top = h("div", { class: "d-top" },
     h("div", { class: "d-head" },
-      h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: closeDetail }, "×"),
+      h("button", { type: "button", class: "close", "aria-label": t("Close detail"), "data-focus": "detail:close", onclick: closeDetail }, "×"),
+      detailWindowControls(),
       h("h1", {}, r.title || labelOf(r)),
       h("div", { class: "meta" },
         h("span", { class: "ref" }, labelOf(r)),
         " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": "detail:link" }, providerName(unitOf(r).provider)),
-        p.author ? [" by ", h("span", { class: "who" }, p.author)] : null)),
+        p.author ? [" ", t("by"), " ", h("span", { class: "who" }, p.author)] : null)),
     h("div", { class: "d-sit " + waitClass(r) + (sm(r).stalled ? " late" : "") },
       h("div", { class: "d-clock" }, roundGate(r) ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
-      h("div", {}, "Waiting on ", h("strong", {}, waitingLabel(r)), isSet(sm(r).since) ? ` since ${stamp(sm(r).since)}` : ""),
-      h("div", { class: "why" }, sm(r).reason),
+      h("div", {}, t("Waiting on"), " ", h("strong", {}, waitingLabel(r)), isSet(sm(r).since) ? " " + t("since {time}", { time: stamp(sm(r).since) }) : ""),
+      h("div", { class: "why" }, reasonText(r)),
       sm(r).line && sm(r).line !== sm(r).reason ? h("div", { class: "line" }, sm(r).line) : null,
-      sm(r).stalled ? h("div", { class: "late-note" }, "Past its threshold") : null),
+      sm(r).stalled ? h("div", { class: "late-note" }, t("Past its threshold")) : null),
     checksBlock(r),
     h("dl", { class: "d-facts" },
-      h("dt", {}, "In scope as"), h("dd", {}, (p.reasons || []).join(", ") || "out of scope"),
-      h("dt", {}, "Workspace"), h("dd", {}, p.workspace && p.workspace.display_name ? where(r, "detail") : "none"),
-      h("dt", {}, "Controls"), h("dd", {}, [o.hold ? "paused" : "", muteState, o.adopted ? "adopted" : ""].filter(Boolean).join(", ") || "none"),
+      h("dt", {}, t("In scope as")), h("dd", {}, (p.reasons || []).join(", ") || t("out of scope")),
+      h("dt", {}, t("Workspace")), h("dd", {}, p.workspace && p.workspace.display_name ? where(r, "detail") : t("none")),
+      h("dt", {}, t("Controls")), h("dd", {}, [o.hold ? t("paused") : "", muteState, o.adopted ? t("adopted") : ""].filter(Boolean).join(", ") || t("none")),
       detailFacts(r, d, o)),
     questionBlock(d),
     unitExtras(d),
@@ -2420,11 +2129,11 @@ function renderDetail() {
     intakeBlock(r),
     inCard ? null : h("label", { class: "d-sub", for: "guidance" }, guidanceLabel(r)));
   const acts = h("div", { class: "d-acts" },
-    h("div", { class: "d-actions" }, [...actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) }), h("button", { type: "button", class: "act", "data-focus": "detail:copy-review", title: "Copy a review request with the title, link and brief, formatted for Slack", onclick: () => copyReviewRequest(r, d.brief) }, "Copy review request")]),
+    h("div", { class: "d-actions" }, [...actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) }), h("button", { type: "button", class: "act", "data-focus": "detail:copy-review", title: t("Copy a review request with the title, link and brief, formatted for a chat message"), onclick: () => copyReviewRequest(r, d.brief) }, t("Copy review request"))]),
     actionNotes(r, "detail"),
     briefBlock(d.brief, r, readLens()));
   const log = h("div", { class: "d-log" },
-    h("h2", { class: "d-sub" }, "Timeline"),
+    h("h2", { class: "d-sub" }, t("Timeline")),
     h("ol", { class: "timeline" }, events.map((e) => h("li", { class: "ev-" + e.kind },
       h("time", { datetime: e.at }, stamp(e.at)),
       h("div", {}, h("span", { class: "kind" }, eventLabel(e.kind)), e.actor ? h("span", { class: "who" }, " " + e.actor) : null),
@@ -2467,15 +2176,15 @@ function revealOpenRow(pr) {
   }
   if (state.revealed === pr) return;
   const slot = openSlot(pr);
-  const row = (slot && document.querySelector(`[data-focus="${CSS.escape(slot)}"]`)) || document.querySelector("tbody tr.sel, .card.sel");
+  const row = (slot && document.querySelector(`[data-focus="${CSS.escape(slot)}"]`)) || document.querySelector(".row.sel, .card.sel");
   if (!row) return;
   state.revealed = pr;
   row.scrollIntoView({ block: "nearest" });
 }
 
-function ago(t) {
-  const a = age(t);
-  return a === "now" ? "just now" : a ? `${a} ago` : "";
+function ago(iso) {
+  if (!isSet(iso)) return "";
+  return Date.now() - Date.parse(iso) < 60000 ? t("just now") : t("{age} ago", { age: age(iso) });
 }
 
 function candidateURL(c) {
@@ -2530,9 +2239,9 @@ function pickSort(sort) {
 
 function waited(ms) {
   const hours = Math.floor(ms / 3600000);
-  if (hours < 1) return `${Math.floor(ms / 60000)}m`;
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  if (hours < 1) return t("{minutes}m", { minutes: Math.floor(ms / 60000) });
+  if (hours < 48) return t("{hours}h", { hours });
+  return t("{days}d", { days: Math.floor(hours / 24) });
 }
 
 // candidateWait counts from the last activity, or from the row's own clock
@@ -2542,7 +2251,7 @@ function candidateWait(c, row, hours, now = Date.now()) {
   const since = tracked ? sm(row).since : c.updated_at;
   if (!isSet(since)) return null;
   const ms = Math.max(0, now - Date.parse(since));
-  return { text: `waiting ${waited(ms)}`, late: tracked ? !!sm(row).stalled : ms > (hours || 48) * 3600000 };
+  return { text: t("waiting {time}", { time: waited(ms) }), late: tracked ? !!sm(row).stalled : ms > (hours || 48) * 3600000 };
 }
 
 function toggleTerm(term) {
@@ -2577,7 +2286,7 @@ async function explore(query) {
     state.explore.recent = out.recent || state.explore.recent;
     state.explore.sel = out.candidates.length === 1 ? keyOf(out.candidates[0]) : "";
   } catch (err) {
-    state.explore.error = `Explore failed: ${err.message}`;
+    state.explore.error = t("Explore failed: {error}", { error: err.message });
   }
   state.explore.busy = false;
   render();
@@ -2585,43 +2294,47 @@ async function explore(query) {
 
 function exploreStatus() {
   const ex = state.explore;
-  if (ex.busy) return "Searching GitHub…";
+  if (ex.busy) return t("Searching {provider}…", { provider: searchService() });
   if (ex.error) return ex.error;
   const r = ex.result;
-  if (!r) return "A search runs only when you press Enter or Search; each one spends about 1 point of GitHub's hourly budget.";
+  if (!r) return t("A search runs only when you press Enter or Search; each one spends about 1 point of the hourly API budget of {provider}.", { provider: searchService() });
   const shown = r.candidates.length;
   const order = (exploreSearch().sorts || []).find((s) => s.sort === querySort(r.query || ""));
-  const more = r.total > shown ? `, the ${order ? `${shown} ${order.shown}` : `first ${shown}`} of ${r.total}; narrow the search for the rest` : "";
-  const cost = r.rate_limit && r.rate_limit.limit ? ` · cost ${r.cost}, ${r.rate_limit.remaining} of ${r.rate_limit.limit} left` : "";
+  const cost = r.rate_limit && r.rate_limit.limit ? " · " + t("cost {cost}, {remaining} of {limit} left", { cost: r.cost, remaining: r.rate_limit.remaining, limit: r.rate_limit.limit }) : "";
   const read = r.read ? `${r.read} · ` : "";
   if (!shown && r.empty) return `${read}${r.empty}${cost}`;
-  return `${read}${shown} pull request${shown === 1 ? "" : "s"}${more} for ${r.query}${cost}`;
+  const vars = { count: tn("{n} pull requests", shown), shown, order: order ? order.shown : "", total: r.total, query: r.query };
+  if (r.total <= shown) return read + t("{count} for {query}", vars) + cost;
+  return read + (order ? t("{count}, the {shown} {order} of {total}; narrow the search for the rest for {query}", vars) : t("{count}, the first {shown} of {total}; narrow the search for the rest for {query}", vars)) + cost;
 }
 
 function candidateItem(c, sel) {
   const key = keyOf(c);
   const row = rowByKey(key);
   const facts = [
-    `+${c.additions} -${c.deletions} · ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`,
+    `+${c.additions} -${c.deletions} · ` + tn("{n} files", c.changed_files),
     reviewDecision(c.review_decision),
-    c.checks ? `checks ${c.checks.toLowerCase()}` : "no checks",
-    `${c.comments} comment${c.comments === 1 ? "" : "s"}`,
+    c.checks ? t("checks {state}", { state: c.checks.toLowerCase() }) : t("no checks"),
+    tn("{n} comments", c.comments),
   ];
-  if ((c.review_requests || []).length) facts.push("asks " + c.review_requests.map((w) => w.replace(/^team:/, "")).join(", "));
-  if (c.my_review) facts.push(`my review: ${c.my_review.toLowerCase().replace("_", " ")}${c.my_review_on_head ? "" : " (older head)"}`);
+  if ((c.review_requests || []).length) facts.push(t("asks {who}", { who: c.review_requests.map((w) => w.replace(/^team:/, "")).join(", ") }));
+  if (c.my_review) {
+    const review = c.my_review.toLowerCase().replace("_", " ");
+    facts.push(c.my_review_on_head ? t("my review: {review}", { review }) : t("my review: {review} (older head)", { review }));
+  }
   const b = c.brief && c.brief.brief;
   const wait = candidateWait(c, row, state.health && state.health.stalled_review_hours);
   return h("li", { class: ["cand", row ? waitClass(row) : "", key === sel ? "sel" : ""].join(" ") },
     h("button", { type: "button", class: "cand-pick", "aria-pressed": String(key === sel), "data-focus": `cand:${key}`, onclick: () => selectCandidate(key) },
       h("span", { class: "title" }, c.title || labelOf(c)),
-      h("span", { class: "meta" }, `${labelOf(c)} by ${c.author} · opened ${ago(c.created_at)} · updated ${ago(c.updated_at)}`,
-        wait ? h("span", { class: wait.late ? "wait late" : "wait", title: row ? `waiting on ${waitingLabel(row)}` : "since the last activity" }, wait.text) : null,
-        c.draft ? h("span", { class: "flag" }, "draft") : null,
+      h("span", { class: "meta" }, t("{unit} by {author} · opened {opened} · updated {updated}", { unit: labelOf(c), author: c.author, opened: ago(c.created_at), updated: ago(c.updated_at) }),
+        wait ? h("span", { class: "wait" + (wait.late ? " late" : ""), title: row ? t("waiting on {who}", { who: waitingLabel(row) }) : t("since the last activity") }, wait.text) : null,
+        c.draft ? h("span", { class: "flag" }, t("draft")) : null,
         c.state && c.state !== "OPEN" ? h("span", { class: "flag" }, c.state.toLowerCase()) : null)),
     h("div", { class: "facts" }, facts.join(" · ")),
     row ? h("div", { class: "inv" }, h("span", { class: "pill" }, rowKindLabel(row)),
-      ` waiting on ${waitingLabel(row)} for ${age(sm(row).since)} · in {{name}} as ${(pl(row).reasons || []).join(", ") || "out of scope"}`)
-      : h("div", { class: "inv" }, "not in {{name}}"),
+      " " + t("waiting on {who} for {age} · in {name} as {reasons}", { name: "{{name}}", who: waitingLabel(row), age: age(sm(row).since), reasons: (pl(row).reasons || []).join(", ") || t("out of scope") }))
+      : h("div", { class: "inv" }, t("not in {name}", { name: "{{name}}" })),
     b ? h("div", { class: "brief-line" }, briefTags({ size: b.size, risk: b.risk, open_questions: (b.open_questions || []).length }), ` ${b.kind} · ${b.goal}`) : null,
     candidateStatus(key));
 }
@@ -2629,8 +2342,9 @@ function candidateItem(c, sel) {
 function candidateStatus(key) {
   const st = state.explore.status[key];
   if (!st) return null;
-  return h("div", { class: st.error ? "inv cand-status err" : "inv cand-status", role: "status" }, st.text,
-    st.done && rowByKey(key) ? h("button", { type: "button", class: "act", "data-focus": `cand:open:${key}`, onclick: () => writeHash({ pr: key }) }, "Open in {{name}}") : null);
+  return h("div", { class: "inv cand-status" + (st.error ? " err" : ""), role: "status" }, st.text,
+
+    st.done && rowByKey(key) ? h("button", { type: "button", class: "act", "data-focus": `cand:open:${key}`, onclick: () => writeHash({ pr: key }) }, t("Open in {name}", { name: "{{name}}" })) : null);
 }
 
 // actOnCandidate brings a pull request the inventory lacks in first, so its
@@ -2641,23 +2355,23 @@ async function actOnCandidate(c, name, extra = {}) {
   const status = (text, more = {}) => { state.explore.status[key] = { text, ...more }; render(); };
   const implicit = !rowByKey(key);
   if (implicit) {
-    status("adding it to {{name}}…");
-    if (!(await act(c, "track"))) return status(state.actionError || "adding it to {{name}} failed", { error: true }), false;
+    status(t("adding it to {name}…", { name: "{{name}}" }));
+    if (!(await act(c, "track"))) return status(state.actionError || t("adding it to {name} failed", { name: "{{name}}" }), { error: true }), false;
     await load();
-    if (name === "track") return status("added to {{name}}", { done: true }), true;
+    if (name === "track") return status(t("added to {name}", { name: "{{name}}" }), { done: true }), true;
   }
   const row = rowByKey(key) || c;
   const offered = (row.actions || []).find((a) => a.id === name);
   const refused = offered && !offered.enabled ? offered.reason : "";
-  const ok = refused ? undefined : (status(`${name} running…`), await act(row, name, extra));
+  const ok = refused ? undefined : (status(t("{action} running…", { action: name })), await act(row, name, extra));
   await load();
   if (ok === undefined && implicit) {
-    const undone = (await act(row, "untrack")) ? "untracked it again" : `untracking it failed too: ${state.actionError}`;
-    status(`${name} ${labelOf(c)}: ${refused || "cancelled"}; ${undone}`, { error: true });
+    const undone = (await act(row, "untrack")) ? t("untracked it again") : t("untracking it failed too: {error}", { error: state.actionError });
+    status(t("{action} {unit}: {why}; {undone}", { action: name, unit: labelOf(c), why: refused || t("cancelled"), undone }), { error: true });
     return false;
   }
   if (refused) return status(`${name} ${labelOf(c)}: ${refused}`, { error: true }), false;
-  status(ok ? (implicit ? `${name} started; it is in {{name}} now` : `${name} sent`) : (state.actionError || `${name} failed`), { error: !ok, done: ok });
+  status(ok ? (implicit ? t("{action} started; it is in {name} now", { name: "{{name}}", action: name }) : t("{action} sent", { action: name })) : (state.actionError || t("{action} failed", { action: name })), { error: !ok, done: ok });
   return ok;
 }
 
@@ -2683,7 +2397,7 @@ function renderExploreActions() {
     h("a", { href: candidateURL(c), target: "_blank", rel: "noopener noreferrer", "data-focus": "explore:gh" }, labelOf(c)), " ", c.title);
   document.getElementById("explore-act-buttons").replaceChildren(
     ...actionButtons(c, "explore", { scope: "explore", run: (id) => actOnCandidate(c, id, { guidance: guidance.value.trim() }) }),
-    row ? h("button", { type: "button", class: "act", disabled: state.busy.has(key), "data-focus": "explore:detail", onclick: () => writeHash({ pr: key }) }, "Detail") : null);
+    row ? h("button", { type: "button", class: "act", disabled: state.busy.has(key), "data-focus": "explore:detail", onclick: () => writeHash({ pr: key }) }, t("Detail")) : null);
 }
 
 function renderExplore(view) {
@@ -2696,34 +2410,36 @@ function renderExplore(view) {
   if (document.activeElement !== input && input.value !== x) input.value = x;
   document.getElementById("explore-go").disabled = ex.busy;
   document.getElementById("explore-chips").replaceChildren(
-    h("span", { class: "chip-head" }, "Run"),
+    h("span", { class: "chip-head" }, t("Run")),
     ...(exploreSearch().presets || []).map((p) => chip({
       title: p.query, disabled: ex.busy, "data-focus": `explore:preset:${p.query}`, onclick: () => explore(p.query),
     }, p.label)),
-    h("span", { class: "chip-head" }, "Filters"),
+    h("span", { class: "chip-head" }, t("Filters")),
     ...(exploreSearch().filters || []).map((f) => f.window ? chip({
       title: "updated:>=", "aria-pressed": String(hasWindow(input.value)), "data-focus": "explore:filter:window", onclick: () => toggleWindow(f.window),
     }, f.label) : chip({
       "aria-pressed": String(hasTerm(input.value, f.term)), "data-focus": `explore:filter:${f.term}`, onclick: () => toggleTerm(f.term),
     }, f.label)),
-    h("span", { class: "chip-head" }, "Order"),
+    h("span", { class: "chip-head" }, t("Order")),
     ...(exploreSearch().sorts || []).map((o) => chip({
       title: `sort:${o.sort}`, "aria-pressed": String(querySort(input.value) === o.sort), "data-focus": `explore:sort:${o.sort}`, onclick: () => pickSort(o.sort),
     }, o.label)),
-    ex.recent.length ? h("span", { class: "chip-head" }, "Recent") : null,
+    ex.recent.length ? h("span", { class: "chip-head" }, t("Recent")) : null,
     ...ex.recent.map((q) => chip({ title: q, "data-focus": `explore:recent:${q}`, onclick: () => explore(q) }, q)));
   const status = document.getElementById("explore-status");
   const cands = (ex.result && ex.result.candidates) || [];
   status.replaceChildren(exploreStatus(), cands.length ? h("button", {
-    type: "button", class: "act", "data-focus": "explore:copy", title: "Copy these candidates as YAML, to paste for an agent", onclick: copyCandidates,
-  }, "Copy list") : "");
+    type: "button", class: "act", "data-focus": "explore:copy", title: t("Copy these candidates as YAML, to paste for an agent"), onclick: copyCandidates,
+  }, t("Copy list")) : "");
   status.classList.toggle("err", !!ex.error && !ex.busy);
   document.getElementById("explore-results").replaceChildren(...((ex.result && ex.result.candidates) || []).map((c) => candidateItem(c, ex.sel)));
   renderExploreActions();
 }
 
 const PLAN_ORDER = ["pending", "blocked"];
-const PLAN_HEAD = { pending: "Pending", blocked: "Blocked" };
+function planHead(decision) {
+  return decision === "blocked" ? t("Blocked") : t("Pending");
+}
 // PLAN_ACTS are the plan actions POST /api/plan carries, by spec id; an
 // item's other actions are its unit's.
 const PLAN_ACTS = { plan_apply: "apply", plan_dismiss: "dismiss", guide: "guide" };
@@ -2742,13 +2458,13 @@ function planGroups(items) {
 // planWhen says when an item runs: at its window's end, when the user
 // applies it, or not while it is blocked.
 function planWhen(it, now = Date.now()) {
-  if (it.decision === "blocked") return "blocked";
-  if (it.default !== "run") return "waits for you";
-  if (!it.deadline) return "runs now";
+  if (it.decision === "blocked") return t("blocked");
+  if (it.default !== "run") return t("waits for you");
+  if (!it.deadline) return t("runs now");
   const s = Math.ceil((Date.parse(it.deadline) - now) / 1000);
-  if (s <= 0) return "running";
-  if (s <= 99) return `runs in ${s} s`;
-  return `runs in ${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  if (s <= 0) return t("running");
+  if (s <= 99) return t("runs in {seconds} s", { seconds: s });
+  return t("runs in {minutes}m {seconds}s", { minutes: Math.floor(s / 60), seconds: String(s % 60).padStart(2, "0") });
 }
 
 function planCount() {
@@ -2761,10 +2477,10 @@ const planName = (it) => (it.title ? `${itemLabel(it)} · ${it.title}` : itemLab
 async function loadPlan() {
   const view = readHash().view;
   try {
-    const res = await getJSON(view === "plan" ? "/api/plan?closed=1" : "/api/plan");
-    state.plan = { items: res.items || [], closed: view === "plan" ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
+    const res = await getJSON(view === PLAN ? "/api/plan?closed=1" : "/api/plan");
+    state.plan = { items: res.items || [], closed: view === PLAN ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
   } catch (err) {
-    state.plan = { ...state.plan, error: `Could not load the plan: ${err.message}`, loaded: true };
+    state.plan = { ...state.plan, error: t("Could not load the plan: {error}", { error: err.message }), loaded: true };
   }
 }
 
@@ -2772,7 +2488,7 @@ async function actOnPlan(it, id) {
   if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: planName(it) }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(`Guidance for ${it.workflow} on ${planName(it)}`, "");
+    const guidance = prompt(t("Guidance for {workflow} on {item}", { workflow: it.workflow, item: planName(it) }), "");
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2789,7 +2505,7 @@ async function actOnPlan(it, id) {
     if ((out.errors || []).length) throw new Error(out.errors.join("; "));
     setNotice(`${body.action}: ${it.workflow} ${planName(it)}`);
   } catch (err) {
-    setNotice(`${body.action} ${it.workflow} ${planName(it)} failed: ${err.message}`, true);
+    setNotice(t("{action} failed: {error}", { action: `${body.action} ${it.workflow} ${planName(it)}`, error: err.message }), true);
   } finally {
     state.busy.delete(it.id);
   }
@@ -2811,17 +2527,24 @@ function planButtons(it) {
     }, st.label || sp.label));
 }
 
+// planItem is a plan item as the plan lists it: when it runs, what its workflow does, on what, what applying it
+// does, why it fired, folded, and its actions.
 function planItem(it) {
   const ticking = it.decision === "pending" && it.default === "run" && it.deadline;
+  const when = planWhen(it);
+  const reason = it.reason ? planReason(it) : "";
   return h("li", { class: `plan-item ${it.decision}` },
     h("div", { class: "plan-line" },
-      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? `runs at ${stamp(it.deadline)}` : undefined }, planWhen(it)),
-      h("span", { class: "plan-wf" }, it.workflow),
-      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
-      it.title ? h("span", { class: "plan-title" }, it.title) : null,
-      it.observe ? h("span", { class: "plan-mode", title: "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off" }, "observe") : null),
-    it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
-    it.error ? h("p", { class: "plan-error" }, `attempt ${it.attempts}: ${it.error}`) : null,
+      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, when),
+      h("span", { class: "plan-wf", title: it.summary ? it.workflow : undefined }, it.summary || it.workflow),
+      it.target ? null : h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
+      !it.target && it.title ? h("span", { class: "plan-title" }, it.title) : null,
+      it.observe ? h("span", { class: "plan-mode", title: t("This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off") }, t("observe")) : null),
+    it.target ? planTarget(it) : null,
+    planDoes(it),
+    reason && reason !== when ? h("p", { class: "plan-reason" }, reason) : null,
+    it.error ? h("p", { class: "plan-error" }, t("attempt {n}: {error}", { n: it.attempts, error: it.error })) : null,
+    planWhy(it),
     h("div", { class: "d-actions" }, ...planButtons(it)));
 }
 
@@ -2833,24 +2556,24 @@ function closedItem(c) {
       h("span", { class: "plan-reason" }, c.reason)),
     c.resume ? h("div", { class: "plan-resume" },
       h("code", {}, c.resume),
-      h("button", { type: "button", class: "act", "data-focus": `plan:closed:${c.session}`, title: "Copy the command that resumes this session",
-        onclick: () => navigator.clipboard.writeText(c.resume).then(() => setNotice(`copied the resume line of ${c.session}`), (err) => setNotice(`could not copy the resume line of ${c.session}: ${err.message}`, true)) }, "Copy")) : null);
+      h("button", { type: "button", class: "act", "data-focus": `plan:closed:${c.session}`, title: t("Copy the command that resumes this session"),
+        onclick: () => navigator.clipboard.writeText(c.resume).then(() => setNotice(t("copied the resume line of {session}", { session: c.session })), (err) => setNotice(t("could not copy the resume line of {session}: {error}", { session: c.session, error: err.message }), true)) }, t("Copy"))) : null);
 }
 
 function renderPlan(view) {
   const box = document.getElementById("plan");
-  box.hidden = view !== "plan";
+  box.hidden = view !== PLAN;
   if (box.hidden) return;
   const p = state.plan;
   const groups = planGroups(p.items);
   const parts = [];
   if (p.error) parts.push(h("p", { class: "plan-error" }, p.error));
-  if (!groups.length) parts.push(h("p", { class: "empty" }, p.loaded ? "Nothing pending or blocked in the plan." : "Loading the plan."));
+  if (!groups.length) parts.push(h("p", { class: "empty" }, p.loaded ? t("Nothing pending or blocked in the plan.") : t("Loading the plan.")));
   for (const g of groups) {
-    parts.push(h("h2", { class: "plan-head" }, `${PLAN_HEAD[g.decision]} (${g.items.length})`), h("ol", { class: "plan-items" }, ...g.items.map(planItem)));
+    parts.push(h("h2", { class: "plan-head" }, `${planHead(g.decision)} (${g.items.length})`), h("ol", { class: "plan-items" }, ...g.items.map(planItem)));
   }
   if (p.closed.length) {
-    parts.push(h("h2", { class: "plan-head" }, `Sessions closed in the last day (${p.closed.length})`), h("ol", { class: "plan-items" }, ...p.closed.map(closedItem)));
+    parts.push(h("h2", { class: "plan-head" }, t("Sessions closed in the last day ({n})", { n: p.closed.length })), h("ol", { class: "plan-items" }, ...p.closed.map(closedItem)));
   }
   box.replaceChildren(...parts);
 }
@@ -2906,15 +2629,18 @@ function render() {
   renderSync();
   renderPause();
   renderWarnings();
-  renderRail();
+  renderRail(railNav(readLens()), readHash());
   renderExplore(readHash().view);
   renderPlan(readHash().view);
   renderPluginView(readHash().view);
   renderTasks(readHash());
+  renderScreens(readHash());
   renderDash(readLens());
   renderRows();
   renderDetail();
+  syncWindowChrome();
   revealOpenRow(readHash().pr);
+  watchWrapped(document);
   restoreFocus();
 }
 
@@ -2932,8 +2658,105 @@ function unitFallback(err, tasks) {
   return err && err.status === 404 && tasks && tasks.length ? "#" + viewHash({ task: tasks[0].id, pr: "" }) : "";
 }
 
+// homeState is the home the daemon last served, and why it could not serve it.
+const homeState = { home: null, error: "" };
+
+async function loadHome() {
+  if (readHash().view !== HOME) return;
+  try {
+    homeState.home = await getJSON("/api/home");
+    homeState.error = "";
+  } catch (err) {
+    homeState.error = t("Could not load the home: {error}", { error: err.message });
+  }
+}
+
+async function loadQueue() {
+  const route = readRoute(location.hash);
+  if (route.view === QUEUE) await queueLoad(route, screenEnv());
+}
+
+// screenRow is task e's row as the list of view draws it, the profile's first view when none is named.
+function screenRow(e, view) {
+  const lens = lensOf({ view: view || (coreViews()[0] || { id: "" }).id, q: "", g: "", s: "", layout: "", area: "", ctx: [], tk: "", done: false });
+  return rowView(taskModel(e, "", "", lens), lens);
+}
+
+// openTaskSource opens unit u of task e at its source, else the task's first unit's; the unit's detail when
+// no card links it.
+function openTaskSource(e, u) {
+  const card = ((e && e.cards) || []).find((x) => x.card && u && x.card.unit.provider === u.provider && x.card.unit.key === u.key);
+  const link = (card && safeURL(card.card.link)) || sourceLink(e);
+  if (link) window.open(link, "_blank", "noopener");
+  else if (u) writeHash({ pr: u.provider + ":" + u.key, task: "" });
+}
+
+// pageGates are the gates the page draws as cards, each with its task: the detail's, the queue's item's and
+// the gates list's.
+function pageGates() {
+  const out = [];
+  const e = detailState.task;
+  if (e) out.push({ task: e, gates: e.gates || [] });
+  const queue = queueShown(readRoute(location.hash));
+  const item = queue && (queue.items || [])[queueState.at];
+  if (item && item.gate) out.push({ task: item.task, gates: [item.gate] });
+  for (const g of tasksState.gates || []) out.push({ task: taskById(g.task), gates: [g] });
+  return out;
+}
+
+// pageQuestion is the gate a digit answers from el: the one whose card holds el, else, on a queue, its item's
+// gate when that is no draft's and no detail is open over the queue.
+function pageQuestion(el) {
+  const at = gateAt(el, pageGates());
+  if (at || (el && el.closest && el.closest(".d-gate"))) return at;
+  const route = readRoute(location.hash);
+  if (route.view !== QUEUE || route.task || route.unit || (el && el.closest && el.closest("#detail"))) return null;
+  const queue = queueShown(route);
+  const item = queue && (queue.items || [])[queueState.at];
+  return item && item.gate && !queueDraft(item.gate) ? { task: item.task, gate: item.gate } : null;
+}
+
+// screenEnv is what the home and the queue screens read and run through.
+function screenEnv() {
+  return {
+    route: () => readRoute(location.hash),
+    get: getJSON,
+    post: (url, body) => detailEnv.post(url, body),
+    row: screenRow,
+    openSource: openTaskSource,
+    openTask: (id) => writeHash({ task: id, pr: "" }),
+    keyOf: (action) => (typeof cockpitKeys === "object" && cockpitKeys ? cockpitKeys.keyOf(action) : ""),
+    act: async (u, id) => {
+      if ((await omniboxAct(u, id)) === false) throw new Error(state.actionError || t("{action} failed", { action: id }));
+    },
+    navigate: (view) => { location.hash = hashString({ view }); },
+    render,
+    capture: async (title) => {
+      try {
+        await detailEnv.post("/api/tasks", { title });
+        setNotice(t("captured: {title}", { title }));
+        scheduleLoad({ tasks: true });
+        return true;
+      } catch (err) {
+        setNotice(t("capture failed: {error}", { error: err.message }), true);
+        return false;
+      }
+    },
+  };
+}
+
+// renderScreens draws the home or the queue when the route shows one, and hides both otherwise.
+function renderScreens(route) {
+  const home = document.getElementById("home");
+  const queue = document.getElementById("queue");
+  home.hidden = route.view !== HOME;
+  queue.hidden = route.view !== QUEUE;
+  if (!home.hidden) home.replaceChildren(...(homeState.error ? [h("p", { class: "err" }, homeState.error)] : renderHome(homeState.home, screenEnv())));
+  if (!queue.hidden) queue.replaceChildren(...renderQueue(queueShown(readRoute(location.hash)), queueState.at, screenEnv()));
+}
+
 async function loadActivity() {
-  if (readHash().view !== "recent") {
+  if (readHash().view !== RECENT) {
     state.activityError = "";
     return;
   }
@@ -2942,7 +2765,7 @@ async function loadActivity() {
     state.activityLoaded = true;
     state.activityError = "";
   } catch (err) {
-    state.activityError = `Could not load the recent activity: ${err.message}`;
+    state.activityError = t("Could not load the recent activity: {error}", { error: err.message });
     state.activityLoaded = true;
   }
 }
@@ -3003,18 +2826,19 @@ async function load() {
   if (health.status === "fulfilled") {
     state.health = health.value;
     checkBuild(state.health);
+    followStrings(state.health.strings, getJSON);
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
   // A daemon that cannot open its store says why in its health's warnings.
   const storeClosed = health.status === "fulfilled" && health.value.store && health.value.store.state !== "ok";
   if (failed.length && !storeClosed) {
-    state.error = `Could not reach the daemon: ${[...new Set(failed.map((r) => r.reason.message))].join("; ")}`;
+    state.error = t("Could not reach the daemon: {error}", { error: [...new Set(failed.map((r) => r.reason.message))].join("; ") });
   } else {
     state.error = "";
     state.authLost = false;
   }
   forgetTasksPage();
-  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks()]);
+  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadRoundGates(), loadTasks(), loadHome(), loadQueue()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
 }
@@ -3027,13 +2851,13 @@ async function act(row, name, extra = {}) {
   const input = spec.input;
   const guidance = extra.guidance || "";
   const refuse = (why) => { state.actionError = `${name} ${labelOf(row)}: ${why}`; state.actionDetail = ""; state.actionSource = ""; render(); };
-  if (input && input.kind === "text" && input.required && !guidance) return refuse(`${input.label || "Guidance"} is required`);
-  if (input && input.max && [...guidance].length > input.max) return refuse(`guidance is ${[...guidance].length} characters, the limit is ${input.max}`);
+  if (input && input.kind === "text" && input.required && !guidance) return refuse(t("{field} is required", { field: input.label || t("Guidance") }));
+  if (input && input.max && [...guidance].length > input.max) return refuse(t("guidance is {length} characters, the limit is {max}", { length: [...guidance].length, max: input.max }));
   if (st && st.confirm && !confirm(st.confirm)) return;
   const body = { source: "cockpit" };
   if (st && st.basis) body.basis = st.basis;
   if (input && input.kind === "duration") {
-    const hint = [input.placeholder && `a duration such as ${input.placeholder}`, input.until_state && `"state" to wait until the situation changes`].filter(Boolean).join(", or ");
+    const hint = [input.placeholder && t("a duration such as {example}", { example: input.placeholder }), input.until_state && t("\"state\" to wait until the situation changes")].filter(Boolean).join(", " + t("or") + " ");
     const answer = prompt(`${input.label || name}? ${hint}`, input.default || "");
     if (answer === null) return;
     if (input.until_state && answer.trim() === "state") body.until_state = true;
@@ -3059,7 +2883,7 @@ async function act(row, name, extra = {}) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
-    setNotice(acceptedNote(name, labelOf(row), out.intake) || `${name} done: ${labelOf(row)}${out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
+    setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
     ok = true;
     if (name === "answer" && row.question) state.answered.set(key, questionShown(row));
     if (body.guidance) {
@@ -3070,7 +2894,8 @@ async function act(row, name, extra = {}) {
       }
     }
   } catch (err) {
-    state.actionError = `${name} ${labelOf(row)} failed: ${err.message}`;
+    state.actionError = t("{action} failed: {error}", { action: `${name} ${labelOf(row)}`, error: err.message });
+
     state.actionDetail = err.detail || "";
     state.actionSource = err.source || "";
     setNotice("");
@@ -3104,8 +2929,9 @@ function mergeRows(page) {
   return true;
 }
 
-// applyChange brings the cockpit up to a change: the rows that moved, the
-// health only when it did, the detail only when its unit moved.
+// applyChange brings the cockpit up to a change: the rows that moved, and
+// only what the change names of the rest: the health, the plan (also when a
+// row it shows moved), the round gates, the detail when its unit moved.
 async function applyChange(c) {
   if (c.all || !state.loaded) return load();
   try {
@@ -3117,6 +2943,7 @@ async function applyChange(c) {
     if (c.health) {
       state.health = await getJSON("/api/health");
       checkBuild(state.health);
+      followStrings(state.health.strings, getJSON);
     }
   } catch {
     return load();
@@ -3125,12 +2952,15 @@ async function applyChange(c) {
   state.authLost = false;
   const route = readHash();
   const { view, pr } = route;
+  const planned = new Set((state.plan.items || []).map((it) => unitKey(it.unit)));
   await Promise.all([
     c.units.length && view === "recent" ? loadActivity() : null,
     (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
-    loadPlan(),
-    loadRoundGates(),
+    c.plan || c.units.some((u) => planned.has(u)) ? loadPlan() : null,
+    c.gates ? loadRoundGates() : null,
     c.tasks ? loadTasks(route, c.units) : null,
+    c.tasks || c.all || c.units.length ? loadHome() : null,
+    c.tasks || c.all || c.units.length ? loadQueue() : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -3140,12 +2970,9 @@ let pending;
 let queued = null;
 let chain = Promise.resolve();
 function scheduleLoad(c = { all: true }) {
-  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false };
+  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false, plan: false, gates: false };
   queued.units = [...new Set([...queued.units, ...(c.units || [])])];
-  queued.all = queued.all || !!c.all;
-  queued.rows = queued.rows || !!c.rows;
-  queued.health = queued.health || !!c.health;
-  queued.tasks = queued.tasks || !!c.tasks;
+  for (const k of Object.keys(queued)) if (k !== "units") queued[k] = queued[k] || !!c[k];
   clearTimeout(pending);
   pending = setTimeout(() => {
     const c = queued;
@@ -3161,7 +2988,9 @@ function onChange(e) {
   } catch {
     return scheduleLoad();
   }
-  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters });
+  const change = { units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters, plan: !!c.plan, gates: !!c.gates };
+  if (!change.units.length && !Object.values(change).some((v) => v === true)) return;
+  scheduleLoad(change);
 }
 
 let retries = 0;
@@ -3175,7 +3004,7 @@ function connect() {
     state.authLost = false;
     if (opened) {
       forgetTasksPage();
-      scheduleLoad({ rows: true, health: true, tasks: true });
+      scheduleLoad({ rows: true, health: true, tasks: true, plan: true, gates: true });
     }
     opened = true;
   };
@@ -3201,7 +3030,7 @@ window.addEventListener("hashchange", async () => {
   searchBox.value = readHash().q;
   document.getElementById("explore-q").value = readHash().x;
   render();
-  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash())]);
+  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash()), loadHome(), loadQueue()]);
   render();
 });
 
@@ -3247,8 +3076,46 @@ document.getElementById("explore-form").addEventListener("submit", (e) => {
 document.getElementById("explore-q").addEventListener("input", (e) => writeHash({ x: e.target.value.slice(0, 256) }, true));
 document.getElementById("explore-guidance").addEventListener("input", (e) => { state.guidance[e.target.dataset.key] = e.target.value; });
 
+// panelPage says the page is the floating panel's, which shows the omnibox alone and none of the cockpit.
+function panelPage() {
+  return readRoute(location.hash).panel === "omnibox";
+}
+
+// refreshClock re-renders the cockpit's relative times; the panel has none.
+function refreshClock() {
+  if (!panelPage()) render();
+}
+
 setupDetailResize();
-setInterval(render, 60000);
+setInterval(refreshClock, 60000);
 setInterval(tickCountdowns, 1000);
-load();
-connect();
+loadStrings(getJSON).then(() => {
+  document.documentElement.lang = I18N.locale;
+  translateStatic(document);
+  if (panelPage()) {
+    showOmnibox({ panel: true });
+    panelFollow(window, document, {
+      reset: () => showOmnibox({ panel: true }),
+      health: () => getJSON("/api/health"),
+      strings: (stamp) => followStrings(stamp, getJSON),
+      build: checkPanelBuild,
+    });
+    return;
+  }
+  tellLinkNotice();
+  load();
+  connect();
+});
+
+// i18nChanged re-renders in the strings that arrived after the boot stopped waiting for them: the cockpit, or
+// the panel's omnibox with the text typed in it.
+function i18nChanged() {
+  document.documentElement.lang = I18N.locale;
+  translateStatic(document);
+  if (!panelPage()) {
+    render();
+    return;
+  }
+  const field = document.querySelector(".omni-input");
+  showOmnibox({ panel: true, text: field ? field.value : "" });
+}

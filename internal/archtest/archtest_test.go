@@ -22,11 +22,13 @@ type pkg struct {
 	GoFiles      []string
 	TestGoFiles  []string
 	XTestGoFiles []string
-	Imports      []string
-	TestImports  []string
-	XTestImports []string
-	Standard     bool
-	EmbedFiles   []string
+	// IgnoredGoFiles are the files a build tag leaves out of this build.
+	IgnoredGoFiles []string
+	Imports        []string
+	TestImports    []string
+	XTestImports   []string
+	Standard       bool
+	EmbedFiles     []string
 }
 
 var forbidden = []string{"os/exec", "net/http", "database/sql"}
@@ -83,7 +85,7 @@ func parseFile(t *testing.T, path string) (*token.FileSet, *ast.File) {
 
 func parseOnce(path string) (*ast.File, error) {
 	parse, _ := parsed.LoadOrStore(path, sync.OnceValues(func() (*ast.File, error) {
-		return parser.ParseFile(fileSet, path, nil, 0)
+		return parser.ParseFile(fileSet, path, nil, parser.ParseComments)
 	}))
 	return parse.(func() (*ast.File, error))()
 }
@@ -104,7 +106,7 @@ func under(path string, roots ...string) bool {
 const pluginStore = "pkg/plugin/store"
 
 // TestArchitecture checks that only the store imports the SQLite driver;
-// clients import only the API, the domain and `termfmt`; the domain imports
+// clients import only the API, the domain, `termfmt` and `i18n`; the domain imports
 // only the domain; the brief reaches agents and the store only through its
 // ports; the API imports only the domain; only `intent/expr` imports cel-go; a
 // core interface has at most five methods.
@@ -123,8 +125,8 @@ func TestArchitecture(t *testing.T) {
 				broken = append(broken, fmt.Sprintf("%s imports %s; only the store may (C1)", self, imp))
 			case under(self, "internal/domain") && !std(imp) && !(internal && under(dep, "internal/domain")):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the domain imports only the standard library and the domain (C3)", self, imp))
-			case under(self, "internal/client") && internal && !under(dep, "internal/api", "internal/domain", "internal/client", "internal/termfmt"):
-				broken = append(broken, fmt.Sprintf("%s imports %s; a client imports only the API and internal/termfmt (C2)", self, imp))
+			case under(self, "internal/client") && internal && !under(dep, "internal/api", "internal/domain", "internal/client", "internal/termfmt", "internal/i18n"):
+				broken = append(broken, fmt.Sprintf("%s imports %s; a client imports only the API, internal/termfmt and internal/i18n (C2)", self, imp))
 			case under(self, "internal/brief") && (imp == "os/exec" || (internal && under(dep, "internal/adapter/agent"))):
 				broken = append(broken, fmt.Sprintf("%s imports %s; the brief runs the agent only through turns.Asker (C4)", self, imp))
 			case under(self, "internal/brief") && internal && under(dep, "internal/adapter/store/sqlite"):
@@ -258,4 +260,39 @@ func TestNothingImportsTheGate(t *testing.T) {
 func TestNoGateFlagsAPlantedImport(t *testing.T) {
 	t.Parallel()
 	flagged(t, "a planted import", ruleNoGate("internal/cli", []string{"context", module + "internal/gate"}), 1, "the workflows are the only automation")
+}
+
+// ruleI18n flags an import of internal/i18n that is neither the standard
+// library nor golang.org/x/text.
+func ruleI18n(self string, imports []string) []string {
+	if self != "internal/i18n" {
+		return nil
+	}
+	var out []string
+	for _, imp := range imports {
+		if !std(imp) && !under(imp, "golang.org/x/text") {
+			out = append(out, fmt.Sprintf("%s imports %s; i18n imports only the standard library and golang.org/x/text", self, imp))
+		}
+	}
+	return out
+}
+
+// TestI18nIsALeaf checks that `internal/i18n` imports only the standard
+// library and `golang.org/x/text`, so the loader and the clients may import it.
+func TestI18nIsALeaf(t *testing.T) {
+	t.Parallel()
+	seen := false
+	for _, p := range packages(t) {
+		self, ok := local(p.ImportPath)
+		if !ok {
+			continue
+		}
+		seen = seen || self == "internal/i18n"
+		for _, b := range ruleI18n(self, p.Imports) {
+			t.Error(b)
+		}
+	}
+	if !seen {
+		t.Error("internal/i18n is missing from the package list")
+	}
 }

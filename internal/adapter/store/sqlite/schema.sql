@@ -443,13 +443,25 @@ CREATE TABLE drafts (
   -- an edit's: the text it replaced
   replaced TEXT NOT NULL DEFAULT '',
   -- the session that proposed it; '' when none did
-  origin_session TEXT NOT NULL DEFAULT ''
+  origin_session TEXT NOT NULL DEFAULT '',
+  -- why it was proposed, in the user's language when it was; the locale its text is written in
+  why TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT '',
+  -- a thread reply's: 'on' or 'off' for also posting it to its conversation; '' when it replies in no thread
+  broadcast TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
 CREATE INDEX drafts_task ON drafts (task, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
 CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
+
+-- a workflow the user stopped on one unit, until they undo it
+CREATE TABLE workflow_skips (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  workflow TEXT NOT NULL CHECK (workflow != ''),
+  at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key, workflow)
+) WITHOUT ROWID;
 
 CREATE TABLE review_runs (
   id TEXT PRIMARY KEY,

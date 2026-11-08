@@ -16,7 +16,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Each enab
 | The words of the built-in actions (Run now, Skip, Take over, ...): `label`, `summary`, `note`, `warning`, `confirm`, `why` and an input's `label` and `help` | `profiles/default/actions.toml` | an `actions.toml` whose tables replace the bundled ones |
 | Judgment: what a review looks for, the voice of a reply | the bundled guides, `profiles/default/intent=<name>.md` | blocks whose path says when they apply, such as `repo=api/intent=address.md` |
 | Partials: the text every intent's instructions share, such as the record protocol, the history and the brief | `profiles/default/partials/<name>.md.tmpl` | replaces a partial for every intent under `partials/<name>.md.tmpl`, and adds partials its intents call |
-| Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
+| Prompts of {{name}}'s own calls: the headless turn's wrapper (`headless.md.tmpl`), the omnibox agent call's (`omnibox.md.tmpl`) | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
 | What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml`, and a plugin's tools in its layer's `tools.toml` | a `tools.toml` whose keys replace the bundled ones |
 | The task states and their categories, the task properties with their types and writers, the verbs, a profile's own included, and their words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first), where a task offers each (`offer`), its move (`from`, `to`), its `handler` and who may run it (`by`, `gate`) | `profiles/default/tasks.toml` | a `tasks.toml` whose keys replace the bundled ones and whose new states and properties come after the bundled ones |
@@ -25,6 +25,11 @@ The embedded `profiles/default/` is the lowest layer of every profile. Each enab
 | The record kinds: the JSON schema each one's data follows, who may write it and the task properties its fields set | `profiles/default/records.toml`, its schemas under `profiles/default/records/` | a `records.toml` whose keys replace the bundled ones |
 | The help line of each core key, by context, then action | `profiles/default/keys.toml` | a `keys.toml` whose keys replace the bundled ones |
 | What the loop tells a session, and the person about what they wrote: the notice that the user answered a gate or wrote on the task's chat, the reason a stop is blocked while the turn owes a record, where a reply went, the words of a notification's text inputs | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
+| The decision kinds a task waits on: each gate kind's, each plugin's situations' and link signals' (in its layer), each kind's view and words, and what a queue offers first on a plugin's unit | `profiles/default/decisions.toml`, a plugin's in its layer's `decisions.toml` | a `decisions.toml`, or `plugins/<id>/decisions.toml`, whose keys replace the bundled ones |
+| A plugin's predicates over its units' facts, by the names its manifest's `[[source.predicates]]` declares, such as the GitHub plugin's `reviewer_required`: whether a pull request waits for a reviewer before its merge | a plugin's layer's `predicates.toml` | a `plugins/<id>/predicates.toml` whose keys replace the bundled ones; one that does not compile leaves the bundled one in force |
+| Whether a Slack thread reply also posts to its conversation when its proposer did not say: by the kind of conversation, and for a reply the person writes | the Slack plugin's layer's `drafts.toml` | a `plugins/slack/drafts.toml` that replaces the whole file |
+| The home: the briefing's counters and words, its sections and the capture field's hint | `profiles/default/home.toml` | a `home.toml` whose keys replace the bundled ones, and whose list of counters or sections replaces the whole list |
+| The omnibox: how a search groups its results (each group a view and its label), and the last group's label | `profiles/default/omnibox.toml` | an `omnibox.toml` whose keys replace the bundled ones, and whose list of groups replaces the whole list |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 
@@ -64,6 +69,9 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - A draft's text comes from a profile template or from whoever wrote it, and only `draft.propose` and the plugin rules its allowlist names propose drafts on their own (`TestDraftTextComesFromTheProfile`, `TestOnlyTheDraftStepProposes`).
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
+- The terminal client's words are `strings.toml`'s, through `texts.Catalog`, its key names (Tab, Ctrl+E) passed as values, never translated.
+- The cockpit's words are `strings.toml`'s, through `t` and `tn` in `internal/web/static/i18n.js`, and the core's event kinds are `timeline.toml`'s; no script quotes a text a person reads outside them (`TestClientsQuoteNoProseOutsideTheCatalog`).
+- The menu bar's words, its items, the notes on what became of an answer and the app window's menus, are `strings.toml`'s, which the daemon serves at `/api/strings` in the interface language (`internal/client/texts`); the app reads them again when their stamp in the health moves, and words the window's menus anew.
 
 ## What Go still owns today
 
@@ -71,8 +79,6 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 - the GitHub plugin's `github-nudge` rule (`plugins/github/nudge`), whose texts are its profile layer's `prompts/github-nudge.tmpl`;
 - the workflow providers, pull requests, sessions, workspaces, tasks and Slack units (`builtin.Slots`);
-- the menu bar's copy, such as the notes on what became of an answer (a notification's titles and buttons and the digest's words are `notices.toml`'s);
-- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles of the panes and the empty states of those that are not a view of `views.toml` (a plugin's views, the plan), the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when a task does not offer a verb;
 - the renderings of Slack messages that `slack_read` and `slack_search` return (the Slack plugin's `plugins/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction

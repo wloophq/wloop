@@ -36,7 +36,9 @@ func (t *tally) add(r result) {
 }
 
 // Sweep implements daemon.Sweeper. Without the loop lock it checks the
-// manager is reachable, refreshes the facts providers, evaluates every
+// manager is reachable, refreshes the facts providers, withdraws the step
+// gates whose workflow's [gates.withdraw] holds, so this pass's facts see
+// them closed, evaluates every
 // trigger, saves the plan, advances the event cursors and drops the run
 // items whose source moved and that no longer hold. Under the lock it drops
 // the run items whose unit was noted after the plan's generation and no
@@ -53,6 +55,9 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		if err := r.Refresh(ctx); err != nil {
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
+	}
+	if err := e.withdrawSteps(ctx); err != nil {
+		e.logf("withdrawing steps: %v", err)
 	}
 	var ev *evaluation
 	if err := e.prepared(ctx, func(ctx context.Context) (err error) {
@@ -75,7 +80,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		return "", "", err
 	}
 	write := PlanWrite{Workflows: append(slices.Clone(ev.workflows), gone...), Items: ev.plan.Items}
-	if err := e.save(ctx, write, append(plannedEvents(ev, e.now()), ev.passed...)); err != nil {
+	if err := e.save(ctx, write, slices.Concat(plannedEvents(ev, e.now()), ev.passed, ev.withdrawn)); err != nil {
 		return "", "", err
 	}
 	for _, b := range ev.batches {
@@ -104,7 +109,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	runs = e.revalidate(ctx, ev, runs, &t)
 	runs = e.drop(runs, &t, func(pl *planned) string {
 		if holds(pause, pl.w.Slot, pl.facts) {
-			return "paused since it was planned"
+			return workflow.ReasonSincePaused
 		}
 		return ""
 	})
@@ -324,16 +329,16 @@ func (e *Engine) stale(ctx context.Context, w workflow.Workflow, it workflow.Ite
 		}
 	}
 	if ok, err := match(w.When, vars); err != nil || !ok {
-		return "it no longer matches since it was planned", nil
+		return workflow.ReasonSinceUnmatched, nil
 	}
 	if keyMoved(w, it, facts) {
-		return "its unit changed since it was planned", nil
+		return workflow.ReasonSinceUnit, nil
 	}
 	if byHand {
 		return "", nil
 	}
 	if rule, err := matchedRule(w.Approval, vars); err != nil || rule != nil && rule.Mode == workflow.ApprovalWait {
-		return "it waits for you since it was planned", nil
+		return workflow.ReasonSinceWaits, nil
 	}
 	return "", nil
 }
@@ -346,8 +351,11 @@ func (e *Engine) settled(ctx context.Context, it workflow.Item) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	if ok && (run.Status == workflow.RunDone || run.Status == workflow.RunDismissed) {
-		return "it was " + string(run.Status) + " since it was planned", nil
+	switch {
+	case ok && run.Status == workflow.RunDone:
+		return workflow.ReasonSinceDone, nil
+	case ok && run.Status == workflow.RunDismissed:
+		return workflow.ReasonSinceDismissed, nil
 	}
 	stored, err := e.Ledger.Items(ctx, Filter{ID: it.ID})
 	if err != nil {
@@ -355,9 +363,9 @@ func (e *Engine) settled(ctx context.Context, it workflow.Item) (string, error) 
 	}
 	switch {
 	case len(stored) == 0:
-		return "it left the plan since it was planned", nil
+		return workflow.ReasonSinceLeft, nil
 	case stored[0].Decision != workflow.DecisionRun:
-		return "it was acted on since it was planned", nil
+		return workflow.ReasonSinceActed, nil
 	}
 	return "", nil
 }

@@ -39,9 +39,20 @@ func (s *Store) Session(ctx context.Context, id string) (turn.Session, bool, err
 
 // SaveSession writes the session's row; its handles move only through
 // BindHandle and EndHandle, so a save of a session read before its handle
-// ended never opens it again.
+// ended never opens it again. A save that closes the session notes
+// TopicPlan, whose closed sessions it lists.
 func (s *Store) SaveSession(ctx context.Context, ses turn.Session, evs ...port.Event) error {
 	return s.write(ctx, evs, func(tx *Tx) error {
+		if !ses.ClosedAt.IsZero() {
+			var was string
+			err := tx.QueryRowContext(ctx, `SELECT closed_at FROM sessions WHERE session_id = ?`, ses.ID).Scan(&was)
+			switch {
+			case errors.Is(err, sql.ErrNoRows) || err == nil && was == "":
+				tx.Touch(port.TopicPlan)
+			case err != nil:
+				return err
+			}
+		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO sessions (session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed,
 			started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

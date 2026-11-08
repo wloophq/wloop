@@ -303,6 +303,9 @@ func TestSchemaRoundTrip(t *testing.T) {
 	if r.Verdict != "waits_on_viewer" || !r.StartedByViewer || len(r.Items) != 3 || len(r.Links) != 1 {
 		t.Fatalf("result = %+v", r)
 	}
+	if r.Items[0].Ask != "review the release notes draft I wrote" || r.Items[1].Ask != "ship the widget toggle on by default?" {
+		t.Errorf("asks %q, %q", r.Items[0].Ask, r.Items[1].Ask)
+	}
 	n1 := r.Items[2]
 	if n1.Ref != "n1" || n1.Mode != "session" || n1.Place.Context != "widget" || n1.Assignees[0] != (PersonOut{ID: "U0000000001"}) {
 		t.Errorf("n1 = %+v", n1)

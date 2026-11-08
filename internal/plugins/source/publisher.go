@@ -73,12 +73,13 @@ func (p Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 	return c.Where(ctx, WireDraft(d))
 }
 
-func (p Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
+func (p Publisher) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	c, err := p.Kind.Client(p.ID)
 	if err != nil {
-		return "", err
+		return draft.Placed{}, err
 	}
-	return c.Place(ctx, WireDraft(d))
+	pl, err := c.Place(ctx, WireDraft(d))
+	return draft.Placed{Target: pl.Target, Broadcast: draft.Broadcast(pl.Broadcast)}, err
 }
 
 func (p Publisher) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error) {

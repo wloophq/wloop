@@ -295,7 +295,7 @@ func TestQuit(t *testing.T) {
 func TestHardToUndoActionsAskForTheServedConfirm(t *testing.T) {
 	m, r := modelOn(t, "others_not_adopted")
 	var takeOver = "Take over acme/api#7? It becomes yours to develop: " + brand.Name + " creates or renames its author workspace."
-	if _, ok := press(m, Key{Rune: 'A'}, Key{Rune: 'A'}); ok || m.prompt != nil || m.status != "take_over acme/api#7 cancelled" {
+	if _, ok := press(m, Key{Rune: 'A'}, Key{Rune: 'A'}); ok || m.prompt != nil || m.status != "take over acme/api#7 cancelled" {
 		t.Fatalf("a second A took over: prompt %v status %q", m.prompt, m.status)
 	}
 	press(m, Key{Rune: 'A'})

@@ -81,8 +81,12 @@ func nextLocalDay(t time.Time) time.Time {
 
 // Facts are the row's workflow facts that read the pull request alone;
 // the host adds those that read its own state.
-func (r Row) Facts() []src.Fact {
-	p, in := r.PR, r.in
+func (r Row) Facts() []src.Fact { return FactsOf(r.in) }
+
+// FactsOf are the workflow facts of in's pull request, which its situation
+// does not change: the facts the profile's predicates read before Derive.
+func FactsOf(in Input) []src.Fact {
+	p := in.PR
 	ref := p.Ref
 	viewer := in.Viewer
 	var out []src.Fact
@@ -101,6 +105,7 @@ func (r Row) Facts() []src.Fact {
 		add("pr.closed_at", src.Time(p.ClosedAt))
 	}
 	add("pr.draft", src.Bool(p.IsDraft))
+	add("pr.changed_files", src.Int(int64(p.ChangedFiles)))
 	add("pr.head", src.String(p.HeadOid))
 	if p.Mergeable == "CONFLICTING" && !p.MergeableAt.IsZero() {
 		add("pr.conflicting_for", src.Since(p.MergeableAt))
@@ -117,7 +122,7 @@ func (r Row) Facts() []src.Fact {
 		add("pr.age", src.Since(p.CreatedAt))
 	}
 	add("pr.adopted", src.Bool(in.Override.Adopted))
-	add("pr.stale", r.stale())
+	add("pr.stale", stale(in))
 	visibility, association, labels := "", "", []string{}
 	exists, verdict, decision := false, "", ""
 	if d := in.Detail; d != nil {
@@ -140,15 +145,15 @@ func (r Row) Facts() []src.Fact {
 
 // stale says the stored detail of an open pull request is older than the
 // plugin calls fresh, or missing.
-func (r Row) stale() src.Value {
-	if r.PR.State != "OPEN" {
+func stale(in Input) src.Value {
+	if in.PR.State != "OPEN" {
 		return src.Bool(false)
 	}
-	d := r.in.Detail
+	d := in.Detail
 	if d == nil || d.ReadAt.IsZero() {
 		return src.Bool(true)
 	}
-	return src.After(d.ReadAt, r.in.MaxDetailAge-time.Nanosecond, src.Calendar)
+	return src.After(d.ReadAt, in.MaxDetailAge-time.Nanosecond, src.Calendar)
 }
 
 // requestedTeams are the teams of review requests, as <org>-<slug>.

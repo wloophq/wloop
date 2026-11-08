@@ -15,6 +15,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -74,9 +75,14 @@ type TasksDef struct {
 	// session's id.
 	ViaSession string
 	// ViaWorkflow names a change a workflow made; {workflow} is the workflow's name.
-	ViaWorkflow      string
-	Areas, Contexts  []string
-	StaleWaitingDays int
+	ViaWorkflow string
+	// DetailVerbs are the verbs a task's detail offers as its buttons, in order; the rest it offers wait in a
+	// palette.
+	DetailVerbs []string
+	// RunStates word a run's turn state and SessionStates its session's, by state: tasks.toml's [runs].
+	RunStates, SessionStates map[string]string
+	Areas, Contexts          []string
+	StaleWaitingDays         int
 }
 
 // PropDef is a task property: the fact task.prop.<Name>. Values are an
@@ -341,6 +347,8 @@ type mTasks struct {
 	OwedBy           *mOwedBy             `toml:"owed_by"`
 	Chat             *mChat               `toml:"chat"`
 	Attribution      *mAttribution        `toml:"attribution"`
+	Detail           *mDetail             `toml:"detail"`
+	Runs             *mRuns               `toml:"runs"`
 	Areas            []string             `toml:"areas"`
 	Contexts         []string             `toml:"contexts"`
 	StaleWaitingDays *int                 `toml:"stale_waiting_days"`
@@ -382,6 +390,15 @@ type mChat struct {
 	Intent *string `toml:"intent"`
 }
 
+type mDetail struct {
+	Verbs []string `toml:"verbs"`
+}
+
+type mRuns struct {
+	States   map[string]string `toml:"states"`
+	Sessions map[string]string `toml:"sessions"`
+}
+
 type mAttribution struct {
 	ViaSession  *string `toml:"via_session"`
 	ViaWorkflow *string `toml:"via_workflow"`
@@ -404,23 +421,25 @@ type tasksLoad struct {
 	// survivors are the verbs' survivor predicates, by path, compiled once every layer's properties are read.
 	survivors map[string]ref
 	owed      *ref
+	// detail are the verbs detail.verbs names, checked once every layer's verbs are read.
+	detail []ref
 	// roles are the file that gave each role its property: a later layer's moves it, one file gives it once.
 	roles map[task.Role]string
 }
 
 // BundledTasks is the bundled profile's tasks.toml alone.
 func BundledTasks(bundled fs.FS) (TasksDef, Problems) {
-	return loadTasks(nil, bundled, nil)
+	return loadTasks(nil, readerOf(bundled), nil)
 }
 
 // loadTasks reads tasks.toml from bundled and the user's layers: a higher
 // layer's key replaces a lower one's. A verb's to and from name declared
 // states, its by keys actors, its gate one gates declares (nil gates checks
 // none), and its by predicates compile over the task's facts.
-func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef, Problems) {
+func loadTasks(layers []profile.Layer, r layerReader, gates *GatesDef) (TasksDef, Problems) {
 	l := &tasksLoad{def: TasksDef{Verbs: map[string]VerbText{}}, states: map[string]ref{}, gates: map[string]ref{}, preds: map[string]ref{},
 		survivors: map[string]ref{}}
-	problems, read := readLayered(layers, bundled, TasksFile, l.merge)
+	problems, read := readLayered(layers, r, TasksFile, l.merge)
 	if !read {
 		return l.def, problems
 	}
@@ -466,6 +485,17 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	if m.Attribution != nil {
 		text(s, "attribution.via_session", m.Attribution.ViaSession, &l.def.ViaSession)
 		text(s, "attribution.via_workflow", m.Attribution.ViaWorkflow, &l.def.ViaWorkflow)
+	}
+	if m.Detail != nil && m.Detail.Verbs != nil {
+		l.def.DetailVerbs = slices.Clone(m.Detail.Verbs)
+		l.detail = nil
+		for i, v := range m.Detail.Verbs {
+			l.detail = append(l.detail, ref{s, fmt.Sprintf("detail.verbs[%d]", i), v})
+		}
+	}
+	if m.Runs != nil {
+		l.def.RunStates = mergeStateWords(s, "runs.states", l.def.RunStates, m.Runs.States, turn.States)
+		l.def.SessionStates = mergeStateWords(s, "runs.sessions", l.def.SessionStates, m.Runs.Sessions, turn.SessionStates)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)
@@ -709,6 +739,11 @@ func (l *tasksLoad) check(gates *GatesDef) Problems {
 			}
 		}
 	}
+	for _, r := range l.detail {
+		if _, ok := l.def.Verbs[r.name]; !ok {
+			out = append(out, r.s.problem(r.path, "names no verb %s%s", r.name, expr.DidYouMean(r.name, l.def.VerbOrder)))
+		}
+	}
 	if r := l.owed; r != nil && strings.TrimSpace(r.name) != "" {
 		prog, err := expr.CompileString(r.name, OwedByEnv(l.def))
 		if err != nil {
@@ -849,4 +884,22 @@ func writerNames() []string {
 		out[i] = string(w)
 	}
 	return out
+}
+
+// mergeStateWords lays the words m gives the states of section over into: a word replaces a lower layer's, an
+// empty word takes it off, and a word for none of states is a problem.
+func mergeStateWords[S ~string](s *sheet, section string, into, m map[string]string, states []S) map[string]string {
+	known := make([]string, len(states))
+	for i, st := range states {
+		known[i] = string(st)
+	}
+	var names []string
+	for _, name := range declared(s, section, m) {
+		if !slices.Contains(known, name) {
+			s.add(section+"."+name, "names no state%s; the states are %s", expr.DidYouMean(name, known), strings.Join(known, ", "))
+			continue
+		}
+		names = append(names, name)
+	}
+	return mergeWords(into, m, names)
 }

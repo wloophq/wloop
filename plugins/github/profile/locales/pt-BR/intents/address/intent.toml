@@ -1,0 +1,12 @@
+label = "Address"
+summary = "Triar as reviews e os checks falhando de um pull request que você desenvolve, no workspace dele, mudando o código onde elas pedirem; o Agir só resolve itens abertos e rascunha respostas"
+why = "{{.pr.address.reason}}"
+
+[guidance]
+help = "o que a rodada deve olhar"
+
+[action]
+warning = "{{if .row.question}}Começa uma rodada nova; a pergunta aberta do agente é substituída{{end}}"
+
+[[action.refuse]]
+why = "Não é seu: assuma antes"

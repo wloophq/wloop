@@ -54,10 +54,11 @@ func contrast(a, b string) float64 {
 // TestTextColorsMeetAA checks every text token against the backgrounds it is
 // drawn on, in both themes, for the WCAG AA small-text minimum.
 func TestTextColorsMeetAA(t *testing.T) {
-	surfaces := []string{"bg", "panel", "hover", "sel", "mine-bg"}
+	surfaces := []string{"bg", "panel", "hover", "sel", "mine-bg", "raise"}
 	pairs := map[string][]string{
-		"ink":           slices.Concat(surfaces, []string{"mark"}),
+		"ink":           slices.Concat(surfaces, []string{"mark", "code-bg"}),
 		"muted":         slices.Concat(surfaces, []string{"late-bg", "err-bg"}),
+		"faint":         surfaces,
 		"me-text":       surfaces,
 		"author-text":   surfaces,
 		"reviewer-text": surfaces,
@@ -95,7 +96,7 @@ func TestStripColorsTellApart(t *testing.T) {
 			t.Errorf("%s: --author and --none strips are %.2f:1 apart", theme, r)
 		}
 		for _, strip := range []string{"me", "author", "reviewer", "loop", "none"} {
-			for _, bg := range []string{"panel", "bg", "mine-bg"} {
+			for _, bg := range []string{"panel", "bg", "mine-bg", "raise"} {
 				if r := contrast(tokens[strip], tokens[bg]); r < 1.5 {
 					t.Errorf("%s: --%s strip on --%s is %.2f:1", theme, strip, bg, r)
 				}

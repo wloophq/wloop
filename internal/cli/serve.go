@@ -42,10 +42,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/i18n"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
+	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
@@ -139,6 +141,14 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		e.cfg.Break(err)
 	}
+	var detected []string
+	if e.Languages != nil {
+		detected = e.Languages()
+	}
+	e.intentState().useLocale(func() string {
+		cfg := e.cfg.Config()
+		return serveLocale(cfg, detected, intentload.Locales(profile.Chain(cfg), turn.BundledFS()))
+	})
 	vctx, stopViews := context.WithCancel(ctx)
 	e.serveTurns(vctx, db, store, startCfg, logf)
 	defer stopViews()
@@ -163,6 +173,9 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			srv := daemon.New(deps)
 			e.Briefing, e.consequences = srv, srv
 			e.linkStates.Store(srv)
+			if e.jobRunner != nil {
+				e.jobRunner.Store(srv)
+			}
 			err := srv.Run(ctx)
 			stop()
 			return err
@@ -174,9 +187,19 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	}
 }
 
-// configHolder holds cfg for a serve: the profile setting follows the config
-// file and any other change is reported stale.
+// serveLocale is the locale a serve shows its texts in: ui.locale when set, else the best of available for
+// the system's detected languages.
+func serveLocale(cfg config.Config, detected, available []string) string {
+	return i18n.Pick(cfg.UI.Locale, detected, available)
+}
+
+// configHolder holds cfg for a serve: the live keys follow the config file and
+// any other change is reported stale. The serve's own edits of the file take
+// turns from here on.
 func (e *Env) configHolder(cfg config.Config) *config.Holder {
+	if e.configMu == nil {
+		e.configMu = &sync.Mutex{}
+	}
 	return config.NewHolder(cfg, config.HolderOptions{Path: e.ConfigPath, Load: e.readConfig, Now: e.Now,
 		OnProfileChange: func(string) { e.noteConfig() }, OnWarningChange: e.noteConfig})
 }
@@ -301,7 +324,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Changes:   e.changes,
 		Snapshot:  db,
 
-		Timeline: taskTimeline(db),
+		Timeline:  taskTimeline(db),
+		ConfigSet: e.setConfig,
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,
@@ -375,10 +399,12 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = links.serve(d, mods)
 	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
 	serveProjects(d.Tasks, db, dossierSvc)
+	e.callBudget = callBudget(db, cfg, e.Now)
 	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)
 	d.Placer = sessionPlacer{e: e, cfg: cfg}
+	d.UnitEnded = unitsEnded(mods)
 	e.viewFacts().set(authorFacts(mods))
 	notices := &noticeFeed{}
 	d.Notices = notices
@@ -858,7 +884,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	e.Store, e.Views, e.served = store, v, served
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, Answers: hostAnswers{events: sqlite.New(db), viewer: store},
-		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
+		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast, OrphanHold: time.Duration(cfg.Cleanup.OrphanHold),
 		AgentFor:      e.agentFor(served),
 		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db},
 		Prompts: transcriptPrompts(db.AgentTranscript)}

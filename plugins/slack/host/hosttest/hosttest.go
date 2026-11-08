@@ -42,6 +42,8 @@ type Host struct {
 	Resolve func(address string) (unit.Unit, bool)
 	// Configured is what Services.Config answers.
 	Configured src.Config
+	// WakeErr is what WakeJob answers; nil records the wake.
+	WakeErr error
 	// Disabled says a provider is disabled: an ApplyItems with an op on one
 	// of its units fails whole, as the host's ledger does.
 	Disabled func(p unit.ProviderID) bool
@@ -66,6 +68,38 @@ type Host struct {
 	marks     map[unit.Unit]map[string]string
 	asks      []src.AskRequest
 	samples   []src.Sample
+	wakes     []JobWake
+}
+
+// JobWake is a WakeJob call.
+type JobWake struct {
+	Job string
+	At  time.Time
+}
+
+// WakeJob records the wake, unless WakeErr refuses it.
+func (h *Host) WakeJob(_ context.Context, job string, at time.Time) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.WakeErr != nil {
+		return h.WakeErr
+	}
+	h.wakes = append(h.wakes, JobWake{Job: job, At: at})
+	return nil
+}
+
+// RefuseWakes makes WakeJob answer err; nil records wakes again.
+func (h *Host) RefuseWakes(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.WakeErr = err
+}
+
+// Wakes are the WakeJob calls, in order.
+func (h *Host) Wakes() []JobWake {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.wakes)
 }
 
 type stored struct {
@@ -85,7 +119,7 @@ func (h *Host) Broker() host.Broker { return host.Broker{Host: h.Src()} }
 
 // Src is the fake as the SDK's Host.
 func (h *Host) Src() src.Host {
-	return src.Host{Reporter: h, Ledger: h, Reader: h, Gates: h, Recorder: h, Services: h, History: h}
+	return src.Host{Reporter: h, Ledger: h, Reader: h, Gates: h, Recorder: h, Services: h, History: h, Jobs: h}
 }
 
 var fixed = time.Date(2026, 1, 5, 12, 0, 0, 0, time.UTC)
@@ -427,6 +461,7 @@ func applyFields(it *items.Item, f *items.Fields) {
 	}
 	set(&it.Kind, f.Kind)
 	set(&it.Summary, f.Summary)
+	set(&it.Ask, f.Ask)
 	set(&it.Context, f.Context)
 	set(&it.Deadline, f.Deadline)
 	set(&it.Ambiguity, f.Ambiguity)
@@ -673,6 +708,10 @@ func (h *Host) Samples() []src.Sample {
 }
 
 func (h *Host) Config(context.Context) (src.Config, error) { return h.Configured, nil }
+
+func (*Host) Holds(context.Context, string, [][]src.Fact) ([]src.Holding, error) {
+	return nil, src.ErrUnsupported
+}
 
 func (h *Host) Profile(_ context.Context, path string) ([]byte, error) {
 	if b, ok := h.ProfileFiles[path]; ok {

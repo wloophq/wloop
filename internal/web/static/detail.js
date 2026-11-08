@@ -1,28 +1,8 @@
 "use strict";
 
 // SKIP_HANDLERS are the handlers of the verbs the page offers elsewhere: seen when it opens, answer in its
-// gate and a draft's in its card; the verb whose handler replies is in the composer.
+// gate and a draft's in its card (gate.js); the verb whose handler replies is in the composer.
 const SKIP_HANDLERS = new Set(["seen", "answer", "edit", "retry"]);
-// DRAFT_HANDLERS are the handlers of a draft's delivery actions; DRAFT_CARD_HANDLERS those of every verb its
-// card offers, the kind's own dismiss among them.
-const DRAFT_HANDLERS = { "draft.edit": "edit", "draft.retry": "retry" };
-const DRAFT_CARD_HANDLERS = ["approve", "drop", "edit", "retry"];
-
-// draftWord is the label of a draft's action id, from the served specs, else its verb's.
-function draftWord(id) {
-  const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
-  return (sp && sp.label) || verbLabel(verbFor(DRAFT_HANDLERS[id]));
-}
-
-// gateWord is the label gates.toml gives the intent of e's draft gate that resolves it to status, else verb's.
-function gateWord(e, status, verb) {
-  const d = draftOf(e) || {};
-  const name = (d.intents || {})[status];
-  const g = (e.gates || []).find((x) => x.kind === "draft");
-  const intent = g && name ? (g.intents || []).find((x) => x.id === name) : null;
-  return (intent && intent.label) || verbLabel(verb);
-}
-
 const detailState = {
   id: "", task: null, error: "", seenFor: "", editing: new Map(), unitKey: "", unitTasks: [], compose: { key: "", text: "", reaction: "" },
 };
@@ -89,7 +69,7 @@ async function taskAct(task, verb, args) {
     detailEnv.changed();
     return out || {};
   } catch (err) {
-    detailEnv.notice(`${verb} ${task.title || task.id} failed: ${err.message}`, true);
+    detailEnv.notice(t("{verb} {task} failed: {error}", { verb, task: task.title || task.id, error: err.message }), true);
     return null;
   }
 }
@@ -103,7 +83,7 @@ async function taskIntentAct(task, id) {
     detailEnv.notice(`${id}: ${task.title || task.id}${out && out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
     detailEnv.changed();
   } catch (err) {
-    detailEnv.notice(`${id} ${task.title || task.id} failed: ${err.message}`, true);
+    detailEnv.notice(t("{verb} {task} failed: {error}", { verb: id, task: task.title || task.id, error: err.message }), true);
   }
 }
 
@@ -149,13 +129,8 @@ const detailPane = {
   selected: () => taskById(detailEnv.focused()) || detailState.task,
   act: (verb, args, task) => actOn(task || detailPane.selected(), verb, args),
   load: (route) => loadDetailPane(route),
-  gateAt: (el) => {
-    const e = detailState.task;
-    const card = e && el && el.closest ? el.closest(".d-gate") : null;
-    const g = card && (e.gates || []).find((x) => String(x.id) === card.getAttribute("data-gate"));
-    return g ? { task: e, gate: g } : null;
-  },
   resolve: (task, gate, intent) => resolveGate(task, gate, intent),
+  tab: (dir) => stepTab(detailState.task, dir === "prev" ? -1 : 1, true),
 };
 
 async function loadDetailPane(route) {
@@ -253,14 +228,54 @@ function verbLabel(verb) {
   return verbTask(verb).label || verb;
 }
 
-function verbButtons(e) {
+// offeredVerbs are the verbs e offers that the page lists as its own: not those it offers elsewhere, the reply
+// verb, a verb on a related or merged task's row, nor, on a draft's own task, those of the draft's card.
+function offeredVerbs(e) {
   const replies = handlerVerb("reply");
   const onRows = (verb) => ["merged", "related"].includes(verbTask(verb).pick);
   const skip = (verb) => SKIP_HANDLERS.has(verbHandler(verb)) || verb === replies || onRows(verb) || (isDraftTask(e) && DRAFT_CARD_HANDLERS.includes(verbHandler(verb)));
-  return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
-    if (verbTask(v.verb).pick) return pickTask(e, v.verb);
-    const args = askedArgs(v.verb);
-    if (args) taskAct(e, v.verb, args);
+  return (e.verbs || []).filter((v) => !skip(v.verb));
+}
+
+// runVerb runs verb on e: over the tasks it picks from, or after the question it puts first.
+function runVerb(e, verb) {
+  if (verbTask(verb).pick) return pickTask(e, verb);
+  const args = askedArgs(verb);
+  return args ? taskAct(e, verb, args) : null;
+}
+
+// detailVerbs are the verbs the profile's detail.verbs names, in its order.
+function detailVerbs() {
+  return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.detail_verbs) || []);
+}
+
+// primaryVerbs are the buttons of the profile's detail verbs e offers, each with its key, then More, which
+// opens the palette over the other verbs e offers.
+function primaryVerbs(e) {
+  const offered = offeredVerbs(e);
+  const named = detailVerbs();
+  const buttons = named.map((verb) => offered.find((v) => v.verb === verb)).filter(Boolean).map((v) => {
+    const key = verbTask(v.verb).key;
+    return verbButton(e, v.verb, [h("span", { class: "lb" }, verbLabel(v.verb)), key ? [" ", h("kbd", {}, key)] : null], () => runVerb(e, v.verb));
+  });
+  const rest = moreVerbs(e);
+  if (!rest.length) return buttons;
+  const key = keyCap("palette");
+  return [...buttons, h("button", {
+    type: "button", class: "act more", "data-focus": `detail:more:${e.id}`, "aria-keyshortcuts": servedKey("palette").replace("Cmd+", "Meta+") || undefined,
+    onclick: () => detailEnv.palette({ title: t("Actions"), items: moreVerbs(e) }),
+  }, h("span", { class: "lb" }, t("More {n}", { n: fmtNumber(rest.length) })), key ? [" ", h("kbd", {}, key)] : null)];
+}
+
+// moreVerbs are the palette items of the verbs e offers past the profile's detail verbs, each running as its
+// button would; a verb offered but off says why.
+function moreVerbs(e) {
+  const named = new Set(detailVerbs());
+  return offeredVerbs(e).filter((v) => !named.has(v.verb)).map((v) => ({
+    label: verbLabel(v.verb),
+    key: verbTask(v.verb).key || "",
+    meta: v.enabled ? undefined : v.reason,
+    run: () => (v.enabled ? runVerb(e, v.verb) : detailEnv.notice(`${verbLabel(v.verb)}: ${v.reason || t("not offered here")}`, true)),
   }));
 }
 
@@ -274,7 +289,7 @@ function pickTask(e, verb) {
       try {
         return (await detailEnv.getJSON(matchPath(q, e.id))).tasks || [];
       } catch (err) {
-        detailEnv.notice(`Could not list the tasks: ${err.message}`, true);
+        detailEnv.notice(t("Could not list the tasks: {error}", { error: err.message }), true);
         return [];
       }
     },
@@ -309,8 +324,8 @@ function taskRelated(e) {
   const refs = e.related || [];
   if (!refs.length) return null;
   const verb = pickVerb(e, "related");
-  return h("section", { class: "d-related", "aria-label": "Related" },
-    h("h2", { class: "d-sub" }, "Related"),
+  return h("section", { class: "d-related", "aria-label": t("Related") },
+    h("h2", { class: "d-sub" }, t("Related")),
     h("ul", { class: "d-tasks" }, ...refs.map((r) => h("li", {}, refRow(e, r, verb, "related")))));
 }
 
@@ -322,40 +337,9 @@ function taskMerged(e) {
   if (!refs.length) return null;
   const verb = pickVerb(e, "merged");
   const within = (r) => (r.within || []).length ? h("ul", { class: "d-tasks" }, ...r.within.map((w) => h("li", {}, refRow(e, w, "", "merged"), within(w)))) : null;
-  return h("section", { class: "d-merged", "aria-label": "Merged from" },
-    h("h2", { class: "d-sub" }, "Merged from"),
+  return h("section", { class: "d-merged", "aria-label": t("Merged from") },
+    h("h2", { class: "d-sub" }, t("Merged from")),
     h("ul", { class: "d-tasks" }, ...refs.map((r) => h("li", {}, refRow(e, r, verb, "merged"), within(r)))));
-}
-
-// windowLine says when the window of d's gate sends it, "" when it has none.
-function windowLine(d) {
-  return d.deadline ? `Sends at ${stamp(d.deadline)} unless you decide first` : "";
-}
-
-// draftCard shows the draft a task carries, with approve, edit and
-// discard through the task's verbs.
-function draftCard(e, scope) {
-  const d = draftOf(e);
-  const editing = detailState.editing.has(e.id);
-  const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "held" ? ` (${d.state})` : "");
-  const [approve, drop, edit, retry] = DRAFT_CARD_HANDLERS.map((x) => offeredVerb(e, x));
-  const buttons = editing ? [
-    verbButton(e, approve, gateWord(e, "approved", approve), () => approveEdited(e), { scope, primary: true }),
-    h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),
-  ] : [
-    d.state === "failed" ? verbButton(e, retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, approve, gateWord(e, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), { scope, primary: true }),
-    verbButton(e, edit || approve, draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, drop, gateWord(e, "rejected", drop), () => taskAct(e, drop, {}), { scope }),
-  ];
-  return h("section", { class: "d-draft", "aria-label": "Draft" },
-    h("div", { class: "d-sub" }, head),
-    draftWhere(d),
-    editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": "Draft text", "data-focus": `${scope}:draft-text:${e.id}`, oninput: (ev) => detailState.editing.set(e.id, ev.target.value) }, detailState.editing.get(e.id))
-      : h("pre", { class: "draft-text" }, d.text || (d.reaction ? `:${d.reaction}:` : "")),
-    d.error ? h("p", { class: "err" }, d.error) : null,
-    windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...buttons));
 }
 
 // composeFor is the composer's text for key, empty when it last held another key's.
@@ -386,7 +370,7 @@ function composer(key, opts) {
   const run = async (send) => {
     const args = replyArgs(c, send);
     if (!args) {
-      detailEnv.notice("Write a reply or name a reaction first", true);
+      detailEnv.notice(t("Write a reply or name a reaction first"), true);
       return;
     }
     if (await opts.post(args)) {
@@ -397,15 +381,15 @@ function composer(key, opts) {
   const off = opts.reason || "";
   const button = (label, send, primary) => h("button", { type: "button", class: "act" + (off ? " off" : "") + (primary ? " primary" : ""), disabled: !!off, title: off || undefined,
     "data-focus": `${opts.scope}:${send ? "send" : "save"}`, onclick: () => run(send) }, label);
-  return h("section", { class: "d-compose", "aria-label": "Reply" },
-    h("h2", { class: "d-sub" }, "Reply"),
+  return h("section", { class: "d-compose", "aria-label": t("Reply") },
+    h("h2", { class: "d-sub" }, t("Reply")),
     off ? h("p", { class: "empty" }, off) : null,
-    h("textarea", { rows: 3, "aria-label": "Reply", placeholder: opts.placeholder || "Your reply", disabled: !!off, "data-focus": `${opts.scope}:text`,
+    h("textarea", { rows: 3, "aria-label": t("Reply"), placeholder: opts.placeholder || t("Your reply"), disabled: !!off, "data-focus": `${opts.scope}:text`,
       oninput: (ev) => { c.text = ev.target.value; } }, c.text),
-    opts.reacts ? h("input", { type: "text", class: "d-reaction", "aria-label": "Reaction", placeholder: "or a reaction, such as eyes", disabled: !!off, value: c.reaction,
+    opts.reacts ? h("input", { type: "text", class: "d-reaction", "aria-label": t("Reaction"), placeholder: t("or a reaction, such as eyes"), disabled: !!off, value: c.reaction,
       "data-focus": `${opts.scope}:reaction`, oninput: (ev) => { c.reaction = ev.target.value; } }) : null,
-    h("div", { class: "d-actions" }, ...(replySendsNow() ? [button("Send now", true, true), button("Save to Outbox", false, false)]
-      : [button("Save to Outbox", false, true), button("Send now", true, false)])));
+    h("div", { class: "d-actions" }, ...(replySendsNow() ? [button(t("Send now"), true, true), button(t("Save to Outbox"), false, false)]
+      : [button(t("Save to Outbox"), false, true), button(t("Send now"), true, false)])));
 }
 
 // unitComposer replies on a unit through POST /api/drafts.
@@ -414,11 +398,11 @@ function unitComposer(u) {
   return composer("unit:" + u.provider + ":" + u.key, { scope: "unit:reply", reacts: providerReacts(u.provider), post: async (args) => {
     try {
       const d = await detailEnv.postJSON("/api/drafts", { unit: u, kind: args.kind, text: args.text, reaction: args.reaction, send: args.send === "now", source: "cockpit" });
-      detailEnv.notice(d.state === "queued" ? `Draft ${d.id} approved; it goes out in a moment` : `Draft ${d.id} saved to the Outbox for your approval`);
+      detailEnv.notice(d.state === "queued" ? t("Draft {id} approved; it goes out in a moment", { id: d.id }) : t("Draft {id} saved to the Outbox for your approval", { id: d.id }));
       detailEnv.changed();
       return d;
     } catch (err) {
-      detailEnv.notice(`Reply on ${unitLabel(u)} failed: ${err.message}`, true);
+      detailEnv.notice(t("Reply on {unit} failed: {error}", { unit: unitLabel(u), error: err.message }), true);
       return null;
     }
   } });
@@ -426,13 +410,6 @@ function unitComposer(u) {
 
 function personName(p) {
   return (p && (p.name || p.key)) || "";
-}
-
-// draftWhere is where a draft posts, as its publisher named it; the raw target, marked unknown, when it could not.
-function draftWhere(d) {
-  if (d.where) return h("div", { class: "meta" }, "To ", h("span", { class: "ref" }, d.where));
-  const pending = ["held", "failed", "queued", "sending"].includes(d.state);
-  return h("div", { class: "meta" }, "To ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (destination unknown)" : "");
 }
 
 // unitHomeView is the view a unit opens in: its provider's "all" when it
@@ -452,40 +429,83 @@ function unitRef(u, label, link) {
   ];
 }
 
-// unitCard is a unit's stored card (#unit-card).
-function unitCard(s) {
+// signalWords are a card signal in its plugin's words (the catalog's card_signals): its name, and its value
+// filled with its params followed by each note in its tone; value is how an instant value shows. A code with no
+// words shows as itself, and an empty one as its key.
+function signalWords(provider, g, value) {
+  const spec = (catalog.cardSignals || []).find((s) => s.provider === provider && s.key === g.key) || {};
+  const word = (spec.values || {})[g.value];
+  const notes = (g.notes || []).map((n) => {
+    const w = (spec.notes || {})[n.code];
+    return [" · ", h("span", { class: "tone-" + (n.tone || "neutral") }, w ? fillWord(w, n.params || {}) : n.code)];
+  });
+  return { label: spec.label || g.key, value: [g.at ? value(g.at) : word ? fillWord(word, g.params || {}) : g.value || g.key, ...notes] };
+}
+
+// unitCard is a unit's stored card (#unit-card); opts.signals false leaves its signals to a grid that shows them.
+function unitCard(s, opts = {}) {
   const c = s.card || {};
-  const signals = c.signals || [];
+  const signals = opts.signals === false ? [] : c.signals || [];
   const lh = c.last_human;
-  return h("section", { class: "d-card" + (s.stale ? " stale" : ""), "aria-label": "Card" },
+  return h("section", { class: "d-card" + (s.stale ? " stale" : ""), "aria-label": t("Card") },
     h("div", { class: "meta" },
       unitRef(c.unit || {}, c.label || unitLabel(c.unit), c.link),
       c.state ? [" ", h("span", { class: "pill" }, c.state)] : null,
       c.outcome ? [" ", h("span", { class: "pill" }, c.outcome)] : null,
-      s.stale ? [" ", h("span", { class: "flag" }, "plugin disabled")] : null),
+      s.stale ? [" ", h("span", { class: "flag" }, t("plugin disabled"))] : null),
     c.title ? h("div", { class: "title" }, c.title) : null,
     c.why ? h("div", { class: "why" }, c.why) : null,
-    (c.waits_on || []).length ? h("div", {}, "Waiting on ", h("strong", {}, c.waits_on.map(personName).join(", "))) : null,
-    signals.length ? h("ul", { class: "signals" }, ...signals.map((g) => h("li", { class: "tone-" + (g.tone || "neutral") }, h("span", { class: "k" }, g.key), " ", g.at ? stamp(g.at) : g.value))) : null,
+    (c.waits_on || []).length ? h("div", {}, t("Waiting on"), " ", h("strong", {}, c.waits_on.map(personName).join(", "))) : null,
+    signals.length ? h("ul", { class: "signals" }, ...signals.map((g) => {
+      const w = signalWords((c.unit || {}).provider, g, stamp);
+      return h("li", { class: "tone-" + (g.tone || "neutral") }, h("span", { class: "k" }, w.label), " ", ...w.value);
+    })) : null,
     lh ? h("div", { class: "meta" }, `${personName(lh.who)}: ${lh.what}`, lh.at ? ` (${stamp(lh.at)})` : "") : null);
 }
 
-function itemsBlock(items) {
-  if (!items || !items.length) return null;
-  return [h("h2", { class: "d-sub" }, "Items"),
-    h("ul", { class: "d-items" }, ...items.map((it) => h("li", { class: "item-" + (it.state || "open") },
-      h("span", {}, it.summary || it.id), " ", h("span", { class: "pill" }, it.state || ""))))];
+// RESOLVED_ITEMS_SHOWN is how many resolved items a unit detail shows before it folds the rest.
+const RESOLVED_ITEMS_SHOWN = 3;
+
+// itemWaitsOn is whom an open item waits on: the user as "you", others by name, or no owner.
+function itemWaitsOn(tie) {
+  const people = (tie && tie.waits_on) || [];
+  if (!people.length) return t("no owner");
+  return [t("Waiting on"), " ", h("strong", {}, people.map((p) => (p.me ? t("you") : personName(p))).join(", "))];
+}
+
+// itemsBlock lists a unit's items, open first, each with whom it waits on and the task that holds it; resolved
+// items past RESOLVED_ITEMS_SHOWN fold until the user unfolds them for unit key.
+function itemsBlock(list, ties, key) {
+  if (!list || !list.length) return null;
+  const isOpen = (it) => it.state !== "resolved";
+  const open = list.filter(isOpen);
+  const resolved = list.filter((it) => !isOpen(it));
+  const unfolded = detailState.itemsUnfolded === key;
+  const hidden = unfolded ? 0 : Math.max(0, resolved.length - RESOLVED_ITEMS_SHOWN);
+  const row = (it) => {
+    const tie = (ties || {})[it.id] || {};
+    const st = it.state || "open";
+    return h("li", { class: "item-" + st },
+      h("span", { class: "pill" }, itemStateWord(st)), " ", h("span", {}, it.summary || it.id),
+      isOpen(it) ? [" ", h("span", { class: "meta" }, itemWaitsOn(tie))] : null,
+      tie.task ? [" · ", h("a", { href: taskHref(tie.task), class: "ref", "data-focus": "unit-item-task:" + it.id }, tie.task_title || tie.task)] : null);
+  };
+  return [h("h2", { class: "d-sub" }, t("Items")),
+    h("ul", { class: "d-items" }, ...open.map(row), ...resolved.slice(0, resolved.length - hidden).map(row)),
+    hidden ? h("button", { type: "button", class: "act", "data-focus": "unit:items:more",
+      onclick: () => { detailState.itemsUnfolded = key; detailEnv.render(); } }, tn("+{n} resolved", hidden)) : null];
 }
 
 // unitExtras are a unit detail's card and open tasks.
 function unitExtras(d) {
   const key = detailState.unitKey;
   const tasks = key ? detailState.unitTasks : [];
+  const u = (d && d.row && d.row.unit) || {};
   return h("div", { class: "d-unit" },
     d && d.card ? unitCard(d.card) : null,
-    d && (d.items || []).length ? itemsBlock(d.items) : null,
+    d && (d.items || []).length ? itemsBlock(d.items, d.item_ties, u.provider + ":" + u.key) : null,
     d && d.row ? unitComposer(d.row.unit) : null,
-    tasks.length ? [h("h2", { class: "d-sub" }, "Tasks"),
+    tasks.length ? [h("h2", { class: "d-sub" }, t("Tasks")),
       h("ul", { class: "d-tasks" }, ...tasks.map((e) => h("li", {},
         h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), "data-focus": "unit-task:" + e.id }, e.title || e.id), " ", h("span", { class: "pill" }, e.state))))] : null);
 }
@@ -497,8 +517,8 @@ function renderTaskDetail(box, route) {
   const e = detailState.task && detailState.task.id === route.task ? detailState.task : null;
   const parts = e ? taskPage(e) : [
     h("div", { class: "d-head" },
-      h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
-      h("p", { class: detailState.error ? "plan-error" : "empty" }, detailState.error ? `Could not load the task: ${detailState.error}` : "Loading the task.")),
+      h("button", { type: "button", class: "close", "aria-label": t("Close detail"), "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
+      h("p", { class: detailState.error ? "plan-error" : "empty" }, detailState.error ? t("Could not load the task: {error}", { error: detailState.error }) : t("Loading the task."))),
   ];
   const was = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
   const caret = was && typeof was.selectionStart === "number" ? [was.selectionStart, was.selectionEnd] : null;

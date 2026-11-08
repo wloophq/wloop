@@ -2,6 +2,9 @@
 
 const ROUTE_PROVIDER = /^[a-z][a-z0-9-]*$/;
 const ROUTE_KEY_MAX = 300;
+// ROUTE_LAYOUTS are a list's board, its list (over a view the profile draws as a board) and a window that shows
+// one item's detail alone.
+const ROUTE_LAYOUTS = ["board", "list", "detail"];
 
 // routeUnitKey reads a unit= value, "<provider>/<key>" once decoded, as the
 // cockpit's unit key "<provider>:<key>"; "" when it is not one.
@@ -39,16 +42,40 @@ function routeHash(view, unitKey, rest) {
   return parts.join("&");
 }
 
+// HOME is the cockpit's home route, which no view of the profile may be named; QUEUE the view of a decision
+// queue's route; PLAN the core's screen of every workflow's plan and RECENT its feed of the newest events of
+// every unit the loop follows, which no view may be named either.
+const HOME = "home";
+const QUEUE = "queue";
+const PLAN = "plan";
+const RECENT = "recent";
+// QUEUE_LIST is the queue of the tasks a route's ids name, in their order; QUEUE_IDS_MAX the most it takes.
+const QUEUE_LIST = "list";
+const QUEUE_IDS_MAX = 200;
+
+// routeView is the view a route's parameters name: its view, the queue's for a queue, none for an item opened
+// alone, else the home.
+function routeView(p) {
+  if (p.get("view")) return p.get("view");
+  if (p.get("queue")) return QUEUE;
+  return p.get("task") || p.get("unit") || p.get("panel") ? "" : HOME;
+}
+
 // readRoute is the route a hash names; view is "" when it names none.
 function readRoute(hash) {
   const p = new URLSearchParams(String(hash || "").replace(/^#/, ""));
   const ctx = (p.get("ctx") || "").split(",").map((c) => c.trim()).filter(Boolean);
   return {
-    view: p.get("view") || "",
+    view: routeView(p),
+    queue: (p.get("queue") || "").slice(0, 100),
+    ids: (p.get("ids") || "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, QUEUE_IDS_MAX),
     unit: routeUnitKey(p.get("unit")),
     task: (p.get("task") || "").slice(0, 200),
     area: (p.get("area") || "").slice(0, 100),
     ctx,
     q: p.get("q") || "",
+    panel: p.get("panel") || "",
+    layout: ROUTE_LAYOUTS.includes(p.get("layout")) ? p.get("layout") : "",
+    link: p.get("link") || "",
   };
 }

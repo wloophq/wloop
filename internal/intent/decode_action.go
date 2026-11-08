@@ -121,10 +121,10 @@ func compileAction(a *dintent.Action, one func(path string, p dintent.Pred) *exp
 // ActionFuncs are the functions action texts may call.
 var ActionFuncs = template.FuncMap{"join": strings.Join, "name": func() string { return brand.Name }, "command": func() string { return brand.Command }}
 
-// ActionText parses an action text named path and executes it once over
-// sample, so a text that cannot render fails at load.
-func ActionText(path, src string, sample map[string]any) (*template.Template, error) {
-	t, err := template.New(path).Funcs(ActionFuncs).Option("missingkey=error").Parse(src)
+// ActionText parses an action text named path with funcs and executes it
+// once over sample, so a text that cannot render fails at load.
+func ActionText(funcs template.FuncMap, path, src string, sample map[string]any) (*template.Template, error) {
+	t, err := template.New(path).Funcs(funcs).Option("missingkey=error").Parse(src)
 	if err == nil {
 		err = t.Execute(io.Discard, sample)
 	}
@@ -148,7 +148,7 @@ func (s *sheet) parseActionTexts(a *dintent.Action) map[string]*template.Templat
 			continue
 		}
 		path := "action." + k
-		t, err := ActionText(path, texts[k].Src, sample)
+		t, err := ActionText(s.textFuncs(), path, texts[k].Src, sample)
 		if err != nil {
 			_, msg := templateMsg(path, err)
 			s.add(path, "%s", msg)

@@ -96,7 +96,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 |---|---|---|---|
 | `draft.state` | string | draft_action | The draft's state. |
 | `draft.provider` | string | draft_action | The provider of the draft's unit. |
-| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
+| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 
 ### An item proposal's gate (`proposal.*`; slot `proposal`)
@@ -157,6 +157,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
 | `session.transcript_gone` | bool | The agent's transcript of the session, as its hooks reported it, no longer exists. |
 | `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager. |
+| `session.process_orphaned` | bool | Complete censuses of the same runtime have listed the active session's process orphaned, a terminal no window of the app shows with no agent in it, for a fast job. It proves nothing about the process staying so. |
+| `session.orphan_durable` | bool | The census proved the active session's process a durable orphan, while the app's windows showed some terminal and their graph held for a fast job: it outlived a restart of the app's windows after a fast job orphaned in windows that showed some terminal, or stayed orphaned two hours with a known last output from before, every reading showing some terminal. |
 | `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
 | `session.name` | string | What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id. |
@@ -197,6 +199,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.units` | list | The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them. |
 | `task.unit_providers` | list | The providers of task.units, each once, in order. |
 | `task.unit_kinds` | list | The task kinds the plugins of task.units give their units' tasks, each once, in order, such as pull-request for a task that holds a pull request, whatever its own kind. |
+| `task.open_unit_kinds` | list | The task kinds of the units of task.units that have not ended as their plugin says, each once, in order: pull-request while a pull request the task holds is open. Unset where nothing says whether a unit ended. |
 | `task.link_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
 | `task.turns` | int | Turns run on the task itself, such as a start; turns on its units are not counted. |
 | `task.captured_by_user` | bool | The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service. |
@@ -215,6 +218,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
 | `task.check_on` | timestamp | When to check on the task: its check_on property, else, when the items it holds wait on someone else and not on you, tasks.stale_waiting_days working days after the oldest of them; zero when neither. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.gates_open` | int | The task's open gates. |
+| `task.decisions` | list | The decision kinds the task waits on the user for, as decisions.toml maps its open gates and, while it is open, its units' situations and link signals; the oldest first. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.decision_since` | timestamp | Since when the oldest of task.decisions waits; zero when none. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.turns_open_by_hand` | int | The open turns (sent, started or asked) someone started by hand on the task or a unit it links, but those of the chat intent tasks.toml names. |
 | `task.turn_by_hand_at` | timestamp | When the newest of task.turns_open_by_hand was sent; zero when none is open. Test with `> timestamp(0)`. |
 | `task.turns_running` | int | The turns the loop sent on the task or a unit it links that an agent is working on: sent or started, not yet asking or ended. |
@@ -282,6 +287,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. Test with `> timestamp(0)`. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
 | `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
+| `pr.changed_files` | int | How many files the pull request changes, as GitHub last reported it; 0 when not read. |
 | `pr.head` | string | The head commit's oid. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
@@ -312,7 +318,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.channel` | string | The conversation's channel id. |
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
 | `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
-| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.closure_posted` | bool | A closure was posted on the unit, or closed without a message, by the extraction or a draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.live_task` | bool | A live task is attached to the unit: neither done, in the trash nor deferred, as a snoozed or muted task is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.items_resolved` | int | Resolved items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
@@ -321,6 +327,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after. |
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.language` | string | The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.members` | list | The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one. |
 
 ### Briefs (`brief.*`)
 
@@ -337,11 +345,13 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 
 | `draft` fact | Type | Meaning |
 |---|---|---|
-| `draft.person_waited` | bool | The draft's person is still waited on by its task; true for a draft of no person. |
-| `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
+| `draft.person_waited` | bool | One of the draft's people, the person a per-person draft is to or those its text mentions, is still waited on by its task; true for a draft of no people. |
+| `draft.items_owed` | int | Items of the draft still open and held by any of its people, or unowned for a draft of no people. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
-| `draft.person_asks_you` | bool | The draft's person asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no person. |
+| `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
+| `draft.people_outside` | int | The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted. |
+| `draft.target_joined` | bool | The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft. |
 
 ### Gates (`gate.*`)
 
@@ -399,7 +409,8 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `workspace.unregister` | workspace | Unregisters a workspace whose path is gone. |
 | `turn.dismiss` | session, github | Dismisses the open turn, recording the reason. |
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
-| `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
+| `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists, or has listed orphaned with no agent for a fast job (`session.process_orphaned`) when no turn is sent or started in it, its agent neither works nor waits for permission, its workspace is not focused and you did not prompt it since the loop's last turn: the session stays open, and the next turn, or a census that shows its process in a window again, wakes it. It records the state and ends no process. |
+| `session.close_orphan` | session | Side effect: ends the process of an active session that the census proved a durable orphan (`session.orphan_durable`), a terminal no window of the app shows with no agent in it. It runs under `session.close`'s guards (no turn sent or started, the agent neither working nor waiting for permission, the workspace not focused, no prompt of yours since the loop's last turn) and records nothing on the session: the censuses that then miss the process mark it dormant. Refused for good on a session gone, closed or dormant. |
 | `turn.start` | any | Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`. |
 | `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts "task.promised"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) `repeat_after_sent` (the same after a sent one, or `forever`) and `ended` (`hold`, the default, holds proposals of no task or of the same task while a draft's task a verb ended stays ended; `repeat` holds them for `repeat_after`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts, `classify.<workflow>.<field>` with each - of the workflow's name an _, typed by the schema's top-level properties: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). With `with`, a list fact of task ids, it reads those tasks too and its prompt is a template over them. Event triggers only, cached by fingerprint, prompt and schema, under `classify.per_day`. Each run that reads its output records a `classified` event on the unit, whose data is the workflow's name. |
@@ -418,8 +429,8 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `plan.cleared` | any | Drops the unit's pending plan items. |
 | `turn.guidance_handed` | any | Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent. |
 | `turn.round_sent` | any | Records the round-sent event on the unit when a person sends the turn. |
-| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. |
-| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. |
+| `task.nudged` | any | Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post. |
+| `unit.closed` | any | Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |

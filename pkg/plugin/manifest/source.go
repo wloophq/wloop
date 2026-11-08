@@ -50,10 +50,13 @@ type SourceVocabulary struct {
 	DraftKinds      []DraftKind `toml:"draft_kinds" doc:"The kinds of the plugin's drafts; the host derives a draft's delivery from its kind."`
 	DefaultDelivery string      `toml:"default_delivery" doc:"The delivery of a draft whose kind names none; one of deliveries."`
 	Signals         []Named     `toml:"signals" doc:"The link signals the plugin reports, read as task.link_signal.<name>."`
+	Predicates      []Predicate `toml:"predicates" doc:"The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds."`
 	Marks           []Named     `toml:"marks" doc:"The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character."`
 	Kinds           []string    `toml:"kinds" doc:"The task kind values the plugin's units give their tasks."`
 	Situations      []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
 	Steps           []string    `toml:"steps" doc:"The core workflow steps that run on the plugin's units, such as \"turn.dismiss\"."`
+	LanguageFact    string      `toml:"language_fact" doc:"The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's."`
+	MembersFact     string      `toml:"members_fact" doc:"The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells."`
 }
 
 // Codec is how a source plugin's unit keys and web addresses are spelled.
@@ -86,6 +89,7 @@ type Effect struct {
 	Name    string   `toml:"name" doc:"The effect's name, <slot>.<name>. Required."`
 	Applies []string `toml:"applies" doc:"What may carry it. Required." enum:"turn,draft"`
 	Doc     string   `toml:"doc" doc:"What the effect does. Required."`
+	Silent  bool     `toml:"silent" doc:"A draft effect that applies without the draft's post, so a person may close the conversation without the message."`
 }
 
 // Event is an event kind only a plugin's units record.
@@ -110,6 +114,14 @@ type DraftKind struct {
 	Name     string `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
 	Purpose  string `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
 	Delivery string `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+}
+
+// Predicate is a predicate the plugin's profile layer sets, over the facts the plugin hands the host when it
+// asks whether it holds.
+type Predicate struct {
+	Name  string   `toml:"name" doc:"The predicate's name, its key in predicates.toml. Required."`
+	Doc   string   `toml:"doc" doc:"What the predicate decides. Required."`
+	Facts []string `toml:"facts" doc:"The facts of facts the plugin hands with each question, the only ones the predicate may read. Required."`
 }
 
 // Named is a name the plugin declares, with what it means.
@@ -144,6 +156,7 @@ type Job struct {
 	Every     Duration `toml:"every" doc:"How often the job runs, as a Go duration, unless every_from is set. Required."`
 	EveryFrom string   `toml:"every_from" doc:"A duration key of the configuration the interval comes from, such as \"sweep.fast\", one of config_reads or under them; every is its default."`
 	Timeout   Duration `toml:"timeout" doc:"A run's limit, as a Go duration; empty is the host's default."`
+	Retry     Duration `toml:"retry" doc:"The first wait after a failed run, as a Go duration, doubling up to every; empty backs off from every."`
 }
 
 // Command is a command of the plugin binary in CLI mode.
@@ -347,6 +360,17 @@ func (s *Source) validate() error {
 		}
 	}
 	named("signal", s.Signals)
+	for _, p := range s.Predicates {
+		named("predicate", []Named{{p.Name, p.Doc}})
+		if len(p.Facts) == 0 {
+			bad("predicate %q: facts is required", p.Name)
+		}
+		for _, f := range p.Facts {
+			if !slices.ContainsFunc(s.Facts, func(x Fact) bool { return x.Name == f }) {
+				bad("predicate %q: fact %q is not one of facts", p.Name, f)
+			}
+		}
+	}
 	ranked := 0
 	for _, sit := range s.Situations {
 		if sit.Rank != 0 {
@@ -362,6 +386,12 @@ func (s *Source) validate() error {
 	var deliveries []string
 	for _, d := range s.Deliveries {
 		deliveries = append(deliveries, d.Name)
+	}
+	if s.LanguageFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.LanguageFact && f.Type == "string" }) {
+		bad("language_fact %q is not a string fact of facts", s.LanguageFact)
+	}
+	if s.MembersFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.MembersFact && f.Type == "list" }) {
+		bad("members_fact %q is not a list fact of facts", s.MembersFact)
 	}
 	if s.DefaultDelivery != "" && !slices.Contains(deliveries, s.DefaultDelivery) {
 		bad("default_delivery %q is not one of deliveries", s.DefaultDelivery)

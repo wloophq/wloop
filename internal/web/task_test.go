@@ -70,6 +70,24 @@ func timelineEvents() []api.TimelineEvent {
 	}
 }
 
+// timelineNodes are timelineEvents as GET the timeline?as=nodes serves them, one node each, newest first.
+func timelineNodes() []api.TimelineNode {
+	var out []api.TimelineNode
+	for _, ev := range timelineEvents() {
+		out = append(out, api.TimelineNode{Label: ev.Kind, At: ev.At, Actor: ev.Actor, Events: []api.TimelineEvent{ev}})
+	}
+	return out
+}
+
+// nodesPath is task id's timeline as nodes, narrowed to kinds when any.
+func nodesPath(id, kinds string) string {
+	p := "/api/tasks/" + id + "/timeline?as=nodes"
+	if kinds != "" {
+		p += "&kinds=" + kinds
+	}
+	return p
+}
+
 // taskPageHarness drives the page over domShim: page(id) loads the task and
 // draws it into a box; walk, cls and focus read the drawn tree.
 const taskPageHarness = `
@@ -109,14 +127,15 @@ func runTaskPageOn(t *testing.T, cat api.ViewsCatalog, main string, answers map[
 func pageAnswers(t *testing.T) map[string]any {
 	e := pageTask(t)
 	return map[string]any{
-		"/api/tasks/" + e.ID:               e,
-		"/api/tasks/" + e.ID + "/timeline": timelineEvents(),
+		"/api/tasks/" + e.ID: e,
+		nodesPath(e.ID, ""):  timelineNodes(),
 	}
 }
 
 func TestTaskPageSections(t *testing.T) {
 	var got struct {
 		Sections []string
+		Tabs     []string
 		Head     string
 		State    string
 		Category string
@@ -126,21 +145,29 @@ func TestTaskPageSections(t *testing.T) {
 		Child    string
 	}
 	runTaskPage(t, `
-const box = await page("t-0123456789abcdef");
+let box = await page("t-0123456789abcdef");
 const head = box.children[0];
+const props = cls(box, "props")[0];
+const sections = box.children.map((c) => c.attrs.class);
+const tabs = walk(cls(box, "tabs")[0], (x) => x.attrs.role === "tab").map((b) => b.attrs["data-focus"]);
+taskState.tab = "related";
+box = await page("t-0123456789abcdef");
 done({
-  Sections: box.children.map((c) => c.attrs.class),
+  Sections: sections, Tabs: tabs,
   Head: head.textContent,
   State: cls(head, "state")[0].textContent,
   Category: cls(head, "state")[0].attrs["data-category"],
-  Props: Object.fromEntries(walk(head, (x) => x.tag === "dd").map((d) => [d.attrs["data-prop"], d.textContent])),
+  Props: Object.fromEntries(walk(props, (x) => x.tag === "dd").map((d) => [d.attrs["data-prop"], d.textContent])),
   Ref: cls(head, "ref")[0].attrs.href,
   Ext: cls(head, "ext")[0].attrs.href,
   Child: focus(box, "child:t-00000000000000c1").attrs.href,
 });`, pageAnswers(t), &got)
-	want := []string{"d-head", "d-asks", "d-brief", "d-gates", "d-runs", "d-timeline", "d-compose", "d-children"}
+	want := []string{"d-head", "props d-props", "d-links", "d-gates", "verbs d-actions", "d-tabs", "compose d-compose"}
 	if !slices.Equal(got.Sections, want) {
 		t.Errorf("sections %v, want %v", got.Sections, want)
+	}
+	if want := []string{"task:tab:brief", "task:tab:timeline", "task:tab:asks", "task:tab:related", "task:tab:runs"}; !slices.Equal(got.Tabs, want) {
+		t.Errorf("tabs %v, want %v", got.Tabs, want)
 	}
 	if got.State != "Doing" || got.Category != "active" {
 		t.Errorf("the state reads %q in category %q, want the catalog's Doing in active", got.State, got.Category)
@@ -151,7 +178,7 @@ done({
 	if got.Ref != "#view=all&unit=github/acme%2Fapi%238" || got.Ext != "https://github.com/acme/api/pull/8" {
 		t.Errorf("links: ref %q ext %q", got.Ref, got.Ext)
 	}
-	for _, s := range []string{"Ship the retry change", "owed by me", "Retry flaky uploads", "Finish"} {
+	for _, s := range []string{"Ship the retry change", "owed by me", "acme/api#8"} {
 		if !strings.Contains(got.Head, s) {
 			t.Errorf("the header lacks %q: %s", s, got.Head)
 		}
@@ -168,62 +195,15 @@ func TestAsksShowTheirSourceQuotes(t *testing.T) {
 		Source string
 	}
 	runTaskPage(t, `
+taskState.tab = "asks";
 const box = await page("t-0123456789abcdef");
 const asks = cls(box, "d-asks")[0];
-done({ Quotes: cls(asks, "quote").map((q) => q.textContent), Ask: cls(asks, "ask")[0].textContent, Source: cls(asks, "ext")[0].attrs.href });`, pageAnswers(t), &got)
+done({ Quotes: cls(asks, "quote").map((q) => q.textContent), Ask: cls(asks, "ask-item")[0].textContent, Source: cls(asks, "ext")[0].attrs.href });`, pageAnswers(t), &got)
 	if !slices.Equal(got.Quotes, []string{"can we get the retry out before the freeze?", "Friday at the latest"}) {
 		t.Errorf("quotes %q", got.Quotes)
 	}
 	if !strings.Contains(got.Ask, "Bruno: Ship it before Friday") || got.Source != "https://chat.example/p/1" {
 		t.Errorf("ask %q from %q", got.Ask, got.Source)
-	}
-}
-
-func TestAGateShowsItsProfileIntentsAndDigitKeys(t *testing.T) {
-	var got struct {
-		Buttons [][]string
-		Boxes   []int
-		Keyed   []string
-		Clicked []any
-		Empty   string
-	}
-	src := strings.Replace(staticJS(t, "keys.js"), `if (typeof document !== "undefined" && typeof state !== "undefined") installKeys(appEnv());`, "", 1)
-	raw, _ := json.Marshal(webBindings(t))
-	runTaskPage(t, strings.Replace(src, `"use strict";`, "", 1)+`
-const box = await page("t-0123456789abcdef");
-const gates = cls(box, "d-gate");
-const keys = createKeys({
-  selected: () => detailState.task,
-  questionAt: (el) => detailPane.gateAt(el),
-  resolveGate: (task, gate, intent) => detailPane.resolve(task, gate, intent),
-  verbs: () => [],
-});
-keys.setBindings(`+string(raw)+`);
-const inGate = (g) => ({ tagName: "DIV", closest: (s) => (s === ".d-gate" ? g : null) });
-const press = (key, target) => keys.handle({ key, code: "Digit" + key, target, defaultPrevented: false, preventDefault() {} });
-await press("2", inGate(gates[0]));
-await press("1", inGate(gates[1]));
-const empty = notices.slice(-1)[0];
-const keyed = posts.splice(0).map((p) => p.path);
-focus(box, "gate:9:text").on.input({ target: { value: "Take the timeout case first" } });
-await focus(box, "gate:9:answer").on.click();
-done({
-  Buttons: gates.map((g) => walk(g, (x) => x.tag === "button").map((b) => b.textContent)),
-  Boxes: gates.map((g) => walk(g, (x) => x.tag === "textarea").length),
-  Keyed: keyed, Clicked: posts, Empty: empty,
-});`, pageAnswers(t), &got)
-	if want := [][]string{{"1 Run now", "2 Skip"}, {"1 Answer", "2 Dismiss"}}; !slices.EqualFunc(got.Buttons, want, slices.Equal) {
-		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
-	}
-	if !slices.Equal(got.Boxes, []int{0, 1}) {
-		t.Errorf("answer boxes %v, want one on the gate whose intent takes an answer", got.Boxes)
-	}
-	if !slices.Equal(got.Keyed, []string{"/api/gates/7/skip"}) || !strings.HasPrefix(got.Empty, "! Answer") {
-		t.Errorf("digits posted %v, then said %q", got.Keyed, got.Empty)
-	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "Take the timeout case first"}}}}
-	if mustJS(t, got.Clicked) != mustJS(t, want) {
-		t.Errorf("answering posted %v, want %v", got.Clicked, want)
 	}
 }
 
@@ -238,6 +218,7 @@ func TestARunOffersOpenEnterTranscript(t *testing.T) {
 	answers := pageAnswers(t)
 	answers["/api/runs/3/transcript"] = []map[string]string{{"role": "user", "text": "Take the timeout case first."}, {"role": "assistant", "text": "Done; tests pass."}}
 	runTaskPage(t, `
+taskState.tab = "runs";
 let box = await page("t-0123456789abcdef");
 await focus(box, "run:3:open").on.click();
 await focus(box, "run:3:enter").on.click();
@@ -272,10 +253,11 @@ func TestTheTimelineFiltersByKind(t *testing.T) {
 		Asked         string
 	}
 	answers := pageAnswers(t)
-	answers["/api/tasks/t-0123456789abcdef/timeline?kinds=message"] = timelineEvents()
+	answers[nodesPath("t-0123456789abcdef", "message")] = []api.TimelineNode{timelineNodes()[0], timelineNodes()[2]}
 	runTaskPage(t, `
+taskState.tab = "timeline";
 let box = await page("t-0123456789abcdef");
-const said = (b) => cls(b, "msg").map((m) => m.textContent);
+const said = (b) => cls(b, "ev").map((m) => m.textContent);
 const before = said(box);
 const chips = walk(cls(box, "kinds")[0], (x) => x.tag === "button").map((b) => b.textContent);
 await focus(box, "timeline:kind:message").on.click();
@@ -287,8 +269,30 @@ done({ Before: before, After: said(box), Chips: chips, Asked: asked.slice(-1)[0]
 	if !slices.Equal(got.Chips, []string{"all", "message", "verb"}) {
 		t.Errorf("kind chips %v", got.Chips)
 	}
-	if got.Asked != "/api/tasks/t-0123456789abcdef/timeline?kinds=message" || len(got.After) != 2 {
+	if got.Asked != nodesPath("t-0123456789abcdef", "message") || len(got.After) != 2 {
 		t.Errorf("filtered to messages: asked %q, shows %q", got.Asked, got.After)
+	}
+}
+
+// Starting the task's agent can take most of a minute: while the message is on its way the composer says so and
+// takes no second send.
+func TestComposerShowsItsMessageOnItsWay(t *testing.T) {
+	var got struct {
+		Notices []string
+		Posts   []any
+	}
+	runTaskPage(t, `
+const box = await page("t-0123456789abcdef");
+focus(box, "task:compose:text").on.input({ target: { value: "Take the timeout case first." } });
+const first = focus(box, "task:compose:send").on.click();
+const second = focus(box, "task:compose:send").on.click();
+await Promise.all([first, second]);
+done({ Notices: notices, Posts: posts });`, pageAnswers(t), &got)
+	if len(got.Posts) != 1 {
+		t.Errorf("two clicks while sending posted %d times: %v", len(got.Posts), got.Posts)
+	}
+	if len(got.Notices) < 2 || !strings.HasPrefix(got.Notices[0], "Sending to ") || !strings.HasPrefix(got.Notices[len(got.Notices)-1], "Sent to ") {
+		t.Errorf("notices %q: the composer says the message is on its way, then that it went", got.Notices)
 	}
 }
 
@@ -326,6 +330,93 @@ done({
 	}
 	if got.Empty != "! Write a message first" {
 		t.Errorf("an empty composer said %q", got.Empty)
+	}
+}
+
+func TestComposerOffersToAlsoSendAThreadReplyToTheConversation(t *testing.T) {
+	type side struct {
+		Label   string
+		Checked []bool
+		Posts   []any
+	}
+	run := func(served string) side {
+		t.Helper()
+		var got side
+		answers := pageAnswers(t)
+		e := pageTask(t)
+		e.ReplyBroadcast = served
+		answers["/api/tasks/"+e.ID] = e
+		runTaskPage(t, `
+let box = await page("t-0123456789abcdef");
+const toggle = (b) => walk(b, (x) => x.attrs["data-focus"] === "task:compose:broadcast")[0];
+const label = toggle(box) ? cls(box, "broadcast")[0].textContent : "";
+const checked = [];
+if (toggle(box)) checked.push("checked" in toggle(box).attrs);
+focus(box, "task:compose:text").on.input({ target: { value: "We ship Friday." } });
+await focus(box, "task:compose:draft").on.click();
+box = await page("t-0123456789abcdef");
+if (toggle(box)) {
+  toggle(box).on.change({ target: { checked: !("checked" in toggle(box).attrs) } });
+  box = await page("t-0123456789abcdef");
+  checked.push("checked" in toggle(box).attrs);
+}
+focus(box, "task:compose:text").on.input({ target: { value: "Merged." } });
+await focus(box, "task:compose:reply").on.click();
+done({ Label: label, Checked: checked, Posts: posts.map((p) => p.body.args) });`, answers, &got)
+		return got
+	}
+	on := run("on")
+	if strings.TrimSpace(on.Label) != "Also send to the conversation" || !slices.Equal(on.Checked, []bool{true, false}) {
+		t.Errorf("served on: label %q, checked %v", on.Label, on.Checked)
+	}
+	wantOn := []any{
+		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday.", "broadcast": "true"},
+		map[string]any{"kind": "reply", "send": "now", "text": "Merged.", "broadcast": "false"},
+	}
+	if mustJS(t, on.Posts) != mustJS(t, wantOn) {
+		t.Errorf("served on: posts %v, want %v", on.Posts, wantOn)
+	}
+	off := run("off")
+	if !slices.Equal(off.Checked, []bool{false, true}) {
+		t.Errorf("served off: checked %v", off.Checked)
+	}
+	none := run("")
+	if none.Label != "" || len(none.Checked) != 0 {
+		t.Errorf("no thread to broadcast from: the composer offers %q", none.Label)
+	}
+	wantNone := []any{
+		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."},
+		map[string]any{"kind": "reply", "send": "now", "text": "Merged."},
+	}
+	if mustJS(t, none.Posts) != mustJS(t, wantNone) {
+		t.Errorf("no thread: posts %v, want %v", none.Posts, wantNone)
+	}
+}
+
+func TestTheComposersBroadcastStartsAsServedOnEachTask(t *testing.T) {
+	var got []bool
+	answers := pageAnswers(t)
+	e := pageTask(t)
+	e.ReplyBroadcast = "on"
+	answers["/api/tasks/"+e.ID] = e
+	other := pageTask(t)
+	other.ID, other.ReplyBroadcast = "t-00000000000000b2", "on"
+	answers["/api/tasks/"+other.ID] = other
+	answers[nodesPath(other.ID, "")] = timelineNodes()
+	runTaskPage(t, `
+const toggle = (b) => walk(b, (x) => x.attrs["data-focus"] === "task:compose:broadcast")[0];
+const out = [];
+let box = await page("t-0123456789abcdef");
+toggle(box).on.change({ target: { checked: false } });
+box = await page("t-0123456789abcdef");
+out.push("checked" in toggle(box).attrs);
+box = await page("t-00000000000000b2");
+out.push("checked" in toggle(box).attrs);
+box = await page("t-0123456789abcdef");
+out.push("checked" in toggle(box).attrs);
+done(out);`, answers, &got)
+	if !slices.Equal(got, []bool{false, true, true}) {
+		t.Errorf("checked after unchecking, on another task, back on the first: %v", got)
 	}
 }
 
@@ -432,29 +523,23 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 	}
 }
 
-// TestAQuestionGateOffersItsOptions checks that a question gate whose message offers options shows one button
-// per option, the recommended first, and that picking one answers with the option and the note typed beside it.
-func TestAQuestionGateOffersItsOptions(t *testing.T) {
+func TestARunAndABriefReadInTheLocale(t *testing.T) {
 	var got struct {
-		Buttons []string
-		Clicked []any
+		Run, Brief, Line string
+		Strong           int
 	}
-	in := pageAnswers(t)
-	e := pageTask(t)
-	e.Gates[1].Subject = json.RawMessage(`{"kind": "question", "text": "Approve it?", "recommend": "approve",
-		"options": [{"id": "threads", "label": "Resolve the threads"}, {"id": "approve", "label": "Approve", "consequence": "Publishes APPROVE"}]}`)
-	in["/api/tasks/"+e.ID] = e
-	runTaskPage(t, `
-const box = await page("t-0123456789abcdef");
-const gate = cls(box, "d-gate")[1];
-focus(box, "gate:9:text").on.input({ target: { value: "ship it" } });
-await focus(box, "gate:9:option:approve").on.click();
-done({ Buttons: walk(gate, (x) => x.tag === "button").map((b) => b.textContent), Clicked: posts });`, in, &got)
-	if want := []string{"Approve recommended", "Resolve the threads", "1 Answer", "2 Dismiss"}; !slices.Equal(got.Buttons, want) {
-		t.Errorf("gate buttons %q, want %q", got.Buttons, want)
+	nodeRun(t, viewsPrelude(t)+stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml"), nil, `
+tasksState.catalog = { facets: [{ id: "risk", fact: "brief.risk", label: "Risco", labels: { high: "alto" } }],
+  run_states: { started: "iniciado" }, session_states: { dormant: "dormente" } };
+taskState.transcript = { seq: 3, lines: ["assistant: **Done**; tests pass."] };
+const run = runCard({ seq: 3, intent: "start", state: "started", session: "s-1", session_state: "dormant", actions: [] });
+const brief = taskBrief({ id: "t-1", brief: { data: { risk: "high" } } });
+const line = byClass(run, "transcript");
+process.stdout.write(JSON.stringify({ Run: text(byClass(run, "meta")[0]), Brief: text(brief), Line: text(line), Strong: all(line, (x) => x.tag === "strong").length }));`, nil, &got)
+	if !strings.Contains(got.Run, "iniciado") || !strings.Contains(got.Run, "(dormente)") || !strings.Contains(got.Brief, "Risco: alto") {
+		t.Errorf("%+v: a run's states and the brief's risk read in pt-BR", got)
 	}
-	want := []any{map[string]any{"path": "/api/gates/9/answer", "body": map[string]any{"source": "cockpit", "args": map[string]any{"answer": "approve\nship it"}}}}
-	if mustJS(t, got.Clicked) != mustJS(t, want) {
-		t.Errorf("picking an option posted %v, want %v", got.Clicked, want)
+	if got.Strong != 1 || strings.Contains(got.Line, "**") {
+		t.Errorf("%+v: a transcript line renders as markdown", got)
 	}
 }

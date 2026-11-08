@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +14,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/client/window"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -206,6 +211,26 @@ func TestInfoPlistVersionsAreNumeric(t *testing.T) {
 	}
 }
 
+func TestInfoPlistRegistersTheLinkScheme(t *testing.T) {
+	t.Parallel()
+	p := infoPlist("v1.0.0", "/bin/"+brand.Name)
+	d := xml.NewDecoder(strings.NewReader(p))
+	for {
+		if _, err := d.Token(); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatalf("Info.plist is not well-formed: %v", err)
+		}
+	}
+	want := `<key>CFBundleURLTypes</key><array><dict>` +
+		`<key>CFBundleURLName</key><string>` + bundleID + `</string>` +
+		`<key>CFBundleURLSchemes</key><array><string>` + brand.URLScheme() + `</string></array>` +
+		`</dict></array>`
+	if !strings.Contains(p, want) {
+		t.Fatalf("Info.plist does not register the %s scheme:\n%s", brand.URLScheme(), p)
+	}
+}
+
 func TestSyncBundleIgnoresAMissingSource(t *testing.T) {
 	t.Parallel()
 	te, _ := bundleEnv(t)
@@ -264,7 +289,9 @@ func TestAppRebuildsAStaleBundleAndRestartsInPlace(t *testing.T) {
 	mustBuild(t, te)
 	te.Executable = bundleExe(te.Home)
 	te.NativeAvailable = func() bool { return true }
-	te.RunNative = func(func(menubar.Tray, menubar.Notifier)) { t.Error("the menu ran from a stale bundle") }
+	te.RunNative = func(config.Window, *texts.Catalog, func(menubar.Tray, menubar.Notifier, window.Host)) {
+		t.Error("the menu ran from a stale bundle")
+	}
 	reexecs := 0
 	te.Reexec = func() error { reexecs++; return errors.New("exec refused") }
 	sourceSays(te, "v0.17.0\n")

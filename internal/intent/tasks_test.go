@@ -35,7 +35,7 @@ func loadTasksWith(t *testing.T, bundled, user string) (TasksDef, string) {
 		}
 		layers = []profile.Layer{{Name: "user", Dir: dir}}
 	}
-	def, problems := loadTasks(layers, fstest.MapFS{TasksFile: {Data: []byte(bundled)}}, nil)
+	def, problems := loadTasks(layers, readerOf(fstest.MapFS{TasksFile: {Data: []byte(bundled)}}), nil)
 	return def, problems.Error()
 }
 
@@ -478,5 +478,49 @@ func TestNoWriterMayWriteTheMergedOrRelatedProperty(t *testing.T) {
 		if _, problems := loadTasksWith(t, defaultTasks(t), src); !strings.Contains(problems, "props."+prop+".writers: is refused") {
 			t.Errorf("%s: problems %q", prop, problems)
 		}
+	}
+}
+
+func TestRunStateWordsNameKnownStates(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "[runs.states]\nstarted = \"under way\"\nfailed = \"\"\n[runs.sessions]\ndormant = \"asleep\"\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if d.RunStates["started"] != "under way" || d.RunStates["asked"] == "" || d.SessionStates["dormant"] != "asleep" {
+		t.Errorf("run states %v, sessions %v: a user layer's word replaces the bundled one", d.RunStates, d.SessionStates)
+	}
+	if _, ok := d.RunStates["failed"]; ok {
+		t.Errorf("an empty word keeps the state worded: %v", d.RunStates)
+	}
+	_, problems = loadTasksWith(t, defaultTasks(t), "[runs.states]\nstartd = \"x\"\n[runs.sessions]\nasleep = \"y\"\n")
+	if !strings.Contains(problems, "runs.states.startd") || !strings.Contains(problems, "runs.sessions.asleep") {
+		t.Errorf("a word for no state loads: %q", problems)
+	}
+}
+
+func TestDetailVerbsNameDeclaredVerbs(t *testing.T) {
+	t.Parallel()
+	d, problems := loadTasksWith(t, defaultTasks(t), "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	for _, v := range d.DetailVerbs {
+		if _, ok := d.Verbs[v]; !ok {
+			t.Errorf("the bundled detail.verbs names %s, which no verb is", v)
+		}
+	}
+	if len(d.DetailVerbs) == 0 {
+		t.Error("the bundled profile names no primary verb of the detail")
+	}
+	d, problems = loadTasksWith(t, defaultTasks(t), "[detail]\nverbs = [\"waiting\", \"done\"]\n")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	if !slices.Equal(d.DetailVerbs, []string{"waiting", "done"}) {
+		t.Errorf("a user layer's detail.verbs gives %q", d.DetailVerbs)
+	}
+	if _, problems := loadTasksWith(t, defaultTasks(t), "[detail]\nverbs = [\"done\", \"nope\"]\n"); !strings.Contains(problems, "detail.verbs[1]") || !strings.Contains(problems, "nope") {
+		t.Errorf("a detail verb no verb is loads: %q", problems)
 	}
 }

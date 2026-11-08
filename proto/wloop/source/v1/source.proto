@@ -98,11 +98,15 @@ service HostService {
   rpc SetWake(SetWakeRequest) returns (SetWakeResponse);
   rpc ClearWake(ClearWakeRequest) returns (ClearWakeResponse);
 
+  // Jobs.
+  rpc WakeJob(WakeJobRequest) returns (WakeJobResponse);
+
   // Services.
   rpc Ask(AskRequest) returns (AskResponse);
   rpc Meter(MeterRequest) returns (MeterResponse);
   rpc Config(ConfigRequest) returns (ConfigResponse);
   rpc Profile(ProfileRequest) returns (ProfileResponse);
+  rpc Holds(HoldsRequest) returns (HoldsResponse);
 
   // History.
   rpc Events(EventsRequest) returns (EventsResponse);
@@ -218,6 +222,21 @@ message CardSignal {
   // tone is "neutral", "good", "warn", "bad" or "info".
   string tone = 3;
   google.protobuf.Timestamp at = 4;
+  // key and value are codes the plugin's ui.toml [signals] words, params the
+  // values its words fill; a code with no words shows as itself.
+  map<string, string> params = 5;
+  repeated SignalNote notes = 6;
+}
+
+// SignalNote is what a signal's line adds after its value, in its own tone:
+// a code its signal's notes word, filled with params.
+message SignalNote {
+  string code = 1;
+  string tone = 2;
+  map<string, string> params = 3;
+  // since is the instant the note counts from: each read of the card fills
+  // its "days" param with the whole working days since it, at least one.
+  google.protobuf.Timestamp since = 4;
 }
 
 message Human {
@@ -296,6 +315,9 @@ message Item {
   google.protobuf.Timestamp user_at = 26;
   google.protobuf.Timestamp created_at = 27;
   google.protobuf.Timestamp updated_at = 28;
+  // ask is the item said to whom it waits on, in the voice of the user who
+  // sends it: what a nudge to them lists. Empty when the source wrote none.
+  string ask = 29;
 }
 
 // Snapshot is everything the plugin reports of one unit. A later snapshot
@@ -346,6 +368,10 @@ message Situation {
   string reason = 4;
   // stalled is an After value: the situation is stalled once it holds.
   Fact stalled = 5;
+  // reason_key names reason in the words of the plugin's profile layer (ui.toml's [reasons]), which
+  // reason_params fill; empty leaves reason as it is.
+  string reason_key = 6;
+  map<string, string> reason_params = 7;
 }
 
 // Link is a link the unit's source holds to an address, which the host
@@ -392,6 +418,9 @@ message Draft {
   DraftOrigin origin = 13;
   string state = 14;
   DraftEvidence evidence = 15;
+  // broadcast is "on" or "off" for a thread reply also posted, or not, to its
+  // conversation, "" for a draft that replies in no thread.
+  string broadcast = 16;
 }
 
 message Placement {
@@ -417,6 +446,9 @@ message IngestRequest {
 message IngestResponse {
   string summary = 1;
   string skipped = 2;
+  // next is when the job next has work; the host runs it then, and on its
+  // interval when unset.
+  google.protobuf.Timestamp next = 3;
 }
 
 message TrackRequest {
@@ -518,6 +550,9 @@ message PlaceRequest {
 
 message PlaceResponse {
   string target = 1;
+  // broadcast is the draft's broadcast as proposed: "" when it replies in no
+  // thread, else "on" or "off".
+  string broadcast = 2;
 }
 
 message PublishRequest {
@@ -861,6 +896,7 @@ message ItemFields {
   Person requester = 10;
   PersonList waiting_on = 11;
   optional string confidence = 12;
+  optional string ask = 13;
 }
 
 // ItemOp is one change to the items ledger.
@@ -1134,6 +1170,16 @@ message ClearWakeRequest {
 
 message ClearWakeResponse {}
 
+message WakeJobRequest {
+  // job is the name of a manifest job of the calling plugin.
+  string job = 1;
+  // at is when the job has work; a time past or unset runs it now. An
+  // earlier wake already set keeps.
+  google.protobuf.Timestamp at = 2;
+}
+
+message WakeJobResponse {}
+
 message AskRequest {
   string prompt = 1;
   // schema is the JSON schema the answer must match; empty asks for text.
@@ -1201,6 +1247,30 @@ message ProfileRequest {
 
 message ProfileResponse {
   bytes content = 1;
+}
+
+// HoldsRequest asks whether a predicate the plugin's manifest declares, as
+// its profile layer sets it, holds over each set of facts.
+message HoldsRequest {
+  string predicate = 1;
+  repeated FactSet facts = 2;
+}
+
+// FactSet is one unit's facts.
+message FactSet {
+  repeated Fact facts = 1;
+}
+
+message HoldsResponse {
+  // verdicts has one verdict per fact set, in order.
+  repeated PredicateVerdict verdicts = 1;
+}
+
+// PredicateVerdict is whether a predicate holds over one fact set; error says why it
+// could not be evaluated over it, and holds is then meaningless.
+message PredicateVerdict {
+  bool holds = 1;
+  string error = 2;
 }
 
 message EventsRequest {

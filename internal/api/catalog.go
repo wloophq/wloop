@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -80,6 +81,29 @@ func (c CatalogResponse) ViewsOn(surface string) []ViewSpec {
 	}
 	slices.SortStableFunc(out, func(a, b ViewSpec) int { return a.Order - b.Order })
 	return out
+}
+
+// ReasonOf is why r waits: its plugin's words of the reason it names, filled with the reason's values, else
+// the reason as the plugin wrote it.
+func (c CatalogResponse) ReasonOf(r Row) string {
+	i := slices.IndexFunc(c.Reasons, func(p ProviderWords) bool { return p.Provider == string(r.Unit.Provider) })
+	if i < 0 {
+		return r.Summary.Reason
+	}
+	return WordReason(c.Reasons[i].Words, r.Summary)
+}
+
+// WordReason is why s waits in words, a plugin's words of reasons by key, filled with the reason's values;
+// s's reason as written when words name none.
+func WordReason(words map[string]string, s Summary) string {
+	word := words[s.ReasonKey]
+	if s.ReasonKey == "" || word == "" {
+		return s.Reason
+	}
+	for k, v := range s.ReasonParams {
+		word = strings.ReplaceAll(word, "{{."+k+"}}", v)
+	}
+	return word
 }
 
 // RowWordsOf are w with provider's own row words of c over them.

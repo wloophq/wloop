@@ -1,7 +1,7 @@
-summary = "Offer to close a session you started that stayed quiet for cleanup.manual_idle"
+summary = "Offer to close a session you started that stayed quiet for a while, as your cleanup settings set"
 ask = 'Close the quiet session {{index .Facts "session.name"}}?'
 provider = "session"
-when = '!session.managed && session.agent_state == "done" && session.idle_for > config.cleanup.manual_idle'
+when = '!session.managed && session.agent_state == "done" && session.idle_for > config.cleanup.manual_idle && session.state == "active"'
 order = 16
 
 [[step]]

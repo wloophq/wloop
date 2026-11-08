@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/omnibox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/views"
@@ -61,7 +62,7 @@ type Retention struct {
 var SessionEventKinds = []string{
 	turns.KindSessionIdle, turns.KindSessionActive, turns.KindSessionStarted, turns.KindSessionLaunched,
 	turns.KindSessionAbandoned, turns.KindSessionClosed, turns.KindMCPSeen, turns.KindReconcileReport,
-	turns.KindSessionTyped, turns.KindSessionPrompted, turns.KindSessionUnit,
+	turns.KindSessionTyped, turns.KindSessionPrompted, turns.KindSessionUnit, omnibox.KindCall,
 }
 
 const retentionWindow = 30 * 24 * time.Hour
@@ -294,7 +295,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, keyList(in.viewEnded))
 		}
 		if p.PlanItems > 0 {
-			r.exec("plan_items", 0, retainPlanItemsSQL, cutoff(now, p.PlanItems))
+			r.exec("plan_items", port.TopicPlan, retainPlanItemsSQL, cutoff(now, p.PlanItems))
 		}
 		if p.WorkflowRuns > 0 {
 			r.exec("workflow_runs", 0, retainWorkflowRunsSQL, cutoff(now, p.WorkflowRuns))

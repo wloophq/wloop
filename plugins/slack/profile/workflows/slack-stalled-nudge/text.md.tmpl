@@ -1,4 +1,4 @@
-@{{"{"}}{{.Person.Key}}}, any news on {{if eq (len .Items) 1}}this{{else}}these{{end}}?
+{{range $i, $p := .People}}{{if $i}} {{end}}@{{"{"}}{{$p.Key}}}{{end}}, any news on {{plural (len .Items) "one" "this" "other" "these"}}?
 
 {{range $i, $it := .Items}}{{if $i}}
-{{end}}- {{$it.Line}}{{end -}}
+{{end}}- {{or $it.Ask $it.Line}}{{end -}}

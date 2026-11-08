@@ -8,10 +8,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
-
-const planLabel = "Plan"
 
 // planActs are the plan actions POST /api/plan carries, by their spec id;
 // the other actions an item offers are its unit's.
@@ -26,7 +25,7 @@ var shown = []string{"pending", "blocked"}
 func (m *Model) SetPlan(items []api.PlanItem, err error) {
 	m.planLoaded = true
 	if err != nil {
-		m.planErr = "plan not loaded: " + err.Error()
+		m.planErr = m.w().T("plan not loaded: {error}", map[string]any{"error": err.Error()})
 		return
 	}
 	m.planErr = ""
@@ -119,12 +118,12 @@ func (m *Model) planAction(k Key) (Command, bool) {
 	}
 	label := itemLabel(it)
 	if running, busy := m.busy[it.Unit]; busy {
-		m.status = fmt.Sprintf("%s %s still running", running, label)
+		m.status = m.w().T("{action} {task} still running", map[string]any{"action": m.actionWord(running), "task": label})
 		return Command{}, false
 	}
 	switch {
 	case !offered:
-		m.status = fmt.Sprintf("no %s on %s", strings.ToLower(spec.Label), label)
+		m.status = m.w().T("no {action} on {task}", map[string]any{"action": strings.ToLower(spec.Label), "task": label})
 	case !st.Enabled:
 		m.status = st.Reason
 	default:
@@ -135,7 +134,7 @@ func (m *Model) planAction(k Key) (Command, bool) {
 		if spec.Input == nil {
 			return m.finish(c, st, k.Read)
 		}
-		m.ask(*spec, st, c, inputLabel(label, *spec, st), k.Read)
+		m.ask(*spec, st, c, inputLabel(m.w(), label, *spec, st), k.Read)
 	}
 	return Command{}, false
 }
@@ -165,11 +164,11 @@ func (m *Model) timeLeft(it api.PlanItem, now time.Time) (string, func(string) s
 	t := m.t
 	switch {
 	case it.Decision == "blocked":
-		return "blocked", t.Red
+		return m.w().T("blocked", nil), t.Red
 	case it.Default != "run":
-		return "wait", t.Yellow
+		return m.w().T("wait", nil), t.Yellow
 	case it.Deadline.IsZero():
-		return "now", t.Cyan
+		return m.w().T("now", nil), t.Cyan
 	}
 	return fmt.Sprintf("%ds", max(0, int(it.Deadline.Sub(now).Seconds()+0.999))), t.Cyan
 }
@@ -190,9 +189,9 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 		body -= len(closed) + 1
 	}
 	if len(m.plan) == 0 {
-		text := "Nothing pending or blocked in the plan."
+		text := m.w().T("Nothing pending or blocked in the plan.", nil)
 		if !m.planLoaded {
-			text = "loading…"
+			text = m.w().T("loading…", nil)
 		}
 		lines = append(lines, "  "+m.t.Dim(text))
 	} else {
@@ -211,11 +210,11 @@ func (m *Model) closedLines(width int, now time.Time) []string {
 		return nil
 	}
 	t := m.t
-	out := []string{"  " + t.Bold(fmt.Sprintf("Sessions closed in the last day (%d)", len(m.closed)))}
+	out := []string{"  " + t.Bold(m.w().T("Sessions closed in the last day ({n})", map[string]any{"n": len(m.closed)}))}
 	for _, c := range m.closed {
 		out = append(out, "  "+termfmt.Cut(fmt.Sprintf("%s  %s  %s", span(now.Sub(c.At)), c.Session, oneLine(c.Reason)), width-2))
 		if c.Resume != "" {
-			out = append(out, "    "+t.Dim(termfmt.Cut("resume: "+oneLine(c.Resume), width-4)))
+			out = append(out, "    "+t.Dim(termfmt.Cut(m.w().T("resume: {command}", map[string]any{"command": oneLine(c.Resume)}), width-4)))
 		}
 	}
 	return out
@@ -257,7 +256,7 @@ func (m *Model) planList(cur, width, height int, now time.Time) []string {
 			name += "  " + oneLine(it.Title)
 		}
 		link := func(s string) string { return t.Link(it.Link, s) }
-		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: name, Style: link}, {Text: oneLine(it.Reason)}}
+		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: firstOf(it.Summary, it.Workflow), Style: t.Dim}, {Text: name, Style: link}, {Text: oneLine(m.planReason(it))}}
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
 	start := max(0, cur-height+1)
@@ -304,32 +303,43 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	decision := it.Decision
 	switch left, _ := m.timeLeft(it, now); {
 	case it.Decision != "pending":
-	case left == "wait":
-		decision += " · waits for you"
+	case it.Default != "run":
+		decision += " · " + m.w().T("waits for you", nil)
 	default:
-		decision += " · runs in " + left
+		decision += " · " + m.w().T("runs in {time}", map[string]any{"time": left})
 	}
 	if it.Observe {
-		decision += " · observe"
+		decision += " · " + m.w().T("observe", nil)
 	}
-	fact("workflow", it.Workflow, plain)
-	fact("decision", decision, plain)
+	fact(m.w().T("workflow", nil), firstOf(it.Summary, it.Workflow), plain)
+	fact(m.w().T("decision", nil), decision, plain)
 	if it.Reason != "" {
-		fact("why", it.Reason, plain)
+		fact(m.w().T("why", nil), m.planReason(it), plain)
 	}
-	fact("steps", strings.Join(it.Steps, ", "), plain)
+	if len(it.Does) == 0 {
+		fact(m.w().T("steps", nil), strings.Join(it.Steps, ", "), plain)
+	}
+	for _, st := range it.Does {
+		fact(m.w().T("steps", nil), m.stepText(st), plain)
+		for _, item := range st.Items {
+			fact("", "· "+item, t.Dim)
+		}
+	}
+	if len(it.Does) > 0 && !planPosts(it.Does) {
+		fact("", m.w().T("Posts nothing", nil), t.Dim)
+	}
 	var matched []string
 	for _, f := range it.Why.Matched {
-		matched = append(matched, f.Name+" = "+f.Value)
+		matched = append(matched, m.planFactText(f))
 	}
 	if len(matched) > 0 {
-		fact("matched", strings.Join(matched, ", "), t.Dim)
+		fact(m.w().T("matched", nil), strings.Join(matched, ", "), t.Dim)
 	}
-	if g := gain(it.Gain); g != "" {
-		fact("frees", g, plain)
+	if g := gain(m.w(), it.Gain); g != "" {
+		fact(m.w().T("frees", nil), g, plain)
 	}
 	if it.Error != "" {
-		fact("error", fmt.Sprintf("attempt %d: %s", it.Attempts, it.Error), t.Red)
+		fact(m.w().T("error", nil), m.w().T("attempt {n}: {error}", map[string]any{"n": it.Attempts, "error": it.Error}), t.Red)
 	}
 	for _, st := range it.Actions {
 		if st.Enabled && st.Note != "" {
@@ -339,15 +349,18 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	return append(lines, m.itemKeys(it, width, col)...)
 }
 
-func gain(g api.Gain) string {
+func gain(w *texts.Catalog, g api.Gain) string {
 	var parts []string
 	if g.MemoryBytes > 0 {
-		parts = append(parts, mib(g.MemoryBytes)+" of memory")
+		parts = append(parts, w.T("{size} of memory", map[string]any{"size": mib(g.MemoryBytes)}))
 	}
 	if g.DiskBytes > 0 {
-		parts = append(parts, mib(g.DiskBytes)+" of disk")
+		parts = append(parts, w.T("{size} of disk", map[string]any{"size": mib(g.DiskBytes)}))
 	}
-	return strings.Join(parts, " and ")
+	if len(parts) < 2 {
+		return strings.Join(parts, "")
+	}
+	return w.T("{list} and {last}", map[string]any{"list": strings.Join(parts[:len(parts)-1], ", "), "last": parts[len(parts)-1]})
 }
 
 func mib(n int64) string {
@@ -373,13 +386,13 @@ func (m *Model) itemKeys(it api.PlanItem, width, col int) []string {
 	t := m.t
 	on, off := m.planHelp(it)
 	var lines []string
-	head := "  " + t.Dim(termfmt.Fit("keys", factLabel)) + "  "
+	head := "  " + t.Dim(termfmt.Fit(m.w().T("keys", nil), factLabel)) + "  "
 	for _, l := range m.pack(on, width-col) {
 		lines = append(lines, head+l)
 		head = strings.Repeat(" ", col)
 	}
 	if len(off) > 0 {
-		lines = append(lines, "  "+t.Dim(termfmt.Fit("not now", factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
+		lines = append(lines, "  "+t.Dim(termfmt.Fit(m.w().T("not now", nil), factLabel))+"  "+t.Dim(termfmt.Cut(strings.Join(off, " · "), width-col)))
 	}
 	return lines
 }

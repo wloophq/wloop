@@ -51,19 +51,28 @@ type Since struct {
 	Rev   uint64
 }
 
-// Change says the rows moved: the units whose row changed or left since
-// the previous change, or All when too much moved to list. A "notify"
-// change carries the notices a workflow raised for the user.
+// Change says what moved: the units whose row changed or left since the
+// previous change, or All when too much moved to list, and whether the
+// health, the plan or the gates moved. A client reads again only what a
+// change names. A "notify" change carries the notices a workflow raised
+// for the user.
 type Change struct {
-	Type    string      `json:"type"` // "changed" or "notify"
-	Epoch   string      `json:"epoch"`
-	Rev     uint64      `json:"rev"`
-	Units   []unit.Unit `json:"units,omitempty"`
-	All     bool        `json:"all,omitempty"`
-	Health  bool        `json:"health,omitempty"`
-	Notices []Notice    `json:"notices,omitempty"`
-	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
+	Type   string      `json:"type"` // "changed", "notify" or "window"
+	Epoch  string      `json:"epoch"`
+	Rev    uint64      `json:"rev"`
+	Units  []unit.Unit `json:"units,omitempty"`
+	All    bool        `json:"all,omitempty"`
+	Health bool        `json:"health,omitempty"`
+	// Plan says what GET /api/plan serves moved.
+	Plan bool `json:"plan,omitempty"`
+	// Gates says what GET /api/gates serves moved: a gate, or the draft, item, message or plan item one shows.
+	Gates   bool     `json:"gates,omitempty"`
+	Notices []Notice `json:"notices,omitempty"`
+	// Counters are the Area "" counters, on every "changed" change after a note of what a view reads: the tasks,
+	// their gates, wakes, drafts, records, links, placements or the profile.
 	Counters *Counters `json:"counters,omitempty"`
+	// Windows are window requests, in the order they came, sent only to the events client named WindowClient.
+	Windows []WindowRequest `json:"windows,omitempty"`
 }
 
 // Notice is a notification a workflow's notify.self step raised; ID is
@@ -275,6 +284,24 @@ type Detail struct {
 	// Card and Items are the unit card's (#unit-card).
 	Card  *card.Snapshot `json:"card,omitempty"`
 	Items []items.Item   `json:"items"`
+	// ItemTies are how each of Items stands with the user's work, by item id.
+	ItemTies map[string]ItemTie `json:"item_ties"`
+	// SkippedWorkflows are the workflows skipped on the unit, through UnitSkip.
+	SkippedWorkflows []string `json:"skipped_workflows"`
+}
+
+// ItemTie is whom an item waits on and the task that holds it; Task is empty when no task does.
+type ItemTie struct {
+	WaitsOn   []ItemPerson `json:"waits_on"`
+	Task      string       `json:"task,omitempty"`
+	TaskTitle string       `json:"task_title,omitempty"`
+}
+
+// ItemPerson is a person an item waits on; Me marks the user.
+type ItemPerson struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Me   bool   `json:"me,omitempty"`
 }
 
 type Workspace struct {
@@ -369,16 +396,19 @@ type Health struct {
 	Version string `json:"version"`
 	// Build names the cockpit the daemon serves; a page that loaded another
 	// reloads.
-	Build     string       `json:"build"`
-	Jobs      []JobStatus  `json:"jobs"`
-	Warnings  []string     `json:"warnings"`
-	RateLimit RateLimit    `json:"rate_limit"`
-	SlowSync  bool         `json:"slow_sync"`
-	Viewer    string       `json:"viewer"`
-	Paused    bool         `json:"paused"`
-	PausedAt  time.Time    `json:"paused_at,omitzero"`
-	App       *AppStatus   `json:"app,omitempty"`
-	Brief     *BriefStatus `json:"brief,omitempty"`
+	Build     string      `json:"build"`
+	Jobs      []JobStatus `json:"jobs"`
+	Warnings  []string    `json:"warnings"`
+	RateLimit RateLimit   `json:"rate_limit"`
+	SlowSync  bool        `json:"slow_sync"`
+	Viewer    string      `json:"viewer"`
+	// Strings is a stamp of the client strings /api/strings serves, which changes with their locale and
+	// words, so a client reads them again only then.
+	Strings  string       `json:"strings,omitempty"`
+	Paused   bool         `json:"paused"`
+	PausedAt time.Time    `json:"paused_at,omitzero"`
+	App      *AppStatus   `json:"app,omitempty"`
+	Brief    *BriefStatus `json:"brief,omitempty"`
 	// Briefs is the brief breaker; nil when briefs are off.
 	Briefs *BriefsHealth `json:"briefs,omitempty"`
 	// Notifier is whether the menu bar follows the daemon's events.

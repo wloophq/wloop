@@ -40,11 +40,39 @@ func TestAPassLoadsOnceWhatEveryTaskReads(t *testing.T) {
 	if _, err := Once(ctx, "gates", func() (int, error) { return 0, errors.New("down") }); err == nil {
 		t.Fatal("the error was lost")
 	}
-	if _, err := Once(ctx, "gates", func() (int, error) { t.Fatal("loaded again after an error"); return 0, nil }); err == nil {
-		t.Fatal("the error was not kept")
+	if got, err := Once(ctx, "gates", func() (int, error) { return 3, nil }); err != nil || got != 3 {
+		t.Fatalf("after a failed load the next reader got %v, %v; want a fresh load", got, err)
 	}
 	if got, err := Once(context.Background(), "sessions", read); err != nil || got["open"] != 2 {
 		t.Fatalf("outside a pass: %v, %v", got, err)
+	}
+}
+
+func TestALoadCancelledWithItsCallerIsLoadedAgainByTheNext(t *testing.T) {
+	p := &Pass{}
+	gone, cancel := context.WithCancel(WithPass(context.Background(), p))
+	cancel()
+	if _, err := Once(gone, "items", func() (int, error) { return 0, gone.Err() }); !errors.Is(err, context.Canceled) {
+		t.Fatalf("the cancelled caller got %v", err)
+	}
+	got, err := Once(WithPass(context.Background(), p), "items", func() (int, error) { return 7, nil })
+	if err != nil || got != 7 {
+		t.Fatalf("the next caller got %v, %v; want a fresh load", got, err)
+	}
+}
+
+func TestACallerWaitingOnAnotherCallersCancelledLoadLoadsItself(t *testing.T) {
+	ctx := WithPass(context.Background(), &Pass{})
+	loads := 0
+	got, err := Once(ctx, "items", func() (int, error) {
+		loads++
+		if loads == 1 {
+			return 0, context.Canceled
+		}
+		return 7, nil
+	})
+	if err != nil || got != 7 || loads != 2 {
+		t.Fatalf("got %v, %v after %d loads; want 7 after 2", got, err, loads)
 	}
 }
 

@@ -9,12 +9,15 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 |---|---|
 | `TestAStandInSourcePluginRunsWithNoEditOutsideItsDirectory` | A source plugin whose code, manifest and profile layer all live in internal/archtest/testdata/standin, and which no other file of the repository names, runs in the daemon from the user's plugins directory through the real launcher: its manifest's fact, temporal fact, delivery, task kind and signal merge into the host's tables, its profile layer's workflow matches the unit it reports, its own store opens, and its MCP tool answers in the words of its layer's tools.toml. |
 | `TestApprovalRulesReadTrustedFacts` | No [gates.approval] rule that releases a gate (a draft gate's rule of any mode, any other gate's of mode send, run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's manifest, for its plan gates and its draft gates, and the config's workflows.<name>.gates.approval. The untrusted facts are the table's, the brief's extra fields, a classification's output and a task property an agent or a plugin writes, so an agent or a thread's text never releases a send or a run. |
-| `TestArchitecture` | Only the store imports the SQLite driver; clients import only the API, the domain and `termfmt`; the domain imports only the domain; the brief reaches agents and the store only through its ports; the API imports only the domain; only `intent/expr` imports cel-go; a core interface has at most five methods. |
+| `TestArchitecture` | Only the store imports the SQLite driver; clients import only the API, the domain, `termfmt` and `i18n`; the domain imports only the domain; the brief reaches agents and the store only through its ports; the API imports only the domain; only `intent/expr` imports cel-go; a core interface has at most five methods. |
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. A released migration keeps the words that version stored, so migrate_v*.go files are history and exempt. |
 | `TestCLIImportsNoGitHubClient` | No file under `internal/cli` imports the GitHub plugin's API client or gh: the CLI reaches GitHub through its plugin's calls. The test files in `cliGitHubDebt` pass, and the list only shrinks. |
+| `TestCatalogKeysAreUsedAndKnown` | Every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the page's `data-i18n` attributes) is a key of `strings.toml`, and every key of it is read by a client or names a text the API, the configuration, the engine's plan reasons (`workflow.Reasons`, a plan item's `reason_key`) or the step words of a plan item (`builtin.StepSays`, `StepSaysWithTask`, `ResolutionSays`) serve. |
 | `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
+| `TestClientsQuoteNoProseOutsideTheCatalog` | The cockpit's scripts, its page and the Go clients quote no text a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for the debts `proseDebts` counts, which only shrink. |
+| `TestClientsQuoteNoWordOutsideTheCatalog` | The Go clients quote no single word a person reads outside the string catalog (`strings.toml`, through `texts.Catalog`): a single word a client quotes is a catalog key, or is compared, switched on, a key, a constant, an Objective-C name, or one of the `clientTokens`, which let exactly `clientTokenUses` literals pass. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
@@ -29,6 +32,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestGoNamesNoState` | Go reads a task's category and never names a state: no Go literal is converted to, assigned to or compared with a task.State or a task.Category outside internal/intent and the version 7 migration, but the Category constants and Categories of internal/domain/task/schema.go, which declare the closed set; and no SQL text under internal/adapter/store compares the state column with a state the bundled profile declares, nor inlines a category, which it binds as a parameter. |
 | `TestGoNamesNoView` | Go never names a view: no Go constant, a literal or a conversion of one, is typed task.View outside internal/intent. The views and their ids are the profile's views.toml. |
 | `TestHostImportsNoPlugin` | No host package's code imports a plugin's package, so the host binary links no plugin. A test-only package, whose path ends in "test" and which only tests and other test-only packages import, such as `ghreporttest`, may run a plugin's code for the host's tests; the root `plugins` package, which the host reads the bundled manifests and profile layers from, imports only the standard library. Test files are left to R16. |
+| `TestI18nIsALeaf` | `internal/i18n` imports only the standard library and `golang.org/x/text`, so the loader and the clients may import it. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
 | `TestManifestKeysAreInTheGrammar` | Every toml key the module decodes is a word of builtin.Grammar and that only internal/intent, internal/profile, internal/frontmatter and internal/config decode a profile file's or the configuration's TOML, so no key is read outside the table the loaders check, the schemas and the reference pages derive from. The configuration's keys are checked against the table by internal/config's TestEveryConfigKeyIsInTheGrammar. The plugin SDK under `pkg/plugin`, which reads a plugin's `plugin.toml`, is outside the rule. |
 | `TestMeterIsALeaf` | `internal/meter` imports only the standard library. |
@@ -47,8 +51,10 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
 | `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, an agent through a session the user drives, a trusted policy rule or a passed window. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
+| `TestOnlyTheWindowAdapterImportsWails` | No Go file outside `internal/client/window/wails` imports Wails, test files and files a build tag leaves out of this build included: the window host stays one adapter behind the window client's port. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestPluginsImportOnlyTheSDK` | No package under `plugins/`, nor the stand-in plugin's, imports a package under `internal/` or a package of another plugin, tests included: every plugin builds against the SDK and its own packages alone. |
+| `TestProseInternalMarksStayFew` | The clients mark as no text a person reads exactly proseInternalMarks literals, so a mark is a reviewed exception. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/` and a plugin's profile layer, `plugins/<id>/profile/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "plugins.slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
@@ -72,6 +78,103 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/harness_test.go` | ✅ | the harness reads a pull request the inventory lacks from the fake GitHub as the plugin does |
 | `internal/cli/plugin_binary_test.go` | ✅ | the test serves a fake GitHub to the plugin's binary |
 
+### `TestClientsQuoteNoProseOutsideTheCatalog`
+
+| `nonProse` entry | Status | Reason |
+|---|---|---|
+| `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `Accept` | ✅ | an HTTP header name |
+| `Alt` | ✅ | KeyboardEvent.key |
+| `Backspace` | ✅ | KeyboardEvent.key |
+| `Contents` | ✅ | a macOS bundle's directory |
+| `Control` | ✅ | KeyboardEvent.key |
+| `DELETE` | ✅ | an HTTP method |
+| `Delete` | ✅ | KeyboardEvent.key |
+| `End` | ✅ | KeyboardEvent.key |
+| `Enter` | ✅ | KeyboardEvent.key |
+| `Esc` | ✅ | the Escape key's name as the served bindings spell it |
+| `Escape` | ✅ | KeyboardEvent.key |
+| `GET` | ✅ | an HTTP method |
+| `Home` | ✅ | KeyboardEvent.key |
+| `Meta` | ✅ | KeyboardEvent.key |
+| `POST` | ✅ | an HTTP method |
+| `Plus` | ✅ | the + key's name in aria-keyshortcuts |
+| `Shift` | ✅ | KeyboardEvent.key |
+| `Tab` | ✅ | KeyboardEvent.key |
+| `noopener noreferrer` | ✅ | a link's rel tokens |
+| `use strict` | ✅ | a script's directive |
+
+### `TestClientsQuoteNoWordOutsideTheCatalog`
+
+| `clientTokens` entry | Status | Reason |
+|---|---|---|
+| `%.1f GiB` | ✅ | a size in a binary unit |
+| `%.1f MiB` | ✅ | a size in a binary unit |
+| `Backspace` | ✅ | a key's name as the served bindings spell it |
+| `Enter` | ✅ | a key's name as the served bindings spell it |
+| `Esc` | ✅ | a key's name as the served bindings spell it |
+| `PR` | ✅ | the status item's mark before its first count, the same in every language |
+| `Tab` | ✅ | a key's name as the served bindings spell it |
+| `answer` | ✅ | an action's id |
+| `app` | ✅ | the name the app subscribes to the daemon's events as |
+| `apply` | ✅ | a plan action's handler |
+| `blocked` | ✅ | a plan decision the API serves |
+| `capture` | ✅ | a command's action id |
+| `detached ` | ✅ | a native window's internal name prefix, never shown |
+| `detail` | ✅ | a command's action id |
+| `dismiss` | ✅ | a plan action's handler |
+| `draft` | ✅ | a reply's send mode an action takes |
+| `edit` | ✅ | a draft verb's handler |
+| `filter` | ✅ | a core action's id |
+| `guide` | ✅ | a plan action's handler |
+| `help` | ✅ | a core action's id |
+| `main` | ✅ | a native window's internal name, never shown |
+| `makeKeyWindow` | ✅ | an AppKit selector |
+| `match` | ✅ | a command's action id |
+| `menubar` | ✅ | the menu bar's name as a surface |
+| `now` | ✅ | a reply's send mode an action takes |
+| `open` | ✅ | an action's id |
+| `open-source` | ✅ | a core action's id |
+| `palette` | ✅ | a core action's id |
+| `panel` | ✅ | a native window's internal name, never shown |
+| `pending` | ✅ | a plan decision the API serves |
+| `plan` | ✅ | the plan tab's key |
+| `quit` | ✅ | a core action's id |
+| `retry` | ✅ | a draft verb's handler |
+| `review` | ✅ | a command's action id and the review's context |
+| `reviewed` | ✅ | a project verb's handler |
+| `running` | ✅ | an app state the status API takes |
+| `sequential` | ✅ | a project verb's handler |
+| `session` | ✅ | the delegate prompt's mode |
+| `sweep` | ✅ | a job the daemon triggers |
+| `true` | ✅ | a flag's value an action takes |
+| `tui` | ✅ | the terminal client's name as an events subscriber and a surface |
+| `vi` | ✅ | the editor run when $VISUAL and $EDITOR are unset |
+
+| `nonProse` entry | Status | Reason |
+|---|---|---|
+| `(prefers-color-scheme: dark)` | ✅ | a CSS media query |
+| `Accept` | ✅ | an HTTP header name |
+| `Alt` | ✅ | KeyboardEvent.key |
+| `Backspace` | ✅ | KeyboardEvent.key |
+| `Contents` | ✅ | a macOS bundle's directory |
+| `Control` | ✅ | KeyboardEvent.key |
+| `DELETE` | ✅ | an HTTP method |
+| `Delete` | ✅ | KeyboardEvent.key |
+| `End` | ✅ | KeyboardEvent.key |
+| `Enter` | ✅ | KeyboardEvent.key |
+| `Esc` | ✅ | the Escape key's name as the served bindings spell it |
+| `Escape` | ✅ | KeyboardEvent.key |
+| `GET` | ✅ | an HTTP method |
+| `Home` | ✅ | KeyboardEvent.key |
+| `Meta` | ✅ | KeyboardEvent.key |
+| `POST` | ✅ | an HTTP method |
+| `Plus` | ✅ | the + key's name in aria-keyshortcuts |
+| `Shift` | ✅ | KeyboardEvent.key |
+| `Tab` | ✅ | KeyboardEvent.key |
+| `noopener noreferrer` | ✅ | a link's rel tokens |
+| `use strict` | ✅ | a script's directive |
+
 ### `TestNoIntentEnumerations`
 
 | `intentAllowlist` entry | Status | Reason |
@@ -93,6 +196,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `embedKept` entry | Status | Reason |
 |---|---|---|
+| `internal/web/static/fonts/OFL.txt` | ✅ | the SIL Open Font License must ship with the fonts the cockpit serves |
 | `skills` | ✅ | the skills install writes into agent homes |
 
 ### `TestProviderIdentityThroughAPluginPackageOnlyShrinks`

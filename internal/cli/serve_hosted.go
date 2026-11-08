@@ -60,6 +60,7 @@ func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedg
 		Items:    items,
 		Ask:      e.pluginAsk(id),
 		Profile:  pluginProfile(id, e.currentConfig),
+		Holds:    e.pluginHolds(id),
 		Sessions: sessionBooks{sqlite.New(db)},
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
@@ -76,6 +77,28 @@ func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedg
 			return unit.Unit{}, false, nil
 		},
 		Now: e.Now,
+	}
+}
+
+// pluginHolds evaluates plugin id's predicates over every set of one call as one loaded profile sets them.
+func (e *Env) pluginHolds(id string) func(ctx context.Context, predicate string, sets []map[string]any) ([]src.Holding, error) {
+	return func(_ context.Context, predicate string, sets []map[string]any) ([]src.Holding, error) {
+		l := e.loadedIntents()
+		if l == nil {
+			return nil, fmt.Errorf("%w: no profile loaded to read predicate %s from", src.ErrUnavailable, predicate)
+		}
+		holds, errs, err := l.Predicates.Eval(unit.ProviderID(id), predicate, sets)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]src.Holding, len(sets))
+		for i := range sets {
+			out[i].Holds = holds[i]
+			if errs[i] != nil {
+				out[i] = src.Holding{Err: errs[i].Error()}
+			}
+		}
+		return out, nil
 	}
 }
 

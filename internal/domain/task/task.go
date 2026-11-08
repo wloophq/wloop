@@ -24,18 +24,21 @@ const (
 	OriginGate    = "gate"
 )
 
+// IDPrefix starts every task id.
+const IDPrefix = "t-"
+
 // DerivedID is the id of the task item of u calls for, so a re-derivation finds it again. It hashes as the
 // action entries of schema version 6 did, so the tasks they became keep matching their items.
 func DerivedID(u unit.Unit, item string) ID {
 	sum := sha256.Sum256([]byte("action|" + string(u.Provider) + "|" + u.Key + "|" + item))
-	return ID("t-" + hex.EncodeToString(sum[:])[:16])
+	return ID(IDPrefix + hex.EncodeToString(sum[:])[:16])
 }
 
 // NewID is a random task id.
 func NewID() ID {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
-	return ID("t-" + hex.EncodeToString(b[:]))
+	return ID(IDPrefix + hex.EncodeToString(b[:]))
 }
 
 // Open says whether the task is still to do: its category is neither done nor dropped.
@@ -86,6 +89,17 @@ func (e Task) FirstUnit() (unit.Unit, bool) {
 		return e.Items[0].Unit, true
 	}
 	return unit.Unit{}, false
+}
+
+// LinkedUnits are the units the task links: its units, then its items' units, each once.
+func (e Task) LinkedUnits() []unit.Unit {
+	out := slices.Clone(e.Units)
+	for _, r := range e.Items {
+		if !slices.Contains(out, r.Unit) {
+			out = append(out, r.Unit)
+		}
+	}
+	return out
 }
 
 // CapturedByUser says whether the user made the task, rather than the loop

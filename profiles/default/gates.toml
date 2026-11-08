@@ -143,17 +143,23 @@ summary = "Lift the block without trusting the folder; the round waits for its n
 note = "Lift the block without trusting; the round waits for a new trigger"
 status = "dismissed"
 
+# The diff of a pull request a start turn opened, for you to review; its
+# text reads the facts of the task and of the units it holds.
 [gates.review-diff]
 kind = "step"
 label = "Review the diff"
+card_says = true
+text = "Review the diff{{with .pr.slug}} of {{.}}{{end}}{{with .pr.changed_files}}, {{if eq . 1}}1 file{{else}}{{.}} files{{end}} changed{{end}}"
 closes_with = "dismiss"
 
 [gates.review-diff.intents.approve]
 label = "Looks good"
+summary = "Mark the diff reviewed; posts nothing."
 status = "approved"
 
 [gates.review-diff.intents.dismiss]
 label = "Dismiss"
+summary = "Close this step without reviewing; the task stays as it is."
 status = "dismissed"
 
 # A run that failed or ended without its record, of an intent whose
@@ -187,3 +193,43 @@ mode = "wait"
 [[approval.rule]]
 when = 'gate.kind == "plan"'
 mode = "run"
+
+# What sending a draft does besides posting it, by effect: a draft's card
+# says it in these words.
+[effects]
+"task.nudged" = "The task is marked as nudged."
+"unit.closed" = "The conversation is closed and the open tasks that hold it end."
+
+# What a draft's card and the Outbox call drafts: the group of those written by
+# hand, what a draft is for, and where its delivery stands.
+[drafts]
+by_hand = "Written by hand"
+by_hand_about = "Replies and reactions you wrote yourself, waiting to be sent."
+quoted = "Quotes an item of {conversation}, a conversation they are not in."
+
+[drafts.purposes]
+nudge = "Nudge"
+close = "Close"
+ask_owner = "Ask who owns it"
+acknowledge = "Acknowledge"
+redirect = "Point elsewhere"
+reply = "Reply"
+react = "React"
+unreact = "Remove a reaction"
+
+[drafts.states]
+held = "waiting for you"
+queued = "queued"
+sending = "sending"
+sent = "sent"
+failed = "failed to send"
+dropped = "dropped"
+
+[drafts.reasons]
+assigned = "its items got an owner"
+moot = "it no longer applies"
+outside = "it addressed someone who cannot read that conversation"
+joined = "the person it was written to joined the conversation it came from"
+ended = "its task ended"
+skipped = "you skipped its workflow there"
+superseded = "a draft to the whole conversation replaced it"

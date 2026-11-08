@@ -57,6 +57,7 @@ func infoPlist(version, source string) string {
 <key>CFBundleShortVersionString</key><string>` + bundleVersion(version) + `</string>
 <key>CFBundleVersion</key><string>` + bundleVersion(version) + `</string>
 <key>LoopVersion</key><string>` + xmlText(version) + `</string>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>` + bundleID + `</string><key>CFBundleURLSchemes</key><array><string>` + brand.URLScheme() + `</string></array></dict></array>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>LoopSource</key><string>` + xmlText(source) + `</string>

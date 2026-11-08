@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -116,12 +118,12 @@ func TestHolderWarnsWhileTheFileIsBrokenAndClearsWhenItLoads(t *testing.T) {
 	r := newHolderRig(t)
 	r.write(`{`)
 	r.later()
-	if w := r.h.Warning(); w == "" {
+	if w := r.h.Warning(); w.Key == "" {
 		t.Fatal("a broken file raised no warning")
 	}
 	r.write(`sweep = {fast = "2m"}`)
 	r.later()
-	if w := r.h.Warning(); w != "" {
+	if w := r.h.Warning(); w.Key != "" {
 		t.Fatalf("warning after the file loads: %q", w)
 	}
 }
@@ -160,5 +162,89 @@ func TestHolderCallsOnWarningChangeWhenTheWarningFlips(t *testing.T) {
 	r.h.Config()
 	if r.flips != 2 {
 		t.Fatalf("%d flips after the file broke, want 2", r.flips)
+	}
+}
+
+func TestUILocaleAppliesWithoutARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nui = {locale = \"pt-BR\"}\n")
+	r.later()
+	if got := r.h.Config().UI.Locale; got != "pt-BR" || r.h.Stale() || r.h.Warning().Key != "" {
+		t.Fatalf("locale %q, stale %v, warning %q", got, r.h.Stale(), r.h.Warning())
+	}
+	r.write("sweep = {fast = \"5m\"}\nui = {locale = \"en\"}\n")
+	r.later()
+	if got := r.h.Config().UI.Locale; got != "en" || !r.h.Stale() {
+		t.Fatalf("locale %q, stale %v", got, r.h.Stale())
+	}
+	if w := r.h.Warning(); w.Key != WarningStale || !strings.Contains(fmt.Sprint(w.Params["keys"]), "ui.locale") || !strings.Contains(fmt.Sprint(w.Params["keys"]), "profile") {
+		t.Fatalf("warning %q", w)
+	}
+}
+
+func TestAWorkflowSwitchAppliesWithoutARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\n")
+	r.h.Reload()
+	if w := r.h.Config().Workflows["wf"]; w.Enabled == nil || *w.Enabled || r.h.Stale() {
+		t.Fatalf("workflow %+v, stale %v", w, r.h.Stale())
+	}
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\nobserve = true\n")
+	r.h.Reload()
+	if w := r.h.Config().Workflows["wf"]; w.Enabled == nil || *w.Enabled || w.Observe != nil || !r.h.Stale() {
+		t.Fatalf("observe beside the switch: workflow %+v, stale %v", w, r.h.Stale())
+	}
+}
+
+func TestAWorkflowSwitchDoesNotTouchTheStartConfig(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\n[workflows.wf]\nenabled = false\n")
+	r.h.Reload()
+	r.write("sweep = {fast = \"2m\"}\n")
+	r.h.Reload()
+	if r.h.Stale() || r.h.Warning().Key != "" {
+		t.Fatalf("back to the start file: stale %v, warning %q", r.h.Stale(), r.h.Warning())
+	}
+}
+
+func TestAnotherChangeStillNeedsARestart(t *testing.T) {
+	r := newHolderRig(t)
+	r.write(`sweep = {fast = "5m"}`)
+	r.h.Reload()
+	if !r.h.Stale() || r.h.Config().Sweep.Fast != Days(2*time.Minute) {
+		t.Fatalf("stale %v, fast %v", r.h.Stale(), r.h.Config().Sweep.Fast)
+	}
+}
+
+func TestReloadReadsTheFileAtOnce(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nui = {locale = \"pt-BR\"}\n")
+	loads := r.loads
+	r.h.Reload()
+	if r.loads != loads+1 || r.h.Config().UI.Locale != "pt-BR" {
+		t.Fatalf("%d loads, locale %q", r.loads-loads, r.h.Config().UI.Locale)
+	}
+}
+
+func TestConfigWarningIsACodeNotEnglish(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"5m\"}\n")
+	r.later()
+	if w := r.h.Warning(); w.Key != WarningStale || !strings.HasPrefix(fmt.Sprint(w.Params["keys"]), "profile, ui.locale") {
+		t.Fatalf("%+v", w)
+	}
+	r.write("sweep = 3\n")
+	r.later()
+	if w := r.h.Warning(); w.Key != WarningBroken || w.Params["error"] == "" {
+		t.Fatalf("%+v", w)
+	}
+}
+
+func TestTheWindowKeysLeaveTheDaemonFresh(t *testing.T) {
+	r := newHolderRig(t)
+	r.write("sweep = {fast = \"2m\"}\nwindow = {enabled = false}\n")
+	r.later()
+	if r.h.Stale() || r.h.Warning().Key != "" {
+		t.Fatalf("a window key the app reads made the daemon stale: %+v", r.h.Warning())
 	}
 }

@@ -110,7 +110,7 @@ func TestATaskWithNoUnitHasOnlyItsOwnFacets(t *testing.T) {
 	e := task.Task{ID: "t-own", State: "inbox", Category: task.CategoryInbox, Title: "Think it over", Created: tasksNow, Updated: tasksNow, Origin: task.OriginUser}
 	r.put(t, e)
 	got := facetsOf(t, r.page(t, "view=inbox"), "t-own")
-	want := map[string][]string{"category": {"inbox"}, "moved": {tasksNow.Format(time.RFC3339)}, "state": {"inbox"}, "turn": {"me"}, "waits-on": {"me"}}
+	want := map[string][]string{"category": {"inbox"}, "moved": {tasksNow.Format(time.RFC3339)}, "owed": {tasksNow.Format(time.RFC3339)}, "state": {"inbox"}, "turn": {"me"}, "waits-on": {"me"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("facets %v, want its facts' %v", got, want)
 	}
@@ -231,7 +231,7 @@ func BenchmarkPublishTasks(b *testing.B) {
 	r.s.moved.attach()
 	for b.Loop() {
 		r.s.moved.add(api.Change{Units: units})
-		r.s.publishTasks(ctx, port.Change{})
+		r.s.publishTasks(ctx, port.Change{}, port.Change{})
 	}
 }
 

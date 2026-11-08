@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/rowset"
+	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -41,6 +43,7 @@ type Daemon interface {
 	Keys(ctx context.Context, surface string) (api.KeysResponse, error)
 	Review(ctx context.Context) (api.Review, error)
 	ReviewStepDone(ctx context.Context, step string) (api.Review, error)
+	Strings(ctx context.Context) (api.Strings, error)
 }
 
 type Terminal interface {
@@ -110,6 +113,8 @@ type loaded struct {
 	// load read them.
 	filtered    *filteredRead
 	filteredErr error
+	// words are the client strings when this load read them.
+	words *texts.Catalog
 	// review is the Review when the screen shows it.
 	review    *api.Review
 	reviewErr error
@@ -140,11 +145,27 @@ type finished struct {
 // carried is what a command brought back: its lines, the task it left, and
 // for a detail the drafts made for its task.
 type carried struct {
+	// note is the terminal's own line in the model's words; lines are the daemon's.
+	note   func(*texts.Catalog) string
 	lines  []string
 	task   api.TaskView
 	drafts []api.Draft
 	// matched are the open tasks a match command read.
 	matched []api.TaskView
+}
+
+// worded is an error of the terminal's own, which words itself in a catalog.
+type worded func(*texts.Catalog) string
+
+func (e worded) Error() string { return e(texts.English()) }
+
+// errorText is err as the status line says it: the terminal's own errors in the model's words.
+func (m *Model) errorText(err error) string {
+	var w worded
+	if errors.As(err, &w) {
+		return w(m.w())
+	}
+	return err.Error()
 }
 
 // Run draws the views and applies keys until q, Ctrl-C, the end of the keys
@@ -244,7 +265,7 @@ func Run(ctx context.Context, cfg Config) error {
 					return nil
 				}
 				leaving = true
-				m.Stay(waitingFor(running))
+				m.Stay(m.w().T("running actions to wait for: {n}; q again leaves without them", map[string]any{"n": running}))
 			}
 		case r := <-results:
 			if r.err != nil {
@@ -262,13 +283,17 @@ func Run(ctx context.Context, cfg Config) error {
 				m.SetDetail(f.cmd.task, f.task, f.err)
 				m.SetDrafts(f.cmd.task, f.drafts)
 			default:
-				m.Done(f.cmd, f.lines, f.err)
+				lines := f.lines
+				if f.note != nil {
+					lines = append([]string{f.note(m.w())}, lines...)
+				}
+				m.Done(f.cmd, lines, f.err)
 			}
 			if leaving {
 				if running == 0 {
 					return nil
 				}
-				m.Stay(waitingFor(running))
+				m.Stay(m.w().T("running actions to wait for: {n}; q again leaves without them", map[string]any{"n": running}))
 			}
 			if !f.cmd.matching && (!f.cmd.fetch || f.cmd.seen) {
 				due.rows.Store(true)
@@ -295,6 +320,9 @@ func (m *Model) apply(r loaded) {
 	}
 	if r.keys != nil {
 		m.SetKeys(r.keys.Bindings)
+	}
+	if r.words != nil {
+		m.words = r.words
 	}
 	m.SetData(r.rows, r.health)
 	if r.gates != nil {
@@ -326,13 +354,13 @@ func (m *Model) apply(r loaded) {
 	}
 	switch {
 	case r.specsErr != nil:
-		m.status = "actions not refreshed: " + r.specsErr.Error()
+		m.status = m.w().T("actions not refreshed: {error}", map[string]any{"error": r.specsErr.Error()})
 	case r.tasksErr != nil:
-		m.status = "tasks not refreshed: " + r.tasksErr.Error()
+		m.status = m.w().T("tasks not refreshed: {error}", map[string]any{"error": r.tasksErr.Error()})
 	case r.reviewErr != nil:
-		m.status = "review not refreshed: " + r.reviewErr.Error()
+		m.status = m.w().T("review not refreshed: {error}", map[string]any{"error": r.reviewErr.Error()})
 	case r.filteredErr != nil:
-		m.status = "filtered counts not refreshed: " + r.filteredErr.Error()
+		m.status = m.w().T("filtered counts not refreshed: {error}", map[string]any{"error": r.filteredErr.Error()})
 	}
 }
 
@@ -340,7 +368,7 @@ func (m *Model) apply(r loaded) {
 func edit(t Terminal, text string) (string, error) {
 	ed, ok := t.(Editor)
 	if !ok {
-		return "", errors.New("no editor here: type the text on the bottom line")
+		return "", worded(func(w *texts.Catalog) string { return w.T("no editor here: type the text on the bottom line", nil) })
 	}
 	return ed.Edit(text)
 }
@@ -352,7 +380,7 @@ func guard(crashed chan<- error, f func()) {
 		defer func() {
 			if p := recover(); p != nil {
 				select {
-				case crashed <- fmt.Errorf(brand.Command+" tui: %v", p):
+				case crashed <- fmt.Errorf(brand.Command+" tui: %v", p): //prose:internal the command line reports a crash in English
 				default:
 				}
 			}
@@ -361,20 +389,16 @@ func guard(crashed chan<- error, f func()) {
 	}()
 }
 
-func waitingFor(running int) string {
-	return fmt.Sprintf("waiting for %d running action(s) to finish; q again leaves without them", running)
-}
-
 // suspend hands the terminal back on Ctrl-Z. A failure is fatal: the
 // terminal may be neither raw nor restored, and Run's caller restores it.
 func suspend(t Terminal, m *Model) error {
 	s, ok := t.(Suspender)
 	if !ok {
-		m.status = "suspend is not supported here"
+		m.status = m.w().T("suspend is not supported here", nil)
 		return nil
 	}
 	if err := s.Suspend(); err != nil {
-		return fmt.Errorf("suspend: %w", err)
+		return fmt.Errorf("suspend: %w", err) //prose:internal the command line reports a failed suspend in English
 	}
 	return nil
 }
@@ -402,11 +426,13 @@ func (c *cursor) set(s api.Since) {
 // counts the last change carried, moved the units the changes with counters
 // named since the last task pull, or all of them.
 type wants struct {
-	health, rows, plan, tasks, filtered atomic.Bool
-	counters                            atomic.Pointer[api.Counters]
-	movedMu                             sync.Mutex
-	moved                               []unit.Unit
-	movedAll                            bool
+	health, rows, plan, gates, tasks, filtered atomic.Bool
+	counters                                   atomic.Pointer[api.Counters]
+	// planned are the units of the plan items last read, whose rows the plan shows.
+	planned  atomic.Pointer[map[unit.Unit]bool]
+	movedMu  sync.Mutex
+	moved    []unit.Unit
+	movedAll bool
 }
 
 func (r *wants) move(units []unit.Unit, all bool) {
@@ -428,8 +454,23 @@ func (r *wants) all() {
 	r.health.Store(true)
 	r.rows.Store(true)
 	r.plan.Store(true)
+	r.gates.Store(true)
 	r.tasks.Store(true)
 	r.filtered.Store(true)
+}
+
+// plans says whether the plan last read shows a row of units.
+func (r *wants) plans(units []unit.Unit) bool {
+	p := r.planned.Load()
+	return p != nil && slices.ContainsFunc(units, func(u unit.Unit) bool { return (*p)[u] })
+}
+
+func (r *wants) readPlan(items []api.PlanItem) {
+	p := make(map[unit.Unit]bool, len(items))
+	for _, it := range items {
+		p[it.Unit] = true
+	}
+	r.planned.Store(&p)
 }
 
 // query is the task view the screen shows and the area it follows, shared
@@ -530,15 +571,15 @@ func pullTasks(ctx context.Context, d Daemon, q client.TaskQuery, set *taskSet) 
 // onceReads are the reads a load makes once, and again only after a failure
 // or, for the catalog and the task views, when their version changed.
 type onceReads struct {
-	catalog, plugins, viewsCat, keys bool
-	specs, catalogAt, viewsAt        string
+	catalog, plugins, viewsCat, keys, words bool
+	specs, catalogAt, viewsAt, wordsAt      string
 }
 
 func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loaded, answering *atomic.Bool, at *cursor, due *wants, shown *query) {
 	var have onceReads
 	var set rowset.Set
 	var h api.Health
-	needHealth, needRows, needPlan := true, true, true
+	needHealth, needRows, needPlan, needGates := true, true, true, true
 	var plan []api.PlanItem
 	var err error
 	var rowsLoading []api.Loading
@@ -576,6 +617,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 			var res api.PlanResponse
 			if res, planErr = d.Plan(ctx, api.PlanQuery{Closed: true}); planErr == nil {
 				plan, closed = res.Items, res.Closed
+				due.readPlan(plan)
 				read := slices.Clone(plan)
 				planRead = &read
 			}
@@ -583,10 +625,16 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 		}
 		rows := set.All()
 		r := loaded{rows: rows, rowsLoading: rowsLoading, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
-		if err == nil {
+		needGates = due.gates.Swap(false) || needGates
+		if err == nil && needGates {
 			if gs, e := d.Gates(ctx); e == nil {
-				r.gates = gs
+				if gs == nil {
+					gs = []api.GateView{}
+				}
+				r.gates, needGates = gs, false
 			}
+		}
+		if err == nil {
 			r.specsErr = have.read(ctx, d, rows, len(plan) > 0, &r)
 			if shown.reviewing() {
 				if rv, e := d.Review(ctx); e != nil {
@@ -646,7 +694,19 @@ func (have *onceReads) read(ctx context.Context, d Daemon, rows []api.Row, plann
 		}
 	}
 	have.readViews(ctx, d, r)
+	have.readWords(ctx, d, r)
 	return failed
+}
+
+// readWords fills r with the client strings when none were read or the health's stamp of them moved; a
+// failure keeps the last ones, read again on the next load.
+func (have *onceReads) readWords(ctx context.Context, d Daemon, r *loaded) {
+	if have.words && r.health.Strings == have.wordsAt {
+		return
+	}
+	if res, e := d.Strings(ctx); e == nil {
+		r.words, have.words, have.wordsAt = texts.New(res), true, r.health.Strings
+	}
 }
 
 // readViews fills r with the task views until they were read once; a failure
@@ -774,7 +834,12 @@ func listen(ctx context.Context, events <-chan api.Change, at *cursor, due *want
 				counters := *c.Counters
 				due.counters.Store(&counters)
 			}
-			due.plan.Store(true)
+			if c.Plan || c.All || due.plans(c.Units) {
+				due.plan.Store(true)
+			}
+			if c.Gates || c.All {
+				due.gates.Store(true)
+			}
 			kick()
 		}
 	}
@@ -789,14 +854,18 @@ func specsVersion(rows []api.Row) string {
 	return ""
 }
 
-func acceptedLine(i api.Intake) string {
-	switch {
-	case !i.Joined:
-		return fmt.Sprintf("accepted as intake %d", i.Seq)
-	case i.Waiting():
-		return fmt.Sprintf("joined intake %d", i.Seq)
+// acceptedLine says what became of a request, in the model's words.
+func acceptedLine(i api.Intake) func(*texts.Catalog) string {
+	params := map[string]any{"n": i.Seq}
+	return func(w *texts.Catalog) string {
+		switch {
+		case !i.Joined:
+			return w.T("accepted as intake {n}", params)
+		case i.Waiting():
+			return w.T("joined intake {n}", params)
+		}
+		return w.T("intake {n} is already starting the turn; this request changed nothing", params)
 	}
-	return fmt.Sprintf("intake %d is already starting the turn; this request changed nothing", i.Seq)
 }
 
 // carry takes c to the daemon: a task's verb, detail or capture, a link
@@ -825,7 +894,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		if err != nil {
 			return carried{}, err
 		}
-		return carried{lines: []string{"in the Inbox as " + e.ID}, task: e}, nil
+		return carried{note: func(w *texts.Catalog) string { return w.T("in the Inbox as {task}", map[string]any{"task": e.ID}) }, task: e}, nil
 	case c.open != "" || c.openFind:
 		lines, e, err := openLink(ctx, cfg, c)
 		return carried{lines: lines, task: e}, err
@@ -843,17 +912,17 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		if err != nil || !rv.Done {
 			return carried{}, err
 		}
-		return carried{lines: []string{"the review is done"}}, nil
+		return carried{note: func(w *texts.Catalog) string { return w.T("the review is done", nil) }}, nil
 	}
-	lines, err := carryAction(ctx, d, c)
-	return carried{lines: lines}, err
+	lines, said, err := carryAction(ctx, d, c)
+	return carried{lines: lines, note: said}, err
 }
 
 // openLink opens the command's link, looking it up first from the task's
 // cards when the list had none.
 func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskView, error) {
 	if cfg.OpenURL == nil {
-		return nil, api.TaskView{}, errors.New("opening links is not supported here")
+		return nil, api.TaskView{}, worded(func(w *texts.Catalog) string { return w.T("opening links is not supported here", nil) })
 	}
 	link := c.open
 	if link == "" {
@@ -867,38 +936,40 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 			}
 		}
 		if link == "" {
-			return nil, e, errors.New("its unit has no link")
+			return nil, e, worded(func(w *texts.Catalog) string { return w.T("its unit has no link", nil) })
 		}
 	}
 	if !strings.HasPrefix(link, "https://") {
-		return nil, api.TaskView{}, fmt.Errorf("not opening %q: only https links open", link)
+		return nil, api.TaskView{}, worded(func(w *texts.Catalog) string {
+			return w.T("not opening {link}: only https links open", map[string]any{"link": strconv.Quote(link)})
+		})
 	}
 	if err := cfg.OpenURL(link); err != nil {
 		return nil, api.TaskView{}, err
 	}
-	return []string{"opened " + link}, api.TaskView{}, nil
+	return []string{link}, api.TaskView{}, nil
 }
 
 // carryAction takes a plan action to its item, any other to its unit.
-func carryAction(ctx context.Context, d Daemon, c Command) ([]string, error) {
+func carryAction(ctx context.Context, d Daemon, c Command) ([]string, func(*texts.Catalog) string, error) {
 	if act, ok := planActs[c.Action]; ok && c.PlanID != "" {
 		res, err := d.ActOnPlan(ctx, api.PlanActRequest{IDs: []string{c.PlanID}, Action: act, Guidance: c.Req.Guidance})
 		switch {
 		case err != nil:
-			return nil, err
+			return nil, nil, err
 		case len(res.Errors) > 0:
-			return nil, errors.New(strings.Join(res.Errors, "; "))
+			return nil, nil, errors.New(strings.Join(res.Errors, "; "))
 		case len(res.Items) == 0:
-			return nil, nil
+			return nil, nil, nil
 		}
 		it := res.Items[0]
-		return []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}, nil
+		return []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}, nil, nil
 	}
 	res, err := d.Ask(ctx, c.Unit, c.Action, c.Req)
 	if res.Intake != nil {
-		return []string{acceptedLine(*res.Intake)}, err
+		return nil, acceptedLine(*res.Intake), err
 	}
-	return res.Output, err
+	return res.Output, nil, err
 }
 
 func deref(p *[]api.PlanItem) []api.PlanItem {

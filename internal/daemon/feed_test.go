@@ -127,6 +127,8 @@ func runFeeds(t *testing.T, s *Server) {
 		cancel()
 		wg.Wait()
 	})
+	// The health the feed starts from names the viewer, as a daemon's does once it read who that is.
+	_, _ = s.viewerInfo(ctx)
 	wg.Go(func() { s.feedRows(ctx) })
 	wg.Go(func() { s.feedHealth(ctx) })
 	synctest.Wait()
@@ -251,8 +253,8 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 				health++
 			}
 		}
-		if health != 1 {
-			t.Fatalf("%d health messages: %+v", health, got)
+		if health != 0 {
+			t.Fatalf("a job nobody's health shows published %d health messages: %+v", health, got)
 		}
 	})
 }

@@ -53,11 +53,7 @@ func (ps *pubSlack) placing(its ...items.Item) *Publisher {
 
 func placeAndPublish(t *testing.T, p *Publisher, d draft.Draft) draft.Draft {
 	t.Helper()
-	target, err := p.Place(context.Background(), d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	d.Target = target
+	d = placeOnly(t, p, d)
 	if _, err := p.Publish(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +105,8 @@ func TestAChannelThreadKeepsItsThread(t *testing.T) {
 	d := threadDraft(draft.Reply, "on it")
 	d.Items = []string{"i1"}
 	p := ps.placing(anchored(d.Unit, "i1", pubConv+"/"+pubReply))
-	if target, err := p.Place(context.Background(), d); err != nil || target != "" {
-		t.Fatalf("Place = %q %v", target, err)
+	if got, err := p.Place(context.Background(), d); err != nil || got.Target != "" {
+		t.Fatalf("Place = %+v %v", got, err)
 	}
 }
 

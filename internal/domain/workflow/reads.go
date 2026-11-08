@@ -46,7 +46,14 @@ func Names(ctx context.Context, fact string) bool {
 // every text of its steps' args and of its ask, any of which may name a fact.
 func Reads(w Workflow) []string {
 	var out []string
-	for _, p := range append(w.Approval.Predicates(), w.When, w.Withdraw) {
+	preds := append(w.Approval.Predicates(), w.When)
+	for _, r := range w.Withdrawals() {
+		preds = append(preds, r.When)
+	}
+	if w.GateWithdraw != nil {
+		preds = append(preds, w.GateWithdraw.When)
+	}
+	for _, p := range preds {
 		if p != nil {
 			out = append(out, p.Reads()...)
 		}

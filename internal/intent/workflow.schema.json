@@ -20,9 +20,39 @@
               "description": "The reason the withdrawn draft stores.",
               "enum": [
                 "assigned",
-                "moot"
+                "moot",
+                "outside",
+                "joined"
               ],
               "type": "string"
+            },
+            "rule": {
+              "description": "A rule tried before when, in order, that withdraws with a reason of its own.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "default": "moot",
+                    "description": "The reason the draft the rule withdraws stores.",
+                    "enum": [
+                      "assigned",
+                      "moot",
+                      "outside",
+                      "joined"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "when"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             },
             "when": {
               "description": "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.",
@@ -33,6 +63,11 @@
         }
       },
       "type": "object"
+    },
+    "enabled": {
+      "default": true,
+      "description": "false ships the workflow off: it plans nothing until workflows.<name>.enabled = true in the config turns it on.",
+      "type": "boolean"
     },
     "gates": {
       "additionalProperties": false,
@@ -88,6 +123,29 @@
             }
           },
           "type": "object"
+        },
+        "drafts_wait": {
+          "default": false,
+          "description": "Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it.",
+          "type": "boolean"
+        },
+        "withdraw": {
+          "additionalProperties": false,
+          "description": "When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it.",
+          "properties": {
+            "reason": {
+              "description": "Why the gate was withdrawn, as its task's timeline shows it.",
+              "type": "string"
+            },
+            "when": {
+              "description": "When an open gate the workflow opened is withdrawn, over its unit's facts; it may read no untrusted fact, since a withdrawal closes a gate that waits on you. Required.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "when"
+          ],
+          "type": "object"
         }
       },
       "type": "object"
@@ -142,6 +200,21 @@
       "default": 100,
       "description": "Evaluation order, lowest first.",
       "type": "integer"
+    },
+    "outbox": {
+      "additionalProperties": false,
+      "description": "How the Outbox heads the group of the drafts the workflow proposed.",
+      "properties": {
+        "about": {
+          "description": "One line under the title on when the workflow drafts them, such as \"Drafted when a conversation where you asked something goes quiet.\"",
+          "type": "string"
+        },
+        "title": {
+          "description": "The group's title, what the drafts are for, such as \"Ask who hasn't answered\"; the summary when absent.",
+          "type": "string"
+        }
+      },
+      "type": "object"
     },
     "provider": {
       "description": "The provider of the units it matches. Required.",
@@ -304,6 +377,26 @@
             "if": {
               "properties": {
                 "use": {
+                  "const": "session.close_orphan"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "session.close_orphan"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
                   "const": "turn.start"
                 }
               },
@@ -438,20 +531,36 @@
                 },
                 "target": {
                   "default": "unit",
-                  "description": "Where the draft posts: on the unit, or on each item; an intent's help.target is free text.",
+                  "description": "Where the draft posts: on the unit, on each item, or, with per = \"person\", in the direct conversation between you and the person it is to; an intent's help.target is free text.",
                   "enum": [
                     "unit",
-                    "item"
+                    "item",
+                    "person"
                   ],
                   "type": "string"
                 },
                 "text": {
                   "default": "text.md.tmpl",
-                  "description": "The template of the draft's text, beside the manifest.",
+                  "description": "The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.",
+                  "type": "string"
+                },
+                "to": {
+                  "default": "all",
+                  "description": "Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both.",
+                  "enum": [
+                    "all",
+                    "members",
+                    "non_members"
+                  ],
                   "type": "string"
                 },
                 "use": {
                   "const": "draft.propose"
+                },
+                "why": {
+                  "default": "why.md.tmpl",
+                  "description": "The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.",
+                  "type": "string"
                 }
               },
               "required": [
@@ -682,6 +791,7 @@
               "turn.dismiss",
               "answer.refuse",
               "session.mark_dormant",
+              "session.close_orphan",
               "turn.start",
               "draft.propose",
               "classify",

@@ -4,6 +4,8 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 MODULE := github.com/wloophq/wloop
 GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
+# The binary hosts the cockpit's window on darwin through Wails' cgo-free backend, which the purego tag selects.
+WINDOW_TAGS = $(if $(filter darwin,$(1)),-tags purego)
 BRAND_TEST_NAME := zzbrand
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=$(BRAND_TEST_NAME) -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
@@ -13,7 +15,7 @@ PLUGINS := github slack
 
 build: ## Build the binary into ./bin and each plugin into ./bin/plugins/<id>/ with its manifest and profile layer
 	@mkdir -p bin
-	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/$(BINARY)
+	go build $(call WINDOW_TAGS,$(shell go env GOOS)) -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/$(BINARY)
 	@for id in $(PLUGINS); do \
 		rm -rf bin/plugins/$$id && mkdir -p bin/plugins/$$id && \
 		echo "go build -o bin/plugins/$$id/$(BINARY)-plugin-$$id ./plugins/$$id/cmd/wloop-plugin-$$id" && \
@@ -25,19 +27,20 @@ build-targets: ## Build every package, the binary and each plugin's binary for e
 	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && \
 	for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do \
 		echo "$$t" && \
-		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build ./... && \
-		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o "$$d/$$t/$(BINARY)" ./cmd/$(BINARY) || exit 1; \
+		tags=$$([ "$${t%/*}" = darwin ] && echo "-tags purego"); \
+		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build $$tags ./... && \
+		CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build $$tags -o "$$d/$$t/$(BINARY)" ./cmd/$(BINARY) || exit 1; \
 		for id in $(PLUGINS); do \
 			CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o "$$d/$$t/plugins/$$id/$(BINARY)-plugin-$$id" ./plugins/$$id/cmd/wloop-plugin-$$id || exit 1; \
 		done; \
 	done
 
 vet-darwin: ## Vet the darwin build
-	GOOS=darwin CGO_ENABLED=0 go vet ./...
+	GOOS=darwin CGO_ENABLED=0 go vet $(call WINDOW_TAGS,darwin) ./...
 
 vet-tags: ## Vet the contract and live tests, for linux and darwin, without running them
 	GOOS=linux go vet -tags contract,live ./...
-	GOOS=darwin CGO_ENABLED=0 go vet -tags contract,live ./...
+	GOOS=darwin CGO_ENABLED=0 go vet -tags contract,live,purego ./...
 
 dev-install: build ## Run this checkout's build as the installed one: agent homes, placed plugins, app, LaunchAgents and ~/.local/bin
 	@mkdir -p $(HOME)/.local/bin
@@ -76,7 +79,7 @@ print-brand-ldflags: ## Print the test brand's ldflags, to update goldens
 
 lint: fmt-check $(GOLANGCI_LINT) ## gofmt and golangci-lint, for linux and darwin
 	GOOS=linux $(GOLANGCI_LINT) run ./...
-	GOOS=darwin $(GOLANGCI_LINT) run ./...
+	GOOS=darwin $(GOLANGCI_LINT) run --build-tags purego ./...
 
 fmt-check: ## Check that every Go file is gofmt-formatted
 	@test -z "$$(git ls-files -co --exclude-standard '*.go' | xargs gofmt -l)" || (echo "gofmt needed:"; git ls-files -co --exclude-standard '*.go' | xargs gofmt -l; exit 1)

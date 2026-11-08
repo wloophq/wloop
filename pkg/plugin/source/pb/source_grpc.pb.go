@@ -1241,10 +1241,12 @@ const (
 	HostService_PutBrief_FullMethodName     = "/wloop.source.v1.HostService/PutBrief"
 	HostService_SetWake_FullMethodName      = "/wloop.source.v1.HostService/SetWake"
 	HostService_ClearWake_FullMethodName    = "/wloop.source.v1.HostService/ClearWake"
+	HostService_WakeJob_FullMethodName      = "/wloop.source.v1.HostService/WakeJob"
 	HostService_Ask_FullMethodName          = "/wloop.source.v1.HostService/Ask"
 	HostService_Meter_FullMethodName        = "/wloop.source.v1.HostService/Meter"
 	HostService_Config_FullMethodName       = "/wloop.source.v1.HostService/Config"
 	HostService_Profile_FullMethodName      = "/wloop.source.v1.HostService/Profile"
+	HostService_Holds_FullMethodName        = "/wloop.source.v1.HostService/Holds"
 	HostService_Events_FullMethodName       = "/wloop.source.v1.HostService/Events"
 )
 
@@ -1280,11 +1282,14 @@ type HostServiceClient interface {
 	// Wakes.
 	SetWake(ctx context.Context, in *SetWakeRequest, opts ...grpc.CallOption) (*SetWakeResponse, error)
 	ClearWake(ctx context.Context, in *ClearWakeRequest, opts ...grpc.CallOption) (*ClearWakeResponse, error)
+	// Jobs.
+	WakeJob(ctx context.Context, in *WakeJobRequest, opts ...grpc.CallOption) (*WakeJobResponse, error)
 	// Services.
 	Ask(ctx context.Context, in *AskRequest, opts ...grpc.CallOption) (*AskResponse, error)
 	Meter(ctx context.Context, in *MeterRequest, opts ...grpc.CallOption) (*MeterResponse, error)
 	Config(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
 	Profile(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*ProfileResponse, error)
+	Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error)
 	// History.
 	Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*EventsResponse, error)
 }
@@ -1477,6 +1482,16 @@ func (c *hostServiceClient) ClearWake(ctx context.Context, in *ClearWakeRequest,
 	return out, nil
 }
 
+func (c *hostServiceClient) WakeJob(ctx context.Context, in *WakeJobRequest, opts ...grpc.CallOption) (*WakeJobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WakeJobResponse)
+	err := c.cc.Invoke(ctx, HostService_WakeJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *hostServiceClient) Ask(ctx context.Context, in *AskRequest, opts ...grpc.CallOption) (*AskResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AskResponse)
@@ -1511,6 +1526,16 @@ func (c *hostServiceClient) Profile(ctx context.Context, in *ProfileRequest, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ProfileResponse)
 	err := c.cc.Invoke(ctx, HostService_Profile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *hostServiceClient) Holds(ctx context.Context, in *HoldsRequest, opts ...grpc.CallOption) (*HoldsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HoldsResponse)
+	err := c.cc.Invoke(ctx, HostService_Holds_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1559,11 +1584,14 @@ type HostServiceServer interface {
 	// Wakes.
 	SetWake(context.Context, *SetWakeRequest) (*SetWakeResponse, error)
 	ClearWake(context.Context, *ClearWakeRequest) (*ClearWakeResponse, error)
+	// Jobs.
+	WakeJob(context.Context, *WakeJobRequest) (*WakeJobResponse, error)
 	// Services.
 	Ask(context.Context, *AskRequest) (*AskResponse, error)
 	Meter(context.Context, *MeterRequest) (*MeterResponse, error)
 	Config(context.Context, *ConfigRequest) (*ConfigResponse, error)
 	Profile(context.Context, *ProfileRequest) (*ProfileResponse, error)
+	Holds(context.Context, *HoldsRequest) (*HoldsResponse, error)
 	// History.
 	Events(context.Context, *EventsRequest) (*EventsResponse, error)
 	mustEmbedUnimplementedHostServiceServer()
@@ -1630,6 +1658,9 @@ func (UnimplementedHostServiceServer) SetWake(context.Context, *SetWakeRequest) 
 func (UnimplementedHostServiceServer) ClearWake(context.Context, *ClearWakeRequest) (*ClearWakeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClearWake not implemented")
 }
+func (UnimplementedHostServiceServer) WakeJob(context.Context, *WakeJobRequest) (*WakeJobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WakeJob not implemented")
+}
 func (UnimplementedHostServiceServer) Ask(context.Context, *AskRequest) (*AskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Ask not implemented")
 }
@@ -1641,6 +1672,9 @@ func (UnimplementedHostServiceServer) Config(context.Context, *ConfigRequest) (*
 }
 func (UnimplementedHostServiceServer) Profile(context.Context, *ProfileRequest) (*ProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Profile not implemented")
+}
+func (UnimplementedHostServiceServer) Holds(context.Context, *HoldsRequest) (*HoldsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Holds not implemented")
 }
 func (UnimplementedHostServiceServer) Events(context.Context, *EventsRequest) (*EventsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Events not implemented")
@@ -1990,6 +2024,24 @@ func _HostService_ClearWake_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HostService_WakeJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WakeJobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HostServiceServer).WakeJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HostService_WakeJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HostServiceServer).WakeJob(ctx, req.(*WakeJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _HostService_Ask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AskRequest)
 	if err := dec(in); err != nil {
@@ -2058,6 +2110,24 @@ func _HostService_Profile_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(HostServiceServer).Profile(ctx, req.(*ProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HostService_Holds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HoldsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HostServiceServer).Holds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HostService_Holds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HostServiceServer).Holds(ctx, req.(*HoldsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2160,6 +2230,10 @@ var HostService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _HostService_ClearWake_Handler,
 		},
 		{
+			MethodName: "WakeJob",
+			Handler:    _HostService_WakeJob_Handler,
+		},
+		{
 			MethodName: "Ask",
 			Handler:    _HostService_Ask_Handler,
 		},
@@ -2174,6 +2248,10 @@ var HostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Profile",
 			Handler:    _HostService_Profile_Handler,
+		},
+		{
+			MethodName: "Holds",
+			Handler:    _HostService_Holds_Handler,
 		},
 		{
 			MethodName: "Events",

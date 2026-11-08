@@ -16,10 +16,13 @@ type Engine struct {
 	// Broken names the workflows that failed to load; their proposed drafts
 	// stay until they load again or are gone. Nil: none failed.
 	Broken func() []string
-	Units  Units
+	// Disabled names the workflows the configuration turns off; they
+	// propose nothing, and their proposed drafts stay. Nil: none is off.
+	Disabled func() []string
+	Units    Units
 	// Keep is the host's own bookkeeping of the units, which no unit
 	// reports: a value implementing any of Preparer, Refresher, Settler,
-	// Gainer, Owner, Seener, Scoper and EventFacts; nil keeps none.
+	// Gainer, Owner, Seener, Scoper, EventFacts and Skipper; nil keeps none.
 	Keep     any
 	Events   Events
 	Steps    Steps

@@ -13,6 +13,15 @@ import (
 // GatePath; a draft gate's Subject is its Draft.
 const Drafts = "/api/drafts"
 
+// DraftCloseSilently takes a DraftCloseSilentlyRequest: it closes the held draft's conversation as the
+// draft would, applying its effects without posting it, and answers the Draft.
+const DraftCloseSilently = Drafts + "/{id}/close-silently"
+
+// DraftCloseSilentlyRequest names the draft's version the person saw.
+type DraftCloseSilentlyRequest struct {
+	Rev int64 `json:"rev"`
+}
+
 type DraftsResponse struct {
 	Drafts []Draft `json:"drafts"`
 }
@@ -29,9 +38,16 @@ type Draft struct {
 	Delivery string   `json:"delivery"`
 	Effects  []string `json:"effects"`
 	Target   string   `json:"target"`
+	// Broadcast is "on" or "off" for a thread reply also posted, or not, to its conversation, which edit's
+	// broadcast argument turns; "" when the draft replies in no thread.
+	Broadcast string `json:"broadcast"`
 	// Where names the conversation or person the draft posts to; "" when its publisher could not tell.
-	Where    string `json:"where"`
-	Text     string `json:"text"`
+	Where string `json:"where"`
+	Text  string `json:"text"`
+	// Why is why the draft was proposed, in the interface language when it was made; Language is the
+	// language Text is written in.
+	Why      string `json:"why"`
+	Language string `json:"language"`
 	Reaction string `json:"reaction"`
 	Original string `json:"original"`
 	// Replaced is the text a sent edit replaced.
@@ -39,10 +55,16 @@ type Draft struct {
 	Edited   bool        `json:"edited"`
 	Origin   DraftOrigin `json:"origin"`
 	// State is where its delivery stands: held while its gate is open, queued, sending, sent, failed or dropped.
-	State     string `json:"state"`
-	Error     string `json:"error"`
-	Reason    string `json:"reason"`
-	Permalink string `json:"permalink"`
+	State  string `json:"state"`
+	Error  string `json:"error"`
+	Reason string `json:"reason"`
+	// Quoted says, in the profile's words (gates.toml's drafts.quoted), which conversation a draft posted in
+	// the direct conversation of the person it is to quotes; "" for any other draft.
+	Quoted string `json:"quoted,omitempty"`
+	// ReasonText is Reason in the profile's words (gates.toml's drafts.reasons) for a dropped draft; "" when
+	// it words none.
+	ReasonText string `json:"reason_text,omitempty"`
+	Permalink  string `json:"permalink"`
 	// Gate is the draft's gate, 0 for none; Deadline is when its window resolves it, nil for none; Intents are
 	// its open gate's intents by the status each resolves it to (approved, rejected), the first of each.
 	Gate     int64             `json:"gate,omitempty"`
@@ -63,6 +85,42 @@ type Draft struct {
 	Names map[string]string `json:"names,omitempty"`
 	// ItemDetails are the items the draft is about, with their summaries.
 	ItemDetails []ItemView `json:"item_details,omitempty"`
+}
+
+// OutboxPage is the Outbox's drafts in groups, the largest first, then by title.
+type OutboxPage struct {
+	Groups []OutboxGroup `json:"groups"`
+}
+
+// OutboxGroup is the drafts one workflow proposed (Workflow its name), else those of one Purpose no workflow
+// proposed, else those written by hand (both ""). Title and About are the profile's words for it, in the
+// served locale.
+type OutboxGroup struct {
+	Workflow string        `json:"workflow,omitempty"`
+	Purpose  string        `json:"purpose,omitempty"`
+	Title    string        `json:"title"`
+	About    string        `json:"about,omitempty"`
+	Drafts   []OutboxDraft `json:"drafts"`
+}
+
+// OutboxDraft is a draft with what a person reads to decide on it.
+type OutboxDraft struct {
+	Draft
+	Context DraftContext `json:"context"`
+}
+
+// DraftContext is what a draft answers: the asks of its task, with their quotes, and the items it is about,
+// with where each stands.
+type DraftContext struct {
+	Asks  []AskView    `json:"asks"`
+	Items []OutboxItem `json:"items"`
+}
+
+// OutboxItem is an item a draft is about.
+type OutboxItem struct {
+	ID      string `json:"id"`
+	Summary string `json:"summary"`
+	State   string `json:"state"`
 }
 
 type DraftOrigin struct {
@@ -96,8 +154,11 @@ type DraftCreate struct {
 	// Target is the message a reply answers or a reaction goes on, when it is
 	// not the unit's own.
 	Target string `json:"target,omitempty"`
-	Send   bool   `json:"send,omitempty"`
-	Source string `json:"source"`
+	// Broadcast asks, "on" or "off", that a reply in a thread also post to its conversation, or not; "" leaves it
+	// to the publisher, which also ignores it on a reply in no thread.
+	Broadcast string `json:"broadcast,omitempty"`
+	Send      bool   `json:"send,omitempty"`
+	Source    string `json:"source"`
 }
 
 // DraftOf is the draft of e's first draft gate, its subject; false when e has none.

@@ -43,6 +43,20 @@
       },
       "type": "array"
     },
+    "detail": {
+      "additionalProperties": false,
+      "description": "What a task's detail panel offers.",
+      "properties": {
+        "verbs": {
+          "description": "The verbs the detail shows as buttons, in order, each a verb of verbs; those the task does not offer are left out, and every other verb it offers waits behind a More button that opens the palette. A user layer's list replaces the one below it.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "owed_by": {
       "additionalProperties": false,
       "description": "Who owes a task's next step.",
@@ -114,6 +128,29 @@
         "type": "object"
       },
       "description": "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type.",
+      "type": "object"
+    },
+    "runs": {
+      "additionalProperties": false,
+      "description": "The words a task's runs read in its detail and its terminal page.",
+      "properties": {
+        "sessions": {
+          "additionalProperties": {
+            "description": "The session state's word, such as \"dormant\"; the key is a session state: active, dormant or closed.",
+            "type": "string"
+          },
+          "description": "Where a run's agent session stands, by state, as its run card says it.",
+          "type": "object"
+        },
+        "states": {
+          "additionalProperties": {
+            "description": "The state's word, such as \"started\"; the key is a turn state: sent, started, asked, done, settled, failed, unrecorded, dismissed, replaced or withdrawn.",
+            "type": "string"
+          },
+          "description": "Where a run's turn stands, by state, as its run card says it. A state with no word shows as it is named.",
+          "type": "object"
+        }
+      },
       "type": "object"
     },
     "stale_waiting_days": {

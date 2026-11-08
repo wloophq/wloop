@@ -60,7 +60,8 @@ func (c Catalog) Facets() []api.FacetSpec {
 		w := t.Facets[f.ID]
 		spec := api.FacetSpec{ID: f.ID, Label: cmp.Or(w.Label, f.ID), Provider: c.Source.Provider, Group: f.Group, Sort: f.Sort,
 			Rank: slices.Clone(f.Rank), Empty: w.Empty, Match: f.Match, Menu: f.Menu, Strip: f.Strip,
-			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass), Colors: maps.Clone(w.Colors)}
+			Show: w.Show.Part, ShowOnly: slices.Clone(w.Show.Only), ShowValues: w.Show.Values, RowClass: maps.Clone(w.RowClass), Colors: maps.Clone(w.Colors),
+			ShowWhen: maps.Clone(w.Show.When), ShowMax: w.Show.Max, ShowLabel: w.Show.Label}
 		if w.LabelPrefix != nil {
 			spec.LabelPrefix = *w.LabelPrefix
 		}
@@ -120,6 +121,33 @@ func (c Catalog) Lens() api.ProviderWords {
 	return api.ProviderWords{Provider: c.Source.Provider, Words: c.texts().Lens.Set()}
 }
 
+// Reasons are the plugin's words of the reasons its situations name, by reason key.
+func (c Catalog) Reasons() api.ProviderWords {
+	if c.Source == nil {
+		return api.ProviderWords{}
+	}
+	return api.ProviderWords{Provider: c.Source.Provider, Words: maps.Clone(c.texts().Reasons)}
+}
+
+// CardSignals are the plugin's words of its cards' signals, by key, in key order; a signal whose values take
+// words from the situations reads each kind as the situations do unless its own values word it.
+func (c Catalog) CardSignals() []api.SignalSpec {
+	if c.Source == nil {
+		return nil
+	}
+	t := c.texts()
+	var out []api.SignalSpec
+	for _, key := range slices.Sorted(maps.Keys(t.Signals)) {
+		w := t.Signals[key]
+		values := maps.Clone(w.Values)
+		if w.ValuesFrom == "situations" {
+			values = mergeLabels(maps.Clone(t.Situations), values)
+		}
+		out = append(out, api.SignalSpec{Provider: c.Source.Provider, Key: key, Label: cmp.Or(w.Label, key), Values: values, Notes: maps.Clone(w.Notes)})
+	}
+	return out
+}
+
 // Events are the words of the event kinds the manifest declares that its
 // profile layer words; a kind it leaves out shows as itself.
 func (c Catalog) Events() []api.EventSpec {
@@ -130,7 +158,11 @@ func (c Catalog) Events() []api.EventSpec {
 	var out []api.EventSpec
 	for _, e := range c.Source.Events {
 		if w, ok := t.Events[e.Name]; ok {
-			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: w.Loop, Data: w.Data})
+			tone := w.Tone
+			if tone == "" && w.Loop {
+				tone = "loop"
+			}
+			out = append(out, api.EventSpec{Provider: c.Source.Provider, Kind: e.Name, Label: w.Label, Loop: tone == "loop", Tone: tone, Data: w.Data})
 		}
 	}
 	return out

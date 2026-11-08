@@ -3,6 +3,7 @@
 package turnstest
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"sync"
@@ -34,6 +35,10 @@ type Sessions struct {
 	readErr   error
 	partial   bool
 	refreshes int
+	orphaned  map[string]bool
+	epoch     string
+	at        time.Time
+	hidden    bool
 }
 
 var (
@@ -143,20 +148,63 @@ func (s *Sessions) Typed() []Typed {
 func (s *Sessions) Terminals(_ context.Context, workspaceID string) ([]turns.Terminal, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.terminals[workspaceID]), s.readErr
+	return slices.DeleteFunc(slices.Clone(s.terminals[workspaceID]), func(t turns.Terminal) bool { return s.orphaned[t.Session] }), s.readErr
 }
 
-// Census lists every terminal Put holds, complete unless Partial was called.
+// Census lists every terminal Put holds, complete unless Partial was called,
+// those Orphan named orphaned with their last output, read in the epoch and at
+// the time SetReading set ("e1" and the caller's clock by default).
 func (s *Sessions) Census(context.Context) (turns.Census, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c := turns.Census{Sessions: map[string]string{}, Complete: !s.partial, RuntimeID: "fake"}
+	c := turns.Census{Sessions: map[string]string{}, Complete: !s.partial, RuntimeID: "fake", Epoch: cmp.Or(s.epoch, "e1"), At: s.at,
+		Orphans: map[string]time.Time{}, Shown: !s.hidden, Processes: map[string]turns.ProcessRef{}}
 	for ws, ts := range s.terminals {
 		for _, t := range ts {
 			c.Sessions[t.Session] = ws
+			c.Processes[t.Session] = turns.ProcessRef{Manager: cmp.Or(t.Manager, TestManager), Handle: cmp.Or(t.Handle, t.Session)}
+			if s.orphaned[t.Session] {
+				c.Orphans[t.Session] = t.LastOutput
+			}
 		}
 	}
 	return c, s.readErr
+}
+
+// SetReading makes Census read in epoch at at.
+func (s *Sessions) SetReading(epoch string, at time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.epoch, s.at = epoch, at
+}
+
+// SetShown makes Census report whether the app's windows show some terminal (they do by default).
+func (s *Sessions) SetShown(shown bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hidden = !shown
+}
+
+// Unorphan makes the sessions' terminals shown again, as a window reattaching them.
+func (s *Sessions) Unorphan(sessions ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range sessions {
+		delete(s.orphaned, id)
+	}
+}
+
+// Orphan makes the sessions' terminals orphaned: the census lists them, and
+// Terminals, as an app no longer showing them, does not.
+func (s *Sessions) Orphan(sessions ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.orphaned == nil {
+		s.orphaned = map[string]bool{}
+	}
+	for _, id := range sessions {
+		s.orphaned[id] = true
+	}
 }
 
 // Partial makes Census incomplete.

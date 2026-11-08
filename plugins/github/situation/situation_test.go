@@ -1,11 +1,15 @@
 package situation
 
 import (
+	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
@@ -138,6 +142,37 @@ func TestNoReviewerWaitsOnAuthor(t *testing.T) {
 	r := derive(open("ana"), h(10), ev(pr.KindOpened, "", "ana", h(0), ""), ev(pr.KindPush, "h2", "ana", h(1), ""))
 	if r.Kind != KindNoReviewer || r.WaitingOn != "author" || !r.Since.Equal(h(1)) {
 		t.Fatalf("%+v", r)
+	}
+}
+
+func TestWithNoReviewerRequiredAnUnreviewedPullRequestIsNeverNoReviewer(t *testing.T) {
+	solo := func(p pr.PR, evs ...pr.Event) Result {
+		return Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, ReviewerOptional: true})
+	}
+	push := ev(pr.KindPush, "h2", "me", h(1), "")
+	if r := solo(open("me"), push); r.Kind != KindMerge || r.WaitingOn != "author" || !r.Since.Equal(h(1)) || r.ReasonKey != "no_review_required" {
+		t.Fatalf("green: %+v", r)
+	}
+	pending := open("me")
+	pending.ChecksState = "PENDING"
+	if r := solo(pending, push); r.Kind != KindMerge || r.ReasonKey != "no_review_required_checks_pending" {
+		t.Fatalf("checks pending: %+v", r)
+	}
+	failing := open("me")
+	failing.ChecksState = "FAILURE"
+	if r := solo(failing, push); r.Kind != KindChecks {
+		t.Fatalf("failing checks: %+v", r)
+	}
+	conflicting := open("me")
+	conflicting.Mergeable, conflicting.BaseBranch, conflicting.MergeableAt = "CONFLICTING", "main", h(3)
+	if r := solo(conflicting, push); r.Kind != KindConflicts || !r.Since.Equal(h(3)) {
+		t.Fatalf("conflicts: %+v", r)
+	}
+	if r := solo(open("me", "carla"), push, requested("carla", "me", h(2))); r.Kind != KindReview || r.WaitingOn != "carla" {
+		t.Fatalf("a reviewer asked still waits on them: %+v", r)
+	}
+	if r := Derive(Input{PR: open("me"), Events: []pr.Event{push}, Viewer: "me", Now: h(10), Stalled: th}); r.Kind != KindNoReviewer {
+		t.Fatalf("a reviewer required: %+v", r)
 	}
 }
 
@@ -565,5 +600,63 @@ func TestAnOpenQuestionWaitsOnMeWhateverTheAuthorOwes(t *testing.T) {
 	}
 	if r := Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th}); r.Kind != KindChanges {
 		t.Fatalf("no question: %+v", r)
+	}
+}
+
+func TestDeriveNamesItsReasonForTheProfile(t *testing.T) {
+	noReviewer := derive(open("ana"), h(10), ev(pr.KindPush, "h2", "ana", h(1), ""))
+	changes := derive(open("ana"), h(10), ev(pr.KindPush, "h2", "ana", h(1), ""), ev(pr.KindReview, "r1", "bia", h(3), "CHANGES_REQUESTED:h2"))
+	p := open("ana")
+	p.ChecksState = "FAILURE"
+	p.FailingChecks = []pr.FailingCheck{{Name: "build"}, {Name: "lint"}, {Name: "e2e"}, {Name: "docs"}}
+	checks := derive(p, h(10))
+	for _, c := range []struct {
+		got    Result
+		key    string
+		params map[string]string
+	}{
+		{noReviewer, "no_reviewer_requested", nil},
+		{changes, "changes_requested", map[string]string{"actor": "bia"}},
+		{checks, "checks_failing_more", map[string]string{"checks": "build, lint, e2e", "more": "1"}},
+	} {
+		if c.got.ReasonKey != c.key || !maps.Equal(c.got.ReasonParams, c.params) {
+			t.Errorf("%q: key %q params %v, want %q %v", c.got.Reason, c.got.ReasonKey, c.got.ReasonParams, c.key, c.params)
+		}
+		if s := c.got.Situation(); s.ReasonKey != c.key || !maps.Equal(s.ReasonParams, c.params) {
+			t.Errorf("the snapshot's situation drops the reason's key: %+v", s)
+		}
+	}
+}
+
+// TestEveryReasonIsWordedInEveryLocale checks that the profile layer words every reason Derive names, in
+// English and in Portuguese, filling every value the reason carries, and words no other.
+func TestEveryReasonIsWordedInEveryLocale(t *testing.T) {
+	for _, path := range []string{"../profile/ui.toml", "../profile/locales/pt-BR/ui.toml"} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Reasons map[string]string `toml:"reasons"`
+		}
+		if err := toml.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for key, english := range Reasons {
+			word := doc.Reasons[key]
+			if word == "" {
+				t.Errorf("%s does not word the reason %s", path, key)
+			}
+			for _, p := range reasonParams(english) {
+				if !strings.Contains(word, "{{."+p+"}}") {
+					t.Errorf("%s: the reason %s does not show %s: %q", path, key, p, word)
+				}
+			}
+		}
+		for key := range doc.Reasons {
+			if _, ok := Reasons[key]; !ok {
+				t.Errorf("%s words %s, which no reason is", path, key)
+			}
+		}
 	}
 }

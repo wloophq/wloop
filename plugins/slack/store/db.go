@@ -22,6 +22,8 @@ const TimeLayout = time.RFC3339Nano
 type Change struct {
 	Units []unit.Unit
 	All   bool
+	// Landed says the commit added a change for the extraction to read.
+	Landed bool
 }
 
 // DB is the plugin's store. Every write runs under one lock, and each
@@ -81,8 +83,9 @@ func (db *DB) Read(ctx context.Context, fn func(tx *sql.Tx) error) error {
 // Tx is a write transaction that records the units it changed.
 type Tx struct {
 	*sql.Tx
-	units []unit.Unit
-	all   bool
+	units  []unit.Unit
+	all    bool
+	landed bool
 }
 
 // Touch records that the transaction changed the reported facts of units;
@@ -112,12 +115,12 @@ func (db *DB) Write(ctx context.Context, fn func(tx *Tx) error) (Change, error) 
 	if err := stx.Commit(); err != nil {
 		return Change{}, err
 	}
-	if len(tx.units) == 0 && !tx.all {
+	if len(tx.units) == 0 && !tx.all && !tx.landed {
 		return Change{}, nil
 	}
 	units := slices.Clone(tx.units)
 	slices.SortFunc(units, unit.Compare)
-	c := Change{Units: slices.Compact(units), All: tx.all}
+	c := Change{Units: slices.Compact(units), All: tx.all, Landed: tx.landed}
 	db.listenMu.Lock()
 	listen := slices.Clone(db.listen)
 	db.listenMu.Unlock()

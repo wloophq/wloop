@@ -30,14 +30,18 @@ func appJS(t *testing.T) string {
 	return string(render(raw))
 }
 
-// cockpitJS is app.js and dash.js, the scripts whose functions tests run.
+// cockpitJS is app.js, dash.js, rail.js and toolbar.js, the scripts whose functions tests run.
 func cockpitJS(t *testing.T) string {
 	t.Helper()
-	raw, err := fs.ReadFile(files, "static/dash.js")
-	if err != nil {
-		t.Fatal(err)
+	out := appJS(t)
+	for _, name := range []string{"dash.js", "rail.js", "toolbar.js"} {
+		raw, err := fs.ReadFile(files, "static/"+name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out += "\n" + string(render(raw))
 	}
-	return appJS(t) + "\n" + string(render(raw))
+	return out
 }
 
 // jsFunction is the source of a top-level function in app.js.
@@ -122,6 +126,8 @@ func filterPrelude(t *testing.T) string {
 	for _, c := range []string{"UNIT_KEY", "PR_URL"} {
 		b.WriteString(jsConst(t, src, c))
 	}
+	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
+	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "RECENT"))
 	b.WriteString(keyJS(t))
 	b.WriteString(fieldsPrelude(t))
 	return b.String()
@@ -129,7 +135,7 @@ func filterPrelude(t *testing.T) string {
 
 var queryFuncs = []string{"fold", "tokens", "unquote", "terms", "fieldById", "normValue", "qualifierOf", "qualifiers"}
 
-var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
+var filterFuncs = append(slices.Clone(queryFuncs), "rowTexts", "reasonText", "fillWord", "rowKindLabel", "kindLabel", "haystack", "matches", "foldMap", "marked", "rowByURL")
 
 func TestFilterFoldsAndMarks(t *testing.T) {
 	cases := [][2]string{
@@ -199,6 +205,7 @@ func TestFilterMatchesEveryTermAndAPastedLinkFindsItsRow(t *testing.T) {
 
 func TestEmptyNotesNameTheFilter(t *testing.T) {
 	prelude := filterPrelude(t) + `let activityLoopOnly = false;
+const searchService = () => "GitHub";
 const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event: { kind: "push" } }] };
 `
 	var got [][]any
@@ -213,7 +220,7 @@ const state = { loaded: true, rows: [], activityLoaded: true, activity: [{ event
 ]));`, nil, &got)
 	want := [][]any{
 		{`Nothing in Recent matches "zzz".`},
-		{"acme/web#3 is not in the inventory. ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
+		{"acme/web#3 is not in the inventory.", " ", map[string]any{"button": "Explore it"}, " ", map[string]any{"a": "Open it on GitHub"}},
 		{"No loop events in the recent activity."},
 		{"Nothing happened in the inventory yet."},
 		{`Nothing in My PRs matches "zzz".`},
@@ -316,7 +323,7 @@ func TestRowsShowTheBriefSizeRiskAndQuestions(t *testing.T) {
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }` + "\n" +
 		jsConst(t, appJS(t), "SIZES") + jsConst(t, appJS(t), "RISKS") + jsConst(t, appJS(t), "TAG_CHIPS")
 	var got []any
-	nodeRun(t, prelude, []string{"tagChips", "briefTags"}, `process.stdout.write(JSON.stringify(input.map((b) => briefTags(b))));`, []any{
+	nodeRun(t, prelude+stringsPrelude(t, "en", "../../profiles/default/strings.toml"), []string{"tagChips", "briefTags"}, `process.stdout.write(JSON.stringify(input.map((b) => briefTags(b))));`, []any{
 		map[string]any{"size": "m", "risk": "high", "goal": "g", "open_questions": 2},
 		map[string]any{"size": "xs", "risk": "low", "open_questions": 1},
 		map[string]any{"size": "huge", "risk": "x\" onmouseover=\"y", "open_questions": 0},
@@ -357,6 +364,19 @@ func TestTheFilterFindsARowsSearchTexts(t *testing.T) {
 		`process.stdout.write(JSON.stringify(["webhook", "batch delivery", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
 	if !slices.Equal(got, []bool{true, true, false}) {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestTheFilterFindsAReasonByItsWords(t *testing.T) {
+	var got []bool
+	row := wireRow("me", time.Now(), map[string]any{"title": "Batch export", "label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}})
+	sum := row["summary"].(map[string]any)
+	sum["reason"], sum["reason_key"] = "no reviewer requested", "no_reviewer_requested"
+	nodeRun(t, filterPrelude(t), filterFuncs, `
+catalog.reasons = [{ provider: "github", words: { no_reviewer_requested: "nenhum revisor pedido" } }];
+process.stdout.write(JSON.stringify(["revisor", "reviewer", "zebra"].map((q) => matches(input, terms(q)))));`, row, &got)
+	if !slices.Equal(got, []bool{true, true, false}) {
+		t.Fatalf("%v: the filter finds a row by the words its reason shows, and by its sentence", got)
 	}
 }
 
@@ -473,7 +493,7 @@ func TestCopiedExploreCandidatesSayWhatTheCardsSay(t *testing.T) {
 	var got string
 	nodeRun(t, keyJS(t)+catalogPrelude(t)+`const state = { rows: [] };
 const rowByKey = () => undefined;`,
-		[]string{"safeURL", "candidateURL", "yamlString", "candidatesYAML"},
+		[]string{"safeURL", "candidateURL", "yamlString", "yamlMap", "candidatesYAML"},
 		`process.stdout.write(JSON.stringify(candidatesYAML(input.meta, input.cands)));`, in, &got)
 	for _, want := range []string{
 		`query: "widgets"`, `read_as: "read \"widgets\" as repo:acme/widgets"`, "count: 1", "pull_requests:",
@@ -545,12 +565,12 @@ func TestAFacetTogglesItsQualifier(t *testing.T) {
 }
 
 // rowFuncs are app.js's row renderer and what it calls beyond the lens.
-var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "rowParts", "rowClasses", "partClass", "pieceButtons", "rowColumnDefs", "rowColumns",
-	"columnSort", "sortPick", "rowHead", "rowTr", "rowMeta", "rowWho", "rowCard", "roveKey", "roveStop", "rowStops", "joined", "refTail", "rowTable", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
+var rowFuncs = []string{"stripDot", "specFor", "rfc3339", "agePart", "ageText", "partPiece", "holdsWhen", "rowParts", "rowClasses",
+	"roveKey", "roveStop", "rowStops", "refTail", "unitTitle", "rowWords", "lensWords", "fillWord", "facet",
 	"rowLink", "bucketOf", "goDuration", "toggleCollapsed", "onlyThis", "groupQualifier", "multiCopy", "marked", "foldMap", "copySlot"}
 
 // lensFuncs are what pipeline runs, with what the fields call.
-var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
+var lensFuncs = append(slices.Clone(queryFuncs), "rowTexts", "reasonText", "rowKindLabel", "kindLabel", "haystack", "matches", "inView", "isSet", "isMuted", "resolveWho", "waitingWho", "waitingLabel",
 	"specFor", "stripSpec", "stripColor", "stripOf", "rowStrip", "waitCat", "waitColor", "waitClass", "rowTip", "viewStrip", "isStalled", "rowFlags", "upcoming", "sinceTime", "itemValues", "itemKey", "filtersOf", "passesFilters", "passes", "parseSort",
 	"lensWords", "fillWord", "tagKeyField", "groupField", "effectiveGroup", "cmp", "byDefault", "keyRank", "keyOrder", "compareItems", "groupLabel", "groupItems", "pipelineOf", "pipeline")
 
@@ -747,7 +767,7 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"tbody tr.sel td:first-child, .card.sel", "box-shadow: inset var(--strip-card) 0 0 var(--me)", "--sel-unit: color-mix(in srgb, var(--me) 14%"} {
+	for _, want := range []string{".row.sel, .card.sel", "box-shadow: inset var(--strip-card) 0 0 var(--me)", "--sel-unit: color-mix(in srgb, var(--me) 14%"} {
 		if !strings.Contains(string(css), want) {
 			t.Errorf("app.css lacks %s", want)
 		}
@@ -989,23 +1009,6 @@ func TestAnswerSaidJoinsTheChoiceAndTheNote(t *testing.T) {
 	want := []string{"yes", "yes. but squash", "option b. after CI", "no. drop the nit", "look elsewhere", "no"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("%q, want %q", got, want)
-	}
-}
-
-func TestEveryLoopActionHasALabelAndIsALoopEvent(t *testing.T) {
-	src := appJS(t)
-	labels := src[strings.Index(src, "const EVENT_LABEL = {"):]
-	labels = labels[:strings.Index(labels, "};")]
-	loop := src[strings.Index(src, "const LOOP_EVENTS = "):]
-	loop = loop[:strings.Index(loop, "\n")]
-	for _, kind := range []string{"turn_sent", "turn_delivered", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn",
-		"answered", "answer_routed", "question_dismissed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"} {
-		if !strings.Contains(labels, kind+": ") {
-			t.Errorf("%s has no label", kind)
-		}
-		if !strings.Contains(loop, `"`+kind+`"`) {
-			t.Errorf("%s is not a loop event", kind)
-		}
 	}
 }
 
@@ -1607,7 +1610,7 @@ func TestLoadRefreshesTheSpecsAndKeepsThemWhenTheFetchFails(t *testing.T) {
 		Error    string   `json:"error"`
 	}
 	nodeRun(t, `const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "", busy: new Set(), answered: new Map() };
-`+keyJS(t)+noPlugins+noViews+noUpdate+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
+`+keyJS(t)+noPlugins+noViews+noUpdate+noScreens+`const CARD_GROUPS = new Set(["turn", "intake", "brief"]);
 const focusSlot = (n) => n;
 function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, text: c.flat().join("") }; }
 const fetches = []; let listed = "v1"; let actionsFail = false; let detailVersion = "v1";
@@ -1673,7 +1676,7 @@ func TestSpecsLoadWithAnEmptyInventory(t *testing.T) {
 		Fetches []string `json:"fetches"`
 		Version string   `json:"version"`
 	}
-	nodeRun(t, noPlugins+noViews+noUpdate+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
+	nodeRun(t, noPlugins+noViews+noUpdate+noScreens+`const state = { specs: { version: "", byId: {} }, rows: [], detail: null, error: "" };
 const fetches = [];
 const getJSON = async (url) => {
   if (url === "/api/rows") return { rows: [] };
@@ -1802,20 +1805,31 @@ func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
 		Unit  string `json:"unit"`
 		Title string `json:"title"`
 		Href  string `json:"href"`
+		WF    string `json:"wf"`
+		WFTip string `json:"wf_tip"`
+		Bare  string `json:"bare"`
 	}
 	src := appJS(t)
 	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
 const state = { busy: new Set(), answered: new Map(), planSpecs: {} };
 const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () => "";
+const planTarget = () => null, planDoes = () => null, planWhy = () => null, planReason = (it) => it.reason;
 `
 	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
 const li = planItem({ id: "slack-follow-up/slack/T1%2FC1%2F171.1/ee", workflow: "slack-follow-up", decision: "pending", default: "wait",
+  summary: "Nudge a thread that waits on someone; posts after you approve",
   unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan for the export", link: "https://chat.example/T1/C1/171.1", actions: [] });
+const bare = planItem({ id: "fake/x", workflow: "fake-close", decision: "pending", unit: { provider: "task", key: "t-1" }, actions: [] });
 const unit = byClass(li, "plan-unit")[0];
 const link = all(unit, (x) => x.tag === "a")[0];
-process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "" }));`, nil, &got)
+const wf = byClass(li, "plan-wf")[0];
+process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "",
+  wf: text(wf), wf_tip: wf.attrs.title || "", bare: text(byClass(bare, "plan-wf")[0]) }));`, nil, &got)
 	if got.Unit != "#general" || got.Title != "Launch plan for the export" || got.Href != "https://chat.example/T1/C1/171.1" {
 		t.Fatalf("%+v", got)
+	}
+	if got.WF != "Nudge a thread that waits on someone; posts after you approve" || got.WFTip != "slack-follow-up" || got.Bare != "fake-close" {
+		t.Errorf("workflow shown %q titled %q, without a summary %q: want its summary, its id in the title", got.WF, got.WFTip, got.Bare)
 	}
 }
 

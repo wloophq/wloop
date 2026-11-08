@@ -3,6 +3,7 @@ package tasks
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -23,6 +24,9 @@ type ViewSpec struct {
 	Over         string
 	Paged        bool
 	HideDisabled bool
+	// Uncounted leaves the view out of the counters, unless the badge or a review step names it: a view off
+	// the rail, which the home and the queues read with Sets when they need it.
+	Uncounted bool
 }
 
 // Views are the profile's views that list something, in its order, and the views its badge and its review name.
@@ -91,7 +95,8 @@ func (p *Pass) Facts(id task.ID, read func() (workflow.Facts, error)) (workflow.
 }
 
 // Once is what load returns under key, loaded once per pass and shared by every task of it: what a fact reads
-// of the store as a whole, such as the open sessions, rather than once per task.
+// of the store as a whole, such as the open sessions, rather than once per task. A load that fails is loaded
+// again by the next reader.
 func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
 	p.mu.Lock()
 	if p.once == nil {
@@ -104,7 +109,18 @@ func (p *Pass) Once(key string, load func() (any, error)) (any, error) {
 	}
 	p.mu.Unlock()
 	l.once.Do(func() { l.v, l.err = load() })
+	if l.err != nil {
+		p.mu.Lock()
+		if p.once[key] == l {
+			delete(p.once, key)
+		}
+		p.mu.Unlock()
+	}
 	return l.v, l.err
+}
+
+func cancelled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // Units are the units of every task of the pass, its own and its items', each once, in pass order.
@@ -167,6 +183,10 @@ func Once[T any](ctx context.Context, key string, load func() (T, error)) (T, er
 		return load()
 	}
 	v, err := p.Once(key, func() (any, error) { return load() })
+	if err != nil && cancelled(err) && ctx.Err() == nil {
+		// The load another reader of the pass ran ended with its reader's context.
+		v, err = p.Once(key, func() (any, error) { return load() })
+	}
 	if err != nil {
 		var zero T
 		return zero, err
@@ -255,12 +275,11 @@ func (s *Service) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) 
 	if spec.Over != task.OverTasks {
 		return s.sourced(ctx, spec, q)
 	}
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	pass, err := s.pass(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ctx = WithPass(ctx, &Pass{Tasks: all})
-	return s.list(ctx, spec, q, all)
+	return s.list(WithPass(ctx, pass), spec, q, pass.Tasks)
 }
 
 // sourced are the tasks of the view over another thing than the stored tasks, from its ViewSource, narrowed to
@@ -294,6 +313,9 @@ func (s *Service) listed(ctx context.Context, spec ViewSpec, q task.Query, all [
 	hidden := s.hiderFor(spec)
 	var out []task.Task
 	for _, e := range all {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		in, err := s.in(ctx, spec, q, e, hidden)
 		if err != nil {
 			return nil, err
@@ -370,6 +392,25 @@ func (s *Service) hider() func(task.Task) bool {
 	}
 }
 
+// Stored are the stored tasks of ids, from the pass ctx carries, else the pass every reader shares; an id no
+// stored task holds is left out.
+func (s *Service) Stored(ctx context.Context, ids []task.ID) (map[task.ID]task.Task, error) {
+	pass, ok := PassOf(ctx)
+	if !ok {
+		var err error
+		if pass, err = s.pass(ctx); err != nil {
+			return nil, err
+		}
+	}
+	out := make(map[task.ID]task.Task, len(ids))
+	for _, id := range ids {
+		if e, ok := pass.Task(id); ok {
+			out[id] = e
+		}
+	}
+	return out, nil
+}
+
 // Task reads id from the ViewSource its prefix names, or the store.
 func (s *Service) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	if src, ok := s.sourceOf(id); ok {
@@ -401,47 +442,19 @@ func (s *Service) CountsWhere(ctx context.Context, area string, keep func(contex
 	return s.counts(WithPass(ctx, n.pass), area, n.pass.Tasks, keep)
 }
 
-func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep func(context.Context, task.Task) (bool, error)) (task.Counters, error) {
-	kept := map[task.ID]bool{}
-	keeps := func(e task.Task) (bool, error) {
-		if keep == nil {
-			return true, nil
-		}
-		k, seen := kept[e.ID]
-		if !seen {
-			var err error
-			if k, err = keep(ctx, e); err != nil {
-				return false, err
-			}
-			kept[e.ID] = k
-		}
-		return k, nil
-	}
+func (s *Service) counts(ctx context.Context, area string, all []task.Task, keep Keep) (task.Counters, error) {
+	keeps := keptOnce(ctx, keep)
 	vs := s.profileViews()
 	c := task.Counters{Area: area, Views: map[task.View]int{}, Areas: map[string]int{}, Contexts: map[string]int{}}
-	for _, spec := range vs.List {
-		q := task.Query{View: spec.ID, Area: area}
-		var es []task.Task
-		var err error
-		if spec.Over == task.OverTasks {
-			es, err = s.listed(ctx, spec, q, all)
-		} else {
-			es, err = s.sourced(ctx, spec, q)
-		}
-		if err != nil {
-			return task.Counters{}, err
-		}
-		n := 0
-		for _, e := range es {
-			k, err := keeps(e)
-			if err != nil {
-				return task.Counters{}, err
-			}
-			if k {
-				n++
-			}
-		}
-		c.Views[spec.ID] = n
+	counted := slices.DeleteFunc(slices.Clone(vs.List), func(spec ViewSpec) bool {
+		return spec.Uncounted && !slices.Contains(vs.Badge, spec.ID) && !slices.Contains(vs.Review, spec.ID)
+	})
+	sets, err := s.sets(ctx, counted, area, all, keeps, false)
+	if err != nil {
+		return task.Counters{}, err
+	}
+	for v, es := range sets {
+		c.Views[v] = len(es)
 	}
 	hidden := s.hider()
 	for _, e := range all {
@@ -483,13 +496,16 @@ func (s *Service) TasksSince(ctx context.Context, q task.Query, since Since, uni
 	if err != nil {
 		return Page{}, err
 	}
-	all := p.Tasks
-	if !p.Full {
-		if all, err = s.d.Store.Tasks(ctx, task.Query{All: true}); err != nil {
+	pass, err := s.pass(ctx)
+	if err != nil {
+		return Page{}, err
+	}
+	if !pass.covers(p) {
+		if pass, err = s.newPass(ctx); err != nil {
 			return Page{}, err
 		}
 	}
-	pass := &Pass{Tasks: all}
+	all := pass.Tasks
 	ctx = WithPass(ctx, pass)
 	switch {
 	case spec.Over != task.OverTasks:
@@ -558,11 +574,16 @@ type Snapshot struct {
 
 // Snapshot reads every stored task, whatever its category.
 func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
-	all, err := s.d.Store.Tasks(ctx, task.Query{All: true})
+	pass, err := s.pass(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{s: s, pass: &Pass{Tasks: all}}, nil
+	return Snapshot{s: s, pass: pass}, nil
+}
+
+// Open are n's open tasks, in the store's order.
+func (n Snapshot) Open() []task.Task {
+	return slices.DeleteFunc(slices.Clone(n.pass.Tasks), func(e task.Task) bool { return !e.Open() })
 }
 
 // Held are those of units a task of n holds, as its own or an item's, in their order.

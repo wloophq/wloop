@@ -12,3 +12,7 @@ actors = ["person", "agent"]
 use = "draft.propose"
 purpose = "acknowledge"
 delivery = "message"
+
+[outbox]
+title = "Say you're on it, by when"
+about = "Drafted when you acknowledge a task and give it a time."

@@ -23,13 +23,15 @@ func taskUnit(id string) unit.Unit { return unit.Unit{Provider: taskProvider, Ke
 // the user moved to a view, it shows the first.
 func (m *Model) SetViews(c api.ViewsCatalog) {
 	current := m.viewKey()
-	if !m.navigated && len(c.Views) > 0 {
-		current = "view:" + c.Views[0].ID
-	}
 	m.viewsCat, m.taskViews, m.rowWords = c, nil, nil
 	m.refreshFacets()
 	for _, v := range c.Views {
-		m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})
+		if v.Rail {
+			m.taskViews = append(m.taskViews, View{ID: v.ID, Label: v.Label})
+		}
+	}
+	if !m.navigated && len(m.taskViews) > 0 {
+		current = "view:" + m.taskViews[0].ID
 	}
 	m.goTo(current)
 }
@@ -250,9 +252,9 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 		text := m.viewSpec(v.ID).Empty
 		switch {
 		case !m.tasksLoaded:
-			text = "loading…"
+			text = m.w().T("loading…", nil)
 		case len(m.filter) > 0:
-			text = "Nothing in " + v.Label + " matches \"" + string(m.filter) + "\"."
+			text = m.w().T("Nothing in {view} matches \"{filter}\".", map[string]any{"view": v.Label, "filter": string(m.filter)})
 		}
 		return append(lines, "  "+m.t.Dim(termfmt.Cut(text, width-2)))
 	}
@@ -292,7 +294,7 @@ func (m *Model) loadingLine(ls []api.Loading, width int) (string, bool) {
 	for i, l := range ls {
 		parts[i] = strings.TrimSuffix(l.Plugin+": "+l.Reason, ": ")
 	}
-	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean("loading "+strings.Join(parts, " · ")), width-2)), true
+	return "  " + m.t.Dim(termfmt.Cut(termfmt.Clean(m.w().T("loading {parts}", map[string]any{"parts": strings.Join(parts, " · ")})), width-2)), true
 }
 
 // taskList lays the tasks out as lines, with a head line before each group, and shows the height of them

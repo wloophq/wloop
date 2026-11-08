@@ -27,6 +27,9 @@ type Proposal struct {
 	Task                   string
 	Kind                   draft.Kind
 	Target, Text, Reaction string
+	// Broadcast is the broadcast the proposer asks for a thread reply; its
+	// publisher's Placer decides the draft's.
+	Broadcast draft.Broadcast
 	// Replaced is the text a recorded edit replaced.
 	Replaced string
 	Origin   draft.Origin
@@ -48,6 +51,9 @@ type Proposal struct {
 	RepeatAfter time.Duration
 	// Tool is the tool that made a post RecordSent records.
 	Tool string
+	// Why is why the draft is proposed, in the user's language; Language
+	// is the locale Text is written in.
+	Why, Language string
 }
 
 type Filter struct {
@@ -140,6 +146,9 @@ type Service struct {
 	Applier Applier
 	// Results attaches a sent post to its turn's task; nil attaches none.
 	Results Results
+	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
+	// none does.
+	Silent func(name string) bool
 }
 
 var (
@@ -169,9 +178,9 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	}
 	now := s.Clock.Now()
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
+		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
-		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
+		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
 	}))
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err
@@ -186,7 +195,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if dup, ok, err := s.duplicate(ctx, d, dec.Approval, p.RepeatAfter, now); err != nil || ok {
 		return dup, err
 	}
-	if err := s.publishable(ctx, &d); err != nil {
+	if err := s.proposable(ctx, &d); err != nil {
 		return draft.Draft{}, err
 	}
 	if err := s.implemented(d); err != nil {
@@ -282,6 +291,8 @@ func checkContent(d draft.Draft) error {
 		return fmt.Errorf("%w: empty text", ErrInvalid)
 	case strings.TrimSpace(d.Purpose) == "":
 		return fmt.Errorf("%w: no purpose", ErrInvalid)
+	case !d.Broadcast.Valid():
+		return fmt.Errorf("%w: unknown broadcast %q", ErrInvalid, d.Broadcast)
 	}
 	return nil
 }
@@ -378,13 +389,22 @@ func (s *Service) posts(d draft.Draft) bool {
 }
 
 // publishable refuses d when its provider has no enabled publisher, its Placer cannot place d
-// proposed with no target, or its Validator refuses d. A placement is stored in d.Target.
+// proposed with no target, or its Validator refuses d. A placement is stored in d.Target, and,
+// when proposing, in d.Broadcast.
 func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
+	return s.check(ctx, d, false)
+}
+
+func (s *Service) proposable(ctx context.Context, d *draft.Draft) error {
+	return s.check(ctx, d, true)
+}
+
+func (s *Service) check(ctx context.Context, d *draft.Draft, proposing bool) error {
 	fx, err := s.publisher(*d)
 	if err != nil {
 		return err
 	}
-	if err := place(ctx, fx, d); err != nil {
+	if err := place(ctx, fx, d, proposing); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if v, ok := fx.(port.Validator); ok {
@@ -423,21 +443,52 @@ func (s *Service) PublisherOf(d draft.Draft) unit.ProviderID {
 	return own
 }
 
+// BroadcastOf is the broadcast the draft p proposes would take: the one its publisher's Placer places, NoBroadcast
+// when it replies in no thread or its publisher places nothing. It stores nothing and opens no gate.
+func (s *Service) BroadcastOf(ctx context.Context, p Proposal) (draft.Broadcast, error) {
+	if err := checkKind(p.Kind); err != nil {
+		return draft.NoBroadcast, err
+	}
+	d := s.delivered(shaped(draft.Draft{Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target,
+		Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction, Origin: p.Origin, Purpose: p.Purpose, Delivery: p.Delivery}))
+	fx, err := s.publisher(d)
+	if err != nil {
+		return draft.NoBroadcast, err
+	}
+	if err := place(ctx, fx, &d, true); err != nil {
+		return draft.NoBroadcast, err
+	}
+	return d.Broadcast, nil
+}
+
 func (s *Service) publisher(d draft.Draft) (port.Effects, error) {
 	return s.effects(s.PublisherOf(d))
 }
 
-// place stores in d.Target where fx's Placer puts d when d has no target.
-func place(ctx context.Context, fx port.Effects, d *draft.Draft) error {
+// place stores in d where fx's Placer puts it: its Target when d has none and,
+// when proposing, its Broadcast.
+func place(ctx context.Context, fx port.Effects, d *draft.Draft, proposing bool) error {
 	pl, ok := fx.(port.Placer)
-	if !ok || strings.TrimSpace(d.Target) != "" {
+	untargeted := strings.TrimSpace(d.Target) == ""
+	if !ok && proposing {
+		d.Broadcast = draft.NoBroadcast
+	}
+	if !ok || !proposing && !untargeted {
 		return nil
 	}
-	target, err := pl.Place(ctx, *d)
+	got, err := pl.Place(ctx, *d)
 	if err != nil {
 		return err
 	}
-	d.Target = target
+	if !got.Broadcast.Valid() {
+		return fmt.Errorf("the publisher placed the draft with an unknown broadcast %q", got.Broadcast)
+	}
+	if untargeted {
+		d.Target = got.Target
+	}
+	if proposing {
+		d.Broadcast = got.Broadcast
+	}
 	return nil
 }
 
@@ -496,12 +547,42 @@ func setText(d *draft.Draft, text string) error {
 // person again: its gate is superseded first, so no window and no approval
 // given to the old text releases the new one, and a gate that waits opens.
 func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Draft, error) {
+	return s.Amend(ctx, id, Amendment{Text: &text})
+}
+
+// SetBroadcast turns on or off whether held or failed draft id, a thread
+// reply, is also posted to its conversation; its gate is handled as Edit's.
+func (s *Service) SetBroadcast(ctx context.Context, id draft.ID, on bool) (draft.Draft, error) {
+	return s.Amend(ctx, id, Amendment{Broadcast: &on})
+}
+
+// Amendment is what a person changes on a draft: its text, a thread reply's
+// broadcast, or both; nil leaves it.
+type Amendment struct {
+	Text      *string
+	Broadcast *bool
+}
+
+// Amend applies a to held or failed draft id at once, both changes or
+// neither; its gate is handled as Edit's.
+func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
 	d, err := s.load(ctx, id, "", draft.Held, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if err := setText(&d, text); err != nil {
-		return draft.Draft{}, err
+	if a.Text != nil {
+		if err := setText(&d, *a.Text); err != nil {
+			return draft.Draft{}, err
+		}
+	}
+	if a.Broadcast != nil {
+		if d.Broadcast == draft.NoBroadcast {
+			return draft.Draft{}, fmt.Errorf("%w: draft %d replies in no thread, so it has nothing to broadcast", ErrInvalid, id)
+		}
+		d.Broadcast = draft.BroadcastOff
+		if *a.Broadcast {
+			d.Broadcast = draft.BroadcastOn
+		}
 	}
 	reopen := false
 	if d.State == draft.Held {
@@ -559,7 +640,21 @@ func (s *Service) Discard(ctx context.Context, id draft.ID, reason string) (draf
 // Withdraw drops draft id, which its proposer no longer stands by, for
 // reason: a held draft's gate is superseded.
 func (s *Service) Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
-	d, err := s.load(ctx, id, draft.Dropped, draft.Held, draft.Queued, draft.Failed)
+	return s.withdraw(ctx, id, reason, false)
+}
+
+// WithdrawHeld is Withdraw of a draft still held alone: one its gate approved meanwhile is left as it is,
+// refused with ErrConflict.
+func (s *Service) WithdrawHeld(ctx context.Context, id draft.ID, reason string) (draft.Draft, error) {
+	return s.withdraw(ctx, id, reason, true)
+}
+
+func (s *Service) withdraw(ctx context.Context, id draft.ID, reason string, heldOnly bool) (draft.Draft, error) {
+	from := []draft.State{draft.Held, draft.Queued, draft.Failed}
+	if heldOnly {
+		from = from[:1]
+	}
+	d, err := s.load(ctx, id, draft.Dropped, from...)
 	if err != nil {
 		return draft.Draft{}, err
 	}
@@ -573,8 +668,14 @@ func (s *Service) Withdraw(ctx context.Context, id draft.ID, reason string) (dra
 				return draft.Draft{}, err
 			}
 		}
-		if d, err = s.Store.Get(ctx, id); err != nil || d.State != draft.Held {
+		if d, err = s.Store.Get(ctx, id); err != nil {
 			return d, err
+		}
+		if d.State != draft.Held {
+			if heldOnly {
+				return d, fmt.Errorf("draft %d is %s: %w", id, d.State, ErrConflict)
+			}
+			return d, nil
 		}
 	}
 	return s.drop(ctx, d, reason)
@@ -757,7 +858,7 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 		err = s.approved(ctx, d)
 	}
 	if err == nil {
-		err = place(ctx, fx, &d)
+		err = place(ctx, fx, &d, false)
 	}
 	if err != nil {
 		d.State, d.Error = draft.Failed, err.Error()
@@ -848,6 +949,45 @@ func (s *Service) Recover(ctx context.Context) error {
 	}
 	if err := s.ApplyPending(ctx); err != nil {
 		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
+// PlaceBroadcasts runs at daemon start: every held or failed message draft
+// stored with no broadcast, as a version before broadcasts left it, takes the
+// broadcast its publisher's Placer gives it now. Its gate stays as it is. A
+// draft placed in no thread, or whose publisher cannot place it now, keeps
+// none and is asked again at the next start.
+func (s *Service) PlaceBroadcasts(ctx context.Context) error {
+	ds, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held, draft.Failed}})
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range ds {
+		if d.Delivery != draft.Message || d.Broadcast != draft.NoBroadcast {
+			continue
+		}
+		fx, err := s.publisher(d)
+		if err != nil {
+			continue
+		}
+		pl, ok := fx.(port.Placer)
+		if !ok {
+			continue
+		}
+		got, err := pl.Place(ctx, d)
+		if err != nil {
+			s.logf("draft %d: its broadcast stays unplaced: %v", d.ID, err)
+			continue
+		}
+		if got.Broadcast == draft.NoBroadcast || !got.Broadcast.Valid() {
+			continue
+		}
+		d.Broadcast = got.Broadcast
+		if _, err := s.save(ctx, d, d.State); err != nil && !errors.Is(err, ErrConflict) {
+			errs = append(errs, err)
+		}
 	}
 	return errors.Join(errs...)
 }

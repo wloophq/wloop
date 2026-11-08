@@ -31,7 +31,7 @@ func TestTheTerminalReadsCapabilitiesFromTheAPI(t *testing.T) {
 	}
 
 	tabs := m.tabs(400)
-	all, changes, plan, threads := strings.Index(tabs, "All"), strings.Index(tabs, "Changes"), strings.Index(tabs, planLabel), strings.Index(tabs, "Threads")
+	all, changes, plan, threads := strings.Index(tabs, "All"), strings.Index(tabs, "Changes"), strings.Index(tabs, "Plan"), strings.Index(tabs, "Threads")
 	if all < 0 || changes < 0 || plan < 0 || threads < 0 {
 		t.Fatalf("tabs: %q", tabs)
 	}

@@ -35,10 +35,10 @@ var groups = map[builtin.Surface][]group{
 	},
 	builtin.SurfaceWorkflow: {
 		{"What it matches", []string{"summary", "provider", "when", "order", "key", "marks"}},
-		{"When it is planned", []string{"trigger", "observe", "limits"}},
+		{"When it is planned", []string{"trigger", "observe", "enabled", "limits"}},
 		{"Steps", []string{"step"}},
 		{"Gate approval", []string{"ask", "gates"}},
-		{"Drafts", []string{"drafts"}},
+		{"Drafts", []string{"drafts", "outbox"}},
 	},
 	builtin.SurfaceConfig: {
 		{"Agent and workspaces", []string{"profile", "agent", "agent_home", "agent_models", "projects_dir", "workspace_managers", "intents"}},
@@ -55,9 +55,11 @@ var groups = map[builtin.Surface][]group{
 		{"Workflow gate approval", []string{"workflows.*.gates"}},
 		{"Turns and headless calls", []string{"turns", "headless", "brief", "classify"}},
 		{"Drafts and notifications", []string{"drafts", "notifications"}},
+		{"Window", []string{"window"}},
 		{"Units and tasks", []string{"items", "tasks"}},
 		{"Cleanup", []string{"cleanup"}},
 		{"Dossiers", []string{"dossiers"}},
+		{"Interface", []string{"ui"}},
 		{"Daemon", []string{"sweep", "http", "mcp", "views"}},
 	},
 }

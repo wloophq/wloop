@@ -1,10 +1,12 @@
 package row
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/api"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
@@ -111,6 +113,52 @@ func TestResolvedThreadsSettleAReviewersCommentOnlyWhenThePullRequestHasThreads(
 		in.Detail = c.detail
 		if got := Derive(in).Kind(); got != c.want {
 			t.Errorf("%s: %s, want %s", name, got, c.want)
+		}
+	}
+}
+
+func TestAStalledCardSaysSoOnItsSituationLine(t *testing.T) {
+	f := fixtures()[slices.IndexFunc(fixtures(), func(f fixture) bool { return f.name == "mine changes asked" })]
+	r := Derive(input(f))
+	if r.Kind() != situation.KindChanges || !r.Stalled() {
+		t.Fatalf("fixture is %s, stalled %v", r.Kind(), r.Stalled())
+	}
+	sigs := r.Card().Signals
+	if slices.ContainsFunc(sigs, func(s src.CardSignal) bool { return s.Key == "stalled" }) {
+		t.Errorf("a separate stalled signal: %+v", sigs)
+	}
+	want := src.CardSignal{Key: SignalSituation, Value: string(situation.KindChanges), Tone: ToneNeutral,
+		Detail: &src.SignalDetail{Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Since: r.Situation.Since}}}}
+	if !reflect.DeepEqual(sigs[0], want) || r.Situation.Since.IsZero() {
+		t.Errorf("situation signal %+v, want %+v", sigs[0], want)
+	}
+	if slices.ContainsFunc(sigs, func(s src.CardSignal) bool { return s.Key == SignalReview }) {
+		t.Errorf("signals %+v repeat the situation's changes asked in a review signal", sigs)
+	}
+}
+
+func TestEachCardSignalIsACode(t *testing.T) {
+	want := map[string][]string{
+		"mine checks failing": {"situation=checks", "checks=failing_named names=lint, unit"},
+		"mine can merge":      {"situation=merge", "checks=passing", "review=approved"},
+		"mine conflicts":      {"situation=conflicts", "checks=passing", "merge=conflicts"},
+		"merged":              {"situation=done"},
+	}
+	for _, f := range fixtures() {
+		w, ok := want[f.name]
+		if !ok {
+			continue
+		}
+		var got []string
+		for _, s := range Derive(input(f)).Card().Signals {
+			line := s.Key + "=" + s.Value
+			if s.Detail != nil && s.Detail.Params["names"] != "" {
+				line += " names=" + s.Detail.Params["names"]
+			}
+			got = append(got, line)
+		}
+		if !slices.Equal(got, w) {
+			t.Errorf("%s: signals %q, want %q", f.name, got, w)
 		}
 	}
 }

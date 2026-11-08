@@ -60,7 +60,9 @@ func (r *replay) nudges(person items.Person) []draft.Draft {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.Origin.Key != d.Unit.String()+":"+person.Key })
+	return slices.DeleteFunc(ds, func(d draft.Draft) bool {
+		return d.Reason == draft.WithdrawSuperseded || !slices.Contains(draftPeople(d, draftSubjectUnit(d)), person.Key)
+	})
 }
 
 // mine is an open item of the thread the user asked, created at created, due by deadline, waiting on on.
@@ -148,6 +150,65 @@ func TestStalledNudgeSparesWhoeverWaitsOnMeInTheThread(t *testing.T) {
 	}
 	if ds := r.nudges(twCarla); len(ds) != 1 {
 		t.Fatalf("nudges to Carla, who waits on me only in another thread: %+v, want one", ds)
+	}
+}
+
+// heldNudges are the stalled nudges held on the thread.
+func (r *replay) heldNudges() []draft.Draft {
+	r.t.Helper()
+	ds, err := r.svc.List(context.Background(), outbox.Filter{Workflow: "slack-stalled-nudge", States: []draft.State{draft.Held}})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return ds
+}
+
+func TestAStalledNudgeListsOnlyTheDueTasksItems(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	r.mine("i1", replayStart.AddDate(0, 0, -7), "", twCarla)
+	r.mine("i2", r.now, "", twBruno)
+	r.sync(twThread)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	held := r.heldNudges()
+	if len(held) != 1 || !slices.Equal(held[0].Items, []string{"i1"}) || !slices.Equal(draftPeople(held[0], draftSubjectUnit(held[0])), []string{twCarla.Key}) {
+		t.Fatalf("held nudges %+v, want one to Carla over i1 alone", held)
+	}
+	if e := r.taskOf(task.DerivedID(twThread, "i2")); !e.Prop(task.PropLastNudge).Time.IsZero() {
+		t.Error("Bruno's task, not yet due, was marked nudged")
+	}
+}
+
+func TestASecondTaskComingDueJoinsTheHeldNudge(t *testing.T) {
+	t.Parallel()
+	r, p := taskWorkflows(t)
+	ctx := context.Background()
+	r.mine("i1", replayStart.AddDate(0, 0, -7), "", twCarla)
+	r.mine("i2", r.now, "", twBruno)
+	r.sync(twThread)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	first := r.heldNudges()
+	if len(first) != 1 {
+		t.Fatalf("%d held nudges, want Carla's", len(first))
+	}
+	r.now = r.now.AddDate(0, 0, 14)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	held := r.heldNudges()
+	if len(held) != 1 || !slices.Equal(held[0].Items, []string{"i1", "i2"}) {
+		t.Fatalf("held nudges %+v, want one over i1 and i2", held)
+	}
+	if got := draftPeople(held[0], draftSubjectUnit(held[0])); !slices.Contains(got, twCarla.Key) || !slices.Contains(got, twBruno.Key) {
+		t.Errorf("people %v, want Carla and Bruno", got)
+	}
+	if old, _ := r.svc.Store.Get(ctx, first[0].ID); old.State != draft.Dropped || old.Reason != draft.WithdrawSuperseded {
+		t.Errorf("Carla's first nudge: %s %q, want superseded", old.State, old.Reason)
 	}
 }
 

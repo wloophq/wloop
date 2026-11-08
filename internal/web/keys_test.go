@@ -64,7 +64,7 @@ func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
 	}
 }
 
-// keysHarness is palette.js and keys.js with a recording environment:
+// keysHarness is omnibox.js and keys.js with a recording environment:
 // harness(o) returns { keys, log, press, tick }.
 const keysHarness = `
 function harness(o = {}) {
@@ -110,6 +110,10 @@ function harness(o = {}) {
     act: o.act,
     verbs: () => o.verbs || VERBS,
     verbSpecs: () => o.verbSpecs || VERB_SPECS,
+    detailAt: (el) => !!(el && el.inDetail),
+    detach: () => { log.detached = (log.detached || 0) + 1; },
+    copyLink: () => { log.copied = (log.copied || 0) + 1; },
+    addFilter: o.addFilter,
   };
   const keys = createKeys(env);
   keys.setBindings(BINDINGS);
@@ -121,7 +125,7 @@ function harness(o = {}) {
 }
 `
 
-// keysRun runs main, an async body, after keys.js, palette.js, the fixture
+// keysRun runs main, an async body, after keys.js, omnibox.js, the fixture
 // bindings and the harness; main returns the JSON result. prelude comes
 // first, for app.js functions the test drives through the keys.
 func keysRun(t *testing.T, prelude, main string, in, out any) {
@@ -136,7 +140,13 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	b.WriteString("\nconst BINDINGS = " + string(raw) + ";\n")
 	b.WriteString("const VERBS = " + mustJS(t, servedVerbs(t)) + ";\n")
 	b.WriteString("const VERB_SPECS = " + mustJS(t, servedVerbSpecs(t)) + ";\n")
-	b.WriteString(staticJS(t, "palette.js"))
+	if !strings.Contains(prelude, "const QUEUE ") {
+		b.WriteString(`const QUEUE = "queue";` + "\n")
+	}
+	if !strings.Contains(prelude, "const PLAN ") {
+		b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
+	}
+	b.WriteString(staticJS(t, "omnibox.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))
 	b.WriteString(keysHarness)
@@ -194,6 +204,23 @@ for (const key of ["j", "j", "k", "Enter", "Escape"]) await k.press(key);
 return k.log;`, taskFixture(), &got)
 	if !reflect.DeepEqual(got.Moves, []int{1, 1, -1}) || got.Detail != 1 || got.Closed != 1 {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestWindowKeysDetachInTheDetailAndCopyALinkEverywhere(t *testing.T) {
+	var got struct {
+		Detached int `json:"detached"`
+		Copied   int `json:"copied"`
+	}
+	keysRun(t, "", `
+const k = harness({ selected: input });
+await k.press("t");
+await k.press("t", { target: { tagName: "DIV", inDetail: true } });
+await k.press("c");
+await k.press("c", { target: { tagName: "DIV", inDetail: true } });
+return k.log;`, taskFixture(), &got)
+	if got.Detached != 1 || got.Copied != 2 {
+		t.Fatalf("detached %d times, want 1 (in the detail only); copied %d times, want 2", got.Detached, got.Copied)
 	}
 }
 
@@ -531,9 +558,9 @@ func TestKeysMoveOutOfAppJS(t *testing.T) {
 		}
 	}
 	page := staticJS(t, "index.html")
-	app, pal, k := strings.Index(page, "/static/app.js"), strings.Index(page, "/static/palette.js"), strings.Index(page, "/static/keys.js")
+	app, pal, k := strings.Index(page, "/static/app.js"), strings.Index(page, "/static/omnibox.js"), strings.Index(page, "/static/keys.js")
 	if app < 0 || pal < app || k < pal {
-		t.Fatalf("index.html loads app.js, palette.js, keys.js in that order: %d %d %d", app, pal, k)
+		t.Fatalf("index.html loads app.js, omnibox.js, keys.js in that order: %d %d %d", app, pal, k)
 	}
 }
 
@@ -561,13 +588,26 @@ func scriptFile(t *testing.T, script string) string {
 // its stdout into out.
 func nodeScript(t *testing.T, script string, in, out any) {
 	t.Helper()
+	nodeScriptEnv(t, nil, script, in, out)
+}
+
+// nodeScriptEnv is nodeScript with env added to node's environment. The script runs after i18n.js, which
+// the cockpit loads before every other script, unless it brings its own.
+func nodeScriptEnv(t *testing.T, env []string, script string, in, out any) {
+	t.Helper()
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not on PATH")
 	}
+	if !strings.Contains(script, "const I18N = ") {
+		script = staticJS(t, "i18n.js") + "\n" + script
+	}
 	raw, _ := json.Marshal(in)
 	cmd := exec.Command(node, scriptFile(t, "const input = JSON.parse(require(\"fs\").readFileSync(0, \"utf8\"));\n"+script))
 	cmd.Stdin = strings.NewReader(string(raw))
+	if env != nil {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	got, err := cmd.Output()
 	if err != nil {
 		var stderr []byte

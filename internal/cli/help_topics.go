@@ -127,14 +127,17 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"open"},
 				Summary: "The cockpit, a workspace or a pull request",
-				Usage:   []string{"open [<url>]", "open [<url>] --print [--view <view>]"},
+				Usage: []string{"open [<pr-url> | #<route> | <cockpit-url> | " + brand.URLScheme() + "://open/#<route>]",
+					"open [<pr-url> | #<route>] --print [--view <view>]"},
 				About: "Open the workspace of a pull request in " + manager + ", or the pull request itself when it has none. " +
-					"With no URL, open the cockpit. With --print, print the cockpit URL with its token instead of opening it.",
+					"With no argument, open the cockpit; with a route (#queue=answer), a URL of this cockpit or a " + brand.URLScheme() + ":// link, " +
+					"open the cockpit there. The cockpit opens in the app's window when the app runs, else in the browser. " +
+					"With --print, print the cockpit URL with its token instead of opening it.",
 				Flags: []helpFlag{
 					{"--print", "Print the cockpit URL with its token instead of opening it"},
 					{"--view <view>", "The cockpit view, by its id, such as needs-me or mine"},
 				},
-				Examples: []string{"open", "open " + pr, "open --print --view needs-me"},
+				Examples: []string{"open", "open " + pr, "open '#queue=answer'", "open " + brand.URLScheme() + "://open/#view=needs-me", "open --print --view needs-me"},
 				Docs:     "concepts/surfaces",
 			},
 			{
@@ -315,10 +318,10 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"profile schema"},
 				Summary: "The JSON Schemas of the profile files, for editors",
-				Usage:   []string{"profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--config]"},
+				Usage:   []string{"profile schema [--workflow|--actions|--tasks|--views|--gates|--records|--keys|--strings|--timeline|--decisions|--home|--omnibox|--config]"},
 				About:   "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, tasks.toml, views.toml, gates.toml, records.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
 				Flags: []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--tasks", "The schema of tasks.toml"},
-					{"--views", "The schema of views.toml"}, {"--gates", "The schema of gates.toml"}, {"--records", "The schema of records.toml"}, {"--keys", "The schema of keys.toml"}, {"--config", "The schema of config.toml"}},
+					{"--views", "The schema of views.toml"}, {"--gates", "The schema of gates.toml"}, {"--records", "The schema of records.toml"}, {"--keys", "The schema of keys.toml"}, {"--strings", "The schema of strings.toml"}, {"--timeline", "The schema of timeline.toml"}, {"--decisions", "The schema of decisions.toml"}, {"--home", "The schema of home.toml"}, {"--omnibox", "The schema of omnibox.toml"}, {"--config", "The schema of config.toml"}},
 				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
 				Docs:     "reference/language",
 			},
