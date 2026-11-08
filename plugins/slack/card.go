@@ -43,18 +43,29 @@ func Card(r slackrows.Row) (src.Card, error) {
 	return c, nil
 }
 
+// The keys of a card's signals and the codes of their values, which the plugin's ui.toml [signals] words.
+const (
+	SignalItems        = "items"
+	SignalReplies      = "replies"
+	SignalLastActivity = "last_activity"
+
+	ItemsNone    = "none"
+	ItemsOpen    = "open"
+	RepliesCount = "count"
+)
+
 func signals(r slackrows.Row, p slackrows.Payload) []src.CardSignal {
-	open := src.CardSignal{Key: "items", Value: "none open", Tone: toneNeutral}
-	switch n := r.Summary.OpenItems; {
-	case n == 1:
-		open.Value, open.Tone = "1 open", toneWarn
-	case n > 1:
-		open.Value, open.Tone = strconv.Itoa(n)+" open", toneWarn
+	open := src.CardSignal{Key: SignalItems, Value: ItemsNone, Tone: toneNeutral}
+	if n := r.Summary.OpenItems; n > 0 {
+		open.Value, open.Tone, open.Detail = ItemsOpen, toneWarn, count(n)
 	}
-	out := []src.CardSignal{open, {Key: "replies", Value: strconv.Itoa(p.Replies), Tone: toneNeutral}}
+	out := []src.CardSignal{open, {Key: SignalReplies, Value: RepliesCount, Tone: toneNeutral, Detail: count(p.Replies)}}
 	if !p.LastActivity.IsZero() {
-		out = append(out, src.CardSignal{Key: "last activity", Value: p.LastActivity.UTC().Format("2006-01-02 15:04 UTC"), Tone: toneInfo,
-			At: p.LastActivity})
+		out = append(out, src.CardSignal{Key: SignalLastActivity, Tone: toneInfo, At: p.LastActivity})
 	}
 	return out
+}
+
+func count(n int) *src.SignalDetail {
+	return &src.SignalDetail{Params: map[string]string{"n": strconv.Itoa(n)}}
 }

@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"reflect"
 	"context"
 	"encoding/json"
 	"github.com/wloophq/wloop/plugins/slack/store"
@@ -140,9 +141,11 @@ func TestCardFromFactsAndState(t *testing.T) {
 	if c.TurnsLink != "#unit=slack/"+u.Key || c.Outcome != "" {
 		t.Errorf("card %+v", c)
 	}
-	want := []src.CardSignal{{Key: "items", Value: "2 open", Tone: toneWarn}, {Key: "replies", Value: "2", Tone: toneNeutral},
-		{Key: "last activity", Value: tsAt(3).Format("2006-01-02 15:04 UTC"), Tone: toneInfo, At: tsAt(3)}}
-	if !slices.Equal(c.Signals, want) {
+	want := []src.CardSignal{
+		{Key: SignalItems, Value: ItemsOpen, Tone: toneWarn, Detail: &src.SignalDetail{Params: map[string]string{"n": "2"}}},
+		{Key: SignalReplies, Value: RepliesCount, Tone: toneNeutral, Detail: &src.SignalDetail{Params: map[string]string{"n": "2"}}},
+		{Key: SignalLastActivity, Tone: toneInfo, At: tsAt(3)}}
+	if !reflect.DeepEqual(c.Signals, want) {
 		t.Errorf("signals %+v", c.Signals)
 	}
 }

@@ -36,6 +36,17 @@ show_label = "desde {{.at}}"
 4w = "2-4 semanas"
 older = "mais de 4 semanas"
 
+[signals.items]
+label = "itens"
+values = { none = "nenhum aberto", open = '{{.n}} {{plural .n "one" "aberto" "other" "abertos"}}' }
+
+[signals.replies]
+label = "respostas"
+values = { count = "{{.n}}" }
+
+[signals.last_activity]
+label = "última atividade"
+
 [situations]
 waits_on_viewer = "espera por você"
 needs_closure = "precisa fechar"
