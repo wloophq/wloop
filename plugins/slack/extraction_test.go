@@ -44,7 +44,7 @@ func answerPerson(id string) map[string]any { return map[string]any{"id": id, "n
 
 func extractionAnswer(t *testing.T, origin string, segments []map[string]string) []byte {
 	t.Helper()
-	it := map[string]any{"ref": "n1", "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
+	it := map[string]any{"ref": "n1", "kind": "request", "summary": "review the PR", "ask": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
 		"assignees": []any{answerPerson(me)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{answerPerson(me)},
 		"state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none", "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "headless", "place": map[string]string{"context": "", "why": ""}}
@@ -189,7 +189,7 @@ func threadAnswer(t *testing.T, ref, origin, evidence string) []byte {
 	if evidence != "" {
 		state, resolution, kind = "resolved", "done", "message"
 	}
-	it := map[string]any{"ref": ref, "kind": "request", "summary": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
+	it := map[string]any{"ref": ref, "kind": "request", "summary": "review the PR", "ask": "review the PR", "origin_ts": origin, "requester": answerPerson(other),
 		"assignees": []any{answerPerson(me)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{},
 		"state": state, "resolution": resolution, "evidence_ts": evidence, "evidence_kind": kind, "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none", "place": map[string]string{"context": "", "why": ""}}

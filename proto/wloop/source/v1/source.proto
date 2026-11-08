@@ -312,6 +312,9 @@ message Item {
   google.protobuf.Timestamp user_at = 26;
   google.protobuf.Timestamp created_at = 27;
   google.protobuf.Timestamp updated_at = 28;
+  // ask is the item said to whom it waits on, in the voice of the user who
+  // sends it: what a nudge to them lists. Empty when the source wrote none.
+  string ask = 29;
 }
 
 // Snapshot is everything the plugin reports of one unit. A later snapshot
@@ -887,6 +890,7 @@ message ItemFields {
   Person requester = 10;
   PersonList waiting_on = 11;
   optional string confidence = 12;
+  optional string ask = 13;
 }
 
 // ItemOp is one change to the items ledger.

@@ -23,6 +23,10 @@ const StepTurnStart = "turn.start"
 // StepDraftPropose is the step that proposes a draft in the Outbox.
 const StepDraftPropose = "draft.propose"
 
+// DraftTargetPerson is draft.propose's target that posts each per-person draft in the direct conversation
+// between the user and the person it is to.
+const DraftTargetPerson = "person"
+
 // The steps whose arguments the grammar names.
 const (
 	StepTurnDismiss  = "turn.dismiss"
@@ -43,7 +47,10 @@ var (
 	DraftEmojiDeliveries = []string{"reaction"}
 	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
 	DraftPer             = []string{"unit", "person"}
-	DraftTargets         = []string{"unit", "item"}
+	DraftTargets         = []string{"unit", "item", DraftTargetPerson}
+	// DraftTo are whom of the people a draft would address it addresses: all of them, those who can read the
+	// conversation it posts on, or those who cannot.
+	DraftTo = []string{"all", "members", "non_members"}
 	// DraftEnded is what a draft withdrawn as its task ended does to draft.propose while that task stays ended:
 	// hold the workflow's proposals of no task or of that task, or hold them only for repeat_after.
 	DraftEnded = []string{"hold", "repeat"}

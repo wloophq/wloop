@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"fmt"
 	"maps"
 	"reflect"
 	"slices"
@@ -10,10 +11,16 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
+// maxManifestDepth is deeper than any manifest key nests; a path past it is a struct that holds itself.
+const maxManifestDepth = 12
+
 // structPaths are the grammar path and kind of every key t decodes.
 func structPaths(t reflect.Type, at string, out map[string]builtin.Kind) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
+	}
+	if strings.Count(at, ".") > maxManifestDepth {
+		panic("a manifest struct holds itself, at " + at)
 	}
 	join := func(k string) string {
 		if at == "" {
@@ -65,6 +72,20 @@ func pathOf(t reflect.Type, path string, out map[string]builtin.Kind) {
 	default:
 		out[path] = builtin.KindText
 	}
+}
+
+type selfHolding struct {
+	Name *string       `toml:"name"`
+	Rule []selfHolding `toml:"rule"`
+}
+
+func TestAManifestStructThatHoldsItselfStopsTheWalk(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil || !strings.Contains(fmt.Sprint(r), "holds itself") {
+			t.Fatalf("recovered %v, want the depth guard's panic", r)
+		}
+	}()
+	structPaths(reflect.TypeOf(selfHolding{}), "", map[string]builtin.Kind{})
 }
 
 // refines says a row of kind row may hold a key decoded as kind field.

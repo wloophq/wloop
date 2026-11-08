@@ -65,6 +65,7 @@ every = "5m"
 | `situations` | array of tables | The situations the plugin derives, in the order the cockpit ranks them. |
 | `steps` | list of strings | The core workflow steps that run on the plugin's units, such as "turn.dismiss". |
 | `language_fact` | string | The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's. |
+| `members_fact` | string | The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells. |
 | `jobs` | array of tables | The jobs the host runs on the plugin through Ingest, by name. |
 | `config_reads` | list of strings | The configuration keys outside its own table the plugin reads, such as "sweep" or "items.heat"; Config returns them, checked against the configuration's keys. |
 | `notify` | list of `rounds`, `gates`, `marks`, `tasks`, `turns`, `sessions`, `overrides`, `viewer`, `config`, `events`, `workspaces`, `agents` | The host topics whose changes the host notifies the plugin of. |

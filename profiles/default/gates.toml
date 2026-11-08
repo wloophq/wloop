@@ -199,6 +199,7 @@ mode = "run"
 [drafts]
 by_hand = "Written by hand"
 by_hand_about = "Replies and reactions you wrote yourself, waiting to be sent."
+quoted = "Quotes an item of {conversation}, a conversation they are not in."
 
 [drafts.purposes]
 nudge = "Nudge"
@@ -217,3 +218,12 @@ sending = "sending"
 sent = "sent"
 failed = "failed to send"
 dropped = "dropped"
+
+[drafts.reasons]
+assigned = "its items got an owner"
+moot = "it no longer applies"
+outside = "it addressed someone who cannot read that conversation"
+joined = "the person it was written to joined the conversation it came from"
+ended = "its task ended"
+skipped = "you skipped its workflow there"
+superseded = "a draft to the whole conversation replaced it"

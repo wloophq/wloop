@@ -15,7 +15,7 @@ import (
 )
 
 // MaxPromptWords caps the extraction prompt's template, counted as space-separated words.
-const MaxPromptWords = 5600
+const MaxPromptWords = 5725
 
 // PromptFile, BriefSchemaFile and CitedFile are the extraction's prompt, its brief's schema and the block
 // that holds the cited items, {{ITEMS}}, in the plugin's profile layer. Untrusted text is defused only of the

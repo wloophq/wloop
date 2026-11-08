@@ -104,6 +104,8 @@ func resolve(t *testing.T, v src.Value, now time.Time) any {
 		return v.String
 	case src.KindTime:
 		return v.Time
+	case src.KindList:
+		return v.List
 	case src.KindAfter:
 		if v.Unit != src.Calendar {
 			t.Fatalf("an After of unit %d", v.Unit)
@@ -142,7 +144,9 @@ func TestSlackFactsAreTheManifestsFacts(t *testing.T) {
 	}
 	var want, names []string
 	for _, d := range s.Facts {
-		want = append(want, d.Name)
+		if d.Name != s.MembersFact {
+			want = append(want, d.Name)
+		}
 	}
 	for k := range got {
 		names = append(names, k)

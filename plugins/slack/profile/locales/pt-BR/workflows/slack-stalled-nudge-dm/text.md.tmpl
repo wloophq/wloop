@@ -1,0 +1,4 @@
+Oi! Alguma novidade sobre {{plural (len .Items) "one" "isto" "other" "estes"}}? Surgiu em outra conversa:
+
+{{range $i, $it := .Items}}{{if $i}}
+{{end}}> {{or $it.Ask $it.Line}}{{end -}}

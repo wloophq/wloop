@@ -283,6 +283,9 @@ type Workflow struct {
 	// propose, from its [gates.approval]; nil when that names none for a
 	// draft gate.
 	DraftApproval *draft.Policy
+	// DraftsWait pins every draft the workflow proposes to wait for a person, whatever the configuration's
+	// approval says.
+	DraftsWait bool
 	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.
@@ -290,6 +293,9 @@ type Workflow struct {
 	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
 	// or moot.
 	WithdrawReason string
+	// WithdrawRules are the manifest's [[drafts.withdraw.rule]], tried in order before Withdraw, each
+	// withdrawing with its own reason.
+	WithdrawRules []WithdrawRule
 	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
 	Ask *template.Template
 	// Outbox is how the Outbox names the group of the drafts the workflow proposed.
@@ -320,6 +326,22 @@ func (w Workflow) Asks(label string, facts Facts) (string, error) {
 		return w.Summary, err
 	}
 	return strings.TrimSpace(b.String()), nil
+}
+
+// WithdrawRule withdraws an open draft that matches When, with Reason.
+type WithdrawRule struct {
+	When   Predicate
+	Reason string
+}
+
+// Withdrawals are the rules w withdraws its open drafts by, in the order they are tried: its WithdrawRules,
+// then Withdraw with WithdrawReason; none when it withdraws none.
+func (w Workflow) Withdrawals() []WithdrawRule {
+	out := slices.Clone(w.WithdrawRules)
+	if w.Withdraw != nil {
+		out = append(out, WithdrawRule{When: w.Withdraw, Reason: w.WithdrawReason})
+	}
+	return out
 }
 
 // Visible says whether a step of the workflow acts in the user's name where others see it.

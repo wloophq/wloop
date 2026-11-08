@@ -201,6 +201,9 @@ type Item struct {
 	UserAt    time.Time `json:"user_at,omitzero"`
 	CreatedAt time.Time `json:"created_at,omitzero"`
 	UpdatedAt time.Time `json:"updated_at,omitzero"`
+	// Ask is the item said to whom it waits on, in the voice of the user who sends it; empty when the
+	// plugin wrote none.
+	Ask string `json:"ask,omitempty"`
 }
 
 // Option is one of the choices a decision item offers.
@@ -240,6 +243,7 @@ type ItemFields struct {
 	Requester                                   *Person
 	WaitingOn                                   *[]Person
 	Confidence                                  *string
+	Ask                                         *string
 }
 
 // ItemResult is the outcome of one op: the item it touched, or why it was

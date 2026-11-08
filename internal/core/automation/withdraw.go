@@ -1,6 +1,7 @@
 package automation
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -86,8 +87,8 @@ func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workfl
 		}
 		return "", err
 	}
-	switch {
-	case w.Withdraw == nil || w.Observe:
+	rules := w.Withdrawals()
+	if len(rules) == 0 || w.Observe {
 		return "", nil
 	}
 	facts, err := e.factsFor(ctx, w, d.Subject)
@@ -103,11 +104,13 @@ func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workfl
 			vars.Facts[k] = v
 		}
 	}
-	if ok, err := match(w.Withdraw, vars); err != nil || !ok {
-		return "", err
+	for _, r := range rules {
+		switch ok, err := match(r.When, vars); {
+		case err != nil:
+			return "", err
+		case ok:
+			return cmp.Or(r.Reason, draft.WithdrawMoot), nil
+		}
 	}
-	if w.WithdrawReason != "" {
-		return w.WithdrawReason, nil
-	}
-	return draft.WithdrawMoot, nil
+	return "", nil
 }

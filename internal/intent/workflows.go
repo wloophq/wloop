@@ -43,8 +43,14 @@ type wManifest struct {
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
 	Drafts   *wDrafts          `toml:"drafts"`
-	Gates    *mGates           `toml:"gates"`
+	Gates    *wGates           `toml:"gates"`
 	Outbox   *wOutbox          `toml:"outbox"`
+}
+
+// wGates is a workflow's [gates]: an intent's, and whether its drafts always wait.
+type wGates struct {
+	Approval   *mApproval `toml:"approval"`
+	DraftsWait bool       `toml:"drafts_wait"`
 }
 
 type wOutbox struct {
@@ -59,6 +65,12 @@ type wDrafts struct {
 }
 
 type wWithdraw struct {
+	When   *string         `toml:"when"`
+	Reason *string         `toml:"reason"`
+	Rule   []wWithdrawRule `toml:"rule"`
+}
+
+type wWithdrawRule struct {
 	When   *string `toml:"when"`
 	Reason *string `toml:"reason"`
 }
@@ -366,19 +378,35 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 	if m == nil {
 		return
 	}
-	if m.When == nil {
-		s.add("drafts.withdraw.when", "is required: a predicate over the unit's facts and draft.* that withdraws an open draft the workflow proposed")
+	const need = "is required: a predicate over the unit's facts and draft.* that withdraws an open draft the workflow proposed"
+	if m.When == nil && len(m.Rule) == 0 {
+		s.add("drafts.withdraw.when", need)
 		return
 	}
 	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepDraftPropose }) {
 		s.add("drafts.withdraw", "withdraws drafts the workflow proposed; it has no %s step", builtin.StepDraftPropose)
 	}
-	if slot != "" {
-		w.Withdraw = s.predicate("drafts.withdraw.when", *m.When, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
+	rule := func(path string, when string, reason *string) workflow.WithdrawRule {
+		r := workflow.WithdrawRule{Reason: draft.WithdrawMoot}
+		if slot != "" {
+			r.When = s.predicate(path, when, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
+		}
+		if reason != nil {
+			r.Reason = *reason
+		}
+		return r
 	}
-	w.WithdrawReason = draft.WithdrawMoot
-	if m.Reason != nil {
-		w.WithdrawReason = *m.Reason
+	for i, r := range m.Rule {
+		path := fmt.Sprintf("drafts.withdraw.rule[%d]", i)
+		if r.When == nil {
+			s.add(path+".when", need)
+			continue
+		}
+		w.WithdrawRules = append(w.WithdrawRules, rule(path+".when", *r.When, r.Reason))
+	}
+	if m.When != nil {
+		r := rule("drafts.withdraw.when", *m.When, m.Reason)
+		w.Withdraw, w.WithdrawReason = r.When, r.Reason
 	}
 }
 
@@ -695,6 +723,11 @@ func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.Provi
 	if r, _ := arg("reaction"); slices.Contains(builtin.DraftEmojiDeliveries, delivery) && r == "" {
 		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
 	}
+	if t, _ := arg("target"); t == builtin.DraftTargetPerson {
+		if per, _ := arg("per"); per != "person" {
+			s.add(p+".target", "person needs per = \"person\": each draft posts in the direct conversation of the person it is to")
+		}
+	}
 	if v, ok := arg("repeat_after"); ok {
 		s.repeatAfter(p+".repeat_after", v)
 	}
@@ -767,10 +800,10 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 // defineApproval loads the workflow's [gates.approval]: the approval of its
 // runs' plan gates, of the drafts its steps and turns propose, and of the
 // gates its gate.open steps open, each laid over gates.toml's default.
-func (s *sheet) defineApproval(w *workflow.Workflow, g *mGates, slot string) {
+func (s *sheet) defineApproval(w *workflow.Workflow, g *wGates, slot string) {
 	var m *mApproval
 	if g != nil {
-		m = g.Approval
+		m, w.DraftsWait = g.Approval, g.DraftsWait
 	}
 	draftEnv := s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot)
 	var unitEnv expr.Env

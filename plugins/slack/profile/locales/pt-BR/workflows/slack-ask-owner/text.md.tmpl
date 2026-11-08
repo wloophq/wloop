@@ -1,4 +1,4 @@
 Quem cuida {{plural (len .Items) "one" "disto" "other" "destes"}}?
 
 {{range $i, $it := .Items}}{{if $i}}
-{{end}}- {{$it.Line}}{{end -}}
+{{end}}- {{or $it.Ask $it.Line}}{{end -}}

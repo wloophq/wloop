@@ -10,6 +10,7 @@ kinds = ["thread"]
 
 default_delivery = "message"
 language_fact = "slack.language"
+members_fact = "slack.members"
 config_reads = ["placement", "items.heat"]
 notify = ["tasks", "gates"]
 
@@ -125,6 +126,11 @@ name = "slack.language"
 type = "string"
 doc = "The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell."
 untrusted = true
+
+[[source.facts]]
+name = "slack.members"
+type = "list"
+doc = "The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one."
 
 [[source.signals]]
 name = "asked_reacted"

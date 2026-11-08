@@ -84,6 +84,17 @@ func TestOutboxShowReadsTheDraft(t *testing.T) {
 	golden(t, "outbox_show_closing.golden", closing.String())
 }
 
+func TestOutboxShowSaysWhichConversationADraftQuotes(t *testing.T) {
+	t.Parallel()
+	d := outboxFixture()[0]
+	d.Quoted = "Quotes an item of the DM with Ana, a conversation they are not in."
+	var out bytes.Buffer
+	writeDraftView(&out, termfmt.Term{Width: 120}, d, outboxNow)
+	if !strings.Contains(out.String(), "Quotes") || !strings.Contains(out.String(), d.Quoted) {
+		t.Fatalf("show:\n%s", out.String())
+	}
+}
+
 func TestADraftClosesWhatItsEffectsSayWhateverItsPurpose(t *testing.T) {
 	t.Parallel()
 	closing := outboxFixture()[2]

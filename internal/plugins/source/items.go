@@ -91,7 +91,8 @@ func wireItem(it items.Item) src.Item {
 		Assignees: wirePeople(it.Assignees), AssignedAt: wireAnchor(it.AssignedAt), Basis: string(it.Basis),
 		WaitingOn: wirePeople(it.WaitingOn), State: string(it.State), Resolution: string(it.Resolution),
 		Evidence: wireEvidence(it.Evidence), Confidence: string(it.Confidence), Ambiguity: it.Ambiguity,
-		Provenance: string(it.Provenance), Confirmed: it.Confirmed, TaskKey: it.TaskKey, UserAt: it.UserAt, CreatedAt: it.CreatedAt, UpdatedAt: it.UpdatedAt}
+		Provenance: string(it.Provenance), Confirmed: it.Confirmed, TaskKey: it.TaskKey, UserAt: it.UserAt, CreatedAt: it.CreatedAt, UpdatedAt: it.UpdatedAt,
+		Ask: it.Ask}
 	for _, e := range it.Trail {
 		out.Trail = append(out.Trail, wireEvidence(e))
 	}
@@ -103,7 +104,7 @@ func opOf(w src.ItemOp) items.Op {
 	out := items.Op{Op: items.OpKind(w.Op), Unit: rawUnit(w.Unit), Item: w.Item, Anchor: anchorOf(w.Anchor), Assignees: peopleOf(w.Assignees),
 		Basis: items.Basis(w.Basis), Resolution: items.Resolution(w.Resolution), LinkKind: link.Kind(w.LinkKind), Reason: w.Reason}
 	if f := w.Fields; f != nil {
-		o := &items.Fields{Summary: f.Summary, Context: f.Context, Deadline: f.Deadline, Ambiguity: f.Ambiguity, URLs: f.URLs, Contexts: f.Contexts}
+		o := &items.Fields{Summary: f.Summary, Ask: f.Ask, Context: f.Context, Deadline: f.Deadline, Ambiguity: f.Ambiguity, URLs: f.URLs, Contexts: f.Contexts}
 		if f.Kind != nil {
 			k := items.Kind(*f.Kind)
 			o.Kind = &k
@@ -149,7 +150,7 @@ func ItemOf(w src.Item) items.Item {
 		AssignedAt: anchorOf(w.AssignedAt), Basis: items.Basis(w.Basis), WaitingOn: peopleOf(w.WaitingOn), State: items.State(w.State),
 		Resolution: items.Resolution(w.Resolution), Evidence: evidenceOf(w.Evidence), Confidence: items.Confidence(w.Confidence),
 		Ambiguity: w.Ambiguity, Provenance: items.Provenance(w.Provenance), Confirmed: w.Confirmed, TaskKey: w.TaskKey, UserAt: w.UserAt,
-		CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}
+		CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Ask: w.Ask}
 	for _, e := range w.Trail {
 		out.Trail = append(out.Trail, evidenceOf(e))
 	}

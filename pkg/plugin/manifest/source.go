@@ -56,6 +56,7 @@ type SourceVocabulary struct {
 	Situations      []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
 	Steps           []string    `toml:"steps" doc:"The core workflow steps that run on the plugin's units, such as \"turn.dismiss\"."`
 	LanguageFact    string      `toml:"language_fact" doc:"The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's."`
+	MembersFact     string      `toml:"members_fact" doc:"The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells."`
 }
 
 // Codec is how a source plugin's unit keys and web addresses are spelled.
@@ -387,6 +388,9 @@ func (s *Source) validate() error {
 	}
 	if s.LanguageFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.LanguageFact && f.Type == "string" }) {
 		bad("language_fact %q is not a string fact of facts", s.LanguageFact)
+	}
+	if s.MembersFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.MembersFact && f.Type == "list" }) {
+		bad("members_fact %q is not a list fact of facts", s.MembersFact)
 	}
 	if s.DefaultDelivery != "" && !slices.Contains(deliveries, s.DefaultDelivery) {
 		bad("default_delivery %q is not one of deliveries", s.DefaultDelivery)

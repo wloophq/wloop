@@ -173,7 +173,7 @@ func snapshot() source.Snapshot {
 			WaitingOn: []source.Person{bru}, State: "open", Resolution: "done",
 			Evidence: source.ItemEvidence{Kind: "message", Anchor: anchor}, Trail: []source.ItemEvidence{{Kind: "unit_event", Anchor: anchor}},
 			Confidence: "high", Ambiguity: "none", Provenance: "derived", Confirmed: true, TaskKey: pr.Key,
-			UserAt: t0, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour),
+			UserAt: t0, CreatedAt: t0, UpdatedAt: t0.Add(time.Hour), Ask: "review the retries I wrote",
 		}},
 		Facts:       []source.Fact{{Name: "pull.state", Value: source.String("OPEN")}, {Name: "pull.waiting", Value: source.Since(t0)}},
 		Signals:     []source.Signal{{Name: "stalled", On: true, Since: t0}, {Name: "ready"}},
@@ -225,7 +225,7 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		return source.ToolResult{}, err
 	}
 	res, err := h.ApplyItems(ctx, []source.ItemOp{{Op: "create", Unit: se.Unit, Anchor: source.Anchor{Unit: se.Unit, Ref: "turn:" + call.Turn},
-		Fields: &source.ItemFields{Kind: ptr("todo"), Summary: ptr("Answer Ana"), WaitingOn: &[]source.Person{ana}}}})
+		Fields: &source.ItemFields{Kind: ptr("todo"), Summary: ptr("Answer Ana"), Ask: ptr("answer me"), WaitingOn: &[]source.Person{ana}}}})
 	if err != nil {
 		return source.ToolResult{}, err
 	}
@@ -328,7 +328,8 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	if !reflect.DeepEqual(rec.asks, []source.AskRequest{{Prompt: "Is it done?", Tier: "small", MaxCostUSD: 0.5, MeterScope: "mcp/pull_read/ask"}}) {
 		t.Errorf("asks %+v", rec.asks)
 	}
-	if len(rec.ops) != 1 || *rec.ops[0].Fields.Summary != "Answer Ana" || !reflect.DeepEqual(*rec.ops[0].Fields.WaitingOn, []source.Person{ana}) ||
+	if len(rec.ops) != 1 || *rec.ops[0].Fields.Summary != "Answer Ana" || rec.ops[0].Fields.Ask == nil || *rec.ops[0].Fields.Ask != "answer me" ||
+		!reflect.DeepEqual(*rec.ops[0].Fields.WaitingOn, []source.Person{ana}) ||
 		rec.ops[0].Fields.Context != nil || rec.ops[0].Fields.URLs != nil {
 		t.Errorf("ops %+v", rec.ops)
 	}

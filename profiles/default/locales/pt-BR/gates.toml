@@ -123,6 +123,7 @@ summary = "Fechar a execução parada sem retomá-la."
 [drafts]
 by_hand = "Escritos à mão"
 by_hand_about = "Respostas e reações que você mesmo escreveu, esperando o envio."
+quoted = "Cita um item de {conversation}, uma conversa da qual a pessoa não participa."
 
 [drafts.purposes]
 nudge = "Cutucar"
@@ -141,3 +142,12 @@ sending = "enviando"
 sent = "enviado"
 failed = "falhou no envio"
 dropped = "descartado"
+
+[drafts.reasons]
+assigned = "seus itens ganharam um responsável"
+moot = "não se aplica mais"
+outside = "se dirigia a alguém que não consegue ler aquela conversa"
+joined = "a pessoa para quem foi escrito entrou na conversa de onde ele veio"
+ended = "sua tarefa terminou"
+skipped = "você pulou o workflow dele ali"
+superseded = "um rascunho para a conversa toda o substituiu"

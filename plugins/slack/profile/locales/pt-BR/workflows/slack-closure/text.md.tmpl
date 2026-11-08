@@ -1,4 +1,4 @@
 Encerrando por aqui:
 
 {{range $i, $it := .Items}}{{if $i}}
-{{end}}- {{$it.Line}}: {{$r := print $it.Resolution}}{{if eq $r "done"}}feito{{else if eq $r "answered"}}respondido{{else if eq $r "fixed"}}corrigido{{else if eq $r "delegated"}}delegado{{else if eq $r "declined"}}recusado{{else if eq $r "dismissed"}}descartado{{else if eq $r "superseded"}}substituído{{else if eq $r "moot"}}sem efeito{{else}}resolvido{{end}}{{end -}}
+{{end}}- {{or $it.Ask $it.Line}}: {{$r := print $it.Resolution}}{{if eq $r "done"}}feito{{else if eq $r "answered"}}respondido{{else if eq $r "fixed"}}corrigido{{else if eq $r "delegated"}}delegado{{else if eq $r "declined"}}recusado{{else if eq $r "dismissed"}}descartado{{else if eq $r "superseded"}}substituído{{else if eq $r "moot"}}sem efeito{{else}}resolvido{{end}}{{end -}}

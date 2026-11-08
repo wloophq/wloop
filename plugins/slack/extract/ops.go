@@ -251,7 +251,7 @@ func (b *opBuilder) fields(out ItemOut) items.Fields {
 	}
 	waiting := b.people(out.WaitingOn)
 	f := items.Fields{
-		Kind: &kind, Summary: &out.Summary, Context: &out.Context, Deadline: &out.Deadline,
+		Kind: &kind, Summary: &out.Summary, Ask: &out.Ask, Context: &out.Context, Deadline: &out.Deadline,
 		Ambiguity: &out.Ambiguity, Options: &opts, URLs: &urls, WaitingOn: &waiting, Confidence: &conf,
 	}
 	if p := b.person(out.Requester); p.Key != "" {
@@ -261,7 +261,8 @@ func (b *opBuilder) fields(out ItemOut) items.Fields {
 }
 
 // diffFields keeps only the fields of want that differ from cur. On a confirmed item the
-// free-text fields are left out: a rewording would become a new proposal on every run.
+// free-text fields are left out: a rewording would become a new proposal on every run. Its ask is filled
+// once, when it has none.
 func diffFields(cur items.Item, want items.Fields) (items.Fields, bool) {
 	var f items.Fields
 	if *want.Kind != cur.Kind {
@@ -269,6 +270,9 @@ func diffFields(cur items.Item, want items.Fields) (items.Fields, bool) {
 	}
 	if !cur.Confirmed && *want.Summary != cur.Summary {
 		f.Summary = want.Summary
+	}
+	if *want.Ask != cur.Ask && (cur.Ask == "" || !cur.Confirmed) {
+		f.Ask = want.Ask
 	}
 	if !cur.Confirmed && oneLine(*want.Context) != oneLine(cur.Context) {
 		f.Context = want.Context

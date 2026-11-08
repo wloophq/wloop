@@ -1490,10 +1490,13 @@ type Item struct {
 	Confirmed  bool            `protobuf:"varint,24,opt,name=confirmed,proto3" json:"confirmed,omitempty"`
 	// task_key groups items into one task: the item id when empty, or the
 	// unit's key for a source whose unit is the task.
-	TaskKey       string                 `protobuf:"bytes,25,opt,name=task_key,json=taskKey,proto3" json:"task_key,omitempty"`
-	UserAt        *timestamppb.Timestamp `protobuf:"bytes,26,opt,name=user_at,json=userAt,proto3" json:"user_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,27,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,28,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	TaskKey   string                 `protobuf:"bytes,25,opt,name=task_key,json=taskKey,proto3" json:"task_key,omitempty"`
+	UserAt    *timestamppb.Timestamp `protobuf:"bytes,26,opt,name=user_at,json=userAt,proto3" json:"user_at,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,27,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,28,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// ask is the item said to whom it waits on, in the voice of the user who
+	// sends it: what a nudge to them lists. Empty when the source wrote none.
+	Ask           string `protobuf:"bytes,29,opt,name=ask,proto3" json:"ask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1722,6 +1725,13 @@ func (x *Item) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Item) GetAsk() string {
+	if x != nil {
+		return x.Ask
+	}
+	return ""
 }
 
 // Snapshot is everything the plugin reports of one unit. A later snapshot
@@ -6707,6 +6717,7 @@ type ItemFields struct {
 	Requester     *Person                `protobuf:"bytes,10,opt,name=requester,proto3" json:"requester,omitempty"`
 	WaitingOn     *PersonList            `protobuf:"bytes,11,opt,name=waiting_on,json=waitingOn,proto3" json:"waiting_on,omitempty"`
 	Confidence    *string                `protobuf:"bytes,12,opt,name=confidence,proto3,oneof" json:"confidence,omitempty"`
+	Ask           *string                `protobuf:"bytes,13,opt,name=ask,proto3,oneof" json:"ask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6821,6 +6832,13 @@ func (x *ItemFields) GetWaitingOn() *PersonList {
 func (x *ItemFields) GetConfidence() string {
 	if x != nil && x.Confidence != nil {
 		return *x.Confidence
+	}
+	return ""
+}
+
+func (x *ItemFields) GetAsk() string {
+	if x != nil && x.Ask != nil {
+		return *x.Ask
 	}
 	return ""
 }
@@ -10383,7 +10401,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\aoptions\x18\x01 \x03(\v2\x1b.wloop.source.v1.ItemOptionR\aoptions\"S\n" +
 	"\fItemEvidence\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12/\n" +
-	"\x06anchor\x18\x02 \x01(\v2\x17.wloop.source.v1.AnchorR\x06anchor\"\xb7\b\n" +
+	"\x06anchor\x18\x02 \x01(\v2\x17.wloop.source.v1.AnchorR\x06anchor\"\xc9\b\n" +
 	"\x04Item\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
 	"\x04unit\x18\x02 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12\x12\n" +
@@ -10423,7 +10441,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x1b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x1c \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xfb\a\n" +
+	"updated_at\x18\x1c \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x10\n" +
+	"\x03ask\x18\x1d \x01(\tR\x03ask\"\xfb\a\n" +
 	"\bSnapshot\x12)\n" +
 	"\x04unit\x18\x01 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12\x10\n" +
 	"\x03rev\x18\x02 \x01(\x04R\x03rev\x12*\n" +
@@ -10800,7 +10819,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\x0eChangedRequest\x12+\n" +
 	"\x05units\x18\x01 \x03(\v2\x15.wloop.plugin.v1.UnitR\x05units\x12\x16\n" +
 	"\x06topics\x18\x02 \x03(\tR\x06topics\"\x11\n" +
-	"\x0fChangedResponse\"\xdd\x04\n" +
+	"\x0fChangedResponse\"\xfc\x04\n" +
 	"\n" +
 	"ItemFields\x12\x17\n" +
 	"\x04kind\x18\x01 \x01(\tH\x00R\x04kind\x88\x01\x01\x12\x1d\n" +
@@ -10818,7 +10837,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"waiting_on\x18\v \x01(\v2\x1b.wloop.source.v1.PersonListR\twaitingOn\x12#\n" +
 	"\n" +
 	"confidence\x18\f \x01(\tH\x06R\n" +
-	"confidence\x88\x01\x01B\a\n" +
+	"confidence\x88\x01\x01\x12\x15\n" +
+	"\x03ask\x18\r \x01(\tH\aR\x03ask\x88\x01\x01B\a\n" +
 	"\x05_kindB\n" +
 	"\n" +
 	"\b_summaryB\n" +
@@ -10828,7 +10848,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\n" +
 	"_ambiguityB\v\n" +
 	"\t_categoryB\r\n" +
-	"\v_confidence\"\xc1\x03\n" +
+	"\v_confidenceB\x06\n" +
+	"\x04_ask\"\xc1\x03\n" +
 	"\x06ItemOp\x12\x0e\n" +
 	"\x02op\x18\x01 \x01(\tR\x02op\x12)\n" +
 	"\x04unit\x18\x02 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12\x12\n" +

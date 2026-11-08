@@ -74,6 +74,18 @@
           "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.",
           "type": "object"
         },
+        "quoted": {
+          "description": "What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.",
+          "type": "string"
+        },
+        "reasons": {
+          "additionalProperties": {
+            "description": "The reason's words; the key is a withdraw reason: assigned, moot, outside, joined, ended, skipped or superseded.",
+            "type": "string"
+          },
+          "description": "Why a dropped draft was withdrawn, by reason, as the Outbox says it.",
+          "type": "object"
+        },
         "states": {
           "additionalProperties": {
             "description": "The state's words, such as \"failed to send\"; the key is a draft state: held, queued, sending, sent, failed or dropped.",

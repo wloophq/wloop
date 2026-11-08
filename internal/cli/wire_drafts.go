@@ -113,11 +113,16 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		switch {
 		case err != nil && d.Task != "" && errors.Is(err, coretasks.ErrNoTask):
 			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false,
-				"draft.person_asks_you": false}
+				"draft.person_asks_you": false, "draft.people_outside": 0, "draft.target_joined": false}
 		case err != nil:
 			return nil, err
 		default:
-			pd.Facts = draftFactsOf(sub, draftPeople(d, subject), d.Items, w.d.me())
+			rd, err := w.d.unitReaders(ctx, d.Unit)
+			if err != nil {
+				return nil, err
+			}
+			people := draftPeople(d, subject)
+			pd.Facts = draftFactsOf(sub, people, d.Items, w.d.me(), rd.outside(people, d.Target, w.d.Codecs), rd.joined(people, d.Target, w.d.Codecs))
 		}
 		out = append(out, pd)
 	}

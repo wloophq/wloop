@@ -37,10 +37,13 @@ type GatesDef struct {
 }
 
 // DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts no
-// workflow proposed and no purpose names, Purposes name a purpose and States a delivery state, by its id.
+// workflow proposed and no purpose names, Purposes name a purpose, States a delivery state and Reasons why a
+// dropped draft was withdrawn, by its id.
 type DraftWords struct {
-	ByHand, ByHandAbout string
-	Purposes, States    map[string]string
+	ByHand, ByHandAbout       string
+	Purposes, States, Reasons map[string]string
+	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
+	Quoted string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -199,8 +202,10 @@ type mGatesFile struct {
 type mDraftWords struct {
 	ByHand      *string           `toml:"by_hand"`
 	ByHandAbout *string           `toml:"by_hand_about"`
+	Quoted      *string           `toml:"quoted"`
 	Purposes    map[string]string `toml:"purposes"`
 	States      map[string]string `toml:"states"`
+	Reasons     map[string]string `toml:"reasons"`
 }
 
 type mGate struct {
@@ -352,6 +357,9 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	if m.ByHandAbout != nil {
 		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
 	}
+	if m.Quoted != nil {
+		w.Quoted = strings.TrimSpace(*m.Quoted)
+	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
 	states := make([]string, len(draft.States))
 	for i, st := range draft.States {
@@ -366,6 +374,15 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 		known = append(known, name)
 	}
 	w.States = mergeWords(w.States, m.States, known)
+	known = nil
+	for _, name := range declared(s, "drafts.reasons", m.Reasons) {
+		if !slices.Contains(draft.WithdrawReasons, name) {
+			s.add("drafts.reasons."+name, "names no withdraw reason%s; the reasons are %s", expr.DidYouMean(name, draft.WithdrawReasons), strings.Join(draft.WithdrawReasons, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.Reasons = mergeWords(w.Reasons, m.Reasons, known)
 }
 
 // mergeWords is into with the words of names in m laid over it, an empty word taking one off.

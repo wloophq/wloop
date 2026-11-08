@@ -82,9 +82,9 @@ func (s draftSubject) held() []items.Item {
 
 // unitOwed are, for one draft on the subject's conversation, the people it is to and the items it lists:
 // those the subject's open items, and the open items of absorbed (the items of a draft the new one
-// replaces), wait on, me left out, then each who asks me something left out with the items only they owe,
-// unless everyone does.
-func (s draftSubject) unitOwed(me task.Me, absorbed []string) ([]items.Person, []items.Item) {
+// replaces), wait on, me and those keep refuses left out, then each who asks me something left out with the
+// items only they owe, unless everyone does.
+func (s draftSubject) unitOwed(me task.Me, absorbed []string, keep func(items.Person) bool) ([]items.Person, []items.Item) {
 	isMe := func(p items.Person) bool { return p.Is(me) }
 	pool := s.held()
 	for _, it := range s.items {
@@ -99,7 +99,7 @@ func (s draftSubject) unitOwed(me task.Me, absorbed []string) ([]items.Person, [
 	var people []items.Person
 	for _, it := range pool {
 		for _, p := range it.WaitingOn {
-			if !isMe(p) && !slices.ContainsFunc(people, func(q items.Person) bool { return q.Key == p.Key }) {
+			if !isMe(p) && !slices.ContainsFunc(people, func(q items.Person) bool { return q.Key == p.Key }) && keep(p) {
 				people = append(people, p)
 			}
 		}
@@ -116,9 +116,10 @@ func (s draftSubject) unitOwed(me task.Me, absorbed []string) ([]items.Person, [
 }
 
 // draftFactsOf are the draft slot's facts of a draft on sub to people over the items ids: whether any of
-// people is still waited on, the draft's items still held by any of them (unowned ones for no people), and
-// whether every one of them asks you.
-func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me) workflow.Facts {
+// people is still waited on, the draft's items still held by any of them (unowned ones for no people),
+// whether every one of them asks you, outside, how many cannot read where it posts, and joined, whether the
+// person it was written to in their own conversation now reads the one it came from.
+func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, outside int, joined bool) workflow.Facts {
 	var mine []items.Item
 	for _, it := range sub.items {
 		if slices.Contains(ids, it.ID) {
@@ -152,6 +153,8 @@ func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me) w
 		"draft.items_assigned":  owned,
 		"draft.unit_open":       sub.task == nil || sub.task.Open(),
 		"draft.person_asks_you": asks,
+		"draft.people_outside":  outside,
+		"draft.target_joined":   joined,
 	}
 }
 

@@ -35,6 +35,10 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "drafts.withdraw", In: SurfaceWorkflow, Kind: KindTable, Doc: "When an open draft the workflow proposed is withdrawn."},
 	{Path: "drafts.withdraw.when", In: SurfaceWorkflow, Kind: KindPred, Doc: "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's."},
 	{Path: "drafts.withdraw.reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the withdrawn draft stores."},
+	{Path: "gates.drafts_wait", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it."},
+	{Path: "drafts.withdraw.rule[]", In: SurfaceWorkflow, Kind: KindTable, Doc: "A rule tried before when, in order, that withdraws with a reason of its own."},
+	{Path: "drafts.withdraw.rule[].when", In: SurfaceWorkflow, Kind: KindPred, Required: true, Doc: "When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required."},
+	{Path: "drafts.withdraw.rule[].reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the draft the rule withdraws stores."},
 	{Path: "outbox", In: SurfaceWorkflow, Kind: KindTable, Doc: "How the Outbox heads the group of the drafts the workflow proposed."},
 	{Path: "outbox.title", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "The group's title, what the drafts are for, such as \"Ask who hasn't answered\"; the summary when absent."},
 	{Path: "outbox.about", In: SurfaceWorkflow, Localized: true, Kind: KindText, Doc: "One line under the title on when the workflow drafts them, such as \"Drafted when a conversation where you asked something goes quiet.\""},
@@ -44,6 +48,8 @@ func withdrawValues() []Value {
 	return []Value{
 		{Name: draft.WithdrawAssigned, Doc: "Its items got an owner."},
 		{Name: draft.WithdrawMoot, Doc: "It no longer applies."},
+		{Name: draft.WithdrawOutside, Doc: "It addresses someone who cannot read the conversation it posts in."},
+		{Name: draft.WithdrawJoined, Doc: "The person it was written to in their own conversation joined the one it came from."},
 	}
 }
 
