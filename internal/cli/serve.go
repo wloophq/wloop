@@ -404,6 +404,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)
 	d.Placer = sessionPlacer{e: e, cfg: cfg}
+	d.UnitEnded = unitsEnded(mods)
 	e.viewFacts().set(authorFacts(mods))
 	notices := &noticeFeed{}
 	d.Notices = notices

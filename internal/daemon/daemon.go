@@ -238,6 +238,9 @@ type Deps struct {
 	// Facts reads what a pull request's guide is matched against, for
 	// profile show <pr-url>; nil answers 503.
 	Facts func(ctx context.Context, u unit.Unit) (api.Facts, error)
+	// UnitEnded says whether u has ended as its plugin says, which a step gate's card reads to show the open
+	// units it is about first; nil keeps the task's order.
+	UnitEnded func(ctx context.Context, u unit.Unit) (bool, error)
 	// SessionWait is how long a turn by hand waits for its brief; 0 is
 	// brief.SessionWait.
 	SessionWait time.Duration

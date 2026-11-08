@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // stepGates are the gates gate.open opens, and the open ones it holds on.
@@ -88,23 +89,33 @@ func (s *stepSet) gateOpenRun(ctx context.Context, c stepCall, _ automation.RunO
 }
 
 // stepText is gate name's text over the facts of its unit, which are facts, and of the units its task holds,
-// the first unit's where two say the same fact; "" leaves the gate its label, as when the text fails.
+// where two say the same fact the first unit's that has not ended, so the text names an open one; "" leaves the
+// gate its label, as when the text fails.
 func (s *stepSet) stepText(ctx context.Context, name string, facts workflow.Facts) string {
 	def, ok := s.e.loadedIntents().Gates.Gate(name)
 	if !ok || def.Text == nil {
 		return ""
 	}
-	all := maps.Clone(facts)
+	var open, ended []workflow.Facts
 	for _, ref := range factList(facts, "task.units") {
 		p, key, ok := strings.Cut(ref, ":")
 		if !ok {
 			continue
 		}
-		f, err := s.facts(ctx, unit.Unit{Provider: unit.ProviderID(p), Key: key})
+		u := unit.Unit{Provider: unit.ProviderID(p), Key: key}
+		f, err := s.facts(ctx, u)
 		if err != nil {
 			s.logf("gate %s: the facts of %s: %v", name, ref, err)
 			continue
 		}
+		if endedFact, ok := builtin.EndedFact(u.Provider); ok && f[endedFact] == true {
+			ended = append(ended, f)
+		} else {
+			open = append(open, f)
+		}
+	}
+	all := maps.Clone(facts)
+	for _, f := range slices.Concat(open, ended) {
 		for k, v := range f {
 			if _, set := all[k]; !set {
 				all[k] = v

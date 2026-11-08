@@ -14,8 +14,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// startedTask is a task the user captured, a start turn ran on, and the pull request it opened attached.
-func (p *prTaskRig) startedTask(t *testing.T, pr unit.Unit) task.ID {
+// startedTask is a task the user captured, a start turn ran on, and the units it opened attached.
+func (p *prTaskRig) startedTask(t *testing.T, units ...unit.Unit) task.ID {
 	t.Helper()
 	ctx := context.Background()
 	e, err := p.r.te.tasks.Capture(ctx, "ship the export", "", nil)
@@ -26,10 +26,58 @@ func (p *prTaskRig) startedTask(t *testing.T, pr unit.Unit) task.ID {
 	if _, err := sqlite.New(p.r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.r.te.tasks.Attach(ctx, e.ID, pr); err != nil {
-		t.Fatal(err)
+	for _, u := range units {
+		if err := p.r.te.tasks.Attach(ctx, e.ID, u); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return e.ID
+}
+
+// stepRig is a prTaskRig whose engine opens and withdraws step gates, its pull requests reporting their slugs.
+func stepRig(t *testing.T, prs ...unit.Unit) *prTaskRig {
+	t.Helper()
+	p := newPRTaskRig(t)
+	p.r.te.newGates(p.r.db, t.Logf)
+	p.eng.Gates = draftGates{e: p.r.te.Env, db: p.r.db, logf: t.Logf}
+	p.prs.more = map[unit.Unit]workflow.Facts{}
+	for _, u := range prs {
+		p.prs.more[u] = workflow.Facts{"pr.slug": u.Key, "pr.changed_files": int64(2)}
+	}
+	return p
+}
+
+func TestAReviewDiffStepStaysWhileAPROfItsTaskIsOpenAndNamesAnOpenOne(t *testing.T) {
+	t.Parallel()
+	pr3, pr4, pr5 := unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}, unit.Unit{Provider: unit.GitHub, Key: "acme/api#4"}, unit.Unit{Provider: unit.GitHub, Key: "acme/api#5"}
+	p := stepRig(t, ptPR1, ptPR2, pr3, pr4, pr5)
+	two := p.startedTask(t, ptPR1, ptPR2)
+	withThread := p.startedTask(t, pr3, twThread)
+	p.prs.end(pr4)
+	lateOpen := p.startedTask(t, pr4, pr5)
+	p.pass(t)
+	for id, want := range map[task.ID]string{two: "acme/api#1", withThread: "acme/api#3", lateOpen: "acme/api#5"} {
+		if gs := p.reviewDiff(t, id); len(gs) != 1 || gs[0].Status != gate.Open || gs[0].Text != "Review the diff of "+want+", 2 files changed" {
+			t.Fatalf("%s: steps %+v, want one open naming %s, the first pull request not ended", id, gs, want)
+		}
+	}
+
+	p.r.now = p.r.now.Add(time.Minute)
+	p.prs.end(ptPR1)
+	p.prs.end(pr3)
+	p.pass(t)
+	if gs := p.reviewDiff(t, two); len(gs) != 1 || gs[0].Status != gate.Open {
+		t.Errorf("a merged pull request beside an open one: steps %+v, want kept", gs)
+	}
+	if e := p.r.taskOf(two); !e.Open() {
+		t.Errorf("the task with an open pull request closed: %s", e.Category)
+	}
+	if gs := p.reviewDiff(t, withThread); len(gs) != 1 || gs[0].Status != gate.Superseded {
+		t.Errorf("a merged pull request beside an open thread: steps %+v, want withdrawn", gs)
+	}
+	if e := p.r.taskOf(withThread); !e.Open() {
+		t.Errorf("the task its open thread holds closed: %s", e.Category)
+	}
 }
 
 func (p *prTaskRig) reviewDiff(t *testing.T, id task.ID) []gate.Gate {

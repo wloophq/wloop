@@ -63,6 +63,19 @@ func TestAStepGateServesTheUnitsItIsAboutAndWhatEachAnswerDoes(t *testing.T) {
 	}
 	want("detail", &v.Gates[0])
 
+	merged := unit.Unit{Provider: "thread", Key: "8"}
+	r.put(t, task.Task{ID: "t-0000000000000002", State: "next", Category: task.CategoryReady, Title: "two changes", Units: []unit.Unit{merged, change}})
+	r.s.deps.UnitEnded = func(_ context.Context, u unit.Unit) (bool, error) { return u == merged, nil }
+	g2, err := r.s.deps.Gates.Open(ctx, gate.Gate{Name: "review-diff", Unit: task.UnitOf("t-0000000000000002"), Subject: "start-review-diff"}, gates.Policy(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var two api.TaskView
+	get(t, r.s, "/api/tasks/t-0000000000000002", &two)
+	if len(two.Gates) != 1 || two.Gates[0].ID != g2.ID || len(two.Gates[0].Units) != 2 || two.Gates[0].Units[0].Link != "https://forge.example/acme/api/changes/9" {
+		t.Errorf("a step on a merged change and an open one: %+v, want the open one first", two.Gates)
+	}
+
 	var other api.TaskView
 	get(t, r.s, "/api/tasks/t-0000000000000009", &other)
 	if len(other.Gates) != 1 || other.Gates[0].Units != nil {
