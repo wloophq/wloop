@@ -680,6 +680,7 @@ const lensMemo = { tasks: null, fields: null, viewsCat: null, offered: null };
 // lensFields are the fields a query over view names: a task view's are the profile's task facets and the
 // plugins' facets, one by id as the daemon counts with them; a row view's are the plugins'.
 function lensFields(view) {
+  if (view === PLAN) return [];
   if (typeof isCoreView !== "function" || !isCoreView(view)) return catalog.fields;
   const cat = tasksState.catalog;
   if (lensMemo.fields !== catalog.fields || lensMemo.viewsCat !== cat) {
