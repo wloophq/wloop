@@ -71,6 +71,9 @@ type Input struct {
 	// AskedAt is when the newest turn of an intent on the pull request asked
 	// the user something no answer reached yet; zero without one.
 	AskedAt time.Time
+	// ReviewerOptional says the profile's reviewer_required does not hold for
+	// the pull request: with no reviewer asked, it is ready as an approved one.
+	ReviewerOptional bool
 }
 
 type Result struct {
@@ -116,6 +119,9 @@ var Reasons = map[string]string{
 	"reviewer_not_back":       "{{.author}} replied, {{.reviewer}} has not returned",
 	"commented_no_reply":      "{{.actor}} commented, no reply",
 	"no_reviewer_requested":   "no reviewer requested",
+
+	"no_review_required":                "green, no review required",
+	"no_review_required_checks_pending": "no review required, checks pending",
 }
 
 var reasonParam = regexp.MustCompile(`\{\{\.(\w+)\}\}`)
@@ -250,17 +256,7 @@ func Derive(in Input) Result {
 				}
 			}
 		}
-		if p.Mergeable == "CONFLICTING" {
-			if p.MergeableAt.After(since) {
-				since = p.MergeableAt
-			}
-			return stalled(Result{Kind: KindConflicts, WaitingOn: "author", Since: since}.because("merge_conflicts", "branch", p.BaseBranch), in.Stalled.Reply)
-		}
-		reason := "approved_green"
-		if p.ChecksState == "PENDING" {
-			reason = "approved_checks_pending"
-		}
-		return stalled(Result{Kind: KindMerge, WaitingOn: "author", Since: since}.because(reason), in.Stalled.Merge)
+		return ready(in, since, "approved_green", "approved_checks_pending")
 	}
 	if at, again, ok := requestedOfMe(in, evs); ok {
 		reason := "review_requested"
@@ -321,7 +317,27 @@ func Derive(in Input) Result {
 		}
 		return stalled(Result{Kind: KindReview, WaitingOn: waitingOn(in, pending), Since: since}.because("review_requested"), in.Stalled.Review)
 	}
+	if in.ReviewerOptional {
+		return ready(in, pushedAt, "no_review_required", "no_review_required_checks_pending")
+	}
 	return stalled(Result{Kind: KindNoReviewer, WaitingOn: "author", Since: pushedAt}.because("no_reviewer_requested"), in.Stalled.Review)
+}
+
+// ready is a pull request nothing but its merge waits on since since, or
+// its conflicts with its base; green and pending word why it may merge.
+func ready(in Input, since time.Time, green, pending string) Result {
+	p := in.PR
+	if p.Mergeable == "CONFLICTING" {
+		if p.MergeableAt.After(since) {
+			since = p.MergeableAt
+		}
+		return stalled(Result{Kind: KindConflicts, WaitingOn: "author", Since: since}.because("merge_conflicts", "branch", p.BaseBranch), in.Stalled.Reply)
+	}
+	reason := green
+	if p.ChecksState == "PENDING" {
+		reason = pending
+	}
+	return stalled(Result{Kind: KindMerge, WaitingOn: "author", Since: since}.because(reason), in.Stalled.Merge)
 }
 
 // requestedOfMe is when the viewer's review was last requested by name,

@@ -83,6 +83,34 @@ type fakeHost struct {
 	books   []src.Book
 	// profile overrides files of the plugin's profile layer, by path.
 	profile map[string]string
+	// holds answers reviewer_required over a pull request's facts; nil
+	// answers no predicate.
+	holds  func([]src.Fact) bool
+	holdOn [][]src.Fact
+}
+
+func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact) ([]bool, error) {
+	if h.holds == nil {
+		return nil, src.ErrUnsupported
+	}
+	if predicate != "reviewer_required" {
+		return nil, fmt.Errorf("no predicate %s", predicate)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]bool, len(facts))
+	for i, fs := range facts {
+		h.holdOn = append(h.holdOn, fs)
+		out[i] = h.holds(fs)
+	}
+	return out, nil
+}
+
+// asked are the fact sets the plugin asked the host about, in order.
+func (h *fakeHost) asked() [][]src.Fact {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.holdOn)
 }
 
 func (h *fakeHost) host() src.Host {

@@ -174,6 +174,8 @@ review_requested_again = "review requested again after your review"
 reviewer_not_back = "{{.author}} replied, {{.reviewer}} has not returned"
 commented_no_reply = "{{.actor}} commented, no reply"
 no_reviewer_requested = "no reviewer requested"
+no_review_required = "green, no review required"
+no_review_required_checks_pending = "no review required, checks pending"
 
 [events.opened]
 label = "opened"

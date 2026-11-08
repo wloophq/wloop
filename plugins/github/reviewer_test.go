@@ -1,0 +1,103 @@
+package github
+
+import (
+	"context"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/pr"
+)
+
+// ownNoReviewer stores ana's own pull request 7, green, with no reviewer asked, opened ten days before
+// testAt.
+func ownNoReviewer(t *testing.T, p *Plugin, checks, mergeable string) {
+	t.Helper()
+	ctx := context.Background()
+	if err := p.store().SetViewer(ctx, "ana"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.store().UpsertPR(ctx, pr.PR{Ref: ref7, Title: "Change 7", Author: "ana", State: pr.StateOpen, HeadOid: "h7", URL: ref7.URL(),
+		CreatedAt: testAt.Add(-10 * 24 * time.Hour), ChecksState: checks, Mergeable: mergeable, BaseBranch: "main", Reasons: []string{"author"}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// snapshotOf is the plugin's snapshot of ref7 at testAt.
+func snapshotOf(t *testing.T, p *Plugin) src.Snapshot {
+	t.Helper()
+	r, err := p.running()
+	if err != nil {
+		t.Fatal(err)
+	}
+	snaps, err := r.snapshots(context.Background(), []pr.Ref{ref7})
+	if err != nil || len(snaps) != 1 {
+		t.Fatalf("snapshots %+v %v", snaps, err)
+	}
+	return snaps[0]
+}
+
+func itemIDs(s src.Snapshot) []string {
+	var out []string
+	for _, it := range s.Items {
+		out = append(out, it.ID+" "+it.Summary)
+	}
+	return out
+}
+
+func TestAnOwnPullRequestWithNoReviewerWaitsForOneWhileTheProfileRequiresIt(t *testing.T) {
+	t.Parallel()
+	for name, h := range map[string]*fakeHost{
+		"the bundled true":                {holds: func([]src.Fact) bool { return true }},
+		"a host that cannot say":          {},
+		"another owner of a solo profile": {holds: func(fs []src.Fact) bool { return !ownerIs(fs, "solo") }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := started(t, &githubGraphQL{states: map[int]string{}}, h)
+			ownNoReviewer(t, p, "SUCCESS", "MERGEABLE")
+			s := snapshotOf(t, p)
+			if s.Situation.Kind != "no_reviewer" || !slices.ContainsFunc(itemIDs(s), func(id string) bool { return strings.HasPrefix(id, "gh:reviewer Pick a reviewer for") }) {
+				t.Fatalf("situation %+v items %v, want no_reviewer asking to pick a reviewer", s.Situation, itemIDs(s))
+			}
+			got, err := p.Proposals(context.Background(), testAt)
+			if err != nil || len(got.Drafts) != 1 {
+				t.Fatalf("proposals %+v %v, want the nudge for a reviewer", got, err)
+			}
+		})
+	}
+}
+
+func TestAnOwnPullRequestTheProfileNeedsNoReviewerForIsReadyToMerge(t *testing.T) {
+	t.Parallel()
+	solo := func(fs []src.Fact) bool { return !ownerIs(fs, "acme") }
+	for _, c := range []struct {
+		checks, mergeable, kind string
+	}{
+		{"SUCCESS", "MERGEABLE", "merge"},
+		{"PENDING", "MERGEABLE", "merge"},
+		{"FAILURE", "MERGEABLE", "checks"},
+		{"SUCCESS", "CONFLICTING", "conflicts"},
+	} {
+		t.Run(c.kind+" "+c.checks, func(t *testing.T) {
+			h := &fakeHost{holds: solo}
+			p := started(t, &githubGraphQL{states: map[int]string{}}, h)
+			ownNoReviewer(t, p, c.checks, c.mergeable)
+			s := snapshotOf(t, p)
+			if s.Situation.Kind != c.kind || slices.ContainsFunc(itemIDs(s), func(id string) bool { return strings.HasPrefix(id, "gh:reviewer") }) {
+				t.Fatalf("situation %+v items %v, want %s and no reviewer to pick", s.Situation, itemIDs(s), c.kind)
+			}
+			if got, err := p.Proposals(context.Background(), testAt); err != nil || len(got.Drafts) != 0 {
+				t.Fatalf("proposals %+v %v, want no nudge for a reviewer", got, err)
+			}
+			if asked := h.asked(); len(asked) == 0 || !ownerIs(asked[0], "acme") {
+				t.Fatalf("the host was asked over %v, want the pull request's facts", asked)
+			}
+		})
+	}
+}
+
+func ownerIs(fs []src.Fact, owner string) bool {
+	return slices.ContainsFunc(fs, func(f src.Fact) bool { return f.Name == "pr.owner" && f.Value.String == owner })
+}

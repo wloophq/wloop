@@ -335,7 +335,8 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 	if err != nil {
 		return nil, rowInputs{}, err
 	}
-	var out []derived
+	var ds []Data
+	var ris []row.Input
 	for _, ref := range refs {
 		p, ok := rows[ref]
 		if !ok {
@@ -352,11 +353,46 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 			d.Detail, d.DetailVersion, d.DetailReadAt = &det, det.Version, det.ReadAt
 			ri.Detail = &det
 		}
+		ds, ris = append(ds, d), append(ris, ri)
+	}
+	required := r.reviewerRequired(ctx, ris)
+	out := make([]derived, len(ris))
+	for i, ri := range ris {
+		ri.ReviewerOptional = !required[i]
 		x := row.Derive(ri)
-		d.Row = &x.Payload
-		out = append(out, derived{row: x, data: d})
+		ds[i].Row = &x.Payload
+		out[i] = derived{row: x, data: ds[i]}
 	}
 	return out, in, nil
+}
+
+// predicateReviewerRequired is the predicate plugin.toml declares that says
+// whether a pull request waits for a reviewer before its merge.
+const predicateReviewerRequired = "reviewer_required"
+
+// reviewerRequired says, for each of ins, whether the profile's
+// reviewer_required holds over its pull request's facts; true for every
+// one when the host cannot say, as the bundled profile sets it.
+func (r *running) reviewerRequired(ctx context.Context, ins []row.Input) []bool {
+	out := make([]bool, len(ins))
+	for i := range out {
+		out[i] = true
+	}
+	if r.host.Services == nil || len(ins) == 0 {
+		return out
+	}
+	facts := make([][]src.Fact, len(ins))
+	for i, in := range ins {
+		facts[i] = row.FactsOf(in)
+	}
+	holds, err := r.host.Services.Holds(ctx, predicateReviewerRequired, facts)
+	if err != nil {
+		if !errors.Is(err, src.ErrUnsupported) {
+			logf("%s: %v", predicateReviewerRequired, err)
+		}
+		return out
+	}
+	return holds
 }
 
 // rowInputs are what the rows of refs read besides their pull requests:

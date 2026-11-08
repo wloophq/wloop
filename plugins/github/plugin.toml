@@ -33,6 +33,10 @@ doc = "The work on the pull request is approved: my review approved its head, or
 name = "workspace"
 doc = "A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state."
 
+[[source.predicates]]
+name = "reviewer_required"
+doc = "An open pull request waits for a reviewer before its merge. Where it does not hold, a pull request nobody was asked to review is never no_reviewer: with checks green and no conflict it is merge, as an approved one is, and no nudge asks for a reviewer."
+
 [[source.marks]]
 name = "addressed.reviews"
 doc = "The newest review an address round triaged on a pull request you develop, a time: `handled(\"addressed.reviews\", <time>)`."
