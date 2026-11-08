@@ -238,9 +238,11 @@ type Pause struct {
 }
 
 // Gates are the plan gates the pending items wait on, each naming its
-// item's id as its Subject: the gates service, which alone resolves them.
+// item's id as its Subject, and the step gates a workflow's gate.open
+// opened, naming the workflow: the gates service, which alone resolves them.
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
+	Withdraw(ctx context.Context, id int64, reason string) error
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

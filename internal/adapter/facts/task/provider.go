@@ -293,6 +293,7 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.units":               []string{},
 		"task.unit_providers":      []string{},
 		"task.unit_kinds":          []string{},
+		"task.open_unit_kinds":     []string{},
 		"task.link_ended":          false,
 		"task.captured_by_user":    e.CapturedByUser(),
 		"task.turns":               0,
@@ -410,11 +411,11 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		}
 	}
 	f["task.units"], f["task.unit_providers"], f["task.unit_kinds"] = names, providers, kinds
-	ended, err := p.ended(ctx, e, us)
+	ended, openKinds, err := p.ended(ctx, e, us)
 	if err != nil {
 		return nil, err
 	}
-	f["task.link_ended"] = ended
+	f["task.link_ended"], f["task.open_unit_kinds"] = ended, openKinds
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {
@@ -606,23 +607,31 @@ func (p *Provider) placement(ctx context.Context, us []unit.Unit) (string, error
 }
 
 // ended says whether every unit of us but the task's own has ended, with
-// at least one such unit.
-func (p *Provider) ended(ctx context.Context, e task.Task, us []unit.Unit) (bool, error) {
+// at least one such unit, and the task kinds of those that have not, each once.
+func (p *Provider) ended(ctx context.Context, e task.Task, us []unit.Unit) (bool, []string, error) {
+	open := []string{}
 	if p.d.Ended == nil {
-		return false, nil
+		return false, open, nil
 	}
-	n := 0
+	n, all := 0, true
 	for _, u := range us {
 		if u == task.UnitOf(e.ID) {
 			continue
 		}
 		done, err := p.d.Ended(ctx, u)
-		if err != nil || !done {
-			return false, err
+		if err != nil {
+			return false, []string{}, err
 		}
 		n++
+		if done {
+			continue
+		}
+		all = false
+		if k := p.unitKind(u.Provider); k != "" && !slices.Contains(open, k) {
+			open = append(open, k)
+		}
 	}
-	return n > 0, nil
+	return n > 0 && all, open, nil
 }
 
 // Scope sets task.settled_at to the newest settled draft workflow wf

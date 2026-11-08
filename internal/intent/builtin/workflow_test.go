@@ -23,7 +23,7 @@ var workflowTable = map[string]string{
 		"idle_for:D unread_gates:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B process_orphaned:B orphan_durable:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +
 		"unpushed:I newest_turn_state:S open_turn:B pendency:L sessions:I manager:S last_activity:T quiet_for:D fingerprint:S repo:S",
-	"task": "id:S state:S unit:S unit_provider:S units:L unit_providers:L unit_kinds:L link_ended:B turns:I captured_by_user:B " +
+	"task": "id:S state:S unit:S unit_provider:S units:L unit_providers:L unit_kinds:L open_unit_kinds:L link_ended:B turns:I captured_by_user:B " +
 		"link_started_by_me:B link_closure_posted:B items_open:I items_resolved:I items_changed_at:T settled_at:T fingerprint:S " +
 		"category:S owed_by:S turn:S owed_since:T moved_at:T since_movement:D check_on:T gates_open:I decisions:L decision_since:T turns_open_by_hand:I turn_by_hand_at:T turns_running:I wake_until:T wake_when:S placement:S " +
 		"sequential_next:B review_due:B children_ready:B children_mine:B ask_age:D askers:L asker_names:L promised:T extraction_lag:D link_owes:L link_signals:L " +

@@ -75,6 +75,9 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 |---|---|---|---|
 | `ask` | string, localized |  | What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent. |
 | `gates.drafts_wait` | bool | `false` | Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it. |
+| `gates.withdraw` | table |  | When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it. |
+| `gates.withdraw.when` | predicate |  | When an open gate the workflow opened is withdrawn, over its unit's facts. Required. |
+| `gates.withdraw.reason` | string, localized |  | Why the gate was withdrawn, as its task's timeline shows it. |
 | `gates` | table |  | The gates its runs and drafts open. |
 | `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
 | `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |

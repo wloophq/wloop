@@ -199,6 +199,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.units` | list | The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them. |
 | `task.unit_providers` | list | The providers of task.units, each once, in order. |
 | `task.unit_kinds` | list | The task kinds the plugins of task.units give their units' tasks, each once, in order, such as pull-request for a task that holds a pull request, whatever its own kind. |
+| `task.open_unit_kinds` | list | The task kinds of the units of task.units that have not ended as their plugin says, each once, in order: pull-request while a pull request the task holds is open. |
 | `task.link_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
 | `task.turns` | int | Turns run on the task itself, such as a start; turns on its units are not counted. |
 | `task.captured_by_user` | bool | The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service. |

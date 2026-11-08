@@ -247,7 +247,7 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.
 var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
-	EventRemoved, "status", gate.EventResolved, task.EventCreated, task.EventLinked, merge.RecordKind, EventClassified}
+	EventRemoved, "status", gate.EventResolved, gate.EventWithdrawn, task.EventCreated, task.EventLinked, merge.RecordKind, EventClassified}
 
 // Bookkeeping are the loop's event kinds that only trigger workflows, which no task's timeline shows.
 var Bookkeeping = []string{task.EventCreated, task.EventLinked, EventClassified}

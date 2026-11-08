@@ -96,3 +96,7 @@ func ProposalSubject(id int64) string { return "proposal/" + strconv.FormatInt(i
 // its unit with none: Key "<name>/<id>", Data the intent it was resolved
 // with, Actor who resolved it.
 const EventResolved = "gate_resolved"
+
+// EventWithdrawn is the event a step gate its workflow withdrew records on its task, or its unit with none:
+// Key "<name>/<id>", Data the workflow's reason.
+const EventWithdrawn = "gate_withdrawn"

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -88,6 +90,73 @@ func (e *Engine) syncGates(ctx context.Context) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// withdrawSteps withdraws each open step gate whose workflow's [gates.withdraw] holds on its unit's fresh facts,
+// with the workflow's reason. A gate of a workflow not loaded, observing or with no [gates.withdraw], or on a unit
+// gone, is left as it is. The facts are read in a pass of their own, only when such a gate is open.
+func (e *Engine) withdrawSteps(ctx context.Context) error {
+	if e.Gates == nil {
+		return nil
+	}
+	live := e.live()
+	if !slices.ContainsFunc(slices.Collect(maps.Values(live)), withdrawsGates) {
+		return nil
+	}
+	open, err := e.Gates.Where(ctx, gates.Query{Kind: gate.KindStep})
+	if err != nil {
+		return err
+	}
+	open = slices.DeleteFunc(open, func(g gate.Gate) bool {
+		w, ok := live[g.Subject]
+		return itemSubject(g.Subject) || !ok || !withdrawsGates(w)
+	})
+	if len(open) == 0 {
+		return nil
+	}
+	var gone []gate.Gate
+	var errs []error
+	err = e.prepared(ctx, func(ctx context.Context) error {
+		vars := workflow.Vars{Now: e.now()}
+		if e.Config != nil {
+			vars.Config = e.Config()
+		}
+		for _, g := range open {
+			w := live[g.Subject]
+			facts, err := e.factsFor(ctx, w, g.Unit)
+			switch {
+			case errors.Is(err, ErrUnitGone):
+				continue
+			case err != nil:
+				errs = append(errs, fmt.Errorf("%s: the facts of gate %d's unit: %w", w.Name, g.ID, err))
+				continue
+			}
+			vars.Facts = facts
+			switch ok, err := match(w.GateWithdraw.When, vars); {
+			case err != nil:
+				errs = append(errs, fmt.Errorf("%s: gates.withdraw on gate %d: %w", w.Name, g.ID, err))
+			case ok:
+				gone = append(gone, g)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, g := range gone {
+		reason := live[g.Subject].GateWithdraw.Reason
+		if err := e.Gates.Withdraw(ctx, g.ID, reason); err != nil && !errors.Is(err, gates.ErrResolved) {
+			errs = append(errs, fmt.Errorf("%s: withdrawing gate %d: %w", g.Subject, g.ID, err))
+			continue
+		}
+		e.logf("%s: gate %s %d on %s withdrawn: %s", g.Subject, g.Name, g.ID, g.Unit, reason)
+	}
+	return errors.Join(errs...)
+}
+
+func withdrawsGates(w workflow.Workflow) bool {
+	return !w.Observe && w.GateWithdraw != nil && w.GateWithdraw.When != nil
 }
 
 // asks is what it's plan gate asks: w's Ask over its unit's facts, else w's

@@ -128,6 +128,24 @@
           "default": false,
           "description": "Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it.",
           "type": "boolean"
+        },
+        "withdraw": {
+          "additionalProperties": false,
+          "description": "When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it.",
+          "properties": {
+            "reason": {
+              "description": "Why the gate was withdrawn, as its task's timeline shows it.",
+              "type": "string"
+            },
+            "when": {
+              "description": "When an open gate the workflow opened is withdrawn, over its unit's facts. Required.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "when"
+          ],
+          "type": "object"
         }
       },
       "type": "object"

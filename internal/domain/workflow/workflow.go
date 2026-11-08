@@ -299,6 +299,9 @@ type Workflow struct {
 	// WithdrawRules are the manifest's [[drafts.withdraw.rule]], tried in order before Withdraw, each
 	// withdrawing with its own reason.
 	WithdrawRules []WithdrawRule
+	// GateWithdraw is the manifest's [gates.withdraw]: when an open gate its gate.open steps opened on a unit
+	// no longer stands, over the unit's facts, with the reason the withdrawal records. Nil withdraws none.
+	GateWithdraw *WithdrawRule
 	// Ask is what the plan gate of a run asks, over AskData; nil asks its Summary.
 	Ask *template.Template
 	// Outbox is how the Outbox names the group of the drafts the workflow proposed.

@@ -50,6 +50,9 @@ func Reads(w Workflow) []string {
 	for _, r := range w.Withdrawals() {
 		preds = append(preds, r.When)
 	}
+	if w.GateWithdraw != nil {
+		preds = append(preds, w.GateWithdraw.When)
+	}
 	for _, p := range preds {
 		if p != nil {
 			out = append(out, p.Reads()...)

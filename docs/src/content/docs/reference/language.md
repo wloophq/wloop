@@ -525,6 +525,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `ask` (string, localized): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
 - `gates.drafts_wait` (bool, default `false`): Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it.
+- `gates.withdraw` (table): When an open gate the workflow's gate.open opened on a unit no longer stands: the engine supersedes it at the start of a sweep and records gate_withdrawn on its task with the reason, so a step whose subject is gone never waits for you to dismiss it.
+- `gates.withdraw.when` (predicate): When an open gate the workflow opened is withdrawn, over its unit's facts. Required.
+- `gates.withdraw.reason` (string, localized): Why the gate was withdrawn, as its task's timeline shows it.
 - `gates` (table): The gates its runs and drafts open.
 - `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
@@ -1098,6 +1101,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `view_applied`: A view's change applied.
   - `record`: A record written, such as a brief.
   - `gate_resolved`: A decision that waited on you resolved.
+  - `gate_withdrawn`: A step that waited on you withdrawn by its workflow, its subject gone; its data is the workflow's reason.
   - `message`: A message in the task's conversation with its agent.
 - `events.<name>.label` (string, localized): What the timeline calls an event of the kind, such as "paused".
 - `events.<name>.tone` (one of ``, `loop`, `me`, `people`): The tone the timeline and the activity draw an event of the kind in; "loop" is what the activity's loop filter keeps.

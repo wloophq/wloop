@@ -150,6 +150,9 @@ func newEnv(t *testing.T) *env {
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() facttask.Settings { return e.s },
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
+		UnitKind: func(p unit.ProviderID) string {
+			return map[unit.ProviderID]string{"chat": "thread", "doc": "document"}[p]
+		},
 		Turns: func(_ context.Context, us []unit.Unit) (map[unit.Unit]int, error) {
 			e.reads["turns"]++
 			out := map[unit.Unit]int{}
@@ -588,6 +591,24 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e.ended[chatB] = true
 	if f := e.facts("t-02"); f["task.link_ended"] != true {
 		t.Error("a task whose every unit ended has not")
+	}
+}
+
+func TestTaskOpenUnitKindsAreTheKindsOfItsUnitsNotEnded(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.task(task.Task{ID: "t-01", State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "t-02", State: "next", Category: task.CategoryReady, Title: "three", Units: []unit.Unit{docY, chatA, chatB}})
+	if got := e.facts("t-01")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{}) {
+		t.Errorf("a task with no unit: %v", got)
+	}
+	e.ended[chatA] = true
+	if got := e.facts("t-02")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{"document", "thread"}) {
+		t.Errorf("one thread ended, another open: %v, want each kind with a unit open once, in order", got)
+	}
+	e.ended[chatB], e.ended[docY] = true, true
+	if got := e.facts("t-02")["task.open_unit_kinds"]; !slices.Equal(got.([]string), []string{}) {
+		t.Errorf("every unit ended: %v", got)
 	}
 }
 
