@@ -23,7 +23,8 @@ func (s *Service) ProcessGone(id string) bool {
 }
 
 // Census reads every manager's census and marks the active sessions whose
-// manager's complete census misses their process; it changes nothing.
+// manager's complete census misses their process or lists it orphaned; it
+// changes nothing but waking a dormant session whose process is live again.
 // ProcessGone then names the ones missed by two censuses at least FastJob apart.
 // A manager that cannot list completely marks none of its sessions.
 func (s *Service) Census(ctx context.Context) error {
@@ -42,7 +43,7 @@ func (s *Service) Census(ctx context.Context) error {
 
 	for _, sess := range open {
 		p, listed := c.Processes[sess.ID]
-		if sess.State() == turn.SessionDormant && listed {
+		if sess.State() == turn.SessionDormant && listed && !c.Orphaned[sess.ID] {
 			if err := s.Woken(ctx, sess.ID, p.Manager, p.Handle); err != nil {
 				return err
 			}
@@ -62,7 +63,7 @@ func (s *Service) Census(ctx context.Context) error {
 			}
 			continue
 		}
-		if _, listed := c.Sessions[sess.ID]; listed || sess.StartedAt.After(at) {
+		if c.Live(sess.ID) || sess.StartedAt.After(at) {
 			continue
 		}
 		m, ok := s.goneSeen[sess.ID]

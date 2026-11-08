@@ -58,6 +58,16 @@ type Census struct {
 	At         time.Time
 	// Processes address each listed session's process.
 	Processes map[string]ProcessRef
+	// Orphaned are the listed sessions whose process no app window shows and
+	// runs no agent: the user closed its tab and only the process lingers.
+	Orphaned map[string]bool
+}
+
+// Live says whether the census lists the session's process in a window of
+// the app; an orphaned one counts as gone.
+func (c Census) Live(id string) bool {
+	_, listed := c.Sessions[id]
+	return listed && !c.Orphaned[id]
 }
 
 // ProcessRef is a process's manager and handle.

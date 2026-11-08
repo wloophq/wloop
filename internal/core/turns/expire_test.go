@@ -196,6 +196,60 @@ func TestAListedSessionIsNotGone(t *testing.T) {
 	}
 }
 
+// orphaned is a complete census listing every handle, those named in orphans orphaned.
+func (s *scripted) orphaned(at time.Time, runtime string, listed []string, orphans ...string) {
+	s.complete(at, runtime, listed...)
+	s.reading.Orphaned = map[string]bool{}
+	for _, h := range orphans {
+		s.reading.Orphaned[h] = true
+	}
+}
+
+func TestAnOrphanedProcessIsGoneAfterTwoReadings(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1", "term_2")
+	listed := []string{"term_1", "term_2"}
+	sc.orphaned(t0, "rt", listed, "term_1")
+	if got := gone(t, s, reg); len(got) != 0 {
+		t.Fatalf("one reading found %v gone", got)
+	}
+	sc.orphaned(t0.Add(s.FastJob), "rt", listed, "term_1")
+	if got := gone(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
+		t.Fatalf("gone %v, want the orphaned term_1", got)
+	}
+}
+
+func TestARestartThatOrphansEveryProcessForAWhileMarksNothingGone(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1")
+	listed := []string{"term_1"}
+	sc.orphaned(t0, "rt-a", listed)
+	gone(t, s, reg)
+	sc.orphaned(t0.Add(s.FastJob), "rt-b", listed, "term_1")
+	if got := gone(t, s, reg); len(got) != 0 {
+		t.Fatalf("the first reading after a restart found %v gone", got)
+	}
+	sc.orphaned(t0.Add(2*s.FastJob), "rt-b", listed)
+	if got := gone(t, s, reg); len(got) != 0 {
+		t.Fatalf("a reattached process is gone: %v", got)
+	}
+	sc.orphaned(t0.Add(3*s.FastJob), "rt-b", listed)
+	if got := gone(t, s, reg); len(got) != 0 {
+		t.Fatalf("reattaching cleared no mark: gone %v", got)
+	}
+}
+
+func TestACensusWakesNoDormantSessionWhoseProcessIsOrphaned(t *testing.T) {
+	s, reg, sc, _ := expireService(t)
+	reg.Put(turn.Session{ID: "term_1", WorkspaceID: cleanupWS, StartedAt: t0.Add(-time.Hour), Manager: "orca"})
+	sc.orphaned(t0, "rt", []string{"term_1"}, "term_1")
+	sc.reading.Processes = map[string]turns.ProcessRef{"term_1": {Manager: "orca", Handle: "term_1"}}
+	if err := s.Census(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := reg.Session(context.Background(), "term_1"); got.State() != turn.SessionDormant {
+		t.Fatalf("an orphaned process woke the session: %+v", got)
+	}
+}
+
 func TestASessionStartedAfterTheCensusIsNotGone(t *testing.T) {
 	s, reg, sc, _ := expireService(t)
 	reg.Put(turn.Session{ID: "term_new", WorkspaceID: cleanupWS, StartedAt: t0.Add(30 * time.Minute)})

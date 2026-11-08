@@ -250,6 +250,40 @@ func TestCensusCountsEveryRowAndKnowsACutShortList(t *testing.T) {
 	}
 }
 
+func TestCensusNamesOrphanedProcessesOnlyWhileTheAppIsAttached(t *testing.T) {
+	ctx := context.Background()
+	const shown = `{"handle":"term_shown","worktreeId":"ws","connected":true,"writable":true,"orphaned":false}`
+	const orphan = `{"handle":"term_1","worktreeId":"ws","connected":true,"writable":true,"orphaned":true}`
+	const orphanAgent = `{"handle":"term_2","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"agentIdentity":"claude"}`
+	list := func(rows ...string) string {
+		return `{"ok":true,"result":{"terminals":[` + strings.Join(rows, ",") + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+	}
+	for _, c := range []struct {
+		name string
+		list string
+		want []string
+	}{
+		{"an orphaned process beside a shown one", list(shown, orphan, orphanAgent), []string{"term_1"}},
+		{"every process orphaned, as an app restarting", list(orphan, orphanAgent), nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := orca.New(&wsorca.Manager{R: listRunner{c.list}}, cols, nil).Census(ctx)
+			if err != nil || !got.Complete {
+				t.Fatalf("Census = %+v, %v", got, err)
+			}
+			var names []string
+			for h, ok := range got.Orphaned {
+				if ok {
+					names = append(names, h)
+				}
+			}
+			if !slices.Equal(names, c.want) || got.Handles["term_1"] != "ws" {
+				t.Fatalf("orphaned %v, want %v; handles %v", names, c.want, got.Handles)
+			}
+		})
+	}
+}
+
 func TestATruncatedListStillServesTerminals(t *testing.T) {
 	list := `{"ok":true,"result":{"terminals":[{"handle":"term_1","worktreeId":"ws","tabId":"tab-1","connected":true,"writable":true}],"truncated":true}}`
 	a := orca.New(&wsorca.Manager{R: listRunner{list}}, cols, nil)

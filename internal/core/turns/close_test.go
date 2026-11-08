@@ -48,6 +48,33 @@ func TestMarkDormantLeavesAGoneOneOpenWithoutItsHandle(t *testing.T) {
 	}
 }
 
+func TestMarkDormantClosesTheOrphanedProcessLeftBehind(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	cleanupCase{sess: loopSession("term_1")}.put(reg, store, sess)
+	sess.Orphan("term_1")
+	if err := s.MarkDormant(context.Background(), "term_1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := reg.Session(context.Background(), "term_1"); got.State() != turn.SessionDormant {
+		t.Fatalf("session %+v, want dormant", got)
+	}
+	if closed := sess.Closed(); len(closed) != 1 || closed[0] != "term_1" {
+		t.Fatalf("closed %v, want the orphaned term_1", closed)
+	}
+}
+
+func TestMarkDormantClosesNoProcessThatIsGone(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	cleanupCase{sess: loopSession("term_1")}.put(reg, store, sess)
+	sess.Put(cleanupWS)
+	if err := s.MarkDormant(context.Background(), "term_1"); err != nil {
+		t.Fatal(err)
+	}
+	if closed := sess.Closed(); len(closed) != 0 {
+		t.Fatalf("closed %v", closed)
+	}
+}
+
 func TestMarkDormantNeedsAReadableList(t *testing.T) {
 	s, store, reg, sess, _ := newService(t)
 	cleanupCase{sess: loopSession("term_1")}.put(reg, store, sess)

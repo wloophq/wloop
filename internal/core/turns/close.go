@@ -11,9 +11,10 @@ import (
 )
 
 // MarkDormant records that the session's process is gone: its manager no
-// longer lists it. The session stays open, and its manager can wake it. It
-// refuses a session the manager still lists in any state, one with no
-// workspace, and a manager that cannot list completely.
+// longer lists it, or lists it orphaned, which it then closes. The session
+// stays open, and its manager can wake it. It refuses a session the manager
+// still lists live in any state, one with no workspace, and a manager that
+// cannot list completely.
 func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	sess, ok, err := s.Registry.Session(ctx, id)
 	if err != nil {
@@ -36,8 +37,13 @@ func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	if !census.CompleteOf(sess.Manager) {
 		return Refusal{Reason: "its manager's process list is incomplete"}
 	}
-	if _, listed := census.Sessions[id]; listed {
+	if census.Live(id) {
 		return Refusal{Reason: "the session's process is still listed"}
+	}
+	if census.Orphaned[id] {
+		if err := s.Sessions.Close(ctx, id); err != nil {
+			return err
+		}
 	}
 	s.mu.Lock()
 	cur, ok, err := s.Registry.Session(ctx, id)

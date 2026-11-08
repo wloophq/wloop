@@ -28,6 +28,10 @@ type ProcessCensus struct {
 	// restart may list other handles.
 	RuntimeID string
 	At        time.Time
+	// Orphaned are the listed handles no app window shows, with no agent in
+	// them. A manager names them only while its app is attached, so a restart
+	// that lists every process orphaned until its windows return names none.
+	Orphaned map[string]bool
 }
 
 // ManagerSessions is one workspace manager's processes, addressed by its
@@ -282,7 +286,7 @@ func (r *Router) WaitIdle(ctx context.Context, id string, timeout time.Duration)
 // handle; a manager that cannot be read counts as incomplete, never as
 // listing no session.
 func (r *Router) Census(ctx context.Context) (Census, error) {
-	c := Census{Sessions: map[string]string{}, Complete: true, CompleteFor: map[string]bool{}, RuntimeIDs: map[string]string{}, Processes: map[string]ProcessRef{}}
+	c := Census{Sessions: map[string]string{}, Complete: true, CompleteFor: map[string]bool{}, RuntimeIDs: map[string]string{}, Processes: map[string]ProcessRef{}, Orphaned: map[string]bool{}}
 	var errs []error
 	for _, m := range r.Managers {
 		pc, err := m.Census(ctx)
@@ -305,6 +309,9 @@ func (r *Router) Census(ctx context.Context) (Census, error) {
 			if id != "" {
 				c.Sessions[id] = pc.Handles[h]
 				c.Processes[id] = ProcessRef{Manager: m.Name(), Handle: h}
+				if pc.Orphaned[h] {
+					c.Orphaned[id] = true
+				}
 			}
 		}
 	}

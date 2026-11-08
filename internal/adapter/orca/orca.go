@@ -157,8 +157,19 @@ func (a *Adapter) Census(ctx context.Context) (turns.ProcessCensus, error) {
 	}
 	c := turns.ProcessCensus{Handles: make(map[string]string, len(s.Terminals)), Complete: s.TerminalScope.Complete,
 		RuntimeID: s.TerminalScope.RuntimeID, At: s.ReadAt[wsdomain.PartTerminals]}
+	attached := false
 	for _, t := range s.Terminals {
 		c.Handles[t.Handle] = t.WorkspaceID
+		attached = attached || !t.Orphaned
+	}
+	if !attached {
+		return c, nil
+	}
+	c.Orphaned = map[string]bool{}
+	for _, t := range s.Terminals {
+		if t.Orphaned && t.Agent == "" {
+			c.Orphaned[t.Handle] = true
+		}
 	}
 	return c, nil
 }

@@ -53,6 +53,8 @@ type Terminal struct {
 	LastOutput                               time.Time
 	// Usable is connected, writable and not orphaned.
 	Usable bool
+	// Orphaned is a process no window of the app shows any longer.
+	Orphaned bool
 }
 
 // Snapshot is one generation of the manager's listings. Readers never modify its slices.

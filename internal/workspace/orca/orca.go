@@ -572,7 +572,7 @@ func (m *Manager) AllTerminals(ctx context.Context) ([]wsdomain.Terminal, wsdoma
 	out := make([]wsdomain.Terminal, 0, len(res.Terminals))
 	for _, t := range res.Terminals {
 		term := wsdomain.Terminal{Handle: t.Handle, WorkspaceID: t.WorktreeID, TabID: t.TabID, Title: t.Title,
-			Agent: t.AgentIdentity, Usable: t.usable()}
+			Agent: t.AgentIdentity, Usable: t.usable(), Orphaned: t.Orphaned}
 		if t.LastOutputAt != 0 {
 			term.LastOutput = time.UnixMilli(t.LastOutputAt)
 		}
