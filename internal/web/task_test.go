@@ -393,6 +393,33 @@ done({ Label: label, Checked: checked, Posts: posts.map((p) => p.body.args) });`
 	}
 }
 
+func TestTheComposersBroadcastStartsAsServedOnEachTask(t *testing.T) {
+	var got []bool
+	answers := pageAnswers(t)
+	e := pageTask(t)
+	e.ReplyBroadcast = "on"
+	answers["/api/tasks/"+e.ID] = e
+	other := pageTask(t)
+	other.ID, other.ReplyBroadcast = "t-00000000000000b2", "on"
+	answers["/api/tasks/"+other.ID] = other
+	answers[nodesPath(other.ID, "")] = timelineNodes()
+	runTaskPage(t, `
+const toggle = (b) => walk(b, (x) => x.attrs["data-focus"] === "task:compose:broadcast")[0];
+const out = [];
+let box = await page("t-0123456789abcdef");
+toggle(box).on.change({ target: { checked: false } });
+box = await page("t-0123456789abcdef");
+out.push("checked" in toggle(box).attrs);
+box = await page("t-00000000000000b2");
+out.push("checked" in toggle(box).attrs);
+box = await page("t-0123456789abcdef");
+out.push("checked" in toggle(box).attrs);
+done(out);`, answers, &got)
+	if !slices.Equal(got, []bool{false, true, true}) {
+		t.Errorf("checked after unchecking, on another task, back on the first: %v", got)
+	}
+}
+
 // bundledViewIDs are the bundled profile's view ids, which no client logic may name.
 var bundledViewIDs = []string{"inbox", "needs-me", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
 
