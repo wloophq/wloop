@@ -189,6 +189,9 @@ func snapshot() source.Snapshot {
 	}
 }
 
+// A plugin compares its card signals with ==; a field that breaks that breaks every plugin that does.
+var _ = source.CardSignal{} == source.CardSignal{}
+
 func TestSourceRoundTripsASnapshot(t *testing.T) {
 	rec := &recorder{}
 	want := []source.Snapshot{snapshot(), {Unit: plugin.Unit{Provider: "pulls", Key: "acme/api#13"}, Rev: 1, Gone: true}}
