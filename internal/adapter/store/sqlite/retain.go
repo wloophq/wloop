@@ -295,7 +295,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, keyList(in.viewEnded))
 		}
 		if p.PlanItems > 0 {
-			r.exec("plan_items", 0, retainPlanItemsSQL, cutoff(now, p.PlanItems))
+			r.exec("plan_items", port.TopicPlan, retainPlanItemsSQL, cutoff(now, p.PlanItems))
 		}
 		if p.WorkflowRuns > 0 {
 			r.exec("workflow_runs", 0, retainWorkflowRunsSQL, cutoff(now, p.WorkflowRuns))

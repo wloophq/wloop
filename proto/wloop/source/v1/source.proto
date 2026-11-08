@@ -98,6 +98,9 @@ service HostService {
   rpc SetWake(SetWakeRequest) returns (SetWakeResponse);
   rpc ClearWake(ClearWakeRequest) returns (ClearWakeResponse);
 
+  // Jobs.
+  rpc WakeJob(WakeJobRequest) returns (WakeJobResponse);
+
   // Services.
   rpc Ask(AskRequest) returns (AskResponse);
   rpc Meter(MeterRequest) returns (MeterResponse);
@@ -443,6 +446,9 @@ message IngestRequest {
 message IngestResponse {
   string summary = 1;
   string skipped = 2;
+  // next is when the job next has work; the host runs it then, and on its
+  // interval when unset.
+  google.protobuf.Timestamp next = 3;
 }
 
 message TrackRequest {
@@ -1163,6 +1169,16 @@ message ClearWakeRequest {
 }
 
 message ClearWakeResponse {}
+
+message WakeJobRequest {
+  // job is the name of a manifest job of the calling plugin.
+  string job = 1;
+  // at is when the job has work; a time past or unset runs it now. An
+  // earlier wake already set keeps.
+  google.protobuf.Timestamp at = 2;
+}
+
+message WakeJobResponse {}
 
 message AskRequest {
   string prompt = 1;

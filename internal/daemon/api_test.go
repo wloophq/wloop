@@ -1085,6 +1085,7 @@ func TestANoticeStreamsAsANotifyMessage(t *testing.T) {
 	if line, _ := r.ReadString('\n'); !strings.HasPrefix(line, ": connected") {
 		t.Fatalf("first line %q", line)
 	}
+	s.hub.moveTo(api.Since{Epoch: "e", Rev: 2})
 	s.hub.publish(api.Change{Type: "changed", Epoch: "e", Rev: 2})
 	s.notify(api.Notice{ID: "n1", Workflow: "ping", Text: "look at it"})
 	deadline := time.Now().Add(2 * time.Second)

@@ -35,6 +35,16 @@ func (b *breaker) allow(now time.Time) bool {
 	return !b.open || !now.Before(b.until)
 }
 
+// trial is when an open breaker lets its trial call run; zero while closed.
+func (b *breaker) trial() time.Time {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.open {
+		return time.Time{}
+	}
+	return b.until
+}
+
 func (b *breaker) failed(now time.Time, err error) (event string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

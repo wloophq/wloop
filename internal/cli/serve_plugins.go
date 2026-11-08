@@ -141,7 +141,7 @@ func withSources(d daemon.Deps, ps []compiledPlugin, mods []pluginModule, ui uiO
 func runtimeOf(m pluginModule, web fs.FS) daemon.PluginRuntime {
 	rt := daemon.PluginRuntime{ID: m.ID, Run: m.Run, Health: m.Health, WebAssets: web}
 	for _, j := range m.Jobs {
-		rt.Jobs = append(rt.Jobs, daemon.PluginJob{Name: j.Name, Every: j.Every, Timeout: j.Timeout, Run: j.Run})
+		rt.Jobs = append(rt.Jobs, daemon.PluginJob{Name: j.Name, Every: j.Every, Timeout: j.Timeout, Retry: j.Retry, Run: j.Run})
 	}
 	return rt
 }
@@ -267,6 +267,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 	snaps := psource.NewSnapshots(db.Snapshots())
 	meters := &psource.Meters{Registry: e.meter}
 	e.briefsHeard = &atomic.Pointer[brief.Queue]{}
+	e.jobRunner = &atomic.Pointer[daemon.Server]{}
 	briefIntents := e.briefIntents(logf)
 	hosted := e.hostedFor(db, cfg, logf)
 	codecs := e.unitCodecs()
@@ -287,7 +288,8 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 			return e.withGitHubBroker(&psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
 				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
 				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Wakes: envWakes{e, db}, Paused: e.roundsPaused, Rounds: e.storedRoundState,
-				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing, Books: sqlite.New(db).Books}, id, db)
+				Links: db.Links(), Hosted: hosted(id), Meters: meters, Workspaces: e.workspaceListing, Books: sqlite.New(db).Books,
+				WakeJob: e.wakeJob}, id, db)
 		},
 		Loaded: func(id string) {
 			logf("plugin %s: loaded", id)
@@ -336,6 +338,12 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 }
 
 // heardBrief wakes the turns waiting on u's brief, which a plugin wrote.
+// wakeJob runs the serving daemon's job name at at; false while no daemon serves, or it runs no such job.
+func (e *Env) wakeJob(name string, at time.Time) bool {
+	s := e.jobRunner.Load()
+	return s != nil && s.WakeJob(name, at)
+}
+
 func (e *Env) heardBrief(u unit.Unit) {
 	if q := e.briefsHeard.Load(); q != nil {
 		q.Noted(u)

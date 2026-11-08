@@ -427,6 +427,17 @@ type Why struct {
 
 type Gain struct{ MemoryBytes, DiskBytes int64 }
 
+// Shown is g at the precision a client shows a size: tenths of a MiB under a GiB, tenths of a GiB from there.
+func (g Gain) Shown() Gain { return Gain{shownSize(g.MemoryBytes), shownSize(g.DiskBytes)} }
+
+func shownSize(n int64) int64 {
+	step := int64(1<<20) / 10
+	if n >= 1<<30 {
+		step = int64(1<<30) / 10
+	}
+	return (n + step/2) / step * step
+}
+
 type Item struct {
 	ID       string
 	Key      Key

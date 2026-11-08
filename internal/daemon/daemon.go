@@ -432,6 +432,8 @@ type Server struct {
 	warnings *warnings
 	grace    time.Duration
 	hub      *hub
+	// healthWake holds at most one ask of the health feed to compare.
+	healthWake chan struct{}
 	// moved holds the units of the row changes published, for the tasks feed.
 	moved     *rowMoves
 	model     *readmodel.Model
@@ -515,7 +517,7 @@ func New(d Deps) *Server {
 	if d.GitAccess == nil && d.Meta != nil {
 		d.GitAccess = &GitAccessLog{Store: d.Meta}
 	}
-	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), moved: newRowMoves(), app: d.App,
+	s := &Server{deps: d, jobs: map[string]*job{}, token: rand.Text(), warnings: &warnings{}, grace: ShutdownGrace, hub: newHub(), healthWake: make(chan struct{}, 1), moved: newRowMoves(), app: d.App,
 		track:     d.Track,
 		reconcile: reconcileState{ready: make(chan struct{}), done: make(chan struct{}), wait: ReconcileWait}, sessionWait: cmp.Or(d.SessionWait, brief.SessionWait),
 		streamClock: wallClock{}, draftClock: wallClock{}}
@@ -917,8 +919,8 @@ func (s *Server) Run(ctx context.Context) error {
 		case <-jctx.Done():
 		}
 	})
+	wg.Go(func() { s.feedTasks(jctx) })
 	if d.Tasks != nil {
-		wg.Go(func() { s.feedTasks(jctx) })
 		wg.Go(func() {
 			select {
 			case <-s.reconcile.ready:

@@ -426,11 +426,13 @@ func (c *cursor) set(s api.Since) {
 // counts the last change carried, moved the units the changes with counters
 // named since the last task pull, or all of them.
 type wants struct {
-	health, rows, plan, tasks, filtered atomic.Bool
-	counters                            atomic.Pointer[api.Counters]
-	movedMu                             sync.Mutex
-	moved                               []unit.Unit
-	movedAll                            bool
+	health, rows, plan, gates, tasks, filtered atomic.Bool
+	counters                                   atomic.Pointer[api.Counters]
+	// planned are the units of the plan items last read, whose rows the plan shows.
+	planned  atomic.Pointer[map[unit.Unit]bool]
+	movedMu  sync.Mutex
+	moved    []unit.Unit
+	movedAll bool
 }
 
 func (r *wants) move(units []unit.Unit, all bool) {
@@ -452,8 +454,23 @@ func (r *wants) all() {
 	r.health.Store(true)
 	r.rows.Store(true)
 	r.plan.Store(true)
+	r.gates.Store(true)
 	r.tasks.Store(true)
 	r.filtered.Store(true)
+}
+
+// plans says whether the plan last read shows a row of units.
+func (r *wants) plans(units []unit.Unit) bool {
+	p := r.planned.Load()
+	return p != nil && slices.ContainsFunc(units, func(u unit.Unit) bool { return (*p)[u] })
+}
+
+func (r *wants) readPlan(items []api.PlanItem) {
+	p := make(map[unit.Unit]bool, len(items))
+	for _, it := range items {
+		p[it.Unit] = true
+	}
+	r.planned.Store(&p)
 }
 
 // query is the task view the screen shows and the area it follows, shared
@@ -562,7 +579,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 	var have onceReads
 	var set rowset.Set
 	var h api.Health
-	needHealth, needRows, needPlan := true, true, true
+	needHealth, needRows, needPlan, needGates := true, true, true, true
 	var plan []api.PlanItem
 	var err error
 	var rowsLoading []api.Loading
@@ -600,6 +617,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 			var res api.PlanResponse
 			if res, planErr = d.Plan(ctx, api.PlanQuery{Closed: true}); planErr == nil {
 				plan, closed = res.Items, res.Closed
+				due.readPlan(plan)
 				read := slices.Clone(plan)
 				planRead = &read
 			}
@@ -607,10 +625,16 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 		}
 		rows := set.All()
 		r := loaded{rows: rows, rowsLoading: rowsLoading, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
-		if err == nil {
+		needGates = due.gates.Swap(false) || needGates
+		if err == nil && needGates {
 			if gs, e := d.Gates(ctx); e == nil {
-				r.gates = gs
+				if gs == nil {
+					gs = []api.GateView{}
+				}
+				r.gates, needGates = gs, false
 			}
+		}
+		if err == nil {
 			r.specsErr = have.read(ctx, d, rows, len(plan) > 0, &r)
 			if shown.reviewing() {
 				if rv, e := d.Review(ctx); e != nil {
@@ -810,7 +834,12 @@ func listen(ctx context.Context, events <-chan api.Change, at *cursor, due *want
 				counters := *c.Counters
 				due.counters.Store(&counters)
 			}
-			due.plan.Store(true)
+			if c.Plan || c.All || due.plans(c.Units) {
+				due.plan.Store(true)
+			}
+			if c.Gates || c.All {
+				due.gates.Store(true)
+			}
 			kick()
 		}
 	}

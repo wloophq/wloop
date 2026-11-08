@@ -203,6 +203,8 @@ type Env struct {
 	// briefsHeard holds the brief queue that hears of each brief a plugin
 	// writes through its broker; nil outside serve.
 	briefsHeard *atomic.Pointer[brief.Queue]
+	// jobRunner holds the server whose jobs a plugin wakes through its broker; nil outside serve.
+	jobRunner *atomic.Pointer[daemon.Server]
 	// pluginEffects applies a provider's plugin effects in place of its
 	// running plugin; nil asks the plugin.
 	pluginEffects func(p unit.ProviderID) (effectApplier, bool)

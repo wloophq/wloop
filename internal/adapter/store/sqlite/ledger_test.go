@@ -62,7 +62,7 @@ func (b eventsBackend) Append(evs ...workflow.Event) []workflow.Event {
 	return out
 }
 
-func openLogged(t *testing.T, path string) (*DB, *change.Log) {
+func openLogged(t testing.TB, path string) (*DB, *change.Log) {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := Open(path, log)
@@ -344,19 +344,50 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 		}
 		return got
 	}
-	if c := save(p); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	both := port.TopicPending | port.TopicPlan
+	if c := save(p); c.Topics != both || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a new pending item noted %+v", c)
 	}
-	if c := save(p, blocked); !c.Empty() {
-		t.Errorf("a new blocked item noted %+v", c)
+	if c := save(p, blocked); c.Topics != port.TopicPlan || !slices.Equal(c.Units, []unit.Unit{blocked.Unit}) {
+		t.Errorf("a new blocked item noted %+v, want the plan alone", c)
 	}
 	other := p
 	other.Default = workflow.OutcomeWait
-	if c := save(other, blocked); c.Topics != port.TopicPending {
+	if c := save(other, blocked); c.Topics != both {
 		t.Errorf("a pending item whose default changed noted %+v", c)
 	}
-	if c := save(blocked); c.Topics != port.TopicPending || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+	if c := save(blocked); c.Topics != both || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
 		t.Errorf("a dropped pending item noted %+v", c)
+	}
+}
+
+func TestPlanWritesNotePlanWhenWhatThePlanServesChanges(t *testing.T) {
+	t.Parallel()
+	db, log := openLogged(t, filepath.Join(t.TempDir(), "plan.db"))
+	ctx := context.Background()
+	l := db.Ledger()
+	p := pendingItem("w", wfUnit)
+	blocked := pendingItem("w", unit.Unit{Provider: unit.Workspace, Key: "ws1"})
+	blocked.Decision, blocked.Default, blocked.Deadline = workflow.DecisionBlocked, "", time.Time{}
+	save := func(items ...workflow.Item) port.Change {
+		t.Helper()
+		got, _, err := noted(log, func() error { return l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: items}) })
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	save(p, blocked)
+	reworded := p
+	reworded.Reason = "another reason"
+	if c := save(reworded, blocked); c.Topics != port.TopicPlan || !slices.Equal(c.Units, []unit.Unit{wfUnit}) {
+		t.Errorf("a pending item whose reason changed under the same decision noted %+v, want the plan alone", c)
+	}
+	if c := save(reworded, blocked); !c.Empty() {
+		t.Errorf("the same items saved again noted %+v", c)
+	}
+	if c := save(reworded); c.Topics != port.TopicPlan || !slices.Equal(c.Units, []unit.Unit{blocked.Unit}) {
+		t.Errorf("a dropped blocked item noted %+v, want the plan alone", c)
 	}
 }
 
@@ -401,7 +432,7 @@ func TestEngineEventsShareTheSaveTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 || got.Topics != port.TopicPending|port.TopicLoopEvents {
+	if n != 1 || got.Topics != port.TopicPending|port.TopicPlan|port.TopicLoopEvents {
 		t.Errorf("a save with its event noted %d times %+v, want once with gate and loop events", n, got)
 	}
 
@@ -514,6 +545,56 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 // TestADismissedKeyIsNotPlannedAgainAfter31Days: the engine plans no item
 // for a key whose run is dismissed (automation's evaluate), so the run must
 // outlive every retention pass while its unit lives.
+func TestAGainThatMovesUnderTheShownPrecisionNotesNothing(t *testing.T) {
+	t.Parallel()
+	db, log := openLogged(t, filepath.Join(t.TempDir(), "gain.db"))
+	ctx := context.Background()
+	l := db.Ledger()
+	blocked := pendingItem("w", unit.Unit{Provider: unit.Workspace, Key: "ws1"})
+	blocked.Decision, blocked.Default, blocked.Deadline = workflow.DecisionBlocked, "", time.Time{}
+	save := func(memory, disk int64) port.Change {
+		t.Helper()
+		it := blocked
+		it.Gain = workflow.Gain{MemoryBytes: memory, DiskBytes: disk}
+		got, _, err := noted(log, func() error {
+			return l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{it}})
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	save(300<<20, 2<<30)
+	if c := save(300<<20+4<<10, 2<<30+3<<20); !c.Empty() {
+		t.Errorf("a gain that moved by a few KiB of memory and MiB of disk noted %+v", c)
+	}
+	if c := save(310<<20, 2<<30+3<<20); c.Topics != port.TopicPlan {
+		t.Errorf("a gain that moved by 10 MiB noted %+v, want the plan", c)
+	}
+}
+
+func TestRetentionOfPlanItemsNotesThePlan(t *testing.T) {
+	t.Parallel()
+	db, log := openLogged(t, filepath.Join(t.TempDir(), "retain.db"))
+	ctx := context.Background()
+	old := retainNow.Add(-8 * day)
+	if err := savedAt(db, old).Save(ctx, automation.PlanWrite{Workflows: []string{"gone"}, Items: []workflow.Item{
+		runItem("gone", wfUnit, "blocked", workflow.DecisionBlocked, old),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := noted(log, func() error {
+		_, err := db.Retain(ctx, retainNow, Retention{PlanItems: DefaultRetention.PlanItems})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Has(port.TopicPlan) {
+		t.Errorf("retention that dropped a plan item noted %+v, want the plan", got)
+	}
+}
+
 func TestADismissedKeyIsNotPlannedAgainAfter31Days(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)

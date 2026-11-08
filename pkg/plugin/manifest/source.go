@@ -156,6 +156,7 @@ type Job struct {
 	Every     Duration `toml:"every" doc:"How often the job runs, as a Go duration, unless every_from is set. Required."`
 	EveryFrom string   `toml:"every_from" doc:"A duration key of the configuration the interval comes from, such as \"sweep.fast\", one of config_reads or under them; every is its default."`
 	Timeout   Duration `toml:"timeout" doc:"A run's limit, as a Go duration; empty is the host's default."`
+	Retry     Duration `toml:"retry" doc:"The first wait after a failed run, as a Go duration, doubling up to every; empty backs off from every."`
 }
 
 // Command is a command of the plugin binary in CLI mode.

@@ -74,7 +74,11 @@ func (s *Server) viewerInfo(ctx context.Context) (src.Identity, error) {
 		s.logf("viewer: %v", err)
 		return c.id, nil
 	}
+	moved := s.login(c.id) != s.login(id)
 	c.id, c.at, c.gen, c.err, c.failedAt = id, now, gen, nil, time.Time{}
+	if moved {
+		s.pokeHealth()
+	}
 	return id, nil
 }
 

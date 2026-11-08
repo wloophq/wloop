@@ -173,6 +173,9 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			srv := daemon.New(deps)
 			e.Briefing, e.consequences = srv, srv
 			e.linkStates.Store(srv)
+			if e.jobRunner != nil {
+				e.jobRunner.Store(srv)
+			}
 			err := srv.Run(ctx)
 			stop()
 			return err

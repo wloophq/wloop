@@ -155,7 +155,9 @@ type pluginJob struct {
 	Name    string
 	Every   time.Duration
 	Timeout time.Duration // a run's limit; 0 is the daemon's default
-	Run     func(ctx context.Context) (summary, skipped string, err error)
+	Retry   time.Duration // the first backoff after a failed run; 0 backs off from Every
+	// Run is one run; next is when the job next has work, zero for none known.
+	Run func(ctx context.Context) (summary, skipped string, next time.Time, err error)
 }
 
 // CLI is a plugin's own command, run as <command> <Name> ... when Name is not a core command.

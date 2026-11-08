@@ -43,6 +43,7 @@ const (
 	TopicRuns                           // a task's runs: its turns' sessions and workspaces
 	TopicRecords                        // a unit's records, such as its brief (noted with TopicLoopEvents)
 	TopicPlacements                     // placements
+	TopicPlan                           // what the plan serves: plan_items as served, and the closed sessions it lists
 )
 
 // pr_seen notes nothing. A write that inserts events notes SourceEvents or
@@ -55,8 +56,8 @@ const (
 		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems | TopicGates | TopicWakes
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
-	// SweepInputs leaves out LoopEvents and Rounds, the sweep's own writes
-	// that never change its plan. Tasks, items and drafts wake the
+	// SweepInputs leaves out LoopEvents, Rounds and Plan, the sweep's own
+	// writes that never change its plan. Tasks, items and drafts wake the
 	// workflows over tasks and Slack units, and a matched wake the one that
 	// reacts to task.woke; the drafts draft.propose
 	// writes wake one more pass, which their hold makes idle. The

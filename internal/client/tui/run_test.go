@@ -61,7 +61,8 @@ type fakeDaemon struct {
 	// catalog is the version of the catalog, which every rows page names; "" is c1.
 	catalog string
 	// gates are the open gates.
-	gates []api.GateView
+	gates     []api.GateView
+	gateReads int
 	// tasks are each view's tasks; a page since the fake's position
 	// carries taskDelta of its view instead, once.
 	tasks       map[string][]api.TaskView
@@ -329,6 +330,7 @@ func (f *fakeDaemon) Catalog(context.Context) (api.CatalogResponse, error) {
 func (f *fakeDaemon) Gates(context.Context) ([]api.GateView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.gateReads++
 	return append([]api.GateView{}, f.gates...), nil
 }
 
@@ -390,6 +392,20 @@ func (f *fakeDaemon) announceHealth() {
 	s, rev := f.stream, f.rev
 	f.mu.Unlock()
 	s <- api.Change{Type: "changed", Epoch: "e1", Rev: rev, Health: true}
+}
+
+func (f *fakeDaemon) announceChange(c api.Change) {
+	f.mu.Lock()
+	s, rev := f.stream, f.rev
+	f.mu.Unlock()
+	c.Type, c.Epoch, c.Rev = "changed", "e1", rev
+	s <- c
+}
+
+func (f *fakeDaemon) reads() (plan, gates int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.planReads, f.gateReads
 }
 
 func (f *fakeDaemon) endStream() {
@@ -647,6 +663,47 @@ func TestTUIHealthOnlyChangeReadsNoRows(t *testing.T) {
 	})
 }
 
+func TestTUIReadsThePlanAndTheGatesOnlyWhenAChangeNamesThem(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		plan0, gates0 := d.reads()
+		d.announceHealth()
+		eventually(t, "the health", func() bool { return len(d.times(&d.healthAt)) == 2 })
+		if plan, gates := d.reads(); plan != plan0 || gates != gates0 {
+			t.Fatalf("a health-only change read the plan %d and the gates %d times", plan-plan0, gates-gates0)
+		}
+		d.announceChange(api.Change{Plan: true})
+		eventually(t, "the plan", func() bool { plan, _ := d.reads(); return plan == plan0+1 })
+		if _, gates := d.reads(); gates != gates0 {
+			t.Fatalf("a plan change read the gates %d times", gates-gates0)
+		}
+		d.announceChange(api.Change{Gates: true})
+		eventually(t, "the gates", func() bool { _, gates := d.reads(); return gates == gates0+1 })
+		if plan, _ := d.reads(); plan != plan0+1 {
+			t.Fatalf("a gates change read the plan %d more times", plan-plan0-1)
+		}
+		quit(t, term, done)
+	})
+}
+
+func TestTUIReadsThePlanWhenARowItShowsMoved(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		d.plan = []api.PlanItem{{ID: "i1", Workflow: "tidy", Decision: "pending", Unit: d.rows[0].Unit}}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		plan0, _ := d.reads()
+		d.change(nil)
+		d.announceChange(api.Change{Units: []unit.Unit{d.rows[0].Unit}})
+		eventually(t, "the plan", func() bool { plan, _ := d.reads(); return plan == plan0+1 })
+		quit(t, term, done)
+	})
+}
+
 func TestTUIResumesFromRev(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		d := &fakeDaemon{rows: oneRow()}
@@ -656,7 +713,7 @@ func TestTUIResumesFromRev(t *testing.T) {
 		// fold into that pull and leave nothing to resume from.
 		eventually(t, "the first load", func() bool { return d.planCount() == 1 })
 		d.change(nil)
-		d.announce()
+		d.announceChange(api.Change{Plan: true})
 		// The load asks for the plan after it holds the pulled revision.
 		eventually(t, "the second load", func() bool { return len(d.times(&d.rowsAt)) == 2 && d.planCount() == 2 })
 		d.endStream()

@@ -78,6 +78,7 @@ type plugin struct {
 	logins  logins
 	started time.Time
 	job     *extract.Job
+	wake    *waker
 	reports *reporter
 	brand   string
 }
@@ -124,6 +125,7 @@ func newPlugin(cfg config.Config, h host.Broker, db *store.DB, s Slack, log func
 	p.events = &stream{now: p.now, team: func() string { t, _ := src.viewer(); return t }, metrics: p.slack.Metrics, log: p.logf,
 		deliver: p.deliver}
 	p.job = p.extraction()
+	p.wake = newWaker(p)
 	p.reports = newReporter(p)
 	return p
 }

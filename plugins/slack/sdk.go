@@ -118,6 +118,7 @@ func (s *Plugin) Start(ctx context.Context, req src.StartRequest) error {
 	s.p, s.cancel = p, cancel
 	s.mu.Unlock()
 	s.wg.Go(func() { p.reports.run(life, RestartAfter) })
+	s.wg.Go(func() { p.wake.run(life) })
 	s.wg.Go(func() {
 		for {
 			if err := p.run(life); err != nil && life.Err() == nil {
@@ -186,16 +187,17 @@ func (s *Plugin) Ingest(ctx context.Context, req src.IngestRequest) (src.IngestR
 	if err != nil {
 		return src.IngestResult{}, err
 	}
-	var summary, skipped string
+	var res src.IngestResult
 	switch req.Job {
 	case JobIngest:
-		summary, skipped, err = p.ingestJob(ctx)
+		res.Summary, res.Skipped, err = p.ingestJob(ctx)
 	case JobExtract:
-		summary, skipped, err = p.job.Run(ctx)
+		res.Summary, res.Skipped, err = p.job.Run(ctx)
+		res.Next = p.job.Next()
 	default:
 		return src.IngestResult{}, fmt.Errorf("slack: no job %q", req.Job)
 	}
-	return src.IngestResult{Summary: summary, Skipped: skipped}, err
+	return res, err
 }
 
 func (s *Plugin) Track(ctx context.Context, req src.TrackRequest) (src.Tracked, error) {
@@ -362,10 +364,11 @@ func (s *Plugin) BriefWant(_ context.Context, u sdk.Unit) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if p.job == nil {
+	if p.job == nil || !p.job.Want(unit.Of(u)) {
 		return false, nil
 	}
-	return p.job.Want(unit.Of(u)), nil
+	p.wake.at(p.now())
+	return true, nil
 }
 
 // Plan plans no round: Slack units have no automatic rounds.

@@ -146,7 +146,8 @@ every = "1m"
 
 [[source.jobs]]
 name = "extract"
-every = "30s"
+every = "5m"
+retry = "1m"
 timeout = "22m"
 
 [[source.situations]]

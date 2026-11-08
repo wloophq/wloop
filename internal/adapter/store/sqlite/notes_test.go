@@ -225,6 +225,32 @@ var writes = []writeCase{
 		topics: port.TopicSessions | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
 	},
 	{
+		method: "Store.SaveSession",
+		name:   "close",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := New(e.db).SaveSession(context.Background(), turn.Session{ID: "term_1"}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			return New(e.db).SaveSession(ctx, turn.Session{ID: "term_1", ClosedAt: noteAt}, loopEvent("session_closed"))
+		},
+		topics: port.TopicSessions | port.TopicPlan | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+	},
+	{
+		method: "Store.SaveSession",
+		name:   "closed again",
+		seed: func(t *testing.T, e *noteEnv) {
+			if err := New(e.db).SaveSession(context.Background(), turn.Session{ID: "term_1", ClosedAt: noteAt}); err != nil {
+				t.Fatal(err)
+			}
+		},
+		call: func(ctx context.Context, e *noteEnv) error {
+			return New(e.db).SaveSession(ctx, turn.Session{ID: "term_1", ClosedAt: noteAt})
+		},
+		topics: port.TopicSessions, units: []unit.Unit{term1},
+	},
+	{
 		method: "Store.LogStop",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return New(e.db).LogStop(ctx, turn.Stop{Session: "term_1", PromptID: "p1", At: noteAt})
@@ -360,7 +386,7 @@ var writes = []writeCase{
 			it := noteItem(workflow.DecisionPending)
 			return e.db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{it.Workflow}, Items: []workflow.Item{it}}, loopEvent(workflow.KindPlanned))
 		},
-		topics: port.TopicPending | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
+		topics: port.TopicPending | port.TopicPlan | port.TopicLoopEvents, units: []unit.Unit{u7, term1},
 	},
 	{
 		method: "ledger.Record",

@@ -88,7 +88,7 @@ func TestExtractionJobOverTheStore(t *testing.T) {
 			{TS: ts(1), User: other, Text: "<@U0000000001> review please"}, {TS: ts(2), ThreadTS: ts(1), User: me, Text: "on it"}}}},
 		DMs: []dslack.DMWindow{{Conversation: dm1, Latest: ts(5), Messages: []dslack.Message{{TS: ts(5), User: other, Text: "the PR?"}}}},
 	})
-	if j, ok := manifestJob(t, JobExtract); !ok || time.Duration(j.Every) != extract.JobEvery || time.Duration(j.Timeout) != extract.JobTimeout {
+	if j, ok := manifestJob(t, JobExtract); !ok || time.Duration(j.Every) != extract.JobEvery || time.Duration(j.Retry) != extract.JobRetry || time.Duration(j.Timeout) != extract.JobTimeout {
 		t.Fatalf("the manifest's job %+v", j)
 	}
 	f.now = t0

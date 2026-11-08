@@ -97,7 +97,7 @@ func (s *server) Capabilities(context.Context, *pb.CapabilitiesRequest) (*pb.Cap
 func (s *server) Ingest(ctx context.Context, r *pb.IngestRequest) (*pb.IngestResponse, error) {
 	return serve[Ingester](ctx, s.src, "ingester", r.GetCall(), func(ctx context.Context, c Ingester) (*pb.IngestResponse, error) {
 		res, err := c.Ingest(ctx, IngestRequest{Job: r.GetJob(), Now: tm(r.GetNow())})
-		return &pb.IngestResponse{Summary: res.Summary, Skipped: res.Skipped}, err
+		return &pb.IngestResponse{Summary: res.Summary, Skipped: res.Skipped, Next: ts(res.Next)}, err
 	})
 }
 

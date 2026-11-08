@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -26,11 +27,15 @@ var _ automation.Ledger = ledger{}
 
 // Ledger is the workflows' plan and runs. A write stores its rows and its
 // events in one transaction, noting TopicLoopEvents for the events and
-// TopicPending only when the pending set changes.
+// TopicPending only when the pending set changes and TopicPlan only when
+// what the plan serves of an item changes.
 func (db *DB) Ledger() automation.Ledger { return ledger{db, time.Now} }
 
-const itemColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
-	default_outcome, deadline, guidance, attempts, error, observe, at, gain_memory, gain_disk`
+const itemColumns = shownColumns + `, gain_memory, gain_disk`
+
+// shownColumns are the item columns but the gain, which each pass measures again.
+const shownColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
+	default_outcome, deadline, guidance, attempts, error, observe, at`
 
 // insertItemSQL takes itemArgs and the write time, which retention ages
 // the row by.
@@ -105,7 +110,8 @@ func (l ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, ev
 }
 
 // write runs fn and writes evs in one transaction, touching TopicPending with
-// the units of the pending items fn added, dropped or re-timed.
+// the units of the pending items fn added, dropped or re-timed, and TopicPlan
+// with those of the items whose served columns it changed.
 func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) error) error {
 	for _, ev := range evs {
 		if ev.At.IsZero() {
@@ -113,54 +119,77 @@ func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) err
 		}
 	}
 	_, err := l.db.Write(ctx, func(tx *Tx) error {
-		before, err := pendingSet(ctx, tx)
+		before, err := planSet(ctx, tx)
 		if err != nil {
 			return err
 		}
 		if err := fn(tx); err != nil {
 			return err
 		}
-		after, err := pendingSet(ctx, tx)
+		after, err := planSet(ctx, tx)
 		if err != nil {
 			return err
 		}
-		var moved []unit.Unit
-		for id, b := range before {
-			if a, ok := after[id]; !ok || a != b {
-				moved = append(moved, b.unit)
+		var pending, served []unit.Unit
+		moved := func(b, a planRow, had, has bool) {
+			u := cmp.Or(b.unit, a.unit)
+			if b.pending() && (!has || a.gate() != b.gate()) || a.pending() && (!had || a.gate() != b.gate()) {
+				pending = append(pending, u)
 			}
+			if !had || !has || a.served != b.served || a.gain != b.gain {
+				served = append(served, u)
+			}
+		}
+		for id, b := range before {
+			a, ok := after[id]
+			moved(b, a, true, ok)
 		}
 		for id, a := range after {
 			if _, ok := before[id]; !ok {
-				moved = append(moved, a.unit)
+				moved(planRow{}, a, false, true)
 			}
 		}
-		if len(moved) > 0 {
-			tx.Touch(port.TopicPending, moved...)
+		if len(pending) > 0 {
+			tx.Touch(port.TopicPending, pending...)
+		}
+		if len(served) > 0 {
+			tx.Touch(port.TopicPlan, served...)
 		}
 		return writeEvents(ctx, tx, evs)
 	})
 	return err
 }
 
-type pendingRow struct {
-	unit              unit.Unit
-	deadline, outcome string
+// planRow is a plan item as the plan serves it: served holds every column but saved_at, which each sweep pass
+// rewrites, and the gain, which gain holds at the precision a client shows it.
+type planRow struct {
+	unit                        unit.Unit
+	decision, deadline, outcome string
+	served                      string
+	gain                        workflow.Gain
 }
 
-func pendingSet(ctx context.Context, tx *Tx) (map[string]pendingRow, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id, provider, unit_key, deadline, default_outcome FROM plan_items WHERE decision = 'pending'`)
+func (r planRow) pending() bool { return r.decision == string(workflow.DecisionPending) }
+
+// gate is what a pending item's gate reads of it.
+func (r planRow) gate() [3]string { return [3]string{r.decision, r.deadline, r.outcome} }
+
+func planSet(ctx context.Context, tx *Tx) (map[string]planRow, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT id, provider, unit_key, decision, deadline, default_outcome, json_array(`+shownColumns+`),
+		gain_memory, gain_disk FROM plan_items`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]pendingRow{}
+	out := map[string]planRow{}
 	for rows.Next() {
 		var id string
-		var r pendingRow
-		if err := rows.Scan(&id, &r.unit.Provider, &r.unit.Key, &r.deadline, &r.outcome); err != nil {
+		var r planRow
+		if err := rows.Scan(&id, &r.unit.Provider, &r.unit.Key, &r.decision, &r.deadline, &r.outcome, &r.served,
+			&r.gain.MemoryBytes, &r.gain.DiskBytes); err != nil {
 			return nil, err
 		}
+		r.gain = r.gain.Shown()
 		out[id] = r
 	}
 	return out, rows.Err()
