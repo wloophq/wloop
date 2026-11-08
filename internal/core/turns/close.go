@@ -103,14 +103,17 @@ func withoutHandle(sess turn.Session) turn.Session {
 
 // The close refusals of a session whose terminal runs no agent. A closed
 // terminal clears on its own: the census marks the session dormant once its
-// process is gone, and a process left orphaned is ended by the profile's
-// session.close_orphan step. An open one, or a session with no workspace to
-// look for one in, waits for the user.
+// process is gone or has stayed orphaned (session.mark_dormant). An open one,
+// or a session with no workspace to look for one in, waits for the user.
 const (
 	RefusalTerminalClosed = "its terminal is closed; it ends on its own"
 	RefusalNoAgent        = "its terminal is open with no agent in it: close that terminal, or dismiss this"
 	RefusalNoWorkspace    = "it has no workspace to find its terminal in: dismiss this"
 )
+
+// RefusalCloseRaced refuses a close whose session took another process, or
+// woke, between its check and its close.
+const RefusalCloseRaced = "its process changed while it was being closed"
 
 // CloseRefusal is why session.close may not close the handle's session, ""
 // when it may. It writes nothing; an error is a read that failed.
@@ -149,6 +152,9 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 		}
 	}
 	if sess.State() == turn.SessionDormant {
+		if s.orphanLingers(handle) {
+			return RefusalOrphanLingers, promptWindow{}, nil
+		}
 		return "", promptWindow{sess: sess}, nil
 	}
 	if sess.WorkspaceID == "" {
@@ -179,10 +185,28 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 // CloseSession closes the handle's session for reason when CloseRefusal
 // allows it, and records session_closed with its resume line.
 func (s *Service) CloseSession(ctx context.Context, handle, reason string) error {
+	return s.closeSession(ctx, handle, reason, false)
+}
+
+// CloseRecord is CloseSession for a session whose workspace goes away: it
+// also closes a dormant session whose orphan lingers, which ends no process,
+// as nothing is left to reattach it to.
+func (s *Service) CloseRecord(ctx context.Context, handle, reason string) error {
+	return s.closeSession(ctx, handle, reason, true)
+}
+
+func (s *Service) closeSession(ctx context.Context, handle, reason string, lingering bool) error {
 	s.refresh()
 	why, w, err := s.closeCheck(ctx, handle)
 	if err != nil {
 		return err
+	}
+	if lingering && why == RefusalOrphanLingers {
+		sess, ok, err := s.Registry.Session(ctx, handle)
+		if err != nil || !ok {
+			return err
+		}
+		why, w = "", promptWindow{sess: sess}
 	}
 	if why == "" && !w.sess.PromptSeenAt.IsZero() {
 		at, ok, _ := s.lastUserPrompt(ctx, w.sess)
@@ -198,14 +222,21 @@ func (s *Service) CloseSession(ctx context.Context, handle, reason string) error
 	if err != nil {
 		return err
 	}
-	if err := s.Sessions.Close(ctx, handle); err != nil {
-		return err
-	}
 	s.mu.Lock()
 	cur, ok, err := s.Registry.Session(ctx, handle)
 	if err != nil || !ok || !cur.ClosedAt.IsZero() {
 		s.mu.Unlock()
 		return err
+	}
+	if cur.Handle != w.sess.Handle {
+		s.mu.Unlock()
+		return Refusal{Reason: RefusalCloseRaced}
+	}
+	if cur.Handle != "" {
+		if err := s.Sessions.Close(ctx, handle); err != nil {
+			s.mu.Unlock()
+			return err
+		}
 	}
 	cur.ClosedAt = s.now()
 	ev := s.event(unit.Unit{}, KindSessionClosed, handle, s.closeDetail(sessionFacts{Session: cur, Unit: units[handle]}, reason))

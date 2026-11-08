@@ -30,7 +30,13 @@ type orphanMark struct {
 	// quietSince starts the run of readings that all showed some terminal,
 	// zero after one that showed none or could not tell.
 	quietSince time.Time
-	durable    bool
+	// attachedSince starts the run of complete readings, with or without an
+	// epoch, whose windows showed some terminal; zero after one that showed
+	// none or could not tell.
+	attachedSince time.Time
+	durable       bool
+	// active says the session was active at the reading, not dormant.
+	active bool
 }
 
 // DefaultOrphanAfter is how long a process must stay orphaned, with no output
@@ -54,10 +60,10 @@ func (s *Service) ProcessOrphaned(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	m, ok := s.orphanSeen[id]
-	return ok && !m.at.IsZero() && m.at.Sub(m.since) >= s.FastJob
+	return ok && m.active && !m.at.IsZero() && m.at.Sub(m.since) >= s.FastJob
 }
 
-// OrphanDurable says whether the last Census proved the active session's
+// OrphanDurable says whether the last Census proved the open session's
 // process a durable orphan: complete readings of the same runtime have listed
 // it orphaned since it was first seen so, the latest renderer graph epoch held
 // across two readings at least FastJob apart while the app's windows showed
@@ -116,18 +122,23 @@ func (s *Service) Census(ctx context.Context) error {
 	orphans := map[string]orphanMark{}
 	for _, sess := range open {
 		runtime := c.RuntimeOf(sess.Manager)
-		if sess.State() != turn.SessionActive || !c.CompleteOf(sess.Manager) || runtime == "" {
+		if !c.CompleteOf(sess.Manager) || runtime == "" {
 			if m, ok := s.goneSeen[sess.ID]; ok && sess.State() == turn.SessionActive {
 				marks[sess.ID], gone[sess.ID] = m, s.gone[sess.ID]
 			}
-			if m, ok := s.orphanSeen[sess.ID]; ok && sess.State() == turn.SessionActive {
-				m.durable, m.quietSince = false, time.Time{}
+			if m, ok := s.orphanSeen[sess.ID]; ok {
+				m.durable, m.quietSince, m.attachedSince = false, time.Time{}, time.Time{}
 				orphans[sess.ID] = m
 			}
 			continue
 		}
 		if last, ok := c.Orphans[sess.ID]; ok {
-			orphans[sess.ID] = s.orphanAt(sess.ID, runtime, c.EpochOf(sess.Manager), c.ShownOf(sess.Manager), last, at)
+			m := s.orphanAt(sess.ID, runtime, c.EpochOf(sess.Manager), c.ShownOf(sess.Manager), last, at)
+			m.active = sess.State() == turn.SessionActive
+			orphans[sess.ID] = m
+		}
+		if sess.State() != turn.SessionActive {
+			continue
 		}
 		if _, listed := c.Sessions[sess.ID]; listed || sess.StartedAt.After(at) {
 			continue
@@ -162,6 +173,12 @@ func (s *Service) orphanAt(id, runtime, epoch string, shown bool, last, at time.
 	}
 	prev := m.at
 	m.at, m.durable = at, false
+	switch {
+	case !shown:
+		m.attachedSince = time.Time{}
+	case m.attachedSince.IsZero():
+		m.attachedSince = at
+	}
 	if epoch == "" {
 		m.epoch, m.epochAt, m.shownAt, m.crossed, m.quietSince = "", time.Time{}, time.Time{}, false, time.Time{}
 		return m

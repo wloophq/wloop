@@ -290,6 +290,10 @@ type Cleanup struct {
 	WorkspaceGrace Days `json:"workspace_grace"` // counted in working time
 	ManualIdle     Days `json:"manual_idle"`
 	StaleWorkspace Days `json:"stale_workspace"`
+	// OrphanHold is how long the close of a dormant session waits on its
+	// process lingering orphaned, the app attached throughout, before it
+	// closes the record anyway; it ends no process.
+	OrphanHold Days `json:"orphan_hold"`
 	// Disposable names ignored files and directories a tool recreates, so
 	// removing a workspace that holds them loses nothing.
 	Disposable []string `json:"disposable"`
@@ -454,6 +458,7 @@ func Defaults() Config {
 			WorkspaceGrace: Days(24 * time.Hour),
 			ManualIdle:     Days(24 * time.Hour),
 			StaleWorkspace: Days(14 * 24 * time.Hour),
+			OrphanHold:     Days(24 * time.Hour),
 			Disposable: []string{
 				"node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
 				"dist", "build", "target", "bin", ".terraform", ".next", "coverage", ".gradle", "_build", ".docusaurus",
@@ -668,6 +673,7 @@ func (c Config) validateWorkflows() error {
 		{"cleanup.workspace_grace", c.Cleanup.WorkspaceGrace},
 		{"cleanup.manual_idle", c.Cleanup.ManualIdle},
 		{"cleanup.stale_workspace", c.Cleanup.StaleWorkspace},
+		{"cleanup.orphan_hold", c.Cleanup.OrphanHold},
 	}
 	for _, d := range durations {
 		if d.v <= 0 {

@@ -40,6 +40,9 @@ type Service struct {
 	// OrphanAfter is how long a process stays orphaned, with no output, before
 	// OrphanDurable holds without a renderer restart; zero is DefaultOrphanAfter.
 	OrphanAfter time.Duration
+	// OrphanHold is how long a dormant session's close waits on its lingering
+	// orphan, the app attached throughout; zero is DefaultOrphanHold.
+	OrphanHold time.Duration
 	// AgentFor is the agent the sessions of the unit's project run, the
 	// top-level kind for the zero unit, nil for none; with nil, a session_closed
 	// line names no resume command.

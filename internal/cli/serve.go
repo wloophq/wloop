@@ -880,7 +880,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	e.Store, e.Views, e.served = store, v, served
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, Answers: hostAnswers{events: sqlite.New(db), viewer: store},
-		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
+		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast, OrphanHold: time.Duration(cfg.Cleanup.OrphanHold),
 		AgentFor:      e.agentFor(served),
 		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db},
 		Prompts: transcriptPrompts(db.AgentTranscript)}

@@ -500,6 +500,8 @@
 "it has no workspace to find its terminal in: dismiss this" = "ela não tem workspace onde achar o terminal: dispense este item"
 "its process is not proven a lasting orphan" = "o processo dela não está provado como órfão duradouro"
 "its process is no longer the orphan the census proved" = "o processo dela já não é o órfão que o censo provou"
+"its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold" = "o processo dela continua órfão e pode voltar; ela fecha quando o processo sumir, ou depois de cleanup.orphan_hold"
+"its process changed while it was being closed" = "o processo dela mudou enquanto ela era fechada"
 "now" = "agora"
 "observe" = "observar"
 "only this" = "só este"

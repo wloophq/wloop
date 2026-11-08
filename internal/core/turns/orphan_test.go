@@ -3,6 +3,7 @@ package turns_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -209,5 +210,132 @@ func TestCloseOrphanOfASessionGoneClosedOrDormantIsGone(t *testing.T) {
 	}
 	if len(sess.Closed()) != 0 {
 		t.Fatalf("closed %v", sess.Closed())
+	}
+}
+
+// retiredEnv is c's session retired dormant while its process lingers orphaned.
+func retiredEnv(t *testing.T, c cleanupCase) closeEnv {
+	t.Helper()
+	e := orphanedEnv(t, c)
+	if err := e.s.MarkDormant(context.Background(), c.sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.s.Census(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestADormantSessionsCloseWaitsWhileItsOrphanLingers(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if why, err := e.s.CloseRefusal(ctx, "term_1"); err != nil || why != turns.RefusalOrphanLingers {
+		t.Fatalf("refusal %q %v, want the close held while the orphan may be reclaimed", why, err)
+	}
+	if err := e.s.CloseSession(ctx, "term_1", "test"); !refusal(err, turns.RefusalOrphanLingers) {
+		t.Fatalf("CloseSession = %v", err)
+	}
+	e.sess.Unorphan("term_1")
+	if err := e.s.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want woken by its reclaimed pane", got)
+	}
+}
+
+func TestADormantSessionClosesOnceItsOrphanIsGone(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	e.sess.Put(cleanupWS)
+	if err := e.s.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if why, err := e.s.CloseRefusal(ctx, "term_1"); err != nil || why != "" {
+		t.Fatalf("refusal %q %v", why, err)
+	}
+	if err := e.s.CloseSession(ctx, "term_1", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionClosed {
+		t.Fatalf("session %+v, want closed", got)
+	}
+	if closed := e.sess.Closed(); len(closed) != 0 {
+		t.Fatalf("closing a dormant session ended %v: a pane woken meanwhile would be ended without the shown-terminal guards", closed)
+	}
+}
+
+// readHourly runs a census each hour from from to to, the app's windows shown
+// unless hidden names the hour, term_1's last output unknown so no quiet
+// window proves its orphan.
+func readHourly(t *testing.T, e closeEnv, from, to int, hidden ...int) {
+	t.Helper()
+	e.sess.Put(cleanupWS, turns.Terminal{Session: "term_1", Key: "tab-term_1", Agent: "claude"})
+	for h := from; h <= to; h++ {
+		e.sess.SetShown(!slices.Contains(hidden, h))
+		e.sess.SetReading("", t0.Add(time.Duration(h)*time.Hour))
+		if err := e.s.Census(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.sess.SetShown(true)
+}
+
+func TestADormantSessionsRecordClosesAfterTheHoldWindowAndEndsNothing(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	readHourly(t, e, 1, 23)
+	if why, _ := e.s.CloseRefusal(ctx, "term_1"); why != turns.RefusalOrphanLingers {
+		t.Fatalf("refusal %q before the hold window ends", why)
+	}
+	readHourly(t, e, 24, 25)
+	if why, err := e.s.CloseRefusal(ctx, "term_1"); err != nil || why != "" {
+		t.Fatalf("refusal %q %v after a day orphaned with the app attached, its output unknown", why, err)
+	}
+	if err := e.s.CloseSession(ctx, "term_1", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionClosed || len(e.sess.Closed()) != 0 {
+		t.Fatalf("session %+v, closed %v: want the record closed and no process ended", got, e.sess.Closed())
+	}
+}
+
+func TestTheHoldWindowRestartsWhenTheAppShowsNoTerminal(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	readHourly(t, e, 1, 30, 12)
+	if why, _ := e.s.CloseRefusal(ctx, "term_1"); why != turns.RefusalOrphanLingers {
+		t.Fatalf("refusal %q: a reading with no window showing a terminal did not restart the window", why)
+	}
+	readHourly(t, e, 31, 37)
+	if why, _ := e.s.CloseRefusal(ctx, "term_1"); why != "" {
+		t.Fatalf("refusal %q a whole window after the app showed terminals again", why)
+	}
+}
+
+func TestCloseRecordClosesADormantSessionWhoseOrphanLingers(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if err := e.s.CloseRecord(ctx, "term_1", "its workspace was removed"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionClosed || len(e.sess.Closed()) != 0 {
+		t.Fatalf("session %+v, closed %v", got, e.sess.Closed())
+	}
+}
+
+func TestAProcessStillListedLingers(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || !lingers {
+		t.Fatalf("lingers %v %v, want true while the census lists its orphan", lingers, err)
+	}
+	e.sess.Put(cleanupWS)
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || lingers {
+		t.Fatalf("lingers %v %v once the census lists none", lingers, err)
+	}
+	e.sess.Partial()
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || !lingers {
+		t.Fatalf("lingers %v %v, want true when the census cannot tell", lingers, err)
 	}
 }

@@ -387,10 +387,15 @@ func (s *stepSet) closeCheck(ctx context.Context, c stepCall, _ automation.Check
 		return "", err
 	}
 	why, err := t.CloseRefusal(ctx, c.u.Key)
-	if err == nil && turns.CloseGone(c.u.Key, why) {
+	switch {
+	case err != nil:
+		return "", err
+	case turns.CloseGone(c.u.Key, why):
 		return "", automation.Moot{Reason: why}
+	case why == turns.RefusalOrphanLingers:
+		return "", automation.Held{Reason: why}
 	}
-	return why, err
+	return why, nil
 }
 
 func (s *stepSet) closeRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
@@ -892,7 +897,8 @@ func (g turnsGuard) live(ctx context.Context, id string) ([]string, error) {
 }
 
 // Refusal is why the workspace may not be removed. A session whose terminal
-// is closed holds nothing a removal could lose.
+// is closed holds nothing a removal could lose, nor does a dormant one whose
+// orphan lingers: the removal closes its record and ends no process.
 func (g turnsGuard) Refusal(ctx context.Context, id string) (string, error) {
 	handles, err := g.live(ctx, id)
 	if err != nil {
@@ -903,7 +909,7 @@ func (g turnsGuard) Refusal(ctx context.Context, id string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if why != "" && why != turns.RefusalTerminalClosed {
+		if why != "" && why != turns.RefusalTerminalClosed && why != turns.RefusalOrphanLingers {
 			return "session " + h + ": " + why, nil
 		}
 	}
@@ -994,10 +1000,10 @@ func (g turnsGuard) closeCount(ctx context.Context, id, reason string) (int, err
 		if err != nil {
 			return n, err
 		}
-		if why != "" {
+		if why != "" && why != turns.RefusalOrphanLingers {
 			continue
 		}
-		if err := g.e.Turns.CloseSession(ctx, h, reason); err != nil {
+		if err := g.e.Turns.CloseRecord(ctx, h, reason); err != nil {
 			return n, err
 		}
 		n++

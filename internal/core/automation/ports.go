@@ -135,8 +135,9 @@ type Moot struct{ Reason string }
 
 func (m Moot) Error() string { return m.Reason }
 
-// Held is a guard refusing until Until, when the hold ends on its own: the
-// item is skipped with the reason, and the sweep is due again by then.
+// Held is a guard refusing until a hold ends on its own: the item is skipped
+// with the reason, and the sweep is due again by Until; a zero Until is a
+// hold no time ends, checked again on each sweep.
 type Held struct {
 	Reason string
 	Until  time.Time

@@ -8,8 +8,10 @@ import (
 )
 
 // PlanReasons are the plan item reasons strings.toml words, by their English
-// text, which a client reads through its catalog; any other reason reads as
-// the daemon gives it.
+// text. No code reads the list: a client reads every reason through its
+// catalog, and these literals are what internal/archtest counts as the
+// clients reading those keys, since the daemon's guards, which give the
+// reasons, lie outside the packages it scans.
 var PlanReasons = []string{
 	"the task holds no open item",
 	"the task is not derived from items: its items do not close it",
@@ -18,6 +20,8 @@ var PlanReasons = []string{
 	"it has no workspace to find its terminal in: dismiss this",
 	"its process is not proven a lasting orphan",
 	"its process is no longer the orphan the census proved",
+	"its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold",
+	"its process changed while it was being closed",
 }
 
 // PlanItem is one item of the workflows' plan.
