@@ -546,7 +546,8 @@ func match(pred workflow.Predicate, v workflow.Vars) (bool, error) {
 	return pred.Match(v)
 }
 
-// matched are the predicate's reads with their values, sorted by name.
+// matched are the predicate's reads with their values, sorted by name; a duration to the minute, so a clock
+// fact that grows between passes leaves the served plan as it was.
 func matched(pred workflow.Predicate, v workflow.Vars) []workflow.Fact {
 	if pred == nil {
 		return nil
@@ -562,6 +563,9 @@ func matched(pred workflow.Predicate, v workflow.Vars) []workflow.Fact {
 				val = x
 				break
 			}
+		}
+		if d, ok := val.(time.Duration); ok {
+			val = d.Truncate(time.Minute)
 		}
 		out = append(out, workflow.Fact{Name: n, Value: val})
 	}
