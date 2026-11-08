@@ -23,6 +23,16 @@ func TestAPluginLayerWordingThePlanNamesWhereItsWordsMoved(t *testing.T) {
 	}
 }
 
+func TestAnObsoletePlanViewKeepsTheRestOfThePluginLayer(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"plugins/github/ui.toml": "[views.plan]\nlabel = \"Runs\"\n\n[views.mine]\nlabel = \"Mine\"\n"})
+	if _, ok := problemAt(problems, "views.plan", "strings.toml"); !ok {
+		t.Fatalf("problems: %v", problems)
+	}
+	if got := l.UI["github"].Views["mine"].Label; got != "Mine" {
+		t.Errorf("the layer's other words read %q, want the user's Mine", got)
+	}
+}
+
 func TestTheBundledPluginsWordNoPlanView(t *testing.T) {
 	l, problems := loadProfile(t, "en", nil)
 	if len(problems) > 0 {
