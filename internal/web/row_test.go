@@ -67,8 +67,11 @@ func TestARowHasTwoLinesInTheirOrder(t *testing.T) {
 	if want := []string{"glyph", "l1", "meta", "l2", "r2"}; !slices.Equal(got.Children, want) {
 		t.Errorf("the row's slots %q, want %q", got.Children, want)
 	}
-	if want := []string{"verb", "t", "ch"}; !slices.Equal(got.L1, want) {
-		t.Errorf("line 1 holds %q, want %q", got.L1, want)
+	if want := []string{"t", "ch"}; !slices.Equal(got.L1, want) {
+		t.Errorf("line 1 holds %q, want the title leading it, %q", got.L1, want)
+	}
+	if len(got.Meta) == 0 || got.Meta[0] != "Review" {
+		t.Errorf("the meta pieces %q, want the kind first among them", got.Meta)
 	}
 	if want := []string{"ref", "why"}; !slices.Equal(got.L2, want) {
 		t.Errorf("line 2 holds %q, want %q", got.L2, want)
@@ -94,13 +97,13 @@ func TestARowsGlyphIsItsStateAndFiltersByIt(t *testing.T) {
 const g = slot(row, "glyph");
 const button = row.children[0];
 process.stdout.write(JSON.stringify({ Category: g.attrs["data-category"], Title: g.attrs.title, Field: g.attrs["data-field"] || "", Value: g.attrs["data-value"] || "",
-  Button: button.tag === "button" && button.attrs.class === "facet", Kinds: all(slot(row, "l1"), (x) => String(x.attrs.class || "").includes("verb")).map(text) }));`,
+  Button: button.tag === "button" && button.attrs.class === "facet", Kinds: all(slot(row, "meta"), (x) => String(x.attrs.class || "").includes("verb")).map(text) }));`,
 		map[string]any{"task": rowTask(nil)}, &got)
 	if got.Category != "ready" || got.Title != "Next" || got.Field != "state" || got.Value != "next" || !got.Button {
 		t.Errorf("the glyph %+v, want the ready shape titled Next, a button filtering state:next", got)
 	}
 	if slices.Contains(got.Kinds, "Next") {
-		t.Errorf("line 1 repeats the state its glyph draws: %q", got.Kinds)
+		t.Errorf("the kind pieces repeat the state its glyph draws: %q", got.Kinds)
 	}
 }
 
@@ -161,7 +164,7 @@ func TestTheBoardCardUsesTheRowsSlots(t *testing.T) {
 	if got.Card.Tag != "li" || !slices.Contains(strings.Fields(got.Card.Class), "card") {
 		t.Errorf("the card is %s.%s, want li.card", got.Card.Tag, got.Card.Class)
 	}
-	for _, s := range []string{"verb", "open", "ch"} {
+	for _, s := range []string{"open", "ch"} {
 		if !slices.Contains(got.Card.L1, s) {
 			t.Errorf("the card's line 1 %q lacks %s", got.Card.L1, s)
 		}

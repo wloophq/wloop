@@ -213,17 +213,18 @@ const cut = pieces.filter((p) => {
 }).map((p) => p.textContent);
 const more = [...metaEl.querySelectorAll("[data-more]")].map((m) => m.textContent + "|" + (m.getAttribute("title") || ""));
 return JSON.stringify({ Title: r(row.querySelector(".t")).width, Row: r(row).width, L1Right: r(row.querySelector(".l1")).right, MetaLeft: meta.left,
-  VerbRight: r(row.querySelector(".l1 .verb")).right, Acts: acts.length, Whole: whole, Cut: cut, More: more, TitleWhole: row.querySelector(".t").scrollWidth <= row.querySelector(".t").clientWidth + 1 });`
+  KindBesideTitle: !!row.querySelector(".l1 .verb"), KindInMeta: !!metaEl.querySelector(".pieces .verb"), Acts: acts.length, Whole: whole, Cut: cut, More: more, TitleWhole: row.querySelector(".t").scrollWidth <= row.querySelector(".t").clientWidth + 1 });`
 
 type rowBox struct {
-	Title, Row, L1Right, MetaLeft, VerbRight float64
-	Acts, Whole                              int
-	Cut, More                                []string
-	TitleWhole                               bool
+	Title, Row, L1Right, MetaLeft           float64
+	Acts, Whole                             int
+	Cut, More                               []string
+	TitleWhole, KindBesideTitle, KindInMeta bool
 }
 
 // TestTheUsersRowReadsWholeAtEveryWidth lays out the user's row at the widths it is seen at: its title keeps a
-// fair share of the first line, nothing of the first line paints under the meta, no piece of the meta is cut
+// fair share of the first line and leads it, its kind reads with the other pieces of the meta, nothing of the
+// first line paints under the meta, no piece of the meta is cut
 // mid-word, the tags past the first two collapse into a +n chip that names them, and every action it shows
 // shows whole.
 func TestTheUsersRowReadsWholeAtEveryWidth(t *testing.T) {
@@ -242,7 +243,7 @@ func TestTheUsersRowReadsWholeAtEveryWidth(t *testing.T) {
 		if c.width >= 1900 && !box.TitleWhole {
 			t.Errorf("%dpx: the title is cut although the row has room for it: %+v", c.width, box)
 		}
-		if box.Title < share*box.Row || box.L1Right > box.MetaLeft || box.VerbRight > box.MetaLeft || box.Whole != box.Acts || len(box.Cut) > 0 {
+		if box.Title < share*box.Row || box.L1Right > box.MetaLeft || box.KindBesideTitle || !box.KindInMeta || box.Whole != box.Acts || len(box.Cut) > 0 {
 			t.Errorf("%dpx list in a %dpx window: %+v", c.width, c.viewport, box)
 		}
 		if c.viewport > 900 && box.Acts == 0 {

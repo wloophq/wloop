@@ -105,17 +105,15 @@ function draftMark(e) {
   return h("span", { class: "draft-mark", role: "img", title: label, "aria-label": label }, fmtNumber(n));
 }
 
-// rowLine1 is a row's first line: what it is and what it is called. A card's title, the control that opens
-// it, leads so that it is the card's first stop.
-function rowLine1(m, lens, title, card) {
-  const verbs = pieceButtons(m, lens, "kind");
-  return h("div", { class: "l1" }, m.pre || null, card ? [title, verbs] : [verbs, title], rowChanged(m), m.draftMark || null);
+// rowLine1 is a row's first line: its title, which leads it, the dot of a change and its drafts' marker.
+function rowLine1(m, title) {
+  return h("div", { class: "l1" }, m.pre || null, title, rowChanged(m), m.draftMark || null);
 }
 
-// rowRight1 is the right side of a row's first line: its meta and flag pieces, then its actions.
+// rowRight1 is the right side of a row's first line: its kind, meta and flag pieces, then its actions.
 function rowRight1(m, lens, card) {
   return h("div", { class: "meta" },
-    h("span", { class: "pieces" }, pieceButtons(m, lens, "meta"), m.meta || null, pieceButtons(m, lens, "flag"), m.flags || null),
+    h("span", { class: "pieces" }, pieceButtons(m, lens, "kind"), pieceButtons(m, lens, "meta"), m.meta || null, pieceButtons(m, lens, "flag"), m.flags || null),
     card || !m.actions ? null : h("span", { class: "acts" }, m.actions));
 }
 
@@ -152,7 +150,7 @@ function rowView(m, lens, opts = {}) {
     const at = { class: "open", "data-focus": m.scope, "data-rove": "", title: m.tip || undefined, "aria-current": m.selected ? "true" : undefined };
     const title = m.open ? h("button", { type: "button", ...at, onclick: m.open }, label) : m.href ? h("a", { ...at, href: m.href }, label) : label;
     return h("li", { class: cls, "data-row": m.scope, onkeydown: roveKey },
-      rowLine1(m, lens, title, true), rowGlyph(m, lens), rowRight1(m, lens, true), rowLine2(m, lens), right2, m.after || null);
+      rowLine1(m, title), rowGlyph(m, lens), rowRight1(m, lens, true), rowLine2(m, lens), right2, m.after || null);
   }
   const open = m.open;
   return h("div", {
@@ -171,7 +169,7 @@ function rowView(m, lens, opts = {}) {
         open();
       }
     },
-  }, rowGlyph(m, lens), rowLine1(m, lens, rowTitle(m, lens), false), rowRight1(m, lens, false), rowLine2(m, lens), right2,
+  }, rowGlyph(m, lens), rowLine1(m, rowTitle(m, lens)), rowRight1(m, lens, false), rowLine2(m, lens), right2,
   [m.after].flat().some(Boolean) ? h("div", { class: "after" }, m.after) : null);
 }
 
