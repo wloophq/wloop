@@ -536,7 +536,10 @@ func TestADeadlineSurvivesAMachineSleep(t *testing.T) {
 			cancel()
 			<-exited
 		})
-		waitFor(t, func() bool { return clk.armed() > 0 })
+		synctest.Wait()
+		if clk.armed() == 0 {
+			t.Fatal("wait armed no timer")
+		}
 		clk.sleep(13 * time.Hour)
 		clk.run(waitSlice)
 		select {
