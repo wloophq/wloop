@@ -105,6 +105,7 @@ func FactsOf(in Input) []src.Fact {
 		add("pr.closed_at", src.Time(p.ClosedAt))
 	}
 	add("pr.draft", src.Bool(p.IsDraft))
+	add("pr.changed_files", src.Int(int64(p.ChangedFiles)))
 	add("pr.head", src.String(p.HeadOid))
 	if p.Mergeable == "CONFLICTING" && !p.MergeableAt.IsZero() {
 		add("pr.conflicting_for", src.Since(p.MergeableAt))

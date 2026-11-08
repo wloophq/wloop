@@ -287,6 +287,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. Test with `> timestamp(0)`. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
 | `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
+| `pr.changed_files` | int | How many files the pull request changes, as GitHub last reported it; 0 when not read. |
 | `pr.head` | string | The head commit's oid. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |

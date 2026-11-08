@@ -12,7 +12,7 @@ import (
 
 // workflowTable is the plan's workflow fact table: slot, then name:type pairs.
 var workflowTable = map[string]string{
-	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B " +
+	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B changed_files:I head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B " +
 		"has_workspace:B stale:B open_turn:S open_turn_seq:I orphan_answer_id:I review.action:S review.reason:S review.observed:B " +
 		"first.due:B first.reason:S address.due:B address.reason:S address.reviewers:L address.checks:L address.conflict:B address.observed:B " +
 		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S " +
