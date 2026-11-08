@@ -94,7 +94,7 @@ func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.It
 // key facts moved, or its source moved and it is stale.
 func (e *Engine) invalid(ctx context.Context, w workflow.Workflow, it workflow.Item, facts workflow.Facts, byHand bool) (string, error) {
 	if keyMoved(w, it, facts) {
-		return "its unit changed since it was planned", nil
+		return workflow.ReasonSinceUnit, nil
 	}
 	moved, err := e.sourceMoved(ctx, it)
 	if err != nil {
@@ -108,7 +108,7 @@ func (e *Engine) invalid(ctx context.Context, w workflow.Workflow, it workflow.I
 
 // whyMoved refuses an item of a workflow no longer loaded whose source moved
 // since it was planned.
-const whyMoved = "its source moved since it was planned"
+const whyMoved = workflow.ReasonSinceSource
 
 // sourceMoved says whether it's unit was reported again since the last
 // sweep planned it, as the sweep checks before it runs an item; an item

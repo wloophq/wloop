@@ -558,7 +558,7 @@ func TestAWaitRuleMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
 	r.steps.Refuse("workspace.remove", s1, refusal)
 	r.steps.Refuse("workspace.remove", s2, refusal)
 	r.sweep()
-	if it := r.mustItem("finished", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
+	if it := r.mustItem("finished", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "waits for you while session.dirty true: "+refusal {
 		t.Errorf("wait rule item = %+v", it)
 	}
 	if it := r.mustItem("finished", s2); it.Decision != workflow.DecisionBlocked {
@@ -585,10 +585,10 @@ func TestAWaitNamesWhatItWaitsOn(t *testing.T) {
 	refusal := "3 commits not pushed in /w; back them up with: git push origin HEAD:refs/heads/me/backup-b"
 	r.steps.Refuse("workspace.remove", s2, refusal)
 	r.sweep()
-	if it := r.mustItem("finished", s1); it.Reason != "session.pendency [turn asked unanswered]" {
+	if it := r.mustItem("finished", s1); it.Reason != "waits for you while session.pendency [turn asked unanswered]" {
 		t.Errorf("a wait with no refusal: %q", it.Reason)
 	}
-	if it := r.mustItem("finished", s2); it.Reason != "session.pendency [modified files, commits on no remote], session.dirty 1: "+refusal {
+	if it := r.mustItem("finished", s2); it.Reason != "waits for you while session.pendency [modified files, commits on no remote], session.dirty 1: "+refusal {
 		t.Errorf("a wait over a refusal: %q", it.Reason)
 	}
 }
@@ -630,7 +630,7 @@ func TestRunRulesAreFirstMatch(t *testing.T) {
 	if it := r.mustItem("shadowed", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {
 		t.Errorf("a run rule before a wait rule shadows it: %+v", it)
 	}
-	if it := r.mustItem("waits", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
+	if it := r.mustItem("waits", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "waits for you while session.dirty true: "+refusal {
 		t.Errorf("a matched wait rule holds a refused item: %+v", it)
 	}
 	if it := r.mustItem("table-wait", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {

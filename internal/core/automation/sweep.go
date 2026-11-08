@@ -104,7 +104,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	runs = e.revalidate(ctx, ev, runs, &t)
 	runs = e.drop(runs, &t, func(pl *planned) string {
 		if holds(pause, pl.w.Slot, pl.facts) {
-			return "paused since it was planned"
+			return workflow.ReasonSincePaused
 		}
 		return ""
 	})
@@ -324,16 +324,16 @@ func (e *Engine) stale(ctx context.Context, w workflow.Workflow, it workflow.Ite
 		}
 	}
 	if ok, err := match(w.When, vars); err != nil || !ok {
-		return "it no longer matches since it was planned", nil
+		return workflow.ReasonSinceUnmatched, nil
 	}
 	if keyMoved(w, it, facts) {
-		return "its unit changed since it was planned", nil
+		return workflow.ReasonSinceUnit, nil
 	}
 	if byHand {
 		return "", nil
 	}
 	if rule, err := matchedRule(w.Approval, vars); err != nil || rule != nil && rule.Mode == workflow.ApprovalWait {
-		return "it waits for you since it was planned", nil
+		return workflow.ReasonSinceWaits, nil
 	}
 	return "", nil
 }
@@ -346,8 +346,11 @@ func (e *Engine) settled(ctx context.Context, it workflow.Item) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	if ok && (run.Status == workflow.RunDone || run.Status == workflow.RunDismissed) {
-		return "it was " + string(run.Status) + " since it was planned", nil
+	switch {
+	case ok && run.Status == workflow.RunDone:
+		return workflow.ReasonSinceDone, nil
+	case ok && run.Status == workflow.RunDismissed:
+		return workflow.ReasonSinceDismissed, nil
 	}
 	stored, err := e.Ledger.Items(ctx, Filter{ID: it.ID})
 	if err != nil {
@@ -355,9 +358,9 @@ func (e *Engine) settled(ctx context.Context, it workflow.Item) (string, error) 
 	}
 	switch {
 	case len(stored) == 0:
-		return "it left the plan since it was planned", nil
+		return workflow.ReasonSinceLeft, nil
 	case stored[0].Decision != workflow.DecisionRun:
-		return "it was acted on since it was planned", nil
+		return workflow.ReasonSinceActed, nil
 	}
 	return "", nil
 }
