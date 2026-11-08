@@ -261,6 +261,16 @@ func TestCloseRefusesNoAgent(t *testing.T) {
 	e.refuses(t, turns.RefusalTerminalClosed)
 }
 
+func TestCloseOfASessionWithNoWorkspaceSaysSo(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	nowhere := quietSession("term_1")
+	nowhere.WorkspaceID = ""
+	cleanupCase{sess: nowhere}.put(reg, store, sess)
+	if why, err := s.CloseRefusal(context.Background(), "term_1"); err != nil || why != turns.RefusalNoWorkspace {
+		t.Fatalf("refusal %q %v", why, err)
+	}
+}
+
 func TestCloseOfAGoneOrClosedSessionIsGone(t *testing.T) {
 	s, store, reg, sess, _ := newService(t)
 	closed := quietSession("term_1")

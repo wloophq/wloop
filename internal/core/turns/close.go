@@ -11,10 +11,10 @@ import (
 )
 
 // MarkDormant records that the session's process is gone: its manager no
-// longer lists it, or lists it orphaned, which it then closes. The session
-// stays open, and its manager can wake it. It refuses a session the manager
-// still lists live in any state, one with no workspace, and a manager that
-// cannot list completely.
+// longer lists it. The session stays open, and its manager can wake it. It
+// refuses a session the manager still lists in any state, orphaned included,
+// one with no workspace, and a manager that cannot list completely. It ends
+// no process.
 func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	sess, ok, err := s.Registry.Session(ctx, id)
 	if err != nil {
@@ -37,13 +37,8 @@ func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	if !census.CompleteOf(sess.Manager) {
 		return Refusal{Reason: "its manager's process list is incomplete"}
 	}
-	if census.Live(id) {
+	if _, listed := census.Sessions[id]; listed {
 		return Refusal{Reason: "the session's process is still listed"}
-	}
-	if census.Orphaned[id] {
-		if err := s.Sessions.Close(ctx, id); err != nil {
-			return err
-		}
 	}
 	s.mu.Lock()
 	cur, ok, err := s.Registry.Session(ctx, id)
@@ -70,11 +65,14 @@ func withoutHandle(sess turn.Session) turn.Session {
 }
 
 // The close refusals of a session whose terminal runs no agent. A closed
-// terminal clears on its own, as the census marks the session dormant; an
-// open one waits for the user.
+// terminal clears on its own: the census marks the session dormant once its
+// process is gone, and a process left orphaned is ended by the profile's
+// session.close_orphan step. An open one, or a session with no workspace to
+// look for one in, waits for the user.
 const (
 	RefusalTerminalClosed = "its terminal is closed; it ends on its own"
 	RefusalNoAgent        = "its terminal is open with no agent in it: close that terminal, or dismiss this"
+	RefusalNoWorkspace    = "it has no workspace to find its terminal in: dismiss this"
 )
 
 // CloseRefusal is why session.close may not close the handle's session, ""
@@ -115,6 +113,9 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 	}
 	if sess.State() == turn.SessionDormant {
 		return "", promptWindow{sess: sess}, nil
+	}
+	if sess.WorkspaceID == "" {
+		return RefusalNoWorkspace, promptWindow{}, nil
 	}
 	agent, shown, has, focused, err := s.agentNow(ctx, sess)
 	switch {
@@ -220,13 +221,10 @@ func (s *Service) sessionTurns(ctx context.Context, handle string) (handleTurns,
 	return out, nil
 }
 
-// agentNow is the session's agent as the manager lists it, whether the app
-// shows its terminal, and whether its workspace is the one open in the app. A
-// session with no workspace counts as shown, as nothing can tell otherwise.
+// agentNow is the session's agent as the manager lists it in the session's
+// workspace, whether the app shows its terminal, and whether its workspace is
+// the one open in the app.
 func (s *Service) agentNow(ctx context.Context, sess turn.Session) (a AgentObservation, shown, has, focused bool, err error) {
-	if sess.WorkspaceID == "" {
-		return AgentObservation{}, true, false, false, nil
-	}
 	agents, err := s.Sessions.Agents(ctx)
 	if err != nil {
 		return AgentObservation{}, false, false, false, err

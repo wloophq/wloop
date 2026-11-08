@@ -3,6 +3,7 @@
 package turnstest
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"sync"
@@ -35,6 +36,8 @@ type Sessions struct {
 	partial   bool
 	refreshes int
 	orphaned  map[string]bool
+	epoch     string
+	at        time.Time
 }
 
 var (
@@ -148,20 +151,29 @@ func (s *Sessions) Terminals(_ context.Context, workspaceID string) ([]turns.Ter
 }
 
 // Census lists every terminal Put holds, complete unless Partial was called,
-// with those Orphan named orphaned.
+// those Orphan named orphaned with their last output, read in the epoch and at
+// the time SetReading set ("e1" and the caller's clock by default).
 func (s *Sessions) Census(context.Context) (turns.Census, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	c := turns.Census{Sessions: map[string]string{}, Complete: !s.partial, RuntimeID: "fake", Orphaned: map[string]bool{}}
+	c := turns.Census{Sessions: map[string]string{}, Complete: !s.partial, RuntimeID: "fake", Epoch: cmp.Or(s.epoch, "e1"), At: s.at,
+		Orphans: map[string]time.Time{}}
 	for ws, ts := range s.terminals {
 		for _, t := range ts {
 			c.Sessions[t.Session] = ws
 			if s.orphaned[t.Session] {
-				c.Orphaned[t.Session] = true
+				c.Orphans[t.Session] = t.LastOutput
 			}
 		}
 	}
 	return c, s.readErr
+}
+
+// SetReading makes Census read in epoch at at.
+func (s *Sessions) SetReading(epoch string, at time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.epoch, s.at = epoch, at
 }
 
 // Orphan makes the sessions' terminals orphaned: the census lists them, and

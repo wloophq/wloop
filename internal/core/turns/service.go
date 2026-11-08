@@ -37,6 +37,9 @@ type Service struct {
 	Notices Notices
 	// FastJob is the configured interval of the fast job Reconcile runs on.
 	FastJob time.Duration
+	// OrphanAfter is how long a process stays orphaned, with no output, before
+	// OrphanDurable holds without a renderer restart; zero is DefaultOrphanAfter.
+	OrphanAfter time.Duration
 	// AgentFor is the agent the sessions of the unit's project run, the
 	// top-level kind for the zero unit, nil for none; with nil, a session_closed
 	// line names no resume command.
@@ -70,6 +73,8 @@ type Service struct {
 	mu       sync.Mutex
 	doneSeen map[string]time.Time
 	goneSeen map[string]goneMark
+	// orphanSeen is the active sessions the censuses list orphaned.
+	orphanSeen map[string]orphanMark
 	// gone is the sessions the last Census found missing long enough.
 	gone map[string]bool
 	// typing counts the lines being typed into each handle.

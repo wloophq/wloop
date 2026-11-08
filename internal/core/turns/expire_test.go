@@ -196,51 +196,136 @@ func TestAListedSessionIsNotGone(t *testing.T) {
 	}
 }
 
-// orphaned is a complete census listing every handle, those named in orphans orphaned.
-func (s *scripted) orphaned(at time.Time, runtime string, listed []string, orphans ...string) {
+// orphaned is a complete census in epoch listing every handle, those in
+// orphans orphaned with output last at lastOut.
+func (s *scripted) orphaned(at time.Time, runtime, epoch string, lastOut time.Time, listed []string, orphans ...string) {
 	s.complete(at, runtime, listed...)
-	s.reading.Orphaned = map[string]bool{}
+	s.reading.Epoch = epoch
+	s.reading.Orphans = map[string]time.Time{}
 	for _, h := range orphans {
-		s.reading.Orphaned[h] = true
+		s.reading.Orphans[h] = lastOut
 	}
 }
 
-func TestAnOrphanedProcessIsGoneAfterTwoReadings(t *testing.T) {
-	s, reg, sc, _ := expireService(t, "term_1", "term_2")
-	listed := []string{"term_1", "term_2"}
-	sc.orphaned(t0, "rt", listed, "term_1")
-	if got := gone(t, s, reg); len(got) != 0 {
-		t.Fatalf("one reading found %v gone", got)
+// durable runs a census and names the open sessions it proves durable orphans.
+func durable(t *testing.T, s *turns.Service, reg *turnstest.Registry) []string {
+	t.Helper()
+	if err := s.Census(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	sc.orphaned(t0.Add(s.FastJob), "rt", listed, "term_1")
-	if got := gone(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
-		t.Fatalf("gone %v, want the orphaned term_1", got)
+	var out []string
+	for _, h := range openHandles(t, reg) {
+		if s.OrphanDurable(h) {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+func TestAnOrphanedProcessIsNeverGone(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1")
+	for i := range 4 {
+		sc.orphaned(t0.Add(time.Duration(i)*s.FastJob), "rt", "e1", t0.Add(-time.Hour), []string{"term_1"}, "term_1")
+		if got := gone(t, s, reg); len(got) != 0 {
+			t.Fatalf("reading %d found the orphaned %v gone", i, got)
+		}
 	}
 }
 
-func TestARestartThatOrphansEveryProcessForAWhileMarksNothingGone(t *testing.T) {
+func TestAnOrphanThatOutlivesARendererRestartIsDurable(t *testing.T) {
 	s, reg, sc, _ := expireService(t, "term_1")
 	listed := []string{"term_1"}
-	sc.orphaned(t0, "rt-a", listed)
-	gone(t, s, reg)
-	sc.orphaned(t0.Add(s.FastJob), "rt-b", listed, "term_1")
-	if got := gone(t, s, reg); len(got) != 0 {
-		t.Fatalf("the first reading after a restart found %v gone", got)
+	sc.orphaned(t0, "rt", "e1", t0.Add(-time.Hour), listed, "term_1")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("one reading proved %v", got)
 	}
-	sc.orphaned(t0.Add(2*s.FastJob), "rt-b", listed)
-	if got := gone(t, s, reg); len(got) != 0 {
-		t.Fatalf("a reattached process is gone: %v", got)
+	sc.orphaned(t0.Add(s.FastJob), "rt", "e2", t0.Add(-time.Hour), listed, "term_1")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("the first reading of a new epoch proved %v", got)
 	}
-	sc.orphaned(t0.Add(3*s.FastJob), "rt-b", listed)
-	if got := gone(t, s, reg); len(got) != 0 {
-		t.Fatalf("reattaching cleared no mark: gone %v", got)
+	sc.orphaned(t0.Add(2*s.FastJob), "rt", "e2", t0.Add(-time.Hour), listed, "term_1")
+	if got := durable(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
+		t.Fatalf("durable %v, want term_1 once e2 held for FastJob", got)
+	}
+}
+
+func TestARendererRestartThatReattachesLazilyProvesNoOrphan(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1", "term_2")
+	listed := []string{"term_1", "term_2"}
+	old := t0.Add(-3 * time.Hour)
+	sc.orphaned(t0, "rt", "e1", old, listed)
+	durable(t, s, reg)
+	sc.orphaned(t0.Add(s.FastJob), "rt", "e2", old, listed, "term_1", "term_2")
+	durable(t, s, reg)
+	sc.orphaned(t0.Add(2*s.FastJob), "rt", "e2", old, listed, "term_2")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("a process not yet reclaimed after a renderer restart is durable: %v", got)
+	}
+	sc.orphaned(t0.Add(3*s.FastJob), "rt", "e2", old, listed, "term_2")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("still unreclaimed a little later: %v", got)
+	}
+	sc.orphaned(t0.Add(4*s.FastJob), "rt", "e2", old, listed)
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("after reattaching: %v", got)
+	}
+}
+
+func TestAnOrphanQuietForTheLongWindowIsDurable(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1", "term_2")
+	listed := []string{"term_1", "term_2"}
+	sc.orphaned(t0, "rt", "e1", t0.Add(-3*time.Hour), listed, "term_1")
+	durable(t, s, reg)
+	sc.orphaned(t0.Add(turns.DefaultOrphanAfter-time.Minute), "rt", "e1", t0.Add(-3*time.Hour), listed, "term_1")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("before the window: %v", got)
+	}
+	sc.orphaned(t0.Add(turns.DefaultOrphanAfter), "rt", "e1", t0.Add(-3*time.Hour), listed, "term_1")
+	if got := durable(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
+		t.Fatalf("durable %v, want term_1 past the window", got)
+	}
+
+	s, reg, sc, _ = expireService(t, "term_1")
+	sc.orphaned(t0, "rt", "e1", t0.Add(-3*time.Hour), []string{"term_1"}, "term_1")
+	durable(t, s, reg)
+	sc.orphaned(t0.Add(turns.DefaultOrphanAfter), "rt", "e1", t0.Add(time.Minute), []string{"term_1"}, "term_1")
+	if got := durable(t, s, reg); len(got) != 0 {
+		t.Fatalf("an orphan that printed since it was seen is durable: %v", got)
+	}
+}
+
+func TestAReadingThatCannotProveAnOrphanProvesNone(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		set  func(sc *scripted, at time.Time)
+	}{
+		{"no epoch", func(sc *scripted, at time.Time) {
+			sc.orphaned(at, "rt", "", t0.Add(-3*time.Hour), []string{"term_1"}, "term_1")
+		}},
+		{"incomplete", func(sc *scripted, at time.Time) {
+			sc.orphaned(at, "rt", "e1", t0.Add(-3*time.Hour), []string{"term_1"}, "term_1")
+			sc.reading.Complete = false
+		}},
+		{"a new runtime each time", func(sc *scripted, at time.Time) {
+			sc.orphaned(at, at.String(), "e1", t0.Add(-3*time.Hour), []string{"term_1"}, "term_1")
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s, reg, sc, _ := expireService(t, "term_1")
+			for i := range 4 {
+				c.set(sc, t0.Add(time.Duration(i)*turns.DefaultOrphanAfter))
+				if got := durable(t, s, reg); len(got) != 0 {
+					t.Fatalf("reading %d proved %v", i, got)
+				}
+			}
+		})
 	}
 }
 
 func TestACensusWakesNoDormantSessionWhoseProcessIsOrphaned(t *testing.T) {
 	s, reg, sc, _ := expireService(t)
 	reg.Put(turn.Session{ID: "term_1", WorkspaceID: cleanupWS, StartedAt: t0.Add(-time.Hour), Manager: "orca"})
-	sc.orphaned(t0, "rt", []string{"term_1"}, "term_1")
+	sc.orphaned(t0, "rt", "e1", time.Time{}, []string{"term_1"}, "term_1")
 	sc.reading.Processes = map[string]turns.ProcessRef{"term_1": {Manager: "orca", Handle: "term_1"}}
 	if err := s.Census(context.Background()); err != nil {
 		t.Fatal(err)

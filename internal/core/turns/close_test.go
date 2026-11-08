@@ -48,18 +48,20 @@ func TestMarkDormantLeavesAGoneOneOpenWithoutItsHandle(t *testing.T) {
 	}
 }
 
-func TestMarkDormantClosesTheOrphanedProcessLeftBehind(t *testing.T) {
+func TestMarkDormantRefusesAnOrphanedProcessAndEndsNone(t *testing.T) {
 	s, store, reg, sess, _ := newService(t)
-	cleanupCase{sess: loopSession("term_1")}.put(reg, store, sess)
+	c := cleanupCase{sess: loopSession("term_1"), turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "r1", Trigger: turn.Automated,
+		State: turn.Started, Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-time.Minute), StartedAt: t0.Add(-time.Minute)}}, state: turn.AgentWorking}
+	c.put(reg, store, sess)
 	sess.Orphan("term_1")
-	if err := s.MarkDormant(context.Background(), "term_1"); err != nil {
-		t.Fatal(err)
+	if err := s.MarkDormant(context.Background(), "term_1"); !refusal(err, "the session's process is still listed") {
+		t.Fatalf("MarkDormant = %v", err)
 	}
-	if got, _, _ := reg.Session(context.Background(), "term_1"); got.State() != turn.SessionDormant {
-		t.Fatalf("session %+v, want dormant", got)
+	if got, _, _ := reg.Session(context.Background(), "term_1"); got.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want active", got)
 	}
-	if closed := sess.Closed(); len(closed) != 1 || closed[0] != "term_1" {
-		t.Fatalf("closed %v, want the orphaned term_1", closed)
+	if closed := sess.Closed(); len(closed) != 0 {
+		t.Fatalf("closed %v: a census-driven step killed a working agent's process", closed)
 	}
 }
 
