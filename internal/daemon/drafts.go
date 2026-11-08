@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -552,8 +553,8 @@ func (s *Server) itemsOnce(ctx context.Context, byUnit map[unit.Unit][]items.Ite
 }
 
 // draftWhere is where a draft still to be posted goes, best effort: "" when its publisher cannot tell.
-// A unit and target never change, so a resolved destination is kept for the daemon's life; a failed lookup, or one
-// the page had no time left for, is kept for draftWhereRetry.
+// A unit and target never change, so a resolved destination is kept while pages keep reading it; a failed lookup,
+// or one the page had no time left for, is kept for draftWhereRetry. keepLookup forgets what went unread that long.
 func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 	if !slices.Contains(draft.Open, d.State) && d.State != draft.Failed {
 		return ""
@@ -561,8 +562,12 @@ func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 	now := time.Now()
 	if c, ok := s.draftWheres.Load(d.ID); ok {
 		w := c.(whereSeen)
-		if w.where != "" || now.Sub(w.failedAt) < draftWhereRetry {
+		if w.where != "" {
+			s.keepLookup(&s.draftWheres, d.ID, whereSeen{where: w.where, at: now}, now)
 			return w.where
+		}
+		if now.Sub(w.at) < draftWhereRetry {
+			return ""
 		}
 	}
 	loc := s.locator(s.publisherOf(d))
@@ -574,23 +579,50 @@ func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 		by = page
 	}
 	if !now.Before(by) {
-		s.draftWheres.Store(d.ID, whereSeen{failedAt: now})
+		s.keepLookup(&s.draftWheres, d.ID, whereSeen{at: now}, now)
 		return ""
 	}
 	ctx, cancel := context.WithDeadline(ctx, by)
 	defer cancel()
 	w, err := loc.Where(ctx, d)
 	if err != nil || w == "" {
-		s.draftWheres.Store(d.ID, whereSeen{failedAt: time.Now()})
+		s.keepLookup(&s.draftWheres, d.ID, whereSeen{at: time.Now()}, now)
 		return ""
 	}
-	s.draftWheres.Store(d.ID, whereSeen{where: w})
+	s.keepLookup(&s.draftWheres, d.ID, whereSeen{where: w, at: now}, now)
 	return w
 }
 
+// whereSeen is a destination its publisher resolved and when a page last read it, or, with no where, when the
+// lookup failed.
 type whereSeen struct {
-	where    string
-	failedAt time.Time
+	where string
+	at    time.Time
+}
+
+// keepLookup stores v under key in m, and at most once each draftWhereRetry forgets every draft destination and
+// reply broadcast older than that, so neither cache outgrows what pages read.
+func (s *Server) keepLookup(m *sync.Map, key, v any, now time.Time) {
+	m.Store(key, v)
+	last := s.lookupsSwept.Load()
+	if now.UnixNano()-last < int64(draftWhereRetry) || !s.lookupsSwept.CompareAndSwap(last, now.UnixNano()) {
+		return
+	}
+	for _, c := range []*sync.Map{&s.draftWheres, &s.replyBroadcasts} {
+		c.Range(func(k, v any) bool {
+			var at time.Time
+			switch v := v.(type) {
+			case whereSeen:
+				at = v.at
+			case broadcastSeen:
+				at = v.at
+			}
+			if now.Sub(at) >= draftWhereRetry {
+				c.Delete(k)
+			}
+			return true
+		})
+	}
 }
 
 type whereByKey struct{}

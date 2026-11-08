@@ -165,3 +165,28 @@ func TestAnAmendOfTextAndBroadcastChangesBothOrNeither(t *testing.T) {
 		t.Fatalf("the first gate %+v", old)
 	}
 }
+
+func TestBroadcastOfIsWhatProposingWouldPlaceAndStoresNothing(t *testing.T) {
+	e := newEnv()
+	if b, err := e.svc.BroadcastOf(ctx, reply("done")); err != nil || b != draft.NoBroadcast {
+		t.Fatalf("a publisher that places nothing: %q %v", b, err)
+	}
+	pl := withPlacer(e, "msg:D000AAA/1700000000.000100")
+	pl.broadcast = draft.BroadcastOn
+	p := reply("done")
+	p.Unit, p.Items = segment, []string{"i1"}
+	b, err := e.svc.BroadcastOf(ctx, p)
+	if err != nil || b != draft.BroadcastOn {
+		t.Fatalf("broadcast %q %v", b, err)
+	}
+	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || pl.asked[0].Delivery != draft.Message || pl.asked[0].Kind != draft.Reply {
+		t.Fatalf("asked %+v", pl.asked)
+	}
+	if ds, _ := e.svc.Store.List(ctx, Filter{}); len(ds) != 0 {
+		t.Fatalf("stored %+v", ds)
+	}
+	pl.refuse = errBoom
+	if _, err := e.svc.BroadcastOf(ctx, p); !errors.Is(err, errBoom) {
+		t.Fatalf("a refused placement: %v", err)
+	}
+}

@@ -1,11 +1,12 @@
 "use strict";
 
 // taskState is what the task page holds beside the task: its timeline's facts, the kinds it is narrowed to and every
-// kind seen, the composer's text, a run's transcript, the drafts that wait on it and the tab picked.
-const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", sending: false, transcript: null, drafts: [], tab: "" };
+// kind seen, the composer's text and whether its reply also goes to the conversation (null: as served), a run's
+// transcript, the drafts that wait on it and the tab picked.
+const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", broadcast: null, sending: false, transcript: null, drafts: [], tab: "" };
 
 function resetTaskPage(id) {
-  Object.assign(taskState, { id, timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [] });
+  Object.assign(taskState, { id, timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", broadcast: null, transcript: null, drafts: [] });
   resetGates();
 }
 
@@ -327,12 +328,31 @@ async function replyWith(e, verb, send) {
     detailEnv.notice(t("Write a message first"), true);
     return null;
   }
-  const out = await taskAct(e, verb, { kind: "reply", text, send });
+  const args = { kind: "reply", text, send };
+  if (e.reply_broadcast) args.broadcast = String(replyBroadcasts(e));
+  const out = await taskAct(e, verb, args);
   if (out) {
     taskState.text = "";
+    taskState.broadcast = null;
     detailEnv.render();
   }
   return out;
+}
+
+// replyBroadcasts says whether e's reply also goes to the conversation: as the composer's checkbox was turned, else
+// as served.
+function replyBroadcasts(e) {
+  return taskState.broadcast === null ? e.reply_broadcast === "on" : taskState.broadcast;
+}
+
+// replyBroadcastToggle is the checkbox that also posts the composer's reply to the conversation, offered when the
+// daemon serves e.reply_broadcast: the reply goes in a thread that can.
+function replyBroadcastToggle(e) {
+  if (!e.reply_broadcast) return null;
+  return h("label", { class: "meta broadcast" },
+    h("input", { type: "checkbox", checked: replyBroadcasts(e), "data-focus": "task:compose:broadcast",
+      onchange: (ev) => { taskState.broadcast = !!ev.target.checked; detailEnv.render(); } }),
+    " ", t("Also send to the conversation"));
 }
 
 // taskComposer writes to the task's agent: Send, the default that Ctrl+Enter
@@ -356,6 +376,7 @@ function taskComposer(e) {
         if (ev.preventDefault) ev.preventDefault();
         sendChat(e);
       } }, taskState.text),
+    replyBroadcastToggle(e),
     h("div", { class: "d-actions" },
       h("button", { type: "button", class: "act primary", "data-focus": "task:compose:send", onclick: () => sendChat(e) }, t("Send")),
       ...replies));

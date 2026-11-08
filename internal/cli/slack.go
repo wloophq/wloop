@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -238,7 +239,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, args []string) e
 	if err != nil {
 		return err
 	}
-	if (req.Thread == nil || *req.Thread) && !req.Broadcast {
+	if req.Thread == nil || *req.Thread {
 		u, ok, err := c.ResolveUnit(ctx, req.Target)
 		if err != nil {
 			return err
@@ -270,6 +271,9 @@ func (e *Env) slackSendDraft(ctx context.Context, c *client.Client, u unit.Unit,
 		return nil
 	}
 	cr := api.DraftCreate{Unit: u, Kind: api.DraftReply, Text: req.Text, Target: req.Target, Source: string(dturn.Terminal)}
+	if req.Broadcast {
+		cr.Broadcast = string(draft.BroadcastOn)
+	}
 	return e.sendUserDraft(ctx, c, cr, yes, ready, false)
 }
 

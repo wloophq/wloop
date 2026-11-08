@@ -305,6 +305,10 @@ type TaskView struct {
 	MergedFrom []TaskRef `json:"merged_from,omitempty"`
 	// Drafts are the ids of the task's pending drafts (held or failed), ascending.
 	Drafts []int64 `json:"drafts"`
+	// ReplyBroadcast is "on" or "off" when a reply the user writes on the task would reply in a thread that can
+	// also post to its conversation, as its publisher would place it, which the reply verb's broadcast argument
+	// turns; "" otherwise. Detail only.
+	ReplyBroadcast string `json:"reply_broadcast,omitempty"`
 }
 
 // TaskRef is another task as a task's page names it: its id, title and state; Merged says it is merged

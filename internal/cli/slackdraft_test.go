@@ -453,6 +453,30 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 }
 
+func TestSlackSendBroadcastToAThreadGoesThroughTheOutbox(t *testing.T) {
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	d := w.deps
+	d.Startup = nil
+	w.te.Socket = serveSocket(t, daemon.New(d).Handler())
+	wait := postWait
+	postWait = 10 * time.Millisecond
+	t.Cleanup(func() { postWait = wait })
+	if code := w.te.run("slack", "send", sessChannel+"/"+sessReply, "heads up, all", "--broadcast", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 queued") {
+		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
+	}
+	ds := w.drafts(t)
+	if len(ds) != 1 || ds[0].Broadcast != draft.BroadcastOn || ds[0].Origin.Kind != draft.OriginUser {
+		t.Fatalf("drafts %+v", ds)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v", sent, err)
+	}
+	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("thread_ts") != sessParent || posts[0].Get("reply_broadcast") != "true" {
+		t.Fatalf("posts %v", posts)
+	}
+}
+
 func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T) {
 	w := newSessionWiring(t)
 	ctx := context.Background()

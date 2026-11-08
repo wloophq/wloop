@@ -967,6 +967,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 			return api.TaskView{}, err
 		}
 		v.Runs = runs
+		v.ReplyBroadcast = ev.s.replyBroadcast(ctx, e)
 	}
 	v.Attention = ev.attention(ctx, e)
 	v.Verbs = ev.verbs(ctx, e)
