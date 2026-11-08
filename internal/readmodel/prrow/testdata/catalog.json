@@ -1,5 +1,5 @@
 {
-  "version": "ec5916df7add",
+  "version": "85d922ffdbd7",
   "views": [
     {
       "id": "mine",
@@ -809,8 +809,7 @@
       "key": "review",
       "label": "review",
       "values": {
-        "approved": "approved",
-        "changes_requested": "changes requested"
+        "approved": "approved"
       }
     },
     {
