@@ -102,7 +102,10 @@ function taskProps(e) {
   if (b.risk) rows.push([risk ? risk.label : t("Risk"), [h("span", { class: "risk-" + b.risk }, propText(b.risk, risk)), b.risk_why ? " · " + b.risk_why : null], { "data-prop": "brief:risk" }]);
   if (b.size) rows.push([size ? size.label : t("Size"), propText(b.size, size), { "data-prop": "brief:size" }]);
   for (const c of e.cards || []) {
-    for (const g of (c.card || {}).signals || []) rows.push([g.key, g.at ? fmtDate(g.at, "datetime") : g.value, { class: "tone-" + (g.tone || "neutral") }]);
+    for (const g of (c.card || {}).signals || []) {
+      const w = signalWords(((c.card || {}).unit || {}).provider, g, (at) => fmtDate(at, "datetime"));
+      rows.push([w.label, w.value, { class: "tone-" + (g.tone || "neutral") }]);
+    }
   }
   const tags = b.tags || [];
   const max = tagMax() || tags.length;

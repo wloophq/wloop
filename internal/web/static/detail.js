@@ -429,6 +429,19 @@ function unitRef(u, label, link) {
   ];
 }
 
+// signalWords are a card signal in its plugin's words (the catalog's card_signals): its name, and its value
+// filled with its params followed by each note in its tone; value is how an instant value shows. A code with no
+// words shows as itself.
+function signalWords(provider, g, value) {
+  const spec = (catalog.cardSignals || []).find((s) => s.provider === provider && s.key === g.key) || {};
+  const word = (spec.values || {})[g.value];
+  const notes = (g.notes || []).map((n) => {
+    const w = (spec.notes || {})[n.code];
+    return [" · ", h("span", { class: "tone-" + (n.tone || "neutral") }, w ? fillWord(w, n.params || {}) : n.code)];
+  });
+  return { label: spec.label || g.key, value: [g.at ? value(g.at) : word ? fillWord(word, g.params || {}) : g.value, ...notes] };
+}
+
 // unitCard is a unit's stored card (#unit-card); opts.signals false leaves its signals to a grid that shows them.
 function unitCard(s, opts = {}) {
   const c = s.card || {};
@@ -443,7 +456,10 @@ function unitCard(s, opts = {}) {
     c.title ? h("div", { class: "title" }, c.title) : null,
     c.why ? h("div", { class: "why" }, c.why) : null,
     (c.waits_on || []).length ? h("div", {}, t("Waiting on"), " ", h("strong", {}, c.waits_on.map(personName).join(", "))) : null,
-    signals.length ? h("ul", { class: "signals" }, ...signals.map((g) => h("li", { class: "tone-" + (g.tone || "neutral") }, h("span", { class: "k" }, g.key), " ", g.at ? stamp(g.at) : g.value))) : null,
+    signals.length ? h("ul", { class: "signals" }, ...signals.map((g) => {
+      const w = signalWords((c.unit || {}).provider, g, stamp);
+      return h("li", { class: "tone-" + (g.tone || "neutral") }, h("span", { class: "k" }, w.label), " ", ...w.value);
+    })) : null,
     lh ? h("div", { class: "meta" }, `${personName(lh.who)}: ${lh.what}`, lh.at ? ` (${stamp(lh.at)})` : "") : null);
 }
 
