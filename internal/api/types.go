@@ -51,18 +51,25 @@ type Since struct {
 	Rev   uint64
 }
 
-// Change says the rows moved: the units whose row changed or left since
-// the previous change, or All when too much moved to list. A "notify"
-// change carries the notices a workflow raised for the user.
+// Change says what moved: the units whose row changed or left since the
+// previous change, or All when too much moved to list, and whether the
+// health, the plan or the gates moved. A client reads again only what a
+// change names. A "notify" change carries the notices a workflow raised
+// for the user.
 type Change struct {
-	Type    string      `json:"type"` // "changed", "notify" or "window"
-	Epoch   string      `json:"epoch"`
-	Rev     uint64      `json:"rev"`
-	Units   []unit.Unit `json:"units,omitempty"`
-	All     bool        `json:"all,omitempty"`
-	Health  bool        `json:"health,omitempty"`
-	Notices []Notice    `json:"notices,omitempty"`
-	// Counters are the Area "" counters, on every "changed" change after a TopicTasks or TopicDrafts note.
+	Type   string      `json:"type"` // "changed", "notify" or "window"
+	Epoch  string      `json:"epoch"`
+	Rev    uint64      `json:"rev"`
+	Units  []unit.Unit `json:"units,omitempty"`
+	All    bool        `json:"all,omitempty"`
+	Health bool        `json:"health,omitempty"`
+	// Plan says what GET /api/plan serves moved.
+	Plan bool `json:"plan,omitempty"`
+	// Gates says what GET /api/gates serves moved: a gate, or the draft, item, message or plan item one shows.
+	Gates   bool     `json:"gates,omitempty"`
+	Notices []Notice `json:"notices,omitempty"`
+	// Counters are the Area "" counters, on every "changed" change after a note of what a view reads: the tasks,
+	// their gates, wakes, drafts, records, links, placements or the profile.
 	Counters *Counters `json:"counters,omitempty"`
 	// Windows are window requests, in the order they came, sent only to the events client named WindowClient.
 	Windows []WindowRequest `json:"windows,omitempty"`
