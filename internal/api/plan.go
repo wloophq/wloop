@@ -11,6 +11,7 @@ import (
 type PlanItem struct {
 	ID       string        `json:"id"`
 	Workflow string        `json:"workflow"`
+	Summary  string        `json:"summary,omitempty"` // Workflow's summary, in the profile's locale
 	Decision string        `json:"decision"`
 	Reason   string        `json:"reason,omitempty"`
 	Default  string        `json:"default,omitempty"`

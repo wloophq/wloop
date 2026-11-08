@@ -243,6 +243,10 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 		Observe: api.ObserveMode(it.Observe), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
+	l := s.loaded()
+	if i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == it.Workflow }); i >= 0 {
+		p.Summary = l.Workflows[i].Summary
+	}
 	for _, st := range it.Steps {
 		p.Steps = append(p.Steps, st.Use)
 	}
@@ -261,7 +265,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 			row = rd.Row.Actions
 		}
 	}
-	p.Actions = catalog.PlanStates(s.loaded(), p, row)
+	p.Actions = catalog.PlanStates(l, p, row)
 	return p
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -26,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 )
@@ -187,8 +189,54 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit
 	if m, ok := s.messageOf(ctx, g); ok {
 		v.Subject, _ = json.Marshal(s.messageView(ctx, m))
 	}
+	if g.Kind == gate.KindPlan {
+		v.Plan = s.gatePlan(ctx, g)
+	}
 	return v
 }
+
+// gatePlan is the plan item plan gate g holds, as the plan page serves it without its actions, which are the
+// gate's intents; nil when the plan no longer holds it. In a pass, the pending items are read once for every gate.
+func (s *Server) gatePlan(ctx context.Context, g gate.Gate) *api.PlanItem {
+	p := s.deps.Plan
+	if p == nil || g.Subject == "" {
+		return nil
+	}
+	var it workflow.Item
+	var found bool
+	if _, ok := coretasks.PassOf(ctx); ok {
+		pending, err := coretasks.Once(ctx, passPendingItems, func() (map[string]workflow.Item, error) {
+			its, err := p.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+			out := make(map[string]workflow.Item, len(its))
+			for _, it := range its {
+				out[it.ID] = it
+			}
+			return out, err
+		})
+		if err != nil {
+			s.logf("plan gate %d: the pending items: %v", g.ID, err)
+			return nil
+		}
+		it, found = pending[g.Subject]
+	} else {
+		its, err := p.Items(ctx, automation.Filter{ID: g.Subject})
+		if err != nil {
+			s.logf("plan gate %d: its item: %v", g.ID, err)
+			return nil
+		}
+		if found = len(its) > 0; found {
+			it = its[0]
+		}
+	}
+	if !found {
+		return nil
+	}
+	v := s.wirePlanItem(ctx, it, s.presentations([]unit.Unit{it.Unit})[it.Unit])
+	v.Actions = nil
+	return &v
+}
+
+const passPendingItems = "daemon.pending_items"
 
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
 func (s *Server) draftGateView(g gate.Gate, dv api.Draft) api.GateView {

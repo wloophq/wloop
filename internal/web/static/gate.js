@@ -98,6 +98,31 @@ function gateAnswer(e, g, answer) {
   }, gateState.answers.get(g.id) || "");
 }
 
+// planFactText is a fact that made a plan item, in the words of the profile's task facet that reads it, else as
+// name = value.
+function planFactText(f) {
+  const facet = taskFacetOf(f.name);
+  return facet ? `${facet.label}: ${propText(f.value, facet)}` : `${f.name} = ${f.value}`;
+}
+
+// gatePlan is what running a plan gate's item does, what it acts on and, folded, why it fired; its steps only
+// when its workflow has no summary to say them. Null when the plan no longer holds the item.
+function gatePlan(g) {
+  const p = g.plan;
+  if (!p) return null;
+  const href = safeURL(p.link);
+  const label = p.label || (p.unit && p.unit.key) || "";
+  const facts = (p.why && p.why.matched) || [];
+  return h("div", { class: "gate-plan" },
+    p.summary ? h("p", { class: "plan-summary" }, p.summary) : null,
+    !p.summary && (p.steps || []).length ? h("p", { class: "meta plan-steps" }, t("Steps: {steps}", { steps: p.steps.join(", ") })) : null,
+    label ? h("p", { class: "meta plan-on" }, t("Acts on"), " ",
+      href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label) : null,
+    facts.length ? h("details", { class: "plan-why" },
+      h("summary", {}, t("Why it fired")),
+      h("ul", {}, ...facts.map((f) => h("li", {}, planFactText(f))))) : null);
+}
+
 // gateCard is an open gate of task e: what it asks, the agent's message as markdown folded after its first
 // blocks, its option cards, the free-text answer when an intent takes one, then its intents in the profile's
 // order, the first primary, each with the digit that picks it while the card has the focus.
@@ -115,6 +140,7 @@ function gateCard(e, g, opts = {}) {
       subject.created_at ? h("time", { datetime: subject.created_at }, fmtDate(subject.created_at, "datetime")) : null),
     h("div", { class: "bd" },
       subject.text ? renderMarkdown(subject.text, { fold: 4, key: `${scope}:${g.id}` }) : null,
+      gatePlan(g),
       g.delivery ? h("p", { class: "meta" }, g.delivery) : null,
       g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: fmtDate(g.deadline, "datetime") })
         : t("Until {time}", { time: fmtDate(g.deadline, "datetime") })) : null,

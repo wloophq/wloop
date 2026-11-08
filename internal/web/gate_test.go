@@ -215,6 +215,76 @@ done({
 	}
 }
 
+// planGate is the open plan gate 5 of task t-1, which asks to run plan, nil when the plan no longer holds it.
+func planGate(plan *api.PlanItem) api.GateView {
+	return api.GateView{ID: 5, Task: "t-1", Kind: "plan", Name: "plan", Status: "open", Text: "Run this?", Subject: json.RawMessage(`"fake-close/task/t-1/ab12"`),
+		Intents: []api.IntentView{{ID: "run_now", Label: "Run now"}, {ID: "skip", Label: "Skip"}, {ID: "guide", Label: "Guide", Answer: true}}, Plan: plan}
+}
+
+func closingPlan(summary string) *api.PlanItem {
+	return &api.PlanItem{ID: "fake-close/task/t-1/ab12", Workflow: "fake-close", Summary: summary, Decision: "pending",
+		Label: "Retry flaky uploads", Link: "https://chat.example/c1", Steps: []string{"items.resolve"},
+		Why: api.Why{Trigger: "sweep", Matched: []api.Fact{{Name: "task.category", Value: "active"}, {Name: "task.items_open", Value: "2"}}}}
+}
+
+func TestAPlanGateSaysWhatItsPlanDoesOnWhatAndWhy(t *testing.T) {
+	type shape struct {
+		Title, Summary, On, Link string
+		Why                      []string
+		Steps                    []string
+		Folded                   bool
+		Buttons                  []string
+	}
+	var got []shape
+	cat := taskCatalog()
+	cat.Facets = []api.FacetSpec{{ID: "category", Label: "Category", Fact: "task.category", Labels: map[string]string{"active": "Active"}}}
+	runGate(t, `
+const shape = (g) => {
+  const c = card(g);
+  const on = cls(c, "plan-on")[0];
+  const why = cls(c, "plan-why")[0];
+  return {
+    Title: cls(c, "d-sub")[0].textContent,
+    Summary: cls(c, "plan-summary").map((x) => x.textContent).join(""),
+    On: on ? on.textContent : "",
+    Link: on ? walk(on, (x) => x.tag === "a").map((a) => attr(a, "href")).join("") : "",
+    Why: why ? walk(why, (x) => x.tag === "li").map((x) => x.textContent) : [],
+    Steps: cls(c, "plan-steps").map((x) => x.textContent),
+    Folded: !!why && why.tag === "details",
+    Buttons: walk(c, (x) => x.tag === "button").map((b) => b.textContent),
+  };
+};
+done([shape(input.full), shape(input.bare), shape(input.gone)]);`, map[string]any{
+		"catalog": cat,
+		"full":    planGate(closingPlan("Close the task once its asker checked the answer; posts nothing")),
+		"bare":    planGate(closingPlan("")),
+		"gone":    planGate(nil),
+	}, &got)
+	if len(got) != 3 {
+		t.Fatalf("got %+v", got)
+	}
+	full := got[0]
+	if full.Title != "Run this?" || full.Summary != "Close the task once its asker checked the answer; posts nothing" {
+		t.Errorf("title %q, summary %q", full.Title, full.Summary)
+	}
+	if !strings.Contains(full.On, "Retry flaky uploads") || full.Link != "https://chat.example/c1" {
+		t.Errorf("on %q linked %q, want the unit's label linked", full.On, full.Link)
+	}
+	if !full.Folded || !slices.Equal(full.Why, []string{"Category: Active", "task.items_open = 2"}) {
+		t.Errorf("why %q folded %v, want the catalog's words for a fact it names, else name = value, folded", full.Why, full.Folded)
+	}
+	if len(full.Steps) != 0 {
+		t.Errorf("steps %q shown beside the summary", full.Steps)
+	}
+	if bare := got[1]; bare.Summary != "" || len(bare.Steps) != 1 || !strings.Contains(bare.Steps[0], "items.resolve") {
+		t.Errorf("a plan without a summary: %+v, want its steps", bare)
+	}
+	if gone := got[2]; gone.Title != "Run this?" || gone.Summary != "" || gone.On != "" || len(gone.Why) != 0 ||
+		!slices.Equal(gone.Buttons, []string{"1 Run now", "2 Skip", "3 Guide"}) {
+		t.Errorf("a gate whose plan left: %+v, want its question and intents", gone)
+	}
+}
+
 // pendingDraft is a held nudge on task t-1, from workflow fake-nudge, whose gate 12 approves or discards it.
 func pendingDraft() api.Draft {
 	return api.Draft{ID: 7, Unit: "github/acme/api#8", Task: "t-1", Kind: "nudge", Purpose: "nudge", Target: "acme/api#8", Where: "acme/api#8",

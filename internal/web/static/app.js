@@ -2528,7 +2528,7 @@ function planItem(it) {
   return h("li", { class: `plan-item ${it.decision}` },
     h("div", { class: "plan-line" },
       h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, planWhen(it)),
-      h("span", { class: "plan-wf" }, it.workflow),
+      h("span", { class: "plan-wf", title: it.summary ? it.workflow : undefined }, it.summary || it.workflow),
       h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
       it.title ? h("span", { class: "plan-title" }, it.title) : null,
       it.observe ? h("span", { class: "plan-mode", title: t("This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off") }, t("observe")) : null),

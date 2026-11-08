@@ -330,7 +330,8 @@ type AskView struct {
 // GateView is a gate as clients offer it: Task and Unit what it is on ("" when none), Text its words from
 // gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
 // with, Delivery a draft gate's delivery state (held, queued, sending, sent, failed, dropped), Subject its subject as
-// its kind serves it: a draft gate's is its Draft.
+// its kind serves it: a draft gate's is its Draft, a plan gate's its plan item's id. Plan is a plan gate's item while
+// the plan holds it.
 type GateView struct {
 	ID       int64           `json:"id"`
 	Task     string          `json:"task,omitempty"`
@@ -344,6 +345,7 @@ type GateView struct {
 	Default  string          `json:"default,omitempty"`
 	Delivery string          `json:"delivery,omitempty"`
 	Subject  json.RawMessage `json:"subject,omitempty"`
+	Plan     *PlanItem       `json:"plan,omitempty"`
 }
 
 // IntentView is an intent a gate offers; Answer says it takes text, as a question's answer.
