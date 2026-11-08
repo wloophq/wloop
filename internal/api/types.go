@@ -277,8 +277,24 @@ type Detail struct {
 	// Card and Items are the unit card's (#unit-card).
 	Card  *card.Snapshot `json:"card,omitempty"`
 	Items []items.Item   `json:"items"`
+	// ItemTies are how each of Items stands with the user's work, by item id.
+	ItemTies map[string]ItemTie `json:"item_ties"`
 	// SkippedWorkflows are the workflows skipped on the unit, through UnitSkip.
 	SkippedWorkflows []string `json:"skipped_workflows"`
+}
+
+// ItemTie is whom an item waits on and the task that holds it; Task is empty when no task does.
+type ItemTie struct {
+	WaitsOn   []ItemPerson `json:"waits_on"`
+	Task      string       `json:"task,omitempty"`
+	TaskTitle string       `json:"task_title,omitempty"`
+}
+
+// ItemPerson is a person an item waits on; Me marks the user.
+type ItemPerson struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	Me   bool   `json:"me,omitempty"`
 }
 
 type Workspace struct {
