@@ -55,6 +55,7 @@ type Vocabulary struct {
 	toolProviders      map[string]unit.ProviderID
 	draftKinds         map[unit.ProviderID]DraftKinds
 	languageFacts      map[unit.ProviderID]string
+	membersFacts       map[unit.ProviderID]string
 	marks              []Mark
 	linkSignals        []string
 	situations         map[unit.ProviderID][]string
@@ -77,6 +78,10 @@ var PluginDraftKinds = map[unit.ProviderID]DraftKinds{}
 // people write in, as a plugin's language_fact names it; a provider absent
 // writes its drafts in the user's locale.
 var LanguageFacts = map[unit.ProviderID]string{}
+
+// MembersFacts are, by provider, the list fact that holds who can read a unit's conversation, as a plugin's
+// members_fact names it; a provider absent never tells.
+var MembersFacts = map[unit.ProviderID]string{}
 
 // pluginDeliveries are the deliveries the merged plugins declare, each
 // with whether a draft of it reaches people, as a manifest's posts says.
@@ -144,7 +149,7 @@ func Install(v *Vocabulary) {
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
-	LanguageFacts = v.languageFacts
+	LanguageFacts, MembersFacts = v.languageFacts, v.membersFacts
 	pluginDeliveries = v.pluginDeliveries
 	Marks = v.marks
 	LinkSignals = v.linkSignals
@@ -287,7 +292,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	tools, answers := slices.Clone(coreTools), slices.Clone(coreToolAnswers)
 	toolProviders := map[string]unit.ProviderID{}
 	draftKinds := map[unit.ProviderID]DraftKinds{}
-	languageFacts := map[unit.ProviderID]string{}
+	languageFacts, membersFacts := map[unit.ProviderID]string{}, map[unit.ProviderID]string{}
 	var marks []Mark
 	var signals []string
 	situations, signalsOf := map[unit.ProviderID][]string{}, map[unit.ProviderID][]string{}
@@ -315,6 +320,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		}
 		if v.LanguageFact != "" {
 			languageFacts[id] = v.LanguageFact
+		}
+		if v.MembersFact != "" {
+			membersFacts[id] = v.MembersFact
 		}
 		for _, m := range v.Marks {
 			marks = append(marks, Mark{Name: m.Name, Doc: m.Doc, Provider: string(id)})
@@ -398,7 +406,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
-		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, marks: marks, linkSignals: signals,
+		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, membersFacts: membersFacts, marks: marks, linkSignals: signals,
 		situations: situations, signalsOf: signalsOf, predicates: predicates}
 }
 

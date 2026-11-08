@@ -41,12 +41,48 @@ func TestAWorkflowOnTasksProposesAndWithdrawsDrafts(t *testing.T) {
 	}
 }
 
+func TestAWithdrawRuleLoadsWithItsReasonBeforeTheWhen(t *testing.T) {
+	root := t.TempDir()
+	writeWorkflow(t, root, "my-nudge", slackNudge+`
+[[drafts.withdraw.rule]]
+when = 'draft.people_outside > 0'
+reason = "outside"
+`)
+	l, problems := Load(userLayer(root), nil, testBase(), nil)
+	if len(problems) > 0 || len(l.Workflows) != 1 {
+		t.Fatalf("%s", problems.Error())
+	}
+	rules := l.Workflows[0].Withdrawals()
+	if len(rules) != 2 || rules[0].Reason != "outside" || rules[1].Reason != "moot" {
+		t.Fatalf("rules %+v", rules)
+	}
+	if reads := strings.Join(rules[0].When.Reads(), ","); reads != "draft.people_outside" {
+		t.Fatalf("rule reads %s", reads)
+	}
+}
+
+func TestAWithdrawRuleNeedsItsWhenAndAKnownReason(t *testing.T) {
+	for _, c := range []struct{ rule, want string }{
+		{"reason = \"outside\"\n", "drafts.withdraw.rule[0].when: is required"},
+		{"when = 'draft.people_outside > 0'\nreason = \"later\"\n", `"later" is not one of`},
+	} {
+		root := t.TempDir()
+		writeWorkflow(t, root, "my-nudge", slackNudge+"\n[[drafts.withdraw.rule]]\n"+c.rule)
+		_, problems := Load(userLayer(root), nil, testBase(), nil)
+		if !strings.Contains(problems.Error(), c.want) {
+			t.Errorf("%s: %s, want %q", c.rule, problems.Error(), c.want)
+		}
+	}
+}
+
 func TestDraftProposeRefusesBadArguments(t *testing.T) {
 	for _, c := range []struct{ from, to, want string }{
 		{`purpose = "nudge"`, `purpose = ""`, "step[0].purpose: is required"},
 		{`purpose = "nudge"`, "purpose = \"nudge\"\ndelivery = \"fax\"", `step[0].delivery: "fax" is not one of`},
 		{`items = "owed"`, `items = "mine"`, `step[0].items: "mine" is not one of`},
 		{`per = "person"`, `per = "team"`, `step[0].per: "team" is not one of`},
+		{`per = "person"`, "per = \"unit\"\ntarget = \"person\"", `step[0].target: person needs per = "person"`},
+		{`per = "person"`, "per = \"person\"\nto = \"friends\"", `step[0].to: "friends" is not one of`},
 		{`effects = ["task.nudged"]`, `effects = ["task.nudged", "task.closed"]`, `step[0].effects[1]: "task.closed" is not one of`},
 		{`repeat_after = "1d"`, `repeat_after = "soon"`, `step[0].repeat_after: "soon" is not a duration`},
 		{"when = '!draft.person_waited'", "when = '!draft.nope'", "unknown field draft.nope"},

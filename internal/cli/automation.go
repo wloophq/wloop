@@ -109,6 +109,9 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	units.skips = d.Skips
 	if d.Drafts != nil {
 		units.taskOf = d.Drafts.task
+		if d.Drafts.Facts == nil {
+			d.Drafts.Facts = units.Facts
+		}
 	}
 	if d.Planners == nil {
 		d.Planners = e.planners()

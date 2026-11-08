@@ -223,10 +223,12 @@ var transitions = map[State][]State{
 // The reasons a draft is withdrawn, as Reason of the discarded draft: a
 // workflow's, its person was assigned the items or it is moot; a verb
 // ended the task the draft served; the user skipped its workflow on its
-// unit; or one draft to the whole conversation replaced it.
+// unit; or one draft to the whole conversation replaced it. Outside: it addresses someone who cannot read
+// the conversation it posts in.
 const (
 	WithdrawAssigned   = "assigned"
 	WithdrawMoot       = "moot"
+	WithdrawOutside    = "outside"
 	WithdrawEnded      = "ended"
 	WithdrawSkipped    = "skipped"
 	WithdrawSuperseded = "superseded"

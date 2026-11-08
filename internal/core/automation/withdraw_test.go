@@ -119,6 +119,30 @@ func TestPlanningWithdrawsNothing(t *testing.T) {
 	}
 }
 
+func TestAWithdrawRuleWithdrawsWithItsOwnReasonBeforeTheWhen(t *testing.T) {
+	w := withdrawWF("nudge", draft.WithdrawMoot)
+	w.WithdrawRules = []workflow.WithdrawRule{{When: automationtest.MatchFunc(func(v workflow.Vars) bool {
+		return v.Facts["draft.people_outside"] == 1
+	}, "draft.people_outside"), Reason: draft.WithdrawOutside}}
+	r := newRig(t, w)
+	ws := withWithdrawals(r)
+	r.put(s1, "a")
+	r.put(s2, "b", "session.idle", false)
+	outside := owned(1, s1, 0)
+	outside.Facts["draft.people_outside"] = 1
+	both := owned(2, s2, 0)
+	both.Facts["draft.people_outside"] = 1
+	moot := owned(3, s2, 0)
+	moot.Facts["draft.people_outside"] = 0
+	ws.Put("nudge", outside, both, moot)
+	r.sweep()
+	for id, want := range map[int64]string{1: draft.WithdrawOutside, 2: draft.WithdrawOutside, 3: draft.WithdrawMoot} {
+		if got, ok := ws.Withdrawn(id); !ok || got != want {
+			t.Errorf("draft %d: withdrawn %v %q, want %q", id, ok, got, want)
+		}
+	}
+}
+
 func TestWithdrawWhenReadsTheFactsScopedToItsWorkflow(t *testing.T) {
 	w := withdrawWF("ask", draft.WithdrawAssigned)
 	w.Withdraw = automationtest.MatchFunc(func(v workflow.Vars) bool {

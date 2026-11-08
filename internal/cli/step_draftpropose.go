@@ -71,6 +71,11 @@ type draftDeps struct {
 	Me func() task.Me
 	// Languages are the facts that tell a unit's language, by provider; nil: builtin.LanguageFacts.
 	Languages map[unit.ProviderID]string
+	// Members are the facts that hold who reads a unit's conversation, by provider; nil: builtin.MembersFacts.
+	Members map[unit.ProviderID]string
+	// Facts are a unit's facts, which the withdrawals read who reads a draft's conversation from; nil reads
+	// none.
+	Facts func(ctx context.Context, u unit.Unit) (workflow.Facts, error)
 }
 
 // languageFact is the fact that tells the language of p's units; "" for none.
@@ -106,7 +111,7 @@ func (d *draftDeps) outbox() (draftOutbox, error) {
 
 // draftArgs are draft.propose's arguments with their defaults.
 type draftArgs struct {
-	purpose, text, why, reaction, items, per, target string
+	purpose, text, why, reaction, items, per, target, to string
 	delivery                                         draft.Delivery
 	effects                                          []string
 	repeatAfter, repeatAfterSent                     time.Duration
@@ -121,9 +126,13 @@ const (
 func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 	a := draftArgs{purpose: strings.TrimSpace(c.arg("purpose")), delivery: draft.Delivery(cmp.Or(c.arg("delivery"), builtin.DraftDeliveries[0])),
 		text: cmp.Or(c.arg("text"), defaultDraftText), why: cmp.Or(c.arg("why"), defaultDraftWhy), reaction: strings.Trim(strings.TrimSpace(c.arg("reaction")), ":"),
-		items: cmp.Or(c.arg("items"), "all"), per: cmp.Or(c.arg("per"), builtin.DraftPer[0]), target: cmp.Or(c.arg("target"), builtin.DraftTargets[0])}
+		items: cmp.Or(c.arg("items"), "all"), per: cmp.Or(c.arg("per"), builtin.DraftPer[0]), target: cmp.Or(c.arg("target"), builtin.DraftTargets[0]),
+		to: cmp.Or(c.arg("to"), builtin.DraftTo[0])}
 	if a.purpose == "" {
 		return a, errors.New("draft.propose names no purpose")
+	}
+	if a.target == builtin.DraftTargetPerson && a.per != "person" {
+		return a, errors.New(`draft.propose's target person needs per = "person"`)
 	}
 	for _, f := range []struct{ key, name string }{{"text", a.text}, {"why", a.why}} {
 		if f.name != path.Base(f.name) || strings.HasPrefix(f.name, ".") {
@@ -264,10 +273,25 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		}
 	}
 	l := s.e.loadedIntents()
-	lang, err := s.draftLanguage(ctx, sub.unit, l.Locale)
+	unitFacts, err := s.draftUnitFacts(ctx, sub.unit)
 	if err != nil {
 		return nil, err
 	}
+	lang := s.draftLanguage(unitFacts, sub.unit, l.Locale)
+	rd := deps.readersOf(sub.unit, unitFacts)
+	var unplaced []string
+	keep := func(p items.Person) bool {
+		ok, unknown := rd.addressed(a.to, p, deps.Codecs)
+		if unknown && !slices.Contains(unplaced, p.Key) {
+			unplaced = append(unplaced, p.Key)
+		}
+		return ok
+	}
+	defer func() {
+		if len(unplaced) > 0 {
+			s.logf("draft.propose %s: who can read %s is unknown; leaving out %s", w.Name, sub.unit, strings.Join(unplaced, ", "))
+		}
+	}()
 	layers := profile.Chain(deps.Config())
 	tmpl, written, err := draftTemplate(layers, turn.BundledFS(), w.Name, a.text, a.delivery, lang)
 	if err != nil {
@@ -280,7 +304,8 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	now := deps.Now()
 	policy := draftApproval(deps.Config(), w, briefExtrasOf(l), intentload.DefaultDraftApproval(l.Gates))
 	var subject *draft.Subject
-	if w.Withdraw != nil || len(policy.Rules) > 0 {
+	withdraws := len(w.Withdrawals()) > 0
+	if withdraws || len(policy.Rules) > 0 {
 		read, err := subjectFacts(ctx, s.d.Units, s.d.Keep, c.u, w.Name)
 		if err != nil {
 			return nil, err
@@ -310,6 +335,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
+		if person.Key != "" && !keep(person) {
+			continue
+		}
 		its := selectItems(sub, a.items, person, now, deps.Codecs)
 		var to []items.Person
 		if person.Key != "" {
@@ -317,14 +345,14 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		}
 		var absorbs []draft.ID
 		if a.per != "person" && a.items == "owed" {
-			if to, its = sub.unitOwed(deps.me(), nil); len(its) > 0 {
+			if to, its = sub.unitOwed(deps.me(), nil, keep); len(its) > 0 {
 				ps, err := prior()
 				if err != nil {
 					return nil, err
 				}
 				if ids, absorbed := heldPerUnit(ps, sub.unit, w.Name); len(ids) > 0 && !covers(absorbed, itemIDs(its)) {
 					absorbs = ids
-					to, its = sub.unitOwed(deps.me(), absorbed)
+					to, its = sub.unitOwed(deps.me(), absorbed, keep)
 				}
 			}
 		}
@@ -349,6 +377,8 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			if cd.p.Target == "" && slices.Contains(builtin.DraftEmojiDeliveries, string(a.delivery)) {
 				cd.refusal = "its item has no permalink to react to"
 			}
+		case a.target == builtin.DraftTargetPerson:
+			cd.p.Target = person.Key
 		}
 		if cd.refusal == "" {
 			ps, err := prior()
@@ -359,8 +389,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 				return nil, err
 			}
 		}
-		if cd.refusal == "" && w.Withdraw != nil {
-			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, draftFactsOf(sub, personKeys(to), cd.p.Items, deps.me()), deps.Config, now)
+		if cd.refusal == "" && withdraws {
+			drafted := draftFactsOf(sub, personKeys(to), cd.p.Items, deps.me(), rd.outside(personKeys(to), cd.p.Target, deps.Codecs))
+			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, drafted, deps.Config, now)
 			if err != nil {
 				return nil, err
 			}
@@ -381,21 +412,27 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	return out, nil
 }
 
-// draftLanguage is the locale a draft posted on u is written in, through the fact u's plugin names as its
-// units' language; userLocale when the plugin names none or u is gone.
-func (s *stepSet) draftLanguage(ctx context.Context, u unit.Unit, userLocale string) (string, error) {
-	fact := s.d.Drafts.languageFact(u.Provider)
-	if fact == "" {
-		return userLocale, nil
+// draftUnitFacts are the facts of u, the unit a draft posts on, when its plugin names a fact of its language
+// or of its members; none when it names neither or u is gone.
+func (s *stepSet) draftUnitFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	if s.d.Drafts.languageFact(u.Provider) == "" && s.d.Drafts.membersFact(u.Provider) == "" {
+		return nil, nil
 	}
 	facts, err := s.facts(ctx, u)
-	switch {
-	case errors.Is(err, automation.ErrUnitGone):
-		return userLocale, nil
-	case err != nil:
-		return "", err
+	if errors.Is(err, automation.ErrUnitGone) {
+		return nil, nil
 	}
-	return draftLanguage(facts, fact, userLocale, intentload.Locales(profile.Chain(s.d.Drafts.Config()), turn.BundledFS())), nil
+	return facts, err
+}
+
+// draftLanguage is the locale a draft posted on u is written in, through the fact among facts, u's, that
+// u's plugin names as its units' language; userLocale when the plugin names none or u is gone.
+func (s *stepSet) draftLanguage(facts workflow.Facts, u unit.Unit, userLocale string) string {
+	fact := s.d.Drafts.languageFact(u.Provider)
+	if fact == "" || facts == nil {
+		return userLocale
+	}
+	return draftLanguage(facts, fact, userLocale, intentload.Locales(profile.Chain(s.d.Drafts.Config()), turn.BundledFS()))
 }
 
 // heldPerUnit are the held drafts among prior of workflow to the whole of conversation u, and the items they
@@ -416,15 +453,15 @@ func covers(listed, ids []string) bool {
 	return !slices.ContainsFunc(ids, func(id string) bool { return !slices.Contains(listed, id) })
 }
 
-// supersede withdraws the held per-person drafts of d's workflow on d's unit, which d, to the whole
-// conversation, replaces.
+// supersede withdraws the held per-person drafts of d's workflow posted on d's unit, which d, to the whole
+// conversation, replaces; one posted elsewhere, a direct conversation its target names, stays.
 func supersede(ctx context.Context, ob draftOutbox, d draft.Draft) error {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &d.Unit, Workflow: d.Origin.Workflow, States: []draft.State{draft.Held}})
 	if err != nil {
 		return err
 	}
 	for _, p := range prior {
-		if p.ID != d.ID && p.Origin.Kind == draft.OriginAuto && draftPerson(p.Origin.Key, p.Unit, draftSubjectUnit(p)) != "" {
+		if p.ID != d.ID && p.Origin.Kind == draft.OriginAuto && p.Target == "" && draftPerson(p.Origin.Key, p.Unit, draftSubjectUnit(p)) != "" {
 			if _, err := ob.Withdraw(ctx, p.ID, draft.WithdrawSuperseded); err != nil && !errors.Is(err, outbox.ErrConflict) {
 				return err
 			}
@@ -614,7 +651,7 @@ func holdOf(ctx context.Context, prior []draft.Draft, tasks draftTasks, p outbox
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
 		perConversation := person == "" && a.per != "person" && a.items == "owed"
 		if perConversation && draftPerson(d.Origin.Key, d.Unit, draftSubjectUnit(d)) != "" {
-			if d.State == draft.Queued || d.State == draft.Sending {
+			if d.Target == "" && (d.State == draft.Queued || d.State == draft.Sending) {
 				return held, false, nil
 			}
 			continue
@@ -660,9 +697,11 @@ func withdrawnAtOnce(w workflow.Workflow, subject, drafted workflow.Facts, cfg f
 			facts[k] = v
 		}
 	}
-	ok, err := w.Withdraw.Match(workflow.Vars{Facts: facts, Config: configFacts(cfg()), Now: now})
-	if err != nil || !ok {
-		return "", err
+	vars := workflow.Vars{Facts: facts, Config: configFacts(cfg()), Now: now}
+	for _, r := range w.Withdrawals() {
+		if ok, err := r.When.Match(vars); err != nil || ok {
+			return "its withdraw when holds", err
+		}
 	}
-	return "its withdraw when holds", nil
+	return "", nil
 }

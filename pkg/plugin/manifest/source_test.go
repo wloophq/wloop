@@ -279,6 +279,8 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"a predicate name", "[[source.facts]]\nname = \"acme.x\"\ntype = \"bool\"\ndoc = \"d\"\n[[source.predicates]]\nname = \"Solo\"\ndoc = \"d\"\nfacts = [\"acme.x\"]\n", "lowercase"},
 		{"a predicate over no facts", "[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\n", "facts"},
 		{"a predicate over a fact not declared", "[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\nfacts = [\"acme.nope\"]\n", "acme.nope"},
+		{"a members fact not declared", "members_fact = \"acme.members\"\n", "members_fact"},
+		{"a members fact of another type", "members_fact = \"acme.members\"\n[[source.facts]]\nname = \"acme.members\"\ntype = \"string\"\ndoc = \"d\"\n", "members_fact"},
 		{"mixed ranks", "[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
