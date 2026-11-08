@@ -81,4 +81,9 @@ func TestAStepGateServesTheUnitsItIsAboutAndWhatEachAnswerDoes(t *testing.T) {
 	if len(other.Gates) != 1 || other.Gates[0].Units != nil {
 		t.Errorf("a question's gate serves units %+v", other.Gates)
 	}
+	for _, in := range other.Gates[0].Intents {
+		if in.Summary != "" {
+			t.Errorf("the bundled question gate, whose gates.toml sets no card_says, serves %s's summary %q for its card", in.ID, in.Summary)
+		}
+	}
 }

@@ -148,6 +148,7 @@ status = "dismissed"
 [gates.review-diff]
 kind = "step"
 label = "Review the diff"
+card_says = true
 text = "Review the diff{{with .pr.slug}} of {{.}}{{end}}{{with .pr.changed_files}}, {{if eq . 1}}1 file{{else}}{{.}} files{{end}} changed{{end}}"
 closes_with = "dismiss"
 

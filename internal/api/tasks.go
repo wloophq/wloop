@@ -354,8 +354,8 @@ type GateView struct {
 	Units []PlanUnit `json:"units,omitempty"`
 }
 
-// IntentView is an intent a gate offers: Summary says what resolving with it does, Answer that it takes text,
-// as a question's answer.
+// IntentView is an intent a gate offers: Summary says what resolving with it does, for the card of a gate whose
+// gates.toml sets card_says, Answer that it takes text, as a question's answer.
 type IntentView struct {
 	ID      string `json:"id"`
 	Label   string `json:"label"`

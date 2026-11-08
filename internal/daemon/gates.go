@@ -327,7 +327,10 @@ func gateView(g gate.Gate, d intentload.GatesDef) api.GateView {
 		iv := api.IntentView{ID: name, Label: name}
 		for _, in := range def.Intents {
 			if in.Name == name {
-				iv.Label, iv.Summary, iv.Answer = in.Label, in.Summary, in.Answer
+				iv.Label, iv.Answer = in.Label, in.Answer
+				if def.CardSays {
+					iv.Summary = in.Summary
+				}
 			}
 		}
 		v.Intents = append(v.Intents, iv)

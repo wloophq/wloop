@@ -127,6 +127,8 @@ type GateDef struct {
 	// EndsTask is the category, done or dropped, a task opened only to hold gates ends in once the gate closes
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.
 	EndsTask map[gate.Status]task.Category
+	// CardSays makes the gate's card list what each intent does, its Summary.
+	CardSays bool
 	// Text words the gate's subject when the loop writes it, a template
 	// over the proposal facts, or a step gate's over StepFacts; nil writes nothing.
 	Text *template.Template
@@ -226,6 +228,7 @@ type mGate struct {
 	Kind       *string                `toml:"kind"`
 	Label      *string                `toml:"label"`
 	Text       *string                `toml:"text"`
+	CardSays   *bool                  `toml:"card_says"`
 	ClosesWith *string                `toml:"closes_with"`
 	Intents    map[string]mGateIntent `toml:"intents"`
 	EndsTask   map[string]string      `toml:"ends_task"`
@@ -431,6 +434,9 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 		s.add(path+".kind", "is required: what the gate decides")
 	}
 	text(s, path+".label", m.Label, &g.Label)
+	if m.CardSays != nil {
+		g.CardSays = *m.CardSays
+	}
 	switch {
 	case m.Text == nil:
 	case *m.Text == "":
