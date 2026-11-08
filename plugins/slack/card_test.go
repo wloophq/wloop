@@ -1,10 +1,10 @@
 package slack
 
 import (
-	"reflect"
 	"context"
 	"encoding/json"
 	"github.com/wloophq/wloop/plugins/slack/store"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
