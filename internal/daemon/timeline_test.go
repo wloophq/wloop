@@ -211,3 +211,30 @@ func TestTheTimelineServesNodes(t *testing.T) {
 		t.Fatalf("an unknown as: %d", code)
 	}
 }
+
+// The host records that a round or a request was sent right after the turn it sent: both read inside that
+// agent round, never beside it.
+func TestTheRoundsSendAndARequestsStartReadInsideTheAgentRound(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	at := time.Date(2026, 10, 27, 9, 39, 0, 0, time.UTC)
+	own := task.UnitOf("t-0123456789abcdef")
+	e := func(seq int64, kind string, after time.Duration) timeline.Event {
+		return timeline.Event{Seq: seq, Event: port.Event{Unit: own, Kind: kind, Actor: "loop", At: at.Add(after)}}
+	}
+	r.s.deps.Timeline = fixedTimeline{
+		e(5, "turn_ended", 3*time.Minute),
+		e(4, "turn_started", time.Minute),
+		e(3, "intake_started", time.Second),
+		e(2, "round_sent", time.Second),
+		e(1, "turn_sent", 0),
+	}
+	r.put(t, task.Task{ID: "t-0123456789abcdef", State: "next", Category: task.CategoryReady, Title: "Review the export"})
+	var nodes []api.TimelineNode
+	if code := get(t, r.s, api.TaskPath("t-0123456789abcdef", "timeline")+"?as=nodes", &nodes); code != 200 {
+		t.Fatalf("GET the nodes: %d", code)
+	}
+	if len(nodes) != 1 || nodes[0].Rule != "round" || len(nodes[0].Events) != 5 {
+		t.Fatalf("want one agent round of five events: %+v", nodes)
+	}
+}
