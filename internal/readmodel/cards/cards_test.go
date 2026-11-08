@@ -524,3 +524,19 @@ func TestAServedNoteCountsItsWorkingDaysAtTheRead(t *testing.T) {
 		t.Errorf("serving wrote %v into the stored card", p)
 	}
 }
+
+func BenchmarkServedCountsAStalledNote(b *testing.B) {
+	since := time.Date(2026, 8, 3, 9, 0, 0, 0, time.UTC)
+	store := &fakeStore{}
+	if _, err := store.Save(context.Background(), card.Card{Unit: t1, Signals: []card.Signal{
+		{Key: "situation", Value: "review", Notes: []card.Note{{Code: "stalled", Tone: "warn", Since: since}}}, {Key: "checks", Value: "passing"}}}, since); err != nil {
+		b.Fatal(err)
+	}
+	now := since.Add(60 * 24 * time.Hour)
+	served := Served(store, nil, func() time.Time { return now })
+	for b.Loop() {
+		if _, err := served.Get(context.Background(), []unit.Unit{t1}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
