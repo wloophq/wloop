@@ -555,7 +555,10 @@ func TestRetentionOfPlanItemsNotesThePlan(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	got, _, err := noted(log, func() error { _, err := db.Retain(ctx, retainNow, Retention{PlanItems: DefaultRetention.PlanItems}); return err })
+	got, _, err := noted(log, func() error {
+		_, err := db.Retain(ctx, retainNow, Retention{PlanItems: DefaultRetention.PlanItems})
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

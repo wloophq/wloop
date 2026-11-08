@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	JobName  = "extract:slack"
+	JobName = "extract:slack"
 	// JobEvery is the backstop for a lost wake: a landing and each run say when the job next has work.
 	JobEvery = 5 * time.Minute
 	// JobRetry is the first wait after a failed pass.

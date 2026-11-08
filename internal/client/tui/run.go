@@ -429,10 +429,10 @@ type wants struct {
 	health, rows, plan, gates, tasks, filtered atomic.Bool
 	counters                                   atomic.Pointer[api.Counters]
 	// planned are the units of the plan items last read, whose rows the plan shows.
-	planned atomic.Pointer[map[unit.Unit]bool]
-	movedMu                             sync.Mutex
-	moved                               []unit.Unit
-	movedAll                            bool
+	planned  atomic.Pointer[map[unit.Unit]bool]
+	movedMu  sync.Mutex
+	moved    []unit.Unit
+	movedAll bool
 }
 
 func (r *wants) move(units []unit.Unit, all bool) {
