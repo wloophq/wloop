@@ -132,7 +132,7 @@ process.stdout.write(JSON.stringify({ AfterSkip: afterSkip, AfterBack: afterBack
 // with its key, off at either end, and a click moves as the key does.
 func TestQueueOffersSkipAndBackAsButtons(t *testing.T) {
 	var got struct {
-		First, Last         [][2]string
+		First, Last        [][2]string
 		AfterClick, Labels string
 	}
 	nodeRun(t, queuePrelude(t), nil, `
