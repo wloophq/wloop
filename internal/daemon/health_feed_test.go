@@ -8,6 +8,9 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/wloophq/wloop/internal/brief"
+	"github.com/wloophq/wloop/internal/core/port"
 )
 
 // healthMessages counts the health messages that reach msgs within the health feed's quiet period.
@@ -104,6 +107,45 @@ func TestTheMenuBarConnectingPublishesHealth(t *testing.T) {
 		listen(t, s, func(r *http.Request) { r.URL.RawQuery += "&client=" + notifierClient })
 		if n := healthMessages(t, msgs); n != 1 {
 			t.Fatalf("the menu bar connecting, which the notifier field reads, published %d health messages, want 1", n)
+		}
+	})
+}
+
+// queueHealth is a brief queue whose counts and pause the test moves.
+type queueHealth struct {
+	pending atomic.Int64
+	paused  atomic.Bool
+}
+
+func (b *queueHealth) Status(context.Context) (brief.Status, error) {
+	st := brief.Status{Pending: int(b.pending.Load())}
+	if b.paused.Load() {
+		st.PausedUntil = time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)
+	}
+	return st, nil
+}
+
+func (b *queueHealth) Breaker() (bool, time.Time, string, time.Time) {
+	return false, time.Time{}, "", time.Time{}
+}
+
+func TestTheBriefCountsNoClientShowsPublishNoHealth(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, log, _ := feedServer(t)
+		b := &queueHealth{}
+		s.deps.BriefStatus = b
+		runFeeds(t, s)
+		msgs := listen(t, s, nil)
+		b.pending.Store(3)
+		log.Note(port.TopicBriefs)
+		if n := healthMessages(t, msgs); n != 0 {
+			t.Fatalf("a brief queued, which only doctor counts, published %d health messages", n)
+		}
+		b.paused.Store(true)
+		log.Note(port.TopicBriefs)
+		if n := healthMessages(t, msgs); n != 1 {
+			t.Fatalf("the briefs pausing, which the dashboard shows, published %d health messages, want 1", n)
 		}
 	})
 }

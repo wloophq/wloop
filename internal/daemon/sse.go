@@ -304,7 +304,8 @@ func (s *Server) pokeHealth() {
 }
 
 // visibleHealth digests h as a client shows it: without the times of runs nobody reads, a job's last run and
-// whether it runs, and the last success of a job other than an ingestion, which only the sync labels read.
+// whether it runs, the last success of a job other than an ingestion, which only the sync labels read, and the
+// brief queue's counts, which only doctor reads.
 func visibleHealth(h api.Health) [sha256.Size]byte {
 	jobs := make([]api.JobStatus, len(h.Jobs))
 	for i, j := range h.Jobs {
@@ -315,6 +316,9 @@ func visibleHealth(h api.Health) [sha256.Size]byte {
 		jobs[i] = j
 	}
 	h.Jobs = jobs
+	if h.Brief != nil {
+		h.Brief = &api.BriefStatus{LastError: h.Brief.LastError, PausedUntil: h.Brief.PausedUntil}
+	}
 	b, _ := json.Marshal(h)
 	return sha256.Sum256(b)
 }
