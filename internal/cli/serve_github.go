@@ -701,7 +701,7 @@ func githubHostModule(cfg config.Config, d moduleDeps) (pluginModule, error) {
 		Facts:      githubFactsOf(cfg, d),
 		Slow:       func(context.Context) (string, string, error) { return "skipped", "the GitHub plugin does not run", nil },
 		Items:      ghsource.Cards{Reports: d.Reports}.Items,
-		Card:       ghsource.Cards{Reports: d.Reports}.Card,
+		Card:       ghsource.Cards{Reports: d.Reports, Now: clockNow(d.Clock)}.Card,
 		Identity:   ghsource.IdentityOf(d.Inventory),
 		UnitEvents: ghsource.UnitEvents{Store: d.Inventory, PRs: prrow.ReportedPRs{Reports: d.Reports}, Fresh: linksEvery(cfg), Now: clockNow(d.Clock)},
 		Detail:     true,

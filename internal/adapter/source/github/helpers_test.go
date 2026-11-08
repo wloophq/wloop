@@ -42,5 +42,5 @@ func cardOf(_ context.Context, r api.Row) (card.Card, error) {
 	if !ok {
 		return card.Card{}, errNoReport
 	}
-	return CardOf(r, rep)
+	return CardOf(r, rep, ghsourcetest.Now)
 }

@@ -112,7 +112,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 	for i, c := range cases {
 		u := c.Row.Unit
 		units = append(units, u)
-		cd, err := ghsource.CardOf(c.Row, c.Report)
+		cd, err := ghsource.CardOf(c.Row, c.Report, ghsourcetest.Now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -379,7 +379,7 @@ func (l *prLife) derive(s ghsourcetest.Situation) ([]items.Item, []task.Task) {
 	l.t.Helper()
 	ctx := context.Background()
 	row, rep := ghsourcetest.DeriveReport(s)
-	cd, err := ghsource.CardOf(row, rep)
+	cd, err := ghsource.CardOf(row, rep, ghsourcetest.Now)
 	if err != nil {
 		l.t.Fatal(err)
 	}

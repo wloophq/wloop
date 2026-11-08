@@ -17,6 +17,17 @@ type Signal struct {
 	Tone  Tone   `json:"tone"`
 	// At is the instant Value shows, for a client to show in the viewer's zone.
 	At time.Time `json:"at,omitzero"`
+	// Key and Value are codes the plugin's catalog words (api.SignalSpec), Params the values its words fill.
+	Params map[string]string `json:"params,omitempty"`
+	Notes  []Note            `json:"notes,omitempty"`
+}
+
+// Note is what a signal's line adds after its value, in its own tone: a code
+// its signal's notes word, filled with Params.
+type Note struct {
+	Code   string            `json:"code"`
+	Tone   Tone              `json:"tone"`
+	Params map[string]string `json:"params,omitempty"`
 }
 
 type Human struct {

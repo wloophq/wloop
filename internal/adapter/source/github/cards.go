@@ -6,23 +6,38 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/termfmt"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // Cards are the pull requests' cards and items: the ones the GitHub
 // plugin reported, under the overlays the host laid on their rows.
-type Cards struct{ Reports readmodel.Reports }
+type Cards struct {
+	Reports readmodel.Reports
+	// Now is the host's clock, which counts a stall's working days; nil is the wall clock.
+	Now func() time.Time
+}
+
+func (c Cards) now() time.Time {
+	if c.Now == nil {
+		return time.Now()
+	}
+	return c.Now()
+}
 
 var errNoReport = errors.New("the GitHub plugin has reported no such pull request")
 
@@ -53,7 +68,7 @@ func (c Cards) Card(ctx context.Context, r api.Row) (card.Card, error) {
 	if err != nil {
 		return card.Card{}, err
 	}
-	return CardOf(r, s)
+	return CardOf(r, s, c.now())
 }
 
 // Items are the items of the pull request of r.
@@ -70,9 +85,9 @@ func (c Cards) Items(ctx context.Context, r api.Row) ([]items.Item, error) {
 
 // CardOf is the card the plugin reported in s, under the overlays of r,
 // the pull request's row: the row says why, on whom and since when, its
-// situation signal words the row's kind, a mute snoozes it, and stalled
-// follows the host's clock.
-func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
+// situation signal is the row's kind, a mute snoozes it, and the stall its
+// situation notes follows the host's clock, counted in working days to now.
+func CardOf(r api.Row, s prrow.Report, now time.Time) (card.Card, error) {
 	p, ok := prrow.PayloadOf(r)
 	if !ok || s.Card == nil {
 		return card.Card{}, fmt.Errorf("github card: %s has no pull request payload", r.Unit.Label())
@@ -86,16 +101,14 @@ func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	for _, sig := range rc.Signals {
 		switch {
 		case sig.Key == signalSituation:
-			sig.Value = situation.Kind(r.Kind).Label()
-		case sig.Key == signalStalled:
-			continue
+			sig.Value, sig.Notes = string(r.Kind), nil
+			if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
+				sig.Notes = []src.SignalNote{{Code: noteStalled, Tone: "warn", Params: map[string]string{"days": stalledDays(r.Summary.Since, now)}}}
+			}
 		case overlaid && !muted && sig.Key != signalChecks:
 			continue
 		}
-		c.Signals = append(c.Signals, card.Signal{Key: sig.Key, Value: sig.Value, Tone: card.Tone(sig.Tone), At: sig.At})
-	}
-	if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
-		c.Signals = append(c.Signals, card.Signal{Key: signalStalled, Value: "stalled", Tone: "warn"})
+		c.Signals = append(c.Signals, readmodel.CardSignal(sig))
 	}
 	if h := rc.LastHuman; h != nil {
 		c.LastHuman = &card.Human{Who: items.Person{Key: h.Who.Key, Name: h.Who.Name, Aliases: slices.Clone(h.Who.Aliases)}, What: h.What, At: h.At, Link: h.Link}
@@ -103,12 +116,19 @@ func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	return c, nil
 }
 
-// The keys of the card signals the host lays its overlays on.
+// The keys of the card signals the host lays its overlays on, and the code of
+// the note it adds to a stalled situation's.
 const (
 	signalSituation = "situation"
-	signalStalled   = "stalled"
 	signalChecks    = "checks"
+	noteStalled     = "stalled"
 )
+
+// stalledDays is the whole working days from since to now, at least one: a
+// stall under a day's threshold still reads as a day.
+func stalledDays(since, now time.Time) string {
+	return strconv.Itoa(max(1, int(workday.Between(since, now)/(24*time.Hour))))
+}
 
 // ItemsOf are the items the plugin reported in s, under the overlays of r,
 // the pull request's row, every one keyed on the pull request so they are

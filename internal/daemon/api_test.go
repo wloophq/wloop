@@ -246,9 +246,9 @@ func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readm
 func (s *Server) cards() ghsource.Cards {
 	st := s.store()
 	if kept, ok := keptReports.Load(st); ok {
-		return ghsource.Cards{Reports: kept.(readmodel.Reports)}
+		return ghsource.Cards{Reports: kept.(readmodel.Reports), Now: st.Now}
 	}
-	return ghsource.Cards{Reports: ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return s.deps.Cfg }}}
+	return ghsource.Cards{Reports: ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return s.deps.Cfg }}, Now: st.Now}
 }
 
 // keptReports are the reports a test kept in its store, by the store whose
