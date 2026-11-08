@@ -242,6 +242,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `cleanup.workspace_grace` | duration | `1d` | How long, in working time, a workspace stays after its unit finished. |
 | `cleanup.manual_idle` | duration | `1d` | How long a session you started stays idle before it closes. |
 | `cleanup.stale_workspace` | duration | `14d` | How long an untouched workspace stays. |
+| `cleanup.orphan_hold` | duration | `1d` | How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process. |
 | `cleanup.disposable` | list of strings |  | Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing. |
 
 ### Dossiers

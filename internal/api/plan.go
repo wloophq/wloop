@@ -20,7 +20,7 @@ var PlanReasons = []string{
 	"it has no workspace to find its terminal in: dismiss this",
 	"its process is not proven a lasting orphan",
 	"its process is no longer the orphan the census proved",
-	"its process lingers orphaned and may come back; it closes once the process is gone or proven a lasting orphan",
+	"its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold",
 	"its process changed while it was being closed",
 }
 

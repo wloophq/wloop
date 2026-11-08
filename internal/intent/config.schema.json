@@ -88,6 +88,11 @@
           "description": "How long a session you started stays idle before it closes.",
           "type": "string"
         },
+        "orphan_hold": {
+          "default": "1d",
+          "description": "How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process.",
+          "type": "string"
+        },
         "stale_workspace": {
           "default": "14d",
           "description": "How long an untouched workspace stays.",

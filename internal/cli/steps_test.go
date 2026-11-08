@@ -169,6 +169,41 @@ func TestACloseOfADormantSessionWhoseOrphanLingersIsHeldNotBlocked(t *testing.T)
 	}
 }
 
+func TestARemovalIsNotBlockedByADormantSessionWhoseOrphanLingers(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	for i := range 2 {
+		sess.SetReading("", testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := te.Turns.MarkDormant(ctx, "term-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if why, _ := te.Turns.CloseRefusal(ctx, "term-1"); why != turns.RefusalOrphanLingers {
+		t.Fatalf("the session's close is not held: %q", why)
+	}
+	g := turnsGuard{e: te.Env}
+	if why, err := g.Refusal(ctx, "ws1"); err != nil || why != "" {
+		t.Fatalf("removal refused %q %v", why, err)
+	}
+	if n, err := g.closeCount(ctx, "ws1", "removed"); err != nil || n != 1 {
+		t.Fatalf("closed %d %v, want the dormant session's record", n, err)
+	}
+	if got, _, _ := te.repo.Session(ctx, "term-1"); got.State() != dturn.SessionClosed || len(sess.Closed()) != 0 {
+		t.Fatalf("session %+v, processes ended %v", got, sess.Closed())
+	}
+}
+
 func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
 	t.Parallel()
 	l := newTestEnv(t, &fake.Manager{}).loadedIntents()

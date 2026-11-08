@@ -128,6 +128,7 @@ var configGrammar = slices.Concat(
 		cfgKey("cleanup.workspace_grace", KindDur, "1d", "How long, in working time, a workspace stays after its unit finished."),
 		cfgKey("cleanup.manual_idle", KindDur, "1d", "How long a session you started stays idle before it closes."),
 		cfgKey("cleanup.stale_workspace", KindDur, "14d", "How long an untouched workspace stays."),
+		cfgKey("cleanup.orphan_hold", KindDur, "1d", "How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process."),
 		cfgList("cleanup.disposable", "Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing."),
 		cfgKey("classify", KindTable, "", "The classify step."),
 		cfgKey("classify.per_day", KindInt, "50", "Classify calls per day."),

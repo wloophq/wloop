@@ -3,6 +3,7 @@ package turns
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
@@ -20,7 +21,7 @@ const sessionDormant = "the session is dormant"
 // RefusalOrphanLingers holds the close of a dormant session whose process the
 // census still lists orphaned and has not proven a lasting orphan: a window
 // may reclaim the pane, and the census then wakes the session.
-const RefusalOrphanLingers = "its process lingers orphaned and may come back; it closes once the process is gone or proven a lasting orphan"
+const RefusalOrphanLingers = "its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold"
 
 // ProcessLingers says whether a fresh census lists a process of the session,
 // orphaned or not, or cannot tell: waking it with a new process would run
@@ -45,7 +46,20 @@ func (s *Service) orphanLingers(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	m, ok := s.orphanSeen[id]
-	return ok && !m.durable
+	held := !m.attachedSince.IsZero() && m.at.Sub(m.attachedSince) >= s.orphanHold()
+	return ok && !m.durable && !held
+}
+
+// DefaultOrphanHold is how long a dormant session's close waits on its
+// lingering orphan, the app's windows attached throughout, before it closes
+// the record anyway.
+const DefaultOrphanHold = 24 * time.Hour
+
+func (s *Service) orphanHold() time.Duration {
+	if s.OrphanHold > 0 {
+		return s.OrphanHold
+	}
+	return DefaultOrphanHold
 }
 
 // CloseOrphanGone says whether why, a CloseOrphanRefusal of id, holds for

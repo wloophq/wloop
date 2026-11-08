@@ -185,10 +185,28 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 // CloseSession closes the handle's session for reason when CloseRefusal
 // allows it, and records session_closed with its resume line.
 func (s *Service) CloseSession(ctx context.Context, handle, reason string) error {
+	return s.closeSession(ctx, handle, reason, false)
+}
+
+// CloseRecord is CloseSession for a session whose workspace goes away: it
+// also closes a dormant session whose orphan lingers, which ends no process,
+// as nothing is left to reattach it to.
+func (s *Service) CloseRecord(ctx context.Context, handle, reason string) error {
+	return s.closeSession(ctx, handle, reason, true)
+}
+
+func (s *Service) closeSession(ctx context.Context, handle, reason string, lingering bool) error {
 	s.refresh()
 	why, w, err := s.closeCheck(ctx, handle)
 	if err != nil {
 		return err
+	}
+	if lingering && why == RefusalOrphanLingers {
+		sess, ok, err := s.Registry.Session(ctx, handle)
+		if err != nil || !ok {
+			return err
+		}
+		why, w = "", promptWindow{sess: sess}
 	}
 	if why == "" && !w.sess.PromptSeenAt.IsZero() {
 		at, ok, _ := s.lastUserPrompt(ctx, w.sess)

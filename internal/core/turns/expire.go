@@ -30,7 +30,11 @@ type orphanMark struct {
 	// quietSince starts the run of readings that all showed some terminal,
 	// zero after one that showed none or could not tell.
 	quietSince time.Time
-	durable    bool
+	// attachedSince starts the run of complete readings, with or without an
+	// epoch, whose windows showed some terminal; zero after one that showed
+	// none or could not tell.
+	attachedSince time.Time
+	durable       bool
 	// active says the session was active at the reading, not dormant.
 	active bool
 }
@@ -123,7 +127,7 @@ func (s *Service) Census(ctx context.Context) error {
 				marks[sess.ID], gone[sess.ID] = m, s.gone[sess.ID]
 			}
 			if m, ok := s.orphanSeen[sess.ID]; ok {
-				m.durable, m.quietSince = false, time.Time{}
+				m.durable, m.quietSince, m.attachedSince = false, time.Time{}, time.Time{}
 				orphans[sess.ID] = m
 			}
 			continue
@@ -169,6 +173,12 @@ func (s *Service) orphanAt(id, runtime, epoch string, shown bool, last, at time.
 	}
 	prev := m.at
 	m.at, m.durable = at, false
+	switch {
+	case !shown:
+		m.attachedSince = time.Time{}
+	case m.attachedSince.IsZero():
+		m.attachedSince = at
+	}
 	if epoch == "" {
 		m.epoch, m.epochAt, m.shownAt, m.crossed, m.quietSince = "", time.Time{}, time.Time{}, false, time.Time{}
 		return m
