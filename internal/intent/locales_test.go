@@ -12,6 +12,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
@@ -211,6 +212,26 @@ func TestBundledWorkflowSummariesAreForPeople(t *testing.T) {
 			}
 			if postsNothing.MatchString(w.Summary) {
 				t.Errorf("%s (%s): the summary says it posts nothing, which the cockpit says from its steps: %s", w.Name, locale, w.Summary)
+			}
+		}
+	}
+}
+
+// TestEveryPlanReasonTheEngineGivesIsWorded says each reason template of the engine is a key of the bundled
+// strings.toml and of its pt-BR translation, which the cockpit words a plan item's reason by.
+func TestEveryPlanReasonTheEngineGivesIsWorded(t *testing.T) {
+	for _, path := range []string{"strings.toml", "locales/pt-BR/strings.toml"} {
+		raw, err := fs.ReadFile(turn.BundledFS(), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct{ Strings map[string]any }
+		if err := toml.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range workflow.Reasons {
+			if _, ok := doc.Strings[r]; !ok {
+				t.Errorf("%s does not word the engine's reason %q", path, r)
 			}
 		}
 	}

@@ -2524,22 +2524,12 @@ function planButtons(it) {
     }, st.label || sp.label));
 }
 
-// PLAN_REASONS are the reasons the engine gives a plan item that the catalog words, by the engine's text.
-const PLAN_REASONS = new Set([tKey("waits for you"), tKey("paused"), tKey("a visible step waits for you"), tKey("observe mode"),
-  tKey("it waits for you since it was planned"), tKey("it no longer matches since it was planned"),
-  tKey("its unit changed since it was planned"), tKey("the task holds no open item")]);
-
-// planReason is the reason the engine gave a plan item, in the catalog's words when it has them.
-function planReason(reason) {
-  return PLAN_REASONS.has(reason) ? t(reason) : reason;
-}
-
 // planItem is a plan item as the plan lists it: when it runs, what its workflow does, on what, what applying it
 // does, why it fired, folded, and its actions.
 function planItem(it) {
   const ticking = it.decision === "pending" && it.default === "run" && it.deadline;
   const when = planWhen(it);
-  const reason = it.reason ? planReason(it.reason) : "";
+  const reason = it.reason ? planReason(it) : "";
   return h("li", { class: `plan-item ${it.decision}` },
     h("div", { class: "plan-line" },
       h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, when),

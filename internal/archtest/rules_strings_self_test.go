@@ -19,7 +19,6 @@ el.textContent = ` + "`Synced ${x}`" + `;
 const re = /a "quoted" b/;
 el.title = 'Waiting longest';
 getJSON("/api/strings");
-const reasons = new Set([tKey("waits for you")]);
 `
 	flagged(t, "js", ruleClientProse("internal/web/static/x.js", js), 3, "goes through t or tn")
 	src := `package p

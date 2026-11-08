@@ -338,6 +338,38 @@ func TestAPlanGateWhoseItemNoLongerWaitsServesNoPlanAnywhere(t *testing.T) {
 	}
 }
 
+func TestThePlanServesEachReasonAsItsTemplateValuesAndFacts(t *testing.T) {
+	t.Parallel()
+	r, _, _ := planGateRig(t)
+	plan := r.s.deps.Plan.(*itemsPlan)
+	held := plan.items[0]
+	held.Reason = workflow.Reason(workflow.ReasonHeldRefused, map[string]string{"facts": "task.items_open 2", "refusal": "the task holds no open item"})
+	failed := plan.items[0]
+	failed.ID, failed.Reason = "failed/x", workflow.Reason(workflow.ReasonFailed, map[string]string{"n": "3", "error": "exit 1"})
+	refused := plan.items[0]
+	refused.ID, refused.Reason = "refused/x", "a guard words its own refusal"
+	plan.items = []workflow.Item{held, failed, refused}
+	var res api.PlanResponse
+	if code := get(t, r.s, api.Plan, &res); code != 200 || len(res.Items) != 3 {
+		t.Fatalf("plan: %d %+v", code, res)
+	}
+	by := map[string]api.PlanItem{}
+	for _, it := range res.Items {
+		by[it.ID] = it
+	}
+	h := by[held.ID]
+	if h.ReasonKey != workflow.ReasonHeldRefused || h.ReasonParams["refusal"] != "the task holds no open item" ||
+		len(h.ReasonFacts) != 1 || h.ReasonFacts[0] != (api.Fact{Name: "task.items_open", Value: "2"}) {
+		t.Errorf("held: key %q params %v facts %+v", h.ReasonKey, h.ReasonParams, h.ReasonFacts)
+	}
+	if f := by["failed/x"]; f.ReasonKey != workflow.ReasonFailed || f.ReasonParams["n"] != "3" || f.ReasonParams["error"] != "exit 1" {
+		t.Errorf("failed: key %q params %v", f.ReasonKey, f.ReasonParams)
+	}
+	if x := by["refused/x"]; x.ReasonKey != "" || x.Reason != "a guard words its own refusal" {
+		t.Errorf("a refusal: key %q reason %q, want the text alone", x.ReasonKey, x.Reason)
+	}
+}
+
 func TestAPlanGateWhosePlanLeftServesNoPlan(t *testing.T) {
 	t.Parallel()
 	r, _, g := planGateRig(t)

@@ -123,13 +123,30 @@ func TestTheQueuesPlanGateShowsTheSameTargetAndItems(t *testing.T) {
 	wantPlanShape(t, "gate", got, "Resolver os itens abertos como sem efeito", "Não publica nada", "")
 }
 
-func TestEveryPlanReasonTheEngineWritesIsWorded(t *testing.T) {
+func TestAPlanReasonReadsInTheCatalogsWords(t *testing.T) {
 	var got []string
-	reasons := []string{"waits for you", "a visible step waits for you", "observe mode", "paused", "it waits for you since it was planned"}
-	runPlanPage(t, "pt-BR", `process.stdout.write(JSON.stringify(input.map((r) => planReason(r))));`, reasons, &got)
-	for i, r := range reasons {
-		if i >= len(got) || got[i] == r || got[i] == "" {
-			t.Errorf("reason %q reads %q in pt-BR", r, got)
-		}
+	items := []api.PlanItem{
+		{Reason: "waits for you", ReasonKey: "waits for you"},
+		{Reason: "waits for you while task.items_open 2: the agent is busy", ReasonKey: "waits for you while {facts}: {refusal}",
+			ReasonParams: map[string]string{"facts": "task.items_open 2", "refusal": "the agent is busy"},
+			ReasonFacts:  []api.Fact{{Name: "task.items_open", Value: "2"}}},
+		{Reason: "failed 3 times: exit 1", ReasonKey: "failed {n} times: {error}", ReasonParams: map[string]string{"n": "3", "error": "exit 1"}},
+		{Reason: "Open cockpit"},
+		{Reason: "a refusal no catalog words"},
+	}
+	runPlanPage(t, "pt-BR", `process.stdout.write(JSON.stringify(input.map((it) => planReason(it))));`, items, &got)
+	want := []string{"espera você", "espera você enquanto task.items_open = 2: the agent is busy", "falhou 3 vezes: exit 1", "Abrir o cockpit", "a refusal no catalog words"}
+	if !slices.Equal(got, want) {
+		t.Errorf("reasons %q, want %q", got, want)
+	}
+}
+
+func TestThePlanGateCardSaysWhyItsItemWaits(t *testing.T) {
+	p := quietClose()
+	p.Reason, p.ReasonKey = "observe mode", "observe mode"
+	var got planShape
+	runPlanPage(t, "pt-BR", `process.stdout.write(JSON.stringify(shape(gateCard({ id: "t-06bec1c03a26fadf" }, input))));`, planGate(&p), &got)
+	if !slices.Equal(got.Reasons, []string{"o workflow só observa: nada roda até você aplicar"}) {
+		t.Errorf("reasons %q, want the item's reason in pt-BR", got.Reasons)
 	}
 }

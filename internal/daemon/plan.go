@@ -287,6 +287,16 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 	for _, f := range it.Why.Matched {
 		p.Why.Matched = append(p.Why.Matched, api.Fact{Name: f.Name, Value: turn.FactText(f.Value)})
 	}
+	if key, params, ok := workflow.ReasonOf(it.Reason); ok {
+		p.ReasonKey, p.ReasonParams = key, params
+		if held := params["facts"]; held != "" {
+			for _, f := range p.Why.Matched {
+				if strings.HasPrefix(held, f.Name+" ") || strings.Contains(held, ", "+f.Name+" ") {
+					p.ReasonFacts = append(p.ReasonFacts, f)
+				}
+			}
+		}
+	}
 	return p
 }
 

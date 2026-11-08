@@ -1811,9 +1811,9 @@ func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
 	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
 const state = { busy: new Set(), answered: new Map(), planSpecs: {} };
 const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () => "";
-const planTarget = () => null, planDoes = () => null, planWhy = () => null, PLAN_REASONS = new Set();
+const planTarget = () => null, planDoes = () => null, planWhy = () => null, planReason = (it) => it.reason;
 `
-	nodeRun(t, prelude, []string{"planButtons", "planReason", "planItem"}, `
+	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
 const li = planItem({ id: "slack-follow-up/slack/T1%2FC1%2F171.1/ee", workflow: "slack-follow-up", decision: "pending", default: "wait",
   summary: "Nudge a thread that waits on someone; posts after you approve",
   unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan for the export", link: "https://chat.example/T1/C1/171.1", actions: [] });

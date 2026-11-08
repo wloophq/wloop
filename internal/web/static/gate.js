@@ -204,7 +204,19 @@ function gatePlan(g) {
     p.summary ? h("p", { class: "plan-summary" }, p.summary) : null,
     planTarget(p),
     planDoes(p),
+    p.reason ? h("p", { class: "meta plan-reason" }, planReason(p)) : null,
     planWhy(p));
+}
+
+// planReason is why the plan holds item p, in the catalog's words: the engine's template filled with its values, a
+// wait's facts as planFactText words them and a refusal through the catalog; any other reason through the catalog,
+// as it reads when the catalog has no words for it.
+function planReason(p) {
+  if (!p.reason_key) return t(p.reason);
+  const params = { ...(p.reason_params || {}) };
+  if ((p.reason_facts || []).length) params.facts = p.reason_facts.map(planFactText).join(", ");
+  if (params.refusal) params.refusal = t(params.refusal);
+  return t(p.reason_key, params);
 }
 
 // gateCard is an open gate of task e: what it asks, the agent's message as markdown folded after its first
