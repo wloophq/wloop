@@ -556,7 +556,9 @@ func TestAGainThatMovesUnderTheShownPrecisionNotesNothing(t *testing.T) {
 		t.Helper()
 		it := blocked
 		it.Gain = workflow.Gain{MemoryBytes: memory, DiskBytes: disk}
-		got, _, err := noted(log, func() error { return l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{it}}) })
+		got, _, err := noted(log, func() error {
+			return l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{it}})
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
