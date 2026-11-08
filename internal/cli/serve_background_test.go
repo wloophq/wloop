@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -28,24 +29,35 @@ func cliGoroutines() map[string]string {
 	return out
 }
 
+// startedSince are the goroutines running this package's code that before did not list. A goroutine that has
+// not run yet shows no frame of this package, so a caller waits for them to show.
+func startedSince(before map[string]string) map[string]string {
+	out := map[string]string{}
+	for header, g := range cliGoroutines() {
+		if _, ok := before[header]; !ok {
+			out[header] = g
+		}
+	}
+	return out
+}
+
 // Not parallel: it reads every goroutine of the process.
 func TestStopServingWaitsForServesJobs(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	before := cliGoroutines()
 	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)
-	started := 0
-	for header, g := range cliGoroutines() {
-		if _, ok := before[header]; ok {
-			continue
-		}
-		started++
+	started := startedSince(before)
+	for deadline := time.Now().Add(10 * time.Second); len(started) == 0 && time.Now().Before(deadline); started = startedSince(before) {
+		runtime.Gosched()
+	}
+	if len(started) == 0 {
+		t.Fatal("serve started no job")
+	}
+	for _, g := range started {
 		if !strings.Contains(g, "sync.(*WaitGroup).Go.func1") {
 			t.Errorf("serve started a job it does not wait for:\n%s", g)
 		}
-	}
-	if started == 0 {
-		t.Fatal("serve started no job")
 	}
 	te.stopServing()
 	for header, g := range cliGoroutines() {

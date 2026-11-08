@@ -337,13 +337,13 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 	}
 }
 
-// heardBrief wakes the turns waiting on u's brief, which a plugin wrote.
 // wakeJob runs the serving daemon's job name at at; false while no daemon serves, or it runs no such job.
 func (e *Env) wakeJob(name string, at time.Time) bool {
 	s := e.jobRunner.Load()
 	return s != nil && s.WakeJob(name, at)
 }
 
+// heardBrief wakes the turns waiting on u's brief, which a plugin wrote.
 func (e *Env) heardBrief(u unit.Unit) {
 	if q := e.briefsHeard.Load(); q != nil {
 		q.Noted(u)
