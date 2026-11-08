@@ -18,15 +18,15 @@ const UIFile = "ui.toml"
 
 // UITexts are one plugin's words of its manifest's ids.
 type UITexts struct {
-	Views      map[string]UIView  `toml:"views"`
-	Facets     map[string]UIFacet `toml:"facets"`
-	Situations map[string]string  `toml:"situations"`
-	Reasons    map[string]string  `toml:"reasons"`
+	Views      map[string]UIView   `toml:"views"`
+	Facets     map[string]UIFacet  `toml:"facets"`
+	Situations map[string]string   `toml:"situations"`
+	Reasons    map[string]string   `toml:"reasons"`
 	Signals    map[string]UISignal `toml:"signals"`
-	Events     map[string]UIEvent `toml:"events"`
-	Menubar    map[string]string  `toml:"menubar"`
-	Detail     map[string]UIField `toml:"detail"`
-	LensRaw    map[string]string  `toml:"lens"`
+	Events     map[string]UIEvent  `toml:"events"`
+	Menubar    map[string]string   `toml:"menubar"`
+	Detail     map[string]UIField  `toml:"detail"`
+	LensRaw    map[string]string   `toml:"lens"`
 	// Lens are the plugin's own row words, those it leaves out empty.
 	Lens    RowWords `toml:"-"`
 	NounRaw any      `toml:"noun"`

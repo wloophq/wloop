@@ -129,13 +129,21 @@ type Card struct {
 }
 
 // CardSignal is one line of a card: a key, its value and its tone. Key and
-// Value are codes the plugin's ui.toml [signals] words, Params the values
-// its words fill; a code with no words shows as itself.
+// Value are codes the plugin's ui.toml [signals] words; a code with no words
+// shows as itself.
 type CardSignal struct {
-	Key    string            `json:"key,omitempty"`
-	Value  string            `json:"value,omitempty"`
-	Tone   string            `json:"tone,omitempty"`
-	At     time.Time         `json:"at,omitzero"`
+	Key   string    `json:"key,omitempty"`
+	Value string    `json:"value,omitempty"`
+	Tone  string    `json:"tone,omitempty"`
+	At    time.Time `json:"at,omitzero"`
+	// Detail is what the signal's words read besides its codes; nil for none.
+	// A pointer keeps CardSignal comparable.
+	Detail *SignalDetail `json:"detail,omitempty"`
+}
+
+// SignalDetail is the values a signal's words fill and the notes its line
+// adds after its value.
+type SignalDetail struct {
 	Params map[string]string `json:"params,omitempty"`
 	Notes  []SignalNote      `json:"notes,omitempty"`
 }

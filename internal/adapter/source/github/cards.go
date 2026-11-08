@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/termfmt"
-	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // Cards are the pull requests' cards and items: the ones the GitHub
@@ -99,16 +98,17 @@ func CardOf(r api.Row, s prrow.Report, now time.Time) (card.Card, error) {
 	overlaid := string(r.Kind) != s.Situation.Kind
 	muted := situation.Kind(r.Kind) == situation.KindMuted
 	for _, sig := range rc.Signals {
-		switch {
-		case sig.Key == signalSituation:
-			sig.Value, sig.Notes = string(r.Kind), nil
-			if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
-				sig.Notes = []src.SignalNote{{Code: noteStalled, Tone: "warn", Params: map[string]string{"days": stalledDays(r.Summary.Since, now)}}}
-			}
-		case overlaid && !muted && sig.Key != signalChecks:
+		if overlaid && !muted && sig.Key != signalChecks && sig.Key != signalSituation {
 			continue
 		}
-		c.Signals = append(c.Signals, readmodel.CardSignal(sig))
+		cs := readmodel.CardSignal(sig)
+		if sig.Key == signalSituation {
+			cs.Value, cs.Notes = string(r.Kind), nil
+			if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
+				cs.Notes = []card.Note{{Code: noteStalled, Tone: "warn", Params: map[string]string{"days": stalledDays(r.Summary.Since, now)}}}
+			}
+		}
+		c.Signals = append(c.Signals, cs)
 	}
 	if h := rc.LastHuman; h != nil {
 		c.LastHuman = &card.Human{Who: items.Person{Key: h.Who.Key, Name: h.Who.Name, Aliases: slices.Clone(h.Who.Aliases)}, What: h.What, At: h.At, Link: h.Link}

@@ -84,7 +84,7 @@ func (r Row) signals() []src.CardSignal {
 		return []src.CardSignal{sit}
 	}
 	if r.Stalled() {
-		sit.Notes = []src.SignalNote{StalledNote(r.Situation.Stalled.Time, r.in.Now)}
+		sit.Detail = &src.SignalDetail{Notes: []src.SignalNote{stalledNote(r.Situation.Stalled.Time, r.in.Now)}}
 	}
 	out := []src.CardSignal{sit}
 	if f := r.Payload.Facts; f != nil {
@@ -92,7 +92,7 @@ func (r Row) signals() []src.CardSignal {
 		case "FAILURE", "ERROR":
 			s := src.CardSignal{Key: SignalChecks, Value: ChecksFailing, Tone: ToneBad}
 			if len(f.Checks.Failing) > 0 {
-				s.Value, s.Params = ChecksFailingNamed, map[string]string{"names": strings.Join(f.Checks.Failing, ", ")}
+				s.Value, s.Detail = ChecksFailingNamed, &src.SignalDetail{Params: map[string]string{"names": strings.Join(f.Checks.Failing, ", ")}}
 			}
 			out = append(out, s)
 		case "PENDING":
@@ -113,8 +113,8 @@ func (r Row) signals() []src.CardSignal {
 	return out
 }
 
-// StalledNote is the situation's note of a stall that began waiting at since, as of now.
-func StalledNote(since, now time.Time) src.SignalNote {
+// stalledNote is the situation's note of a stall that began waiting at since, as of now.
+func stalledNote(since, now time.Time) src.SignalNote {
 	return src.SignalNote{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": stalledDays(since, now)}}
 }
 

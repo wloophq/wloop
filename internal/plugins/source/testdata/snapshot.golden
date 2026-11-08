@@ -42,18 +42,20 @@
         "value": "snapshot.Card.Signals[0].Value",
         "tone": "snapshot.Card.Signals[0].Tone",
         "at": "2026-10-28T09:00:41Z",
-        "params": {
-          "snapshot.Card.Signals[0].Params.key": "snapshot.Card.Signals[0].Params.value"
-        },
-        "notes": [
-          {
-            "code": "snapshot.Card.Signals[0].Notes[0].Code",
-            "tone": "snapshot.Card.Signals[0].Notes[0].Tone",
-            "params": {
-              "snapshot.Card.Signals[0].Notes[0].Params.key": "snapshot.Card.Signals[0].Notes[0].Params.value"
+        "detail": {
+          "params": {
+            "snapshot.Card.Signals[0].Detail.Params.key": "snapshot.Card.Signals[0].Detail.Params.value"
+          },
+          "notes": [
+            {
+              "code": "snapshot.Card.Signals[0].Detail.Notes[0].Code",
+              "tone": "snapshot.Card.Signals[0].Detail.Notes[0].Tone",
+              "params": {
+                "snapshot.Card.Signals[0].Detail.Notes[0].Params.key": "snapshot.Card.Signals[0].Detail.Notes[0].Params.value"
+              }
             }
-          }
-        ]
+          ]
+        }
       }
     ],
     "last_human": {
@@ -65,7 +67,7 @@
         ]
       },
       "what": "snapshot.Card.LastHuman.What",
-      "at": "2026-10-28T09:01:00Z",
+      "at": "2026-10-28T09:01:02Z",
       "link": "snapshot.Card.LastHuman.Link"
     },
     "why": "snapshot.Card.Why",
@@ -78,7 +80,7 @@
         ]
       }
     ],
-    "since": "2026-10-28T09:01:09Z",
+    "since": "2026-10-28T09:01:11Z",
     "link": "snapshot.Card.Link",
     "turns_link": "snapshot.Card.TurnsLink",
     "started_by_me": true,
@@ -124,7 +126,7 @@
         },
         "ref": "snapshot.Items[0].Origin.Ref",
         "permalink": "snapshot.Items[0].Origin.Permalink",
-        "at": "2026-10-28T09:01:45Z"
+        "at": "2026-10-28T09:01:47Z"
       },
       "requester": {
         "key": "snapshot.Items[0].Requester.Key",
@@ -149,7 +151,7 @@
         },
         "ref": "snapshot.Items[0].AssignedAt.Ref",
         "permalink": "snapshot.Items[0].AssignedAt.Permalink",
-        "at": "2026-10-28T09:02:03Z"
+        "at": "2026-10-28T09:02:05Z"
       },
       "basis": "snapshot.Items[0].Basis",
       "waiting_on": [
@@ -172,7 +174,7 @@
           },
           "ref": "snapshot.Items[0].Evidence.Anchor.Ref",
           "permalink": "snapshot.Items[0].Evidence.Anchor.Permalink",
-          "at": "2026-10-28T09:02:21Z"
+          "at": "2026-10-28T09:02:23Z"
         }
       },
       "trail": [
@@ -185,7 +187,7 @@
             },
             "ref": "snapshot.Items[0].Trail[0].Anchor.Ref",
             "permalink": "snapshot.Items[0].Trail[0].Anchor.Permalink",
-            "at": "2026-10-28T09:02:31Z"
+            "at": "2026-10-28T09:02:33Z"
           }
         }
       ],
@@ -194,26 +196,26 @@
       "provenance": "snapshot.Items[0].Provenance",
       "confirmed": true,
       "task_key": "snapshot.Items[0].TaskKey",
-      "user_at": "2026-10-28T09:02:37Z",
-      "created_at": "2026-10-28T09:02:38Z",
-      "updated_at": "2026-10-28T09:02:39Z"
+      "user_at": "2026-10-28T09:02:39Z",
+      "created_at": "2026-10-28T09:02:40Z",
+      "updated_at": "2026-10-28T09:02:41Z"
     }
   ],
   "facts": [
     {
       "name": "snapshot.Facts[0].Name",
       "value": {
-        "kind": 164,
+        "kind": 166,
         "bool": true,
-        "int": 166,
+        "int": 168,
         "string": "snapshot.Facts[0].Value.String",
         "list": [
           "snapshot.Facts[0].Value.List[0]"
         ],
-        "duration": 170,
-        "time": "2026-10-28T09:02:51Z",
-        "threshold": 172,
-        "unit": 173
+        "duration": 172,
+        "time": "2026-10-28T09:02:53Z",
+        "threshold": 174,
+        "unit": 175
       }
     }
   ],
@@ -221,7 +223,7 @@
     {
       "name": "snapshot.Signals[0].Name",
       "on": true,
-      "since": "2026-10-28T09:02:58Z"
+      "since": "2026-10-28T09:03:00Z"
     }
   ],
   "owes": [
@@ -237,19 +239,19 @@
     {
       "action": "snapshot.Offers[0].Action",
       "args": {
-        "n": 188
+        "n": 190
       }
     }
   ],
   "extraction": {
-    "pending": 191,
+    "pending": 193,
     "budget_hit": true,
-    "oldest": "2026-10-28T09:03:13Z"
+    "oldest": "2026-10-28T09:03:15Z"
   },
   "contexts": [
     "snapshot.Contexts[0]"
   ],
-  "due": "2026-10-28T09:03:16Z",
+  "due": "2026-10-28T09:03:18Z",
   "links": [
     {
       "url": "snapshot.Links[0].URL",
@@ -262,7 +264,7 @@
         },
         "ref": "snapshot.Links[0].Evidence.Ref",
         "permalink": "snapshot.Links[0].Evidence.Permalink",
-        "at": "2026-10-28T09:03:28Z"
+        "at": "2026-10-28T09:03:30Z"
       }
     }
   ],

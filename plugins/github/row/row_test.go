@@ -184,7 +184,7 @@ func TestCardFromRow(t *testing.T) {
 		t.Errorf("card %+v", c)
 	}
 	want := []src.CardSignal{{Key: SignalSituation, Value: string(situation.KindChecks), Tone: ToneNeutral},
-		{Key: SignalChecks, Value: ChecksFailingNamed, Tone: ToneBad, Params: map[string]string{"names": "lint"}}}
+		{Key: SignalChecks, Value: ChecksFailingNamed, Tone: ToneBad, Detail: &src.SignalDetail{Params: map[string]string{"names": "lint"}}}}
 	if !reflect.DeepEqual(c.Signals, want) {
 		t.Errorf("signals %+v, want %+v", c.Signals, want)
 	}

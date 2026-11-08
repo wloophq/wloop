@@ -128,7 +128,7 @@ func TestAStalledCardSaysSoOnItsSituationLine(t *testing.T) {
 		t.Errorf("a separate stalled signal: %+v", sigs)
 	}
 	want := src.CardSignal{Key: SignalSituation, Value: string(situation.KindChanges), Tone: ToneNeutral,
-		Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": "7"}}}}
+		Detail: &src.SignalDetail{Notes: []src.SignalNote{{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": "7"}}}}}
 	if !reflect.DeepEqual(sigs[0], want) {
 		t.Errorf("situation signal %+v, want %+v", sigs[0], want)
 	}
@@ -153,8 +153,8 @@ func TestEachCardSignalIsACode(t *testing.T) {
 		var got []string
 		for _, s := range Derive(input(f)).Card().Signals {
 			line := s.Key + "=" + s.Value
-			if n := s.Params["names"]; n != "" {
-				line += " names=" + n
+			if s.Detail != nil && s.Detail.Params["names"] != "" {
+				line += " names=" + s.Detail.Params["names"]
 			}
 			got = append(got, line)
 		}

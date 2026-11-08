@@ -1010,15 +1010,17 @@
             "key": "situation",
             "value": "no_reviewer",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "2"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "2"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -1669,22 +1671,26 @@
             "key": "situation",
             "value": "checks",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "2"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "2"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "failing_named",
             "tone": "bad",
-            "params": {
-              "names": "lint, unit"
+            "detail": {
+              "params": {
+                "names": "lint, unit"
+              }
             }
           }
         ],
@@ -2025,15 +2031,17 @@
             "key": "situation",
             "value": "changes",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "7"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "7"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -3070,15 +3078,17 @@
             "key": "situation",
             "value": "reply",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "3"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "3"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -3406,15 +3416,17 @@
             "key": "situation",
             "value": "no_reviewer",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "3"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "3"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -5543,15 +5555,17 @@
             "key": "situation",
             "value": "review",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "10"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "10"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -5876,15 +5890,17 @@
             "key": "situation",
             "value": "no_reviewer",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "10"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "10"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",
@@ -6490,15 +6506,17 @@
             "key": "situation",
             "value": "review",
             "tone": "neutral",
-            "notes": [
-              {
-                "code": "stalled",
-                "tone": "warn",
-                "params": {
-                  "days": "42"
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "params": {
+                    "days": "42"
+                  }
                 }
-              }
-            ]
+              ]
+            }
           },
           {
             "key": "checks",

@@ -429,9 +429,12 @@ func people(ps []src.Person) []items.Person {
 
 // CardSignal is a plugin's card signal as a card holds it.
 func CardSignal(s src.CardSignal) card.Signal {
-	out := card.Signal{Key: s.Key, Value: s.Value, Tone: card.Tone(s.Tone), At: s.At, Params: maps.Clone(s.Params)}
-	for _, n := range s.Notes {
-		out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params)})
+	out := card.Signal{Key: s.Key, Value: s.Value, Tone: card.Tone(s.Tone), At: s.At}
+	if d := s.Detail; d != nil {
+		out.Params = maps.Clone(d.Params)
+		for _, n := range d.Notes {
+			out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params)})
+		}
 	}
 	return out
 }
