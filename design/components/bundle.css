@@ -832,7 +832,7 @@ body.layout-detail .d-window { right: 0; }
 
 /* piece B: the home, the decision queue and the omnibox. */
 .home-screen, .queue-screen { padding: var(--space-16); font-size: var(--text-body); }
-.home { display: flex; flex-direction: column; gap: var(--space-16); max-width: 56rem; }
+.home { display: flex; flex-direction: column; gap: var(--space-16); }
 .briefing { margin: 0; font-size: var(--text-heading); line-height: 1.5; color: var(--ink); }
 .briefing.empty { color: var(--muted); }
 .briefing .counter { color: var(--me); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--rule-strong); }

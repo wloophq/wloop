@@ -316,3 +316,18 @@ return JSON.stringify({ Panel: r(".omni-panel").width, Field: r(".omni-input").w
 		t.Fatalf("%+v: the field spans the panel in a large type and the keys hint sits at its bottom", got)
 	}
 }
+
+// TestTheHomeSpansTheList lays the home out in a wide list: it takes the list's whole width, which only the
+// detail opening beside it narrows.
+func TestTheHomeSpansTheList(t *testing.T) {
+	const page = `<body style="margin: 0"><section id="list" style="width: 1600px"><section id="home" class="home-screen"><div class="home"><p class="briefing">The agent has 3 questions for you.</p></div></section></section>`
+	const probe = `const r = (s) => document.querySelector(s).getBoundingClientRect();
+return JSON.stringify({ Screen: r(".home-screen").width, Home: r(".home").width });`
+	var got struct{ Screen, Home float64 }
+	if err := json.Unmarshal([]byte(pageProbe(t, page, 1700, probe)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Home < got.Screen-2*16-1 {
+		t.Fatalf("%+v: the home spans its screen", got)
+	}
+}
