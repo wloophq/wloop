@@ -143,17 +143,22 @@ summary = "Lift the block without trusting the folder; the round waits for its n
 note = "Lift the block without trusting; the round waits for a new trigger"
 status = "dismissed"
 
+# The diff of a pull request a start turn opened, for you to review; its
+# text reads the facts of the task and of the units it holds.
 [gates.review-diff]
 kind = "step"
 label = "Review the diff"
+text = "Review the diff{{with .pr.slug}} of {{.}}{{end}}{{with .pr.changed_files}}, {{if eq . 1}}1 file{{else}}{{.}} files{{end}} changed{{end}}"
 closes_with = "dismiss"
 
 [gates.review-diff.intents.approve]
 label = "Looks good"
+summary = "Mark the diff reviewed; posts nothing."
 status = "approved"
 
 [gates.review-diff.intents.dismiss]
 label = "Dismiss"
+summary = "Close this step without reviewing; the task stays as it is."
 status = "dismissed"
 
 # A run that failed or ended without its record, of an intent whose

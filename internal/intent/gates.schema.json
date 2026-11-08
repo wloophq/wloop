@@ -160,7 +160,7 @@
                   "type": "string"
                 },
                 "summary": {
-                  "description": "What resolving the gate with the intent does, as help and palettes show it.",
+                  "description": "What resolving the gate with the intent does, as help, palettes and the gate's card show it.",
                   "type": "string"
                 }
               },
@@ -187,7 +187,7 @@
             "type": "string"
           },
           "text": {
-            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.",
+            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb. A step gate's is over the workflow facts of its unit and of the units its task holds, such as `{{.pr.slug}}`, rendered as its gate.open opens it.",
             "type": "string"
           }
         },

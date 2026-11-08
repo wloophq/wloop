@@ -421,12 +421,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `trust`: A repository's first run: resolving it unblocks the run.
   - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string, localized): What the gate asks of you, as clients list it.
-- `gates.<name>.text` (template, localized): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.
+- `gates.<name>.text` (template, localized): The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb. A step gate's is over the workflow facts of its unit and of the units its task holds, such as `{{.pr.slug}}`, rendered as its gate.open opens it.
 - `gates.<name>.closes_with` (string): The intent, one that refuses the gate, the gate closes with when you end the task it is on. While the gate is open, nothing else ends the task: its items resolving leave it open, and a workflow's verb that would end it is refused, until you settle the gate. The task's unit ending (a pull request merged or closed) supersedes the gate as moot. Empty or left out, the gate neither holds its task nor closes with it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `gates.<name>.intents.<name>.label` (string, localized): The name people read on its button.
-- `gates.<name>.intents.<name>.summary` (string, localized): What resolving the gate with the intent does, as help and palettes show it.
+- `gates.<name>.intents.<name>.summary` (string, localized): What resolving the gate with the intent does, as help, palettes and the gate's card show it.
 - `gates.<name>.intents.<name>.note` (template, localized): What the intent would do on a row that offers it, over the action facts.
 - `gates.<name>.intents.<name>.confirm` (template, localized): The dialog that confirms the intent on a row, over the action facts; empty asks nothing.
 - `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to; required for a new intent.

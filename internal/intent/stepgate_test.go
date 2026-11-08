@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 const stepWorkflow = `summary = "Case"
@@ -46,10 +47,46 @@ func TestAGateWithdrawLoadsWithItsReasonAndNeedsAGateOpenStep(t *testing.T) {
 	}
 }
 
+func TestAStepGatesTextReadsTheWorkflowFacts(t *testing.T) {
+	facts := func(changed any) map[string]any {
+		return intentload.StepFacts(func(n string) any {
+			return map[string]any{"pr.slug": "acme/api#7", "pr.changed_files": changed}[n]
+		})
+	}
+	for _, c := range []struct {
+		locale  string
+		changed any
+		want    string
+	}{
+		{"", int64(3), "Review the diff of acme/api#7, 3 files changed"},
+		{"", int64(1), "Review the diff of acme/api#7, 1 file changed"},
+		{"", nil, "Review the diff of acme/api#7"},
+		{"pt-BR", int64(3), "Revisar o diff de acme/api#7, 3 arquivos alterados"},
+		{"pt-BR", int64(1), "Revisar o diff de acme/api#7, 1 arquivo alterado"},
+	} {
+		l, problems := loadProfile(t, c.locale, nil)
+		if len(problems) > 0 {
+			t.Fatal(problems.Error())
+		}
+		def, _ := l.Gates.Gate("review-diff")
+		if got, err := def.Words(facts(c.changed)); err != nil || got != c.want {
+			t.Errorf("%s, %v files: %q %v, want %q", c.locale, c.changed, got, err, c.want)
+		}
+	}
+	_, problems := loadProfile(t, "", map[string]string{"gates.toml": "[gates.review-diff]\ntext = \"{{.pr.nope}}\"\n"})
+	if !strings.Contains(problems.Error(), "gates.review-diff.text") {
+		t.Fatalf("a step gate's text naming no fact: %v", problems)
+	}
+}
+
 func TestTheReviewDiffStepReadsInPortuguese(t *testing.T) {
 	l, problems := loadProfile(t, "pt-BR", nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
+	}
+	def, _ := l.Gates.Gate("review-diff")
+	if len(def.Intents) != 2 || def.Intents[0].Summary != "Marcar o diff como revisado; não publica nada." || def.Intents[1].Summary == "" {
+		t.Fatalf("review-diff's answers in pt-BR: %+v", def.Intents)
 	}
 	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == "start-review-diff" })
 	if i < 0 || l.Workflows[i].GateWithdraw == nil || !strings.HasPrefix(l.Workflows[i].GateWithdraw.Reason, "o pull request foi mesclado") {

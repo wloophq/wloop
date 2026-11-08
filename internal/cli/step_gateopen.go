@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 // stepGates are the gates gate.open opens, and the open ones it holds on.
@@ -76,11 +80,44 @@ func (s *stepSet) gateOpenRun(ctx context.Context, c stepCall, _ automation.RunO
 	if err != nil && !errors.Is(err, automation.ErrUnitGone) {
 		return "", err
 	}
-	g, err := s.d.Gates.Open(ctx, gate.Gate{Name: c.arg("name"), Unit: c.u, Subject: w.Name}, s.e.workflowPolicy(w, facts))
-	if err != nil {
+	g := gate.Gate{Name: c.arg("name"), Unit: c.u, Subject: w.Name, Text: s.stepText(ctx, c.arg("name"), facts)}
+	if g, err = s.d.Gates.Open(ctx, g, s.e.workflowPolicy(w, facts)); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("opened gate %s %d, %s", g.Name, g.ID, g.Status), nil
+}
+
+// stepText is gate name's text over the facts of its unit, which are facts, and of the units its task holds,
+// the first unit's where two say the same fact; "" leaves the gate its label, as when the text fails.
+func (s *stepSet) stepText(ctx context.Context, name string, facts workflow.Facts) string {
+	def, ok := s.e.loadedIntents().Gates.Gate(name)
+	if !ok || def.Text == nil {
+		return ""
+	}
+	all := maps.Clone(facts)
+	for _, ref := range factList(facts, "task.units") {
+		p, key, ok := strings.Cut(ref, ":")
+		if !ok {
+			continue
+		}
+		f, err := s.facts(ctx, unit.Unit{Provider: unit.ProviderID(p), Key: key})
+		if err != nil {
+			s.logf("gate %s: the facts of %s: %v", name, ref, err)
+			continue
+		}
+		for k, v := range f {
+			if _, set := all[k]; !set {
+				all[k] = v
+			}
+		}
+	}
+	all, _ = workflow.Resolve(all, s.e.Now())
+	text, err := def.Words(intentload.StepFacts(func(n string) any { return all[n] }))
+	if err != nil {
+		s.logf("gate %s: its text: %v", name, err)
+		return ""
+	}
+	return text
 }
 
 // configuredWorkflow is the loaded workflow name with the configuration

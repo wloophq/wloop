@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // startedTask is a task the user captured, a start turn ran on, and the pull request it opened attached.
@@ -47,12 +48,16 @@ func TestAReviewDiffStepLeavesOnceItsPRMergesAndTheTaskCloses(t *testing.T) {
 	p := newPRTaskRig(t)
 	p.r.te.newGates(p.r.db, t.Logf)
 	p.eng.Gates = draftGates{e: p.r.te.Env, db: p.r.db, logf: t.Logf}
+	p.prs.more = map[unit.Unit]workflow.Facts{
+		ptPR1: {"pr.slug": "acme/api#1", "pr.changed_files": int64(3)},
+		ptPR2: {"pr.slug": "acme/api#2", "pr.changed_files": int64(1)},
+	}
 	merged := p.startedTask(t, ptPR1)
 	open := p.startedTask(t, ptPR2)
 	p.pass(t)
-	for _, id := range []task.ID{merged, open} {
-		if gs := p.reviewDiff(t, id); len(gs) != 1 || gs[0].Status != gate.Open {
-			t.Fatalf("%s: the review-diff steps %+v, want one open", id, gs)
+	for id, want := range map[task.ID]string{merged: "Review the diff of acme/api#1, 3 files changed", open: "Review the diff of acme/api#2, 1 file changed"} {
+		if gs := p.reviewDiff(t, id); len(gs) != 1 || gs[0].Status != gate.Open || gs[0].Text != want {
+			t.Fatalf("%s: the review-diff steps %+v, want one open that reads %q", id, gs, want)
 		}
 	}
 

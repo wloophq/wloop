@@ -128,7 +128,7 @@ type GateDef struct {
 	// with a status and none of its gates is open; a status it leaves out leaves the task open.
 	EndsTask map[gate.Status]task.Category
 	// Text words the gate's subject when the loop writes it, a template
-	// over the proposal facts; nil writes nothing.
+	// over the proposal facts, or a step gate's over StepFacts; nil writes nothing.
 	Text *template.Template
 }
 
@@ -145,6 +145,20 @@ func (g GateDef) Words(facts map[string]any) (string, error) {
 // ProposalFacts are the proposal facts, each value got by its name.
 func ProposalFacts(get func(name string) any) map[string]any {
 	return factMap(builtin.ProposalSlot, get)
+}
+
+// StepFacts are the facts a step gate's text reads: the workflow facts of its unit and of the units its task
+// holds, each value got by its name.
+func StepFacts(get func(name string) any) map[string]any {
+	return factMap(builtin.WorkflowSlot, get)
+}
+
+// textSample is the facts gate kind k's text is checked over.
+func textSample(k gate.Kind) map[string]any {
+	if k == gate.KindStep {
+		return sampleFacts(builtin.WorkflowSlot)
+	}
+	return sampleFacts(builtin.ProposalSlot)
 }
 
 // GateIntent is what a gate is resolved with: the status it resolves the
@@ -422,7 +436,7 @@ func mergeGate(s *sheet, d *GatesDef, name string, m mGate) {
 	case *m.Text == "":
 		g.Text = nil
 	default:
-		tmpl, err := ActionText(s.textFuncs(), path+".text", *m.Text, sampleFacts(builtin.ProposalSlot))
+		tmpl, err := ActionText(s.textFuncs(), path+".text", *m.Text, textSample(g.Kind))
 		if err != nil {
 			_, msg := templateMsg(path+".text", err)
 			s.add(path+".text", "%s", msg)
