@@ -62,7 +62,7 @@ func (b eventsBackend) Append(evs ...workflow.Event) []workflow.Event {
 	return out
 }
 
-func openLogged(t *testing.T, path string) (*DB, *change.Log) {
+func openLogged(t testing.TB, path string) (*DB, *change.Log) {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := Open(path, log)
