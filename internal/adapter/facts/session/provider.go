@@ -136,7 +136,9 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	p.mu.Lock()
 	p.due[u.Key] = p.deadline(s)
 	p.mu.Unlock()
-	return s.facts(p.d.Clock.Now(), pf, p.d.Turns.ProcessGone(u.Key)), nil
+	f := s.facts(p.d.Clock.Now(), pf, p.d.Turns.ProcessGone(u.Key))
+	f["session.orphan_durable"] = p.d.Turns.OrphanDurable(u.Key)
+	return f, nil
 }
 
 // Owners is the unit the session's facts are about: that of the newest turn

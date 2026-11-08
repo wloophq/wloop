@@ -250,37 +250,29 @@ func TestCensusCountsEveryRowAndKnowsACutShortList(t *testing.T) {
 	}
 }
 
-func TestCensusNamesOrphanedProcessesOnlyWhileTheAppIsAttached(t *testing.T) {
-	ctx := context.Background()
-	const shown = `{"handle":"term_shown","worktreeId":"ws","connected":true,"writable":true,"orphaned":false}`
-	const orphan = `{"handle":"term_1","worktreeId":"ws","connected":true,"writable":true,"orphaned":true}`
-	const orphanAgent = `{"handle":"term_2","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"agentIdentity":"claude"}`
-	list := func(rows ...string) string {
-		return `{"ok":true,"result":{"terminals":[` + strings.Join(rows, ",") + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+type epochRunner struct {
+	list  string
+	epoch string
+}
+
+func (r epochRunner) Run(_ context.Context, args ...string) ([]byte, error) {
+	if args[0] == "status" {
+		return []byte(`{"ok":true,"result":{"graphStatus":"ready","rendererGraphEpoch":"` + r.epoch + `"}}`), nil
 	}
-	for _, c := range []struct {
-		name string
-		list string
-		want []string
-	}{
-		{"an orphaned process beside a shown one", list(shown, orphan, orphanAgent), []string{"term_1"}},
-		{"every process orphaned, as an app restarting", list(orphan, orphanAgent), nil},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			got, err := orca.New(&wsorca.Manager{R: listRunner{c.list}}, cols, nil).Census(ctx)
-			if err != nil || !got.Complete {
-				t.Fatalf("Census = %+v, %v", got, err)
-			}
-			var names []string
-			for h, ok := range got.Orphaned {
-				if ok {
-					names = append(names, h)
-				}
-			}
-			if !slices.Equal(names, c.want) || got.Handles["term_1"] != "ws" {
-				t.Fatalf("orphaned %v, want %v; handles %v", names, c.want, got.Handles)
-			}
-		})
+	return []byte(r.list), nil
+}
+
+func TestCensusNamesEveryOrphanWithNoAgentWithItsLastOutputAndTheEpoch(t *testing.T) {
+	const rows = `{"handle":"term_shown","worktreeId":"ws","connected":true,"writable":true,"orphaned":false},` +
+		`{"handle":"term_1","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"lastOutputAt":1760000000000},` +
+		`{"handle":"term_2","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"agentIdentity":"claude"}`
+	list := `{"ok":true,"result":{"terminals":[` + rows + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+	got, err := orca.New(&wsorca.Manager{R: epochRunner{list, "9"}}, cols, nil).Census(context.Background())
+	if err != nil || !got.Complete || got.Epoch != "9" || len(got.Handles) != 3 {
+		t.Fatalf("Census = %+v, %v", got, err)
+	}
+	if last, ok := got.Orphans["term_1"]; len(got.Orphans) != 1 || !ok || !last.Equal(time.UnixMilli(1760000000000)) {
+		t.Fatalf("orphans %v, want term_1 alone with its last output", got.Orphans)
 	}
 }
 

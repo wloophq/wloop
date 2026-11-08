@@ -361,6 +361,26 @@ func TestWorktreeGone(t *testing.T) {
 	}
 }
 
+func TestAnOrphanIsDurableOnceTheCensusProvesIt(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.session("term_1", nil)
+	w.sess.Orphan("term_1")
+	for i, epoch := range []string{"e1", "e2", "e2"} {
+		if got := w.facts(t, "term_1")["session.orphan_durable"]; got != false {
+			t.Fatalf("durable before reading %d", i)
+		}
+		w.sess.SetReading(epoch, w.clock.Now())
+		if err := w.p.Refresh(ctx); err != nil {
+			t.Fatal(err)
+		}
+		w.clock.Advance(time.Minute)
+	}
+	if w.facts(t, "term_1")["session.orphan_durable"] != true {
+		t.Fatal("not durable after it outlived a renderer restart")
+	}
+}
+
 func TestGoneFollowsTwoCompleteCensuses(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)

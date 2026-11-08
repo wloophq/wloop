@@ -103,6 +103,22 @@ func TestAllTerminalsScope(t *testing.T) {
 	}
 }
 
+func TestAllTerminalsReadsTheRendererGraphEpoch(t *testing.T) {
+	list := `{"ok":true,"result":{"terminals":[{"handle":"h1","worktreeId":"a","orphaned":true}],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}},"_meta":{"runtimeId":"rt-1"}}`
+	for status, want := range map[string]string{
+		`{"ok":true,"result":{"graphStatus":"ready","rendererGraphEpoch":7}}`:     "7",
+		`{"ok":true,"result":{"graphStatus":"ready","rendererGraphEpoch":"e-2"}}`: "e-2",
+		`{"ok":true,"result":{"graphStatus":"ready"}}`:                            "",
+		`{"ok":true,"result":{"graphStatus":"loading","rendererGraphEpoch":7}}`:   "",
+	} {
+		m := canned{"terminal list": list, "status get": status, "status": status}.manager()
+		terms, scope, err := m.AllTerminals(context.Background())
+		if err != nil || scope.Epoch != want || len(terms) != 1 || !terms[0].Orphaned {
+			t.Errorf("%s: scope %+v, terms %+v, %v; want epoch %q", status, scope, terms, err, want)
+		}
+	}
+}
+
 func TestAllTerminalsKeepsTheListWhenStatusFails(t *testing.T) {
 	f := &fakeRPC{replies: map[string]string{
 		"terminal.list": `{"ok":true,"result":{"terminals":[{"handle":"h1","worktreeId":"a"}],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}},"_meta":{"runtimeId":"r"}}`,

@@ -26,6 +26,10 @@ type Scope struct {
 	Complete bool
 	// RuntimeID is the manager instance that answered; it changes on restart.
 	RuntimeID string
+	// Epoch is the manager's renderer graph epoch, which changes when the app's
+	// windows restart and reattach their processes while RuntimeID stays; ""
+	// when unknown or the graph is not ready.
+	Epoch string
 }
 
 // Pane is one agent the manager sees in a workspace. A Pane with no State is no agent: it
