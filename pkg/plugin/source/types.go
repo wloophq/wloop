@@ -128,12 +128,24 @@ type Card struct {
 	Cares         bool         `json:"cares,omitempty"`
 }
 
-// CardSignal is one line of a card: a key, its value and its tone.
+// CardSignal is one line of a card: a key, its value and its tone. Key and
+// Value are codes the plugin's ui.toml [signals] words, Params the values
+// its words fill; a code with no words shows as itself.
 type CardSignal struct {
-	Key   string    `json:"key,omitempty"`
-	Value string    `json:"value,omitempty"`
-	Tone  string    `json:"tone,omitempty"`
-	At    time.Time `json:"at,omitzero"`
+	Key    string            `json:"key,omitempty"`
+	Value  string            `json:"value,omitempty"`
+	Tone   string            `json:"tone,omitempty"`
+	At     time.Time         `json:"at,omitzero"`
+	Params map[string]string `json:"params,omitempty"`
+	Notes  []SignalNote      `json:"notes,omitempty"`
+}
+
+// SignalNote is what a signal's line adds after its value, in its own
+// tone: a code its signal's notes word, filled with Params.
+type SignalNote struct {
+	Code   string            `json:"code,omitempty"`
+	Tone   string            `json:"tone,omitempty"`
+	Params map[string]string `json:"params,omitempty"`
 }
 
 // Human is the last thing a person did on a unit.
