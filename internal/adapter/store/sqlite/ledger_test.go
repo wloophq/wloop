@@ -545,6 +545,32 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 // TestADismissedKeyIsNotPlannedAgainAfter31Days: the engine plans no item
 // for a key whose run is dismissed (automation's evaluate), so the run must
 // outlive every retention pass while its unit lives.
+func TestAGainThatMovesUnderTheShownPrecisionNotesNothing(t *testing.T) {
+	t.Parallel()
+	db, log := openLogged(t, filepath.Join(t.TempDir(), "gain.db"))
+	ctx := context.Background()
+	l := db.Ledger()
+	blocked := pendingItem("w", unit.Unit{Provider: unit.Workspace, Key: "ws1"})
+	blocked.Decision, blocked.Default, blocked.Deadline = workflow.DecisionBlocked, "", time.Time{}
+	save := func(memory, disk int64) port.Change {
+		t.Helper()
+		it := blocked
+		it.Gain = workflow.Gain{MemoryBytes: memory, DiskBytes: disk}
+		got, _, err := noted(log, func() error { return l.Save(ctx, automation.PlanWrite{Workflows: []string{"w"}, Items: []workflow.Item{it}}) })
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	save(300<<20, 2<<30)
+	if c := save(300<<20+4<<10, 2<<30+3<<20); !c.Empty() {
+		t.Errorf("a gain that moved by a few KiB of memory and MiB of disk noted %+v", c)
+	}
+	if c := save(310<<20, 2<<30+3<<20); c.Topics != port.TopicPlan {
+		t.Errorf("a gain that moved by 10 MiB noted %+v, want the plan", c)
+	}
+}
+
 func TestRetentionOfPlanItemsNotesThePlan(t *testing.T) {
 	t.Parallel()
 	db, log := openLogged(t, filepath.Join(t.TempDir(), "retain.db"))

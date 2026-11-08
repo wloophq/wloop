@@ -31,8 +31,11 @@ var _ automation.Ledger = ledger{}
 // what the plan serves of an item changes.
 func (db *DB) Ledger() automation.Ledger { return ledger{db, time.Now} }
 
-const itemColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
-	default_outcome, deadline, guidance, attempts, error, observe, at, gain_memory, gain_disk`
+const itemColumns = shownColumns + `, gain_memory, gain_disk`
+
+// shownColumns are the item columns but the gain, which each pass measures again.
+const shownColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
+	default_outcome, deadline, guidance, attempts, error, observe, at`
 
 // insertItemSQL takes itemArgs and the write time, which retention ages
 // the row by.
@@ -133,7 +136,7 @@ func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) err
 			if b.pending() && (!has || a.gate() != b.gate()) || a.pending() && (!had || a.gate() != b.gate()) {
 				pending = append(pending, u)
 			}
-			if !had || !has || a.served != b.served {
+			if !had || !has || a.served != b.served || a.gain != b.gain {
 				served = append(served, u)
 			}
 		}
@@ -158,11 +161,12 @@ func (l ledger) write(ctx context.Context, evs []port.Event, fn func(tx *Tx) err
 }
 
 // planRow is a plan item as the plan serves it: served holds every column but saved_at, which each sweep pass
-// rewrites.
+// rewrites, and the gain, which gain holds at the precision a client shows it.
 type planRow struct {
 	unit                        unit.Unit
 	decision, deadline, outcome string
 	served                      string
+	gain                        workflow.Gain
 }
 
 func (r planRow) pending() bool { return r.decision == string(workflow.DecisionPending) }
@@ -171,7 +175,8 @@ func (r planRow) pending() bool { return r.decision == string(workflow.DecisionP
 func (r planRow) gate() [3]string { return [3]string{r.decision, r.deadline, r.outcome} }
 
 func planSet(ctx context.Context, tx *Tx) (map[string]planRow, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT id, provider, unit_key, decision, deadline, default_outcome, json_array(`+itemColumns+`) FROM plan_items`)
+	rows, err := tx.QueryContext(ctx, `SELECT id, provider, unit_key, decision, deadline, default_outcome, json_array(`+shownColumns+`),
+		gain_memory, gain_disk FROM plan_items`)
 	if err != nil {
 		return nil, err
 	}
@@ -180,9 +185,11 @@ func planSet(ctx context.Context, tx *Tx) (map[string]planRow, error) {
 	for rows.Next() {
 		var id string
 		var r planRow
-		if err := rows.Scan(&id, &r.unit.Provider, &r.unit.Key, &r.decision, &r.deadline, &r.outcome, &r.served); err != nil {
+		if err := rows.Scan(&id, &r.unit.Provider, &r.unit.Key, &r.decision, &r.deadline, &r.outcome, &r.served,
+			&r.gain.MemoryBytes, &r.gain.DiskBytes); err != nil {
 			return nil, err
 		}
+		r.gain = r.gain.Shown()
 		out[id] = r
 	}
 	return out, rows.Err()
