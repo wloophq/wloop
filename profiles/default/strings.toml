@@ -502,6 +502,7 @@
 # The reasons a session close waits on, as a plan item shows them.
 "its terminal is closed; it ends on its own" = "its terminal is closed; it ends on its own"
 "its terminal is open with no agent in it: close that terminal, or dismiss this" = "its terminal is open with no agent in it: close that terminal, or dismiss this"
+"it has no workspace to find its terminal in: dismiss this" = "it has no workspace to find its terminal in: dismiss this"
 "now" = "now"
 "observe" = "observe"
 "only this" = "only this"

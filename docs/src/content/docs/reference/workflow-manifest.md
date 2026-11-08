@@ -65,7 +65,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Gate approval

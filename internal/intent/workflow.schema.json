@@ -354,6 +354,26 @@
             "if": {
               "properties": {
                 "use": {
+                  "const": "session.close_orphan"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "session.close_orphan"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
                   "const": "turn.start"
                 }
               },
@@ -748,6 +768,7 @@
               "turn.dismiss",
               "answer.refuse",
               "session.mark_dormant",
+              "session.close_orphan",
               "turn.start",
               "draft.propose",
               "classify",

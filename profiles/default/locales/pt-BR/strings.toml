@@ -495,6 +495,7 @@
 "Nothing pending or blocked in the plan." = "Nada pendente ou bloqueado no plano."
 "its terminal is closed; it ends on its own" = "o terminal dela foi fechado; ela termina sozinha"
 "its terminal is open with no agent in it: close that terminal, or dismiss this" = "o terminal dela está aberto sem agente: feche esse terminal ou dispense este item"
+"it has no workspace to find its terminal in: dismiss this" = "ela não tem workspace onde achar o terminal: dispense este item"
 "now" = "agora"
 "observe" = "observar"
 "only this" = "só este"

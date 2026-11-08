@@ -948,7 +948,7 @@ func TestCleanupWorkflowsLoad(t *testing.T) {
 			names = append(names, w.Name)
 		}
 	}
-	if len(names) != 16 {
+	if len(names) != 17 {
 		t.Fatalf("%d cleanup workflows: %v; problems %v %v", len(names), names, l.Problems, l.BrokenWorkflows)
 	}
 }
@@ -1365,8 +1365,9 @@ func TestManualSessionsWaitForTheUser(t *testing.T) {
 }
 
 // orphanTab closes the tab of handle's terminal in the app as a person does:
-// the manager lists its process orphaned, and the app shows no terminal. The
-// agent the app reported in it stays reported, as Orca's pane state lingers.
+// the manager lists its process orphaned with no agent identity, and the app
+// shows no terminal. The agent's pane state the app reported stays, as Orca's
+// lingers.
 func (f *fixtureEnv) orphanTab(t *testing.T, handle string) {
 	t.Helper()
 	i := slices.IndexFunc(f.snap.terms, func(tm wsdomain.Terminal) bool { return tm.Handle == handle })
@@ -1397,9 +1398,16 @@ func TestAQuietManualSessionWhoseTabWasClosedEndsOnItsOwn(t *testing.T) {
 	if it := itemOf(t, evaluate(t, eng), quiet, "session-manual-quiet"); it.Decision != workflow.DecisionBlocked || it.Reason != turns.RefusalTerminalClosed {
 		t.Fatalf("with its tab closed: %s (%s)", it.Decision, it.Reason)
 	}
-	for range 3 {
-		sweepOnce(t, eng)
+	sweepOnce(t, eng)
+	f.now = f.now.Add(3 * time.Minute)
+	sweepOnce(t, eng)
+	if slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatal("an orphan was ended before anything proved it durable")
+	}
+	f.sessions.SetReading("e2", time.Time{})
+	for range 4 {
 		f.now = f.now.Add(3 * time.Minute)
+		sweepOnce(t, eng)
 	}
 	row, ok, err := f.te.repo.Session(ctx, quiet.Key)
 	if err != nil || !ok || row.State() != turn.SessionDormant {

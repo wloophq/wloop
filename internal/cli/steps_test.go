@@ -15,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -105,12 +106,50 @@ func TestASessionCloseOfASessionGoneOrClosedIsMoot(t *testing.T) {
 	}
 }
 
+func TestTheOrphanCloseStepEndsOnlyADurableOrphanAndIsMootOnceTheSessionIsGone(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	u := unit.Unit{Provider: unit.Session, Key: "term-1"}
+	step := wfStep("session.close_orphan")
+	if why, err := s.Check(ctx, step, u, workflow.Why{}, automation.CheckOpts{}); err != nil || why != turns.RefusalOrphanUnproven {
+		t.Fatalf("before the census proves it: %q %v", why, err)
+	}
+	for i, epoch := range []string{"e1", "e2", "e2"} {
+		sess.SetReading(epoch, testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if why, err := s.Check(ctx, step, u, workflow.Why{}, automation.CheckOpts{}); err != nil || why != "" {
+		t.Fatalf("a durable orphan: %q %v", why, err)
+	}
+	if _, err := s.Run(ctx, step, u, workflow.Why{Workflow: "session-orphan-close"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if closed := sess.Closed(); len(closed) != 1 || closed[0] != "term-1" {
+		t.Fatalf("closed %v", closed)
+	}
+	var moot automation.Moot
+	if _, err := s.Check(ctx, step, unit.Unit{Provider: unit.Session, Key: "term-absent"}, workflow.Why{}, automation.CheckOpts{}); !errors.As(err, &moot) {
+		t.Fatalf("an absent session: %v, want moot", err)
+	}
+}
+
 func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
 	t.Parallel()
 	l := newTestEnv(t, &fake.Manager{}).loadedIntents()
-	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed} {
+	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace} {
 		if _, ok := l.Strings[key]; !ok {
 			t.Errorf("strings.toml does not word %q", key)
+		}
+		if !slices.Contains(api.PlanReasons, key) {
+			t.Errorf("api.PlanReasons lacks %q, so no client reads it through its catalog", key)
 		}
 	}
 }
