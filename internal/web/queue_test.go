@@ -444,3 +444,26 @@ process.stdout.write(JSON.stringify({ Posts: log.posts, Notices: log.notices }))
 		t.Fatalf("%+v: Enter on an off primary runs nothing and says why", got)
 	}
 }
+
+func TestAQueuedDraftOrGateSaysWhichTaskItIsAbout(t *testing.T) {
+	gateItem := map[string]any{"task": map[string]any{"id": "t-2", "title": "pick a name", "units": []any{}},
+		"gate":    map[string]any{"id": 8, "kind": "question", "text": "Which name?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}}},
+		"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Approve"}}
+	in := queuedDraft()
+	in["queues"].(map[string]any)["answer"] = map[string]any{"kind": "answer", "title": "Agent questions", "total": 1, "items": []any{gateItem}}
+	var got struct{ Draft, Gate []string }
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+const card = () => all(view(), (x) => String(x.attrs.class || "") === "queue-item")[0];
+const rows = () => all(card(), (x) => x.attrs["data-task"]).map((x) => x.attrs["data-task"]);
+globalThis.hash = "#queue=send-draft";
+await queueLoad(env.route(), env);
+const draft = rows();
+globalThis.hash = "#queue=answer";
+await queueLoad(env.route(), env);
+process.stdout.write(JSON.stringify({ Draft: draft, Gate: rows() }));
+})();`, in, &got)
+	if !slices.Equal(got.Draft, []string{"t-1"}) || !slices.Equal(got.Gate, []string{"t-2"}) {
+		t.Fatalf("draft %v, gate %v: a queued draft or gate shows the row of the task it is about", got.Draft, got.Gate)
+	}
+}

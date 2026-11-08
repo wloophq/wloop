@@ -36,12 +36,12 @@ function queueDraftOf(g) {
   return { ...g.subject, gate: g.subject.gate || g.id };
 }
 
-// queueItemCard is the decision of item: its gate's card, the draft's card for a gate on a draft (which the
+// queueItemCard is the decision of item: the row of its task above its gate's card, or the draft's card for a gate on a draft (which the
 // daemon serves with its delivery), else its unit's row, as view draws it, with the situation that makes it.
 function queueItemCard(item, env, view) {
   const g = item.gate;
-  if (queueDraft(g)) return draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf });
-  if (g) return gateCard(item.task, g, { scope: "queue" });
+  if (queueDraft(g)) return [env.row(item.task, view), draftCard(item.task, queueDraftOf(g), { scope: "queue", keyOf: env.keyOf })];
+  if (g) return [env.row(item.task, view), gateCard(item.task, g, { scope: "queue" })];
   return h("div", { class: "queue-unit" },
     env.row(item.task, view),
     item.situation && item.situation.label ? h("p", { class: "situation" }, item.situation.label) : null);
