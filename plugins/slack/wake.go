@@ -27,7 +27,8 @@ type waker struct {
 }
 
 func newWaker(p *plugin) *waker {
-	w := &waker{host: p.host, now: p.now, quiet: p.all.Slack.Extraction.QuietFor, log: p.logf, kick: make(chan struct{}, 1)}
+	w := &waker{host: p.host, now: p.now, quiet: func() time.Duration { return p.all.Slack.Extraction.QuietFor() }, log: p.logf,
+		kick: make(chan struct{}, 1)}
 	p.db.OnChange(func(c store.Change) {
 		if c.Landed {
 			w.at(w.now().Add(w.quiet()))
@@ -36,16 +37,17 @@ func newWaker(p *plugin) *waker {
 	return w
 }
 
-// at asks for the extraction at t, unless a wake no later is pending or held.
+// at asks for the extraction at t, unless the host holds a wake no later; a wake not sent yet, such as one the
+// host could not take before its daemon served, is sent again with it.
 func (w *waker) at(t time.Time) {
 	w.mu.Lock()
 	held := w.held.After(w.now()) && !t.Before(w.held)
-	pending := !w.want.IsZero() && !t.Before(w.want)
-	if !held && !pending {
+	if !held && (w.want.IsZero() || t.Before(w.want)) {
 		w.want = t
 	}
+	send := !w.want.IsZero()
 	w.mu.Unlock()
-	if !held && !pending {
+	if send {
 		select {
 		case w.kick <- struct{}{}:
 		default:
@@ -53,7 +55,8 @@ func (w *waker) at(t time.Time) {
 	}
 }
 
-// flush sends the pending wake; a wake the host refuses is left to the job's interval.
+// flush sends the pending wake. One the host has no job for yet stays pending for the next ask; one it refuses
+// otherwise is left to the job's interval.
 func (w *waker) flush(ctx context.Context) {
 	w.mu.Lock()
 	t := w.want
@@ -62,10 +65,19 @@ func (w *waker) flush(ctx context.Context) {
 	if t.IsZero() || w.host.Host.Jobs == nil {
 		return
 	}
-	if err := w.host.Host.Jobs.WakeJob(ctx, JobExtract, t); err != nil {
-		if !errors.Is(err, src.ErrUnsupported) {
-			w.log("slack extraction: wake at %s: %v", t.Format(time.TimeOnly), err)
+	err := w.host.Host.Jobs.WakeJob(ctx, JobExtract, t)
+	switch {
+	case errors.Is(err, src.ErrNotFound):
+		w.mu.Lock()
+		if w.want.IsZero() || t.Before(w.want) {
+			w.want = t
 		}
+		w.mu.Unlock()
+		return
+	case errors.Is(err, src.ErrUnsupported):
+		return
+	case err != nil:
+		w.log("slack extraction: wake at %s: %v", t.Format(time.TimeOnly), err)
 		return
 	}
 	w.mu.Lock()

@@ -42,6 +42,8 @@ type Host struct {
 	Resolve func(address string) (unit.Unit, bool)
 	// Configured is what Services.Config answers.
 	Configured src.Config
+	// WakeErr is what WakeJob answers; nil records the wake.
+	WakeErr error
 	// Disabled says a provider is disabled: an ApplyItems with an op on one
 	// of its units fails whole, as the host's ledger does.
 	Disabled func(p unit.ProviderID) bool
@@ -75,12 +77,22 @@ type JobWake struct {
 	At  time.Time
 }
 
-// WakeJob records the wake.
+// WakeJob records the wake, unless WakeErr refuses it.
 func (h *Host) WakeJob(_ context.Context, job string, at time.Time) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.WakeErr != nil {
+		return h.WakeErr
+	}
 	h.wakes = append(h.wakes, JobWake{Job: job, At: at})
 	return nil
+}
+
+// RefuseWakes makes WakeJob answer err; nil records wakes again.
+func (h *Host) RefuseWakes(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.WakeErr = err
 }
 
 // Wakes are the WakeJob calls, in order.
