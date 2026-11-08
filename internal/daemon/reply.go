@@ -128,6 +128,11 @@ func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 		return ""
 	}
 	c := replyDraft(e)
+	c.Kind = api.DraftReply
+	kind, err := userDraftKind(c)
+	if err != nil {
+		return ""
+	}
 	key := c.Unit.String() + "\x00" + strings.Join(c.Items, "\x00")
 	now := time.Now()
 	if v, ok := s.replyBroadcasts.Load(key); ok {
@@ -144,7 +149,7 @@ func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 	}
 	ctx, cancel := context.WithDeadline(ctx, by)
 	defer cancel()
-	b, err := s.deps.Outbox.BroadcastOf(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: draft.Reply,
+	b, err := s.deps.Outbox.BroadcastOf(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind,
 		Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		b = draft.NoBroadcast
