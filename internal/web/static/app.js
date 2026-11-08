@@ -2525,20 +2525,13 @@ function planButtons(it) {
 }
 
 // PLAN_REASONS are the reasons the engine gives a plan item that the catalog words, by the engine's text.
-const PLAN_REASONS = {
-  "waits for you": () => t("waits for you"),
-  "paused": () => t("paused"),
-  "a visible step waits for you": () => t("a visible step waits for you"),
-  "observe mode": () => t("observe mode"),
-  "it waits for you since it was planned": () => t("it waits for you since it was planned"),
-  "it no longer matches since it was planned": () => t("it no longer matches since it was planned"),
-  "its unit changed since it was planned": () => t("its unit changed since it was planned"),
-  "the task holds no open item": () => t("the task holds no open item"),
-};
+const PLAN_REASONS = new Set([tKey("waits for you"), tKey("paused"), tKey("a visible step waits for you"), tKey("observe mode"),
+  tKey("it waits for you since it was planned"), tKey("it no longer matches since it was planned"),
+  tKey("its unit changed since it was planned"), tKey("the task holds no open item")]);
 
 // planReason is the reason the engine gave a plan item, in the catalog's words when it has them.
 function planReason(reason) {
-  return Object.hasOwn(PLAN_REASONS, reason) ? PLAN_REASONS[reason]() : reason;
+  return PLAN_REASONS.has(reason) ? t(reason) : reason;
 }
 
 // planItem is a plan item as the plan lists it: when it runs, what its workflow does, on what, what applying it

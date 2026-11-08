@@ -167,8 +167,9 @@ func jsLiterals(src string) []jsLiteral {
 	return out
 }
 
-// jsExempt are the calls whose first argument is no text a person reads, or is the catalog's key.
-var jsExempt = regexp.MustCompile(`(?:\b(?:t|tn|h|querySelector|querySelectorAll|addEventListener|removeEventListener|getElementById|getJSON|postJSON|sendJSON|fetch|setAttribute|getAttribute|removeAttribute|matches|closest|CustomEvent|createElement)|classList\.(?:add|remove|toggle|contains|replace))\(\s*$|(?:\bclass|className)\s*[:=]\s*$`)
+// jsExempt are the calls whose first argument is no text a person reads, or is the catalog's key (tKey names a key
+// a client words later through t).
+var jsExempt = regexp.MustCompile(`(?:\b(?:t|tn|tKey|h|querySelector|querySelectorAll|addEventListener|removeEventListener|getElementById|getJSON|postJSON|sendJSON|fetch|setAttribute|getAttribute|removeAttribute|matches|closest|CustomEvent|createElement)|classList\.(?:add|remove|toggle|contains|replace))\(\s*$|(?:\bclass|className)\s*[:=]\s*$`)
 
 // ruleClientProse flags each prose literal of the script file outside the catalog.
 func ruleClientProse(file string, src string) []string {
@@ -326,11 +327,11 @@ func catalogKeys(t *testing.T) map[string]bool {
 }
 
 var (
-	jsKeyCall = regexp.MustCompile(`\bt(?:n)?\(\s*$`)
+	jsKeyCall = regexp.MustCompile(`\b(?:tn?|tKey)\(\s*$`)
 	pageKey   = regexp.MustCompile(`data-i18n(?:-[a-z-]+)?="([^"]*)"`)
 )
 
-// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the
+// TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `tKey`, `.T`, `.TN`, the
 // page's `data-i18n` attributes) is
 // a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves.
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {

@@ -225,7 +225,7 @@ func closingPlan(summary string) *api.PlanItem {
 	return &api.PlanItem{ID: "fake-close/task/t-1/ab12", Workflow: "fake-close", Summary: summary, Decision: "pending",
 		Label: "Retry flaky uploads", Link: "https://chat.example/c1", Steps: []string{"items.resolve"},
 		Does: []api.PlanStep{{Use: "items.resolve", Reach: "local"}},
-		Why: api.Why{Trigger: "sweep", Matched: []api.Fact{{Name: "task.category", Value: "active"}, {Name: "task.items_open", Value: "2"}}}}
+		Why:  api.Why{Trigger: "sweep", Matched: []api.Fact{{Name: "task.category", Value: "active"}, {Name: "task.items_open", Value: "2"}}}}
 }
 
 func TestAPlanGateSaysWhatItsPlanDoesOnWhatAndWhy(t *testing.T) {

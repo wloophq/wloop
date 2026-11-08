@@ -17,6 +17,11 @@ function t(key, params) {
   return interpolate(text, params);
 }
 
+// tKey is key, a catalog key the client words later through t, for a text the daemon sends as it is.
+function tKey(key) {
+  return key;
+}
+
 function pluralForm(count) {
   try {
     return new Intl.PluralRules(I18N.locale).select(count);

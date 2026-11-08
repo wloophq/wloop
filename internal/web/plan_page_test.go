@@ -69,7 +69,9 @@ func runPlanPage(t *testing.T, locale string, main string, in any, out any) {
 
 func wantPlanShape(t *testing.T, where string, got planShape, does, posts string, reasonGone string) {
 	t.Helper()
-	if !slices.ContainsFunc(got.Links, func(l [2]string) bool { return strings.Contains(l[0], "task=t-06bec1c03a26fadf") && l[1] == "Answer Ana about the retries" }) {
+	if !slices.ContainsFunc(got.Links, func(l [2]string) bool {
+		return strings.Contains(l[0], "task=t-06bec1c03a26fadf") && l[1] == "Answer Ana about the retries"
+	}) {
 		t.Errorf("%s: links %q, want the task's title linked to its detail", where, got.Links)
 	}
 	if !slices.Contains(got.Links, [2]string{"https://chat.example/c1", "#general"}) || !strings.Contains(got.Text, "#ops") {

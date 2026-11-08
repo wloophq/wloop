@@ -9,19 +9,19 @@ import (
 
 // PlanItem is one item of the workflows' plan.
 type PlanItem struct {
-	ID       string        `json:"id"`
-	Workflow string        `json:"workflow"`
-	Summary  string        `json:"summary,omitempty"` // Workflow's summary, in the profile's locale
-	Decision string        `json:"decision"`
-	Reason   string        `json:"reason,omitempty"`
-	Default  string        `json:"default,omitempty"`
-	Observe  ObserveMode   `json:"observe"`
-	Error    string        `json:"error,omitempty"`
-	Unit     unit.Unit     `json:"unit"`
-	Label    string        `json:"label"`           // Unit as a person reads it
-	Title    string        `json:"title,omitempty"` // Unit's row title
-	Link     string        `json:"link,omitempty"`  // Unit's row link
-	Steps    []string      `json:"steps"`
+	ID       string      `json:"id"`
+	Workflow string      `json:"workflow"`
+	Summary  string      `json:"summary,omitempty"` // Workflow's summary, in the profile's locale
+	Decision string      `json:"decision"`
+	Reason   string      `json:"reason,omitempty"`
+	Default  string      `json:"default,omitempty"`
+	Observe  ObserveMode `json:"observe"`
+	Error    string      `json:"error,omitempty"`
+	Unit     unit.Unit   `json:"unit"`
+	Label    string      `json:"label"`           // Unit as a person reads it
+	Title    string      `json:"title,omitempty"` // Unit's row title
+	Link     string      `json:"link,omitempty"`  // Unit's row link
+	Steps    []string    `json:"steps"`
 	// Target is the task a task's item acts on, as a person finds it; nil for another unit.
 	Target *PlanTarget `json:"target,omitempty"`
 	// Does are its steps with what each needs said of it.
