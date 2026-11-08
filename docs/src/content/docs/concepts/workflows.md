@@ -21,7 +21,9 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `workspace-review-finished`, `workspace-author-finished`, `workspace-temporary`, `workspace-duplicate` | remove workspaces of finished pull requests, under temporary paths, or duplicated | **observe** |
 | `workspace-path-gone` | unregisters a workspace whose path no longer exists | runs |
 | `workspace-idle-no-pr` | offers to remove a workspace with no pull request and no open session, idle for `cleanup.stale_workspace` | waits for you |
-| `hygiene-turn-on-finished-pr`, `hygiene-orphan-answer`, `hygiene-session-dormant` | keep the turn and session records consistent; a session whose process its manager stopped listing turns dormant | runs |
+| `hygiene-turn-on-finished-pr`, `hygiene-orphan-answer`, `hygiene-session-dormant` | keep the turn and session records consistent; a session whose process its manager stopped listing turns dormant, which ends no process | runs |
+| `hygiene-session-orphaned` | marks dormant a session whose terminal you closed in the app, its process left orphaned with no agent, when no turn runs in it and you did not prompt it; it ends no process, and the session wakes when a window shows the process again | runs |
+| `session-orphan-close` | ends the process such a session left behind, once the census proves the orphan durable, under `session.close`'s guards | **off** (`enabled = false`); `workflows.session-orphan-close.enabled = true` turns it on |
 
 A run that waits for you or for its window is a plan gate on its unit. It asks what the workflow's `ask` renders over the unit's facts (`.Unit`, the unit as people read it, and `.Facts`, by name), else its `summary`; the Inbox, the cockpit and the terminal show those words, and a task opened for the gate takes them as its title. While the item waits, the gate carries it too: the cockpit's card for the gate reads the workflow's `summary` (what running it does, what it posts or not), the unit it acts on, linked, and, folded, the facts that fired it, each in the words of the task facet that reads it, else as `name = value`; the item's steps show only when the workflow has no `summary`. The gate is withdrawn when its item stops waiting: the unit left its plugin's inventory, the workflow's `when` no longer holds on it, or its key moved.
 
@@ -76,7 +78,9 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - **pending**: waits for you, with a window. `runs in 41s` runs when the window ends; `waits for you` stays until you act.
 - **blocked**: a guard refused it (a workspace holds unpushed commits, say), with the reason and the command that backs the work up.
 - **run**: the next sweep runs it.
-- **skipped**: the workflow matched and its rules say not now, with the reason.
+- **skipped**: the workflow matched and its rules say not now, with the reason. A guard whose refusal ends at a known time skips the item until then: a draft proposal held by an earlier draft for `repeat_after` waits out that window off the list of blocked items.
+
+A guard that refuses for good withdraws the item: its subject is gone or its step can never run on it again, such as a session close whose session is already closed, a draft proposal held while its task stays ended or by a draft sent with `repeat_after_sent = "forever"`, or one its own `[drafts.withdraw] when` would withdraw at once. The item leaves the plan with a `workflow_dropped` event that records the reason, and nothing asks you to dismiss it; the workflow plans it again when its unit matches on facts the guard passes. A blocked item is left for you only when you can act on it, and its reason says how.
 
 ```sh
 {{command}} plan                                  # what the next sweep would do
@@ -102,5 +106,9 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - a live session that closing would refuse.
 
 `session.close` refuses while a turn is sent or started, the agent works or waits for permission, the workspace is focused in its manager, or you typed in the session after the loop's last turn. A dormant session has no process, so the checks on the agent's work and permission prompts do not apply to it.
+
+A session whose terminal the app shows with no agent in it refuses too, since your own shell may run there: close that terminal, or dismiss the item; so does one with no workspace to find its terminal in. One whose terminal is closed refuses only until the census marks it dormant. A terminal you closed in Orca can leave its process behind, listed orphaned with no agent. Once two complete censuses a fast job apart list it so, `hygiene-session-orphaned` marks the session dormant without ending the process, under the guards of `session.close` that need no shown terminal: no turn sent or started in it, its agent neither working nor waiting for permission (read by its pane, else by any agent of its workspace), its workspace not the one focused, and no prompt of yours since the loop's last turn. The close then runs or, for `session-manual-quiet`, which offers only active sessions, leaves the plan. If a window shows the process again, the next census wakes the session; one already closed by then stays closed, and the next turn starts a new session. A session already closed, or no longer known, withdraws its close.
+
+`session-orphan-close` ends the leftover process itself. It ships off: ending a process risks a pane the app has not reattached yet. Turned on, it acts only once the census proves the orphan durable, in readings of the same runtime whose windows showed some terminal and whose window graph held for a fast job: the orphan outlived a restart of the app's windows after it stayed orphaned for a fast job in windows that showed some terminal, or it stayed orphaned two hours, every reading showing some terminal, with a known last output from before. A restart that shows processes orphaned until the windows reclaim them, or two restarts in a row, prove nothing. It reads a fresh census before ending the process and refuses when the process is no longer orphaned in that runtime and window graph, and it keeps the guards above.
 
 Your own workflows go in your profile; see the [workflow manifest](/reference/workflow-manifest/).

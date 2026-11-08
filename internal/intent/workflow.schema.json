@@ -64,6 +64,11 @@
       },
       "type": "object"
     },
+    "enabled": {
+      "default": true,
+      "description": "false ships the workflow off: it plans nothing until workflows.<name>.enabled = true in the config turns it on.",
+      "type": "boolean"
+    },
     "gates": {
       "additionalProperties": false,
       "description": "The gates its runs and drafts open.",
@@ -346,6 +351,26 @@
               "properties": {
                 "use": {
                   "const": "session.mark_dormant"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "session.close_orphan"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "session.close_orphan"
                 }
               }
             }
@@ -748,6 +773,7 @@
               "turn.dismiss",
               "answer.refuse",
               "session.mark_dormant",
+              "session.close_orphan",
               "turn.start",
               "draft.propose",
               "classify",

@@ -156,7 +156,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	eng := &automation.Engine{
 		Workflows: workflows,
 		Broken:    e.brokenWorkflows,
-		Disabled:  func() []string { return disabledWorkflows(e.currentConfig()) },
+		Disabled:  func() []string { return disabledWorkflows(e.currentConfig(), e.loadedIntents().Workflows) },
 		Units:     units,
 		Keep:      unitKeeping{units},
 		Steps:     steps,
@@ -194,15 +194,31 @@ func (e *Env) brokenWorkflows() []string {
 	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
 }
 
-// disabledWorkflows are the workflows cfg turns off.
-func disabledWorkflows(cfg config.Config) []string {
+// disabledWorkflows are the workflows of ws, or named in cfg, that cfg turns
+// off or that ship off and cfg does not turn on.
+func disabledWorkflows(cfg config.Config, ws []workflow.Workflow) []string {
 	var out []string
 	for name, wc := range cfg.Workflows {
 		if wc.Enabled != nil && !*wc.Enabled {
 			out = append(out, name)
 		}
 	}
+	for _, w := range ws {
+		if off(w, cfg) && !slices.Contains(out, w.Name) {
+			out = append(out, w.Name)
+		}
+	}
 	return out
+}
+
+// off says whether cfg leaves w off: it turns it off, or w ships off and cfg
+// does not turn it on.
+func off(w workflow.Workflow, cfg config.Config) bool {
+	wc := cfg.Workflows[w.Name]
+	if wc.Enabled != nil {
+		return !*wc.Enabled
+	}
+	return w.Off
 }
 
 func (e *Env) currentConfig() config.Config {
@@ -233,7 +249,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 	out := make([]workflow.Workflow, 0, len(ws))
 	for _, w := range ws {
 		wc := cfg.Workflows[w.Name]
-		if wc.Enabled != nil && !*wc.Enabled {
+		if off(w, cfg) {
 			continue
 		}
 		if wc.Observe != nil {

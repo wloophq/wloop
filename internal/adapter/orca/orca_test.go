@@ -250,6 +250,51 @@ func TestCensusCountsEveryRowAndKnowsACutShortList(t *testing.T) {
 	}
 }
 
+type epochRunner struct {
+	list  string
+	epoch string
+}
+
+func (r epochRunner) Run(_ context.Context, args ...string) ([]byte, error) {
+	if args[0] == "status" {
+		return []byte(`{"ok":true,"result":{"graphStatus":"ready","rendererGraphEpoch":"` + r.epoch + `"}}`), nil
+	}
+	return []byte(r.list), nil
+}
+
+func TestCensusNamesEveryOrphanWithNoAgentWithItsLastOutputAndTheEpoch(t *testing.T) {
+	const rows = `{"handle":"term_shown","worktreeId":"ws","connected":true,"writable":true,"orphaned":false},` +
+		`{"handle":"term_1","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"lastOutputAt":1760000000000},` +
+		`{"handle":"term_2","worktreeId":"ws","connected":true,"writable":true,"orphaned":true,"agentIdentity":"claude"}`
+	list := `{"ok":true,"result":{"terminals":[` + rows + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+	got, err := orca.New(&wsorca.Manager{R: epochRunner{list, "9"}}, cols, nil).Census(context.Background())
+	if err != nil || !got.Complete || got.Epoch != "9" || len(got.Handles) != 3 {
+		t.Fatalf("Census = %+v, %v", got, err)
+	}
+	if last, ok := got.Orphans["term_1"]; len(got.Orphans) != 1 || !ok || !last.Equal(time.UnixMilli(1760000000000)) {
+		t.Fatalf("orphans %v, want term_1 alone with its last output", got.Orphans)
+	}
+}
+
+func BenchmarkCensusOfOrphanedProcesses(b *testing.B) {
+	rows := make([]string, 500)
+	for i := range rows {
+		rows[i] = fmt.Sprintf(`{"handle":"term_%d","worktreeId":"ws","connected":true,"writable":true,"orphaned":%v}`, i, i%4 != 0)
+	}
+	list := `{"ok":true,"result":{"terminals":[` + strings.Join(rows, ",") + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+	a := orca.New(&wsorca.Manager{R: listRunner{list}}, cols, nil)
+	ctx := context.Background()
+	if _, err := a.Census(ctx); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := a.Census(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestATruncatedListStillServesTerminals(t *testing.T) {
 	list := `{"ok":true,"result":{"terminals":[{"handle":"term_1","worktreeId":"ws","tabId":"tab-1","connected":true,"writable":true}],"truncated":true}}`
 	a := orca.New(&wsorca.Manager{R: listRunner{list}}, cols, nil)

@@ -65,7 +65,13 @@ func (e *Engine) stopped(ctx context.Context, it workflow.Item, err error, evs [
 	var refused Refused
 	var deferred Deferred
 	var transient Transient
+	var moot Moot
+	var held Held
 	switch {
+	case errors.As(err, &moot):
+		return result{it, outcomeRefused, err}, e.withdrawItem(ctx, it, moot.Reason, evs, now)
+	case errors.As(err, &held):
+		return e.stopped(ctx, it, Refused{Reason: held.Reason}, evs, now)
 	case errors.As(err, &refused):
 		it.Decision, it.Reason = workflow.DecisionBlocked, refused.Reason
 		evs = append(evs, event(it, workflow.KindStepRefused, fmt.Sprintf("%s:%d", it.ID, it.Attempts), refused.Reason, now))
@@ -109,6 +115,23 @@ func (e *Engine) replace(ctx context.Context, it workflow.Item, evs []port.Event
 	}
 	items = slices.DeleteFunc(items, func(o workflow.Item) bool { return o.ID == it.ID })
 	return e.save(ctx, PlanWrite{Workflows: []string{it.Workflow}, Items: append(items, it)}, evs)
+}
+
+// withdrawItem takes it out of the plan for a guard's reason that holds for
+// good, without recording a run.
+func (e *Engine) withdrawItem(ctx context.Context, it workflow.Item, reason string, evs []port.Event, now time.Time) error {
+	items, err := e.Ledger.Items(ctx, Filter{Workflow: it.Workflow})
+	if err != nil {
+		return err
+	}
+	items = slices.DeleteFunc(items, func(o workflow.Item) bool { return o.ID == it.ID })
+	e.logf("withdraw %s: %s", it.ID, reason)
+	return e.save(ctx, PlanWrite{Workflows: []string{it.Workflow}, Items: items}, append(evs, withdrawal(it, reason, now)))
+}
+
+// withdrawal is the workflow_dropped event of an item a guard refused for good.
+func withdrawal(it workflow.Item, reason string, now time.Time) port.Event {
+	return event(it, workflow.KindItemDropped, it.ID+":"+now.UTC().Format(time.RFC3339Nano), "withdrawn: "+reason, now)
 }
 
 func (e *Engine) save(ctx context.Context, p PlanWrite, evs []port.Event) error {
@@ -200,6 +223,9 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 	}
 	for _, st := range it.Steps {
 		refusal, err := e.Steps.Check(ctx, st, it.Unit, it.Why, CheckOpts{Observe: it.Observe, ByHand: true})
+		if errors.As(err, new(Moot)) || errors.As(err, new(Held)) {
+			return outcomeOf(e.stopped(ctx, it, err, nil, e.now()))
+		}
 		if err != nil {
 			return it, err
 		}

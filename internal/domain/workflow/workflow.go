@@ -265,8 +265,11 @@ type Workflow struct {
 	Limits        Limits
 	// Observe plans items pending and never runs them by itself.
 	Observe bool
-	Order   int
-	Key     []string // fact names; empty means the slot's fingerprint fact
+	// Off ships the workflow switched off: it plans nothing until the config's
+	// workflows.<name>.enabled turns it on.
+	Off   bool
+	Order int
+	Key   []string // fact names; empty means the slot's fingerprint fact
 	// Marks are the facts whose values a done or dismissed item records as
 	// the unit's marks, by the mark's name under the workflow (mark.Of).
 	Marks map[string]string

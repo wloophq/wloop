@@ -10,10 +10,39 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
+// DormantRefusal is why MarkDormant may not retire the session whose process
+// its manager lists orphaned, "" when it may: the census has listed it
+// orphaned for FastJob (ProcessOrphaned), and session.close's guards that need
+// no shown terminal pass. It writes nothing.
+func (s *Service) DormantRefusal(ctx context.Context, id string) (string, error) {
+	sess, ok, err := s.Registry.Session(ctx, id)
+	switch {
+	case err != nil:
+		return "", err
+	case !ok:
+		return noSession(id), nil
+	case sess.State() != turn.SessionActive:
+		return "", nil
+	case !s.ProcessOrphaned(id):
+		return "the session's process is still listed", nil
+	}
+	why, w, err := s.paneless(ctx, sess)
+	if err != nil || why != "" {
+		return why, err
+	}
+	if !w.sess.PromptSeenAt.IsZero() {
+		at, ok, _ := s.lastUserPrompt(ctx, w.sess)
+		why = w.transcriptRefusal(at, ok)
+	}
+	return why, nil
+}
+
 // MarkDormant records that the session's process is gone: its manager no
-// longer lists it. The session stays open, and its manager can wake it. It
-// refuses a session the manager still lists in any state, one with no
-// workspace, and a manager that cannot list completely.
+// longer lists it, or lists it orphaned, no window of the app showing it,
+// where DormantRefusal allows. The session stays open, and its manager can
+// wake it: a census that lists its process in a window again does. It
+// refuses a session the manager still lists otherwise, one with no workspace,
+// and a manager that cannot list completely. It ends no process.
 func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	sess, ok, err := s.Registry.Session(ctx, id)
 	if err != nil {
@@ -37,7 +66,16 @@ func (s *Service) MarkDormant(ctx context.Context, id string) error {
 		return Refusal{Reason: "its manager's process list is incomplete"}
 	}
 	if _, listed := census.Sessions[id]; listed {
-		return Refusal{Reason: "the session's process is still listed"}
+		if _, orphan := census.Orphans[id]; !orphan {
+			return Refusal{Reason: "the session's process is still listed"}
+		}
+		why, err := s.DormantRefusal(ctx, id)
+		if err != nil {
+			return err
+		}
+		if why != "" {
+			return Refusal{Reason: why}
+		}
 	}
 	s.mu.Lock()
 	cur, ok, err := s.Registry.Session(ctx, id)
@@ -63,6 +101,17 @@ func withoutHandle(sess turn.Session) turn.Session {
 	return sess
 }
 
+// The close refusals of a session whose terminal runs no agent. A closed
+// terminal clears on its own: the census marks the session dormant once its
+// process is gone, and a process left orphaned is ended by the profile's
+// session.close_orphan step. An open one, or a session with no workspace to
+// look for one in, waits for the user.
+const (
+	RefusalTerminalClosed = "its terminal is closed; it ends on its own"
+	RefusalNoAgent        = "its terminal is open with no agent in it: close that terminal, or dismiss this"
+	RefusalNoWorkspace    = "it has no workspace to find its terminal in: dismiss this"
+)
+
 // CloseRefusal is why session.close may not close the handle's session, ""
 // when it may. It writes nothing; an error is a read that failed.
 func (s *Service) CloseRefusal(ctx context.Context, handle string) (string, error) {
@@ -70,15 +119,23 @@ func (s *Service) CloseRefusal(ctx context.Context, handle string) (string, erro
 	return why, err
 }
 
+// CloseGone says whether why, a CloseRefusal of handle, holds for good: there
+// is no such session, or it is closed.
+func CloseGone(handle, why string) bool { return why == noSession(handle) || why == sessionClosed }
+
+const sessionClosed = "the session is closed"
+
+func noSession(handle string) string { return "no session " + handle }
+
 func (s *Service) closeCheck(ctx context.Context, handle string) (string, promptWindow, error) {
 	sess, ok, err := s.Registry.Session(ctx, handle)
 	switch {
 	case err != nil:
 		return "", promptWindow{}, err
 	case !ok:
-		return "no session " + handle, promptWindow{}, nil
+		return noSession(handle), promptWindow{}, nil
 	case !sess.ClosedAt.IsZero():
-		return "the session is closed", promptWindow{}, nil
+		return sessionClosed, promptWindow{}, nil
 	case s.typingInto(handle):
 		return "its turn is " + string(turn.Sent), promptWindow{}, nil
 	}
@@ -94,12 +151,17 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 	if sess.State() == turn.SessionDormant {
 		return "", promptWindow{sess: sess}, nil
 	}
-	agent, has, focused, err := s.agentNow(ctx, sess)
+	if sess.WorkspaceID == "" {
+		return RefusalNoWorkspace, promptWindow{}, nil
+	}
+	agent, shown, has, focused, err := s.agentNow(ctx, sess)
 	switch {
 	case err != nil:
 		return "", promptWindow{}, err
+	case !shown:
+		return RefusalTerminalClosed, promptWindow{}, nil
 	case !has:
-		return "no agent", promptWindow{}, nil
+		return RefusalNoAgent, promptWindow{}, nil
 	case agent.State == turn.AgentWorking:
 		return "its agent is working", promptWindow{}, nil
 	case agent.State == turn.AgentWaiting:
@@ -127,6 +189,9 @@ func (s *Service) CloseSession(ctx context.Context, handle, reason string) error
 		why = w.transcriptRefusal(at, ok)
 	}
 	if why != "" {
+		if CloseGone(handle, why) {
+			return Gone{Reason: why}
+		}
 		return Refusal{Reason: why}
 	}
 	units, err := s.Store.UnitsOf(ctx, []string{handle})
@@ -193,27 +258,25 @@ func (s *Service) sessionTurns(ctx context.Context, handle string) (handleTurns,
 	return out, nil
 }
 
-// agentNow is the session's agent as the manager lists it, and whether its
-// workspace is the one open in the app.
-func (s *Service) agentNow(ctx context.Context, sess turn.Session) (a AgentObservation, has, focused bool, err error) {
-	if sess.WorkspaceID == "" {
-		return AgentObservation{}, false, false, nil
-	}
+// agentNow is the session's agent as the manager lists it in the session's
+// workspace, whether the app shows its terminal, and whether its workspace is
+// the one open in the app.
+func (s *Service) agentNow(ctx context.Context, sess turn.Session) (a AgentObservation, shown, has, focused bool, err error) {
 	agents, err := s.Sessions.Agents(ctx)
 	if err != nil {
-		return AgentObservation{}, false, false, err
+		return AgentObservation{}, false, false, false, err
 	}
 	terms, err := s.Sessions.Terminals(ctx, sess.WorkspaceID)
 	if err != nil {
-		return AgentObservation{}, false, false, err
+		return AgentObservation{}, false, false, false, err
 	}
 	i := slices.IndexFunc(terms, func(t Terminal) bool { return t.Session == sess.ID })
 	if i < 0 {
-		return AgentObservation{}, false, false, nil
+		return AgentObservation{}, false, false, false, nil
 	}
 	a, has = agentOf(agents, sess, terms[i])
 	focused = slices.ContainsFunc(agents, func(a AgentObservation) bool { return a.UserActive && a.WorkspaceID == sess.WorkspaceID })
-	return a, has, focused, nil
+	return a, true, has, focused, nil
 }
 
 const cannotTell = "cannot tell whether you typed in it"

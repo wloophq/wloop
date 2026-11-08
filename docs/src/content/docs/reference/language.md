@@ -493,6 +493,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `trigger.actors` (list of `person`, `workflow`, `agent`, `plugin`): With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent.
 - `trigger.depth` (integer, default `3`): With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
+- `enabled` (bool, default `true`): false ships the workflow off: it plans nothing until workflows.&lt;name&gt;.enabled = true in the config turns it on.
 - `limits` (table): How many runs the workflow may take.
 - `limits.per_run` (integer, default `0`): Runs per evaluation; 0 is no limit.
 - `limits.per_day` (integer, default `0`): Runs per local day; 0 is no limit.
@@ -502,13 +503,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
   - `turn.dismiss`: Dismisses the open turn, recording the reason.
   - `answer.refuse`: Refuses a queued answer whose route is gone.
-  - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
+  - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists, or has listed orphaned with no agent for a fast job (`session.process_orphaned`) when no turn is sent or started in it, its agent neither works nor waits for permission, its workspace is not focused and you did not prompt it since the loop's last turn: the session stays open, and the next turn, or a census that shows its process in a window again, wakes it. It records the state and ends no process.
+  - `session.close_orphan`: Side effect: ends the process of an active session that the census proved a durable orphan (`session.orphan_durable`), a terminal no window of the app shows with no agent in it. It runs under `session.close`'s guards (no turn sent or started, the agent neither working nor waiting for permission, the workspace not focused, no prompt of yours since the loop's last turn) and records nothing on the session: the censuses that then miss the process mark it dormant. Refused for good on a session gone, closed or dormant.
   - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Items`, `.Person` and `.Facts`, the subject's facts by name, such as `{{index .Facts "task.promised"}}`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) `repeat_after_sent` (the same after a sent one, or `forever`) and `ended` (`hold`, the default, holds proposals of no task or of the same task while a draft's task a verb ended stays ended; `repeat` holds them for `repeat_after`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts, `classify.&lt;workflow&gt;.&lt;field&gt;` with each - of the workflow's name an _, typed by the schema's top-level properties: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). With `with`, a list fact of task ids, it reads those tasks too and its prompt is a template over them. Event triggers only, cached by fingerprint, prompt and schema, under `classify.per_day`. Each run that reads its output records a `classified` event on the unit, whose data is the workflow's name.
@@ -557,6 +559,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `answer.refuse`:
   - `reason` (string): The reason the refused answer records.
 - `session.mark_dormant`: no arguments.
+- `session.close_orphan`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
   - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.

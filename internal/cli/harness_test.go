@@ -836,7 +836,7 @@ func (h handleSessions) Processes(ctx context.Context, workspaceID string) ([]tu
 
 func (h handleSessions) Census(ctx context.Context) (turns.ProcessCensus, error) {
 	c, err := h.Sessions.Census(ctx)
-	return turns.ProcessCensus{Handles: c.Sessions, Complete: c.Complete, RuntimeID: c.RuntimeID, At: c.At}, err
+	return turns.ProcessCensus{Handles: c.Sessions, Complete: c.Complete, RuntimeID: c.RuntimeID, At: c.At, Orphans: c.Orphans, Epoch: c.Epoch, Shown: c.Shown}, err
 }
 
 // agentCommand is the line that starts a session of opts in worktree.

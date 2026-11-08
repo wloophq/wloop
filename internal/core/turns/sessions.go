@@ -58,6 +58,36 @@ type Census struct {
 	At         time.Time
 	// Processes address each listed session's process.
 	Processes map[string]ProcessRef
+	// Orphans are the listed sessions whose process no app window shows and
+	// runs no agent, each with the process's last output, zero when unknown.
+	// A census still lists them: only a step that proves the orphan durable
+	// closes one.
+	Orphans map[string]time.Time
+	// Epoch is the renderer graph epoch of the app that answered, which changes
+	// when its windows restart and reattach their processes; "" when unknown.
+	// Epochs is per manager.
+	Epoch  string
+	Epochs map[string]string
+	// Shown says the app's windows showed some terminal of the list: the app
+	// is attached. ShownFor is per manager.
+	Shown    bool
+	ShownFor map[string]bool
+}
+
+// ShownOf says whether manager's windows showed some terminal in the census.
+func (c Census) ShownOf(manager string) bool {
+	if shown, ok := c.ShownFor[manager]; ok {
+		return shown
+	}
+	return c.Shown
+}
+
+// EpochOf is manager's renderer graph epoch in the census.
+func (c Census) EpochOf(manager string) string {
+	if e, ok := c.Epochs[manager]; ok {
+		return e
+	}
+	return c.Epoch
 }
 
 // ProcessRef is a process's manager and handle.

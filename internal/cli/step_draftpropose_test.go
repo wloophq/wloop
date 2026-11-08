@@ -148,13 +148,35 @@ func draftWF(name string, args ...string) workflow.Workflow {
 	return workflow.Workflow{Name: name, Observe: false, Steps: []workflow.Step{wfStep("draft.propose", args...)}}
 }
 
+// check is the step's refusal on u, a hold for good or for a while read as its reason.
 func (r *draftRig) check(u unit.Unit) string {
 	r.t.Helper()
+	refusal, _ := r.checkKind(u)
+	return refusal
+}
+
+// checkKind is check with how the refusal holds: "moot" for good, "held"
+// until a time, "blocked" until something else changes.
+func (r *draftRig) checkKind(u unit.Unit) (refusal, kind string) {
+	r.t.Helper()
 	refusal, err := r.s.Check(context.Background(), r.wf.Steps[0], u, workflow.Why{Workflow: r.wf.Name}, automation.CheckOpts{})
-	if err != nil {
+	var moot automation.Moot
+	var held automation.Held
+	switch {
+	case errors.As(err, &moot):
+		return moot.Reason, "moot"
+	case errors.As(err, &held):
+		if !held.Until.After(r.now) {
+			r.t.Fatalf("held until %v, not after now %v", held.Until, r.now)
+		}
+		return held.Reason, "held"
+	case err != nil:
 		r.t.Fatal(err)
 	}
-	return refusal
+	if refusal == "" {
+		return "", ""
+	}
+	return refusal, "blocked"
 }
 
 func (r *draftRig) run(u unit.Unit) string {
@@ -230,8 +252,8 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Task != "t1" || len(anas.Effects) != 1 {
 		t.Fatalf("ana's draft %+v", anas)
 	}
-	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
-		t.Fatalf("an open draft does not hold: %q", got)
+	if got, kind := r.checkKind(draftTask); !strings.Contains(got, "held by draft") || kind != "blocked" {
+		t.Fatalf("an open draft does not hold until it is settled: %q %s", got, kind)
 	}
 	if err := approveDraft(context.Background(), r.svc, anas.ID); err != nil {
 		t.Fatal(err)
@@ -279,8 +301,8 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 		t.Fatal(err)
 	}
 	forever.now = forever.now.Add(365 * 24 * time.Hour)
-	if got := forever.check(draftThread); !strings.Contains(got, "held by draft") {
-		t.Fatalf("hold_after_sent forever: %q", got)
+	if got, kind := forever.checkKind(draftThread); !strings.Contains(got, "held by draft") || kind != "moot" {
+		t.Fatalf("hold_after_sent forever: %q %s", got, kind)
 	}
 }
 
@@ -339,8 +361,8 @@ func TestASubjectMatchingWhenAndWithdrawWhenIsProposedOnce(t *testing.T) {
 	for pass := range 3 {
 		before := r.writes
 		got := r.pass(draftThread)
-		if got != "its withdraw when holds" {
-			t.Fatalf("pass %d: %q", pass, got)
+		if _, kind := r.checkKind(draftThread); got != "its withdraw when holds" || kind != "moot" {
+			t.Fatalf("pass %d: %q %s", pass, got, kind)
 		}
 		if r.writes != before {
 			t.Fatalf("pass %d wrote %d drafts", pass, r.writes-before)
@@ -450,13 +472,13 @@ func TestADraftItsTasksEndWithdrewHoldsWhileTheTaskStaysEnded(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.tasks.m["t1"] = waiting
-	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
-		t.Fatalf("the task reopened at once, and the ended draft does not hold for repeat_after: %q", got)
+	if got, kind := r.checkKind(draftTask); !strings.Contains(got, "held by draft") || kind != "held" {
+		t.Fatalf("the task reopened at once, and the ended draft does not hold for repeat_after: %q %s", got, kind)
 	}
 	r.tasks.m["t1"] = ended
 	r.now = r.now.Add(72 * time.Hour)
-	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
-		t.Fatalf("a draft withdrawn as its task ended does not hold while the task stays done: %q", got)
+	if got, kind := r.checkKind(draftTask); !strings.Contains(got, "held by draft") || kind != "moot" {
+		t.Fatalf("a draft withdrawn as its task ended does not hold for good while the task stays done: %q %s", got, kind)
 	}
 	captured := waiting
 	captured.ID = "t2"
@@ -467,6 +489,28 @@ func TestADraftItsTasksEndWithdrewHoldsWhileTheTaskStaysEnded(t *testing.T) {
 	r.tasks.m["t1"] = waiting
 	if got := r.check(draftTask); got != "" {
 		t.Fatalf("the task is open again past repeat_after, and the ended draft still holds: %q", got)
+	}
+}
+
+func TestADroppedDraftHoldsItsProposalUntilRepeatAfterEnds(t *testing.T) {
+	t.Parallel()
+	r := newDraftRig(t, draftWF("asks", "purpose", "ask_owner", "items", "unowned", "repeat_after", "24h"), "Who owns this?")
+	r.items.set(draftThread, openItem("i1", "Old", r.now.Add(-72*time.Hour)))
+	r.run(draftThread)
+	ds := r.drafts()
+	if len(ds) != 1 {
+		t.Fatalf("%d drafts", len(ds))
+	}
+	if _, err := r.svc.Withdraw(context.Background(), ds[0].ID, draft.WithdrawSkipped); err != nil {
+		t.Fatal(err)
+	}
+	refusal, err := r.s.Check(context.Background(), r.wf.Steps[0], draftThread, workflow.Why{Workflow: r.wf.Name}, automation.CheckOpts{})
+	var held automation.Held
+	if !errors.As(err, &held) || refusal != "" || !strings.Contains(held.Reason, "held by draft") {
+		t.Fatalf("check %q %v, want held", refusal, err)
+	}
+	if d := r.drafts()[0]; !held.Until.Equal(d.UpdatedAt.Add(24 * time.Hour)) {
+		t.Fatalf("held until %v, want 24h after %v", held.Until, d.UpdatedAt)
 	}
 }
 

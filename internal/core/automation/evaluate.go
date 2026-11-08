@@ -40,6 +40,8 @@ type planned struct {
 	// decided again; it does not run on the facts it was planned with.
 	carried bool
 	retryAt time.Time
+	// moot is why a guard refused the item for good; it leaves the plan.
+	moot string
 	// rev is the rev of the unit's report its facts came from; hasRev is
 	// false when its provider reports none.
 	rev    uint64
@@ -53,6 +55,9 @@ type evaluation struct {
 	workflows []string
 	// passed are the workflow_failed events of the events held too long.
 	passed []port.Event
+	// withdrawn are the workflow_dropped events of the stored items a guard
+	// refused for good.
+	withdrawn []port.Event
 	// decided are the fresh events this evaluation decided, marked once saved.
 	decided []eventOf
 	// due is the earliest deadline of a temporal fact the evaluation read.
@@ -76,21 +81,22 @@ type planner struct {
 	config workflow.Facts
 	// reads are what the sweep (false) and the event (true) workflows of the pass read: a unit's facts are read
 	// once for all the workflows of a kind.
-	reads   map[bool][]string
-	facts   map[factsRead]workflow.Facts
-	factErr map[factsRead]error
-	revs    map[unit.Unit]uint64
-	due     time.Time
-	marks   map[unit.Unit]map[string]string
-	lists   map[unit.ProviderID][]unit.Unit
-	seen    map[string]bool
-	perRun  map[string]int
-	perUnit map[unitOf]int
-	out     []*planned
-	errs    []string
-	apply   bool
-	passed  []port.Event
-	decided []eventOf
+	reads     map[bool][]string
+	facts     map[factsRead]workflow.Facts
+	factErr   map[factsRead]error
+	revs      map[unit.Unit]uint64
+	due       time.Time
+	marks     map[unit.Unit]map[string]string
+	lists     map[unit.ProviderID][]unit.Unit
+	seen      map[string]bool
+	perRun    map[string]int
+	perUnit   map[unitOf]int
+	out       []*planned
+	errs      []string
+	apply     bool
+	passed    []port.Event
+	withdrawn []port.Event
+	decided   []eventOf
 }
 
 type eventOf struct {
@@ -136,7 +142,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 			ev.workflows = append(ev.workflows, b.w.Name)
 		}
 	}
-	ev.items, ev.passed, ev.decided, ev.due = p.out, p.passed, p.decided, p.due
+	ev.items, ev.passed, ev.withdrawn, ev.decided, ev.due = p.out, p.passed, p.withdrawn, p.decided, p.due
 	for _, pl := range p.out {
 		ev.plan.Items = append(ev.plan.Items, pl.item)
 	}
@@ -389,6 +395,12 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 		pl.prevDecision = prev.Decision
 	}
 	p.rules(pl, vars, run, ran, prev, had)
+	if pl.moot != "" {
+		if had {
+			p.withdrawn = append(p.withdrawn, withdrawal(pl.item, pl.moot, p.now))
+		}
+		return nil
+	}
 	if had && prev.Decision == pl.item.Decision {
 		pl.item.At, pl.item.Guidance = prev.At, prev.Guidance
 	}
@@ -432,7 +444,17 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 	waitRule := rule != nil && rule.Mode == workflow.ApprovalWait
 	for i, st := range w.Steps {
 		refusal, err := p.e.Steps.Check(p.ctx, st, it.Unit, it.Why, CheckOpts{Observe: w.Observe})
-		if err != nil {
+		var moot Moot
+		var held Held
+		switch {
+		case errors.As(err, &moot):
+			pl.moot = moot.Reason
+			return
+		case errors.As(err, &held):
+			decide(workflow.DecisionSkipped, held.Reason)
+			pl.retryAt = held.Until
+			return
+		case err != nil:
 			decide(workflow.DecisionBlocked, err.Error())
 			return
 		}

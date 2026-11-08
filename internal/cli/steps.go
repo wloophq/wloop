@@ -213,6 +213,7 @@ func stepRegistry() map[string]stepEntry {
 	return map[string]stepEntry{
 		"session.close":          {check: (*stepSet).closeCheck, run: (*stepSet).closeRun},
 		"session.mark_dormant":   {check: (*stepSet).markDormantCheck, run: (*stepSet).markDormantRun},
+		"session.close_orphan":   {check: (*stepSet).closeOrphanCheck, run: (*stepSet).closeOrphanRun},
 		"turn.dismiss":           {check: (*stepSet).dismissTurnCheck, run: (*stepSet).dismissTurnRun},
 		"answer.refuse":          {check: (*stepSet).refuseAnswerCheck, run: (*stepSet).refuseAnswerRun},
 		"workspace.remove":       {check: (*stepSet).removeCheck, note: (*stepSet).removeNote, run: (*stepSet).removeRun},
@@ -359,9 +360,12 @@ func factInt(f workflow.Facts, name string) int64 {
 // guardRefusal is a refusal a use case returned at run time as the
 // engine's: blocked and planned again, its attempts untouched.
 func guardRefusal(err error) error {
+	var gone turns.Gone
 	var tr turns.Refusal
 	var wr workspaces.Refusal
 	switch {
+	case errors.As(err, &gone):
+		return automation.Moot{Reason: gone.Reason}
 	case errors.As(err, &tr):
 		return automation.Refused{Reason: tr.Reason}
 	case errors.As(err, &wr):
@@ -382,7 +386,11 @@ func (s *stepSet) closeCheck(ctx context.Context, c stepCall, _ automation.Check
 	if err != nil {
 		return "", err
 	}
-	return t.CloseRefusal(ctx, c.u.Key)
+	why, err := t.CloseRefusal(ctx, c.u.Key)
+	if err == nil && turns.CloseGone(c.u.Key, why) {
+		return "", automation.Moot{Reason: why}
+	}
+	return why, err
 }
 
 func (s *stepSet) closeRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
@@ -401,10 +409,17 @@ func (s *stepSet) markDormantCheck(ctx context.Context, c stepCall, _ automation
 	if err != nil {
 		return "", err
 	}
-	if !factBool(f, "session.process_gone") {
-		return "the session's process is not gone", nil
+	switch {
+	case factBool(f, "session.process_gone"):
+		return "", nil
+	case factBool(f, "session.process_orphaned"):
+		t, err := s.turns()
+		if err != nil {
+			return "", err
+		}
+		return t.DormantRefusal(ctx, c.u.Key)
 	}
-	return "", nil
+	return "the session's process is not gone", nil
 }
 
 func (s *stepSet) markDormantRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
@@ -416,6 +431,29 @@ func (s *stepSet) markDormantRun(ctx context.Context, c stepCall, _ automation.R
 		return "", guardRefusal(err)
 	}
 	return "marked " + c.u.Key + " dormant", nil
+}
+
+func (s *stepSet) closeOrphanCheck(ctx context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
+	t, err := s.turns()
+	if err != nil {
+		return "", err
+	}
+	why, err := t.CloseOrphanRefusal(ctx, c.u.Key)
+	if err == nil && turns.CloseOrphanGone(c.u.Key, why) {
+		return "", automation.Moot{Reason: why}
+	}
+	return why, err
+}
+
+func (s *stepSet) closeOrphanRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
+	t, err := s.turns()
+	if err != nil {
+		return "", err
+	}
+	if err := t.CloseOrphan(ctx, c.u.Key); err != nil {
+		return "", guardRefusal(err)
+	}
+	return "ended the orphaned process of " + c.u.Key, nil
 }
 
 // openTurn is the turn turn.dismiss closes: the pull request's open turn,
@@ -853,21 +891,8 @@ func (g turnsGuard) live(ctx context.Context, id string) ([]string, error) {
 	return out, nil
 }
 
-// noAgent is the close refusal of a session with no agent in its terminal,
-// or with no terminal.
-const noAgent = "no agent"
-
-// listed says whether the manager still lists the handle's terminal in the
-// workspace: a session with no agent and no terminal holds nothing a
-// removal could lose.
-func (g turnsGuard) listed(ctx context.Context, id, handle string) (bool, error) {
-	terms, err := g.e.Turns.Sessions.Terminals(ctx, id)
-	if err != nil {
-		return false, err
-	}
-	return slices.ContainsFunc(terms, func(t turns.Terminal) bool { return t.Session == handle }), nil
-}
-
+// Refusal is why the workspace may not be removed. A session whose terminal
+// is closed holds nothing a removal could lose.
 func (g turnsGuard) Refusal(ctx context.Context, id string) (string, error) {
 	handles, err := g.live(ctx, id)
 	if err != nil {
@@ -878,15 +903,7 @@ func (g turnsGuard) Refusal(ctx context.Context, id string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if why == noAgent {
-			if listed, err := g.listed(ctx, id, h); err != nil || !listed {
-				if err != nil {
-					return "", err
-				}
-				continue
-			}
-		}
-		if why != "" {
+		if why != "" && why != turns.RefusalTerminalClosed {
 			return "session " + h + ": " + why, nil
 		}
 	}

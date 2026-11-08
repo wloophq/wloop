@@ -1,0 +1,1 @@
+summary = "Encerrar o processo que uma sessão deixou quando você fechou o terminal dela no app: um órfão sem agente que sobreviveu a um reinício das janelas do app ou ficou quieto por duas horas, sob as guardas do fechamento de sessão; o censo então marca a sessão como dormente"

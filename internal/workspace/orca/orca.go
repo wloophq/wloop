@@ -561,18 +561,22 @@ func (m *Manager) AllTerminals(ctx context.Context) ([]wsdomain.Terminal, wsdoma
 	scope := res.scope(runtimeID)
 	if scope.Complete {
 		var st struct {
-			GraphStatus string `json:"graphStatus"`
+			GraphStatus string          `json:"graphStatus"`
+			Epoch       json.RawMessage `json:"rendererGraphEpoch"`
 		}
 		err := m.do(ctx, &st, statusOp())
 		if ctxErr := ctx.Err(); err != nil && ctxErr != nil {
 			return nil, wsdomain.Scope{}, ctxErr
 		}
 		scope.Complete = err == nil && st.GraphStatus == "ready"
+		if scope.Complete && len(st.Epoch) > 0 && string(st.Epoch) != "null" {
+			scope.Epoch = strings.Trim(string(st.Epoch), `"`)
+		}
 	}
 	out := make([]wsdomain.Terminal, 0, len(res.Terminals))
 	for _, t := range res.Terminals {
 		term := wsdomain.Terminal{Handle: t.Handle, WorkspaceID: t.WorktreeID, TabID: t.TabID, Title: t.Title,
-			Agent: t.AgentIdentity, Usable: t.usable()}
+			Agent: t.AgentIdentity, Usable: t.usable(), Orphaned: t.Orphaned}
 		if t.LastOutputAt != 0 {
 			term.LastOutput = time.UnixMilli(t.LastOutputAt)
 		}
