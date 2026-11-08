@@ -2,8 +2,10 @@ package daemon
 
 import (
 	"context"
+	"maps"
 
 	"github.com/wloophq/wloop/internal/api"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -46,6 +48,9 @@ func (s *Server) planViews(ctx context.Context, its []workflow.Item, known map[u
 			tg.Units = append(tg.Units, api.PlanUnit{Label: shown[u].Label, Link: shown[u].Link})
 		}
 		out[i].Target = tg
+		if !waits(it) {
+			continue
+		}
 		for j := range out[i].Does {
 			if out[i].Does[j].Use == builtin.StepItemsResolve {
 				out[i].Does[j].Items = held[e.ID]
@@ -53,6 +58,11 @@ func (s *Server) planViews(ctx context.Context, its []workflow.Item, known map[u
 		}
 	}
 	return out
+}
+
+// waits says whether it has yet to run, so the open items its task holds now are those it would resolve.
+func waits(it workflow.Item) bool {
+	return it.Decision == workflow.DecisionPending || it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionDeferred
 }
 
 // planTasks are the stored tasks the items of its act on.
@@ -109,14 +119,37 @@ func (s *Server) openItemsOf(ctx context.Context, tasks map[task.ID]task.Task) m
 	return out
 }
 
+// itemsOfUnits are the items of units: those the pass ctx carries from the items it read once for all its units,
+// the rest in one batch when the ledger reads many units at once.
 func (s *Server) itemsOfUnits(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
 	if len(units) == 0 {
 		return nil, nil
 	}
-	if l, ok := s.deps.Items.(itemsLoader); ok {
-		return l.Load(ctx, units)
-	}
+	l, batches := s.deps.Items.(itemsLoader)
 	out := make(map[unit.Unit][]items.Item, len(units))
+	if pass, ok := coretasks.PassOf(ctx); ok && batches {
+		all, err := coretasks.Once(ctx, coretasks.ItemsKey, func() (map[unit.Unit][]items.Item, error) { return l.Load(ctx, pass.Units()) })
+		if err != nil {
+			return out, err
+		}
+		var rest []unit.Unit
+		for _, u := range units {
+			if pass.Holds(u) {
+				out[u] = all[u]
+			} else {
+				rest = append(rest, u)
+			}
+		}
+		units = rest
+		if len(units) == 0 {
+			return out, nil
+		}
+	}
+	if batches {
+		got, err := l.Load(ctx, units)
+		maps.Copy(out, got)
+		return out, err
+	}
 	for _, u := range units {
 		its, err := s.deps.Items.Items(ctx, u)
 		if err != nil {

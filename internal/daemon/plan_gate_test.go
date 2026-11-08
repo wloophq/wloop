@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/automation"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -367,6 +368,44 @@ func TestThePlanServesEachReasonAsItsTemplateValuesAndFacts(t *testing.T) {
 	}
 	if x := by["refused/x"]; x.ReasonKey != "" || x.Reason != "a guard words its own refusal" {
 		t.Errorf("a refusal: key %q reason %q, want the text alone", x.ReasonKey, x.Reason)
+	}
+}
+
+func TestAPassesItemsServeThePlansOpenItems(t *testing.T) {
+	t.Parallel()
+	r, _, _ := planGateRig(t)
+	ctx := context.Background()
+	e, err := r.s.deps.Tasks.Task(ctx, "t-0000000000000001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	th := threadOf(e.ID)
+	pass := &coretasks.Pass{Tasks: []task.Task{e}}
+	ctx = coretasks.WithPass(ctx, pass)
+	if _, err := coretasks.Once(ctx, coretasks.ItemsKey, func() (map[unit.Unit][]items.Item, error) {
+		return map[unit.Unit][]items.Item{th: {{ID: "i1", Unit: th, Summary: "Ana asks, as the pass read it", State: items.Open}}}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reads := r.s.deps.Items.(*readItems)
+	reads.load.Store(0)
+	got := r.s.openItemsOf(ctx, map[task.ID]task.Task{e.ID: e})
+	if want := []string{"Ana asks, as the pass read it"}; !slices.Equal(got[e.ID], want) || reads.load.Load() != 0 || reads.byUnit.Load() != 0 {
+		t.Errorf("open items %q from %d batch and %d unit reads, want %q from the pass alone", got[e.ID], reads.load.Load(), reads.byUnit.Load(), want)
+	}
+}
+
+func TestAnItemThatRanListsNoOpenItemsAsOfNow(t *testing.T) {
+	t.Parallel()
+	r, _, _ := planGateRig(t)
+	plan := r.s.deps.Plan.(*itemsPlan)
+	plan.items[0].Decision = workflow.DecisionRun
+	var res api.PlanResponse
+	if code := get(t, r.s, api.Plan+"?closed=1", &res); code != 200 || len(res.Items) != 1 {
+		t.Fatalf("plan: %d %+v", code, res)
+	}
+	if it := res.Items[0]; it.Target == nil || len(it.Does) != 1 || len(it.Does[0].Items) != 0 {
+		t.Errorf("an item that ran: target %+v does %+v, want its task and no open items of now", it.Target, it.Does)
 	}
 }
 
