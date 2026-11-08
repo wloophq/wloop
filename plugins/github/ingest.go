@@ -72,6 +72,9 @@ type running struct {
 	git   plan.Git
 	lists listings
 	views presenting
+
+	loggedMu sync.Mutex
+	logged   map[string]bool
 }
 
 func (p *Plugin) now() time.Time {
@@ -371,8 +374,9 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 const predicateReviewerRequired = "reviewer_required"
 
 // reviewerRequired says, for each of ins, whether the profile's
-// reviewer_required holds over its pull request's facts; true for every
-// one when the host cannot say, as the bundled profile sets it.
+// reviewer_required holds over its pull request's facts; true, as the
+// bundled profile sets it, for every one when the host cannot say and for
+// one whose facts it could not evaluate the predicate over.
 func (r *running) reviewerRequired(ctx context.Context, ins []row.Input) []bool {
 	out := make([]bool, len(ins))
 	for i := range out {
@@ -386,13 +390,37 @@ func (r *running) reviewerRequired(ctx context.Context, ins []row.Input) []bool 
 		facts[i] = row.FactsOf(in)
 	}
 	holds, err := r.host.Services.Holds(ctx, predicateReviewerRequired, facts)
+	if err == nil && len(holds) != len(ins) {
+		err = fmt.Errorf("%d verdicts for %d pull requests", len(holds), len(ins))
+	}
 	if err != nil {
 		if !errors.Is(err, src.ErrUnsupported) {
-			logf("%s: %v", predicateReviewerRequired, err)
+			r.logOnce(fmt.Sprintf("%s: %v", predicateReviewerRequired, err))
 		}
 		return out
 	}
-	return holds
+	for i, h := range holds {
+		if h.Err != "" {
+			r.logOnce(fmt.Sprintf("%s for %s: %s", predicateReviewerRequired, ins[i].PR.Ref, h.Err))
+			continue
+		}
+		out[i] = h.Holds
+	}
+	return out
+}
+
+// logOnce logs msg the first time the running plugin meets it.
+func (r *running) logOnce(msg string) {
+	r.loggedMu.Lock()
+	defer r.loggedMu.Unlock()
+	if r.logged[msg] {
+		return
+	}
+	if r.logged == nil {
+		r.logged = map[string]bool{}
+	}
+	r.logged[msg] = true
+	logf("%s", msg)
 }
 
 // rowInputs are what the rows of refs read besides their pull requests:

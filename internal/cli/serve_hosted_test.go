@@ -53,11 +53,13 @@ func TestAPluginsPredicateHoldsAsTheUsersLayerSetsIt(t *testing.T) {
 	}
 	cfg := config.Config{Profile: user}
 	e := &Env{StateDir: t.TempDir(), LoadConfig: func() (config.Config, error) { return cfg, nil }}
-	holds := e.pluginHolds("github")
-	for owner, want := range map[string]bool{"solo": false, "lone": false, "acme": true} {
-		if got, err := holds(context.Background(), "reviewer_required", map[string]any{"pr.owner": owner}); err != nil || got != want {
-			t.Errorf("reviewer_required for %s = %v, %v; want %v", owner, got, err, want)
-		}
+	got, err := e.pluginHolds("github")(context.Background(), "reviewer_required",
+		[]map[string]any{{"pr.owner": "solo"}, {"pr.owner": "lone"}, {"pr.owner": 7}, {"pr.owner": "acme"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 || got[0] != (src.Holding{}) || got[1] != (src.Holding{}) || got[2].Err == "" || got[3] != (src.Holding{Holds: true}) {
+		t.Errorf("holdings %+v, want solo and lone false, the bad set alone failing, acme true", got)
 	}
 }
 

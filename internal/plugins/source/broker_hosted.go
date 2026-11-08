@@ -26,8 +26,8 @@ type Hosted struct {
 	Ask func(ctx context.Context, req src.AskRequest) (src.AskResult, error)
 	// Profile reads path in the plugin's profile layer.
 	Profile func(ctx context.Context, path string) ([]byte, error)
-	// Holds says whether the plugin's predicate holds over facts, as the loaded profile sets it.
-	Holds func(ctx context.Context, predicate string, facts map[string]any) (bool, error)
+	// Holds says whether the plugin's predicate holds over each of sets, as one loaded profile sets it.
+	Holds func(ctx context.Context, predicate string, sets []map[string]any) ([]src.Holding, error)
 	// Sessions are the host's sessions and their turns.
 	Sessions SessionBooks
 	// Intents is the loaded registry, whose drafts.allowed_effects bound a

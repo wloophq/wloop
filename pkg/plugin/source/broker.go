@@ -221,7 +221,11 @@ func (s *hostServer) Holds(ctx context.Context, r *pb.HoldsRequest) (*pb.HoldsRe
 		if err == nil && len(holds) != len(sets) {
 			err = fmt.Errorf("holds %s: %d verdicts for %d fact sets", r.GetPredicate(), len(holds), len(sets))
 		}
-		return &pb.HoldsResponse{Holds: holds}, err
+		out := make([]*pb.PredicateVerdict, len(holds))
+		for i, x := range holds {
+			out[i] = &pb.PredicateVerdict{Holds: x.Holds, Error: x.Err}
+		}
+		return &pb.HoldsResponse{Verdicts: out}, err
 	})
 }
 
@@ -412,7 +416,7 @@ func (h *hostClient) Profile(ctx context.Context, path string) ([]byte, error) {
 	return r.GetContent(), err
 }
 
-func (h *hostClient) Holds(ctx context.Context, predicate string, facts [][]Fact) ([]bool, error) {
+func (h *hostClient) Holds(ctx context.Context, predicate string, facts [][]Fact) ([]Holding, error) {
 	sets := make([]*pb.FactSet, len(facts))
 	for i, fs := range facts {
 		sets[i] = &pb.FactSet{Facts: factsPB(fs)}
@@ -423,10 +427,14 @@ func (h *hostClient) Holds(ctx context.Context, predicate string, facts [][]Fact
 	if err != nil {
 		return nil, err
 	}
-	if len(r.GetHolds()) != len(facts) {
-		return nil, fmt.Errorf("holds %s: %d verdicts for %d fact sets", predicate, len(r.GetHolds()), len(facts))
+	if len(r.GetVerdicts()) != len(facts) {
+		return nil, fmt.Errorf("holds %s: %d verdicts for %d fact sets", predicate, len(r.GetVerdicts()), len(facts))
 	}
-	return r.GetHolds(), nil
+	out := make([]Holding, len(facts))
+	for i, v := range r.GetVerdicts() {
+		out[i] = Holding{Holds: v.GetHolds(), Err: v.GetError()}
+	}
+	return out, nil
 }
 
 func (h *hostClient) Events(ctx context.Context, q EventQuery) ([]Event, error) {

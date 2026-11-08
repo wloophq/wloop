@@ -85,11 +85,15 @@ type fakeHost struct {
 	profile map[string]string
 	// holds answers reviewer_required over a pull request's facts; nil
 	// answers no predicate.
-	holds  func([]src.Fact) bool
+	holds func([]src.Fact) bool
+	// failOn fails the evaluation of a set it says, and short answers one
+	// verdict fewer than asked.
+	failOn func([]src.Fact) bool
+	short  bool
 	holdOn [][]src.Fact
 }
 
-func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact) ([]bool, error) {
+func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact) ([]src.Holding, error) {
 	if h.holds == nil {
 		return nil, src.ErrUnsupported
 	}
@@ -98,10 +102,17 @@ func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	out := make([]bool, len(facts))
+	out := make([]src.Holding, len(facts))
 	for i, fs := range facts {
 		h.holdOn = append(h.holdOn, fs)
-		out[i] = h.holds(fs)
+		if h.failOn != nil && h.failOn(fs) {
+			out[i].Err = "pr.owner has Go type int, want string"
+			continue
+		}
+		out[i].Holds = h.holds(fs)
+	}
+	if h.short && len(out) > 0 {
+		out = out[:len(out)-1]
 	}
 	return out, nil
 }

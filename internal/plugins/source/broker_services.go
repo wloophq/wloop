@@ -84,7 +84,7 @@ func (s services) Profile(ctx context.Context, path string) ([]byte, error) {
 }
 
 // Holds evaluates the plugin's predicate over each set of facts, a temporal one at the host's now.
-func (s services) Holds(ctx context.Context, predicate string, facts [][]src.Fact) ([]bool, error) {
+func (s services) Holds(ctx context.Context, predicate string, facts [][]src.Fact) ([]src.Holding, error) {
 	h := s.b.Hosted
 	if h == nil || h.Holds == nil {
 		return nil, src.ErrUnsupported
@@ -93,19 +93,15 @@ func (s services) Holds(ctx context.Context, predicate string, facts [][]src.Fac
 	if h.Now != nil {
 		now = h.Now()
 	}
-	out := make([]bool, len(facts))
+	sets := make([]map[string]any, len(facts))
 	for i, set := range facts {
 		m := make(map[string]any, len(set))
 		for _, f := range set {
 			m[f.Name] = value.Resolve(f.Value, now)
 		}
-		ok, err := h.Holds(ctx, predicate, m)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = ok
+		sets[i] = m
 	}
-	return out, nil
+	return h.Holds(ctx, predicate, sets)
 }
 
 // tree is cfg as config get reads it: its keys by their names in the file.

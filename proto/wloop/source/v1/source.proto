@@ -1227,8 +1227,15 @@ message FactSet {
 }
 
 message HoldsResponse {
-  // holds has one verdict per fact set, in order.
-  repeated bool holds = 1;
+  // verdicts has one verdict per fact set, in order.
+  repeated PredicateVerdict verdicts = 1;
+}
+
+// PredicateVerdict is whether a predicate holds over one fact set; error says why it
+// could not be evaluated over it, and holds is then meaningless.
+message PredicateVerdict {
+  bool holds = 1;
+  string error = 2;
 }
 
 message EventsRequest {

@@ -39,6 +39,59 @@ func snapshotOf(t *testing.T, p *Plugin) src.Snapshot {
 	return snaps[0]
 }
 
+// soloRef is ana's pull request in a repository nobody reviews.
+var soloRef = pr.Ref{Owner: "solo", Repo: "api", Number: 8}
+
+// kindsOfAChunk stores ana's green pull requests ref7, of acme, and soloRef with no reviewer asked, and
+// is the situation of each as one report chunk derives them, by owner.
+func kindsOfAChunk(t *testing.T, h *fakeHost) map[string]string {
+	t.Helper()
+	p := started(t, &githubGraphQL{states: map[int]string{}}, h)
+	ownNoReviewer(t, p, "SUCCESS", "MERGEABLE")
+	if err := p.store().UpsertPR(context.Background(), pr.PR{Ref: soloRef, Title: "Change 8", Author: "ana", State: pr.StateOpen, HeadOid: "h8", URL: soloRef.URL(),
+		CreatedAt: testAt.Add(-10 * 24 * time.Hour), ChecksState: "SUCCESS", Mergeable: "MERGEABLE", BaseBranch: "main", Reasons: []string{"author"}}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := p.running()
+	if err != nil {
+		t.Fatal(err)
+	}
+	snaps, err := r.snapshots(context.Background(), []pr.Ref{ref7, soloRef})
+	if err != nil || len(snaps) != 2 {
+		t.Fatalf("snapshots %+v %v", snaps, err)
+	}
+	out := map[string]string{}
+	for _, s := range snaps {
+		ref, _ := pr.RefOf(s.Unit)
+		out[ref.Owner] = s.Situation.Kind
+	}
+	return out
+}
+
+func TestEachPullRequestOfAChunkTakesItsOwnVerdict(t *testing.T) {
+	t.Parallel()
+	got := kindsOfAChunk(t, &fakeHost{holds: func(fs []src.Fact) bool { return !ownerIs(fs, "solo") }})
+	if got["solo"] != "merge" || got["acme"] != "no_reviewer" {
+		t.Fatalf("situations %v, want solo merge and acme no_reviewer", got)
+	}
+}
+
+func TestASetTheHostCannotEvaluateKeepsTheDefaultAlone(t *testing.T) {
+	t.Parallel()
+	h := &fakeHost{holds: func([]src.Fact) bool { return false }, failOn: func(fs []src.Fact) bool { return ownerIs(fs, "solo") }}
+	if got := kindsOfAChunk(t, h); got["solo"] != "no_reviewer" || got["acme"] != "merge" {
+		t.Fatalf("situations %v, want the failed solo set to require a reviewer and acme's verdict to stand", got)
+	}
+}
+
+func TestAShortAnswerKeepsTheDefaultForEveryPullRequest(t *testing.T) {
+	t.Parallel()
+	h := &fakeHost{holds: func([]src.Fact) bool { return false }, short: true}
+	if got := kindsOfAChunk(t, h); got["solo"] != "no_reviewer" || got["acme"] != "no_reviewer" {
+		t.Fatalf("situations %v, want every pull request to require a reviewer", got)
+	}
+}
+
 func itemIDs(s src.Snapshot) []string {
 	var out []string
 	for _, it := range s.Items {

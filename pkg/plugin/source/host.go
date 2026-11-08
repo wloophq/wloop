@@ -115,9 +115,16 @@ type Services interface {
 	// plugins/<id>/ over the plugin's own.
 	Profile(ctx context.Context, path string) ([]byte, error)
 	// Holds says whether predicate, one the plugin's manifest declares, as
-	// its profile layer sets it, holds over each of facts, one verdict per
+	// its profile layer sets it, holds over each of facts, one Holding per
 	// set in order. A fact a set lacks reads as its type's zero value.
-	Holds(ctx context.Context, predicate string, facts [][]Fact) ([]bool, error)
+	Holds(ctx context.Context, predicate string, facts [][]Fact) ([]Holding, error)
+}
+
+// Holding is whether a predicate holds over one set of facts; Err says why
+// it could not be evaluated over that set, and Holds is then meaningless.
+type Holding struct {
+	Holds bool
+	Err   string
 }
 
 // History reads the events the host keeps: the plugin's own recorded

@@ -23,15 +23,29 @@ type Predicates map[dunit.ProviderID]map[string]*expr.Program
 // Holds says whether plugin p's predicate name holds over facts; an error when p declares no such predicate
 // or no layer sets it, or when it fails to evaluate.
 func (ps Predicates) Holds(p dunit.ProviderID, name string, facts map[string]any) (bool, error) {
+	holds, errs, err := ps.Eval(p, name, []map[string]any{facts})
+	if err != nil {
+		return false, err
+	}
+	return holds[0], errs[0]
+}
+
+// Eval is Holds over each of sets: one verdict and one evaluation error per set, in order; err when p
+// declares no such predicate or no layer sets it.
+func (ps Predicates) Eval(p dunit.ProviderID, name string, sets []map[string]any) (holds []bool, errs []error, err error) {
 	prg := ps[p][name]
 	if prg == nil {
-		return false, fmt.Errorf("plugin %s sets no predicate %s", p, name)
+		return nil, nil, fmt.Errorf("plugin %s sets no predicate %s", p, name)
 	}
-	ok, err := prg.Holds(facts)
-	if err != nil {
-		return false, fmt.Errorf("plugin %s's predicate %s: %w", p, name, err)
+	holds, errs = make([]bool, len(sets)), make([]error, len(sets))
+	for i, facts := range sets {
+		ok, err := prg.Holds(facts)
+		if err != nil {
+			errs[i] = fmt.Errorf("plugin %s's predicate %s: %w", p, name, err)
+		}
+		holds[i] = ok
 	}
-	return ok, nil
+	return holds, errs, nil
 }
 
 // loadPredicates reads predicates.toml from each plugin's layers: a higher layer's predicate replaces a lower

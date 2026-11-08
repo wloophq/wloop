@@ -107,14 +107,18 @@ func (r *recorder) Profile(_ context.Context, path string) ([]byte, error) {
 	return []byte("profile " + path), nil
 }
 
-// Holds holds where a set's pull.owner fact is "acme".
-func (r *recorder) Holds(_ context.Context, predicate string, facts [][]source.Fact) ([]bool, error) {
+// Holds holds where a set's pull.owner fact is "acme", and fails on a set with none.
+func (r *recorder) Holds(_ context.Context, predicate string, facts [][]source.Fact) ([]source.Holding, error) {
 	if predicate != "reviewer_required" {
 		return nil, fmt.Errorf("no predicate %s", predicate)
 	}
-	out := make([]bool, len(facts))
+	out := make([]source.Holding, len(facts))
 	for i, fs := range facts {
-		out[i] = slices.ContainsFunc(fs, func(f source.Fact) bool { return f.Name == "pull.owner" && f.Value.String == "acme" })
+		if len(fs) == 0 {
+			out[i].Err = "no owner"
+			continue
+		}
+		out[i].Holds = slices.ContainsFunc(fs, func(f source.Fact) bool { return f.Name == "pull.owner" && f.Value.String == "acme" })
 	}
 	return out, nil
 }
@@ -303,7 +307,8 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	}
 	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "model": "small-1", "cost": 0.02, "item": "icreate",
 		"priority": float64(source.PriorityBackground), "wake": true, "event": "review:9", "host": `{"sweep":{"fast":"1m"}}`, "prompt": "profile prompts/extract.md",
-		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false, "holds": []any{true, false, false}}
+		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false,
+		"holds": []any{map[string]any{"Holds": true, "Err": ""}, map[string]any{"Holds": false, "Err": ""}, map[string]any{"Holds": false, "Err": "no owner"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tool result %v, want %v", got, want)
 	}

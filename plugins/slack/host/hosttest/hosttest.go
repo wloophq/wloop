@@ -674,7 +674,7 @@ func (h *Host) Samples() []src.Sample {
 
 func (h *Host) Config(context.Context) (src.Config, error) { return h.Configured, nil }
 
-func (*Host) Holds(context.Context, string, [][]src.Fact) ([]bool, error) {
+func (*Host) Holds(context.Context, string, [][]src.Fact) ([]src.Holding, error) {
 	return nil, src.ErrUnsupported
 }
 
