@@ -16,10 +16,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// endedPRs are the GitHub plugin's workflow facts a pull request's task reads: whether it ended.
+// endedPRs are the GitHub plugin's workflow facts a pull request's task reads: whether it ended, and any
+// other its test sets.
 type endedPRs struct {
 	mu    sync.Mutex
 	ended map[unit.Unit]bool
+	more  map[unit.Unit]workflow.Facts
 }
 
 func (f *endedPRs) List(context.Context, unit.ProviderID) ([]unit.Unit, error) { return nil, nil }
@@ -27,7 +29,11 @@ func (f *endedPRs) List(context.Context, unit.ProviderID) ([]unit.Unit, error) {
 func (f *endedPRs) Facts(_ context.Context, u unit.Unit) (workflow.Facts, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return workflow.Facts{"pr.ended": f.ended[u]}, nil
+	out := workflow.Facts{"pr.ended": f.ended[u]}
+	for k, v := range f.more[u] {
+		out[k] = v
+	}
+	return out, nil
 }
 
 func (f *endedPRs) end(u unit.Unit) {

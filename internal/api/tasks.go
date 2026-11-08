@@ -350,13 +350,17 @@ type GateView struct {
 	Delivery string          `json:"delivery,omitempty"`
 	Subject  json.RawMessage `json:"subject,omitempty"`
 	Plan     *PlanItem       `json:"plan,omitempty"`
+	// Units are what a step gate is about: the units its task holds, as a person finds them.
+	Units []PlanUnit `json:"units,omitempty"`
 }
 
-// IntentView is an intent a gate offers; Answer says it takes text, as a question's answer.
+// IntentView is an intent a gate offers: Summary says what resolving with it does, for the card of a gate whose
+// gates.toml sets card_says, Answer that it takes text, as a question's answer.
 type IntentView struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Answer bool   `json:"answer,omitempty"`
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Summary string `json:"summary,omitempty"`
+	Answer  bool   `json:"answer,omitempty"`
 }
 
 // RunView is a run of a task: the turn Seq of Intent in State, where it ran, its session and that session's

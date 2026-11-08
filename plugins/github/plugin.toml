@@ -36,7 +36,7 @@ doc = "A workspace of the pull request remains on disk, a review or an author on
 [[source.predicates]]
 name = "reviewer_required"
 facts = ["pr.repo", "pr.repo_name", "pr.owner", "pr.slug", "pr.author", "pr.state", "pr.ended", "pr.merged_at", "pr.closed_at",
-  "pr.draft", "pr.head", "pr.conflicting_for", "pr.mine", "pr.base", "pr.cross_repository", "pr.requested_teams",
+  "pr.draft", "pr.changed_files", "pr.head", "pr.conflicting_for", "pr.mine", "pr.base", "pr.cross_repository", "pr.requested_teams",
   "pr.review_requested_me", "pr.checks", "pr.age", "pr.adopted", "pr.stale", "pr.visibility", "pr.association", "pr.labels",
   "pr.last_review.exists", "pr.last_review.verdict", "pr.last_review.decision", "pr.last_interaction_at", "pr.silent_days"]
 doc ="An open pull request waits for a reviewer before its merge. Where it does not hold, a pull request nobody was asked to review is never no_reviewer: with checks green and no conflict it is merge, as an approved one is, and no nudge asks for a reviewer."
@@ -478,6 +478,11 @@ doc = "Working time since it ended, max(merged_at, closed_at), the rule retentio
 name = "pr.ended"
 type = "bool"
 doc = "The pull request merged or closed: the GitHub plugin's word that the unit has ended."
+
+[[source.facts]]
+name = "pr.changed_files"
+type = "int"
+doc = "How many files the pull request changes, as GitHub last reported it; 0 when not read."
 
 [[source.facts]]
 name = "pr.head"

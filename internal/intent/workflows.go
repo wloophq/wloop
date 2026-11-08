@@ -50,8 +50,15 @@ type wManifest struct {
 
 // wGates is a workflow's [gates]: an intent's, and whether its drafts always wait.
 type wGates struct {
-	Approval   *mApproval `toml:"approval"`
-	DraftsWait bool       `toml:"drafts_wait"`
+	Approval   *mApproval     `toml:"approval"`
+	DraftsWait bool           `toml:"drafts_wait"`
+	Withdraw   *wGateWithdraw `toml:"withdraw"`
+}
+
+// wGateWithdraw is a workflow's [gates.withdraw]: when the gates its gate.open steps opened no longer stand.
+type wGateWithdraw struct {
+	When   *string `toml:"when"`
+	Reason *string `toml:"reason"`
 }
 
 type wOutbox struct {
@@ -360,6 +367,9 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Gates, slot)
+	if g := m.Gates; g != nil {
+		s.defineGateWithdraw(&w, g.Withdraw, slot)
+	}
 	if d := m.Drafts; d != nil {
 		s.defineWithdraw(&w, d.Withdraw, slot)
 	}
@@ -409,6 +419,36 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 		r := rule("drafts.withdraw.when", *m.When, m.Reason)
 		w.Withdraw, w.WithdrawReason = r.When, r.Reason
 	}
+}
+
+func (s *sheet) defineGateWithdraw(w *workflow.Workflow, m *wGateWithdraw, slot string) {
+	if m == nil {
+		return
+	}
+	if m.When == nil {
+		s.add("gates.withdraw.when", "is required: a predicate over the unit's facts that withdraws an open gate the workflow opened")
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepGateOpen }) {
+		s.add("gates.withdraw", "withdraws gates the workflow opened; it has no %s step", builtin.StepGateOpen)
+	}
+	r := workflow.WithdrawRule{}
+	if slot != "" {
+		env := s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+		r.When = s.predicate("gates.withdraw.when", *m.When, env)
+		if r.When == nil {
+			return
+		}
+		// A withdrawal closes a gate that waits on you, so no third party's text may decide it.
+		if f := untrustedRead(r.When, env); f != "" {
+			s.add("gates.withdraw.when", "%s", (&builtin.UntrustedError{Fact: f}).Error())
+			return
+		}
+	}
+	if m.Reason != nil {
+		r.Reason = strings.TrimSpace(*m.Reason)
+	}
+	w.GateWithdraw = &r
 }
 
 // turnBudget refuses a workflow that starts turns on units outside

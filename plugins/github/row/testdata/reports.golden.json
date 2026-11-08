@@ -173,6 +173,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 1
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -490,6 +497,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 2
           }
         },
         {
@@ -811,6 +825,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 3
           }
         },
         {
@@ -1143,6 +1164,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 4
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -1453,6 +1481,13 @@
           "value": {
             "kind": 1,
             "bool": true
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 5
           }
         },
         {
@@ -1804,6 +1839,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 6
           }
         },
         {
@@ -2169,6 +2211,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 7
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -2520,6 +2569,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 8
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -2855,6 +2911,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 9
           }
         },
         {
@@ -3196,6 +3259,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 10
           }
         },
         {
@@ -3543,6 +3613,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 11
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -3809,6 +3886,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 13
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -4070,6 +4154,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 14
           }
         },
         {
@@ -4384,6 +4475,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 18
           }
         },
         {
@@ -4704,6 +4802,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 19
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -5018,6 +5123,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 20
           }
         },
         {
@@ -5338,6 +5450,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 25
           }
         },
         {
@@ -5668,6 +5787,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 26
           }
         },
         {
@@ -6004,6 +6130,13 @@
           }
         },
         {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 27
+          }
+        },
+        {
           "name": "pr.head",
           "value": {
             "kind": 3,
@@ -6279,6 +6412,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 28
           }
         },
         {
@@ -6625,6 +6765,13 @@
           "name": "pr.draft",
           "value": {
             "kind": 1
+          }
+        },
+        {
+          "name": "pr.changed_files",
+          "value": {
+            "kind": 2,
+            "int": 31
           }
         },
         {

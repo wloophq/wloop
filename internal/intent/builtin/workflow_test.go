@@ -12,7 +12,7 @@ import (
 
 // workflowTable is the plan's workflow fact table: slot, then name:type pairs.
 var workflowTable = map[string]string{
-	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B " +
+	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B changed_files:I head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B " +
 		"has_workspace:B stale:B open_turn:S open_turn_seq:I orphan_answer_id:I review.action:S review.reason:S review.observed:B " +
 		"first.due:B first.reason:S address.due:B address.reason:S address.reviewers:L address.checks:L address.conflict:B address.observed:B " +
 		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S " +
@@ -23,7 +23,7 @@ var workflowTable = map[string]string{
 		"idle_for:D unread_gates:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B process_orphaned:B orphan_durable:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +
 		"unpushed:I newest_turn_state:S open_turn:B pendency:L sessions:I manager:S last_activity:T quiet_for:D fingerprint:S repo:S",
-	"task": "id:S state:S unit:S unit_provider:S units:L unit_providers:L unit_kinds:L link_ended:B turns:I captured_by_user:B " +
+	"task": "id:S state:S unit:S unit_provider:S units:L unit_providers:L unit_kinds:L open_unit_kinds:L link_ended:B turns:I captured_by_user:B " +
 		"link_started_by_me:B link_closure_posted:B items_open:I items_resolved:I items_changed_at:T settled_at:T fingerprint:S " +
 		"category:S owed_by:S turn:S owed_since:T moved_at:T since_movement:D check_on:T gates_open:I decisions:L decision_since:T turns_open_by_hand:I turn_by_hand_at:T turns_running:I wake_until:T wake_when:S placement:S " +
 		"sequential_next:B review_due:B children_ready:B children_mine:B ask_age:D askers:L asker_names:L promised:T extraction_lag:D link_owes:L link_signals:L " +

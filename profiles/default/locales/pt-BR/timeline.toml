@@ -166,6 +166,9 @@ label = "registro gravado"
 [events.gate_resolved]
 label = "decisão resolvida"
 
+[events.gate_withdrawn]
+label = "etapa retirada"
+
 [events.message]
 label = "mensagem"
 
@@ -179,6 +182,9 @@ label = "Você respondeu ao agente"
 
 [facts.decision]
 label = "Decisão resolvida"
+
+[facts.withdrawn]
+label = "Etapa retirada: {{.sub}}"
 
 [facts.moved]
 label = "Movida: {{.event}}"

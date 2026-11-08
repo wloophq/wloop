@@ -110,6 +110,11 @@
         "additionalProperties": false,
         "description": "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.",
         "properties": {
+          "card_says": {
+            "default": false,
+            "description": "The gate's card lists what each of its intents does, its summary, under what it asks; false leaves the summaries to help and palettes.",
+            "type": "boolean"
+          },
           "closes_with": {
             "description": "The intent, one that refuses the gate, the gate closes with when you end the task it is on. While the gate is open, nothing else ends the task: its items resolving leave it open, and a workflow's verb that would end it is refused, until you settle the gate. The task's unit ending (a pull request merged or closed) supersedes the gate as moot. Empty or left out, the gate neither holds its task nor closes with it.",
             "type": "string"
@@ -160,7 +165,7 @@
                   "type": "string"
                 },
                 "summary": {
-                  "description": "What resolving the gate with the intent does, as help and palettes show it.",
+                  "description": "What resolving the gate with the intent does, as help, palettes and the gate's card show it.",
                   "type": "string"
                 }
               },
@@ -187,7 +192,7 @@
             "type": "string"
           },
           "text": {
-            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb.",
+            "description": "The words of the gate's subject when the loop writes them, over the proposal facts: the first proposal gate words an item proposal of the ledger with it, and a verb's gate the proposal of its verb. A step gate's is over the workflow facts of its unit and of the units its task holds, such as `{{.pr.slug}}`, rendered as its gate.open opens it.",
             "type": "string"
           }
         },

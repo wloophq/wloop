@@ -247,6 +247,27 @@ func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error 
 	return s.endHeld(ctx, closed)
 }
 
+// Withdraw closes open step gate id as superseded by the workflow that opened it, whose subject is gone, and
+// records gate.EventWithdrawn with reason on its task.
+func (s *Service) Withdraw(ctx context.Context, id int64, reason string) error {
+	g, err := s.d.Reader.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if g.Kind != gate.KindStep {
+		return fmt.Errorf("%w: gate %d is a %s gate; only a step gate is withdrawn", ErrRefused, id, g.Kind)
+	}
+	if err := s.Supersede(ctx, id, task.ActorWorkflow); err != nil {
+		return err
+	}
+	if s.d.Events == nil {
+		return nil
+	}
+	ev := resolvedEvent(g)
+	ev.Kind, ev.Actor, ev.Session, ev.Data, ev.At = gate.EventWithdrawn, string(task.ActorWorkflow), "", reason, s.d.Clock.Now()
+	return s.d.Events.RecordEvents(ctx, ev)
+}
+
 // ActingFor are the open gates that would act in task id's name: those of kind proposal, plan or step on its
 // own unit, and the proposals on any task whose proposed verb names id in task.ArgTask.
 func (s *Service) ActingFor(ctx context.Context, id task.ID) ([]gate.Gate, error) {

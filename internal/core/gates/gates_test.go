@@ -430,6 +430,39 @@ func TestResolvingAStepGateRecordsAnEvent(t *testing.T) {
 	}
 }
 
+func TestWithdrawingAStepGateSupersedesItWithItsReason(t *testing.T) {
+	store := gatestest.NewStore(fixedNow)
+	log := &eventLog{}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Clock: clock{fixedNow}, Events: log})
+	ctx := context.Background()
+	step, err := svc.Open(ctx, gate.Gate{Name: "review-diff", Task: "t-0000000000000001", Unit: acme}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	question, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Task: "t-0000000000000001", Unit: acme}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Withdraw(ctx, question.ID, "gone"); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("withdrawing a question: %v, want refused", err)
+	}
+	if err := svc.Withdraw(ctx, step.ID, "The pull request merged"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.Get(ctx, step.ID)
+	if err != nil || got.Status != gate.Superseded || got.By != task.ActorWorkflow {
+		t.Fatalf("the withdrawn step %+v %v, want superseded by the workflow", got, err)
+	}
+	want := port.Event{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.EventWithdrawn, Key: fmt.Sprintf("review-diff/%d", step.ID), Actor: "workflow",
+		Data: "The pull request merged", At: fixedNow()}
+	if len(log.evs) != 1 || log.evs[0] != want {
+		t.Fatalf("events %+v, want only %+v", log.evs, want)
+	}
+	if err := svc.Withdraw(ctx, step.ID, "again"); !errors.Is(err, gates.ErrResolved) || len(log.evs) != 1 {
+		t.Fatalf("withdrawing a closed step: %v, events %+v", err, log.evs)
+	}
+}
+
 func TestAnEndedTasksGatesCloseAsWhoEndedItSays(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {

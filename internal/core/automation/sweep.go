@@ -36,7 +36,9 @@ func (t *tally) add(r result) {
 }
 
 // Sweep implements daemon.Sweeper. Without the loop lock it checks the
-// manager is reachable, refreshes the facts providers, evaluates every
+// manager is reachable, refreshes the facts providers, withdraws the step
+// gates whose workflow's [gates.withdraw] holds, so this pass's facts see
+// them closed, evaluates every
 // trigger, saves the plan, advances the event cursors and drops the run
 // items whose source moved and that no longer hold. Under the lock it drops
 // the run items whose unit was noted after the plan's generation and no
@@ -53,6 +55,9 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		if err := r.Refresh(ctx); err != nil {
 			return "", "", fmt.Errorf("refreshing facts: %w", err)
 		}
+	}
+	if err := e.withdrawSteps(ctx); err != nil {
+		e.logf("withdrawing steps: %v", err)
 	}
 	var ev *evaluation
 	if err := e.prepared(ctx, func(ctx context.Context) (err error) {

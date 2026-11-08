@@ -63,6 +63,7 @@ var EventKinds = []Value{
 	{Name: "view_applied", Doc: "A view's change applied."},
 	{Name: "record", Doc: "A record written, such as a brief."},
 	{Name: "gate_resolved", Doc: "A decision that waited on you resolved."},
+	{Name: "gate_withdrawn", Doc: "A step that waited on you withdrawn by its workflow, its subject gone; its data is the workflow's reason."},
 	{Name: "message", Doc: "A message in the task's conversation with its agent."},
 }
 

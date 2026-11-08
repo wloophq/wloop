@@ -225,6 +225,10 @@ tone = "loop"
 label = "decision resolved"
 tone = "me"
 
+[events.gate_withdrawn]
+label = "step withdrawn"
+tone = "loop"
+
 [events.message]
 label = "message"
 
@@ -250,6 +254,12 @@ start = ["gate_resolved"]
 label = "Decision resolved"
 tone  = "me"
 order = 30
+
+[facts.withdrawn]
+start = ["gate_withdrawn"]
+label = "Step withdrawn: {{.sub}}"
+tone  = "loop"
+order = 31
 
 [facts.moved]
 start = ["verb_next", "verb_waiting", "verb_schedule", "verb_someday", "verb_reference", "verb_done", "verb_dismiss", "verb_acknowledge", "verb_not-mine", "verb_hand-to"]

@@ -94,12 +94,15 @@ note = "Tirar o bloqueio sem confiar; a rodada espera um novo gatilho"
 
 [gates.review-diff]
 label = "Revisar o diff"
+text = "Revisar o diff{{with .pr.slug}} de {{.}}{{end}}{{with .pr.changed_files}}, {{if eq . 1}}1 arquivo alterado{{else}}{{.}} arquivos alterados{{end}}{{end}}"
 
 [gates.review-diff.intents.approve]
 label = "Está bom"
+summary = "Marcar o diff como revisado; não publica nada."
 
 [gates.review-diff.intents.dismiss]
 label = "Dispensar"
+summary = "Fechar esta etapa sem revisar; a tarefa fica como está."
 
 [gates.missing-record]
 label = "A execução parou: falhou ou terminou sem o registro"
