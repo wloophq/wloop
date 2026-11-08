@@ -81,18 +81,18 @@ type planner struct {
 	config workflow.Facts
 	// reads are what the sweep (false) and the event (true) workflows of the pass read: a unit's facts are read
 	// once for all the workflows of a kind.
-	reads   map[bool][]string
-	facts   map[factsRead]workflow.Facts
-	factErr map[factsRead]error
-	revs    map[unit.Unit]uint64
-	due     time.Time
-	marks   map[unit.Unit]map[string]string
-	lists   map[unit.ProviderID][]unit.Unit
-	seen    map[string]bool
-	perRun  map[string]int
-	perUnit map[unitOf]int
-	out     []*planned
-	errs    []string
+	reads     map[bool][]string
+	facts     map[factsRead]workflow.Facts
+	factErr   map[factsRead]error
+	revs      map[unit.Unit]uint64
+	due       time.Time
+	marks     map[unit.Unit]map[string]string
+	lists     map[unit.ProviderID][]unit.Unit
+	seen      map[string]bool
+	perRun    map[string]int
+	perUnit   map[unitOf]int
+	out       []*planned
+	errs      []string
 	apply     bool
 	passed    []port.Event
 	withdrawn []port.Event
