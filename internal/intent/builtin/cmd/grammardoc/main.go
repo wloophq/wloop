@@ -277,6 +277,7 @@ var sections = []struct {
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceUI, "A plugin's views, facets and situations (`ui.toml`)"},
+	{builtin.SurfacePreds, "A plugin's predicates (`predicates.toml`)"},
 	{builtin.SurfaceStrings, "Client strings (`strings.toml`)"},
 	{builtin.SurfaceTimeline, "The core's event kinds (`timeline.toml`)"},
 	{builtin.SurfaceDecisions, "Decision kinds (`decisions.toml`)"},

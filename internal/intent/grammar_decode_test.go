@@ -15,6 +15,9 @@ func TestPredicateHintCoversEveryPredKey(t *testing.T) {
 		}
 		segs := strings.Split(k.Path, ".")
 		key := segs[len(segs)-1]
+		if k.In == builtin.SurfacePreds {
+			key = builtin.PluginPredicates["github"][0].Name
+		}
 		var src string
 		for i, s := range segs[:len(segs)-1] {
 			name := strings.Join(segs[:i+1], ".")

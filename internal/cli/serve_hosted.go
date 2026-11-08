@@ -57,9 +57,10 @@ func (e *Env) hostedFor(db *sqlite.DB, cfg config.Config, logf func(string, ...a
 
 func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedger) *psource.Hosted {
 	return &psource.Hosted{
-		Items:    items,
-		Ask:      e.pluginAsk(id),
-		Profile:  pluginProfile(id, e.currentConfig),
+		Items:   items,
+		Ask:     e.pluginAsk(id),
+		Profile: pluginProfile(id, e.currentConfig),
+		Holds:    e.pluginHolds(id),
 		Sessions: sessionBooks{sqlite.New(db)},
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
@@ -76,6 +77,17 @@ func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedg
 			return unit.Unit{}, false, nil
 		},
 		Now: e.Now,
+	}
+}
+
+// pluginHolds evaluates plugin id's predicates as the loaded profile sets them.
+func (e *Env) pluginHolds(id string) func(ctx context.Context, predicate string, facts map[string]any) (bool, error) {
+	return func(_ context.Context, predicate string, facts map[string]any) (bool, error) {
+		l := e.loadedIntents()
+		if l == nil {
+			return false, fmt.Errorf("%w: no profile loaded to read predicate %s from", src.ErrUnavailable, predicate)
+		}
+		return l.Predicates.Holds(unit.ProviderID(id), predicate, facts)
 	}
 }
 
