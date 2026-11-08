@@ -1,5 +1,5 @@
 {
-  "version": "1c06f381b44c",
+  "version": "8d8e218ccb6e",
   "views": [
     {
       "id": "mine",
@@ -771,6 +771,8 @@
         "draft": "draft",
         "merge_conflicts": "merge conflicts with {{.branch}}",
         "merged": "merged",
+        "no_review_required": "green, no review required",
+        "no_review_required_checks_pending": "no review required, checks pending",
         "no_reviewer_requested": "no reviewer requested",
         "review_requested": "review requested, no review on the head",
         "review_requested_again": "review requested again after your review",

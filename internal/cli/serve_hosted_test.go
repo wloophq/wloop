@@ -48,13 +48,13 @@ func TestAPluginsPredicateHoldsAsTheUsersLayerSetsIt(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "predicates.toml"), []byte(`reviewer_required = "!(pr.owner in ['solo', 'wloophq'])"`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "predicates.toml"), []byte(`reviewer_required = "!(pr.owner in ['solo', 'lone'])"`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg := config.Config{Profile: user}
 	e := &Env{StateDir: t.TempDir(), LoadConfig: func() (config.Config, error) { return cfg, nil }}
 	holds := e.pluginHolds("github")
-	for owner, want := range map[string]bool{"solo": false, "wloophq": false, "acme": true} {
+	for owner, want := range map[string]bool{"solo": false, "lone": false, "acme": true} {
 		if got, err := holds(context.Background(), "reviewer_required", map[string]any{"pr.owner": owner}); err != nil || got != want {
 			t.Errorf("reviewer_required for %s = %v, %v; want %v", owner, got, err, want)
 		}

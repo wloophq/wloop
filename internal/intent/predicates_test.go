@@ -18,12 +18,12 @@ func TestTheBundledReviewerRequiredHoldsForEveryPullRequest(t *testing.T) {
 
 func TestAUserLayerSetsReviewerRequiredPerOwner(t *testing.T) {
 	l, problems := loadProfile(t, "en", map[string]string{
-		"plugins/github/predicates.toml": `reviewer_required = "!(pr.owner in ['solo', 'wloophq'])"` + "\n",
+		"plugins/github/predicates.toml": `reviewer_required = "!(pr.owner in ['solo', 'lone'])"` + "\n",
 	})
 	if len(problems) > 0 {
 		t.Fatalf("problems: %v", problems)
 	}
-	for owner, want := range map[string]bool{"solo": false, "wloophq": false, "acme": true} {
+	for owner, want := range map[string]bool{"solo": false, "lone": false, "acme": true} {
 		if ok, err := l.Predicates.Holds("github", "reviewer_required", map[string]any{"pr.owner": owner}); err != nil || ok != want {
 			t.Errorf("reviewer_required for %s = %v, %v; want %v", owner, ok, err, want)
 		}
@@ -51,7 +51,7 @@ func TestAMalformedPredicateIsAProblemAndTheBundledOneStays(t *testing.T) {
 
 func BenchmarkReviewerRequiredOverAReportChunk(b *testing.B) {
 	l, problems := loadProfile(b, "en", map[string]string{
-		"plugins/github/predicates.toml": `reviewer_required = "!(pr.owner in ['solo', 'wloophq'])"` + "\n",
+		"plugins/github/predicates.toml": `reviewer_required = "!(pr.owner in ['solo', 'lone'])"` + "\n",
 	})
 	if len(problems) > 0 {
 		b.Fatal(problems)
