@@ -12,10 +12,13 @@ import (
 // day is the spend day of now, in the local zone.
 func day(now time.Time) string { return now.Local().Format(time.DateOnly) }
 
-// frees is when the spend day of now ends: the next local midnight.
-func frees(now time.Time) string {
+// frees says when the spend day of now ends.
+func frees(now time.Time) string { return freesAt(now).Format("2006-01-02 15:04 MST") }
+
+// freesAt is when the spend day of now ends: the next local midnight.
+func freesAt(now time.Time) time.Time {
 	l := now.Local()
-	return time.Date(l.Year(), l.Month(), l.Day()+1, 0, 0, 0, 0, time.Local).Format("2006-01-02 15:04 MST")
+	return time.Date(l.Year(), l.Month(), l.Day()+1, 0, 0, 0, 0, time.Local)
 }
 
 // capped names the daily cap that stops further calls today and when it frees, "" while under both.

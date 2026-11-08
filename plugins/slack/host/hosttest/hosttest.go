@@ -66,6 +66,28 @@ type Host struct {
 	marks     map[unit.Unit]map[string]string
 	asks      []src.AskRequest
 	samples   []src.Sample
+	wakes     []JobWake
+}
+
+// JobWake is a WakeJob call.
+type JobWake struct {
+	Job string
+	At  time.Time
+}
+
+// WakeJob records the wake.
+func (h *Host) WakeJob(_ context.Context, job string, at time.Time) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.wakes = append(h.wakes, JobWake{Job: job, At: at})
+	return nil
+}
+
+// Wakes are the WakeJob calls, in order.
+func (h *Host) Wakes() []JobWake {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.wakes)
 }
 
 type stored struct {
@@ -85,7 +107,7 @@ func (h *Host) Broker() host.Broker { return host.Broker{Host: h.Src()} }
 
 // Src is the fake as the SDK's Host.
 func (h *Host) Src() src.Host {
-	return src.Host{Reporter: h, Ledger: h, Reader: h, Gates: h, Recorder: h, Services: h, History: h}
+	return src.Host{Reporter: h, Ledger: h, Reader: h, Gates: h, Recorder: h, Services: h, History: h, Jobs: h}
 }
 
 var fixed = time.Date(2026, 1, 5, 12, 0, 0, 0, time.UTC)

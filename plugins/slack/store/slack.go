@@ -427,6 +427,7 @@ func insertChange(ctx context.Context, tx *Tx, m MessageRow, kind, editedTS stri
 		return 0, err
 	}
 	n, err := res.RowsAffected()
+	tx.landed = tx.landed || n > 0
 	return int(n), err
 }
 

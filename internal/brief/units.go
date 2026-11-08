@@ -14,7 +14,7 @@ import (
 )
 
 // DemandTimeout bounds a first turn's wait for an OnDemand source's brief:
-// the Slack extraction runs every 30 seconds and its call takes as long.
+// a want runs the Slack extraction at once, and its call takes up to a minute.
 const DemandTimeout = 2 * time.Minute
 
 // OnDemand is a BriefSource whose briefs another job writes, such as the
