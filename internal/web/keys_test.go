@@ -143,6 +143,9 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	if !strings.Contains(prelude, "const QUEUE ") {
 		b.WriteString(`const QUEUE = "queue";` + "\n")
 	}
+	if !strings.Contains(prelude, "const PLAN ") {
+		b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
+	}
 	b.WriteString(staticJS(t, "omnibox.js"))
 	b.WriteString("\n")
 	b.WriteString(strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1))

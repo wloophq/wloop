@@ -126,6 +126,7 @@ func filterPrelude(t *testing.T) string {
 	for _, c := range []string{"UNIT_KEY", "PR_URL"} {
 		b.WriteString(jsConst(t, src, c))
 	}
+	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
 	b.WriteString(keyJS(t))
 	b.WriteString(fieldsPrelude(t))
 	return b.String()

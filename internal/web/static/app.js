@@ -583,7 +583,7 @@ function isMuted(p) {
 
 // The backlog is every pull request still open; done joins it on request.
 function inView(row, view, withDone) {
-  if (view === "recent" || view === "explore" || view === "plan") return false;
+  if (view === "recent" || view === "explore" || view === PLAN) return false;
   if (view === "dash") return (row.unit || {}).provider === (catalog.views.find((v) => v.id === view) || {}).provider && (withDone || !sm(row).closed);
   return view === "all" || (row.views || []).includes(view);
 }
@@ -1444,14 +1444,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
+  const listless = view === "recent" || view === "explore" || view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
+  listBox.hidden = view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     if (isCoreView(view)) hideLens(document.getElementById("tools"));
@@ -2474,8 +2474,8 @@ const planName = (it) => (it.title ? `${itemLabel(it)} · ${it.title}` : itemLab
 async function loadPlan() {
   const view = readHash().view;
   try {
-    const res = await getJSON(view === "plan" ? "/api/plan?closed=1" : "/api/plan");
-    state.plan = { items: res.items || [], closed: view === "plan" ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
+    const res = await getJSON(view === PLAN ? "/api/plan?closed=1" : "/api/plan");
+    state.plan = { items: res.items || [], closed: view === PLAN ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
   } catch (err) {
     state.plan = { ...state.plan, error: t("Could not load the plan: {error}", { error: err.message }), loaded: true };
   }
@@ -2559,7 +2559,7 @@ function closedItem(c) {
 
 function renderPlan(view) {
   const box = document.getElementById("plan");
-  box.hidden = view !== "plan";
+  box.hidden = view !== PLAN;
   if (box.hidden) return;
   const p = state.plan;
   const groups = planGroups(p.items);
