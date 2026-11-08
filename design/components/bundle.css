@@ -701,7 +701,7 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .ob-stop .act + .act { margin-left: 0; }
 .ob-about { margin: var(--space-4) 0 var(--space-12); color: var(--muted); font-size: var(--text-meta); }
 .d-gate, .d-draft { transition: opacity var(--motion-fast) var(--motion-ease); }
-.d-gate.resolving, .d-draft.resolving { opacity: .5; pointer-events: none; }
+.d-gate.resolving, .d-draft.resolving, .d-compose.resolving { opacity: .5; pointer-events: none; }
 .outbox .d-draft { transition: border-color var(--motion-fast) var(--motion-ease), opacity var(--motion-fast) var(--motion-ease); }
 .outbox .d-draft:focus-within { border-color: var(--rule-strong); }
 .verbs { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; padding: var(--space-12) 0; border-bottom: 1px solid var(--rule); }

@@ -2,7 +2,7 @@
 
 // taskState is what the task page holds beside the task: its timeline's facts, the kinds it is narrowed to and every
 // kind seen, the composer's text, a run's transcript, the drafts that wait on it and the tab picked.
-const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [], tab: "" };
+const taskState = { id: "", timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", sending: false, transcript: null, drafts: [], tab: "" };
 
 function resetTaskPage(id) {
   Object.assign(taskState, { id, timeline: null, timelineError: "", kinds: [], kindsSeen: [], text: "", transcript: null, drafts: [] });
@@ -290,11 +290,15 @@ function timelineCount() {
 
 // sendChat writes the composer's text to the task's agent.
 async function sendChat(e) {
+  if (taskState.sending) return null;
   const text = taskState.text.trim();
   if (!text) {
     detailEnv.notice(t("Write a message first"), true);
     return null;
   }
+  taskState.sending = true;
+  detailEnv.notice(t("Sending to {task}…", { task: e.title || e.id }));
+  detailEnv.render();
   try {
     const out = await detailEnv.post(taskPath(e.id, "chat"), { text });
     taskState.text = "";
@@ -305,6 +309,9 @@ async function sendChat(e) {
   } catch (err) {
     detailEnv.notice(t("Sending failed: {error}", { error: err.message }), true);
     return null;
+  } finally {
+    taskState.sending = false;
+    detailEnv.render();
   }
 }
 
@@ -338,7 +345,7 @@ function taskComposer(e) {
   const now = verbTask(verb).send === "now";
   const replies = [replyButton(t("Send reply"), "now", "task:compose:reply", now), replyButton(t("Save as draft"), "draft", "task:compose:draft", !now)];
   if (!now) replies.reverse();
-  return h("section", { class: "compose d-compose", "aria-label": t("Message") },
+  return h("section", { class: "compose d-compose" + (taskState.sending ? " resolving" : ""), "aria-label": t("Message"), "aria-busy": String(!!taskState.sending) },
     h("textarea", { rows: 3, "aria-label": t("Message"), placeholder: t("Write to the agent"), "data-focus": "task:compose:text",
       oninput: (ev) => { taskState.text = ev.target.value; },
       onkeydown: (ev) => {

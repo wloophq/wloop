@@ -291,6 +291,7 @@
 "Sending failed: {error}" = "Sending failed: {error}"
 "Sends at {time} unless you decide first" = "Sends at {time} unless you decide first"
 "Sent to {task}" = "Sent to {task}"
+"Sending to {task}…" = "Sending to {task}…"
 "session" = "session"
 "size {size}" = "size {size}"
 "size {size}, risk {risk}: {n}" = "size {size}, risk {risk}: {n}"

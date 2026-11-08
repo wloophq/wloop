@@ -288,6 +288,7 @@
 "Sending failed: {error}" = "O envio falhou: {error}"
 "Sends at {time} unless you decide first" = "Envia às {time}, a menos que você decida antes"
 "Sent to {task}" = "Enviada para {task}"
+"Sending to {task}…" = "Enviando para {task}…"
 "session" = "sessão"
 "size {size}" = "tamanho {size}"
 "size {size}, risk {risk}: {n}" = "tamanho {size}, risco {risk}: {n}"

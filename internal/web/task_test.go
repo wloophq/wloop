@@ -274,6 +274,28 @@ done({ Before: before, After: said(box), Chips: chips, Asked: asked.slice(-1)[0]
 	}
 }
 
+// Starting the task's agent can take most of a minute: while the message is on its way the composer says so and
+// takes no second send.
+func TestComposerShowsItsMessageOnItsWay(t *testing.T) {
+	var got struct {
+		Notices []string
+		Posts   []any
+	}
+	runTaskPage(t, `
+const box = await page("t-0123456789abcdef");
+focus(box, "task:compose:text").on.input({ target: { value: "Take the timeout case first." } });
+const first = focus(box, "task:compose:send").on.click();
+const second = focus(box, "task:compose:send").on.click();
+await Promise.all([first, second]);
+done({ Notices: notices, Posts: posts });`, pageAnswers(t), &got)
+	if len(got.Posts) != 1 {
+		t.Errorf("two clicks while sending posted %d times: %v", len(got.Posts), got.Posts)
+	}
+	if len(got.Notices) < 2 || !strings.HasPrefix(got.Notices[0], "Sending to ") || !strings.HasPrefix(got.Notices[len(got.Notices)-1], "Sent to ") {
+		t.Errorf("notices %q: the composer says the message is on its way, then that it went", got.Notices)
+	}
+}
+
 func TestComposerPostsToChat(t *testing.T) {
 	var got struct {
 		Buttons []string
