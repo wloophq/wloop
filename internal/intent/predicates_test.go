@@ -32,10 +32,12 @@ func TestAUserLayerSetsReviewerRequiredPerOwner(t *testing.T) {
 
 func TestAMalformedPredicateIsAProblemAndTheBundledOneStays(t *testing.T) {
 	for name, body := range map[string]string{
-		"syntax":       `reviewer_required = "pr.owner in ['solo'"`,
-		"no such fact": `reviewer_required = "pr.nope == 'solo'"`,
-		"not a bool":   `reviewer_required = "pr.owner"`,
-		"not a string": `reviewer_required = true`,
+		"syntax":           `reviewer_required = "pr.owner in ['solo'"`,
+		"no such fact":     `reviewer_required = "pr.nope == 'solo'"`,
+		"not a bool":       `reviewer_required = "pr.owner"`,
+		"not a string":     `reviewer_required = true`,
+		"a host fact":      `reviewer_required = "!pr.has_workspace"`,
+		"a situation fact": `reviewer_required = "!pr.stalled"`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			l, problems := loadProfile(t, "en", map[string]string{"plugins/github/predicates.toml": body + "\n"})
@@ -46,6 +48,13 @@ func TestAMalformedPredicateIsAProblemAndTheBundledOneStays(t *testing.T) {
 				t.Errorf("reviewer_required = %v, %v; want the bundled true", ok, err)
 			}
 		})
+	}
+}
+
+func TestAPredicatesFileOfAPluginThatDeclaresNoneSaysSo(t *testing.T) {
+	_, problems := loadProfile(t, "en", map[string]string{"plugins/slack/predicates.toml": `solo = "true"` + "\n"})
+	if _, ok := problemAt(problems, "solo", "declares no predicates"); !ok {
+		t.Fatalf("problems %v do not say slack declares no predicates", problems)
 	}
 }
 

@@ -393,22 +393,30 @@
           "type": "string"
         },
         "predicates": {
-          "description": "The predicates the plugin's profile layer sets in predicates.toml, by name, over the facts the plugin declares; the plugin asks the host whether one holds through Holds.",
+          "description": "The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds.",
           "items": {
             "additionalProperties": false,
             "properties": {
               "doc": {
-                "description": "What it means. Required.",
+                "description": "What the predicate decides. Required.",
                 "type": "string"
               },
+              "facts": {
+                "description": "The facts of facts the plugin hands with each question, the only ones the predicate may read. Required.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "name": {
-                "description": "The name. Required.",
+                "description": "The predicate's name, its key in predicates.toml. Required.",
                 "type": "string"
               }
             },
             "required": [
               "name",
-              "doc"
+              "doc",
+              "facts"
             ],
             "type": "object"
           },

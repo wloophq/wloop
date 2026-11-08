@@ -76,9 +76,13 @@ func loadPredicates(layers []profile.Layer, r layerReader) (Predicates, Problems
 		for _, n := range builtin.PluginPredicates[id] {
 			declared = append(declared, n.Name)
 		}
-		env := builtin.PluginFactsEnv(id)
 		for _, name := range slices.Sorted(maps.Keys(m)) {
-			if !slices.Contains(declared, name) {
+			env, ok := builtin.PredicateEnv(id, name)
+			switch {
+			case !ok && len(declared) == 0:
+				s.add(name, "plugin %s declares no predicates, so its %s sets none", id, PredicatesFile)
+				continue
+			case !ok:
 				s.add(name, "plugin %s declares no predicate %s; it declares: %s", id, name, strings.Join(declared, ", "))
 				continue
 			}

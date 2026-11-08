@@ -141,7 +141,7 @@ func IsPredKey(last string) bool {
 		}
 	}
 	for _, ns := range PluginPredicates {
-		if slices.ContainsFunc(ns, func(n manifest.Named) bool { return n.Name == last }) {
+		if slices.ContainsFunc(ns, func(n manifest.Predicate) bool { return n.Name == last }) {
 			return true
 		}
 	}

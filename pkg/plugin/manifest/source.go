@@ -50,7 +50,7 @@ type SourceVocabulary struct {
 	DraftKinds      []DraftKind `toml:"draft_kinds" doc:"The kinds of the plugin's drafts; the host derives a draft's delivery from its kind."`
 	DefaultDelivery string      `toml:"default_delivery" doc:"The delivery of a draft whose kind names none; one of deliveries."`
 	Signals         []Named     `toml:"signals" doc:"The link signals the plugin reports, read as task.link_signal.<name>."`
-	Predicates      []Named     `toml:"predicates" doc:"The predicates the plugin's profile layer sets in predicates.toml, by name, over the facts the plugin declares; the plugin asks the host whether one holds through Holds."`
+	Predicates      []Predicate `toml:"predicates" doc:"The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds."`
 	Marks           []Named     `toml:"marks" doc:"The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character."`
 	Kinds           []string    `toml:"kinds" doc:"The task kind values the plugin's units give their tasks."`
 	Situations      []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
@@ -113,6 +113,14 @@ type DraftKind struct {
 	Name     string `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
 	Purpose  string `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
 	Delivery string `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+}
+
+// Predicate is a predicate the plugin's profile layer sets, over the facts the plugin hands the host when it
+// asks whether it holds.
+type Predicate struct {
+	Name  string   `toml:"name" doc:"The predicate's name, its key in predicates.toml. Required."`
+	Doc   string   `toml:"doc" doc:"What the predicate decides. Required."`
+	Facts []string `toml:"facts" doc:"The facts of facts the plugin hands with each question, the only ones the predicate may read. Required."`
 }
 
 // Named is a name the plugin declares, with what it means.
@@ -350,7 +358,17 @@ func (s *Source) validate() error {
 		}
 	}
 	named("signal", s.Signals)
-	named("predicate", s.Predicates)
+	for _, p := range s.Predicates {
+		named("predicate", []Named{{p.Name, p.Doc}})
+		if len(p.Facts) == 0 {
+			bad("predicate %q: facts is required", p.Name)
+		}
+		for _, f := range p.Facts {
+			if !slices.ContainsFunc(s.Facts, func(x Fact) bool { return x.Name == f }) {
+				bad("predicate %q: fact %q is not one of facts", p.Name, f)
+			}
+		}
+	}
 	ranked := 0
 	for _, sit := range s.Situations {
 		if sit.Rank != 0 {

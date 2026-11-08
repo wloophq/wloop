@@ -997,7 +997,7 @@ The fields each notice reads besides `Name` and `Command`:
 
 ## A plugin's predicates (`predicates.toml`)
 
-- `<name>` (predicate): A predicate the plugin's manifest declares in [[source.predicates]], by name, over the facts the plugin declares; a higher layer's replaces a lower one's, and one that does not compile leaves the lower one in force. The plugin asks whether it holds for a unit with the unit's facts, such as the GitHub plugin's reviewer_required: `!(pr.owner in ['acme'])`.
+- `<name>` (predicate): A predicate the plugin's manifest declares in [[source.predicates]], by name, over the facts its facts list names, the ones the plugin hands with the question; a higher layer's replaces a lower one's, and one that does not compile leaves the lower one in force. The plugin asks whether it holds for a unit with the unit's facts, such as the GitHub plugin's reviewer_required: `!(pr.owner in ['acme'])`.
 
 ## Client strings (`strings.toml`)
 
