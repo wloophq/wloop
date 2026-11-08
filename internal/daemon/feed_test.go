@@ -127,6 +127,8 @@ func runFeeds(t *testing.T, s *Server) {
 		cancel()
 		wg.Wait()
 	})
+	// The health the feed starts from names the viewer, as a daemon's does once it read who that is.
+	_, _ = s.viewerInfo(ctx)
 	wg.Go(func() { s.feedRows(ctx) })
 	wg.Go(func() { s.feedHealth(ctx) })
 	synctest.Wait()

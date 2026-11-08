@@ -108,6 +108,25 @@ func TestTheMenuBarConnectingPublishesHealth(t *testing.T) {
 	})
 }
 
+func TestTheViewerArrivingPublishesHealth(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, _, _ := feedServer(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() { defer close(done); s.feedHealth(ctx) }()
+		t.Cleanup(func() { cancel(); <-done })
+		synctest.Wait()
+		msgs := listen(t, s, nil)
+		if _, err := s.viewerInfo(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := healthMessages(t, msgs); n != 1 {
+			t.Fatalf("the viewer, which the health names, arriving published %d health messages, want 1", n)
+		}
+	})
+}
+
 func TestAHealthFieldNoNoteMovesIsPublishedByTheRecheck(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
