@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -185,6 +186,26 @@ func TestBundledProfileLoadsInPtBR(t *testing.T) {
 	for _, p := range problems {
 		if strings.Contains(p, "locales/") {
 			t.Errorf("%s", p)
+		}
+	}
+}
+
+// dottedName is a configuration key or a step's name, as `plugins.slack.ended_after` or `items.resolve`.
+var dottedName = regexp.MustCompile(`\b[a-z_]+(\.[a-z_]+)+\b`)
+
+// TestBundledWorkflowSummariesAreForPeople says no bundled workflow's summary, which the cockpit shows as what
+// running it does, names a configuration key or a step.
+func TestBundledWorkflowSummariesAreForPeople(t *testing.T) {
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, locale := range []string{"en", ptBRTag} {
+		l, _ := intentloadIn(locale, base)
+		for _, w := range l.Workflows {
+			if m := dottedName.FindString(w.Summary); m != "" {
+				t.Errorf("%s (%s): the summary names %q: %s", w.Name, locale, m, w.Summary)
+			}
 		}
 	}
 }
