@@ -71,7 +71,7 @@ func TestOpsCreate(t *testing.T) {
 		t.Errorf("create = %+v", c)
 	}
 	f := c.Fields
-	if f == nil || *f.Kind != "request" || *f.Summary != r.Items[2].Summary || *f.Confidence != "high" {
+	if f == nil || *f.Kind != "request" || *f.Summary != r.Items[2].Summary || f.Ask == nil || *f.Ask != r.Items[2].Ask || *f.Confidence != "high" {
 		t.Fatalf("fields = %+v", f)
 	}
 	if want := (items.Person{Key: "slack:U0000000003", Name: "Cy", Aliases: []string{"email:cy@example.com"}}); !reflect.DeepEqual(*f.Requester, want) {

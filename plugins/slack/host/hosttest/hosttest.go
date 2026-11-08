@@ -427,6 +427,7 @@ func applyFields(it *items.Item, f *items.Fields) {
 	}
 	set(&it.Kind, f.Kind)
 	set(&it.Summary, f.Summary)
+	set(&it.Ask, f.Ask)
 	set(&it.Context, f.Context)
 	set(&it.Deadline, f.Deadline)
 	set(&it.Ambiguity, f.Ambiguity)

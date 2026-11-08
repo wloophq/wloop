@@ -116,7 +116,7 @@ A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted*
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `observe = true` plans the workflow and proposes nothing, while a `dry_run` rule over a draft's facts proposes each draft and stores it as what would have been sent, without sending it.
 
-Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
+Their texts are `text.md.tmpl` in each workflow's directory, which the Slack plugin's profile layer ships in `plugins/slack/profile/workflows/`, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line and `.Ask` the item said to whom it waits on, in your voice, empty for an item its source wrote none for, so a nudge reads `{{or .Ask .Line}}`. The summary is written for your task list; the Slack extraction writes the ask in the first person for you and the second person for its owner, naming neither, so a nudge never speaks of its reader in the third person. An item extracted before asks existed has none until the extraction reads its conversation again. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
 
 ```
 Encerrando:

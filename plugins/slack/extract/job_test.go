@@ -340,7 +340,7 @@ type obj = map[string]any
 func jPerson(id string) obj { return obj{"id": id, "name": ""} }
 
 func jItem(ref, origin string, mods ...func(obj)) obj {
-	it := obj{"ref": ref, "kind": "request", "summary": "Bob asks Ann for a review", "origin_ts": origin, "requester": jPerson(jOther),
+	it := obj{"ref": ref, "kind": "request", "summary": "Bob asks Ann for a review", "ask": "", "origin_ts": origin, "requester": jPerson(jOther),
 		"assignees": []any{jPerson(jViewer)}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []any{jPerson(jViewer)},
 		"state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none", "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none", "place": obj{"context": "", "why": ""}}

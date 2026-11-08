@@ -59,9 +59,14 @@ type wDrafts struct {
 }
 
 type wWithdraw struct {
-	When   *string     `toml:"when"`
-	Reason *string     `toml:"reason"`
-	Rule   []wWithdraw `toml:"rule"`
+	When   *string         `toml:"when"`
+	Reason *string         `toml:"reason"`
+	Rule   []wWithdrawRule `toml:"rule"`
+}
+
+type wWithdrawRule struct {
+	When   *string `toml:"when"`
+	Reason *string `toml:"reason"`
 }
 
 type wTrigger struct {
@@ -390,9 +395,6 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 		if r.When == nil {
 			s.add(path+".when", need)
 			continue
-		}
-		if len(r.Rule) > 0 {
-			s.add(path+".rule", "is not a key of a rule")
 		}
 		w.WithdrawRules = append(w.WithdrawRules, rule(path+".when", *r.When, r.Reason))
 	}

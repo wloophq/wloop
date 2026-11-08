@@ -251,7 +251,7 @@ func (b *opBuilder) fields(out ItemOut) items.Fields {
 	}
 	waiting := b.people(out.WaitingOn)
 	f := items.Fields{
-		Kind: &kind, Summary: &out.Summary, Context: &out.Context, Deadline: &out.Deadline,
+		Kind: &kind, Summary: &out.Summary, Ask: &out.Ask, Context: &out.Context, Deadline: &out.Deadline,
 		Ambiguity: &out.Ambiguity, Options: &opts, URLs: &urls, WaitingOn: &waiting, Confidence: &conf,
 	}
 	if p := b.person(out.Requester); p.Key != "" {
@@ -269,6 +269,9 @@ func diffFields(cur items.Item, want items.Fields) (items.Fields, bool) {
 	}
 	if !cur.Confirmed && *want.Summary != cur.Summary {
 		f.Summary = want.Summary
+	}
+	if !cur.Confirmed && *want.Ask != cur.Ask {
+		f.Ask = want.Ask
 	}
 	if !cur.Confirmed && oneLine(*want.Context) != oneLine(cur.Context) {
 		f.Context = want.Context

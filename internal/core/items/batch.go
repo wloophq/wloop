@@ -236,6 +236,7 @@ func applyFields(it *items.Item, f *items.Fields) {
 	}
 	set(&it.Kind, f.Kind)
 	set(&it.Summary, f.Summary)
+	set(&it.Ask, f.Ask)
 	set(&it.Context, f.Context)
 	set(&it.Deadline, f.Deadline)
 	set(&it.Ambiguity, f.Ambiguity)
@@ -520,7 +521,7 @@ func desiredItem(u unit.Unit, d items.Item, at unit.Anchor, cur *items.Item) ite
 }
 
 func fieldsOf(it items.Item) *items.Fields {
-	return &items.Fields{Kind: &it.Kind, Summary: &it.Summary, Context: &it.Context, Deadline: &it.Deadline,
+	return &items.Fields{Kind: &it.Kind, Summary: &it.Summary, Ask: &it.Ask, Context: &it.Context, Deadline: &it.Deadline,
 		Ambiguity: &it.Ambiguity, Options: &it.Options, URLs: &it.URLs, Contexts: &it.Contexts, Initial: &it.Initial,
 		Requester: &it.Requester, WaitingOn: &it.WaitingOn, Confidence: &it.Confidence}
 }

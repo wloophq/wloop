@@ -72,7 +72,7 @@ type Result struct {
 type PersonOut struct{ ID, Name string }
 
 type ItemOut struct {
-	Ref, Kind, Summary, OriginTS                                               string // Ref is an Item.ID of Input.Ledger, or "n<N>" for a new item
+	Ref, Kind, Summary, Ask, OriginTS                                          string // Ref is an Item.ID of Input.Ledger, or "n<N>" for a new item
 	Requester                                                                  PersonOut
 	Assignees, WaitingOn                                                       []PersonOut
 	AssignmentTS, AssignmentBasis, State, Resolution, EvidenceTS, EvidenceKind string
@@ -154,6 +154,7 @@ type wireItem struct {
 	Ref             string       `json:"ref"`
 	Kind            string       `json:"kind"`
 	Summary         string       `json:"summary"`
+	Ask             string       `json:"ask"`
 	OriginTS        string       `json:"origin_ts"`
 	Requester       wirePerson   `json:"requester"`
 	Assignees       []wirePerson `json:"assignees"`
@@ -259,7 +260,7 @@ func decode(raw []byte, in Input) (Result, error) {
 		}
 		refs[wi.Ref] = true
 		it := ItemOut{
-			Ref: wi.Ref, Kind: wi.Kind, Summary: wi.Summary, OriginTS: wi.OriginTS, Requester: PersonOut(wi.Requester),
+			Ref: wi.Ref, Kind: wi.Kind, Summary: wi.Summary, Ask: wi.Ask, OriginTS: wi.OriginTS, Requester: PersonOut(wi.Requester),
 			Assignees: personsOut(wi.Assignees), WaitingOn: personsOut(wi.WaitingOn), AssignmentTS: wi.AssignmentTS,
 			AssignmentBasis: wi.AssignmentBasis, State: wi.State, Resolution: wi.Resolution,
 			EvidenceTS: wi.EvidenceTS, EvidenceKind: wi.EvidenceKind, Confidence: wi.Confidence,

@@ -215,7 +215,7 @@ func itemPB(it Item) *pb.Item {
 		WaitingOn: peoplePB(it.WaitingOn), State: it.State, Resolution: it.Resolution,
 		Evidence: evidencePB(it.Evidence), Trail: mapSlice(it.Trail, evidencePB), Confidence: it.Confidence,
 		Ambiguity: it.Ambiguity, Provenance: it.Provenance, Confirmed: it.Confirmed, TaskKey: it.TaskKey,
-		UserAt: ts(it.UserAt), CreatedAt: ts(it.CreatedAt), UpdatedAt: ts(it.UpdatedAt),
+		UserAt: ts(it.UserAt), CreatedAt: ts(it.CreatedAt), UpdatedAt: ts(it.UpdatedAt), Ask: it.Ask,
 	}
 }
 
@@ -228,7 +228,7 @@ func itemGo(it *pb.Item) Item {
 		WaitingOn: peopleGo(it.GetWaitingOn()), State: it.GetState(), Resolution: it.GetResolution(),
 		Evidence: evidenceGo(it.GetEvidence()), Trail: mapSlice(it.GetTrail(), evidenceGo), Confidence: it.GetConfidence(),
 		Ambiguity: it.GetAmbiguity(), Provenance: it.GetProvenance(), Confirmed: it.GetConfirmed(), TaskKey: it.GetTaskKey(),
-		UserAt: tm(it.GetUserAt()), CreatedAt: tm(it.GetCreatedAt()), UpdatedAt: tm(it.GetUpdatedAt()),
+		UserAt: tm(it.GetUserAt()), CreatedAt: tm(it.GetCreatedAt()), UpdatedAt: tm(it.GetUpdatedAt()), Ask: it.GetAsk(),
 	}
 }
 
@@ -410,7 +410,7 @@ func itemOpPB(o ItemOp) *pb.ItemOp {
 	if f := o.Fields; f != nil {
 		out.Fields = &pb.ItemFields{
 			Kind: optString(f.Kind), Summary: optString(f.Summary), Context: optString(f.Context), Deadline: optString(f.Deadline),
-			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence),
+			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence), Ask: optString(f.Ask),
 		}
 		if f.Options != nil {
 			out.Fields.Options = &pb.ItemOptionList{Options: mapSlice(*f.Options, optionPB)}
@@ -447,7 +447,7 @@ func itemOpGo(o *pb.ItemOp) ItemOp {
 	if f := o.GetFields(); f != nil {
 		out.Fields = &ItemFields{
 			Kind: optString(f.Kind), Summary: optString(f.Summary), Context: optString(f.Context), Deadline: optString(f.Deadline),
-			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence),
+			Ambiguity: optString(f.Ambiguity), Category: optString(f.Category), Confidence: optString(f.Confidence), Ask: optString(f.Ask),
 		}
 		if f.GetOptions() != nil {
 			opts := mapSlice(f.GetOptions().GetOptions(), optionGo)

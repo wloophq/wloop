@@ -10,10 +10,16 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
+// maxManifestDepth is deeper than any manifest key nests; a path past it is a struct that holds itself.
+const maxManifestDepth = 12
+
 // structPaths are the grammar path and kind of every key t decodes.
 func structPaths(t reflect.Type, at string, out map[string]builtin.Kind) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
+	}
+	if strings.Count(at, ".") > maxManifestDepth {
+		panic("a manifest struct holds itself, at " + at)
 	}
 	join := func(k string) string {
 		if at == "" {

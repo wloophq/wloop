@@ -37,9 +37,11 @@ type draftTextData struct {
 
 type draftTextPerson struct{ Key, Name string }
 
+// draftTextItem is an item as a draft's templates read it: Line is its summary on one line, Ask the item
+// said to whom it waits on, on one line, "" when its source wrote none.
 type draftTextItem struct {
-	ID, Summary, Line, Resolution, State, Permalink string
-	Asked, Updated                                  time.Time
+	ID, Summary, Line, Ask, Resolution, State, Permalink string
+	Asked, Updated                                       time.Time
 }
 
 // draftTemplate is file of the workflow's directory through layers, the bundled one read from bundled, in
@@ -101,6 +103,7 @@ func draftData(data draftTextData, sub draftSubject, person items.Person, its []
 	}
 	for _, it := range its {
 		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),
+			Ask: strings.Join(strings.Fields(it.Ask), " "),
 			Resolution: string(it.Resolution), State: string(it.State), Permalink: it.Origin.Permalink,
 			Asked: in(it.CreatedAt), Updated: in(it.UpdatedAt)})
 		if a := in(it.CreatedAt); !a.IsZero() && (data.Since.IsZero() || a.Before(data.Since)) {

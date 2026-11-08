@@ -133,6 +133,8 @@ type Item struct {
 	Unit       unit.Unit   `json:"unit"`
 	Kind       Kind        `json:"kind"`
 	Summary    string      `json:"summary"` // <= 300
+	// Ask is the item said to whom it waits on, in the viewer's voice, <= 300; empty when none was written.
+	Ask        string      `json:"ask,omitempty"`
 	Context    string      `json:"context"` // <= 4000
 	Options    []Option    `json:"options,omitempty"`
 	Deadline   string      `json:"deadline,omitempty"`
@@ -190,6 +192,7 @@ type Op struct {
 type Fields struct {
 	Kind       *Kind       `json:"kind,omitempty"`
 	Summary    *string     `json:"summary,omitempty"`
+	Ask        *string     `json:"ask,omitempty"`
 	Context    *string     `json:"context,omitempty"`
 	Deadline   *string     `json:"deadline,omitempty"`
 	Ambiguity  *string     `json:"ambiguity,omitempty"`
@@ -332,6 +335,9 @@ func (c *checker) fields(f *Fields) {
 			c.bad("fields.summary", "required")
 		}
 		c.text("fields.summary", *f.Summary, MaxSummary)
+	}
+	if f.Ask != nil {
+		c.text("fields.ask", *f.Ask, MaxSummary)
 	}
 	if f.Context != nil {
 		c.text("fields.context", *f.Context, MaxContext)

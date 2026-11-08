@@ -40,6 +40,7 @@
      "ref",
      "kind",
      "summary",
+     "ask",
      "origin_ts",
      "requester",
      "assignees",
@@ -76,6 +77,10 @@
      "summary": {
       "type": "string",
       "minLength": 1,
+      "maxLength": 200
+     },
+     "ask": {
+      "type": "string",
       "maxLength": 200
      },
      "origin_ts": {
