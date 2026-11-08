@@ -284,3 +284,35 @@ return JSON.stringify(out);`
 		t.Fatalf("%+v: what wraps out of sight is inert, what shows is not", got)
 	}
 }
+
+// panelPage is the floating panel's page as the omnibox draws it: the box alone, without the overlay's styles.
+const panelPage = `<body class="panel-omnibox"><div class="pal omni omni-panel"><input class="omni-input"><div class="omni-results"><div role="option">A task</div></div><p class="omni-keys">Esc</p></div>`
+
+// TestTheFloatingPanelDragsFromItsEdges lays the floating panel out: its frame and its keys hint move the
+// window, while its field and its results take the mouse as they would anywhere.
+func TestTheFloatingPanelDragsFromItsEdges(t *testing.T) {
+	const probe = `const drag = (s) => getComputedStyle(document.querySelector(s)).getPropertyValue("--wails-draggable").trim();
+return JSON.stringify({ Box: drag(".omni-panel"), Keys: drag(".omni-keys"), Input: drag(".omni-input"), Option: drag("[role=option]") });`
+	var got struct{ Box, Keys, Input, Option string }
+	if err := json.Unmarshal([]byte(pageProbe(t, panelPage, 680, probe)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Box != "drag" || got.Keys != "drag" || got.Input != "no-drag" || got.Option != "no-drag" {
+		t.Fatalf("%+v: the frame and the hint drag the panel, the field and the results do not", got)
+	}
+}
+
+// TestTheFloatingPanelsFieldSpansIt lays the floating panel out: its field spans the panel in a large type,
+// and its keys hint sits at the bottom whatever the results hold.
+func TestTheFloatingPanelsFieldSpansIt(t *testing.T) {
+	const probe = `const r = (s) => document.querySelector(s).getBoundingClientRect();
+return JSON.stringify({ Panel: r(".omni-panel").width, Field: r(".omni-input").width, Font: parseFloat(getComputedStyle(document.querySelector(".omni-input")).fontSize),
+  Height: r(".omni-input").height, Keys: r(".omni-keys").bottom, Bottom: r(".omni-panel").bottom });`
+	var got struct{ Panel, Field, Font, Height, Keys, Bottom float64 }
+	if err := json.Unmarshal([]byte(pageProbe(t, panelPage, 680, probe)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Field < 0.9*got.Panel || got.Font < 18 || got.Height < 40 || got.Keys < got.Bottom-1 {
+		t.Fatalf("%+v: the field spans the panel in a large type and the keys hint sits at its bottom", got)
+	}
+}

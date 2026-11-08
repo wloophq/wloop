@@ -970,4 +970,9 @@ body.layout-detail .d-window { right: 0; }
 .omni-ran .ok { color: var(--ink); }
 .omni-ran .err, .omni-ask-error { color: var(--err); }
 body.panel-omnibox { margin: 0; background: var(--panel); }
-body.panel-omnibox .pal.omni { width: 100vw; max-height: 100vh; height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+body.panel-omnibox .pal.omni { display: flex; flex-direction: column; width: 100vw; max-height: 100vh; height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+body.panel-omnibox .pal.omni .omni-input { margin: var(--space-12); padding: var(--space-10) var(--space-12); font: var(--text-kpi)/1.3 var(--sans); border-radius: var(--radius-md); }
+body.panel-omnibox .omni-results { flex: 1; }
+body.panel-omnibox .omni-panel { --wails-draggable: drag; }
+body.panel-omnibox .omni-panel :is(input, button, a, .omni-results) { --wails-draggable: no-drag; }
+body.panel-omnibox .omni-keys { cursor: grab; }

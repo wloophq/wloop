@@ -195,10 +195,8 @@ function tellLinkNotice() {
 // The chrome installs while the page parses, before the cockpit's own
 // listeners, so a detached window's guard sees each route first.
 if (typeof document !== "undefined" && document.readyState === "loading") {
-  if (insetTitleBar(location.search)) {
-    detailWindowInstall(window, document, postWindow);
-    installDrag(document, window);
-  }
+  if (insetTitleBar(location.search)) detailWindowInstall(window, document, postWindow);
+  installDrag(document, window);
   window.addEventListener("hashchange", tellLinkNotice);
   document.addEventListener("DOMContentLoaded", () => {
     if (insetTitleBar(location.search)) installTitleBar(document);

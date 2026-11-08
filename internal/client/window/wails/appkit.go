@@ -71,13 +71,14 @@ func centeredIn(area rect, s size) point {
 }
 
 // centerOnFocusedScreen moves w to the middle of the screen whose window has
-// the keyboard focus, whichever app owns it; it runs on the main thread.
+// the keyboard focus, whichever app owns it, unless w is already on it, where
+// it stays where it was left; it runs on the main thread.
 func centerOnFocusedScreen(w *application.WebviewWindow) {
 	screen := class("NSScreen").Send(sel("mainScreen"))
-	if screen == 0 {
+	win := nsWindow(w)
+	if screen == 0 || objc.Send[bool](screen, sel("isEqual:"), win.Send(sel("screen"))) {
 		return
 	}
-	win := nsWindow(w)
 	area := objc.Send[rect](screen, sel("visibleFrame"))
 	frame := objc.Send[rect](win, sel("frame"))
 	win.Send(sel("setFrameOrigin:"), centeredIn(area, frame.Size))
