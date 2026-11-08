@@ -173,7 +173,7 @@ func (s *Server) registerPluginJobs() {
 			var j *job
 			j = newJob(pj.Name, pj.Every, timeout, func(ctx context.Context) (string, string, error) {
 				summary, skipped, next, err := pj.Run(ctx)
-				if !next.IsZero() {
+				if err == nil && !next.IsZero() {
 					j.wakeAt(next)
 				}
 				return summary, skipped, err

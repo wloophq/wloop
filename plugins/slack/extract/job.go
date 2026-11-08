@@ -280,6 +280,8 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 			// this one last failed; in an outage nothing does.
 			healthy := p.retries > 0 && j.oks > p.oksAtFail
 			j.backOff(k, p, ec, j.now(), failed, unfit || errors.As(o.err, &bad) || timedOut && healthy)
+		} else if !o.called && o.err != nil && ctx.Err() == nil {
+			j.backOff(k, p, ec, j.now(), o.err, false)
 		}
 		if o.done {
 			done++

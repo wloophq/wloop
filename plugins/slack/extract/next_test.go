@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -49,6 +50,28 @@ func TestAnOpenBreakerWaitsForItsTrial(t *testing.T) {
 	r.run(jT0.Add(2 * time.Minute))
 	if got, want := r.job.Next(), jT0.Add(2*time.Minute+BreakerCool); !got.Equal(want) {
 		t.Fatalf("next %v with the breaker open, want its trial at %v", got, want)
+	}
+}
+
+func TestATargetThatFailsBeforeTheCallWaitsForItsRetry(t *testing.T) {
+	r := newRig(t)
+	reads := 0
+	r.job.Extra = func(context.Context) (Extra, error) { reads++; return Extra{}, errors.New("the profile is gone") }
+	postUnits(r, 1)
+	at := jT0.Add(2 * time.Minute)
+	r.clock.set(at)
+	if _, _, err := r.job.Run(context.Background()); err == nil {
+		t.Fatal("a pass whose target failed before the call reported no error")
+	}
+	if got, want := r.job.Next(), at.Add(90*time.Second); !got.Equal(want) {
+		t.Fatalf("next %v, want the target's retry at %v, not a time already past", got, want)
+	}
+	r.clock.set(at.Add(time.Second))
+	if _, _, err := r.job.Run(context.Background()); err != nil {
+		t.Fatalf("a pass with nothing due: %v", err)
+	}
+	if reads != 1 {
+		t.Fatalf("the failed target was read %d times before its retry, want once", reads)
 	}
 }
 

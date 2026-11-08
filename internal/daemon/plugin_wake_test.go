@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -14,6 +15,7 @@ type pluginWakeRig struct {
 	mu   sync.Mutex
 	runs []time.Time
 	next time.Time
+	err  error
 }
 
 func newPluginWakeRig(t *testing.T) *pluginWakeRig {
@@ -27,7 +29,7 @@ func newPluginWakeRig(t *testing.T) *pluginWakeRig {
 				r.runs = append(r.runs, time.Now())
 				next := r.next
 				r.next = time.Time{}
-				return "", "", next, nil
+				return "", "", next, r.err
 			}}}}}
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -90,6 +92,24 @@ func TestARunsNextRunsTheJobThen(t *testing.T) {
 		synctest.Wait()
 		if got := r.ran(); len(got) != 3 || !got[1].Equal(start) || !got[2].Equal(start.Add(100*time.Second)) {
 			t.Fatalf("runs at %v, want the start twice and %v", got, start.Add(100*time.Second))
+		}
+	})
+}
+
+func TestAFailedRunsNextWaitsForTheRetry(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newPluginWakeRig(t)
+		start := time.Now()
+		r.mu.Lock()
+		r.err = errors.New("the store is locked")
+		r.next = start
+		r.mu.Unlock()
+		r.s.WakeJob("extract:thread", time.Time{})
+		time.Sleep(90 * time.Second)
+		synctest.Wait()
+		if got := r.ran(); len(got) != 3 || !got[1].Equal(start) || !got[2].Equal(start.Add(time.Minute)) {
+			t.Fatalf("runs at %v, want the start twice and the retry a minute later, not the failed run's next", got)
 		}
 	})
 }
