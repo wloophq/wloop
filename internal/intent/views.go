@@ -176,6 +176,10 @@ type mView struct {
 // HomeView is the cockpit's home route, which no view may be named.
 const HomeView = "home"
 
+// PlanView is the cockpit's plan route, the core's screen of every workflow's plan, which no view may be named;
+// its label is the "Plan" text of strings.toml.
+const PlanView = "plan"
+
 type mFacet struct {
 	Fact        *string             `toml:"fact"`
 	Label       *string             `toml:"label"`
@@ -458,6 +462,10 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 		path, m := "views."+id, views[id]
 		if id == HomeView {
 			s.add(path, "%s is the cockpit's home route; name the view otherwise", HomeView)
+			continue
+		}
+		if id == PlanView {
+			s.add(path, "%s is the cockpit's plan route; name the view otherwise", PlanView)
 			continue
 		}
 		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })

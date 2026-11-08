@@ -43,9 +43,10 @@ function routeHash(view, unitKey, rest) {
 }
 
 // HOME is the cockpit's home route, which no view of the profile may be named; QUEUE the view of a decision
-// queue's route.
+// queue's route; PLAN the core's screen of every workflow's plan, which no view may be named either.
 const HOME = "home";
 const QUEUE = "queue";
+const PLAN = "plan";
 // QUEUE_LIST is the queue of the tasks a route's ids name, in their order; QUEUE_IDS_MAX the most it takes.
 const QUEUE_LIST = "list";
 const QUEUE_IDS_MAX = 200;
