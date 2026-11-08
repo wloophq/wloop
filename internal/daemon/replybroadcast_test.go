@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -16,16 +19,21 @@ import (
 )
 
 // threadPlacer places a draft as its publisher places a thread reply: in no thread, no broadcast; in a thread, the
-// broadcast its proposer asked for, else def. places counts its calls.
+// broadcast its proposer asked for, else def. places counts its calls; hangs makes it wait for its deadline.
 type threadPlacer struct {
 	*fakeFx
 	thread bool
 	def    draft.Broadcast
 	places *atomic.Int32
+	hangs  bool
 }
 
-func (p threadPlacer) Place(_ context.Context, d draft.Draft) (draft.Placed, error) {
+func (p threadPlacer) Place(ctx context.Context, d draft.Draft) (draft.Placed, error) {
 	p.places.Add(1)
+	if p.hangs {
+		<-ctx.Done()
+		return draft.Placed{}, ctx.Err()
+	}
 	switch {
 	case !p.thread:
 		return draft.Placed{Broadcast: draft.NoBroadcast}, nil
@@ -118,33 +126,86 @@ func TestATasksDetailServesItsReplysBroadcast(t *testing.T) {
 			r := newOutboxRig(t)
 			places := r.placeAs(c.thread, c.def)
 			r.put(t, unitTask("t-1", task.OriginDerived, r7u))
-			var v api.TaskView
-			if code := get(t, r.s, api.TaskPath("t-1"), &v); code != 200 || v.ReplyBroadcast != c.want {
-				t.Fatalf("%d reply_broadcast %q, want %q", code, v.ReplyBroadcast, c.want)
-			}
-			if len(r.drafts(t)) != 0 {
-				t.Errorf("reading the task stored a draft: %+v", r.drafts(t))
-			}
-			before := places.Load()
-			if code := get(t, r.s, api.TaskPath("t-1"), &v); code != 200 || v.ReplyBroadcast != c.want || places.Load() != before {
-				t.Fatalf("read again: %d %q, the publisher asked %d more times", code, v.ReplyBroadcast, places.Load()-before)
-			}
 			var page api.TasksPage
-			if code := get(t, r.s, api.TasksPath+"?view=inbox", &page); code != 200 {
-				t.Fatalf("list: %d", code)
+			if code := get(t, r.s, api.TasksPath+"?view=inbox", &page); code != 200 || len(page.Tasks) == 0 {
+				t.Fatalf("list: %d %+v", code, page.Tasks)
 			}
 			var listed []api.TaskView
-			if code := get(t, r.s, "/api/units/github/acme%2Fapi%237/tasks", &listed); code != 200 {
-				t.Fatalf("unit tasks: %d", code)
+			if code := get(t, r.s, "/api/units/github/acme%2Fapi%237/tasks", &listed); code != 200 || len(listed) == 0 {
+				t.Fatalf("unit tasks: %d %+v", code, listed)
 			}
 			for _, e := range append(page.Tasks, listed...) {
 				if e.ReplyBroadcast != "" {
 					t.Errorf("a list serves reply_broadcast %q", e.ReplyBroadcast)
 				}
 			}
-			if n := places.Load(); n != before {
-				t.Errorf("the lists asked the publisher %d times", n-before)
+			if n := places.Load(); n != 0 {
+				t.Errorf("the lists asked the publisher %d times", n)
+			}
+			var v api.TaskView
+			if code := get(t, r.s, api.TaskPath("t-1"), &v); code != 200 || v.ReplyBroadcast != c.want || places.Load() != 1 {
+				t.Fatalf("%d reply_broadcast %q, want %q, asked %d times", code, v.ReplyBroadcast, c.want, places.Load())
+			}
+			if len(r.drafts(t)) != 0 {
+				t.Errorf("reading the task stored a draft: %+v", r.drafts(t))
+			}
+			if code := get(t, r.s, api.TaskPath("t-1"), &v); code != 200 || v.ReplyBroadcast != c.want || places.Load() != 1 {
+				t.Fatalf("read again: %d %q, the publisher asked %d times", code, v.ReplyBroadcast, places.Load())
 			}
 		})
 	}
+}
+
+// A lookup the page ran out of time for says nothing about the publisher and is asked again on the next read; one that
+// ran out of its own time is a slow publisher, kept for draftWhereRetry.
+func TestAReplysBroadcastIsKeptOnlyWhenItsOwnLookupTimedOut(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newOutboxRig(t)
+		n := &atomic.Int32{}
+		pl := threadPlacer{fakeFx: r.fx, thread: true, places: n, hangs: true}
+		r.o.Effects = func(unit.ProviderID) (port.Effects, error) { return pl, nil }
+		r.put(t, unitTask("t-1", task.OriginDerived, r7u))
+		r.s.whereLookup, r.s.wherePage = time.Second, 200*time.Millisecond
+		for range 2 {
+			if code := get(t, r.s, api.TaskPath("t-1"), nil); code != 200 {
+				t.Fatalf("read: %d", code)
+			}
+		}
+		if got := n.Load(); got != 2 {
+			t.Fatalf("under the page's deadline the publisher was asked %d times, want each read", got)
+		}
+		r.s.whereLookup, r.s.wherePage = 200*time.Millisecond, time.Second
+		for range 2 {
+			if code := get(t, r.s, api.TaskPath("t-1"), nil); code != 200 {
+				t.Fatalf("read: %d", code)
+			}
+		}
+		if got := n.Load(); got != 3 {
+			t.Fatalf("under its own deadline the publisher was asked %d more times, want once", got-2)
+		}
+	})
+}
+
+func TestReplyBroadcastsAndDraftWheresForgetOldLookups(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newOutboxRig(t)
+		r.placeAs(true, draft.BroadcastOn)
+		r.put(t, unitTask("t-1", task.OriginDerived, r7u))
+		r.put(t, unitTask("t-2", task.OriginDerived, unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}))
+		d := r.propose(t, r7u, "hello", draft.Wait)
+		get(t, r.s, api.TaskPath("t-1"), nil)
+		r.s.draftWhere(context.Background(), d)
+		time.Sleep(draftWhereRetry + time.Second)
+		get(t, r.s, api.TaskPath("t-2"), nil)
+		count := func(m *sync.Map) int {
+			n := 0
+			m.Range(func(any, any) bool { n++; return true })
+			return n
+		}
+		if b, w := count(&r.s.replyBroadcasts), count(&r.s.draftWheres); b != 1 || w != 0 {
+			t.Fatalf("kept %d reply broadcasts and %d destinations, want only the newest broadcast", b, w)
+		}
+	})
 }

@@ -121,8 +121,9 @@ func replyDraft(e task.Task) api.DraftCreate {
 
 // replyBroadcast is the broadcast a reply the user writes on e would take, as its publisher's Placer places it: "on"
 // or "off" in a thread that can also post to its conversation, "" otherwise or when the publisher cannot tell. Each
-// answer, a failure included, is kept for draftWhereRetry by the draft's unit and items, so a detail refreshed
-// often asks the publisher once a minute; one lookup is bounded as a draft's destination is.
+// answer is kept for draftWhereRetry by the draft's unit and items, so a detail refreshed often asks the publisher
+// once a minute; one lookup is bounded as a draft's destination is. A failure is kept too, unless the page's deadline
+// cut it short: that one says nothing about the publisher.
 func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 	if s.replyRefusal(e) != "" || s.replyVerb() == "" {
 		return ""
@@ -141,20 +142,25 @@ func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 		}
 	}
 	by := now.Add(s.whereTimeout())
-	if page, ok := ctx.Value(whereByKey{}).(time.Time); ok && page.Before(by) {
+	page, ok := ctx.Value(whereByKey{}).(time.Time)
+	pageBound := ok && page.Before(by)
+	if pageBound {
 		by = page
 	}
 	if !now.Before(by) {
 		return ""
 	}
-	ctx, cancel := context.WithDeadline(ctx, by)
+	lctx, cancel := context.WithDeadline(ctx, by)
 	defer cancel()
-	b, err := s.deps.Outbox.BroadcastOf(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind,
+	b, err := s.deps.Outbox.BroadcastOf(lctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind,
 		Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
+		if pageBound && lctx.Err() != nil || ctx.Err() != nil {
+			return ""
+		}
 		b = draft.NoBroadcast
 	}
-	s.replyBroadcasts.Store(key, broadcastSeen{broadcast: b, at: now})
+	s.keepLookup(&s.replyBroadcasts, key, broadcastSeen{broadcast: b, at: now}, now)
 	return string(b)
 }
 
