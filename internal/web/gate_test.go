@@ -285,6 +285,27 @@ done([shape(input.full), shape(input.bare), shape(input.gone)]);`, map[string]an
 	}
 }
 
+func TestAPlanGateDropsAnUnsafeLinkAndTitlesEachFact(t *testing.T) {
+	var got struct {
+		Links  []string
+		On     string
+		Titles []string
+	}
+	p := closingPlan("Close it")
+	p.Link = "javascript:alert(1)"
+	runGate(t, `
+const c = card(input.gate);
+const on = cls(c, "plan-on")[0];
+done({ Links: walk(c, (x) => x.tag === "a").map((a) => attr(a, "href")), On: on.textContent,
+  Titles: walk(cls(c, "plan-why")[0], (x) => x.tag === "li").map((x) => attr(x, "title")) });`, map[string]any{"gate": planGate(p)}, &got)
+	if len(got.Links) != 0 || !strings.Contains(got.On, "Retry flaky uploads") {
+		t.Errorf("links %q, target %q: want the label as text and no javascript: link", got.Links, got.On)
+	}
+	if !slices.Equal(got.Titles, []string{"task.category = active", "task.items_open = 2"}) {
+		t.Errorf("fact titles %q, want each fact's name and raw value, which a cut line hides", got.Titles)
+	}
+}
+
 // pendingDraft is a held nudge on task t-1, from workflow fake-nudge, whose gate 12 approves or discards it.
 func pendingDraft() api.Draft {
 	return api.Draft{ID: 7, Unit: "github/acme/api#8", Task: "t-1", Kind: "nudge", Purpose: "nudge", Target: "acme/api#8", Where: "acme/api#8",

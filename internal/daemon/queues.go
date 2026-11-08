@@ -31,7 +31,7 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ctx := r.Context()
+	ctx := withPlanReads(r.Context())
 	var keep coretasks.Keep
 	if text := strings.TrimSpace(r.URL.Query().Get("q")); text != "" {
 		keep = s.lensKeep(ctx, g, text)

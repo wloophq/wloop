@@ -331,7 +331,7 @@ type AskView struct {
 // gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
 // with, Delivery a draft gate's delivery state (held, queued, sending, sent, failed, dropped), Subject its subject as
 // its kind serves it: a draft gate's is its Draft, a plan gate's its plan item's id. Plan is a plan gate's item while
-// the plan holds it.
+// it waits.
 type GateView struct {
 	ID       int64           `json:"id"`
 	Task     string          `json:"task,omitempty"`

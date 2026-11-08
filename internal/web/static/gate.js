@@ -120,7 +120,7 @@ function gatePlan(g) {
       href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label) : null,
     facts.length ? h("details", { class: "plan-why" },
       h("summary", {}, t("Why it fired")),
-      h("ul", {}, ...facts.map((f) => h("li", {}, planFactText(f))))) : null);
+      h("ul", {}, ...facts.map((f) => h("li", { title: `${f.name} = ${f.value}` }, planFactText(f))))) : null);
 }
 
 // gateCard is an open gate of task e: what it asks, the agent's message as markdown folded after its first

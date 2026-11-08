@@ -239,6 +239,22 @@ func itemUnits(items []workflow.Item) []unit.Unit {
 // turn.start item a start block holds offers its row's trust_run and
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
+	p := s.planItemView(it, shown)
+	var row []api.ActionState
+	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
+		slices.Contains(p.Steps, builtin.StepTurnStart) {
+		if rd, ok, err := s.readRow(ctx, it.Unit); err != nil {
+			s.logf("plan %s: its row: %v", it.ID, err)
+		} else if ok {
+			row = rd.Row.Actions
+		}
+	}
+	p.Actions = catalog.PlanStates(s.loaded(), p, row)
+	return p
+}
+
+// planItemView is it as the API serves it, its unit presented as shown, without the actions it offers.
+func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
 		Observe: api.ObserveMode(it.Observe), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
@@ -256,16 +272,6 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 	for _, f := range it.Why.Matched {
 		p.Why.Matched = append(p.Why.Matched, api.Fact{Name: f.Name, Value: turn.FactText(f.Value)})
 	}
-	var row []api.ActionState
-	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
-		slices.Contains(p.Steps, builtin.StepTurnStart) {
-		if rd, ok, err := s.readRow(ctx, it.Unit); err != nil {
-			s.logf("plan %s: its row: %v", it.ID, err)
-		} else if ok {
-			row = rd.Row.Actions
-		}
-	}
-	p.Actions = catalog.PlanStates(l, p, row)
 	return p
 }
 

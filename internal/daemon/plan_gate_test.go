@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -15,14 +16,18 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-// itemsPlan is a plan whose stored items are its own, which nothing acts on.
-type itemsPlan struct{ items []workflow.Item }
+// itemsPlan is a plan whose stored items are its own, which nothing acts on; reads counts its reads.
+type itemsPlan struct {
+	items []workflow.Item
+	reads atomic.Int32
+}
 
 func (p *itemsPlan) Evaluate(context.Context, workflow.TriggerKind) (automation.Plan, error) {
 	return automation.Plan{}, nil
 }
 
 func (p *itemsPlan) Items(_ context.Context, f automation.Filter) ([]workflow.Item, error) {
+	p.reads.Add(1)
 	var out []workflow.Item
 	for _, it := range p.items {
 		if (f.ID == "" || it.ID == f.ID) && (len(f.Decisions) == 0 || slices.Contains(f.Decisions, it.Decision)) {
@@ -84,6 +89,8 @@ func wantPlanOf(t *testing.T, where string, g api.GateView, pt *intentload.Loade
 		t.Errorf("%s: matched %+v", where, p.Why.Matched)
 	case !slices.Equal(p.Steps, []string{"items.resolve"}):
 		t.Errorf("%s: steps %q", where, p.Steps)
+	case p.Actions != nil:
+		t.Errorf("%s: actions %+v, want none beside the gate's intents", where, p.Actions)
 	}
 }
 
@@ -139,6 +146,90 @@ func BenchmarkPlanGateView(b *testing.B) {
 	for b.Loop() {
 		if v := r.s.gateView(ctx, g, nil); v.Plan == nil {
 			b.Fatal("no plan")
+		}
+	}
+}
+
+// withMorePlanGates adds n tasks, each held by the open plan gate of a pending item of the rig's workflow.
+func withMorePlanGates(t *testing.T, r *tasksRig, n int) {
+	t.Helper()
+	plan := r.s.deps.Plan.(*itemsPlan)
+	for i := range n {
+		id := task.ID(fmt.Sprintf("t-%016x", i+0x100))
+		r.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: fmt.Sprintf("reply to Cid %d", i)})
+		it := plan.items[0]
+		it.ID, it.Unit = doneReacted+"/task/"+string(id)+"/aa", task.UnitOf(id)
+		plan.items = append(plan.items, it)
+		if _, err := r.s.deps.Gates.Open(context.Background(), gate.Gate{Unit: it.Unit, Kind: gate.KindPlan, Subject: it.ID}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestEveryPageReadsThePlanOnceForAllItsPlanGates(t *testing.T) {
+	t.Parallel()
+	r, _, _ := planGateRig(t)
+	withMorePlanGates(t, r, 3)
+	plan := r.s.deps.Plan.(*itemsPlan)
+	count := func(where string, gates func() []api.GateView) {
+		t.Helper()
+		plan.reads.Store(0)
+		gs := gates()
+		planned := 0
+		for _, g := range gs {
+			if g.Kind == "plan" && g.Plan != nil {
+				planned++
+			}
+		}
+		if planned != 4 {
+			t.Errorf("%s: %d of %d gates with their plan, want 4", where, planned, len(gs))
+		}
+		if n := plan.reads.Load(); n != 1 {
+			t.Errorf("%s read the plan %d times, want once", where, n)
+		}
+	}
+	count("the view", func() []api.GateView {
+		var out []api.GateView
+		for _, v := range r.page(t, "view=decide-approve-plan").Tasks {
+			out = append(out, v.Gates...)
+		}
+		return out
+	})
+	count("the queue", func() []api.GateView {
+		var q api.Queue
+		get(t, r.s, queuePath("approve-plan"), &q)
+		var out []api.GateView
+		for _, it := range q.Items {
+			if it.Gate != nil {
+				out = append(out, *it.Gate)
+			}
+		}
+		return out
+	})
+	count("the gates", func() []api.GateView {
+		var gs []api.GateView
+		get(t, r.s, api.GatesPath+"?kind=plan", &gs)
+		return gs
+	})
+}
+
+func TestAPlanGateWhoseItemNoLongerWaitsServesNoPlanAnywhere(t *testing.T) {
+	t.Parallel()
+	r, _, g := planGateRig(t)
+	r.s.deps.Plan.(*itemsPlan).items[0].Decision = workflow.DecisionRun
+	var v api.TaskView
+	get(t, r.s, "/api/tasks/t-0000000000000001", &v)
+	var lists []api.GateView
+	for _, e := range r.page(t, "view=decide-approve-plan").Tasks {
+		lists = append(lists, e.Gates...)
+	}
+	for where, gs := range map[string][]api.GateView{"detail": v.Gates, "list": lists} {
+		i := slices.IndexFunc(gs, func(x api.GateView) bool { return x.ID == g.ID })
+		if i < 0 {
+			t.Fatalf("%s: no plan gate in %+v", where, gs)
+		}
+		if gs[i].Plan != nil {
+			t.Errorf("%s: plan %+v of an item that ran, want none", where, gs[i].Plan)
 		}
 	}
 }

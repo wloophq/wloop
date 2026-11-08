@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -89,7 +90,7 @@ func (s *Server) handleGates(w http.ResponseWriter, r *http.Request) {
 			q.Statuses = append(q.Statuses, gate.Status(strings.TrimSpace(st)))
 		}
 	}
-	ctx := whereBy(r.Context(), time.Now().Add(s.whereBudget()))
+	ctx := withPlanReads(whereBy(r.Context(), time.Now().Add(s.whereBudget())))
 	gs, err := rd.Where(ctx, q)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -195,48 +196,70 @@ func (s *Server) gateView(ctx context.Context, g gate.Gate, byUnit map[unit.Unit
 	return v
 }
 
-// gatePlan is the plan item plan gate g holds, as the plan page serves it without its actions, which are the
-// gate's intents; nil when the plan no longer holds it. In a pass, the pending items are read once for every gate.
+// gatePlan is the pending plan item plan gate g holds, as the plan page serves it without its actions, which are
+// the gate's intents; nil when the item no longer waits. A request that reads the plan once for its gates, a
+// page's pass or a withPlanReads context, looks every gate up in one read of the pending items.
 func (s *Server) gatePlan(ctx context.Context, g gate.Gate) *api.PlanItem {
 	p := s.deps.Plan
 	if p == nil || g.Subject == "" {
 		return nil
 	}
-	var it workflow.Item
-	var found bool
-	if _, ok := coretasks.PassOf(ctx); ok {
-		pending, err := coretasks.Once(ctx, passPendingItems, func() (map[string]workflow.Item, error) {
-			its, err := p.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
-			out := make(map[string]workflow.Item, len(its))
-			for _, it := range its {
-				out[it.ID] = it
-			}
-			return out, err
-		})
-		if err != nil {
-			s.logf("plan gate %d: the pending items: %v", g.ID, err)
-			return nil
-		}
-		it, found = pending[g.Subject]
-	} else {
-		its, err := p.Items(ctx, automation.Filter{ID: g.Subject})
-		if err != nil {
-			s.logf("plan gate %d: its item: %v", g.ID, err)
-			return nil
-		}
-		if found = len(its) > 0; found {
-			it = its[0]
-		}
+	it, found, err := s.pendingItem(ctx, p, g.Subject)
+	if err != nil {
+		s.logf("plan gate %d: its item: %v", g.ID, err)
+		return nil
 	}
 	if !found {
 		return nil
 	}
-	v := s.wirePlanItem(ctx, it, s.presentations([]unit.Unit{it.Unit})[it.Unit])
-	v.Actions = nil
+	v := s.planItemView(it, s.presentations([]unit.Unit{it.Unit})[it.Unit])
 	return &v
 }
 
+// pendingItem is the pending plan item id, read with every other pending item once per request when ctx asks
+// for it, else on its own.
+func (s *Server) pendingItem(ctx context.Context, p Plan, id string) (workflow.Item, bool, error) {
+	all := func() (map[string]workflow.Item, error) {
+		its, err := p.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+		out := make(map[string]workflow.Item, len(its))
+		for _, it := range its {
+			out[it.ID] = it
+		}
+		return out, err
+	}
+	var pending map[string]workflow.Item
+	var err error
+	if r, ok := ctx.Value(planReadsKey{}).(*planReads); ok {
+		r.once.Do(func() { r.pending, r.err = all() })
+		pending, err = r.pending, r.err
+	} else if _, ok := coretasks.PassOf(ctx); ok {
+		pending, err = coretasks.Once(ctx, passPendingItems, all)
+	} else {
+		its, err := p.Items(ctx, automation.Filter{ID: id, Decisions: []workflow.Decision{workflow.DecisionPending}})
+		if err != nil || len(its) == 0 {
+			return workflow.Item{}, false, err
+		}
+		return its[0], true, nil
+	}
+	it, ok := pending[id]
+	return it, ok, err
+}
+
 const passPendingItems = "daemon.pending_items"
+
+type planReadsKey struct{}
+
+// planReads are the pending plan items one request read, once.
+type planReads struct {
+	once    sync.Once
+	pending map[string]workflow.Item
+	err     error
+}
+
+// withPlanReads is ctx whose plan gates read the pending plan items once for all of them.
+func withPlanReads(ctx context.Context) context.Context {
+	return context.WithValue(ctx, planReadsKey{}, &planReads{})
+}
 
 // draftGateView is draft gate g with dv, its draft, as its subject, and its delivery.
 func (s *Server) draftGateView(g gate.Gate, dv api.Draft) api.GateView {
