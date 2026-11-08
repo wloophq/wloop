@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 func (s *stepSet) itemsResolveCheck(ctx context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
@@ -17,7 +18,7 @@ func (s *stepSet) itemsResolveCheck(ctx context.Context, c stepCall, _ automatio
 		return refusal, err
 	}
 	if len(open) == 0 {
-		return "the task holds no open item", nil
+		return builtin.RefusalNoOpenItem, nil
 	}
 	return "", nil
 }
@@ -28,7 +29,7 @@ func (s *stepSet) itemsResolveRun(ctx context.Context, c stepCall, _ automation.
 		return "", err
 	}
 	if refusal == "" && len(open) == 0 {
-		refusal = "the task holds no open item"
+		refusal = builtin.RefusalNoOpenItem
 	}
 	if refusal != "" {
 		return "", automation.Refused{Reason: refusal}
@@ -89,7 +90,7 @@ func (s *stepSet) openItemsOf(ctx context.Context, c stepCall) ([]items.Item, st
 		return nil, "", err
 	}
 	if e.Origin != task.OriginDerived {
-		return nil, "the task is not derived from items: its items do not close it", nil
+		return nil, builtin.RefusalNotDerived, nil
 	}
 	held := map[unit.Unit]map[string]bool{}
 	for _, r := range e.Items {

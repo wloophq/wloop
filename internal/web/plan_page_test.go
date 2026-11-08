@@ -154,9 +154,14 @@ func TestAPlanReasonReadsInTheCatalogsWords(t *testing.T) {
 		{Reason: "failed 3 times: exit 1", ReasonKey: "failed {n} times: {error}", ReasonParams: map[string]string{"n": "3", "error": "exit 1"}},
 		{Reason: "Open cockpit"},
 		{Reason: "a refusal no catalog words"},
+		{Reason: "the task holds no open item"},
+		{Reason: "waits for you while task.items_open 0: the task holds no open item", ReasonKey: "waits for you while {facts}: {refusal}",
+			ReasonParams: map[string]string{"facts": "task.items_open 0", "refusal": "the task holds no open item"},
+			ReasonFacts:  []api.Fact{{Name: "task.items_open", Value: "0"}}},
 	}
 	runPlanPage(t, "pt-BR", `process.stdout.write(JSON.stringify(input.map((it) => planReason(it))));`, items, &got)
-	want := []string{"espera você", "espera você enquanto task.items_open = 2: the agent is busy", "falhou 3 vezes: exit 1", "Abrir o cockpit", "a refusal no catalog words"}
+	want := []string{"espera você", "espera você enquanto task.items_open = 2: the agent is busy", "falhou 3 vezes: exit 1", "Abrir o cockpit", "a refusal no catalog words",
+		"a tarefa não tem item aberto", "espera você enquanto task.items_open = 0: a tarefa não tem item aberto"}
 	if !slices.Equal(got, want) {
 		t.Errorf("reasons %q, want %q", got, want)
 	}

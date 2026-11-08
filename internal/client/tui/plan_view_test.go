@@ -33,6 +33,26 @@ func TestThePlanViewWordsStepsAndReasonsFromTheCatalog(t *testing.T) {
 	}
 }
 
+func TestAPlanReasonReadsInTheTerminalsCatalog(t *testing.T) {
+	m := newModel(t)
+	m.words = ptBR(t)
+	m.SetViews(api.ViewsCatalog{Lens: testLensWords, Facets: []api.FacetSpec{{ID: "kind", Label: "Tipo", Fact: "task.prop.kind", Labels: map[string]string{"thread": "Conversa"}}}})
+	held := api.PlanItem{Reason: "waits for you while task.prop.kind thread: the task holds no open item", ReasonKey: "waits for you while {facts}: {refusal}",
+		ReasonParams: map[string]string{"facts": "task.prop.kind thread", "refusal": "the task holds no open item"},
+		ReasonFacts:  []api.Fact{{Name: "task.prop.kind", Value: "thread"}}}
+	for _, c := range []struct {
+		it   api.PlanItem
+		want string
+	}{
+		{api.PlanItem{Reason: "the task holds no open item"}, "a tarefa não tem item aberto"},
+		{held, "espera você enquanto Tipo: Conversa: a tarefa não tem item aberto"},
+	} {
+		if got := m.planReason(c.it); got != c.want {
+			t.Errorf("%q reads %q, want %q", c.it.Reason, got, c.want)
+		}
+	}
+}
+
 func TestThePlanTabStaysWithNoRowViews(t *testing.T) {
 	m := NewModel()
 	m.SetCatalog(api.CatalogResponse{})

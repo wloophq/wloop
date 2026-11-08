@@ -25,15 +25,37 @@ func (m *Model) stepText(st api.PlanStep) string {
 	a["task"] = st.Args["task_title"]
 	a["verb"] = m.verbLabel(st.Args["verb"])
 	prop, value := st.Args["prop"], st.Args["value"]
-	if i := slices.IndexFunc(m.viewsCat.Facets, func(f api.FacetSpec) bool { return prop != "" && f.Fact == "task.prop."+prop && f.Provider == "" }); i >= 0 {
-		f := m.viewsCat.Facets[i]
+	if f, ok := m.taskFacetOf("task.prop." + prop); ok && prop != "" {
 		a["prop"] = f.Label
-		if l, ok := f.Labels[value]; ok {
-			value = l
-		}
+		value = facetValue(f, value)
 	}
 	a["value"] = value
 	return w.T(st.Says, a)
+}
+
+// taskFacetOf is the profile's task facet that reads fact.
+func (m *Model) taskFacetOf(fact string) (api.FacetSpec, bool) {
+	i := slices.IndexFunc(m.viewsCat.Facets, func(f api.FacetSpec) bool { return f.Fact == fact && f.Provider == "" })
+	if i < 0 {
+		return api.FacetSpec{}, false
+	}
+	return m.viewsCat.Facets[i], true
+}
+
+// facetValue is value as facet f words it.
+func facetValue(f api.FacetSpec, value string) string {
+	if l, ok := f.Labels[value]; ok {
+		return l
+	}
+	return value
+}
+
+// planFactText is a fact that made a plan item, in the words of the task facet that reads it, else as name = value.
+func (m *Model) planFactText(f api.Fact) string {
+	if facet, ok := m.taskFacetOf(f.Name); ok {
+		return facet.Label + ": " + facetValue(facet, f.Value)
+	}
+	return f.Name + " = " + f.Value
 }
 
 // planPosts says whether applying a plan item may post where others see it, as the daemon says of each step.
@@ -56,7 +78,7 @@ func (m *Model) planReason(it api.PlanItem) string {
 	if len(it.ReasonFacts) > 0 {
 		facts := make([]string, len(it.ReasonFacts))
 		for i, f := range it.ReasonFacts {
-			facts[i] = f.Name + " = " + f.Value
+			facts[i] = m.planFactText(f)
 		}
 		params["facts"] = strings.Join(facts, ", ")
 	}

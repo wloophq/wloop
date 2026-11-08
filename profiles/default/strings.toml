@@ -335,6 +335,8 @@
 "it waits for you since it was planned" = "it waits for you since it was planned"
 "it no longer matches since it was planned" = "it no longer matches since it was planned"
 "its unit changed since it was planned" = "what it acts on changed since it was planned"
+"the task holds no open item" = "the task holds no open item"
+"the task is not derived from items: its items do not close it" = "the task is not derived from items: its items do not close it"
 "runs when its window ends" = "runs when its window ends"
 "guided by you" = "guided by you"
 "waits for you while {facts}" = "waits for you while {facts}"
