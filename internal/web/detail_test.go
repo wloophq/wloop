@@ -360,7 +360,7 @@ func TestUnitDetailItemsSayWhomTheyWaitOnAndWhichTaskHoldsThem(t *testing.T) {
 		resolved = append(resolved, item("r-"+s, s, items.Resolved))
 	}
 	its := append([]items.Item{resolved[0], item("i1", "Review the retry change", items.Open, items.Person{Key: "github:me", Name: "Me"}),
-		item("i2", "Pick a release date", items.Open)}, resolved[1:]...)
+		item("i2", "Pick a release date", items.Open), item("i5", "Ship the docs", items.State("snoozed"))}, resolved[1:]...)
 	detail := api.Detail{Row: api.Row{Unit: prUnit}, Events: []api.Event{}, Items: its, ItemTies: map[string]api.ItemTie{
 		"i1": {WaitsOn: []api.ItemPerson{{Key: "github:me", Name: "Me", Me: true}}, Task: "t-1", TaskTitle: "Review the retries"},
 		"i2": {WaitsOn: []api.ItemPerson{}},
@@ -378,11 +378,11 @@ const links = rows(box).map((li) => all(li, (x) => x.tag === "a").map((a) => tex
 more.attrs.onclick();
 process.stdout.write(JSON.stringify({ Rows: rows(box).map(text), Links: links, More: text(more), Folded: rows(unitExtras(input)).map(text) }));`, detail, &got)
 	want := []string{"aberto Review the retry change Esperando você · Review the retries", "aberto Pick a release date sem dono",
-		"resolvido Rename the flag", "resolvido Bump the client", "resolvido Drop the shim"}
+		"snoozed Ship the docs sem dono", "resolvido Rename the flag", "resolvido Bump the client", "resolvido Drop the shim"}
 	if !slices.Equal(got.Rows, want) {
 		t.Errorf("rows\n%q\nwant\n%q", got.Rows, want)
 	}
-	if len(got.Links) != 5 || len(got.Links[0]) != 1 || !strings.Contains(got.Links[0][0], "Review the retries #") || !strings.Contains(got.Links[0][0], "task=t-1") {
+	if len(got.Links) != 6 || len(got.Links[0]) != 1 || !strings.Contains(got.Links[0][0], "Review the retries #") || !strings.Contains(got.Links[0][0], "task=t-1") {
 		t.Errorf("links %q, want one to t-1 on the first item", got.Links)
 	}
 	for i, l := range got.Links[1:] {
@@ -393,7 +393,7 @@ process.stdout.write(JSON.stringify({ Rows: rows(box).map(text), Links: links, M
 	if got.More != "+2 resolvidos" {
 		t.Errorf("fold %q", got.More)
 	}
-	if len(got.Folded) != 7 {
-		t.Errorf("unfolded rows %q, want all seven", got.Folded)
+	if len(got.Folded) != 8 {
+		t.Errorf("unfolded rows %q, want all eight", got.Folded)
 	}
 }

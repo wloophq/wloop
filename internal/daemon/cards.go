@@ -88,18 +88,9 @@ func (s *Server) itemTies(ctx context.Context, u unit.Unit, its []items.Item) (m
 	if s.deps.Tasks != nil {
 		me = s.deps.Tasks.Me()
 		var err error
-		if holders, err = s.deps.Tasks.TasksOf(ctx, u); err != nil {
+		if holders, err = s.deps.Tasks.HoldersOf(ctx, u); err != nil {
 			return nil, err
 		}
-		slices.SortStableFunc(holders, func(a, b task.Task) int {
-			switch {
-			case a.Open() == b.Open():
-				return 0
-			case a.Open():
-				return -1
-			}
-			return 1
-		})
 	}
 	for _, it := range its {
 		tie := api.ItemTie{WaitsOn: make([]api.ItemPerson, 0, len(it.WaitingOn))}
@@ -107,7 +98,8 @@ func (s *Server) itemTies(ctx context.Context, u unit.Unit, its []items.Item) (m
 			tie.WaitsOn = append(tie.WaitsOn, api.ItemPerson{Key: p.Key, Name: p.Name, Me: p.Is(me)})
 		}
 		for _, e := range holders {
-			if slices.Contains(e.Items, task.ItemRef{Unit: u, Item: it.ID}) {
+			ref := task.ItemRef{Unit: u, Item: it.ID}
+			if slices.Contains(e.Items, ref) || slices.Contains(e.Resolved, ref) {
 				tie.Task, tie.TaskTitle = string(e.ID), e.Title
 				break
 			}

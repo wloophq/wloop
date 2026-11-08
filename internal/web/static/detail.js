@@ -477,8 +477,9 @@ function itemWaitsOn(tie) {
 // items past RESOLVED_ITEMS_SHOWN fold until the user unfolds them for unit key.
 function itemsBlock(list, ties, key) {
   if (!list || !list.length) return null;
-  const open = list.filter((it) => it.state !== "resolved");
-  const resolved = list.filter((it) => it.state === "resolved");
+  const isOpen = (it) => it.state !== "resolved";
+  const open = list.filter(isOpen);
+  const resolved = list.filter((it) => !isOpen(it));
   const unfolded = detailState.itemsUnfolded === key;
   const hidden = unfolded ? 0 : Math.max(0, resolved.length - RESOLVED_ITEMS_SHOWN);
   const row = (it) => {
@@ -486,7 +487,7 @@ function itemsBlock(list, ties, key) {
     const st = it.state || "open";
     return h("li", { class: "item-" + st },
       h("span", { class: "pill" }, itemStateWord(st)), " ", h("span", {}, it.summary || it.id),
-      st === "open" ? [" ", h("span", { class: "meta" }, itemWaitsOn(tie))] : null,
+      isOpen(it) ? [" ", h("span", { class: "meta" }, itemWaitsOn(tie))] : null,
       tie.task ? [" · ", h("a", { href: taskHref(tie.task), class: "ref", "data-focus": "unit-item-task:" + it.id }, tie.task_title || tie.task)] : null);
   };
   return [h("h2", { class: "d-sub" }, t("Items")),

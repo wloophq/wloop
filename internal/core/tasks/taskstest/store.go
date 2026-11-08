@@ -83,7 +83,7 @@ func (s *Store) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
 	defer s.mu.Unlock()
 	var out []task.Task
 	for _, e := range s.all() {
-		if slices.Contains(e.Units, u) || slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u }) {
+		if slices.Contains(e.Units, u) || slices.ContainsFunc(slices.Concat(e.Items, e.Resolved), func(r task.ItemRef) bool { return r.Unit == u }) {
 			out = append(out, e)
 		}
 	}
