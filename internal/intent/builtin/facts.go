@@ -208,7 +208,7 @@ var otherFacts = []Fact{
 	wf("task", "units", expr.List, "The task's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The task itself is not one of them."),
 	wf("task", "unit_providers", expr.List, "The providers of task.units, each once, in order."),
 	wf("task", "unit_kinds", expr.List, "The task kinds the plugins of task.units give their units' tasks, each once, in order, such as pull-request for a task that holds a pull request, whatever its own kind."),
-	wf("task", "open_unit_kinds", expr.List, "The task kinds of the units of task.units that have not ended as their plugin says, each once, in order: pull-request while a pull request the task holds is open."),
+	timeVarying(wf("task", "open_unit_kinds", expr.List, "The task kinds of the units of task.units that have not ended as their plugin says, each once, in order: pull-request while a pull request the task holds is open. Unset where nothing says whether a unit ended.")),
 	timeVarying(wf("task", "link_ended", expr.Bool, "The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
 	wf("task", "turns", expr.Int, "Turns run on the task itself, such as a start; turns on its units are not counted."),
 	wf("task", "captured_by_user", expr.Bool, "The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service."),

@@ -293,7 +293,6 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 		"task.units":               []string{},
 		"task.unit_providers":      []string{},
 		"task.unit_kinds":          []string{},
-		"task.open_unit_kinds":     []string{},
 		"task.link_ended":          false,
 		"task.captured_by_user":    e.CapturedByUser(),
 		"task.turns":               0,
@@ -334,6 +333,9 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	}
 	if err := p.mergeFacts(ctx, e, f); err != nil {
 		return nil, err
+	}
+	if p.d.Ended != nil {
+		f["task.open_unit_kinds"] = []string{}
 	}
 	for _, name := range builtin.LinkSignals {
 		f[builtin.LinkSignalPrefix+name] = false
@@ -415,7 +417,10 @@ func (p *Provider) base(ctx context.Context, e task.Task) (workflow.Facts, error
 	if err != nil {
 		return nil, err
 	}
-	f["task.link_ended"], f["task.open_unit_kinds"] = ended, openKinds
+	f["task.link_ended"] = ended
+	if p.d.Ended != nil {
+		f["task.open_unit_kinds"] = openKinds
+	}
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {

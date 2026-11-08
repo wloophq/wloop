@@ -612,6 +612,28 @@ func TestTaskOpenUnitKindsAreTheKindsOfItsUnitsNotEnded(t *testing.T) {
 	}
 }
 
+func TestTaskOpenUnitKindsIsLeftOutWhenNothingSaysWhetherAUnitEnded(t *testing.T) {
+	t.Parallel()
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "s.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	p := facttask.New(facttask.Deps{Tasks: db.Tasks(), Items: db.Items(), Clock: &clock{now: monday},
+		UnitKind: func(unit.ProviderID) string { return "thread" }})
+	if err := db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-01", State: "next",
+		Category: task.CategoryReady, Title: "one", Units: []unit.Unit{chatA}, Created: monday, Updated: monday}}}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := p.Facts(context.Background(), task.UnitOf("t-01"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := f["task.open_unit_kinds"]; ok {
+		t.Errorf("open_unit_kinds %v with no Ended wired, want it left out so no withdraw reads every unit as ended", got)
+	}
+}
+
 func TestTaskPlacementIsTheFirstRepositoryOfItsUnits(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
