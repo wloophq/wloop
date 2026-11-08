@@ -2929,8 +2929,9 @@ function mergeRows(page) {
   return true;
 }
 
-// applyChange brings the cockpit up to a change: the rows that moved, the
-// health only when it did, the detail only when its unit moved.
+// applyChange brings the cockpit up to a change: the rows that moved, and
+// only what the change names of the rest: the health, the plan (also when a
+// row it shows moved), the round gates, the detail when its unit moved.
 async function applyChange(c) {
   if (c.all || !state.loaded) return load();
   try {
@@ -2951,11 +2952,12 @@ async function applyChange(c) {
   state.authLost = false;
   const route = readHash();
   const { view, pr } = route;
+  const planned = new Set((state.plan.items || []).map((it) => unitKey(it.unit)));
   await Promise.all([
     c.units.length && view === "recent" ? loadActivity() : null,
     (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
-    loadPlan(),
-    loadRoundGates(),
+    c.plan || c.units.some((u) => planned.has(u)) ? loadPlan() : null,
+    c.gates ? loadRoundGates() : null,
     c.tasks ? loadTasks(route, c.units) : null,
     c.tasks || c.all || c.units.length ? loadHome() : null,
     c.tasks || c.all || c.units.length ? loadQueue() : null,
@@ -2968,12 +2970,9 @@ let pending;
 let queued = null;
 let chain = Promise.resolve();
 function scheduleLoad(c = { all: true }) {
-  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false };
+  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false, plan: false, gates: false };
   queued.units = [...new Set([...queued.units, ...(c.units || [])])];
-  queued.all = queued.all || !!c.all;
-  queued.rows = queued.rows || !!c.rows;
-  queued.health = queued.health || !!c.health;
-  queued.tasks = queued.tasks || !!c.tasks;
+  for (const k of Object.keys(queued)) if (k !== "units") queued[k] = queued[k] || !!c[k];
   clearTimeout(pending);
   pending = setTimeout(() => {
     const c = queued;
@@ -2989,7 +2988,9 @@ function onChange(e) {
   } catch {
     return scheduleLoad();
   }
-  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters });
+  const change = { units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters, plan: !!c.plan, gates: !!c.gates };
+  if (!change.units.length && !Object.values(change).some((v) => v === true)) return;
+  scheduleLoad(change);
 }
 
 let retries = 0;
@@ -3003,7 +3004,7 @@ function connect() {
     state.authLost = false;
     if (opened) {
       forgetTasksPage();
-      scheduleLoad({ rows: true, health: true, tasks: true });
+      scheduleLoad({ rows: true, health: true, tasks: true, plan: true, gates: true });
     }
     opened = true;
   };
