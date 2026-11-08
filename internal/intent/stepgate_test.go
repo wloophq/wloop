@@ -18,7 +18,7 @@ use = "gate.open"
 name = "review-diff"
 
 [gates.withdraw]
-when = 'task.state != "next"'
+when = 'task.turns > 2'
 reason = "moved on"
 `
 
@@ -32,13 +32,14 @@ func TestAGateWithdrawLoadsWithItsReasonAndNeedsAGateOpenStep(t *testing.T) {
 		t.Fatal("my-step did not load")
 	}
 	gw := l.Workflows[i].GateWithdraw
-	if gw == nil || gw.Reason != "moved on" || strings.Join(gw.When.Reads(), ",") != "task.state" {
+	if gw == nil || gw.Reason != "moved on" || strings.Join(gw.When.Reads(), ",") != "task.turns" {
 		t.Fatalf("gates.withdraw %+v", gw)
 	}
 	for _, c := range []struct{ from, to, want string }{
-		{"when = 'task.state != \"next\"'\n", "", "gates.withdraw.when: is required"},
+		{"when = 'task.turns > 2'\n", "", "gates.withdraw.when: is required"},
 		{"use = \"gate.open\"\nname = \"review-diff\"", `use = "notify.self"`, "gates.withdraw: withdraws gates the workflow opened; it has no gate.open step"},
-		{`task.state != "next"`, `task.nope`, "task.nope"},
+		{`task.turns > 2`, `task.nope`, "task.nope"},
+		{`task.turns > 2`, `task.title == "done"`, "gates.withdraw.when: reads task.title"},
 	} {
 		_, problems := loadProfile(t, "", map[string]string{"workflows/my-step/workflow.toml": strings.Replace(stepWorkflow, c.from, c.to, 1)})
 		if !strings.Contains(problems.Error(), c.want) {

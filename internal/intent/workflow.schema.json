@@ -138,7 +138,7 @@
               "type": "string"
             },
             "when": {
-              "description": "When an open gate the workflow opened is withdrawn, over its unit's facts. Required.",
+              "description": "When an open gate the workflow opened is withdrawn, over its unit's facts; it may read no untrusted fact, since a withdrawal closes a gate that waits on you. Required.",
               "type": "string"
             }
           },

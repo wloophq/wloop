@@ -434,7 +434,16 @@ func (s *sheet) defineGateWithdraw(w *workflow.Workflow, m *wGateWithdraw, slot 
 	}
 	r := workflow.WithdrawRule{}
 	if slot != "" {
-		r.When = s.predicate("gates.withdraw.when", *m.When, s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot))
+		env := s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
+		r.When = s.predicate("gates.withdraw.when", *m.When, env)
+		if r.When == nil {
+			return
+		}
+		// A withdrawal closes a gate that waits on you, so no third party's text may decide it.
+		if f := untrustedRead(r.When, env); f != "" {
+			s.add("gates.withdraw.when", "%s", (&builtin.UntrustedError{Fact: f}).Error())
+			return
+		}
 	}
 	if m.Reason != nil {
 		r.Reason = strings.TrimSpace(*m.Reason)
