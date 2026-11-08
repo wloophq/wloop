@@ -7,6 +7,15 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
+// PlanReasons are the plan item reasons strings.toml words, by their English
+// text, which a client reads through its catalog; any other reason reads as
+// the daemon gives it.
+var PlanReasons = []string{
+	"its terminal is closed; it ends on its own",
+	"its terminal is open with no agent in it: close that terminal, or dismiss this",
+	"it has no workspace to find its terminal in: dismiss this",
+}
+
 // PlanItem is one item of the workflows' plan.
 type PlanItem struct {
 	ID       string `json:"id"`
