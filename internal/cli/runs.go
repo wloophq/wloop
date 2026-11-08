@@ -42,6 +42,15 @@ func (h runHost) Wake(ctx context.Context, u unit.Unit, intent string, sess dtur
 	if !ok {
 		return fmt.Errorf("%s cannot wake the session %s", h.e.displayOf([]string{m.Name()}), sess.ID)
 	}
+	if h.e.Turns != nil {
+		lingers, err := h.e.Turns.ProcessLingers(ctx, sess.ID)
+		if err != nil {
+			return err
+		}
+		if lingers {
+			return fmt.Errorf("the session %s still has a process, out of view or orphaned: show its terminal in %s", sess.ID, h.e.displayOf([]string{m.Name()}))
+		}
+	}
 	_, woke, err := h.e.wakeSession(ctx, cfg, m, w, ws, u, opts, sess)
 	if err == nil && !woke {
 		err = fmt.Errorf("waking the session %s failed", sess.ID)

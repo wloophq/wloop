@@ -17,6 +17,37 @@ const RefusalOrphanMoved = "its process is no longer the orphan the census prove
 
 const sessionDormant = "the session is dormant"
 
+// RefusalOrphanLingers holds the close of a dormant session whose process the
+// census still lists orphaned and has not proven a lasting orphan: a window
+// may reclaim the pane, and the census then wakes the session.
+const RefusalOrphanLingers = "its process lingers orphaned and may come back; it closes once the process is gone or proven a lasting orphan"
+
+// ProcessLingers says whether a fresh census lists a process of the session,
+// orphaned or not, or cannot tell: waking it with a new process would run
+// two on one agent session.
+func (s *Service) ProcessLingers(ctx context.Context, id string) (bool, error) {
+	sess, ok, err := s.Registry.Session(ctx, id)
+	if err != nil || !ok {
+		return false, err
+	}
+	s.refresh()
+	c, err := s.Sessions.Census(ctx)
+	if err != nil {
+		return false, err
+	}
+	_, listed := c.Sessions[id]
+	return listed || !c.CompleteOf(sess.Manager), nil
+}
+
+// orphanLingers says whether the last Census listed the dormant session's
+// process orphaned without proving it a lasting orphan.
+func (s *Service) orphanLingers(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, ok := s.orphanSeen[id]
+	return ok && !m.durable
+}
+
 // CloseOrphanGone says whether why, a CloseOrphanRefusal of id, holds for
 // good: there is no such session, or it is closed or dormant, so no process
 // of it is left to close.

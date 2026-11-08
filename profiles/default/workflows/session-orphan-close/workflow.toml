@@ -1,7 +1,9 @@
 summary = "End the process a session left behind when you closed its terminal in the app: an orphan with no agent that outlived a restart of the app's windows or stayed quiet for two hours, under the guards of a session close; the census then marks the session dormant"
 provider = "session"
-# Off: ending a process risks a pane the app has not reattached yet. Turn it on
-# with workflows.session-orphan-close.enabled = true; hygiene-session-orphaned
+# Off: ending a process risks a pane the app has not reattached yet, such as one
+# of a worktree whose tabs the app mounts only when you open it, left
+# unreclaimed through a whole restart. Turn it on with
+# workflows.session-orphan-close.enabled = true; hygiene-session-orphaned
 # already retires these sessions without ending their processes.
 enabled = false
 when = 'session.orphan_durable'

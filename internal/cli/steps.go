@@ -387,10 +387,15 @@ func (s *stepSet) closeCheck(ctx context.Context, c stepCall, _ automation.Check
 		return "", err
 	}
 	why, err := t.CloseRefusal(ctx, c.u.Key)
-	if err == nil && turns.CloseGone(c.u.Key, why) {
+	switch {
+	case err != nil:
+		return "", err
+	case turns.CloseGone(c.u.Key, why):
 		return "", automation.Moot{Reason: why}
+	case why == turns.RefusalOrphanLingers:
+		return "", automation.Held{Reason: why}
 	}
-	return why, err
+	return why, nil
 }
 
 func (s *stepSet) closeRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {

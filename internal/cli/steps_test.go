@@ -141,10 +141,38 @@ func TestTheOrphanCloseStepEndsOnlyADurableOrphanAndIsMootOnceTheSessionIsGone(t
 	}
 }
 
+func TestACloseOfADormantSessionWhoseOrphanLingersIsHeldNotBlocked(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", Managed: true, StartedAt: testNow.Add(-4 * time.Hour), PromptSeenAt: testNow.Add(-3 * time.Hour)})
+	sess := te.Turns.Sessions.(*turnstest.Sessions)
+	sess.Put("ws1", turns.Terminal{Session: "term-1"})
+	sess.Orphan("term-1")
+	for i := range 2 {
+		sess.SetReading("", testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
+		if err := te.Turns.Census(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := te.Turns.MarkDormant(ctx, "term-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Turns.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	_, err := s.Check(ctx, wfStep("session.close"), unit.Unit{Provider: unit.Session, Key: "term-1"}, workflow.Why{}, automation.CheckOpts{})
+	var held automation.Held
+	if !errors.As(err, &held) || held.Reason != turns.RefusalOrphanLingers {
+		t.Fatalf("check %v, want the close held while the orphan lingers", err)
+	}
+}
+
 func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
 	t.Parallel()
 	l := newTestEnv(t, &fake.Manager{}).loadedIntents()
-	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace, turns.RefusalOrphanUnproven, turns.RefusalOrphanMoved} {
+	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace, turns.RefusalOrphanUnproven, turns.RefusalOrphanMoved, turns.RefusalOrphanLingers, turns.RefusalCloseRaced} {
 		if _, ok := l.Strings[key]; !ok {
 			t.Errorf("strings.toml does not word %q", key)
 		}

@@ -228,6 +228,27 @@ func TestAWakeThatFailsLateBindsTheProcessAndStartsANewSession(t *testing.T) {
 	}
 }
 
+func TestAWakeLeavesASessionWhoseProcessStillRuns(t *testing.T) {
+	t.Parallel()
+	te, m := sharedEnv(t, "")
+	te.registerSession(t, dturn.Session{ID: "old", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), AgentSession: "conv-1", StartedAt: testNow.Add(-time.Hour)})
+	ctx := context.Background()
+	if err := te.repo.EndHandle(ctx, "old", testNow.Add(-30*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	m.Sessions = nil
+	te.Turns.Sessions.(*turnstest.Sessions).Put(sharedWS.ID, turns.Terminal{Session: "old"})
+	te.Turns.Sessions.(*turnstest.Sessions).Orphan("old")
+	_, woke, err := te.wake(ctx, te.cfg, m, sharedWS, r7.Unit(), roundOptions{}, func(time.Time) bool { return true })
+	if err != nil || woke || len(m.Wakes) != 0 {
+		t.Fatalf("wake = %v, %v, wakes %+v; want a new session, not a second process resuming conv-1", woke, err, m.Wakes)
+	}
+	sess, _, _ := te.repo.Session(ctx, "old")
+	if err := (runHost{te.Env}).Wake(ctx, r7.Unit(), "address", sess); err == nil || len(m.Wakes) != 0 {
+		t.Fatalf("Enter woke a session whose process still runs: %v, wakes %+v", err, m.Wakes)
+	}
+}
+
 func TestAWakeNamesTheResumedSession(t *testing.T) {
 	t.Parallel()
 	te, m := sharedEnv(t, "")

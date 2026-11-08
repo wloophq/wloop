@@ -211,3 +211,71 @@ func TestCloseOrphanOfASessionGoneClosedOrDormantIsGone(t *testing.T) {
 		t.Fatalf("closed %v", sess.Closed())
 	}
 }
+
+// retiredEnv is c's session retired dormant while its process lingers orphaned.
+func retiredEnv(t *testing.T, c cleanupCase) closeEnv {
+	t.Helper()
+	e := orphanedEnv(t, c)
+	if err := e.s.MarkDormant(context.Background(), c.sess.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.s.Census(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func TestADormantSessionsCloseWaitsWhileItsOrphanLingers(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if why, err := e.s.CloseRefusal(ctx, "term_1"); err != nil || why != turns.RefusalOrphanLingers {
+		t.Fatalf("refusal %q %v, want the close held while the orphan may be reclaimed", why, err)
+	}
+	if err := e.s.CloseSession(ctx, "term_1", "test"); !refusal(err, turns.RefusalOrphanLingers) {
+		t.Fatalf("CloseSession = %v", err)
+	}
+	e.sess.Unorphan("term_1")
+	if err := e.s.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want woken by its reclaimed pane", got)
+	}
+}
+
+func TestADormantSessionClosesOnceItsOrphanIsGone(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	e.sess.Put(cleanupWS)
+	if err := e.s.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if why, err := e.s.CloseRefusal(ctx, "term_1"); err != nil || why != "" {
+		t.Fatalf("refusal %q %v", why, err)
+	}
+	if err := e.s.CloseSession(ctx, "term_1", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionClosed {
+		t.Fatalf("session %+v, want closed", got)
+	}
+	if closed := e.sess.Closed(); len(closed) != 0 {
+		t.Fatalf("closing a dormant session ended %v: a pane woken meanwhile would be ended without the shown-terminal guards", closed)
+	}
+}
+
+func TestAProcessStillListedLingers(t *testing.T) {
+	ctx := context.Background()
+	e := retiredEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || !lingers {
+		t.Fatalf("lingers %v %v, want true while the census lists its orphan", lingers, err)
+	}
+	e.sess.Put(cleanupWS)
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || lingers {
+		t.Fatalf("lingers %v %v once the census lists none", lingers, err)
+	}
+	e.sess.Partial()
+	if lingers, err := e.s.ProcessLingers(ctx, "term_1"); err != nil || !lingers {
+		t.Fatalf("lingers %v %v, want true when the census cannot tell", lingers, err)
+	}
+}
