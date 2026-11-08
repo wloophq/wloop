@@ -260,6 +260,7 @@
 "Pending" = "Pending"
 "Plan" = "Plan"
 "What the workflows will do, and what waits for you to apply it" = "What the workflows will do, and what waits for you to apply it"
+"The newest events of every unit the loop follows" = "The newest events of every unit the loop follows"
 "People holding the backlog" = "People holding the backlog"
 "plugin disabled" = "plugin disabled"
 "Plugin view" = "Plugin view"

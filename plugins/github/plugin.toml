@@ -628,11 +628,6 @@ id = "explore"
 order = 9
 surfaces = ["web"]
 
-[[source.ui.views]]
-id = "recent"
-order = 10
-surfaces = ["web"]
-
 [[source.ui.facets]]
 id = "where"
 group = true

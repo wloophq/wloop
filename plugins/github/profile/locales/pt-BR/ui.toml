@@ -52,9 +52,6 @@ APPROVED = "aprovado"
 CHANGES_REQUESTED = "mudanças pedidas"
 REVIEW_REQUIRED = "review exigida"
 
-[views.recent]
-label = "Recentes"
-
 [facets.where]
 label = "Onde"
 

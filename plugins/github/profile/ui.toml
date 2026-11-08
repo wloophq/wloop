@@ -39,9 +39,6 @@ sorts = [
 decisions = { APPROVED = "approved", CHANGES_REQUESTED = "changes requested", REVIEW_REQUIRED = "review required" }
 no_decision = "no review required"
 
-[views.recent]
-label = "Recent"
-
 [facets.where]
 label = "Where"
 show = "ref"

@@ -55,7 +55,7 @@ func TestCockpitHasTheRecentView(t *testing.T) {
 		Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/"+name, nil))
 		body += rec.Body.String()
 	}
-	for _, want := range []string{`v.id !== "recent"`, "/api/activity", "renderActivity"} {
+	for _, want := range []string{"out.push({ id: RECENT", "/api/activity", "renderActivity"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("app.js and rail.js lack %s", want)
 		}

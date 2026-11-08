@@ -37,8 +37,8 @@ folder.attrs.onclick();
 process.stdout.write(JSON.stringify({ Closed: closed, Open: railLinks(), Label: text(folder.children[0]), Count: text(folder.children[1]),
   Expanded: expanded, ExpandedOn: byFocus(railEls.views.kids, "rail:empties").attrs["aria-expanded"], Omnibox: text(railEls["omnibox-entry"].kids) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	if want := []string{"Home", "Focus", "Inbox", "Outbox", "Fits now", "Waiting", "Projects", "Someday", "Plan"}; !slices.Equal(got.Closed, want) {
-		t.Errorf("rail %v, want %v: Logbook folds, Someday is the view shown, the plan not loaded yet stays", got.Closed, want)
+	if want := []string{"Home", "Focus", "Inbox", "Outbox", "Fits now", "Waiting", "Projects", "Someday", "Plan", "Recent"}; !slices.Equal(got.Closed, want) {
+		t.Errorf("rail %v, want %v: Logbook folds, Someday is the view shown, the plan not loaded yet and Recent, which counts nothing, stay", got.Closed, want)
 	}
 	if got.Label != "Empty" || got.Count != "1" || got.Expanded != "false" {
 		t.Errorf("the Empty entry reads %q %q, expanded %q", got.Label, got.Count, got.Expanded)
@@ -138,8 +138,8 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
-	plugin := []string{"mine", "dash", "all", "explore", "recent"}
-	want := slices.Concat(coreViewIDs, []string{"plan"}, plugin, []string{"fake-board"})
+	plugin := []string{"mine", "dash", "all", "explore"}
+	want := slices.Concat(coreViewIDs, coreRoutes, plugin, []string{"fake-board"})
 	if !slices.Equal(got.IDs, want) {
 		t.Fatalf("nav %v, want %v", got.IDs, want)
 	}
@@ -147,7 +147,7 @@ process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((
 		t.Errorf("first view %q, want focus", got.IDs[0])
 	}
 	for i, c := range got.Core {
-		if c != (i <= len(coreViewIDs)) {
+		if c != (i < len(coreViewIDs)+len(coreRoutes)) {
 			t.Errorf("%s core=%v", got.IDs[i], c)
 		}
 	}
@@ -176,8 +176,8 @@ process.stdout.write(JSON.stringify({
   enabled: resolveView("mine", input.cat, served, () => false),
   core_stay: resolveView("waiting", input.cat, [], () => false),
 }));`, map[string]any{"cat": viewsCatalog()}, &got)
-	if !slices.Equal(got.IDs, append(slices.Clone(coreViewIDs), "plan")) {
-		t.Errorf("nav with the GitHub plugin off %v, want the core views and the plan", got.IDs)
+	if !slices.Equal(got.IDs, slices.Concat(coreViewIDs, coreRoutes)) {
+		t.Errorf("nav with the GitHub plugin off %v, want the core views, the plan and Recent", got.IDs)
 	}
 	if got.View != "focus" {
 		t.Errorf("#view=mine with the plugin off shows %q, want focus", got.View)
@@ -199,7 +199,7 @@ const nav = viewNav(input.cat, input.served, [], null);
 const names = { github: "GitHub", slack: "Slack" };
 process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) => ({ Title: s.title, Views: s.views.map((v) => v.id) }))));`,
 		map[string]any{"cat": viewsCatalog(), "served": served}, &got)
-	if len(got) != 3 || got[0].Title != "" || !slices.Equal(got[0].Views, append(slices.Clone(coreViewIDs), "plan")) ||
+	if len(got) != 3 || got[0].Title != "" || !slices.Equal(got[0].Views, slices.Concat(coreViewIDs, coreRoutes)) ||
 		got[1].Title != "GitHub" || !slices.Equal(got[1].Views, []string{"needs-me", "all"}) ||
 		got[2].Title != "Slack" || !slices.Equal(got[2].Views, []string{"slack"}) {
 		t.Errorf("sections %+v", got)
@@ -225,6 +225,28 @@ process.stdout.write(JSON.stringify({ core: plan.core, label: plan.label, view: 
 		map[string]any{"cat": viewsCatalog()}, &got)
 	if !got.Core || got.Label != "Plan" || got.View != "plan" || got.Section != "" || got.Count != float64(2) {
 		t.Fatalf("%+v: the plan sits among the core views, counted, with no plugin running", got)
+	}
+}
+
+func TestRecentIsACoreViewWhateverPluginRuns(t *testing.T) {
+	var got struct {
+		Core    bool   `json:"core"`
+		Label   string `json:"label"`
+		View    string `json:"view"`
+		Count   any    `json:"count"`
+		Section string `json:"section"`
+		Served  bool   `json:"served"`
+	}
+	nodeRun(t, viewsPrelude(t), nil, `
+const nav = viewNav(input.cat, [], [], null);
+const recent = nav.find((v) => v.id === "recent");
+const secs = railSections(nav, (p) => p);
+process.stdout.write(JSON.stringify({ core: recent.core, label: recent.label, view: resolveView("recent", input.cat, [], () => false),
+  count: railCount(recent, {}), section: secs.find((s) => s.views.some((v) => v.id === "recent")).title,
+  served: catalog.views.some((v) => v.id === "recent") }));`,
+		map[string]any{"cat": viewsCatalog()}, &got)
+	if !got.Core || got.Label != "Recent" || got.View != "recent" || got.Section != "" || got.Count != "" || got.Served {
+		t.Fatalf("%+v: Recent sits among the core views, uncounted, with no plugin running and no plugin serving it", got)
 	}
 }
 

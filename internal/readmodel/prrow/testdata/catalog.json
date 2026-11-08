@@ -1,5 +1,5 @@
 {
-  "version": "125887be3294",
+  "version": "d753e6ef5d59",
   "views": [
     {
       "id": "mine",
@@ -99,16 +99,6 @@
         },
         "no_decision": "no review required"
       }
-    },
-    {
-      "id": "recent",
-      "label": "Recent",
-      "provider": "github",
-      "rows": false,
-      "order": 10,
-      "surfaces": [
-        "web"
-      ]
     }
   ],
   "facets": [

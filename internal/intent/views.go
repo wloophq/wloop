@@ -180,6 +180,14 @@ const HomeView = "home"
 // its label is the "Plan" text of strings.toml.
 const PlanView = "plan"
 
+// RecentView is the cockpit's recent route, the core's feed of the newest events of every unit the loop
+// follows, which no view may be named; its label is the "Recent" text of strings.toml.
+const RecentView = "recent"
+
+// coreRoutes are the core's screens of the rail no view may be named, each with its label's text in
+// strings.toml.
+var coreRoutes = map[string]string{PlanView: "Plan", RecentView: "Recent"}
+
 type mFacet struct {
 	Fact        *string             `toml:"fact"`
 	Label       *string             `toml:"label"`
@@ -464,8 +472,8 @@ func (l *viewsLoad) mergeViews(s *sheet, views map[string]mView) {
 			s.add(path, "%s is the cockpit's home route; name the view otherwise", HomeView)
 			continue
 		}
-		if id == PlanView {
-			s.add(path, "%s is the cockpit's plan route; name the view otherwise", PlanView)
+		if _, ok := coreRoutes[id]; ok {
+			s.add(path, "%s is the cockpit's %s route; name the view otherwise", id, id)
 			continue
 		}
 		i := slices.IndexFunc(l.def.Views, func(v ViewDef) bool { return v.ID == id })
