@@ -9,19 +9,28 @@ import (
 
 // PlanItem is one item of the workflows' plan.
 type PlanItem struct {
-	ID       string        `json:"id"`
-	Workflow string        `json:"workflow"`
-	Summary  string        `json:"summary,omitempty"` // Workflow's summary, in the profile's locale
-	Decision string        `json:"decision"`
-	Reason   string        `json:"reason,omitempty"`
-	Default  string        `json:"default,omitempty"`
-	Observe  ObserveMode   `json:"observe"`
-	Error    string        `json:"error,omitempty"`
-	Unit     unit.Unit     `json:"unit"`
-	Label    string        `json:"label"`           // Unit as a person reads it
-	Title    string        `json:"title,omitempty"` // Unit's row title
-	Link     string        `json:"link,omitempty"`  // Unit's row link
-	Steps    []string      `json:"steps"`
+	ID       string `json:"id"`
+	Workflow string `json:"workflow"`
+	Summary  string `json:"summary,omitempty"` // Workflow's summary, in the profile's locale
+	Decision string `json:"decision"`
+	Reason   string `json:"reason,omitempty"`
+	// ReasonKey is the engine's template Reason renders, the catalog's key for it, with the values it carries and,
+	// for a wait on facts, those facts; "" for a reason no template renders, which reads as Reason.
+	ReasonKey    string            `json:"reason_key,omitempty"`
+	ReasonParams map[string]string `json:"reason_params,omitempty"`
+	ReasonFacts  []Fact            `json:"reason_facts,omitempty"`
+	Default      string            `json:"default,omitempty"`
+	Observe      ObserveMode       `json:"observe"`
+	Error        string            `json:"error,omitempty"`
+	Unit         unit.Unit         `json:"unit"`
+	Label        string            `json:"label"`           // Unit as a person reads it
+	Title        string            `json:"title,omitempty"` // Unit's row title
+	Link         string            `json:"link,omitempty"`  // Unit's row link
+	Steps        []string          `json:"steps"`
+	// Target is the task a task's item acts on, as a person finds it; nil for another unit.
+	Target *PlanTarget `json:"target,omitempty"`
+	// Does are its steps with what each needs said of it.
+	Does     []PlanStep    `json:"does,omitempty"`
 	Deadline time.Time     `json:"deadline,omitzero"`
 	Gain     Gain          `json:"gain"`
 	Why      Why           `json:"why"`
@@ -31,6 +40,32 @@ type PlanItem struct {
 
 // UnitLabel is the item's unit as a person reads it.
 func (it PlanItem) UnitLabel() string { return cmp.Or(it.Label, it.Unit.Label()) }
+
+// PlanTarget is a task a plan item acts on: its id, its title and the units it came from.
+type PlanTarget struct {
+	Task  string     `json:"task"`
+	Title string     `json:"title"`
+	Units []PlanUnit `json:"units,omitempty"`
+}
+
+// PlanUnit is a unit as a person reads it, with its link when it has one.
+type PlanUnit struct {
+	Label string `json:"label"`
+	Link  string `json:"link,omitempty"`
+}
+
+// PlanStep is a step of a plan item: what it uses, its reach (local, private, visible; "" for the intent's), its
+// text arguments, and for items.resolve the summaries of the open items it resolves.
+type PlanStep struct {
+	Use   string `json:"use"`
+	Reach string `json:"reach,omitempty"`
+	// Says is the catalog key of what the step does, its {name}s its Args; "" for a step the catalog does not word.
+	Says string `json:"says,omitempty"`
+	// Posts says the step may post where others see it: its reach is visible or its intent's, or it drafts.
+	Posts bool              `json:"posts,omitempty"`
+	Args  map[string]string `json:"args,omitempty"`
+	Items []string          `json:"items,omitempty"`
+}
 
 type Gain struct {
 	MemoryBytes int64 `json:"memory_bytes"`

@@ -613,11 +613,6 @@ order = 2
 surfaces = ["web", "tui"]
 
 [[source.ui.views]]
-id = "plan"
-order = 4
-surfaces = ["web", "tui"]
-
-[[source.ui.views]]
 id = "dash"
 order = 6
 surfaces = ["web"]

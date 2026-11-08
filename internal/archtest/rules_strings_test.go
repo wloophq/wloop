@@ -15,6 +15,9 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/net/html"
+
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // nonProse are literals that read like prose and are not: what each is, by literal.
@@ -332,7 +335,9 @@ var (
 
 // TestCatalogKeysAreUsedAndKnown checks that every literal key the clients read (`t`, `tn`, `.T`, `.TN`, the
 // page's `data-i18n` attributes) is
-// a key of `strings.toml`, and every key of it is read by a client or names a text the API or the configuration serves.
+// a key of `strings.toml`, and every key of it is read by a client or names a text the API, the configuration,
+// the engine's plan reasons (`workflow.Reasons`, a plan item's `reason_key`) or the step words of a plan item
+// (`builtin.StepSays`, `StepSaysWithTask`, `ResolutionSays`) serve.
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	keys := catalogKeys(t)
 	used := map[string]bool{}
@@ -385,6 +390,13 @@ func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 			return true
 		})
 	})
+	for _, r := range workflow.Reasons {
+		literals[r] = true
+	}
+	for _, s := range slices.Concat(slices.Collect(maps.Values(builtin.StepSays)), slices.Collect(maps.Values(builtin.StepSaysWithTask)),
+		slices.Collect(maps.Values(builtin.ResolutionSays))) {
+		literals[s] = true
+	}
 	for _, k := range slices.Sorted(maps.Keys(keys)) {
 		if !used[k] && !literals[k] {
 			t.Errorf("strings.toml's %q is read by no client", k)

@@ -325,6 +325,8 @@ func TestAPlanGateCardReadsWithinTheQueue(t *testing.T) {
 	card := `<article class="ask d-gate" data-kind="plan"><header class="hd"><i class="dot"></i><h3 class="d-sub">Run this?</h3></header><div class="bd">` +
 		`<div class="gate-plan"><p class="plan-summary">Close the task once its asker checked the answer; posts nothing</p>` +
 		`<p class="meta plan-on">Acts on <a href="https://chat.example/c1">Retry flaky uploads</a></p>` +
+		`<div class="plan-does"><ul><li class="plan-do"><span class="plan-do-what">Resolve its open items as no longer relevant</span>` +
+		`<ul class="plan-do-items"><li class="plan-do-item">` + long + `</li></ul></li></ul><p class="meta plan-posts">Posts nothing</p></div>` +
 		`<details class="plan-why" open><summary>Why it fired</summary><ul><li>task.link_signal = ` + long + `</li><li>Category: Active</li></ul></details></div>` +
 		`</div></article>`
 	plan := `<ol class="plan-items"><li class="plan-item pending"><div class="plan-line"><span class="plan-when">waits</span><span class="plan-wf">Close the task once its asker checked the answer; posts nothing</span></div></li></ol>`

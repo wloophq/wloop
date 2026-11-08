@@ -1446,7 +1446,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 		units.Put(finishedWorkspace, f)
 		steps.Refuse("workspace.remove", finishedWorkspace, c.refusal)
 		items := planOf(t, eng)
-		if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != c.fact+" 1: "+c.refusal {
+		if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "waits for you while "+c.fact+" 1: "+c.refusal {
 			t.Errorf("%s: %+v", c.fact, items)
 		}
 		sweepOnce(t, eng)
@@ -1466,7 +1466,7 @@ func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 	refusal := "3 commits not pushed in /w/ws1; back them up with: git push origin HEAD:refs/heads/me/backup-b"
 	steps.Refuse("workspace.remove", finishedWorkspace, refusal)
 	items := planOf(t, eng)
-	if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "workspace.pendency [commits on no remote]: "+refusal {
+	if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait || items[0].Reason != "waits for you while workspace.pendency [commits on no remote]: "+refusal {
 		t.Fatalf("items %+v", items)
 	}
 	f["workspace.sessions"] = 1
@@ -1504,7 +1504,7 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 		f := workspaceFactsOf("author", "CLOSED", 25*time.Hour)
 		f["workspace.pendency"] = []string{c.pendency}
 		units.Put(finishedWorkspace, f)
-		reason := "workspace.pendency [" + c.pendency + "]"
+		reason := "waits for you while workspace.pendency [" + c.pendency + "]"
 		if c.refusal != "" {
 			steps.Refuse("workspace.remove", finishedWorkspace, c.refusal)
 			reason += ": " + c.refusal

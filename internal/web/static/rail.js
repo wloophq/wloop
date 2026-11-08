@@ -5,12 +5,13 @@ const railEnv = { omnibox: () => openOmnibox() };
 
 const railState = { emptiesOpen: false };
 
-// viewNav is the rail: the core views with their counters, then each plugin
-// view (count left to the caller).
+// viewNav is the rail: the core views with their counters and the plan, then each plugin view (count left to
+// the caller).
 function viewNav(cat, served, plugin, counters) {
   const views = (counters && counters.views) || {};
   const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, summary: v.summary || "", count: views[v.id] === undefined ? "" : views[v.id], core: true,
     offRail: v.rail === false }));
+  out.push({ id: PLAN, label: t("Plan"), summary: t("What the workflows will do, and what waits for you to apply it"), count: "", core: true });
   const taken = new Set(out.map((v) => v.id));
   for (const v of served) {
     if (taken.has(v.id)) continue;
@@ -57,8 +58,8 @@ function lensHash(change, route = readHash()) {
 // railCount is what the rail counts of the entry v under lens: a core view's counter, the plan's steps, the
 // rows of a row view the lens keeps; "" for a view it does not count.
 function railCount(v, lens) {
+  if (v.id === PLAN) return planCount();
   if (v.core) return v.count;
-  if (v.id === "plan") return planCount();
   const rows = catalog.views.some((c) => c.id === v.id) && v.id !== "recent" && v.id !== "explore";
   return rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
 }

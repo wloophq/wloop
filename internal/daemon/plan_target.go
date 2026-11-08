@@ -1,0 +1,184 @@
+package daemon
+
+import (
+	"context"
+	"maps"
+
+	"github.com/wloophq/wloop/internal/api"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
+)
+
+// itemsLoader is an items ledger that reads the items of many units at once.
+type itemsLoader interface {
+	Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error)
+}
+
+// planViews are its as the API serves them, without their actions, each unit presented as known presents it: a
+// task's item names its task, by title, with the units the task came from, and says which open items an
+// items.resolve resolves, and a step naming another task names it by title. The tasks come from one pass and
+// their units' items from one read.
+func (s *Server) planViews(ctx context.Context, its []workflow.Item, known map[unit.Unit]readmodel.Presentation) []api.PlanItem {
+	out := make([]api.PlanItem, len(its))
+	for i, it := range its {
+		out[i] = s.planItemView(it, known[it.Unit])
+	}
+	tasks := s.planTasks(ctx, its, out)
+	if len(tasks) == 0 {
+		return out
+	}
+	targets := map[task.ID]task.Task{}
+	var units []unit.Unit
+	for _, it := range its {
+		id, _ := task.IDOf(it.Unit)
+		if e, ok := tasks[id]; ok {
+			targets[id] = e
+			units = append(units, e.Units...)
+		}
+	}
+	for i := range out {
+		for j, st := range out[i].Does {
+			if e, ok := tasks[task.ID(st.Args["task_id"])]; ok {
+				out[i].Does[j].Args["task_title"] = e.Title
+				if says, ok := builtin.StepSaysWithTask[st.Use]; ok {
+					out[i].Does[j].Says = says
+				}
+			}
+		}
+	}
+	shown := s.presentations(units)
+	held := s.openItemsOf(ctx, targets)
+	for i, it := range its {
+		id, _ := task.IDOf(it.Unit)
+		e, ok := targets[id]
+		if !ok {
+			continue
+		}
+		tg := &api.PlanTarget{Task: string(e.ID), Title: e.Title}
+		for _, u := range e.Units {
+			tg.Units = append(tg.Units, api.PlanUnit{Label: shown[u].Label, Link: shown[u].Link})
+		}
+		out[i].Target = tg
+		if !waits(it) {
+			continue
+		}
+		for j := range out[i].Does {
+			if out[i].Does[j].Use == builtin.StepItemsResolve {
+				out[i].Does[j].Items = held[e.ID]
+			}
+		}
+	}
+	return out
+}
+
+// waits says whether it has yet to run, so the open items its task holds now are those it would resolve.
+func waits(it workflow.Item) bool {
+	return it.Decision == workflow.DecisionPending || it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionDeferred
+}
+
+// planTasks are the stored tasks the items of its act on and those their steps, views, name.
+func (s *Server) planTasks(ctx context.Context, its []workflow.Item, views []api.PlanItem) map[task.ID]task.Task {
+	if s.deps.Tasks == nil {
+		return nil
+	}
+	var ids []task.ID
+	for _, it := range its {
+		if id, ok := task.IDOf(it.Unit); ok {
+			ids = append(ids, id)
+		}
+	}
+	for _, v := range views {
+		for _, st := range v.Does {
+			if id := st.Args["task_id"]; id != "" {
+				ids = append(ids, task.ID(id))
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	tasks, err := s.deps.Tasks.Stored(ctx, ids)
+	if err != nil {
+		s.logf("plan: the tasks of its items: %v", err)
+	}
+	return tasks
+}
+
+// openItemsOf are the summaries of the open items each task of tasks holds, by task, in its order, from one read
+// of their units' items when the ledger reads many units at once.
+func (s *Server) openItemsOf(ctx context.Context, tasks map[task.ID]task.Task) map[task.ID][]string {
+	if s.deps.Items == nil {
+		return nil
+	}
+	var units []unit.Unit
+	seen := map[unit.Unit]bool{}
+	for _, e := range tasks {
+		for _, r := range e.Items {
+			if !seen[r.Unit] {
+				seen[r.Unit] = true
+				units = append(units, r.Unit)
+			}
+		}
+	}
+	byUnit, err := s.itemsOfUnits(ctx, units)
+	if err != nil {
+		s.logf("plan: the items of its tasks: %v", err)
+	}
+	out := map[task.ID][]string{}
+	for id, e := range tasks {
+		for _, r := range e.Items {
+			for _, it := range byUnit[r.Unit] {
+				if it.ID == r.Item && it.State == items.Open {
+					out[id] = append(out[id], it.Summary)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// itemsOfUnits are the items of units: those the pass ctx carries from the items it read once for all its units,
+// the rest in one batch when the ledger reads many units at once.
+func (s *Server) itemsOfUnits(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	if len(units) == 0 {
+		return nil, nil
+	}
+	l, batches := s.deps.Items.(itemsLoader)
+	out := make(map[unit.Unit][]items.Item, len(units))
+	if pass, ok := coretasks.PassOf(ctx); ok && batches {
+		all, err := coretasks.Once(ctx, coretasks.ItemsKey, func() (map[unit.Unit][]items.Item, error) { return l.Load(ctx, pass.Units()) })
+		if err != nil {
+			return out, err
+		}
+		var rest []unit.Unit
+		for _, u := range units {
+			if pass.Holds(u) {
+				out[u] = all[u]
+			} else {
+				rest = append(rest, u)
+			}
+		}
+		units = rest
+		if len(units) == 0 {
+			return out, nil
+		}
+	}
+	if batches {
+		got, err := l.Load(ctx, units)
+		maps.Copy(out, got)
+		return out, err
+	}
+	for _, u := range units {
+		its, err := s.deps.Items.Items(ctx, u)
+		if err != nil {
+			return out, err
+		}
+		out[u] = its
+	}
+	return out, nil
+}

@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -105,6 +106,38 @@ var coreSteps = []StepDef{
 		"Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing."},
 	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
 		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
+}
+
+// StepSays are the catalog keys of what each core step does to a plan item's unit, as strings.toml words them for
+// a person; a {name} is a step argument as the clients read it.
+var StepSays = map[string]string{
+	"session.close":        "Close the agent session",
+	"workspace.remove":     "Remove the workspace",
+	"workspace.unregister": "Forget the workspace whose folder is gone",
+	StepTurnDismiss:        "Dismiss the agent's open turn",
+	StepAnswerRefuse:       "Refuse a queued answer whose route is gone",
+	"session.mark_dormant": "Mark the agent session dormant",
+	StepTurnStart:          "Start an agent turn: {intent}",
+	StepDraftPropose:       "Draft a message you approve before it posts",
+	StepClassify:           "Classify it with an agent call",
+	StepNotifySelf:         "Notify you",
+	StepTaskVerb:           "Run {verb} on the task",
+	StepGateOpen:           "Ask you to decide",
+	StepItemsResolve:       "Resolve its open items as {resolution}",
+	StepTaskSet:            "Set {prop} to {value}",
+}
+
+// StepSaysWithTask is the catalog key of what a step that names another task does, by step.
+var StepSaysWithTask = map[string]string{StepTaskVerb: "Run {verb} on the task, with “{task}”"}
+
+// StepDrafts are the steps whose message posts once you approve its draft: a plan item running one may post.
+var StepDrafts = []string{StepDraftPropose}
+
+// ResolutionSays are the catalog keys of how an item resolves, by resolution, as items.resolve's resolution reads.
+var ResolutionSays = map[items.Resolution]string{
+	items.Done: "resolved as done", items.Answered: "resolved as answered", items.Fixed: "resolved as fixed",
+	items.Delegated: "resolved as delegated", items.Declined: "resolved as declined", items.Dismissed: "resolved as dismissed",
+	items.Superseded: "resolved as superseded", items.Moot: "resolved as moot",
 }
 
 // StepArg is the grammar row of step use's argument k.

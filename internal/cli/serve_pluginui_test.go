@@ -103,10 +103,13 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 			t.Fatalf("saved views %v, catalog views %v", got, want)
 		}
 	}
-	for _, id := range []string{"plan", "dash", "explore", "recent", "all", "mine"} {
+	for _, id := range []string{"dash", "explore", "recent", "all", "mine"} {
 		if !specs[id] {
 			t.Errorf("view %s is not served", id)
 		}
+	}
+	if specs["plan"] {
+		t.Error("the GitHub plugin serves the plan, which is the core's view")
 	}
 	for _, sec := range gh.UI.Menubar {
 		if !specs[sec.View] {

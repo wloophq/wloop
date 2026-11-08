@@ -583,7 +583,7 @@ function isMuted(p) {
 
 // The backlog is every pull request still open; done joins it on request.
 function inView(row, view, withDone) {
-  if (view === "recent" || view === "explore" || view === "plan") return false;
+  if (view === "recent" || view === "explore" || view === PLAN) return false;
   if (view === "dash") return (row.unit || {}).provider === (catalog.views.find((v) => v.id === view) || {}).provider && (withDone || !sm(row).closed);
   return view === "all" || (row.views || []).includes(view);
 }
@@ -1444,14 +1444,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
+  const listless = view === "recent" || view === "explore" || view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
+  listBox.hidden = view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     if (isCoreView(view)) hideLens(document.getElementById("tools"));
@@ -2474,8 +2474,8 @@ const planName = (it) => (it.title ? `${itemLabel(it)} · ${it.title}` : itemLab
 async function loadPlan() {
   const view = readHash().view;
   try {
-    const res = await getJSON(view === "plan" ? "/api/plan?closed=1" : "/api/plan");
-    state.plan = { items: res.items || [], closed: view === "plan" ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
+    const res = await getJSON(view === PLAN ? "/api/plan?closed=1" : "/api/plan");
+    state.plan = { items: res.items || [], closed: view === PLAN ? res.closed || [] : state.plan.closed, error: (res.errors || []).join("; "), loaded: true };
   } catch (err) {
     state.plan = { ...state.plan, error: t("Could not load the plan: {error}", { error: err.message }), loaded: true };
   }
@@ -2524,17 +2524,24 @@ function planButtons(it) {
     }, st.label || sp.label));
 }
 
+// planItem is a plan item as the plan lists it: when it runs, what its workflow does, on what, what applying it
+// does, why it fired, folded, and its actions.
 function planItem(it) {
   const ticking = it.decision === "pending" && it.default === "run" && it.deadline;
+  const when = planWhen(it);
+  const reason = it.reason ? planReason(it) : "";
   return h("li", { class: `plan-item ${it.decision}` },
     h("div", { class: "plan-line" },
-      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, planWhen(it)),
+      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, when),
       h("span", { class: "plan-wf", title: it.summary ? it.workflow : undefined }, it.summary || it.workflow),
-      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
-      it.title ? h("span", { class: "plan-title" }, it.title) : null,
+      it.target ? null : h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
+      !it.target && it.title ? h("span", { class: "plan-title" }, it.title) : null,
       it.observe ? h("span", { class: "plan-mode", title: t("This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off") }, t("observe")) : null),
-    it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
+    it.target ? planTarget(it) : null,
+    planDoes(it),
+    reason && reason !== when ? h("p", { class: "plan-reason" }, reason) : null,
     it.error ? h("p", { class: "plan-error" }, t("attempt {n}: {error}", { n: it.attempts, error: it.error })) : null,
+    planWhy(it),
     h("div", { class: "d-actions" }, ...planButtons(it)));
 }
 
@@ -2552,7 +2559,7 @@ function closedItem(c) {
 
 function renderPlan(view) {
   const box = document.getElementById("plan");
-  box.hidden = view !== "plan";
+  box.hidden = view !== PLAN;
   if (box.hidden) return;
   const p = state.plan;
   const groups = planGroups(p.items);

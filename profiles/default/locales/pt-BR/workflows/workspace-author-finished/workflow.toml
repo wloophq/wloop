@@ -1,1 +1,1 @@
-summary = "Remover um workspace seu cujo pull request terminou há mais de cleanup.workspace_grace"
+summary = "Remover um workspace seu cujo pull request terminou há algum tempo, além da folga que a sua configuração de limpeza define"

@@ -105,22 +105,82 @@ function planFactText(f) {
   return facet ? `${facet.label}: ${propText(f.value, facet)}` : `${f.name} = ${f.value}`;
 }
 
-// gatePlan is what running a plan gate's item does, what it acts on and, folded, why it fired; its steps only
-// when its workflow has no summary to say them. Null when the plan no longer holds the item.
+// outLink is label linked to href, a page of another site, when href is safe; else label as text.
+function outLink(href, label) {
+  const safe = safeURL(href);
+  return safe ? h("a", { href: safe, target: "_blank", rel: "noopener noreferrer" }, label) : h("span", {}, label);
+}
+
+// planTarget is what a plan item acts on: its task's title, linked to the task's detail, with the units the task
+// came from, each linked when it has a link; else its unit as its plugin labels it.
+function planTarget(p) {
+  const tg = p.target;
+  if (tg) {
+    return h("p", { class: "meta plan-on" }, t("Acts on"), " ", h("a", { href: taskHref(tg.task), "data-focus": "plan-task:" + tg.task }, tg.title || tg.task),
+      ...(tg.units || []).flatMap((u) => [" · ", outLink(u.link, u.label)]));
+  }
+  const label = p.label || (p.unit && p.unit.key) || "";
+  return label ? h("p", { class: "meta plan-on" }, t("Acts on"), " ", outLink(p.link, label)) : null;
+}
+
+// stepText is a plan step in the catalog's words the daemon names, filled with its arguments as a person reads
+// them; the step's name when the catalog has no words for it.
+function stepText(st) {
+  if (!st.says) return st.use;
+  const args = st.args || {};
+  const prop = args.prop ? taskFacetOf("task.prop." + args.prop) : null;
+  return t(st.says, { ...args, resolution: args.resolution_says ? t(args.resolution_says) : args.resolution || "",
+    intent: args.intent_label || args.intent || "", task: args.task_title || "",
+    verb: args.verb ? verbLabel(args.verb) : "", prop: prop ? prop.label : args.prop || "", value: propText(args.value, prop) });
+}
+
+// planPosts says whether applying a plan item may post where others see it, as the daemon says of each step.
+function planPosts(does) {
+  return does.some((st) => st.posts);
+}
+
+// planDoes is what applying a plan item does: each step in the catalog's words with the open items it resolves,
+// and that it posts nothing when no step may post.
+function planDoes(p) {
+  const does = p.does || [];
+  if (!does.length) return null;
+  return h("div", { class: "plan-does" },
+    h("ul", {}, ...does.map((st) => h("li", { class: "plan-do" },
+      h("span", { class: "plan-do-what", title: st.use }, stepText(st)),
+      (st.items || []).length ? h("ul", { class: "plan-do-items" }, ...st.items.map((x) => h("li", { class: "plan-do-item" }, x))) : null))),
+    planPosts(does) ? null : h("p", { class: "meta plan-posts" }, t("Posts nothing")));
+}
+
+// planWhy is why a plan item fired, folded: each fact its workflow matched, worded as planFactText words it.
+function planWhy(p) {
+  const facts = (p.why && p.why.matched) || [];
+  return facts.length ? h("details", { class: "plan-why" },
+    h("summary", {}, t("Why it fired")),
+    h("ul", {}, ...facts.map((f) => h("li", { title: `${f.name} = ${f.value}` }, planFactText(f))))) : null;
+}
+
+// gatePlan is what running a plan gate's item does, on what and, folded, why it fired. Null when the item no
+// longer waits.
 function gatePlan(g) {
   const p = g.plan;
   if (!p) return null;
-  const href = safeURL(p.link);
-  const label = p.label || (p.unit && p.unit.key) || "";
-  const facts = (p.why && p.why.matched) || [];
   return h("div", { class: "gate-plan" },
     p.summary ? h("p", { class: "plan-summary" }, p.summary) : null,
-    !p.summary && (p.steps || []).length ? h("p", { class: "meta plan-steps" }, t("Steps: {steps}", { steps: p.steps.join(", ") })) : null,
-    label ? h("p", { class: "meta plan-on" }, t("Acts on"), " ",
-      href ? h("a", { href, target: "_blank", rel: "noopener noreferrer" }, label) : label) : null,
-    facts.length ? h("details", { class: "plan-why" },
-      h("summary", {}, t("Why it fired")),
-      h("ul", {}, ...facts.map((f) => h("li", { title: `${f.name} = ${f.value}` }, planFactText(f))))) : null);
+    planTarget(p),
+    planDoes(p),
+    p.reason ? h("p", { class: "meta plan-reason" }, planReason(p)) : null,
+    planWhy(p));
+}
+
+// planReason is why the plan holds item p, in the catalog's words: the engine's template filled with its values, a
+// wait's facts as planFactText words them and a refusal through the catalog; any other reason through the catalog,
+// as it reads when the catalog has no words for it.
+function planReason(p) {
+  if (!p.reason_key) return t(p.reason);
+  const params = { ...(p.reason_params || {}) };
+  if ((p.reason_facts || []).length) params.facts = p.reason_facts.map(planFactText).join(", ");
+  if (params.refusal) params.refusal = t(params.refusal);
+  return t(p.reason_key, params);
 }
 
 // gateCard is an open gate of task e: what it asks, the agent's message as markdown folded after its first

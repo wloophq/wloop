@@ -1133,7 +1133,7 @@ func TestCatalogRouteServesTheProviders(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil || rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(c.Views) != 6 || c.Views[0].ID != "mine" || len(c.Situations) != 18 || c.Version == "" {
+	if len(c.Views) != 5 || c.Views[0].ID != "mine" || slices.ContainsFunc(c.Views, func(v api.ViewSpec) bool { return v.ID == "plan" }) || len(c.Situations) != 18 || c.Version == "" {
 		t.Fatalf("catalog %+v", c)
 	}
 }

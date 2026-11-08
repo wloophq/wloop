@@ -126,6 +126,7 @@ func filterPrelude(t *testing.T) string {
 	for _, c := range []string{"UNIT_KEY", "PR_URL"} {
 		b.WriteString(jsConst(t, src, c))
 	}
+	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
 	b.WriteString(keyJS(t))
 	b.WriteString(fieldsPrelude(t))
 	return b.String()
@@ -1811,6 +1812,7 @@ func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
 	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
 const state = { busy: new Set(), answered: new Map(), planSpecs: {} };
 const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () => "";
+const planTarget = () => null, planDoes = () => null, planWhy = () => null, planReason = (it) => it.reason;
 `
 	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
 const li = planItem({ id: "slack-follow-up/slack/T1%2FC1%2F171.1/ee", workflow: "slack-follow-up", decision: "pending", default: "wait",

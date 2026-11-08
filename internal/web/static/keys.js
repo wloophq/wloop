@@ -84,7 +84,7 @@ function questionOptions(q) {
 }
 
 // keyContextOf is the key context a view adds before the list's.
-const keyContextOf = (view) => (view === "plan" || view === "review" || view === QUEUE ? view : "");
+const keyContextOf = (view) => (view === PLAN || view === "review" || view === QUEUE ? view : "");
 
 const CONTEXT_HEADS = {
   get global() { return t("Everywhere"); },
@@ -499,7 +499,7 @@ function appEnv() {
         next.focus();
         return true;
       }
-      if (readHash().view === "plan") {
+      if (readHash().view === PLAN) {
         const items = planItems();
         const at = items.indexOf(focusedPlan());
         const next = items[Math.max(0, Math.min(items.length - 1, at < 0 ? 0 : at + delta))];

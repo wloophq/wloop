@@ -77,13 +77,13 @@ const route = { view: "fits-now", area: "", ctx: [], task: "", q: "invoice" };
 	if slices.ContainsFunc(got.Before, func(c any) bool { return c != "" }) {
 		t.Errorf("before the narrowed counters arrive the rail shows no whole count: %v", got.Before)
 	}
-	if want := []any{0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 0.0, 1.0}; !slices.Equal(got.Rail, want) {
+	if want := []any{0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 0.0, 1.0, ""}; !slices.Equal(got.Rail, want) {
 		t.Errorf("rail under the filter %v, want %v", got.Rail, want)
 	}
 	if !slices.Equal(got.Stale, got.Rail) {
 		t.Errorf("an older answer replaced the latest: %v, want %v", got.Stale, got.Rail)
 	}
-	if want := []any{1.0, 3.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0}; !slices.Equal(got.Cleared, want) {
+	if want := []any{1.0, 3.0, 0.0, 3.0, 0.0, 0.0, 0.0, 4.0, ""}; !slices.Equal(got.Cleared, want) {
 		t.Errorf("rail with the query cleared %v, want %v", got.Cleared, want)
 	}
 	if want := "/api/counters?q=invoice"; len(got.URLs) == 0 || got.URLs[0] != want {

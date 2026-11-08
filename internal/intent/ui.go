@@ -154,6 +154,12 @@ func loadUI(layers []profile.Layer, r layerReader) (map[string]UITexts, Problems
 		}
 		s := &sheet{file: res.Path, at: positions(res.Body), funcs: r.funcs()}
 		s.addGrammar(grammar(builtin.SurfaceUI, res.Body))
+		if _, ok := m.Views[PlanView]; ok {
+			notice := &sheet{file: res.Path, at: s.at}
+			notice.add("views."+PlanView, `the plan is the core's view now, which this key no longer words: its label is "Plan" in %s`, StringsFile)
+			problems = append(problems, notice.problems...)
+			delete(m.Views, PlanView)
+		}
 		for id, f := range m.Facets {
 			if f.ShowRaw != nil || f.ShowValues != nil {
 				readShow(s, "facets."+id, f.ShowRaw, f.ShowValues, &f.Show)

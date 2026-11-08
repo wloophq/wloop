@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,8 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -218,9 +221,9 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 // wirePlanItems are items as the API serves them, each unit presented as
 // known, from presentations, presents it.
 func (s *Server) wirePlanItems(ctx context.Context, items []workflow.Item, known map[unit.Unit]readmodel.Presentation) []api.PlanItem {
-	out := make([]api.PlanItem, len(items))
+	out := s.planViews(ctx, items, known)
 	for i, it := range items {
-		out[i] = s.wirePlanItem(ctx, it, known[it.Unit])
+		s.offer(ctx, it, &out[i])
 	}
 	return out
 }
@@ -240,6 +243,12 @@ func itemUnits(items []workflow.Item) []unit.Unit {
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := s.planItemView(it, shown)
+	s.offer(ctx, it, &p)
+	return p
+}
+
+// offer sets the actions p, item it as the API serves it, offers.
+func (s *Server) offer(ctx context.Context, it workflow.Item, p *api.PlanItem) {
 	var row []api.ActionState
 	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
 		slices.Contains(p.Steps, builtin.StepTurnStart) {
@@ -249,8 +258,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 			row = rd.Row.Actions
 		}
 	}
-	p.Actions = catalog.PlanStates(s.loaded(), p, row)
-	return p
+	p.Actions = catalog.PlanStates(s.loaded(), *p, row)
 }
 
 // planItemView is it as the API serves it, its unit presented as shown, without the actions it offers.
@@ -265,6 +273,34 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 	}
 	for _, st := range it.Steps {
 		p.Steps = append(p.Steps, st.Use)
+		ps := api.PlanStep{Use: st.Use, Reach: string(st.Reach)}
+		for k, v := range st.Args {
+			if text, ok := v.(string); ok {
+				if ps.Args == nil {
+					ps.Args = map[string]string{}
+				}
+				ps.Args[k] = text
+			}
+		}
+		if name := ps.Args["intent"]; name != "" && l.Registry != nil {
+			if def, ok := l.Registry.Get(dintent.Name(name)); ok && def.Label != "" {
+				ps.Args["intent_label"] = def.Label
+			}
+		}
+		if id := factTask(it.Why.Matched, ps.Args["task"]); id != "" {
+			ps.Args["task_id"] = id
+		}
+		ps.Says = builtin.StepSays[st.Use]
+		ps.Posts = st.Reach == workflow.ReachVisible || st.Reach == "" || slices.Contains(builtin.StepDrafts, st.Use)
+		if k, ok := builtin.StepArg(st.Use, "resolution"); ok {
+			if says, ok := builtin.ResolutionSays[items.Resolution(cmp.Or(ps.Args["resolution"], k.Default))]; ok {
+				if ps.Args == nil {
+					ps.Args = map[string]string{}
+				}
+				ps.Args["resolution_says"] = says
+			}
+		}
+		p.Does = append(p.Does, ps)
 	}
 	if ev := it.Why.Event; ev != nil {
 		p.Why.Event = ev.Kind
@@ -272,7 +308,39 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 	for _, f := range it.Why.Matched {
 		p.Why.Matched = append(p.Why.Matched, api.Fact{Name: f.Name, Value: turn.FactText(f.Value)})
 	}
+	if key, params, ok := workflow.ReasonOf(it.Reason); ok {
+		p.ReasonKey, p.ReasonParams = key, params
+		if held := params["facts"]; held != "" {
+			for _, f := range p.Why.Matched {
+				if strings.HasPrefix(held, f.Name+" ") || strings.Contains(held, ", "+f.Name+" ") {
+					p.ReasonFacts = append(p.ReasonFacts, f)
+				}
+			}
+		}
+	}
 	return p
+}
+
+// factTask is the task id the matched fact named fact holds, a string or a list's first element; "" when the item
+// did not read it.
+func factTask(matched []workflow.Fact, fact string) string {
+	if fact == "" {
+		return ""
+	}
+	for _, f := range matched {
+		if f.Name != fact {
+			continue
+		}
+		switch v := f.Value.(type) {
+		case string:
+			return v
+		case []string:
+			if len(v) > 0 {
+				return v[0]
+			}
+		}
+	}
+	return ""
 }
 
 // dropPending discards u's pending plan items without marking them handled.

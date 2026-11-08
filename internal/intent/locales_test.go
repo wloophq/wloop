@@ -3,7 +3,9 @@ package intent_test
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
@@ -185,6 +188,58 @@ func TestBundledProfileLoadsInPtBR(t *testing.T) {
 	for _, p := range problems {
 		if strings.Contains(p, "locales/") {
 			t.Errorf("%s", p)
+		}
+	}
+}
+
+// dottedName is a configuration key or a step's name, as `plugins.slack.ended_after` or `items.resolve`.
+var dottedName = regexp.MustCompile(`\b[a-z_]+(\.[a-z_]+)+\b`)
+
+// postsNothing is a summary saying its workflow posts nothing, in English or Portuguese.
+var postsNothing = regexp.MustCompile(`(?i)posts nothing|não publica nada`)
+
+// TestBundledWorkflowSummariesAreForPeople says no bundled workflow's summary, which the cockpit shows as what
+// running it does, names a configuration key or a step.
+func TestBundledWorkflowSummariesAreForPeople(t *testing.T) {
+	base, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, locale := range []string{"en", ptBRTag} {
+		l, _ := intentloadIn(locale, base)
+		for _, w := range l.Workflows {
+			if m := dottedName.FindString(w.Summary); m != "" {
+				t.Errorf("%s (%s): the summary names %q: %s", w.Name, locale, m, w.Summary)
+			}
+			if postsNothing.MatchString(w.Summary) {
+				t.Errorf("%s (%s): the summary says it posts nothing, which the cockpit says from its steps: %s", w.Name, locale, w.Summary)
+			}
+		}
+	}
+}
+
+// TestEveryPlanReasonTheEngineGivesIsWorded says each reason template of the engine is a key of the bundled
+// strings.toml and of its pt-BR translation, which the cockpit words a plan item's reason by.
+func TestEveryPlanReasonTheEngineGivesIsWorded(t *testing.T) {
+	for _, path := range []string{"strings.toml", "locales/pt-BR/strings.toml"} {
+		raw, err := fs.ReadFile(turn.BundledFS(), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct{ Strings map[string]any }
+		if err := toml.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range workflow.Reasons {
+			if _, ok := doc.Strings[r]; !ok {
+				t.Errorf("%s does not word the engine's reason %q", path, r)
+			}
+		}
+		for _, s := range slices.Concat(slices.Collect(maps.Values(builtin.StepSays)), slices.Collect(maps.Values(builtin.StepSaysWithTask)),
+			slices.Collect(maps.Values(builtin.ResolutionSays))) {
+			if _, ok := doc.Strings[s]; !ok {
+				t.Errorf("%s does not word what a step says, %q", path, s)
+			}
 		}
 	}
 }

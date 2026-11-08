@@ -414,7 +414,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		it.Default = workflow.OutcomeWait
 	}
 	if !w.Observe && p.paused(w, pl.facts) {
-		decide(workflow.DecisionSkipped, "paused")
+		decide(workflow.DecisionSkipped, workflow.ReasonPaused)
 		return
 	}
 	if reason, err := p.limit(w, it.Unit); err != nil {
@@ -447,11 +447,11 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 	}
 	if ran && run.Status == workflow.RunFailed {
 		if run.Attempts >= workflow.MaxAttempts {
-			decide(workflow.DecisionBlocked, fmt.Sprintf("failed %d times: %s", run.Attempts, run.Error))
+			decide(workflow.DecisionBlocked, workflow.Reason(workflow.ReasonFailed, map[string]string{"n": strconv.Itoa(run.Attempts), "error": run.Error}))
 			return
 		}
 		if retry := run.At.Add(p.e.retryBase() << run.Attempts); p.now.Before(retry) {
-			decide(workflow.DecisionSkipped, "retrying after "+run.Error)
+			decide(workflow.DecisionSkipped, workflow.Reason(workflow.ReasonRetrying, map[string]string{"error": run.Error}))
 			pl.retryAt = retry
 			return
 		}
@@ -465,13 +465,13 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		wait(waitReason(rule.When, vars, pl.refusal))
 		return
 	case w.Observe:
-		wait("observe mode")
+		wait(workflow.ReasonObserve)
 		return
 	case w.Visible():
-		wait("a visible step waits for you")
+		wait(workflow.ReasonVisible)
 		return
 	case mode == workflow.ApprovalWait:
-		wait("waits for you")
+		wait(workflow.ReasonWaits)
 		return
 	}
 	deferred := had && prev.Decision == workflow.DecisionDeferred
@@ -486,7 +486,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 			p.errorf("%s: %s: %v", w.Name, it.Unit, err)
 		}
 		if g != "" {
-			decide(workflow.DecisionRun, "guided by you")
+			decide(workflow.DecisionRun, workflow.ReasonGuided)
 			pl.guided = true
 			return
 		}
@@ -496,7 +496,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		it.Default, it.Deadline = workflow.OutcomeRun, prev.Deadline
 		return
 	}
-	decide(workflow.DecisionPending, "runs when its window ends")
+	decide(workflow.DecisionPending, workflow.ReasonWindow)
 	it.Default, it.Deadline = workflow.OutcomeRun, p.now.Add(window)
 	if carried {
 		it.Reason, it.Deadline = prev.Reason, prev.Deadline
@@ -561,11 +561,11 @@ func waitReason(pred workflow.Predicate, v workflow.Vars, refusal string) string
 	})
 	switch {
 	case len(held) == 0:
-		return cmp.Or(refusal, "waits for you")
+		return cmp.Or(refusal, workflow.ReasonWaits)
 	case refusal == "":
-		return strings.Join(held, ", ")
+		return workflow.Reason(workflow.ReasonHeld, map[string]string{"facts": strings.Join(held, ", ")})
 	}
-	return strings.Join(held, ", ") + ": " + refusal
+	return workflow.Reason(workflow.ReasonHeldRefused, map[string]string{"facts": strings.Join(held, ", "), "refusal": refusal})
 }
 
 func pendencyRank(read string) int {

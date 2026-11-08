@@ -244,14 +244,14 @@
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "pending",
-   "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
+   "reason": "waits for you while workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
   },
   {
    "unit": "workspace:/Users/user/worktrees/handbook/catalog",
    "clock": "A",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+   "reason": "waits for you while workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
   },
   {
    "unit": "workspace:/Users/user/src/billing",
@@ -528,7 +528,7 @@
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote], workspace.dirty 1, workspace.unpushed 4: 4 commits not pushed in /Users/user/worktrees/widgets/REVIEW-feat-batch-upload; back them up with: git push origin HEAD:refs/heads/me/backup-feat/batch-upload"
+   "reason": "waits for you while workspace.pendency [modified files, commits on no remote], workspace.dirty 1, workspace.unpushed 4: 4 commits not pushed in /Users/user/worktrees/widgets/REVIEW-feat-batch-upload; back them up with: git push origin HEAD:refs/heads/me/backup-feat/batch-upload"
   },
   {
    "unit": "workspace:/Users/user/worktrees/widgets/REVIEW-feat-dark-mode",
@@ -549,7 +549,7 @@
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [commits on no remote]: 3 commits not pushed in /Users/user/worktrees/widgets/me-runbook-command; back them up with: git push origin HEAD:refs/heads/me/backup-chore/runbook-command"
+   "reason": "waits for you while workspace.pendency [commits on no remote]: 3 commits not pushed in /Users/user/worktrees/widgets/me-runbook-command; back them up with: git push origin HEAD:refs/heads/me/backup-chore/runbook-command"
   },
   {
    "unit": "workspace:/private/tmp/scratch/widgets-review",
@@ -577,14 +577,14 @@
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
-   "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
+   "reason": "waits for you while workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
   },
   {
    "unit": "workspace:/Users/user/worktrees/handbook/catalog",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+   "reason": "waits for you while workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
   },
   {
    "unit": "workspace:/Users/user/src/billing",
