@@ -34,7 +34,41 @@ const (
 
 // whereRig nudges a conversation's members in it and everyone else the items wait on in their direct
 // conversation, as the bundled Slack nudge does.
-func whereRig(t *testing.T) (*draftRig, *lines) {
+// BenchmarkTheWithdrawalsReadWhoReadsEachDraft lists 200 held nudges, each on its own DM with its readers,
+// with the drafts' facts, as a sweep's withdrawal pass does.
+func BenchmarkTheWithdrawalsReadWhoReadsEachDraft(b *testing.B) {
+	r, _ := whereRig(b)
+	ctx := context.Background()
+	for i := range 200 {
+		u := unit.Unit{Provider: "slack", Key: fmt.Sprintf("T000AAA/D%06d/seg/s1", i)}
+		r.units.Put(u, workflow.Facts{membersFact: []string{meP.Key, ana.Key}})
+		it := dmItem("i1", "The study", r.now.Add(-96*time.Hour), bruno)
+		it.Unit, it.Origin.Unit = u, u
+		r.items.set(u, it)
+		if _, err := r.svc.Propose(ctx, outbox.Proposal{Unit: u, Purpose: "nudge", Text: "@{" + bruno.Key + "}, any news?", Items: []string{"i1"},
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: u.String()}}); err != nil {
+			b.Fatal(err)
+		}
+	}
+	w := draftWithdrawals{d: r.deps}
+	members := r.deps.Members
+	for _, c := range []struct {
+		name    string
+		members map[unit.ProviderID]string
+	}{{"members", members}, {"no members fact", map[unit.ProviderID]string{}}} {
+		b.Run(c.name, func(b *testing.B) {
+			r.deps.Members = c.members
+			for b.Loop() {
+				pds, err := w.Proposed(ctx, "")
+				if err != nil || len(pds) != 200 {
+					b.Fatal(len(pds), err)
+				}
+			}
+		})
+	}
+}
+
+func whereRig(t testing.TB) (*draftRig, *lines) {
 	t.Helper()
 	moot := automationtest.MatchFunc(func(v workflow.Vars) bool {
 		return v.Facts["draft.person_waited"] != true || v.Facts["draft.items_owed"] == 0 || v.Facts["draft.person_asks_you"] == true
@@ -84,7 +118,7 @@ func (l *lines) has(s string) bool {
 	return slices.ContainsFunc(l.all, func(x string) bool { return strings.Contains(x, s) })
 }
 
-func writeFileOf(t *testing.T, r *draftRig, workflowName, name, body string) {
+func writeFileOf(t testing.TB, r *draftRig, workflowName, name, body string) {
 	t.Helper()
 	wd := filepath.Join(r.cfg.Profile, "workflows", workflowName)
 	if err := os.MkdirAll(wd, 0o755); err != nil {

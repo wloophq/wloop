@@ -82,7 +82,7 @@ func (okEffects) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence
 // draftRig runs draft.propose over a real store's Outbox, a user profile
 // layer in a temporary directory and fake tasks and items.
 type draftRig struct {
-	t      *testing.T
+	t      testing.TB
 	s      *stepSet
 	db     *sqlite.DB
 	svc    *outbox.Service
@@ -97,7 +97,7 @@ type draftRig struct {
 	writes int
 }
 
-func newDraftRig(t *testing.T, wf workflow.Workflow, text string) *draftRig {
+func newDraftRig(t testing.TB, wf workflow.Workflow, text string) *draftRig {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "d.db"), nil)
