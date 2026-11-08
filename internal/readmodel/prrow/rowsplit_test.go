@@ -156,12 +156,12 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	want := []struct {
 		id, label string
 		order     int
-	}{{"mine", "My PRs", 2}, {"plan", "Plan", 4}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}, {"recent", "Recent", 10}}
+	}{{"mine", "My PRs", 2}, {"dash", "Backlog", 6}, {"all", "All", 8}, {"explore", "Explore", 9}, {"recent", "Recent", 10}}
 	c := readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))}))
 	if len(c.Views) != len(want) {
 		t.Fatalf("%d views: %+v", len(c.Views), c.Views)
 	}
-	custom := []string{"plan", "dash", "explore", "recent"}
+	custom := []string{"dash", "explore", "recent"}
 	for i, v := range c.Views {
 		if v.ID != want[i].id || v.Label != want[i].label || v.Provider != "github" || v.Order != want[i].order || v.Rows == slices.Contains(custom, v.ID) ||
 			!slices.Contains(v.Surfaces, "web") {
@@ -172,7 +172,7 @@ func TestCatalogServesTheGitHubViews(t *testing.T) {
 	for _, v := range c.ViewsOn("tui") {
 		tui = append(tui, v.ID)
 	}
-	if !slices.Equal(tui, []string{"mine", "plan"}) {
+	if !slices.Equal(tui, []string{"mine"}) {
 		t.Errorf("terminal views %v", tui)
 	}
 	if c.Version == "" || c.Version != readmodel.BuildCatalog(New(Source{Catalog: psource.BundledCatalog(string(unit.GitHub))})).Version {

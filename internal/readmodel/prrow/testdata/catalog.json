@@ -1,5 +1,5 @@
 {
-  "version": "85d922ffdbd7",
+  "version": "125887be3294",
   "views": [
     {
       "id": "mine",
@@ -13,17 +13,6 @@
       ],
       "unit": "Pull request",
       "default_sort": "Waiting longest"
-    },
-    {
-      "id": "plan",
-      "label": "Plan",
-      "provider": "github",
-      "rows": false,
-      "order": 4,
-      "surfaces": [
-        "web",
-        "tui"
-      ]
     },
     {
       "id": "dash",
