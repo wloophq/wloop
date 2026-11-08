@@ -583,7 +583,7 @@ function isMuted(p) {
 
 // The backlog is every pull request still open; done joins it on request.
 function inView(row, view, withDone) {
-  if (view === "recent" || view === "explore" || view === PLAN) return false;
+  if (view === RECENT || view === "explore" || view === PLAN) return false;
   if (view === "dash") return (row.unit || {}).provider === (catalog.views.find((v) => v.id === view) || {}).provider && (withDone || !sm(row).closed);
   return view === "all" || (row.views || []).includes(view);
 }
@@ -1445,7 +1445,7 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
+  const listless = view === RECENT || view === "explore" || view === PLAN || view === HOME || view === QUEUE || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
@@ -1643,7 +1643,7 @@ function activityEmptyNote(q) {
   if (!state.activityLoaded) return [t("Loading the activity.")];
   if (state.activityError && !state.activity.length) return [t("The recent activity could not be loaded.")];
   if (!state.activity.length) return [t("Nothing happened in the inventory yet.")];
-  if (tokens(q).length) return emptyNote("recent", q);
+  if (tokens(q).length) return emptyNote(RECENT, q);
   return [t("No loop events in the recent activity.")];
 }
 
@@ -2756,7 +2756,7 @@ function renderScreens(route) {
 }
 
 async function loadActivity() {
-  if (readHash().view !== "recent") {
+  if (readHash().view !== RECENT) {
     state.activityError = "";
     return;
   }
