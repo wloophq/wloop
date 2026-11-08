@@ -1487,7 +1487,7 @@ function renderRows() {
 
 function emptyNote(view, q) {
   if (!state.loaded) return [t("Loading the inventory.")];
-  const label = (catalog.views.find((v) => v.id === view) || {}).label;
+  const label = view === RECENT ? t("Recent") : (catalog.views.find((v) => v.id === view) || {}).label;
   const row = rowByURL(q);
   if (row) {
     return [t("{unit} is in the inventory.", { unit: labelOf(row) }), " ", h("button", {
@@ -1630,7 +1630,9 @@ function renderActivity(lens) {
         requested ? h("span", { class: "who" }, " " + t("from {who}", { who: requestedFrom(e.data) })) : null,
         e.actor ? h("span", { class: "who" }, " " + (requested ? t("by {who}", { who: actorLabel(e.actor) }) : actorLabel(e.actor))) : null,
         " ", h("span", { class: "ref" }, eventRef(it)),
-        " ", h("span", { class: "title" }, it.title)),
+        " ", h("span", { class: "title" }, it.title),
+        safeURL(it.url) ? [" ", h("a", { href: safeURL(it.url), target: "_blank", rel: "noopener noreferrer", class: "ext", onclick: (ev) => ev.stopPropagation() },
+          providerName(e.unit.provider))] : null),
       data ? h("span", { class: "data" }, data) : null));
   }
   if (!items.length) out.push(h("li", { class: "empty" }, activityEmptyNote(readHash().q)));

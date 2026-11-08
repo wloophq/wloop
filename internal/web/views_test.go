@@ -46,6 +46,9 @@ func viewsCatalog() api.ViewsCatalog {
 
 var coreViewIDs = []string{"focus", "inbox", "outbox", "fits-now", "waiting", "projects", "someday", "logbook"}
 
+// coreRoutes are the core's screens the rail lists after the profile's views, whatever plugin runs.
+var coreRoutes = []string{"plan", "recent"}
+
 // noViews stands in for views.js where a test runs app.js's loading alone.
 const noViews = "const loadTasks = async () => {};\nconst forgetTasksPage = () => {};\n"
 

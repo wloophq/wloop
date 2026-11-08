@@ -127,6 +127,7 @@ func filterPrelude(t *testing.T) string {
 		b.WriteString(jsConst(t, src, c))
 	}
 	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "PLAN"))
+	b.WriteString(jsConst(t, staticJS(t, "routes.js"), "RECENT"))
 	b.WriteString(keyJS(t))
 	b.WriteString(fieldsPrelude(t))
 	return b.String()

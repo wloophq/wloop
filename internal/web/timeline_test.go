@@ -59,6 +59,48 @@ process.stdout.write(JSON.stringify(evs.map((li) => li.attrs.class + "|" + text(
 	}
 }
 
+func TestTheActivityDrawsAnotherSourcesUnitByItsCard(t *testing.T) {
+	var got struct {
+		Text, Href, Link string
+		Stopped          bool
+	}
+	nodeRun(t, treeJS+jsConst(t, appJS(t), "catalog")+jsConst(t, appJS(t), "eventRef")+`
+const state = { activity: [], activityLoaded: true };
+let activityLoopOnly = false, activitySelected = "";
+const list = h("ol", {});
+list.replaceChildren = (...c) => { list.children = c; };
+const document = { getElementById: () => list };
+function t(key) { return key; }
+function readHash() { return { view: "recent", pr: "", q: "" }; }
+function activityPasses() { return true; }
+function dayLabel() { return "Today"; }
+function keyOf(e) { return e.unit.provider + ":" + e.unit.key; }
+function clock(at) { return at; }
+function actorLabel(a) { return a; }
+function writeHash() {}
+function activityEmptyNote() { return []; }
+function safeURL(u) { return u; }
+function providerName(p) { return { chat: "Chatter" }[p] || p; }
+`, []string{"applyCatalog", "fieldOf", "eventLabel", "eventTone", "loopEvent", "eventData", "renderActivity"}, `
+applyCatalog({ events: [{ provider: "chat", kind: "message", label: "wrote", tone: "people" }] });
+state.activity = [{ event: { unit: { provider: "chat", key: "W1/C2/1700.1" }, kind: "message", key: "m1", actor: "rio", at: "2026-10-27T15:00:00Z" },
+  label: "#launches", title: "Pick the launch date", url: "https://chat.example/archives/C2/p17001", author: "" }];
+renderActivity({});
+const ev = list.children.find((li) => String(li.attrs.class).includes("a-ev"));
+const a = all([ev], (x) => x.tag === "a")[0];
+let stopped = false;
+a.attrs.onclick({ stopPropagation: () => { stopped = true; } });
+process.stdout.write(JSON.stringify({ Text: text(ev), Href: a.attrs.href, Link: text(a), Stopped: stopped }));`, nil, &got)
+	for _, want := range []string{"wrote", "rio", "#launches", "Pick the launch date"} {
+		if !strings.Contains(got.Text, want) {
+			t.Errorf("the event reads %q, without %q", got.Text, want)
+		}
+	}
+	if got.Href != "https://chat.example/archives/C2/p17001" || got.Link != "Chatter" || !got.Stopped {
+		t.Errorf("the event links %q as %q (click kept on the link: %v), want its card's link under its service's name", got.Href, got.Link, got.Stopped)
+	}
+}
+
 func TestTheTimelineTabFoldsRawEventsInEachNode(t *testing.T) {
 	var got struct {
 		Count            string

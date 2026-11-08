@@ -23,21 +23,21 @@ var scriptDebts = map[string]map[string]int{
 	"app.js": {
 		"closed": 3, "draft": 2, "guidance": 5, "review": 1, "wait": 1,
 		"age": 2, "author": 3, "due": 6, "is": 5, "kind": 2, "lane": 2, "where": 1, "risk": 1, "size": 2, "status": 1, "tag": 5, "type": 1, "waits-on": 1,
-		"all": 1, "dash": 7, "explore": 12, "mine": 0, "plan": 7, "recent": 6,
+		"all": 1, "dash": 7, "explore": 12, "mine": 0,
 	},
 	"dash.js": {
 		"draft": 1, "dash": 5,
 		"author": 4, "ci": 4, "due": 2, "is": 5, "kind": 10, "opened": 5, "risk": 5, "size": 5, "tag": 8, "type": 2, "wait": 1, "waits-on": 2, "where": 3,
 	},
 	"detail.js":  {"draft": 1, "merged": 4, "all": 4},
-	"keys.js":    {"review": 3, "plan": 6},
+	"keys.js":    {"review": 3},
 	"omnibox.js": {"merged": 1},
 	"plugins.js": {"author": 1},
-	"rail.js":    {"waits-on": 4, "explore": 1, "plan": 1, "recent": 1},
+	"rail.js":    {"waits-on": 4, "explore": 1},
 	"row.js":     {"age": 1, "kind": 1},
 	"task.js":    {"draft": 2, "merged": 1, "all": 1},
-	"toolbar.js": {"kind": 1, "explore": 1, "recent": 1},
-	"views.js":   {"draft": 1, "where": 1, "review": 1, "plan": 1},
+	"toolbar.js": {"kind": 1, "explore": 1},
+	"views.js":   {"draft": 1, "where": 1, "review": 1},
 }
 
 // githubVocabulary is every event kind, intent, view id and facet id the
@@ -102,9 +102,14 @@ func TestNoScriptNamesTheGitHubPluginsVocabulary(t *testing.T) {
 			t.Errorf("%s: %s", name, s)
 		}
 	}
-	for name := range scriptDebts {
+	for name, debts := range scriptDebts {
 		if !seen[name] {
 			t.Errorf("scriptDebts names %s, which static/ does not hold", name)
+		}
+		for word := range debts {
+			if _, ok := vocab[word]; !ok {
+				t.Errorf("scriptDebts of %s names %s, which the GitHub plugin no longer declares", name, word)
+			}
 		}
 	}
 }

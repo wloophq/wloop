@@ -26,7 +26,7 @@ function viewSpec(id, cat = tasksState.catalog) {
 // view or a plugin's own web view; the catalog's first view otherwise.
 // Before anything is loaded every view stands.
 function resolveView(view, cat, served, plugin) {
-  if (view === HOME || view === QUEUE || view === PLAN) return view;
+  if (view === HOME || view === QUEUE || view === PLAN || view === RECENT) return view;
   if (view &&((!cat && !served.length) || isCoreView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
   if (!cat && served.length) return served[0].id;
   return (coreViews(cat)[0] || served[0] || { id: "" }).id;
