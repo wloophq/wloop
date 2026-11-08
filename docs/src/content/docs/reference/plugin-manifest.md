@@ -185,6 +185,7 @@ every = "5m"
 | `every` | duration | How often the job runs, as a Go duration, unless every_from is set. Required. |
 | `every_from` | string | A duration key of the configuration the interval comes from, such as "sweep.fast", one of config_reads or under them; every is its default. |
 | `timeout` | duration | A run's limit, as a Go duration; empty is the host's default. |
+| `retry` | duration | The first wait after a failed run, as a Go duration, doubling up to every; empty backs off from every. |
 
 ## `[source.ui]`
 

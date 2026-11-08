@@ -317,6 +317,10 @@
                 "description": "The job's name, which Ingest receives. Required.",
                 "type": "string"
               },
+              "retry": {
+                "description": "The first wait after a failed run, as a Go duration, doubling up to every; empty backs off from every.",
+                "type": "string"
+              },
               "timeout": {
                 "description": "A run's limit, as a Go duration; empty is the host's default.",
                 "type": "string"
