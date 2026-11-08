@@ -21,7 +21,8 @@
               "enum": [
                 "assigned",
                 "moot",
-                "outside"
+                "outside",
+                "joined"
               ],
               "type": "string"
             },
@@ -36,7 +37,8 @@
                     "enum": [
                       "assigned",
                       "moot",
-                      "outside"
+                      "outside",
+                      "joined"
                     ],
                     "type": "string"
                   },
@@ -116,6 +118,11 @@
             }
           },
           "type": "object"
+        },
+        "drafts_wait": {
+          "default": false,
+          "description": "Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it.",
+          "type": "boolean"
         }
       },
       "type": "object"

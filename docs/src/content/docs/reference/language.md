@@ -440,12 +440,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts` (table): The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.
 - `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
 - `drafts.by_hand_about` (string, localized): One line under that title.
+- `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
 - `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
 - `drafts.states.<name>` (string, localized): The state's words, such as "failed to send"; the key is a draft state: held, queued, sending, sent, failed or dropped.
 - `drafts.reasons` (table by name): Why a dropped draft was withdrawn, by reason, as the Outbox says it.
-- `drafts.reasons.<name>` (string, localized): The reason's words; the key is a withdraw reason: assigned, moot, outside, ended, skipped or superseded.
+- `drafts.reasons.<name>` (string, localized): The reason's words; the key is a withdraw reason: assigned, moot, outside, joined, ended, skipped or superseded.
 - `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.
 
 ## Record kinds (`records.toml`)
@@ -521,6 +522,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Gate approval
 
 - `ask` (string, localized): What the plan gate of a run asks, a text template over `.Unit` (the unit as people read it) and `.Facts` (the unit's facts by name, such as `{{index .Facts "session.name"}}`); its summary when absent.
+- `gates.drafts_wait` (bool, default `false`): Every draft the workflow proposes waits for a person: no approval rule of its own or of the configuration releases it.
 - `gates` (table): The gates its runs and drafts open.
 - `gates.approval` (an [approval table](#approval-tables) of gate modes): The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.
 
@@ -529,16 +531,18 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts` (table): The drafts the workflow's steps and turns propose.
 - `drafts.withdraw` (table): When an open draft the workflow proposed is withdrawn.
 - `drafts.withdraw.when` (predicate): When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.
-- `drafts.withdraw.reason` (one of `assigned`, `moot`, `outside`, default `moot`): The reason the withdrawn draft stores.
+- `drafts.withdraw.reason` (one of `assigned`, `moot`, `outside`, `joined`, default `moot`): The reason the withdrawn draft stores.
   - `assigned`: Its items got an owner.
   - `moot`: It no longer applies.
   - `outside`: It addresses someone who cannot read the conversation it posts in.
+  - `joined`: The person it was written to in their own conversation joined the one it came from.
 - `drafts.withdraw.rule[]` (table): A rule tried before when, in order, that withdraws with a reason of its own.
 - `drafts.withdraw.rule[].when` (predicate): When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required.
-- `drafts.withdraw.rule[].reason` (one of `assigned`, `moot`, `outside`, default `moot`): The reason the draft the rule withdraws stores.
+- `drafts.withdraw.rule[].reason` (one of `assigned`, `moot`, `outside`, `joined`, default `moot`): The reason the draft the rule withdraws stores.
   - `assigned`: Its items got an owner.
   - `moot`: It no longer applies.
   - `outside`: It addresses someone who cannot read the conversation it posts in.
+  - `joined`: The person it was written to in their own conversation joined the one it came from.
 - `outbox` (table): How the Outbox heads the group of the drafts the workflow proposed.
 - `outbox.title` (string, localized): The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent.
 - `outbox.about` (string, localized): One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet."
