@@ -471,7 +471,7 @@ func Defaults() Config {
 		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
+		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour)},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
 	}

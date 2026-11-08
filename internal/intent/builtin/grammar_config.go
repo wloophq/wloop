@@ -176,7 +176,7 @@ var configGrammar = slices.Concat(
 		cfgKey("dossiers.compact_at_kb", KindInt, "256", "The log size that triggers compaction."),
 
 		cfgKey("drafts", KindTable, "", "The settings every proposer's drafts share."),
-		cfgKey("drafts.repeat_after", KindDur, "1d", "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again."),
+		cfgKey("drafts.repeat_after", KindDur, "7d", "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again."),
 		cfgKey("items", KindTable, "", "The items."),
 		cfgKey("items.heat", KindTable, "", "How long a unit stays warm."),
 		cfgKey("items.heat.warm_for", KindDur, "", "How long a unit stays warm after its last item resolved; left out, the heat reader's default."),

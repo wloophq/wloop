@@ -1419,7 +1419,7 @@ The fields each notice reads besides `Name` and `Command`:
 ### Drafts and notifications
 
 - `drafts` (table): The settings every proposer's drafts share.
-- `drafts.repeat_after` (duration, default `1d`): The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.
+- `drafts.repeat_after` (duration, default `7d`): The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.
 - `notifications` (table): The notifications.
 - `notifications.digest_at` (string, default `09:00`): The local HH:MM of the daily digest; empty for none.
 

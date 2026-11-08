@@ -148,7 +148,7 @@
       "description": "The settings every proposer's drafts share.",
       "properties": {
         "repeat_after": {
-          "default": "1d",
+          "default": "7d",
           "description": "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.",
           "type": "string"
         }

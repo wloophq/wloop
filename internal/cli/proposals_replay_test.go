@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/wloophq/wloop/internal/config"
 	"hash/fnv"
 	"os"
 	"path/filepath"
@@ -111,6 +112,8 @@ func newReplay(t *testing.T) *replay {
 func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
+	// The job the golden records re-proposed a settled draft after a day.
+	te.cfg.Drafts.RepeatAfter = config.Days(24 * time.Hour)
 	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
