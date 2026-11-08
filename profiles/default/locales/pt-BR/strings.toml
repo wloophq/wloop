@@ -611,6 +611,10 @@
 "Stopped {workflow}" = "{workflow} parado"
 "open" = "aberto"
 "resolved" = "resolvido"
+# A unit's items.
+"no owner" = "sem dono"
+"you" = "você"
+"+{n} resolved" = { one = "+{n} resolvido", other = "+{n} resolvidos" }
 # The omnibox agent call's errors.
 "Type what to ask the agent" = "Digite o que perguntar ao agente"
 "Today's spend cap for agent calls is reached; ask again tomorrow" = "O limite de gasto de hoje com chamadas ao agente foi atingido; pergunte de novo amanhã"

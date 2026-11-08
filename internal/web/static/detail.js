@@ -463,20 +463,46 @@ function unitCard(s, opts = {}) {
     lh ? h("div", { class: "meta" }, `${personName(lh.who)}: ${lh.what}`, lh.at ? ` (${stamp(lh.at)})` : "") : null);
 }
 
-function itemsBlock(items) {
-  if (!items || !items.length) return null;
+// RESOLVED_ITEMS_SHOWN is how many resolved items a unit detail shows before it folds the rest.
+const RESOLVED_ITEMS_SHOWN = 3;
+
+// itemWaitsOn is whom an open item waits on: the user as "you", others by name, or no owner.
+function itemWaitsOn(tie) {
+  const people = (tie && tie.waits_on) || [];
+  if (!people.length) return t("no owner");
+  return [t("Waiting on"), " ", h("strong", {}, people.map((p) => (p.me ? t("you") : personName(p))).join(", "))];
+}
+
+// itemsBlock lists a unit's items, open first, each with whom it waits on and the task that holds it; resolved
+// items past RESOLVED_ITEMS_SHOWN fold until the user unfolds them for unit key.
+function itemsBlock(list, ties, key) {
+  if (!list || !list.length) return null;
+  const open = list.filter((it) => it.state !== "resolved");
+  const resolved = list.filter((it) => it.state === "resolved");
+  const unfolded = detailState.itemsUnfolded === key;
+  const hidden = unfolded ? 0 : Math.max(0, resolved.length - RESOLVED_ITEMS_SHOWN);
+  const row = (it) => {
+    const tie = (ties || {})[it.id] || {};
+    const st = it.state || "open";
+    return h("li", { class: "item-" + st },
+      h("span", { class: "pill" }, itemStateWord(st)), " ", h("span", {}, it.summary || it.id),
+      st === "open" ? [" ", h("span", { class: "meta" }, itemWaitsOn(tie))] : null,
+      tie.task ? [" · ", h("a", { href: taskHref(tie.task), class: "ref", "data-focus": "unit-item-task:" + it.id }, tie.task_title || tie.task)] : null);
+  };
   return [h("h2", { class: "d-sub" }, t("Items")),
-    h("ul", { class: "d-items" }, ...items.map((it) => h("li", { class: "item-" + (it.state || "open") },
-      h("span", {}, it.summary || it.id), " ", h("span", { class: "pill" }, it.state || ""))))];
+    h("ul", { class: "d-items" }, ...open.map(row), ...resolved.slice(0, resolved.length - hidden).map(row)),
+    hidden ? h("button", { type: "button", class: "act", "data-focus": "unit:items:more",
+      onclick: () => { detailState.itemsUnfolded = key; detailEnv.render(); } }, tn("+{n} resolved", hidden)) : null];
 }
 
 // unitExtras are a unit detail's card and open tasks.
 function unitExtras(d) {
   const key = detailState.unitKey;
   const tasks = key ? detailState.unitTasks : [];
+  const u = (d && d.row && d.row.unit) || {};
   return h("div", { class: "d-unit" },
     d && d.card ? unitCard(d.card) : null,
-    d && (d.items || []).length ? itemsBlock(d.items) : null,
+    d && (d.items || []).length ? itemsBlock(d.items, d.item_ties, u.provider + ":" + u.key) : null,
     d && d.row ? unitComposer(d.row.unit) : null,
     tasks.length ? [h("h2", { class: "d-sub" }, t("Tasks")),
       h("ul", { class: "d-tasks" }, ...tasks.map((e) => h("li", {},

@@ -350,3 +350,50 @@ const gone = Object.assign(new Error("session:0b9c7d1e is not in the inventory")
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestUnitDetailItemsSayWhomTheyWaitOnAndWhichTaskHoldsThem(t *testing.T) {
+	item := func(id, summary string, state items.State, waits ...items.Person) items.Item {
+		return items.Item{ID: id, Unit: prUnit, Kind: items.Request, Summary: summary, State: state, WaitingOn: waits}
+	}
+	resolved := []items.Item{}
+	for _, s := range []string{"Rename the flag", "Bump the client", "Drop the shim", "Tag the release", "Close the epic"} {
+		resolved = append(resolved, item("r-"+s, s, items.Resolved))
+	}
+	its := append([]items.Item{resolved[0], item("i1", "Review the retry change", items.Open, items.Person{Key: "github:me", Name: "Me"}),
+		item("i2", "Pick a release date", items.Open)}, resolved[1:]...)
+	detail := api.Detail{Row: api.Row{Unit: prUnit}, Events: []api.Event{}, Items: its, ItemTies: map[string]api.ItemTie{
+		"i1": {WaitsOn: []api.ItemPerson{{Key: "github:me", Name: "Me", Me: true}}, Task: "t-1", TaskTitle: "Review the retries"},
+		"i2": {WaitsOn: []api.ItemPerson{}},
+	}}
+	var got struct {
+		Rows, Folded []string
+		Links        [][]string
+		More         string
+	}
+	nodeRun(t, viewsPrelude(t)+stringsPrelude(t, "pt-BR", "../../profiles/default/locales/pt-BR/strings.toml")+detailHarness, nil, `
+const rows = (box) => byClass(box, "d-items")[0].children.filter((x) => x.tag === "li");
+const box = unitExtras(input);
+const more = byFocus(box, "unit:items:more");
+const links = rows(box).map((li) => all(li, (x) => x.tag === "a").map((a) => text(a) + " " + a.attrs.href));
+more.attrs.onclick();
+process.stdout.write(JSON.stringify({ Rows: rows(box).map(text), Links: links, More: text(more), Folded: rows(unitExtras(input)).map(text) }));`, detail, &got)
+	want := []string{"aberto Review the retry change Esperando você · Review the retries", "aberto Pick a release date sem dono",
+		"resolvido Rename the flag", "resolvido Bump the client", "resolvido Drop the shim"}
+	if !slices.Equal(got.Rows, want) {
+		t.Errorf("rows\n%q\nwant\n%q", got.Rows, want)
+	}
+	if len(got.Links) != 5 || len(got.Links[0]) != 1 || !strings.Contains(got.Links[0][0], "Review the retries #") || !strings.Contains(got.Links[0][0], "task=t-1") {
+		t.Errorf("links %q, want one to t-1 on the first item", got.Links)
+	}
+	for i, l := range got.Links[1:] {
+		if len(l) != 0 {
+			t.Errorf("item %d links %q, want none", i+2, l)
+		}
+	}
+	if got.More != "+2 resolvidos" {
+		t.Errorf("fold %q", got.More)
+	}
+	if len(got.Folded) != 7 {
+		t.Errorf("unfolded rows %q, want all seven", got.Folded)
+	}
+}
