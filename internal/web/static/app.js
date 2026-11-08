@@ -2524,17 +2524,29 @@ function planButtons(it) {
     }, st.label || sp.label));
 }
 
+// planReason is the reason the engine gave a plan item, in the catalog's words when it has them.
+function planReason(reason) {
+  return hasText(reason) ? t(reason) : reason;
+}
+
+// planItem is a plan item as the plan lists it: when it runs, what its workflow does, on what, what applying it
+// does, why it fired, folded, and its actions.
 function planItem(it) {
   const ticking = it.decision === "pending" && it.default === "run" && it.deadline;
+  const when = planWhen(it);
+  const reason = it.reason ? planReason(it.reason) : "";
   return h("li", { class: `plan-item ${it.decision}` },
     h("div", { class: "plan-line" },
-      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, planWhen(it)),
+      h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? t("runs at {time}", { time: stamp(it.deadline) }) : undefined }, when),
       h("span", { class: "plan-wf", title: it.summary ? it.workflow : undefined }, it.summary || it.workflow),
-      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
-      it.title ? h("span", { class: "plan-title" }, it.title) : null,
+      it.target ? null : h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
+      !it.target && it.title ? h("span", { class: "plan-title" }, it.title) : null,
       it.observe ? h("span", { class: "plan-mode", title: t("This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off") }, t("observe")) : null),
-    it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
+    it.target ? planTarget(it) : null,
+    planDoes(it),
+    reason && reason !== when ? h("p", { class: "plan-reason" }, reason) : null,
     it.error ? h("p", { class: "plan-error" }, t("attempt {n}: {error}", { n: it.attempts, error: it.error })) : null,
+    planWhy(it),
     h("div", { class: "d-actions" }, ...planButtons(it)));
 }
 

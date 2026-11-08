@@ -224,6 +224,7 @@ func planGate(plan *api.PlanItem) api.GateView {
 func closingPlan(summary string) *api.PlanItem {
 	return &api.PlanItem{ID: "fake-close/task/t-1/ab12", Workflow: "fake-close", Summary: summary, Decision: "pending",
 		Label: "Retry flaky uploads", Link: "https://chat.example/c1", Steps: []string{"items.resolve"},
+		Does: []api.PlanStep{{Use: "items.resolve", Reach: "local"}},
 		Why: api.Why{Trigger: "sweep", Matched: []api.Fact{{Name: "task.category", Value: "active"}, {Name: "task.items_open", Value: "2"}}}}
 }
 
@@ -249,7 +250,7 @@ const shape = (g) => {
     On: on ? on.textContent : "",
     Link: on ? walk(on, (x) => x.tag === "a").map((a) => attr(a, "href")).join("") : "",
     Why: why ? walk(why, (x) => x.tag === "li").map((x) => x.textContent) : [],
-    Steps: cls(c, "plan-steps").map((x) => x.textContent),
+    Steps: cls(c, "plan-do").map((x) => attr(cls(x, "plan-do-what")[0], "title")),
     Folded: !!why && why.tag === "details",
     Buttons: walk(c, (x) => x.tag === "button").map((b) => b.textContent),
   };
@@ -273,10 +274,10 @@ done([shape(input.full), shape(input.bare), shape(input.gone)]);`, map[string]an
 	if !full.Folded || !slices.Equal(full.Why, []string{"Category: Active", "task.items_open = 2"}) {
 		t.Errorf("why %q folded %v, want the catalog's words for a fact it names, else name = value, folded", full.Why, full.Folded)
 	}
-	if len(full.Steps) != 0 {
-		t.Errorf("steps %q shown beside the summary", full.Steps)
+	if !slices.Equal(full.Steps, []string{"items.resolve"}) {
+		t.Errorf("steps %q, want what applying does beside the summary", full.Steps)
 	}
-	if bare := got[1]; bare.Summary != "" || len(bare.Steps) != 1 || !strings.Contains(bare.Steps[0], "items.resolve") {
+	if bare := got[1]; bare.Summary != "" || !slices.Equal(bare.Steps, []string{"items.resolve"}) {
 		t.Errorf("a plan without a summary: %+v, want its steps", bare)
 	}
 	if gone := got[2]; gone.Title != "Run this?" || gone.Summary != "" || gone.On != "" || len(gone.Why) != 0 ||
