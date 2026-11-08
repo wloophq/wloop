@@ -32,7 +32,7 @@ func newCardsServer(t *testing.T, enabled func(unit.ProviderID) bool) (*Server, 
 	t.Cleanup(func() { db.Close() })
 	l := &coreitems.Ledger{Store: db.Items(), Enabled: enabled, Clock: fixedClock(time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC))}
 	s := newServerOn(t, db, nil, func(d *Deps) {
-		d.Items, d.PluginEnabled, d.Cards = l, enabled, cards.Served(db.Cards(), enabled)
+		d.Items, d.PluginEnabled, d.Cards = l, enabled, cards.Served(db.Cards(), enabled, nil)
 		if enabled != nil && !enabled(unit.GitHub) {
 			d.RowProviders = nil
 		}

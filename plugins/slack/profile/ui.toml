@@ -34,6 +34,18 @@ buckets = { "1d" = "0-1 days", "3d" = "1-3 days", "7d" = "3-7 days", "2w" = "1-2
 show = "age"
 show_label = "since {{.at}}"
 
+# How each line of a conversation's card shows, by the signal's key; {{.name}} is a value the plugin fills.
+[signals.items]
+label = "items"
+values = { none = "none open", open = '{{.n}} open {{plural .n "one" "item" "other" "items"}}' }
+
+[signals.replies]
+label = "replies"
+values = { count = "{{.n}}" }
+
+[signals.last_activity]
+label = "last activity"
+
 [situations]
 waits_on_viewer = "waits on you"
 needs_closure = "needs closing"

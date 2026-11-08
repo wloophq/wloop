@@ -126,6 +126,13 @@ func (p *Reported) Reasons() api.ProviderWords {
 	return api.ProviderWords{}
 }
 
+func (p *Reported) CardSignals() []api.SignalSpec {
+	if sp, ok := p.src.Catalog.(SignalPresenter); ok {
+		return sp.CardSignals()
+	}
+	return nil
+}
+
 func (p *Reported) Lens() api.ProviderWords {
 	if lp, ok := p.src.Catalog.(LensPresenter); ok {
 		return lp.Lens()
@@ -395,7 +402,7 @@ func (p *Reported) Card(ctx context.Context, row api.Row) (card.Card, error) {
 		Why: c.Why, WaitsOn: people(c.WaitsOn), Since: c.Since, Link: c.Link, TurnsLink: c.TurnsLink, StartedByMe: c.StartedByMe,
 		ClosurePosted: c.ClosurePosted, Cares: c.Cares, Signals: []card.Signal{}}
 	for _, sig := range c.Signals {
-		out.Signals = append(out.Signals, card.Signal{Key: sig.Key, Value: sig.Value, Tone: card.Tone(sig.Tone), At: sig.At})
+		out.Signals = append(out.Signals, CardSignal(sig))
 	}
 	if h := c.LastHuman; h != nil {
 		out.LastHuman = &card.Human{Who: person(h.Who), What: h.What, At: h.At, Link: h.Link}
@@ -416,6 +423,18 @@ func people(ps []src.Person) []items.Person {
 	var out []items.Person
 	for _, p := range ps {
 		out = append(out, person(p))
+	}
+	return out
+}
+
+// CardSignal is a plugin's card signal as a card holds it.
+func CardSignal(s src.CardSignal) card.Signal {
+	out := card.Signal{Key: s.Key, Value: s.Value, Tone: card.Tone(s.Tone), At: s.At}
+	if d := s.Detail; d != nil {
+		out.Params = maps.Clone(d.Params)
+		for _, n := range d.Notes {
+			out.Notes = append(out.Notes, card.Note{Code: n.Code, Tone: card.Tone(n.Tone), Params: maps.Clone(n.Params), Since: n.Since})
+		}
 	}
 	return out
 }

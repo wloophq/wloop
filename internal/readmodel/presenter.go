@@ -20,6 +20,11 @@ type ReasonPresenter interface {
 	Reasons() api.ProviderWords
 }
 
+// SignalPresenter is optional on a Presenter: its words of its cards' signals.
+type SignalPresenter interface {
+	CardSignals() []api.SignalSpec
+}
+
 // LensPresenter is optional on a Presenter: its own row words.
 type LensPresenter interface {
 	Lens() api.ProviderWords

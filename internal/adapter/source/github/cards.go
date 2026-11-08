@@ -70,8 +70,8 @@ func (c Cards) Items(ctx context.Context, r api.Row) ([]items.Item, error) {
 
 // CardOf is the card the plugin reported in s, under the overlays of r,
 // the pull request's row: the row says why, on whom and since when, its
-// situation signal words the row's kind, a mute snoozes it, and stalled
-// follows the host's clock.
+// situation signal is the row's kind, a mute snoozes it, and a stall the row
+// shows is a note on it counting from when the situation began.
 func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	p, ok := prrow.PayloadOf(r)
 	if !ok || s.Card == nil {
@@ -84,18 +84,17 @@ func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	overlaid := string(r.Kind) != s.Situation.Kind
 	muted := situation.Kind(r.Kind) == situation.KindMuted
 	for _, sig := range rc.Signals {
-		switch {
-		case sig.Key == signalSituation:
-			sig.Value = situation.Kind(r.Kind).Label()
-		case sig.Key == signalStalled:
-			continue
-		case overlaid && !muted && sig.Key != signalChecks:
+		if overlaid && !muted && sig.Key != signalChecks && sig.Key != signalSituation {
 			continue
 		}
-		c.Signals = append(c.Signals, card.Signal{Key: sig.Key, Value: sig.Value, Tone: card.Tone(sig.Tone), At: sig.At})
-	}
-	if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
-		c.Signals = append(c.Signals, card.Signal{Key: signalStalled, Value: "stalled", Tone: "warn"})
+		cs := readmodel.CardSignal(sig)
+		if sig.Key == signalSituation {
+			cs.Value, cs.Notes = string(r.Kind), nil
+			if r.Summary.Stalled && situation.Kind(r.Kind) != situation.KindDone {
+				cs.Notes = []card.Note{{Code: noteStalled, Tone: "warn", Since: r.Summary.Since}}
+			}
+		}
+		c.Signals = append(c.Signals, cs)
 	}
 	if h := rc.LastHuman; h != nil {
 		c.LastHuman = &card.Human{Who: items.Person{Key: h.Who.Key, Name: h.Who.Name, Aliases: slices.Clone(h.Who.Aliases)}, What: h.What, At: h.At, Link: h.Link}
@@ -103,11 +102,12 @@ func CardOf(r api.Row, s prrow.Report) (card.Card, error) {
 	return c, nil
 }
 
-// The keys of the card signals the host lays its overlays on.
+// The keys of the card signals the host lays its overlays on, and the code of
+// the note it adds to a stalled situation's.
 const (
 	signalSituation = "situation"
-	signalStalled   = "stalled"
 	signalChecks    = "checks"
+	noteStalled     = "stalled"
 )
 
 // ItemsOf are the items the plugin reported in s, under the overlays of r,

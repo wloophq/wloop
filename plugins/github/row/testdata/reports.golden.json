@@ -1009,17 +1009,21 @@
           {
             "key": "situation",
             "value": "no_reviewer",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-10-12T11:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "why": "no reviewer requested",
@@ -1664,17 +1668,26 @@
           {
             "key": "situation",
             "value": "checks",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-10-11T09:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
-            "value": "failing: lint, unit",
-            "tone": "bad"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
+            "value": "failing_named",
+            "tone": "bad",
+            "detail": {
+              "params": {
+                "names": "lint, unit"
+              }
+            }
           }
         ],
         "why": "checks failing: lint, unit",
@@ -2013,22 +2026,21 @@
           {
             "key": "situation",
             "value": "changes",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-10-05T15:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "review",
-            "value": "changes requested",
-            "tone": "warn"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "last_human": {
@@ -3054,17 +3066,21 @@
           {
             "key": "situation",
             "value": "reply",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-10-09T15:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "why": "me-login commented, no reply",
@@ -3386,17 +3402,21 @@
           {
             "key": "situation",
             "value": "no_reviewer",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-10-08T16:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "last_human": {
@@ -5519,17 +5539,21 @@
           {
             "key": "situation",
             "value": "review",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-09-30T13:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "why": "review requested, no review on the head",
@@ -5848,17 +5872,21 @@
           {
             "key": "situation",
             "value": "no_reviewer",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-09-30T00:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "why": "no reviewer requested",
@@ -6458,17 +6486,21 @@
           {
             "key": "situation",
             "value": "review",
-            "tone": "neutral"
+            "tone": "neutral",
+            "detail": {
+              "notes": [
+                {
+                  "code": "stalled",
+                  "tone": "warn",
+                  "since": "2026-08-15T15:00:00Z"
+                }
+              ]
+            }
           },
           {
             "key": "checks",
             "value": "passing",
             "tone": "good"
-          },
-          {
-            "key": "stalled",
-            "value": "stalled",
-            "tone": "warn"
           }
         ],
         "last_human": {

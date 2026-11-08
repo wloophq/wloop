@@ -51,6 +51,16 @@ var uiGrammar = []Key{
 	{Path: "situations.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One situation's words."},
 	{Path: "reasons", In: SurfaceUI, Kind: KindTable, Doc: "Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it."},
 	{Path: "reasons.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One reason's words, `{{.name}}` where a value the situation gives goes, such as `changes requested by {{.actor}}`."},
+	{Path: "signals", In: SurfaceUI, Kind: KindTable, Doc: "How each line of the plugin's cards shows, by the signal's key: the plugin sends the key, a value code, the values its words fill and the codes of its notes; a code with no words shows as itself."},
+	{Path: "signals.*", In: SurfaceUI, Kind: KindTable, Doc: "One signal's words."},
+	{Path: "signals.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The signal's name, before its value. Required."},
+	{Path: "signals.*.values", In: SurfaceUI, Kind: KindTable, Doc: "How each value shows, by code."},
+	{Path: "signals.*.values.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One value's words, `{{.name}}` where a value the signal gives goes, such as `failing: {{.names}}`."},
+	{Path: "signals.*.values_from", In: SurfaceUI, Kind: KindEnum, Values: func() []Value {
+		return []Value{{Name: "situations", Doc: "The signal's value is a situation kind, worded as [situations] words it unless its own values word it."}}
+	}, Doc: "Where the signal's values take their words from besides its own values."},
+	{Path: "signals.*.notes", In: SurfaceUI, Kind: KindTable, Doc: "How each note shows after the signal's value, in the note's own tone, by code."},
+	{Path: "signals.*.notes.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "One note's words, `{{.name}}` where a value the note gives goes and `{{plural .name \"one\" \"…\" \"other\" \"…\"}}` its plural form, such as `stalled for {{.days}} {{plural .days \"one\" \"working day\" \"other\" \"working days\"}}`."},
 	{Path: "events", In: SurfaceUI, Kind: KindTable, Doc: "How each event kind the plugin declares shows on a timeline, by kind."},
 	{Path: "events.*", In: SurfaceUI, Kind: KindTable, Doc: "One event kind's words."},
 	{Path: "events.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The event in a few words. Required."},

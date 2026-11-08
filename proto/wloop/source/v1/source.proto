@@ -219,6 +219,21 @@ message CardSignal {
   // tone is "neutral", "good", "warn", "bad" or "info".
   string tone = 3;
   google.protobuf.Timestamp at = 4;
+  // key and value are codes the plugin's ui.toml [signals] words, params the
+  // values its words fill; a code with no words shows as itself.
+  map<string, string> params = 5;
+  repeated SignalNote notes = 6;
+}
+
+// SignalNote is what a signal's line adds after its value, in its own tone:
+// a code its signal's notes word, filled with params.
+message SignalNote {
+  string code = 1;
+  string tone = 2;
+  map<string, string> params = 3;
+  // since is the instant the note counts from: each read of the card fills
+  // its "days" param with the whole working days since it, at least one.
+  google.protobuf.Timestamp since = 4;
 }
 
 message Human {

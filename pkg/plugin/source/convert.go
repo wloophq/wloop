@@ -147,7 +147,14 @@ func cardPB(c *Card) *pb.Card {
 		WaitsOn: peoplePB(c.WaitsOn), Since: ts(c.Since), Link: c.Link, TurnsLink: c.TurnsLink,
 		StartedByMe: c.StartedByMe, ClosurePosted: c.ClosurePosted, Cares: c.Cares,
 		Signals: mapSlice(c.Signals, func(s CardSignal) *pb.CardSignal {
-			return &pb.CardSignal{Key: s.Key, Value: s.Value, Tone: s.Tone, At: ts(s.At)}
+			out := &pb.CardSignal{Key: s.Key, Value: s.Value, Tone: s.Tone, At: ts(s.At)}
+			if d := s.Detail; d != nil {
+				out.Params = d.Params
+				out.Notes = mapSlice(d.Notes, func(n SignalNote) *pb.SignalNote {
+					return &pb.SignalNote{Code: n.Code, Tone: n.Tone, Params: n.Params, Since: ts(n.Since)}
+				})
+			}
+			return out
 		}),
 	}
 	if h := c.LastHuman; h != nil {
@@ -165,7 +172,13 @@ func cardGo(c *pb.Card) *Card {
 		WaitsOn: peopleGo(c.GetWaitsOn()), Since: tm(c.GetSince()), Link: c.GetLink(), TurnsLink: c.GetTurnsLink(),
 		StartedByMe: c.GetStartedByMe(), ClosurePosted: c.GetClosurePosted(), Cares: c.GetCares(),
 		Signals: mapSlice(c.GetSignals(), func(s *pb.CardSignal) CardSignal {
-			return CardSignal{Key: s.GetKey(), Value: s.GetValue(), Tone: s.GetTone(), At: tm(s.GetAt())}
+			out := CardSignal{Key: s.GetKey(), Value: s.GetValue(), Tone: s.GetTone(), At: tm(s.GetAt())}
+			if len(s.GetParams()) > 0 || len(s.GetNotes()) > 0 {
+				out.Detail = &SignalDetail{Params: s.GetParams(), Notes: mapSlice(s.GetNotes(), func(n *pb.SignalNote) SignalNote {
+					return SignalNote{Code: n.GetCode(), Tone: n.GetTone(), Params: n.GetParams(), Since: tm(n.GetSince())}
+				})}
+			}
+			return out
 		}),
 	}
 	if h := c.GetLastHuman(); h != nil {

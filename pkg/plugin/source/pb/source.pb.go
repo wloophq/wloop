@@ -937,8 +937,12 @@ type CardSignal struct {
 	Key   string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Value string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	// tone is "neutral", "good", "warn", "bad" or "info".
-	Tone          string                 `protobuf:"bytes,3,opt,name=tone,proto3" json:"tone,omitempty"`
-	At            *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=at,proto3" json:"at,omitempty"`
+	Tone string                 `protobuf:"bytes,3,opt,name=tone,proto3" json:"tone,omitempty"`
+	At   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=at,proto3" json:"at,omitempty"`
+	// key and value are codes the plugin's ui.toml [signals] words, params the
+	// values its words fill; a code with no words shows as itself.
+	Params        map[string]string `protobuf:"bytes,5,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Notes         []*SignalNote     `protobuf:"bytes,6,rep,name=notes,proto3" json:"notes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1001,6 +1005,92 @@ func (x *CardSignal) GetAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *CardSignal) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+func (x *CardSignal) GetNotes() []*SignalNote {
+	if x != nil {
+		return x.Notes
+	}
+	return nil
+}
+
+// SignalNote is what a signal's line adds after its value, in its own tone:
+// a code its signal's notes word, filled with params.
+type SignalNote struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Code   string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Tone   string                 `protobuf:"bytes,2,opt,name=tone,proto3" json:"tone,omitempty"`
+	Params map[string]string      `protobuf:"bytes,3,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// since is the instant the note counts from: each read of the card fills
+	// its "days" param with the whole working days since it, at least one.
+	Since         *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=since,proto3" json:"since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalNote) Reset() {
+	*x = SignalNote{}
+	mi := &file_wloop_source_v1_source_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalNote) ProtoMessage() {}
+
+func (x *SignalNote) ProtoReflect() protoreflect.Message {
+	mi := &file_wloop_source_v1_source_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalNote.ProtoReflect.Descriptor instead.
+func (*SignalNote) Descriptor() ([]byte, []int) {
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SignalNote) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *SignalNote) GetTone() string {
+	if x != nil {
+		return x.Tone
+	}
+	return ""
+}
+
+func (x *SignalNote) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
+func (x *SignalNote) GetSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Since
+	}
+	return nil
+}
+
 type Human struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Who           *Person                `protobuf:"bytes,1,opt,name=who,proto3" json:"who,omitempty"`
@@ -1013,7 +1103,7 @@ type Human struct {
 
 func (x *Human) Reset() {
 	*x = Human{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[13]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1025,7 +1115,7 @@ func (x *Human) String() string {
 func (*Human) ProtoMessage() {}
 
 func (x *Human) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[13]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1038,7 +1128,7 @@ func (x *Human) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Human.ProtoReflect.Descriptor instead.
 func (*Human) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{13}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Human) GetWho() *Person {
@@ -1094,7 +1184,7 @@ type Card struct {
 
 func (x *Card) Reset() {
 	*x = Card{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[14]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1106,7 +1196,7 @@ func (x *Card) String() string {
 func (*Card) ProtoMessage() {}
 
 func (x *Card) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[14]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1119,7 +1209,7 @@ func (x *Card) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Card.ProtoReflect.Descriptor instead.
 func (*Card) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{14}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Card) GetLabel() string {
@@ -1230,7 +1320,7 @@ type ItemOption struct {
 
 func (x *ItemOption) Reset() {
 	*x = ItemOption{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[15]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1242,7 +1332,7 @@ func (x *ItemOption) String() string {
 func (*ItemOption) ProtoMessage() {}
 
 func (x *ItemOption) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[15]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1255,7 +1345,7 @@ func (x *ItemOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemOption.ProtoReflect.Descriptor instead.
 func (*ItemOption) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{15}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ItemOption) GetLabel() string {
@@ -1281,7 +1371,7 @@ type ItemOptionList struct {
 
 func (x *ItemOptionList) Reset() {
 	*x = ItemOptionList{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[16]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1293,7 +1383,7 @@ func (x *ItemOptionList) String() string {
 func (*ItemOptionList) ProtoMessage() {}
 
 func (x *ItemOptionList) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[16]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,7 +1396,7 @@ func (x *ItemOptionList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemOptionList.ProtoReflect.Descriptor instead.
 func (*ItemOptionList) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{16}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ItemOptionList) GetOptions() []*ItemOption {
@@ -1327,7 +1417,7 @@ type ItemEvidence struct {
 
 func (x *ItemEvidence) Reset() {
 	*x = ItemEvidence{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[17]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1339,7 +1429,7 @@ func (x *ItemEvidence) String() string {
 func (*ItemEvidence) ProtoMessage() {}
 
 func (x *ItemEvidence) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[17]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1352,7 +1442,7 @@ func (x *ItemEvidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemEvidence.ProtoReflect.Descriptor instead.
 func (*ItemEvidence) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{17}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ItemEvidence) GetKind() string {
@@ -1410,7 +1500,7 @@ type Item struct {
 
 func (x *Item) Reset() {
 	*x = Item{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[18]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1422,7 +1512,7 @@ func (x *Item) String() string {
 func (*Item) ProtoMessage() {}
 
 func (x *Item) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[18]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1435,7 +1525,7 @@ func (x *Item) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Item.ProtoReflect.Descriptor instead.
 func (*Item) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{18}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Item) GetId() string {
@@ -1672,7 +1762,7 @@ type Snapshot struct {
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[19]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +1774,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[19]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +1787,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{19}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Snapshot) GetUnit() *pb.Unit {
@@ -1843,7 +1933,7 @@ type FacetValues struct {
 
 func (x *FacetValues) Reset() {
 	*x = FacetValues{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[20]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1855,7 +1945,7 @@ func (x *FacetValues) String() string {
 func (*FacetValues) ProtoMessage() {}
 
 func (x *FacetValues) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[20]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1868,7 +1958,7 @@ func (x *FacetValues) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FacetValues.ProtoReflect.Descriptor instead.
 func (*FacetValues) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{20}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *FacetValues) GetValues() []string {
@@ -1899,7 +1989,7 @@ type Situation struct {
 
 func (x *Situation) Reset() {
 	*x = Situation{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[21]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1911,7 +2001,7 @@ func (x *Situation) String() string {
 func (*Situation) ProtoMessage() {}
 
 func (x *Situation) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[21]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1924,7 +2014,7 @@ func (x *Situation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Situation.ProtoReflect.Descriptor instead.
 func (*Situation) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{21}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Situation) GetKind() string {
@@ -1990,7 +2080,7 @@ type Link struct {
 
 func (x *Link) Reset() {
 	*x = Link{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[22]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2002,7 +2092,7 @@ func (x *Link) String() string {
 func (*Link) ProtoMessage() {}
 
 func (x *Link) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[22]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2015,7 +2105,7 @@ func (x *Link) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Link.ProtoReflect.Descriptor instead.
 func (*Link) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{22}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Link) GetUrl() string {
@@ -2062,7 +2152,7 @@ type DraftOrigin struct {
 
 func (x *DraftOrigin) Reset() {
 	*x = DraftOrigin{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[23]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2074,7 +2164,7 @@ func (x *DraftOrigin) String() string {
 func (*DraftOrigin) ProtoMessage() {}
 
 func (x *DraftOrigin) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[23]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2087,7 +2177,7 @@ func (x *DraftOrigin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DraftOrigin.ProtoReflect.Descriptor instead.
 func (*DraftOrigin) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{23}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DraftOrigin) GetKind() string {
@@ -2150,7 +2240,7 @@ type DraftEvidence struct {
 
 func (x *DraftEvidence) Reset() {
 	*x = DraftEvidence{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[24]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2162,7 +2252,7 @@ func (x *DraftEvidence) String() string {
 func (*DraftEvidence) ProtoMessage() {}
 
 func (x *DraftEvidence) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[24]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2175,7 +2265,7 @@ func (x *DraftEvidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DraftEvidence.ProtoReflect.Descriptor instead.
 func (*DraftEvidence) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{24}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DraftEvidence) GetRef() string {
@@ -2227,7 +2317,7 @@ type Draft struct {
 
 func (x *Draft) Reset() {
 	*x = Draft{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[25]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2239,7 +2329,7 @@ func (x *Draft) String() string {
 func (*Draft) ProtoMessage() {}
 
 func (x *Draft) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[25]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2252,7 +2342,7 @@ func (x *Draft) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Draft.ProtoReflect.Descriptor instead.
 func (*Draft) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{25}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Draft) GetId() int64 {
@@ -2379,7 +2469,7 @@ type Placement struct {
 
 func (x *Placement) Reset() {
 	*x = Placement{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[26]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2391,7 +2481,7 @@ func (x *Placement) String() string {
 func (*Placement) ProtoMessage() {}
 
 func (x *Placement) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[26]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2404,7 +2494,7 @@ func (x *Placement) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Placement.ProtoReflect.Descriptor instead.
 func (*Placement) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{26}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Placement) GetRepo() string {
@@ -2443,7 +2533,7 @@ type CapabilitiesRequest struct {
 
 func (x *CapabilitiesRequest) Reset() {
 	*x = CapabilitiesRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[27]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2455,7 +2545,7 @@ func (x *CapabilitiesRequest) String() string {
 func (*CapabilitiesRequest) ProtoMessage() {}
 
 func (x *CapabilitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[27]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2468,7 +2558,7 @@ func (x *CapabilitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapabilitiesRequest.ProtoReflect.Descriptor instead.
 func (*CapabilitiesRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{27}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{28}
 }
 
 type CapabilitiesResponse struct {
@@ -2480,7 +2570,7 @@ type CapabilitiesResponse struct {
 
 func (x *CapabilitiesResponse) Reset() {
 	*x = CapabilitiesResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[28]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2492,7 +2582,7 @@ func (x *CapabilitiesResponse) String() string {
 func (*CapabilitiesResponse) ProtoMessage() {}
 
 func (x *CapabilitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[28]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2505,7 +2595,7 @@ func (x *CapabilitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapabilitiesResponse.ProtoReflect.Descriptor instead.
 func (*CapabilitiesResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{28}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *CapabilitiesResponse) GetCapabilities() []string {
@@ -2527,7 +2617,7 @@ type IngestRequest struct {
 
 func (x *IngestRequest) Reset() {
 	*x = IngestRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[29]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2539,7 +2629,7 @@ func (x *IngestRequest) String() string {
 func (*IngestRequest) ProtoMessage() {}
 
 func (x *IngestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[29]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2552,7 +2642,7 @@ func (x *IngestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestRequest.ProtoReflect.Descriptor instead.
 func (*IngestRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{29}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *IngestRequest) GetCall() *Call {
@@ -2586,7 +2676,7 @@ type IngestResponse struct {
 
 func (x *IngestResponse) Reset() {
 	*x = IngestResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[30]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2598,7 +2688,7 @@ func (x *IngestResponse) String() string {
 func (*IngestResponse) ProtoMessage() {}
 
 func (x *IngestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[30]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2611,7 +2701,7 @@ func (x *IngestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestResponse.ProtoReflect.Descriptor instead.
 func (*IngestResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{30}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *IngestResponse) GetSummary() string {
@@ -2641,7 +2731,7 @@ type TrackRequest struct {
 
 func (x *TrackRequest) Reset() {
 	*x = TrackRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[31]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2653,7 +2743,7 @@ func (x *TrackRequest) String() string {
 func (*TrackRequest) ProtoMessage() {}
 
 func (x *TrackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[31]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2666,7 +2756,7 @@ func (x *TrackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrackRequest.ProtoReflect.Descriptor instead.
 func (*TrackRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{31}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *TrackRequest) GetCall() *Call {
@@ -2701,7 +2791,7 @@ type TrackResponse struct {
 
 func (x *TrackResponse) Reset() {
 	*x = TrackResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[32]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2713,7 +2803,7 @@ func (x *TrackResponse) String() string {
 func (*TrackResponse) ProtoMessage() {}
 
 func (x *TrackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[32]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2726,7 +2816,7 @@ func (x *TrackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrackResponse.ProtoReflect.Descriptor instead.
 func (*TrackResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{32}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TrackResponse) GetUnit() *pb.Unit {
@@ -2753,7 +2843,7 @@ type UntrackRequest struct {
 
 func (x *UntrackRequest) Reset() {
 	*x = UntrackRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[33]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2765,7 +2855,7 @@ func (x *UntrackRequest) String() string {
 func (*UntrackRequest) ProtoMessage() {}
 
 func (x *UntrackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[33]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2778,7 +2868,7 @@ func (x *UntrackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UntrackRequest.ProtoReflect.Descriptor instead.
 func (*UntrackRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{33}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UntrackRequest) GetCall() *Call {
@@ -2803,7 +2893,7 @@ type UntrackResponse struct {
 
 func (x *UntrackResponse) Reset() {
 	*x = UntrackResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[34]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2815,7 +2905,7 @@ func (x *UntrackResponse) String() string {
 func (*UntrackResponse) ProtoMessage() {}
 
 func (x *UntrackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[34]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2828,7 +2918,7 @@ func (x *UntrackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UntrackResponse.ProtoReflect.Descriptor instead.
 func (*UntrackResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{34}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{35}
 }
 
 type ResolveRequest struct {
@@ -2841,7 +2931,7 @@ type ResolveRequest struct {
 
 func (x *ResolveRequest) Reset() {
 	*x = ResolveRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[35]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2853,7 +2943,7 @@ func (x *ResolveRequest) String() string {
 func (*ResolveRequest) ProtoMessage() {}
 
 func (x *ResolveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[35]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2866,7 +2956,7 @@ func (x *ResolveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveRequest.ProtoReflect.Descriptor instead.
 func (*ResolveRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{35}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ResolveRequest) GetCall() *Call {
@@ -2893,7 +2983,7 @@ type ResolveResponse struct {
 
 func (x *ResolveResponse) Reset() {
 	*x = ResolveResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[36]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2905,7 +2995,7 @@ func (x *ResolveResponse) String() string {
 func (*ResolveResponse) ProtoMessage() {}
 
 func (x *ResolveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[36]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2918,7 +3008,7 @@ func (x *ResolveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveResponse.ProtoReflect.Descriptor instead.
 func (*ResolveResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{36}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ResolveResponse) GetUnit() *pb.Unit {
@@ -2946,7 +3036,7 @@ type LocateRequest struct {
 
 func (x *LocateRequest) Reset() {
 	*x = LocateRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[37]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2958,7 +3048,7 @@ func (x *LocateRequest) String() string {
 func (*LocateRequest) ProtoMessage() {}
 
 func (x *LocateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[37]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2971,7 +3061,7 @@ func (x *LocateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocateRequest.ProtoReflect.Descriptor instead.
 func (*LocateRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{37}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *LocateRequest) GetCall() *Call {
@@ -2998,7 +3088,7 @@ type LocateResponse struct {
 
 func (x *LocateResponse) Reset() {
 	*x = LocateResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[38]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3010,7 +3100,7 @@ func (x *LocateResponse) String() string {
 func (*LocateResponse) ProtoMessage() {}
 
 func (x *LocateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[38]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3023,7 +3113,7 @@ func (x *LocateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocateResponse.ProtoReflect.Descriptor instead.
 func (*LocateResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{38}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *LocateResponse) GetUnit() *pb.Unit {
@@ -3056,7 +3146,7 @@ type ActionRequest struct {
 
 func (x *ActionRequest) Reset() {
 	*x = ActionRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[39]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3068,7 +3158,7 @@ func (x *ActionRequest) String() string {
 func (*ActionRequest) ProtoMessage() {}
 
 func (x *ActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[39]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3081,7 +3171,7 @@ func (x *ActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionRequest.ProtoReflect.Descriptor instead.
 func (*ActionRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{39}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ActionRequest) GetCall() *Call {
@@ -3135,7 +3225,7 @@ type ActionResponse struct {
 
 func (x *ActionResponse) Reset() {
 	*x = ActionResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[40]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3147,7 +3237,7 @@ func (x *ActionResponse) String() string {
 func (*ActionResponse) ProtoMessage() {}
 
 func (x *ActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[40]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3160,7 +3250,7 @@ func (x *ActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResponse.ProtoReflect.Descriptor instead.
 func (*ActionResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{40}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ActionResponse) GetResultJson() []byte {
@@ -3181,7 +3271,7 @@ type ViewRequest struct {
 
 func (x *ViewRequest) Reset() {
 	*x = ViewRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[41]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3193,7 +3283,7 @@ func (x *ViewRequest) String() string {
 func (*ViewRequest) ProtoMessage() {}
 
 func (x *ViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[41]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3206,7 +3296,7 @@ func (x *ViewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ViewRequest.ProtoReflect.Descriptor instead.
 func (*ViewRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{41}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ViewRequest) GetCall() *Call {
@@ -3239,7 +3329,7 @@ type ViewResponse struct {
 
 func (x *ViewResponse) Reset() {
 	*x = ViewResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[42]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3251,7 +3341,7 @@ func (x *ViewResponse) String() string {
 func (*ViewResponse) ProtoMessage() {}
 
 func (x *ViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[42]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3264,7 +3354,7 @@ func (x *ViewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ViewResponse.ProtoReflect.Descriptor instead.
 func (*ViewResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{42}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ViewResponse) GetContentJson() []byte {
@@ -3283,7 +3373,7 @@ type IdentityRequest struct {
 
 func (x *IdentityRequest) Reset() {
 	*x = IdentityRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[43]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3295,7 +3385,7 @@ func (x *IdentityRequest) String() string {
 func (*IdentityRequest) ProtoMessage() {}
 
 func (x *IdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[43]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3308,7 +3398,7 @@ func (x *IdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdentityRequest.ProtoReflect.Descriptor instead.
 func (*IdentityRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{43}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *IdentityRequest) GetCall() *Call {
@@ -3328,7 +3418,7 @@ type IdentityResponse struct {
 
 func (x *IdentityResponse) Reset() {
 	*x = IdentityResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[44]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3340,7 +3430,7 @@ func (x *IdentityResponse) String() string {
 func (*IdentityResponse) ProtoMessage() {}
 
 func (x *IdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[44]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3353,7 +3443,7 @@ func (x *IdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdentityResponse.ProtoReflect.Descriptor instead.
 func (*IdentityResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{44}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *IdentityResponse) GetViewer() *Person {
@@ -3380,7 +3470,7 @@ type ValidateRequest struct {
 
 func (x *ValidateRequest) Reset() {
 	*x = ValidateRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[45]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3392,7 +3482,7 @@ func (x *ValidateRequest) String() string {
 func (*ValidateRequest) ProtoMessage() {}
 
 func (x *ValidateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[45]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3405,7 +3495,7 @@ func (x *ValidateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateRequest.ProtoReflect.Descriptor instead.
 func (*ValidateRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{45}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ValidateRequest) GetCall() *Call {
@@ -3430,7 +3520,7 @@ type ValidateResponse struct {
 
 func (x *ValidateResponse) Reset() {
 	*x = ValidateResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[46]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3442,7 +3532,7 @@ func (x *ValidateResponse) String() string {
 func (*ValidateResponse) ProtoMessage() {}
 
 func (x *ValidateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[46]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3455,7 +3545,7 @@ func (x *ValidateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateResponse.ProtoReflect.Descriptor instead.
 func (*ValidateResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{46}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{47}
 }
 
 type WhereRequest struct {
@@ -3468,7 +3558,7 @@ type WhereRequest struct {
 
 func (x *WhereRequest) Reset() {
 	*x = WhereRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[47]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3480,7 +3570,7 @@ func (x *WhereRequest) String() string {
 func (*WhereRequest) ProtoMessage() {}
 
 func (x *WhereRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[47]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3493,7 +3583,7 @@ func (x *WhereRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhereRequest.ProtoReflect.Descriptor instead.
 func (*WhereRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{47}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *WhereRequest) GetCall() *Call {
@@ -3519,7 +3609,7 @@ type WhereResponse struct {
 
 func (x *WhereResponse) Reset() {
 	*x = WhereResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[48]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3531,7 +3621,7 @@ func (x *WhereResponse) String() string {
 func (*WhereResponse) ProtoMessage() {}
 
 func (x *WhereResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[48]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3544,7 +3634,7 @@ func (x *WhereResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WhereResponse.ProtoReflect.Descriptor instead.
 func (*WhereResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{48}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *WhereResponse) GetWhere() string {
@@ -3564,7 +3654,7 @@ type PlaceRequest struct {
 
 func (x *PlaceRequest) Reset() {
 	*x = PlaceRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[49]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3576,7 +3666,7 @@ func (x *PlaceRequest) String() string {
 func (*PlaceRequest) ProtoMessage() {}
 
 func (x *PlaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[49]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3589,7 +3679,7 @@ func (x *PlaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlaceRequest.ProtoReflect.Descriptor instead.
 func (*PlaceRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{49}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *PlaceRequest) GetCall() *Call {
@@ -3618,7 +3708,7 @@ type PlaceResponse struct {
 
 func (x *PlaceResponse) Reset() {
 	*x = PlaceResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[50]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3630,7 +3720,7 @@ func (x *PlaceResponse) String() string {
 func (*PlaceResponse) ProtoMessage() {}
 
 func (x *PlaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[50]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3643,7 +3733,7 @@ func (x *PlaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlaceResponse.ProtoReflect.Descriptor instead.
 func (*PlaceResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{50}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *PlaceResponse) GetTarget() string {
@@ -3670,7 +3760,7 @@ type PublishRequest struct {
 
 func (x *PublishRequest) Reset() {
 	*x = PublishRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[51]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3682,7 +3772,7 @@ func (x *PublishRequest) String() string {
 func (*PublishRequest) ProtoMessage() {}
 
 func (x *PublishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[51]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3695,7 +3785,7 @@ func (x *PublishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
 func (*PublishRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{51}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *PublishRequest) GetCall() *Call {
@@ -3721,7 +3811,7 @@ type PublishResponse struct {
 
 func (x *PublishResponse) Reset() {
 	*x = PublishResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[52]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3733,7 +3823,7 @@ func (x *PublishResponse) String() string {
 func (*PublishResponse) ProtoMessage() {}
 
 func (x *PublishResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[52]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3746,7 +3836,7 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
 func (*PublishResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{52}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *PublishResponse) GetEvidence() *DraftEvidence {
@@ -3767,7 +3857,7 @@ type VerifyRequest struct {
 
 func (x *VerifyRequest) Reset() {
 	*x = VerifyRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[53]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3779,7 +3869,7 @@ func (x *VerifyRequest) String() string {
 func (*VerifyRequest) ProtoMessage() {}
 
 func (x *VerifyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[53]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3792,7 +3882,7 @@ func (x *VerifyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyRequest.ProtoReflect.Descriptor instead.
 func (*VerifyRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{53}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *VerifyRequest) GetCall() *Call {
@@ -3826,7 +3916,7 @@ type VerifyResponse struct {
 
 func (x *VerifyResponse) Reset() {
 	*x = VerifyResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[54]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3838,7 +3928,7 @@ func (x *VerifyResponse) String() string {
 func (*VerifyResponse) ProtoMessage() {}
 
 func (x *VerifyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[54]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3851,7 +3941,7 @@ func (x *VerifyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyResponse.ProtoReflect.Descriptor instead.
 func (*VerifyResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{54}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *VerifyResponse) GetEvidence() *DraftEvidence {
@@ -3878,7 +3968,7 @@ type LandedRequest struct {
 
 func (x *LandedRequest) Reset() {
 	*x = LandedRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[55]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3890,7 +3980,7 @@ func (x *LandedRequest) String() string {
 func (*LandedRequest) ProtoMessage() {}
 
 func (x *LandedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[55]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3903,7 +3993,7 @@ func (x *LandedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LandedRequest.ProtoReflect.Descriptor instead.
 func (*LandedRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{55}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *LandedRequest) GetCall() *Call {
@@ -3930,7 +4020,7 @@ type LandedResponse struct {
 
 func (x *LandedResponse) Reset() {
 	*x = LandedResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[56]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3942,7 +4032,7 @@ func (x *LandedResponse) String() string {
 func (*LandedResponse) ProtoMessage() {}
 
 func (x *LandedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[56]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3955,7 +4045,7 @@ func (x *LandedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LandedResponse.ProtoReflect.Descriptor instead.
 func (*LandedResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{56}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *LandedResponse) GetUnit() *pb.Unit {
@@ -3982,7 +4072,7 @@ type CheckoutRequest struct {
 
 func (x *CheckoutRequest) Reset() {
 	*x = CheckoutRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[57]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3994,7 +4084,7 @@ func (x *CheckoutRequest) String() string {
 func (*CheckoutRequest) ProtoMessage() {}
 
 func (x *CheckoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[57]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4007,7 +4097,7 @@ func (x *CheckoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckoutRequest.ProtoReflect.Descriptor instead.
 func (*CheckoutRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{57}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *CheckoutRequest) GetCall() *Call {
@@ -4041,7 +4131,7 @@ type CheckoutResponse struct {
 
 func (x *CheckoutResponse) Reset() {
 	*x = CheckoutResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[58]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4053,7 +4143,7 @@ func (x *CheckoutResponse) String() string {
 func (*CheckoutResponse) ProtoMessage() {}
 
 func (x *CheckoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[58]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4066,7 +4156,7 @@ func (x *CheckoutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckoutResponse.ProtoReflect.Descriptor instead.
 func (*CheckoutResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{58}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *CheckoutResponse) GetRepo() string {
@@ -4124,7 +4214,7 @@ type WriteStateRequest struct {
 
 func (x *WriteStateRequest) Reset() {
 	*x = WriteStateRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[59]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4136,7 +4226,7 @@ func (x *WriteStateRequest) String() string {
 func (*WriteStateRequest) ProtoMessage() {}
 
 func (x *WriteStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[59]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4149,7 +4239,7 @@ func (x *WriteStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteStateRequest.ProtoReflect.Descriptor instead.
 func (*WriteStateRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{59}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *WriteStateRequest) GetCall() *Call {
@@ -4196,7 +4286,7 @@ type WriteStateResponse struct {
 
 func (x *WriteStateResponse) Reset() {
 	*x = WriteStateResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[60]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4208,7 +4298,7 @@ func (x *WriteStateResponse) String() string {
 func (*WriteStateResponse) ProtoMessage() {}
 
 func (x *WriteStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[60]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4221,7 +4311,7 @@ func (x *WriteStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteStateResponse.ProtoReflect.Descriptor instead.
 func (*WriteStateResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{60}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *WriteStateResponse) GetEvidence() *DraftEvidence {
@@ -4241,7 +4331,7 @@ type BriefInputRequest struct {
 
 func (x *BriefInputRequest) Reset() {
 	*x = BriefInputRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[61]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4253,7 +4343,7 @@ func (x *BriefInputRequest) String() string {
 func (*BriefInputRequest) ProtoMessage() {}
 
 func (x *BriefInputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[61]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4266,7 +4356,7 @@ func (x *BriefInputRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefInputRequest.ProtoReflect.Descriptor instead.
 func (*BriefInputRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{61}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *BriefInputRequest) GetCall() *Call {
@@ -4295,7 +4385,7 @@ type BriefInputResponse struct {
 
 func (x *BriefInputResponse) Reset() {
 	*x = BriefInputResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[62]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4307,7 +4397,7 @@ func (x *BriefInputResponse) String() string {
 func (*BriefInputResponse) ProtoMessage() {}
 
 func (x *BriefInputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[62]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4320,7 +4410,7 @@ func (x *BriefInputResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefInputResponse.ProtoReflect.Descriptor instead.
 func (*BriefInputResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{62}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *BriefInputResponse) GetText() string {
@@ -4361,7 +4451,7 @@ type BriefRevisionRequest struct {
 
 func (x *BriefRevisionRequest) Reset() {
 	*x = BriefRevisionRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[63]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4373,7 +4463,7 @@ func (x *BriefRevisionRequest) String() string {
 func (*BriefRevisionRequest) ProtoMessage() {}
 
 func (x *BriefRevisionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[63]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4386,7 +4476,7 @@ func (x *BriefRevisionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefRevisionRequest.ProtoReflect.Descriptor instead.
 func (*BriefRevisionRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{63}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *BriefRevisionRequest) GetCall() *Call {
@@ -4416,7 +4506,7 @@ type BriefRevisionResponse struct {
 
 func (x *BriefRevisionResponse) Reset() {
 	*x = BriefRevisionResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[64]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4428,7 +4518,7 @@ func (x *BriefRevisionResponse) String() string {
 func (*BriefRevisionResponse) ProtoMessage() {}
 
 func (x *BriefRevisionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[64]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4441,7 +4531,7 @@ func (x *BriefRevisionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefRevisionResponse.ProtoReflect.Descriptor instead.
 func (*BriefRevisionResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{64}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *BriefRevisionResponse) GetRevision() string {
@@ -4475,7 +4565,7 @@ type BriefDescribeRequest struct {
 
 func (x *BriefDescribeRequest) Reset() {
 	*x = BriefDescribeRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[65]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4487,7 +4577,7 @@ func (x *BriefDescribeRequest) String() string {
 func (*BriefDescribeRequest) ProtoMessage() {}
 
 func (x *BriefDescribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[65]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4500,7 +4590,7 @@ func (x *BriefDescribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefDescribeRequest.ProtoReflect.Descriptor instead.
 func (*BriefDescribeRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{65}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *BriefDescribeRequest) GetCall() *Call {
@@ -4526,7 +4616,7 @@ type BriefDescribeResponse struct {
 
 func (x *BriefDescribeResponse) Reset() {
 	*x = BriefDescribeResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[66]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4538,7 +4628,7 @@ func (x *BriefDescribeResponse) String() string {
 func (*BriefDescribeResponse) ProtoMessage() {}
 
 func (x *BriefDescribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[66]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4551,7 +4641,7 @@ func (x *BriefDescribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefDescribeResponse.ProtoReflect.Descriptor instead.
 func (*BriefDescribeResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{66}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *BriefDescribeResponse) GetLine() string {
@@ -4575,7 +4665,7 @@ type BriefWritten struct {
 
 func (x *BriefWritten) Reset() {
 	*x = BriefWritten{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[67]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4587,7 +4677,7 @@ func (x *BriefWritten) String() string {
 func (*BriefWritten) ProtoMessage() {}
 
 func (x *BriefWritten) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[67]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4600,7 +4690,7 @@ func (x *BriefWritten) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefWritten.ProtoReflect.Descriptor instead.
 func (*BriefWritten) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{67}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *BriefWritten) GetAt() *BriefRevisionResponse {
@@ -4658,7 +4748,7 @@ type BriefStaleRequest struct {
 
 func (x *BriefStaleRequest) Reset() {
 	*x = BriefStaleRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[68]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4670,7 +4760,7 @@ func (x *BriefStaleRequest) String() string {
 func (*BriefStaleRequest) ProtoMessage() {}
 
 func (x *BriefStaleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[68]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4683,7 +4773,7 @@ func (x *BriefStaleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefStaleRequest.ProtoReflect.Descriptor instead.
 func (*BriefStaleRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{68}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *BriefStaleRequest) GetCall() *Call {
@@ -4730,7 +4820,7 @@ type BriefStaleResponse struct {
 
 func (x *BriefStaleResponse) Reset() {
 	*x = BriefStaleResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[69]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4742,7 +4832,7 @@ func (x *BriefStaleResponse) String() string {
 func (*BriefStaleResponse) ProtoMessage() {}
 
 func (x *BriefStaleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[69]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4755,7 +4845,7 @@ func (x *BriefStaleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefStaleResponse.ProtoReflect.Descriptor instead.
 func (*BriefStaleResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{69}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *BriefStaleResponse) GetStale() bool {
@@ -4775,7 +4865,7 @@ type BriefWantRequest struct {
 
 func (x *BriefWantRequest) Reset() {
 	*x = BriefWantRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[70]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4787,7 +4877,7 @@ func (x *BriefWantRequest) String() string {
 func (*BriefWantRequest) ProtoMessage() {}
 
 func (x *BriefWantRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[70]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4800,7 +4890,7 @@ func (x *BriefWantRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefWantRequest.ProtoReflect.Descriptor instead.
 func (*BriefWantRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{70}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *BriefWantRequest) GetCall() *Call {
@@ -4828,7 +4918,7 @@ type BriefWantResponse struct {
 
 func (x *BriefWantResponse) Reset() {
 	*x = BriefWantResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[71]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4840,7 +4930,7 @@ func (x *BriefWantResponse) String() string {
 func (*BriefWantResponse) ProtoMessage() {}
 
 func (x *BriefWantResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[71]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4853,7 +4943,7 @@ func (x *BriefWantResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefWantResponse.ProtoReflect.Descriptor instead.
 func (*BriefWantResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{71}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *BriefWantResponse) GetComing() bool {
@@ -4884,7 +4974,7 @@ type RoundState struct {
 
 func (x *RoundState) Reset() {
 	*x = RoundState{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[72]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4896,7 +4986,7 @@ func (x *RoundState) String() string {
 func (*RoundState) ProtoMessage() {}
 
 func (x *RoundState) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[72]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4909,7 +4999,7 @@ func (x *RoundState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundState.ProtoReflect.Descriptor instead.
 func (*RoundState) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{72}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *RoundState) GetMarks() map[string]string {
@@ -4980,7 +5070,7 @@ type Blocked struct {
 
 func (x *Blocked) Reset() {
 	*x = Blocked{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[73]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4992,7 +5082,7 @@ func (x *Blocked) String() string {
 func (*Blocked) ProtoMessage() {}
 
 func (x *Blocked) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[73]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5005,7 +5095,7 @@ func (x *Blocked) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Blocked.ProtoReflect.Descriptor instead.
 func (*Blocked) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{73}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *Blocked) GetQuestion() string {
@@ -5048,7 +5138,7 @@ type PlanRequest struct {
 
 func (x *PlanRequest) Reset() {
 	*x = PlanRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[74]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5060,7 +5150,7 @@ func (x *PlanRequest) String() string {
 func (*PlanRequest) ProtoMessage() {}
 
 func (x *PlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[74]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5073,7 +5163,7 @@ func (x *PlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanRequest.ProtoReflect.Descriptor instead.
 func (*PlanRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{74}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *PlanRequest) GetCall() *Call {
@@ -5113,7 +5203,7 @@ type PlanResponse struct {
 
 func (x *PlanResponse) Reset() {
 	*x = PlanResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[75]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5125,7 +5215,7 @@ func (x *PlanResponse) String() string {
 func (*PlanResponse) ProtoMessage() {}
 
 func (x *PlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[75]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5138,7 +5228,7 @@ func (x *PlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanResponse.ProtoReflect.Descriptor instead.
 func (*PlanResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{75}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *PlanResponse) GetRounds() []*Round {
@@ -5158,7 +5248,7 @@ type WorkspaceRef struct {
 
 func (x *WorkspaceRef) Reset() {
 	*x = WorkspaceRef{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[76]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5170,7 +5260,7 @@ func (x *WorkspaceRef) String() string {
 func (*WorkspaceRef) ProtoMessage() {}
 
 func (x *WorkspaceRef) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[76]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5183,7 +5273,7 @@ func (x *WorkspaceRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspaceRef.ProtoReflect.Descriptor instead.
 func (*WorkspaceRef) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{76}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *WorkspaceRef) GetManager() string {
@@ -5224,7 +5314,7 @@ type Round struct {
 
 func (x *Round) Reset() {
 	*x = Round{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[77]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5236,7 +5326,7 @@ func (x *Round) String() string {
 func (*Round) ProtoMessage() {}
 
 func (x *Round) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[77]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5249,7 +5339,7 @@ func (x *Round) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Round.ProtoReflect.Descriptor instead.
 func (*Round) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{77}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *Round) GetName() string {
@@ -5341,7 +5431,7 @@ type PayloadRequest struct {
 
 func (x *PayloadRequest) Reset() {
 	*x = PayloadRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[78]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5353,7 +5443,7 @@ func (x *PayloadRequest) String() string {
 func (*PayloadRequest) ProtoMessage() {}
 
 func (x *PayloadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[78]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5366,7 +5456,7 @@ func (x *PayloadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PayloadRequest.ProtoReflect.Descriptor instead.
 func (*PayloadRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{78}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *PayloadRequest) GetCall() *Call {
@@ -5492,7 +5582,7 @@ type Verdict struct {
 
 func (x *Verdict) Reset() {
 	*x = Verdict{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[79]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5504,7 +5594,7 @@ func (x *Verdict) String() string {
 func (*Verdict) ProtoMessage() {}
 
 func (x *Verdict) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[79]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5517,7 +5607,7 @@ func (x *Verdict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Verdict.ProtoReflect.Descriptor instead.
 func (*Verdict) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{79}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *Verdict) GetHead() string {
@@ -5553,7 +5643,7 @@ type Wording struct {
 
 func (x *Wording) Reset() {
 	*x = Wording{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[80]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5565,7 +5655,7 @@ func (x *Wording) String() string {
 func (*Wording) ProtoMessage() {}
 
 func (x *Wording) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[80]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5578,7 +5668,7 @@ func (x *Wording) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Wording.ProtoReflect.Descriptor instead.
 func (*Wording) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{80}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *Wording) GetNoun() string {
@@ -5622,7 +5712,7 @@ type PayloadResponse struct {
 
 func (x *PayloadResponse) Reset() {
 	*x = PayloadResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[81]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5634,7 +5724,7 @@ func (x *PayloadResponse) String() string {
 func (*PayloadResponse) ProtoMessage() {}
 
 func (x *PayloadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[81]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5647,7 +5737,7 @@ func (x *PayloadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PayloadResponse.ProtoReflect.Descriptor instead.
 func (*PayloadResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{81}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *PayloadResponse) GetArg() string {
@@ -5696,7 +5786,7 @@ type TurnRef struct {
 
 func (x *TurnRef) Reset() {
 	*x = TurnRef{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[82]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5708,7 +5798,7 @@ func (x *TurnRef) String() string {
 func (*TurnRef) ProtoMessage() {}
 
 func (x *TurnRef) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[82]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5721,7 +5811,7 @@ func (x *TurnRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnRef.ProtoReflect.Descriptor instead.
 func (*TurnRef) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{82}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *TurnRef) GetSeq() int64 {
@@ -5765,7 +5855,7 @@ type ApplyEffectRequest struct {
 
 func (x *ApplyEffectRequest) Reset() {
 	*x = ApplyEffectRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[83]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5777,7 +5867,7 @@ func (x *ApplyEffectRequest) String() string {
 func (*ApplyEffectRequest) ProtoMessage() {}
 
 func (x *ApplyEffectRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[83]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5790,7 +5880,7 @@ func (x *ApplyEffectRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyEffectRequest.ProtoReflect.Descriptor instead.
 func (*ApplyEffectRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{83}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ApplyEffectRequest) GetCall() *Call {
@@ -5857,7 +5947,7 @@ type ApplyEffectResponse struct {
 
 func (x *ApplyEffectResponse) Reset() {
 	*x = ApplyEffectResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[84]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5869,7 +5959,7 @@ func (x *ApplyEffectResponse) String() string {
 func (*ApplyEffectResponse) ProtoMessage() {}
 
 func (x *ApplyEffectResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[84]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5882,7 +5972,7 @@ func (x *ApplyEffectResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyEffectResponse.ProtoReflect.Descriptor instead.
 func (*ApplyEffectResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{84}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{85}
 }
 
 type ProposalsRequest struct {
@@ -5895,7 +5985,7 @@ type ProposalsRequest struct {
 
 func (x *ProposalsRequest) Reset() {
 	*x = ProposalsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[85]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5907,7 +5997,7 @@ func (x *ProposalsRequest) String() string {
 func (*ProposalsRequest) ProtoMessage() {}
 
 func (x *ProposalsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[85]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5920,7 +6010,7 @@ func (x *ProposalsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProposalsRequest.ProtoReflect.Descriptor instead.
 func (*ProposalsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{85}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ProposalsRequest) GetCall() *Call {
@@ -5949,7 +6039,7 @@ type ProposalsResponse struct {
 
 func (x *ProposalsResponse) Reset() {
 	*x = ProposalsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[86]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5961,7 +6051,7 @@ func (x *ProposalsResponse) String() string {
 func (*ProposalsResponse) ProtoMessage() {}
 
 func (x *ProposalsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[86]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5974,7 +6064,7 @@ func (x *ProposalsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProposalsResponse.ProtoReflect.Descriptor instead.
 func (*ProposalsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{86}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *ProposalsResponse) GetDrafts() []*Draft {
@@ -6001,7 +6091,7 @@ type Withdrawal struct {
 
 func (x *Withdrawal) Reset() {
 	*x = Withdrawal{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[87]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6013,7 +6103,7 @@ func (x *Withdrawal) String() string {
 func (*Withdrawal) ProtoMessage() {}
 
 func (x *Withdrawal) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[87]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6026,7 +6116,7 @@ func (x *Withdrawal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Withdrawal.ProtoReflect.Descriptor instead.
 func (*Withdrawal) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{87}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *Withdrawal) GetUnit() *pb.Unit {
@@ -6054,7 +6144,7 @@ type PlacementRequest struct {
 
 func (x *PlacementRequest) Reset() {
 	*x = PlacementRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[88]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6066,7 +6156,7 @@ func (x *PlacementRequest) String() string {
 func (*PlacementRequest) ProtoMessage() {}
 
 func (x *PlacementRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[88]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6079,7 +6169,7 @@ func (x *PlacementRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlacementRequest.ProtoReflect.Descriptor instead.
 func (*PlacementRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{88}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *PlacementRequest) GetCall() *Call {
@@ -6115,7 +6205,7 @@ type PlacementResponse struct {
 
 func (x *PlacementResponse) Reset() {
 	*x = PlacementResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[89]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6127,7 +6217,7 @@ func (x *PlacementResponse) String() string {
 func (*PlacementResponse) ProtoMessage() {}
 
 func (x *PlacementResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[89]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6140,7 +6230,7 @@ func (x *PlacementResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlacementResponse.ProtoReflect.Descriptor instead.
 func (*PlacementResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{89}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *PlacementResponse) GetDefault() *Placement {
@@ -6172,7 +6262,7 @@ type CallToolRequest struct {
 
 func (x *CallToolRequest) Reset() {
 	*x = CallToolRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[90]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6184,7 +6274,7 @@ func (x *CallToolRequest) String() string {
 func (*CallToolRequest) ProtoMessage() {}
 
 func (x *CallToolRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[90]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6197,7 +6287,7 @@ func (x *CallToolRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CallToolRequest.ProtoReflect.Descriptor instead.
 func (*CallToolRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{90}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *CallToolRequest) GetCall() *Call {
@@ -6248,7 +6338,7 @@ type CallToolResponse struct {
 
 func (x *CallToolResponse) Reset() {
 	*x = CallToolResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[91]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6260,7 +6350,7 @@ func (x *CallToolResponse) String() string {
 func (*CallToolResponse) ProtoMessage() {}
 
 func (x *CallToolResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[91]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6273,7 +6363,7 @@ func (x *CallToolResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CallToolResponse.ProtoReflect.Descriptor instead.
 func (*CallToolResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{91}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *CallToolResponse) GetAnswer() string {
@@ -6309,7 +6399,7 @@ type RunCLIRequest struct {
 
 func (x *RunCLIRequest) Reset() {
 	*x = RunCLIRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[92]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6321,7 +6411,7 @@ func (x *RunCLIRequest) String() string {
 func (*RunCLIRequest) ProtoMessage() {}
 
 func (x *RunCLIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[92]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6334,7 +6424,7 @@ func (x *RunCLIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunCLIRequest.ProtoReflect.Descriptor instead.
 func (*RunCLIRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{92}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *RunCLIRequest) GetCall() *Call {
@@ -6379,7 +6469,7 @@ type RunCLIResponse struct {
 
 func (x *RunCLIResponse) Reset() {
 	*x = RunCLIResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[93]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6391,7 +6481,7 @@ func (x *RunCLIResponse) String() string {
 func (*RunCLIResponse) ProtoMessage() {}
 
 func (x *RunCLIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[93]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6404,7 +6494,7 @@ func (x *RunCLIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunCLIResponse.ProtoReflect.Descriptor instead.
 func (*RunCLIResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{93}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *RunCLIResponse) GetStdout() []byte {
@@ -6444,7 +6534,7 @@ type ReportRequest struct {
 
 func (x *ReportRequest) Reset() {
 	*x = ReportRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[94]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6456,7 +6546,7 @@ func (x *ReportRequest) String() string {
 func (*ReportRequest) ProtoMessage() {}
 
 func (x *ReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[94]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6469,7 +6559,7 @@ func (x *ReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportRequest.ProtoReflect.Descriptor instead.
 func (*ReportRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{94}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ReportRequest) GetSnapshots() []*Snapshot {
@@ -6487,7 +6577,7 @@ type ReportResponse struct {
 
 func (x *ReportResponse) Reset() {
 	*x = ReportResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[95]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6499,7 +6589,7 @@ func (x *ReportResponse) String() string {
 func (*ReportResponse) ProtoMessage() {}
 
 func (x *ReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[95]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6512,7 +6602,7 @@ func (x *ReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportResponse.ProtoReflect.Descriptor instead.
 func (*ReportResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{95}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{96}
 }
 
 type ChangedRequest struct {
@@ -6525,7 +6615,7 @@ type ChangedRequest struct {
 
 func (x *ChangedRequest) Reset() {
 	*x = ChangedRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[96]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6537,7 +6627,7 @@ func (x *ChangedRequest) String() string {
 func (*ChangedRequest) ProtoMessage() {}
 
 func (x *ChangedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[96]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6550,7 +6640,7 @@ func (x *ChangedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangedRequest.ProtoReflect.Descriptor instead.
 func (*ChangedRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{96}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ChangedRequest) GetUnits() []*pb.Unit {
@@ -6575,7 +6665,7 @@ type ChangedResponse struct {
 
 func (x *ChangedResponse) Reset() {
 	*x = ChangedResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[97]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6587,7 +6677,7 @@ func (x *ChangedResponse) String() string {
 func (*ChangedResponse) ProtoMessage() {}
 
 func (x *ChangedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[97]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6600,7 +6690,7 @@ func (x *ChangedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangedResponse.ProtoReflect.Descriptor instead.
 func (*ChangedResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{97}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{98}
 }
 
 type ItemFields struct {
@@ -6623,7 +6713,7 @@ type ItemFields struct {
 
 func (x *ItemFields) Reset() {
 	*x = ItemFields{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[98]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6635,7 +6725,7 @@ func (x *ItemFields) String() string {
 func (*ItemFields) ProtoMessage() {}
 
 func (x *ItemFields) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[98]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6648,7 +6738,7 @@ func (x *ItemFields) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemFields.ProtoReflect.Descriptor instead.
 func (*ItemFields) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{98}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ItemFields) GetKind() string {
@@ -6757,7 +6847,7 @@ type ItemOp struct {
 
 func (x *ItemOp) Reset() {
 	*x = ItemOp{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[99]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6769,7 +6859,7 @@ func (x *ItemOp) String() string {
 func (*ItemOp) ProtoMessage() {}
 
 func (x *ItemOp) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[99]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6782,7 +6872,7 @@ func (x *ItemOp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemOp.ProtoReflect.Descriptor instead.
 func (*ItemOp) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{99}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ItemOp) GetOp() string {
@@ -6879,7 +6969,7 @@ type ItemResult struct {
 
 func (x *ItemResult) Reset() {
 	*x = ItemResult{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[100]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6891,7 +6981,7 @@ func (x *ItemResult) String() string {
 func (*ItemResult) ProtoMessage() {}
 
 func (x *ItemResult) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[100]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6904,7 +6994,7 @@ func (x *ItemResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemResult.ProtoReflect.Descriptor instead.
 func (*ItemResult) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{100}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ItemResult) GetItem() string {
@@ -6930,7 +7020,7 @@ type ApplyItemsRequest struct {
 
 func (x *ApplyItemsRequest) Reset() {
 	*x = ApplyItemsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[101]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6942,7 +7032,7 @@ func (x *ApplyItemsRequest) String() string {
 func (*ApplyItemsRequest) ProtoMessage() {}
 
 func (x *ApplyItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[101]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6955,7 +7045,7 @@ func (x *ApplyItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyItemsRequest.ProtoReflect.Descriptor instead.
 func (*ApplyItemsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{101}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ApplyItemsRequest) GetOps() []*ItemOp {
@@ -6974,7 +7064,7 @@ type ApplyItemsResponse struct {
 
 func (x *ApplyItemsResponse) Reset() {
 	*x = ApplyItemsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[102]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6986,7 +7076,7 @@ func (x *ApplyItemsResponse) String() string {
 func (*ApplyItemsResponse) ProtoMessage() {}
 
 func (x *ApplyItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[102]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6999,7 +7089,7 @@ func (x *ApplyItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyItemsResponse.ProtoReflect.Descriptor instead.
 func (*ApplyItemsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{102}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ApplyItemsResponse) GetResults() []*ItemResult {
@@ -7019,7 +7109,7 @@ type QueryItemsRequest struct {
 
 func (x *QueryItemsRequest) Reset() {
 	*x = QueryItemsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[103]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7031,7 +7121,7 @@ func (x *QueryItemsRequest) String() string {
 func (*QueryItemsRequest) ProtoMessage() {}
 
 func (x *QueryItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[103]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7044,7 +7134,7 @@ func (x *QueryItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryItemsRequest.ProtoReflect.Descriptor instead.
 func (*QueryItemsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{103}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *QueryItemsRequest) GetUnits() []*pb.Unit {
@@ -7070,7 +7160,7 @@ type QueryItemsResponse struct {
 
 func (x *QueryItemsResponse) Reset() {
 	*x = QueryItemsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[104]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7082,7 +7172,7 @@ func (x *QueryItemsResponse) String() string {
 func (*QueryItemsResponse) ProtoMessage() {}
 
 func (x *QueryItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[104]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7095,7 +7185,7 @@ func (x *QueryItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryItemsResponse.ProtoReflect.Descriptor instead.
 func (*QueryItemsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{104}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *QueryItemsResponse) GetItems() []*Item {
@@ -7120,7 +7210,7 @@ type Task struct {
 
 func (x *Task) Reset() {
 	*x = Task{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[105]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7132,7 +7222,7 @@ func (x *Task) String() string {
 func (*Task) ProtoMessage() {}
 
 func (x *Task) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[105]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7145,7 +7235,7 @@ func (x *Task) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Task.ProtoReflect.Descriptor instead.
 func (*Task) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{105}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *Task) GetId() string {
@@ -7206,7 +7296,7 @@ type TasksRequest struct {
 
 func (x *TasksRequest) Reset() {
 	*x = TasksRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[106]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7218,7 +7308,7 @@ func (x *TasksRequest) String() string {
 func (*TasksRequest) ProtoMessage() {}
 
 func (x *TasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[106]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7231,7 +7321,7 @@ func (x *TasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TasksRequest.ProtoReflect.Descriptor instead.
 func (*TasksRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{106}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *TasksRequest) GetUnits() []*pb.Unit {
@@ -7250,7 +7340,7 @@ type TasksResponse struct {
 
 func (x *TasksResponse) Reset() {
 	*x = TasksResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[107]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7262,7 +7352,7 @@ func (x *TasksResponse) String() string {
 func (*TasksResponse) ProtoMessage() {}
 
 func (x *TasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[107]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7275,7 +7365,7 @@ func (x *TasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TasksResponse.ProtoReflect.Descriptor instead.
 func (*TasksResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{107}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *TasksResponse) GetTasks() []*Task {
@@ -7310,7 +7400,7 @@ type Turn struct {
 
 func (x *Turn) Reset() {
 	*x = Turn{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[108]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7322,7 +7412,7 @@ func (x *Turn) String() string {
 func (*Turn) ProtoMessage() {}
 
 func (x *Turn) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[108]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7335,7 +7425,7 @@ func (x *Turn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Turn.ProtoReflect.Descriptor instead.
 func (*Turn) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{108}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *Turn) GetSeq() int64 {
@@ -7463,7 +7553,7 @@ type TurnRecord struct {
 
 func (x *TurnRecord) Reset() {
 	*x = TurnRecord{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[109]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7475,7 +7565,7 @@ func (x *TurnRecord) String() string {
 func (*TurnRecord) ProtoMessage() {}
 
 func (x *TurnRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[109]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7488,7 +7578,7 @@ func (x *TurnRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TurnRecord.ProtoReflect.Descriptor instead.
 func (*TurnRecord) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{109}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *TurnRecord) GetId() int64 {
@@ -7537,7 +7627,7 @@ type Book struct {
 
 func (x *Book) Reset() {
 	*x = Book{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[110]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7549,7 +7639,7 @@ func (x *Book) String() string {
 func (*Book) ProtoMessage() {}
 
 func (x *Book) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[110]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7562,7 +7652,7 @@ func (x *Book) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Book.ProtoReflect.Descriptor instead.
 func (*Book) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{110}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *Book) GetUnit() *pb.Unit {
@@ -7595,7 +7685,7 @@ type BooksRequest struct {
 
 func (x *BooksRequest) Reset() {
 	*x = BooksRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[111]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7607,7 +7697,7 @@ func (x *BooksRequest) String() string {
 func (*BooksRequest) ProtoMessage() {}
 
 func (x *BooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[111]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7620,7 +7710,7 @@ func (x *BooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BooksRequest.ProtoReflect.Descriptor instead.
 func (*BooksRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{111}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *BooksRequest) GetUnits() []*pb.Unit {
@@ -7639,7 +7729,7 @@ type BooksResponse struct {
 
 func (x *BooksResponse) Reset() {
 	*x = BooksResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[112]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7651,7 +7741,7 @@ func (x *BooksResponse) String() string {
 func (*BooksResponse) ProtoMessage() {}
 
 func (x *BooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[112]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7664,7 +7754,7 @@ func (x *BooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BooksResponse.ProtoReflect.Descriptor instead.
 func (*BooksResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{112}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *BooksResponse) GetBooks() []*Book {
@@ -7683,7 +7773,7 @@ type RoundStateRequest struct {
 
 func (x *RoundStateRequest) Reset() {
 	*x = RoundStateRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[113]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7695,7 +7785,7 @@ func (x *RoundStateRequest) String() string {
 func (*RoundStateRequest) ProtoMessage() {}
 
 func (x *RoundStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[113]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7708,7 +7798,7 @@ func (x *RoundStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundStateRequest.ProtoReflect.Descriptor instead.
 func (*RoundStateRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{113}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *RoundStateRequest) GetUnit() *pb.Unit {
@@ -7727,7 +7817,7 @@ type RoundStateResponse struct {
 
 func (x *RoundStateResponse) Reset() {
 	*x = RoundStateResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[114]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7739,7 +7829,7 @@ func (x *RoundStateResponse) String() string {
 func (*RoundStateResponse) ProtoMessage() {}
 
 func (x *RoundStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[114]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7752,7 +7842,7 @@ func (x *RoundStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundStateResponse.ProtoReflect.Descriptor instead.
 func (*RoundStateResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{114}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *RoundStateResponse) GetState() *RoundState {
@@ -7785,7 +7875,7 @@ type Workspace struct {
 
 func (x *Workspace) Reset() {
 	*x = Workspace{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[115]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7797,7 +7887,7 @@ func (x *Workspace) String() string {
 func (*Workspace) ProtoMessage() {}
 
 func (x *Workspace) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[115]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7810,7 +7900,7 @@ func (x *Workspace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workspace.ProtoReflect.Descriptor instead.
 func (*Workspace) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{115}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *Workspace) GetManager() string {
@@ -7923,7 +8013,7 @@ type Repo struct {
 
 func (x *Repo) Reset() {
 	*x = Repo{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[116]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7935,7 +8025,7 @@ func (x *Repo) String() string {
 func (*Repo) ProtoMessage() {}
 
 func (x *Repo) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[116]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7948,7 +8038,7 @@ func (x *Repo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repo.ProtoReflect.Descriptor instead.
 func (*Repo) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{116}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *Repo) GetId() string {
@@ -7989,7 +8079,7 @@ type WorkspacesRequest struct {
 
 func (x *WorkspacesRequest) Reset() {
 	*x = WorkspacesRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[117]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8001,7 +8091,7 @@ func (x *WorkspacesRequest) String() string {
 func (*WorkspacesRequest) ProtoMessage() {}
 
 func (x *WorkspacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[117]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8014,7 +8104,7 @@ func (x *WorkspacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspacesRequest.ProtoReflect.Descriptor instead.
 func (*WorkspacesRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{117}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *WorkspacesRequest) GetRepo() string {
@@ -8036,7 +8126,7 @@ type WorkspacesResponse struct {
 
 func (x *WorkspacesResponse) Reset() {
 	*x = WorkspacesResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[118]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8048,7 +8138,7 @@ func (x *WorkspacesResponse) String() string {
 func (*WorkspacesResponse) ProtoMessage() {}
 
 func (x *WorkspacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[118]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8061,7 +8151,7 @@ func (x *WorkspacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkspacesResponse.ProtoReflect.Descriptor instead.
 func (*WorkspacesResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{118}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *WorkspacesResponse) GetPartial() bool {
@@ -8094,7 +8184,7 @@ type SessionRequest struct {
 
 func (x *SessionRequest) Reset() {
 	*x = SessionRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[119]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8106,7 +8196,7 @@ func (x *SessionRequest) String() string {
 func (*SessionRequest) ProtoMessage() {}
 
 func (x *SessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[119]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8119,7 +8209,7 @@ func (x *SessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionRequest.ProtoReflect.Descriptor instead.
 func (*SessionRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{119}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *SessionRequest) GetHandle() string {
@@ -8145,7 +8235,7 @@ type SessionResponse struct {
 
 func (x *SessionResponse) Reset() {
 	*x = SessionResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[120]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8157,7 +8247,7 @@ func (x *SessionResponse) String() string {
 func (*SessionResponse) ProtoMessage() {}
 
 func (x *SessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[120]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8170,7 +8260,7 @@ func (x *SessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionResponse.ProtoReflect.Descriptor instead.
 func (*SessionResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{120}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *SessionResponse) GetUnit() *pb.Unit {
@@ -8228,7 +8318,7 @@ type GateRef struct {
 
 func (x *GateRef) Reset() {
 	*x = GateRef{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[121]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8240,7 +8330,7 @@ func (x *GateRef) String() string {
 func (*GateRef) ProtoMessage() {}
 
 func (x *GateRef) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[121]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8253,7 +8343,7 @@ func (x *GateRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GateRef.ProtoReflect.Descriptor instead.
 func (*GateRef) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{121}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *GateRef) GetGate() string {
@@ -8290,7 +8380,7 @@ type OpenGateRequest struct {
 
 func (x *OpenGateRequest) Reset() {
 	*x = OpenGateRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[122]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8302,7 +8392,7 @@ func (x *OpenGateRequest) String() string {
 func (*OpenGateRequest) ProtoMessage() {}
 
 func (x *OpenGateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[122]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8315,7 +8405,7 @@ func (x *OpenGateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenGateRequest.ProtoReflect.Descriptor instead.
 func (*OpenGateRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{122}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *OpenGateRequest) GetDraft() *Draft {
@@ -8341,7 +8431,7 @@ type OpenGateResponse struct {
 
 func (x *OpenGateResponse) Reset() {
 	*x = OpenGateResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[123]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8353,7 +8443,7 @@ func (x *OpenGateResponse) String() string {
 func (*OpenGateResponse) ProtoMessage() {}
 
 func (x *OpenGateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[123]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8366,7 +8456,7 @@ func (x *OpenGateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenGateResponse.ProtoReflect.Descriptor instead.
 func (*OpenGateResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{123}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *OpenGateResponse) GetGate() *GateRef {
@@ -8390,7 +8480,7 @@ type RecordSentRequest struct {
 
 func (x *RecordSentRequest) Reset() {
 	*x = RecordSentRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[124]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8402,7 +8492,7 @@ func (x *RecordSentRequest) String() string {
 func (*RecordSentRequest) ProtoMessage() {}
 
 func (x *RecordSentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[124]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8415,7 +8505,7 @@ func (x *RecordSentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordSentRequest.ProtoReflect.Descriptor instead.
 func (*RecordSentRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{124}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *RecordSentRequest) GetDraft() *Draft {
@@ -8448,7 +8538,7 @@ type RecordSentResponse struct {
 
 func (x *RecordSentResponse) Reset() {
 	*x = RecordSentResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[125]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8460,7 +8550,7 @@ func (x *RecordSentResponse) String() string {
 func (*RecordSentResponse) ProtoMessage() {}
 
 func (x *RecordSentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[125]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8473,7 +8563,7 @@ func (x *RecordSentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordSentResponse.ProtoReflect.Descriptor instead.
 func (*RecordSentResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{125}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *RecordSentResponse) GetGate() *GateRef {
@@ -8493,7 +8583,7 @@ type UnitMove struct {
 
 func (x *UnitMove) Reset() {
 	*x = UnitMove{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[126]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8505,7 +8595,7 @@ func (x *UnitMove) String() string {
 func (*UnitMove) ProtoMessage() {}
 
 func (x *UnitMove) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[126]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8518,7 +8608,7 @@ func (x *UnitMove) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitMove.ProtoReflect.Descriptor instead.
 func (*UnitMove) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{126}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *UnitMove) GetFrom() *pb.Unit {
@@ -8546,7 +8636,7 @@ type RehomeDraftsRequest struct {
 
 func (x *RehomeDraftsRequest) Reset() {
 	*x = RehomeDraftsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[127]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8558,7 +8648,7 @@ func (x *RehomeDraftsRequest) String() string {
 func (*RehomeDraftsRequest) ProtoMessage() {}
 
 func (x *RehomeDraftsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[127]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8571,7 +8661,7 @@ func (x *RehomeDraftsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RehomeDraftsRequest.ProtoReflect.Descriptor instead.
 func (*RehomeDraftsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{127}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *RehomeDraftsRequest) GetMoves() []*UnitMove {
@@ -8590,7 +8680,7 @@ type RehomeDraftsResponse struct {
 
 func (x *RehomeDraftsResponse) Reset() {
 	*x = RehomeDraftsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[128]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8602,7 +8692,7 @@ func (x *RehomeDraftsResponse) String() string {
 func (*RehomeDraftsResponse) ProtoMessage() {}
 
 func (x *RehomeDraftsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[128]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8615,7 +8705,7 @@ func (x *RehomeDraftsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RehomeDraftsResponse.ProtoReflect.Descriptor instead.
 func (*RehomeDraftsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{128}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *RehomeDraftsResponse) GetMoved() int64 {
@@ -8638,7 +8728,7 @@ type SetOverrideRequest struct {
 
 func (x *SetOverrideRequest) Reset() {
 	*x = SetOverrideRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[129]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8650,7 +8740,7 @@ func (x *SetOverrideRequest) String() string {
 func (*SetOverrideRequest) ProtoMessage() {}
 
 func (x *SetOverrideRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[129]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8663,7 +8753,7 @@ func (x *SetOverrideRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetOverrideRequest.ProtoReflect.Descriptor instead.
 func (*SetOverrideRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{129}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *SetOverrideRequest) GetUnit() *pb.Unit {
@@ -8696,7 +8786,7 @@ type SetOverrideResponse struct {
 
 func (x *SetOverrideResponse) Reset() {
 	*x = SetOverrideResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[130]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8708,7 +8798,7 @@ func (x *SetOverrideResponse) String() string {
 func (*SetOverrideResponse) ProtoMessage() {}
 
 func (x *SetOverrideResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[130]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8721,7 +8811,7 @@ func (x *SetOverrideResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetOverrideResponse.ProtoReflect.Descriptor instead.
 func (*SetOverrideResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{130}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *SetOverrideResponse) GetWritten() bool {
@@ -8748,7 +8838,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[131]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8760,7 +8850,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[131]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8773,7 +8863,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{131}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *Event) GetUnit() *pb.Unit {
@@ -8834,7 +8924,7 @@ type RecordEventsRequest struct {
 
 func (x *RecordEventsRequest) Reset() {
 	*x = RecordEventsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[132]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8846,7 +8936,7 @@ func (x *RecordEventsRequest) String() string {
 func (*RecordEventsRequest) ProtoMessage() {}
 
 func (x *RecordEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[132]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8859,7 +8949,7 @@ func (x *RecordEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordEventsRequest.ProtoReflect.Descriptor instead.
 func (*RecordEventsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{132}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *RecordEventsRequest) GetEvents() []*Event {
@@ -8877,7 +8967,7 @@ type RecordEventsResponse struct {
 
 func (x *RecordEventsResponse) Reset() {
 	*x = RecordEventsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[133]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8889,7 +8979,7 @@ func (x *RecordEventsResponse) String() string {
 func (*RecordEventsResponse) ProtoMessage() {}
 
 func (x *RecordEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[133]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8902,7 +8992,7 @@ func (x *RecordEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordEventsResponse.ProtoReflect.Descriptor instead.
 func (*RecordEventsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{133}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{134}
 }
 
 type SetMarksRequest struct {
@@ -8916,7 +9006,7 @@ type SetMarksRequest struct {
 
 func (x *SetMarksRequest) Reset() {
 	*x = SetMarksRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[134]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8928,7 +9018,7 @@ func (x *SetMarksRequest) String() string {
 func (*SetMarksRequest) ProtoMessage() {}
 
 func (x *SetMarksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[134]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8941,7 +9031,7 @@ func (x *SetMarksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMarksRequest.ProtoReflect.Descriptor instead.
 func (*SetMarksRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{134}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *SetMarksRequest) GetUnit() *pb.Unit {
@@ -8966,7 +9056,7 @@ type SetMarksResponse struct {
 
 func (x *SetMarksResponse) Reset() {
 	*x = SetMarksResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[135]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8978,7 +9068,7 @@ func (x *SetMarksResponse) String() string {
 func (*SetMarksResponse) ProtoMessage() {}
 
 func (x *SetMarksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[135]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8991,7 +9081,7 @@ func (x *SetMarksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMarksResponse.ProtoReflect.Descriptor instead.
 func (*SetMarksResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{135}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{136}
 }
 
 type PutBriefRequest struct {
@@ -9006,7 +9096,7 @@ type PutBriefRequest struct {
 
 func (x *PutBriefRequest) Reset() {
 	*x = PutBriefRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[136]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9018,7 +9108,7 @@ func (x *PutBriefRequest) String() string {
 func (*PutBriefRequest) ProtoMessage() {}
 
 func (x *PutBriefRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[136]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9031,7 +9121,7 @@ func (x *PutBriefRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutBriefRequest.ProtoReflect.Descriptor instead.
 func (*PutBriefRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{136}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *PutBriefRequest) GetTask() string {
@@ -9070,7 +9160,7 @@ type PutBriefResponse struct {
 
 func (x *PutBriefResponse) Reset() {
 	*x = PutBriefResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[137]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9082,7 +9172,7 @@ func (x *PutBriefResponse) String() string {
 func (*PutBriefResponse) ProtoMessage() {}
 
 func (x *PutBriefResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[137]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9095,7 +9185,7 @@ func (x *PutBriefResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutBriefResponse.ProtoReflect.Descriptor instead.
 func (*PutBriefResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{137}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{138}
 }
 
 type SetWakeRequest struct {
@@ -9111,7 +9201,7 @@ type SetWakeRequest struct {
 
 func (x *SetWakeRequest) Reset() {
 	*x = SetWakeRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[138]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9123,7 +9213,7 @@ func (x *SetWakeRequest) String() string {
 func (*SetWakeRequest) ProtoMessage() {}
 
 func (x *SetWakeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[138]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9136,7 +9226,7 @@ func (x *SetWakeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetWakeRequest.ProtoReflect.Descriptor instead.
 func (*SetWakeRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{138}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *SetWakeRequest) GetUnit() *pb.Unit {
@@ -9175,7 +9265,7 @@ type SetWakeResponse struct {
 
 func (x *SetWakeResponse) Reset() {
 	*x = SetWakeResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[139]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9187,7 +9277,7 @@ func (x *SetWakeResponse) String() string {
 func (*SetWakeResponse) ProtoMessage() {}
 
 func (x *SetWakeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[139]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9200,7 +9290,7 @@ func (x *SetWakeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetWakeResponse.ProtoReflect.Descriptor instead.
 func (*SetWakeResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{139}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{140}
 }
 
 type ClearWakeRequest struct {
@@ -9213,7 +9303,7 @@ type ClearWakeRequest struct {
 
 func (x *ClearWakeRequest) Reset() {
 	*x = ClearWakeRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[140]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9225,7 +9315,7 @@ func (x *ClearWakeRequest) String() string {
 func (*ClearWakeRequest) ProtoMessage() {}
 
 func (x *ClearWakeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[140]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9238,7 +9328,7 @@ func (x *ClearWakeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearWakeRequest.ProtoReflect.Descriptor instead.
 func (*ClearWakeRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{140}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *ClearWakeRequest) GetUnit() *pb.Unit {
@@ -9263,7 +9353,7 @@ type ClearWakeResponse struct {
 
 func (x *ClearWakeResponse) Reset() {
 	*x = ClearWakeResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[141]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9275,7 +9365,7 @@ func (x *ClearWakeResponse) String() string {
 func (*ClearWakeResponse) ProtoMessage() {}
 
 func (x *ClearWakeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[141]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9288,7 +9378,7 @@ func (x *ClearWakeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearWakeResponse.ProtoReflect.Descriptor instead.
 func (*ClearWakeResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{141}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{142}
 }
 
 type AskRequest struct {
@@ -9305,7 +9395,7 @@ type AskRequest struct {
 
 func (x *AskRequest) Reset() {
 	*x = AskRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[142]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9317,7 +9407,7 @@ func (x *AskRequest) String() string {
 func (*AskRequest) ProtoMessage() {}
 
 func (x *AskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[142]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9330,7 +9420,7 @@ func (x *AskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AskRequest.ProtoReflect.Descriptor instead.
 func (*AskRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{142}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *AskRequest) GetPrompt() string {
@@ -9382,7 +9472,7 @@ type AskResponse struct {
 
 func (x *AskResponse) Reset() {
 	*x = AskResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[143]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9394,7 +9484,7 @@ func (x *AskResponse) String() string {
 func (*AskResponse) ProtoMessage() {}
 
 func (x *AskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[143]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9407,7 +9497,7 @@ func (x *AskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AskResponse.ProtoReflect.Descriptor instead.
 func (*AskResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{143}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *AskResponse) GetText() string {
@@ -9460,7 +9550,7 @@ type MeterRequest struct {
 
 func (x *MeterRequest) Reset() {
 	*x = MeterRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[144]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9472,7 +9562,7 @@ func (x *MeterRequest) String() string {
 func (*MeterRequest) ProtoMessage() {}
 
 func (x *MeterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[144]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9485,7 +9575,7 @@ func (x *MeterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeterRequest.ProtoReflect.Descriptor instead.
 func (*MeterRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{144}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *MeterRequest) GetScope() string {
@@ -9545,7 +9635,7 @@ type MeterResponse struct {
 
 func (x *MeterResponse) Reset() {
 	*x = MeterResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[145]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9557,7 +9647,7 @@ func (x *MeterResponse) String() string {
 func (*MeterResponse) ProtoMessage() {}
 
 func (x *MeterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[145]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9570,7 +9660,7 @@ func (x *MeterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeterResponse.ProtoReflect.Descriptor instead.
 func (*MeterResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{145}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{146}
 }
 
 type ConfigRequest struct {
@@ -9581,7 +9671,7 @@ type ConfigRequest struct {
 
 func (x *ConfigRequest) Reset() {
 	*x = ConfigRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[146]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9593,7 +9683,7 @@ func (x *ConfigRequest) String() string {
 func (*ConfigRequest) ProtoMessage() {}
 
 func (x *ConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[146]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9606,7 +9696,7 @@ func (x *ConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigRequest.ProtoReflect.Descriptor instead.
 func (*ConfigRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{146}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{147}
 }
 
 // Config is the configuration a plugin reads.
@@ -9625,7 +9715,7 @@ type Config struct {
 
 func (x *Config) Reset() {
 	*x = Config{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[147]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9637,7 +9727,7 @@ func (x *Config) String() string {
 func (*Config) ProtoMessage() {}
 
 func (x *Config) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[147]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9650,7 +9740,7 @@ func (x *Config) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Config.ProtoReflect.Descriptor instead.
 func (*Config) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{147}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *Config) GetPluginJson() []byte {
@@ -9691,7 +9781,7 @@ type BriefIntent struct {
 
 func (x *BriefIntent) Reset() {
 	*x = BriefIntent{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[148]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9703,7 +9793,7 @@ func (x *BriefIntent) String() string {
 func (*BriefIntent) ProtoMessage() {}
 
 func (x *BriefIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[148]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9716,7 +9806,7 @@ func (x *BriefIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BriefIntent.ProtoReflect.Descriptor instead.
 func (*BriefIntent) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{148}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *BriefIntent) GetExtraSchemaJson() []byte {
@@ -9756,7 +9846,7 @@ type ConfigResponse struct {
 
 func (x *ConfigResponse) Reset() {
 	*x = ConfigResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[149]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9768,7 +9858,7 @@ func (x *ConfigResponse) String() string {
 func (*ConfigResponse) ProtoMessage() {}
 
 func (x *ConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[149]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9781,7 +9871,7 @@ func (x *ConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigResponse.ProtoReflect.Descriptor instead.
 func (*ConfigResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{149}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *ConfigResponse) GetConfig() *Config {
@@ -9802,7 +9892,7 @@ type ProfileRequest struct {
 
 func (x *ProfileRequest) Reset() {
 	*x = ProfileRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[150]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9814,7 +9904,7 @@ func (x *ProfileRequest) String() string {
 func (*ProfileRequest) ProtoMessage() {}
 
 func (x *ProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[150]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9827,7 +9917,7 @@ func (x *ProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfileRequest.ProtoReflect.Descriptor instead.
 func (*ProfileRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{150}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *ProfileRequest) GetPath() string {
@@ -9846,7 +9936,7 @@ type ProfileResponse struct {
 
 func (x *ProfileResponse) Reset() {
 	*x = ProfileResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[151]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9858,7 +9948,7 @@ func (x *ProfileResponse) String() string {
 func (*ProfileResponse) ProtoMessage() {}
 
 func (x *ProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[151]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9871,7 +9961,7 @@ func (x *ProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProfileResponse.ProtoReflect.Descriptor instead.
 func (*ProfileResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{151}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *ProfileResponse) GetContent() []byte {
@@ -9893,7 +9983,7 @@ type HoldsRequest struct {
 
 func (x *HoldsRequest) Reset() {
 	*x = HoldsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[152]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9905,7 +9995,7 @@ func (x *HoldsRequest) String() string {
 func (*HoldsRequest) ProtoMessage() {}
 
 func (x *HoldsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[152]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9918,7 +10008,7 @@ func (x *HoldsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoldsRequest.ProtoReflect.Descriptor instead.
 func (*HoldsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{152}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *HoldsRequest) GetPredicate() string {
@@ -9945,7 +10035,7 @@ type FactSet struct {
 
 func (x *FactSet) Reset() {
 	*x = FactSet{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[153]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9957,7 +10047,7 @@ func (x *FactSet) String() string {
 func (*FactSet) ProtoMessage() {}
 
 func (x *FactSet) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[153]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9970,7 +10060,7 @@ func (x *FactSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FactSet.ProtoReflect.Descriptor instead.
 func (*FactSet) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{153}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *FactSet) GetFacts() []*Fact {
@@ -9990,7 +10080,7 @@ type HoldsResponse struct {
 
 func (x *HoldsResponse) Reset() {
 	*x = HoldsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[154]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10002,7 +10092,7 @@ func (x *HoldsResponse) String() string {
 func (*HoldsResponse) ProtoMessage() {}
 
 func (x *HoldsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[154]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10015,7 +10105,7 @@ func (x *HoldsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoldsResponse.ProtoReflect.Descriptor instead.
 func (*HoldsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{154}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *HoldsResponse) GetVerdicts() []*PredicateVerdict {
@@ -10037,7 +10127,7 @@ type PredicateVerdict struct {
 
 func (x *PredicateVerdict) Reset() {
 	*x = PredicateVerdict{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[155]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10049,7 +10139,7 @@ func (x *PredicateVerdict) String() string {
 func (*PredicateVerdict) ProtoMessage() {}
 
 func (x *PredicateVerdict) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[155]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10062,7 +10152,7 @@ func (x *PredicateVerdict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PredicateVerdict.ProtoReflect.Descriptor instead.
 func (*PredicateVerdict) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{155}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *PredicateVerdict) GetHolds() bool {
@@ -10091,7 +10181,7 @@ type EventsRequest struct {
 
 func (x *EventsRequest) Reset() {
 	*x = EventsRequest{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[156]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10103,7 +10193,7 @@ func (x *EventsRequest) String() string {
 func (*EventsRequest) ProtoMessage() {}
 
 func (x *EventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[156]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10116,7 +10206,7 @@ func (x *EventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventsRequest.ProtoReflect.Descriptor instead.
 func (*EventsRequest) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{156}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *EventsRequest) GetUnits() []*pb.Unit {
@@ -10149,7 +10239,7 @@ type EventsResponse struct {
 
 func (x *EventsResponse) Reset() {
 	*x = EventsResponse{}
-	mi := &file_wloop_source_v1_source_proto_msgTypes[157]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10161,7 +10251,7 @@ func (x *EventsResponse) String() string {
 func (*EventsResponse) ProtoMessage() {}
 
 func (x *EventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_wloop_source_v1_source_proto_msgTypes[157]
+	mi := &file_wloop_source_v1_source_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10174,7 +10264,7 @@ func (x *EventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventsResponse.ProtoReflect.Descriptor instead.
 func (*EventsResponse) Descriptor() ([]byte, []int) {
-	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{157}
+	return file_wloop_source_v1_source_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *EventsResponse) GetEvents() []*Event {
@@ -10241,13 +10331,27 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\apending\x18\x01 \x01(\x03R\apending\x12\x1d\n" +
 	"\n" +
 	"budget_hit\x18\x02 \x01(\bR\tbudgetHit\x122\n" +
-	"\x06oldest\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06oldest\"t\n" +
+	"\x06oldest\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06oldest\"\xa3\x02\n" +
 	"\n" +
 	"CardSignal\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x12\x12\n" +
 	"\x04tone\x18\x03 \x01(\tR\x04tone\x12*\n" +
-	"\x02at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\x86\x01\n" +
+	"\x02at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12?\n" +
+	"\x06params\x18\x05 \x03(\v2'.wloop.source.v1.CardSignal.ParamsEntryR\x06params\x121\n" +
+	"\x05notes\x18\x06 \x03(\v2\x1b.wloop.source.v1.SignalNoteR\x05notes\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe2\x01\n" +
+	"\n" +
+	"SignalNote\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x12\n" +
+	"\x04tone\x18\x02 \x01(\tR\x04tone\x12?\n" +
+	"\x06params\x18\x03 \x03(\v2'.wloop.source.v1.SignalNote.ParamsEntryR\x06params\x120\n" +
+	"\x05since\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x86\x01\n" +
 	"\x05Human\x12)\n" +
 	"\x03who\x18\x01 \x01(\v2\x17.wloop.source.v1.PersonR\x03who\x12\x12\n" +
 	"\x04what\x18\x02 \x01(\tR\x04what\x12*\n" +
@@ -11063,7 +11167,7 @@ func file_wloop_source_v1_source_proto_rawDescGZIP() []byte {
 }
 
 var file_wloop_source_v1_source_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_wloop_source_v1_source_proto_msgTypes = make([]protoimpl.MessageInfo, 169)
+var file_wloop_source_v1_source_proto_msgTypes = make([]protoimpl.MessageInfo, 172)
 var file_wloop_source_v1_source_proto_goTypes = []any{
 	(Priority)(0),                 // 0: wloop.source.v1.Priority
 	(TimeUnit)(0),                 // 1: wloop.source.v1.TimeUnit
@@ -11080,496 +11184,503 @@ var file_wloop_source_v1_source_proto_goTypes = []any{
 	(*Offer)(nil),                 // 12: wloop.source.v1.Offer
 	(*ExtractionHealth)(nil),      // 13: wloop.source.v1.ExtractionHealth
 	(*CardSignal)(nil),            // 14: wloop.source.v1.CardSignal
-	(*Human)(nil),                 // 15: wloop.source.v1.Human
-	(*Card)(nil),                  // 16: wloop.source.v1.Card
-	(*ItemOption)(nil),            // 17: wloop.source.v1.ItemOption
-	(*ItemOptionList)(nil),        // 18: wloop.source.v1.ItemOptionList
-	(*ItemEvidence)(nil),          // 19: wloop.source.v1.ItemEvidence
-	(*Item)(nil),                  // 20: wloop.source.v1.Item
-	(*Snapshot)(nil),              // 21: wloop.source.v1.Snapshot
-	(*FacetValues)(nil),           // 22: wloop.source.v1.FacetValues
-	(*Situation)(nil),             // 23: wloop.source.v1.Situation
-	(*Link)(nil),                  // 24: wloop.source.v1.Link
-	(*DraftOrigin)(nil),           // 25: wloop.source.v1.DraftOrigin
-	(*DraftEvidence)(nil),         // 26: wloop.source.v1.DraftEvidence
-	(*Draft)(nil),                 // 27: wloop.source.v1.Draft
-	(*Placement)(nil),             // 28: wloop.source.v1.Placement
-	(*CapabilitiesRequest)(nil),   // 29: wloop.source.v1.CapabilitiesRequest
-	(*CapabilitiesResponse)(nil),  // 30: wloop.source.v1.CapabilitiesResponse
-	(*IngestRequest)(nil),         // 31: wloop.source.v1.IngestRequest
-	(*IngestResponse)(nil),        // 32: wloop.source.v1.IngestResponse
-	(*TrackRequest)(nil),          // 33: wloop.source.v1.TrackRequest
-	(*TrackResponse)(nil),         // 34: wloop.source.v1.TrackResponse
-	(*UntrackRequest)(nil),        // 35: wloop.source.v1.UntrackRequest
-	(*UntrackResponse)(nil),       // 36: wloop.source.v1.UntrackResponse
-	(*ResolveRequest)(nil),        // 37: wloop.source.v1.ResolveRequest
-	(*ResolveResponse)(nil),       // 38: wloop.source.v1.ResolveResponse
-	(*LocateRequest)(nil),         // 39: wloop.source.v1.LocateRequest
-	(*LocateResponse)(nil),        // 40: wloop.source.v1.LocateResponse
-	(*ActionRequest)(nil),         // 41: wloop.source.v1.ActionRequest
-	(*ActionResponse)(nil),        // 42: wloop.source.v1.ActionResponse
-	(*ViewRequest)(nil),           // 43: wloop.source.v1.ViewRequest
-	(*ViewResponse)(nil),          // 44: wloop.source.v1.ViewResponse
-	(*IdentityRequest)(nil),       // 45: wloop.source.v1.IdentityRequest
-	(*IdentityResponse)(nil),      // 46: wloop.source.v1.IdentityResponse
-	(*ValidateRequest)(nil),       // 47: wloop.source.v1.ValidateRequest
-	(*ValidateResponse)(nil),      // 48: wloop.source.v1.ValidateResponse
-	(*WhereRequest)(nil),          // 49: wloop.source.v1.WhereRequest
-	(*WhereResponse)(nil),         // 50: wloop.source.v1.WhereResponse
-	(*PlaceRequest)(nil),          // 51: wloop.source.v1.PlaceRequest
-	(*PlaceResponse)(nil),         // 52: wloop.source.v1.PlaceResponse
-	(*PublishRequest)(nil),        // 53: wloop.source.v1.PublishRequest
-	(*PublishResponse)(nil),       // 54: wloop.source.v1.PublishResponse
-	(*VerifyRequest)(nil),         // 55: wloop.source.v1.VerifyRequest
-	(*VerifyResponse)(nil),        // 56: wloop.source.v1.VerifyResponse
-	(*LandedRequest)(nil),         // 57: wloop.source.v1.LandedRequest
-	(*LandedResponse)(nil),        // 58: wloop.source.v1.LandedResponse
-	(*CheckoutRequest)(nil),       // 59: wloop.source.v1.CheckoutRequest
-	(*CheckoutResponse)(nil),      // 60: wloop.source.v1.CheckoutResponse
-	(*WriteStateRequest)(nil),     // 61: wloop.source.v1.WriteStateRequest
-	(*WriteStateResponse)(nil),    // 62: wloop.source.v1.WriteStateResponse
-	(*BriefInputRequest)(nil),     // 63: wloop.source.v1.BriefInputRequest
-	(*BriefInputResponse)(nil),    // 64: wloop.source.v1.BriefInputResponse
-	(*BriefRevisionRequest)(nil),  // 65: wloop.source.v1.BriefRevisionRequest
-	(*BriefRevisionResponse)(nil), // 66: wloop.source.v1.BriefRevisionResponse
-	(*BriefDescribeRequest)(nil),  // 67: wloop.source.v1.BriefDescribeRequest
-	(*BriefDescribeResponse)(nil), // 68: wloop.source.v1.BriefDescribeResponse
-	(*BriefWritten)(nil),          // 69: wloop.source.v1.BriefWritten
-	(*BriefStaleRequest)(nil),     // 70: wloop.source.v1.BriefStaleRequest
-	(*BriefStaleResponse)(nil),    // 71: wloop.source.v1.BriefStaleResponse
-	(*BriefWantRequest)(nil),      // 72: wloop.source.v1.BriefWantRequest
-	(*BriefWantResponse)(nil),     // 73: wloop.source.v1.BriefWantResponse
-	(*RoundState)(nil),            // 74: wloop.source.v1.RoundState
-	(*Blocked)(nil),               // 75: wloop.source.v1.Blocked
-	(*PlanRequest)(nil),           // 76: wloop.source.v1.PlanRequest
-	(*PlanResponse)(nil),          // 77: wloop.source.v1.PlanResponse
-	(*WorkspaceRef)(nil),          // 78: wloop.source.v1.WorkspaceRef
-	(*Round)(nil),                 // 79: wloop.source.v1.Round
-	(*PayloadRequest)(nil),        // 80: wloop.source.v1.PayloadRequest
-	(*Verdict)(nil),               // 81: wloop.source.v1.Verdict
-	(*Wording)(nil),               // 82: wloop.source.v1.Wording
-	(*PayloadResponse)(nil),       // 83: wloop.source.v1.PayloadResponse
-	(*TurnRef)(nil),               // 84: wloop.source.v1.TurnRef
-	(*ApplyEffectRequest)(nil),    // 85: wloop.source.v1.ApplyEffectRequest
-	(*ApplyEffectResponse)(nil),   // 86: wloop.source.v1.ApplyEffectResponse
-	(*ProposalsRequest)(nil),      // 87: wloop.source.v1.ProposalsRequest
-	(*ProposalsResponse)(nil),     // 88: wloop.source.v1.ProposalsResponse
-	(*Withdrawal)(nil),            // 89: wloop.source.v1.Withdrawal
-	(*PlacementRequest)(nil),      // 90: wloop.source.v1.PlacementRequest
-	(*PlacementResponse)(nil),     // 91: wloop.source.v1.PlacementResponse
-	(*CallToolRequest)(nil),       // 92: wloop.source.v1.CallToolRequest
-	(*CallToolResponse)(nil),      // 93: wloop.source.v1.CallToolResponse
-	(*RunCLIRequest)(nil),         // 94: wloop.source.v1.RunCLIRequest
-	(*RunCLIResponse)(nil),        // 95: wloop.source.v1.RunCLIResponse
-	(*ReportRequest)(nil),         // 96: wloop.source.v1.ReportRequest
-	(*ReportResponse)(nil),        // 97: wloop.source.v1.ReportResponse
-	(*ChangedRequest)(nil),        // 98: wloop.source.v1.ChangedRequest
-	(*ChangedResponse)(nil),       // 99: wloop.source.v1.ChangedResponse
-	(*ItemFields)(nil),            // 100: wloop.source.v1.ItemFields
-	(*ItemOp)(nil),                // 101: wloop.source.v1.ItemOp
-	(*ItemResult)(nil),            // 102: wloop.source.v1.ItemResult
-	(*ApplyItemsRequest)(nil),     // 103: wloop.source.v1.ApplyItemsRequest
-	(*ApplyItemsResponse)(nil),    // 104: wloop.source.v1.ApplyItemsResponse
-	(*QueryItemsRequest)(nil),     // 105: wloop.source.v1.QueryItemsRequest
-	(*QueryItemsResponse)(nil),    // 106: wloop.source.v1.QueryItemsResponse
-	(*Task)(nil),                  // 107: wloop.source.v1.Task
-	(*TasksRequest)(nil),          // 108: wloop.source.v1.TasksRequest
-	(*TasksResponse)(nil),         // 109: wloop.source.v1.TasksResponse
-	(*Turn)(nil),                  // 110: wloop.source.v1.Turn
-	(*TurnRecord)(nil),            // 111: wloop.source.v1.TurnRecord
-	(*Book)(nil),                  // 112: wloop.source.v1.Book
-	(*BooksRequest)(nil),          // 113: wloop.source.v1.BooksRequest
-	(*BooksResponse)(nil),         // 114: wloop.source.v1.BooksResponse
-	(*RoundStateRequest)(nil),     // 115: wloop.source.v1.RoundStateRequest
-	(*RoundStateResponse)(nil),    // 116: wloop.source.v1.RoundStateResponse
-	(*Workspace)(nil),             // 117: wloop.source.v1.Workspace
-	(*Repo)(nil),                  // 118: wloop.source.v1.Repo
-	(*WorkspacesRequest)(nil),     // 119: wloop.source.v1.WorkspacesRequest
-	(*WorkspacesResponse)(nil),    // 120: wloop.source.v1.WorkspacesResponse
-	(*SessionRequest)(nil),        // 121: wloop.source.v1.SessionRequest
-	(*SessionResponse)(nil),       // 122: wloop.source.v1.SessionResponse
-	(*GateRef)(nil),               // 123: wloop.source.v1.GateRef
-	(*OpenGateRequest)(nil),       // 124: wloop.source.v1.OpenGateRequest
-	(*OpenGateResponse)(nil),      // 125: wloop.source.v1.OpenGateResponse
-	(*RecordSentRequest)(nil),     // 126: wloop.source.v1.RecordSentRequest
-	(*RecordSentResponse)(nil),    // 127: wloop.source.v1.RecordSentResponse
-	(*UnitMove)(nil),              // 128: wloop.source.v1.UnitMove
-	(*RehomeDraftsRequest)(nil),   // 129: wloop.source.v1.RehomeDraftsRequest
-	(*RehomeDraftsResponse)(nil),  // 130: wloop.source.v1.RehomeDraftsResponse
-	(*SetOverrideRequest)(nil),    // 131: wloop.source.v1.SetOverrideRequest
-	(*SetOverrideResponse)(nil),   // 132: wloop.source.v1.SetOverrideResponse
-	(*Event)(nil),                 // 133: wloop.source.v1.Event
-	(*RecordEventsRequest)(nil),   // 134: wloop.source.v1.RecordEventsRequest
-	(*RecordEventsResponse)(nil),  // 135: wloop.source.v1.RecordEventsResponse
-	(*SetMarksRequest)(nil),       // 136: wloop.source.v1.SetMarksRequest
-	(*SetMarksResponse)(nil),      // 137: wloop.source.v1.SetMarksResponse
-	(*PutBriefRequest)(nil),       // 138: wloop.source.v1.PutBriefRequest
-	(*PutBriefResponse)(nil),      // 139: wloop.source.v1.PutBriefResponse
-	(*SetWakeRequest)(nil),        // 140: wloop.source.v1.SetWakeRequest
-	(*SetWakeResponse)(nil),       // 141: wloop.source.v1.SetWakeResponse
-	(*ClearWakeRequest)(nil),      // 142: wloop.source.v1.ClearWakeRequest
-	(*ClearWakeResponse)(nil),     // 143: wloop.source.v1.ClearWakeResponse
-	(*AskRequest)(nil),            // 144: wloop.source.v1.AskRequest
-	(*AskResponse)(nil),           // 145: wloop.source.v1.AskResponse
-	(*MeterRequest)(nil),          // 146: wloop.source.v1.MeterRequest
-	(*MeterResponse)(nil),         // 147: wloop.source.v1.MeterResponse
-	(*ConfigRequest)(nil),         // 148: wloop.source.v1.ConfigRequest
-	(*Config)(nil),                // 149: wloop.source.v1.Config
-	(*BriefIntent)(nil),           // 150: wloop.source.v1.BriefIntent
-	(*ConfigResponse)(nil),        // 151: wloop.source.v1.ConfigResponse
-	(*ProfileRequest)(nil),        // 152: wloop.source.v1.ProfileRequest
-	(*ProfileResponse)(nil),       // 153: wloop.source.v1.ProfileResponse
-	(*HoldsRequest)(nil),          // 154: wloop.source.v1.HoldsRequest
-	(*FactSet)(nil),               // 155: wloop.source.v1.FactSet
-	(*HoldsResponse)(nil),         // 156: wloop.source.v1.HoldsResponse
-	(*PredicateVerdict)(nil),      // 157: wloop.source.v1.PredicateVerdict
-	(*EventsRequest)(nil),         // 158: wloop.source.v1.EventsRequest
-	(*EventsResponse)(nil),        // 159: wloop.source.v1.EventsResponse
-	nil,                           // 160: wloop.source.v1.Snapshot.FacetsEntry
-	nil,                           // 161: wloop.source.v1.Snapshot.FacetValuesEntry
-	nil,                           // 162: wloop.source.v1.Situation.ReasonParamsEntry
-	nil,                           // 163: wloop.source.v1.RoundState.MarksEntry
-	nil,                           // 164: wloop.source.v1.RoundState.OverridesEntry
-	nil,                           // 165: wloop.source.v1.Round.OnSentEntry
-	nil,                           // 166: wloop.source.v1.Round.OnSkippedEntry
-	nil,                           // 167: wloop.source.v1.SetOverrideRequest.SetEntry
-	nil,                           // 168: wloop.source.v1.SetOverrideRequest.IfMatchEntry
-	nil,                           // 169: wloop.source.v1.SetMarksRequest.MarksEntry
-	nil,                           // 170: wloop.source.v1.BriefIntent.FieldVersionsEntry
-	(*pb.Unit)(nil),               // 171: wloop.plugin.v1.Unit
-	(*timestamppb.Timestamp)(nil), // 172: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),   // 173: google.protobuf.Duration
+	(*SignalNote)(nil),            // 15: wloop.source.v1.SignalNote
+	(*Human)(nil),                 // 16: wloop.source.v1.Human
+	(*Card)(nil),                  // 17: wloop.source.v1.Card
+	(*ItemOption)(nil),            // 18: wloop.source.v1.ItemOption
+	(*ItemOptionList)(nil),        // 19: wloop.source.v1.ItemOptionList
+	(*ItemEvidence)(nil),          // 20: wloop.source.v1.ItemEvidence
+	(*Item)(nil),                  // 21: wloop.source.v1.Item
+	(*Snapshot)(nil),              // 22: wloop.source.v1.Snapshot
+	(*FacetValues)(nil),           // 23: wloop.source.v1.FacetValues
+	(*Situation)(nil),             // 24: wloop.source.v1.Situation
+	(*Link)(nil),                  // 25: wloop.source.v1.Link
+	(*DraftOrigin)(nil),           // 26: wloop.source.v1.DraftOrigin
+	(*DraftEvidence)(nil),         // 27: wloop.source.v1.DraftEvidence
+	(*Draft)(nil),                 // 28: wloop.source.v1.Draft
+	(*Placement)(nil),             // 29: wloop.source.v1.Placement
+	(*CapabilitiesRequest)(nil),   // 30: wloop.source.v1.CapabilitiesRequest
+	(*CapabilitiesResponse)(nil),  // 31: wloop.source.v1.CapabilitiesResponse
+	(*IngestRequest)(nil),         // 32: wloop.source.v1.IngestRequest
+	(*IngestResponse)(nil),        // 33: wloop.source.v1.IngestResponse
+	(*TrackRequest)(nil),          // 34: wloop.source.v1.TrackRequest
+	(*TrackResponse)(nil),         // 35: wloop.source.v1.TrackResponse
+	(*UntrackRequest)(nil),        // 36: wloop.source.v1.UntrackRequest
+	(*UntrackResponse)(nil),       // 37: wloop.source.v1.UntrackResponse
+	(*ResolveRequest)(nil),        // 38: wloop.source.v1.ResolveRequest
+	(*ResolveResponse)(nil),       // 39: wloop.source.v1.ResolveResponse
+	(*LocateRequest)(nil),         // 40: wloop.source.v1.LocateRequest
+	(*LocateResponse)(nil),        // 41: wloop.source.v1.LocateResponse
+	(*ActionRequest)(nil),         // 42: wloop.source.v1.ActionRequest
+	(*ActionResponse)(nil),        // 43: wloop.source.v1.ActionResponse
+	(*ViewRequest)(nil),           // 44: wloop.source.v1.ViewRequest
+	(*ViewResponse)(nil),          // 45: wloop.source.v1.ViewResponse
+	(*IdentityRequest)(nil),       // 46: wloop.source.v1.IdentityRequest
+	(*IdentityResponse)(nil),      // 47: wloop.source.v1.IdentityResponse
+	(*ValidateRequest)(nil),       // 48: wloop.source.v1.ValidateRequest
+	(*ValidateResponse)(nil),      // 49: wloop.source.v1.ValidateResponse
+	(*WhereRequest)(nil),          // 50: wloop.source.v1.WhereRequest
+	(*WhereResponse)(nil),         // 51: wloop.source.v1.WhereResponse
+	(*PlaceRequest)(nil),          // 52: wloop.source.v1.PlaceRequest
+	(*PlaceResponse)(nil),         // 53: wloop.source.v1.PlaceResponse
+	(*PublishRequest)(nil),        // 54: wloop.source.v1.PublishRequest
+	(*PublishResponse)(nil),       // 55: wloop.source.v1.PublishResponse
+	(*VerifyRequest)(nil),         // 56: wloop.source.v1.VerifyRequest
+	(*VerifyResponse)(nil),        // 57: wloop.source.v1.VerifyResponse
+	(*LandedRequest)(nil),         // 58: wloop.source.v1.LandedRequest
+	(*LandedResponse)(nil),        // 59: wloop.source.v1.LandedResponse
+	(*CheckoutRequest)(nil),       // 60: wloop.source.v1.CheckoutRequest
+	(*CheckoutResponse)(nil),      // 61: wloop.source.v1.CheckoutResponse
+	(*WriteStateRequest)(nil),     // 62: wloop.source.v1.WriteStateRequest
+	(*WriteStateResponse)(nil),    // 63: wloop.source.v1.WriteStateResponse
+	(*BriefInputRequest)(nil),     // 64: wloop.source.v1.BriefInputRequest
+	(*BriefInputResponse)(nil),    // 65: wloop.source.v1.BriefInputResponse
+	(*BriefRevisionRequest)(nil),  // 66: wloop.source.v1.BriefRevisionRequest
+	(*BriefRevisionResponse)(nil), // 67: wloop.source.v1.BriefRevisionResponse
+	(*BriefDescribeRequest)(nil),  // 68: wloop.source.v1.BriefDescribeRequest
+	(*BriefDescribeResponse)(nil), // 69: wloop.source.v1.BriefDescribeResponse
+	(*BriefWritten)(nil),          // 70: wloop.source.v1.BriefWritten
+	(*BriefStaleRequest)(nil),     // 71: wloop.source.v1.BriefStaleRequest
+	(*BriefStaleResponse)(nil),    // 72: wloop.source.v1.BriefStaleResponse
+	(*BriefWantRequest)(nil),      // 73: wloop.source.v1.BriefWantRequest
+	(*BriefWantResponse)(nil),     // 74: wloop.source.v1.BriefWantResponse
+	(*RoundState)(nil),            // 75: wloop.source.v1.RoundState
+	(*Blocked)(nil),               // 76: wloop.source.v1.Blocked
+	(*PlanRequest)(nil),           // 77: wloop.source.v1.PlanRequest
+	(*PlanResponse)(nil),          // 78: wloop.source.v1.PlanResponse
+	(*WorkspaceRef)(nil),          // 79: wloop.source.v1.WorkspaceRef
+	(*Round)(nil),                 // 80: wloop.source.v1.Round
+	(*PayloadRequest)(nil),        // 81: wloop.source.v1.PayloadRequest
+	(*Verdict)(nil),               // 82: wloop.source.v1.Verdict
+	(*Wording)(nil),               // 83: wloop.source.v1.Wording
+	(*PayloadResponse)(nil),       // 84: wloop.source.v1.PayloadResponse
+	(*TurnRef)(nil),               // 85: wloop.source.v1.TurnRef
+	(*ApplyEffectRequest)(nil),    // 86: wloop.source.v1.ApplyEffectRequest
+	(*ApplyEffectResponse)(nil),   // 87: wloop.source.v1.ApplyEffectResponse
+	(*ProposalsRequest)(nil),      // 88: wloop.source.v1.ProposalsRequest
+	(*ProposalsResponse)(nil),     // 89: wloop.source.v1.ProposalsResponse
+	(*Withdrawal)(nil),            // 90: wloop.source.v1.Withdrawal
+	(*PlacementRequest)(nil),      // 91: wloop.source.v1.PlacementRequest
+	(*PlacementResponse)(nil),     // 92: wloop.source.v1.PlacementResponse
+	(*CallToolRequest)(nil),       // 93: wloop.source.v1.CallToolRequest
+	(*CallToolResponse)(nil),      // 94: wloop.source.v1.CallToolResponse
+	(*RunCLIRequest)(nil),         // 95: wloop.source.v1.RunCLIRequest
+	(*RunCLIResponse)(nil),        // 96: wloop.source.v1.RunCLIResponse
+	(*ReportRequest)(nil),         // 97: wloop.source.v1.ReportRequest
+	(*ReportResponse)(nil),        // 98: wloop.source.v1.ReportResponse
+	(*ChangedRequest)(nil),        // 99: wloop.source.v1.ChangedRequest
+	(*ChangedResponse)(nil),       // 100: wloop.source.v1.ChangedResponse
+	(*ItemFields)(nil),            // 101: wloop.source.v1.ItemFields
+	(*ItemOp)(nil),                // 102: wloop.source.v1.ItemOp
+	(*ItemResult)(nil),            // 103: wloop.source.v1.ItemResult
+	(*ApplyItemsRequest)(nil),     // 104: wloop.source.v1.ApplyItemsRequest
+	(*ApplyItemsResponse)(nil),    // 105: wloop.source.v1.ApplyItemsResponse
+	(*QueryItemsRequest)(nil),     // 106: wloop.source.v1.QueryItemsRequest
+	(*QueryItemsResponse)(nil),    // 107: wloop.source.v1.QueryItemsResponse
+	(*Task)(nil),                  // 108: wloop.source.v1.Task
+	(*TasksRequest)(nil),          // 109: wloop.source.v1.TasksRequest
+	(*TasksResponse)(nil),         // 110: wloop.source.v1.TasksResponse
+	(*Turn)(nil),                  // 111: wloop.source.v1.Turn
+	(*TurnRecord)(nil),            // 112: wloop.source.v1.TurnRecord
+	(*Book)(nil),                  // 113: wloop.source.v1.Book
+	(*BooksRequest)(nil),          // 114: wloop.source.v1.BooksRequest
+	(*BooksResponse)(nil),         // 115: wloop.source.v1.BooksResponse
+	(*RoundStateRequest)(nil),     // 116: wloop.source.v1.RoundStateRequest
+	(*RoundStateResponse)(nil),    // 117: wloop.source.v1.RoundStateResponse
+	(*Workspace)(nil),             // 118: wloop.source.v1.Workspace
+	(*Repo)(nil),                  // 119: wloop.source.v1.Repo
+	(*WorkspacesRequest)(nil),     // 120: wloop.source.v1.WorkspacesRequest
+	(*WorkspacesResponse)(nil),    // 121: wloop.source.v1.WorkspacesResponse
+	(*SessionRequest)(nil),        // 122: wloop.source.v1.SessionRequest
+	(*SessionResponse)(nil),       // 123: wloop.source.v1.SessionResponse
+	(*GateRef)(nil),               // 124: wloop.source.v1.GateRef
+	(*OpenGateRequest)(nil),       // 125: wloop.source.v1.OpenGateRequest
+	(*OpenGateResponse)(nil),      // 126: wloop.source.v1.OpenGateResponse
+	(*RecordSentRequest)(nil),     // 127: wloop.source.v1.RecordSentRequest
+	(*RecordSentResponse)(nil),    // 128: wloop.source.v1.RecordSentResponse
+	(*UnitMove)(nil),              // 129: wloop.source.v1.UnitMove
+	(*RehomeDraftsRequest)(nil),   // 130: wloop.source.v1.RehomeDraftsRequest
+	(*RehomeDraftsResponse)(nil),  // 131: wloop.source.v1.RehomeDraftsResponse
+	(*SetOverrideRequest)(nil),    // 132: wloop.source.v1.SetOverrideRequest
+	(*SetOverrideResponse)(nil),   // 133: wloop.source.v1.SetOverrideResponse
+	(*Event)(nil),                 // 134: wloop.source.v1.Event
+	(*RecordEventsRequest)(nil),   // 135: wloop.source.v1.RecordEventsRequest
+	(*RecordEventsResponse)(nil),  // 136: wloop.source.v1.RecordEventsResponse
+	(*SetMarksRequest)(nil),       // 137: wloop.source.v1.SetMarksRequest
+	(*SetMarksResponse)(nil),      // 138: wloop.source.v1.SetMarksResponse
+	(*PutBriefRequest)(nil),       // 139: wloop.source.v1.PutBriefRequest
+	(*PutBriefResponse)(nil),      // 140: wloop.source.v1.PutBriefResponse
+	(*SetWakeRequest)(nil),        // 141: wloop.source.v1.SetWakeRequest
+	(*SetWakeResponse)(nil),       // 142: wloop.source.v1.SetWakeResponse
+	(*ClearWakeRequest)(nil),      // 143: wloop.source.v1.ClearWakeRequest
+	(*ClearWakeResponse)(nil),     // 144: wloop.source.v1.ClearWakeResponse
+	(*AskRequest)(nil),            // 145: wloop.source.v1.AskRequest
+	(*AskResponse)(nil),           // 146: wloop.source.v1.AskResponse
+	(*MeterRequest)(nil),          // 147: wloop.source.v1.MeterRequest
+	(*MeterResponse)(nil),         // 148: wloop.source.v1.MeterResponse
+	(*ConfigRequest)(nil),         // 149: wloop.source.v1.ConfigRequest
+	(*Config)(nil),                // 150: wloop.source.v1.Config
+	(*BriefIntent)(nil),           // 151: wloop.source.v1.BriefIntent
+	(*ConfigResponse)(nil),        // 152: wloop.source.v1.ConfigResponse
+	(*ProfileRequest)(nil),        // 153: wloop.source.v1.ProfileRequest
+	(*ProfileResponse)(nil),       // 154: wloop.source.v1.ProfileResponse
+	(*HoldsRequest)(nil),          // 155: wloop.source.v1.HoldsRequest
+	(*FactSet)(nil),               // 156: wloop.source.v1.FactSet
+	(*HoldsResponse)(nil),         // 157: wloop.source.v1.HoldsResponse
+	(*PredicateVerdict)(nil),      // 158: wloop.source.v1.PredicateVerdict
+	(*EventsRequest)(nil),         // 159: wloop.source.v1.EventsRequest
+	(*EventsResponse)(nil),        // 160: wloop.source.v1.EventsResponse
+	nil,                           // 161: wloop.source.v1.CardSignal.ParamsEntry
+	nil,                           // 162: wloop.source.v1.SignalNote.ParamsEntry
+	nil,                           // 163: wloop.source.v1.Snapshot.FacetsEntry
+	nil,                           // 164: wloop.source.v1.Snapshot.FacetValuesEntry
+	nil,                           // 165: wloop.source.v1.Situation.ReasonParamsEntry
+	nil,                           // 166: wloop.source.v1.RoundState.MarksEntry
+	nil,                           // 167: wloop.source.v1.RoundState.OverridesEntry
+	nil,                           // 168: wloop.source.v1.Round.OnSentEntry
+	nil,                           // 169: wloop.source.v1.Round.OnSkippedEntry
+	nil,                           // 170: wloop.source.v1.SetOverrideRequest.SetEntry
+	nil,                           // 171: wloop.source.v1.SetOverrideRequest.IfMatchEntry
+	nil,                           // 172: wloop.source.v1.SetMarksRequest.MarksEntry
+	nil,                           // 173: wloop.source.v1.BriefIntent.FieldVersionsEntry
+	(*pb.Unit)(nil),               // 174: wloop.plugin.v1.Unit
+	(*timestamppb.Timestamp)(nil), // 175: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),   // 176: google.protobuf.Duration
 }
 var file_wloop_source_v1_source_proto_depIdxs = []int32{
 	0,   // 0: wloop.source.v1.Call.priority:type_name -> wloop.source.v1.Priority
 	4,   // 1: wloop.source.v1.PersonList.people:type_name -> wloop.source.v1.Person
-	171, // 2: wloop.source.v1.Anchor.unit:type_name -> wloop.plugin.v1.Unit
-	172, // 3: wloop.source.v1.Anchor.at:type_name -> google.protobuf.Timestamp
-	172, // 4: wloop.source.v1.Since.since:type_name -> google.protobuf.Timestamp
-	172, // 5: wloop.source.v1.At.at:type_name -> google.protobuf.Timestamp
-	172, // 6: wloop.source.v1.After.after:type_name -> google.protobuf.Timestamp
-	173, // 7: wloop.source.v1.After.threshold:type_name -> google.protobuf.Duration
+	174, // 2: wloop.source.v1.Anchor.unit:type_name -> wloop.plugin.v1.Unit
+	175, // 3: wloop.source.v1.Anchor.at:type_name -> google.protobuf.Timestamp
+	175, // 4: wloop.source.v1.Since.since:type_name -> google.protobuf.Timestamp
+	175, // 5: wloop.source.v1.At.at:type_name -> google.protobuf.Timestamp
+	175, // 6: wloop.source.v1.After.after:type_name -> google.protobuf.Timestamp
+	176, // 7: wloop.source.v1.After.threshold:type_name -> google.protobuf.Duration
 	1,   // 8: wloop.source.v1.After.unit:type_name -> wloop.source.v1.TimeUnit
 	3,   // 9: wloop.source.v1.Fact.list:type_name -> wloop.source.v1.StringList
-	173, // 10: wloop.source.v1.Fact.duration:type_name -> google.protobuf.Duration
-	172, // 11: wloop.source.v1.Fact.time:type_name -> google.protobuf.Timestamp
+	176, // 10: wloop.source.v1.Fact.duration:type_name -> google.protobuf.Duration
+	175, // 11: wloop.source.v1.Fact.time:type_name -> google.protobuf.Timestamp
 	7,   // 12: wloop.source.v1.Fact.since:type_name -> wloop.source.v1.Since
 	8,   // 13: wloop.source.v1.Fact.at:type_name -> wloop.source.v1.At
 	9,   // 14: wloop.source.v1.Fact.after:type_name -> wloop.source.v1.After
-	172, // 15: wloop.source.v1.LinkSignal.since:type_name -> google.protobuf.Timestamp
-	172, // 16: wloop.source.v1.ExtractionHealth.oldest:type_name -> google.protobuf.Timestamp
-	172, // 17: wloop.source.v1.CardSignal.at:type_name -> google.protobuf.Timestamp
-	4,   // 18: wloop.source.v1.Human.who:type_name -> wloop.source.v1.Person
-	172, // 19: wloop.source.v1.Human.at:type_name -> google.protobuf.Timestamp
-	14,  // 20: wloop.source.v1.Card.signals:type_name -> wloop.source.v1.CardSignal
-	15,  // 21: wloop.source.v1.Card.last_human:type_name -> wloop.source.v1.Human
-	4,   // 22: wloop.source.v1.Card.waits_on:type_name -> wloop.source.v1.Person
-	172, // 23: wloop.source.v1.Card.since:type_name -> google.protobuf.Timestamp
-	4,   // 24: wloop.source.v1.ItemOption.argued_by:type_name -> wloop.source.v1.Person
-	17,  // 25: wloop.source.v1.ItemOptionList.options:type_name -> wloop.source.v1.ItemOption
-	6,   // 26: wloop.source.v1.ItemEvidence.anchor:type_name -> wloop.source.v1.Anchor
-	171, // 27: wloop.source.v1.Item.unit:type_name -> wloop.plugin.v1.Unit
-	17,  // 28: wloop.source.v1.Item.options:type_name -> wloop.source.v1.ItemOption
-	6,   // 29: wloop.source.v1.Item.origin:type_name -> wloop.source.v1.Anchor
-	4,   // 30: wloop.source.v1.Item.requester:type_name -> wloop.source.v1.Person
-	4,   // 31: wloop.source.v1.Item.assignees:type_name -> wloop.source.v1.Person
-	6,   // 32: wloop.source.v1.Item.assigned_at:type_name -> wloop.source.v1.Anchor
-	4,   // 33: wloop.source.v1.Item.waiting_on:type_name -> wloop.source.v1.Person
-	19,  // 34: wloop.source.v1.Item.evidence:type_name -> wloop.source.v1.ItemEvidence
-	19,  // 35: wloop.source.v1.Item.trail:type_name -> wloop.source.v1.ItemEvidence
-	172, // 36: wloop.source.v1.Item.user_at:type_name -> google.protobuf.Timestamp
-	172, // 37: wloop.source.v1.Item.created_at:type_name -> google.protobuf.Timestamp
-	172, // 38: wloop.source.v1.Item.updated_at:type_name -> google.protobuf.Timestamp
-	171, // 39: wloop.source.v1.Snapshot.unit:type_name -> wloop.plugin.v1.Unit
-	172, // 40: wloop.source.v1.Snapshot.at:type_name -> google.protobuf.Timestamp
-	23,  // 41: wloop.source.v1.Snapshot.situation:type_name -> wloop.source.v1.Situation
-	16,  // 42: wloop.source.v1.Snapshot.card:type_name -> wloop.source.v1.Card
-	20,  // 43: wloop.source.v1.Snapshot.items:type_name -> wloop.source.v1.Item
-	10,  // 44: wloop.source.v1.Snapshot.facts:type_name -> wloop.source.v1.Fact
-	11,  // 45: wloop.source.v1.Snapshot.signals:type_name -> wloop.source.v1.LinkSignal
-	4,   // 46: wloop.source.v1.Snapshot.owes:type_name -> wloop.source.v1.Person
-	12,  // 47: wloop.source.v1.Snapshot.offers:type_name -> wloop.source.v1.Offer
-	13,  // 48: wloop.source.v1.Snapshot.extraction_health:type_name -> wloop.source.v1.ExtractionHealth
-	172, // 49: wloop.source.v1.Snapshot.due:type_name -> google.protobuf.Timestamp
-	24,  // 50: wloop.source.v1.Snapshot.links:type_name -> wloop.source.v1.Link
-	160, // 51: wloop.source.v1.Snapshot.facets:type_name -> wloop.source.v1.Snapshot.FacetsEntry
-	161, // 52: wloop.source.v1.Snapshot.facet_values:type_name -> wloop.source.v1.Snapshot.FacetValuesEntry
-	172, // 53: wloop.source.v1.Situation.since:type_name -> google.protobuf.Timestamp
-	10,  // 54: wloop.source.v1.Situation.stalled:type_name -> wloop.source.v1.Fact
-	162, // 55: wloop.source.v1.Situation.reason_params:type_name -> wloop.source.v1.Situation.ReasonParamsEntry
-	6,   // 56: wloop.source.v1.Link.evidence:type_name -> wloop.source.v1.Anchor
-	171, // 57: wloop.source.v1.DraftOrigin.unit:type_name -> wloop.plugin.v1.Unit
-	172, // 58: wloop.source.v1.DraftEvidence.at:type_name -> google.protobuf.Timestamp
-	171, // 59: wloop.source.v1.Draft.unit:type_name -> wloop.plugin.v1.Unit
-	25,  // 60: wloop.source.v1.Draft.origin:type_name -> wloop.source.v1.DraftOrigin
-	26,  // 61: wloop.source.v1.Draft.evidence:type_name -> wloop.source.v1.DraftEvidence
-	2,   // 62: wloop.source.v1.IngestRequest.call:type_name -> wloop.source.v1.Call
-	172, // 63: wloop.source.v1.IngestRequest.now:type_name -> google.protobuf.Timestamp
-	2,   // 64: wloop.source.v1.TrackRequest.call:type_name -> wloop.source.v1.Call
-	171, // 65: wloop.source.v1.TrackRequest.unit:type_name -> wloop.plugin.v1.Unit
-	171, // 66: wloop.source.v1.TrackResponse.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 67: wloop.source.v1.UntrackRequest.call:type_name -> wloop.source.v1.Call
-	171, // 68: wloop.source.v1.UntrackRequest.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 69: wloop.source.v1.ResolveRequest.call:type_name -> wloop.source.v1.Call
-	171, // 70: wloop.source.v1.ResolveResponse.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 71: wloop.source.v1.LocateRequest.call:type_name -> wloop.source.v1.Call
-	171, // 72: wloop.source.v1.LocateResponse.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 73: wloop.source.v1.ActionRequest.call:type_name -> wloop.source.v1.Call
-	171, // 74: wloop.source.v1.ActionRequest.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 75: wloop.source.v1.ViewRequest.call:type_name -> wloop.source.v1.Call
-	2,   // 76: wloop.source.v1.IdentityRequest.call:type_name -> wloop.source.v1.Call
-	4,   // 77: wloop.source.v1.IdentityResponse.viewer:type_name -> wloop.source.v1.Person
-	2,   // 78: wloop.source.v1.ValidateRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 79: wloop.source.v1.ValidateRequest.draft:type_name -> wloop.source.v1.Draft
-	2,   // 80: wloop.source.v1.WhereRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 81: wloop.source.v1.WhereRequest.draft:type_name -> wloop.source.v1.Draft
-	2,   // 82: wloop.source.v1.PlaceRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 83: wloop.source.v1.PlaceRequest.draft:type_name -> wloop.source.v1.Draft
-	2,   // 84: wloop.source.v1.PublishRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 85: wloop.source.v1.PublishRequest.draft:type_name -> wloop.source.v1.Draft
-	26,  // 86: wloop.source.v1.PublishResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
-	2,   // 87: wloop.source.v1.VerifyRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 88: wloop.source.v1.VerifyRequest.draft:type_name -> wloop.source.v1.Draft
-	172, // 89: wloop.source.v1.VerifyRequest.started_at:type_name -> google.protobuf.Timestamp
-	26,  // 90: wloop.source.v1.VerifyResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
-	2,   // 91: wloop.source.v1.LandedRequest.call:type_name -> wloop.source.v1.Call
-	27,  // 92: wloop.source.v1.LandedRequest.draft:type_name -> wloop.source.v1.Draft
-	171, // 93: wloop.source.v1.LandedResponse.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 94: wloop.source.v1.CheckoutRequest.call:type_name -> wloop.source.v1.Call
-	171, // 95: wloop.source.v1.CheckoutRequest.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 96: wloop.source.v1.WriteStateRequest.call:type_name -> wloop.source.v1.Call
-	171, // 97: wloop.source.v1.WriteStateRequest.unit:type_name -> wloop.plugin.v1.Unit
-	26,  // 98: wloop.source.v1.WriteStateResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
-	2,   // 99: wloop.source.v1.BriefInputRequest.call:type_name -> wloop.source.v1.Call
-	171, // 100: wloop.source.v1.BriefInputRequest.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 101: wloop.source.v1.BriefRevisionRequest.call:type_name -> wloop.source.v1.Call
-	171, // 102: wloop.source.v1.BriefRevisionRequest.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 103: wloop.source.v1.BriefDescribeRequest.call:type_name -> wloop.source.v1.Call
-	64,  // 104: wloop.source.v1.BriefDescribeRequest.input:type_name -> wloop.source.v1.BriefInputResponse
-	66,  // 105: wloop.source.v1.BriefWritten.at:type_name -> wloop.source.v1.BriefRevisionResponse
-	172, // 106: wloop.source.v1.BriefWritten.attempted_at:type_name -> google.protobuf.Timestamp
-	2,   // 107: wloop.source.v1.BriefStaleRequest.call:type_name -> wloop.source.v1.Call
-	69,  // 108: wloop.source.v1.BriefStaleRequest.written:type_name -> wloop.source.v1.BriefWritten
-	66,  // 109: wloop.source.v1.BriefStaleRequest.current:type_name -> wloop.source.v1.BriefRevisionResponse
-	172, // 110: wloop.source.v1.BriefStaleRequest.now:type_name -> google.protobuf.Timestamp
-	2,   // 111: wloop.source.v1.BriefWantRequest.call:type_name -> wloop.source.v1.Call
-	171, // 112: wloop.source.v1.BriefWantRequest.unit:type_name -> wloop.plugin.v1.Unit
-	163, // 113: wloop.source.v1.RoundState.marks:type_name -> wloop.source.v1.RoundState.MarksEntry
-	172, // 114: wloop.source.v1.RoundState.sent_at:type_name -> google.protobuf.Timestamp
-	164, // 115: wloop.source.v1.RoundState.overrides:type_name -> wloop.source.v1.RoundState.OverridesEntry
-	75,  // 116: wloop.source.v1.RoundState.blocked:type_name -> wloop.source.v1.Blocked
-	172, // 117: wloop.source.v1.Blocked.since:type_name -> google.protobuf.Timestamp
-	2,   // 118: wloop.source.v1.PlanRequest.call:type_name -> wloop.source.v1.Call
-	171, // 119: wloop.source.v1.PlanRequest.unit:type_name -> wloop.plugin.v1.Unit
-	74,  // 120: wloop.source.v1.PlanRequest.state:type_name -> wloop.source.v1.RoundState
-	172, // 121: wloop.source.v1.PlanRequest.now:type_name -> google.protobuf.Timestamp
-	79,  // 122: wloop.source.v1.PlanResponse.rounds:type_name -> wloop.source.v1.Round
-	78,  // 123: wloop.source.v1.Round.workspace:type_name -> wloop.source.v1.WorkspaceRef
-	10,  // 124: wloop.source.v1.Round.turn_facts:type_name -> wloop.source.v1.Fact
-	165, // 125: wloop.source.v1.Round.on_sent:type_name -> wloop.source.v1.Round.OnSentEntry
-	166, // 126: wloop.source.v1.Round.on_skipped:type_name -> wloop.source.v1.Round.OnSkippedEntry
-	2,   // 127: wloop.source.v1.PayloadRequest.call:type_name -> wloop.source.v1.Call
-	171, // 128: wloop.source.v1.PayloadRequest.unit:type_name -> wloop.plugin.v1.Unit
-	81,  // 129: wloop.source.v1.PayloadRequest.last_verdict:type_name -> wloop.source.v1.Verdict
-	172, // 130: wloop.source.v1.Verdict.at:type_name -> google.protobuf.Timestamp
-	82,  // 131: wloop.source.v1.PayloadResponse.wording:type_name -> wloop.source.v1.Wording
-	10,  // 132: wloop.source.v1.PayloadResponse.facts:type_name -> wloop.source.v1.Fact
-	2,   // 133: wloop.source.v1.ApplyEffectRequest.call:type_name -> wloop.source.v1.Call
-	171, // 134: wloop.source.v1.ApplyEffectRequest.unit:type_name -> wloop.plugin.v1.Unit
-	84,  // 135: wloop.source.v1.ApplyEffectRequest.turn:type_name -> wloop.source.v1.TurnRef
-	27,  // 136: wloop.source.v1.ApplyEffectRequest.draft:type_name -> wloop.source.v1.Draft
-	2,   // 137: wloop.source.v1.ProposalsRequest.call:type_name -> wloop.source.v1.Call
-	172, // 138: wloop.source.v1.ProposalsRequest.now:type_name -> google.protobuf.Timestamp
-	27,  // 139: wloop.source.v1.ProposalsResponse.drafts:type_name -> wloop.source.v1.Draft
-	89,  // 140: wloop.source.v1.ProposalsResponse.withdrawals:type_name -> wloop.source.v1.Withdrawal
-	171, // 141: wloop.source.v1.Withdrawal.unit:type_name -> wloop.plugin.v1.Unit
-	2,   // 142: wloop.source.v1.PlacementRequest.call:type_name -> wloop.source.v1.Call
-	171, // 143: wloop.source.v1.PlacementRequest.unit:type_name -> wloop.plugin.v1.Unit
-	28,  // 144: wloop.source.v1.PlacementResponse.default:type_name -> wloop.source.v1.Placement
-	28,  // 145: wloop.source.v1.PlacementResponse.suggested:type_name -> wloop.source.v1.Placement
-	2,   // 146: wloop.source.v1.CallToolRequest.call:type_name -> wloop.source.v1.Call
-	2,   // 147: wloop.source.v1.RunCLIRequest.call:type_name -> wloop.source.v1.Call
-	149, // 148: wloop.source.v1.RunCLIRequest.config:type_name -> wloop.source.v1.Config
-	21,  // 149: wloop.source.v1.ReportRequest.snapshots:type_name -> wloop.source.v1.Snapshot
-	171, // 150: wloop.source.v1.ChangedRequest.units:type_name -> wloop.plugin.v1.Unit
-	18,  // 151: wloop.source.v1.ItemFields.options:type_name -> wloop.source.v1.ItemOptionList
-	3,   // 152: wloop.source.v1.ItemFields.urls:type_name -> wloop.source.v1.StringList
-	3,   // 153: wloop.source.v1.ItemFields.contexts:type_name -> wloop.source.v1.StringList
-	4,   // 154: wloop.source.v1.ItemFields.requester:type_name -> wloop.source.v1.Person
-	5,   // 155: wloop.source.v1.ItemFields.waiting_on:type_name -> wloop.source.v1.PersonList
-	171, // 156: wloop.source.v1.ItemOp.unit:type_name -> wloop.plugin.v1.Unit
-	6,   // 157: wloop.source.v1.ItemOp.anchor:type_name -> wloop.source.v1.Anchor
-	100, // 158: wloop.source.v1.ItemOp.fields:type_name -> wloop.source.v1.ItemFields
-	4,   // 159: wloop.source.v1.ItemOp.assignees:type_name -> wloop.source.v1.Person
-	19,  // 160: wloop.source.v1.ItemOp.evidence:type_name -> wloop.source.v1.ItemEvidence
-	171, // 161: wloop.source.v1.ItemOp.to:type_name -> wloop.plugin.v1.Unit
-	101, // 162: wloop.source.v1.ApplyItemsRequest.ops:type_name -> wloop.source.v1.ItemOp
-	102, // 163: wloop.source.v1.ApplyItemsResponse.results:type_name -> wloop.source.v1.ItemResult
-	171, // 164: wloop.source.v1.QueryItemsRequest.units:type_name -> wloop.plugin.v1.Unit
-	20,  // 165: wloop.source.v1.QueryItemsResponse.items:type_name -> wloop.source.v1.Item
-	171, // 166: wloop.source.v1.Task.units:type_name -> wloop.plugin.v1.Unit
-	171, // 167: wloop.source.v1.TasksRequest.units:type_name -> wloop.plugin.v1.Unit
-	107, // 168: wloop.source.v1.TasksResponse.tasks:type_name -> wloop.source.v1.Task
-	172, // 169: wloop.source.v1.Turn.sent_at:type_name -> google.protobuf.Timestamp
-	172, // 170: wloop.source.v1.Turn.started_at:type_name -> google.protobuf.Timestamp
-	172, // 171: wloop.source.v1.Turn.ended_at:type_name -> google.protobuf.Timestamp
-	172, // 172: wloop.source.v1.Turn.answered_at:type_name -> google.protobuf.Timestamp
-	172, // 173: wloop.source.v1.Turn.at:type_name -> google.protobuf.Timestamp
-	172, // 174: wloop.source.v1.TurnRecord.at:type_name -> google.protobuf.Timestamp
-	171, // 175: wloop.source.v1.Book.unit:type_name -> wloop.plugin.v1.Unit
-	110, // 176: wloop.source.v1.Book.turns:type_name -> wloop.source.v1.Turn
-	111, // 177: wloop.source.v1.Book.records:type_name -> wloop.source.v1.TurnRecord
-	171, // 178: wloop.source.v1.BooksRequest.units:type_name -> wloop.plugin.v1.Unit
-	112, // 179: wloop.source.v1.BooksResponse.books:type_name -> wloop.source.v1.Book
-	171, // 180: wloop.source.v1.RoundStateRequest.unit:type_name -> wloop.plugin.v1.Unit
-	74,  // 181: wloop.source.v1.RoundStateResponse.state:type_name -> wloop.source.v1.RoundState
-	171, // 182: wloop.source.v1.Workspace.units:type_name -> wloop.plugin.v1.Unit
-	118, // 183: wloop.source.v1.WorkspacesResponse.repos:type_name -> wloop.source.v1.Repo
-	117, // 184: wloop.source.v1.WorkspacesResponse.workspaces:type_name -> wloop.source.v1.Workspace
-	171, // 185: wloop.source.v1.SessionResponse.unit:type_name -> wloop.plugin.v1.Unit
-	27,  // 186: wloop.source.v1.OpenGateRequest.draft:type_name -> wloop.source.v1.Draft
-	123, // 187: wloop.source.v1.OpenGateResponse.gate:type_name -> wloop.source.v1.GateRef
-	27,  // 188: wloop.source.v1.RecordSentRequest.draft:type_name -> wloop.source.v1.Draft
-	123, // 189: wloop.source.v1.RecordSentResponse.gate:type_name -> wloop.source.v1.GateRef
-	171, // 190: wloop.source.v1.UnitMove.from:type_name -> wloop.plugin.v1.Unit
-	171, // 191: wloop.source.v1.UnitMove.to:type_name -> wloop.plugin.v1.Unit
-	128, // 192: wloop.source.v1.RehomeDraftsRequest.moves:type_name -> wloop.source.v1.UnitMove
-	171, // 193: wloop.source.v1.SetOverrideRequest.unit:type_name -> wloop.plugin.v1.Unit
-	167, // 194: wloop.source.v1.SetOverrideRequest.set:type_name -> wloop.source.v1.SetOverrideRequest.SetEntry
-	168, // 195: wloop.source.v1.SetOverrideRequest.if_match:type_name -> wloop.source.v1.SetOverrideRequest.IfMatchEntry
-	171, // 196: wloop.source.v1.Event.unit:type_name -> wloop.plugin.v1.Unit
-	172, // 197: wloop.source.v1.Event.at:type_name -> google.protobuf.Timestamp
-	6,   // 198: wloop.source.v1.Event.anchor:type_name -> wloop.source.v1.Anchor
-	133, // 199: wloop.source.v1.RecordEventsRequest.events:type_name -> wloop.source.v1.Event
-	171, // 200: wloop.source.v1.SetMarksRequest.unit:type_name -> wloop.plugin.v1.Unit
-	169, // 201: wloop.source.v1.SetMarksRequest.marks:type_name -> wloop.source.v1.SetMarksRequest.MarksEntry
-	171, // 202: wloop.source.v1.PutBriefRequest.unit:type_name -> wloop.plugin.v1.Unit
-	171, // 203: wloop.source.v1.SetWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
-	172, // 204: wloop.source.v1.SetWakeRequest.until:type_name -> google.protobuf.Timestamp
-	171, // 205: wloop.source.v1.ClearWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
-	173, // 206: wloop.source.v1.AskResponse.duration:type_name -> google.protobuf.Duration
-	173, // 207: wloop.source.v1.MeterRequest.duration:type_name -> google.protobuf.Duration
-	150, // 208: wloop.source.v1.Config.brief_intent:type_name -> wloop.source.v1.BriefIntent
-	170, // 209: wloop.source.v1.BriefIntent.field_versions:type_name -> wloop.source.v1.BriefIntent.FieldVersionsEntry
-	149, // 210: wloop.source.v1.ConfigResponse.config:type_name -> wloop.source.v1.Config
-	155, // 211: wloop.source.v1.HoldsRequest.facts:type_name -> wloop.source.v1.FactSet
-	10,  // 212: wloop.source.v1.FactSet.facts:type_name -> wloop.source.v1.Fact
-	157, // 213: wloop.source.v1.HoldsResponse.verdicts:type_name -> wloop.source.v1.PredicateVerdict
-	171, // 214: wloop.source.v1.EventsRequest.units:type_name -> wloop.plugin.v1.Unit
-	172, // 215: wloop.source.v1.EventsRequest.since:type_name -> google.protobuf.Timestamp
-	133, // 216: wloop.source.v1.EventsResponse.events:type_name -> wloop.source.v1.Event
-	22,  // 217: wloop.source.v1.Snapshot.FacetValuesEntry.value:type_name -> wloop.source.v1.FacetValues
-	29,  // 218: wloop.source.v1.SourceService.Capabilities:input_type -> wloop.source.v1.CapabilitiesRequest
-	31,  // 219: wloop.source.v1.SourceService.Ingest:input_type -> wloop.source.v1.IngestRequest
-	33,  // 220: wloop.source.v1.SourceService.Track:input_type -> wloop.source.v1.TrackRequest
-	35,  // 221: wloop.source.v1.SourceService.Untrack:input_type -> wloop.source.v1.UntrackRequest
-	37,  // 222: wloop.source.v1.SourceService.Resolve:input_type -> wloop.source.v1.ResolveRequest
-	39,  // 223: wloop.source.v1.SourceService.Locate:input_type -> wloop.source.v1.LocateRequest
-	41,  // 224: wloop.source.v1.SourceService.Action:input_type -> wloop.source.v1.ActionRequest
-	43,  // 225: wloop.source.v1.SourceService.View:input_type -> wloop.source.v1.ViewRequest
-	45,  // 226: wloop.source.v1.SourceService.Identity:input_type -> wloop.source.v1.IdentityRequest
-	47,  // 227: wloop.source.v1.SourceService.Validate:input_type -> wloop.source.v1.ValidateRequest
-	49,  // 228: wloop.source.v1.SourceService.Where:input_type -> wloop.source.v1.WhereRequest
-	51,  // 229: wloop.source.v1.SourceService.Place:input_type -> wloop.source.v1.PlaceRequest
-	53,  // 230: wloop.source.v1.SourceService.Publish:input_type -> wloop.source.v1.PublishRequest
-	55,  // 231: wloop.source.v1.SourceService.Verify:input_type -> wloop.source.v1.VerifyRequest
-	57,  // 232: wloop.source.v1.SourceService.Landed:input_type -> wloop.source.v1.LandedRequest
-	59,  // 233: wloop.source.v1.SourceService.Checkout:input_type -> wloop.source.v1.CheckoutRequest
-	61,  // 234: wloop.source.v1.SourceService.WriteState:input_type -> wloop.source.v1.WriteStateRequest
-	63,  // 235: wloop.source.v1.SourceService.BriefInput:input_type -> wloop.source.v1.BriefInputRequest
-	65,  // 236: wloop.source.v1.SourceService.BriefRevision:input_type -> wloop.source.v1.BriefRevisionRequest
-	67,  // 237: wloop.source.v1.SourceService.BriefDescribe:input_type -> wloop.source.v1.BriefDescribeRequest
-	70,  // 238: wloop.source.v1.SourceService.BriefStale:input_type -> wloop.source.v1.BriefStaleRequest
-	72,  // 239: wloop.source.v1.SourceService.BriefWant:input_type -> wloop.source.v1.BriefWantRequest
-	76,  // 240: wloop.source.v1.SourceService.Plan:input_type -> wloop.source.v1.PlanRequest
-	80,  // 241: wloop.source.v1.SourceService.Payload:input_type -> wloop.source.v1.PayloadRequest
-	85,  // 242: wloop.source.v1.SourceService.ApplyEffect:input_type -> wloop.source.v1.ApplyEffectRequest
-	87,  // 243: wloop.source.v1.SourceService.Proposals:input_type -> wloop.source.v1.ProposalsRequest
-	90,  // 244: wloop.source.v1.SourceService.Placement:input_type -> wloop.source.v1.PlacementRequest
-	92,  // 245: wloop.source.v1.SourceService.CallTool:input_type -> wloop.source.v1.CallToolRequest
-	94,  // 246: wloop.source.v1.SourceService.RunCLI:input_type -> wloop.source.v1.RunCLIRequest
-	96,  // 247: wloop.source.v1.HostService.Report:input_type -> wloop.source.v1.ReportRequest
-	98,  // 248: wloop.source.v1.HostService.Changed:input_type -> wloop.source.v1.ChangedRequest
-	103, // 249: wloop.source.v1.HostService.ApplyItems:input_type -> wloop.source.v1.ApplyItemsRequest
-	105, // 250: wloop.source.v1.HostService.QueryItems:input_type -> wloop.source.v1.QueryItemsRequest
-	108, // 251: wloop.source.v1.HostService.Tasks:input_type -> wloop.source.v1.TasksRequest
-	113, // 252: wloop.source.v1.HostService.Books:input_type -> wloop.source.v1.BooksRequest
-	115, // 253: wloop.source.v1.HostService.RoundState:input_type -> wloop.source.v1.RoundStateRequest
-	119, // 254: wloop.source.v1.HostService.Workspaces:input_type -> wloop.source.v1.WorkspacesRequest
-	121, // 255: wloop.source.v1.HostService.Session:input_type -> wloop.source.v1.SessionRequest
-	124, // 256: wloop.source.v1.HostService.OpenGate:input_type -> wloop.source.v1.OpenGateRequest
-	126, // 257: wloop.source.v1.HostService.RecordSent:input_type -> wloop.source.v1.RecordSentRequest
-	129, // 258: wloop.source.v1.HostService.RehomeDrafts:input_type -> wloop.source.v1.RehomeDraftsRequest
-	131, // 259: wloop.source.v1.HostService.SetOverride:input_type -> wloop.source.v1.SetOverrideRequest
-	134, // 260: wloop.source.v1.HostService.RecordEvents:input_type -> wloop.source.v1.RecordEventsRequest
-	136, // 261: wloop.source.v1.HostService.SetMarks:input_type -> wloop.source.v1.SetMarksRequest
-	138, // 262: wloop.source.v1.HostService.PutBrief:input_type -> wloop.source.v1.PutBriefRequest
-	140, // 263: wloop.source.v1.HostService.SetWake:input_type -> wloop.source.v1.SetWakeRequest
-	142, // 264: wloop.source.v1.HostService.ClearWake:input_type -> wloop.source.v1.ClearWakeRequest
-	144, // 265: wloop.source.v1.HostService.Ask:input_type -> wloop.source.v1.AskRequest
-	146, // 266: wloop.source.v1.HostService.Meter:input_type -> wloop.source.v1.MeterRequest
-	148, // 267: wloop.source.v1.HostService.Config:input_type -> wloop.source.v1.ConfigRequest
-	152, // 268: wloop.source.v1.HostService.Profile:input_type -> wloop.source.v1.ProfileRequest
-	154, // 269: wloop.source.v1.HostService.Holds:input_type -> wloop.source.v1.HoldsRequest
-	158, // 270: wloop.source.v1.HostService.Events:input_type -> wloop.source.v1.EventsRequest
-	30,  // 271: wloop.source.v1.SourceService.Capabilities:output_type -> wloop.source.v1.CapabilitiesResponse
-	32,  // 272: wloop.source.v1.SourceService.Ingest:output_type -> wloop.source.v1.IngestResponse
-	34,  // 273: wloop.source.v1.SourceService.Track:output_type -> wloop.source.v1.TrackResponse
-	36,  // 274: wloop.source.v1.SourceService.Untrack:output_type -> wloop.source.v1.UntrackResponse
-	38,  // 275: wloop.source.v1.SourceService.Resolve:output_type -> wloop.source.v1.ResolveResponse
-	40,  // 276: wloop.source.v1.SourceService.Locate:output_type -> wloop.source.v1.LocateResponse
-	42,  // 277: wloop.source.v1.SourceService.Action:output_type -> wloop.source.v1.ActionResponse
-	44,  // 278: wloop.source.v1.SourceService.View:output_type -> wloop.source.v1.ViewResponse
-	46,  // 279: wloop.source.v1.SourceService.Identity:output_type -> wloop.source.v1.IdentityResponse
-	48,  // 280: wloop.source.v1.SourceService.Validate:output_type -> wloop.source.v1.ValidateResponse
-	50,  // 281: wloop.source.v1.SourceService.Where:output_type -> wloop.source.v1.WhereResponse
-	52,  // 282: wloop.source.v1.SourceService.Place:output_type -> wloop.source.v1.PlaceResponse
-	54,  // 283: wloop.source.v1.SourceService.Publish:output_type -> wloop.source.v1.PublishResponse
-	56,  // 284: wloop.source.v1.SourceService.Verify:output_type -> wloop.source.v1.VerifyResponse
-	58,  // 285: wloop.source.v1.SourceService.Landed:output_type -> wloop.source.v1.LandedResponse
-	60,  // 286: wloop.source.v1.SourceService.Checkout:output_type -> wloop.source.v1.CheckoutResponse
-	62,  // 287: wloop.source.v1.SourceService.WriteState:output_type -> wloop.source.v1.WriteStateResponse
-	64,  // 288: wloop.source.v1.SourceService.BriefInput:output_type -> wloop.source.v1.BriefInputResponse
-	66,  // 289: wloop.source.v1.SourceService.BriefRevision:output_type -> wloop.source.v1.BriefRevisionResponse
-	68,  // 290: wloop.source.v1.SourceService.BriefDescribe:output_type -> wloop.source.v1.BriefDescribeResponse
-	71,  // 291: wloop.source.v1.SourceService.BriefStale:output_type -> wloop.source.v1.BriefStaleResponse
-	73,  // 292: wloop.source.v1.SourceService.BriefWant:output_type -> wloop.source.v1.BriefWantResponse
-	77,  // 293: wloop.source.v1.SourceService.Plan:output_type -> wloop.source.v1.PlanResponse
-	83,  // 294: wloop.source.v1.SourceService.Payload:output_type -> wloop.source.v1.PayloadResponse
-	86,  // 295: wloop.source.v1.SourceService.ApplyEffect:output_type -> wloop.source.v1.ApplyEffectResponse
-	88,  // 296: wloop.source.v1.SourceService.Proposals:output_type -> wloop.source.v1.ProposalsResponse
-	91,  // 297: wloop.source.v1.SourceService.Placement:output_type -> wloop.source.v1.PlacementResponse
-	93,  // 298: wloop.source.v1.SourceService.CallTool:output_type -> wloop.source.v1.CallToolResponse
-	95,  // 299: wloop.source.v1.SourceService.RunCLI:output_type -> wloop.source.v1.RunCLIResponse
-	97,  // 300: wloop.source.v1.HostService.Report:output_type -> wloop.source.v1.ReportResponse
-	99,  // 301: wloop.source.v1.HostService.Changed:output_type -> wloop.source.v1.ChangedResponse
-	104, // 302: wloop.source.v1.HostService.ApplyItems:output_type -> wloop.source.v1.ApplyItemsResponse
-	106, // 303: wloop.source.v1.HostService.QueryItems:output_type -> wloop.source.v1.QueryItemsResponse
-	109, // 304: wloop.source.v1.HostService.Tasks:output_type -> wloop.source.v1.TasksResponse
-	114, // 305: wloop.source.v1.HostService.Books:output_type -> wloop.source.v1.BooksResponse
-	116, // 306: wloop.source.v1.HostService.RoundState:output_type -> wloop.source.v1.RoundStateResponse
-	120, // 307: wloop.source.v1.HostService.Workspaces:output_type -> wloop.source.v1.WorkspacesResponse
-	122, // 308: wloop.source.v1.HostService.Session:output_type -> wloop.source.v1.SessionResponse
-	125, // 309: wloop.source.v1.HostService.OpenGate:output_type -> wloop.source.v1.OpenGateResponse
-	127, // 310: wloop.source.v1.HostService.RecordSent:output_type -> wloop.source.v1.RecordSentResponse
-	130, // 311: wloop.source.v1.HostService.RehomeDrafts:output_type -> wloop.source.v1.RehomeDraftsResponse
-	132, // 312: wloop.source.v1.HostService.SetOverride:output_type -> wloop.source.v1.SetOverrideResponse
-	135, // 313: wloop.source.v1.HostService.RecordEvents:output_type -> wloop.source.v1.RecordEventsResponse
-	137, // 314: wloop.source.v1.HostService.SetMarks:output_type -> wloop.source.v1.SetMarksResponse
-	139, // 315: wloop.source.v1.HostService.PutBrief:output_type -> wloop.source.v1.PutBriefResponse
-	141, // 316: wloop.source.v1.HostService.SetWake:output_type -> wloop.source.v1.SetWakeResponse
-	143, // 317: wloop.source.v1.HostService.ClearWake:output_type -> wloop.source.v1.ClearWakeResponse
-	145, // 318: wloop.source.v1.HostService.Ask:output_type -> wloop.source.v1.AskResponse
-	147, // 319: wloop.source.v1.HostService.Meter:output_type -> wloop.source.v1.MeterResponse
-	151, // 320: wloop.source.v1.HostService.Config:output_type -> wloop.source.v1.ConfigResponse
-	153, // 321: wloop.source.v1.HostService.Profile:output_type -> wloop.source.v1.ProfileResponse
-	156, // 322: wloop.source.v1.HostService.Holds:output_type -> wloop.source.v1.HoldsResponse
-	159, // 323: wloop.source.v1.HostService.Events:output_type -> wloop.source.v1.EventsResponse
-	271, // [271:324] is the sub-list for method output_type
-	218, // [218:271] is the sub-list for method input_type
-	218, // [218:218] is the sub-list for extension type_name
-	218, // [218:218] is the sub-list for extension extendee
-	0,   // [0:218] is the sub-list for field type_name
+	175, // 15: wloop.source.v1.LinkSignal.since:type_name -> google.protobuf.Timestamp
+	175, // 16: wloop.source.v1.ExtractionHealth.oldest:type_name -> google.protobuf.Timestamp
+	175, // 17: wloop.source.v1.CardSignal.at:type_name -> google.protobuf.Timestamp
+	161, // 18: wloop.source.v1.CardSignal.params:type_name -> wloop.source.v1.CardSignal.ParamsEntry
+	15,  // 19: wloop.source.v1.CardSignal.notes:type_name -> wloop.source.v1.SignalNote
+	162, // 20: wloop.source.v1.SignalNote.params:type_name -> wloop.source.v1.SignalNote.ParamsEntry
+	175, // 21: wloop.source.v1.SignalNote.since:type_name -> google.protobuf.Timestamp
+	4,   // 22: wloop.source.v1.Human.who:type_name -> wloop.source.v1.Person
+	175, // 23: wloop.source.v1.Human.at:type_name -> google.protobuf.Timestamp
+	14,  // 24: wloop.source.v1.Card.signals:type_name -> wloop.source.v1.CardSignal
+	16,  // 25: wloop.source.v1.Card.last_human:type_name -> wloop.source.v1.Human
+	4,   // 26: wloop.source.v1.Card.waits_on:type_name -> wloop.source.v1.Person
+	175, // 27: wloop.source.v1.Card.since:type_name -> google.protobuf.Timestamp
+	4,   // 28: wloop.source.v1.ItemOption.argued_by:type_name -> wloop.source.v1.Person
+	18,  // 29: wloop.source.v1.ItemOptionList.options:type_name -> wloop.source.v1.ItemOption
+	6,   // 30: wloop.source.v1.ItemEvidence.anchor:type_name -> wloop.source.v1.Anchor
+	174, // 31: wloop.source.v1.Item.unit:type_name -> wloop.plugin.v1.Unit
+	18,  // 32: wloop.source.v1.Item.options:type_name -> wloop.source.v1.ItemOption
+	6,   // 33: wloop.source.v1.Item.origin:type_name -> wloop.source.v1.Anchor
+	4,   // 34: wloop.source.v1.Item.requester:type_name -> wloop.source.v1.Person
+	4,   // 35: wloop.source.v1.Item.assignees:type_name -> wloop.source.v1.Person
+	6,   // 36: wloop.source.v1.Item.assigned_at:type_name -> wloop.source.v1.Anchor
+	4,   // 37: wloop.source.v1.Item.waiting_on:type_name -> wloop.source.v1.Person
+	20,  // 38: wloop.source.v1.Item.evidence:type_name -> wloop.source.v1.ItemEvidence
+	20,  // 39: wloop.source.v1.Item.trail:type_name -> wloop.source.v1.ItemEvidence
+	175, // 40: wloop.source.v1.Item.user_at:type_name -> google.protobuf.Timestamp
+	175, // 41: wloop.source.v1.Item.created_at:type_name -> google.protobuf.Timestamp
+	175, // 42: wloop.source.v1.Item.updated_at:type_name -> google.protobuf.Timestamp
+	174, // 43: wloop.source.v1.Snapshot.unit:type_name -> wloop.plugin.v1.Unit
+	175, // 44: wloop.source.v1.Snapshot.at:type_name -> google.protobuf.Timestamp
+	24,  // 45: wloop.source.v1.Snapshot.situation:type_name -> wloop.source.v1.Situation
+	17,  // 46: wloop.source.v1.Snapshot.card:type_name -> wloop.source.v1.Card
+	21,  // 47: wloop.source.v1.Snapshot.items:type_name -> wloop.source.v1.Item
+	10,  // 48: wloop.source.v1.Snapshot.facts:type_name -> wloop.source.v1.Fact
+	11,  // 49: wloop.source.v1.Snapshot.signals:type_name -> wloop.source.v1.LinkSignal
+	4,   // 50: wloop.source.v1.Snapshot.owes:type_name -> wloop.source.v1.Person
+	12,  // 51: wloop.source.v1.Snapshot.offers:type_name -> wloop.source.v1.Offer
+	13,  // 52: wloop.source.v1.Snapshot.extraction_health:type_name -> wloop.source.v1.ExtractionHealth
+	175, // 53: wloop.source.v1.Snapshot.due:type_name -> google.protobuf.Timestamp
+	25,  // 54: wloop.source.v1.Snapshot.links:type_name -> wloop.source.v1.Link
+	163, // 55: wloop.source.v1.Snapshot.facets:type_name -> wloop.source.v1.Snapshot.FacetsEntry
+	164, // 56: wloop.source.v1.Snapshot.facet_values:type_name -> wloop.source.v1.Snapshot.FacetValuesEntry
+	175, // 57: wloop.source.v1.Situation.since:type_name -> google.protobuf.Timestamp
+	10,  // 58: wloop.source.v1.Situation.stalled:type_name -> wloop.source.v1.Fact
+	165, // 59: wloop.source.v1.Situation.reason_params:type_name -> wloop.source.v1.Situation.ReasonParamsEntry
+	6,   // 60: wloop.source.v1.Link.evidence:type_name -> wloop.source.v1.Anchor
+	174, // 61: wloop.source.v1.DraftOrigin.unit:type_name -> wloop.plugin.v1.Unit
+	175, // 62: wloop.source.v1.DraftEvidence.at:type_name -> google.protobuf.Timestamp
+	174, // 63: wloop.source.v1.Draft.unit:type_name -> wloop.plugin.v1.Unit
+	26,  // 64: wloop.source.v1.Draft.origin:type_name -> wloop.source.v1.DraftOrigin
+	27,  // 65: wloop.source.v1.Draft.evidence:type_name -> wloop.source.v1.DraftEvidence
+	2,   // 66: wloop.source.v1.IngestRequest.call:type_name -> wloop.source.v1.Call
+	175, // 67: wloop.source.v1.IngestRequest.now:type_name -> google.protobuf.Timestamp
+	2,   // 68: wloop.source.v1.TrackRequest.call:type_name -> wloop.source.v1.Call
+	174, // 69: wloop.source.v1.TrackRequest.unit:type_name -> wloop.plugin.v1.Unit
+	174, // 70: wloop.source.v1.TrackResponse.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 71: wloop.source.v1.UntrackRequest.call:type_name -> wloop.source.v1.Call
+	174, // 72: wloop.source.v1.UntrackRequest.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 73: wloop.source.v1.ResolveRequest.call:type_name -> wloop.source.v1.Call
+	174, // 74: wloop.source.v1.ResolveResponse.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 75: wloop.source.v1.LocateRequest.call:type_name -> wloop.source.v1.Call
+	174, // 76: wloop.source.v1.LocateResponse.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 77: wloop.source.v1.ActionRequest.call:type_name -> wloop.source.v1.Call
+	174, // 78: wloop.source.v1.ActionRequest.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 79: wloop.source.v1.ViewRequest.call:type_name -> wloop.source.v1.Call
+	2,   // 80: wloop.source.v1.IdentityRequest.call:type_name -> wloop.source.v1.Call
+	4,   // 81: wloop.source.v1.IdentityResponse.viewer:type_name -> wloop.source.v1.Person
+	2,   // 82: wloop.source.v1.ValidateRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 83: wloop.source.v1.ValidateRequest.draft:type_name -> wloop.source.v1.Draft
+	2,   // 84: wloop.source.v1.WhereRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 85: wloop.source.v1.WhereRequest.draft:type_name -> wloop.source.v1.Draft
+	2,   // 86: wloop.source.v1.PlaceRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 87: wloop.source.v1.PlaceRequest.draft:type_name -> wloop.source.v1.Draft
+	2,   // 88: wloop.source.v1.PublishRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 89: wloop.source.v1.PublishRequest.draft:type_name -> wloop.source.v1.Draft
+	27,  // 90: wloop.source.v1.PublishResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
+	2,   // 91: wloop.source.v1.VerifyRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 92: wloop.source.v1.VerifyRequest.draft:type_name -> wloop.source.v1.Draft
+	175, // 93: wloop.source.v1.VerifyRequest.started_at:type_name -> google.protobuf.Timestamp
+	27,  // 94: wloop.source.v1.VerifyResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
+	2,   // 95: wloop.source.v1.LandedRequest.call:type_name -> wloop.source.v1.Call
+	28,  // 96: wloop.source.v1.LandedRequest.draft:type_name -> wloop.source.v1.Draft
+	174, // 97: wloop.source.v1.LandedResponse.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 98: wloop.source.v1.CheckoutRequest.call:type_name -> wloop.source.v1.Call
+	174, // 99: wloop.source.v1.CheckoutRequest.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 100: wloop.source.v1.WriteStateRequest.call:type_name -> wloop.source.v1.Call
+	174, // 101: wloop.source.v1.WriteStateRequest.unit:type_name -> wloop.plugin.v1.Unit
+	27,  // 102: wloop.source.v1.WriteStateResponse.evidence:type_name -> wloop.source.v1.DraftEvidence
+	2,   // 103: wloop.source.v1.BriefInputRequest.call:type_name -> wloop.source.v1.Call
+	174, // 104: wloop.source.v1.BriefInputRequest.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 105: wloop.source.v1.BriefRevisionRequest.call:type_name -> wloop.source.v1.Call
+	174, // 106: wloop.source.v1.BriefRevisionRequest.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 107: wloop.source.v1.BriefDescribeRequest.call:type_name -> wloop.source.v1.Call
+	65,  // 108: wloop.source.v1.BriefDescribeRequest.input:type_name -> wloop.source.v1.BriefInputResponse
+	67,  // 109: wloop.source.v1.BriefWritten.at:type_name -> wloop.source.v1.BriefRevisionResponse
+	175, // 110: wloop.source.v1.BriefWritten.attempted_at:type_name -> google.protobuf.Timestamp
+	2,   // 111: wloop.source.v1.BriefStaleRequest.call:type_name -> wloop.source.v1.Call
+	70,  // 112: wloop.source.v1.BriefStaleRequest.written:type_name -> wloop.source.v1.BriefWritten
+	67,  // 113: wloop.source.v1.BriefStaleRequest.current:type_name -> wloop.source.v1.BriefRevisionResponse
+	175, // 114: wloop.source.v1.BriefStaleRequest.now:type_name -> google.protobuf.Timestamp
+	2,   // 115: wloop.source.v1.BriefWantRequest.call:type_name -> wloop.source.v1.Call
+	174, // 116: wloop.source.v1.BriefWantRequest.unit:type_name -> wloop.plugin.v1.Unit
+	166, // 117: wloop.source.v1.RoundState.marks:type_name -> wloop.source.v1.RoundState.MarksEntry
+	175, // 118: wloop.source.v1.RoundState.sent_at:type_name -> google.protobuf.Timestamp
+	167, // 119: wloop.source.v1.RoundState.overrides:type_name -> wloop.source.v1.RoundState.OverridesEntry
+	76,  // 120: wloop.source.v1.RoundState.blocked:type_name -> wloop.source.v1.Blocked
+	175, // 121: wloop.source.v1.Blocked.since:type_name -> google.protobuf.Timestamp
+	2,   // 122: wloop.source.v1.PlanRequest.call:type_name -> wloop.source.v1.Call
+	174, // 123: wloop.source.v1.PlanRequest.unit:type_name -> wloop.plugin.v1.Unit
+	75,  // 124: wloop.source.v1.PlanRequest.state:type_name -> wloop.source.v1.RoundState
+	175, // 125: wloop.source.v1.PlanRequest.now:type_name -> google.protobuf.Timestamp
+	80,  // 126: wloop.source.v1.PlanResponse.rounds:type_name -> wloop.source.v1.Round
+	79,  // 127: wloop.source.v1.Round.workspace:type_name -> wloop.source.v1.WorkspaceRef
+	10,  // 128: wloop.source.v1.Round.turn_facts:type_name -> wloop.source.v1.Fact
+	168, // 129: wloop.source.v1.Round.on_sent:type_name -> wloop.source.v1.Round.OnSentEntry
+	169, // 130: wloop.source.v1.Round.on_skipped:type_name -> wloop.source.v1.Round.OnSkippedEntry
+	2,   // 131: wloop.source.v1.PayloadRequest.call:type_name -> wloop.source.v1.Call
+	174, // 132: wloop.source.v1.PayloadRequest.unit:type_name -> wloop.plugin.v1.Unit
+	82,  // 133: wloop.source.v1.PayloadRequest.last_verdict:type_name -> wloop.source.v1.Verdict
+	175, // 134: wloop.source.v1.Verdict.at:type_name -> google.protobuf.Timestamp
+	83,  // 135: wloop.source.v1.PayloadResponse.wording:type_name -> wloop.source.v1.Wording
+	10,  // 136: wloop.source.v1.PayloadResponse.facts:type_name -> wloop.source.v1.Fact
+	2,   // 137: wloop.source.v1.ApplyEffectRequest.call:type_name -> wloop.source.v1.Call
+	174, // 138: wloop.source.v1.ApplyEffectRequest.unit:type_name -> wloop.plugin.v1.Unit
+	85,  // 139: wloop.source.v1.ApplyEffectRequest.turn:type_name -> wloop.source.v1.TurnRef
+	28,  // 140: wloop.source.v1.ApplyEffectRequest.draft:type_name -> wloop.source.v1.Draft
+	2,   // 141: wloop.source.v1.ProposalsRequest.call:type_name -> wloop.source.v1.Call
+	175, // 142: wloop.source.v1.ProposalsRequest.now:type_name -> google.protobuf.Timestamp
+	28,  // 143: wloop.source.v1.ProposalsResponse.drafts:type_name -> wloop.source.v1.Draft
+	90,  // 144: wloop.source.v1.ProposalsResponse.withdrawals:type_name -> wloop.source.v1.Withdrawal
+	174, // 145: wloop.source.v1.Withdrawal.unit:type_name -> wloop.plugin.v1.Unit
+	2,   // 146: wloop.source.v1.PlacementRequest.call:type_name -> wloop.source.v1.Call
+	174, // 147: wloop.source.v1.PlacementRequest.unit:type_name -> wloop.plugin.v1.Unit
+	29,  // 148: wloop.source.v1.PlacementResponse.default:type_name -> wloop.source.v1.Placement
+	29,  // 149: wloop.source.v1.PlacementResponse.suggested:type_name -> wloop.source.v1.Placement
+	2,   // 150: wloop.source.v1.CallToolRequest.call:type_name -> wloop.source.v1.Call
+	2,   // 151: wloop.source.v1.RunCLIRequest.call:type_name -> wloop.source.v1.Call
+	150, // 152: wloop.source.v1.RunCLIRequest.config:type_name -> wloop.source.v1.Config
+	22,  // 153: wloop.source.v1.ReportRequest.snapshots:type_name -> wloop.source.v1.Snapshot
+	174, // 154: wloop.source.v1.ChangedRequest.units:type_name -> wloop.plugin.v1.Unit
+	19,  // 155: wloop.source.v1.ItemFields.options:type_name -> wloop.source.v1.ItemOptionList
+	3,   // 156: wloop.source.v1.ItemFields.urls:type_name -> wloop.source.v1.StringList
+	3,   // 157: wloop.source.v1.ItemFields.contexts:type_name -> wloop.source.v1.StringList
+	4,   // 158: wloop.source.v1.ItemFields.requester:type_name -> wloop.source.v1.Person
+	5,   // 159: wloop.source.v1.ItemFields.waiting_on:type_name -> wloop.source.v1.PersonList
+	174, // 160: wloop.source.v1.ItemOp.unit:type_name -> wloop.plugin.v1.Unit
+	6,   // 161: wloop.source.v1.ItemOp.anchor:type_name -> wloop.source.v1.Anchor
+	101, // 162: wloop.source.v1.ItemOp.fields:type_name -> wloop.source.v1.ItemFields
+	4,   // 163: wloop.source.v1.ItemOp.assignees:type_name -> wloop.source.v1.Person
+	20,  // 164: wloop.source.v1.ItemOp.evidence:type_name -> wloop.source.v1.ItemEvidence
+	174, // 165: wloop.source.v1.ItemOp.to:type_name -> wloop.plugin.v1.Unit
+	102, // 166: wloop.source.v1.ApplyItemsRequest.ops:type_name -> wloop.source.v1.ItemOp
+	103, // 167: wloop.source.v1.ApplyItemsResponse.results:type_name -> wloop.source.v1.ItemResult
+	174, // 168: wloop.source.v1.QueryItemsRequest.units:type_name -> wloop.plugin.v1.Unit
+	21,  // 169: wloop.source.v1.QueryItemsResponse.items:type_name -> wloop.source.v1.Item
+	174, // 170: wloop.source.v1.Task.units:type_name -> wloop.plugin.v1.Unit
+	174, // 171: wloop.source.v1.TasksRequest.units:type_name -> wloop.plugin.v1.Unit
+	108, // 172: wloop.source.v1.TasksResponse.tasks:type_name -> wloop.source.v1.Task
+	175, // 173: wloop.source.v1.Turn.sent_at:type_name -> google.protobuf.Timestamp
+	175, // 174: wloop.source.v1.Turn.started_at:type_name -> google.protobuf.Timestamp
+	175, // 175: wloop.source.v1.Turn.ended_at:type_name -> google.protobuf.Timestamp
+	175, // 176: wloop.source.v1.Turn.answered_at:type_name -> google.protobuf.Timestamp
+	175, // 177: wloop.source.v1.Turn.at:type_name -> google.protobuf.Timestamp
+	175, // 178: wloop.source.v1.TurnRecord.at:type_name -> google.protobuf.Timestamp
+	174, // 179: wloop.source.v1.Book.unit:type_name -> wloop.plugin.v1.Unit
+	111, // 180: wloop.source.v1.Book.turns:type_name -> wloop.source.v1.Turn
+	112, // 181: wloop.source.v1.Book.records:type_name -> wloop.source.v1.TurnRecord
+	174, // 182: wloop.source.v1.BooksRequest.units:type_name -> wloop.plugin.v1.Unit
+	113, // 183: wloop.source.v1.BooksResponse.books:type_name -> wloop.source.v1.Book
+	174, // 184: wloop.source.v1.RoundStateRequest.unit:type_name -> wloop.plugin.v1.Unit
+	75,  // 185: wloop.source.v1.RoundStateResponse.state:type_name -> wloop.source.v1.RoundState
+	174, // 186: wloop.source.v1.Workspace.units:type_name -> wloop.plugin.v1.Unit
+	119, // 187: wloop.source.v1.WorkspacesResponse.repos:type_name -> wloop.source.v1.Repo
+	118, // 188: wloop.source.v1.WorkspacesResponse.workspaces:type_name -> wloop.source.v1.Workspace
+	174, // 189: wloop.source.v1.SessionResponse.unit:type_name -> wloop.plugin.v1.Unit
+	28,  // 190: wloop.source.v1.OpenGateRequest.draft:type_name -> wloop.source.v1.Draft
+	124, // 191: wloop.source.v1.OpenGateResponse.gate:type_name -> wloop.source.v1.GateRef
+	28,  // 192: wloop.source.v1.RecordSentRequest.draft:type_name -> wloop.source.v1.Draft
+	124, // 193: wloop.source.v1.RecordSentResponse.gate:type_name -> wloop.source.v1.GateRef
+	174, // 194: wloop.source.v1.UnitMove.from:type_name -> wloop.plugin.v1.Unit
+	174, // 195: wloop.source.v1.UnitMove.to:type_name -> wloop.plugin.v1.Unit
+	129, // 196: wloop.source.v1.RehomeDraftsRequest.moves:type_name -> wloop.source.v1.UnitMove
+	174, // 197: wloop.source.v1.SetOverrideRequest.unit:type_name -> wloop.plugin.v1.Unit
+	170, // 198: wloop.source.v1.SetOverrideRequest.set:type_name -> wloop.source.v1.SetOverrideRequest.SetEntry
+	171, // 199: wloop.source.v1.SetOverrideRequest.if_match:type_name -> wloop.source.v1.SetOverrideRequest.IfMatchEntry
+	174, // 200: wloop.source.v1.Event.unit:type_name -> wloop.plugin.v1.Unit
+	175, // 201: wloop.source.v1.Event.at:type_name -> google.protobuf.Timestamp
+	6,   // 202: wloop.source.v1.Event.anchor:type_name -> wloop.source.v1.Anchor
+	134, // 203: wloop.source.v1.RecordEventsRequest.events:type_name -> wloop.source.v1.Event
+	174, // 204: wloop.source.v1.SetMarksRequest.unit:type_name -> wloop.plugin.v1.Unit
+	172, // 205: wloop.source.v1.SetMarksRequest.marks:type_name -> wloop.source.v1.SetMarksRequest.MarksEntry
+	174, // 206: wloop.source.v1.PutBriefRequest.unit:type_name -> wloop.plugin.v1.Unit
+	174, // 207: wloop.source.v1.SetWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
+	175, // 208: wloop.source.v1.SetWakeRequest.until:type_name -> google.protobuf.Timestamp
+	174, // 209: wloop.source.v1.ClearWakeRequest.unit:type_name -> wloop.plugin.v1.Unit
+	176, // 210: wloop.source.v1.AskResponse.duration:type_name -> google.protobuf.Duration
+	176, // 211: wloop.source.v1.MeterRequest.duration:type_name -> google.protobuf.Duration
+	151, // 212: wloop.source.v1.Config.brief_intent:type_name -> wloop.source.v1.BriefIntent
+	173, // 213: wloop.source.v1.BriefIntent.field_versions:type_name -> wloop.source.v1.BriefIntent.FieldVersionsEntry
+	150, // 214: wloop.source.v1.ConfigResponse.config:type_name -> wloop.source.v1.Config
+	156, // 215: wloop.source.v1.HoldsRequest.facts:type_name -> wloop.source.v1.FactSet
+	10,  // 216: wloop.source.v1.FactSet.facts:type_name -> wloop.source.v1.Fact
+	158, // 217: wloop.source.v1.HoldsResponse.verdicts:type_name -> wloop.source.v1.PredicateVerdict
+	174, // 218: wloop.source.v1.EventsRequest.units:type_name -> wloop.plugin.v1.Unit
+	175, // 219: wloop.source.v1.EventsRequest.since:type_name -> google.protobuf.Timestamp
+	134, // 220: wloop.source.v1.EventsResponse.events:type_name -> wloop.source.v1.Event
+	23,  // 221: wloop.source.v1.Snapshot.FacetValuesEntry.value:type_name -> wloop.source.v1.FacetValues
+	30,  // 222: wloop.source.v1.SourceService.Capabilities:input_type -> wloop.source.v1.CapabilitiesRequest
+	32,  // 223: wloop.source.v1.SourceService.Ingest:input_type -> wloop.source.v1.IngestRequest
+	34,  // 224: wloop.source.v1.SourceService.Track:input_type -> wloop.source.v1.TrackRequest
+	36,  // 225: wloop.source.v1.SourceService.Untrack:input_type -> wloop.source.v1.UntrackRequest
+	38,  // 226: wloop.source.v1.SourceService.Resolve:input_type -> wloop.source.v1.ResolveRequest
+	40,  // 227: wloop.source.v1.SourceService.Locate:input_type -> wloop.source.v1.LocateRequest
+	42,  // 228: wloop.source.v1.SourceService.Action:input_type -> wloop.source.v1.ActionRequest
+	44,  // 229: wloop.source.v1.SourceService.View:input_type -> wloop.source.v1.ViewRequest
+	46,  // 230: wloop.source.v1.SourceService.Identity:input_type -> wloop.source.v1.IdentityRequest
+	48,  // 231: wloop.source.v1.SourceService.Validate:input_type -> wloop.source.v1.ValidateRequest
+	50,  // 232: wloop.source.v1.SourceService.Where:input_type -> wloop.source.v1.WhereRequest
+	52,  // 233: wloop.source.v1.SourceService.Place:input_type -> wloop.source.v1.PlaceRequest
+	54,  // 234: wloop.source.v1.SourceService.Publish:input_type -> wloop.source.v1.PublishRequest
+	56,  // 235: wloop.source.v1.SourceService.Verify:input_type -> wloop.source.v1.VerifyRequest
+	58,  // 236: wloop.source.v1.SourceService.Landed:input_type -> wloop.source.v1.LandedRequest
+	60,  // 237: wloop.source.v1.SourceService.Checkout:input_type -> wloop.source.v1.CheckoutRequest
+	62,  // 238: wloop.source.v1.SourceService.WriteState:input_type -> wloop.source.v1.WriteStateRequest
+	64,  // 239: wloop.source.v1.SourceService.BriefInput:input_type -> wloop.source.v1.BriefInputRequest
+	66,  // 240: wloop.source.v1.SourceService.BriefRevision:input_type -> wloop.source.v1.BriefRevisionRequest
+	68,  // 241: wloop.source.v1.SourceService.BriefDescribe:input_type -> wloop.source.v1.BriefDescribeRequest
+	71,  // 242: wloop.source.v1.SourceService.BriefStale:input_type -> wloop.source.v1.BriefStaleRequest
+	73,  // 243: wloop.source.v1.SourceService.BriefWant:input_type -> wloop.source.v1.BriefWantRequest
+	77,  // 244: wloop.source.v1.SourceService.Plan:input_type -> wloop.source.v1.PlanRequest
+	81,  // 245: wloop.source.v1.SourceService.Payload:input_type -> wloop.source.v1.PayloadRequest
+	86,  // 246: wloop.source.v1.SourceService.ApplyEffect:input_type -> wloop.source.v1.ApplyEffectRequest
+	88,  // 247: wloop.source.v1.SourceService.Proposals:input_type -> wloop.source.v1.ProposalsRequest
+	91,  // 248: wloop.source.v1.SourceService.Placement:input_type -> wloop.source.v1.PlacementRequest
+	93,  // 249: wloop.source.v1.SourceService.CallTool:input_type -> wloop.source.v1.CallToolRequest
+	95,  // 250: wloop.source.v1.SourceService.RunCLI:input_type -> wloop.source.v1.RunCLIRequest
+	97,  // 251: wloop.source.v1.HostService.Report:input_type -> wloop.source.v1.ReportRequest
+	99,  // 252: wloop.source.v1.HostService.Changed:input_type -> wloop.source.v1.ChangedRequest
+	104, // 253: wloop.source.v1.HostService.ApplyItems:input_type -> wloop.source.v1.ApplyItemsRequest
+	106, // 254: wloop.source.v1.HostService.QueryItems:input_type -> wloop.source.v1.QueryItemsRequest
+	109, // 255: wloop.source.v1.HostService.Tasks:input_type -> wloop.source.v1.TasksRequest
+	114, // 256: wloop.source.v1.HostService.Books:input_type -> wloop.source.v1.BooksRequest
+	116, // 257: wloop.source.v1.HostService.RoundState:input_type -> wloop.source.v1.RoundStateRequest
+	120, // 258: wloop.source.v1.HostService.Workspaces:input_type -> wloop.source.v1.WorkspacesRequest
+	122, // 259: wloop.source.v1.HostService.Session:input_type -> wloop.source.v1.SessionRequest
+	125, // 260: wloop.source.v1.HostService.OpenGate:input_type -> wloop.source.v1.OpenGateRequest
+	127, // 261: wloop.source.v1.HostService.RecordSent:input_type -> wloop.source.v1.RecordSentRequest
+	130, // 262: wloop.source.v1.HostService.RehomeDrafts:input_type -> wloop.source.v1.RehomeDraftsRequest
+	132, // 263: wloop.source.v1.HostService.SetOverride:input_type -> wloop.source.v1.SetOverrideRequest
+	135, // 264: wloop.source.v1.HostService.RecordEvents:input_type -> wloop.source.v1.RecordEventsRequest
+	137, // 265: wloop.source.v1.HostService.SetMarks:input_type -> wloop.source.v1.SetMarksRequest
+	139, // 266: wloop.source.v1.HostService.PutBrief:input_type -> wloop.source.v1.PutBriefRequest
+	141, // 267: wloop.source.v1.HostService.SetWake:input_type -> wloop.source.v1.SetWakeRequest
+	143, // 268: wloop.source.v1.HostService.ClearWake:input_type -> wloop.source.v1.ClearWakeRequest
+	145, // 269: wloop.source.v1.HostService.Ask:input_type -> wloop.source.v1.AskRequest
+	147, // 270: wloop.source.v1.HostService.Meter:input_type -> wloop.source.v1.MeterRequest
+	149, // 271: wloop.source.v1.HostService.Config:input_type -> wloop.source.v1.ConfigRequest
+	153, // 272: wloop.source.v1.HostService.Profile:input_type -> wloop.source.v1.ProfileRequest
+	155, // 273: wloop.source.v1.HostService.Holds:input_type -> wloop.source.v1.HoldsRequest
+	159, // 274: wloop.source.v1.HostService.Events:input_type -> wloop.source.v1.EventsRequest
+	31,  // 275: wloop.source.v1.SourceService.Capabilities:output_type -> wloop.source.v1.CapabilitiesResponse
+	33,  // 276: wloop.source.v1.SourceService.Ingest:output_type -> wloop.source.v1.IngestResponse
+	35,  // 277: wloop.source.v1.SourceService.Track:output_type -> wloop.source.v1.TrackResponse
+	37,  // 278: wloop.source.v1.SourceService.Untrack:output_type -> wloop.source.v1.UntrackResponse
+	39,  // 279: wloop.source.v1.SourceService.Resolve:output_type -> wloop.source.v1.ResolveResponse
+	41,  // 280: wloop.source.v1.SourceService.Locate:output_type -> wloop.source.v1.LocateResponse
+	43,  // 281: wloop.source.v1.SourceService.Action:output_type -> wloop.source.v1.ActionResponse
+	45,  // 282: wloop.source.v1.SourceService.View:output_type -> wloop.source.v1.ViewResponse
+	47,  // 283: wloop.source.v1.SourceService.Identity:output_type -> wloop.source.v1.IdentityResponse
+	49,  // 284: wloop.source.v1.SourceService.Validate:output_type -> wloop.source.v1.ValidateResponse
+	51,  // 285: wloop.source.v1.SourceService.Where:output_type -> wloop.source.v1.WhereResponse
+	53,  // 286: wloop.source.v1.SourceService.Place:output_type -> wloop.source.v1.PlaceResponse
+	55,  // 287: wloop.source.v1.SourceService.Publish:output_type -> wloop.source.v1.PublishResponse
+	57,  // 288: wloop.source.v1.SourceService.Verify:output_type -> wloop.source.v1.VerifyResponse
+	59,  // 289: wloop.source.v1.SourceService.Landed:output_type -> wloop.source.v1.LandedResponse
+	61,  // 290: wloop.source.v1.SourceService.Checkout:output_type -> wloop.source.v1.CheckoutResponse
+	63,  // 291: wloop.source.v1.SourceService.WriteState:output_type -> wloop.source.v1.WriteStateResponse
+	65,  // 292: wloop.source.v1.SourceService.BriefInput:output_type -> wloop.source.v1.BriefInputResponse
+	67,  // 293: wloop.source.v1.SourceService.BriefRevision:output_type -> wloop.source.v1.BriefRevisionResponse
+	69,  // 294: wloop.source.v1.SourceService.BriefDescribe:output_type -> wloop.source.v1.BriefDescribeResponse
+	72,  // 295: wloop.source.v1.SourceService.BriefStale:output_type -> wloop.source.v1.BriefStaleResponse
+	74,  // 296: wloop.source.v1.SourceService.BriefWant:output_type -> wloop.source.v1.BriefWantResponse
+	78,  // 297: wloop.source.v1.SourceService.Plan:output_type -> wloop.source.v1.PlanResponse
+	84,  // 298: wloop.source.v1.SourceService.Payload:output_type -> wloop.source.v1.PayloadResponse
+	87,  // 299: wloop.source.v1.SourceService.ApplyEffect:output_type -> wloop.source.v1.ApplyEffectResponse
+	89,  // 300: wloop.source.v1.SourceService.Proposals:output_type -> wloop.source.v1.ProposalsResponse
+	92,  // 301: wloop.source.v1.SourceService.Placement:output_type -> wloop.source.v1.PlacementResponse
+	94,  // 302: wloop.source.v1.SourceService.CallTool:output_type -> wloop.source.v1.CallToolResponse
+	96,  // 303: wloop.source.v1.SourceService.RunCLI:output_type -> wloop.source.v1.RunCLIResponse
+	98,  // 304: wloop.source.v1.HostService.Report:output_type -> wloop.source.v1.ReportResponse
+	100, // 305: wloop.source.v1.HostService.Changed:output_type -> wloop.source.v1.ChangedResponse
+	105, // 306: wloop.source.v1.HostService.ApplyItems:output_type -> wloop.source.v1.ApplyItemsResponse
+	107, // 307: wloop.source.v1.HostService.QueryItems:output_type -> wloop.source.v1.QueryItemsResponse
+	110, // 308: wloop.source.v1.HostService.Tasks:output_type -> wloop.source.v1.TasksResponse
+	115, // 309: wloop.source.v1.HostService.Books:output_type -> wloop.source.v1.BooksResponse
+	117, // 310: wloop.source.v1.HostService.RoundState:output_type -> wloop.source.v1.RoundStateResponse
+	121, // 311: wloop.source.v1.HostService.Workspaces:output_type -> wloop.source.v1.WorkspacesResponse
+	123, // 312: wloop.source.v1.HostService.Session:output_type -> wloop.source.v1.SessionResponse
+	126, // 313: wloop.source.v1.HostService.OpenGate:output_type -> wloop.source.v1.OpenGateResponse
+	128, // 314: wloop.source.v1.HostService.RecordSent:output_type -> wloop.source.v1.RecordSentResponse
+	131, // 315: wloop.source.v1.HostService.RehomeDrafts:output_type -> wloop.source.v1.RehomeDraftsResponse
+	133, // 316: wloop.source.v1.HostService.SetOverride:output_type -> wloop.source.v1.SetOverrideResponse
+	136, // 317: wloop.source.v1.HostService.RecordEvents:output_type -> wloop.source.v1.RecordEventsResponse
+	138, // 318: wloop.source.v1.HostService.SetMarks:output_type -> wloop.source.v1.SetMarksResponse
+	140, // 319: wloop.source.v1.HostService.PutBrief:output_type -> wloop.source.v1.PutBriefResponse
+	142, // 320: wloop.source.v1.HostService.SetWake:output_type -> wloop.source.v1.SetWakeResponse
+	144, // 321: wloop.source.v1.HostService.ClearWake:output_type -> wloop.source.v1.ClearWakeResponse
+	146, // 322: wloop.source.v1.HostService.Ask:output_type -> wloop.source.v1.AskResponse
+	148, // 323: wloop.source.v1.HostService.Meter:output_type -> wloop.source.v1.MeterResponse
+	152, // 324: wloop.source.v1.HostService.Config:output_type -> wloop.source.v1.ConfigResponse
+	154, // 325: wloop.source.v1.HostService.Profile:output_type -> wloop.source.v1.ProfileResponse
+	157, // 326: wloop.source.v1.HostService.Holds:output_type -> wloop.source.v1.HoldsResponse
+	160, // 327: wloop.source.v1.HostService.Events:output_type -> wloop.source.v1.EventsResponse
+	275, // [275:328] is the sub-list for method output_type
+	222, // [222:275] is the sub-list for method input_type
+	222, // [222:222] is the sub-list for extension type_name
+	222, // [222:222] is the sub-list for extension extendee
+	0,   // [0:222] is the sub-list for field type_name
 }
 
 func init() { file_wloop_source_v1_source_proto_init() }
@@ -11588,15 +11699,15 @@ func file_wloop_source_v1_source_proto_init() {
 		(*Fact_At)(nil),
 		(*Fact_After)(nil),
 	}
-	file_wloop_source_v1_source_proto_msgTypes[98].OneofWrappers = []any{}
-	file_wloop_source_v1_source_proto_msgTypes[143].OneofWrappers = []any{}
+	file_wloop_source_v1_source_proto_msgTypes[99].OneofWrappers = []any{}
+	file_wloop_source_v1_source_proto_msgTypes[144].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_wloop_source_v1_source_proto_rawDesc), len(file_wloop_source_v1_source_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   169,
+			NumMessages:   172,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

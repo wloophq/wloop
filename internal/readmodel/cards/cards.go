@@ -290,27 +290,36 @@ func sameCard(a, b card.Card) bool {
 	return errA == nil && errB == nil && bytes.Equal(x, y)
 }
 
-// Served is s with each snapshot of a disabled plugin marked Stale; s itself
-// when enabled is nil.
-func Served(s card.Store, enabled func(unit.ProviderID) bool) card.Store {
-	if enabled == nil {
+// Served is s with each snapshot of a disabled plugin marked Stale and each
+// card's notes counted at now (card.Card.CountedAt); s itself when enabled
+// and now are nil.
+func Served(s card.Store, enabled func(unit.ProviderID) bool, now func() time.Time) card.Store {
+	if enabled == nil && now == nil {
 		return s
 	}
-	return served{s, enabled}
+	return served{s, enabled, now}
 }
 
 type served struct {
 	card.Store
 	enabled func(unit.ProviderID) bool
+	now     func() time.Time
 }
 
 func (s served) Get(ctx context.Context, units []unit.Unit) (map[unit.Unit]card.Snapshot, error) {
 	got, err := s.Store.Get(ctx, units)
+	var at time.Time
+	if s.now != nil {
+		at = s.now()
+	}
 	for u, snap := range got {
-		if !s.enabled(u.Provider) {
+		if s.enabled != nil && !s.enabled(u.Provider) {
 			snap.Stale = true
-			got[u] = snap
 		}
+		if s.now != nil {
+			snap.Card = snap.Card.CountedAt(at)
+		}
+		got[u] = snap
 	}
 	return got, err
 }

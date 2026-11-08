@@ -177,6 +177,24 @@ no_reviewer_requested = "no reviewer requested"
 no_review_required = "green, no review required"
 no_review_required_checks_pending = "no review required, checks pending"
 
+# How each line of a pull request's card shows, by the signal's key; {{.name}} is a value the plugin fills.
+[signals.situation]
+label = "situation"
+values_from = "situations"
+notes = { stalled = 'stalled for {{.days}} {{plural .days "one" "working day" "other" "working days"}}' }
+
+[signals.checks]
+label = "checks"
+values = { passing = "passing", pending = "pending", failing = "failing", failing_named = "failing: {{.names}}" }
+
+[signals.review]
+label = "review"
+values = { approved = "approved" }
+
+[signals.merge]
+label = "merge"
+values = { conflicts = "conflicts" }
+
 [events.opened]
 label = "opened"
 tone = "people"

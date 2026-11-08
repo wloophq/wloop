@@ -3,10 +3,14 @@ package card
 
 import (
 	"context"
+	"maps"
+	"slices"
+	"strconv"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 )
 
 type Tone string // "neutral", "good", "warn", "bad", "info"
@@ -17,6 +21,54 @@ type Signal struct {
 	Tone  Tone   `json:"tone"`
 	// At is the instant Value shows, for a client to show in the viewer's zone.
 	At time.Time `json:"at,omitzero"`
+	// Key and Value are codes the plugin's catalog words (api.SignalSpec), Params the values its words fill.
+	Params map[string]string `json:"params,omitempty"`
+	Notes  []Note            `json:"notes,omitempty"`
+}
+
+// Note is what a signal's line adds after its value, in its own tone: a code
+// its signal's notes word, filled with Params.
+type Note struct {
+	Code   string            `json:"code"`
+	Tone   Tone              `json:"tone"`
+	Params map[string]string `json:"params,omitempty"`
+	// Since is the instant the note counts from; a read of the card fills
+	// Params["days"] with the working days since it (CountedAt).
+	Since time.Time `json:"since,omitzero"`
+}
+
+// DaysParam is the param a note that counts from an instant reads its working days in.
+const DaysParam = "days"
+
+// CountedAt is c with each note that counts from an instant reading the whole
+// working days from it to now, at least one, as the read sees them; c's own
+// signals are left as they are.
+func (c Card) CountedAt(now time.Time) Card {
+	counted := false
+	for _, s := range c.Signals {
+		counted = counted || slices.ContainsFunc(s.Notes, func(n Note) bool { return !n.Since.IsZero() })
+	}
+	if !counted {
+		return c
+	}
+	signals := slices.Clone(c.Signals)
+	for i, s := range signals {
+		notes := slices.Clone(s.Notes)
+		for j, n := range notes {
+			if n.Since.IsZero() {
+				continue
+			}
+			n.Params = maps.Clone(n.Params)
+			if n.Params == nil {
+				n.Params = map[string]string{}
+			}
+			n.Params[DaysParam] = strconv.Itoa(max(1, int(workday.Between(n.Since, now)/(24*time.Hour))))
+			notes[j] = n
+		}
+		signals[i].Notes = notes
+	}
+	c.Signals = signals
+	return c
 }
 
 type Human struct {

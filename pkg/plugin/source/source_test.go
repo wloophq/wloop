@@ -158,7 +158,9 @@ func snapshot() source.Snapshot {
 			Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
 		Card: &source.Card{
 			Label: "api#12", Title: "Add retries", State: "open", Outcome: "",
-			Signals:   []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0}},
+			Signals: []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0},
+				{Key: "situation", Value: "to_review", Tone: "neutral", Detail: &source.SignalDetail{Params: map[string]string{"actor": "Ana"},
+					Notes: []source.SignalNote{{Code: "stalled", Tone: "warn", Params: map[string]string{"days": "3"}, Since: t0}}}}},
 			LastHuman: &source.Human{Who: ana, What: "commented", At: t0, Link: "https://pulls.example/c/1"},
 			Why:       "Ana asked for your review", WaitsOn: []source.Person{bru}, Since: t0,
 			Link: "https://pulls.example/acme/api/pull/12", TurnsLink: "/turns/12", StartedByMe: true, ClosurePosted: true, Cares: true,
@@ -186,6 +188,9 @@ func snapshot() source.Snapshot {
 		FacetValues: map[string][]string{"waits-on": {"me", "ana"}},
 	}
 }
+
+// A plugin compares its card signals with ==; a field that breaks that breaks every plugin that does.
+var _ = source.CardSignal{} == source.CardSignal{}
 
 func TestSourceRoundTripsASnapshot(t *testing.T) {
 	rec := &recorder{}

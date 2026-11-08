@@ -108,3 +108,32 @@ func TestGitHubsReasonsAreWordedByItsLayer(t *testing.T) {
 		t.Fatalf("reasons %+v", w)
 	}
 }
+
+func TestGitHubsCardSignalsAreWordedByItsLayer(t *testing.T) {
+	by := map[string]api.SignalSpec{}
+	for _, s := range bundledCatalog(t, "github").CardSignals() {
+		if s.Provider != "github" {
+			t.Errorf("signal %+v of another provider", s)
+		}
+		by[s.Key] = s
+	}
+	for key, want := range map[string]string{"situation": "situation", "checks": "checks", "review": "review", "merge": "merge"} {
+		if by[key].Label != want {
+			t.Errorf("signal %s labeled %q, want %q", key, by[key].Label, want)
+		}
+	}
+	for _, c := range []struct{ key, code, want string }{
+		{"situation", "changes", "changes asked"},
+		{"situation", "loop_working", "agent working"},
+		{"checks", "passing", "passing"},
+		{"checks", "failing_named", "failing: {{.names}}"},
+		{"merge", "conflicts", "conflicts"},
+	} {
+		if got := by[c.key].Values[c.code]; got != c.want {
+			t.Errorf("%s=%s reads %q, want %q", c.key, c.code, got, c.want)
+		}
+	}
+	if got := by["situation"].Notes["stalled"]; got != `stalled for {{.days}} {{plural .days "one" "working day" "other" "working days"}}` {
+		t.Errorf("the stalled note reads %q", got)
+	}
+}

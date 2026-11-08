@@ -18,7 +18,7 @@ const TAG_CHIPS = 3;
 // catalog is the daemon's served presentation (GET /api/catalog): its views
 // for the web, the lens's fields built from its facets, and the situations'
 // labels in rank order.
-const catalog = { version: "", views: [], specs: [], fields: [], lens: [], reasons: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
+const catalog = { version: "", views: [], specs: [], fields: [], lens: [], reasons: [], cardSignals: [], kinds: new Map(), kindOrder: [], events: new Map(), eventData: new Map(), eventTones: new Map(), details: [], search: null };
 
 // MATCH is how a facet's match compares a row's value v with a query q.
 const MATCH = {
@@ -37,6 +37,7 @@ function applyCatalog(c) {
   catalog.fields = catalog.specs.map(fieldOf);
   catalog.lens = c.lens || [];
   catalog.reasons = c.reasons || [];
+  catalog.cardSignals = c.card_signals || [];
   catalog.events = new Map((c.events || []).map((e) => [e.kind, e.label]));
   catalog.eventData = new Map((c.events || []).filter((e) => e.data).map((e) => [e.kind, e.data]));
   catalog.eventTones = new Map((c.events || []).filter((e) => e.tone).map((e) => [e.kind, e.tone]));
