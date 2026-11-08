@@ -1,11 +1,14 @@
 package row
 
 import (
+	"strconv"
 	"strings"
+	"time"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/situation"
+	"github.com/wloophq/wloop/plugins/github/workday"
 )
 
 // The tones of a card's signals.
@@ -16,9 +19,27 @@ const (
 	ToneBad     = "bad"
 )
 
-// SignalSituation is the key of a card's first signal, whose value is the
-// situation's kind; the host words it.
-const SignalSituation = "situation"
+// The keys of a card's signals and the codes of their values and notes,
+// which the plugin's ui.toml [signals] words. The situation signal's value
+// is the situation's kind.
+const (
+	SignalSituation = "situation"
+	SignalChecks    = "checks"
+	SignalReview    = "review"
+	SignalMerge     = "merge"
+
+	ChecksFailing          = "failing"
+	ChecksFailingNamed     = "failing_named"
+	ChecksPending          = "pending"
+	ChecksPassing          = "passing"
+	ReviewApproved         = "approved"
+	ReviewChangesRequested = "changes_requested"
+	MergeConflicts         = "conflicts"
+
+	// NoteStalled is the situation's note once it is stalled; its days param
+	// is how many working days it has waited.
+	NoteStalled = "stalled"
+)
 
 // Card is the pull request's card from its source row.
 func (r Row) Card() *src.Card {
@@ -58,37 +79,49 @@ const (
 
 func (r Row) signals() []src.CardSignal {
 	kind := r.Kind()
-	out := []src.CardSignal{{Key: SignalSituation, Value: string(kind), Tone: ToneNeutral}}
+	sit := src.CardSignal{Key: SignalSituation, Value: string(kind), Tone: ToneNeutral}
 	if kind == situation.KindDone {
-		return out
+		return []src.CardSignal{sit}
 	}
+	if r.Stalled() {
+		sit.Notes = []src.SignalNote{StalledNote(r.Situation.Stalled.Time, r.in.Now)}
+	}
+	out := []src.CardSignal{sit}
 	if f := r.Payload.Facts; f != nil {
 		switch f.Checks.State {
 		case "FAILURE", "ERROR":
-			v := "failing"
+			s := src.CardSignal{Key: SignalChecks, Value: ChecksFailing, Tone: ToneBad}
 			if len(f.Checks.Failing) > 0 {
-				v += ": " + strings.Join(f.Checks.Failing, ", ")
+				s.Value, s.Params = ChecksFailingNamed, map[string]string{"names": strings.Join(f.Checks.Failing, ", ")}
 			}
-			out = append(out, src.CardSignal{Key: "checks", Value: v, Tone: ToneBad})
+			out = append(out, s)
 		case "PENDING":
-			out = append(out, src.CardSignal{Key: "checks", Value: "pending", Tone: ToneWarn})
+			out = append(out, src.CardSignal{Key: SignalChecks, Value: ChecksPending, Tone: ToneWarn})
 		case "SUCCESS":
-			out = append(out, src.CardSignal{Key: "checks", Value: "passing", Tone: ToneGood})
+			out = append(out, src.CardSignal{Key: SignalChecks, Value: ChecksPassing, Tone: ToneGood})
 		}
 	}
 	switch {
 	case r.Payload.Approved || kind == situation.KindMerge:
-		out = append(out, src.CardSignal{Key: "review", Value: "approved", Tone: ToneGood})
+		out = append(out, src.CardSignal{Key: SignalReview, Value: ReviewApproved, Tone: ToneGood})
 	case kind == situation.KindChanges:
-		out = append(out, src.CardSignal{Key: "review", Value: "changes requested", Tone: ToneWarn})
+		out = append(out, src.CardSignal{Key: SignalReview, Value: ReviewChangesRequested, Tone: ToneWarn})
 	}
 	if kind == situation.KindConflicts {
-		out = append(out, src.CardSignal{Key: "merge", Value: "conflicts", Tone: ToneBad})
-	}
-	if r.Stalled() {
-		out = append(out, src.CardSignal{Key: "stalled", Value: "stalled", Tone: ToneWarn})
+		out = append(out, src.CardSignal{Key: SignalMerge, Value: MergeConflicts, Tone: ToneBad})
 	}
 	return out
+}
+
+// StalledNote is the situation's note of a stall that began waiting at since, as of now.
+func StalledNote(since, now time.Time) src.SignalNote {
+	return src.SignalNote{Code: NoteStalled, Tone: ToneWarn, Params: map[string]string{"days": stalledDays(since, now)}}
+}
+
+// stalledDays is the whole working days from since to now, at least one: a
+// stall under a day's threshold still reads as a day.
+func stalledDays(since, now time.Time) string {
+	return strconv.Itoa(max(1, int(workday.Between(since, now)/(24*time.Hour))))
 }
 
 // Person is a GitHub login, or the group of a "team:<org>/<slug>" request.

@@ -183,9 +183,10 @@ func TestCardFromRow(t *testing.T) {
 	if c.Label != "acme/api#1" || c.Title != "change "+fixtureViewer || c.State != "open" || c.Outcome != "" {
 		t.Errorf("card %+v", c)
 	}
-	if !slices.Contains(c.Signals, src.CardSignal{Key: "checks", Value: "failing: lint", Tone: ToneBad}) ||
-		c.Signals[0] != (src.CardSignal{Key: SignalSituation, Value: string(situation.KindChecks), Tone: ToneNeutral}) {
-		t.Errorf("signals %+v", c.Signals)
+	want := []src.CardSignal{{Key: SignalSituation, Value: string(situation.KindChecks), Tone: ToneNeutral},
+		{Key: SignalChecks, Value: ChecksFailingNamed, Tone: ToneBad, Params: map[string]string{"names": "lint"}}}
+	if !reflect.DeepEqual(c.Signals, want) {
+		t.Errorf("signals %+v, want %+v", c.Signals, want)
 	}
 	if c.Why != r.Situation.Reason || c.Why == "" || !c.Since.Equal(r.Situation.Since) || c.Link != r.Link() {
 		t.Errorf("why %q since %v link %q", c.Why, c.Since, c.Link)
