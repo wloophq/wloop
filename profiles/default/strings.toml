@@ -499,6 +499,9 @@
 "Nothing in {view} matches \"{query}\"." = "Nothing in {view} matches \"{query}\"."
 "Nothing in {view} right now." = "Nothing in {view} right now."
 "Nothing pending or blocked in the plan." = "Nothing pending or blocked in the plan."
+# The reasons a session close waits on, as a plan item shows them.
+"its terminal is closed; it ends on its own" = "its terminal is closed; it ends on its own"
+"its terminal is open with no agent in it: close that terminal, or dismiss this" = "its terminal is open with no agent in it: close that terminal, or dismiss this"
 "now" = "now"
 "observe" = "observe"
 "only this" = "only this"

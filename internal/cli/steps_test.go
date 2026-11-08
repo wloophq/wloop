@@ -105,6 +105,16 @@ func TestASessionCloseOfASessionGoneOrClosedIsMoot(t *testing.T) {
 	}
 }
 
+func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
+	t.Parallel()
+	l := newTestEnv(t, &fake.Manager{}).loadedIntents()
+	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed} {
+		if _, ok := l.Strings[key]; !ok {
+			t.Errorf("strings.toml does not word %q", key)
+		}
+	}
+}
+
 func TestASessionCloseOfATerminalOpenWithNoAgentSaysWhatToDo(t *testing.T) {
 	t.Parallel()
 	te, _ := noAgentSession(t, true)
