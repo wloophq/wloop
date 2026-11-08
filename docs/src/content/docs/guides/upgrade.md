@@ -85,6 +85,8 @@ A script that calls the daemon's API finds the tasks' routes renamed:
 
 The agent tools `inbox_post` and `inbox_read` are `task_post` and `task_read`: a post names the gate it waits on, and `task_read` also reads the task, its brief, its open gates and its chat. `{{command}} turn answer` takes `--gate` only; `--message` is gone. The fact `session.unread_answers` is `session.unread_gates`, counting gates, and a user workflow or `tools.toml` that names an old one fails to load naming the new one.
 
+`drafts.repeat_after` defaults to `7d` where it was `1d`: a stalled conversation is nudged again after a week, and a plugin rule proposes a settled draft again after a week. Set `drafts.repeat_after = "1d"` in your configuration to keep the old pace.
+
 A reply that names no `send` takes its verb's `send` in `tasks.toml`, which the bundled profile sets to `now`: set `send = "draft"` under `[verbs.reply]` in your `tasks.toml` to keep replies held for approval by default.
 
 Each plugin's settings live in its `[plugins.<id>]` table, and each old key fails at load naming its new one:

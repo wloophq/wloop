@@ -204,6 +204,6 @@ function renderQueue(queue, at, env) {
       queueStep("queue:back", t("Previous"), i === 0, env), queueStep("queue:skip", t("Next"), i === items.length - 1, env)),
     err,
     h("div", { class: "queue-item" }, queueItemCard(item, env, queue.view), queuePrimary(item, env)),
-    next ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task, queue.view),
+    next && next.task.id !== item.task.id ? h("section", { class: "next-up", "aria-label": t("Next up") }, h("h3", {}, t("Next up")), env.row(next.task, queue.view),
       more > 0 ? h("p", { class: "more" }, tn("+{n} more", more)) : null) : null)];
 }

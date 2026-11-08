@@ -483,3 +483,21 @@ process.stdout.write(JSON.stringify({ Draft: draft, Gate: rows() }));
 		t.Fatalf("draft %v, gate %v: a queued draft or gate shows the row of the task it is about", got.Draft, got.Gate)
 	}
 }
+
+func TestNextUpLeavesOutTheTaskTheCardAlreadyShows(t *testing.T) {
+	gate := func(id int) map[string]any {
+		return map[string]any{"task": map[string]any{"id": "t-1", "title": "ship", "units": []any{}},
+			"gate":    map[string]any{"id": id, "kind": "question", "text": "Which?", "intents": []map[string]any{{"id": "approve", "label": "Approve"}}},
+			"primary": map[string]string{"kind": "gate", "id": "approve", "label": "Approve"}}
+	}
+	var got struct{ Rows []string }
+	nodeRun(t, queuePrelude(t), nil, `
+(async () => {
+globalThis.hash = "#queue=answer";
+await queueLoad(env.route(), env);
+process.stdout.write(JSON.stringify({ Rows: shown() }));
+})();`, map[string]any{"queues": map[string]any{"answer": map[string]any{"kind": "answer", "title": "Agent questions", "total": 2, "items": []any{gate(1), gate(2)}}}}, &got)
+	if !slices.Equal(got.Rows, []string{"t-1"}) {
+		t.Fatalf("rows %v: two gates of one task draw its row once", got.Rows)
+	}
+}

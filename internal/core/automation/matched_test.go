@@ -25,3 +25,11 @@ func TestAMatchedDurationIsKeptToTheMinute(t *testing.T) {
 		}
 	}
 }
+
+func TestAMatchedDurationUnderAMinuteKeepsItsSeconds(t *testing.T) {
+	v := workflow.Vars{Facts: workflow.Facts{"session.idle_for": 40 * time.Second}}
+	got := matched(readsOnly{"session.idle_for"}, v)
+	if len(got) != 1 || got[0].Value != 40*time.Second {
+		t.Fatalf("matched %+v, want 40s: a duration under a minute is shown as it is", got)
+	}
+}

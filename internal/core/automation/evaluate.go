@@ -564,7 +564,7 @@ func matched(pred workflow.Predicate, v workflow.Vars) []workflow.Fact {
 				break
 			}
 		}
-		if d, ok := val.(time.Duration); ok {
+		if d, ok := val.(time.Duration); ok && d >= time.Minute {
 			val = d.Truncate(time.Minute)
 		}
 		out = append(out, workflow.Fact{Name: n, Value: val})
