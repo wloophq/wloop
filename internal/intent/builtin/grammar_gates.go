@@ -32,6 +32,8 @@ var gatesGrammar = []Key{
 	{Path: "drafts.purposes.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The purpose's word, such as \"Nudge\"."},
 	{Path: "drafts.states", In: SurfaceGates, Kind: KindMap, Doc: "Where a draft's delivery stands, by state, as its card says it."},
 	{Path: "drafts.states.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The state's words, such as \"failed to send\"; the key is a draft state: held, queued, sending, sent, failed or dropped."},
+	{Path: "drafts.reasons", In: SurfaceGates, Kind: KindMap, Doc: "Why a dropped draft was withdrawn, by reason, as the Outbox says it."},
+	{Path: "drafts.reasons.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The reason's words; the key is a withdraw reason: assigned, moot, outside, ended, skipped or superseded."},
 	{Path: "approval", In: SurfaceGates, Kind: KindTable, Doc: "How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules."},
 	{Path: "approval.mode", In: SurfaceGates, Kind: KindEnum, Values: GateModes, Doc: "The mode when no rule holds; the bundled file sets it. send and run release a gate at once, delay when its window ends unless you resolve it first, wait holds it for you, dry_run rejects a draft gate."},
 	{Path: "approval.window", In: SurfaceGates, Kind: KindDur, Doc: "With mode delay only: how long you have to resolve the gate."},

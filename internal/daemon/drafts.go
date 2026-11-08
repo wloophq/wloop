@@ -447,6 +447,9 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 			}
 		}
 	}
+	if d.State == draft.Dropped {
+		v.ReasonText = s.loaded().Gates.Drafts.Reasons[d.Reason]
+	}
 	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d))
 	v.Where = s.draftWhere(ctx, d)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]

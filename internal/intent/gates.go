@@ -37,10 +37,11 @@ type GatesDef struct {
 }
 
 // DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts no
-// workflow proposed and no purpose names, Purposes name a purpose and States a delivery state, by its id.
+// workflow proposed and no purpose names, Purposes name a purpose, States a delivery state and Reasons why a
+// dropped draft was withdrawn, by its id.
 type DraftWords struct {
-	ByHand, ByHandAbout string
-	Purposes, States    map[string]string
+	ByHand, ByHandAbout       string
+	Purposes, States, Reasons map[string]string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -201,6 +202,7 @@ type mDraftWords struct {
 	ByHandAbout *string           `toml:"by_hand_about"`
 	Purposes    map[string]string `toml:"purposes"`
 	States      map[string]string `toml:"states"`
+	Reasons     map[string]string `toml:"reasons"`
 }
 
 type mGate struct {
@@ -366,6 +368,15 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 		known = append(known, name)
 	}
 	w.States = mergeWords(w.States, m.States, known)
+	known = nil
+	for _, name := range declared(s, "drafts.reasons", m.Reasons) {
+		if !slices.Contains(draft.WithdrawReasons, name) {
+			s.add("drafts.reasons."+name, "names no withdraw reason%s; the reasons are %s", expr.DidYouMean(name, draft.WithdrawReasons), strings.Join(draft.WithdrawReasons, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.Reasons = mergeWords(w.Reasons, m.Reasons, known)
 }
 
 // mergeWords is into with the words of names in m laid over it, an empty word taking one off.

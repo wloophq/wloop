@@ -217,3 +217,11 @@ sending = "sending"
 sent = "sent"
 failed = "failed to send"
 dropped = "dropped"
+
+[drafts.reasons]
+assigned = "its items got an owner"
+moot = "it no longer applies"
+outside = "it addressed someone who cannot read that conversation"
+ended = "its task ended"
+skipped = "you skipped its workflow there"
+superseded = "a draft to the whole conversation replaced it"

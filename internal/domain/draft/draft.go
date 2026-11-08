@@ -234,6 +234,9 @@ const (
 	WithdrawSuperseded = "superseded"
 )
 
+// WithdrawReasons are every reason a draft is withdrawn with.
+var WithdrawReasons = []string{WithdrawAssigned, WithdrawMoot, WithdrawOutside, WithdrawEnded, WithdrawSkipped, WithdrawSuperseded}
+
 type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"
 
 const (

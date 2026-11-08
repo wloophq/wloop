@@ -167,6 +167,11 @@ func (p *plugin) ingestJob(ctx context.Context) (summary, skipped string, err er
 		return "skipped", skip, nil
 	}
 	rep, err := ingest.Run(ctx, p.registration(), p.now())
+	if err == nil {
+		if err := p.refreshMembers(ctx); err != nil {
+			p.logf("slack: reading who is in the conversations: %v", err)
+		}
+	}
 	return p.after(ctx, rep, err)
 }
 

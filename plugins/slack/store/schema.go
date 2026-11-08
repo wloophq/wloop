@@ -24,6 +24,12 @@ var migrations = []store.Migration{
 		_, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS ledger_migrations (name TEXT PRIMARY KEY, at TEXT NOT NULL) WITHOUT ROWID`)
 		return err
 	}},
+	{Version: 3, Up: func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS slack_members (
+  conversation TEXT PRIMARY KEY, members TEXT NOT NULL DEFAULT '[]', fetched_at TEXT NOT NULL
+) WITHOUT ROWID`)
+		return err
+	}},
 }
 
 var tableRE = regexp.MustCompile(`CREATE TABLE (\w+) \(`)

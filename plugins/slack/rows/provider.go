@@ -135,6 +135,7 @@ type Input struct {
 	hasState bool
 	items    []items.Item
 	users    map[string]store.UserRow
+	members  *store.MembersRow
 	viewer   string
 	// host is the workspace's web host, such as "acme.slack.com"; "" when unknown.
 	host string
@@ -197,7 +198,29 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]*
 	for _, r := range got {
 		users[r.ID] = r
 	}
+	if err := p.loadMembers(ctx, out); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// loadMembers fills each input's stored members of its conversation.
+func (p *Provider) loadMembers(ctx context.Context, ins map[unit.Unit]*Input) error {
+	var convs []string
+	for _, in := range ins {
+		convs = append(convs, in.key.Conversation)
+	}
+	slices.Sort(convs)
+	stored, err := p.src.DB.Slack().Members(ctx, slices.Compact(convs))
+	if err != nil {
+		return err
+	}
+	for _, in := range ins {
+		if m, ok := stored[in.key.Conversation]; ok {
+			in.members = &m
+		}
+	}
+	return nil
 }
 
 func (p *Provider) conversation(ctx context.Context, cache map[string]store.ConversationRow, id string) (store.ConversationRow, error) {
@@ -261,6 +284,14 @@ func (in *Input) State() (store.ExtractionState, bool) { return in.state, in.has
 
 // Items are the unit's items in the host's ledger.
 func (in *Input) Items() []items.Item { return in.items }
+
+// Members are the stored members of the unit's conversation; false when they were never read.
+func (in *Input) Members() (store.MembersRow, bool) {
+	if in.members == nil {
+		return store.MembersRow{}, false
+	}
+	return *in.members, true
+}
 
 // Viewer is the viewer's Slack user id; "" when unknown.
 func (in *Input) Viewer() string { return in.viewer }

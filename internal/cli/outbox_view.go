@@ -314,7 +314,7 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		field("Error", d.Error)
 	}
 	if d.State == string(draft.Dropped) && d.Reason != "" {
-		field("Dropped", d.Reason)
+		field("Dropped", cmp.Or(d.ReasonText, d.Reason))
 	}
 	if d.Permalink != "" {
 		field("Posted", d.Permalink)

@@ -411,6 +411,22 @@ func TestDraftActionStatuses(t *testing.T) {
 	}
 }
 
+func TestADroppedDraftCarriesItsReasonInWords(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := r.propose(t, r7u, "hello", draft.Wait)
+	if _, err := r.o.Withdraw(context.Background(), d.ID, draft.WithdrawOutside); err != nil {
+		t.Fatal(err)
+	}
+	var got api.Draft
+	if code := r.getDraft(t, d.ID, &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	if got.Reason != draft.WithdrawOutside || got.ReasonText != "it addressed someone who cannot read that conversation" {
+		t.Fatalf("reason %q in words %q", got.Reason, got.ReasonText)
+	}
+}
+
 func TestEnabledPluginWithoutPublisherAnswers409(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)

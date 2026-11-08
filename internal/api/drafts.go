@@ -58,7 +58,10 @@ type Draft struct {
 	State     string `json:"state"`
 	Error     string `json:"error"`
 	Reason    string `json:"reason"`
-	Permalink string `json:"permalink"`
+	// ReasonText is Reason in the profile's words (gates.toml's drafts.reasons) for a dropped draft; "" when
+	// it words none.
+	ReasonText string `json:"reason_text,omitempty"`
+	Permalink  string `json:"permalink"`
 	// Gate is the draft's gate, 0 for none; Deadline is when its window resolves it, nil for none; Intents are
 	// its open gate's intents by the status each resolves it to (approved, rejected), the first of each.
 	Gate     int64             `json:"gate,omitempty"`

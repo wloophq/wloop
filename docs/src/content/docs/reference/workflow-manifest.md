@@ -89,7 +89,10 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `drafts` | table |  | The drafts the workflow's steps and turns propose. |
 | `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
 | `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
-| `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
+| `drafts.withdraw.reason` | one of `assigned`, `moot`, `outside` | `moot` | The reason the withdrawn draft stores. |
+| `drafts.withdraw.rule[]` | table |  | A rule tried before when, in order, that withdraws with a reason of its own. |
+| `drafts.withdraw.rule[].when` | predicate |  | When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required. |
+| `drafts.withdraw.rule[].reason` | one of `assigned`, `moot`, `outside` | `moot` | The reason the draft the rule withdraws stores. |
 | `outbox` | table |  | How the Outbox heads the group of the drafts the workflow proposed. |
 | `outbox.title` | string, localized |  | The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent. |
 | `outbox.about` | string, localized |  | One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet." |
@@ -113,7 +116,8 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |
 | `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
-| `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item; an intent's help.target is free text. |
+| `draft.propose` | `target` | one of `unit`, `item`, `person` | `unit` | Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text. |
+| `draft.propose` | `to` | one of `all`, `members`, `non_members` | `all` | Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both. |
 | `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |

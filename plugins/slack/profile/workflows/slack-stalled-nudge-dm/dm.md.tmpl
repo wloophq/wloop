@@ -1,0 +1,4 @@
+Hi! Any news on {{plural (len .Items) "one" "this" "other" "these"}}? It came up in another conversation:
+
+{{range $i, $it := .Items}}{{if $i}}
+{{end}}> {{$it.Line}}{{end -}}

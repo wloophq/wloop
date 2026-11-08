@@ -302,7 +302,8 @@ Every post an agent or a rule proposes is a draft first, held by its draft gate 
 
 | Workflow or rule | Proposes |
 |---|---|
-| `slack-stalled-nudge` | one nudge per Slack thread for the tasks someone else owes there, each once its check date passed and it was not nudged within `drafts.repeat_after` (1d): it mentions everyone those tasks' open items wait on and lists what they owe, and a task coming due while it is held joins it; never to someone with an open ask to you in that thread, one that waits on you, or is assigned to you and waits on nobody else (`draft.person_asks_you`) |
+| `slack-stalled-nudge` | one nudge per Slack thread for the tasks someone else owes there, each once its check date passed and it was not nudged within `drafts.repeat_after` (1d): it mentions everyone those tasks' open items wait on and lists what they owe, and a task coming due while it is held joins it; never to someone with an open ask to you in that thread, one that waits on you, or is assigned to you and waits on nobody else (`draft.person_asks_you`); it mentions only the conversation's members (`to = "members"`), and a held one that addresses someone who is not a member is withdrawn as `outside` |
+| `slack-stalled-nudge-dm` | for the same tasks, one nudge per person they wait on who is not a member of the conversation, such as a third person an item of a direct message names: it posts in your direct conversation with them (`target = "person"`), quotes the items they owe, since they cannot open the conversation, and is written in the language of the conversation the items came from |
 | `slack-closure` | a closing message for a Slack unit you started whose items resolved |
 | `slack-ask-owner` | a question for a Slack unit's open items with no owner after a working day; it always waits for you |
 | `github-nudge` | the GitHub plugin's nudge |

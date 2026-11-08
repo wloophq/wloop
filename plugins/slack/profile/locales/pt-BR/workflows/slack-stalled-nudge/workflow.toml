@@ -1,4 +1,4 @@
-summary = "Cutucar todos que uma tarefa parada do Slack espera em uma só mensagem na conversa, mencionando cada um e listando os itens abertos que devem, uma vez a cada drafts.repeat_after"
+summary = "Cutucar todos da conversa que uma tarefa parada do Slack espera em uma só mensagem na conversa, mencionando cada um e listando os itens abertos que devem, uma vez a cada drafts.repeat_after"
 
 [outbox]
 title = "Perguntar a quem não respondeu"

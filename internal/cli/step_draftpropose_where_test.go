@@ -36,18 +36,27 @@ const (
 // conversation, as the bundled Slack nudge does.
 func whereRig(t *testing.T) (*draftRig, *lines) {
 	t.Helper()
-	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "to", "members")
-	wf.Steps = append(wf.Steps, wfStep("draft.propose", "purpose", "nudge", "items", "owed", "per", "person", "to", "non_members",
-		"target", "person", "text", "dm.md.tmpl"))
-	wf.Withdraw = automationtest.MatchFunc(func(v workflow.Vars) bool {
+	moot := automationtest.MatchFunc(func(v workflow.Vars) bool {
 		return v.Facts["draft.person_waited"] != true || v.Facts["draft.items_owed"] == 0 || v.Facts["draft.person_asks_you"] == true
 	}, "draft.person_waited", "draft.items_owed", "draft.person_asks_you")
+	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "to", "members")
+	wf.Withdraw = moot
 	wf.WithdrawRules = []workflow.WithdrawRule{{When: automationtest.MatchFunc(func(v workflow.Vars) bool {
 		n, _ := v.Facts["draft.people_outside"].(int)
 		return n > 0
 	}, "draft.people_outside"), Reason: draft.WithdrawOutside}}
+	dm := draftWF("nudges-dm", "purpose", "nudge", "items", "owed", "per", "person", "to", "non_members", "target", "person", "text", "dm.md.tmpl")
+	dm.Withdraw = moot
 	r := newDraftRig(t, wf, unitWF)
-	writeWorkflowFile(t, r, "dm.md.tmpl", dmText)
+	r.others = []workflow.Workflow{dm}
+	r.deps.Workflow = func(name string) (workflow.Workflow, bool) {
+		i := slices.IndexFunc(r.workflows(), func(w workflow.Workflow) bool { return w.Name == name })
+		if i < 0 {
+			return workflow.Workflow{}, false
+		}
+		return r.workflows()[i], true
+	}
+	writeFileOf(t, r, dm.Name, "dm.md.tmpl", dmText)
 	log := &lines{}
 	r.s.d.Log = log.add
 	r.deps.Me = func() task.Me { return task.Me{Keys: []string{meP.Key}} }
@@ -75,9 +84,9 @@ func (l *lines) has(s string) bool {
 	return slices.ContainsFunc(l.all, func(x string) bool { return strings.Contains(x, s) })
 }
 
-func writeWorkflowFile(t *testing.T, r *draftRig, name, body string) {
+func writeFileOf(t *testing.T, r *draftRig, workflowName, name, body string) {
 	t.Helper()
-	wd := filepath.Join(r.cfg.Profile, "workflows", r.wf.Name)
+	wd := filepath.Join(r.cfg.Profile, "workflows", workflowName)
 	if err := os.MkdirAll(wd, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -86,16 +95,43 @@ func writeWorkflowFile(t *testing.T, r *draftRig, name, body string) {
 	}
 }
 
-// sweepSteps runs each step of the rig's workflow on u, as one run of it does.
+func (r *draftRig) workflows() []workflow.Workflow { return append([]workflow.Workflow{r.wf}, r.others...) }
+
+// sweepSteps passes each of the rig's workflows over u as a sweep does: a step that refuses stops its run.
 func (r *draftRig) sweepSteps(u unit.Unit) {
 	r.t.Helper()
-	for _, st := range r.wf.Steps {
-		_, err := r.s.Run(context.Background(), st, u, workflow.Why{Workflow: r.wf.Name}, automation.RunOpts{})
-		var deferred automation.Deferred
-		if err != nil && !errors.As(err, &deferred) {
-			r.t.Fatal(err)
+	ctx := context.Background()
+	for _, w := range r.workflows() {
+		why := workflow.Why{Workflow: w.Name}
+		for _, st := range w.Steps {
+			refusal, err := r.s.Check(ctx, st, u, why, automation.CheckOpts{})
+			if err != nil {
+				r.t.Fatal(err)
+			}
+			if refusal != "" {
+				break
+			}
+			_, err = r.s.Run(ctx, st, u, why, automation.RunOpts{})
+			var deferred automation.Deferred
+			if err != nil && !errors.As(err, &deferred) {
+				r.t.Fatal(err)
+			}
 		}
 	}
+}
+
+// allDrafts are the drafts of every workflow of the rig.
+func (r *draftRig) allDrafts() []draft.Draft {
+	r.t.Helper()
+	var out []draft.Draft
+	for _, w := range r.workflows() {
+		ds, err := r.svc.List(context.Background(), outbox.Filter{Workflow: w.Name})
+		if err != nil {
+			r.t.Fatal(err)
+		}
+		out = append(out, ds...)
+	}
+	return out
 }
 
 func dmItem(id, summary string, created time.Time, waiting ...items.Person) items.Item {
@@ -113,7 +149,7 @@ func TestANudgeForSomeoneOutsideADMGoesToTheirOwnDM(t *testing.T) {
 	r, _ := whereRig(t)
 	r.items.set(dmWithAna, dmItem("i1", "Bruno to write the study of the queue", r.now.Add(-96*time.Hour), bruno))
 	r.sweepSteps(dmWithAna)
-	ds := held(r.drafts())
+	ds := held(r.allDrafts())
 	if len(ds) != 1 {
 		t.Fatalf("drafts %+v, want the one to Bruno's DM alone", ds)
 	}
@@ -125,7 +161,7 @@ func TestANudgeForSomeoneOutsideADMGoesToTheirOwnDM(t *testing.T) {
 		t.Errorf("text %q, want the item quoted with no link to the DM Bruno cannot open", d.Text)
 	}
 	r.sweepSteps(dmWithAna)
-	if got := held(r.drafts()); len(got) != 1 {
+	if got := held(r.allDrafts()); len(got) != 1 {
 		t.Errorf("a second sweep left %d held drafts, want the one", len(got))
 	}
 }
@@ -135,7 +171,7 @@ func TestANudgeForTheDMsPeerStaysInTheDM(t *testing.T) {
 	r, _ := whereRig(t)
 	r.items.set(dmWithAna, dmItem("i1", "The deck", r.now.Add(-96*time.Hour), ana))
 	r.sweepSteps(dmWithAna)
-	ds := held(r.drafts())
+	ds := held(r.allDrafts())
 	if len(ds) != 1 || ds[0].Target != "" || !strings.HasPrefix(ds[0].Text, "@{"+ana.Key+"}, any news?") {
 		t.Fatalf("drafts %+v, want one to Ana in the DM", ds)
 	}
@@ -146,7 +182,7 @@ func TestADMWaitingOnItsPeerAndAnotherSplitsTheNudge(t *testing.T) {
 	r, _ := whereRig(t)
 	r.items.set(dmWithAna, dmItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), dmItem("i2", "The study", r.now.Add(-72*time.Hour), bruno))
 	r.sweepSteps(dmWithAna)
-	ds := held(r.drafts())
+	ds := held(r.allDrafts())
 	var inDM, toBruno []draft.Draft
 	for _, d := range ds {
 		if d.Target == "" {
@@ -168,7 +204,7 @@ func TestAChannelNudgeMentionsAMemberAsBefore(t *testing.T) {
 	r, _ := whereRig(t)
 	r.items.set(draftThread, openItem("i1", "The budget", r.now.Add(-72*time.Hour), bruno))
 	r.sweepSteps(draftThread)
-	ds := held(r.drafts())
+	ds := held(r.allDrafts())
 	if len(ds) != 1 || ds[0].Target != "" || !strings.HasPrefix(ds[0].Text, "@{"+bruno.Key+"}, any news?") {
 		t.Fatalf("drafts %+v, want one mentioning Bruno in the thread", ds)
 	}
@@ -202,7 +238,7 @@ func TestAHeldDraftInBrunosDMIsNotWithdrawnAsOutside(t *testing.T) {
 	r, _ := whereRig(t)
 	r.items.set(dmWithAna, dmItem("i1", "The study", r.now.Add(-96*time.Hour), bruno))
 	r.sweepSteps(dmWithAna)
-	ds := held(r.drafts())
+	ds := held(r.allDrafts())
 	if len(ds) != 1 {
 		t.Fatalf("drafts %+v", ds)
 	}
@@ -221,7 +257,7 @@ func TestAnUnknownMembershipAddressesNobodyItCannotPlace(t *testing.T) {
 	r.units.Put(dmWithAna, workflow.Facts{"slack.ended": false})
 	r.items.set(dmWithAna, dmItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), dmItem("i2", "The study", r.now.Add(-72*time.Hour), carla))
 	r.sweepSteps(dmWithAna)
-	for _, d := range r.drafts() {
+	for _, d := range r.allDrafts() {
 		t.Errorf("draft %d to %q: %q, want none while who reads the DM is unknown", d.ID, d.Target, d.Text)
 	}
 	if !log.has("who can read " + dmWithAna.String() + " is unknown") {

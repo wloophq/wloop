@@ -324,6 +324,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.language` | string | The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.members` | list | The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one. |
 
 ### Briefs (`brief.*`)
 
@@ -345,6 +346,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its task is neither done nor in the trash, or its unit is stored. |
 | `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
+| `draft.people_outside` | int | The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted. |
 
 ### Gates (`gate.*`)
 

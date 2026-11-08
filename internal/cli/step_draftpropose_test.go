@@ -91,6 +91,7 @@ type draftRig struct {
 	units  *automationtest.Units
 	deps   *draftDeps
 	wf     workflow.Workflow
+	others []workflow.Workflow
 	cfg    config.Config
 	now    time.Time
 	writes int

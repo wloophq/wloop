@@ -50,7 +50,7 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 	if closure {
 		ended = src.Bool(true)
 	}
-	return []src.Fact{
+	facts := []src.Fact{
 		{Name: "slack.channel", Value: src.String(k.Conversation)},
 		{Name: "slack.conversation", Value: src.String(conversationOf(k, in.Conversation().Kind))},
 		{Name: "slack.started_by_me", Value: src.Bool(st.StartedByViewer)},
@@ -64,7 +64,11 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 		{Name: "slack.settled_at", Value: src.Time(time.Time{})},
 		{Name: "slack.fingerprint", Value: src.String(u.String() + "|" + newest + "|" + updated.UTC().Format(time.RFC3339Nano))},
 		{Name: "slack.language", Value: src.String(threadLanguage(in))},
-	}, next
+	}
+	if members, ok := unitMembers(in); ok {
+		facts = append(facts, src.Fact{Name: "slack.members", Value: src.List(members...)})
+	}
+	return facts, next
 }
 
 // languageMessages is how many of a thread's newest messages tell its language.

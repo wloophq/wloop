@@ -444,6 +444,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
 - `drafts.states.<name>` (string, localized): The state's words, such as "failed to send"; the key is a draft state: held, queued, sending, sent, failed or dropped.
+- `drafts.reasons` (table by name): Why a dropped draft was withdrawn, by reason, as the Outbox says it.
+- `drafts.reasons.<name>` (string, localized): The reason's words; the key is a withdraw reason: assigned, moot, outside, ended, skipped or superseded.
 - `approval` (an [approval table](#approval-tables) of gate modes): How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules.
 
 ## Record kinds (`records.toml`)
@@ -527,9 +529,16 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts` (table): The drafts the workflow's steps and turns propose.
 - `drafts.withdraw` (table): When an open draft the workflow proposed is withdrawn.
 - `drafts.withdraw.when` (predicate): When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.
-- `drafts.withdraw.reason` (one of `assigned`, `moot`, default `moot`): The reason the withdrawn draft stores.
+- `drafts.withdraw.reason` (one of `assigned`, `moot`, `outside`, default `moot`): The reason the withdrawn draft stores.
   - `assigned`: Its items got an owner.
   - `moot`: It no longer applies.
+  - `outside`: It addresses someone who cannot read the conversation it posts in.
+- `drafts.withdraw.rule[]` (table): A rule tried before when, in order, that withdraws with a reason of its own.
+- `drafts.withdraw.rule[].when` (predicate): When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required.
+- `drafts.withdraw.rule[].reason` (one of `assigned`, `moot`, `outside`, default `moot`): The reason the draft the rule withdraws stores.
+  - `assigned`: Its items got an owner.
+  - `moot`: It no longer applies.
+  - `outside`: It addresses someone who cannot read the conversation it posts in.
 - `outbox` (table): How the Outbox heads the group of the drafts the workflow proposed.
 - `outbox.title` (string, localized): The group's title, what the drafts are for, such as "Ask who hasn't answered"; the summary when absent.
 - `outbox.about` (string, localized): One line under the title on when the workflow drafts them, such as "Drafted when a conversation where you asked something goes quiet."
@@ -557,7 +566,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
-  - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item; an intent's help.target is free text.
+  - `target` (one of `unit`, `item`, `person`, default `unit`): Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text.
+  - `to` (one of `all`, `members`, `non_members`, default `all`): Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both.
   - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.

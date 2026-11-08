@@ -20,9 +20,37 @@
               "description": "The reason the withdrawn draft stores.",
               "enum": [
                 "assigned",
-                "moot"
+                "moot",
+                "outside"
               ],
               "type": "string"
+            },
+            "rule": {
+              "description": "A rule tried before when, in order, that withdraws with a reason of its own.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "default": "moot",
+                    "description": "The reason the draft the rule withdraws stores.",
+                    "enum": [
+                      "assigned",
+                      "moot",
+                      "outside"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule withdraws an open draft the workflow proposed, over the unit's facts and the draft's. Required.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "when"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             },
             "when": {
               "description": "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.",
@@ -453,16 +481,27 @@
                 },
                 "target": {
                   "default": "unit",
-                  "description": "Where the draft posts: on the unit, or on each item; an intent's help.target is free text.",
+                  "description": "Where the draft posts: on the unit, on each item, or, with per = \"person\", in the direct conversation between you and the person it is to; an intent's help.target is free text.",
                   "enum": [
                     "unit",
-                    "item"
+                    "item",
+                    "person"
                   ],
                   "type": "string"
                 },
                 "text": {
                   "default": "text.md.tmpl",
                   "description": "The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.",
+                  "type": "string"
+                },
+                "to": {
+                  "default": "all",
+                  "description": "Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both.",
+                  "enum": [
+                    "all",
+                    "members",
+                    "non_members"
+                  ],
                   "type": "string"
                 },
                 "use": {

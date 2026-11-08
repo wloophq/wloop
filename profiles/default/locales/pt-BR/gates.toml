@@ -141,3 +141,11 @@ sending = "enviando"
 sent = "enviado"
 failed = "falhou no envio"
 dropped = "descartado"
+
+[drafts.reasons]
+assigned = "seus itens ganharam um responsável"
+moot = "não se aplica mais"
+outside = "se dirigia a alguém que não consegue ler aquela conversa"
+ended = "sua tarefa terminou"
+skipped = "você pulou o workflow dele ali"
+superseded = "um rascunho para a conversa toda o substituiu"

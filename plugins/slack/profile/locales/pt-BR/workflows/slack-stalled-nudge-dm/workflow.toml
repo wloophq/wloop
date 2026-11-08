@@ -1,0 +1,5 @@
+summary = "Cutucar cada pessoa que uma tarefa parada do Slack espera e que não está na conversa, na sua conversa direta com ela, citando os itens abertos que deve, uma vez a cada drafts.repeat_after"
+
+[outbox]
+title = "Perguntar a quem não está na conversa"
+about = "Rascunhado na sua conversa direta com alguém que uma conversa quieta espera e que não consegue lê-la."

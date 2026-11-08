@@ -383,7 +383,8 @@ function draftCard(e, d, opts = {}) {
   const words = catalogWords();
   const purpose = d.purpose ? (words.draft_purposes || {})[d.purpose] || d.purpose : "";
   const st = d.state && d.state !== "held" ? (words.draft_states || {})[d.state] || d.state : "";
-  const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st})` : "");
+  const why = d.state === "dropped" && d.reason_text ? `: ${d.reason_text}` : "";
+  const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st}${why})` : "");
   const effects = draftEffects(d);
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),

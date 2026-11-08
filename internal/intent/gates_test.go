@@ -38,6 +38,22 @@ func loadGatesWith(t *testing.T, user string) (GatesDef, string) {
 	return d, problems.Error()
 }
 
+func TestGatesTomlWordsEveryWithdrawReason(t *testing.T) {
+	t.Parallel()
+	d, problems := loadGatesWith(t, "")
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	for _, r := range draft.WithdrawReasons {
+		if d.Drafts.Reasons[r] == "" {
+			t.Errorf("reason %s has no words", r)
+		}
+	}
+	if _, problems := loadGatesWith(t, "[drafts.reasons]\nlater = \"Later\"\n"); !strings.Contains(problems, "drafts.reasons.later: names no withdraw reason") {
+		t.Errorf("problems %q, want the unknown reason refused", problems)
+	}
+}
+
 func TestGatesTomlDeclaresKindsAndIntents(t *testing.T) {
 	t.Parallel()
 	d, problems := loadGatesWith(t, "")
