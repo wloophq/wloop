@@ -26,7 +26,7 @@ func (m *Model) viewKey() string {
 	switch {
 	case m.view < len(m.views):
 		return "rows:" + m.views[m.view].ID
-	case len(m.views) > 0 && m.view == m.planView():
+	case m.view == m.planView() && (len(m.views) > 0 || m.navigated):
 		return "plan"
 	}
 	return ""

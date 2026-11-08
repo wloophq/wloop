@@ -45,6 +45,9 @@ func (s *Server) planViews(ctx context.Context, its []workflow.Item, known map[u
 		for j, st := range out[i].Does {
 			if e, ok := tasks[task.ID(st.Args["task_id"])]; ok {
 				out[i].Does[j].Args["task_title"] = e.Title
+				if says, ok := builtin.StepSaysWithTask[st.Use]; ok {
+					out[i].Does[j].Says = says
+				}
 			}
 		}
 	}

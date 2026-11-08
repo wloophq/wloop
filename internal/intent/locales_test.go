@@ -3,6 +3,7 @@ package intent_test
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -232,6 +233,12 @@ func TestEveryPlanReasonTheEngineGivesIsWorded(t *testing.T) {
 		for _, r := range workflow.Reasons {
 			if _, ok := doc.Strings[r]; !ok {
 				t.Errorf("%s does not word the engine's reason %q", path, r)
+			}
+		}
+		for _, s := range slices.Concat(slices.Collect(maps.Values(builtin.StepSays)), slices.Collect(maps.Values(builtin.StepSaysWithTask)),
+			slices.Collect(maps.Values(builtin.ResolutionSays))) {
+			if _, ok := doc.Strings[s]; !ok {
+				t.Errorf("%s does not word what a step says, %q", path, s)
 			}
 		}
 	}

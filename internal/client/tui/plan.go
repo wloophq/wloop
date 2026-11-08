@@ -256,7 +256,7 @@ func (m *Model) planList(cur, width, height int, now time.Time) []string {
 			name += "  " + oneLine(it.Title)
 		}
 		link := func(s string) string { return t.Link(it.Link, s) }
-		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: name, Style: link}, {Text: oneLine(it.Reason)}}
+		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: firstOf(it.Summary, it.Workflow), Style: t.Dim}, {Text: name, Style: link}, {Text: oneLine(m.planReason(it))}}
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
 	start := max(0, cur-height+1)
@@ -311,12 +311,23 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	if it.Observe {
 		decision += " · " + m.w().T("observe", nil)
 	}
-	fact(m.w().T("workflow", nil), it.Workflow, plain)
+	fact(m.w().T("workflow", nil), firstOf(it.Summary, it.Workflow), plain)
 	fact(m.w().T("decision", nil), decision, plain)
 	if it.Reason != "" {
-		fact(m.w().T("why", nil), it.Reason, plain)
+		fact(m.w().T("why", nil), m.planReason(it), plain)
 	}
-	fact(m.w().T("steps", nil), strings.Join(it.Steps, ", "), plain)
+	if len(it.Does) == 0 {
+		fact(m.w().T("steps", nil), strings.Join(it.Steps, ", "), plain)
+	}
+	for _, st := range it.Does {
+		fact(m.w().T("steps", nil), m.stepText(st), plain)
+		for _, item := range st.Items {
+			fact("", "· "+item, t.Dim)
+		}
+	}
+	if len(it.Does) > 0 && !planPosts(it.Does) {
+		fact("", m.w().T("Posts nothing", nil), t.Dim)
+	}
 	var matched []string
 	for _, f := range it.Why.Matched {
 		matched = append(matched, f.Name+" = "+f.Value)

@@ -123,57 +123,20 @@ function planTarget(p) {
   return label ? h("p", { class: "meta plan-on" }, t("Acts on"), " ", outLink(p.link, label)) : null;
 }
 
-// STEP_WORDS are what each step of a plan item does, in the catalog's words, filled with the step's arguments as
-// a person reads them.
-const STEP_WORDS = {
-  "session.close": (a) => t("Close the agent session", a),
-  "workspace.remove": (a) => t("Remove the workspace", a),
-  "workspace.unregister": (a) => t("Forget the workspace whose folder is gone", a),
-  "turn.dismiss": (a) => t("Dismiss the agent's open turn", a),
-  "answer.refuse": (a) => t("Refuse a queued answer whose route is gone", a),
-  "session.mark_dormant": (a) => t("Mark the agent session dormant", a),
-  "turn.start": (a) => t("Start an agent turn: {intent}", a),
-  "draft.propose": (a) => t("Draft a message you approve before it posts", a),
-  "classify": (a) => t("Classify it with an agent call", a),
-  "notify.self": (a) => t("Notify you", a),
-  "task.verb": (a) => (a.task ? t("Run {verb} on the task, with “{task}”", a) : t("Run {verb} on the task", a)),
-  "gate.open": (a) => t("Ask you to decide", a),
-  "items.resolve": (a) => t("Resolve its open items as {resolution}", a),
-  "task.set": (a) => t("Set {prop} to {value}", a),
-};
-
-// RESOLUTION_WORDS are how an item resolves, in the catalog's words, by resolution.
-const RESOLUTION_WORDS = {
-  done: () => t("resolved as done"),
-  answered: () => t("resolved as answered"),
-  fixed: () => t("resolved as fixed"),
-  delegated: () => t("resolved as delegated"),
-  declined: () => t("resolved as declined"),
-  dismissed: () => t("resolved as dismissed"),
-  superseded: () => t("resolved as superseded"),
-  moot: () => t("resolved as moot"),
-};
-
-// stepText is a plan step in the catalog's words, filled with its arguments as a person reads them; the step's
-// name when the catalog has no words for it.
+// stepText is a plan step in the catalog's words the daemon names, filled with its arguments as a person reads
+// them; the step's name when the catalog has no words for it.
 function stepText(st) {
-  const words = Object.hasOwn(STEP_WORDS, st.use) ? STEP_WORDS[st.use] : null;
-  if (!words) return st.use;
+  if (!st.says) return st.use;
   const args = st.args || {};
-  const res = args.resolution || "done";
   const prop = args.prop ? taskFacetOf("task.prop." + args.prop) : null;
-  return words({ ...args, resolution: Object.hasOwn(RESOLUTION_WORDS, res) ? RESOLUTION_WORDS[res]() : res,
+  return t(st.says, { ...args, resolution: args.resolution_says ? t(args.resolution_says) : args.resolution || "",
     intent: args.intent_label || args.intent || "", task: args.task_title || "",
     verb: args.verb ? verbLabel(args.verb) : "", prop: prop ? prop.label : args.prop || "", value: propText(args.value, prop) });
 }
 
-// PLAN_DRAFTS are the steps whose message posts once you approve its draft: applying them posts later.
-const PLAN_DRAFTS = ["draft.propose"];
-
-// planPosts says whether applying a plan item may post where others see it: a step that reaches others, one whose
-// intent decides, or a draft.
+// planPosts says whether applying a plan item may post where others see it, as the daemon says of each step.
 function planPosts(does) {
-  return does.some((st) => st.reach === "visible" || !st.reach || PLAN_DRAFTS.includes(st.use));
+  return does.some((st) => st.posts);
 }
 
 // planDoes is what applying a plan item does: each step in the catalog's words with the open items it resolves,

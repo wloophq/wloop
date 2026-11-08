@@ -15,7 +15,8 @@ func quietClose() api.PlanItem {
 	return api.PlanItem{ID: "fake-close/task/t-06bec1c03a26fadf/ab", Workflow: "fake-close", Summary: "Close a quiet task; posts nothing",
 		Decision: "pending", Default: "wait", Reason: "waits for you", Unit: unit.Unit{Provider: "task", Key: "t-06bec1c03a26fadf"},
 		Label: "task:t-06bec1c03a26fadf", Steps: []string{"items.resolve"},
-		Does: []api.PlanStep{{Use: "items.resolve", Reach: "local", Args: map[string]string{"resolution": "moot"},
+		Does: []api.PlanStep{{Use: "items.resolve", Reach: "local", Says: "Resolve its open items as {resolution}",
+			Args:  map[string]string{"resolution": "moot", "resolution_says": "resolved as moot"},
 			Items: []string{"Ana asks for the retry numbers", "Bea asks when it ships"}}},
 		Target: &api.PlanTarget{Task: "t-06bec1c03a26fadf", Title: "Answer Ana about the retries",
 			Units: []api.PlanUnit{{Label: "#general", Link: "https://chat.example/c1"}, {Label: "#ops"}}},
@@ -107,7 +108,7 @@ func TestThePlanSaysWhatApplyingDoesToWhichTaskAndWhy(t *testing.T) {
 
 func TestAStepThatPostsSaysSoAndAnUnknownStepReadsAsItIs(t *testing.T) {
 	it := quietClose()
-	it.Does = []api.PlanStep{{Use: "draft.propose", Reach: "local"}, {Use: "fake.step", Reach: "visible"}}
+	it.Does = []api.PlanStep{{Use: "draft.propose", Reach: "local", Says: "Draft a message you approve before it posts", Posts: true}, {Use: "fake.step", Reach: "local"}}
 	var got planShape
 	runPlanPage(t, "en", `process.stdout.write(JSON.stringify(shape(planItem(input))));`, it, &got)
 	if !slices.Equal(got.Does, []string{"Draft a message you approve before it posts", "fake.step"}) || got.Posts != "" {
@@ -118,10 +119,10 @@ func TestAStepThatPostsSaysSoAndAnUnknownStepReadsAsItIs(t *testing.T) {
 func TestAStepsArgumentsReadAsAPersonReadsThem(t *testing.T) {
 	it := quietClose()
 	it.Does = []api.PlanStep{
-		{Use: "turn.start", Args: map[string]string{"intent": "act", "intent_label": "Act on its items"}},
-		{Use: "task.verb", Reach: "local", Args: map[string]string{"verb": "next"}},
-		{Use: "task.verb", Reach: "local", Args: map[string]string{"verb": "relate", "task": "task.link_target_tasks", "task_id": "t-2", "task_title": "The other half"}},
-		{Use: "task.set", Reach: "local", Args: map[string]string{"prop": "size", "value": "m"}},
+		{Use: "turn.start", Says: "Start an agent turn: {intent}", Posts: true, Args: map[string]string{"intent": "act", "intent_label": "Act on its items"}},
+		{Use: "task.verb", Reach: "local", Says: "Run {verb} on the task", Args: map[string]string{"verb": "next"}},
+		{Use: "task.verb", Reach: "local", Says: "Run {verb} on the task, with “{task}”", Args: map[string]string{"verb": "relate", "task": "task.link_target_tasks", "task_id": "t-2", "task_title": "The other half"}},
+		{Use: "task.set", Reach: "local", Says: "Set {prop} to {value}", Args: map[string]string{"prop": "size", "value": "m"}},
 	}
 	cat := taskCatalog()
 	cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: "next", Label: "Next"}, api.VerbSpec{Verb: "relate", Label: "Relate"})

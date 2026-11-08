@@ -57,8 +57,12 @@ type PlanUnit struct {
 // PlanStep is a step of a plan item: what it uses, its reach (local, private, visible; "" for the intent's), its
 // text arguments, and for items.resolve the summaries of the open items it resolves.
 type PlanStep struct {
-	Use   string            `json:"use"`
-	Reach string            `json:"reach,omitempty"`
+	Use   string `json:"use"`
+	Reach string `json:"reach,omitempty"`
+	// Says is the catalog key of what the step does, its {name}s its Args; "" for a step the catalog does not word.
+	Says string `json:"says,omitempty"`
+	// Posts says the step may post where others see it: its reach is visible or its intent's, or it drafts.
+	Posts bool              `json:"posts,omitempty"`
 	Args  map[string]string `json:"args,omitempty"`
 	Items []string          `json:"items,omitempty"`
 }

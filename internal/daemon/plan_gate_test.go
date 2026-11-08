@@ -152,7 +152,8 @@ func wantTargetAndSteps(t *testing.T, where string, p api.PlanItem, id task.ID, 
 	case len(tg.Units) != 1 || tg.Units[0].Label == "" || tg.Units[0].Label == "task:"+string(id):
 		t.Errorf("%s: target's conversations %+v, want its thread", where, tg.Units)
 	}
-	want := []api.PlanStep{{Use: "items.resolve", Reach: "local", Args: map[string]string{"resolution": "moot"},
+	want := []api.PlanStep{{Use: "items.resolve", Reach: "local", Says: "Resolve its open items as {resolution}",
+		Args:  map[string]string{"resolution": "moot", "resolution_says": "resolved as moot"},
 		Items: []string{"Ana asks for the retry numbers", "Bea asks when it ships"}}}
 	if mustJSON(t, p.Does) != mustJSON(t, want) {
 		t.Errorf("%s: does %s, want %s", where, mustJSON(t, p.Does), mustJSON(t, want))
@@ -430,6 +431,9 @@ func TestThePlanNamesWhatAStepsArgumentsName(t *testing.T) {
 	does := res.Items[0].Does
 	if len(does) != 2 || does[0].Args["intent_label"] != act.Label || does[1].Args["task_title"] != "the other half of the retries" {
 		t.Errorf("does %+v, want the intent's label and the related task's title", does)
+	}
+	if len(does) == 2 && (!does[0].Posts || does[0].Says != "Start an agent turn: {intent}" || does[1].Posts || does[1].Says != "Run {verb} on the task, with “{task}”") {
+		t.Errorf("does %+v: a turn may post, a local verb does not, each with what it says", does)
 	}
 }
 

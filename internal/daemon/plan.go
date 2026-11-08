@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,8 +15,9 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -287,6 +289,16 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 		}
 		if id := factTask(it.Why.Matched, ps.Args["task"]); id != "" {
 			ps.Args["task_id"] = id
+		}
+		ps.Says = builtin.StepSays[st.Use]
+		ps.Posts = st.Reach == workflow.ReachVisible || st.Reach == "" || slices.Contains(builtin.StepDrafts, st.Use)
+		if k, ok := builtin.StepArg(st.Use, "resolution"); ok {
+			if says, ok := builtin.ResolutionSays[items.Resolution(cmp.Or(ps.Args["resolution"], k.Default))]; ok {
+				if ps.Args == nil {
+					ps.Args = map[string]string{}
+				}
+				ps.Args["resolution_says"] = says
+			}
 		}
 		p.Does = append(p.Does, ps)
 	}
