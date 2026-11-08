@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/client/texts"
+	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dtask "github.com/wloophq/wloop/internal/domain/task"
@@ -401,11 +402,7 @@ func (m *Model) unitCard(s api.CardView, fact func(label, text string, style fun
 	}
 	var sig []string
 	for _, x := range c.Signals {
-		v := x.Value
-		if !x.At.IsZero() {
-			v = x.At.In(zone).Format("2006-01-02 15:04")
-		}
-		sig = append(sig, x.Key+" "+v)
+		sig = append(sig, m.signalLine(string(c.Unit.Provider), x, zone))
 	}
 	if len(sig) > 0 {
 		fact("", strings.Join(sig, " · "), t.Dim)
@@ -491,6 +488,28 @@ func (m *Model) verbSummary(verb string) string {
 		}
 	}
 	return ""
+}
+
+// signalLine is a card signal in its plugin's words: its name, its value filled with its params, an instant in
+// zone, then each note; a code with no words reads as itself, and an empty value as the key.
+func (m *Model) signalLine(provider string, s card.Signal, zone *time.Location) string {
+	spec, _ := m.catalog.CardSignal(provider, s.Key)
+	v := cmp.Or(s.Value, s.Key)
+	if w := spec.Values[s.Value]; w != "" {
+		v = m.w().Fill(w, s.Params)
+	}
+	if !s.At.IsZero() {
+		v = s.At.In(zone).Format("2006-01-02 15:04")
+	}
+	parts := []string{cmp.Or(spec.Label, s.Key) + " " + v}
+	for _, n := range s.Notes {
+		text := n.Code
+		if w := spec.Notes[n.Code]; w != "" {
+			text = m.w().Fill(w, n.Params)
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, " · ")
 }
 
 func (m *Model) verbLabel(verb string) string {

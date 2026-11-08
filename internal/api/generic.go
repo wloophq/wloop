@@ -48,6 +48,15 @@ type CatalogResponse struct {
 	CardSignals []SignalSpec `json:"card_signals,omitempty"`
 }
 
+// CardSignal is the words of provider's card signal key; ok is false when no plugin words it.
+func (c CatalogResponse) CardSignal(provider, key string) (SignalSpec, bool) {
+	i := slices.IndexFunc(c.CardSignals, func(s SignalSpec) bool { return s.Provider == provider && s.Key == key })
+	if i < 0 {
+		return SignalSpec{}, false
+	}
+	return c.CardSignals[i], true
+}
+
 // SignalSpec is how a card signal of a provider shows: its name, its values'
 // and its notes' words by code, `{{.name}}` where a value the signal gives goes.
 type SignalSpec struct {

@@ -3,6 +3,7 @@ package texts
 
 import (
 	"maps"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +41,29 @@ func (c *Catalog) TN(key string, n int, params map[string]any) string {
 	all := map[string]any{"n": c.Number(n), "count": n}
 	maps.Copy(all, params)
 	return i18n.Interpolate(c.forms(key).For(c.Locale(), float64(n)), all)
+}
+
+var (
+	pluralWord = regexp.MustCompile(`\{\{\s*plural\s+\.(\w+)((?:\s+"[^"]*")+)\s*\}\}`)
+	pluralPair = regexp.MustCompile(`"([^"]*)"`)
+	valueWord  = regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`)
+)
+
+// Fill is a plugin's word with each {{.name}} replaced by vars[name], and each
+// {{plural .name "one" "…" "other" "…"}} by the form of vars[name] in the
+// catalog's locale, as the cockpit fills a word.
+func (c *Catalog) Fill(word string, vars map[string]string) string {
+	word = pluralWord.ReplaceAllStringFunc(word, func(m string) string {
+		sub := pluralWord.FindStringSubmatch(m)
+		pairs := pluralPair.FindAllStringSubmatch(sub[2], -1)
+		forms := i18n.Forms{}
+		for i := 0; i+1 < len(pairs); i += 2 {
+			forms[pairs[i][1]] = pairs[i+1][1]
+		}
+		n, _ := strconv.ParseFloat(vars[sub[1]], 64)
+		return forms.For(c.Locale(), n)
+	})
+	return valueWord.ReplaceAllStringFunc(word, func(m string) string { return vars[valueWord.FindStringSubmatch(m)[1]] })
 }
 
 func (c *Catalog) forms(key string) i18n.Forms {

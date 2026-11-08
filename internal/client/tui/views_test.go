@@ -671,6 +671,30 @@ func TestTaskDetail(t *testing.T) {
 	}
 }
 
+// TestTaskDetailWordsTheCardSignals holds that the detail reads each card signal in its plugin's words in the
+// served locale, a stall's working days on the situation's line, and a code with no words as itself.
+func TestTaskDetailWordsTheCardSignals(t *testing.T) {
+	m := viewsModel(t, row(7, "Batch export", "review", "needs-me"))
+	m.words = ptBR(t)
+	m.catalog.CardSignals = []api.SignalSpec{
+		{Provider: "github", Key: "situation", Label: "situação", Values: map[string]string{"changes": "mudanças pedidas"},
+			Notes: map[string]string{"stalled": `parado há {{.days}} {{plural .days "one" "dia útil" "other" "dias úteis"}}`}},
+		{Provider: "github", Key: "checks", Label: "checks", Values: map[string]string{"failing_named": "falhando: {{.names}}"}},
+	}
+	press(m, Key{Name: KeyEnter})
+	e := viewTasks()["focus"][0]
+	e.Cards = []api.CardView{{Card: card.Card{Unit: ref(7).Unit(), Title: "Batch export", State: "open", Signals: []card.Signal{
+		{Key: "situation", Value: "changes", Notes: []card.Note{{Code: "stalled", Tone: "warn", Params: map[string]string{"days": "1"}}}},
+		{Key: "checks", Value: "failing_named", Params: map[string]string{"names": "lint, test"}},
+		{Key: "lane", Value: "fast_track"},
+	}}}}
+	m.SetDetail("e1", e, nil)
+	screen := screenOf(m, 160, 40)
+	if want := "situação mudanças pedidas · parado há 1 dia útil · checks falhando: lint, test · lane fast_track"; !strings.Contains(screen, want) {
+		t.Errorf("detail lacks %q:\n%s", want, screen)
+	}
+}
+
 func TestOpeningSendsSeen(t *testing.T) {
 	m := viewsModel(t)
 	chord(m, "gi")
