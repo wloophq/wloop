@@ -145,6 +145,37 @@ func TestNoReviewerWaitsOnAuthor(t *testing.T) {
 	}
 }
 
+func TestWithNoReviewerRequiredAnUnreviewedPullRequestIsNeverNoReviewer(t *testing.T) {
+	solo := func(p pr.PR, evs ...pr.Event) Result {
+		return Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, ReviewerOptional: true})
+	}
+	push := ev(pr.KindPush, "h2", "me", h(1), "")
+	if r := solo(open("me"), push); r.Kind != KindMerge || r.WaitingOn != "author" || !r.Since.Equal(h(1)) || r.ReasonKey != "no_review_required" {
+		t.Fatalf("green: %+v", r)
+	}
+	pending := open("me")
+	pending.ChecksState = "PENDING"
+	if r := solo(pending, push); r.Kind != KindMerge || r.ReasonKey != "no_review_required_checks_pending" {
+		t.Fatalf("checks pending: %+v", r)
+	}
+	failing := open("me")
+	failing.ChecksState = "FAILURE"
+	if r := solo(failing, push); r.Kind != KindChecks {
+		t.Fatalf("failing checks: %+v", r)
+	}
+	conflicting := open("me")
+	conflicting.Mergeable, conflicting.BaseBranch, conflicting.MergeableAt = "CONFLICTING", "main", h(3)
+	if r := solo(conflicting, push); r.Kind != KindConflicts || !r.Since.Equal(h(3)) {
+		t.Fatalf("conflicts: %+v", r)
+	}
+	if r := solo(open("me", "carla"), push, requested("carla", "me", h(2))); r.Kind != KindReview || r.WaitingOn != "carla" {
+		t.Fatalf("a reviewer asked still waits on them: %+v", r)
+	}
+	if r := Derive(Input{PR: open("me"), Events: []pr.Event{push}, Viewer: "me", Now: h(10), Stalled: th}); r.Kind != KindNoReviewer {
+		t.Fatalf("a reviewer required: %+v", r)
+	}
+}
+
 func TestApprovedAndGreenCanMerge(t *testing.T) {
 	p := open("ana")
 	p.ReviewDecision = "APPROVED"

@@ -59,6 +59,7 @@ type Vocabulary struct {
 	linkSignals        []string
 	situations         map[unit.ProviderID][]string
 	signalsOf          map[unit.ProviderID][]string
+	predicates         map[unit.ProviderID][]manifest.Predicate
 }
 
 // DraftKinds are a plugin's draft kinds and the delivery of a draft whose
@@ -148,6 +149,7 @@ func Install(v *Vocabulary) {
 	Marks = v.marks
 	LinkSignals = v.linkSignals
 	PluginSituations, PluginSignals = v.situations, v.signalsOf
+	PluginPredicates = v.predicates
 }
 
 // fits says why v, provider p's vocabulary among all, cannot merge.
@@ -289,6 +291,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	var marks []Mark
 	var signals []string
 	situations, signalsOf := map[unit.ProviderID][]string{}, map[unit.ProviderID][]string{}
+	predicates := map[unit.ProviderID][]manifest.Predicate{}
 	for _, id := range ids {
 		src := all[id]
 		v := src.SourceVocabulary
@@ -366,6 +369,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				taskKinds = append(taskKinds, k)
 			}
 		}
+		if len(v.Predicates) > 0 {
+			predicates[id] = slices.Clone(v.Predicates)
+		}
 		for _, sit := range v.Situations {
 			situations[id] = append(situations[id], sit.Name)
 		}
@@ -393,7 +399,28 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
 		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, marks: marks, linkSignals: signals,
-		situations: situations, signalsOf: signalsOf}
+		situations: situations, signalsOf: signalsOf, predicates: predicates}
+}
+
+// PluginPredicates are the predicates each merged plugin's profile layer sets in predicates.toml, by
+// provider.
+var PluginPredicates = map[unit.ProviderID][]manifest.Predicate{}
+
+// PredicateEnv is the env of plugin p's predicate name: the facts its manifest says p hands with the
+// question; false when p declares no such predicate.
+func PredicateEnv(p unit.ProviderID, name string) (expr.Env, bool) {
+	i := slices.IndexFunc(PluginPredicates[p], func(x manifest.Predicate) bool { return x.Name == name })
+	if i < 0 {
+		return nil, false
+	}
+	env := expr.Env{}
+	for _, f := range Facts {
+		if f.Provider == p && slices.Contains(f.Slots, WorkflowSlot) && slices.Contains(PluginPredicates[p][i].Facts, f.Name) {
+			put(env, f)
+		}
+	}
+	Narrow(env, []unit.ProviderID{p})
+	return env, true
 }
 
 // LinkSignals are the link signals the merged plugins declare, each read as

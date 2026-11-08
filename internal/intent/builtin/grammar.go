@@ -3,6 +3,8 @@ package builtin
 import (
 	"slices"
 	"strings"
+
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 // Surface is a file kind of the profile language, or the configuration.
@@ -23,6 +25,7 @@ const (
 	SurfaceKeys     Surface = "keys"     // keys.toml
 	SurfaceNotices  Surface = "notices"  // notices.toml
 	SurfaceUI       Surface = "ui"       // a plugin layer's ui.toml
+	SurfacePreds    Surface = "preds"    // a plugin layer's predicates.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
 	SurfaceConfig   Surface = "config"   // config.toml
 )
@@ -85,7 +88,7 @@ type Value struct {
 var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar, tasksGrammar, viewsGrammar, gatesGrammar, recordsGrammar, keysGrammar, noticesGrammar, uiGrammar,
 	rowWordRows(SurfaceViews, true), rowWordRows(SurfaceUI, false), retiredRowWordRows(SurfaceViews), retiredRowWordRows(SurfaceUI), showRows(SurfaceViews), showRows(SurfaceUI),
 	gateApprovalRows(SurfaceIntent), gateApprovalRows(SurfaceWorkflow), stringsGrammar, timelineGrammar,
-	decisionsGrammar, uiPluralGrammar, homeGrammar, omniboxGrammar)
+	decisionsGrammar, uiPluralGrammar, homeGrammar, omniboxGrammar, predsGrammar)
 
 // Problem is a key Check refuses, at its dotted path in the document.
 type Problem struct {
@@ -134,6 +137,11 @@ func StepArgs(use string) []string {
 func IsPredKey(last string) bool {
 	for _, k := range Grammar {
 		if k.Kind == KindPred && k.Path[strings.LastIndex(k.Path, ".")+1:] == last {
+			return true
+		}
+	}
+	for _, ns := range PluginPredicates {
+		if slices.ContainsFunc(ns, func(n manifest.Predicate) bool { return n.Name == last }) {
 			return true
 		}
 	}

@@ -16,6 +16,13 @@ profiles/default/decisions.toml      [gates] question = "answer", plan = "approv
 plugins/<id>/decisions.toml          [situations] merge = "last-step"   [signals] ready = "last-step"
 ```
 
+The GitHub plugin maps `no_reviewer`, your own pull request with no reviewer asked, to `pick-someone`. In a repository where nobody reviews, its `reviewer_required` predicate says no reviewer is needed, and such a pull request is `merge`, a `last-step`, once its checks are green:
+
+```toml
+# plugins/github/predicates.toml of your profile
+reviewer_required = "!(pr.owner in ['acme-solo'])"
+```
+
 The fact `task.decisions` lists the kinds a task waits on, the oldest first: those of its open gates and, while the task is open, those of its units, so a done or dropped task's threads and pull requests wait on nothing while a question still open on it does. `task.decision_since` says since when the oldest waits. Each kind names a view of `views.toml` (`decide-answer`, `decide-last-step`, ...) that lists its tasks; those views, and the home's own, set `rail = false`, so the rail leaves them out. A view may not be named `home`, the cockpit's home route.
 
 ## The briefing

@@ -1,0 +1,8 @@
+# The predicates the GitHub plugin's manifest declares, over the facts of
+# the pull request it reports. A user profile's plugins/github/predicates.toml
+# replaces the keys it sets.
+
+# Whether an open pull request waits for a reviewer before its merge; in a
+# repository where nobody reviews, such as
+# "!(pr.owner in ['acme'])", a pull request with no reviewer asked is merge.
+reviewer_required = "true"

@@ -231,6 +231,8 @@ review_requested_again = "review pedida de novo depois da sua"
 reviewer_not_back = "{{.author}} respondeu, {{.reviewer}} não voltou"
 commented_no_reply = "{{.actor}} comentou, sem resposta"
 no_reviewer_requested = "nenhum revisor pedido"
+no_review_required = "verde, sem review exigida"
+no_review_required_checks_pending = "sem review exigida, checks pendentes"
 
 [events.opened]
 label = "aberto"

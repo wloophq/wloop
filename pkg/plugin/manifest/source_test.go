@@ -274,6 +274,11 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"a mark without its doc", "[[source.marks]]\nname = \"acme.seen\"\n", "doc is required"},
 		{"a language fact not declared", "language_fact = \"acme.language\"\n", "language_fact"},
 		{"a language fact of another type", "language_fact = \"acme.language\"\n[[source.facts]]\nname = \"acme.language\"\ntype = \"int\"\ndoc = \"d\"\n", "language_fact"},
+		{"a predicate without its doc", "[[source.facts]]\nname = \"acme.x\"\ntype = \"bool\"\ndoc = \"d\"\n[[source.predicates]]\nname = \"reviewer_required\"\nfacts = [\"acme.x\"]\n", "doc is required"},
+		{"a repeated predicate", "[[source.facts]]\nname = \"acme.x\"\ntype = \"bool\"\ndoc = \"d\"\n[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\nfacts = [\"acme.x\"]\n[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\nfacts = [\"acme.x\"]\n", "twice"},
+		{"a predicate name", "[[source.facts]]\nname = \"acme.x\"\ntype = \"bool\"\ndoc = \"d\"\n[[source.predicates]]\nname = \"Solo\"\ndoc = \"d\"\nfacts = [\"acme.x\"]\n", "lowercase"},
+		{"a predicate over no facts", "[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\n", "facts"},
+		{"a predicate over a fact not declared", "[[source.predicates]]\nname = \"solo\"\ndoc = \"d\"\nfacts = [\"acme.nope\"]\n", "acme.nope"},
 		{"mixed ranks", "[[source.situations]]\nname = \"review\"\ndoc = \"d\"\nrank = 2\n[[source.situations]]\nname = \"merge\"\ndoc = \"d\"\n", "all or none"},
 	} {
 		t.Run(c.name, func(t *testing.T) {

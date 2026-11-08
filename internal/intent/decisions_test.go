@@ -15,7 +15,7 @@ import (
 
 // loadProfile loads the bundled chain in locale under a user profile holding files, its plugins/<id>/ files
 // read as the user's layer of that plugin.
-func loadProfile(t *testing.T, locale string, files map[string]string) (*intentload.Loaded, intentload.Problems) {
+func loadProfile(t testing.TB, locale string, files map[string]string) (*intentload.Loaded, intentload.Problems) {
 	t.Helper()
 	d := t.TempDir()
 	plugins := map[string]bool{}

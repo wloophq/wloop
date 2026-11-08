@@ -107,6 +107,22 @@ func (r *recorder) Profile(_ context.Context, path string) ([]byte, error) {
 	return []byte("profile " + path), nil
 }
 
+// Holds holds where a set's pull.owner fact is "acme", and fails on a set with none.
+func (r *recorder) Holds(_ context.Context, predicate string, facts [][]source.Fact) ([]source.Holding, error) {
+	if predicate != "reviewer_required" {
+		return nil, fmt.Errorf("no predicate %s", predicate)
+	}
+	out := make([]source.Holding, len(facts))
+	for i, fs := range facts {
+		if len(fs) == 0 {
+			out[i].Err = "no owner"
+			continue
+		}
+		out[i].Holds = slices.ContainsFunc(fs, func(f source.Fact) bool { return f.Name == "pull.owner" && f.Value.String == "acme" })
+	}
+	return out, nil
+}
+
 func (r *recorder) Events(_ context.Context, q source.EventQuery) ([]source.Event, error) {
 	return []source.Event{{Unit: q.Units[0], Kind: q.Kinds[0], Actor: "pulls:ana", At: q.Since, Key: "review:9"}}, nil
 }
@@ -221,6 +237,10 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 	if err != nil {
 		return source.ToolResult{}, err
 	}
+	holds, err := h.Holds(ctx, "reviewer_required", [][]source.Fact{{{Name: "pull.owner", Value: source.String("acme")}}, {{Name: "pull.owner", Value: source.String("solo")}}, nil})
+	if err != nil {
+		return source.ToolResult{}, err
+	}
 	gate, err := h.OpenGate(ctx, source.GateRequest{Draft: source.Draft{Unit: se.Unit, Kind: "nudge", Text: "Any news?"}, Session: call.Session})
 	if err != nil {
 		return source.ToolResult{}, err
@@ -240,7 +260,7 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		"effects": se.AllowedEffects, "answer": ans.Text, "model": ans.Model, "cost": *ans.CostUSD, "item": res[0].Item,
 		"priority": source.CallOf(ctx).Priority, "wake": errors.Is(wakeErr, source.ErrUnsupported),
 		"event": evs[0].Key, "host": string(cfg.Host), "prompt": string(prompt),
-		"gate": gate.Gate, "draft": gate.Draft, "state": gate.State, "moved": moved, "written": written,
+		"gate": gate.Gate, "draft": gate.Draft, "state": gate.State, "moved": moved, "written": written, "holds": holds,
 	})
 	return source.ToolResult{Answer: "read", Fields: out}, nil
 }
@@ -287,7 +307,8 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	}
 	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "model": "small-1", "cost": 0.02, "item": "icreate",
 		"priority": float64(source.PriorityBackground), "wake": true, "event": "review:9", "host": `{"sweep":{"fast":"1m"}}`, "prompt": "profile prompts/extract.md",
-		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false}
+		"gate": "g-1", "draft": float64(4), "state": "approved", "moved": float64(1), "written": false,
+		"holds": []any{map[string]any{"Holds": true, "Err": ""}, map[string]any{"Holds": false, "Err": ""}, map[string]any{"Holds": false, "Err": "no owner"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tool result %v, want %v", got, want)
 	}

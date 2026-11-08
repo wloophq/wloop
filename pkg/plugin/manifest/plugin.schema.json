@@ -392,6 +392,36 @@
           "description": "The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read.",
           "type": "string"
         },
+        "predicates": {
+          "description": "The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "doc": {
+                "description": "What the predicate decides. Required.",
+                "type": "string"
+              },
+              "facts": {
+                "description": "The facts of facts the plugin hands with each question, the only ones the predicate may read. Required.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "description": "The predicate's name, its key in predicates.toml. Required.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "doc",
+              "facts"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "roles": {
           "description": "The roles an intent of the plugin may take, each naming host mechanisms.",
           "items": {

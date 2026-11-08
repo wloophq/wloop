@@ -42,6 +42,27 @@ func TestAPluginsProfileReadsItsBundledLayerUnderTheUsers(t *testing.T) {
 	}
 }
 
+func TestAPluginsPredicateHoldsAsTheUsersLayerSetsIt(t *testing.T) {
+	user := t.TempDir()
+	dir := filepath.Join(user, profile.PluginsDir, "github")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "predicates.toml"), []byte(`reviewer_required = "!(pr.owner in ['solo', 'lone'])"`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{Profile: user}
+	e := &Env{StateDir: t.TempDir(), LoadConfig: func() (config.Config, error) { return cfg, nil }}
+	got, err := e.pluginHolds("github")(context.Background(), "reviewer_required",
+		[]map[string]any{{"pr.owner": "solo"}, {"pr.owner": "lone"}, {"pr.owner": 7}, {"pr.owner": "acme"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 || got[0] != (src.Holding{}) || got[1] != (src.Holding{}) || got[2].Err == "" || got[3] != (src.Holding{Holds: true}) {
+		t.Errorf("holdings %+v, want solo and lone false, the bad set alone failing, acme true", got)
+	}
+}
+
 type askOnlyAgent struct {
 	turns.Agent
 	asker turns.Asker
