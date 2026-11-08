@@ -76,7 +76,9 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - **pending**: waits for you, with a window. `runs in 41s` runs when the window ends; `waits for you` stays until you act.
 - **blocked**: a guard refused it (a workspace holds unpushed commits, say), with the reason and the command that backs the work up.
 - **run**: the next sweep runs it.
-- **skipped**: the workflow matched and its rules say not now, with the reason.
+- **skipped**: the workflow matched and its rules say not now, with the reason. A guard whose refusal ends at a known time skips the item until then: a draft proposal held by an earlier draft for `repeat_after` waits out that window off the list of blocked items.
+
+A guard that refuses for good withdraws the item: its subject is gone or its step can never run on it again, such as a session close whose session is already closed, a draft proposal held while its task stays ended or by a draft sent with `repeat_after_sent = "forever"`, or one its own `[drafts.withdraw] when` would withdraw at once. The item leaves the plan with a `workflow_dropped` event that records the reason, and nothing asks you to dismiss it; the workflow plans it again when its unit matches on facts the guard passes. A blocked item is left for you only when you can act on it, and its reason says how.
 
 ```sh
 {{command}} plan                                  # what the next sweep would do
@@ -102,5 +104,7 @@ Evaluating the workflows yields **plan items**, each with a decision:
 - a live session that closing would refuse.
 
 `session.close` refuses while a turn is sent or started, the agent works or waits for permission, the workspace is focused in its manager, or you typed in the session after the loop's last turn. A dormant session has no process, so the checks on the agent's work and permission prompts do not apply to it.
+
+A session whose terminal the app shows with no agent in it refuses too, since your own shell may run there: close that terminal, or dismiss the item. One whose terminal is closed refuses only until the census marks it dormant: a terminal you closed in Orca whose process lingers, listed orphaned with no agent, counts as gone, so `hygiene-session-dormant` marks the session dormant and closes the lingering process, and the close then runs or, for `session-manual-quiet`, which offers only active sessions, leaves the plan. A session already closed, or no longer known, withdraws its close.
 
 Your own workflows go in your profile; see the [workflow manifest](/reference/workflow-manifest/).

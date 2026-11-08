@@ -156,7 +156,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
 | `session.transcript_gone` | bool | The agent's transcript of the session, as its hooks reported it, no longer exists. |
-| `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager. |
+| `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager, or listed by both orphaned with no agent in it. |
 | `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
 | `session.name` | string | What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id. |

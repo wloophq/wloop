@@ -175,7 +175,7 @@ var otherFacts = []Fact{
 	wf("session", "worktree_gone", expr.Bool, "The session's worktree path no longer exists."),
 	wf("session", "closed_by_manager", expr.Bool, "The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop."),
 	wf("session", "transcript_gone", expr.Bool, "The agent's transcript of the session, as its hooks reported it, no longer exists."),
-	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager."),
+	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager, or listed by both orphaned with no agent in it."),
 	untrusted(wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence.")),
 	wf("session", "repo", expr.String, "owner/repo of the book's pull request; empty when none."),
 	wf("session", "name", expr.String, "What people call the session: its workspace's display name, else its worktree's folder, else its terminal's title, else its id."),
