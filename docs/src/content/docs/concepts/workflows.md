@@ -82,6 +82,14 @@ Evaluating the workflows yields **plan items**, each with a decision:
 
 A guard that refuses for good withdraws the item: its subject is gone or its step can never run on it again, such as a session close whose session is already closed, a draft proposal held while its task stays ended or by a draft sent with `repeat_after_sent = "forever"`, or one its own `[drafts.withdraw] when` would withdraw at once. The item leaves the plan with a `workflow_dropped` event that records the reason, and nothing asks you to dismiss it; the workflow plans it again when its unit matches on facts the guard passes. A blocked item is left for you only when you can act on it, and its reason says how.
 
+The same holds for a gate a workflow's `gate.open` step opened: its `[gates.withdraw] when`, over the unit's facts, says when the gate's subject is gone. At the start of each sweep the engine supersedes every open step gate whose workflow's withdraw holds, before it evaluates, so a task the gate held open can close in the same sweep, and records `gate_withdrawn` on the task with the workflow's `reason`, which the timeline shows as "Step withdrawn: …". The bundled `start-review-diff` withdraws Review the diff once no pull request of its task is open.
+
+```toml
+[gates.withdraw]
+when = '!("pull-request" in task.open_unit_kinds)'
+reason = "its pull request merged or closed, nothing is left to review"
+```
+
 ```sh
 {{command}} plan                                  # what the next sweep would do
 {{command}} plan --unit https://github.com/acme/api/pull/7   # why nothing happens to this one
