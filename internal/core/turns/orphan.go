@@ -11,6 +11,10 @@ import (
 // a durable orphan (see OrphanDurable).
 const RefusalOrphanUnproven = "its process is not proven a lasting orphan"
 
+// RefusalOrphanMoved refuses closing an orphan a fresh census no longer lists
+// as the one the sweep proved.
+const RefusalOrphanMoved = "its process is no longer the orphan the census proved"
+
 const sessionDormant = "the session is dormant"
 
 // CloseOrphanGone says whether why, a CloseOrphanRefusal of id, holds for
@@ -28,8 +32,9 @@ func (s *Service) CloseOrphanRefusal(ctx context.Context, id string) (string, er
 }
 
 // CloseOrphan ends the session's orphaned process when CloseOrphanRefusal
-// allows it. It records nothing on the session: the censuses that then miss
-// the process mark it dormant.
+// allows it and a fresh census still lists the process orphaned with no agent
+// in the runtime and epoch the proof was made in. It records nothing on the
+// session: the censuses that then miss the process mark it dormant.
 func (s *Service) CloseOrphan(ctx context.Context, id string) error {
 	s.refresh()
 	why, w, err := s.orphanCheck(ctx, id)
@@ -40,6 +45,11 @@ func (s *Service) CloseOrphan(ctx context.Context, id string) error {
 		at, ok, _ := s.lastUserPrompt(ctx, w.sess)
 		why = w.transcriptRefusal(at, ok)
 	}
+	if why == "" {
+		if why, err = s.orphanStill(ctx, w.sess); err != nil {
+			return err
+		}
+	}
 	switch {
 	case CloseOrphanGone(id, why):
 		return Gone{Reason: why}
@@ -47,6 +57,22 @@ func (s *Service) CloseOrphan(ctx context.Context, id string) error {
 		return Refusal{Reason: why}
 	}
 	return s.Sessions.Close(ctx, id)
+}
+
+// orphanStill refuses when a fresh census does not list the session's process
+// orphaned, complete, in the runtime and epoch its durable mark was proven in.
+func (s *Service) orphanStill(ctx context.Context, sess turn.Session) (string, error) {
+	c, err := s.Sessions.Census(ctx)
+	if err != nil {
+		return "", err
+	}
+	s.mu.Lock()
+	m := s.orphanSeen[sess.ID]
+	s.mu.Unlock()
+	if _, orphan := c.Orphans[sess.ID]; !orphan || !c.CompleteOf(sess.Manager) || c.RuntimeOf(sess.Manager) != m.runtime || c.EpochOf(sess.Manager) != m.epoch {
+		return RefusalOrphanMoved, nil
+	}
+	return "", nil
 }
 
 func (s *Service) orphanCheck(ctx context.Context, id string) (string, promptWindow, error) {
@@ -60,10 +86,24 @@ func (s *Service) orphanCheck(ctx context.Context, id string) (string, promptWin
 		return sessionClosed, promptWindow{}, nil
 	case sess.State() == turn.SessionDormant:
 		return sessionDormant, promptWindow{}, nil
-	case s.typingInto(id):
+	}
+	if !s.OrphanDurable(id) {
+		return RefusalOrphanUnproven, promptWindow{}, nil
+	}
+	return s.paneless(ctx, sess)
+}
+
+// paneless is why a session whose process no window shows may not be ended
+// or retired, "" when it may: session.close's guards that need no shown
+// terminal. No turn is sent or started on it, no agent of it works or waits
+// for permission (read by its pane, else by any agent of its workspace), its
+// workspace is not the one open in the app, and no prompt of yours came after
+// the loop's last turn, or while it was idle.
+func (s *Service) paneless(ctx context.Context, sess turn.Session) (string, promptWindow, error) {
+	if s.typingInto(sess.ID) {
 		return "its turn is " + string(turn.Sent), promptWindow{}, nil
 	}
-	newest, err := s.sessionTurns(ctx, id)
+	newest, err := s.sessionTurns(ctx, sess.ID)
 	if err != nil {
 		return "", promptWindow{}, err
 	}
@@ -72,19 +112,19 @@ func (s *Service) orphanCheck(ctx context.Context, id string) (string, promptWin
 			return "its turn is " + string(t.State), promptWindow{}, nil
 		}
 	}
-	if !s.OrphanDurable(id) {
-		return RefusalOrphanUnproven, promptWindow{}, nil
-	}
 	agents, err := s.Sessions.Agents(ctx)
 	if err != nil {
 		return "", promptWindow{}, err
 	}
+	busy := func(a AgentObservation) bool { return a.State == turn.AgentWorking || a.State == turn.AgentWaiting }
 	agent, has := agentOf(agents, sess, Terminal{})
 	switch {
 	case has && agent.State == turn.AgentWorking:
 		return "its agent is working", promptWindow{}, nil
 	case has && agent.State == turn.AgentWaiting:
 		return "its agent is waiting for permission", promptWindow{}, nil
+	case sess.Pane == "" && slices.ContainsFunc(agents, func(a AgentObservation) bool { return a.WorkspaceID == sess.WorkspaceID && busy(a) }):
+		return "an agent of its workspace is busy, and nothing tells it is not this session's", promptWindow{}, nil
 	case slices.ContainsFunc(agents, func(a AgentObservation) bool { return a.UserActive && a.WorkspaceID == sess.WorkspaceID }):
 		return "its workspace is the one open in the app", promptWindow{}, nil
 	}

@@ -138,6 +138,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	p.mu.Unlock()
 	f := s.facts(p.d.Clock.Now(), pf, p.d.Turns.ProcessGone(u.Key))
 	f["session.orphan_durable"] = p.d.Turns.OrphanDurable(u.Key)
+	f["session.process_orphaned"] = p.d.Turns.ProcessOrphaned(u.Key)
 	return f, nil
 }
 

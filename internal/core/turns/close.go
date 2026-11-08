@@ -10,11 +10,39 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
+// DormantRefusal is why MarkDormant may not retire the session whose process
+// its manager lists orphaned, "" when it may: the census has listed it
+// orphaned for FastJob (ProcessOrphaned), and session.close's guards that need
+// no shown terminal pass. It writes nothing.
+func (s *Service) DormantRefusal(ctx context.Context, id string) (string, error) {
+	sess, ok, err := s.Registry.Session(ctx, id)
+	switch {
+	case err != nil:
+		return "", err
+	case !ok:
+		return noSession(id), nil
+	case sess.State() != turn.SessionActive:
+		return "", nil
+	case !s.ProcessOrphaned(id):
+		return "the session's process is still listed", nil
+	}
+	why, w, err := s.paneless(ctx, sess)
+	if err != nil || why != "" {
+		return why, err
+	}
+	if !w.sess.PromptSeenAt.IsZero() {
+		at, ok, _ := s.lastUserPrompt(ctx, w.sess)
+		why = w.transcriptRefusal(at, ok)
+	}
+	return why, nil
+}
+
 // MarkDormant records that the session's process is gone: its manager no
-// longer lists it. The session stays open, and its manager can wake it. It
-// refuses a session the manager still lists in any state, orphaned included,
-// one with no workspace, and a manager that cannot list completely. It ends
-// no process.
+// longer lists it, or lists it orphaned, no window of the app showing it,
+// where DormantRefusal allows. The session stays open, and its manager can
+// wake it: a census that lists its process in a window again does. It
+// refuses a session the manager still lists otherwise, one with no workspace,
+// and a manager that cannot list completely. It ends no process.
 func (s *Service) MarkDormant(ctx context.Context, id string) error {
 	sess, ok, err := s.Registry.Session(ctx, id)
 	if err != nil {
@@ -38,7 +66,16 @@ func (s *Service) MarkDormant(ctx context.Context, id string) error {
 		return Refusal{Reason: "its manager's process list is incomplete"}
 	}
 	if _, listed := census.Sessions[id]; listed {
-		return Refusal{Reason: "the session's process is still listed"}
+		if _, orphan := census.Orphans[id]; !orphan {
+			return Refusal{Reason: "the session's process is still listed"}
+		}
+		why, err := s.DormantRefusal(ctx, id)
+		if err != nil {
+			return err
+		}
+		if why != "" {
+			return Refusal{Reason: why}
+		}
 	}
 	s.mu.Lock()
 	cur, ok, err := s.Registry.Session(ctx, id)

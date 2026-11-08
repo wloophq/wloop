@@ -1,0 +1,1 @@
+summary = "Marcar como dormente uma sessão cujo terminal você fechou no app, com o processo deixado órfão e sem agente, quando nenhum turno roda nela e você não a acionou; não encerra nenhum processo, e uma janela que volte a mostrar o processo acorda a sessão"

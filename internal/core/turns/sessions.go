@@ -68,6 +68,18 @@ type Census struct {
 	// Epochs is per manager.
 	Epoch  string
 	Epochs map[string]string
+	// Shown says the app's windows showed some terminal of the list: the app
+	// is attached. ShownFor is per manager.
+	Shown    bool
+	ShownFor map[string]bool
+}
+
+// ShownOf says whether manager's windows showed some terminal in the census.
+func (c Census) ShownOf(manager string) bool {
+	if shown, ok := c.ShownFor[manager]; ok {
+		return shown
+	}
+	return c.Shown
 }
 
 // EpochOf is manager's renderer graph epoch in the census.

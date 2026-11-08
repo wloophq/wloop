@@ -18,6 +18,7 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "marks", In: SurfaceWorkflow, Kind: KindMap, Doc: "Mark name to fact, stored when a run is done or dismissed, which handled() reads."},
 	{Path: "marks.*", In: SurfaceWorkflow, Kind: KindFact, Doc: "The fact whose value the mark stores."},
 	{Path: "observe", In: SurfaceWorkflow, Kind: KindBool, Default: "false", Doc: "Plans items pending and never runs them by itself; a person applies an item by hand."},
+	{Path: "enabled", In: SurfaceWorkflow, Kind: KindBool, Default: "true", Doc: "false ships the workflow off: it plans nothing until workflows.<name>.enabled = true in the config turns it on."},
 	{Path: "trigger", In: SurfaceWorkflow, Kind: KindTable, Doc: "What plans the workflow: on or schedule; absent, every sweep."},
 	{Path: "trigger.on", In: SurfaceWorkflow, Kind: KindList, Elem: KindText, Doc: "The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_<verb>, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task."},
 	{Path: "trigger.schedule", In: SurfaceWorkflow, Kind: KindText, Doc: "A cron schedule, in local time."},

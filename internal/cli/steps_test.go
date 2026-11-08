@@ -120,7 +120,7 @@ func TestTheOrphanCloseStepEndsOnlyADurableOrphanAndIsMootOnceTheSessionIsGone(t
 	if why, err := s.Check(ctx, step, u, workflow.Why{}, automation.CheckOpts{}); err != nil || why != turns.RefusalOrphanUnproven {
 		t.Fatalf("before the census proves it: %q %v", why, err)
 	}
-	for i, epoch := range []string{"e1", "e2", "e2"} {
+	for i, epoch := range []string{"e1", "e1", "e2", "e2"} {
 		sess.SetReading(epoch, testNow.Add(-10*time.Minute+time.Duration(i)*te.Turns.FastJob))
 		if err := te.Turns.Census(ctx); err != nil {
 			t.Fatal(err)
@@ -144,7 +144,7 @@ func TestTheOrphanCloseStepEndsOnlyADurableOrphanAndIsMootOnceTheSessionIsGone(t
 func TestTheCatalogWordsTheCloseRefusalsAPlanItemShows(t *testing.T) {
 	t.Parallel()
 	l := newTestEnv(t, &fake.Manager{}).loadedIntents()
-	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace} {
+	for _, key := range []string{turns.RefusalNoAgent, turns.RefusalTerminalClosed, turns.RefusalNoWorkspace, turns.RefusalOrphanUnproven, turns.RefusalOrphanMoved} {
 		if _, ok := l.Strings[key]; !ok {
 			t.Errorf("strings.toml does not word %q", key)
 		}

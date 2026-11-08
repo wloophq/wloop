@@ -200,7 +200,7 @@ func TestAListedSessionIsNotGone(t *testing.T) {
 // orphans orphaned with output last at lastOut.
 func (s *scripted) orphaned(at time.Time, runtime, epoch string, lastOut time.Time, listed []string, orphans ...string) {
 	s.complete(at, runtime, listed...)
-	s.reading.Epoch = epoch
+	s.reading.Epoch, s.reading.Shown = epoch, true
 	s.reading.Orphans = map[string]time.Time{}
 	for _, h := range orphans {
 		s.reading.Orphans[h] = lastOut
@@ -235,15 +235,13 @@ func TestAnOrphanedProcessIsNeverGone(t *testing.T) {
 func TestAnOrphanThatOutlivesARendererRestartIsDurable(t *testing.T) {
 	s, reg, sc, _ := expireService(t, "term_1")
 	listed := []string{"term_1"}
-	sc.orphaned(t0, "rt", "e1", t0.Add(-time.Hour), listed, "term_1")
-	if got := durable(t, s, reg); len(got) != 0 {
-		t.Fatalf("one reading proved %v", got)
+	for i, epoch := range []string{"e1", "e1", "e2"} {
+		sc.orphaned(t0.Add(time.Duration(i)*s.FastJob), "rt", epoch, t0.Add(-time.Hour), listed, "term_1")
+		if got := durable(t, s, reg); len(got) != 0 {
+			t.Fatalf("reading %d proved %v", i, got)
+		}
 	}
-	sc.orphaned(t0.Add(s.FastJob), "rt", "e2", t0.Add(-time.Hour), listed, "term_1")
-	if got := durable(t, s, reg); len(got) != 0 {
-		t.Fatalf("the first reading of a new epoch proved %v", got)
-	}
-	sc.orphaned(t0.Add(2*s.FastJob), "rt", "e2", t0.Add(-time.Hour), listed, "term_1")
+	sc.orphaned(t0.Add(3*s.FastJob), "rt", "e2", t0.Add(-time.Hour), listed, "term_1")
 	if got := durable(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
 		t.Fatalf("durable %v, want term_1 once e2 held for FastJob", got)
 	}
@@ -291,6 +289,94 @@ func TestAnOrphanQuietForTheLongWindowIsDurable(t *testing.T) {
 	sc.orphaned(t0.Add(turns.DefaultOrphanAfter), "rt", "e1", t0.Add(time.Minute), []string{"term_1"}, "term_1")
 	if got := durable(t, s, reg); len(got) != 0 {
 		t.Fatalf("an orphan that printed since it was seen is durable: %v", got)
+	}
+}
+
+// hidden is orphaned in a reading whose windows show no terminal, as an app still reattaching them.
+func (s *scripted) hidden(at time.Time, runtime, epoch string, lastOut time.Time, listed []string, orphans ...string) {
+	s.orphaned(at, runtime, epoch, lastOut, listed, orphans...)
+	s.reading.Shown = false
+}
+
+func TestTwoRendererRestartsInARowProveNoOrphan(t *testing.T) {
+	listed := []string{"term_1"}
+	old := t0.Add(-3 * time.Hour)
+	t.Run("the first restart still reattaching", func(t *testing.T) {
+		s, reg, sc, _ := expireService(t, "term_1")
+		sc.orphaned(t0, "rt", "e1", old, listed)
+		durable(t, s, reg)
+		sc.hidden(t0.Add(s.FastJob), "rt", "e2", old, listed, "term_1")
+		durable(t, s, reg)
+		sc.hidden(t0.Add(2*s.FastJob), "rt", "e2", old, listed, "term_1")
+		durable(t, s, reg)
+		for i := 3; i < 6; i++ {
+			sc.orphaned(t0.Add(time.Duration(i)*s.FastJob), "rt", "e3", old, listed, "term_1")
+			if got := durable(t, s, reg); len(got) != 0 {
+				t.Fatalf("reading %d proved %v from a crossing out of an epoch that showed nothing", i, got)
+			}
+		}
+	})
+	t.Run("the first restart seen once", func(t *testing.T) {
+		s, reg, sc, _ := expireService(t, "term_1")
+		sc.orphaned(t0, "rt", "e1", old, listed)
+		durable(t, s, reg)
+		sc.orphaned(t0.Add(s.FastJob), "rt", "e2", old, listed, "term_1")
+		durable(t, s, reg)
+		for i := 2; i < 5; i++ {
+			sc.orphaned(t0.Add(time.Duration(i)*s.FastJob), "rt", "e3", old, listed, "term_1")
+			if got := durable(t, s, reg); len(got) != 0 {
+				t.Fatalf("reading %d proved %v from an epoch it was orphaned in for one reading", i, got)
+			}
+		}
+	})
+}
+
+func TestTheQuietWindowNeedsAKnownOutputAndAnAttachedAppThroughout(t *testing.T) {
+	listed := []string{"term_1"}
+	t.Run("an unknown last output", func(t *testing.T) {
+		s, reg, sc, _ := expireService(t, "term_1")
+		sc.orphaned(t0, "rt", "e1", time.Time{}, listed, "term_1")
+		durable(t, s, reg)
+		sc.orphaned(t0.Add(3*turns.DefaultOrphanAfter), "rt", "e1", time.Time{}, listed, "term_1")
+		if got := durable(t, s, reg); len(got) != 0 {
+			t.Fatalf("proved %v with no last output", got)
+		}
+	})
+	t.Run("a reading with no window showing a terminal", func(t *testing.T) {
+		s, reg, sc, _ := expireService(t, "term_1")
+		old := t0.Add(-3 * time.Hour)
+		sc.orphaned(t0, "rt", "e1", old, listed, "term_1")
+		durable(t, s, reg)
+		sc.hidden(t0.Add(time.Hour), "rt", "e1", old, listed, "term_1")
+		durable(t, s, reg)
+		sc.orphaned(t0.Add(turns.DefaultOrphanAfter), "rt", "e1", old, listed, "term_1")
+		if got := durable(t, s, reg); len(got) != 0 {
+			t.Fatalf("proved %v across a reading that showed nothing", got)
+		}
+		sc.orphaned(t0.Add(2*turns.DefaultOrphanAfter), "rt", "e1", old, listed, "term_1")
+		if got := durable(t, s, reg); !slices.Equal(got, []string{"term_1"}) {
+			t.Fatalf("durable %v, want term_1 a whole window after the app showed terminals again", got)
+		}
+	})
+}
+
+func TestAProcessOrphanedForAFastJobIsOrphaned(t *testing.T) {
+	s, reg, sc, _ := expireService(t, "term_1")
+	listed := []string{"term_1"}
+	sc.orphaned(t0, "rt", "", time.Time{}, listed, "term_1")
+	durable(t, s, reg)
+	if s.ProcessOrphaned("term_1") {
+		t.Fatal("orphaned after one reading")
+	}
+	sc.orphaned(t0.Add(s.FastJob), "rt", "", time.Time{}, listed, "term_1")
+	durable(t, s, reg)
+	if !s.ProcessOrphaned("term_1") {
+		t.Fatal("not orphaned after two readings FastJob apart, even with no epoch")
+	}
+	sc.orphaned(t0.Add(2*s.FastJob), "rt", "", time.Time{}, listed)
+	durable(t, s, reg)
+	if s.ProcessOrphaned("term_1") {
+		t.Fatal("still orphaned once a window shows it again")
 	}
 }
 

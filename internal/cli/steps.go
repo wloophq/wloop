@@ -409,10 +409,17 @@ func (s *stepSet) markDormantCheck(ctx context.Context, c stepCall, _ automation
 	if err != nil {
 		return "", err
 	}
-	if !factBool(f, "session.process_gone") {
-		return "the session's process is not gone", nil
+	switch {
+	case factBool(f, "session.process_gone"):
+		return "", nil
+	case factBool(f, "session.process_orphaned"):
+		t, err := s.turns()
+		if err != nil {
+			return "", err
+		}
+		return t.DormantRefusal(ctx, c.u.Key)
 	}
-	return "", nil
+	return "the session's process is not gone", nil
 }
 
 func (s *stepSet) markDormantRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {

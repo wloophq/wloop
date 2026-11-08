@@ -14,6 +14,8 @@ var PlanReasons = []string{
 	"its terminal is closed; it ends on its own",
 	"its terminal is open with no agent in it: close that terminal, or dismiss this",
 	"it has no workspace to find its terminal in: dismiss this",
+	"its process is not proven a lasting orphan",
+	"its process is no longer the orphan the census proved",
 }
 
 // PlanItem is one item of the workflows' plan.

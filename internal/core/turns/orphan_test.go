@@ -20,7 +20,7 @@ func orphanEnv(t *testing.T, c cleanupCase, prove bool) closeEnv {
 	e.sess.Orphan(c.sess.ID)
 	readings := []string{"e1"}
 	if prove {
-		readings = []string{"e1", "e2", "e2"}
+		readings = []string{"e1", "e1", "e2", "e2"}
 	}
 	for i, epoch := range readings {
 		e.sess.SetReading(epoch, t0.Add(-10*time.Minute+time.Duration(i)*e.s.FastJob))
@@ -84,6 +84,107 @@ func TestCloseOrphanRefusesWhatASessionCloseRefuses(t *testing.T) {
 				t.Fatalf("closed %v", closed)
 			}
 		})
+	}
+}
+
+// orphanedEnv is c's session whose process two readings FastJob apart list orphaned.
+func orphanedEnv(t *testing.T, c cleanupCase) closeEnv {
+	t.Helper()
+	e := newCloseEnv(t, c)
+	e.sess.Orphan(c.sess.ID)
+	for i := range 2 {
+		e.sess.SetReading("", t0.Add(-10*time.Minute+time.Duration(i)*e.s.FastJob))
+		if err := e.s.Census(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !e.s.ProcessOrphaned(c.sess.ID) {
+		t.Fatal("not orphaned")
+	}
+	return e
+}
+
+func TestMarkDormantRetiresAQuietOrphanWithoutEndingItsProcessAndAWindowWakesIt(t *testing.T) {
+	ctx := context.Background()
+	e := orphanedEnv(t, cleanupCase{sess: quietSession("term_1")})
+	if why, err := e.s.DormantRefusal(ctx, "term_1"); why != "" || err != nil {
+		t.Fatalf("refusal %q %v", why, err)
+	}
+	if err := e.s.MarkDormant(ctx, "term_1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionDormant {
+		t.Fatalf("session %+v, want dormant", got)
+	}
+	if closed := e.sess.Closed(); len(closed) != 0 {
+		t.Fatalf("retiring the session ended %v", closed)
+	}
+	e.sess.Unorphan("term_1")
+	if err := e.s.Census(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want woken once a window shows its process again", got)
+	}
+}
+
+func TestMarkDormantRefusesAnOrphanWhatASessionCloseRefusesWithNoPane(t *testing.T) {
+	started := []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "r1", Trigger: turn.Automated, State: turn.Started,
+		Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-time.Minute), StartedAt: t0.Add(-time.Minute)}}
+	typed := quietSession("term_1")
+	typed.UserPromptAt = t0.Add(-time.Hour)
+	for _, c := range []struct {
+		name string
+		c    cleanupCase
+		want string
+	}{
+		{"a started turn", cleanupCase{sess: quietSession("term_1"), turns: started, state: turn.AgentWorking}, "its turn is started"},
+		{"a working agent", cleanupCase{sess: quietSession("term_1"), state: turn.AgentWorking}, "its agent is working"},
+		{"you typed after the loop", cleanupCase{sess: typed}, "you typed in it after"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := orphanedEnv(t, c.c)
+			ctx := context.Background()
+			if err := e.s.MarkDormant(ctx, "term_1"); !refusal(err, c.want) {
+				t.Fatalf("MarkDormant = %v, want %q", err, c.want)
+			}
+			if got, _, _ := e.reg.Session(ctx, "term_1"); got.State() != turn.SessionActive || len(e.sess.Closed()) != 0 {
+				t.Fatalf("session %+v, closed %v", got, e.sess.Closed())
+			}
+		})
+	}
+}
+
+func TestCloseOrphanRefusesAnOrphanAFreshCensusNoLongerShows(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name  string
+		after func(e closeEnv)
+	}{
+		{"reattached", func(e closeEnv) { e.sess.Unorphan("term_1") }},
+		{"another epoch", func(e closeEnv) { e.sess.SetReading("e3", time.Time{}) }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := orphanEnv(t, cleanupCase{sess: quietSession("term_1")}, true)
+			c.after(e)
+			var refusal turns.Refusal
+			if err := e.s.CloseOrphan(ctx, "term_1"); !errors.As(err, &refusal) {
+				t.Fatalf("CloseOrphan = %v, want a refusal", err)
+			}
+			if closed := e.sess.Closed(); len(closed) != 0 {
+				t.Fatalf("closed %v", closed)
+			}
+		})
+	}
+}
+
+func TestCloseOrphanOfASessionWithNoPaneReadsItsWorkspacesAgents(t *testing.T) {
+	nopane := quietSession("term_1")
+	nopane.Pane = ""
+	e := orphanEnv(t, cleanupCase{sess: nopane, state: turn.AgentWorking}, true)
+	why, err := e.s.CloseOrphanRefusal(context.Background(), "term_1")
+	if err != nil || !strings.Contains(why, "busy") {
+		t.Fatalf("refusal %q %v, want a busy agent of its workspace", why, err)
 	}
 }
 

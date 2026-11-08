@@ -64,6 +64,11 @@
       },
       "type": "object"
     },
+    "enabled": {
+      "default": true,
+      "description": "false ships the workflow off: it plans nothing until workflows.<name>.enabled = true in the config turns it on.",
+      "type": "boolean"
+    },
     "gates": {
       "additionalProperties": false,
       "description": "The gates its runs and drafts open.",

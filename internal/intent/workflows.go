@@ -39,6 +39,7 @@ type wManifest struct {
 	Step     []map[string]any  `toml:"step"`
 	Limits   *wLimits          `toml:"limits"`
 	Observe  bool              `toml:"observe"`
+	Enabled  *bool             `toml:"enabled"`
 	Order    *int              `toml:"order"`
 	Key      []string          `toml:"key"`
 	Marks    map[string]string `toml:"marks"`
@@ -309,7 +310,7 @@ func providerNames() []string {
 }
 
 func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent, runner string) (arg, msg string)) workflow.Workflow {
-	w := workflow.Workflow{Name: name, Observe: m.Observe, Order: 100}
+	w := workflow.Workflow{Name: name, Observe: m.Observe, Off: m.Enabled != nil && !*m.Enabled, Order: 100}
 	if m.Summary == nil || strings.TrimSpace(*m.Summary) == "" {
 		s.add("summary", "is required: one line saying what the workflow does")
 	} else {

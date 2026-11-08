@@ -54,6 +54,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `trigger.actors` | list of `person`, `workflow`, `agent`, `plugin` |  | With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent. |
 | `trigger.depth` | integer | `3` | With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
+| `enabled` | bool | `true` | false ships the workflow off: it plans nothing until workflows.&lt;name&gt;.enabled = true in the config turns it on. |
 | `limits` | table |  | How many runs the workflow may take. |
 | `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
 | `limits.per_day` | integer | `0` | Runs per local day; 0 is no limit. |

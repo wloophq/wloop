@@ -34,6 +34,8 @@ type ProcessCensus struct {
 	// Epoch is the renderer graph epoch the list was read in: it changes when
 	// the app's windows restart, while RuntimeID stays; "" when unknown.
 	Epoch string
+	// Shown says a window of the app showed some listed terminal.
+	Shown bool
 }
 
 // ManagerSessions is one workspace manager's processes, addressed by its
@@ -288,7 +290,7 @@ func (r *Router) WaitIdle(ctx context.Context, id string, timeout time.Duration)
 // handle; a manager that cannot be read counts as incomplete, never as
 // listing no session.
 func (r *Router) Census(ctx context.Context) (Census, error) {
-	c := Census{Sessions: map[string]string{}, Complete: true, CompleteFor: map[string]bool{}, RuntimeIDs: map[string]string{}, Processes: map[string]ProcessRef{}, Orphans: map[string]time.Time{}, Epochs: map[string]string{}}
+	c := Census{Sessions: map[string]string{}, Complete: true, CompleteFor: map[string]bool{}, RuntimeIDs: map[string]string{}, Processes: map[string]ProcessRef{}, Orphans: map[string]time.Time{}, Epochs: map[string]string{}, ShownFor: map[string]bool{}}
 	var errs []error
 	for _, m := range r.Managers {
 		pc, err := m.Census(ctx)
@@ -300,6 +302,7 @@ func (r *Router) Census(ctx context.Context) (Census, error) {
 		c.CompleteFor[m.Name()] = pc.Complete
 		c.RuntimeIDs[m.Name()] = pc.RuntimeID
 		c.Epochs[m.Name()] = pc.Epoch
+		c.ShownFor[m.Name()] = pc.Shown
 		c.Complete = c.Complete && pc.Complete
 		if pc.At.After(c.At) {
 			c.At = pc.At

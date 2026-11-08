@@ -366,9 +366,13 @@ func TestAnOrphanIsDurableOnceTheCensusProvesIt(t *testing.T) {
 	w := newWorld(t)
 	w.session("term_1", nil)
 	w.sess.Orphan("term_1")
-	for i, epoch := range []string{"e1", "e2", "e2"} {
-		if got := w.facts(t, "term_1")["session.orphan_durable"]; got != false {
+	for i, epoch := range []string{"e1", "e1", "e2", "e2"} {
+		f := w.facts(t, "term_1")
+		if f["session.orphan_durable"] != false {
 			t.Fatalf("durable before reading %d", i)
+		}
+		if f["session.process_orphaned"] != (i >= 2) {
+			t.Fatalf("process_orphaned %v before reading %d", f["session.process_orphaned"], i)
 		}
 		w.sess.SetReading(epoch, w.clock.Now())
 		if err := w.p.Refresh(ctx); err != nil {

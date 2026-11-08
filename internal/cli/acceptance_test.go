@@ -948,8 +948,27 @@ func TestCleanupWorkflowsLoad(t *testing.T) {
 			names = append(names, w.Name)
 		}
 	}
-	if len(names) != 17 {
+	if len(names) != 18 {
 		t.Fatalf("%d cleanup workflows: %v; problems %v %v", len(names), names, l.Problems, l.BrokenWorkflows)
+	}
+}
+
+func TestEndingAnOrphansProcessShipsOffAndTheConfigTurnsItOn(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	applied := func() bool {
+		return slices.ContainsFunc(applyConfig(te.loadedIntents().Workflows, te.cfg), func(w workflow.Workflow) bool { return w.Name == "session-orphan-close" })
+	}
+	if applied() {
+		t.Fatal("session-orphan-close runs by default")
+	}
+	if !slices.Contains(disabledWorkflows(te.cfg, te.loadedIntents().Workflows), "session-orphan-close") {
+		t.Error("an off workflow's drafts are not kept as a disabled one's")
+	}
+	on := true
+	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-orphan-close": {Enabled: &on}}
+	if !applied() {
+		t.Fatal("workflows.session-orphan-close.enabled = true does not turn it on")
 	}
 }
 
@@ -1378,10 +1397,62 @@ func (f *fixtureEnv) orphanTab(t *testing.T, handle string) {
 	f.sessions.Orphan(handle)
 }
 
-func TestAQuietManualSessionWhoseTabWasClosedEndsOnItsOwn(t *testing.T) {
+func TestAQuietManualSessionWhoseTabWasClosedEndsOnItsOwnAndItsProcessLives(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := loadFixture(t, cleanupFixture, clockA)
+	eng := f.engine(t)
+	f.now = f.laterClock(t, eng)
+	quiet := f.quietManual(t, eng)
+	f.orphanTab(t, quiet.Key)
+	if it := itemOf(t, evaluate(t, eng), quiet, "session-manual-quiet"); it.Decision != workflow.DecisionBlocked || it.Reason != turns.RefusalTerminalClosed {
+		t.Fatalf("with its tab closed: %s (%s)", it.Decision, it.Reason)
+	}
+	f.sessions.SetReading("e1", time.Time{})
+	for i := range 6 {
+		sweepOnce(t, eng)
+		f.now = f.now.Add(3 * time.Minute)
+		if i == 2 {
+			f.sessions.SetReading("e2", time.Time{})
+		}
+	}
+	row, ok, err := f.te.repo.Session(ctx, quiet.Key)
+	if err != nil || !ok || row.State() != turn.SessionDormant {
+		t.Fatalf("session %+v %v %v, want dormant", row, ok, err)
+	}
+	if slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatalf("a process was ended with session-orphan-close off: closed %v", f.sessions.Closed())
+	}
+	for _, it := range evaluate(t, eng) {
+		if it.Unit == quiet && (it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionPending) {
+			t.Errorf("%s still asks the user: %s (%s)", it.Workflow, it.Decision, it.Reason)
+		}
+	}
+	f.sessions.Unorphan(quiet.Key)
+	sweepOnce(t, eng)
+	if row, _, _ := f.te.repo.Session(ctx, quiet.Key); row.State() != turn.SessionActive {
+		t.Fatalf("session %+v, want woken once a window shows its process again", row)
+	}
+}
+
+// quietManual is a session session-manual-quiet offers to close.
+func (f *fixtureEnv) quietManual(t *testing.T, eng *automation.Engine) unit.Unit {
+	t.Helper()
+	for _, it := range evaluate(t, eng) {
+		if it.Workflow == "session-manual-quiet" {
+			return it.Unit
+		}
+	}
+	t.Fatal("no quiet manual session in the fixture")
+	return unit.Unit{}
+}
+
+func TestWithOrphanCloseOnADurableOrphansProcessEnds(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := loadFixture(t, cleanupFixture, clockA)
+	on := true
+	f.te.cfg.Workflows = map[string]config.WorkflowConfig{"session-orphan-close": {Enabled: &on}, "hygiene-session-orphaned": {Enabled: new(bool)}}
 	eng := f.engine(t)
 	f.now = f.laterClock(t, eng)
 	var quiet unit.Unit
