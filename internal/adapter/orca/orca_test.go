@@ -284,6 +284,25 @@ func TestCensusNamesOrphanedProcessesOnlyWhileTheAppIsAttached(t *testing.T) {
 	}
 }
 
+func BenchmarkCensusOfOrphanedProcesses(b *testing.B) {
+	rows := make([]string, 500)
+	for i := range rows {
+		rows[i] = fmt.Sprintf(`{"handle":"term_%d","worktreeId":"ws","connected":true,"writable":true,"orphaned":%v}`, i, i%4 != 0)
+	}
+	list := `{"ok":true,"result":{"terminals":[` + strings.Join(rows, ",") + `],"truncated":false,"hostScope":{"hostIds":["local"],"omittedHostIds":[]}}}`
+	a := orca.New(&wsorca.Manager{R: listRunner{list}}, cols, nil)
+	ctx := context.Background()
+	if _, err := a.Census(ctx); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := a.Census(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestATruncatedListStillServesTerminals(t *testing.T) {
 	list := `{"ok":true,"result":{"terminals":[{"handle":"term_1","worktreeId":"ws","tabId":"tab-1","connected":true,"writable":true}],"truncated":true}}`
 	a := orca.New(&wsorca.Manager{R: listRunner{list}}, cols, nil)
