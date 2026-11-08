@@ -181,7 +181,7 @@
    "clock": "A",
    "workflow": "session-worktree-gone",
    "decision": "blocked",
-   "reason": "no agent"
+   "reason": "its terminal is closed; it ends on its own"
   },
   {
    "unit": "workspace:/Users/user/src/widgets",
@@ -500,7 +500,7 @@
    "clock": "B",
    "workflow": "session-worktree-gone",
    "decision": "blocked",
-   "reason": "no agent"
+   "reason": "its terminal is closed; it ends on its own"
   },
   {
    "unit": "workspace:/Users/user/src/widgets",

@@ -1364,6 +1364,57 @@ func TestManualSessionsWaitForTheUser(t *testing.T) {
 	}
 }
 
+// orphanTab closes the tab of handle's terminal in the app as a person does:
+// the manager lists its process orphaned, and the app shows no terminal. The
+// agent the app reported in it stays reported, as Orca's pane state lingers.
+func (f *fixtureEnv) orphanTab(t *testing.T, handle string) {
+	t.Helper()
+	i := slices.IndexFunc(f.snap.terms, func(tm wsdomain.Terminal) bool { return tm.Handle == handle })
+	if i < 0 {
+		t.Fatalf("no terminal %s", handle)
+	}
+	f.snap.terms[i].Usable, f.snap.terms[i].Orphaned, f.snap.terms[i].Agent = false, true, ""
+	f.sessions.Orphan(handle)
+}
+
+func TestAQuietManualSessionWhoseTabWasClosedEndsOnItsOwn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := loadFixture(t, cleanupFixture, clockA)
+	eng := f.engine(t)
+	f.now = f.laterClock(t, eng)
+	var quiet unit.Unit
+	for _, it := range evaluate(t, eng) {
+		if it.Workflow == "session-manual-quiet" {
+			quiet = it.Unit
+			break
+		}
+	}
+	if quiet.Key == "" {
+		t.Fatal("no quiet manual session in the fixture")
+	}
+	f.orphanTab(t, quiet.Key)
+	if it := itemOf(t, evaluate(t, eng), quiet, "session-manual-quiet"); it.Decision != workflow.DecisionBlocked || it.Reason != turns.RefusalTerminalClosed {
+		t.Fatalf("with its tab closed: %s (%s)", it.Decision, it.Reason)
+	}
+	for range 3 {
+		sweepOnce(t, eng)
+		f.now = f.now.Add(3 * time.Minute)
+	}
+	row, ok, err := f.te.repo.Session(ctx, quiet.Key)
+	if err != nil || !ok || row.State() != turn.SessionDormant {
+		t.Fatalf("session %+v %v %v, want dormant", row, ok, err)
+	}
+	if !slices.Contains(f.sessions.Closed(), quiet.Key) {
+		t.Fatalf("its orphaned process was not closed: closed %v", f.sessions.Closed())
+	}
+	for _, it := range evaluate(t, eng) {
+		if it.Unit == quiet && (it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionPending) {
+			t.Errorf("%s still asks the user: %s (%s)", it.Workflow, it.Decision, it.Reason)
+		}
+	}
+}
+
 // cleanupRig is one bundled workflow, overridden to apply when apply is set, over
 // fake facts and steps.
 func cleanupRig(t *testing.T, name string, apply bool) (*automation.Engine, *automationtest.Units, *automationtest.Steps) {

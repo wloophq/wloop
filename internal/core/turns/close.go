@@ -69,6 +69,14 @@ func withoutHandle(sess turn.Session) turn.Session {
 	return sess
 }
 
+// The close refusals of a session whose terminal runs no agent. A closed
+// terminal clears on its own, as the census marks the session dormant; an
+// open one waits for the user.
+const (
+	RefusalTerminalClosed = "its terminal is closed; it ends on its own"
+	RefusalNoAgent        = "its terminal is open with no agent in it: close that terminal, or dismiss this"
+)
+
 // CloseRefusal is why session.close may not close the handle's session, ""
 // when it may. It writes nothing; an error is a read that failed.
 func (s *Service) CloseRefusal(ctx context.Context, handle string) (string, error) {
@@ -76,15 +84,23 @@ func (s *Service) CloseRefusal(ctx context.Context, handle string) (string, erro
 	return why, err
 }
 
+// CloseGone says whether why, a CloseRefusal of handle, holds for good: there
+// is no such session, or it is closed.
+func CloseGone(handle, why string) bool { return why == noSession(handle) || why == sessionClosed }
+
+const sessionClosed = "the session is closed"
+
+func noSession(handle string) string { return "no session " + handle }
+
 func (s *Service) closeCheck(ctx context.Context, handle string) (string, promptWindow, error) {
 	sess, ok, err := s.Registry.Session(ctx, handle)
 	switch {
 	case err != nil:
 		return "", promptWindow{}, err
 	case !ok:
-		return "no session " + handle, promptWindow{}, nil
+		return noSession(handle), promptWindow{}, nil
 	case !sess.ClosedAt.IsZero():
-		return "the session is closed", promptWindow{}, nil
+		return sessionClosed, promptWindow{}, nil
 	case s.typingInto(handle):
 		return "its turn is " + string(turn.Sent), promptWindow{}, nil
 	}
@@ -100,12 +116,14 @@ func (s *Service) closeCheck(ctx context.Context, handle string) (string, prompt
 	if sess.State() == turn.SessionDormant {
 		return "", promptWindow{sess: sess}, nil
 	}
-	agent, has, focused, err := s.agentNow(ctx, sess)
+	agent, shown, has, focused, err := s.agentNow(ctx, sess)
 	switch {
 	case err != nil:
 		return "", promptWindow{}, err
+	case !shown:
+		return RefusalTerminalClosed, promptWindow{}, nil
 	case !has:
-		return "no agent", promptWindow{}, nil
+		return RefusalNoAgent, promptWindow{}, nil
 	case agent.State == turn.AgentWorking:
 		return "its agent is working", promptWindow{}, nil
 	case agent.State == turn.AgentWaiting:
@@ -133,6 +151,9 @@ func (s *Service) CloseSession(ctx context.Context, handle, reason string) error
 		why = w.transcriptRefusal(at, ok)
 	}
 	if why != "" {
+		if CloseGone(handle, why) {
+			return Gone{Reason: why}
+		}
 		return Refusal{Reason: why}
 	}
 	units, err := s.Store.UnitsOf(ctx, []string{handle})
@@ -199,27 +220,28 @@ func (s *Service) sessionTurns(ctx context.Context, handle string) (handleTurns,
 	return out, nil
 }
 
-// agentNow is the session's agent as the manager lists it, and whether its
-// workspace is the one open in the app.
-func (s *Service) agentNow(ctx context.Context, sess turn.Session) (a AgentObservation, has, focused bool, err error) {
+// agentNow is the session's agent as the manager lists it, whether the app
+// shows its terminal, and whether its workspace is the one open in the app. A
+// session with no workspace counts as shown, as nothing can tell otherwise.
+func (s *Service) agentNow(ctx context.Context, sess turn.Session) (a AgentObservation, shown, has, focused bool, err error) {
 	if sess.WorkspaceID == "" {
-		return AgentObservation{}, false, false, nil
+		return AgentObservation{}, true, false, false, nil
 	}
 	agents, err := s.Sessions.Agents(ctx)
 	if err != nil {
-		return AgentObservation{}, false, false, err
+		return AgentObservation{}, false, false, false, err
 	}
 	terms, err := s.Sessions.Terminals(ctx, sess.WorkspaceID)
 	if err != nil {
-		return AgentObservation{}, false, false, err
+		return AgentObservation{}, false, false, false, err
 	}
 	i := slices.IndexFunc(terms, func(t Terminal) bool { return t.Session == sess.ID })
 	if i < 0 {
-		return AgentObservation{}, false, false, nil
+		return AgentObservation{}, false, false, false, nil
 	}
 	a, has = agentOf(agents, sess, terms[i])
 	focused = slices.ContainsFunc(agents, func(a AgentObservation) bool { return a.UserActive && a.WorkspaceID == sess.WorkspaceID })
-	return a, has, focused, nil
+	return a, true, has, focused, nil
 }
 
 const cannotTell = "cannot tell whether you typed in it"

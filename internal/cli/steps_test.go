@@ -87,6 +87,34 @@ func TestASessionCloseRefusedAtRunIsAGuardRefusal(t *testing.T) {
 	}
 }
 
+func TestASessionCloseOfASessionGoneOrClosedIsMoot(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", StartedAt: testNow, ClosedAt: testNow})
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	for _, key := range []string{"term-1", "term-absent"} {
+		u := unit.Unit{Provider: unit.Session, Key: key}
+		var moot automation.Moot
+		if _, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{}); !errors.As(err, &moot) || moot.Reason == "" {
+			t.Fatalf("%s: check %v, want moot", key, err)
+		}
+		_, err := s.Run(context.Background(), wfStep("session.close"), u, workflow.Why{Workflow: "session-done"}, automation.RunOpts{})
+		if !errors.As(err, &moot) {
+			t.Fatalf("%s: run %v, want moot", key, err)
+		}
+	}
+}
+
+func TestASessionCloseOfATerminalOpenWithNoAgentSaysWhatToDo(t *testing.T) {
+	t.Parallel()
+	te, _ := noAgentSession(t, true)
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
+	refusal, err := s.Check(context.Background(), wfStep("session.close"), unit.Unit{Provider: unit.Session, Key: "term-1"}, workflow.Why{}, automation.CheckOpts{})
+	if err != nil || refusal != turns.RefusalNoAgent {
+		t.Fatalf("check %q %v", refusal, err)
+	}
+}
+
 // removalRig is a workspace step over the core's fakes, its round state bound.
 type removalRig struct {
 	s        *stepSet
@@ -257,7 +285,7 @@ func noAgentSession(t *testing.T, listed bool) (*testEnv, turnsGuard) {
 func TestARemovalRefusesAListedTerminalWithNoAgent(t *testing.T) {
 	t.Parallel()
 	_, g := noAgentSession(t, true)
-	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "session term-1: no agent" {
+	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "session term-1: "+turns.RefusalNoAgent {
 		t.Fatalf("refusal %q %v", why, err)
 	}
 }

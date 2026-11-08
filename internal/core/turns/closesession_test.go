@@ -250,11 +250,34 @@ func TestCloseAllowsAnAskedTurn(t *testing.T) {
 func TestCloseRefusesNoAgent(t *testing.T) {
 	e := newCloseEnv(t, cleanupCase{sess: quietSession("term_1")})
 	e.sess.SetAgents()
-	e.refuses(t, "no agent")
+	e.refuses(t, turns.RefusalNoAgent)
 
 	e = newCloseEnv(t, cleanupCase{sess: quietSession("term_1")})
 	e.sess.Put(cleanupWS)
-	e.refuses(t, "no agent")
+	e.refuses(t, turns.RefusalTerminalClosed)
+
+	e = newCloseEnv(t, cleanupCase{sess: quietSession("term_1")})
+	e.sess.Orphan("term_1")
+	e.refuses(t, turns.RefusalTerminalClosed)
+}
+
+func TestCloseOfAGoneOrClosedSessionIsGone(t *testing.T) {
+	s, store, reg, sess, _ := newService(t)
+	closed := quietSession("term_1")
+	closed.ClosedAt = t0
+	cleanupCase{sess: closed}.put(reg, store, sess)
+	for _, h := range []string{"term_1", "term_absent"} {
+		why, err := s.CloseRefusal(context.Background(), h)
+		if err != nil || !turns.CloseGone(h, why) {
+			t.Fatalf("%s: refusal %q %v, want one that holds for good", h, why, err)
+		}
+		var gone turns.Gone
+		var refusal turns.Refusal
+		err = s.CloseSession(context.Background(), h, "test")
+		if !errors.As(err, &gone) || !errors.As(err, &refusal) || refusal.Reason != why {
+			t.Fatalf("%s: CloseSession = %v", h, err)
+		}
+	}
 }
 
 func TestCloseRefusesAnAgentInAnyStateButDone(t *testing.T) {

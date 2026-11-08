@@ -628,7 +628,7 @@ workflow/session-manual-quiet.Summary = "Offer to close a session you started th
 workflow/session-manual-quiet.Provider = "session"
 workflow/session-manual-quiet.Slot = "session"
 workflow/session-manual-quiet.Trigger.Kind = "sweep"
-workflow/session-manual-quiet.When = "!session.managed && session.agent_state == \"done\" && session.idle_for > config.cleanup.manual_idle"
+workflow/session-manual-quiet.When = "!session.managed && session.agent_state == \"done\" && session.idle_for > config.cleanup.manual_idle && session.state == \"active\""
 workflow/session-manual-quiet.Steps[0].Use = "session.close"
 workflow/session-manual-quiet.Steps[0].Reach = "local"
 workflow/session-manual-quiet.Limits.PerRun = 10

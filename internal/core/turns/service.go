@@ -88,6 +88,20 @@ type Service struct {
 // Refusal is a request the turn's state or the caller's identity refuses.
 type Refusal struct{ Reason string }
 
+// Gone is a Refusal no retry can pass: what the request acts on is gone or
+// closed. errors.As reads it as a Refusal too.
+type Gone struct{ Reason string }
+
+func (g Gone) Error() string { return g.Reason }
+
+func (g Gone) As(target any) bool {
+	r, ok := target.(*Refusal)
+	if ok {
+		*r = Refusal(g)
+	}
+	return ok
+}
+
 func (r Refusal) Error() string { return r.Reason }
 
 // InvalidAnswer is an answer the question does not take.
