@@ -12,7 +12,7 @@ const (
 	WindowOpen      = "open"  // show the main window at Route, hide the panel
 	WindowPanel     = "panel" // show the panel
 	WindowHidePanel = "hide-panel"
-	WindowDetach    = "detach" // show the item Route names in a window of its own
+	WindowDetach    = "detach"   // show the item Route names in a window of its own
 	WindowExternal  = "external" // open URL, a web address, in the default browser
 )
 
