@@ -53,6 +53,16 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards | 
 const taskInputs = port.TopicTasks | port.TopicGates | port.TopicWakes | port.TopicDrafts | port.TopicRecords | port.TopicLinks |
 	port.TopicPlacements | port.TopicConfig
 
+// planInputs are the notes after which a change says the plan moved: its items as served, the pending items, the
+// closed sessions it lists, and a reloaded profile, whose words and actions it shows.
+const planInputs = port.TopicPlan | port.TopicPending | port.TopicConfig
+
+// gateInputs are the notes after which a change says the gates moved: a gate, and what one shows of its subject,
+// a draft and its items, a message (whose writes note TopicTasks) or a pending plan item.
+const gateInputs = port.TopicGates | port.TopicDrafts | port.TopicItems | port.TopicTasks | port.TopicPlan | port.TopicPending
+
+const flagInputs = planInputs | gateInputs
+
 // bridged are the handlers whose verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []string{handlerApprove, handlerDelegate, handlerDrop}
 
@@ -1431,13 +1441,13 @@ func (s *Server) facetProblems(l *intentload.Loaded) intentload.Problems {
 	return k.out
 }
 
-// feedTasks publishes a change with the counters after each burst of task and draft notes and of row changes
-// whose units a task holds, naming the units they moved, until ctx ends.
+// feedTasks publishes a change after each burst of notes of what a view, the plan or the gates read and of row
+// changes whose units a task holds, until ctx ends.
 func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
-	poke, cancel := change.Poke(s.deps.Changes, taskInputs)
+	poke, cancel := change.Poke(s.deps.Changes, taskInputs|flagInputs)
 	defer cancel()
 	s.moved.attach()
 	from := s.deps.Changes.Gen()
@@ -1451,9 +1461,10 @@ func (s *Server) feedTasks(ctx context.Context) {
 		case <-quiet:
 			quiet = nil
 			c := s.deps.Changes.Since(from, taskInputs)
-			from = c.Gen
+			flags := s.deps.Changes.Since(from, flagInputs)
+			from = min(c.Gen, flags.Gen)
 			pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
-			s.publishTasks(pctx, c)
+			s.publishTasks(pctx, c, flags)
 			scope.End()
 			continue
 		}
@@ -1464,28 +1475,36 @@ func (s *Server) feedTasks(ctx context.Context) {
 }
 
 // publishTasks publishes the counters with the units c and the row changes since the last call moved, unless
-// nothing moved but rows no task holds; a reloaded profile moves every task, since it can change their facets.
-func (s *Server) publishTasks(ctx context.Context, c port.Change) {
+// nothing moved but rows no task holds, and says whether the plan and the gates moved by the topics of flags. A
+// reloaded profile moves every task, since it can change their facets.
+func (s *Server) publishTasks(ctx context.Context, c, flags port.Change) {
 	rows, all := s.moved.take()
-	held := rows
-	snap, err := s.deps.Tasks.Snapshot(ctx)
-	if err != nil {
+	var held []unit.Unit
+	var snap coretasks.Snapshot
+	err := errTasksUnavailable
+	if s.deps.Tasks == nil {
+		all = false
+	} else if snap, err = s.deps.Tasks.Snapshot(ctx); err != nil {
 		s.logf("tasks feed: %v", err)
+		held = rows
 	} else {
 		held = snap.Held(rows)
 	}
-	if c.Empty() && !all && len(held) == 0 {
-		return
-	}
 	pos := s.hub.position()
-	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev, All: c.All || all || c.Has(port.TopicConfig)}
-	if err == nil {
-		ch.Counters = s.countersOf(snap.Counts(ctx, ""))
-	}
-	if !ch.All {
-		units := slices.Concat(c.Units, held)
-		slices.SortFunc(units, api.CompareUnits)
-		ch.Units = slices.Compact(units)
+	ch := api.Change{Type: "changed", Epoch: pos.Epoch, Rev: pos.Rev,
+		Plan: flags.All || flags.Has(planInputs), Gates: flags.All || flags.Has(gateInputs)}
+	if !c.Empty() || all || len(held) > 0 {
+		ch.All = c.All || all || c.Has(port.TopicConfig)
+		if err == nil {
+			ch.Counters = s.countersOf(snap.Counts(ctx, ""))
+		}
+		if !ch.All {
+			units := slices.Concat(c.Units, held)
+			slices.SortFunc(units, api.CompareUnits)
+			ch.Units = slices.Compact(units)
+		}
+	} else if !ch.Plan && !ch.Gates {
+		return
 	}
 	s.hub.publish(ch)
 }

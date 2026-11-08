@@ -227,6 +227,11 @@ func writeRefusal(w http.ResponseWriter, r Refusal) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.health(r.Context()))
+}
+
+// health is the daemon's health as GET /api/health serves it.
+func (s *Server) health(ctx context.Context) api.Health {
 	s.noteConfigStale()
 	h := api.Health{
 		Version:            s.deps.Version,
@@ -239,7 +244,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
-	plugins, sources := s.pluginsHealth(r.Context())
+	plugins, sources := s.pluginsHealth(ctx)
 	if s.deps.PluginHealth != nil {
 		h.Plugins = plugins
 	}
@@ -249,12 +254,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.deps.GitAccess != nil {
 		var err error
-		if h.GitAccess, err = s.deps.GitAccess.Hosts(r.Context()); err != nil {
+		if h.GitAccess, err = s.deps.GitAccess.Hosts(ctx); err != nil {
 			s.logf("health: git access: %v", err)
 		}
 	}
 	if s.deps.Pauses != nil {
-		p, err := s.deps.Pauses.Pause(r.Context())
+		p, err := s.deps.Pauses.Pause(ctx)
 		if err != nil {
 			s.logf("health: pause: %v", err)
 		}
@@ -276,7 +281,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		h.Warnings = append(h.Warnings, "menu bar not running: notifications are off; "+s.deps.NotifierStart)
 	}
 	if s.deps.BriefStatus != nil {
-		st, err := s.deps.BriefStatus.Status(r.Context())
+		st, err := s.deps.BriefStatus.Status(ctx)
 		if err != nil {
 			s.logf("health: brief: %v", err)
 		} else {
@@ -304,7 +309,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	for _, src := range sources {
 		h.Warnings = append(h.Warnings, sourceWarnings(src)...)
 	}
-	writeJSON(w, h)
+	return h
 }
 
 func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {

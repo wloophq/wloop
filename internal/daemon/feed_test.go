@@ -251,8 +251,8 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 				health++
 			}
 		}
-		if health != 1 {
-			t.Fatalf("%d health messages: %+v", health, got)
+		if health != 0 {
+			t.Fatalf("a job nobody's health shows published %d health messages: %+v", health, got)
 		}
 	})
 }

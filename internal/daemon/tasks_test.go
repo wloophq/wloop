@@ -1385,7 +1385,7 @@ func TestARowMoveNamesItsUnitWhenTheTasksCannotBeRead(t *testing.T) {
 	t.Cleanup(func() { s.hub.unsubscribe(sub) })
 	s.moved.attach()
 	s.moved.add(api.Change{Units: []unit.Unit{apiPR}})
-	s.publishTasks(context.Background(), port.Change{})
+	s.publishTasks(context.Background(), port.Change{}, port.Change{})
 	if c, ok := sub.take(); !ok || !slices.Equal(c.Units, []unit.Unit{apiPR}) {
 		t.Fatalf("published %+v (%v), want the moved unit", c, ok)
 	}
@@ -1397,7 +1397,7 @@ func TestAProfileReloadResendsEveryTask(t *testing.T) {
 	sub := s.hub.subscribe("test")
 	t.Cleanup(func() { s.hub.unsubscribe(sub) })
 	s.moved.attach()
-	s.publishTasks(context.Background(), port.Change{Topics: port.TopicConfig})
+	s.publishTasks(context.Background(), port.Change{Topics: port.TopicConfig}, port.Change{})
 	if c, ok := sub.take(); !ok || !c.All {
 		t.Fatalf("published %+v (%v), want a change of every task", c, ok)
 	}

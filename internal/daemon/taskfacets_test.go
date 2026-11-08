@@ -231,7 +231,7 @@ func BenchmarkPublishTasks(b *testing.B) {
 	r.s.moved.attach()
 	for b.Loop() {
 		r.s.moved.add(api.Change{Units: units})
-		r.s.publishTasks(ctx, port.Change{})
+		r.s.publishTasks(ctx, port.Change{}, port.Change{})
 	}
 }
 
