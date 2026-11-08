@@ -22,6 +22,7 @@ type UITexts struct {
 	Facets     map[string]UIFacet `toml:"facets"`
 	Situations map[string]string  `toml:"situations"`
 	Reasons    map[string]string  `toml:"reasons"`
+	Signals    map[string]UISignal `toml:"signals"`
 	Events     map[string]UIEvent `toml:"events"`
 	Menubar    map[string]string  `toml:"menubar"`
 	Detail     map[string]UIField `toml:"detail"`
@@ -87,6 +88,15 @@ type UIView struct {
 	Unit        string    `toml:"unit"`
 	DefaultSort string    `toml:"default_sort"`
 	Search      *UISearch `toml:"search"`
+}
+
+// UISignal is a card signal's words: its name, its values' and its notes'
+// by code, and where else its values take words from.
+type UISignal struct {
+	Label      string            `toml:"label"`
+	Values     map[string]string `toml:"values"`
+	ValuesFrom string            `toml:"values_from"`
+	Notes      map[string]string `toml:"notes"`
 }
 
 // UIEvent is an event kind's words.
@@ -245,6 +255,17 @@ func mergeUI(into, over UITexts) UITexts {
 	into.Events = mergeMap(into.Events, over.Events, func(_, y UIEvent) UIEvent { return y })
 	into.Situations = mergeMap(into.Situations, over.Situations, func(_, y string) string { return y })
 	into.Reasons = mergeMap(into.Reasons, over.Reasons, func(_, y string) string { return y })
+	into.Signals = mergeMap(into.Signals, over.Signals, func(a, b UISignal) UISignal {
+		if b.Label != "" {
+			a.Label = b.Label
+		}
+		if b.ValuesFrom != "" {
+			a.ValuesFrom = b.ValuesFrom
+		}
+		a.Values = mergeMap(a.Values, b.Values, func(_, y string) string { return y })
+		a.Notes = mergeMap(a.Notes, b.Notes, func(_, y string) string { return y })
+		return a
+	})
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
 	if over.Noun != nil {

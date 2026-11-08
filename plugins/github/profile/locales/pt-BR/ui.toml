@@ -234,6 +234,22 @@ no_reviewer_requested = "nenhum revisor pedido"
 no_review_required = "verde, sem review exigida"
 no_review_required_checks_pending = "sem review exigida, checks pendentes"
 
+[signals.situation]
+label = "situação"
+notes = { stalled = 'parado há {{.days}} {{plural .days "one" "dia útil" "other" "dias úteis"}}' }
+
+[signals.checks]
+label = "checks"
+values = { passing = "passando", pending = "pendentes", failing = "falhando", failing_named = "falhando: {{.names}}" }
+
+[signals.review]
+label = "review"
+values = { approved = "aprovada", changes_requested = "mudanças pedidas" }
+
+[signals.merge]
+label = "merge"
+values = { conflicts = "conflitos" }
+
 [events.opened]
 label = "aberto"
 

@@ -532,6 +532,47 @@
       "description": "Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it.",
       "type": "object"
     },
+    "signals": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One signal's words.",
+        "properties": {
+          "label": {
+            "description": "The signal's name, before its value. Required.",
+            "type": "string"
+          },
+          "notes": {
+            "additionalProperties": {
+              "description": "One note's words, `{{.name}}` where a value the note gives goes and `{{plural .name \"one\" \"…\" \"other\" \"…\"}}` its plural form, such as `stalled for {{.days}} {{plural .days \"one\" \"working day\" \"other\" \"working days\"}}`.",
+              "type": "string"
+            },
+            "description": "How each note shows after the signal's value, in the note's own tone, by code.",
+            "type": "object"
+          },
+          "values": {
+            "additionalProperties": {
+              "description": "One value's words, `{{.name}}` where a value the signal gives goes, such as `failing: {{.names}}`.",
+              "type": "string"
+            },
+            "description": "How each value shows, by code.",
+            "type": "object"
+          },
+          "values_from": {
+            "description": "Where the signal's values take their words from besides its own values.",
+            "enum": [
+              "situations"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "How each line of the plugin's cards shows, by the signal's key: the plugin sends the key, a value code, the values its words fill and the codes of its notes; a code with no words shows as itself.",
+      "type": "object"
+    },
     "situations": {
       "additionalProperties": {
         "description": "One situation's words.",

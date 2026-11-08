@@ -129,6 +129,25 @@ func (c Catalog) Reasons() api.ProviderWords {
 	return api.ProviderWords{Provider: c.Source.Provider, Words: maps.Clone(c.texts().Reasons)}
 }
 
+// CardSignals are the plugin's words of its cards' signals, by key, in key order; a signal whose values take
+// words from the situations reads each kind as the situations do unless its own values word it.
+func (c Catalog) CardSignals() []api.SignalSpec {
+	if c.Source == nil {
+		return nil
+	}
+	t := c.texts()
+	var out []api.SignalSpec
+	for _, key := range slices.Sorted(maps.Keys(t.Signals)) {
+		w := t.Signals[key]
+		values := maps.Clone(w.Values)
+		if w.ValuesFrom == "situations" {
+			values = mergeLabels(maps.Clone(t.Situations), values)
+		}
+		out = append(out, api.SignalSpec{Provider: c.Source.Provider, Key: key, Label: cmp.Or(w.Label, key), Values: values, Notes: maps.Clone(w.Notes)})
+	}
+	return out
+}
+
 // Events are the words of the event kinds the manifest declares that its
 // profile layer words; a kind it leaves out shows as itself.
 func (c Catalog) Events() []api.EventSpec {

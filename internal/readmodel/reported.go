@@ -126,6 +126,13 @@ func (p *Reported) Reasons() api.ProviderWords {
 	return api.ProviderWords{}
 }
 
+func (p *Reported) CardSignals() []api.SignalSpec {
+	if sp, ok := p.src.Catalog.(SignalPresenter); ok {
+		return sp.CardSignals()
+	}
+	return nil
+}
+
 func (p *Reported) Lens() api.ProviderWords {
 	if lp, ok := p.src.Catalog.(LensPresenter); ok {
 		return lp.Lens()

@@ -895,6 +895,15 @@ The fields each notice reads besides `Name` and `Command`:
 - `situations.<name>` (string, localized): One situation's words.
 - `reasons` (table): Why a unit waits, as its row says it, by the reason key its situation names; a reason with no words shows as the plugin wrote it.
 - `reasons.<name>` (string, localized): One reason's words, `{{.name}}` where a value the situation gives goes, such as `changes requested by {{.actor}}`.
+- `signals` (table): How each line of the plugin's cards shows, by the signal's key: the plugin sends the key, a value code, the values its words fill and the codes of its notes; a code with no words shows as itself.
+- `signals.<name>` (table): One signal's words.
+- `signals.<name>.label` (string, localized): The signal's name, before its value. Required.
+- `signals.<name>.values` (table): How each value shows, by code.
+- `signals.<name>.values.<name>` (string, localized): One value's words, `{{.name}}` where a value the signal gives goes, such as `failing: {{.names}}`.
+- `signals.<name>.values_from` (one of `situations`): Where the signal's values take their words from besides its own values.
+  - `situations`: The signal's value is a situation kind, worded as [situations] words it unless its own values word it.
+- `signals.<name>.notes` (table): How each note shows after the signal's value, in the note's own tone, by code.
+- `signals.<name>.notes.<name>` (string, localized): One note's words, `{{.name}}` where a value the note gives goes and `{{plural .name "one" "…" "other" "…"}}` its plural form, such as `stalled for {{.days}} {{plural .days "one" "working day" "other" "working days"}}`.
 - `events` (table): How each event kind the plugin declares shows on a timeline, by kind.
 - `events.<name>` (table): One event kind's words.
 - `events.<name>.label` (string, localized): The event in a few words. Required.

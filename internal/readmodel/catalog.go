@@ -40,6 +40,9 @@ func BuildCatalog(providers ...Provider) api.CatalogResponse {
 				c.Reasons = append(c.Reasons, w)
 			}
 		}
+		if sp, ok := pr.(SignalPresenter); ok {
+			c.CardSignals = append(c.CardSignals, sp.CardSignals()...)
+		}
 		if lp, ok := pr.(LensPresenter); ok {
 			if w := lp.Lens(); len(w.Words) > 0 {
 				c.Lens = append(c.Lens, w)

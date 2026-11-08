@@ -44,6 +44,18 @@ type CatalogResponse struct {
 	Lens []ProviderWords `json:"lens,omitempty"`
 	// Reasons are the plugins' words of the reasons their rows name (Summary.ReasonKey), by key.
 	Reasons []ProviderWords `json:"reasons,omitempty"`
+	// CardSignals are the plugins' words of their cards' signals, by key.
+	CardSignals []SignalSpec `json:"card_signals,omitempty"`
+}
+
+// SignalSpec is how a card signal of a provider shows: its name, its values'
+// and its notes' words by code, `{{.name}}` where a value the signal gives goes.
+type SignalSpec struct {
+	Provider string            `json:"provider"`
+	Key      string            `json:"key"`
+	Label    string            `json:"label"`
+	Values   map[string]string `json:"values,omitempty"`
+	Notes    map[string]string `json:"notes,omitempty"`
 }
 
 // ProviderWords are a provider's words, by key.

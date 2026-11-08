@@ -41,7 +41,19 @@
         "key": "snapshot.Card.Signals[0].Key",
         "value": "snapshot.Card.Signals[0].Value",
         "tone": "snapshot.Card.Signals[0].Tone",
-        "at": "2026-10-28T09:00:41Z"
+        "at": "2026-10-28T09:00:41Z",
+        "params": {
+          "snapshot.Card.Signals[0].Params.key": "snapshot.Card.Signals[0].Params.value"
+        },
+        "notes": [
+          {
+            "code": "snapshot.Card.Signals[0].Notes[0].Code",
+            "tone": "snapshot.Card.Signals[0].Notes[0].Tone",
+            "params": {
+              "snapshot.Card.Signals[0].Notes[0].Params.key": "snapshot.Card.Signals[0].Notes[0].Params.value"
+            }
+          }
+        ]
       }
     ],
     "last_human": {
@@ -53,7 +65,7 @@
         ]
       },
       "what": "snapshot.Card.LastHuman.What",
-      "at": "2026-10-28T09:00:50Z",
+      "at": "2026-10-28T09:01:00Z",
       "link": "snapshot.Card.LastHuman.Link"
     },
     "why": "snapshot.Card.Why",
@@ -66,7 +78,7 @@
         ]
       }
     ],
-    "since": "2026-10-28T09:00:59Z",
+    "since": "2026-10-28T09:01:09Z",
     "link": "snapshot.Card.Link",
     "turns_link": "snapshot.Card.TurnsLink",
     "started_by_me": true,
@@ -112,7 +124,7 @@
         },
         "ref": "snapshot.Items[0].Origin.Ref",
         "permalink": "snapshot.Items[0].Origin.Permalink",
-        "at": "2026-10-28T09:01:35Z"
+        "at": "2026-10-28T09:01:45Z"
       },
       "requester": {
         "key": "snapshot.Items[0].Requester.Key",
@@ -137,7 +149,7 @@
         },
         "ref": "snapshot.Items[0].AssignedAt.Ref",
         "permalink": "snapshot.Items[0].AssignedAt.Permalink",
-        "at": "2026-10-28T09:01:53Z"
+        "at": "2026-10-28T09:02:03Z"
       },
       "basis": "snapshot.Items[0].Basis",
       "waiting_on": [
@@ -160,7 +172,7 @@
           },
           "ref": "snapshot.Items[0].Evidence.Anchor.Ref",
           "permalink": "snapshot.Items[0].Evidence.Anchor.Permalink",
-          "at": "2026-10-28T09:02:11Z"
+          "at": "2026-10-28T09:02:21Z"
         }
       },
       "trail": [
@@ -173,7 +185,7 @@
             },
             "ref": "snapshot.Items[0].Trail[0].Anchor.Ref",
             "permalink": "snapshot.Items[0].Trail[0].Anchor.Permalink",
-            "at": "2026-10-28T09:02:21Z"
+            "at": "2026-10-28T09:02:31Z"
           }
         }
       ],
@@ -182,26 +194,26 @@
       "provenance": "snapshot.Items[0].Provenance",
       "confirmed": true,
       "task_key": "snapshot.Items[0].TaskKey",
-      "user_at": "2026-10-28T09:02:27Z",
-      "created_at": "2026-10-28T09:02:28Z",
-      "updated_at": "2026-10-28T09:02:29Z"
+      "user_at": "2026-10-28T09:02:37Z",
+      "created_at": "2026-10-28T09:02:38Z",
+      "updated_at": "2026-10-28T09:02:39Z"
     }
   ],
   "facts": [
     {
       "name": "snapshot.Facts[0].Name",
       "value": {
-        "kind": 154,
+        "kind": 164,
         "bool": true,
-        "int": 156,
+        "int": 166,
         "string": "snapshot.Facts[0].Value.String",
         "list": [
           "snapshot.Facts[0].Value.List[0]"
         ],
-        "duration": 160,
-        "time": "2026-10-28T09:02:41Z",
-        "threshold": 162,
-        "unit": 163
+        "duration": 170,
+        "time": "2026-10-28T09:02:51Z",
+        "threshold": 172,
+        "unit": 173
       }
     }
   ],
@@ -209,7 +221,7 @@
     {
       "name": "snapshot.Signals[0].Name",
       "on": true,
-      "since": "2026-10-28T09:02:48Z"
+      "since": "2026-10-28T09:02:58Z"
     }
   ],
   "owes": [
@@ -225,19 +237,19 @@
     {
       "action": "snapshot.Offers[0].Action",
       "args": {
-        "n": 178
+        "n": 188
       }
     }
   ],
   "extraction": {
-    "pending": 181,
+    "pending": 191,
     "budget_hit": true,
-    "oldest": "2026-10-28T09:03:03Z"
+    "oldest": "2026-10-28T09:03:13Z"
   },
   "contexts": [
     "snapshot.Contexts[0]"
   ],
-  "due": "2026-10-28T09:03:06Z",
+  "due": "2026-10-28T09:03:16Z",
   "links": [
     {
       "url": "snapshot.Links[0].URL",
@@ -250,7 +262,7 @@
         },
         "ref": "snapshot.Links[0].Evidence.Ref",
         "permalink": "snapshot.Links[0].Evidence.Permalink",
-        "at": "2026-10-28T09:03:18Z"
+        "at": "2026-10-28T09:03:28Z"
       }
     }
   ],
