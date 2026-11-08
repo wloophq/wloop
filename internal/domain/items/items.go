@@ -153,10 +153,10 @@ type Evidence struct {
 }
 
 type Item struct {
-	ID         string      `json:"id"` // stable per unit: derived ids from the plugin's rule ("gh:review"), turn creates "t<hash8>.<i>", others "i<N>"
-	Unit       unit.Unit   `json:"unit"`
-	Kind       Kind        `json:"kind"`
-	Summary    string      `json:"summary"` // <= 300
+	ID      string    `json:"id"` // stable per unit: derived ids from the plugin's rule ("gh:review"), turn creates "t<hash8>.<i>", others "i<N>"
+	Unit    unit.Unit `json:"unit"`
+	Kind    Kind      `json:"kind"`
+	Summary string    `json:"summary"` // <= 300
 	// Ask is the item said to whom it waits on, in the voice of the user who sends it, <= 300; empty when
 	// the source wrote none.
 	Ask        string      `json:"ask,omitempty"`

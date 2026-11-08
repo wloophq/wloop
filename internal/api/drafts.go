@@ -55,9 +55,9 @@ type Draft struct {
 	Edited   bool        `json:"edited"`
 	Origin   DraftOrigin `json:"origin"`
 	// State is where its delivery stands: held while its gate is open, queued, sending, sent, failed or dropped.
-	State     string `json:"state"`
-	Error     string `json:"error"`
-	Reason    string `json:"reason"`
+	State  string `json:"state"`
+	Error  string `json:"error"`
+	Reason string `json:"reason"`
 	// ReasonText is Reason in the profile's words (gates.toml's drafts.reasons) for a dropped draft; "" when
 	// it words none.
 	ReasonText string `json:"reason_text,omitempty"`

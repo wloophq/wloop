@@ -103,7 +103,7 @@ func draftData(data draftTextData, sub draftSubject, person items.Person, its []
 	}
 	for _, it := range its {
 		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),
-			Ask: strings.Join(strings.Fields(it.Ask), " "),
+			Ask:        strings.Join(strings.Fields(it.Ask), " "),
 			Resolution: string(it.Resolution), State: string(it.State), Permalink: it.Origin.Permalink,
 			Asked: in(it.CreatedAt), Updated: in(it.UpdatedAt)})
 		if a := in(it.CreatedAt); !a.IsZero() && (data.Since.IsZero() || a.Before(data.Since)) {

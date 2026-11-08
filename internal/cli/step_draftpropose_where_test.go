@@ -129,7 +129,9 @@ func writeFileOf(t testing.TB, r *draftRig, workflowName, name, body string) {
 	}
 }
 
-func (r *draftRig) workflows() []workflow.Workflow { return append([]workflow.Workflow{r.wf}, r.others...) }
+func (r *draftRig) workflows() []workflow.Workflow {
+	return append([]workflow.Workflow{r.wf}, r.others...)
+}
 
 // sweepSteps passes each of the rig's workflows over u as a sweep does: a step that refuses stops its run.
 func (r *draftRig) sweepSteps(u unit.Unit) {

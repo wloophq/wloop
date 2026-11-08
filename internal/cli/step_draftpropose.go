@@ -112,10 +112,10 @@ func (d *draftDeps) outbox() (draftOutbox, error) {
 // draftArgs are draft.propose's arguments with their defaults.
 type draftArgs struct {
 	purpose, text, why, reaction, items, per, target, to string
-	delivery                                         draft.Delivery
-	effects                                          []string
-	repeatAfter, repeatAfterSent                     time.Duration
-	forever, holdEnded                               bool
+	delivery                                             draft.Delivery
+	effects                                              []string
+	repeatAfter, repeatAfterSent                         time.Duration
+	forever, holdEnded                                   bool
 }
 
 const (
