@@ -392,6 +392,25 @@ func (s *Service) hider() func(task.Task) bool {
 	}
 }
 
+// Stored are the stored tasks of ids, from the pass ctx carries, else the pass every reader shares; an id no
+// stored task holds is left out.
+func (s *Service) Stored(ctx context.Context, ids []task.ID) (map[task.ID]task.Task, error) {
+	pass, ok := PassOf(ctx)
+	if !ok {
+		var err error
+		if pass, err = s.pass(ctx); err != nil {
+			return nil, err
+		}
+	}
+	out := make(map[task.ID]task.Task, len(ids))
+	for _, id := range ids {
+		if e, ok := pass.Task(id); ok {
+			out[id] = e
+		}
+	}
+	return out, nil
+}
+
 // Task reads id from the ViewSource its prefix names, or the store.
 func (s *Service) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	if src, ok := s.sourceOf(id); ok {

@@ -204,7 +204,7 @@ func (s *Server) gatePlan(ctx context.Context, g gate.Gate) *api.PlanItem {
 	if p == nil || g.Subject == "" {
 		return nil
 	}
-	it, found, err := s.pendingItem(ctx, p, g.Subject)
+	v, found, err := s.pendingView(ctx, p, g.Subject)
 	if err != nil {
 		s.logf("plan gate %d: its item: %v", g.ID, err)
 		return nil
@@ -212,47 +212,44 @@ func (s *Server) gatePlan(ctx context.Context, g gate.Gate) *api.PlanItem {
 	if !found {
 		return nil
 	}
-	v := s.planItemView(it, s.presentations([]unit.Unit{it.Unit})[it.Unit])
 	return &v
 }
 
-// pendingItem is the pending plan item id, read with every other pending item once per request when ctx asks
-// for it, else on its own.
-func (s *Server) pendingItem(ctx context.Context, p Plan, id string) (workflow.Item, bool, error) {
-	all := func() (map[string]workflow.Item, error) {
-		its, err := p.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
-		out := make(map[string]workflow.Item, len(its))
-		for _, it := range its {
-			out[it.ID] = it
+// pendingView is the pending plan item id as the API serves it without its actions, built with every other
+// pending item once per request when ctx asks for it, else on its own.
+func (s *Server) pendingView(ctx context.Context, p Plan, id string) (api.PlanItem, bool, error) {
+	views := func(f automation.Filter) (map[string]api.PlanItem, error) {
+		its, err := p.Items(ctx, f)
+		out := make(map[string]api.PlanItem, len(its))
+		for _, v := range s.planViews(ctx, its, s.presentations(itemUnits(its))) {
+			out[v.ID] = v
 		}
 		return out, err
 	}
-	var pending map[string]workflow.Item
+	pending := automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}}
+	var got map[string]api.PlanItem
 	var err error
 	if r, ok := ctx.Value(planReadsKey{}).(*planReads); ok {
-		r.once.Do(func() { r.pending, r.err = all() })
-		pending, err = r.pending, r.err
+		r.once.Do(func() { r.pending, r.err = views(pending) })
+		got, err = r.pending, r.err
 	} else if _, ok := coretasks.PassOf(ctx); ok {
-		pending, err = coretasks.Once(ctx, passPendingItems, all)
+		got, err = coretasks.Once(ctx, passPendingItems, func() (map[string]api.PlanItem, error) { return views(pending) })
 	} else {
-		its, err := p.Items(ctx, automation.Filter{ID: id, Decisions: []workflow.Decision{workflow.DecisionPending}})
-		if err != nil || len(its) == 0 {
-			return workflow.Item{}, false, err
-		}
-		return its[0], true, nil
+		pending.ID = id
+		got, err = views(pending)
 	}
-	it, ok := pending[id]
-	return it, ok, err
+	v, ok := got[id]
+	return v, ok, err
 }
 
 const passPendingItems = "daemon.pending_items"
 
 type planReadsKey struct{}
 
-// planReads are the pending plan items one request read, once.
+// planReads are the pending plan items one request read, once, as the API serves them.
 type planReads struct {
 	once    sync.Once
-	pending map[string]workflow.Item
+	pending map[string]api.PlanItem
 	err     error
 }
 

@@ -218,9 +218,9 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 // wirePlanItems are items as the API serves them, each unit presented as
 // known, from presentations, presents it.
 func (s *Server) wirePlanItems(ctx context.Context, items []workflow.Item, known map[unit.Unit]readmodel.Presentation) []api.PlanItem {
-	out := make([]api.PlanItem, len(items))
+	out := s.planViews(ctx, items, known)
 	for i, it := range items {
-		out[i] = s.wirePlanItem(ctx, it, known[it.Unit])
+		s.offer(ctx, it, &out[i])
 	}
 	return out
 }
@@ -240,6 +240,12 @@ func itemUnits(items []workflow.Item) []unit.Unit {
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := s.planItemView(it, shown)
+	s.offer(ctx, it, &p)
+	return p
+}
+
+// offer sets the actions p, item it as the API serves it, offers.
+func (s *Server) offer(ctx context.Context, it workflow.Item, p *api.PlanItem) {
 	var row []api.ActionState
 	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
 		slices.Contains(p.Steps, builtin.StepTurnStart) {
@@ -249,8 +255,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 			row = rd.Row.Actions
 		}
 	}
-	p.Actions = catalog.PlanStates(s.loaded(), p, row)
-	return p
+	p.Actions = catalog.PlanStates(s.loaded(), *p, row)
 }
 
 // planItemView is it as the API serves it, its unit presented as shown, without the actions it offers.
@@ -265,6 +270,16 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 	}
 	for _, st := range it.Steps {
 		p.Steps = append(p.Steps, st.Use)
+		ps := api.PlanStep{Use: st.Use, Reach: string(st.Reach)}
+		for k, v := range st.Args {
+			if text, ok := v.(string); ok {
+				if ps.Args == nil {
+					ps.Args = map[string]string{}
+				}
+				ps.Args[k] = text
+			}
+		}
+		p.Does = append(p.Does, ps)
 	}
 	if ev := it.Why.Event; ev != nil {
 		p.Why.Event = ev.Kind

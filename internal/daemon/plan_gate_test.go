@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"sync/atomic"
@@ -9,7 +10,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/automation"
+	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -45,22 +48,63 @@ func (p *itemsPlan) Release(context.Context, gate.Gate) error      { return nil 
 
 const doneReacted = "slack-done-reacted"
 
-// planGateRig is a pt-BR daemon with task t-0000000000000001 held by the open plan gate of a slack-done-reacted
-// item on it.
+// readItems is the items ledger counting its reads: by unit and by batch.
+type readItems struct {
+	l            *coreitems.Ledger
+	byUnit, load atomic.Int32
+}
+
+func (c *readItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
+	c.byUnit.Add(1)
+	return c.l.Items(ctx, u)
+}
+
+func (c *readItems) Load(ctx context.Context, us []unit.Unit) (map[unit.Unit][]items.Item, error) {
+	c.load.Add(1)
+	return c.l.Load(ctx, us)
+}
+
+// threadOf is the conversation task id was derived from.
+func threadOf(id task.ID) unit.Unit { return unit.Unit{Provider: "slack", Key: "T1/C1/" + string(id)} }
+
+// putDerived stores task id, derived from its thread's items: two open, which it holds, and one resolved.
+func putDerived(t testing.TB, r *tasksRig, id task.ID, title string) {
+	t.Helper()
+	th := threadOf(id)
+	at := unit.Anchor{Unit: th, Ref: "user:1"}
+	var ops []items.Op
+	for _, it := range []struct{ id, summary string }{{"i1", "Ana asks for the retry numbers"}, {"i2", "Bea asks when it ships"}, {"i3", "Cid thanked"}} {
+		ops = append(ops, items.Op{Op: items.OpCreate, Unit: th, Item: it.id, Anchor: at, Fields: &items.Fields{Kind: ptrOf(items.Todo), Summary: ptrOf(it.summary)}})
+	}
+	ops = append(ops, items.Op{Op: items.OpResolve, Unit: th, Item: "i3", Anchor: at, Resolution: items.Done})
+	if _, err := r.ledger.Apply(context.Background(), items.User, ops); err != nil {
+		t.Fatal(err)
+	}
+	r.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: title, Origin: task.OriginDerived, Units: []unit.Unit{th},
+		Items: []task.ItemRef{{Unit: th, Item: "i1"}, {Unit: th, Item: "i2"}, {Unit: th, Item: "i3"}}})
+}
+
+// planGateRig is a pt-BR daemon with task t-0000000000000001, derived from a thread's items, held by the open
+// plan gate of a slack-done-reacted item on it, which resolves its items as moot.
 func planGateRig(t testing.TB) (*tasksRig, *intentload.Loaded, gate.Gate) {
 	t.Helper()
 	pt := loadedIn(t, "pt-BR")
 	id := task.ID("t-0000000000000001")
 	u := task.UnitOf(id)
 	plan := &itemsPlan{items: []workflow.Item{{ID: doneReacted + "/task/t-0000000000000001/28f2c473", Workflow: doneReacted, Unit: u,
-		Decision: workflow.DecisionPending, Steps: []workflow.Step{{Use: "items.resolve"}},
+		Decision: workflow.DecisionPending, Steps: []workflow.Step{{Use: "items.resolve", Reach: workflow.ReachLocal, Args: map[string]any{"resolution": "moot"}}},
 		Why: workflow.Why{Trigger: workflow.TriggerSweep, Matched: []workflow.Fact{{Name: "task.items_open", Value: 2}}}}}}
+	var counted *readItems
 	r := newTasksRig(t, func(d *Deps) {
 		d.Intents = func() *intentload.Loaded { return pt }
 		d.Plan = plan
+		counted = &readItems{}
+		d.Items = counted
 	})
-	r.put(t, task.Task{ID: id, State: "next", Category: task.CategoryReady, Title: "answer Ada about the retries"},
-		task.Task{ID: "t-0000000000000009", State: "next", Category: task.CategoryReady, Title: "call Bea"})
+	counted.l = r.ledger
+
+	putDerived(t, r, id, "answer Ada about the retries")
+	r.put(t, task.Task{ID: "t-0000000000000009", State: "next", Category: task.CategoryReady, Title: "call Bea"})
 	r.withGates(t, "t-0000000000000009")
 	g, err := r.s.deps.Gates.Open(context.Background(), gate.Gate{Unit: u, Kind: gate.KindPlan, Subject: plan.items[0].ID}, nil)
 	if err != nil {
@@ -91,6 +135,66 @@ func wantPlanOf(t *testing.T, where string, g api.GateView, pt *intentload.Loade
 		t.Errorf("%s: steps %q", where, p.Steps)
 	case p.Actions != nil:
 		t.Errorf("%s: actions %+v, want none beside the gate's intents", where, p.Actions)
+	}
+	wantTargetAndSteps(t, where, *g.Plan, "t-0000000000000001", "answer Ada about the retries")
+}
+
+// wantTargetAndSteps says p acts on task id titled title, derived from its thread, and resolves its two open
+// items as moot.
+func wantTargetAndSteps(t *testing.T, where string, p api.PlanItem, id task.ID, title string) {
+	t.Helper()
+	switch tg := p.Target; {
+	case tg == nil:
+		t.Errorf("%s: no target", where)
+	case tg.Task != string(id) || tg.Title != title:
+		t.Errorf("%s: target %+v, want task %s titled %q", where, tg, id, title)
+	case len(tg.Units) != 1 || tg.Units[0].Label == "" || tg.Units[0].Label == "task:"+string(id):
+		t.Errorf("%s: target's conversations %+v, want its thread", where, tg.Units)
+	}
+	want := []api.PlanStep{{Use: "items.resolve", Reach: "local", Args: map[string]string{"resolution": "moot"},
+		Items: []string{"Ana asks for the retry numbers", "Bea asks when it ships"}}}
+	if mustJSON(t, p.Does) != mustJSON(t, want) {
+		t.Errorf("%s: does %s, want %s", where, mustJSON(t, p.Does), mustJSON(t, want))
+	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestThePlanSaysWhatEachItemDoesToItsTaskFromOneReadOfTheItems(t *testing.T) {
+	t.Parallel()
+	r, _, _ := planGateRig(t)
+	plan := r.s.deps.Plan.(*itemsPlan)
+	for i := range 3 {
+		id := task.ID(fmt.Sprintf("t-%016x", i+0x200))
+		putDerived(t, r, id, fmt.Sprintf("reply to Dan %d", i))
+		it := plan.items[0]
+		it.ID, it.Unit = doneReacted+"/task/"+string(id)+"/bb", task.UnitOf(id)
+		plan.items = append(plan.items, it)
+	}
+	reads := r.s.deps.Items.(*readItems)
+	reads.byUnit.Store(0)
+	reads.load.Store(0)
+	var res api.PlanResponse
+	if code := get(t, r.s, api.Plan, &res); code != 200 || len(res.Items) != 4 {
+		t.Fatalf("plan: %d %+v", code, res)
+	}
+	for _, it := range res.Items {
+		id, _ := task.IDOf(it.Unit)
+		title := "answer Ada about the retries"
+		if id != "t-0000000000000001" {
+			title = fmt.Sprintf("reply to Dan %d", int(id[len(id)-1]-'0'))
+		}
+		wantTargetAndSteps(t, it.ID, it, id, title)
+	}
+	if by, load := reads.byUnit.Load(), reads.load.Load(); by != 0 || load != 1 {
+		t.Errorf("the plan read the items %d times by unit and %d in batches, want one batch", by, load)
 	}
 }
 
