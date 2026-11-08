@@ -333,6 +333,66 @@ done({
 	}
 }
 
+func TestComposerOffersToAlsoSendAThreadReplyToTheConversation(t *testing.T) {
+	type side struct {
+		Label   string
+		Checked []bool
+		Posts   []any
+	}
+	run := func(served string) side {
+		t.Helper()
+		var got side
+		answers := pageAnswers(t)
+		e := pageTask(t)
+		e.ReplyBroadcast = served
+		answers["/api/tasks/"+e.ID] = e
+		runTaskPage(t, `
+let box = await page("t-0123456789abcdef");
+const toggle = (b) => walk(b, (x) => x.attrs["data-focus"] === "task:compose:broadcast")[0];
+const label = toggle(box) ? cls(box, "broadcast")[0].textContent : "";
+const checked = [];
+if (toggle(box)) checked.push("checked" in toggle(box).attrs);
+focus(box, "task:compose:text").on.input({ target: { value: "We ship Friday." } });
+await focus(box, "task:compose:draft").on.click();
+box = await page("t-0123456789abcdef");
+if (toggle(box)) {
+  toggle(box).on.change({ target: { checked: !("checked" in toggle(box).attrs) } });
+  box = await page("t-0123456789abcdef");
+  checked.push("checked" in toggle(box).attrs);
+}
+focus(box, "task:compose:text").on.input({ target: { value: "Merged." } });
+await focus(box, "task:compose:reply").on.click();
+done({ Label: label, Checked: checked, Posts: posts.map((p) => p.body.args) });`, answers, &got)
+		return got
+	}
+	on := run("on")
+	if strings.TrimSpace(on.Label) != "Also send to the conversation" || !slices.Equal(on.Checked, []bool{true, false}) {
+		t.Errorf("served on: label %q, checked %v", on.Label, on.Checked)
+	}
+	wantOn := []any{
+		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday.", "broadcast": "true"},
+		map[string]any{"kind": "reply", "send": "now", "text": "Merged.", "broadcast": "false"},
+	}
+	if mustJS(t, on.Posts) != mustJS(t, wantOn) {
+		t.Errorf("served on: posts %v, want %v", on.Posts, wantOn)
+	}
+	off := run("off")
+	if !slices.Equal(off.Checked, []bool{false, true}) {
+		t.Errorf("served off: checked %v", off.Checked)
+	}
+	none := run("")
+	if none.Label != "" || len(none.Checked) != 0 {
+		t.Errorf("no thread to broadcast from: the composer offers %q", none.Label)
+	}
+	wantNone := []any{
+		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."},
+		map[string]any{"kind": "reply", "send": "now", "text": "Merged."},
+	}
+	if mustJS(t, none.Posts) != mustJS(t, wantNone) {
+		t.Errorf("no thread: posts %v, want %v", none.Posts, wantNone)
+	}
+}
+
 // bundledViewIDs are the bundled profile's view ids, which no client logic may name.
 var bundledViewIDs = []string{"inbox", "needs-me", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
 
