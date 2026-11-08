@@ -21,25 +21,38 @@ type itemsLoader interface {
 
 // planViews are its as the API serves them, without their actions, each unit presented as known presents it: a
 // task's item names its task, by title, with the units the task came from, and says which open items an
-// items.resolve resolves. The tasks come from one pass and their units' items from one read.
+// items.resolve resolves, and a step naming another task names it by title. The tasks come from one pass and
+// their units' items from one read.
 func (s *Server) planViews(ctx context.Context, its []workflow.Item, known map[unit.Unit]readmodel.Presentation) []api.PlanItem {
 	out := make([]api.PlanItem, len(its))
 	for i, it := range its {
 		out[i] = s.planItemView(it, known[it.Unit])
 	}
-	tasks := s.planTasks(ctx, its)
+	tasks := s.planTasks(ctx, its, out)
 	if len(tasks) == 0 {
 		return out
 	}
+	targets := map[task.ID]task.Task{}
 	var units []unit.Unit
-	for _, e := range tasks {
-		units = append(units, e.Units...)
+	for _, it := range its {
+		id, _ := task.IDOf(it.Unit)
+		if e, ok := tasks[id]; ok {
+			targets[id] = e
+			units = append(units, e.Units...)
+		}
+	}
+	for i := range out {
+		for j, st := range out[i].Does {
+			if e, ok := tasks[task.ID(st.Args["task_id"])]; ok {
+				out[i].Does[j].Args["task_title"] = e.Title
+			}
+		}
 	}
 	shown := s.presentations(units)
-	held := s.openItemsOf(ctx, tasks)
+	held := s.openItemsOf(ctx, targets)
 	for i, it := range its {
 		id, _ := task.IDOf(it.Unit)
-		e, ok := tasks[id]
+		e, ok := targets[id]
 		if !ok {
 			continue
 		}
@@ -65,8 +78,8 @@ func waits(it workflow.Item) bool {
 	return it.Decision == workflow.DecisionPending || it.Decision == workflow.DecisionBlocked || it.Decision == workflow.DecisionDeferred
 }
 
-// planTasks are the stored tasks the items of its act on.
-func (s *Server) planTasks(ctx context.Context, its []workflow.Item) map[task.ID]task.Task {
+// planTasks are the stored tasks the items of its act on and those their steps, views, name.
+func (s *Server) planTasks(ctx context.Context, its []workflow.Item, views []api.PlanItem) map[task.ID]task.Task {
 	if s.deps.Tasks == nil {
 		return nil
 	}
@@ -74,6 +87,13 @@ func (s *Server) planTasks(ctx context.Context, its []workflow.Item) map[task.ID
 	for _, it := range its {
 		if id, ok := task.IDOf(it.Unit); ok {
 			ids = append(ids, id)
+		}
+	}
+	for _, v := range views {
+		for _, st := range v.Does {
+			if id := st.Args["task_id"]; id != "" {
+				ids = append(ids, task.ID(id))
+			}
 		}
 	}
 	if len(ids) == 0 {

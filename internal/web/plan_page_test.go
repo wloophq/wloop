@@ -115,6 +115,26 @@ func TestAStepThatPostsSaysSoAndAnUnknownStepReadsAsItIs(t *testing.T) {
 	}
 }
 
+func TestAStepsArgumentsReadAsAPersonReadsThem(t *testing.T) {
+	it := quietClose()
+	it.Does = []api.PlanStep{
+		{Use: "turn.start", Args: map[string]string{"intent": "act", "intent_label": "Act on its items"}},
+		{Use: "task.verb", Reach: "local", Args: map[string]string{"verb": "next"}},
+		{Use: "task.verb", Reach: "local", Args: map[string]string{"verb": "relate", "task": "task.link_target_tasks", "task_id": "t-2", "task_title": "The other half"}},
+		{Use: "task.set", Reach: "local", Args: map[string]string{"prop": "size", "value": "m"}},
+	}
+	cat := taskCatalog()
+	cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: "next", Label: "Next"}, api.VerbSpec{Verb: "relate", Label: "Relate"})
+	cat.Facets = []api.FacetSpec{{ID: "size", Label: "Size", Fact: "task.prop.size", Labels: map[string]string{"m": "Medium"}}}
+	var got planShape
+	runPlanPage(t, "pt-BR", `tasksState.catalog = input.cat;
+process.stdout.write(JSON.stringify(shape(planItem(input.it))));`, map[string]any{"it": it, "cat": cat}, &got)
+	want := []string{"Iniciar um turno do agente: Act on its items", "Executar Next na tarefa", "Executar Relate na tarefa, com “The other half”", "Definir Size como Medium"}
+	if !slices.Equal(got.Does, want) {
+		t.Errorf("does %q, want %q", got.Does, want)
+	}
+}
+
 func TestTheQueuesPlanGateShowsTheSameTargetAndItems(t *testing.T) {
 	p := quietClose()
 	g := planGate(&p)

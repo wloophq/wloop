@@ -409,6 +409,30 @@ func TestAnItemThatRanListsNoOpenItemsAsOfNow(t *testing.T) {
 	}
 }
 
+func TestThePlanNamesWhatAStepsArgumentsName(t *testing.T) {
+	t.Parallel()
+	r, pt, _ := planGateRig(t)
+	plan := r.s.deps.Plan.(*itemsPlan)
+	putDerived(t, r, "t-0000000000000002", "the other half of the retries")
+	plan.items[0].Steps = []workflow.Step{
+		{Use: "turn.start", Args: map[string]any{"intent": "act"}},
+		{Use: "task.verb", Reach: workflow.ReachLocal, Args: map[string]any{"verb": "relate", "task": "task.link_target_tasks"}},
+	}
+	plan.items[0].Why.Matched = append(plan.items[0].Why.Matched, workflow.Fact{Name: "task.link_target_tasks", Value: []string{"t-0000000000000002"}})
+	var res api.PlanResponse
+	if code := get(t, r.s, api.Plan, &res); code != 200 || len(res.Items) != 1 {
+		t.Fatalf("plan: %d %+v", code, res)
+	}
+	act, ok := pt.Registry.Get("act")
+	if !ok || act.Label == "" {
+		t.Fatal("no act intent")
+	}
+	does := res.Items[0].Does
+	if len(does) != 2 || does[0].Args["intent_label"] != act.Label || does[1].Args["task_title"] != "the other half of the retries" {
+		t.Errorf("does %+v, want the intent's label and the related task's title", does)
+	}
+}
+
 func TestAPlanGateWhosePlanLeftServesNoPlan(t *testing.T) {
 	t.Parallel()
 	r, _, g := planGateRig(t)

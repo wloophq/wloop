@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/round"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -279,6 +280,14 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 				ps.Args[k] = text
 			}
 		}
+		if name := ps.Args["intent"]; name != "" && l.Registry != nil {
+			if def, ok := l.Registry.Get(dintent.Name(name)); ok && def.Label != "" {
+				ps.Args["intent_label"] = def.Label
+			}
+		}
+		if id := factTask(it.Why.Matched, ps.Args["task"]); id != "" {
+			ps.Args["task_id"] = id
+		}
 		p.Does = append(p.Does, ps)
 	}
 	if ev := it.Why.Event; ev != nil {
@@ -298,6 +307,28 @@ func (s *Server) planItemView(it workflow.Item, shown readmodel.Presentation) ap
 		}
 	}
 	return p
+}
+
+// factTask is the task id the matched fact named fact holds, a string or a list's first element; "" when the item
+// did not read it.
+func factTask(matched []workflow.Fact, fact string) string {
+	if fact == "" {
+		return ""
+	}
+	for _, f := range matched {
+		if f.Name != fact {
+			continue
+		}
+		switch v := f.Value.(type) {
+		case string:
+			return v
+		case []string:
+			if len(v) > 0 {
+				return v[0]
+			}
+		}
+	}
+	return ""
 }
 
 // dropPending discards u's pending plan items without marking them handled.

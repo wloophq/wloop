@@ -136,7 +136,7 @@ const STEP_WORDS = {
   "draft.propose": (a) => t("Draft a message you approve before it posts", a),
   "classify": (a) => t("Classify it with an agent call", a),
   "notify.self": (a) => t("Notify you", a),
-  "task.verb": (a) => t("{verb} the task", a),
+  "task.verb": (a) => (a.task ? t("Run {verb} on the task, with “{task}”", a) : t("Run {verb} on the task", a)),
   "gate.open": (a) => t("Ask you to decide", a),
   "items.resolve": (a) => t("Resolve its open items as {resolution}", a),
   "task.set": (a) => t("Set {prop} to {value}", a),
@@ -163,7 +163,8 @@ function stepText(st) {
   const res = args.resolution || "done";
   const prop = args.prop ? taskFacetOf("task.prop." + args.prop) : null;
   return words({ ...args, resolution: Object.hasOwn(RESOLUTION_WORDS, res) ? RESOLUTION_WORDS[res]() : res,
-    verb: args.verb ? verbLabel(args.verb) : "", prop: prop ? prop.label : args.prop || "" });
+    intent: args.intent_label || args.intent || "", task: args.task_title || "",
+    verb: args.verb ? verbLabel(args.verb) : "", prop: prop ? prop.label : args.prop || "", value: propText(args.value, prop) });
 }
 
 // PLAN_DRAFTS are the steps whose message posts once you approve its draft: applying them posts later.
