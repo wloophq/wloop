@@ -512,6 +512,13 @@ type overlay struct {
 	help  bool
 	// pick is set on a picker of another task, whose text narrows its items.
 	pick *taskPick
+	// text is a text shown whole, wrapped to the screen, in place of items.
+	text string
+}
+
+// ShowText shows text whole over the list until a key closes it.
+func (m *Model) ShowText(text string) {
+	m.overlay = &overlay{title: m.w().T("Copy this text", nil), text: text, help: true}
 }
 
 type paletteItem struct {
@@ -706,6 +713,20 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 		hint = m.w().T("any key closes", nil)
 	} else if o.at < len(o.items) && o.items[o.at].about != "" {
 		hint = o.items[o.at].about + " · " + hint
+	}
+	if o.text != "" {
+		var out []string
+		for _, l := range strings.Split(o.text, "\n") {
+			wrapped := termfmt.Wrap(l, width-2, width-2)
+			if len(wrapped) == 0 {
+				wrapped = []string{""}
+			}
+			for _, w := range wrapped {
+				out = append(out, "  "+w)
+			}
+		}
+		lines = append(lines, window(out, 0, body-2)...)
+		return append(lines, "  "+t.Dim(termfmt.Cut(hint, width-2)))
 	}
 	keyW := 0
 	for _, it := range o.items {

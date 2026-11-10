@@ -404,23 +404,25 @@ const document = { getElementById: () => null };
 ` + keyJS(t) + jsConst(t, src, "API_VERSION")
 }
 
-var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "copied", "act"}
+var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied", "act"}
 
 func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	var got struct {
 		Writes  []map[string]string
 		Notices []string
+		Error   string
+		Detail  string
 	}
 	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
   const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true }] };
   state.specs.byId.copy_review_request = { id: "copy_review_request", copies: true };
   answer.body = { ok: true, copy: { text: "review, pls? `+"`x`"+`", html: "review, pls? <code>x</code>" }, output: ["Copied the review request for acme/api#7; paste it in a chat."] };
   await act(row, "copy_review_request");
-  answer.body = { ok: true, copy: { text: "a & b" } };
+  answer.body = { ok: true, copy: { text: "a & b" }, output: ["copied a & b"] };
   await act(row, "copy_review_request");
   clipboard.refuse = "denied";
   await act(row, "copy_review_request");
-  process.stdout.write(JSON.stringify({ writes: clipboard.writes, notices: notices.filter((n) => !n.startsWith("copy_review_request:")) }));
+  process.stdout.write(JSON.stringify({ writes: clipboard.writes, notices: notices.filter((n) => !n.startsWith("copy_review_request:")), error: state.actionError, detail: state.actionDetail }));
 })();`, nil, &got)
 	wantWrites := []map[string]string{
 		{"text": "review, pls? `x`", "html": "review, pls? <code>x</code>"},
@@ -429,9 +431,12 @@ func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	if !reflect.DeepEqual(got.Writes, wantWrites) {
 		t.Errorf("clipboard %v, want %v", got.Writes, wantWrites)
 	}
-	wantNotices := []string{"Copied the review request for acme/api#7; paste it in a chat.", "Copied", "! Could not copy: denied"}
+	wantNotices := []string{"Copied the review request for acme/api#7; paste it in a chat.", "copied a & b", ""}
 	if !reflect.DeepEqual(got.Notices, wantNotices) {
 		t.Errorf("notices %v, want %v", got.Notices, wantNotices)
+	}
+	if got.Error != "Could not copy: denied" || got.Detail != "a & b" {
+		t.Errorf("a refused write shows %q with %q, want the error and the text to copy by hand", got.Error, got.Detail)
 	}
 }
 
@@ -1256,7 +1261,7 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 }
 
 var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote",
-	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "copied"}
+	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)

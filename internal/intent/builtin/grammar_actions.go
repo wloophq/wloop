@@ -32,6 +32,10 @@ func actionValues(names []string) func() []Value {
 	}
 }
 
+// CopyActions are the built-in actions whose only effect is the copy their actions.toml table words, the only
+// tables a copy may sit in.
+var CopyActions = []string{"copy_review_request"}
+
 // actionsGrammar is the keys of an intent's [action] and of actions.toml.
 var actionsGrammar = []Key{
 	{Path: "action", In: SurfaceIntent, Kind: KindTable, Doc: "How the intent's action is offered on a row; its description is the intent's summary."},
@@ -57,8 +61,8 @@ var actionsGrammar = []Key{
 	{Path: "*.input", In: SurfaceActions, Kind: KindTable, Doc: "The text the action asks for."},
 	{Path: "*.input.label", In: SurfaceActions, Localized: true, Kind: KindText, Doc: "The input's name."},
 	{Path: "*.input.help", In: SurfaceActions, Localized: true, Kind: KindText, Doc: "What to write, shown in the empty input."},
-	{Path: "*.copy", In: SurfaceActions, Kind: KindTable, Doc: "What running the action gives the person to paste elsewhere: the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title \"`\" \"'\"}}`)."},
+	{Path: "*.copy", In: SurfaceActions, Kind: KindTable, Doc: "What running the action gives the person to paste elsewhere, on an action whose only effect is its copy (copy_review_request): the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title \"`\" \"'\"}}`)."},
 	{Path: "*.copy.text", In: SurfaceActions, Localized: true, Kind: KindTemplate, Required: true, Doc: "The plain text copied, over the copy facts. Required."},
 	{Path: "*.copy.html", In: SurfaceActions, Localized: true, Kind: KindTemplate, Doc: "The same text formatted as HTML, which a rich paste target reads; empty copies the plain text alone."},
-	{Path: "*.copy.notice", In: SurfaceActions, Localized: true, Kind: KindTemplate, Doc: "What the client says once it copied, over the copy facts."},
+	{Path: "*.copy.notice", In: SurfaceActions, Localized: true, Kind: KindTemplate, Required: true, Doc: "What the client says once it copied, over the copy facts. Required."},
 }

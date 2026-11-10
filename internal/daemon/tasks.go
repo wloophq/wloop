@@ -972,9 +972,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		if err := ev.cards(ctx, e, &v); err != nil {
 			return api.TaskView{}, err
 		}
-		if err := ev.unitActions(ctx, e, &v); err != nil {
-			return api.TaskView{}, err
-		}
+		ev.unitActions(ctx, e, &v)
 		runs, err := ev.s.runViews(ctx, task.UnitOf(e.ID))
 		if err != nil {
 			return api.TaskView{}, err
@@ -1245,23 +1243,20 @@ func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) e
 }
 
 // unitActions are the actions the rows of e's units offer on a task's page.
-func (ev *taskViewer) unitActions(ctx context.Context, e task.Task, v *api.TaskView) error {
-	specs := ev.s.servedSpecs()
-	onTask := func(st api.ActionState) bool {
-		i := slices.IndexFunc(specs, func(sp api.ActionSpec) bool { return sp.ID == st.ID })
-		return i >= 0 && slices.Contains(specs[i].Surfaces, catalog.SurfaceTask)
+func (ev *taskViewer) unitActions(ctx context.Context, e task.Task, v *api.TaskView) {
+	onTask := map[string]bool{}
+	for _, sp := range ev.s.servedSpecs() {
+		onTask[sp.ID] = slices.Contains(sp.Surfaces, catalog.SurfaceTask)
 	}
+	rows := ev.rowsOf(ctx, e.Units)
 	for _, u := range e.Units {
-		rd, ok, err := ev.s.readRow(ctx, u)
-		if err != nil {
-			return err
-		}
+		rd, ok := rows[u]
 		if !ok {
 			continue
 		}
 		var acts []api.ActionState
 		for _, st := range rd.Row.Actions {
-			if onTask(st) {
+			if onTask[st.ID] {
 				acts = append(acts, st)
 			}
 		}
@@ -1269,7 +1264,6 @@ func (ev *taskViewer) unitActions(ctx context.Context, e task.Task, v *api.TaskV
 			v.UnitActions = append(v.UnitActions, api.UnitActions{Unit: u, Label: rd.Row.Label, Actions: acts})
 		}
 	}
-	return nil
 }
 
 // verbs are the verbs of the catalog as they stand on e: refused all over on a disabled plugin's unit, taken by

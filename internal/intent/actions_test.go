@@ -130,3 +130,33 @@ func TestAnEmptyWhyFailsAtLoad(t *testing.T) {
 		t.Errorf("%s", got)
 	}
 }
+
+func TestACopySitsOnlyOnAnActionThatCopies(t *testing.T) {
+	got := actionsProblems(t, string(defaultProfile()), "[pause.copy]\ntext = \"x\"\nnotice = \"y\"\n")
+	if !strings.Contains(got, "pause.copy: gives nothing to copy: only copy_review_request copy") {
+		t.Errorf("%s", got)
+	}
+}
+
+func TestACopySaysWhatItCopied(t *testing.T) {
+	for _, user := range []string{"[copy_review_request.copy]\nnotice = \"\"\n", "[copy_review_request.copy]\ntext = \"\"\n"} {
+		if got := actionsProblems(t, string(defaultProfile()), user); !strings.Contains(got, "may not be empty") {
+			t.Errorf("%q: %s", user, got)
+		}
+	}
+	bundled := strings.Replace(string(defaultProfile()), "notice = \"Copied the review request for {{.copy.label}}; paste it in a chat.\"\n", "", 1)
+	_, problems := loadActions(nil, readerOf(fstest.MapFS{ActionsFile: {Data: []byte(bundled)}}))
+	if problems == nil || !strings.Contains(problems.Error(), "copy_review_request.copy.notice: is required") {
+		t.Errorf("%v", problems)
+	}
+}
+
+func TestAnActionThatCopiesNeedsItsCopy(t *testing.T) {
+	start := strings.Index(string(defaultProfile()), "[copy_review_request.copy]")
+	end := strings.Index(string(defaultProfile()), "[intake_without]")
+	bundled := string(defaultProfile())[:start] + string(defaultProfile())[end:]
+	_, problems := loadActions(nil, readerOf(fstest.MapFS{ActionsFile: {Data: []byte(bundled)}}))
+	if problems == nil || !strings.Contains(problems.Error(), "copy_review_request.copy: is missing") {
+		t.Errorf("%v", problems)
+	}
+}

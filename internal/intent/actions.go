@@ -93,6 +93,8 @@ func loadActions(layers []profile.Layer, r layerReader) (map[string]BuiltinActio
 			problems = append(problems, Problem{File: ActionsFile, Field: id + ".label", Msg: "is required"})
 		case a.Summary == "":
 			problems = append(problems, Problem{File: ActionsFile, Field: id + ".summary", Msg: "is required"})
+		case slices.Contains(builtin.CopyActions, id) && !a.Copies():
+			problems = append(problems, Problem{File: ActionsFile, Field: id + ".copy", Msg: "is missing: the action's only effect is its copy"})
 		}
 	}
 	return out, problems
@@ -171,6 +173,10 @@ func (s *sheet) overCopy(id string, a *BuiltinAction, t *mActionCopy) {
 	if t == nil {
 		return
 	}
+	if !slices.Contains(builtin.CopyActions, id) {
+		s.add(id+".copy", "gives nothing to copy: only %s copy", strings.Join(builtin.CopyActions, ", "))
+		return
+	}
 	if a.Copy == nil {
 		a.Copy = map[string]*template.Template{}
 	}
@@ -181,8 +187,8 @@ func (s *sheet) overCopy(id string, a *BuiltinAction, t *mActionCopy) {
 		path := id + ".copy." + name
 		switch {
 		case v == nil:
-		case *v == "" && name == "text":
-			s.add(path, "may not be empty: a copy copies a text")
+		case *v == "" && name != "html":
+			s.add(path, "may not be empty: a copy copies a text and says so")
 		case *v == "":
 			delete(a.Copy, name)
 		default:
@@ -195,7 +201,9 @@ func (s *sheet) overCopy(id string, a *BuiltinAction, t *mActionCopy) {
 			a.Copy[name] = tmpl
 		}
 	}
-	if a.Copy["text"] == nil && len(a.Copy) > 0 {
-		s.add(id+".copy.text", "is required")
+	for _, name := range []string{"text", "notice"} {
+		if a.Copy[name] == nil {
+			s.add(id+".copy."+name, "is required")
+		}
 	}
 }

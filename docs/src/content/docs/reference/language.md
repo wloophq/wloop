@@ -195,10 +195,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>.input` (table): The text the action asks for.
 - `<name>.input.label` (string, localized): The input's name.
 - `<name>.input.help` (string, localized): What to write, shown in the empty input.
-- `<name>.copy` (table): What running the action gives the person to paste elsewhere: the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title "`" "'"}}`).
+- `<name>.copy` (table): What running the action gives the person to paste elsewhere, on an action whose only effect is its copy (copy_review_request): the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title "`" "'"}}`).
 - `<name>.copy.text` (template, localized): The plain text copied, over the copy facts. Required.
 - `<name>.copy.html` (template, localized): The same text formatted as HTML, which a rich paste target reads; empty copies the plain text alone.
-- `<name>.copy.notice` (template, localized): What the client says once it copied, over the copy facts.
+- `<name>.copy.notice` (template, localized): What the client says once it copied, over the copy facts. Required.
 
 ## Tasks: properties, states and verbs (`tasks.toml`)
 

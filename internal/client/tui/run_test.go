@@ -917,14 +917,30 @@ func TestAnActionThatCopiesCopiesOrShowsItsText(t *testing.T) {
 		copied = append(copied, text)
 		return nil
 	}
-	lines, _, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
-	if err != nil || !slices.Equal(lines, []string{"copied"}) || len(copied) != 1 || !strings.HasPrefix(copied[0], "review, pls?") {
-		t.Fatalf("with a clipboard: %v %v %v", lines, copied, err)
+	got, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
+	if err != nil || !slices.Equal(got.lines, []string{"copied"}) || got.show != "" || len(copied) != 1 || !strings.HasPrefix(copied[0], "review, pls?") {
+		t.Fatalf("with a clipboard: %+v %v %v", got, copied, err)
 	}
 	for _, clip := range []func(string) error{nil, func(string) error { return errors.New("no clipboard") }} {
-		lines, _, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
-		if err != nil || !slices.Equal(lines, []string{"review, pls? `x`", "https://github.com/acme/api/pull/7"}) {
-			t.Errorf("without a clipboard: %v %v", lines, err)
+		got, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
+		if err != nil || got.show != "review, pls? `x`\nhttps://github.com/acme/api/pull/7" || len(got.lines) != 0 {
+			t.Errorf("without a clipboard: %+v %v", got, err)
 		}
+	}
+}
+
+func TestATextToCopyShowsWholeOverTheList(t *testing.T) {
+	t.Parallel()
+	m := NewModel()
+	m.ShowText("review, pls? `Batch export`\nhttps://github.com/acme/api/pull/7\n\n*Goal:*\nExport the report in batches so that a large account no longer times out")
+	screen := strings.Join(m.Render(40, 20, time.Unix(0, 0)), "\n")
+	for _, want := range []string{"review, pls? `Batch export`", "https://github.com/acme/api/pull/7", "*Goal:*", "no longer times out"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("the screen lacks %q:\n%s", want, screen)
+		}
+	}
+	m.Key(Key{Rune: 'x'})
+	if m.overlay != nil {
+		t.Error("a key leaves the text open")
 	}
 }

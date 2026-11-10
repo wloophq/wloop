@@ -148,8 +148,11 @@ type finished struct {
 // for a detail the drafts made for its task.
 type carried struct {
 	// note is the terminal's own line in the model's words; lines are the daemon's.
-	note   func(*texts.Catalog) string
-	lines  []string
+	note  func(*texts.Catalog) string
+	lines []string
+	// show is a text to read whole, which the terminal shows over the list: what an action gave to copy
+	// that no clipboard took.
+	show   string
 	task   api.TaskView
 	drafts []api.Draft
 	// matched are the open tasks a match command read.
@@ -290,6 +293,9 @@ func Run(ctx context.Context, cfg Config) error {
 					lines = append([]string{f.note(m.w())}, lines...)
 				}
 				m.Done(f.cmd, lines, f.err)
+				if f.show != "" {
+					m.ShowText(f.show)
+				}
 			}
 			if leaving {
 				if running == 0 {
@@ -916,8 +922,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		}
 		return carried{note: func(w *texts.Catalog) string { return w.T("the review is done", nil) }}, nil
 	}
-	lines, said, err := carryAction(ctx, d, c, cfg.Copy)
-	return carried{lines: lines, note: said}, err
+	return carryAction(ctx, d, c, cfg.Copy)
 }
 
 // openLink opens the command's link, looking it up first from the task's
@@ -953,37 +958,28 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 }
 
 // carryAction takes a plan action to its item, any other to its unit.
-func carryAction(ctx context.Context, d Daemon, c Command, copyText func(string) error) ([]string, func(*texts.Catalog) string, error) {
+func carryAction(ctx context.Context, d Daemon, c Command, copyText func(string) error) (carried, error) {
 	if act, ok := planActs[c.Action]; ok && c.PlanID != "" {
 		res, err := d.ActOnPlan(ctx, api.PlanActRequest{IDs: []string{c.PlanID}, Action: act, Guidance: c.Req.Guidance})
 		switch {
 		case err != nil:
-			return nil, nil, err
+			return carried{}, err
 		case len(res.Errors) > 0:
-			return nil, nil, errors.New(strings.Join(res.Errors, "; "))
+			return carried{}, errors.New(strings.Join(res.Errors, "; "))
 		case len(res.Items) == 0:
-			return nil, nil, nil
+			return carried{}, nil
 		}
 		it := res.Items[0]
-		return []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}, nil, nil
+		return carried{lines: []string{strings.TrimSuffix(it.Decision+": "+it.Reason, ": ")}}, nil
 	}
 	res, err := d.Ask(ctx, c.Unit, c.Action, c.Req)
-	if res.Intake != nil {
-		return nil, acceptedLine(*res.Intake), err
+	switch {
+	case res.Intake != nil:
+		return carried{note: acceptedLine(*res.Intake)}, err
+	case res.Copy != nil && (copyText == nil || copyText(res.Copy.Text) != nil):
+		return carried{show: res.Copy.Text, note: func(w *texts.Catalog) string { return w.T("no clipboard took it; copy it from the screen", nil) }}, err
 	}
-	if res.Copy != nil {
-		return copiedLines(res, copyText), nil, err
-	}
-	return res.Output, nil, err
-}
-
-// copiedLines are what an action that gave something to copy says: its output once copyText put the text on
-// the clipboard, else the text itself, to copy from the screen.
-func copiedLines(res api.ActionResult, copyText func(string) error) []string {
-	if copyText != nil && copyText(res.Copy.Text) == nil {
-		return res.Output
-	}
-	return strings.Split(res.Copy.Text, "\n")
+	return carried{lines: res.Output}, err
 }
 
 func deref(p *[]api.PlanItem) []api.PlanItem {

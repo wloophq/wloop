@@ -2846,18 +2846,29 @@ async function load() {
   render();
 }
 
-// act resolves to undefined when the user backs out or the input is invalid.
+// claimCopy claims the clipboard for the copy an action about to run will answer, while the click lasts: a
+// caller that awaits anything before act claims first and hands the claim to act.
+function claimCopy() {
+  const pending = deferred();
+  return { pending, claimed: claimClipboard(pending.promise) };
+}
+
 // copied puts the copy an action answered on the clipboard, through the write its click claimed when there is
-// one, and says what it copied.
+// one, and says what it copied; a refused write shows the text to copy by hand.
 async function copied(out, claimed) {
   try {
     await (claimed || writeClipboard(out.copy));
-    setNotice((out.output || []).join(" ") || t("Copied"));
+    setNotice((out.output || []).join(" "));
   } catch (err) {
-    setNotice(t("Could not copy: {error}", { error: err.message }), true);
+    state.actionError = t("Could not copy: {error}", { error: err.message });
+    state.actionDetail = out.copy.text;
+    state.actionSource = "";
+    setNotice("");
+    render();
   }
 }
 
+// act resolves to undefined when the user backs out or the input is invalid.
 async function act(row, name, extra = {}) {
   const key = keyOf(row);
   const st = (row.actions || []).find((a) => a.id === name);
@@ -2883,8 +2894,7 @@ async function act(row, name, extra = {}) {
     if (extra.yes) body.yes = true;
     if (extra.no) body.no = true;
   }
-  const copy = spec.copies ? deferred() : null;
-  const claimed = copy && claimClipboard(copy.promise);
+  const copy = spec.copies ? extra.claim || claimCopy() : null;
   state.busy.add(key);
   state.actionError = "";
   state.actionDetail = "";
@@ -2900,10 +2910,10 @@ async function act(row, name, extra = {}) {
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
     if (out.copy) {
-      if (copy) copy.resolve(out.copy);
-      await copied(out, claimed);
+      if (copy) copy.pending.resolve(out.copy);
+      await copied(out, copy && copy.claimed);
     } else {
-      if (copy) copy.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+      if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
       setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
     }
     ok = true;
@@ -2916,7 +2926,7 @@ async function act(row, name, extra = {}) {
       }
     }
   } catch (err) {
-    if (copy) copy.reject(err);
+    if (copy) copy.pending.reject(err);
     state.actionError = t("{action} failed: {error}", { action: `${name} ${labelOf(row)}`, error: err.message });
 
     state.actionDetail = err.detail || "";

@@ -54,6 +54,8 @@
 "Reply sent" = "Resposta enviada"
 "Action not sent" = "Ação não enviada"
 # The terminal client.
+"Copy this text" = "Copie este texto"
+"no clipboard took it; copy it from the screen" = "nenhum clipboard aceitou; copie da tela"
 "no area {n}" = "nenhuma área {n}"
 "{action} {task} still running" = "{action} {task} ainda rodando"
 "no {action} on {task}" = "nenhum(a) {action} em {task}"
@@ -435,7 +437,6 @@
 "cost {cost}, {remaining} of {limit} left" = "custo {cost}, restam {remaining} de {limit}"
 "could not copy the resume line of {session}: {error}" = "não foi possível copiar a linha de retomada de {session}: {error}"
 "Could not copy: {error}" = "Não foi possível copiar: {error}"
-"Copied" = "Copiado"
 "{action} answered nothing to copy" = "{action} não respondeu nada para copiar"
 "Could not load the actions: {error}" = "Não foi possível carregar as ações: {error}"
 "Could not load the plan: {error}" = "Não foi possível carregar o plano: {error}"
