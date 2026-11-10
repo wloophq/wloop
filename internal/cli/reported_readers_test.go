@@ -3,12 +3,16 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/core/lock"
+	"github.com/wloophq/wloop/internal/core/port"
 	wt "github.com/wloophq/wloop/internal/core/workspaces/workspacestest"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/placement"
@@ -18,6 +22,7 @@ import (
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
+	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	ghplugin "github.com/wloophq/wloop/plugins/github"
 )
@@ -130,5 +135,34 @@ func TestTheGitHubFactsListThePullRequestsThePluginReported(t *testing.T) {
 	units, err := mod.Facts.List(context.Background(), unit.GitHub)
 	if err != nil || !slices.Contains(units, reportedRef.Unit()) {
 		t.Fatalf("listed %v %v, want the reported pull request the host keeps no copy of", units, err)
+	}
+}
+
+func TestTheServedStoreReadsThePullRequestsThePluginReported(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	reportAgainstHostCopy(t, te, dinv.PR{Ref: reportedRef, Author: "ana", State: "OPEN", Reasons: []string{"author"}}, nil)
+	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { storeDB.Close() })
+	te.cfg = withoutWindows(te.cfg)
+	te.cfg.Brief.Enabled = true
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
+	if d.BriefStatus == nil {
+		t.Fatal("no briefs while brief.enabled is true")
+	}
+	st, err := d.BriefStatus.Status(context.Background())
+	if err != nil || st.Pending != 1 {
+		t.Fatalf("status %+v %v, want the reported pull request pending", st, err)
+	}
+	ctx := context.Background()
+	if err := d.Events.RecordEvent(ctx, port.Event{Unit: reportedRef.Unit(), Kind: "commented", Key: "c1", Actor: "bruno", At: testNow}); err != nil {
+		t.Fatal(err)
+	}
+	acts, err := d.Events.RecentActivity(ctx, 10)
+	if err != nil || len(acts) != 1 || acts[0].Unit != reportedRef.Unit() {
+		t.Fatalf("activity %+v %v, want the reported pull request's event", acts, err)
 	}
 }
