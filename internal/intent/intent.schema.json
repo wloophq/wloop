@@ -64,6 +64,7 @@
             "enum": [
               "row",
               "detail",
+              "task",
               "tui",
               "menubar",
               "notification",

@@ -380,25 +380,75 @@ process.stdout.write(JSON.stringify(["revisor", "reviewer", "zebra"].map((q) => 
 	}
 }
 
-func TestAReviewRequestIsReadyForSlack(t *testing.T) {
-	in := []map[string]any{
-		{"row": map[string]any{"label": "acme/widgets#4877", "unit": map[string]any{"provider": "github", "key": "acme/widgets#4877"}, "link": "https://github.com/acme/widgets/pull/4877", "title": "perf(queue): refill <each> free slot"},
-			"brief": map[string]any{"brief": map[string]any{"goal": "Give each free slot the next message.", "context": "The loop asked for the whole batch.", "risk_why": "Affects every pod & the dispatch job."}}},
-		{"row": map[string]any{"label": "acme/api#7", "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "link": "javascript:alert(1)", "title": "fix: x"}},
+// copyPrelude stubs the clipboard and the daemon for act: answer is what the action answers, clipboard what
+// the page wrote, its plain text and HTML read after the write settles.
+func copyPrelude(t *testing.T) string {
+	src := appJS(t)
+	return `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+const state = { busy: new Set(), answered: new Map(), guidance: {}, specs: { byId: {} } };
+let answer = { ok: true, status: 200, body: {} };
+const notices = [];
+const clipboard = { writes: [], refuse: "" };
+async function fetch() { return { ok: answer.ok, status: answer.status, json: async () => answer.body }; }
+class ClipboardItem { constructor(parts) { this.parts = parts; } }
+const window = { ClipboardItem };
+const navigator = { clipboard: {
+  write: async (items) => { if (clipboard.refuse) throw new Error(clipboard.refuse); const p = items[0].parts; clipboard.writes.push({ text: await (await p["text/plain"]).text(), html: await (await p["text/html"]).text() }); },
+  writeText: async (text) => { clipboard.writes.push({ text }); },
+} };
+function render() {}
+function setNotice(text, bad) { notices.push(bad ? "! " + text : text); }
+function scheduleLoad() {}
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+const document = { getElementById: () => null };
+` + keyJS(t) + jsConst(t, src, "API_VERSION")
+}
+
+var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "copied", "act"}
+
+func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
+	var got struct {
+		Writes  []map[string]string
+		Notices []string
 	}
-	var got []map[string]string
-	nodeRun(t, keyJS(t), []string{"safeURL", "escapeHTML", "reviewRequest"},
-		`process.stdout.write(JSON.stringify(input.map((x) => reviewRequest(x.row, x.brief))));`, in, &got)
-	wantText := "review, pls? `perf(queue): refill <each> free slot`\nhttps://github.com/acme/widgets/pull/4877\n\n*Goal:*\nGive each free slot the next message.\n\n*Context:*\nThe loop asked for the whole batch.\n\n*Risk:*\nAffects every pod & the dispatch job."
-	if got[0]["text"] != wantText {
-		t.Errorf("text:\n%s\nwant:\n%s", got[0]["text"], wantText)
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true }] };
+  state.specs.byId.copy_review_request = { id: "copy_review_request", copies: true };
+  answer.body = { ok: true, copy: { text: "review, pls? `+"`x`"+`", html: "review, pls? <code>x</code>" }, output: ["Copied the review request for acme/api#7; paste it in a chat."] };
+  await act(row, "copy_review_request");
+  answer.body = { ok: true, copy: { text: "a & b" } };
+  await act(row, "copy_review_request");
+  clipboard.refuse = "denied";
+  await act(row, "copy_review_request");
+  process.stdout.write(JSON.stringify({ writes: clipboard.writes, notices: notices.filter((n) => !n.startsWith("copy_review_request:")) }));
+})();`, nil, &got)
+	wantWrites := []map[string]string{
+		{"text": "review, pls? `x`", "html": "review, pls? <code>x</code>"},
+		{"text": "a & b", "html": "a &amp; b"},
 	}
-	wantHTML := `review, pls? <code>perf(queue): refill &lt;each&gt; free slot</code><br><a href="https://github.com/acme/widgets/pull/4877">acme/widgets#4877</a><br><br><b>Goal:</b><br>Give each free slot the next message.<br><br><b>Context:</b><br>The loop asked for the whole batch.<br><br><b>Risk:</b><br>Affects every pod &amp; the dispatch job.`
-	if got[0]["html"] != wantHTML {
-		t.Errorf("html:\n%s\nwant:\n%s", got[0]["html"], wantHTML)
+	if !reflect.DeepEqual(got.Writes, wantWrites) {
+		t.Errorf("clipboard %v, want %v", got.Writes, wantWrites)
 	}
-	if got[1]["text"] != "review, pls? `fix: x`\nacme/api#7" || strings.Contains(got[1]["html"], "javascript") || !strings.Contains(got[1]["html"], "acme/api#7") {
-		t.Errorf("without a brief or a safe URL: %q / %q", got[1]["text"], got[1]["html"])
+	wantNotices := []string{"Copied the review request for acme/api#7; paste it in a chat.", "Copied", "! Could not copy: denied"}
+	if !reflect.DeepEqual(got.Notices, wantNotices) {
+		t.Errorf("notices %v, want %v", got.Notices, wantNotices)
+	}
+}
+
+func TestAFailedCopyActionWritesNothing(t *testing.T) {
+	var got struct {
+		Writes []map[string]string
+		Error  string
+	}
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true }] };
+  state.specs.byId.copy_review_request = { id: "copy_review_request", copies: true };
+  answer = { ok: false, status: 409, body: { error: "copy_review_request is not offered" } };
+  await act(row, "copy_review_request");
+  process.stdout.write(JSON.stringify({ writes: clipboard.writes, error: state.actionError }));
+})();`, nil, &got)
+	if len(got.Writes) != 0 || !strings.Contains(got.Error, "not offered") {
+		t.Errorf("writes %v, error %q", got.Writes, got.Error)
 	}
 }
 
@@ -1195,6 +1245,7 @@ func buttonPrelude(t *testing.T) string {
 const state = { busy: new Set(), answered: new Map(), guidance: {}, actionError: "", actionDetail: "", specs: { version: "", byId: {} } };
 const render = () => {}, setNotice = () => {}, scheduleLoad = () => {};
 const document = { getElementById: () => null };
+const window = {};
 ` + keyJS(t) + jsConst(t, appJS(t), "API_VERSION") + jsConst(t, appJS(t), "FOCUS_PAIRS") + jsFunction(t, appJS(t), "focusSlot") + "\n" + jsConst(t, appJS(t), "CARD_GROUPS") + `
 let confirmed = [], prompts = [], fetched = [], promptAnswer = null, confirmAnswer = false;
 const confirm = (text) => { confirmed.push(text); return confirmAnswer; };
@@ -1204,7 +1255,8 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 `
 }
 
-var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote"}
+var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote",
+	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "copied"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)
@@ -1561,7 +1613,8 @@ func TestIntakeAndBriefButtonsFollowTheServedStates(t *testing.T) {
 		var wantIntake, wantBrief []wireButton
 		var wantPosts, briefPosts []string
 		for _, st := range states[name] {
-			if st.ID != "intake_without" && st.ID != "intake_cancel" && st.ID != "brief_refresh" {
+			inBrief := st.ID == "brief_refresh" || st.ID == "copy_review_request"
+			if st.ID != "intake_without" && st.ID != "intake_cancel" && !inBrief {
 				continue
 			}
 			b := wireButton{Label: cmpOr(st.Label, byID[st.ID].Label), Disabled: !st.Enabled, Title: wantTitle(byID[st.ID], st), Class: "act"}
@@ -1574,13 +1627,13 @@ func TestIntakeAndBriefButtonsFollowTheServedStates(t *testing.T) {
 					body += `,"basis":"` + st.Basis + `"`
 				}
 				post := "/api/units/github/acme%2Fapi%237/" + st.ID + " " + body + "}"
-				if st.ID == "brief_refresh" {
+				if inBrief {
 					briefPosts = append(briefPosts, post)
 				} else {
 					wantPosts = append(wantPosts, post)
 				}
 			}
-			if st.ID == "brief_refresh" {
+			if inBrief {
 				wantBrief = append(wantBrief, b)
 			} else if strings.HasPrefix(name, "intake_") {
 				wantIntake = append(wantIntake, b)

@@ -21,7 +21,7 @@ const (
 // githubBuiltins are the built-in actions only a pull request offers.
 var githubBuiltins = map[string]bool{
 	"take_over": true, "track": true, "untrack": true,
-	"brief_refresh": true, "intake_without": true, "intake_cancel": true,
+	"brief_refresh": true, CopyReviewRequest: true, "intake_without": true, "intake_cancel": true,
 }
 
 var draftVerbs = []string{"approve", "dismiss", "edit", "retry", "close-silently", "skip-workflow"}

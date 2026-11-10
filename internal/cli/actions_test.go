@@ -640,3 +640,37 @@ func TestBriefRefreshGoesThroughTheDaemon(t *testing.T) {
 		t.Fatalf("no daemon: exit %d: %s", code, te2.err)
 	}
 }
+
+func TestBriefCopyPutsTheReviewRequestOnTheClipboard(t *testing.T) {
+	t.Parallel()
+	d := startDaemon(t, nil)
+	te := newTestEnv(t, &fake.Manager{})
+	te.Socket = d.socket
+	var copied []string
+	te.Clipboard = func(text string) error {
+		copied = append(copied, text)
+		return nil
+	}
+	if code := te.run("brief", "copy", r7.URL()); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if !slices.Contains(d.seen(), "POST /api/units/github/acme/api#7/copy_review_request") {
+		t.Fatalf("requests %v", d.seen())
+	}
+	if len(copied) != 1 || !strings.HasPrefix(copied[0], "review, pls? `") || !strings.Contains(copied[0], "https://github.com/acme/api/pull/7") {
+		t.Fatalf("copied %q", copied)
+	}
+	if got := te.out.String(); got != "Copied the review request for acme/api#7; paste it in a chat.\n" {
+		t.Errorf("output %q", got)
+	}
+
+	te2 := newTestEnv(t, &fake.Manager{})
+	te2.Socket = d.socket
+	te2.Clipboard = func(string) error { return errors.New("no clipboard") }
+	if code := te2.run("brief", "copy", r7.URL()); code != 0 {
+		t.Fatalf("exit %d: %s", code, te2.err)
+	}
+	if got := te2.out.String(); got != copied[0]+"\n" {
+		t.Errorf("without a clipboard it prints %q, want the request", got)
+	}
+}

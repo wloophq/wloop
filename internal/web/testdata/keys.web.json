@@ -682,6 +682,14 @@
       "summary": "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none."
     },
     {
+      "key": "Y",
+      "action": "copy_review_request",
+      "context": "list",
+      "owner": "github",
+      "help": "Copy review request",
+      "summary": "Copy a review request with the title, link and brief, formatted for a chat message."
+    },
+    {
       "key": "Enter",
       "action": "plan_apply",
       "context": "plan",

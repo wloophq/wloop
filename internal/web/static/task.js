@@ -475,9 +475,16 @@ function taskTabs(e) {
   return { tabs: shown.map((x) => ({ id: x.id, label: x.label(), count: x.count(e) })), selected, body };
 }
 
-// taskVerbs are the profile's primary verbs the task offers, More over the rest, and the intents that serve it.
+// unitActionButtons are the actions the task's units offer on a task's page, each run on its unit.
+function unitActionButtons(e) {
+  if (typeof actionButtons !== "function") return [];
+  return (e.unit_actions || []).flatMap((u) => actionButtons(u, "task", { scope: "task:" + keyOf(u) }));
+}
+
+// taskVerbs are the profile's primary verbs the task offers, More over the rest, the intents that serve it and
+// the actions its units offer on it.
 function taskVerbs(e) {
-  const buttons = [...primaryVerbs(e), ...taskIntentButtons(e)].filter(Boolean);
+  const buttons = [...primaryVerbs(e), ...taskIntentButtons(e), ...unitActionButtons(e)].filter(Boolean);
   return buttons.length ? h("div", { class: "verbs d-actions" }, ...buttons) : null;
 }
 

@@ -574,6 +574,15 @@ type ActionResult struct {
 	Intake *Intake  `json:"intake,omitempty"`
 	// Seq is the turn an intent started headless, answered 202; 0 otherwise.
 	Seq int64 `json:"seq,omitempty"`
+	// Copy is what the action produced for the person to paste elsewhere; a client puts it on the
+	// clipboard, or shows it where it cannot. Output then says what was copied.
+	Copy *Copy `json:"copy,omitempty"`
+}
+
+// Copy is a text to put on the clipboard: Text as plain text, HTML the same text formatted, "" for none.
+type Copy struct {
+	Text string `json:"text"`
+	HTML string `json:"html,omitempty"`
 }
 
 // PauseRequest pauses or resumes the repositories in Repos and the pull

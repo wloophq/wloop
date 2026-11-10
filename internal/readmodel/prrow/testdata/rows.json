@@ -124,6 +124,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -296,6 +300,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -460,6 +468,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -621,6 +633,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -784,6 +800,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -953,6 +973,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1122,6 +1146,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1294,6 +1322,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1466,6 +1498,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1629,6 +1665,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1789,6 +1829,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -1960,6 +2004,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -2353,6 +2401,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -2521,6 +2573,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -2687,6 +2743,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -2864,6 +2924,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3029,6 +3093,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3193,6 +3261,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3370,6 +3442,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3543,6 +3619,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3706,6 +3786,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -3871,6 +3955,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4039,6 +4127,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4195,6 +4287,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4360,6 +4456,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4532,6 +4632,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4695,6 +4799,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -4862,6 +4970,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",
@@ -5032,6 +5144,10 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
     "specs_version": "",

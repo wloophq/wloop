@@ -9,6 +9,28 @@
         "description": "The dialog that confirms the action, over the action facts; empty asks nothing.",
         "type": "string"
       },
+      "copy": {
+        "additionalProperties": false,
+        "description": "What running the action gives the person to paste elsewhere: the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title \"`\" \"'\"}}`).",
+        "properties": {
+          "html": {
+            "description": "The same text formatted as HTML, which a rich paste target reads; empty copies the plain text alone.",
+            "type": "string"
+          },
+          "notice": {
+            "description": "What the client says once it copied, over the copy facts.",
+            "type": "string"
+          },
+          "text": {
+            "description": "The plain text copied, over the copy facts. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
       "input": {
         "additionalProperties": false,
         "description": "The text the action asks for.",

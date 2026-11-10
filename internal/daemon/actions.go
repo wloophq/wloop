@@ -238,7 +238,7 @@ func isBuiltin(l *intentload.Loaded, name string) bool {
 	_, isDelegated := delegatedActions[name]
 	_, isIntake := intakeRouteActions[name]
 	_, isGate := catalog.RowGateIntent(l, name)
-	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh"
+	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh" || name == catalog.CopyReviewRequest
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -334,6 +334,10 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		s.refreshBrief(w, r, u)
 		return
 	}
+	if name == catalog.CopyReviewRequest {
+		s.writeResult(ctx, w, l, name, u, nil)
+		return
+	}
 	if change, ok := intakeRouteActions[name]; ok {
 		s.changeIntakeOf(w, ctx, u, change)
 		return
@@ -355,7 +359,34 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		writeActionError(w, err)
 		return
 	}
-	writeJSON(w, api.ActionResult{OK: true, Output: lines(out.String())})
+	s.writeResult(ctx, w, l, name, u, lines(out.String()))
+}
+
+// writeResult answers a built-in action that ran with its output and, when its actions.toml table has a copy,
+// what it gives the person to copy, the client's notice after the output.
+func (s *Server) writeResult(ctx context.Context, w http.ResponseWriter, l *intentload.Loaded, name string, u unit.Unit, output []string) {
+	res := api.ActionResult{OK: true, Output: output}
+	if l != nil && l.Actions[name].Copies() {
+		d, _, err := s.detail(ctx, u)
+		if err != nil {
+			writeActionError(w, err)
+			return
+		}
+		var brief *api.Brief
+		if d.Brief != nil {
+			brief = d.Brief.Brief
+		}
+		c, notice, err := catalog.Copy(l, name, catalog.CopyFacts{Row: d.Row, Brief: brief})
+		if err != nil {
+			writeActionError(w, err)
+			return
+		}
+		res.Copy = c
+		if notice != "" {
+			res.Output = append(res.Output, notice)
+		}
+	}
+	writeJSON(w, res)
 }
 
 // offered is the state of the action on the pull request's row now; an

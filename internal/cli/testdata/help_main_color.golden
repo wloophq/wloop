@@ -63,6 +63,7 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]timings[/]                Review, merge and turn durations, waits, tokens
   [cyan]intake[/]                 Follow, start or cancel an intake
   [cyan]brief refresh[/]          Make a pull request's brief again
+  [cyan]brief copy[/]             Copy a review request for a pull request
   [cyan]turn show[/]              A pull request's turns and their records
   [cyan]probe[/]                  Prove an agent home end to end
 

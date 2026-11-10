@@ -19,7 +19,7 @@ type ActionSpec struct {
 	Summary  string     `json:"summary,omitempty"` // what pressing it does, from the profile
 	Group    string     `json:"group"`             // start | turn | control | workspace | brief | intake; draft and plan for theirs
 	Key      string     `json:"key,omitempty"`     // TUI key
-	Surfaces []string   `json:"surfaces"`          // row, detail, tui, menubar, notification, cli, explore
+	Surfaces []string   `json:"surfaces"`          // row, detail, task, tui, menubar, notification, cli, explore
 	Input    *InputSpec `json:"input,omitempty"`
 	Intake   bool       `json:"intake,omitempty"`
 	Toggle   string     `json:"toggle,omitempty"` // paired id sharing the key: hold<->release
@@ -27,6 +27,9 @@ type ActionSpec struct {
 	Scope    string     `json:"scope,omitempty"`  // "unit" (default), "item", "draft" or "run"
 	Verb     string     `json:"verb,omitempty"`   // task verb it fulfills: "next", "waiting", "delegate", "done", "dismiss", "approve", "snooze"; scope draft also "edit", "retry"
 	Plugin   string     `json:"plugin,omitempty"` // provider id, from the intent's Def.Provider; "" is core
+	// Copies marks an action whose result carries something to copy (ActionResult.Copy), so a client that
+	// must claim the clipboard while the person's click lasts claims it before the result arrives.
+	Copies bool `json:"copies,omitempty"`
 }
 
 type InputSpec struct {

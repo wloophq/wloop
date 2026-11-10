@@ -264,10 +264,13 @@ type TaskView struct {
 	Cards      []CardView  `json:"cards,omitempty"`       // detail only
 	Verbs      []VerbState `json:"verbs"`
 	// Actions are the intents that serve the task's own unit, such as start.
-	Actions   []ActionState `json:"actions,omitempty"`
-	Attention *Attention    `json:"attention,omitempty"`
-	Created   time.Time     `json:"created"`
-	Updated   time.Time     `json:"updated"`
+	Actions []ActionState `json:"actions,omitempty"`
+	// UnitActions are, for each unit the task holds that has a row, the actions its row offers on a task's
+	// page (the task surface), run on that unit; detail only.
+	UnitActions []UnitActions `json:"unit_actions,omitempty"`
+	Attention   *Attention    `json:"attention,omitempty"`
+	Created     time.Time     `json:"created"`
+	Updated     time.Time     `json:"updated"`
 
 	// A project's: whether it takes its children one at a time, and its review.
 	Sequential  bool      `json:"sequential,omitempty"`
@@ -458,6 +461,13 @@ type ItemView struct {
 	Summary string    `json:"summary"`
 	State   string    `json:"state"`
 	Kind    string    `json:"kind"`
+}
+
+// UnitActions are actions a unit's row offers, with the unit and its label.
+type UnitActions struct {
+	Unit    unit.Unit     `json:"unit"`
+	Label   string        `json:"label"`
+	Actions []ActionState `json:"actions"`
 }
 
 // CardView is a unit's stored card on a task's detail.

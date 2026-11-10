@@ -79,6 +79,8 @@ type Config struct {
 	Color bool
 	// OpenURL opens a unit's link, as the open command does; nil cannot.
 	OpenURL func(url string) error
+	// Copy puts text on the clipboard; nil cannot, and what an action gives to copy shows instead.
+	Copy func(text string) error
 }
 
 type loaded struct {
@@ -914,7 +916,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		}
 		return carried{note: func(w *texts.Catalog) string { return w.T("the review is done", nil) }}, nil
 	}
-	lines, said, err := carryAction(ctx, d, c)
+	lines, said, err := carryAction(ctx, d, c, cfg.Copy)
 	return carried{lines: lines, note: said}, err
 }
 
@@ -951,7 +953,7 @@ func openLink(ctx context.Context, cfg Config, c Command) ([]string, api.TaskVie
 }
 
 // carryAction takes a plan action to its item, any other to its unit.
-func carryAction(ctx context.Context, d Daemon, c Command) ([]string, func(*texts.Catalog) string, error) {
+func carryAction(ctx context.Context, d Daemon, c Command, copyText func(string) error) ([]string, func(*texts.Catalog) string, error) {
 	if act, ok := planActs[c.Action]; ok && c.PlanID != "" {
 		res, err := d.ActOnPlan(ctx, api.PlanActRequest{IDs: []string{c.PlanID}, Action: act, Guidance: c.Req.Guidance})
 		switch {
@@ -969,7 +971,19 @@ func carryAction(ctx context.Context, d Daemon, c Command) ([]string, func(*text
 	if res.Intake != nil {
 		return nil, acceptedLine(*res.Intake), err
 	}
+	if res.Copy != nil {
+		return copiedLines(res, copyText), nil, err
+	}
 	return res.Output, nil, err
+}
+
+// copiedLines are what an action that gave something to copy says: its output once copyText put the text on
+// the clipboard, else the text itself, to copy from the screen.
+func copiedLines(res api.ActionResult, copyText func(string) error) []string {
+	if copyText != nil && copyText(res.Copy.Text) == nil {
+		return res.Output
+	}
+	return strings.Split(res.Copy.Text, "\n")
 }
 
 func deref(p *[]api.PlanItem) []api.PlanItem {

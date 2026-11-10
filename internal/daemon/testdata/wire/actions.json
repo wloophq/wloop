@@ -129,9 +129,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -329,9 +333,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -501,9 +509,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -674,9 +686,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -834,9 +850,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1007,9 +1027,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1168,9 +1192,13 @@
         "enabled": false,
         "reason": "the brief is off; set brief.enabled in the config",
         "refusal": "brief_refresh.why"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1289,7 +1317,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1406,7 +1434,7 @@
         "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1528,9 +1556,13 @@
       {
         "id": "open",
         "enabled": true
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1680,9 +1712,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1838,9 +1874,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2008,9 +2048,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2170,6 +2214,10 @@
         "note": "Make this pull request's brief again now"
       },
       {
+        "id": "copy_review_request",
+        "enabled": true
+      },
+      {
         "id": "intake_without",
         "enabled": true
       },
@@ -2178,7 +2226,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2347,6 +2395,10 @@
         "note": "Make this pull request's brief again now"
       },
       {
+        "id": "copy_review_request",
+        "enabled": true
+      },
+      {
         "id": "intake_without",
         "enabled": false,
         "reason": "intake 1 is a turn by hand, which only its session starts; cancel it with {{command}} intake cancel 1",
@@ -2357,7 +2409,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2524,9 +2576,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2677,9 +2733,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2832,9 +2892,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2998,9 +3062,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3168,9 +3236,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3342,9 +3414,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3527,6 +3603,10 @@
         "note": "Make this pull request's brief again now"
       },
       {
+        "id": "copy_review_request",
+        "enabled": true
+      },
+      {
         "id": "intake_without",
         "enabled": true
       },
@@ -3535,7 +3615,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3713,9 +3793,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -3884,9 +3968,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4019,9 +4107,13 @@
       {
         "id": "open",
         "enabled": true
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4160,9 +4252,13 @@
         "id": "brief_refresh",
         "enabled": true,
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "id": "copy_review_request",
+        "enabled": true
       }
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "payload": {
       "author": "ana",
       "repo": "acme/api",

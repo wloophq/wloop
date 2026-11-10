@@ -1,0 +1,10 @@
+{
+  "copy": {
+    "html": "review, pls? \u003ccode\u003eBatch export\u003c/code\u003e\u003cbr\u003e\u003ca href=\"https://github.com/acme/api/pull/7\"\u003eacme/api#7\u003c/a\u003e\u003cbr\u003e\u003cbr\u003e\u003cb\u003eGoal:\u003c/b\u003e\u003cbr\u003eExport in batches\u003cbr\u003e\u003cbr\u003e\u003cb\u003eContext:\u003c/b\u003e\u003cbr\u003eexports time out\u003cbr\u003e\u003cbr\u003e\u003cb\u003eRisk:\u003c/b\u003e\u003cbr\u003ebehind a flag",
+    "text": "review, pls? `Batch export`\nhttps://github.com/acme/api/pull/7\n\n*Goal:*\nExport in batches\n\n*Context:*\nexports time out\n\n*Risk:*\nbehind a flag"
+  },
+  "ok": true,
+  "output": [
+    "Copied the review request for acme/api#7; paste it in a chat."
+  ]
+}

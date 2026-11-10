@@ -99,7 +99,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `action` (table): How the intent's action is offered on a row; its description is the intent's summary.
 - `action.group` (one of `start`, `turn`, `control`, `workspace`, `brief`, `intake`, default `start`): The group the action is listed under.
-- `action.surfaces` (list of `row`, `detail`, `tui`, `menubar`, `notification`, `cli`, `explore`): Where the action is offered: row, detail, tui, cli and explore when absent.
+- `action.surfaces` (list of `row`, `detail`, `task`, `tui`, `menubar`, `notification`, `cli`, `explore`): Where the action is offered: row, detail, tui, cli and explore when absent.
 - `action.when` (predicate, default `row.open`): When the action is offered on a row.
 - `action.primary` (table): When the action is the row's primary one.
 - `action.primary.when` (predicate, default `false`): When the action is the row's primary one.
@@ -195,6 +195,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>.input` (table): The text the action asks for.
 - `<name>.input.label` (string, localized): The input's name.
 - `<name>.input.help` (string, localized): What to write, shown in the empty input.
+- `<name>.copy` (table): What running the action gives the person to paste elsewhere: the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title "`" "'"}}`).
+- `<name>.copy.text` (template, localized): The plain text copied, over the copy facts. Required.
+- `<name>.copy.html` (template, localized): The same text formatted as HTML, which a rich paste target reads; empty copies the plain text alone.
+- `<name>.copy.notice` (template, localized): What the client says once it copied, over the copy facts.
 
 ## Tasks: properties, states and verbs (`tasks.toml`)
 

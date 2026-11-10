@@ -69,13 +69,29 @@ func (e *Env) action(ctx context.Context, ref pr.Ref, action string, req api.Act
 func (e *Env) delegate(ctx context.Context, c *client.Client, ref pr.Ref, action string, req api.ActionRequest, done string) error {
 	req.AgentHome = e.callerAgentHome(config.Config{Agent: e.callerKind()})
 	req.Source = sourceCLI
-	out, err := c.Action(ctx, ref.Unit(), action, req)
-	printLines(e.Out, out)
+	res, err := c.Ask(ctx, ref.Unit(), action, req)
+	e.printResult(res)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(e.Out, "%s %s: %s\n", commandOf(action), ref, done)
 	return nil
+}
+
+// printResult prints what an action reported; an action that gave something to copy puts its text on the
+// clipboard first, or prints the text where it cannot.
+func (e *Env) printResult(res api.ActionResult) {
+	if res.Copy != nil {
+		clip := e.Clipboard
+		if clip == nil {
+			clip = copyToClipboard
+		}
+		if err := clip(res.Copy.Text); err != nil {
+			fmt.Fprintln(e.Out, res.Copy.Text)
+			return
+		}
+	}
+	printLines(e.Out, res.Output)
 }
 
 const sourceCLI = "cli"
@@ -529,9 +545,16 @@ func (e *Env) heldRoleFacts(ctx context.Context, cfg config.Config, repos []wsdo
 	return f, nil
 }
 
+// briefActions are the brief subcommands and the catalog action each runs.
+var briefActions = map[string]string{"refresh": "brief_refresh", "copy": catalog.CopyReviewRequest}
+
 func runBrief(ctx context.Context, e *Env, args []string) error {
-	if len(args) != 2 || args[0] != "refresh" {
-		return errors.New("usage: brief refresh <pr-url>")
+	action, ok := "", len(args) == 2
+	if ok {
+		action, ok = briefActions[args[0]]
+	}
+	if !ok {
+		return errors.New("usage: brief refresh|copy <pr-url>")
 	}
 	ref, err := pr.ParseURL(args[1])
 	if err != nil {
@@ -541,10 +564,8 @@ func runBrief(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	out, err := c.Action(ctx, ref.Unit(), "brief_refresh", api.ActionRequest{Source: sourceCLI})
-	for _, l := range out {
-		fmt.Fprintln(e.Out, l)
-	}
+	res, err := c.Ask(ctx, ref.Unit(), action, api.ActionRequest{Source: sourceCLI})
+	e.printResult(res)
 	return err
 }
 

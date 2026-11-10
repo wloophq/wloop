@@ -83,4 +83,20 @@ When the agent is missing, out of credit or failing, or `gh` is logged out, brie
 {{command}} timings --tags                                       # tag values and the spellings dropped
 ```
 
+## Ask for a review
+
+**Copy review request** (`Y`) puts a review request on the clipboard, to paste in a chat: "review, pls?", the title, the link, then the brief's goal, context and why of its risk. An open pull request offers it on its detail, on the page of a task that holds it, in the omnibox and in the terminal client; `{{command}} brief copy <url>` does it from a terminal. The cockpit copies it as plain text and HTML; the terminal client and the command copy the plain text, and print it where there is no clipboard.
+
+The request is a template of the profile: the `[copy_review_request.copy]` table of `actions.toml`, with `text`, `html` and the `notice` shown once it is copied, over the copy facts (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.label}}`, `{{.copy.brief.goal}}`, `{{.copy.brief.kind}}`, `{{.copy.brief.size}}`, `{{.copy.brief.risk}}`, `{{.copy.brief.open_questions}}` and the others the [facts reference](/reference/facts/) lists). A profile that wants the size and the open questions in it, or another greeting, rewrites the table:
+
+```toml
+[copy_review_request.copy]
+text = """review, please: {{.copy.title}} ({{.copy.brief.size}})
+{{or .copy.link .copy.label}}{{range .copy.brief.open_questions}}
+- {{.}}{{end}}"""
+html = ""
+```
+
+An empty `html` copies the plain text alone. The daemon renders the copy; every client puts whatever an action answers in `copy` on the clipboard, so any built-in action whose table has a `copy` gives one.
+
 The brief is a preview a model wrote from the pull request's text, so its author can influence the tags and therefore which profile blocks match. Each turn's instructions present it as something to verify.

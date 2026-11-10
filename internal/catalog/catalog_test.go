@@ -82,7 +82,7 @@ func TestBundledIntentKeys(t *testing.T) {
 func TestEveryActionHasItsKey(t *testing.T) {
 	actions := map[string]string{
 		"open": "O", "skip": "S", "run_now": "R", "guide": "G", "answer": "W", "continue": "C", "dismiss": "X",
-		"pause": "H", "resume": "H", "mute": "M", "unmute": "M", "take_over": "A", "trust_run": "T", "unblock": "D",
+		"pause": "H", "resume": "H", "mute": "M", "unmute": "M", "take_over": "A", "trust_run": "T", "unblock": "D", "copy_review_request": "Y",
 	}
 	plan := map[string]string{PlanApply: "Enter", PlanDismiss: "X", "guide": "G", "trust_run": "T", "unblock": "D"}
 	intents := map[string]string{"address": "F", "review": "V", "nudge": "N"}

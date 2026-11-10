@@ -67,6 +67,10 @@
         "enabled": true,
         "id": "brief_refresh",
         "note": "Make this pull request's brief again now"
+      },
+      {
+        "enabled": true,
+        "id": "copy_review_request"
       }
     ],
     "facets": {
@@ -191,7 +195,7 @@
       "r2 held",
       "Export in batches"
     ],
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -293,7 +297,7 @@
         "status": ""
       }
     },
-    "specs_version": "8ad46135340f",
+    "specs_version": "48551a885afd",
     "summary": {
       "closed": true,
       "line": "merged",
