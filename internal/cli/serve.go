@@ -290,6 +290,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	forge := unit.GitHub
 	store := inventory.New(db)
 	store.UseClock(e.Now)
+	store.UsePRs(e.reportedPRs())
 	host := e.moduleHost(db)
 	store.UseHost(host(forge))
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)

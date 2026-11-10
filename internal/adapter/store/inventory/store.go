@@ -42,13 +42,16 @@ type PRSource interface {
 	List(ctx context.Context, open bool) ([]dinv.PR, error)
 }
 
-// UsePRs reads the pull requests from prs; until then the store knows none.
+// errNoPRs is the read of pull requests by a store UsePRs never set.
+var errNoPRs = errors.New("inventory: no pull request source; call UsePRs")
+
+// UsePRs reads the pull requests from prs; until then a read of them fails.
 func (s *Store) UsePRs(prs PRSource) { s.prs.Store(&prs) }
 
 func (s *Store) reportedPRs(ctx context.Context, refs []github.Ref) (map[github.Ref]dinv.PR, error) {
 	prs := s.prs.Load()
 	if prs == nil {
-		return map[github.Ref]dinv.PR{}, nil
+		return nil, errNoPRs
 	}
 	return (*prs).PRs(ctx, refs)
 }
@@ -56,7 +59,7 @@ func (s *Store) reportedPRs(ctx context.Context, refs []github.Ref) (map[github.
 func (s *Store) openPRs(ctx context.Context) ([]dinv.PR, error) {
 	prs := s.prs.Load()
 	if prs == nil {
-		return nil, nil
+		return nil, errNoPRs
 	}
 	return (*prs).List(ctx, true)
 }
