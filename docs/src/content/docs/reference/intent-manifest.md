@@ -113,7 +113,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 |---|---|---|---|
 | `action` | table |  | How the intent's action is offered on a row; its description is the intent's summary. |
 | `action.group` | one of `start`, `turn`, `control`, `workspace`, `brief`, `intake` | `start` | The group the action is listed under. |
-| `action.surfaces` | list of `row`, `detail`, `tui`, `menubar`, `notification`, `cli`, `explore` |  | Where the action is offered: row, detail, tui, cli and explore when absent. |
+| `action.surfaces` | list of `row`, `detail`, `task`, `tui`, `menubar`, `notification`, `cli`, `explore` |  | Where the action is offered: row, detail, tui, cli and explore when absent. |
 | `action.when` | predicate | `row.open` | When the action is offered on a row. |
 | `action.primary` | table |  | When the action is the row's primary one. |
 | `action.primary.when` | predicate | `false` | When the action is the row's primary one. |

@@ -62,7 +62,7 @@ The TCP port answers 404 for AgentAPI and AdminAPI, refuses an unexpected `Host`
 
 ## Clients
 
-A client parses input, calls one API operation and renders the answer. The daemon computes the rows, their actions, the facets, the counters and the notifications; no client derives a situation or decides which actions a row offers. Clients import only `internal/api`, `internal/api/client`, the domain and `internal/termfmt`.
+A client parses input, calls one API operation and renders the answer. The daemon computes the rows, their actions, the facets, the counters and the notifications; no client derives a situation or decides which actions a row offers. An action whose answer carries a `copy` (plain text and HTML the daemon rendered from the profile) is handled the same way by every client, whatever the action: the cockpit writes the clipboard, claiming it in the click when the action's spec says `copies`, since WebKit refuses a write that starts after the answer arrives; the terminal client and the CLI copy the plain text, or print it where they cannot. Clients import only `internal/api`, `internal/api/client`, the domain and `internal/termfmt`.
 
 - The CLI, the terminal client (`internal/client/tui`) and the menu bar (`internal/client/menubar`, its own process under its own LaunchAgent) call UserAPI over the socket.
 - The cockpit calls UserAPI over HTTP. Its scripts, plain files under `internal/web/static` loaded in order by `index.html`, each have one reason to change:

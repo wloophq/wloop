@@ -364,6 +364,9 @@ func (f *fakeDaemon) Ask(ctx context.Context, u unit.Unit, action string, req ap
 	if action == "review" {
 		return api.ActionResult{OK: true, Intake: &api.Intake{Seq: 42, State: api.IntakeAccepted}}, nil
 	}
+	if action == "copy_review_request" {
+		return api.ActionResult{OK: true, Copy: &api.Copy{Text: "review, pls? `x`\nhttps://github.com/acme/api/pull/7"}, Output: []string{"copied"}}, nil
+	}
 	return api.ActionResult{OK: true, Output: []string{"ok"}}, nil
 }
 
@@ -904,4 +907,40 @@ func TestAFailingSpecsReadKeepsTheFreshRows(t *testing.T) {
 		eventually(t, "the review still works with the previous specs", func() bool { return len(d.calls()) == 1 })
 		quit(t, term, done)
 	})
+}
+
+func TestAnActionThatCopiesCopiesOrShowsItsText(t *testing.T) {
+	t.Parallel()
+	c := Command{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, Action: "copy_review_request"}
+	var copied []string
+	clip := func(text string) error {
+		copied = append(copied, text)
+		return nil
+	}
+	got, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
+	if err != nil || !slices.Equal(got.lines, []string{"copied"}) || got.show != "" || len(copied) != 1 || !strings.HasPrefix(copied[0], "review, pls?") {
+		t.Fatalf("with a clipboard: %+v %v %v", got, copied, err)
+	}
+	for _, clip := range []func(string) error{nil, func(string) error { return errors.New("no clipboard") }} {
+		got, err := carryAction(context.Background(), &fakeDaemon{}, c, clip)
+		if err != nil || got.show != "review, pls? `x`\nhttps://github.com/acme/api/pull/7" || len(got.lines) != 0 {
+			t.Errorf("without a clipboard: %+v %v", got, err)
+		}
+	}
+}
+
+func TestATextToCopyShowsWholeOverTheList(t *testing.T) {
+	t.Parallel()
+	m := NewModel()
+	m.ShowText("review, pls? `Batch export`\nhttps://github.com/acme/api/pull/7\n\n*Goal:*\nExport the report in batches so that a large account no longer times out")
+	screen := strings.Join(m.Render(40, 20, time.Unix(0, 0)), "\n")
+	for _, want := range []string{"review, pls? `Batch export`", "https://github.com/acme/api/pull/7", "*Goal:*", "no longer times out"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("the screen lacks %q:\n%s", want, screen)
+		}
+	}
+	m.Key(Key{Rune: 'x'})
+	if m.overlay != nil {
+		t.Error("a key leaves the text open")
+	}
 }

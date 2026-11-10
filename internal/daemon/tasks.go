@@ -972,6 +972,7 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 		if err := ev.cards(ctx, e, &v); err != nil {
 			return api.TaskView{}, err
 		}
+		ev.unitActions(ctx, e, &v)
 		runs, err := ev.s.runViews(ctx, task.UnitOf(e.ID))
 		if err != nil {
 			return api.TaskView{}, err
@@ -1239,6 +1240,30 @@ func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) e
 		}
 	}
 	return nil
+}
+
+// unitActions are the actions the rows of e's units offer on a task's page.
+func (ev *taskViewer) unitActions(ctx context.Context, e task.Task, v *api.TaskView) {
+	onTask := map[string]bool{}
+	for _, sp := range ev.s.servedSpecs() {
+		onTask[sp.ID] = slices.Contains(sp.Surfaces, catalog.SurfaceTask)
+	}
+	rows := ev.rowsOf(ctx, e.Units)
+	for _, u := range e.Units {
+		rd, ok := rows[u]
+		if !ok {
+			continue
+		}
+		var acts []api.ActionState
+		for _, st := range rd.Row.Actions {
+			if onTask[st.ID] {
+				acts = append(acts, st)
+			}
+		}
+		if len(acts) > 0 {
+			v.UnitActions = append(v.UnitActions, api.UnitActions{Unit: u, Label: rd.Row.Label, Actions: acts})
+		}
+	}
 }
 
 // verbs are the verbs of the catalog as they stand on e: refused all over on a disabled plugin's unit, taken by

@@ -27,7 +27,7 @@ func runTUI(ctx context.Context, e *Env, args []string) (err error) {
 	}
 	defer func() { err = errors.Join(err, t.Err(), t.Close()) }()
 	open := func(u string) error { return e.openInBrowser(ctx, u) }
-	return tui.Run(ctx, tui.Config{Daemon: c, Term: t, Now: e.Now, Color: e.tuiColor(), OpenURL: open})
+	return tui.Run(ctx, tui.Config{Daemon: c, Term: t, Now: e.Now, Color: e.tuiColor(), OpenURL: open, Copy: copyToClipboard})
 }
 
 // tuiColor is termfmt's color decision for the screen the TUI draws on.

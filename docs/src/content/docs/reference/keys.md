@@ -74,6 +74,7 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `H` | pause or resume |
 | `M` | mute or unmute |
 | `O` | open |
+| `Y` | copy a review request |
 | `V` | review |
 | `F` | address |
 | `N` | nudge |

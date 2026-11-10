@@ -8,7 +8,7 @@ const GroupStart = "start"
 var ActionGroups = []string{GroupStart, "turn", "control", "workspace", "brief", "intake"}
 
 // ActionSurfaces are where an action may be offered.
-var ActionSurfaces = []string{"row", "detail", "tui", "menubar", "notification", "cli", "explore"}
+var ActionSurfaces = []string{"row", "detail", "task", "tui", "menubar", "notification", "cli", "explore"}
 
 // BuiltinActionIDs are the built-in actions actions.toml words, one table
 // each: a row's, a draft's, a plan item's and a task run's. plan_guide is the plan item's
@@ -16,7 +16,7 @@ var ActionSurfaces = []string{"row", "detail", "tui", "menubar", "notification",
 var BuiltinActionIDs = []string{
 	"take_over", "pause", "resume", "mute", "unmute", "track", "untrack",
 	"open", "remove", "remove_force",
-	"brief_refresh", "intake_without", "intake_cancel",
+	"brief_refresh", "copy_review_request", "intake_without", "intake_cancel",
 	"draft.edit", "draft.retry", "draft.close-silently", "draft.skip-workflow",
 	"plan_apply", "plan_dismiss", "plan_guide",
 	"run.open", "run.enter", "run.transcript",
@@ -31,6 +31,10 @@ func actionValues(names []string) func() []Value {
 		return out
 	}
 }
+
+// CopyActions are the built-in actions whose only effect is the copy their actions.toml table words, the only
+// tables a copy may sit in.
+var CopyActions = []string{"copy_review_request"}
 
 // actionsGrammar is the keys of an intent's [action] and of actions.toml.
 var actionsGrammar = []Key{
@@ -57,4 +61,8 @@ var actionsGrammar = []Key{
 	{Path: "*.input", In: SurfaceActions, Kind: KindTable, Doc: "The text the action asks for."},
 	{Path: "*.input.label", In: SurfaceActions, Localized: true, Kind: KindText, Doc: "The input's name."},
 	{Path: "*.input.help", In: SurfaceActions, Localized: true, Kind: KindText, Doc: "What to write, shown in the empty input."},
+	{Path: "*.copy", In: SurfaceActions, Kind: KindTable, Doc: "What running the action gives the person to paste elsewhere, on an action whose only effect is its copy (copy_review_request): the client puts it on the clipboard, or shows it where it cannot. Its texts run over the copy facts of the unit the action runs on (`{{.copy.title}}`, `{{.copy.link}}`, `{{.copy.brief.goal}}`); `html` escapes a value and `replace` swaps a substring (`{{replace .copy.title \"`\" \"'\"}}`)."},
+	{Path: "*.copy.text", In: SurfaceActions, Localized: true, Kind: KindTemplate, Required: true, Doc: "The plain text copied, over the copy facts. Required."},
+	{Path: "*.copy.html", In: SurfaceActions, Localized: true, Kind: KindTemplate, Doc: "The same text formatted as HTML, which a rich paste target reads; empty copies the plain text alone."},
+	{Path: "*.copy.notice", In: SurfaceActions, Localized: true, Kind: KindTemplate, Required: true, Doc: "What the client says once it copied, over the copy facts. Required."},
 }

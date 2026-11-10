@@ -64,6 +64,37 @@ summary = "Make this pull request's brief again now, from what it holds today."
 note    = "Make this pull request's brief again now"
 why     = "the brief is off; set brief.enabled in the config"
 
+[copy_review_request]
+label   = "Copy review request"
+summary = "Copy a review request with the title, link and brief, formatted for a chat message."
+
+[copy_review_request.copy]
+text = '''
+review, pls? `{{replace .copy.title "`" "'"}}`
+{{or .copy.link .copy.label}}
+{{- with .copy.brief.goal}}
+
+*Goal:*
+{{.}}
+{{- end}}
+{{- with .copy.brief.context}}
+
+*Context:*
+{{.}}
+{{- end}}
+{{- with .copy.brief.risk_why}}
+
+*Risk:*
+{{.}}
+{{- end}}'''
+html = '''
+review, pls? <code>{{html .copy.title}}</code><br>
+{{- if .copy.link}}<a href="{{html .copy.link}}">{{html .copy.label}}</a>{{else}}{{html .copy.label}}{{end}}
+{{- with .copy.brief.goal}}<br><br><b>Goal:</b><br>{{html .}}{{end}}
+{{- with .copy.brief.context}}<br><br><b>Context:</b><br>{{html .}}{{end}}
+{{- with .copy.brief.risk_why}}<br><br><b>Risk:</b><br>{{html .}}{{end}}'''
+notice = "Copied the review request for {{.copy.label}}; paste it in a chat."
+
 [intake_without]
 label   = "Start without brief"
 summary = "Start the turn this intake waits on now, without waiting for the brief. Cancel drops the intake instead."

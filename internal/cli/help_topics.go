@@ -522,6 +522,14 @@ func helpGroups(manager string) []helpGroup {
 				Docs:     "concepts/brief",
 			},
 			{
+				Names:    []string{"brief copy"},
+				Summary:  "Copy a review request for a pull request",
+				Usage:    []string{"brief copy <url>"},
+				About:    "Put a review request with the pull request's title, link and brief on the clipboard, to paste in a chat; where there is no clipboard it prints the request. The profile's actions.toml words it.",
+				Examples: []string{"brief copy " + pr},
+				Docs:     "concepts/brief",
+			},
+			{
 				Names:   []string{"turn show"},
 				Summary: "A pull request's turns and their records",
 				Usage:   []string{"turn show <url> [--json] [--color auto|always|never]"},

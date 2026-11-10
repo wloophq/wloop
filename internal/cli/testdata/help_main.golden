@@ -63,6 +63,7 @@ TROUBLESHOOTING
   timings                Review, merge and turn durations, waits, tokens
   intake                 Follow, start or cancel an intake
   brief refresh          Make a pull request's brief again
+  brief copy             Copy a review request for a pull request
   turn show              A pull request's turns and their records
   probe                  Prove an agent home end to end
 

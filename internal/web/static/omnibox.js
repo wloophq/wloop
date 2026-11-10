@@ -315,18 +315,23 @@ async function omniboxUnitAction(st, env, id) {
 }
 
 // omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
-// asks for the action's confirm and input.
+// asks for the action's confirm and input. An action that copies claims the clipboard before the first await.
 async function omniboxAct(u, id) {
-  const d = await getJSON(unitPath(u));
-  await refreshSpecs([d.row]);
-  const input = (state.specs.byId[id] || {}).input;
-  const extra = {};
-  if (input && (input.kind === "text" || input.kind === "answer")) {
-    const v = await askInput({ label: input.label || id, placeholder: input.placeholder });
-    if (v === null || v === undefined) return;
-    extra.guidance = String(v).trim();
+  const claim = (state.specs.byId[id] || {}).copies ? claimCopy() : null;
+  try {
+    const d = await getJSON(unitPath(u));
+    await refreshSpecs([d.row]);
+    const input = (state.specs.byId[id] || {}).input;
+    const extra = claim ? { claim } : {};
+    if (input && (input.kind === "text" || input.kind === "answer")) {
+      const v = await askInput({ label: input.label || id, placeholder: input.placeholder });
+      if (v === null || v === undefined) return;
+      extra.guidance = String(v).trim();
+    }
+    return await act(d.row, id, extra);
+  } finally {
+    if (claim) claim.pending.reject(new Error(t("{action} answered nothing to copy", { action: id })));
   }
-  return act(d.row, id, extra);
 }
 
 // omniboxChoices are what Enter may run, in the order the arrows walk them: the operations to confirm, a

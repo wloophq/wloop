@@ -388,6 +388,21 @@
     "source": "builtin"
   },
   {
+    "id": "copy_review_request",
+    "label": "Copy review request",
+    "summary": "Copy a review request with the title, link and brief, formatted for a chat message.",
+    "group": "brief",
+    "key": "Y",
+    "surfaces": [
+      "detail",
+      "task",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin",
+    "copies": true
+  },
+  {
     "id": "intake_without",
     "label": "Start without brief",
     "summary": "Start the turn this intake waits on now, without waiting for the brief. Cancel drops the intake instead.",

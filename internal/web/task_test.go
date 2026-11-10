@@ -543,3 +543,26 @@ process.stdout.write(JSON.stringify({ Run: text(byClass(run, "meta")[0]), Brief:
 		t.Errorf("%+v: a transcript line renders as markdown", got)
 	}
 }
+
+func TestATaskPageOffersTheActionsItsUnitsOfferOnIt(t *testing.T) {
+	var got struct {
+		Labels []string
+		Asked  string
+	}
+	e := pageTask(t)
+	e.UnitActions = []api.UnitActions{{Unit: prUnit, Label: "acme/api#8", Actions: []api.ActionState{{ID: "copy_review_request", Enabled: true}, {ID: "pause", Enabled: true}}}}
+	answers := pageAnswers(t)
+	answers["/api/tasks/"+e.ID] = e
+	runTaskPage(t, `
+state.specs.byId.copy_review_request = { id: "copy_review_request", label: "Copy review request", group: "brief", surfaces: ["detail", "task"], copies: true };
+state.specs.byId.pause = { id: "pause", label: "Pause", group: "control", surfaces: ["row", "detail"] };
+let ran = "";
+act = async (row, id) => { ran = row.unit.key + " " + id; };
+const box = await page("t-0123456789abcdef");
+const buttons = walk(cls(box, "verbs")[0], (x) => x.tag === "button" && String(x.attrs["data-focus"] || "").startsWith("task:github:"));
+await buttons[0].on.click({ stopPropagation() {} });
+done({ Labels: buttons.map((b) => b.textContent), Asked: ran });`, answers, &got)
+	if !slices.Equal(got.Labels, []string{"Copy review request"}) || got.Asked != "acme/api#8 copy_review_request" {
+		t.Errorf("unit actions on the task page %v, ran %q", got.Labels, got.Asked)
+	}
+}

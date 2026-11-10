@@ -16,14 +16,19 @@ import (
 
 // The surfaces an action spec names.
 const (
-	SurfaceRow          = "row"
-	SurfaceDetail       = "detail"
+	SurfaceRow    = "row"
+	SurfaceDetail = "detail"
+	// SurfaceTask is a task's page, which offers the actions of the units the task holds.
+	SurfaceTask         = "task"
 	SurfaceTUI          = "tui"
 	SurfaceMenubar      = "menubar"
 	SurfaceNotification = "notification"
 	SurfaceCLI          = "cli"
 	SurfaceExplore      = "explore"
 )
+
+// CopyReviewRequest is the built-in action whose only effect is its copy: a review request to paste in a chat.
+const CopyReviewRequest = "copy_review_request"
 
 // SourceBuiltin is the Source of an action spec Go declares.
 const SourceBuiltin = "builtin"
@@ -167,6 +172,12 @@ var builtinActions = []builtinAction{
 		}
 		return on("brief_refresh")
 	}},
+	{api.ActionSpec{ID: CopyReviewRequest, Group: "brief", Key: "Y", Surfaces: []string{SurfaceDetail, SurfaceTask, SurfaceTUI, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+		if !f.Open {
+			return absent()
+		}
+		return on(CopyReviewRequest)
+	}},
 	{api.ActionSpec{ID: "intake_without", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		i := f.intake()
 		if i == nil || !i.Waiting() {
@@ -236,7 +247,7 @@ func draftAction(id, verb string, input *api.InputSpec) builtinAction {
 // worded is spec with the words of its actions.toml table key.
 func worded(l *intentload.Loaded, key string, spec api.ActionSpec) api.ActionSpec {
 	a := actionWords(l, key)
-	spec.Label, spec.Summary = a.Label, a.Summary
+	spec.Label, spec.Summary, spec.Copies = a.Label, a.Summary, a.Copies()
 	if spec.Input != nil {
 		in := *spec.Input
 		in.Label, in.Placeholder = a.Input.Label, a.Input.Help

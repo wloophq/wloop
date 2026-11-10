@@ -119,7 +119,7 @@ func compileAction(a *dintent.Action, one func(path string, p dintent.Pred) *exp
 }
 
 // ActionFuncs are the functions action texts may call.
-var ActionFuncs = template.FuncMap{"join": strings.Join, "name": func() string { return brand.Name }, "command": func() string { return brand.Command }}
+var ActionFuncs = template.FuncMap{"join": strings.Join, "replace": func(s, from, to string) string { return strings.ReplaceAll(s, from, to) }, "name": func() string { return brand.Name }, "command": func() string { return brand.Command }}
 
 // ActionText parses an action text named path with funcs and executes it
 // once over sample, so a text that cannot render fails at load.
@@ -190,6 +190,14 @@ func factMap(slot builtin.FactSlot, get func(name string) any) map[string]any {
 	}
 	return root
 }
+
+// CopyFactMap is ActionFactMap for the copy texts of a built-in action.
+func CopyFactMap(get func(name string) any) map[string]any {
+	return factMap(builtin.CopySlot, get)
+}
+
+// SampleCopyFacts is SampleActionFacts for the copy texts of a built-in action.
+func SampleCopyFacts() map[string]any { return sampleFacts(builtin.CopySlot) }
 
 // SampleActionFacts is the action fact map with every fact set, for checking texts.
 func SampleActionFacts() map[string]any { return sampleFacts(builtin.ActionSlot) }

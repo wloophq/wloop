@@ -121,6 +121,8 @@ type Env struct {
 	Sh func(ctx context.Context, name string, args ...string) ([]byte, error)
 	// Stdout runs a command for its standard output alone.
 	Stdout func(ctx context.Context, name string, args ...string) ([]byte, error)
+	// Clipboard puts text on the clipboard; nil uses the system's.
+	Clipboard func(text string) error
 
 	LoadConfig func() (config.Config, error)
 	// Languages are the system's preferred languages a serve shows its texts in when ui.locale is empty;

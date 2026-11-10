@@ -79,7 +79,7 @@ var ReservedNames = []string{
 	"serve", "slack", "status", "store", "take-over", "task", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
 	"version", "workflows",
 
-	"answer", "brief_refresh", "continue", "dismiss", "guide", "intake_cancel", "intake_without", "remove_force", "skip",
+	"answer", "brief_refresh", "continue", "copy_review_request", "dismiss", "guide", "intake_cancel", "intake_without", "remove_force", "skip",
 	"plan_apply", "plan_dismiss", "run_now", "take_over", "trust_run", "unblock",
 
 	"eval", "intents", "settings", "tags", "try",
@@ -96,6 +96,8 @@ var ActionKeys = map[string]string{
 	"resume":    "H",
 	"mute":      "M",
 	"unmute":    "M",
+
+	"copy_review_request": "Y",
 }
 
 // GateRole is what an intent of a gate does, which its status and answer

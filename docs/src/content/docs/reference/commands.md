@@ -1054,6 +1054,24 @@ Examples:
 
 See [The brief](/concepts/brief/).
 
+### brief copy
+
+Copy a review request for a pull request.
+
+```sh
+{{command}} brief copy <url>
+```
+
+Put a review request with the pull request's title, link and brief on the clipboard, to paste in a chat; where there is no clipboard it prints the request. The profile's actions.toml words it.
+
+Examples:
+
+```sh
+{{command}} brief copy https://github.com/acme/api/pull/7
+```
+
+See [The brief](/concepts/brief/).
+
 ### turn show
 
 A pull request's turns and their records.

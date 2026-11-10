@@ -1810,37 +1810,40 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
 
-function reviewRequest(r, b) {
-  const url = safeURL(r.link);
-  const ref = labelOf(r);
-  const title = r.title.replaceAll("`", "'");
-  const x = b && b.brief;
-  const sections = x ? [[t("Goal:"), [x.goal]], [t("Context:"), [x.context]], [t("Risk:"), [x.risk_why]]]
-    .map(([label, lines]) => [label, lines.filter(Boolean)]).filter(([, lines]) => lines.length) : [];
-  const ask = t("review, pls?");
-  const text = [`${ask} \`${title}\``, url || ref,
-    ...sections.flatMap(([label, lines]) => ["", `*${label}*`, ...lines])].join("\n");
-  const link = url ? `<a href="${escapeHTML(url)}">${escapeHTML(ref)}</a>` : escapeHTML(ref);
-  const html = [`${escapeHTML(ask)} <code>${escapeHTML(title)}</code>`, link,
-    ...sections.flatMap(([label, lines]) => ["", `<b>${label}</b>`, ...lines.map(escapeHTML)])].join("<br>");
-  return { text, html };
+// clipboardItem is the clipboard entry of a copy an action answers, or of a promise of one: plain text and
+// HTML, the plain text escaped when the copy has no HTML.
+function clipboardItem(copy) {
+  const blob = (type, pick) => {
+    const p = Promise.resolve(copy).then((c) => new Blob([pick(c)], { type }));
+    p.catch(() => {});
+    return p;
+  };
+  return new ClipboardItem({
+    "text/plain": blob("text/plain", (c) => c.text),
+    "text/html": blob("text/html", (c) => c.html || escapeHTML(c.text)),
+  });
 }
 
-async function copyReviewRequest(r, b) {
-  const { text, html } = reviewRequest(r, b);
-  try {
-    if (window.ClipboardItem) {
-      await navigator.clipboard.write([new ClipboardItem({
-        "text/plain": new Blob([text], { type: "text/plain" }),
-        "text/html": new Blob([html], { type: "text/html" }),
-      })]);
-    } else {
-      await navigator.clipboard.writeText(text);
-    }
-    setNotice(t("Copied the review request for {unit}; paste it in a chat.", { unit: labelOf(r) }));
-  } catch (err) {
-    setNotice(t("Could not copy: {error}", { error: err.message }), true);
-  }
+// claimClipboard starts writing the copy a pending action will answer while the click that ran it lasts, as
+// WebKit allows a write only then; null where the clipboard takes no promised entry.
+function claimClipboard(copy) {
+  if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) return null;
+  const claimed = navigator.clipboard.write([clipboardItem(copy)]);
+  claimed.catch(() => {});
+  return claimed;
+}
+
+function writeClipboard(copy) {
+  if (window.ClipboardItem && navigator.clipboard.write) return navigator.clipboard.write([clipboardItem(copy)]);
+  return navigator.clipboard.writeText(copy.text);
+}
+
+// deferred is a promise with its resolve and reject.
+function deferred() {
+  const d = {};
+  d.promise = new Promise((resolve, reject) => Object.assign(d, { resolve, reject }));
+  d.promise.catch(() => {});
+  return d;
 }
 
 // questionRecord is the record the open question comes from: its summary
@@ -2129,7 +2132,7 @@ function renderDetail() {
     intakeBlock(r),
     inCard ? null : h("label", { class: "d-sub", for: "guidance" }, guidanceLabel(r)));
   const acts = h("div", { class: "d-acts" },
-    h("div", { class: "d-actions" }, [...actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) }), h("button", { type: "button", class: "act", "data-focus": "detail:copy-review", title: t("Copy a review request with the title, link and brief, formatted for a chat message"), onclick: () => copyReviewRequest(r, d.brief) }, t("Copy review request"))]),
+    h("div", { class: "d-actions" }, actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) })),
     actionNotes(r, "detail"),
     briefBlock(d.brief, r, readLens()));
   const log = h("div", { class: "d-log" },
@@ -2843,6 +2846,28 @@ async function load() {
   render();
 }
 
+// claimCopy claims the clipboard for the copy an action about to run will answer, while the click lasts: a
+// caller that awaits anything before act claims first and hands the claim to act.
+function claimCopy() {
+  const pending = deferred();
+  return { pending, claimed: claimClipboard(pending.promise) };
+}
+
+// copied puts the copy an action answered on the clipboard, through the write its click claimed when there is
+// one, and says what it copied; a refused write shows the text to copy by hand.
+async function copied(out, claimed) {
+  try {
+    await (claimed || writeClipboard(out.copy));
+    setNotice((out.output || []).join(" "));
+  } catch (err) {
+    state.actionError = t("Could not copy: {error}", { error: err.message });
+    state.actionDetail = out.copy.text;
+    state.actionSource = "";
+    setNotice("");
+    render();
+  }
+}
+
 // act resolves to undefined when the user backs out or the input is invalid.
 async function act(row, name, extra = {}) {
   const key = keyOf(row);
@@ -2869,6 +2894,7 @@ async function act(row, name, extra = {}) {
     if (extra.yes) body.yes = true;
     if (extra.no) body.no = true;
   }
+  const copy = spec.copies ? extra.claim || claimCopy() : null;
   state.busy.add(key);
   state.actionError = "";
   state.actionDetail = "";
@@ -2883,7 +2909,13 @@ async function act(row, name, extra = {}) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
-    setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
+    if (out.copy) {
+      if (copy) copy.pending.resolve(out.copy);
+      await copied(out, copy && copy.claimed);
+    } else {
+      if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+      setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
+    }
     ok = true;
     if (name === "answer" && row.question) state.answered.set(key, questionShown(row));
     if (body.guidance) {
@@ -2894,6 +2926,7 @@ async function act(row, name, extra = {}) {
       }
     }
   } catch (err) {
+    if (copy) copy.pending.reject(err);
     state.actionError = t("{action} failed: {error}", { action: `${name} ${labelOf(row)}`, error: err.message });
 
     state.actionDetail = err.detail || "";

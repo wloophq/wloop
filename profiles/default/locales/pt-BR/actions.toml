@@ -59,6 +59,37 @@ summary = "Refazer agora o brief deste pull request, a partir do que ele tem hoj
 note = "Refazer agora o brief deste pull request"
 why = "o brief está desligado; ligue brief.enabled na configuração"
 
+[copy_review_request]
+label = "Copiar pedido de review"
+summary = "Copiar um pedido de review com o título, o link e o brief, formatado para uma mensagem de conversa."
+
+[copy_review_request.copy]
+text = '''
+review, por favor? `{{replace .copy.title "`" "'"}}`
+{{or .copy.link .copy.label}}
+{{- with .copy.brief.goal}}
+
+*Objetivo:*
+{{.}}
+{{- end}}
+{{- with .copy.brief.context}}
+
+*Contexto:*
+{{.}}
+{{- end}}
+{{- with .copy.brief.risk_why}}
+
+*Risco:*
+{{.}}
+{{- end}}'''
+html = '''
+review, por favor? <code>{{html .copy.title}}</code><br>
+{{- if .copy.link}}<a href="{{html .copy.link}}">{{html .copy.label}}</a>{{else}}{{html .copy.label}}{{end}}
+{{- with .copy.brief.goal}}<br><br><b>Objetivo:</b><br>{{html .}}{{end}}
+{{- with .copy.brief.context}}<br><br><b>Contexto:</b><br>{{html .}}{{end}}
+{{- with .copy.brief.risk_why}}<br><br><b>Risco:</b><br>{{html .}}{{end}}'''
+notice = "Pedido de review de {{.copy.label}} copiado; cole numa conversa."
+
 [intake_without]
 label = "Começar sem brief"
 summary = "Começar agora o turno que esta entrada espera, sem esperar o brief. Cancelar descarta a entrada."

@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func relateBody(other string) string {
@@ -198,5 +199,22 @@ func TestSplitAndUnrelateAreOfferedDisabledOnATaskWithNoTaskToPick(t *testing.T)
 	}
 	if st := verbState(bare, "relate"); !st.Enabled {
 		t.Errorf("relate picks from the open tasks: %+v", st)
+	}
+}
+
+func TestATaskViewOffersTheActionsItsUnitsOfferOnATask(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	r.put(t, task.Task{ID: "t-pr", Title: "Batch export", State: "next", Category: task.CategoryReady, Units: []unit.Unit{r7u}})
+	v := r.view(t, "t-pr")
+	if len(v.UnitActions) != 1 || v.UnitActions[0].Unit != r7u {
+		t.Fatalf("unit actions %+v", v.UnitActions)
+	}
+	var ids []string
+	for _, st := range v.UnitActions[0].Actions {
+		ids = append(ids, st.ID)
+	}
+	if !slices.Equal(ids, []string{catalog.CopyReviewRequest}) {
+		t.Errorf("the task page offers %v of its pull request, want only the actions served on the task surface", ids)
 	}
 }

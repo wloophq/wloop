@@ -82,13 +82,14 @@ func TestWireShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.app.Set(api.AppStatus{State: "running", Notifications: "denied"})
-	for _, c := range []struct{ path, golden string }{
-		{api.Rows, "rows.json"},
-		{api.UnitPath(r7.Unit()), "detail.json"},
-		{"/api/health", "health.json"},
+	for _, c := range []struct{ method, path, golden string }{
+		{"GET", api.Rows, "rows.json"},
+		{"GET", api.UnitPath(r7.Unit()), "detail.json"},
+		{"GET", "/api/health", "health.json"},
+		{"POST", api.UnitPath(r7.Unit(), "copy_review_request"), "copy.json"},
 	} {
 		rec := httptest.NewRecorder()
-		s.Handler().ServeHTTP(rec, apiRequest("GET", c.path, nil))
+		s.Handler().ServeHTTP(rec, apiRequest(c.method, c.path, nil))
 		if rec.Code != 200 {
 			t.Fatalf("%s: %d %s", c.path, rec.Code, rec.Body)
 		}

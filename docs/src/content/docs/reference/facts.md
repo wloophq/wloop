@@ -114,6 +114,21 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `proposal.keep` | string | proposal | On a merge's gate, the title of the task the survivor rule keeps as the gate opens; empty otherwise. |
 | `proposal.fold` | string | proposal | On a merge's gate, the title of the task it folds into proposal.keep; empty otherwise. |
 
+### A built-in action's copy (`copy.*`; slot `copy`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `copy.title` | string | copy | The unit's title. |
+| `copy.link` | string | copy | The unit's web address; empty when it has none that is http or https. |
+| `copy.label` | string | copy | The unit as people read it, such as owner/repo#12. |
+| `copy.brief.goal` | string | copy | The brief's goal; empty when the unit has no brief. |
+| `copy.brief.context` | string | copy | The brief's context; empty when the unit has no brief. |
+| `copy.brief.kind` | string | copy | The brief's kind; empty when the unit has no brief. |
+| `copy.brief.size` | string | copy | The brief's size; empty when the unit has no brief. |
+| `copy.brief.risk` | string | copy | The brief's risk: low, medium or high; empty when the unit has no brief. |
+| `copy.brief.risk_why` | string | copy | Why the brief rates its risk so; empty when the unit has no brief. |
+| `copy.brief.open_questions` | list | copy | The brief's open questions; empty when the unit has no brief. |
+
 ### The configuration (`config.*`)
 
 | Fact | Type | Slots | Meaning |

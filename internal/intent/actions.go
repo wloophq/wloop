@@ -22,6 +22,23 @@ type BuiltinAction struct {
 	// Texts are note, warning, confirm and why, parsed; a text the table
 	// leaves empty is absent.
 	Texts map[string]*template.Template
+	// Copy are the texts of its copy table, by key (text, html, notice), over the copy facts; nil when it has
+	// none.
+	Copy map[string]*template.Template
+}
+
+// Copies says a gives the person something to copy.
+func (a BuiltinAction) Copies() bool { return a.Copy["text"] != nil }
+
+// RenderCopy is copy text name of a over facts, "" when a has none.
+func (a BuiltinAction) RenderCopy(name string, facts map[string]any) (string, error) {
+	t := a.Copy[name]
+	if t == nil {
+		return "", nil
+	}
+	var b bytes.Buffer
+	err := t.Execute(&b, facts)
+	return b.String(), err
 }
 
 // Render is text name of a over facts, "" when a has none.
@@ -43,6 +60,13 @@ type mBuiltinAction struct {
 	Confirm *string       `toml:"confirm"`
 	Why     *string       `toml:"why"`
 	Input   *mActionInput `toml:"input"`
+	Copy    *mActionCopy  `toml:"copy"`
+}
+
+type mActionCopy struct {
+	Text   *string `toml:"text"`
+	HTML   *string `toml:"html"`
+	Notice *string `toml:"notice"`
 }
 
 type mActionInput struct {
@@ -69,6 +93,8 @@ func loadActions(layers []profile.Layer, r layerReader) (map[string]BuiltinActio
 			problems = append(problems, Problem{File: ActionsFile, Field: id + ".label", Msg: "is required"})
 		case a.Summary == "":
 			problems = append(problems, Problem{File: ActionsFile, Field: id + ".summary", Msg: "is required"})
+		case slices.Contains(builtin.CopyActions, id) && !a.Copies():
+			problems = append(problems, Problem{File: ActionsFile, Field: id + ".copy", Msg: "is missing: the action's only effect is its copy"})
 		}
 	}
 	return out, problems
@@ -136,5 +162,48 @@ func (s *sheet) overAction(id string, a BuiltinAction, t mBuiltinAction) Builtin
 			a.Texts[name] = tmpl
 		}
 	}
+	s.overCopy(id, &a, t.Copy)
 	return a
+}
+
+// overCopy lays copy table t over a's copy texts: a text left out keeps the lower layer's, an empty one drops
+// it.
+func (s *sheet) overCopy(id string, a *BuiltinAction, t *mActionCopy) {
+	a.Copy = maps.Clone(a.Copy)
+	if t == nil {
+		return
+	}
+	if !slices.Contains(builtin.CopyActions, id) {
+		s.add(id+".copy", "gives nothing to copy: only %s copy", strings.Join(builtin.CopyActions, ", "))
+		return
+	}
+	if a.Copy == nil {
+		a.Copy = map[string]*template.Template{}
+	}
+	sample := SampleCopyFacts()
+	texts := map[string]*string{"text": t.Text, "html": t.HTML, "notice": t.Notice}
+	for _, name := range slices.Sorted(maps.Keys(texts)) {
+		v := texts[name]
+		path := id + ".copy." + name
+		switch {
+		case v == nil:
+		case *v == "" && name != "html":
+			s.add(path, "may not be empty: a copy copies a text and says so")
+		case *v == "":
+			delete(a.Copy, name)
+		default:
+			tmpl, err := ActionText(s.textFuncs(), path, *v, sample)
+			if err != nil {
+				_, msg := templateMsg(path, err)
+				s.add(path, "%s", msg)
+				continue
+			}
+			a.Copy[name] = tmpl
+		}
+	}
+	for _, name := range []string{"text", "notice"} {
+		if a.Copy[name] == nil {
+			s.add(id+".copy."+name, "is required")
+		}
+	}
 }

@@ -294,6 +294,27 @@ process.stdout.write(JSON.stringify({ Got: gets, Acts: acts }));
 	}
 }
 
+func TestOmniboxClaimsTheClipboardBeforeItFetches(t *testing.T) {
+	var got struct {
+		Order []string
+		Extra []bool
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+state.specs = { byId: { copy_review_request: { id: "copy_review_request", copies: true } } };
+const order = [], extra = [];
+globalThis.claimCopy = () => { order.push("claim"); return { pending: { resolve() {}, reject() {} } }; };
+globalThis.getJSON = async () => { order.push("fetch"); return { row: { unit: { provider: "alpha", key: "acme/api#8" }, actions: [] } }; };
+globalThis.refreshSpecs = async () => {};
+globalThis.act = async (row, id, x) => { order.push("act"); extra.push(!!x.claim); return true; };
+await omniboxAct({ provider: "alpha", key: "acme/api#8" }, "copy_review_request");
+process.stdout.write(JSON.stringify({ Order: order, Extra: extra }));
+})();`, nil, &got)
+	if !slices.Equal(got.Order, []string{"claim", "fetch", "act"}) || !slices.Equal(got.Extra, []bool{true}) {
+		t.Fatalf("%+v: an action that copies claims the clipboard in the click, before the omnibox fetches, and hands the claim to act", got)
+	}
+}
+
 func TestOmniboxEnterOnAUnitRunsNothing(t *testing.T) {
 	var got struct {
 		Opened []string

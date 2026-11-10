@@ -18,7 +18,7 @@ acme/api#7  Batch export
              2. Publish APPROVE (recommended)
              3. Hold the draft
   keys       W answer  C continue  X dismiss  G guide  V review  A take over
-             H pause  M mute  O open
+             H pause  M mute  O open  Y copy review request
   not now    F address · N nudge
 
 

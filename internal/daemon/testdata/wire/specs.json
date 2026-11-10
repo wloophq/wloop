@@ -1,5 +1,5 @@
 {
-  "version": "8ad46135340f",
+  "version": "48551a885afd",
   "specs": [
     {
       "id": "answer",
@@ -427,6 +427,23 @@
       "source": "builtin",
       "scope": "unit",
       "plugin": "github"
+    },
+    {
+      "id": "copy_review_request",
+      "label": "Copy review request",
+      "summary": "Copy a review request with the title, link and brief, formatted for a chat message.",
+      "group": "brief",
+      "key": "Y",
+      "surfaces": [
+        "detail",
+        "task",
+        "tui",
+        "cli"
+      ],
+      "source": "builtin",
+      "scope": "unit",
+      "plugin": "github",
+      "copies": true
     },
     {
       "id": "intake_without",

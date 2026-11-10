@@ -238,7 +238,7 @@ func isBuiltin(l *intentload.Loaded, name string) bool {
 	_, isDelegated := delegatedActions[name]
 	_, isIntake := intakeRouteActions[name]
 	_, isGate := catalog.RowGateIntent(l, name)
-	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh"
+	return isHold || isDelegated || followActions[name] || isIntake || isGate || name == "brief_refresh" || slices.Contains(builtin.CopyActions, name)
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -334,6 +334,10 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		s.refreshBrief(w, r, u)
 		return
 	}
+	if slices.Contains(builtin.CopyActions, name) {
+		s.writeCopy(ctx, w, l, name, row)
+		return
+	}
 	if change, ok := intakeRouteActions[name]; ok {
 		s.changeIntakeOf(w, ctx, u, change)
 		return
@@ -356,6 +360,29 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, api.ActionResult{OK: true, Output: lines(out.String())})
+}
+
+// writeCopy answers a built-in action whose only effect is its copy with the copy its actions.toml table renders
+// over row, the row offered() read, and the unit's brief, with the notice that says what it is.
+func (s *Server) writeCopy(ctx context.Context, w http.ResponseWriter, l *intentload.Loaded, name string, row api.Row) {
+	var pd api.PluginDetail
+	if _, err := s.pluginViewOf(ctx, row.Unit.Provider, api.ViewUnitDetail, api.UnitQuery{Unit: row.Unit}, &pd); err != nil {
+		writeActionError(w, err)
+		return
+	}
+	var brief *api.Brief
+	if pd.Brief != nil {
+		brief = pd.Brief.Brief
+	}
+	c, notice, err := catalog.Copy(l, name, catalog.CopyFacts{Row: row, Brief: brief})
+	if err == nil && c == nil {
+		err = fmt.Errorf("%s gives nothing to copy: %s has no %s.copy", name, intentload.ActionsFile, name)
+	}
+	if err != nil {
+		writeActionError(w, err)
+		return
+	}
+	writeJSON(w, api.ActionResult{OK: true, Copy: c, Output: []string{notice}})
 }
 
 // offered is the state of the action on the pull request's row now; an
