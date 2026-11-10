@@ -43,20 +43,22 @@ type Store struct {
 	clock func() time.Time
 }
 
-// Of is st holding its test's pull requests.
+// Of is st holding its test's pull requests. It creates the fixture's
+// tables before another caller can get the store.
 func Of(st *inventory.Store) *Store {
 	if s, ok := held.Load(st); ok {
 		return s.(*Store)
 	}
+	if _, err := st.DB().Write(context.Background(), func(tx *sqlite.Tx) error {
+		_, err := tx.ExecContext(context.Background(), fixtureTables)
+		return err
+	}); err != nil {
+		panic(fmt.Sprintf("inventorytest: creating the fixture's tables: %v", err))
+	}
 	s, loaded := held.LoadOrStore(st, &Store{Store: st, db: st.DB(), clock: st.Now})
 	if !loaded {
-		if _, err := st.DB().Write(context.Background(), func(tx *sqlite.Tx) error {
-			_, err := tx.ExecContext(context.Background(), fixtureTables)
-			return err
-		}); err != nil {
-			panic(fmt.Sprintf("inventorytest: creating the fixture's tables: %v", err))
-		}
 		st.UsePRs(s.(*Store))
+		published(st)
 	}
 	return s.(*Store)
 }
@@ -98,6 +100,16 @@ CREATE TABLE IF NOT EXISTS pr_details (
 
 // held are the stores Of gave, by the inventory they hold.
 var held sync.Map
+
+// onPublish holds, by inventory, what a test runs once Of made its store
+// visible to other callers.
+var onPublish sync.Map
+
+func published(st *inventory.Store) {
+	if f, ok := onPublish.Load(st); ok {
+		f.(func())()
+	}
+}
 
 // List are the pull requests the test holds, the open ones alone when open.
 func (s *Store) List(ctx context.Context, open bool) ([]dinv.PR, error) { return s.ListPRs(ctx, open) }
