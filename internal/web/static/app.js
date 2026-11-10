@@ -2853,11 +2853,24 @@ function claimCopy() {
   return { pending, claimed: claimClipboard(pending.promise) };
 }
 
-// copied puts the copy an action answered on the clipboard, through the write its click claimed when there is
-// one, and says what it copied; a refused write shows the text to copy by hand.
-async function copied(out, claimed) {
+// settleCopy puts the copy action name answered on the clipboard, through the write claim took in the click
+// when there is one; an answer with nothing to copy releases the claim and resolves to false. A refused write
+// throws.
+async function settleCopy(name, out, claim) {
+  if (!out.copy) {
+    if (claim) claim.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+    return false;
+  }
+  if (claim) claim.pending.resolve(out.copy);
+  await ((claim && claim.claimed) || writeClipboard(out.copy));
+  return true;
+}
+
+// copied settles the copy action name answered and says what it copied; a refused write shows the text to
+// copy by hand. False when the answer carries nothing to copy.
+async function copied(name, out, claim) {
   try {
-    await (claimed || writeClipboard(out.copy));
+    if (!(await settleCopy(name, out, claim))) return false;
     setNotice((out.output || []).join(" "));
   } catch (err) {
     state.actionError = t("Could not copy: {error}", { error: err.message });
@@ -2866,6 +2879,7 @@ async function copied(out, claimed) {
     setNotice("");
     render();
   }
+  return true;
 }
 
 // act resolves to undefined when the user backs out or the input is invalid.
@@ -2909,11 +2923,7 @@ async function act(row, name, extra = {}) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
-    if (out.copy) {
-      if (copy) copy.pending.resolve(out.copy);
-      await copied(out, copy && copy.claimed);
-    } else {
-      if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+    if (!(await copied(name, out, copy))) {
       setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
     }
     ok = true;

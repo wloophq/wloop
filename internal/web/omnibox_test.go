@@ -8,16 +8,19 @@ import (
 
 // omniHarness drives the omnibox's state over a fake daemon: input.search answers GET /api/search by query,
 // input.resolve POST /api/omnibox/resolve by text, input.ask the asks in order (a string throws it),
-// input.actions a unit action's POST by path (a string throws it), input.refuse refuses the clipboard's write;
-// posts are logged with their bodies, and the clipboard's claims and writes in steps; later runs at once
-// unless held.
+// input.rows a unit's GET by path, input.actions a unit action's POST by path (a string throws it),
+// input.refuse refuses the clipboard's write, input.confirm answers a confirm; posts are logged with their
+// bodies, and the unit's fetches, posts, claims and copies in steps; later runs at once unless held.
 const omniHarness = `
 const log = { gets: [], posts: [], opened: [], acts: [], actCopies: [], closed: 0, renders: 0, steps: [] };
 const held = [];
 let hold = false;
 let asks = 0;
 const env = {
-  get: async (url) => { log.gets.push(url); return (input.search || {})[decodeURIComponent(url.split("q=")[1])] || { groups: [] }; },
+  get: async (url) => {
+    log.gets.push(url);
+    if (url.startsWith("/api/units/")) { log.steps.push("get"); return (input.rows || {})[url] || { row: { actions: [] } }; }
+    return (input.search || {})[decodeURIComponent(url.split("q=")[1])] || { groups: [] }; },
   post: async (url, body) => {
     log.posts.push({ url, body: JSON.parse(JSON.stringify(body)) });
     if (url === "/api/omnibox/resolve") return (input.resolve || {})[body.text] || { kind: "search" };
@@ -36,7 +39,13 @@ const env = {
       reject: (err) => { log.steps.push("reject " + err.message); settle.no(err); },
     } };
   },
-  write: async (copy) => { log.steps.push("write " + copy.text); },
+  settle: async (name, out, claim) => {
+    if (!out.copy) { claim.pending.reject(new Error(name + " answered nothing to copy")); return false; }
+    claim.pending.resolve(out.copy);
+    await claim.claimed;
+    return true;
+  },
+  confirm: (text) => { log.steps.push("confirm " + text); return input.confirm !== false; },
   later: (fn) => { if (hold) held.push(fn); else fn(); return 1; },
   clear: () => {},
   now: () => 0,
@@ -313,8 +322,75 @@ await copy.attrs.onclick();
 process.stdout.write(JSON.stringify({ Steps: log.steps, Bodies: log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => p.body),
   Opened: log.opened, Acts: log.acts, Closed: log.closed }));
 })();`, map[string]any{"resolve": copyingUnit(), "actions": map[string]any{copyAction: map[string]any{"ok": true, "copy": map[string]any{"text": "review, pls?"}}}}, &got)
-	if !slices.Equal(got.Steps, []string{"claim", "post", "resolve review, pls?"}) || len(got.Bodies) != 1 || got.Closed != 1 || len(got.Opened) != 0 || len(got.Acts) != 0 {
-		t.Fatalf("%+v: in the panel an action that copies claims the clipboard in the click, posts the action, puts its copy there and hides the panel", got)
+	if !slices.Equal(got.Steps, []string{"claim", "get", "post", "resolve review, pls?"}) || len(got.Bodies) != 1 || got.Closed != 1 || len(got.Opened) != 0 || len(got.Acts) != 0 {
+		t.Fatalf("%+v: in the panel an action that copies claims the clipboard in the click, fetches the row, posts the action, puts its copy there and hides the panel", got)
+	}
+}
+
+func servedCopyRow(confirm string) map[string]any {
+	return map[string]any{"/api/units/alpha/acme%2Fapi%238": map[string]any{"row": map[string]any{
+		"actions": []any{map[string]any{"id": "copy_review_request", "enabled": true, "basis": "open@3", "confirm": confirm}}}}}
+}
+
+func TestOmniboxPanelCopyAsksTheRowsConfirmAndSendsItsBasis(t *testing.T) {
+	var got struct {
+		Steps  []string
+		Bodies []map[string]any
+		Closed int
+	}
+	run := func(confirm bool) {
+		nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(true, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+await all(nodes(st), (x) => x.tag === "button" && text(x).includes("Copy review request"))[0].attrs.onclick();
+process.stdout.write(JSON.stringify({ Steps: log.steps, Bodies: log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => p.body), Closed: log.closed }));
+})();`, map[string]any{"resolve": copyingUnit(), "rows": servedCopyRow("Copy it?"), "confirm": confirm,
+			"actions": map[string]any{copyAction: map[string]any{"ok": true, "copy": map[string]any{"text": "review, pls?"}}}}, &got)
+	}
+	run(true)
+	if !slices.Equal(got.Steps, []string{"claim", "get", "confirm Copy it?", "post", "resolve review, pls?"}) || len(got.Bodies) != 1 || got.Bodies[0]["basis"] != "open@3" || got.Closed != 1 {
+		t.Fatalf("%+v: the panel asks the row's confirm and sends the basis the row rests on", got)
+	}
+	run(false)
+	if len(got.Bodies) != 0 || got.Closed != 0 || got.Steps[len(got.Steps)-1] != "reject cancelled" {
+		t.Fatalf("%+v: a declined confirm posts nothing and releases the claim", got)
+	}
+}
+
+func TestOmniboxPanelCopyRunsOncePerClickInFlight(t *testing.T) {
+	var got struct {
+		Posts  int
+		Claims int
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(true, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+const copy = all(nodes(st), (x) => x.tag === "button" && text(x).includes("Copy review request"))[0];
+await Promise.all([copy.attrs.onclick(), copy.attrs.onclick()]);
+process.stdout.write(JSON.stringify({ Posts: log.steps.filter((s) => s === "post").length, Claims: log.steps.filter((s) => s === "claim").length }));
+})();`, map[string]any{"resolve": copyingUnit(), "actions": map[string]any{copyAction: map[string]any{"ok": true, "copy": map[string]any{"text": "review, pls?"}}}}, &got)
+	if got.Posts != 1 || got.Claims != 1 {
+		t.Fatalf("%+v: a second click while the copy is in flight claims and posts nothing", got)
+	}
+}
+
+func TestOmniboxPanelRetryClearsTheEarlierFailure(t *testing.T) {
+	var got []string
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(true, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+const copy = () => all(nodes(st), (x) => x.tag === "button" && text(x).includes("Copy review request"))[0].attrs.onclick();
+input.refuse = "denied";
+await copy();
+input.refuse = "";
+await copy();
+process.stdout.write(JSON.stringify(all(nodes(st), (x) => /omni-copy/.test(x.attrs.class || "")).map(text)));
+})();`, map[string]any{"resolve": copyingUnit(), "actions": map[string]any{copyAction: map[string]any{"ok": true, "copy": map[string]any{"text": "review, pls?"}}}}, &got)
+	if len(got) != 0 {
+		t.Fatalf("%v: a copy that succeeds leaves no earlier failure on show", got)
 	}
 }
 
@@ -348,7 +424,7 @@ await omniboxType(st, "https://example.test/acme/api/pull/8", env);
 await all(nodes(st), (x) => x.tag === "button" && text(x).includes("Copy review request"))[0].attrs.onclick();
 process.stdout.write(JSON.stringify({ Steps: log.steps, Closed: log.closed, Shown: all(nodes(st), (x) => /omni-copy/.test(x.attrs.class || "")).map(text) }));
 })();`, map[string]any{"resolve": copyingUnit(), "actions": map[string]any{copyAction: "not offered"}}, &got)
-	if !slices.Equal(got.Steps, []string{"claim", "post", "reject not offered"}) || got.Closed != 0 || !slices.Equal(got.Shown, []string{"Copy review request failed: not offered"}) {
+	if !slices.Equal(got.Steps, []string{"claim", "get", "post", "reject not offered"}) || got.Closed != 0 || !slices.Equal(got.Shown, []string{"Copy review request failed: not offered"}) {
 		t.Fatalf("%+v: a failed action releases the clipboard's claim and says why, writing nothing", got)
 	}
 }

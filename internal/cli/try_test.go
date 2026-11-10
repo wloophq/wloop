@@ -246,9 +246,12 @@ func TestSessionPoliciesDenyEveryManagersControlButItsBinary(t *testing.T) {
 	has := func(p turns.Policy, rule ...string) bool {
 		return slices.ContainsFunc(p.Deny, func(d []string) bool { return slices.Equal(d, rule) })
 	}
-	for _, managers := range [][]string{{"zed", "none"}, {"none"}} {
+	for _, managers := range [][]string{{"zed", "none"}, {"none"}, {"orca"}} {
 		te.cfg.WorkspaceManagers = managers
 		control := te.controlSurface(te.cfg)
+		if managers[0] == "orca" && len(te.enabledEntries(te.cfg)) != 1 {
+			t.Fatalf("orca is not enabled under %q", managers)
+		}
 		for name, p := range map[string]turns.Policy{
 			"round": policies[policyRound](te.Env, "review", control),
 			"probe": policies["probe"](te.Env, "ask-author", control),

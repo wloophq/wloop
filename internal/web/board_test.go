@@ -404,7 +404,7 @@ const document = { getElementById: () => null };
 ` + keyJS(t) + jsConst(t, src, "API_VERSION")
 }
 
-var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied", "act"}
+var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "settleCopy", "copied", "act"}
 
 func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	var got struct {
@@ -1041,7 +1041,7 @@ const document = { getElementById: () => null };
 		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
 	}
 	var got map[string][]bool
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const buttons = () => walk(questionBlock(input)).filter((x) => x.tag === "button" && !text(x).startsWith("Send answer"));
@@ -1281,7 +1281,7 @@ const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromE
 }
 
 var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote",
-	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied"}
+	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "settleCopy", "copied"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)

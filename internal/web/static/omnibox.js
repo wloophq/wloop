@@ -326,29 +326,40 @@ function omniboxCopied(st) {
 }
 
 // omniboxPanelCopy runs, from the floating panel, an action that copies: it claims the clipboard while the
-// click lasts, posts the action, puts its copy on the clipboard and hides the panel. A failed action says why,
-// and a refused write shows the text to copy by hand.
+// click lasts, asks the confirm of the row the unit serves, posts the action on the basis that row rests on,
+// puts its copy on the clipboard and hides the panel. A failed action says why, and a refused write shows the
+// text to copy by hand.
 async function omniboxPanelCopy(st, env, spec) {
+  if (st.copying) return;
+  st.copying = true;
+  st.copied = null;
   const claim = env.claim();
   const resolved = st.resolved;
+  const u = resolved.unit.unit;
   const action = spec.label || spec.id;
   const show = (error, text) => { st.copied = { resolved, error, text }; env.render(); };
-  let out;
   try {
-    out = await env.post(unitPath(resolved.unit.unit, spec.id), { source: "cockpit" });
-    if (out.error) throw new Error(out.error);
-    if (!out.copy) throw new Error(t("{action} answered nothing to copy", { action }));
-  } catch (err) {
-    claim.pending.reject(err);
-    return show(t("{action} failed: {error}", { action, error: err.message }), "");
+    let out;
+    try {
+      const d = await env.get(unitPath(u));
+      const offered = ((d.row && d.row.actions) || []).find((a) => a.id === spec.id) || {};
+      if (offered.confirm && !env.confirm(offered.confirm)) return claim.pending.reject(new Error("cancelled"));
+      out = await env.post(unitPath(u, spec.id), offered.basis ? { source: "cockpit", basis: offered.basis } : { source: "cockpit" });
+      if (out.error) throw new Error(out.error);
+    } catch (err) {
+      claim.pending.reject(err);
+      return show(t("{action} failed: {error}", { action, error: err.message }), "");
+    }
+    try {
+      if (!(await env.settle(spec.id, out, claim))) return show(t("{action} answered nothing to copy", { action }), "");
+    } catch (err) {
+      return show(t("Could not copy: {error}", { error: err.message }), out.copy.text);
+    }
+    env.render();
+    env.close();
+  } finally {
+    st.copying = false;
   }
-  claim.pending.resolve(out.copy);
-  try {
-    await (claim.claimed || env.write(out.copy));
-  } catch (err) {
-    return show(t("Could not copy: {error}", { error: err.message }), out.copy.text);
-  }
-  env.close();
 }
 
 // omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
@@ -704,7 +715,8 @@ function showOmnibox(opts = {}) {
     open: (href) => { location.hash = href; if (!st.panel) close(); },
     act: (u, id, copies) => omniboxAct(u, id, copies),
     claim: () => claimCopy(),
-    write: (copy) => writeClipboard(copy),
+    settle: (name, out, claim) => settleCopy(name, out, claim),
+    confirm: (text) => confirm(text),
     close: () => close(),
     changed: () => { if (typeof scheduleLoad === "function") scheduleLoad({ tasks: true }); },
     render: () => omniboxRedraw(st, env, input, results),
