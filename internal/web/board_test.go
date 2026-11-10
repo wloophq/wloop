@@ -440,6 +440,26 @@ func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	}
 }
 
+func TestActResolvesAClaimHandedInWhateverItsSpecs(t *testing.T) {
+	var got struct {
+		Resolved string
+		Writes   []map[string]string
+	}
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true }] };
+  answer.body = { ok: true, copy: { text: "review, pls?" }, output: ["copied"] };
+  const claim = claimCopy();
+  let resolved = "";
+  const resolve = claim.pending.resolve;
+  claim.pending.resolve = (copy) => { resolved = copy.text; resolve(copy); };
+  await act(row, "copy_review_request", { claim });
+  process.stdout.write(JSON.stringify({ resolved, writes: clipboard.writes }));
+})();`, nil, &got)
+	if got.Resolved != "review, pls?" || len(got.Writes) != 1 {
+		t.Errorf("%+v: act puts the copy through the claim it was handed even when its own specs do not say the action copies", got)
+	}
+}
+
 func TestAFailedCopyActionWritesNothing(t *testing.T) {
 	var got struct {
 		Writes []map[string]string

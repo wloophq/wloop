@@ -891,6 +891,7 @@ body.layout-detail .d-window { right: 0; }
 .omni-item { display: flex; width: 100%; gap: var(--space-8); padding: var(--space-4) 0; font: inherit; color: inherit; background: none; border: 0; text-align: left; cursor: pointer; }
 .omni-item kbd { margin-left: auto; font: var(--text-meta) var(--mono); color: var(--muted); }
 .omni-why, .omni-hint, .omni-dropped { margin: var(--space-4) 0; font-size: var(--text-meta); color: var(--muted); }
+.omni-copy { box-sizing: border-box; width: 100%; margin: var(--space-6) 0; padding: var(--space-6); font: var(--text-meta)/1.4 var(--mono); background: var(--panel); border: 1px solid var(--rule-strong); border-radius: var(--radius-md); }
 .omni-ops { margin: var(--space-8) 0; }
 .omni-op .why { margin: 0 0 0 var(--space-16); font-size: var(--text-meta); color: var(--muted); }
 .omni-edit { display: block; margin: var(--space-2) 0 0 var(--space-16); width: calc(100% - var(--space-16)); padding: var(--space-2) var(--space-6); font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--radius-sm); }

@@ -2894,7 +2894,7 @@ async function act(row, name, extra = {}) {
     if (extra.yes) body.yes = true;
     if (extra.no) body.no = true;
   }
-  const copy = spec.copies ? extra.claim || claimCopy() : null;
+  const copy = extra.claim || (spec.copies ? claimCopy() : null);
   state.busy.add(key);
   state.actionError = "";
   state.actionDetail = "";

@@ -53,9 +53,9 @@ func tryEnv(t *testing.T, a *tryAgent) *testEnv {
 
 func TestTrySettingsDenyEveryWrite(t *testing.T) {
 	t.Parallel()
-	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"orca"}}}))
+	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
 	for _, want := range []string{"Bash(gh api * --method*)", "Bash(gh api * -X*)", "Bash(gh api * -f*)", "Bash(gh api * --input*)",
-		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(orca *)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
+		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(open claude://*)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("deny lacks %s:\n%s", want, raw)
 		}
@@ -239,7 +239,7 @@ func TestRoundPolicyAllowsTheTurnCommands(t *testing.T) {
 	}
 }
 
-func TestSessionPoliciesDenyEveryManagersControl(t *testing.T) {
+func TestSessionPoliciesDenyEveryManagersControlButItsBinary(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Managers = map[string]ManagerEntry{"zed": {Binary: "zed-cli", Control: [][]string{{"zed", "ctl"}}, ControlPaths: []string{"/zed/sock"}}, "none": {}, "orca": orcaManager(nil)}
@@ -255,7 +255,7 @@ func TestSessionPoliciesDenyEveryManagersControl(t *testing.T) {
 			"try":   tryPolicy("p", bundledStored()).Denied(control),
 		} {
 			zed := managers[0] == "zed"
-			if has(p, "zed-cli") != zed || has(p, "zed", "ctl") != zed || slices.Contains(p.DenyPaths, "/zed/sock") != zed || has(p, "orca") || has(p, "") {
+			if has(p, "zed-cli") || has(p, "zed", "ctl") != zed || slices.Contains(p.DenyPaths, "/zed/sock") != zed || has(p, "orca") || has(p, "") {
 				t.Errorf("%s under %q: deny %q, paths %q", name, managers, p.Deny, p.DenyPaths)
 			}
 		}

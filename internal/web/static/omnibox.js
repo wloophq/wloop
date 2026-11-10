@@ -305,19 +305,56 @@ function omniboxUnitHref(unit) {
   return "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key);
 }
 
-// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes; the
-// floating panel, which holds no detail, hands the unit to the main window instead.
+// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes. The
+// floating panel holds no detail: it runs an action that copies itself and hands any other to the main window.
 async function omniboxUnitAction(st, env, id) {
-  if (st.panel) return env.open(omniboxUnitHref(omniboxUnit(st)));
-  await env.act(omniboxUnit(st).unit, id);
+  const unit = omniboxUnit(st);
+  const spec = (unit.actions || []).find((a) => a.id === id) || { id };
+  if (st.panel) return spec.copies && !spec.input ? omniboxPanelCopy(st, env, spec) : env.open(omniboxUnitHref(unit));
+  await env.act(unit.unit, id, !!spec.copies);
   if (env.changed) env.changed();
   env.render();
 }
 
+// omniboxCopied is what the panel's last copy of the resolved unit left to show: why it failed, and the text
+// to copy by hand when the clipboard refused it.
+function omniboxCopied(st) {
+  const c = st.copied;
+  if (!c || c.resolved !== st.resolved) return [];
+  return [h("p", { class: "err omni-copy-error" }, c.error),
+    c.text ? h("textarea", { class: "omni-copy", readonly: true, rows: 6, "aria-label": c.error }, c.text) : null];
+}
+
+// omniboxPanelCopy runs, from the floating panel, an action that copies: it claims the clipboard while the
+// click lasts, posts the action, puts its copy on the clipboard and hides the panel. A failed action says why,
+// and a refused write shows the text to copy by hand.
+async function omniboxPanelCopy(st, env, spec) {
+  const claim = env.claim();
+  const resolved = st.resolved;
+  const action = spec.label || spec.id;
+  const show = (error, text) => { st.copied = { resolved, error, text }; env.render(); };
+  let out;
+  try {
+    out = await env.post(unitPath(resolved.unit.unit, spec.id), { source: "cockpit" });
+    if (out.error) throw new Error(out.error);
+    if (!out.copy) throw new Error(t("{action} answered nothing to copy", { action }));
+  } catch (err) {
+    claim.pending.reject(err);
+    return show(t("{action} failed: {error}", { action, error: err.message }), "");
+  }
+  claim.pending.resolve(out.copy);
+  try {
+    await (claim.claimed || env.write(out.copy));
+  } catch (err) {
+    return show(t("Could not copy: {error}", { error: err.message }), out.copy.text);
+  }
+  env.close();
+}
+
 // omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
 // asks for the action's confirm and input. An action that copies claims the clipboard before the first await.
-async function omniboxAct(u, id) {
-  const claim = (state.specs.byId[id] || {}).copies ? claimCopy() : null;
+async function omniboxAct(u, id, copies = (state.specs.byId[id] || {}).copies) {
+  const claim = copies ? claimCopy() : null;
   try {
     const d = await getJSON(unitPath(u));
     await refreshSpecs([d.row]);
@@ -577,7 +614,8 @@ function renderOmnibox(st, env) {
       h("h3", {}, r.unit.permalink ? h("a", { href: r.unit.permalink, target: "_blank", rel: "noopener" }, r.unit.label) : r.unit.label),
       h("ol", {}, ...(r.unit.tasks || []).map((e) => h("li", {}, omniboxTaskLink(e)))),
       h("div", { class: "d-actions" }, ...(r.unit.actions || []).map((a) => h("button", { type: "button", class: "act",
-        onclick: () => omniboxUnitAction(st, env, a.id) }, a.label || a.id)))));
+        onclick: () => omniboxUnitAction(st, env, a.id) }, a.label || a.id))),
+      ...omniboxCopied(st)));
   }
   if (r && r.kind === "agent" && !agent) out.push(h("p", { class: "omni-hint", ...opt("ask") }, t("Press ⌘↵ to ask the agent")));
   out.push(...omniboxAnswer(st, env));
@@ -664,7 +702,9 @@ function showOmnibox(opts = {}) {
     clear: (id) => clearTimeout(id),
     now: () => performance.now(),
     open: (href) => { location.hash = href; if (!st.panel) close(); },
-    act: (u, id) => omniboxAct(u, id),
+    act: (u, id, copies) => omniboxAct(u, id, copies),
+    claim: () => claimCopy(),
+    write: (copy) => writeClipboard(copy),
     close: () => close(),
     changed: () => { if (typeof scheduleLoad === "function") scheduleLoad({ tasks: true }); },
     render: () => omniboxRedraw(st, env, input, results),
