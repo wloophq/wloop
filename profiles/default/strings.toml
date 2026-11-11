@@ -179,6 +179,7 @@
 "Brief retry" = "Brief retry"
 "Briefs resume" = "Briefs resume"
 "Cancel" = "Cancel"
+"Confirm" = "Confirm"
 "Capture" = "Capture"
 "capture failed: {error}" = "capture failed: {error}"
 "captured: {title}" = "captured: {title}"

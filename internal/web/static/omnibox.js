@@ -5,6 +5,8 @@ const PALETTE_CSS = `
 @starting-style { .pal-back { opacity: 0; } }
 .pal { background: var(--panel); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; width: min(36rem, calc(100vw - 2rem)); max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgb(0 0 0 / 0.25); font: 14px var(--sans); }
 .pal-head { padding: 0.5rem 0.75rem; color: var(--muted); border-bottom: 1px solid var(--rule); }
+.pal-confirm .pal-head { margin: 0; color: var(--ink); border: 0; }
+.pal-acts { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.5rem 0.75rem; }
 .pal input { margin: 0.5rem 0.75rem; padding: 0.4rem 0.5rem; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; }
 .pal ol, .pal dl { list-style: none; margin: 0; padding: 0 0 0.5rem; overflow: auto; }
 .pal li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.3rem 0.75rem; cursor: pointer; }
@@ -161,9 +163,10 @@ function showHelp(groups) {
 }
 
 // askInput is the small input a key opens: the typed text on Enter, null on Esc.
-function askInput({ label, placeholder }) {
+function askInput({ label, placeholder, value }) {
   return new Promise((resolve) => {
     const input = palEl("input", { type: "text", "aria-label": label, placeholder: placeholder || "", autocomplete: "off" });
+    input.value = value || "";
     const box = palEl("div", { class: "pal", role: "dialog", "aria-label": label }, palEl("div", { class: "pal-head" }, label), input);
     let done = false;
     const close = palOverlay(box);
@@ -181,6 +184,32 @@ function askInput({ label, placeholder }) {
     });
     input.addEventListener("blur", () => finish(null));
     input.focus();
+  });
+}
+
+// askConfirm asks text in the page, as confirm would: true on Confirm or Enter, false on Cancel, Esc or a click
+// outside. The native window's WebKit shows no browser dialog.
+function askConfirm(text) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      close();
+      resolve(v);
+    };
+    const yes = palEl("button", { type: "button", class: "act primary", onclick: () => finish(true) }, t("Confirm"));
+    const no = palEl("button", { type: "button", class: "act", onclick: () => finish(false) }, t("Cancel"));
+    const box = palEl("div", { class: "pal pal-confirm", role: "alertdialog", "aria-label": text }, palEl("p", { class: "pal-head" }, text), palEl("div", { class: "pal-acts" }, no, yes));
+    box.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") finish(false);
+      else if (e.key === "Enter" && document.activeElement !== no) finish(true);
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    const close = palOverlay(box, () => finish(false));
+    yes.focus();
   });
 }
 
@@ -306,59 +335,60 @@ function omniboxUnitHref(unit) {
 }
 
 // omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes. The
-// floating panel holds no detail: it runs an action that copies itself and hands any other to the main window.
+// floating panel holds no detail: it runs the action itself, and hands one that asks for an input to the main
+// window.
 async function omniboxUnitAction(st, env, id) {
   const unit = omniboxUnit(st);
   const spec = (unit.actions || []).find((a) => a.id === id) || { id };
-  if (st.panel) return spec.copies && !spec.input ? omniboxPanelCopy(st, env, spec) : env.open(omniboxUnitHref(unit));
+  if (st.panel) return spec.input ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
   await env.act(unit.unit, id, !!spec.copies);
   if (env.changed) env.changed();
   env.render();
 }
 
-// omniboxCopied is what the panel's last copy of the resolved unit left to show: why it failed, and the text
-// to copy by hand when the clipboard refused it.
-function omniboxCopied(st) {
-  const c = st.copied;
+// omniboxActed is what the panel's last action on the resolved unit left to show: why it failed, and the
+// text to copy by hand when the clipboard refused its copy.
+function omniboxActed(st) {
+  const c = st.acted;
   if (!c || c.resolved !== st.resolved) return [];
   return [h("p", { class: "err omni-copy-error" }, c.error),
     c.text ? h("textarea", { class: "omni-copy", readonly: true, rows: 6, "aria-label": c.error }, c.text) : null];
 }
 
-// omniboxPanelCopy runs, from the floating panel, an action that copies: it claims the clipboard while the
-// click lasts, asks the confirm of the row the unit serves, posts the action on the basis that row rests on,
-// puts its copy on the clipboard and hides the panel. A failed action says why, and a refused write shows the
-// text to copy by hand.
-async function omniboxPanelCopy(st, env, spec) {
-  if (st.copying) return;
-  st.copying = true;
-  st.copied = null;
-  const claim = env.claim();
+// omniboxPanelAct runs a unit's action from the floating panel: it asks the confirm of the row the unit
+// serves, posts the action on the basis that row rests on and hides the panel. An action that copies claims
+// the clipboard while the click lasts and puts its copy there. A failed action says why, and a refused write
+// shows the text to copy by hand.
+async function omniboxPanelAct(st, env, spec) {
+  if (st.acting) return;
+  st.acting = true;
+  st.acted = null;
+  const claim = spec.copies ? env.claim() : null;
   const resolved = st.resolved;
   const u = resolved.unit.unit;
   const action = spec.label || spec.id;
-  const show = (error, text) => { st.copied = { resolved, error, text }; env.render(); };
+  const show = (error, text) => { st.acted = { resolved, error, text }; env.render(); };
   try {
     let out;
     try {
       const d = await env.get(unitPath(u));
       const offered = ((d.row && d.row.actions) || []).find((a) => a.id === spec.id) || {};
-      if (offered.confirm && !env.confirm(offered.confirm)) return claim.pending.reject(new Error("cancelled"));
+      if (offered.confirm && !(await env.confirm(offered.confirm))) return claim && claim.pending.reject(new Error("cancelled"));
       out = await env.post(unitPath(u, spec.id), offered.basis ? { source: "cockpit", basis: offered.basis } : { source: "cockpit" });
       if (out.error) throw new Error(out.error);
     } catch (err) {
-      claim.pending.reject(err);
+      if (claim) claim.pending.reject(err);
       return show(t("{action} failed: {error}", { action, error: err.message }), "");
     }
     try {
-      if (!(await env.settle(spec.id, out, claim))) return show(t("{action} answered nothing to copy", { action }), "");
+      if (claim && !(await env.settle(spec.id, out, claim))) return show(t("{action} answered nothing to copy", { action }), "");
     } catch (err) {
       return show(t("Could not copy: {error}", { error: err.message }), out.copy.text);
     }
     env.render();
     env.close();
   } finally {
-    st.copying = false;
+    st.acting = false;
   }
 }
 
@@ -626,7 +656,7 @@ function renderOmnibox(st, env) {
       h("ol", {}, ...(r.unit.tasks || []).map((e) => h("li", {}, omniboxTaskLink(e)))),
       h("div", { class: "d-actions" }, ...(r.unit.actions || []).map((a) => h("button", { type: "button", class: "act",
         onclick: () => omniboxUnitAction(st, env, a.id) }, a.label || a.id))),
-      ...omniboxCopied(st)));
+      ...omniboxActed(st)));
   }
   if (r && r.kind === "agent" && !agent) out.push(h("p", { class: "omni-hint", ...opt("ask") }, t("Press ⌘↵ to ask the agent")));
   out.push(...omniboxAnswer(st, env));
@@ -716,7 +746,7 @@ function showOmnibox(opts = {}) {
     act: (u, id, copies) => omniboxAct(u, id, copies),
     claim: () => claimCopy(),
     settle: (name, out, claim) => settleCopy(name, out, claim),
-    confirm: (text) => confirm(text),
+    confirm: (text) => askConfirm(text),
     close: () => close(),
     changed: () => { if (typeof scheduleLoad === "function") scheduleLoad({ tasks: true }); },
     render: () => omniboxRedraw(st, env, input, results),

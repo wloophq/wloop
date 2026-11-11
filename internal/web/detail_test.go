@@ -285,7 +285,7 @@ func TestARenamedVerbAsksByItsHandler(t *testing.T) {
 	nodeRun(t, viewsPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
 tasksState.catalog = input.cat;
 detailEnv.ask = (label) => { asked.push(label); return "ana"; };
-process.stdout.write(JSON.stringify({ Asked: asked, Args: askedArgs("park") }));`, map[string]any{"cat": cat, "task": e}, &got)
+(async () => process.stdout.write(JSON.stringify({ Asked: asked, Args: await askedArgs("park") })))();`, map[string]any{"cat": cat, "task": e}, &got)
 	if len(got.Asked) != 1 || got.Asked[0] != "Parked on whom?" || got.Args["on"] != "ana" {
 		t.Errorf("asked %v, args %v", got.Asked, got.Args)
 	}

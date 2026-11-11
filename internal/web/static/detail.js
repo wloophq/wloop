@@ -15,7 +15,7 @@ const detailEnv = {
   changed: () => scheduleLoad({ tasks: true }),
   render: () => render(),
   close: () => writeHash({ task: "" }),
-  ask: (label, value) => prompt(label, value || ""),
+  ask: (label, value) => askInput({ label, value }),
   palette: (o) => showPalette(o),
   postJSON: (path, body) => taskPost(path, body),
   focused: () => {
@@ -189,10 +189,10 @@ function verbButton(e, verb, label, run, extra = {}) {
 }
 
 // askedArgs asks the value a verb needs first; null when the user backed out.
-function askedArgs(verb) {
+async function askedArgs(verb) {
   const ask = typeof servedAsk === "function" ? servedAsk(verb, (typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []) : null;
   if (!ask) return {};
-  const v = detailEnv.ask(ask.label);
+  const v = await detailEnv.ask(ask.label);
   if (v === null || v === undefined) return null;
   return ask.args(String(v).trim());
 }
@@ -238,9 +238,9 @@ function offeredVerbs(e) {
 }
 
 // runVerb runs verb on e: over the tasks it picks from, or after the question it puts first.
-function runVerb(e, verb) {
+async function runVerb(e, verb) {
   if (verbTask(verb).pick) return pickTask(e, verb);
-  const args = askedArgs(verb);
+  const args = await askedArgs(verb);
   return args ? taskAct(e, verb, args) : null;
 }
 

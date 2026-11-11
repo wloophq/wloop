@@ -2491,7 +2491,7 @@ async function actOnPlan(it, id) {
   if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: planName(it) }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(t("Guidance for {workflow} on {item}", { workflow: it.workflow, item: planName(it) }), "");
+    const guidance = await askInput({ label: t("Guidance for {workflow} on {item}", { workflow: it.workflow, item: planName(it) }) });
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2892,13 +2892,15 @@ async function act(row, name, extra = {}) {
   const refuse = (why) => { state.actionError = `${name} ${labelOf(row)}: ${why}`; state.actionDetail = ""; state.actionSource = ""; render(); };
   if (input && input.kind === "text" && input.required && !guidance) return refuse(t("{field} is required", { field: input.label || t("Guidance") }));
   if (input && input.max && [...guidance].length > input.max) return refuse(t("guidance is {length} characters, the limit is {max}", { length: [...guidance].length, max: input.max }));
-  if (st && st.confirm && !confirm(st.confirm)) return;
+  const copy = extra.claim || (spec.copies ? claimCopy() : null);
+  const backOut = () => { if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name }))); };
+  if (st && st.confirm && !(await askConfirm(st.confirm))) return backOut();
   const body = { source: "cockpit" };
   if (st && st.basis) body.basis = st.basis;
   if (input && input.kind === "duration") {
     const hint = [input.placeholder && t("a duration such as {example}", { example: input.placeholder }), input.until_state && t("\"state\" to wait until the situation changes")].filter(Boolean).join(", " + t("or") + " ");
-    const answer = prompt(`${input.label || name}? ${hint}`, input.default || "");
-    if (answer === null) return;
+    const answer = await askInput({ label: `${input.label || name}? ${hint}`, value: input.default });
+    if (answer === null) return backOut();
     if (input.until_state && answer.trim() === "state") body.until_state = true;
     else body.until = answer.trim();
   }
@@ -2908,7 +2910,6 @@ async function act(row, name, extra = {}) {
     if (extra.yes) body.yes = true;
     if (extra.no) body.no = true;
   }
-  const copy = extra.claim || (spec.copies ? claimCopy() : null);
   state.busy.add(key);
   state.actionError = "";
   state.actionDetail = "";

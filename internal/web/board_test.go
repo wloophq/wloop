@@ -460,6 +460,28 @@ func TestActResolvesAClaimHandedInWhateverItsSpecs(t *testing.T) {
 	}
 }
 
+func TestAnActionThatCopiesClaimsBeforeItAsksItsConfirm(t *testing.T) {
+	var got struct {
+		Order  []string
+		Writes int
+	}
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true, confirm: "Copy it?" }] };
+  state.specs.byId.copy_review_request = { id: "copy_review_request", copies: true };
+  answer.body = { ok: true, copy: { text: "review, pls?" }, output: ["copied"] };
+  const order = [];
+  const write = navigator.clipboard.write;
+  navigator.clipboard.write = (items) => { order.push("claim"); return write(items); };
+  globalThis.askConfirm = async (text) => { order.push("confirm " + text); return order.length < 3; };
+  await act(row, "copy_review_request");
+  await act(row, "copy_review_request");
+  process.stdout.write(JSON.stringify({ order, writes: clipboard.writes.length }));
+})();`, nil, &got)
+	if !slices.Equal(got.Order, []string{"claim", "confirm Copy it?", "claim", "confirm Copy it?"}) || got.Writes != 1 {
+		t.Errorf("%+v: the click claims the clipboard before the in-page confirm; a declined confirm writes nothing", got)
+	}
+}
+
 func TestAFailedCopyActionWritesNothing(t *testing.T) {
 	var got struct {
 		Writes []map[string]string
@@ -1275,6 +1297,8 @@ const window = {};
 let confirmed = [], prompts = [], fetched = [], promptAnswer = null, confirmAnswer = false;
 const confirm = (text) => { confirmed.push(text); return confirmAnswer; };
 const prompt = (text, def) => { prompts.push([text, def]); return promptAnswer; };
+const askConfirm = async (text) => confirm(text);
+const askInput = async ({ label, value }) => prompt(label, value || "");
 const fetch = async (url, opts) => { fetched.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 200, json: async () => ({ ok: true, output: [] }) }; };
 const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromEntries(s.specs.map((x) => [x.id, x])) }; };
 `
@@ -1845,7 +1869,7 @@ const API_VERSION = "1";
 const state = { busy: new Set(), answered: new Map() };
 const posts = [], acts = [];
 const render = () => {}, setNotice = () => {}, loadPlan = async () => {}, apiError = (o, f) => o.error || f;
-const prompt = () => "look at the retry";
+const askInput = async () => "look at the retry";
 const act = async (row, id) => { acts.push(id + " " + row.label); };
 const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ items: [], errors: [] }) }; };
 `

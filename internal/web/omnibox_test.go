@@ -277,30 +277,51 @@ process.stdout.write(JSON.stringify({ Acts: log.acts, Runs: log.posts.filter((p)
 	}
 }
 
-func TestOmniboxPanelUnitActionOpensTheUnit(t *testing.T) {
+func TestOmniboxPanelRunsAUnitsActionInPlace(t *testing.T) {
 	var got struct {
+		Steps  []string
+		Bodies []any
 		Opened []string
-		Acts   []string
-		Runs   int
+		Closed int
 	}
 	nodeRun(t, omniPrelude(t), nil, `
 (async () => {
 const st = omniboxNew(true, []);
 await omniboxType(st, "https://example.test/acme/api/pull/8", env);
-const pause = all(nodes(st), (x) => x.tag === "button" && text(x).includes("Pause"))[0];
-await pause.attrs.onclick();
-process.stdout.write(JSON.stringify({ Opened: log.opened, Acts: log.acts, Runs: log.posts.filter((p) => p.url === "/api/omnibox/run").length }));
-})();`, map[string]any{"resolve": pastedUnit()}, &got)
-	if !slices.Equal(got.Opened, []string{"#unit=alpha/acme%2Fapi%238"}) || len(got.Acts) != 0 || got.Runs != 0 {
-		t.Fatalf("%+v: in the panel a unit's action opens the unit in the main window and runs nothing", got)
+await all(nodes(st), (x) => x.tag === "button" && text(x).includes("Open"))[0].attrs.onclick();
+process.stdout.write(JSON.stringify({ Steps: log.steps, Bodies: log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => p.body), Opened: log.opened, Closed: log.closed }));
+})();`, map[string]any{"resolve": unitWith(map[string]any{"id": "open", "label": "Open"})}, &got)
+	if !slices.Equal(got.Steps, []string{"get", "post"}) || len(got.Bodies) != 1 || got.Closed != 1 || len(got.Opened) != 0 {
+		t.Fatalf("%+v: in the panel a unit's action runs on the daemon, claims nothing and hides the panel; it never opens the unit", got)
 	}
 }
 
-func copyingUnit() map[string]any {
+func TestOmniboxPanelHandsAnActionThatTakesTextToTheWindow(t *testing.T) {
+	var got struct {
+		Opened []string
+		Steps  []string
+	}
+	nodeRun(t, omniPrelude(t), nil, `
+(async () => {
+const st = omniboxNew(true, []);
+await omniboxType(st, "https://example.test/acme/api/pull/8", env);
+await all(nodes(st), (x) => x.tag === "button" && text(x).includes("Guide"))[0].attrs.onclick();
+process.stdout.write(JSON.stringify({ Opened: log.opened, Steps: log.steps }));
+})();`, map[string]any{"resolve": unitWith(map[string]any{"id": "guide", "label": "Guide", "input": map[string]any{"kind": "text"}})}, &got)
+	if !slices.Equal(got.Opened, []string{"#unit=alpha/acme%2Fapi%238"}) || len(got.Steps) != 0 {
+		t.Fatalf("%+v: an action that asks for text opens the unit in the main window and runs nothing", got)
+	}
+}
+
+func unitWith(action map[string]any) map[string]any {
 	r := pastedUnit()
 	u := r["https://example.test/acme/api/pull/8"].(map[string]any)["unit"].(map[string]any)
-	u["actions"] = append(u["actions"].([]any), map[string]any{"id": "copy_review_request", "label": "Copy review request", "copies": true})
+	u["actions"] = append(u["actions"].([]any), action)
 	return r
+}
+
+func copyingUnit() map[string]any {
+	return unitWith(map[string]any{"id": "copy_review_request", "label": "Copy review request", "copies": true})
 }
 
 const copyAction = "/api/units/alpha/acme%2Fapi%238/copy_review_request"
