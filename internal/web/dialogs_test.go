@@ -10,7 +10,15 @@ import (
 // The native window's WebKit shows no JavaScript dialog: confirm and prompt answer nothing there, so a page
 // that asks through them backs out without a word.
 func TestThePagesAskNothingThroughBrowserDialogs(t *testing.T) {
-	native := regexp.MustCompile(`(^|[^.\w])(confirm|prompt|alert)\(`)
+	native := regexp.MustCompile(`(^|[^.\w$]|\b(window|globalThis|self)\.)(confirm|prompt|alert)\s*\(`)
+	for line, asks := range map[string]bool{
+		`if (!confirm("Remove?")) return;`: true, `window.confirm("Remove?")`: true, `globalThis.prompt ("Days?")`: true, `alert("x")`: true,
+		`await askConfirm("Remove?")`: false, `env.confirm(text)`: false, `askInput({ label })`: false,
+	} {
+		if native.MatchString(line) != asks {
+			t.Fatalf("the check reads %q as asking through a browser dialog: %v, want %v", line, !asks, asks)
+		}
+	}
 	names, err := fs.Glob(files, "static/*.js")
 	if err != nil {
 		t.Fatal(err)

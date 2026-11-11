@@ -40,21 +40,49 @@ function palEl(tag, attrs, ...children) {
   return node;
 }
 
-// palOverlay shows box over the page; the returned close removes it, gives
-// the focus back and calls closed, as a click on the backdrop does.
-function palOverlay(box, closed) {
+// palOpen are the overlays shown, the topmost last.
+const palOpen = [];
+
+// palOverlay shows box over the page; the returned close removes it, gives the focus back and calls closed, as
+// a click on the backdrop does. With over it opens above the overlays shown, as a question asked from one;
+// otherwise it replaces them. An overlay that goes without close, replaced or under one closed, still calls
+// its closed, so a question awaiting it gets an answer. The second press of a double click, which lands on
+// the backdrop the first opened, does not dismiss it.
+function palOverlay(box, closed, { over = false } = {}) {
   if (!document.getElementById("pal-css")) document.head.append(palEl("style", { id: "pal-css" }, PALETTE_CSS));
-  for (const old of document.querySelectorAll(".pal-back")) old.remove();
+  if (!over) palDropAll();
   const back = document.activeElement;
   const shade = palEl("div", { class: "pal-back" }, box);
-  const close = () => {
+  const take = () => {
+    const at = palOpen.indexOf(entry);
+    if (at < 0) return false;
+    for (const above of palOpen.slice(at + 1).reverse()) above.drop();
+    palOpen.splice(palOpen.indexOf(entry), 1);
     shade.remove();
+    return true;
+  };
+  const entry = { drop: () => { if (take() && closed) closed(); } };
+  const close = () => {
+    if (!take()) return;
     if (back && back.isConnected && back.focus) back.focus();
     if (closed) closed();
   };
-  shade.addEventListener("mousedown", (e) => { if (e.target === shade) close(); });
+  shade.addEventListener("mousedown", (e) => { if (e.target === shade && !(e.detail > 1)) close(); });
   document.body.append(shade);
+  palOpen.push(entry);
   return close;
+}
+
+// palDropAll takes every overlay off the page.
+function palDropAll() {
+  for (const o of palOpen.slice().reverse()) o.drop();
+}
+
+// palPage makes box the whole page, as the floating panel shows the omnibox; the overlays over the page it
+// replaces go with it.
+function palPage(box) {
+  palDropAll();
+  document.body.replaceChildren(box);
 }
 
 // showPalette lists items with their keys and meta; typing narrows them, or
@@ -169,7 +197,7 @@ function askInput({ label, placeholder, value }) {
     input.value = value || "";
     const box = palEl("div", { class: "pal", role: "dialog", "aria-label": label }, palEl("div", { class: "pal-head" }, label), input);
     let done = false;
-    const close = palOverlay(box);
+    const close = palOverlay(box, () => finish(null), { over: true });
     const finish = (v) => {
       if (done) return;
       done = true;
@@ -202,13 +230,15 @@ function askConfirm(text) {
     const no = palEl("button", { type: "button", class: "act", onclick: () => finish(false) }, t("Cancel"));
     const box = palEl("div", { class: "pal pal-confirm", role: "alertdialog", "aria-label": text }, palEl("p", { class: "pal-head" }, text), palEl("div", { class: "pal-acts" }, no, yes));
     box.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") finish(false);
+      const to = omniboxTrap(e, [no, yes], document.activeElement);
+      if (to) to.focus();
+      else if (e.key === "Escape") finish(false);
       else if (e.key === "Enter" && document.activeElement !== no) finish(true);
       else return;
       e.preventDefault();
       e.stopPropagation();
     });
-    const close = palOverlay(box, () => finish(false));
+    const close = palOverlay(box, () => finish(false), { over: true });
     yes.focus();
   });
 }
@@ -753,7 +783,7 @@ function showOmnibox(opts = {}) {
   };
   if (st.panel) {
     document.body.classList.add("panel-omnibox");
-    document.body.replaceChildren(box);
+    palPage(box);
     close = () => window.close();
   } else {
     close = palOverlay(box);
