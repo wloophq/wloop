@@ -404,7 +404,7 @@ const document = { getElementById: () => null };
 ` + keyJS(t) + jsConst(t, src, "API_VERSION")
 }
 
-var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied", "act"}
+var copyFuncs = []string{"apiError", "acceptedNote", "clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "settleCopy", "copied", "act"}
 
 func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	var got struct {
@@ -437,6 +437,48 @@ func TestAnActionThatCopiesPutsItsCopyOnTheClipboard(t *testing.T) {
 	}
 	if got.Error != "Could not copy: denied" || got.Detail != "a & b" {
 		t.Errorf("a refused write shows %q with %q, want the error and the text to copy by hand", got.Error, got.Detail)
+	}
+}
+
+func TestActResolvesAClaimHandedInWhateverItsSpecs(t *testing.T) {
+	var got struct {
+		Resolved string
+		Writes   []map[string]string
+	}
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true }] };
+  answer.body = { ok: true, copy: { text: "review, pls?" }, output: ["copied"] };
+  const claim = claimCopy();
+  let resolved = "";
+  const resolve = claim.pending.resolve;
+  claim.pending.resolve = (copy) => { resolved = copy.text; resolve(copy); };
+  await act(row, "copy_review_request", { claim });
+  process.stdout.write(JSON.stringify({ resolved, writes: clipboard.writes }));
+})();`, nil, &got)
+	if got.Resolved != "review, pls?" || len(got.Writes) != 1 {
+		t.Errorf("%+v: act puts the copy through the claim it was handed even when its own specs do not say the action copies", got)
+	}
+}
+
+func TestAnActionThatCopiesClaimsBeforeItAsksItsConfirm(t *testing.T) {
+	var got struct {
+		Order  []string
+		Writes int
+	}
+	nodeRun(t, copyPrelude(t), copyFuncs, `(async () => {
+  const row = { label: "acme/api#7", unit: { provider: "github", key: "acme/api#7" }, actions: [{ id: "copy_review_request", enabled: true, confirm: "Copy it?" }] };
+  state.specs.byId.copy_review_request = { id: "copy_review_request", copies: true };
+  answer.body = { ok: true, copy: { text: "review, pls?" }, output: ["copied"] };
+  const order = [];
+  const write = navigator.clipboard.write;
+  navigator.clipboard.write = (items) => { order.push("claim"); return write(items); };
+  globalThis.askConfirm = async (text) => { order.push("confirm " + text); return order.length < 3; };
+  await act(row, "copy_review_request");
+  await act(row, "copy_review_request");
+  process.stdout.write(JSON.stringify({ order, writes: clipboard.writes.length }));
+})();`, nil, &got)
+	if !slices.Equal(got.Order, []string{"claim", "confirm Copy it?", "claim", "confirm Copy it?"}) || got.Writes != 1 {
+		t.Errorf("%+v: the click claims the clipboard before the in-page confirm; a declined confirm writes nothing", got)
 	}
 }
 
@@ -1021,7 +1063,7 @@ const document = { getElementById: () => null };
 		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
 	}
 	var got map[string][]bool
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const buttons = () => walk(questionBlock(input)).filter((x) => x.tag === "button" && !text(x).startsWith("Send answer"));
@@ -1255,13 +1297,15 @@ const window = {};
 let confirmed = [], prompts = [], fetched = [], promptAnswer = null, confirmAnswer = false;
 const confirm = (text) => { confirmed.push(text); return confirmAnswer; };
 const prompt = (text, def) => { prompts.push([text, def]); return promptAnswer; };
+const askConfirm = async (text) => confirm(text);
+const askInput = async ({ label, value }) => prompt(label, value || "");
 const fetch = async (url, opts) => { fetched.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 200, json: async () => ({ ok: true, output: [] }) }; };
 const useSpecs = (s) => { state.specs = { version: s.version, byId: Object.fromEntries(s.specs.map((x) => [x.id, x])) }; };
 `
 }
 
 var buttonFuncs = []string{"actionStates", "actionTitle", "actionButton", "roveStop", "actionButtons", "actionNotes", "questionShown", "act", "apiError", "acceptedNote",
-	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "copied"}
+	"clipboardItem", "claimClipboard", "writeClipboard", "deferred", "claimCopy", "settleCopy", "copied"}
 
 func TestActionButtonsRenderTheServedStates(t *testing.T) {
 	specs, rows, byID, states := wireFixtures(t)
@@ -1825,7 +1869,7 @@ const API_VERSION = "1";
 const state = { busy: new Set(), answered: new Map() };
 const posts = [], acts = [];
 const render = () => {}, setNotice = () => {}, loadPlan = async () => {}, apiError = (o, f) => o.error || f;
-const prompt = () => "look at the retry";
+const askInput = async () => "look at the retry";
 const act = async (row, id) => { acts.push(id + " " + row.label); };
 const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ items: [], errors: [] }) }; };
 `

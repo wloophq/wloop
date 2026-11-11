@@ -96,8 +96,8 @@ func TestProbeWritesNoView(t *testing.T) {
 
 func TestProbePolicyDeniesWrites(t *testing.T) {
 	t.Parallel()
-	raw := claude.Agent{}.Settings(probePolicy("'/bin/"+brand.Name+"'", probeStored).Denied(turns.Control{Commands: [][]string{{"orca"}}}))
-	for _, want := range []string{"Bash(gh *)", "Bash(git push *)", "Bash(git commit *)", "Bash(orca *)", "Bash(curl *)"} {
+	raw := claude.Agent{}.Settings(probePolicy("'/bin/"+brand.Name+"'", probeStored).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
+	for _, want := range []string{"Bash(gh *)", "Bash(git push *)", "Bash(git commit *)", "Bash(open claude://*)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("deny lacks %s:\n%s", want, raw)
 		}

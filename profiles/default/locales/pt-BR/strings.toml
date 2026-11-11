@@ -176,6 +176,7 @@
 "Brief retry" = "Nova tentativa do brief"
 "Briefs resume" = "Os briefs voltam"
 "Cancel" = "Cancelar"
+"Confirm" = "Confirmar"
 "Capture" = "Capturar"
 "capture failed: {error}" = "a captura falhou: {error}"
 "captured: {title}" = "capturada: {title}"

@@ -2491,7 +2491,7 @@ async function actOnPlan(it, id) {
   if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: planName(it) }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(t("Guidance for {workflow} on {item}", { workflow: it.workflow, item: planName(it) }), "");
+    const guidance = await askInput({ label: t("Guidance for {workflow} on {item}", { workflow: it.workflow, item: planName(it) }) });
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2853,11 +2853,24 @@ function claimCopy() {
   return { pending, claimed: claimClipboard(pending.promise) };
 }
 
-// copied puts the copy an action answered on the clipboard, through the write its click claimed when there is
-// one, and says what it copied; a refused write shows the text to copy by hand.
-async function copied(out, claimed) {
+// settleCopy puts the copy action name answered on the clipboard, through the write claim took in the click
+// when there is one; an answer with nothing to copy releases the claim and resolves to false. A refused write
+// throws.
+async function settleCopy(name, out, claim) {
+  if (!out.copy) {
+    if (claim) claim.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+    return false;
+  }
+  if (claim) claim.pending.resolve(out.copy);
+  await ((claim && claim.claimed) || writeClipboard(out.copy));
+  return true;
+}
+
+// copied settles the copy action name answered and says what it copied; a refused write shows the text to
+// copy by hand. False when the answer carries nothing to copy.
+async function copied(name, out, claim) {
   try {
-    await (claimed || writeClipboard(out.copy));
+    if (!(await settleCopy(name, out, claim))) return false;
     setNotice((out.output || []).join(" "));
   } catch (err) {
     state.actionError = t("Could not copy: {error}", { error: err.message });
@@ -2866,6 +2879,7 @@ async function copied(out, claimed) {
     setNotice("");
     render();
   }
+  return true;
 }
 
 // act resolves to undefined when the user backs out or the input is invalid.
@@ -2878,13 +2892,15 @@ async function act(row, name, extra = {}) {
   const refuse = (why) => { state.actionError = `${name} ${labelOf(row)}: ${why}`; state.actionDetail = ""; state.actionSource = ""; render(); };
   if (input && input.kind === "text" && input.required && !guidance) return refuse(t("{field} is required", { field: input.label || t("Guidance") }));
   if (input && input.max && [...guidance].length > input.max) return refuse(t("guidance is {length} characters, the limit is {max}", { length: [...guidance].length, max: input.max }));
-  if (st && st.confirm && !confirm(st.confirm)) return;
+  const copy = extra.claim || (spec.copies ? claimCopy() : null);
+  const backOut = () => { if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name }))); };
+  if (st && st.confirm && !(await askConfirm(st.confirm))) return backOut();
   const body = { source: "cockpit" };
   if (st && st.basis) body.basis = st.basis;
   if (input && input.kind === "duration") {
     const hint = [input.placeholder && t("a duration such as {example}", { example: input.placeholder }), input.until_state && t("\"state\" to wait until the situation changes")].filter(Boolean).join(", " + t("or") + " ");
-    const answer = prompt(`${input.label || name}? ${hint}`, input.default || "");
-    if (answer === null) return;
+    const answer = await askInput({ label: `${input.label || name}? ${hint}`, value: input.default });
+    if (answer === null) return backOut();
     if (input.until_state && answer.trim() === "state") body.until_state = true;
     else body.until = answer.trim();
   }
@@ -2894,7 +2910,6 @@ async function act(row, name, extra = {}) {
     if (extra.yes) body.yes = true;
     if (extra.no) body.no = true;
   }
-  const copy = spec.copies ? extra.claim || claimCopy() : null;
   state.busy.add(key);
   state.actionError = "";
   state.actionDetail = "";
@@ -2909,11 +2924,7 @@ async function act(row, name, extra = {}) {
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || out.error) throw Object.assign(new Error(apiError(out, `HTTP ${res.status}`, res.status)), { detail: out.detail, source: out.source });
-    if (out.copy) {
-      if (copy) copy.pending.resolve(out.copy);
-      await copied(out, copy && copy.claimed);
-    } else {
-      if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
+    if (!(await copied(name, out, copy))) {
       setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
     }
     ok = true;

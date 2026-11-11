@@ -476,7 +476,7 @@ const removeState = { busy: false };
 // removeAllClean removes the clean workspaces the n tasks of a view that offers it hold, and says what it removed
 // and what it kept, with why.
 async function removeAllClean(n, view) {
-  if (!confirm(tn("Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.", n, { view: viewLabel(view) }))) return;
+  if (!(await askConfirm(tn("Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.", n, { view: viewLabel(view) })))) return;
   removeState.busy = true;
   state.actionError = "";
   state.actionDetail = "";

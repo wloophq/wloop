@@ -2,7 +2,7 @@ module github.com/wloophq/wloop
 
 go 1.26.7
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	cel.dev/cel-go v0.32.0

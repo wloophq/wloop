@@ -37,9 +37,9 @@ type Policy struct {
 	DenyPaths []string
 }
 
-// Control is what drives the workspace managers: command prefixes and paths a
-// session the loop starts may neither run nor read, so it cannot steer the
-// manager that hosts it or another session.
+// Control is what drives the workspace managers from outside their own CLI:
+// command prefixes and paths a session the loop starts may neither run nor
+// read, so it does not steer another session through them by mistake.
 type Control struct {
 	Commands [][]string
 	Paths    []string

@@ -53,9 +53,9 @@ func tryEnv(t *testing.T, a *tryAgent) *testEnv {
 
 func TestTrySettingsDenyEveryWrite(t *testing.T) {
 	t.Parallel()
-	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"orca"}}}))
+	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
 	for _, want := range []string{"Bash(gh api * --method*)", "Bash(gh api * -X*)", "Bash(gh api * -f*)", "Bash(gh api * --input*)",
-		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(orca *)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
+		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(open claude://*)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("deny lacks %s:\n%s", want, raw)
 		}
@@ -239,23 +239,26 @@ func TestRoundPolicyAllowsTheTurnCommands(t *testing.T) {
 	}
 }
 
-func TestSessionPoliciesDenyEveryManagersControl(t *testing.T) {
+func TestSessionPoliciesDenyEveryManagersControlButItsBinary(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Managers = map[string]ManagerEntry{"zed": {Binary: "zed-cli", Control: [][]string{{"zed", "ctl"}}, ControlPaths: []string{"/zed/sock"}}, "none": {}, "orca": orcaManager(nil)}
 	has := func(p turns.Policy, rule ...string) bool {
 		return slices.ContainsFunc(p.Deny, func(d []string) bool { return slices.Equal(d, rule) })
 	}
-	for _, managers := range [][]string{{"zed", "none"}, {"none"}} {
+	for _, managers := range [][]string{{"zed", "none"}, {"none"}, {"orca"}} {
 		te.cfg.WorkspaceManagers = managers
 		control := te.controlSurface(te.cfg)
+		if managers[0] == "orca" && len(te.enabledEntries(te.cfg)) != 1 {
+			t.Fatalf("orca is not enabled under %q", managers)
+		}
 		for name, p := range map[string]turns.Policy{
 			"round": policies[policyRound](te.Env, "review", control),
 			"probe": policies["probe"](te.Env, "ask-author", control),
 			"try":   tryPolicy("p", bundledStored()).Denied(control),
 		} {
 			zed := managers[0] == "zed"
-			if has(p, "zed-cli") != zed || has(p, "zed", "ctl") != zed || slices.Contains(p.DenyPaths, "/zed/sock") != zed || has(p, "orca") || has(p, "") {
+			if has(p, "zed-cli") || has(p, "zed", "ctl") != zed || slices.Contains(p.DenyPaths, "/zed/sock") != zed || has(p, "orca") || has(p, "") {
 				t.Errorf("%s under %q: deny %q, paths %q", name, managers, p.Deny, p.DenyPaths)
 			}
 		}

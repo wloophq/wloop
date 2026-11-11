@@ -507,13 +507,11 @@ func (e *Env) controlBinary(cfg config.Config) string {
 }
 
 // controlSurface is what drives every manager of cfg, which a session the loop
-// starts may neither run nor read.
+// starts may neither run nor read. The managers' own binaries stay out of it,
+// so a session can open the manager's browser or hand work to another worktree.
 func (e *Env) controlSurface(cfg config.Config) turns.Control {
 	var c turns.Control
 	for _, k := range e.enabledEntries(cfg) {
-		if k.Binary != "" {
-			c.Commands = append(c.Commands, []string{k.Binary})
-		}
 		c.Commands = append(c.Commands, k.Control...)
 		c.Paths = append(c.Paths, k.ControlPaths...)
 	}
