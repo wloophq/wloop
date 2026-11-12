@@ -14,5 +14,6 @@ var _ = func(ctx context.Context, s *gates.Service, question, drafted gate.Gate,
 	if o.Draft == nil {
 		return nil
 	}
-	return s.ApproveOption(ctx, question, drafted, o.Draft.Rev, gate.Resolver{By: task.ActorPerson})
+	r := gates.Resolution{Intent: "answer", Answer: o.Answer(), By: task.ActorPerson}
+	return s.ApproveOption(ctx, question, r, drafted, o.Draft.Rev)
 }

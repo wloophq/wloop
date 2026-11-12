@@ -20,15 +20,15 @@ type Client struct {
 }
 
 var (
-	_ Ingester    = (*Client)(nil)
-	_ Presenter   = (*Client)(nil)
-	_ Publisher   = (*Client)(nil)
-	_ BasisReader = (*Client)(nil)
-	_ Lander      = (*Client)(nil)
-	_ Briefer     = (*Client)(nil)
-	_ Planner     = (*Client)(nil)
-	_ Tooler      = (*Client)(nil)
-	_ CLIRunner   = (*Client)(nil)
+	_ Ingester  = (*Client)(nil)
+	_ Presenter = (*Client)(nil)
+	_ Publisher = (*Client)(nil)
+	_ Drafter   = (*Client)(nil)
+	_ Lander    = (*Client)(nil)
+	_ Briefer   = (*Client)(nil)
+	_ Planner   = (*Client)(nil)
+	_ Tooler    = (*Client)(nil)
+	_ CLIRunner = (*Client)(nil)
 )
 
 // NewClient is the source client of c, a dispensed source kind.
@@ -146,6 +146,13 @@ func (c *Client) Basis(ctx context.Context, u plugin.Unit, kind string) (string,
 		return c.c.Basis(ctx, &pb.BasisRequest{Call: call, Unit: unitPB(u), Kind: kind})
 	})
 	return r.GetBasis(), err
+}
+
+func (c *Client) Within(ctx context.Context, u plugin.Unit, target string) (bool, error) {
+	r, err := via(ctx, func(call *pb.Call) (*pb.WithinResponse, error) {
+		return c.c.Within(ctx, &pb.WithinRequest{Call: call, Unit: unitPB(u), Target: target})
+	})
+	return r.GetWithin(), err
 }
 
 func (c *Client) Landed(ctx context.Context, d Draft) (plugin.Unit, bool, error) {

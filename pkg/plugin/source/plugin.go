@@ -185,9 +185,16 @@ func (s *server) Verify(ctx context.Context, r *pb.VerifyRequest) (*pb.VerifyRes
 }
 
 func (s *server) Basis(ctx context.Context, r *pb.BasisRequest) (*pb.BasisResponse, error) {
-	return serve[BasisReader](ctx, s.src, "basis", r.GetCall(), func(ctx context.Context, c BasisReader) (*pb.BasisResponse, error) {
+	return serve[Drafter](ctx, s.src, "drafter", r.GetCall(), func(ctx context.Context, c Drafter) (*pb.BasisResponse, error) {
 		b, err := c.Basis(ctx, unitGo(r.GetUnit()), r.GetKind())
 		return &pb.BasisResponse{Basis: b}, err
+	})
+}
+
+func (s *server) Within(ctx context.Context, r *pb.WithinRequest) (*pb.WithinResponse, error) {
+	return serve[Drafter](ctx, s.src, "drafter", r.GetCall(), func(ctx context.Context, c Drafter) (*pb.WithinResponse, error) {
+		ok, err := c.Within(ctx, unitGo(r.GetUnit()), r.GetTarget())
+		return &pb.WithinResponse{Within: ok}, err
 	})
 }
 

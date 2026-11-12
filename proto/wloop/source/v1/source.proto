@@ -38,6 +38,10 @@ service SourceService {
   // Basis is what a draft of kind on unit would be written against now, read
   // live from the source, such as a pull request's head.
   rpc Basis(BasisRequest) returns (BasisResponse);
+  // Within says whether target, a draft target of the plugin's grammar,
+  // lies inside unit, such as a review comment of the pull request or a
+  // message of the thread.
+  rpc Within(WithinRequest) returns (WithinResponse);
 
   // Lander.
   rpc Landed(LandedRequest) returns (LandedResponse);
@@ -593,6 +597,16 @@ message BasisRequest {
 
 message BasisResponse {
   string basis = 1;
+}
+
+message WithinRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string target = 3;
+}
+
+message WithinResponse {
+  bool within = 1;
 }
 
 message LandedRequest {

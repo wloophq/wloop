@@ -197,6 +197,9 @@ type Draft struct {
 	// Hold keeps the draft waiting for a person whatever its approval
 	// rules say, except under dry_run.
 	Hold bool
+	// By is who wrote the current content (Text, Payload, Basis); the outbox sets it on Propose, Amend
+	// and AgentAmend.
+	By Actor
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }

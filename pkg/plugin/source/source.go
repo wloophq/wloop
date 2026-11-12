@@ -3,7 +3,7 @@
 //
 // A source plugin implements [Source] and the capability interfaces it has
 // ([Ingester], [Presenter], [Publisher], [Lander], [Briefer], [Planner],
-// [Tooler], [CLIRunner], [BasisReader]), passes it to [New] and serves the result with
+// [Tooler], [CLIRunner], [Drafter]), passes it to [New] and serves the result with
 // [plugin.Serve]. The host reaches it through [Client], and serves the
 // plugin's calls back through [ServeHost], split the same way into
 // [Reporter], [Ledger], [Reader], [Gates], [Recorder], [Wakes] and
@@ -92,10 +92,13 @@ type Publisher interface {
 	Verify(ctx context.Context, d Draft, startedAt time.Time) (Evidence, bool, error)
 }
 
-// BasisReader reads live, never from a cache, what a draft of kind on u
-// would be written against now, such as a pull request's head, for a kind whose manifest sets basis.
-type BasisReader interface {
+// Drafter answers what the host checks a draft against. Basis reads live, never from a cache, what a
+// draft of kind on u would be written against now, such as a pull request's head, for a kind whose
+// manifest sets basis. Within says whether target lies inside u, such as a review comment of the pull
+// request or a message of the thread, so the host does not treat it as posting outside the unit.
+type Drafter interface {
 	Basis(ctx context.Context, u plugin.Unit, kind string) (string, error)
+	Within(ctx context.Context, u plugin.Unit, target string) (bool, error)
 }
 
 // Lander says where the plugin's work lands: the unit a sent draft's post
@@ -161,7 +164,7 @@ const (
 	CapabilityPlanner   Capability = "planner"
 	CapabilityTooler    Capability = "tooler"
 	CapabilityCLIRunner Capability = "cli"
-	CapabilityBasis     Capability = "basis"
+	CapabilityDrafter   Capability = "drafter"
 )
 
 // Capabilities are the capabilities s implements.
@@ -179,7 +182,7 @@ func Capabilities(s Source) []Capability {
 		{CapabilityPlanner, is[Planner](s)},
 		{CapabilityTooler, is[Tooler](s)},
 		{CapabilityCLIRunner, is[CLIRunner](s)},
-		{CapabilityBasis, is[BasisReader](s)},
+		{CapabilityDrafter, is[Drafter](s)},
 	} {
 		if c.has {
 			out = append(out, c.name)

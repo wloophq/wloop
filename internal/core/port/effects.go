@@ -23,6 +23,14 @@ type Validator interface {
 	Validate(ctx context.Context, d draft.Draft) error
 }
 
+// Scoper is optional: an Effects value that implements it says whether target, a draft target of its
+// grammar, lies inside unit u, such as a review comment of the pull request or a message of the thread; a
+// draft whose target is inside its unit does not post outside it. Without it, a target other than the
+// unit's own is outside.
+type Scoper interface {
+	Within(ctx context.Context, u unit.Unit, target string) (bool, error)
+}
+
 // Locator is optional: an Effects value that implements it names, for the user approving d, the
 // conversation or person d posts to.
 type Locator interface {

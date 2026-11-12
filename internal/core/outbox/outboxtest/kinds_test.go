@@ -15,7 +15,7 @@ func TestTheFakeKindsLookUpByProviderAndName(t *testing.T) {
 	t.Parallel()
 	review := draft.KindSpec{Provider: "acme", Name: "review", Delivery: "review", Basis: draft.BasisAgent}
 	k := Kinds{Specs: []draft.KindSpec{review, {Provider: "chat", Name: "review", Delivery: "message"}},
-		Fields: map[string][]string{"acme/review": {"event"}}}
+		Fields: map[string][]string{"acme/review": {"event"}}, Required: map[string][]string{"acme/review": {"event"}}}
 	if got, ok := k.Lookup("acme", "review"); !ok || got.Delivery != "review" {
 		t.Fatalf("Lookup = %+v, %v", got, ok)
 	}
@@ -25,7 +25,7 @@ func TestTheFakeKindsLookUpByProviderAndName(t *testing.T) {
 	if err := k.Validate(review, json.RawMessage(`{"event":"COMMENT"}`)); err != nil {
 		t.Fatal(err)
 	}
-	for _, bad := range []string{`[1]`, `{"verdict":"x"}`} {
+	for _, bad := range []string{``, `{}`, `[1]`, `{"verdict":"x"}`} {
 		if err := k.Validate(review, json.RawMessage(bad)); !errors.Is(err, outbox.ErrInvalid) {
 			t.Errorf("Validate(%s) = %v, want ErrInvalid", bad, err)
 		}

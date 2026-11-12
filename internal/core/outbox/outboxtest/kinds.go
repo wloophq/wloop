@@ -12,13 +12,16 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Kinds are draft kinds in memory. Validate takes a payload that is empty or
-// a JSON object, and whose top-level fields are all in Fields of its kind when
-// the kind is there.
+// Kinds are draft kinds in memory. Validate takes a payload that is a JSON
+// object, or empty for a kind with no Required fields, whose top-level fields
+// are all in Fields of its kind when the kind is there, and that has every
+// Required field of its kind.
 type Kinds struct {
 	Specs []draft.KindSpec
 	// Fields are each kind's payload fields, by "<provider>/<name>"; a kind absent takes any field.
 	Fields map[string][]string
+	// Required are each kind's required payload fields, by "<provider>/<name>".
+	Required map[string][]string
 }
 
 var _ outbox.Kinds = Kinds{}
@@ -33,14 +36,19 @@ func (k Kinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 }
 
 func (k Kinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {
-	if len(payload) == 0 {
-		return nil
-	}
+	key := spec.Provider + "/" + spec.Name
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(payload, &fields); err != nil || fields == nil {
-		return fmt.Errorf("%w: the payload of %s/%s is not a JSON object", outbox.ErrInvalid, spec.Provider, spec.Name)
+	if len(payload) > 0 {
+		if err := json.Unmarshal(payload, &fields); err != nil || fields == nil {
+			return fmt.Errorf("%w: the payload of %s is not a JSON object", outbox.ErrInvalid, key)
+		}
 	}
-	allowed, ok := k.Fields[spec.Provider+"/"+spec.Name]
+	for _, f := range k.Required[key] {
+		if _, ok := fields[f]; !ok {
+			return fmt.Errorf("%w: %s needs payload field %q", outbox.ErrInvalid, key, f)
+		}
+	}
+	allowed, ok := k.Fields[key]
 	if !ok {
 		return nil
 	}

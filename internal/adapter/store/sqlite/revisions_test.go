@@ -17,3 +17,7 @@ func TestApprovedRevStored(t *testing.T) {
 func TestMigrationKeepsDrafts(t *testing.T) {
 	t.Skip("T2")
 }
+
+func TestGateSessionsStored(t *testing.T) {
+	t.Skip("T2")
+}
