@@ -66,7 +66,7 @@ An address round stops the same way before a deep change of direction, an irreve
 
 ### Drafts the daemon posts
 
-A draft is a kind of its plugin, which declares its kinds, deliveries and schemas in its manifest: GitHub's comment, review (events COMMENT, REQUEST_CHANGES and APPROVE, with inline comments), thread reply and resolve; Slack's message, reaction, unreaction, edit and delete. A draft carries its payload, which its kind's schema checks, and the daemon posts exactly that payload. The card shows all of it.
+A draft is a kind of its plugin, which declares its kinds, deliveries and schemas in its manifest: GitHub's comment, reply, nudge, close, ask_owner, react, edit, review (events COMMENT, REQUEST_CHANGES and APPROVE, with inline comments), thread_reply, resolve and request_review; Slack's reply, nudge, close, ask_owner, react, unreact, edit and delete, over the message, reaction, unreaction, edit and delete deliveries. Each kind's preview template lives in the plugin's profile, under `plugins/<id>/profile/drafts/<kind>/`. A draft carries its payload, which its kind's schema checks, and the daemon posts exactly that payload. The card shows all of it.
 
 Four properties make the post safe:
 
@@ -89,11 +89,11 @@ when = 'draft.delivery == "resolve"'
 mode = "send"
 ```
 
-A session reaches its drafts through `mcp__{{name}}__draft_read`, `draft_update` and `draft_withdraw`, the proposing tool of the plugin (`github_draft`, `slack_draft`) and `{{command}} draft propose|read|update|withdraw`, which give the same results. An agent updates or withdraws only a draft of its own turn or session, on its unit; a person's draft and a workflow's are out of reach, and an update at a stale rev is refused as a conflict.
+A session reaches its drafts through `mcp__{{name}}__draft_read`, `draft_update` and `draft_withdraw`, the proposing tool of the plugin (`github_draft`, `slack_draft`; `github_threads` reads the unresolved review threads and their comment ids, to reply to or resolve) and `{{command}} draft propose|read|update|withdraw`, which give the same results. You act on the same drafts with `{{command}} outbox approve <id> [--text <markdown> --rev <n>]` and `outbox edit <id> <markdown> --rev <n>`; the rev names the revision you saw, and a draft that moved meanwhile is refused. An agent updates or withdraws only a draft of its own turn or session, on its unit; a person's draft and a workflow's are out of reach, and an update at a stale rev is refused as a conflict.
 
-A question's option may point to a draft, pinned to its id and rev. When you pick the option, the gate of the draft is approved as you, the drafts of the other options are withdrawn, and the turn completes with the posted draft's permalink. A send that fails after the turn completed becomes a fact on the unit (`draft.failed`, `draft.stale`), which a workflow reads to reopen the round.
+A question's option may point to a draft, pinned to its id and rev. When you pick the option, the gate of the draft is approved as you, the drafts of the other options are withdrawn, and the turn completes with the posted draft's permalink. A send that fails after the turn completed becomes facts on the unit: `draft.failed`, `draft.stale` (the unit moved past what the draft was written against), `draft.failed_kind` and `draft.failed_ref` (`<id>:<rev>`), which a workflow's `when` reads; the core restarts nothing on its own. A turn ends on a draft with `{{command}} turn end <url> --turn <id> --file <path> --draft <id>:<rev>`, which sets the record's `outcome.draft`.
 
-A post you can see after it ran is announced: a draft a rule sent notifies "posted by your rule".
+A draft a rule sent notifies "posted by your rule".
 
 Every outbound post that an agent or a rule proposes (a reply, a nudge, a closing message, a Slack reaction) is a **draft** first, held by a **draft gate**: the gate holds the decision (approve or discard, in `gates.toml`'s words), the draft keeps only its delivery.
 

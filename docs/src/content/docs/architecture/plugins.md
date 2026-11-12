@@ -132,8 +132,9 @@ pointer = "/event"
 
 - **Facts.** A fact's pointer must be required, a string and an `enum` in the schema, and the loader refuses anything else. Such a fact is trusted and read by rules as an allow-list.
 - **Posting.** The publisher posts a draft's payload verbatim and verifies it with `Verify` after a crash, by delivery. `Targeter` decides whether a target is inside the unit. A plugin that has a basis answers `Basis` with the live value, which propose and the publisher read.
-- **Session writes.** `[source.session] write_commands` lists the command prefixes that write to the source (GitHub's `gh api -X POST`, `gh pr review`); a session whose intent sets `[session] source_writes = false` is denied all of them, which is how review, address and nudge sessions write nothing.
-- **Tools.** A `[[source.tools]]` entry with `proposes = true` is a tool that proposes drafts; the session policy allows it, and the core `draft_*` tools, without a prompt.
+- **Session writes.** `[source.session] write_commands` lists the command prefixes that write to the source (GitHub's `gh api -X*`, `gh pr review`, `gh issue create`, `gh run rerun`); they are a policy denial and no sandbox (see [Security](/concepts/security/)); a session whose intent sets `[session] source_writes = false` is denied all of them, which is how review, address and nudge sessions write nothing.
+- **Previews.** A kind's `preview` template is a file of the plugin's profile layer, under `plugins/<id>/profile/drafts/<kind>/`.
+- **Tools.** A `[[source.tools]]` entry with `proposes = true` is a tool that proposes drafts (`github_draft`, `slack_draft`); the session policy allows it, and the core `draft_*` tools, without a prompt.
 - **Posting deliveries.** A delivery marked `posts` is one that posts a message, and its drafts wait for you unless a rule names the delivery.
 
 An archtest refuses, in the core, the domain and the agent adapter, any string literal equal to a name a bundled manifest declares.
