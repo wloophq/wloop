@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -152,6 +153,11 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.DB != nil {
 		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntents(func(string, ...any) {})}
 		units.snapshot = d.DB.Snapshot
+		units.failed = &failedDrafts{store: d.DB.Drafts()}
+		if e.changes != nil {
+			units.failed.changes = e.changes
+		}
+		units.drafted = failedDraftFacts(units.failed)
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
@@ -563,6 +569,9 @@ type unitSet struct {
 	classified *classifiedUnits
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
+	// drafted adds the facts of the unit's failed drafts, which failed reads once a pass; nil adds none.
+	drafted unitFacter
+	failed  *failedDrafts
 	// blocks lifts the answered start blocks first; nil lifts none.
 	blocks *startBlocks
 	// snapshot runs a pass in one read transaction of the store; nil reads
@@ -681,6 +690,16 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 	if err == nil && s.briefed != nil {
 		f, err = s.briefed.add(ctx, u, f)
 	}
+	if err == nil && s.drafted != nil {
+		var drafted workflow.Facts
+		if drafted, err = s.drafted.Facts(ctx, u); err == nil {
+			f = maps.Clone(f)
+			if f == nil {
+				f = workflow.Facts{}
+			}
+			maps.Copy(f, drafted)
+		}
+	}
 	if err != nil || s.classified == nil {
 		return f, err
 	}
@@ -690,6 +709,9 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 func (k unitKeeping) Refresh(ctx context.Context) error {
 	s := k.s
 	var errs []error
+	if s.failed != nil {
+		s.failed.refresh()
+	}
 	if s.blocks != nil {
 		if err := s.blocks.Refresh(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("start blocks: %w", err))
@@ -819,4 +841,58 @@ func (s *unitSet) Due() time.Time {
 		}
 	}
 	return due
+}
+
+// unitFacter reads facts of a unit.
+type unitFacter interface {
+	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
+}
+
+// draftLister lists drafts, as the outbox's store does.
+type draftLister interface {
+	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
+}
+
+// failedDrafts answer the draft facts' reads of a unit's failed drafts from one read of every failed draft
+// a pass, which Refresh starts, read again once the change log notes a draft change.
+type failedDrafts struct {
+	store   draftLister
+	changes port.Changes
+	mu      sync.Mutex
+	read    bool
+	gen     port.Generation
+	all     []draft.Draft
+}
+
+// refresh drops what the last pass read.
+func (f *failedDrafts) refresh() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.read, f.all = false, nil
+}
+
+func (f *failedDrafts) List(ctx context.Context, q outbox.Filter) ([]draft.Draft, error) {
+	if q.Unit == nil || !slices.Equal(q.States, []draft.State{draft.Failed}) || q.Task != "" || q.Rule != "" || q.Key != "" || q.Workflow != "" {
+		return f.store.List(ctx, q)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.read || f.changes != nil && !f.changes.Since(f.gen, port.TopicDrafts).Empty() {
+		var gen port.Generation
+		if f.changes != nil {
+			gen = f.changes.Gen()
+		}
+		all, err := f.store.List(ctx, outbox.Filter{States: []draft.State{draft.Failed}})
+		if err != nil {
+			return nil, err
+		}
+		f.all, f.gen, f.read = all, gen, true
+	}
+	var out []draft.Draft
+	for _, d := range f.all {
+		if d.Unit == *q.Unit {
+			out = append(out, d)
+		}
+	}
+	return out, nil
 }

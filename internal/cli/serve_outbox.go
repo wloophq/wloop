@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/instructions"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -32,7 +35,15 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			targets = append(targets, m.ID)
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+	for p, fx := range e.testPublishers {
+		pubs[p] = pinnedEffects{Effects: fx, turns: pin}
+		if !slices.Contains(targets, p) {
+			targets = append(targets, p)
+		}
+	}
+	effects := publishers(pubs, cfg)
+	e.outbox = &outbox.Service{Store: endingDrafts{Store: db.Drafts(), ended: e.draftEnded, logf: logf}, Gates: draftGates{e, db, logf}, Effects: effects, Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+		Kinds: draftKinds, Bases: publisherBases(effects), OnSent: []func(context.Context, draft.Draft) error{e.draftSent, e.ruleSent},
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Silent: builtin.SilentEffect,
@@ -44,6 +55,9 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
 			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Ends: e.newTasks(db, cfg, ledger), Modules: mods, Appliers: e.draftAppliers()})},
 		Results: e.newTaskResults(e.newTasks(db, cfg, ledger), mods)}
+	if e.Turns != nil {
+		e.Turns.DraftGates, e.Turns.DraftVerdict = e.outbox, e.draftVerdict
+	}
 	e.hosted.setOutbox(e.outbox)
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	if d.Gates == nil {
@@ -51,6 +65,98 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		d.GateReader = e.gateReader
 	}
 	return d
+}
+
+// publisherBases read a unit's live basis from the publisher of its provider; a publisher that reads none
+// answers "", and a provider with none fails, so no draft is taken as fresh unread.
+func publisherBases(effects outbox.Effects) outbox.Bases { return basesOf(effects) }
+
+type basesOf outbox.Effects
+
+func (b basesOf) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	fx, err := b(u.Provider)
+	if err != nil {
+		return "", err
+	}
+	if r, ok := fx.(outbox.Bases); ok {
+		return r.Live(ctx, u, kind)
+	}
+	return "", nil
+}
+
+// draftSent completes the turn that ended on d, now sent.
+func (e *Env) draftSent(ctx context.Context, d draft.Draft) error {
+	if e.Turns == nil {
+		return nil
+	}
+	return e.Turns.DraftSent(ctx, d)
+}
+
+// draftEnded ends the asked turn whose approved answer waited on d, which failed or was dropped.
+func (e *Env) draftEnded(ctx context.Context, d draft.Draft) error {
+	if e.Turns == nil {
+		return nil
+	}
+	return e.Turns.DraftEnded(ctx, d)
+}
+
+// draftVerdict is the record verdict d posted, as the kind's manifest of the plugin that posted it declares.
+func (e *Env) draftVerdict(d draft.Draft) string {
+	spec, ok := draftKinds.Lookup(string(e.outbox.PublisherOf(d)), string(d.Kind))
+	if !ok {
+		return ""
+	}
+	return spec.VerdictOf(d)
+}
+
+// resumeDrafts point to the drafts the turns of seq's chain proposed on b's unit that are still held or failed,
+// with current the unit's basis now, "" when unknown; none while the daemon serves no outbox.
+func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current string) []instructions.Draft {
+	if e.outbox == nil {
+		return nil
+	}
+	u := b.Unit
+	ds, err := e.outbox.Store.List(ctx, outbox.Filter{Unit: &u, States: []draft.State{draft.Held, draft.Failed}})
+	if err != nil {
+		return nil
+	}
+	var seqs []int64
+	for _, t := range b.Chain(seq) {
+		seqs = append(seqs, t.Seq)
+	}
+	ds = slices.DeleteFunc(ds, func(d draft.Draft) bool {
+		agent := d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession
+		return !agent || !slices.Contains(seqs, d.Origin.TurnSeq)
+	})
+	return instructions.Pointers(ds, current)
+}
+
+// endingDrafts are the outbox's drafts, telling ended each draft that fails or is dropped as it is stored so.
+type endingDrafts struct {
+	outbox.Store
+	ended func(ctx context.Context, d draft.Draft) error
+	logf  func(string, ...any)
+}
+
+func (s endingDrafts) Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
+	got, err := s.Store.Update(ctx, d, from)
+	if err == nil && got.State != from && (got.State == draft.Failed || got.State == draft.Dropped) {
+		if err := s.ended(ctx, got); err != nil {
+			s.logf("draft %d %s: ending the turn that waited on it: %v", got.ID, got.State, err)
+		}
+	}
+	return got, err
+}
+
+// ruleSent tells the user, through the daemon serving now, that a rule of theirs posted d.
+func (e *Env) ruleSent(ctx context.Context, d draft.Draft) error {
+	if e.linkStates == nil {
+		return nil
+	}
+	if s := e.linkStates.Load(); s != nil {
+		return s.RuleSent(ctx, d)
+	}
+	return nil
 }
 
 // deliveryPosts says whether a draft of d reaches people, as the plugins'
@@ -111,8 +217,7 @@ func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
 	if dl, ok := p.Effects.(port.Deliverer); ok {
 		return dl.Delivers(k)
 	}
-	_, d := draft.ShapeOf(k)
-	return d
+	return ""
 }
 
 func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
@@ -123,6 +228,20 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 		return v.Validate(ctx, d)
 	}
 	return nil
+}
+
+func (p pinnedEffects) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	if b, ok := p.Effects.(outbox.Bases); ok {
+		return b.Live(ctx, u, kind)
+	}
+	return "", nil
+}
+
+func (p pinnedEffects) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
+	if sc, ok := p.Effects.(port.Scoper); ok {
+		return sc.Within(ctx, u, target)
+	}
+	return false, nil
 }
 
 func (p pinnedEffects) Takes(target string) bool {

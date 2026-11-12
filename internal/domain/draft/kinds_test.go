@@ -155,3 +155,15 @@ func TestLookupByPublisherProvider(t *testing.T) {
 		t.Errorf("a task draft pulls posts: %+v, %v", got, err)
 	}
 }
+
+func TestAKindsVerdictIsThePayloadFieldItPointsTo(t *testing.T) {
+	review := KindSpec{Verdict: "/event"}
+	for payload, want := range map[string]string{`{"event":"APPROVE"}`: "APPROVE", `{"body":"x"}`: "", `[1]`: "", ``: ""} {
+		if got := review.VerdictOf(Draft{Payload: json.RawMessage(payload)}); got != want {
+			t.Errorf("%s: %q, want %q", payload, got, want)
+		}
+	}
+	if got := (KindSpec{}).VerdictOf(Draft{Payload: json.RawMessage(`{"event":"APPROVE"}`)}); got != "" {
+		t.Errorf("a kind that posts no verdict: %q", got)
+	}
+}

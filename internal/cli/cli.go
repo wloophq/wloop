@@ -255,6 +255,8 @@ type Env struct {
 	messages   *messages.Service
 	// outbox is the daemon's drafts, built once per daemon by serveOutbox.
 	outbox *outbox.Service
+	// testPublishers stand, by provider, for the publishers of the modules serve builds; set only by ServeForTest.
+	testPublishers map[unit.ProviderID]port.Effects
 	// gates are the daemon's decisions waiting on the user, built once per daemon by newGates; gateReader
 	// reads them.
 	gates      *gates.Service

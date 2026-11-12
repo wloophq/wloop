@@ -1,15 +1,17 @@
 package turn
 
 import (
-	"encoding/json"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
@@ -32,7 +34,25 @@ func TestReviewAddressNudgeSourceWritesOff(t *testing.T) {
 }
 
 func TestReviewWorkflowRestartsOnFailedOrStaleDraft(t *testing.T) {
-	t.Skip("T9: the workflow reads the draft.failed and draft.stale unit facts T9 declares; it ships with them")
+	l := bundled(t)
+	for _, w := range l.Workflows {
+		if w.Name != "review-draft-failed" {
+			continue
+		}
+		for _, fact := range []string{"draft.failed", "draft.stale", "draft.failed_kind"} {
+			if !slices.Contains(w.When.Reads(), fact) {
+				t.Errorf("its when reads %v, not %s", w.When.Reads(), fact)
+			}
+		}
+		if !slices.Equal(w.Key, []string{"draft.failed_ref"}) {
+			t.Errorf("its key is %v: each failed or stale draft gets its own round", w.Key)
+		}
+		if len(w.Steps) != 1 || w.Steps[0].Use != "turn.start" || w.Steps[0].Args["intent"] != "review" {
+			t.Errorf("it runs %+v, want one turn.start of review", w.Steps)
+		}
+		return
+	}
+	t.Fatal("no review-draft-failed workflow")
 }
 
 // writeCommands are the GitHub manifest's commands a session with
@@ -175,44 +195,56 @@ func TestInstructionsNameDraftTools(t *testing.T) {
 	}
 }
 
-// probe is a draft a shipped rule decides on, and what it must decide.
+// probe is a draft of a GitHub kind a shipped rule decides on, its payload
+// as proposed, and whether the rule sends it.
 type probe struct {
-	delivery, event string
-	posts           bool
-	want            draft.ApprovalMode
+	kind, payload string
+	sends         bool
 }
 
 // shippedProbes leave an approval, a review whose event is absent or
-// unknown, and a comment to the user, and send a thread reply and a
-// resolve.
+// unknown, and a comment to the user, and send a review that comments or
+// requests changes, a thread reply and a resolve.
 var shippedProbes = []probe{
-	{delivery: "review", event: "APPROVE", posts: true, want: draft.Wait},
-	{delivery: "review", posts: true, want: draft.Wait},
-	{delivery: "review", event: "DISMISS", posts: true, want: draft.Wait},
-	{delivery: "comment", posts: true, want: draft.Wait},
-	{delivery: "reply", posts: true, want: draft.Send},
-	{delivery: "resolve", want: draft.Send},
+	{"review", `{"event": "APPROVE"}`, false},
+	{"review", `{}`, false},
+	{"review", ``, false},
+	{"review", `{"event": "DISMISS"}`, false},
+	{"review", `{"event": "COMMENT"}`, true},
+	{"review", `{"event": "REQUEST_CHANGES"}`, true},
+	{"comment", `{}`, false},
+	{"thread_reply", `{}`, true},
+	{"resolve", `{}`, true},
+}
+
+// addressProbes are what the address intent alone sends besides
+// shippedProbes: a review request.
+var addressProbes = []probe{{"request_review", `{"reviewers": ["octocat"]}`, true}}
+
+// kindSpec is the GitHub manifest's spec of kind, as the outbox decides a
+// draft of it.
+func kindSpec(t *testing.T, kind string) draft.KindSpec {
+	t.Helper()
+	spec, ok := builtin.DraftKinds.Lookup(string(unit.GitHub), kind)
+	if !ok {
+		t.Fatalf("github declares no draft kind %s", kind)
+	}
+	return spec
 }
 
 func TestShippedRulesAllowList(t *testing.T) {
 	l := bundled(t)
-	now := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
-	for _, n := range []dintent.Name{dintent.Review, dintent.Address} {
+	for n, probes := range map[dintent.Name][]probe{dintent.Review: shippedProbes, dintent.Address: append(slices.Clone(shippedProbes), addressProbes...)} {
 		p := intentDef(t, l, n).DraftApproval
 		if p == nil {
 			t.Fatalf("%s ships no draft approval", n)
 		}
-		for _, pr := range shippedProbes {
-			d := draft.Draft{Delivery: draft.Delivery(pr.delivery)}
-			if pr.event != "" {
-				d.Payload, _ = json.Marshal(map[string]string{"event": pr.event})
-			}
-			got, err := p.Decide(d, draft.Subject{Slot: "pr"}, pr.posts, now)
-			if err != nil {
-				t.Fatalf("%s %+v: %v", n, pr, err)
-			}
-			if got.Approval.Mode != pr.want {
-				t.Errorf("%s: a %s draft with event %q is %s, want %s", n, pr.delivery, pr.event, got.Approval.Mode, pr.want)
+		for _, pr := range probes {
+			spec := kindSpec(t, pr.kind)
+			d := draft.Draft{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, Kind: draft.Kind(pr.kind), Delivery: draft.Delivery(spec.Delivery), Payload: []byte(pr.payload)}
+			dec, err := p.Decide(d, draft.Subject{Kind: spec}, builtin.DeliveryPosts(spec.Delivery), time.Time{})
+			if got := err == nil && dec.Approval.Releases(); got != pr.sends {
+				t.Errorf("%s: a %s draft with payload %q sends %v, want %v (%+v, %v)", n, pr.kind, pr.payload, got, pr.sends, dec, err)
 			}
 		}
 	}

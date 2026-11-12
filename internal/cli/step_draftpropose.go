@@ -124,7 +124,7 @@ const (
 )
 
 func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
-	a := draftArgs{purpose: strings.TrimSpace(c.arg("purpose")), delivery: draft.Delivery(cmp.Or(c.arg("delivery"), builtin.DraftDeliveries[0])),
+	a := draftArgs{purpose: strings.TrimSpace(c.arg("purpose")), delivery: draft.Delivery(c.arg("delivery")),
 		text: cmp.Or(c.arg("text"), defaultDraftText), why: cmp.Or(c.arg("why"), defaultDraftWhy), reaction: strings.Trim(strings.TrimSpace(c.arg("reaction")), ":"),
 		items: cmp.Or(c.arg("items"), "all"), per: cmp.Or(c.arg("per"), builtin.DraftPer[0]), target: cmp.Or(c.arg("target"), builtin.DraftTargets[0]),
 		to: cmp.Or(c.arg("to"), builtin.DraftTo[0])}

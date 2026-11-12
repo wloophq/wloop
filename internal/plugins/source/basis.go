@@ -25,7 +25,7 @@ var (
 // Live asks u's plugin now, never a cache; a plugin that is not running
 // fails, so no draft is taken as fresh unread.
 func (b Bases) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	c, ok, err := b.drafter(ctx, u)
+	c, ok, err := drafterOf(ctx, b.Kind, string(u.Provider))
 	if err != nil || !ok {
 		return "", err
 	}
@@ -34,16 +34,16 @@ func (b Bases) Live(ctx context.Context, u unit.Unit, kind string) (string, erro
 
 // Within asks u's plugin whether target lies inside u.
 func (b Bases) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
-	c, ok, err := b.drafter(ctx, u)
+	c, ok, err := drafterOf(ctx, b.Kind, string(u.Provider))
 	if err != nil || !ok {
 		return false, err
 	}
 	return c.Within(ctx, Wire(u), target)
 }
 
-// drafter is the client of u's plugin, and whether it is a Drafter.
-func (b Bases) drafter(ctx context.Context, u unit.Unit) (*src.Client, bool, error) {
-	c, err := b.Kind.Client(string(u.Provider))
+// drafterOf is the client of plugin id, and whether it is a Drafter.
+func drafterOf(ctx context.Context, k *Kind, id string) (*src.Client, bool, error) {
+	c, err := k.Client(id)
 	if err != nil {
 		return nil, false, err
 	}

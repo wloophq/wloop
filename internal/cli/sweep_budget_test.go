@@ -33,12 +33,12 @@ func (p *meteredProposer) pass(context.Context) error {
 }
 
 // The store budget of the sweeps of the default workflows over the replay:
-// a pass reads each table once for every unit, in one read transaction, so
+// a pass reads each table once for every unit, the failed drafts included, in one read transaction, so
 // the median sweep, which runs nothing, stays flat as the units grow; the
 // heaviest runs items, whose steps read and write on their own, a draft that joins or leaves its task's
 // pending drafts moving that task on.
 const (
-	sweepStatementsMedian = 128
+	sweepStatementsMedian = 129
 	sweepStatementsMax    = 810
 	sweepReadTxsMedian    = 5
 	sweepReadTxsMax       = 55

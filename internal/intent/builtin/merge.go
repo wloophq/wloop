@@ -77,7 +77,7 @@ func draftSpecs(p unit.ProviderID, src *manifest.Source) ([]draft.KindSpec, []dr
 	var ks []draft.KindSpec
 	for _, k := range src.DraftKinds {
 		spec := draft.KindSpec{Provider: string(p), Name: k.Name, Delivery: cmp.Or(k.Delivery, src.DefaultDelivery), Schema: k.Schema, Preview: k.Preview,
-			Basis: k.Basis, TextRequired: k.TextRequired, Editable: slices.Clone(k.Editable), SchemaJSON: slices.Clone(k.SchemaJSON)}
+			Basis: k.Basis, TextRequired: k.TextRequired, Editable: slices.Clone(k.Editable), SchemaJSON: slices.Clone(k.SchemaJSON), Verdict: k.Verdict}
 		for _, f := range k.Facts {
 			spec.Facts = append(spec.Facts, draft.FactSpec{Name: f.Name, Pointer: f.Pointer})
 		}
@@ -429,7 +429,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 			switch {
 			case f.Slot == BriefSlot:
 				rows[i].Subjects = briefSubjects
-			case f.Name == DraftFailed || f.Name == DraftStale:
+			case slices.Contains(UnitDraftFacts, f.Name):
 				rows[i].Subjects = slices.Clone(unitSlots[len(coreUnitSlots):])
 			case f.Name == RowKindFact && len(rowKinds) > 0:
 				rows[i].Enum = rowKinds

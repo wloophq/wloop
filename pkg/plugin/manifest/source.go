@@ -126,6 +126,7 @@ type DraftKind struct {
 	TextRequired bool            `toml:"text_required" doc:"A draft of the kind needs a text."`
 	Editable     []string        `toml:"editable" doc:"What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\"."`
 	Facts        []DraftKindFact `toml:"facts" doc:"The payload fields an approval rule reads."`
+	Verdict      string          `toml:"verdict" doc:"The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as \"/event\", which the schema makes a required string enum; empty posts none."`
 	// SchemaJSON is the content of Schema, which Source reads from the
 	// plugin's directory.
 	SchemaJSON json.RawMessage `toml:"-"`

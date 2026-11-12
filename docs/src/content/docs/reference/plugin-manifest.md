@@ -153,6 +153,7 @@ every = "5m"
 | `text_required` | bool | A draft of the kind needs a text. |
 | `editable` | list of strings | What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as "/event". |
 | `facts` | array of tables | The payload fields an approval rule reads. |
+| `verdict` | string | The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as "/event", which the schema makes a required string enum; empty posts none. |
 
 ## `[[source.draft_kinds.facts]]`
 

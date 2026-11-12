@@ -31,6 +31,9 @@ type KindSpec struct {
 	Editable []string
 	// Facts are the payload fields an approval rule reads.
 	Facts []FactSpec
+	// Verdict is the JSON pointer to the payload field whose value is the record verdict a sent draft of the
+	// kind posts; "" posts none.
+	Verdict string
 	// SchemaJSON is the content of Schema.
 	SchemaJSON json.RawMessage
 	// Posts says a draft of the kind reaches people, as its delivery's
@@ -42,6 +45,21 @@ type KindSpec struct {
 var ErrEmptyText = errors.New("empty text")
 
 // CheckText refuses a blank text for a kind that requires one.
+// VerdictOf is the record verdict d, a draft of kind s, posts: the payload field s.Verdict points to; "" when
+// the kind posts none or the payload lacks it.
+func (s KindSpec) VerdictOf(d Draft) string {
+	if s.Verdict == "" || len(d.Payload) == 0 {
+		return ""
+	}
+	var doc any
+	if err := json.Unmarshal(d.Payload, &doc); err != nil {
+		return ""
+	}
+	v := pointAt(doc, s.Verdict)
+	out, _ := v.(string)
+	return out
+}
+
 func (s KindSpec) CheckText(text string) error {
 	if s.TextRequired && strings.TrimSpace(text) == "" {
 		return fmt.Errorf("%w: a %s draft of %s needs a text", ErrEmptyText, s.Name, s.Provider)

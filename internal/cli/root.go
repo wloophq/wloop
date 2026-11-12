@@ -20,8 +20,10 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
+	"github.com/wloophq/wloop/internal/adapter/agent/echo"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
+	factdrafts "github.com/wloophq/wloop/internal/adapter/facts/drafts"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
@@ -57,6 +59,12 @@ func Defaults() config.Config {
 	c.WorkspaceManagers = []string{wscd.Name, "orca"}
 	return c
 }
+
+// testAgents are the agents of a test daemon: the echo agent, which a scripted test speaks for.
+func testAgents() map[string]turns.Agent { return map[string]turns.Agent{"echo": &echo.Agent{}} }
+
+// failedDraftFacts are the facts of a unit's failed drafts, over drafts.
+func failedDraftFacts(drafts draftLister) unitFacter { return factdrafts.Provider{Drafts: drafts} }
 
 func defaultAgents() map[string]agentEntry {
 	return map[string]agentEntry{"claude": {

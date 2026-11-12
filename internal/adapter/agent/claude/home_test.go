@@ -74,9 +74,15 @@ func fakeMCP(t *testing.T, userHome string, during func()) ShellFunc {
 	}
 }
 
+// slackSendTool and testAtOnceTools are the at-once tools the bundled manifests mark posts = "now".
+var (
+	slackSendTool   = brand.ToolPrefix() + "slack_send_message"
+	testAtOnceTools = []string{slackSendTool, brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit", brand.ToolPrefix() + "slack_delete"}
+)
+
 func testHome(t *testing.T, during func()) (Home, string) {
 	user := t.TempDir()
-	return Home{Command: "'/bin/" + brand.Name + "'", MCPURL: testURL, MCPKey: testKey, DefaultHome: filepath.Join(user, ".claude"), Sh: fakeMCP(t, user, during),
+	return Home{Command: "'/bin/" + brand.Name + "'", MCPURL: testURL, MCPKey: testKey, AtOnceTools: testAtOnceTools, DefaultHome: filepath.Join(user, ".claude"), Sh: fakeMCP(t, user, during),
 		Now: func() time.Time { return time.Date(2026, 10, 18, 9, 30, 0, 0, time.UTC) }}, t.TempDir()
 }
 
@@ -521,21 +527,21 @@ func TestInstallLetsSlackSendPostWithoutAsking(t *testing.T) {
 	if _, err := h.Install(context.Background(), home, false); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(settingsList(t, home, "allow"), SlackSendTool) {
+	if !slices.Contains(settingsList(t, home, "allow"), slackSendTool) {
 		t.Fatalf("allow = %q", settingsList(t, home, "allow"))
 	}
 	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)"}) {
 		t.Fatalf("ask = %q", got)
 	}
-	if p := problems(t, h, home)["permission "+SlackSendTool]; p != "" {
+	if p := problems(t, h, home)["permission "+slackSendTool]; p != "" {
 		t.Fatalf("check after install: %q", p)
 	}
 }
 
 func TestInstallDropsTheAskRuleAnEarlierInstallAdded(t *testing.T) {
 	h, home := testHome(t, nil)
-	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"ask":["Bash(rm *)","`+SlackSendTool+`"]}}`)
-	if p := problems(t, h, home)["permission "+SlackSendTool]; p == "" {
+	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"ask":["Bash(rm *)","`+slackSendTool+`"]}}`)
+	if p := problems(t, h, home)["permission "+slackSendTool]; p == "" {
 		t.Fatal("check passes a home that asks before every Slack post")
 	}
 	lines, err := h.Install(context.Background(), home, false)
@@ -545,10 +551,10 @@ func TestInstallDropsTheAskRuleAnEarlierInstallAdded(t *testing.T) {
 	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)"}) {
 		t.Fatalf("ask = %q", got)
 	}
-	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission ask "+SlackSendTool) }) {
+	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission ask "+slackSendTool) }) {
 		t.Fatalf("lines %q", lines)
 	}
-	if p := problems(t, h, home)["permission "+SlackSendTool]; p != "" {
+	if p := problems(t, h, home)["permission "+slackSendTool]; p != "" {
 		t.Fatalf("check after install: %q", p)
 	}
 }
@@ -569,7 +575,7 @@ func TestUninstallRemovesTheSlackSendPermission(t *testing.T) {
 	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)"}) {
 		t.Fatalf("ask = %q", got)
 	}
-	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission "+SlackSendTool) }) {
+	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission "+slackSendTool) }) {
 		t.Fatalf("lines %q", lines)
 	}
 }

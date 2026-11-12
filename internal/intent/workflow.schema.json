@@ -460,17 +460,16 @@
               "additionalProperties": false,
               "properties": {
                 "delivery": {
-                  "default": "message",
-                  "description": "How the draft posts: the core's message or reaction, or a delivery a plugin declares.",
+                  "description": "How the draft posts, a delivery the plugin that posts it declares; empty is that plugin's default delivery.",
                   "enum": [
-                    "message",
-                    "reaction",
                     "comment",
+                    "reaction",
                     "edit",
                     "review",
                     "reply",
                     "resolve",
                     "request_review",
+                    "message",
                     "delete",
                     "unreaction"
                   ],

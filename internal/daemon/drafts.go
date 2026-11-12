@@ -62,7 +62,6 @@ func (s *Server) registerOutbox() {
 	if s.deps.Tasks == nil || s.deps.Outbox == nil {
 		return
 	}
-	s.deps.Outbox.OnSent = append(s.deps.Outbox.OnSent, s.notifyByRule)
 	for handler := range draftHandlers {
 		s.deps.Tasks.Register(task.OriginDraft, handler, s.draftVerb(handler))
 	}

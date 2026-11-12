@@ -15,7 +15,7 @@ type homeKind struct{ sh ShellFunc }
 var _ setup.HomeOwner = homeKind{}
 
 func (k homeKind) New(s setup.HomeSpec) setup.AgentHome {
-	return Home{Command: s.Command, MCPURL: s.MCPURL, MCPKey: s.MCPKey, DefaultHome: DefaultHome(s.UserHome), Sh: k.sh, Now: s.Now}
+	return Home{Command: s.Command, MCPURL: s.MCPURL, MCPKey: s.MCPKey, AtOnceTools: s.AtOnceTools, DefaultHome: DefaultHome(s.UserHome), Sh: k.sh, Now: s.Now}
 }
 
 func (homeKind) Find(s setup.HomeSpec) []string {

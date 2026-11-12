@@ -275,10 +275,10 @@ var otherFacts = []Fact{
 	wf("draft", "person_asks_you", expr.Bool, "Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people."),
 	wf("draft", "people_outside", expr.Int, "The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted."),
 	wf("draft", "target_joined", expr.Bool, "The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft."),
-	unitDraftFact("failed", "A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it."),
-	unitDraftFact("stale", "A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too."),
-	wf(DraftSlot, "failed_kind", expr.String, "The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind."),
-	wf(DraftSlot, "failed_ref", expr.String, "The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again."),
+	unitDraftFact("failed", expr.Bool, "A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it."),
+	unitDraftFact("stale", expr.Bool, "A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too."),
+	unitDraftFact("failed_kind", expr.String, "The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind."),
+	unitDraftFact("failed_ref", expr.String, "The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again."),
 	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
@@ -352,17 +352,14 @@ func Narrow(env expr.Env, providers []unit.ProviderID) {
 	}
 }
 
-// DraftFailed and DraftStale are the facts of a unit whose draft failed to
-// send, which every plugin's unit slot reads: a plugin publishes drafts.
-const (
-	DraftFailed = DraftSlot + ".failed"
-	DraftStale  = DraftSlot + ".stale"
-)
+// UnitDraftFacts are the facts of a unit whose draft failed to send, which every plugin's unit slot reads: a
+// plugin publishes drafts.
+var UnitDraftFacts = []string{DraftSlot + ".failed", DraftSlot + ".stale", DraftSlot + ".failed_kind", DraftSlot + ".failed_ref"}
 
-// unitDraftFact is a Bool fact of a unit's drafts, named draft.<name>,
-// which Merge gives every plugin's unit slot to read.
-func unitDraftFact(name, doc string) Fact {
-	return wf(DraftSlot, name, expr.Bool, doc)
+// unitDraftFact is a fact of a unit's drafts, named draft.<name>, which Merge gives every plugin's unit slot to
+// read.
+func unitDraftFact(name string, t expr.Type, doc string) Fact {
+	return wf(DraftSlot, name, t, doc)
 }
 
 // approvalFact is a fact of the draft a draft gate's rule reads,
@@ -621,6 +618,17 @@ func FactType(name string) (expr.Type, bool) {
 		}
 	}
 	return 0, false
+}
+
+// OfSlot says whether the workflow fact name is one of slot's units: named slot.<field>, or a fact of another
+// slot that slot reads, such as a unit's draft facts.
+func OfSlot(name, slot string) bool {
+	for _, f := range Facts {
+		if f.Name == name && slices.Contains(f.Slots, WorkflowSlot) {
+			return slot != "" && (strings.HasPrefix(name, slot+".") || slices.Contains(f.Subjects, slot))
+		}
+	}
+	return false
 }
 
 // TimeVarying says whether the workflow fact name changes as time passes
