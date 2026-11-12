@@ -207,7 +207,6 @@ func TestRuleSentNotifies(t *testing.T) {
 	}
 }
 
-
 // BenchmarkDraftCardFields is the cost the card's fields add to a page of 500 review drafts: each payload decoded,
 // worded and checked for its editable fields.
 func BenchmarkDraftCardFields(b *testing.B) {
