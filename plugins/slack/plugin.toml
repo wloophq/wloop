@@ -45,6 +45,7 @@ name = "unreaction"
 name = "reply"
 delivery = "message"
 schema = "drafts/reply/schema.json"
+preview = "drafts/reply/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -52,6 +53,7 @@ editable = ["text"]
 name = "nudge"
 delivery = "message"
 schema = "drafts/nudge/schema.json"
+preview = "drafts/nudge/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -59,6 +61,7 @@ editable = ["text"]
 name = "close"
 delivery = "message"
 schema = "drafts/close/schema.json"
+preview = "drafts/close/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -66,6 +69,7 @@ editable = ["text"]
 name = "ask_owner"
 delivery = "message"
 schema = "drafts/ask_owner/schema.json"
+preview = "drafts/ask_owner/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -73,16 +77,19 @@ editable = ["text"]
 name = "react"
 delivery = "reaction"
 schema = "drafts/react/schema.json"
+preview = "drafts/react/preview.md.tmpl"
 
 [[source.draft_kinds]]
 name = "unreact"
 delivery = "unreaction"
 schema = "drafts/unreact/schema.json"
+preview = "drafts/unreact/preview.md.tmpl"
 
 [[source.draft_kinds]]
 name = "edit"
 delivery = "edit"
 schema = "drafts/edit/schema.json"
+preview = "drafts/edit/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -90,6 +97,7 @@ editable = ["text"]
 name = "delete"
 delivery = "delete"
 schema = "drafts/delete/schema.json"
+preview = "drafts/delete/preview.md.tmpl"
 
 [[source.facts]]
 name = "slack.channel"
@@ -394,9 +402,9 @@ fields = [{ name = "Text" }]
 
 [[source.tools]]
 name = "slack_draft"
-doc = "Proposes a Slack message or reaction for the user's approval."
+doc = "Proposes a Slack message, a reaction or its removal, or an edit or deletion of the user's message, for the user's approval."
 proposes = true
-input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"}},"additionalProperties":false}'
+input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react","unreact","edit","delete"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"}},"additionalProperties":false}'
 
 [[source.tools.answers]]
 name = "not_logged_in"
@@ -414,7 +422,19 @@ fields = [{ name = "Kinds" }]
 
 [[source.tools.answers]]
 name = "problem_reaction_required"
-doc = "A problem: a react draft has no reaction."
+doc = "A problem: a react or unreact draft has no reaction."
+
+[[source.tools.answers]]
+name = "problem_message"
+doc = "A problem: an edit or delete draft's target is not a message ref or permalink."
+
+[[source.tools.answers]]
+name = "problem_message_gone"
+doc = "A problem: Slack holds no message at an edit or delete draft's target."
+
+[[source.tools.answers]]
+name = "problem_message_not_yours"
+doc = "A problem: the message an edit or delete draft targets is not the user's."
 
 [[source.tools.answers]]
 name = "problem_text_required"

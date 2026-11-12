@@ -648,7 +648,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
-  - `slack_draft`: Proposes a Slack message or reaction for the user's approval.
+  - `slack_draft`: Proposes a Slack message, a reaction or its removal, or an edit or deletion of the user's message, for the user's approval.
   - `slack_react`: Adds or removes a reaction on a Slack message as the user, now.
   - `slack_edit`: Replaces the text of one of the user's Slack messages, now.
   - `slack_delete`: Deletes one of the user's Slack messages, now.
@@ -754,7 +754,10 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
-  - `problem_reaction_required`: A problem: a react draft has no reaction.
+  - `problem_reaction_required`: A problem: a react or unreact draft has no reaction.
+  - `problem_message`: A problem: an edit or delete draft's target is not a message ref or permalink.
+  - `problem_message_gone`: A problem: Slack holds no message at an edit or delete draft's target.
+  - `problem_message_not_yours`: A problem: the message an edit or delete draft targets is not the user's.
   - `problem_text_required`: A problem: text is missing or empty.
   - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user's approval.
   - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it, and it will be posted.

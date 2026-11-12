@@ -23,7 +23,7 @@ import (
 
 func TestPluginServesEveryCapability(t *testing.T) {
 	want := []src.Capability{src.CapabilityIngester, src.CapabilityPresenter, src.CapabilityPublisher, src.CapabilityLander,
-		src.CapabilityBriefer, src.CapabilityPlanner, src.CapabilityTooler, src.CapabilityCLIRunner}
+		src.CapabilityBriefer, src.CapabilityPlanner, src.CapabilityTooler, src.CapabilityCLIRunner, src.CapabilityDrafter}
 	if got := src.Capabilities(&Plugin{}); !slices.Equal(got, want) {
 		t.Fatalf("capabilities %v, want %v", got, want)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/auth"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
@@ -401,61 +403,147 @@ func searchDate(s string) (time.Time, bool) {
 	return d, err == nil
 }
 
-// draftKinds are the kinds slack_draft offers; a react posts no message.
-var draftKinds = func() []string {
-	out := make([]string, len(draft.ConversationKinds))
-	for i, k := range draft.ConversationKinds {
-		out[i] = string(k)
+//go:embed plugin.toml
+var manifestTOML []byte
+
+// draftKind is a kind the manifest declares: what slack_draft proposes and
+// how it reaches Slack.
+type draftKind struct {
+	name, purpose string
+	delivery      draft.Delivery
+}
+
+// declaredKinds are the manifest's draft kinds, in its order; the first is
+// slack_draft's default.
+var declaredKinds = func() []draftKind {
+	m, err := manifest.Parse(manifestTOML)
+	if err != nil {
+		panic(err)
+	}
+	s, err := m.Source()
+	if err != nil {
+		panic(err)
+	}
+	out := make([]draftKind, len(s.DraftKinds))
+	for i, k := range s.DraftKinds {
+		out[i] = draftKind{name: k.Name, purpose: cmp.Or(k.Purpose, k.Name), delivery: draft.Delivery(cmp.Or(k.Delivery, s.DefaultDelivery))}
 	}
 	return out
 }()
+
+// draftKinds are the names of the kinds slack_draft offers.
+var draftKinds = func() []string {
+	out := make([]string, len(declaredKinds))
+	for i, k := range declaredKinds {
+		out[i] = k.name
+	}
+	return out
+}()
+
+func kindNamed(name string) (draftKind, bool) {
+	i := slices.IndexFunc(declaredKinds, func(k draftKind) bool { return k.name == name })
+	if i < 0 {
+		return draftKind{}, false
+	}
+	return declaredKinds[i], true
+}
 
 var errNoDraftTurn = errors.New("this session has no turn; slack_draft drafts on the unit of a turn sent to or started in this session")
 
 func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	var a struct {
-		Text      *string  `json:"text"`
-		Kind      string   `json:"kind"`
-		Target    string   `json:"target"`
-		Items     []string `json:"items"`
-		Reaction  string   `json:"reaction"`
-		Effects   []string `json:"effects"`
-		Broadcast *bool    `json:"broadcast"`
+		Text      *string         `json:"text"`
+		Kind      string          `json:"kind"`
+		Target    string          `json:"target"`
+		Items     []string        `json:"items"`
+		Reaction  string          `json:"reaction"`
+		Effects   []string        `json:"effects"`
+		Broadcast *bool           `json:"broadcast"`
+		Payload   json.RawMessage `json:"payload"`
+		Basis     string          `json:"basis"`
+		Hold      bool            `json:"hold"`
 	}
 	if err := decodeStrict(raw, &a); err != nil {
 		return badArguments(err)
+	}
+	if p := bytes.TrimSpace(a.Payload); len(p) > 0 && p[0] != '{' && !bytes.Equal(p, []byte("null")) {
+		return badArguments(errors.New("payload: an object"))
 	}
 	if t.session == "" {
 		return answer("refused", fields{"Error": "the call names no session; slack_draft drafts for a session"}, true)
 	}
 	d := draft.Draft{Kind: draft.Kind(cmp.Or(strings.TrimSpace(a.Kind), draftKinds[0])), Target: strings.TrimSpace(a.Target), Items: a.Items,
-		Reaction: strings.TrimSpace(a.Reaction), Effects: a.Effects}
+		Reaction: strings.TrimSpace(a.Reaction), Effects: a.Effects, Payload: a.Payload, Basis: a.Basis, Hold: a.Hold}
 	if a.Broadcast != nil {
 		d.Broadcast = draft.BroadcastOff
 		if *a.Broadcast {
 			d.Broadcast = draft.BroadcastOn
 		}
 	}
-	if a.Text != nil {
+	k, ok := kindNamed(string(d.Kind))
+	if !ok {
+		return fixThese([]Problem{{Answer: "problem_kind", Fields: fields{"Kinds": strings.Join(draftKinds, ", ")}}})
+	}
+	d.Purpose, d.Delivery = k.purpose, k.delivery
+	if a.Text != nil && d.Delivery != draft.DeleteDelivery {
 		d.Text = *a.Text
 	}
+	var problems []Problem
+	if d.Delivery.ChangesAMessage() && !send.IsMessage(d.Target) {
+		problems = append(problems, Problem{Answer: "problem_message"})
+	}
 	switch {
-	case !slices.Contains(draftKinds, string(d.Kind)):
-		return fixThese([]Problem{{Answer: "problem_kind", Fields: fields{"Kinds": strings.Join(draftKinds, ", ")}}})
-	case d.Kind.Emoji() && d.Reaction == "":
-		return fixThese([]Problem{{Answer: "problem_reaction_required"}})
-	case !d.Kind.Emoji() && strings.TrimSpace(d.Text) == "":
-		return fixThese([]Problem{{Answer: "problem_text_required"}})
+	case d.Delivery.Emoji() && d.Reaction == "":
+		problems = append(problems, Problem{Answer: "problem_reaction_required"})
+	case !d.Delivery.Emoji() && d.Delivery != draft.DeleteDelivery && strings.TrimSpace(d.Text) == "":
+		problems = append(problems, Problem{Answer: "problem_text_required"})
+	}
+	if len(problems) > 0 {
+		return fixThese(problems)
 	}
 	s, ok := t.sender()
 	if !ok {
 		return notLoggedIn()
+	}
+	if d.Delivery.ChangesAMessage() {
+		problem, err := t.changed(ctx, s, &d)
+		switch {
+		case err != nil:
+			return failed(err)
+		case problem != "":
+			return fixThese([]Problem{{Answer: problem}})
+		}
 	}
 	res, err := t.propose(ctx, s, d)
 	if err != nil {
 		return failed(err)
 	}
 	return res
+}
+
+// changed reads the message an edit or a deletion d changes, so its card
+// shows the text it replaces or removes: a problem when Slack holds no such
+// message or the user did not post it.
+func (t tools) changed(ctx context.Context, s *send.Service, d *draft.Draft) (problem string, err error) {
+	tok, err := t.p.slack.Tokens.Load()
+	if err != nil {
+		return "", err
+	}
+	m, ok, err := s.Read(ctx, d.Target)
+	switch {
+	case err != nil:
+		return "", err
+	case !ok:
+		return "problem_message_gone", nil
+	case m.User != tok.User:
+		return "problem_message_not_yours", nil
+	}
+	if d.Delivery == draft.DeleteDelivery {
+		d.Text = m.Text
+	} else {
+		d.Replaced = m.Text
+	}
+	return "", nil
 }
 
 // propose opens the gate of d for the session: on the unit of the
@@ -500,7 +588,6 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 	if noTurn && d.Unit == turnUnit {
 		return src.ToolResult{}, errNoDraftTurn
 	}
-	d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
 	ref, err := h.Gates.OpenGate(ctx, src.GateRequest{Draft: WireDraft(d), Session: t.session})
 	if err != nil {
 		return src.ToolResult{}, err

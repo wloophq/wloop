@@ -35,7 +35,9 @@ const (
 )
 
 // Publisher posts Slack drafts as the user: messages through send's
-// resolution and post allowlist, reactions with reactions.add.
+// resolution and post allowlist, reactions with reactions.add and
+// reactions.remove, edits and deletions of the user's own messages with
+// chat.update and chat.delete.
 type Publisher struct {
 	Send *send.Service
 	// Token is the stored user token: its user and granted scopes.
@@ -56,9 +58,11 @@ type Publisher struct {
 // plan is where and what a draft posts.
 type plan struct {
 	res      send.Resolved
-	text     string // mrkdwn; messages only
-	reaction string // react only
-	at       string // react only: the message the reaction goes on
+	delivery draft.Delivery
+	text     string // mrkdwn; messages and edits
+	reaction string // reactions only
+	at       string // reactions, edits and deletions: the message they change
+	message  string // edits and deletions: the target naming that message
 }
 
 func (pl plan) where() string {
@@ -74,10 +78,10 @@ func (p *Publisher) Validate(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
-// Where names the conversation d would post to, or, for a recorded edit or
-// deletion, the conversation of the message it changed.
+// Where names the conversation d would post to, or, for an edit or a
+// deletion, the conversation of the message it changes.
 func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
-	if madeAtOnce(d.Delivery) {
+	if d.Delivery.ChangesAMessage() {
 		if p.Send == nil || p.Send.Client == nil {
 			return "", send.ErrNotLoggedIn
 		}
@@ -92,10 +96,6 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 	return pl.where(), nil
 }
 
-// madeAtOnce says a draft of delivery d is a tool's change the Outbox only
-// records: slack_edit's or slack_delete's.
-func madeAtOnce(d draft.Delivery) bool { return d == draft.EditDelivery || d == draft.DeleteDelivery }
-
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	k, err := dslack.ParseUnit(d.Unit)
 	if err != nil && strings.TrimSpace(d.Target) == "" {
@@ -104,29 +104,49 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
 	}
-	if madeAtOnce(d.Delivery) {
-		return plan{}, fmt.Errorf("%s goes out through its tool at once and is only recorded, never published from the Outbox", d.Delivery)
-	}
-	var pl plan
-	if d.Delivery == draft.Reaction {
+	pl := plan{delivery: d.Delivery}
+	switch {
+	case d.Delivery.Emoji():
 		if pl.reaction = strings.Trim(strings.TrimSpace(d.Reaction), ":"); pl.reaction == "" {
 			return plan{}, errors.New("a reaction needs an emoji name")
 		}
 		if err := p.canReact(); err != nil {
 			return plan{}, err
 		}
-	} else if pl.text, err = p.body(ctx, d); err != nil {
-		return plan{}, err
-	} else if strings.TrimSpace(pl.text) == "" {
-		return plan{}, errors.New("the message is empty")
+	case d.Delivery == draft.DeleteDelivery:
+	default:
+		if pl.text, err = p.body(ctx, d); err != nil {
+			return plan{}, err
+		}
+		if strings.TrimSpace(pl.text) == "" {
+			return plan{}, errors.New("the message is empty")
+		}
 	}
-	if err := p.target(ctx, d, k, &pl); err != nil {
+	if d.Delivery.ChangesAMessage() {
+		err = p.changed(ctx, d, &pl)
+	} else {
+		err = p.target(ctx, d, k, &pl)
+	}
+	if err != nil {
 		return plan{}, err
 	}
 	if err := p.Send.Allowed(pl.res); err != nil {
 		return plan{}, err
 	}
 	return pl, nil
+}
+
+// changed resolves the message an edit or a deletion changes, which only
+// its target names.
+func (p *Publisher) changed(ctx context.Context, d draft.Draft, pl *plan) error {
+	t := strings.TrimSpace(d.Target)
+	m, ok := send.ParseMessage(t)
+	if !ok {
+		return fmt.Errorf("an %s needs the message it changes as a message ref or permalink target, not %q", d.Delivery, t)
+	}
+	pl.at, pl.message = m.TS, t
+	no := false
+	return p.resolve(ctx, send.Request{Target: t, Thread: &no}, pl)
 }
 
 func (p *Publisher) canReact() error {
@@ -171,7 +191,7 @@ func userOf(target string) string {
 // post allowlist holds them.
 func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl *plan) error {
 	t := strings.TrimSpace(d.Target)
-	react := d.Delivery == draft.Reaction
+	react := d.Delivery.Emoji()
 	switch {
 	case t == "" && k.Segment != "":
 		return errors.New("a draft on a direct message segment needs a target; its placement is named when it is proposed")
@@ -325,10 +345,10 @@ func (p *Publisher) draftWords(ctx context.Context) (draftWords, error) {
 
 func (p *Publisher) placeTarget(ctx context.Context, d draft.Draft) (string, error) {
 	k, err := dslack.ParseUnit(d.Unit)
-	if err != nil || k.Segment == "" {
+	if err != nil || k.Segment == "" || d.Delivery.ChangesAMessage() {
 		return "", nil
 	}
-	react := d.Delivery == draft.Reaction
+	react := d.Delivery.Emoji()
 	if len(d.Items) == 0 {
 		switch {
 		case d.Origin.Kind != draft.OriginUser:
@@ -513,13 +533,19 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		return draft.Evidence{}, err
 	}
 	c := p.Send.Client
-	if pl.reaction != "" {
-		err := c.AddReaction(ctx, pl.res.Channel, pl.at, pl.reaction)
-		if err != nil && apiCode(err) != "already_reacted" {
+	switch pl.delivery {
+	case draft.Reaction, draft.Unreaction:
+		call, unchanged := c.AddReaction, "already_reacted"
+		if pl.delivery == draft.Unreaction {
+			call, unchanged = c.RemoveReaction, "no_reaction"
+		}
+		if err := call(ctx, pl.res.Channel, pl.at, pl.reaction); err != nil && apiCode(err) != unchanged {
 			return draft.Evidence{}, p.failed(pl, err)
 		}
 		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
 		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), nil
+	case draft.EditDelivery, draft.DeleteDelivery:
+		return p.change(ctx, d, pl)
 	}
 	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS,
 		Broadcast: pl.res.ThreadTS != "" && d.Broadcast == draft.BroadcastOn})
@@ -532,6 +558,39 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
 	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
 	return p.evidence(ctx, channel, posted.TS, postedAt(posted.TS, p.now())), nil
+}
+
+// change edits or deletes the user's message pl names, after reading that
+// it is the user's.
+func (p *Publisher) change(ctx context.Context, d draft.Draft, pl plan) (draft.Evidence, error) {
+	if p.Token == nil {
+		return draft.Evidence{}, send.ErrNotLoggedIn
+	}
+	tok, err := p.Token()
+	if err != nil {
+		return draft.Evidence{}, err
+	}
+	m, ok, err := p.Send.Read(ctx, pl.message)
+	switch {
+	case err != nil:
+		return draft.Evidence{}, fmt.Errorf("reading the message %s: %w", pl.message, err)
+	case !ok:
+		return draft.Evidence{}, fmt.Errorf("%w: no message %s in %s", send.ErrCannotPost, pl.at, pl.res.Channel)
+	case m.User != tok.User:
+		return draft.Evidence{}, fmt.Errorf("%w: %s ts %s is not the user's; an %s changes only the user's own messages", send.ErrCannotPost,
+			pl.res.Channel, pl.at, pl.delivery)
+	}
+	ev := p.evidence(ctx, pl.res.Channel, pl.at, p.now())
+	if pl.delivery == draft.DeleteDelivery {
+		err = p.Send.Client.DeleteMessage(ctx, pl.res.Channel, pl.at)
+	} else {
+		err = p.Send.Client.UpdateMessage(ctx, pl.res.Channel, pl.at, pl.text)
+	}
+	if err != nil {
+		return draft.Evidence{}, p.failed(pl, err)
+	}
+	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
+	return ev, nil
 }
 
 // evidence names the message at ts in channel by its ref and permalink.
@@ -560,17 +619,32 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 	if err != nil {
 		return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
 	}
-	if pl.reaction != "" {
+	switch pl.delivery {
+	case draft.Reaction, draft.Unreaction:
 		rs, err := p.Send.Client.Reactions(ctx, pl.res.Channel, pl.at)
 		if err != nil {
 			return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
 		}
-		for _, r := range rs {
-			if r.Name == pl.reaction && slices.Contains(r.Users, tok.User) {
-				return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), true, nil
-			}
+		mine := slices.ContainsFunc(rs, func(r slackapi.Reaction) bool { return r.Name == pl.reaction && slices.Contains(r.Users, tok.User) })
+		if mine != (pl.delivery == draft.Reaction) {
+			return draft.Evidence{}, false, nil
 		}
-		return draft.Evidence{}, false, nil
+		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), true, nil
+	case draft.EditDelivery, draft.DeleteDelivery:
+		m, ok, err := p.Send.Read(ctx, pl.message)
+		if err != nil {
+			return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
+		}
+		if pl.delivery == draft.DeleteDelivery {
+			if ok {
+				return draft.Evidence{}, false, nil
+			}
+			return draft.Evidence{Ref: send.Ref(pl.res.Channel, pl.at), At: p.now()}, true, nil
+		}
+		if !ok || m.User != tok.User || normalized(m.Text) != normalized(pl.text) {
+			return draft.Evidence{}, false, nil
+		}
+		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), true, nil
 	}
 	oldest := slackTSOf(startedAt.Add(-verifySkew))
 	want := normalized(pl.text)
@@ -606,7 +680,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 // segment message sending with none: only a version that published such a
 // draft at the conversation's top level, before placement, left it so.
 func unplacedAsPosted(d draft.Draft) draft.Draft {
-	if strings.TrimSpace(d.Target) != "" || d.Delivery == draft.Reaction {
+	if strings.TrimSpace(d.Target) != "" || d.Delivery.Emoji() || d.Delivery.ChangesAMessage() {
 		return d
 	}
 	if k, err := dslack.ParseUnit(d.Unit); err == nil && k.Segment != "" {
