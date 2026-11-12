@@ -406,7 +406,7 @@ func TestEveryPreviewRendersItsFixtures(t *testing.T) {
 		if k.Preview == "" {
 			continue
 		}
-		tmpl, err := template.ParseFiles(k.Preview)
+		tmpl, err := template.ParseFiles(filepath.Join("profile", k.Preview))
 		if err != nil {
 			t.Fatalf("%s: %v", k.Name, err)
 		}
