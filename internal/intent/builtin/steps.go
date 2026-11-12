@@ -63,6 +63,13 @@ var (
 // TurnRunners are the values of turn.start's runner.
 var TurnRunners = []string{"session", "headless"}
 
+// TurnDue are the values of turn.start's due, its default first: plan sends a round only when the unit's plan
+// holds it due; when sends one whenever the workflow's when matches.
+var TurnDue = []string{"plan", TurnDueWhen}
+
+// TurnDueWhen is the due of a turn.start whose workflow's when alone decides that its round is due.
+const TurnDueWhen = "when"
+
 // TurnOpenQuestion are the values of turn.start's open_question, its default first.
 var TurnOpenQuestion = []string{"hold", QuestionReplaceIfMoved}
 

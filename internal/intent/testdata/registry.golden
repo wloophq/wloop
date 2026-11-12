@@ -624,6 +624,7 @@ workflow/review-draft-failed.Slot = "pr"
 workflow/review-draft-failed.Trigger.Kind = "sweep"
 workflow/review-draft-failed.When = "draft.failed_kind == \"review\" && draft.failed_ref != \"\" && (draft.failed || draft.stale)"
 workflow/review-draft-failed.Steps[0].Use = "turn.start"
+workflow/review-draft-failed.Steps[0].Args[due] = "when"
 workflow/review-draft-failed.Steps[0].Args[intent] = "review"
 workflow/review-draft-failed.Steps[0].Args[open_question] = "replace_if_moved"
 workflow/review-draft-failed.Order = 15

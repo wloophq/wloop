@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -191,7 +190,12 @@ func TestDrafts(t *testing.T) {
 		if _, err := r.d.Action(r.ctx, draftsPR, ghplugin.ActionRefresh); err != nil {
 			t.Fatalf("reading %s in full: %v", draftsPR.Label(), err)
 		}
-		r.review()
+		r.sweepPastTheWindow()
+		b := r.book()
+		if len(b.Turns) != 1 || b.Turns[0].Workflow != "review-first-round" {
+			t.Fatalf("the requested review started no first round: turns %+v", b.Turns)
+		}
+		r.s = r.d.Launched(t, draftsPR)
 		withInline := json.RawMessage(`{"event":"REQUEST_CHANGES","comments":[{"path":"export.go","line":40,"body":"This reads the dropped column."}]}`)
 		d, err := r.c.ProposeDraft(r.ctx, r.s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One blocking finding.", Payload: withInline, Basis: "c2"})
 		if err != nil {
@@ -204,17 +208,12 @@ func TestDrafts(t *testing.T) {
 		if failed := r.wantState(d.ID, "failed"); !strings.Contains(failed.Error, refused) {
 			t.Fatalf("the draft failed with %q, want GitHub's message", failed.Error)
 		}
-		turns := len(r.book().Turns)
-		for range 2 {
-			if err := r.d.Sweep(r.ctx); err != nil {
-				t.Fatalf("sweep: %v", err)
-			}
-			r.advance(2 * time.Minute)
+		r.sweepPastTheWindow()
+		b = r.book()
+		if len(b.Turns) != 2 || b.Turns[1].Workflow != "review-draft-failed" || b.Turns[1].ReplacedBy != 0 {
+			t.Fatalf("the failed send reopened no round, or another replaced it: turns %+v", b.Turns)
 		}
-		if b := r.book(); len(b.Turns) != turns+1 {
-			t.Fatalf("the failed send reopened no round: turns %+v", b.Turns)
-		}
-		r.resumed()
+		r.s = r.d.Launched(t, draftsPR)
 		if text := r.instructions(); !strings.Contains(text, fmt.Sprintf("`draft.failed_ref`: `%d:", d.ID)) || strings.Contains(text, "This reads the dropped column.") {
 			t.Fatalf("the round's instructions carry no pointer to draft %d, or carry its text:\n%s", d.ID, text)
 		}

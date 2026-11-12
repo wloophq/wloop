@@ -60,6 +60,8 @@ const refusalBriefNotReady = "brief not ready"
 type startArgs struct {
 	intent, round, runner string
 	def                   dintent.Def
+	// dueByWhen sends the turn whenever the workflow's when matches, with no round of the unit's plan.
+	dueByWhen bool
 }
 
 // startOf is st's arguments and the manifest of the intent it starts on
@@ -70,6 +72,8 @@ func (e *Env) startOf(st workflow.Step, p unit.ProviderID) startArgs {
 	a.intent, _ = st.Args["intent"].(string)
 	a.round, _ = st.Args["stage"].(string)
 	a.runner, _ = st.Args["runner"].(string)
+	due, _ := st.Args["due"].(string)
+	a.dueByWhen = due == builtin.TurnDueWhen
 	if l := e.loadedIntents(); l != nil {
 		a.def, _ = l.Registry.Get(dintent.Name(a.intent))
 		if h, ok := l.Registry.ByRole(a.def.Role, p); a.def.Role != "" && ok {
@@ -100,6 +104,9 @@ func isTurnStart(st workflow.Step) bool { return st.Use == builtin.StepTurnStart
 // candidate is the sweep's round the intent's role's round kind and the step's
 // round start, "" for an intent that sends none.
 func (a startArgs) candidate() string {
+	if a.dueByWhen {
+		return ""
+	}
 	switch a.def.RoundKind {
 	case builtin.RoundKindReview:
 		if a.round == roundFirst {
