@@ -15,11 +15,13 @@ function subjectOf(g) {
   return g && g.subject && typeof g.subject === "object" ? g.subject : {};
 }
 
-// gateOption is the option picked on g's card: the person's pick, else the recommended one; "" for none.
+// gateOption is the option picked on g's card: the person's pick, else the recommended one unless it pins a
+// draft, which is sent only once the person picks it; "" for none.
 function gateOption(g) {
   if (gateState.picked.has(g.id)) return gateState.picked.get(g.id);
   const subject = subjectOf(g);
-  return (subject.options || []).some((o) => o.id === subject.recommend) ? subject.recommend : "";
+  const recommended = (subject.options || []).find((o) => o.id === subject.recommend);
+  return recommended && !recommended.draft ? recommended.id : "";
 }
 
 // markResolving dims the card drawn for selector while its decision is on its way; a failed one comes back.

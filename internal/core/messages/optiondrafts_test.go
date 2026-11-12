@@ -378,3 +378,27 @@ func TestOptionDraftNamesOnlyThePinSeen(t *testing.T) {
 		}
 	}
 }
+
+// ApproveOption checks that the resolution answers the question before it approves anything, whoever calls it.
+func TestApproveOptionApprovesNothingForAResolutionThatDoesNotAnswer(t *testing.T) {
+	ctx := context.Background()
+	for _, r := range []gates.Resolution{
+		{Intent: "dismiss", Answer: "approve", By: task.ActorPerson},
+		{Intent: "continue", Answer: "approve", By: task.ActorPerson},
+		{Intent: "no-such-intent", Answer: "approve", By: task.ActorPerson},
+		{Intent: "answer", By: task.ActorPerson},
+		{Intent: "answer", Answer: "approve", By: task.ActorAgent, Session: "not-driven"},
+	} {
+		rg, od, m := draftRig(t)
+		q := rg.gateOf(t, m)
+		if err := rg.gates.ApproveOption(ctx, q, r, od.gateOf(42), 1); err == nil {
+			t.Errorf("%+v: approved", r)
+		}
+		if dg := od.gateOf(42); dg.Status != gate.Open || len(od.approvals) != 0 {
+			t.Errorf("%+v: draft gate %s, approvals %+v", r, dg.Status, od.approvals)
+		}
+		if got := rg.gateOf(t, m); got.Status != gate.Open {
+			t.Errorf("%+v: question %s", r, got.Status)
+		}
+	}
+}

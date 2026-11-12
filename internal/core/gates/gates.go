@@ -242,6 +242,9 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 	if err != nil || q.Kind != gate.KindQuestion || q.Status != gate.Open {
 		return false, err
 	}
+	if s.answers(ctx, q, r) != nil {
+		return false, nil
+	}
 	drafted, rev, ok, err := s.d.Options.OptionDraft(ctx, q, r)
 	if err != nil || !ok {
 		return false, err
