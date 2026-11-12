@@ -38,9 +38,9 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 	if s.Drafts == nil || m.Kind != message.Question {
 		return false, nil
 	}
-	ref, ok, err := s.pickedDraft(ctx, m, a)
-	if err != nil || !ok {
-		return false, err
+	ref, ok := pickedDraft(m, a)
+	if !ok {
+		return false, nil
 	}
 	if g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
 		return false, nil
@@ -85,29 +85,20 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 	return true, nil
 }
 
-// pickedDraft is the draft a points to on m: its option's, or the confirm's on a yes, which the turn's
-// asked record holds since a message keeps no confirm draft.
-func (s *Service) pickedDraft(ctx context.Context, m message.Message, a Answer) (record.DraftRef, bool, error) {
-	if !m.Confirm {
-		i := slices.IndexFunc(m.Options, func(o record.Option) bool { return o.ID == a.OptionID })
-		if a.OptionID == "" || i < 0 || m.Options[i].Draft == nil {
-			return record.DraftRef{}, false, nil
+// pickedDraft is the draft a points to on m, as m pinned it when the person saw it: its option's, or the
+// confirm's on a yes.
+func pickedDraft(m message.Message, a Answer) (record.DraftRef, bool) {
+	if m.Confirm {
+		if !a.Yes || m.Draft == nil {
+			return record.DraftRef{}, false
 		}
-		return *m.Options[i].Draft, true, nil
+		return *m.Draft, true
 	}
-	if !a.Yes {
-		return record.DraftRef{}, false, nil
+	i := slices.IndexFunc(m.Options, func(o record.Option) bool { return o.ID == a.OptionID })
+	if a.OptionID == "" || i < 0 || m.Options[i].Draft == nil {
+		return record.DraftRef{}, false
 	}
-	books, err := s.Books.Books(ctx, m.Unit)
-	if err != nil {
-		return record.DraftRef{}, false, err
-	}
-	b := books[m.Unit]
-	last, ok := b.LastRecord(m.Origin.TurnSeq)
-	if !ok || last.Record.State != record.Asked || last.Record.Question == nil || last.Record.Question.Kind != "confirm" || last.Record.Question.Draft == nil {
-		return record.DraftRef{}, false, nil
-	}
-	return *last.Record.Question.Draft, true, nil
+	return *m.Options[i].Draft, true
 }
 
 // ofTurn is draft id and its gate when the draft is one m's turn proposed on m's unit; false otherwise.

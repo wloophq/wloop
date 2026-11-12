@@ -233,9 +233,16 @@ func (s *Service) reconcile(ctx context.Context, units []unit.Unit) ([]message.M
 			delete(want, k)
 			w.ID, w.TaskID, w.CreatedAt = m.ID, m.TaskID, m.CreatedAt
 			if !sameContent(w, m) {
+				repinned := !samePins(w, m)
 				if m, err = s.Store.Upsert(ctx, w); err != nil {
 					errs = append(errs, err)
 					continue
+				}
+				if repinned {
+					if err := s.supersedeOpen(ctx, m); err != nil {
+						errs = append(errs, err)
+						continue
+					}
 				}
 			}
 			gated = append(gated, m)
@@ -318,13 +325,29 @@ func postable(b *turn.Book, m message.Message) bool {
 
 func sameContent(a, b message.Message) bool {
 	return a.Text == b.Text && a.Recommend == b.Recommend && a.Confirm == b.Confirm && a.Origin.Session == b.Origin.Session &&
-		slices.EqualFunc(a.Options, b.Options, sameOption)
+		slices.EqualFunc(a.Options, b.Options, sameOption) && samePins(a, b)
 }
+
+// samePins says whether a and b point every option, and the confirm, to the same draft at the same rev:
+// an answer approves what the person saw, so a change to a pin is a new question with a new gate.
+func samePins(a, b message.Message) bool {
+	if !sameRef(a.Draft, b.Draft) || len(a.Options) != len(b.Options) {
+		return false
+	}
+	for i := range a.Options {
+		if a.Options[i].ID != b.Options[i].ID || !sameRef(a.Options[i].Draft, b.Options[i].Draft) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameRef(a, b *record.DraftRef) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
 
 func sameOption(a, b record.Option) bool {
 	da, db := a.Draft, b.Draft
 	a.Draft, b.Draft = nil, nil
-	return a == b && (da == nil) == (db == nil) && (da == nil || *da == *db)
+	return a == b && sameRef(da, db)
 }
 
 // questionOf is the open question message the book calls for on u, as the unit's row shows it: the turn an
@@ -345,6 +368,10 @@ func questionOf(u unit.Unit, b turn.Book, answerable []string, now time.Time) (m
 	case recorded && last.Record.Question != nil:
 		rq := last.Record.Question
 		m.Text, m.Options, m.Recommend, m.Confirm = rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Kind == "confirm"
+		if m.Confirm && rq.Draft != nil {
+			pin := *rq.Draft
+			m.Draft = &pin
+		}
 	case recorded:
 		m.Text = strings.TrimSpace(firstOf(last.Record.Summary, last.Record.Resume))
 	}
