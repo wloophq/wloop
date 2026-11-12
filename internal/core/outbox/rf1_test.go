@@ -1,6 +1,7 @@
 package outbox
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -260,5 +261,30 @@ func TestOnlyAStaleRefusalStartsAFailureWithTheStaleToken(t *testing.T) {
 				t.Fatalf("Error %q", got)
 			}
 		})
+	}
+}
+
+// soleGates refuses to open a draft gate while another of its unit is open.
+type soleGates struct{ Gates }
+
+func (g soleGates) Open(ctx context.Context, gt gate.Gate, p gates.Policy) (gate.Gate, error) {
+	open, err := g.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: gt.Unit})
+	if err != nil || len(open) > 0 {
+		return gate.Gate{}, fmt.Errorf("%d open gates on %s: %v", len(open), gt.Unit, err)
+	}
+	return g.Gates.Open(ctx, gt, p)
+}
+
+func TestPlacingAHeldDraftNeverHasTwoOpenGates(t *testing.T) {
+	e := newEnv()
+	pl := withPlacer(e, "msg:C000AAA/1.2")
+	d := e.propose(reply("ship it"))
+	e.svc.Gates = soleGates{e.svc.Gates}
+	pl.broadcast = draft.BroadcastOn
+	if err := e.svc.PlaceBroadcasts(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.get(d.ID); got.State != draft.Held || got.Broadcast != draft.BroadcastOn || e.gate(d.ID).ApprovedRev != got.Rev {
+		t.Fatalf("placed %+v, gate %+v", got, e.gate(d.ID))
 	}
 }

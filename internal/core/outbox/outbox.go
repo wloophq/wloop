@@ -1278,28 +1278,42 @@ func (s *Service) PlaceBroadcasts(ctx context.Context) error {
 			continue
 		}
 		d.Broadcast = got.Broadcast
-		saved, err := s.save(ctx, d, d.State)
-		switch {
-		case errors.Is(err, ErrConflict):
-		case err != nil:
+		if d.State == draft.Held {
+			errs = append(errs, s.placeHeld(ctx, d, prev))
+			continue
+		}
+		if _, err := s.save(ctx, d, d.State); err != nil && !errors.Is(err, ErrConflict) {
 			errs = append(errs, err)
-		case saved.State == draft.Held:
-			errs = append(errs, s.replaceGate(ctx, saved, prev))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// replaceGate opens a waiting gate for held draft d, written by the outbox since prev opened, then
-// supersedes prev; prev resolved meanwhile is left as it is, and its approval fails d's release.
-func (s *Service) replaceGate(ctx context.Context, d draft.Draft, prev gate.Gate) error {
-	if _, err := s.Gates.Open(ctx, gateOf(d, sessionsOf(prev, true, "")), decided(draft.Decision{Approval: waiting, Rule: -1})); err != nil {
-		return errors.Join(fmt.Errorf("reopening the gate of draft %d: %w", d.ID, err), s.ungated(ctx, d))
-	}
-	if err := s.Gates.Supersede(ctx, prev.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+// placeHeld stores held draft d's placement under a new waiting gate: prev, its open gate, is superseded
+// first, as a person's edit supersedes it, so its task is not ended in between, and no instant has two
+// open gates. A prev decided meanwhile leaves d unplaced; a write that loses to another leaves the stored
+// draft waiting on a gate at its rev.
+func (s *Service) placeHeld(ctx context.Context, d draft.Draft, prev gate.Gate) error {
+	if err := s.Gates.Supersede(ctx, prev.ID, task.ActorPerson); errors.Is(err, gates.ErrResolved) {
+		return nil
+	} else if err != nil {
 		return err
 	}
-	return nil
+	at, serr := s.save(ctx, d, draft.Held)
+	if serr != nil {
+		var gerr error
+		if at, gerr = s.Store.Get(ctx, d.ID); gerr != nil || at.State != draft.Held {
+			return errors.Join(ignoreConflict(serr), gerr)
+		}
+	}
+	return errors.Join(ignoreConflict(serr), s.waitAt(ctx, at, sessionsOf(prev, true, ""), ""))
+}
+
+func ignoreConflict(err error) error {
+	if errors.Is(err, ErrConflict) {
+		return nil
+	}
+	return err
 }
 
 // EvidenceOps are the items ledger ops that record sent draft d on each of its items;
