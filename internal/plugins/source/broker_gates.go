@@ -36,7 +36,7 @@ func (g gates) OpenGate(ctx context.Context, req src.GateRequest) (src.GateRef, 
 	}
 	d := req.Draft
 	p := outbox.Proposal{Items: d.Items, Kind: draft.Kind(d.Kind), Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Effects: d.Effects,
-		Purpose: d.Purpose}
+		Purpose: d.Purpose, Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 	if p.Kind != "" {
 		p.Purpose = ""
 	}

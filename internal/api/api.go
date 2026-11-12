@@ -187,6 +187,10 @@ var Operations = []Operation{
 	{"POST", AgentSessionsStop},
 	{"POST", AgentSessionsPrompt},
 	{"GET", AgentAnswer},
+	{"GET", AgentDrafts},
+	{"POST", AgentDrafts},
+	{"PATCH", AgentDrafts},
+	{"DELETE", AgentDrafts},
 
 	{"POST", AdminDryRunTurn},
 	{"GET", AdminDoctor},

@@ -644,6 +644,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
+  - `draft_read`: Reads a draft the session's turns may change: its content, delivery state and revisions.
+  - `draft_update`: Revises a draft of the session's turns at the rev it read; the revision waits for the user's approval again.
+  - `draft_withdraw`: Withdraws a draft of the session's turns at the rev it read.
   - `github_draft`: Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
@@ -703,6 +706,33 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `turn_answers` (`Answers`): A part of read: answers to the session's turns stored before each answer named its message.
   - `option` (`ID`, `Label`): A part of conversation: one option of the message.
   - `answer` (`Option`, `Label`, `Choice`, `Text`, `At`): A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.
+- `draft_read`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `read` (`Draft`): The draft, as JSON.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `failed` (`Error`): The call failed.
+- `draft_update`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `updated` (`Draft`): The revised draft, as JSON.
+  - `rev_conflict` (`Error`): The draft is at another rev than the one given.
+  - `stale` (`Error`): The basis given is not the unit's live one.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `failed` (`Error`): The call failed.
+- `draft_withdraw`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `withdrawn` (`Draft`): The withdrawn draft, as JSON.
+  - `rev_conflict` (`Error`): The draft is at another rev than the one given.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `failed` (`Error`): The call failed.
 - `github_draft`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

@@ -3,6 +3,7 @@ package source_test
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -87,6 +88,18 @@ func TestASessionsGateTakesItsOriginTaskAndItemsFromTheHostsBook(t *testing.T) {
 	p := ds.proposed[0]
 	if p.Origin.Kind != draft.OriginTurn || p.Origin.TurnSeq != 7 || p.Origin.Session != "live" || p.Origin.Rule != "" || p.Task != "task-1" || len(p.Items) != 1 || p.Items[0] != "i1" {
 		t.Fatalf("proposed %+v, want the turn's origin and session, task and items", p)
+	}
+}
+
+func TestASessionsGateKeepsItsPayloadBasisAndHold(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi", Payload: json.RawMessage(`{"event":"COMMENT"}`), Basis: "4f9c2d1", Hold: true}
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: d, Session: "live"}); err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.proposed[0]; string(p.Payload) != `{"event":"COMMENT"}` || p.Basis != "4f9c2d1" || !p.Hold {
+		t.Fatalf("proposed %+v, want the draft's payload, basis and hold", p)
 	}
 }
 
