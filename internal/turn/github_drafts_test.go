@@ -218,8 +218,16 @@ var shippedProbes = []probe{
 }
 
 // addressProbes are what the address intent alone sends besides
-// shippedProbes: a review request.
-var addressProbes = []probe{{"request_review", `{"reviewers": ["octocat"]}`, true}}
+// shippedProbes: a review request and the round's top-level comment.
+var addressProbes = []probe{{"request_review", `{"reviewers": ["octocat"]}`, true}, {"comment", `{}`, true}}
+
+// addressShipped is shippedProbes with addressProbes' kinds replaced by them.
+func addressShipped() []probe {
+	out := slices.DeleteFunc(slices.Clone(shippedProbes), func(p probe) bool {
+		return slices.ContainsFunc(addressProbes, func(a probe) bool { return a.kind == p.kind })
+	})
+	return append(out, addressProbes...)
+}
 
 // kindSpec is the GitHub manifest's spec of kind, as the outbox decides a
 // draft of it.
@@ -234,7 +242,7 @@ func kindSpec(t *testing.T, kind string) draft.KindSpec {
 
 func TestShippedRulesAllowList(t *testing.T) {
 	l := bundled(t)
-	for n, probes := range map[dintent.Name][]probe{dintent.Review: shippedProbes, dintent.Address: append(slices.Clone(shippedProbes), addressProbes...)} {
+	for n, probes := range map[dintent.Name][]probe{dintent.Review: shippedProbes, dintent.Address: addressShipped()} {
 		p := intentDef(t, l, n).DraftApproval
 		if p == nil {
 			t.Fatalf("%s ships no draft approval", n)
