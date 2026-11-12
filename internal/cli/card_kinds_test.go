@@ -1,26 +1,37 @@
 package cli
 
 import (
+	"encoding/json"
+	"reflect"
 	"testing"
-	"testing/fstest"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-func TestCardKindsReadTheManifestsKindAndItsSchema(t *testing.T) {
-	k := cardKinds{files: fstest.MapFS{"github/drafts/review/schema.json": {Data: []byte(`{"type":"object"}`)}}}
-	spec, ok := k.Lookup("github", "review")
-	if !ok || spec.Delivery != "review" || spec.Schema != "drafts/review/schema.json" || len(spec.Editable) != 2 {
-		t.Fatalf("review is %+v, %v", spec, ok)
+// TestCardKindsAreTheOutboxKinds reads every kind the card shows from the outbox's own catalog, and the schema
+// of each kind that has one from the bundled plugins' files.
+func TestCardKindsAreTheOutboxKinds(t *testing.T) {
+	k := cardDraftKinds()
+	kinds := builtin.DraftKinds.Kinds()
+	if len(kinds) == 0 {
+		t.Fatal("the catalog declares no kind")
 	}
-	if raw, err := k.Schema(spec); err != nil || string(raw) != `{"type":"object"}` {
-		t.Fatalf("schema %s, %v", raw, err)
+	for _, want := range kinds {
+		got, ok := k.Lookup(want.Provider, want.Name)
+		if !ok || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s/%s is %+v, want the outbox's %+v", want.Provider, want.Name, got, want)
+		}
+		if want.Schema == "" {
+			continue
+		}
+		raw, err := k.Schema(want)
+		if err != nil || !json.Valid(raw) {
+			t.Errorf("%s/%s schema: %v", want.Provider, want.Name, err)
+		}
 	}
 	if _, ok := k.Lookup("github", "nope"); ok {
-		t.Fatal("an undeclared kind is found")
+		t.Error("an undeclared kind is found")
 	}
-}
-
-func TestCardKindsAreTheOutboxKinds(t *testing.T) {
-	t.Skip("T13: M1 of reviews/T8.md")
 }
 
 func TestServeNotifiesRuleSent(t *testing.T) {
