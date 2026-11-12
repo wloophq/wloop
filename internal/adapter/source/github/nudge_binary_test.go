@@ -191,7 +191,8 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil || len(props) != 1 || props[0].Unit != ref.Unit() || !strings.Contains(props[0].Text, "@{github:bob}") {
 		t.Fatalf("proposals %+v %v, want the nudge of bob on #7", props, err)
 	}
-	gs := outboxtest.NewGates(func() time.Time { return now })
+	gst := db.Gates(func() time.Time { return now })
+	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
 	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})

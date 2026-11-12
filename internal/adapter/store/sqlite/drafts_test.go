@@ -182,7 +182,8 @@ func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
 			return err
 		}),
 	}
-	gs := outboxtest.NewGates(clock.Now)
+	gst := db.Gates(clock.Now)
+	gs := outboxtest.GatesOn(gst, gst, clock.Now)
 	gs.Bind(svc)
 	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Items: []string{"i1"}, Kind: draft.Reply, Text: "done",
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1}})
@@ -325,8 +326,11 @@ func TestStaleSendClaimConflicts(t *testing.T) {
 		t.Fatalf("claim from a stale snapshot: %v", err)
 	}
 	svc.Send(ctx)
-	if !slices.Equal(fx.published[d.ID], []string{"new"}) {
-		t.Fatalf("published %v", fx.published)
+	if len(fx.published[d.ID]) != 0 {
+		t.Fatalf("published %v, text no gate approved", fx.published)
+	}
+	if got, _ := db.Drafts().Get(ctx, d.ID); got.State != draft.Failed {
+		t.Fatalf("the draft changed after its approval is %s, want failed", got.State)
 	}
 }
 
