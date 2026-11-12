@@ -31,8 +31,8 @@ type withdrawal struct {
 	reason string
 }
 
-// optionDrafts keeps drafts and their gates, and approves as gates.Service.ApproveOption promises: it
-// refuses a rev other than the draft's and a resolver among the sessions its gate stamps.
+// optionDrafts keeps drafts and their gates, and approves as gates.Service.ApproveOption promises a rev
+// check; it leaves the resolver unchecked, so the messages service's own check is what a test sees.
 type optionDrafts struct {
 	mu        sync.Mutex
 	drafts    map[int64]draft.Draft
@@ -61,7 +61,7 @@ func (o *optionDrafts) ApproveOption(_ context.Context, question, drafted gate.G
 	defer o.mu.Unlock()
 	id, _ := strconv.ParseInt(drafted.Subject, 10, 64)
 	d := o.drafts[id]
-	if d.Rev != rev || by.Session != "" && slices.Contains(o.gates[id].Sessions, by.Session) {
+	if d.Rev != rev {
 		return fmt.Errorf("%w: draft %d", gates.ErrRefused, id)
 	}
 	o.approvals = append(o.approvals, approval{question.ID, drafted.ID, rev, by})
