@@ -148,11 +148,13 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			}
 			return ""
 		}
-		if code := te.run("outbox", "approve", "1", "--yes"); code == 0 || !strings.Contains(te.err.String(), "agent session") {
-			t.Fatalf("exit %d: %s", code, te.err)
+		for _, args := range [][]string{{"outbox", "approve", "1", "--yes"}, {"outbox", "edit", "1", "agent words", "--rev", "0"}, {"outbox", "discard", "1"}} {
+			if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "agent session") {
+				t.Fatalf("%v: exit %d: %s", args, code, te.err)
+			}
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Held {
-			t.Fatal("an agent approved it")
+		if got := te.draftState(t, db, d.ID); got.State != draft.Held || got.Text != d.Text {
+			t.Fatal("an agent's shell changed it")
 		}
 	})
 	t.Run("answered no", func(t *testing.T) {

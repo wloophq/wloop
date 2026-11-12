@@ -508,6 +508,9 @@ func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) er
 	if *rev < 0 {
 		return usageError{usage: outboxUsage, why: "edit takes --rev, the rev of the draft you read (outbox show prints it)"}
 	}
+	if err := e.namedAgent("edit"); err != nil {
+		return err
+	}
 	id, err := draftArg(pos[:1])
 	if err != nil {
 		return err
@@ -525,6 +528,9 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	reason := fs.String("reason", "", "why a draft its gate approved is dropped")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
+		return err
+	}
+	if err := e.namedAgent("discard"); err != nil {
 		return err
 	}
 	id, err := draftArg(pos)
