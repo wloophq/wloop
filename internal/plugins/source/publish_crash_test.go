@@ -95,6 +95,7 @@ func TestAPluginKilledDuringPublishLeavesTheDraftMayHavePostedAndUnsentAgain(t *
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Files = acmeFiles
 	s, err := m.Source()
 	if err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -80,10 +81,12 @@ name = "reaction"
 
 [[source.draft_kinds]]
 name = "nudge"
+schema = "drafts/nudge/schema.json"
 
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+schema = "drafts/react/schema.json"
 
 [[source.signals]]
 name = "stalled"
@@ -165,6 +168,8 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	empty := &fstest.MapFile{Data: []byte(`{"type": "object", "properties": {}}`)}
+	m.Files = fstest.MapFS{"drafts/nudge/schema.json": empty, "drafts/react/schema.json": empty}
 	src, err := m.Source()
 	if err != nil {
 		t.Fatal(err)

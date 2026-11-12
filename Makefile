@@ -20,7 +20,8 @@ build: ## Build the binary into ./bin and each plugin into ./bin/plugins/<id>/ w
 		rm -rf bin/plugins/$$id && mkdir -p bin/plugins/$$id && \
 		echo "go build -o bin/plugins/$$id/$(BINARY)-plugin-$$id ./plugins/$$id/cmd/wloop-plugin-$$id" && \
 		go build -ldflags "$(LDFLAGS)" -o bin/plugins/$$id/$(BINARY)-plugin-$$id ./plugins/$$id/cmd/wloop-plugin-$$id && \
-		cp plugins/$$id/plugin.toml bin/plugins/$$id/ && cp -R plugins/$$id/profile bin/plugins/$$id/ || exit 1; \
+		cp plugins/$$id/plugin.toml bin/plugins/$$id/ && cp -R plugins/$$id/profile bin/plugins/$$id/ && \
+		{ [ ! -d plugins/$$id/drafts ] || cp -R plugins/$$id/drafts bin/plugins/$$id/; } || exit 1; \
 	done
 
 build-targets: ## Build every package, the binary and each plugin's binary for each release target
@@ -70,7 +71,8 @@ scan-brand: ## Check that a build with the test brand, and the plugins it instal
 	for id in $(PLUGINS); do \
 		mkdir -p "$$d/zz/bin/plugins/$$id" && \
 		go build -o "$$d/zz/bin/plugins/$$id/$(BRAND_TEST_NAME)-plugin-$$id" ./plugins/$$id/cmd/wloop-plugin-$$id && \
-		cp -R plugins/$$id/plugin.toml plugins/$$id/profile "$$d/zz/bin/plugins/$$id/" || exit 1; \
+		cp -R plugins/$$id/plugin.toml plugins/$$id/profile "$$d/zz/bin/plugins/$$id/" && \
+		{ [ ! -d plugins/$$id/drafts ] || cp -R plugins/$$id/drafts "$$d/zz/bin/plugins/$$id/"; } || exit 1; \
 	done && \
 	LOOP_BRAND_SCAN_BIN="$$d/zz/bin/zz" go test -count=1 -ldflags '$(BRAND_TEST_LDFLAGS)' -run TestNothingWrittenNamesTheDefaultBrand ./internal/e2e
 

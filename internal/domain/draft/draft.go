@@ -14,8 +14,12 @@ import (
 
 type ID int64
 
-type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit", "delete"
+// Kind is a draft kind's name, which its plugin's manifest declares.
+type Kind string
 
+// The kinds the core named before the manifests declared them.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 const (
 	Reply    Kind = "reply"
 	Nudge    Kind = "nudge"
@@ -27,24 +31,38 @@ const (
 	Delete   Kind = "delete"
 )
 
+// Kinds are the kinds the core named.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit, Delete}
 
+// Valid says whether k is one of Kinds.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
 // ConversationKinds are the kinds slack_draft offers on a conversation: all
 // but a review comment, an edit and a deletion, which slack_edit and slack_delete
 // make at once.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
 
 // Emoji says whether a draft of kind k posts an emoji, and no text.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 func (k Kind) Emoji() bool {
 	_, d := ShapeOf(k)
 	return d == Reaction
 }
 
-// Delivery is how a draft reaches the provider.
-type Delivery string // "message", "reaction", "comment", "edit", "delete"
+// Delivery is how a draft reaches the provider, as its plugin's manifest
+// declares it.
+type Delivery string
 
+// The deliveries the core named before the manifests declared them.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 const (
 	Message         Delivery = "message"
 	Reaction        Delivery = "reaction"
@@ -56,6 +74,8 @@ const (
 )
 
 // ShapeOf is the purpose and delivery of a draft of kind k.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 func ShapeOf(k Kind) (purpose string, d Delivery) {
 	switch k {
 	case React:
@@ -91,6 +111,8 @@ type Placed struct {
 }
 
 // KindOf is the kind readers of Kind see for a purpose and a delivery.
+//
+// Deprecated: kinds and deliveries are manifest data; use a Catalog.
 func KindOf(purpose string, d Delivery) Kind {
 	switch d {
 	case Reaction:
