@@ -577,7 +577,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
-  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `review`, `reply`, `resolve`, `delete`, `unreaction`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
+  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `review`, `reply`, `resolve`, `request_review`, `delete`, `unreaction`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
   - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.
   - `why` (file, default `why.md.tmpl`): The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.
   - `reaction` (string): The emoji name, with delivery reaction.
@@ -644,7 +644,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
-  - `github_draft`: Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval.
+  - `github_draft`: Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval.
+  - `github_threads`: Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
@@ -716,6 +717,12 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `proposed` (`ID`: number, `Rev`: number, `Unit`): The draft waits for the user's approval.
   - `approved` (`ID`: number, `Rev`: number, `Unit`): A rule of the user's approved the draft, and it will be posted.
   - `dry_run` (`ID`: number, `Rev`: number, `Unit`): The draft's approval is a dry run: it is stored and never posted.
+- `github_threads`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `failed` (`Error`): GitHub or the daemon failed the call.
+  - `threads` (`Unit`, `JSON`): The threads and reviews, as JSON.
 - `slack_send_message`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

@@ -686,6 +686,10 @@
               "proposes": {
                 "description": "The tool only proposes drafts the user approves, so a session policy may allow it without a prompt.",
                 "type": "boolean"
+              },
+              "reads": {
+                "description": "The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt.",
+                "type": "boolean"
               }
             },
             "required": [

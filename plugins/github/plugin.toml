@@ -156,10 +156,14 @@ posts = true
 [[source.deliveries]]
 name = "resolve"
 
+[[source.deliveries]]
+name = "request_review"
+
 [[source.draft_kinds]]
 name = "comment"
 delivery = "comment"
 schema = "drafts/comment/schema.json"
+preview = "drafts/comment/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -167,6 +171,7 @@ editable = ["text"]
 name = "reply"
 delivery = "comment"
 schema = "drafts/reply/schema.json"
+preview = "drafts/reply/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -174,6 +179,7 @@ editable = ["text"]
 name = "nudge"
 delivery = "comment"
 schema = "drafts/nudge/schema.json"
+preview = "drafts/nudge/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -181,6 +187,7 @@ editable = ["text"]
 name = "close"
 delivery = "comment"
 schema = "drafts/close/schema.json"
+preview = "drafts/close/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -188,6 +195,7 @@ editable = ["text"]
 name = "ask_owner"
 delivery = "comment"
 schema = "drafts/ask_owner/schema.json"
+preview = "drafts/ask_owner/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -207,6 +215,7 @@ editable = ["text"]
 name = "review"
 delivery = "review"
 schema = "drafts/review/schema.json"
+preview = "drafts/review/preview.md.tmpl"
 basis = "agent"
 editable = ["text", "/event"]
 
@@ -218,6 +227,7 @@ pointer = "/event"
 name = "thread_reply"
 delivery = "reply"
 schema = "drafts/thread_reply/schema.json"
+preview = "drafts/thread_reply/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -225,6 +235,13 @@ editable = ["text"]
 name = "resolve"
 delivery = "resolve"
 schema = "drafts/resolve/schema.json"
+preview = "drafts/resolve/preview.md.tmpl"
+
+[[source.draft_kinds]]
+name = "request_review"
+delivery = "request_review"
+schema = "drafts/request_review/schema.json"
+preview = "drafts/request_review/preview.md.tmpl"
 
 [[source.roles]]
 name = "pr.review"
@@ -894,9 +911,9 @@ name = "teams"
 
 [[source.tools]]
 name = "github_draft"
-doc = "Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval."
+doc = "Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval."
 proposes = true
-input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
+input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve","request_review"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
 
 [[source.tools.answers]]
 name = "failed"
@@ -941,12 +958,33 @@ name = "dry_run"
 doc = "The draft's approval is a dry run: it is stored and never posted."
 fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
 
+[[source.tools]]
+name = "github_threads"
+doc = "Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review."
+reads = true
+input = '{"type":"object","properties":{},"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "failed"
+doc = "GitHub or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "threads"
+doc = "The threads and reviews, as JSON."
+fields = [{ name = "Unit" }, { name = "JSON" }]
+
 [source.session]
 write_commands = [
-  "gh api -X POST", "gh api -X PATCH", "gh api -X PUT", "gh api -X DELETE",
-  "gh api * -X POST", "gh api * -X PATCH", "gh api * -X PUT", "gh api * -X DELETE",
-  "gh api --method POST", "gh api --method PATCH", "gh api --method PUT", "gh api --method DELETE",
-  "gh api * --method POST", "gh api * --method PATCH", "gh api * --method PUT", "gh api * --method DELETE",
+  "gh api -X POST", "gh api -XPOST", "gh api -X=POST", "gh api --method POST", "gh api --method=POST",
+  "gh api -X PATCH", "gh api -XPATCH", "gh api -X=PATCH", "gh api --method PATCH", "gh api --method=PATCH",
+  "gh api -X PUT", "gh api -XPUT", "gh api -X=PUT", "gh api --method PUT", "gh api --method=PUT",
+  "gh api -X DELETE", "gh api -XDELETE", "gh api -X=DELETE", "gh api --method DELETE", "gh api --method=DELETE",
+  "gh api * -X POST", "gh api * -XPOST", "gh api * -X=POST", "gh api * --method POST", "gh api * --method=POST",
+  "gh api * -X PATCH", "gh api * -XPATCH", "gh api * -X=PATCH", "gh api * --method PATCH", "gh api * --method=PATCH",
+  "gh api * -X PUT", "gh api * -XPUT", "gh api * -X=PUT", "gh api * --method PUT", "gh api * --method=PUT",
+  "gh api * -X DELETE", "gh api * -XDELETE", "gh api * -X=DELETE", "gh api * --method DELETE", "gh api * --method=DELETE",
+  "gh api -f", "gh api -F", "gh api --field", "gh api --raw-field", "gh api --input",
   "gh api * -f", "gh api * -F", "gh api * --field", "gh api * --raw-field", "gh api * --input",
   "gh pr review", "gh pr comment", "gh pr merge", "gh pr close", "gh pr reopen", "gh pr edit", "gh pr ready",
   "gh issue comment", "gh issue close", "gh issue edit",

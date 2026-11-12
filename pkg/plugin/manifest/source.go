@@ -193,6 +193,7 @@ type Tool struct {
 	Input    string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
 	Posts    string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
 	Proposes bool     `toml:"proposes" doc:"The tool only proposes drafts the user approves, so a session policy may allow it without a prompt."`
+	Reads    bool     `toml:"reads" doc:"The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt."`
 	Answers  []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
 }
 

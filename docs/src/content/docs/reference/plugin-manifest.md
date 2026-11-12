@@ -272,6 +272,7 @@ every = "5m"
 | `input` | string | The JSON schema of the tool's arguments, an object. Required. |
 | `posts` | one of `now` | The tool posts at once, recorded as a sent draft; empty posts nothing. |
 | `proposes` | bool | The tool only proposes drafts the user approves, so a session policy may allow it without a prompt. |
+| `reads` | bool | The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt. |
 | `answers` | array of tables | The answers the tool returns, which tools.toml words. |
 
 ## `[[source.tools.answers]]`

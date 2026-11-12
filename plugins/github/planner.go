@@ -71,6 +71,8 @@ func (p *Plugin) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
 	switch {
 	case req.Draft != nil && req.Effect == nudge.EffectNudged && slices.Contains(req.Draft.Effects, nudge.EffectNudged):
 		return nil
+	case req.Draft != nil && req.Effect == EffectReviewed:
+		return p.applyReviewedDraft(ctx, req)
 	case req.Draft == nil && req.Turn != nil:
 		return p.applyTurnEffect(ctx, req)
 	}

@@ -89,7 +89,7 @@ func Reviewer(in ReviewerInput) ReviewerDecision {
 		return ReviewerDecision{Reason: "nothing new since my last review"}
 	}
 	reviewed := last.SubmittedAt.UTC().Format(time.RFC3339)
-	headFP := reviewed + "@" + f.HeadRefOid
+	headFP := Fingerprint(last.SubmittedAt, f.HeadRefOid)
 	fp := headFP
 	if trigger == reRequested {
 		fp += reRequestMark
@@ -101,6 +101,12 @@ func Reviewer(in ReviewerInput) ReviewerDecision {
 		return ReviewerDecision{Reason: trigger + ", but this review already got its follow-up", Fingerprint: fp}
 	}
 	return ReviewerDecision{Action: ReviewerFollowup, Reason: trigger, Fingerprint: fp, LastReviewAt: last.SubmittedAt}
+}
+
+// Fingerprint is what a follow-up covers once my review submitted at
+// reviewedAt saw head.
+func Fingerprint(reviewedAt time.Time, head string) string {
+	return reviewedAt.UTC().Format(time.RFC3339) + "@" + head
 }
 
 // Untrusted says why an automated round may not run on f, or "".
