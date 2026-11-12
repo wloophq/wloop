@@ -121,7 +121,7 @@ type DraftKind struct {
 	Purpose      string          `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
 	Delivery     string          `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
 	Schema       string          `toml:"schema" doc:"The JSON schema of the kind's payload, a path in the plugin's directory such as \"drafts/review/schema.json\"; the publisher posts the payload verbatim."`
-	Preview      string          `toml:"preview" doc:"The template of the summary line a draft of the kind shows, a path in the plugin's directory; the card shows the whole payload besides."`
+	Preview      string          `toml:"preview" doc:"The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides."`
 	Basis        string          `toml:"basis" doc:"Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none." enum:"agent"`
 	TextRequired bool            `toml:"text_required" doc:"A draft of the kind needs a text."`
 	Editable     []string        `toml:"editable" doc:"What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\"."`

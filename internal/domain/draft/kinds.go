@@ -18,8 +18,9 @@ type KindSpec struct {
 	Provider, Name string
 	// Delivery is how the plugin posts a draft of the kind.
 	Delivery string
-	// Schema and Preview are paths in the plugin's directory: the JSON
-	// schema of the kind's payload, and the template of its summary line.
+	// Schema is the JSON schema of the kind's payload, a path in the
+	// plugin's directory; Preview is the template of its summary line, a
+	// path in the plugin's profile layer.
 	Schema, Preview string
 	// Basis is who states what a draft of the kind was written against:
 	// BasisAgent, or BasisNone.

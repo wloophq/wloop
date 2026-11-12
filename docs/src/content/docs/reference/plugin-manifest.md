@@ -148,7 +148,7 @@ every = "5m"
 | `purpose` | string | What a draft of the kind is for; empty is its name. |
 | `delivery` | string | How it is posted, one of deliveries; empty is default_delivery. |
 | `schema` | string | The JSON schema of the kind's payload, a path in the plugin's directory such as "drafts/review/schema.json"; the publisher posts the payload verbatim. |
-| `preview` | string | The template of the summary line a draft of the kind shows, a path in the plugin's directory; the card shows the whole payload besides. |
+| `preview` | string | The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides. |
 | `basis` | one of `agent` | Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none. |
 | `text_required` | bool | A draft of the kind needs a text. |
 | `editable` | list of strings | What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as "/event". |

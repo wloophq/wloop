@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"errors"
 	"io"
@@ -403,8 +403,8 @@ func searchDate(s string) (time.Time, bool) {
 	return d, err == nil
 }
 
-//go:embed plugin.toml
-var manifestTOML []byte
+//go:embed plugin.toml drafts
+var pluginFiles embed.FS
 
 // draftKind is a kind the manifest declares: what slack_draft proposes and
 // how it reaches Slack.
@@ -416,10 +416,15 @@ type draftKind struct {
 // declaredKinds are the manifest's draft kinds, in its order; the first is
 // slack_draft's default.
 var declaredKinds = func() []draftKind {
-	m, err := manifest.Parse(manifestTOML)
+	raw, err := pluginFiles.ReadFile(manifest.File)
 	if err != nil {
 		panic(err)
 	}
+	m, err := manifest.Parse(raw)
+	if err != nil {
+		panic(err)
+	}
+	m.Files = pluginFiles
 	s, err := m.Source()
 	if err != nil {
 		panic(err)
