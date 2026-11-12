@@ -190,8 +190,7 @@ func TestDrafts(t *testing.T) {
 		if _, err := r.d.Action(r.ctx, draftsPR, ghplugin.ActionRefresh); err != nil {
 			t.Fatalf("reading %s in full: %v", draftsPR.Label(), err)
 		}
-		r.sweepPastTheWindow()
-		b := r.book()
+		b := r.sweepPastTheWindow(1)
 		if len(b.Turns) != 1 || b.Turns[0].Workflow != "review-first-round" {
 			t.Fatalf("the requested review started no first round: turns %+v", b.Turns)
 		}
@@ -208,8 +207,7 @@ func TestDrafts(t *testing.T) {
 		if failed := r.wantState(d.ID, "failed"); !strings.Contains(failed.Error, refused) {
 			t.Fatalf("the draft failed with %q, want GitHub's message", failed.Error)
 		}
-		r.sweepPastTheWindow()
-		b = r.book()
+		b = r.sweepPastTheWindow(2)
 		if len(b.Turns) != 2 || b.Turns[1].Workflow != "review-draft-failed" || b.Turns[1].ReplacedBy != 0 {
 			t.Fatalf("the failed send reopened no round, or another replaced it: turns %+v", b.Turns)
 		}
