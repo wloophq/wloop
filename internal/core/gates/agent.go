@@ -45,17 +45,17 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 	return s.taskOf(ctx, g.Unit, cmp.Or(g.Text, def.Label))
 }
 
-// ApproveOption resolves question gate question with r, the option picked (Intent, Answer) and who picked
-// it (By, Session: a person, or an agent through a session the user drives), when that option points to
-// drafted's draft at rev, the rev the option pinned, never the draft's current one; then it approves
-// drafted with the same resolver. It reads both gates again from the store first, trusting neither value
-// the caller passes, and resolves nothing when drafted is no longer open (or approved already) at rev, is
-// on another unit than the question, came from another session than the question's, or stamps r.Session
-// among its Sessions, or when r is a rule's: each is ErrRefused. A question already resolved approves only
-// a draft gate that opened before its answer. When the draft's approval loses a race after the question
-// resolved, as a revision landing between them, it returns that error, and the question's answer stands
-// as a free answer. Each step is idempotent, so a call cut short completes when it is made again with the
-// same r.
+// ApproveOption approves draft gate drafted, which the option a person (or an agent through a session
+// the user drives) picked points to at rev, the rev the option pinned, then resolves question gate
+// question with r, the option picked (Intent, Answer) and who picked it (By, Session). It reads both gates
+// again from the store first, trusting neither value the caller passes, and resolves nothing when drafted
+// is no longer open (or approved already) at rev, is on another unit than the question, came from another
+// session than the question's, or stamps r.Session among its Sessions, or when r is a rule's: each is
+// ErrRefused. The draft is approved before the question is answered, so an answered question names the
+// one draft its answer approved: a later call on an answered question completes only with that draft gate
+// approved, and refuses any other draft gate, another option's or a revision's, with ErrRefused. A draft
+// that loses its approval to a race (a revision) leaves the question open. Each step is idempotent, so a
+// call cut short completes when it is made again with the same r.
 func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64) error {
 	q, err := s.d.Reader.Get(ctx, question.ID)
 	if err != nil {
@@ -68,23 +68,40 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	if err := s.pinned(q, d, r, rev); err != nil {
 		return err
 	}
-	if q.Status == gate.Open {
-		if _, err := s.resolve(ctx, q.ID, r, s.d.Clock.Now()); err != nil && !errors.Is(err, ErrResolved) {
-			return err
-		}
-		if q, err = s.d.Reader.Get(ctx, q.ID); err != nil {
+	if q.Status != gate.Open {
+		return s.answered(q, d, r)
+	}
+	if d.Status == gate.Open {
+		if err := s.approveDraft(ctx, d, r); err != nil {
 			return err
 		}
 	}
+	if _, err := s.resolve(ctx, q.ID, r, s.d.Clock.Now()); err != nil && !errors.Is(err, ErrResolved) {
+		return err
+	}
+	if q, err = s.d.Reader.Get(ctx, q.ID); err != nil {
+		return err
+	}
+	if d, err = s.d.Reader.Get(ctx, d.ID); err != nil {
+		return err
+	}
+	return s.answered(q, d, r)
+}
+
+// answered refuses question q, resolved, unless r resolved it and its draft gate d is approved: the
+// option's draft is approved before its question is answered, so an open draft gate is not the answer's.
+func (s *Service) answered(q, d gate.Gate, r Resolution) error {
 	if q.Intent != r.Intent || q.Answer != r.Answer || q.By != r.By {
 		return fmt.Errorf("%w: question gate %d was resolved otherwise", ErrResolved, q.ID)
 	}
-	if d.OpenedAt.After(q.ClosedAt) {
-		return fmt.Errorf("%w: draft gate %d opened after question gate %d was answered, so the answer is not about it", ErrRefused, d.ID, q.ID)
+	if d.Status != gate.Approved {
+		return fmt.Errorf("%w: question gate %d was answered without draft gate %d, which its answer does not approve", ErrRefused, q.ID, d.ID)
 	}
-	if d.Status == gate.Approved {
-		return nil
-	}
+	return nil
+}
+
+// approveDraft approves open draft gate d with r's resolver; one it approved already counts.
+func (s *Service) approveDraft(ctx context.Context, d gate.Gate, r Resolution) error {
 	def, err := s.def(d)
 	if err != nil {
 		return err
@@ -95,7 +112,7 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	}
 	_, err = s.resolve(ctx, d.ID, Resolution{Intent: approve.Name, By: r.By, Session: r.Session}, s.d.Clock.Now())
 	if errors.Is(err, ErrResolved) {
-		if d, gerr := s.d.Reader.Get(ctx, d.ID); gerr == nil && d.Status == gate.Approved && d.By == r.By && d.BySession == sessionOf(r) {
+		if got, gerr := s.d.Reader.Get(ctx, d.ID); gerr == nil && got.Status == gate.Approved && got.By == r.By && got.BySession == sessionOf(r) {
 			return nil
 		}
 	}

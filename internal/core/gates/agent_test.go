@@ -151,7 +151,7 @@ func TestApproveOptionPinsRev(t *testing.T) {
 		if gq.Status != gate.Answered || gq.Answer != "Approve (option a)" || gd.Status != gate.Approved || gd.By != task.ActorPerson || gd.ApprovedRev != 3 {
 			t.Fatalf("question %+v, draft %+v", gq, gd)
 		}
-		if !slices.Equal(f.cons.Calls, []string{"deliver 2", "publish 1"}) {
+		if !slices.Equal(f.cons.Calls, []string{"publish 1", "deliver 2"}) {
 			t.Fatalf("consequences %v", f.cons.Calls)
 		}
 	})
@@ -164,7 +164,7 @@ func TestApproveOptionIdempotent(t *testing.T) {
 	d := f.draftGate(t)
 	q := f.question(t, "s-worker")
 	r := answer(task.ActorAgent, "s-user")
-	if err := f.svc.Resolve(ctx, q.ID, r); err != nil {
+	if err := f.svc.Resolve(ctx, d.ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "s-user"}); err != nil {
 		t.Fatal(err)
 	}
 	for i := range 2 {
@@ -175,7 +175,7 @@ func TestApproveOptionIdempotent(t *testing.T) {
 	if gd := f.get(t, d.ID); gd.Status != gate.Approved || gd.BySession != "s-user" {
 		t.Fatalf("draft gate %+v", gd)
 	}
-	if !slices.Equal(f.cons.Calls, []string{"deliver 2", "publish 1"}) {
+	if !slices.Equal(f.cons.Calls, []string{"publish 1", "deliver 2"}) {
 		t.Fatalf("consequences %v, want each once", f.cons.Calls)
 	}
 	other := answer(task.ActorPerson, "")
@@ -185,30 +185,38 @@ func TestApproveOptionIdempotent(t *testing.T) {
 	}
 }
 
-// revisingDeliverer supersedes draft gate id, as an agent's revision does, while it delivers a question's
-// answer.
-type revisingDeliverer struct {
-	svc *gates.Service
-	id  int64
+// revisingReader supersedes draft gate id, as an agent's revision does, the second time it is read: after
+// ApproveOption's checks, before the draft's approval.
+type revisingReader struct {
+	*gatestest.Store
+	svc   *gates.Service
+	id    int64
+	reads int
 }
 
-func (d *revisingDeliverer) Deliver(ctx context.Context, g gate.Gate) error {
-	_, err := d.svc.SupersedeForAgent(ctx, d.id, "s-worker")
-	return err
+func (r *revisingReader) Get(ctx context.Context, id int64) (gate.Gate, error) {
+	if id == r.id {
+		if r.reads++; r.reads == 2 {
+			if _, err := r.svc.SupersedeForAgent(ctx, id, "s-worker"); err != nil {
+				return gate.Gate{}, err
+			}
+		}
+	}
+	return r.Store.Get(ctx, id)
 }
 
-func TestApproveOptionLosesARevisionRaceAfterTheQuestion(t *testing.T) {
+func TestApproveOptionLosesARevisionRaceAndLeavesTheQuestionOpen(t *testing.T) {
 	ctx := context.Background()
 	store := gatestest.NewStore(fixedNow)
 	cons := &gatestest.Consequences{}
-	rev := &revisingDeliverer{}
-	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Clock: clock{fixedNow}, Publisher: cons, Deliverer: rev})
-	rev.svc = svc
+	rd := &revisingReader{Store: store}
+	svc := gates.New(gates.Deps{Store: store, Reader: rd, Profile: bundled, Clock: clock{fixedNow}, Publisher: cons, Deliverer: cons})
+	rd.svc = svc
 	d, err := svc.Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "42", Session: "s-worker", ApprovedRev: 3, Sessions: []string{"s-worker"}}, waits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rev.id = d.ID
+	rd.id = d.ID
 	q, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: acme, Subject: "9", Session: "s-worker"}, waits)
 	if err != nil {
 		t.Fatal(err)
@@ -218,8 +226,43 @@ func TestApproveOptionLosesARevisionRaceAfterTheQuestion(t *testing.T) {
 	}
 	gq, _ := store.Get(ctx, q.ID)
 	gd, _ := store.Get(ctx, d.ID)
-	if gq.Status != gate.Answered || gd.Status != gate.Superseded || len(cons.Calls) != 0 {
+	if gq.Status != gate.Open || gd.Status != gate.Superseded || len(cons.Calls) != 0 {
 		t.Fatalf("question %s, draft %s, consequences %v", gq.Status, gd.Status, cons.Calls)
+	}
+}
+
+func TestAnAnswerApprovesOnlyTheDraftOfItsOption(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, nil, bundled)
+	a := f.draftGate(t)
+	b := f.open(t, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "43", Session: "s-worker", ApprovedRev: 1,
+		Sessions: []string{"s-worker"}}, waits)
+	q := f.question(t, "s-worker")
+	r := answer(task.ActorPerson, "")
+	if err := f.svc.ApproveOption(ctx, q, r, a, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ApproveOption(ctx, q, r, b, 1); !errors.Is(err, gates.ErrRefused) || f.get(t, b.ID).Status != gate.Open {
+		t.Fatalf("the answer for draft 42 approved draft 43 too: %v", err)
+	}
+}
+
+func TestAnAnswerNeverApprovesARevisionOpenedInItsInstant(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, nil, bundled)
+	d := f.draftGate(t)
+	q := f.question(t, "s-worker")
+	r := answer(task.ActorPerson, "")
+	if err := f.svc.Resolve(ctx, q.ID, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.SupersedeForAgent(ctx, d.ID, "s-worker"); err != nil {
+		t.Fatal(err)
+	}
+	d2 := f.open(t, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "42", Session: "s-worker", ApprovedRev: 4,
+		Sessions: []string{"s-worker"}}, waits)
+	if err := f.svc.ApproveOption(ctx, q, r, d2, 4); !errors.Is(err, gates.ErrRefused) || f.get(t, d2.ID).Status != gate.Open {
+		t.Fatalf("an answer approved a revision opened in its same instant: %v", err)
 	}
 }
 
