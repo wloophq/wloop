@@ -31,7 +31,6 @@ func TestDrafts(t *testing.T) {
 	})
 
 	t.Run("S2", func(t *testing.T) {
-		t.Skip("T11 found a product bug: picking a draft option resumes the turn instead of approving the draft; messages.approveOption calls gates.ApproveOption from the answered question's consequence, and ApproveOption refuses a question already answered whose draft gate is still open (internal/core/gates/agent.go answered)")
 		r := newDraftsRig(t)
 		r.review()
 		approve := r.propose("APPROVE", "", "c2", true)
@@ -115,7 +114,6 @@ func TestDrafts(t *testing.T) {
 	})
 
 	t.Run("S5", func(t *testing.T) {
-		t.Skip("T11 found a product bug: picking a draft option resumes the turn instead of approving the draft; messages.approveOption calls gates.ApproveOption from the answered question's consequence, and ApproveOption refuses a question already answered whose draft gate is still open (internal/core/gates/agent.go answered)")
 		r := newDraftsRig(t)
 		r.review()
 		changes := r.propose("REQUEST_CHANGES", "The export may read a dropped column.", "c2", true)
