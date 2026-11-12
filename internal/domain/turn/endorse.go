@@ -25,10 +25,18 @@ func (b *Book) Chain(seq int64) []Turn {
 }
 
 // Endorsed says whether the user stands behind the verdict the turn
-// published. A turn without a done verdict published nothing to endorse.
+// published. A turn without a done verdict published nothing to endorse; one
+// that published a draft is endorsed only by the approval of that draft by
+// the user, never by a rule's release, its trigger or an answer.
 func (b *Book) Endorsed(seq int64) string {
 	chain := b.Chain(seq)
 	if len(chain) == 0 || !b.published(seq) {
+		return NotEndorsed
+	}
+	if done, _ := b.LastRecord(seq); done.Record.Outcome.Draft != nil {
+		if done.Record.Outcome.Approved {
+			return EndorsedApproved
+		}
 		return NotEndorsed
 	}
 	if chain[len(chain)-1].Trigger == ByHand {
