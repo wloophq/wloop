@@ -100,3 +100,26 @@ func TestACardApprovalAndAnOptionPickRaceToOneVerdict(t *testing.T) {
 		t.Errorf("question %s %q, want answered %q, the approved draft's option", q.Status, q.Answer, want)
 	}
 }
+
+// unopened answers that a question pins every draft but has no gate yet, as when the message is stored and its
+// gate still opening.
+type unopened struct{ *messages.Service }
+
+func (u unopened) Pinning(_ context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
+	return gate.Gate{}, messages.GateAnswer(messages.Answer{OptionID: "approve"}), drafted.ApprovedRev, true, nil
+}
+
+// TestAPinnedDraftWaitsForItsQuestionToOpen refuses a draft's approval while the question that pins it is stored
+// but its gate is not open yet: the question, once open, is the decision.
+func TestAPinnedDraftWaitsForItsQuestionToOpen(t *testing.T) {
+	ctx := context.Background()
+	r, od, _ := draftRig(t)
+	r.gates = gates.New(gates.Deps{Store: r.gateStore, Reader: r.gateStore, Profile: profileGates, Tasks: gateTasks{r.taskStore, r.tasks}, Clock: r.clock,
+		Deliverer: r.svc, Decider: r.svc, Publisher: od, Options: unopened{r.svc}, Log: t.Logf, Sessions: drivenSessions(nil)})
+	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("approving a draft its unopened question pins: %v, want ErrRefused", err)
+	}
+	if len(od.approvals) != 0 || od.gateOf(42).Status != gate.Open {
+		t.Fatalf("approvals %+v, draft gate %s: want none, still open", od.approvals, od.gateOf(42).Status)
+	}
+}

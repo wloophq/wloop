@@ -61,9 +61,8 @@ func TestDrafts(t *testing.T) {
 		comment := r.propose("COMMENT", "Two nits, nothing blocking.", "c2", true)
 		r.end(fmt.Sprintf(`{"state":"asked","summary":"approve or comment","resume":"post what the user picks","question":%s}`,
 			choice("Approve the pull request?", draftOption("approve", "Approve", approve), draftOption("comment", "Comment only", comment))))
-		if d := r.draft(approve.ID); d.PinnedBy == 0 {
-			t.Fatalf("draft %d is served as no question's: %+v", approve.ID, d)
-		}
+		r.pinned(approve.ID)
+		r.pinned(comment.ID)
 		if err := r.approve(approve.ID, approve.Rev); err != nil {
 			t.Fatalf("approving the first pinned draft: %v", err)
 		}

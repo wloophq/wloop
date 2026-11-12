@@ -123,7 +123,8 @@ func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draf
 // Pinning is the question gate whose open message pins the draft of draft gate drafted, in an option or its
 // confirm, the answer that picks it and the rev it pinned; false when no open message of the draft's turn pins it.
 // A question answered while its message still settles (its other options' drafts not yet withdrawn) still names
-// the pin, so an approval in that window meets the answered question, not a free draft.
+// the pin, so an approval in that window meets the answered question, not a free draft; the gate is zero while
+// the message's question gate is not opened yet.
 func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
 	if s.Drafts == nil || drafted.Kind != gate.KindDraft {
 		return gate.Gate{}, "", 0, false, nil
@@ -156,6 +157,7 @@ func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, st
 				return g, GateAnswer(answer), ref.Rev, true, nil
 			}
 		}
+		return gate.Gate{}, GateAnswer(answer), ref.Rev, true, nil
 	}
 	return gate.Gate{}, "", 0, false, nil
 }

@@ -293,6 +293,8 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 	switch {
 	case err != nil || !ok:
 		return false, err
+	case q.ID == 0:
+		return true, fmt.Errorf("%w: a question about to open decides draft gate %d: answer it once it opens", ErrRefused, id)
 	case rev != g.ApprovedRev:
 		return true, fmt.Errorf("%w: open question gate %d decides draft gate %d, which it pinned at rev %d: answer the question", ErrRefused, q.ID, id, rev)
 	}

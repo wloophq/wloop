@@ -232,6 +232,31 @@ func (r *draftsRig) editPayload(id, rev int64, payload string) error {
 	return err
 }
 
+// pinned waits until the daemon serves draft id as pinned by an open question and that question's gate is open,
+// as the person sees it on the task; it fails the test when that never comes.
+func (r *draftsRig) pinned(id int64) api.Draft {
+	r.t.Helper()
+	for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+		d := r.draft(id)
+		if d.PinnedBy != 0 && r.questionOpen() {
+			return d
+		}
+		if time.Now().After(deadline) {
+			r.t.Fatalf("draft %d is served as no open question's: %+v", id, d)
+		}
+	}
+}
+
+// questionOpen says whether the pull request's question gate is open.
+func (r *draftsRig) questionOpen() bool {
+	r.t.Helper()
+	gs, err := r.c.Gates(r.ctx)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return slices.ContainsFunc(gs, func(g api.GateView) bool { return g.Kind == "question" && g.Unit == draftsPR.String() && g.Status == "open" })
+}
+
 // answer is the person answering, from the cockpit, the question the pull request's turn asks once the daemon
 // has opened its gate: an option's id picks it.
 func (r *draftsRig) answer(text string) {
