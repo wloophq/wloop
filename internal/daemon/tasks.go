@@ -1472,10 +1472,10 @@ func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
+	from := s.deps.Changes.Gen()
 	poke, cancel := change.Poke(s.deps.Changes, taskInputs|flagInputs)
 	defer cancel()
 	s.moved.attach()
-	from := s.deps.Changes.Gen()
 	var quiet <-chan time.Time
 	for {
 		select {
