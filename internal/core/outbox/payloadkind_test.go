@@ -24,6 +24,9 @@ func (k specs) Lookup(provider, kind string) (draft.KindSpec, bool) {
 
 func (specs) Validate(draft.KindSpec, json.RawMessage) error { return nil }
 
+// Shape keeps d as it is: these tests shape nothing.
+func (specs) Shape(_ string, d draft.Draft) (draft.Draft, error) { return d, nil }
+
 // sendsOn holds when facts[name] is "COMMENT".
 type sendsOn struct{ name string }
 
