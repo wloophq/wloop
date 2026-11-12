@@ -26,7 +26,7 @@ surfaces, the shape of the comments and the body, praise and voice.
 The guide never relaxes the ambiguity gate (section 5) or proposing (section 6). If any command below fails in a way you cannot recover from, stop, publish nothing and report{{if not .Plain}}, and record `failed`{{end}}.
 
 This session writes nothing to GitHub, and refuses `gh api` calls that
-pass `-f`, `-F` or `--input`, GraphQL reads included: read through `gh pr
+pass a method or a field flag, GraphQL reads included: read through `gh pr
 view`, `gh pr diff` and `gh api` with a REST path alone.{{if not .Plain}} Every post is a
 draft you propose with `github_draft`; {{name}} posts it once the user, or
 a rule of theirs, approves it.{{end}}
@@ -193,8 +193,8 @@ When one holds, or the verdict is `APPROVE`, propose the review with
 a `choice` question. Each option that posts a review carries `draft` with
 the `id` and `rev` the `github_draft` answer gave; picking it posts that
 draft and withdraws the other options' drafts. For `APPROVE`, also propose
-its `COMMENT` variant (same body and inline comments, also held), so the
-user can post your findings without approving. An option without a draft,
+its `COMMENT` variant (same body and inline comments, also held), which
+posts your findings without approving. An option without a draft,
 or a free answer, comes back to you.
 {{end}}
 ### 6. Propose

@@ -58,7 +58,8 @@ func writeCommands(t *testing.T) [][]string {
 }
 
 // denied says that words start with one of patterns, where a * stands for
-// one or more words and a flag also matches its --flag=value form.
+// one or more words, a word ending in * matches any word it prefixes, as
+// -X* matches -XPOST, and a flag also matches its --flag=value form.
 func denied(words []string, patterns [][]string) bool {
 	var match func(w, p []string) bool
 	match = func(w, p []string) bool {
@@ -75,7 +76,9 @@ func denied(words []string, patterns [][]string) bool {
 			}
 			return false
 		}
-		return (w[0] == p[0] || strings.HasPrefix(w[0], p[0]+"=")) && match(w[1:], p[1:])
+		prefix, wild := strings.CutSuffix(p[0], "*")
+		word := w[0] == p[0] || strings.HasPrefix(w[0], p[0]+"=") || wild && strings.HasPrefix(w[0], prefix)
+		return word && match(w[1:], p[1:])
 	}
 	for _, p := range patterns {
 		if match(words, p) {
@@ -106,6 +109,20 @@ func ghCommands(text string) []string {
 		out = append(out, m[1])
 	}
 	return out
+}
+
+func TestDeniedMatchesPrefixWords(t *testing.T) {
+	patterns := [][]string{{"gh", "api", "-X*"}, {"gh", "api", "*", "-f*"}}
+	for _, c := range []string{"gh api -XPOST repos/acme/api/pulls/7/reviews", "gh api repos/acme/api/issues/7/comments -fbody=x", "gh api graphql -f query=x"} {
+		if !denied(strings.Fields(c), patterns) {
+			t.Errorf("%q is not denied", c)
+		}
+	}
+	for _, c := range []string{"gh api repos/acme/api/pulls/7/comments --paginate", "gh api -x"} {
+		if denied(strings.Fields(c), patterns) {
+			t.Errorf("%q is denied", c)
+		}
+	}
 }
 
 func TestDeniedMatchesTheManifestsWriteCommands(t *testing.T) {
@@ -143,7 +160,7 @@ func TestInstructionsNameDraftTools(t *testing.T) {
 				t.Errorf("%s: the instructions run %q, a write its session refuses", s.Name, c)
 			}
 		}
-		for _, w := range []string{"resolveReviewThread", "mutation", "gh pr comment", "gh pr review", "requested_reviewers"} {
+		for _, w := range []string{"resolveReviewThread", "mutation", "gh pr comment", "gh pr review", "requested_reviewers", "gh run rerun", "gh issue create", "file an issue"} {
 			if strings.Contains(r.Text, w) {
 				t.Errorf("%s: the instructions still write through %q", s.Name, w)
 			}

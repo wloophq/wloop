@@ -108,7 +108,7 @@ var addressRules = []string{
 	"If any command",
 	"wins over the verdicts below, own findings included.",
 	"Scope is the pull request's stated goal, not the lines it touched.",
-	"file an issue and link it",
+	"name it for the user to file as an issue",
 }
 
 // Every scenario carries none of these; the turns that record also carry
@@ -167,8 +167,8 @@ func scenarios() []Scenario {
 		{
 			Name:    "review/first/by-hand/guidance",
 			Context: review(ByHand, func(c *Context) { c.Guidance = "look at the migration first" }),
-			Expect: "A first review the user asked for by hand, with guidance. The agent must know it reviews the whole diff, may publish without the automated-approval hold, " +
-				"and must answer the guidance. Nothing about later rounds, the follow-up approval rule or dry runs.",
+			Expect: "A first review the user asked for by hand, with guidance. The agent must know it reviews the whole diff, proposes its review as a draft, " +
+				"and must answer the guidance. Nothing about later rounds or dry runs.",
 			Must: append([]string{"# First review of acme/api#7, asked for by you.", "## Guidance", "look at the migration first",
 				"never relaxes the writing or publishing rules", "### Your review guide", "Open the body with one line", "This is your first review of it"}, reviewRules...),
 			MustNot:  []string{"ollow-up approval rule", "Later rounds", "Dry run", "dry-run.json", "started by " + brand.Name, "section 4a", "/replies", "/home/me"},
@@ -206,7 +206,7 @@ func scenarios() []Scenario {
 				c.PR().ReviewRequested = true
 			}),
 			Expect: "A follow-up " + brand.Name + " started because the author re-requested the user's review after an approval the user stood behind; only clean base merges came since. " +
-				"GitHub no longer counts that approval, so the agent must not settle: it publishes the event the table gives, APPROVE with an empty body when nothing is new, " +
+				"GitHub no longer counts that approval, so the agent must not settle: it proposes the event the table gives, APPROVE with an empty body when nothing is new, " +
 				"which waits for the user like every approval.",
 			Must: []string{"Your review was re-requested", "your last verdict was `APPROVED` (endorsed: yes: by hand).",
 				"that is `APPROVE` with an", "`settled` is not an option, here or", "which waits for the user like every approval", "git diff 9f8e7d..HEAD"},
@@ -233,7 +233,7 @@ func scenarios() []Scenario {
 		{
 			Name:     "review/follow-up/by-hand/approved",
 			Context:  review(ByHand, func(c *Context) { c.PR().Prior = prior("APPROVED") }),
-			Expect:   "A follow-up the user asked for by hand after approving. The agent diffs from the reviewed head and publishes without the automated hold; no follow-up approval rule.",
+			Expect:   "A follow-up the user asked for by hand after approving. The agent diffs from the reviewed head and proposes its review as a draft.",
 			Must:     []string{"Follow-up review of acme/api#7, asked for by you.", "### 4a. Later rounds", "git diff 9f8e7d..HEAD", "| every blocking finding resolved | `APPROVE` |"},
 			MustNot:  []string{"ollow-up approval rule", "started by " + brand.Name, brand.Name + " started this round"},
 			MaxWords: oldReview * 9 / 10,
