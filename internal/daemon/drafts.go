@@ -212,6 +212,9 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"edit takes the rev you saw"}
 		}
+		if err := s.questionDecides(ctx, d, actor); err != nil {
+			return draft.Draft{}, err
+		}
 		got, err = s.amend(ctx, id, actor.amendment(a.Text, a.Payload, a.Broadcast, a.Rev))
 	case "discard":
 		if d.State == draft.Held {
@@ -316,6 +319,9 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 			return err
 		}
 		if edit.changes(d) {
+			if err := s.questionDecides(ctx, d, actor); err != nil {
+				return err
+			}
 			if d, err = s.amend(ctx, id, actor.amendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
 				return err
 			}
@@ -851,4 +857,14 @@ func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, acto
 		return draft.Draft{}, err
 	}
 	return o.CloseSilently(ctx, id)
+}
+
+// questionDecides refuses a person's change of held draft d while an open question pins it: the question is its one
+// decision, and a change would leave the question's pin behind it. The agent revises a pinned draft through its own
+// route, after which the question's pick of the old pin resumes its turn.
+func (s *Server) questionDecides(ctx context.Context, d draft.Draft, actor requester) error {
+	if actor.Actor == task.ActorAgent || d.State != draft.Held || s.openPins(ctx)[int64(d.ID)] == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: an open question decides draft %d: answer the question", gates.ErrRefused, d.ID)
 }

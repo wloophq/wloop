@@ -134,6 +134,9 @@ type Service struct {
 	d Deps
 
 	mu sync.Mutex
+	// deciding are the question gates an option's approval decides now (ApproveOption): no other decision on
+	// one of them runs until it ends.
+	deciding map[int64]bool
 	// running are the gates whose consequence runs now, which the tick does
 	// not replay.
 	running map[int64]bool
@@ -142,7 +145,7 @@ type Service struct {
 }
 
 func New(d Deps) *Service {
-	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}}
+	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}, deciding: map[int64]bool{}}
 }
 
 // Cut are the resolved gates whose at-most-once consequence began and was
@@ -224,6 +227,9 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 // the intent's declaration in gates.toml. It then applies the one
 // consequence the gate's kind names.
 func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
+	if s.isDeciding(id) {
+		return fmt.Errorf("%w: question gate %d is being decided", ErrResolved, id)
+	}
 	if done, err := s.resolveOption(ctx, id, r); done || err != nil {
 		return err
 	}
@@ -284,8 +290,13 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 		return false, nil
 	}
 	q, answer, rev, ok, err := s.d.Options.Pinning(ctx, g)
-	if err != nil || !ok || rev != g.ApprovedRev {
+	switch {
+	case err != nil || !ok:
 		return false, err
+	case q.ID == 0:
+		return true, fmt.Errorf("%w: a question about to open decides draft gate %d: answer it once it opens", ErrRefused, id)
+	case rev != g.ApprovedRev:
+		return true, fmt.Errorf("%w: open question gate %d decides draft gate %d, which it pinned at rev %d: answer the question", ErrRefused, q.ID, id, rev)
 	}
 	qdef, err := s.def(q)
 	if err != nil {
@@ -907,4 +918,26 @@ func resolvedEvent(g gate.Gate) port.Event {
 		u = task.UnitOf(g.Task)
 	}
 	return port.Event{Unit: u, Kind: gate.EventResolved, Key: fmt.Sprintf("%s/%d", g.Name, g.ID), Actor: string(g.By), Session: g.BySession, Data: g.Intent, At: g.ClosedAt}
+}
+
+// claimQuestion claims question gate id for the decision of one of its options; false when another decision
+// holds it. release ends the claim.
+func (s *Service) claimQuestion(id int64) (release func(), ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deciding[id] {
+		return nil, false
+	}
+	s.deciding[id] = true
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		delete(s.deciding, id)
+	}, true
+}
+
+func (s *Service) isDeciding(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deciding[id]
 }
