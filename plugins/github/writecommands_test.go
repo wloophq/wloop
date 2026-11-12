@@ -77,7 +77,14 @@ func TestWriteCommandsDenyEveryWriteForm(t *testing.T) {
 		"gh secret set TOKEN", "gh variable set X", "gh gist create f.txt", "gh project item-add 1 --url x", "gh cache delete --all",
 	)
 	writes = append(writes, "gh alias set co 'pr comment'", "gh alias import aliases.yml", "gh extension install acme/gh-post",
-		"gh extension exec post")
+		"gh extension exec post", "gh pr revert 7", "gh discussion create --title x --body y", "gh discussion comment 3 --body y",
+		"gh discussion edit 3 --title x", "gh agent-task create 'fix it'", "gh skill publish", "gh skill install acme/skills",
+		"gh skill update", "gh copilot suggest 'push it'")
+	for _, cmd := range slices.Clone(writes) {
+		if w := strings.Fields(cmd); w[1] != "api" && len(w) > 3 {
+			writes = append(writes, strings.Join(w[:3], " "))
+		}
+	}
 	for _, cmd := range slices.Clone(writes) {
 		rest := strings.TrimPrefix(cmd, "gh ")
 		writes = append(writes, "gh -R acme/api "+rest, "gh --hostname ghe.acme.test "+rest, "gh --repo=acme/api "+rest)
@@ -102,6 +109,10 @@ func TestWriteCommandsDenyEveryWriteForm(t *testing.T) {
 		"gh --hostname ghe.acme.test api repos/acme/api/pulls/7/comments",
 		"gh alias list",
 		"gh extension list",
+		"gh discussion view 3",
+		"gh discussion list",
+		"gh agent-task list",
+		"gh skill list",
 	} {
 		if denied(cmd) {
 			t.Errorf("a read denied: %s", cmd)
