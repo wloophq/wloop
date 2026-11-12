@@ -473,6 +473,16 @@ CREATE TABLE draft_revisions (
   PRIMARY KEY (draft_id, rev)
 ) WITHOUT ROWID;
 
+-- A rev that moves with the content unchanged (a state, a task, a unit) moves the rev its draft's waiting or
+-- approved gate approves along: approval is of the content, and only a revision opens a new gate.
+CREATE TRIGGER drafts_rev_keeps_approval AFTER UPDATE OF rev ON drafts
+WHEN NEW.rev != OLD.rev AND NEW.text = OLD.text AND NEW.payload = OLD.payload AND NEW.basis = OLD.basis
+BEGIN
+  UPDATE gates SET approved_rev = NEW.rev
+  WHERE provider = NEW.provider AND unit_key IN (OLD.unit_key, NEW.unit_key) AND kind = 'draft'
+  AND subject = CAST(NEW.id AS TEXT) AND status IN ('open', 'approved') AND approved_rev = OLD.rev;
+END;
+
 -- a workflow the user stopped on one unit, until they undo it
 CREATE TABLE workflow_skips (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,

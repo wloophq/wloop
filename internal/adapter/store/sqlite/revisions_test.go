@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -382,5 +384,117 @@ func TestGateSessionsStored(t *testing.T) {
 	}
 	if got, err := reopened.Gates(now).Get(ctx, none.ID); err != nil || got.Sessions == nil || len(got.Sessions) != 0 {
 		t.Fatalf("a gate no session stamps reads %#v %v", got.Sessions, err)
+	}
+}
+
+// heldWithGate is a held draft on u that no task holds, and its open gate at its rev.
+func heldWithGate(t *testing.T, db *DB, u unit.Unit) (draft.Draft, gate.Gate) {
+	t.Helper()
+	ctx := context.Background()
+	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: u, Kind: draft.Reply, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn, Session: "s-1"},
+		State: draft.Held, CreatedAt: at, UpdatedAt: at})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := db.Gates(func() time.Time { return at }).Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: u, Subject: strconv.FormatInt(int64(d.ID), 10),
+		Intents: []string{"approve"}, ApprovedRev: d.Rev, Sessions: []string{"s-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d, g
+}
+
+// approvesAndSends approves gate g of draft id and takes the draft from held to sent, as the outbox does once
+// the gate's ApprovedRev is the draft's rev.
+func approvesAndSends(t *testing.T, db *DB, id draft.ID, g gate.Gate) {
+	t.Helper()
+	ctx := context.Background()
+	gs := db.Gates(func() time.Time { return time.Date(2026, 11, 10, 10, 0, 0, 0, time.UTC) })
+	d, err := db.Drafts().Get(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := gs.Get(ctx, g.ID); err != nil || got.ApprovedRev != d.Rev {
+		t.Fatalf("the draft is at rev %d and its gate approves rev %d %v", d.Rev, got.ApprovedRev, err)
+	}
+	approved, err := gs.Resolve(ctx, g.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: "person"})
+	if err != nil || approved.ApprovedRev != d.Rev {
+		t.Fatalf("approved %+v %v", approved, err)
+	}
+	for _, step := range []struct{ from, to draft.State }{{draft.Held, draft.Queued}, {draft.Queued, draft.Sending}, {draft.Sending, draft.Sent}} {
+		d.State = step.to
+		if d, err = db.Drafts().Update(ctx, d, step.from); err != nil {
+			t.Fatalf("%s to %s: %v", step.from, step.to, err)
+		}
+	}
+}
+
+func TestATaskAdoptingAHeldDraftKeepsItsApproval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	d, g := heldWithGate(t, db, acmePull)
+	at := time.Date(2026, 11, 10, 9, 30, 0, 0, time.UTC)
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-1", State: "inbox", Category: task.CategoryInbox,
+		Units: []unit.Unit{acmePull}, Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
+		t.Fatal(err)
+	}
+	adopted, err := db.Drafts().Get(ctx, d.ID)
+	if err != nil || adopted.Task != "t-1" || adopted.Rev == d.Rev {
+		t.Fatalf("the task did not adopt the draft: %+v %v", adopted, err)
+	}
+	approvesAndSends(t, db, d.ID, g)
+}
+
+func TestARehomedHeldDraftKeepsItsApproval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	dm := unit.Unit{Provider: "slack", Key: "T0123/C0123/1700000000.000200"}
+	seg := unit.Unit{Provider: "slack", Key: "T0123/C0123/seg/1700000000000100"}
+	d, g := heldWithGate(t, db, dm)
+	if n, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{dm: seg}); err != nil || n != 1 {
+		t.Fatalf("moved %d %v", n, err)
+	}
+	approvesAndSends(t, db, d.ID, g)
+}
+
+func TestARevisionLeavesTheOldApprovalBehind(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	d, g := heldWithGate(t, db, acmePull)
+	d.Text, d.By = "hello", draft.Actor{Kind: draft.ActorSession, Session: "s-2"}
+	revised, err := db.Drafts().Update(ctx, d, draft.Held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.Gates(time.Now).Get(ctx, g.ID); err != nil || got.ApprovedRev == revised.Rev {
+		t.Fatalf("a revision to rev %d moved the gate's approval along: %+v %v", revised.Rev, got, err)
+	}
+}
+
+func TestAnUpdateWithoutAnAuthorKeepsTheStoredOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	d, _ := heldWithGate(t, db, acmePull)
+	session := draft.Actor{Kind: draft.ActorSession, Session: "s-1"}
+	d.By, d.State = draft.Actor{}, draft.Queued
+	moved, err := db.Drafts().Update(ctx, d, draft.Held)
+	if err != nil || moved.By != session {
+		t.Fatalf("a state move by no one returned author %+v %v", moved.By, err)
+	}
+	if got, err := db.Drafts().Get(ctx, d.ID); err != nil || got.By != session {
+		t.Fatalf("a state move by no one stored author %+v %v", got.By, err)
+	}
+	moved.State, moved.By, moved.Text = draft.Held, draft.Actor{}, "edited"
+	edited, err := db.Drafts().Update(ctx, moved, draft.Queued)
+	if err != nil || edited.By != (draft.Actor{Kind: draft.ActorPerson}) {
+		t.Fatalf("an edit by no one is a person's: %+v %v", edited.By, err)
+	}
+	if got, err := db.Drafts().Get(ctx, d.ID); err != nil || got.By != (draft.Actor{Kind: draft.ActorPerson}) {
+		t.Fatalf("stored %+v %v", got.By, err)
 	}
 }
