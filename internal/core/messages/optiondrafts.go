@@ -126,8 +126,8 @@ func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draf
 	if err != nil || !ok {
 		return draft.Draft{}, gate.Gate{}, false, err
 	}
-	onUnit := d.Unit == m.Unit || d.Origin.Unit == m.Unit
-	byTurn := (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && d.Origin.TurnSeq == m.Origin.TurnSeq
+	onUnit := d.Concerns(m.Unit)
+	byTurn := d.Origin.ByAgent() && d.Origin.TurnSeq == m.Origin.TurnSeq
 	ofDraft := dg.Kind == gate.KindDraft && dg.Subject == strconv.FormatInt(id, 10)
 	return d, dg, int64(d.ID) == id && onUnit && byTurn && ofDraft, nil
 }

@@ -215,13 +215,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"edit takes the rev you saw"}
 		}
-		if err := agentRevises(id, actor); err != nil {
-			return draft.Draft{}, err
-		}
-		if err := s.checkEditable(d, a.Text, a.Payload); err != nil {
-			return draft.Draft{}, err
-		}
-		got, err = s.amend(ctx, id, personAmendment(a.Text, a.Payload, a.Broadcast, a.Rev))
+		got, err = s.amend(ctx, id, actor.amendment(a.Text, a.Payload, a.Broadcast, a.Rev))
 	case "discard":
 		if d.State == draft.Held {
 			got, err = s.decideDraft(ctx, d, gate.Rejected, draftEdit{}, actor)
@@ -327,13 +321,7 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 			return err
 		}
 		if edit.changes(d) {
-			if err := agentRevises(id, actor); err != nil {
-				return err
-			}
-			if err := s.checkEditable(d, edit.Text, edit.Payload); err != nil {
-				return err
-			}
-			if d, err = s.amend(ctx, id, personAmendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
+			if d, err = s.amend(ctx, id, actor.amendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
 				return err
 			}
 			ng, ok, err := o.GateOf(ctx, d)
@@ -868,14 +856,4 @@ func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, acto
 		return draft.Draft{}, err
 	}
 	return o.CloseSilently(ctx, id)
-}
-
-// agentRevises refuses an agent session's change of draft id on a person's route, which would stamp the
-// revision as the person's and let that session approve what it wrote; an agent revises a draft through the
-// agent route, which stamps it, and a session that revised a draft never resolves its gate.
-func agentRevises(id draft.ID, actor requester) error {
-	if actor.Actor != task.ActorAgent {
-		return nil
-	}
-	return fmt.Errorf("%w: session %s changes draft %d through draft_update, not a person's edit", gates.ErrRefused, actor.Session, id)
 }

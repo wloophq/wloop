@@ -110,7 +110,8 @@ type Draft struct {
 	// ByRule is the approval rule of the user's that sent the draft, "" when none did.
 	ByRule string `json:"by_rule,omitempty"`
 	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,
-	// notices.toml's draft_by_rule), in that order.
+	// notices.toml's draft_by_rule), in that order, and, on the draft an agent session just wrote and asked to
+	// send, last, notices.toml's draft_rule_sends or draft_waits.
 	Notes []string `json:"notes,omitempty"`
 }
 

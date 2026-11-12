@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 )
@@ -124,11 +125,21 @@ func TestDraftCardReadsStaleLiveForHeldDraftsOnly(t *testing.T) {
 	}
 }
 
+// eventEditable are kinds whose payload's /event a person may change too.
+type eventEditable struct{ outboxtest.Shapes }
+
+func (k eventEditable) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	spec, ok := k.Shapes.Lookup(provider, kind)
+	spec.Editable = append(spec.Editable, "/event")
+	return spec, ok
+}
+
 // TestCardEditPayloadMakesNewRev edits a held draft's payload at the rev the person saw, as a person, through
 // the edit verb and through an approval that changes it; a payload edit without the rev is refused.
 func TestCardEditPayloadMakesNewRev(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
+	r.o.Kinds = eventEditable{outboxtest.Shapes{}}
 	var seen []outbox.Amendment
 	r.s.amender = func(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error) {
 		seen = append(seen, a)
@@ -303,6 +314,17 @@ func TestEditWithoutRevRefused(t *testing.T) {
 	}
 }
 
+// lockedShapes are the outbox's kinds with a reply's text locked, as lockedKinds declare it.
+type lockedShapes struct{ outboxtest.Shapes }
+
+func (k lockedShapes) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	spec, ok := k.Shapes.Lookup(provider, kind)
+	if kind == "reply" {
+		spec.Editable = nil
+	}
+	return spec, ok
+}
+
 // lockedKinds declares a reply locked as GitHub's resolve is, its text no person's to change, and its review, whose text and /event are a
 // person's to change.
 type lockedKinds struct{ reviewKinds }
@@ -321,6 +343,7 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.s.deps.DraftKinds = lockedKinds{}
+	r.o.Kinds = lockedShapes{outboxtest.Shapes{}}
 	d := r.propose(t, r7u, "thread resolved", draft.Wait)
 	id := strconv.FormatInt(int64(d.ID), 10)
 	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "1"})); rec.Code != 400 {
@@ -343,8 +366,10 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 		`{"event":"REQUEST_CHANGES","comments":[]}`: false,
 		`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}],"draft":true}`: false,
 	} {
-		raw := json.RawMessage(p)
-		if err := r.s.checkEditable(review, nil, &raw); (err == nil) != ok {
+		spec, _ := r.s.kindSpec(review)
+		after := review
+		after.Payload = json.RawMessage(p)
+		if err := spec.CheckEdit(review, after); (err == nil) != ok {
 			t.Errorf("payload %s: %v, want allowed %v", p, err, ok)
 		}
 	}

@@ -242,7 +242,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
-		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: proposer(p.Origin),
+		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: draft.ProposerOf(p.Origin),
 	})
 	if err != nil {
 		return draft.Draft{}, err
@@ -291,17 +291,6 @@ func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
 	d.State, d.Reason = draft.Dropped, reasonUngated
 	_, err := s.save(ctx, d, draft.Held)
 	return err
-}
-
-// proposer is who wrote the content a proposal of origin o brings.
-func proposer(o draft.Origin) draft.Actor {
-	switch {
-	case o.Session != "" || o.Kind == draft.OriginTurn || o.Kind == draft.OriginSession:
-		return draft.Actor{Kind: draft.ActorSession, Session: o.Session}
-	case o.Kind == draft.OriginUser:
-		return draft.Actor{Kind: draft.ActorPerson}
-	}
-	return draft.Actor{Kind: draft.ActorRule}
 }
 
 func (s *Service) kinds() Kinds {
@@ -547,7 +536,7 @@ func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) 
 // publisher with no Scoper, a Scoper that cannot say, and a publisher of another provider than the unit's
 // keep the draft outside.
 func (s *Service) targetsOutside(ctx context.Context, d draft.Draft) bool {
-	if d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession {
+	if !d.Origin.ByAgent() {
 		return false
 	}
 	t := strings.TrimSpace(d.Target)
@@ -754,8 +743,14 @@ type Amendment struct {
 }
 
 // Amend applies a, a person's at a.Rev, to held or failed draft id at once, all changes or none; its gate is
-// handled as Edit's. A rev below 1 is ErrInvalid, a draft at another rev ErrRevConflict.
+// handled as Edit's. A rev below 1 is ErrInvalid, a draft at another rev ErrRevConflict. An amendment by a
+// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped, so it never approves
+// what it wrote. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
 func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
+	if a.By.Kind != "" && a.By.Kind != draft.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: %w: %s %s changes draft %d through draft_update, not a person's edit",
+			gates.ErrRefused, ErrOutOfScope, a.By.Kind, a.By.Session, id)
+	}
 	if a.Rev < 1 {
 		return draft.Draft{}, fmt.Errorf("%w: a person revises a draft at the rev they read, at least 1", ErrInvalid)
 	}
@@ -848,12 +843,14 @@ func stampsAll(g gate.Gate, sessions []string) bool {
 	return true
 }
 
-// amended applies a to d: its text, broadcast, payload and basis, each checked as a proposal's.
+// amended applies a to d: its text, broadcast, payload and basis, each checked as a proposal's, and a
+// person's only where d's kind lets them.
 func (s *Service) amended(ctx context.Context, d *draft.Draft, a Amendment) error {
 	spec, declared, err := s.spec(*d)
 	if err != nil {
 		return err
 	}
+	before := *d
 	if a.Text != nil {
 		d.Text, d.Edited = *a.Text, *a.Text != d.Original
 	}
@@ -871,6 +868,11 @@ func (s *Service) amended(ctx context.Context, d *draft.Draft, a Amendment) erro
 	}
 	if a.Basis != nil {
 		d.Basis = strings.TrimSpace(*a.Basis)
+	}
+	if declared && a.By.Kind == draft.ActorPerson {
+		if err := spec.CheckEdit(before, *d); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
 	}
 	if a.Text == nil && a.Payload == nil && a.Basis == nil {
 		return checkFields(*d, spec)

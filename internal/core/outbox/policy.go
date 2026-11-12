@@ -46,7 +46,7 @@ var (
 
 func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Policy, error) {
 	switch {
-	case o.Kind != draft.OriginTurn && o.Kind != draft.OriginSession:
+	case !o.ByAgent():
 		if o.Intent != "" || o.Workflow != "" {
 			return waitPol, fmt.Errorf("a %s draft names a manifest: %w", o.Kind, ErrUnknownOrigin)
 		}

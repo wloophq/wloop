@@ -135,7 +135,7 @@ func normal(d draft.Draft) draft.Draft {
 
 func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	if d.By.Kind == "" {
-		d.By = proposer(d.Origin)
+		d.By = draft.ProposerOf(d.Origin)
 	}
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		res, err := tx.ExecContext(ctx, insertDraft, draftArgs(d)...)
@@ -310,17 +310,6 @@ const (
 
 func revisionArgs(d draft.Draft, at time.Time) []any {
 	return []any{int64(d.ID), d.Rev, d.Text, string(d.Payload), d.Basis, string(d.By.Kind), d.By.Session, draftTime(at)}
-}
-
-// proposer is who proposed a draft of o, for an Insert whose draft names no author.
-func proposer(o draft.Origin) draft.Actor {
-	switch {
-	case o.Session != "" || o.Kind == draft.OriginTurn || o.Kind == draft.OriginSession:
-		return draft.Actor{Kind: draft.ActorSession, Session: o.Session}
-	case o.Kind == draft.OriginAuto:
-		return draft.Actor{Kind: draft.ActorRule}
-	}
-	return draft.Actor{Kind: draft.ActorPerson}
 }
 
 func (s draftStore) Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error) {

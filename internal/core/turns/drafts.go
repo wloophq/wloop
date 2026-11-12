@@ -53,7 +53,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 		return nil
 	}
 	d, ok, err := s.DraftGates.Draft(ctx, draft.ID(ref.ID))
-	if err != nil || !ok || d.State != draft.Sent || d.Unit != u && d.Origin.Unit != u {
+	if err != nil || !ok || d.State != draft.Sent || !d.Concerns(u) {
 		return err
 	}
 	s.mu.Lock()
@@ -63,7 +63,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 		return err
 	}
 	t, ok := b.ByID(id)
-	if !ok || d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession ||
+	if !ok || !d.Origin.ByAgent() ||
 		d.Origin.TurnSeq != t.Seq && (t.Session == "" || d.Origin.Session != t.Session) {
 		return nil
 	}

@@ -45,7 +45,7 @@ func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 	out := workflow.Facts{FactFailed: false, FactStale: false, FactFailedKind: "", FactFailedRef: ""}
 	var newest *draft.Draft
 	for i, d := range failed {
-		if d.State != draft.Failed || d.Unit != u || d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession {
+		if d.State != draft.Failed || d.Unit != u || !d.Origin.ByAgent() {
 			continue
 		}
 		out[FactFailed] = true

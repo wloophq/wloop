@@ -19,7 +19,7 @@ var PersonNotices = []string{
 	NoticeNotifyInbox, NoticeNotifyDraftForMe, NoticeNotifyReply, NoticeNotifySendReply, NoticeNotifyQuestion, NoticeNotifyPinned,
 	NoticeNotifyProposal, NoticeNotifyPost, NoticeNotifyYes, NoticeNotifyNo, NoticeNotifyRecommended,
 	NoticeNotifyDraft, NoticeNotifyDraftFailed, NoticeNotifyOpen, NoticeNotifyDiscard,
-	NoticeDraftSent, NoticeDraftSaved, NoticeDraftByRule, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
+	NoticeDraftSent, NoticeDraftSaved, NoticeDraftRuleSends, NoticeDraftWaits, NoticeDraftByRule, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
 	NoticeTaskMerged, NoticeNothingToPick, NoticeWorkflowUnknown, NoticeConfigUnavailable, NoticeSkipsUnavailable,
 }
 

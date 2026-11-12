@@ -30,8 +30,12 @@ func newShapes() shapes {
 		}
 		for _, k := range []string{"reply", "nudge", "close", "ask_owner", "react", "comment", "edit", "delete"} {
 			d := testKinds[k]
-			kinds = append(kinds, draft.KindSpec{Provider: p, Name: k, Delivery: d, TextRequired: d != "reaction" && d != "delete",
-				SchemaJSON: json.RawMessage(`{"type":"object","properties":{}}`)})
+			spec := draft.KindSpec{Provider: p, Name: k, Delivery: d, TextRequired: d != "reaction" && d != "delete",
+				SchemaJSON: json.RawMessage(`{"type":"object","properties":{}}`)}
+			if spec.TextRequired {
+				spec.Editable = []string{draft.EditableText}
+			}
+			kinds = append(kinds, spec)
 		}
 		defaults[p] = "message"
 	}
