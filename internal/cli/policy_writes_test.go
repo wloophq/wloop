@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -10,22 +9,9 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
-
-// reviewWithoutSourceWrites is the bundled review intent with source_writes = false.
-func reviewWithoutSourceWrites(t *testing.T) string {
-	t.Helper()
-	raw, err := os.ReadFile("../../plugins/github/profile/intents/review/intent.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	const session = `session   = { strategy = "reuse_live", `
-	if !strings.Contains(string(raw), session) {
-		t.Fatalf("the review intent's session line moved:\n%s", raw)
-	}
-	return strings.Replace(string(raw), session, session+"source_writes = false, ", 1)
-}
 
 func denyRules(t *testing.T, settings string) []string {
 	t.Helper()
@@ -45,16 +31,19 @@ func TestRoundPolicyDeniesManifestWriteCommands(t *testing.T) {
 		t.Fatal("no bundled manifest declares write_commands")
 	}
 	control := te.controlSurface(te.cfg)
-	free := policies[policyRound](te.Env, "review", control)
+	if d, ok := te.loadedIntents().Registry.Get("act"); !ok || d.Session.NoSourceWrites {
+		t.Fatalf("the act intent forbids source writes: %+v", d.Session)
+	}
+	free := policies[policyRound](te.Env, "act", control)
 	for _, w := range wants {
 		if slices.ContainsFunc(free.Deny, func(d []string) bool { return slices.Equal(d, w) }) {
 			t.Fatalf("an intent that allows source writes denies %q", w)
 		}
 	}
-
-	userProfile(t, te, map[string]string{"intents/review/intent.toml": reviewWithoutSourceWrites(t)})
-	if d, ok := te.loadedIntents().Registry.Get("review"); !ok || !d.Session.NoSourceWrites {
-		t.Fatalf("the user's review intent did not load with source_writes = false: %+v %v", d.Session, te.loadedIntents().Broken)
+	for _, name := range []string{"review", "address", "nudge"} {
+		if d, ok := te.loadedIntents().Registry.Get(dintent.Name(name)); !ok || !d.Session.NoSourceWrites {
+			t.Fatalf("the bundled %s intent allows source writes: %+v", name, d.Session)
+		}
 	}
 	for name, p := range map[string]turns.Policy{
 		"round": policies[policyRound](te.Env, "review", control),
@@ -81,7 +70,6 @@ func TestRoundPolicyDeniesManifestWriteCommands(t *testing.T) {
 		}
 	}
 	t.Run("every gh api write form", func(t *testing.T) {
-		t.Skip("T13 waits on T5: write_commands that deny a field flag first, -XPOST, --method=POST, -X=POST and a method last")
 		for _, cmd := range []string{
 			"gh api -f body=x repos/acme/api/issues/7/comments",
 			"gh api --input review.json repos/acme/api/pulls/7/reviews",

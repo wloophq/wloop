@@ -8,7 +8,9 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -319,4 +321,31 @@ func proposalText(loaded func() *intentload.Loaded, logf func(string, ...any)) f
 		}
 		return text
 	}
+}
+
+// optionDrafts are the drafts a question's options point to, in the daemon's outbox, read at each pick: the
+// outbox is built after the messages.
+type optionDrafts struct{ draftGates }
+
+func (o optionDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error) {
+	if o.e.outbox == nil {
+		return draft.Draft{}, gate.Gate{}, false, errNoOutboxYet
+	}
+	d, err := o.e.outbox.Store.Get(ctx, draft.ID(id))
+	if errors.Is(err, outbox.ErrNotFound) {
+		return draft.Draft{}, gate.Gate{}, false, nil
+	}
+	if err != nil {
+		return draft.Draft{}, gate.Gate{}, false, err
+	}
+	g, ok, err := o.e.outbox.GateOf(ctx, d)
+	return d, g, ok, err
+}
+
+func (o optionDrafts) WithdrawHeld(ctx context.Context, id int64, reason string) error {
+	if o.e.outbox == nil {
+		return errNoOutboxYet
+	}
+	_, err := o.e.outbox.WithdrawHeld(ctx, draft.ID(id), reason)
+	return err
 }

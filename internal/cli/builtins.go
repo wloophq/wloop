@@ -285,11 +285,10 @@ var policies = map[string]func(e *Env, intent dintent.Name, control turns.Contro
 // plugin's manifest declares as a write to its source.
 func (e *Env) withoutSourceWrites(intent dintent.Name, p turns.Policy) turns.Policy {
 	d, ok := e.loadedIntents().Registry.Get(intent)
-	if !ok || !d.Session.NoSourceWrites {
+	if !ok {
 		return p
 	}
-	p.Deny = append(slices.Clone(p.Deny), writeCommands(e.loadedSources())...)
-	return p
+	return p.WithoutSourceWrites(d.Session, writeCommands(e.loadedSources()))
 }
 
 // writeCommands are the command prefixes srcs declare as writes to their sources, as words.

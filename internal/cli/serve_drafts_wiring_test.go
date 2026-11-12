@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -114,7 +117,23 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 		}
 	})
 	t.Run("through the daemon", func(t *testing.T) {
-		t.Skip("T13 waits on T3 and T7: propose checks the payload and the basis, and the agent route serves it")
+		pub := &livePublisher{head: "c2"}
+		td := servedWithGitHub(t, pub)
+		s := td.Start(t, draftsPR, "review")
+		propose := func(payload, basis string) error {
+			_, err := td.Client().ProposeDraft(context.Background(), s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One finding.",
+				Payload: json.RawMessage(payload), Basis: basis})
+			return err
+		}
+		if err := propose(`{"event":"MERGE"}`, "c2"); err == nil {
+			t.Error("a review with no such event was proposed")
+		}
+		if err := propose(`{"event":"COMMENT"}`, "c1"); err == nil {
+			t.Error("a review read at c1 was proposed while the head is c2")
+		}
+		if err := propose(`{"event":"COMMENT"}`, "c2"); err != nil {
+			t.Errorf("a review read at the live head: %v", err)
+		}
 	})
 }
 
@@ -137,17 +156,95 @@ func TestFailedSendWakesWorkflows(t *testing.T) {
 		t.Fatalf("the failed send woke no sweep of %s: %+v", threadUnit, ch)
 	}
 	t.Run("the unit's facts", func(t *testing.T) {
-		t.Skip("T13 waits on T9: the facts/drafts provider that reads draft.failed")
+		pub := &livePublisher{head: "c2", fail: fmt.Errorf("%w: the head is c3", outbox.ErrStale)}
+		td := servedWithGitHub(t, pub)
+		s := td.Start(t, draftsPR, "review")
+		d, err := td.Client().ProposeDraft(ctx, s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One finding.",
+			Payload: json.RawMessage(`{"event":"COMMENT"}`), Basis: "c2"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := td.Send(ctx); err != nil {
+			t.Fatal(err)
+		}
+		facts, err := td.e.engine.Units.Facts(ctx, draftsPR)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if facts["draft.failed"] != true || facts["draft.stale"] != true || facts["draft.failed_kind"] != "review" ||
+			!strings.HasPrefix(fmt.Sprint(facts["draft.failed_ref"]), fmt.Sprintf("%d:", d.ID)) {
+			t.Fatalf("the unit's draft facts after a stale send: %v %v %v %v", facts["draft.failed"], facts["draft.stale"], facts["draft.failed_kind"], facts["draft.failed_ref"])
+		}
 	})
 }
 
 func TestDraftSentCompletesTurn(t *testing.T) {
 	t.Parallel()
-	t.Skip("T13 waits on T9: turns.(*Service).DraftSent")
-	te, d, _ := servedOutboxOf(t, &basingPublisher{})
-	if te.Turns == nil || len(d.Outbox.OnSent) == 0 {
-		t.Fatal("a sent draft completes no turn")
+	ctx := context.Background()
+	pub := &livePublisher{head: "c2"}
+	td := servedWithGitHub(t, pub)
+	s := td.Start(t, draftsPR, "review")
+	d, err := td.Client().ProposeDraft(ctx, s.Handle, api.AgentDraftProposal{Kind: "review", Text: "Two changes before this merges.",
+		Payload: json.RawMessage(`{"event":"REQUEST_CHANGES"}`), Basis: "c2"})
+	if err != nil {
+		t.Fatal(err)
 	}
+	td.EndTurn(t, s, api.TurnEndRequest{Turn: s.Round, PR: "https://github.com/acme/api/pull/7", Record: json.RawMessage(fmt.Sprintf(
+		`{"state":"done","summary":"requested changes","outcome":{"verdict":"REQUEST_CHANGES","draft":{"id":%d,"rev":%d}}}`, d.ID, d.Rev))})
+	if err := td.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.sent()) != 1 {
+		t.Fatalf("posted %d drafts, want the rule-sent review", len(pub.sent()))
+	}
+	b := td.Book(t, draftsPR)
+	if len(b.Turns) != 1 || b.Turns[0].State != dturn.Done {
+		t.Fatalf("turns %+v", b.Turns)
+	}
+	last, ok := b.LastRecord(b.Turns[0].Seq)
+	if !ok || last.Record.Outcome == nil || last.Record.Outcome.URL != livePermalink(d.ID) || last.Record.Outcome.Verdict != "REQUEST_CHANGES" {
+		t.Fatalf("the turn's last record %+v", last.Record.Outcome)
+	}
+}
+
+var draftsPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+
+func livePermalink(id int64) string {
+	return fmt.Sprintf("https://github.com/acme/api/pull/7#pullrequestreview-%d", 9000+id)
+}
+
+// livePublisher posts into a list, reads its head as the live basis and fails every post with fail when set.
+type livePublisher struct {
+	mu    sync.Mutex
+	head  string
+	fail  error
+	posts []draft.Draft
+}
+
+func (p *livePublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.fail != nil {
+		return draft.Evidence{}, p.fail
+	}
+	p.posts = append(p.posts, d)
+	return draft.Evidence{Ref: fmt.Sprint(d.ID), Permalink: livePermalink(int64(d.ID))}, nil
+}
+
+func (p *livePublisher) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence, bool, error) {
+	return draft.Evidence{}, false, nil
+}
+
+func (p *livePublisher) Live(context.Context, unit.Unit, string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.head, nil
+}
+
+func (p *livePublisher) sent() []draft.Draft {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.posts)
 }
 
 // holds is a rule condition that holds for every draft.
@@ -192,4 +289,39 @@ func TestServeNotifiesRuleSent(t *testing.T) {
 			t.Fatalf("no notice %s", want)
 		}
 	}
+}
+
+func TestAResumePointsToItsTurnsOpenDrafts(t *testing.T) {
+	t.Parallel()
+	te, _, _ := servedOutboxOf(t, &basingPublisher{})
+	of := func(seq int64, state draft.State, basis string) draft.Draft {
+		return insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "x", State: state, Basis: basis,
+			Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq}})
+	}
+	held, failed := of(3, draft.Held, "c1"), of(4, draft.Failed, "")
+	of(5, draft.Held, "")
+	of(4, draft.Sent, "")
+	insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "a rule's", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
+	b := dturn.Book{Unit: threadUnit, Turns: []dturn.Turn{{Seq: 3, Intent: "review"}, {Seq: 4, Intent: "review", ResumeOf: 3}, {Seq: 5, Intent: "review"}}}
+	got := te.resumeDrafts(context.Background(), b, 4, "c2")
+	var ids []int64
+	for _, p := range got {
+		ids = append(ids, p.ID)
+		if p.ID == int64(held.ID) && (!p.Stale || p.CurrentBasis != "c2") {
+			t.Errorf("draft %d written at c1 is not stale at c2: %+v", p.ID, p)
+		}
+	}
+	slices.Sort(ids)
+	if want := []int64{int64(held.ID), int64(failed.ID)}; !slices.Equal(ids, want) {
+		t.Fatalf("pointers to %v, want the chain's open drafts %v", ids, want)
+	}
+}
+
+// servedWithGitHub is a test daemon whose GitHub drafts post through pub, with the real GitHub plugin over a
+// fake GitHub.
+func servedWithGitHub(t *testing.T, pub port.Effects) *TestDaemon {
+	t.Helper()
+	now := func() time.Time { return testNow }
+	return ServeForTest(t, TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: pub},
+		Plugins: map[string]src.Source{string(unit.GitHub): fakeGitHubPlugin(&fakeGH{basics: openBasics}, now)}})
 }

@@ -11,6 +11,7 @@ import (
 
 	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
 
+	factdrafts "github.com/wloophq/wloop/internal/adapter/facts/drafts"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
@@ -152,6 +153,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.DB != nil {
 		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntents(func(string, ...any) {})}
 		units.snapshot = d.DB.Snapshot
+		units.drafted = &factdrafts.Provider{Drafts: d.DB.Drafts()}
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
@@ -563,6 +565,8 @@ type unitSet struct {
 	classified *classifiedUnits
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
+	// drafted adds the facts of the unit's failed drafts; nil adds none.
+	drafted *factdrafts.Provider
 	// blocks lifts the answered start blocks first; nil lifts none.
 	blocks *startBlocks
 	// snapshot runs a pass in one read transaction of the store; nil reads
@@ -680,6 +684,16 @@ func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.
 	}
 	if err == nil && s.briefed != nil {
 		f, err = s.briefed.add(ctx, u, f)
+	}
+	if err == nil && s.drafted != nil {
+		var drafted workflow.Facts
+		if drafted, err = s.drafted.Facts(ctx, u); err == nil {
+			f = maps.Clone(f)
+			if f == nil {
+				f = workflow.Facts{}
+			}
+			maps.Copy(f, drafted)
+		}
 	}
 	if err != nil || s.classified == nil {
 		return f, err
