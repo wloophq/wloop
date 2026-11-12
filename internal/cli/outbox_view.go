@@ -269,6 +269,10 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		fmt.Fprintln(w, t.Dim(d.Link))
 	}
 	fmt.Fprintln(w)
+	if d.Preview != "" {
+		fmt.Fprintln(w, "  "+t.Bold(d.Preview))
+		fmt.Fprintln(w)
+	}
 	if d.Reaction != "" {
 		fmt.Fprintln(w, "  :"+d.Reaction+":")
 	} else {
@@ -280,6 +284,12 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 			for _, x := range termfmt.Wrap(l, width-2, width-2) {
 				fmt.Fprintln(w, "  "+x)
 			}
+		}
+	}
+	if len(d.Fields) > 0 {
+		fmt.Fprintln(w)
+		for _, l := range payloadLines(d.Fields, "  ") {
+			fmt.Fprintln(w, l)
 		}
 	}
 	fmt.Fprintln(w)
@@ -350,4 +360,28 @@ func originOn(d api.Draft) string {
 		return ""
 	}
 	return " on " + d.Origin.Unit
+}
+
+// payloadLines are every value of a draft's payload, each under its field's word as the daemon serves it, an
+// object's or a list's values indented under it, every line of a multi-line value kept; a worded value keeps its
+// raw value beside its word.
+func payloadLines(fs []api.DraftField, indent string) []string {
+	var out []string
+	for _, f := range fs {
+		if len(f.Fields) > 0 {
+			out = append(out, indent+f.Label+":")
+			out = append(out, payloadLines(f.Fields, indent+"  ")...)
+			continue
+		}
+		v := f.Value
+		if f.Shown != "" && f.Shown != f.Value {
+			v = f.Shown + " (" + f.Value + ")"
+		}
+		lines := strings.Split(v, "\n")
+		out = append(out, indent+f.Label+": "+lines[0])
+		for _, l := range lines[1:] {
+			out = append(out, indent+"  "+l)
+		}
+	}
+	return out
 }

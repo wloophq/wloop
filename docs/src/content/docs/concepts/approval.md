@@ -199,9 +199,9 @@ Each draft comes with its context: the asks of its task, each with the quotes it
 
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose
-{{command}} outbox show <id>            # one draft as it reads, its items and the commands it takes
+{{command}} outbox show <id>            # one draft as it reads: its preview line, its text, every value of its payload (a review's verdict and inline comments), its items and the commands it takes
 {{command}} outbox new <unit|message> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
-{{command}} outbox approve <id>         # shows it and approves its gate once you say yes; --text <markdown> --rev <n> posts your text instead
+{{command}} outbox approve <id>         # shows it, payload included, and approves its gate once you say yes; --text <markdown> --rev <n> posts your text instead
 {{command}} outbox edit <id> <markdown> --rev <n> # n is the rev outbox show printed; a revision since then is a conflict
 {{command}} outbox discard <id>         # discards its gate; --reason "not needed" drops a draft its gate approved
 {{command}} outbox retry <id>           # posts a failed draft again
