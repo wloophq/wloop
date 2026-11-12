@@ -1,4 +1,4 @@
-package github_test
+package turn
 
 import (
 	"encoding/json"
@@ -10,21 +10,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	_ "github.com/wloophq/wloop/internal/plugins/bundled"
-	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
-func bundled(t *testing.T) *intentload.Loaded {
-	t.Helper()
-	l, err := turn.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return l
-}
-
-func def(t *testing.T, l *intentload.Loaded, name dintent.Name) dintent.Def {
+func intentDef(t *testing.T, l *intentload.Loaded, name dintent.Name) dintent.Def {
 	t.Helper()
 	d, ok := l.Registry.Get(name)
 	if !ok {
@@ -36,7 +25,7 @@ func def(t *testing.T, l *intentload.Loaded, name dintent.Name) dintent.Def {
 func TestReviewAddressNudgeSourceWritesOff(t *testing.T) {
 	l := bundled(t)
 	for _, n := range []dintent.Name{dintent.Review, dintent.Address, dintent.Nudge} {
-		if !def(t, l, n).Session.NoSourceWrites {
+		if !intentDef(t, l, n).Session.NoSourceWrites {
 			t.Errorf("%s: its sessions may write to GitHub; set [session] source_writes = false", n)
 		}
 	}
@@ -50,7 +39,7 @@ func TestReviewWorkflowRestartsOnFailedOrStaleDraft(t *testing.T) {
 // source_writes = false may not run, each split in words.
 func writeCommands(t *testing.T) [][]string {
 	t.Helper()
-	m, err := manifest.Load(".")
+	m, err := manifest.Load("../../plugins/github")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,12 +129,12 @@ func TestInstructionsNameDraftTools(t *testing.T) {
 	writes := writeCommands(t)
 	drafting := map[dintent.Name]bool{dintent.Review: true, dintent.Address: true, dintent.Nudge: true}
 	seen := 0
-	for _, s := range turn.Scenarios() {
+	for _, s := range Scenarios() {
 		if !drafting[dintent.Name(s.Context.Intent)] {
 			continue
 		}
 		seen++
-		r, err := turn.Render(s.Context, l, "")
+		r, err := Render(s.Context, l, "")
 		if err != nil {
 			t.Fatalf("%s: %v", s.Name, err)
 		}
@@ -192,7 +181,7 @@ func TestShippedRulesAllowList(t *testing.T) {
 	l := bundled(t)
 	now := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
 	for _, n := range []dintent.Name{dintent.Review, dintent.Address} {
-		p := def(t, l, n).DraftApproval
+		p := intentDef(t, l, n).DraftApproval
 		if p == nil {
 			t.Fatalf("%s ships no draft approval", n)
 		}
