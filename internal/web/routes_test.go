@@ -108,7 +108,7 @@ process.stdout.write(JSON.stringify(out));`, viewsCatalog(), &got)
 	}
 }
 
-// TestARoutesPathFormOpensItsTask reads "#task/draft:1606", as wloop open is given it, as the task route
+// TestARoutesPathFormOpensItsTask reads "#task/draft:1606", as the open command is given it, as the task route
 // "#task=draft:1606", and a path of another key the same way.
 func TestARoutesPathFormOpensItsTask(t *testing.T) {
 	var got struct{ Task, Same, Unit, View string }

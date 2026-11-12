@@ -33,11 +33,6 @@ type DraftKinds interface {
 	Schema(spec draft.KindSpec) (json.RawMessage, error)
 }
 
-// staler is the outbox's live check of a draft's basis.
-type staler interface {
-	Stale(ctx context.Context, d draft.Draft) (bool, error)
-}
-
 // cardFields fills v, d's view, with what its card shows of d beyond its text: its payload field by field, its
 // basis, whether it is stale, its hold, and the profile's notes on how it stands; g is d's gate.
 func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *api.Draft) {
