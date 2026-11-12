@@ -1020,6 +1020,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
 - `drafts.<name>.fields.<name>` (table): One field's words.
 - `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.
+- `drafts.<name>.fields.<name>.markdown` (bool, default `false`): The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.
 - `drafts.<name>.fields.<name>.values` (table by name): The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.
 - `drafts.<name>.fields.<name>.values.<name>` (string, localized): The value's word.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.

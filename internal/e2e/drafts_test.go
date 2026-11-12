@@ -54,6 +54,33 @@ func TestDrafts(t *testing.T) {
 		}
 	})
 
+	t.Run("S2 approving both pinned cards", func(t *testing.T) {
+		r := newDraftsRig(t)
+		r.review()
+		approve := r.propose("APPROVE", "", "c2", true)
+		comment := r.propose("COMMENT", "Two nits, nothing blocking.", "c2", true)
+		r.end(fmt.Sprintf(`{"state":"asked","summary":"approve or comment","resume":"post what the user picks","question":%s}`,
+			choice("Approve the pull request?", draftOption("approve", "Approve", approve), draftOption("comment", "Comment only", comment))))
+		if d := r.draft(approve.ID); d.PinnedBy == 0 {
+			t.Fatalf("draft %d is served as no question's: %+v", approve.ID, d)
+		}
+		if err := r.approve(approve.ID, approve.Rev); err != nil {
+			t.Fatalf("approving the first pinned draft: %v", err)
+		}
+		if err := r.approve(comment.ID, comment.Rev); err == nil {
+			t.Fatal("the second pinned draft was approved after the first picked its option")
+		}
+		r.wantState(approve.ID, "queued")
+		if d := r.wantState(comment.ID, "dropped"); d.Reason != "other_option" {
+			t.Fatalf("the other option's draft dropped for %q", d.Reason)
+		}
+		r.send()
+		r.wantPosted(fmt.Sprintf("%d APPROVE", approve.ID))
+		if b := r.book(); len(b.Turns) != 1 || b.Turns[0].State != dturn.Done {
+			t.Fatalf("turns %+v", b.Turns)
+		}
+	})
+
 	t.Run("S3", func(t *testing.T) {
 		r := newDraftsRig(t)
 		r.review()

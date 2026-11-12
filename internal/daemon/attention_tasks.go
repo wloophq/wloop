@@ -31,7 +31,8 @@ type Drafts interface {
 
 const stampToken = "20060102T150405.000000000"
 
-// notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry.
+// notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry; a held draft an open
+// question pins notifies through that question only.
 var notifiedDrafts = []draft.State{draft.Held, draft.Failed}
 
 // attention is e's notification, nil when it posts none: an Inbox task notifies once, a task anywhere else once
@@ -428,7 +429,8 @@ func (ev *taskViewer) openDrafts(ctx context.Context) []draft.Draft {
 	if err != nil {
 		ev.s.logf("notifications: drafts: %v", err)
 	}
-	ev.drafts = ds
+	pins := ev.s.openPins(ctx)
+	ev.drafts = slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.State == draft.Held && pins[int64(d.ID)] != 0 })
 	if ev.drafts == nil {
 		ev.drafts = []draft.Draft{}
 	}

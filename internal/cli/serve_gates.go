@@ -45,6 +45,13 @@ func (m messageOptions) OptionDraft(ctx context.Context, question gate.Gate, r g
 	return m.e.messages.OptionDraft(ctx, question, r)
 }
 
+func (m messageOptions) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
+	if m.e.messages == nil {
+		return gate.Gate{}, "", 0, false, nil
+	}
+	return m.e.messages.Pinning(ctx, drafted)
+}
+
 // drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.
 type drivenSessions struct{ e *Env }
 

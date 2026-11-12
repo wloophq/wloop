@@ -387,3 +387,16 @@ func TestAReconnectReadsTheTasksWhole(t *testing.T) {
 		t.Errorf("requests %v, want the tasks page forgotten, then the tasks read", got)
 	}
 }
+
+// TestADraftsSendReloadsTheOpenTask reloads an open task's detail when a change says the gates moved, as a draft
+// the daemon sends after its approval answered moves them, though the change carries no counters.
+func TestADraftsSendReloadsTheOpenTask(t *testing.T) {
+	got := runDelta(t, `
+  hash = { view: "needs-me", pr: "", task: "draft:1626" };
+  pages[since("e1", 1)] = { epoch: "e1", rev: 1, full: false, rows: [], removed: [] };
+  message({ rev: 1, gates: true, units: [unit("a/b#1")] });
+  await flush();`)
+	if !slices.Contains(got.Requests, "detail") {
+		t.Errorf("requests %v, want the open task's detail reloaded", got.Requests)
+	}
+}

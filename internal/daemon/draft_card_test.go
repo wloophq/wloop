@@ -80,6 +80,9 @@ func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	if !ev.Editable || len(ev.Options) != 3 || ev.Options[0].Value != "APPROVE" || got["/comments/0/side"].Editable || got["/comments/0/side"].Options != nil {
 		t.Errorf("event %+v, side %+v: want only the editable verdict with the schema's enum", ev, got["/comments/0/side"])
 	}
+	if !got["/comments/0/body"].Markdown || got["/comments/0/path"].Markdown {
+		t.Errorf("body markdown %v, path markdown %v: want only the field the plugin words as Markdown", got["/comments/0/body"].Markdown, got["/comments/0/path"].Markdown)
+	}
 	if ev.Label != "Verdict" || ev.Shown != "Request changes" || got["/comments/1/extra"].Label != "extra" {
 		t.Errorf("event worded %q %q, extra %q: want the plugin's words, an unworded key as itself", ev.Label, ev.Shown, got["/comments/1/extra"].Label)
 	}

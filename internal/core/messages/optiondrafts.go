@@ -119,3 +119,91 @@ func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draf
 	ofDraft := dg.Kind == gate.KindDraft && dg.Subject == strconv.FormatInt(id, 10)
 	return d, dg, int64(d.ID) == id && onUnit && byTurn && ofDraft, nil
 }
+
+// Pinning is the open question gate whose message pins the draft of draft gate drafted, in an option or its
+// confirm, the answer that picks it and the rev it pinned; false when no open question of the draft's turn pins it.
+func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
+	if s.Drafts == nil || drafted.Kind != gate.KindDraft {
+		return gate.Gate{}, "", 0, false, nil
+	}
+	id, err := strconv.ParseInt(drafted.Subject, 10, 64)
+	if err != nil {
+		return gate.Gate{}, "", 0, false, nil
+	}
+	open, err := s.Store.Open(ctx)
+	if err != nil {
+		return gate.Gate{}, "", 0, false, err
+	}
+	for _, m := range open {
+		answer, ref, ok := pinOf(m, id)
+		if !ok {
+			continue
+		}
+		if _, _, ofTurn, err := s.ofTurn(ctx, m, id); err != nil || !ofTurn {
+			if err != nil {
+				return gate.Gate{}, "", 0, false, err
+			}
+			continue
+		}
+		gs, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: m.Unit})
+		if err != nil {
+			return gate.Gate{}, "", 0, false, err
+		}
+		for _, g := range gs {
+			if g.Status == gate.Open && g.Subject == strconv.FormatInt(m.ID, 10) {
+				return g, GateAnswer(answer), ref.Rev, true, nil
+			}
+		}
+	}
+	return gate.Gate{}, "", 0, false, nil
+}
+
+// pinOf is the answer to question m that picks draft id, and the pin it holds; false when m pins no such draft.
+func pinOf(m message.Message, id int64) (Answer, record.DraftRef, bool) {
+	if m.Kind != message.Question {
+		return Answer{}, record.DraftRef{}, false
+	}
+	if m.Confirm && m.Draft != nil && m.Draft.ID == id {
+		return Answer{Yes: true}, *m.Draft, true
+	}
+	for _, o := range m.Options {
+		if o.Draft != nil && o.Draft.ID == id {
+			return Answer{OptionID: o.ID}, *o.Draft, true
+		}
+	}
+	return Answer{}, record.DraftRef{}, false
+}
+
+// PinnedDrafts are the drafts the open questions pin, in an option or a confirm, each with the id of the message
+// that pins it: a draft its question's turn holds on the question's unit, which only an answer to that question
+// decides.
+func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
+	if s.Drafts == nil {
+		return nil, nil
+	}
+	open, err := s.Store.Open(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int64]int64{}
+	for _, m := range open {
+		if m.Kind != message.Question {
+			continue
+		}
+		refs := []*record.DraftRef{m.Draft}
+		for _, o := range m.Options {
+			refs = append(refs, o.Draft)
+		}
+		for _, ref := range refs {
+			if ref == nil {
+				continue
+			}
+			if _, _, ok, err := s.ofTurn(ctx, m, ref.ID); err != nil {
+				return nil, err
+			} else if ok {
+				out[ref.ID] = m.ID
+			}
+		}
+	}
+	return out, nil
+}

@@ -189,16 +189,34 @@ function taskBrief(e) {
 
 // taskGates are the decisions that wait on the task: its open gates, the draft it carries as a draft's own task,
 // and the drafts that wait on it, each a card.
+// taskGates are the decisions that wait on task e: its open gates and its drafts, each once. A draft an open
+// question pins is that question's to decide: it shows under the option that pins it, never as a card of its own.
 function taskGates(e) {
   const own = isDraftTask(e) ? draftOf(e) : null;
-  const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d) => !own || d.id !== own.id);
-  const gates = (e.gates || []).filter((g) => g.status === "open" && !(own && g.subject === own) && !drafts.some((d) => d.gate && d.gate === g.id));
+  const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d) => (!own || d.id !== own.id) && !d.pinned_by);
+  const pinnedGate = (g) => !!subjectOf(g).pinned_by;
+  const gates = (e.gates || []).filter((g) => g.status === "open" && !(own && g.subject === own) && !pinnedGate(g) && !drafts.some((d) => d.gate && d.gate === g.id));
   if (!gates.length && !own && !drafts.length) return null;
+  const heading = !gates.length && !drafts.length && own && !["held", "failed"].includes(own.state) ? draftStateWord(own.state) : t("Waiting on you");
   return h("section", { class: "d-gates", "aria-label": t("Open gates") },
-    h("h2", { class: "d-sub" }, t("Waiting on you")),
+    h("h2", { class: "d-sub" }, heading),
     ...gates.map((g) => gateCard(e, g)),
-    own ? draftCard(e, own, { scope: "detail" }) : null,
+    own && own.pinned_by ? pinnedNote(own) : own ? draftCard(e, own, { scope: "detail" }) : null,
     ...drafts.map((d) => draftCard(e, d, { scope: "detail" })));
+}
+
+// draftStateWord is the profile's word for a draft's state, capitalized as a heading.
+function draftStateWord(state) {
+  const w = (catalogWords().draft_states || {})[state] || state;
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+// pinnedNote stands for draft d's card on its own task while an open question pins it: the question decides it,
+// so the note sends the person to that question's task.
+function pinnedNote(d) {
+  return h("section", { class: "d-draft", "data-draft": String(d.id) },
+    h("p", { class: "d-note" }, t("An open question decides this draft: answer it on its task.")),
+    d.task ? h("a", { href: taskHref(d.task), class: "ref", "data-focus": `detail:task:draft:${d.id}` }, t("Open its task")) : null);
 }
 
 const RUN_PATHS = { open: "/api/runs/{seq}/open", enter: "/api/runs/{seq}/enter", transcript: "/api/runs/{seq}/transcript" };

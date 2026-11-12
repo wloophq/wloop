@@ -62,6 +62,8 @@ type UIDraft struct {
 type UIDraftField struct {
 	Label  string            `toml:"label"`
 	Values map[string]string `toml:"values"`
+	// Markdown says the field's value is Markdown, which the card renders as the draft's text is.
+	Markdown *bool `toml:"markdown"`
 }
 
 // UISearch is a custom view's search: the queries it runs at a press, the
@@ -296,6 +298,9 @@ func mergeUI(into, over UITexts) UITexts {
 				x.Label = y.Label
 			}
 			x.Values = mergeMap(x.Values, y.Values, func(_, v string) string { return v })
+			if y.Markdown != nil {
+				x.Markdown = y.Markdown
+			}
 			return x
 		})
 		return a

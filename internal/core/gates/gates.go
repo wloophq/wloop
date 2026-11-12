@@ -227,6 +227,9 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 	if done, err := s.resolveOption(ctx, id, r); done || err != nil {
 		return err
 	}
+	if done, err := s.resolvePinned(ctx, id, r); done || err != nil {
+		return err
+	}
 	_, err := s.resolve(ctx, id, r, s.d.Clock.Now())
 	return err
 }
@@ -258,6 +261,43 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 		}
 	}
 	return true, err
+}
+
+// resolvePinned answers, as a pick of the option that pins it, the open question whose message pins the draft of
+// draft gate id at its rev, when r approves that draft: a question is one decision, so approving a draft it pins,
+// by any route, is picking its option, which approves the draft (ApproveOption, which refuses a resolver who
+// proposed or revised it) and answers the question, whose other options' drafts are then withdrawn. done is false
+// for any other resolution, and when no open question pins the draft at its rev.
+func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (done bool, err error) {
+	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
+		return false, nil
+	}
+	g, err := s.d.Reader.Get(ctx, id)
+	if err != nil || g.Kind != gate.KindDraft || g.Status != gate.Open {
+		return false, err
+	}
+	def, err := s.def(g)
+	if err != nil {
+		return false, nil
+	}
+	if rs, err := withStatus(g, def, r); err != nil || rs.Status != gate.Approved {
+		return false, nil
+	}
+	q, answer, rev, ok, err := s.d.Options.Pinning(ctx, g)
+	if err != nil || !ok || rev != g.ApprovedRev {
+		return false, err
+	}
+	qdef, err := s.def(q)
+	if err != nil {
+		return false, err
+	}
+	i := slices.IndexFunc(qdef.Intents, func(in Intent) bool { return in.Answer && slices.Contains(q.Intents, in.Name) })
+	if i < 0 {
+		return false, fmt.Errorf("%w: question gate %d takes no answer that picks the option pinning draft gate %d", ErrIntent, q.ID, id)
+	}
+	pick := Resolution{Intent: qdef.Intents[i].Name, Answer: answer, By: r.By, Session: r.Session}
+	s.logf("gate %d: approving its draft picks the option of question gate %d that pins it", id, q.ID)
+	return true, s.ApproveOption(ctx, q, pick, g, rev)
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or
