@@ -344,7 +344,7 @@ func pointRows(ctx context.Context, tx *Tx, table, col string, id task.ID, ids [
 	}
 	set := col + ` = ?`
 	if table == "drafts" {
-		set += `, rev = rev + 1`
+		set += `, version = version + 1`
 	}
 	args := []any{string(id)}
 	for _, x := range ids {

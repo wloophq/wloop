@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Gates holds the decision each draft waits on: a draft gate whose Subject
@@ -244,4 +245,37 @@ func (s *Service) DeliveryOf(ctx context.Context, g gate.Gate) (draft.State, err
 		return "", nil
 	}
 	return d.State, err
+}
+
+// Rehomed asks a person again for each draft of units that a move to another unit took past the rev its gate
+// approved or waits on: a held one waits on a new gate at its rev, and a queued one goes back to held under
+// one, so its old approval neither posts it nor fails it.
+func (s *Service) Rehomed(ctx context.Context, units ...unit.Unit) error {
+	var errs []error
+	for _, u := range units {
+		ds, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}, Unit: &u})
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, d := range ds {
+			g, ok, err := s.GateOf(ctx, d)
+			switch {
+			case err != nil:
+				errs = append(errs, err)
+				continue
+			case ok && g.ApprovedRev == d.Rev:
+				continue
+			}
+			if d.State == draft.Queued {
+				d.State = draft.Held
+				if d, err = s.save(ctx, d, draft.Queued); err != nil {
+					errs = append(errs, ignoreConflict(err))
+					continue
+				}
+			}
+			errs = append(errs, s.waitAt(ctx, d, sessionsOf(g, ok, ""), ""))
+		}
+	}
+	return errors.Join(errs...)
 }
