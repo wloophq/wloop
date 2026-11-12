@@ -225,6 +225,15 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	if ms := mentionsOf(text); len(ms) > 0 {
 		fmt.Fprintf(w, "mentions: %s\n", strings.Join(ms, ", "))
 	}
+	if d.Preview != "" {
+		fmt.Fprintf(w, "preview:  %s\n", d.Preview)
+	}
+	if len(d.Fields) > 0 {
+		fmt.Fprintln(w, "payload:")
+		for _, l := range payloadLines(d.Fields, "  ") {
+			fmt.Fprintln(w, l)
+		}
+	}
 	if d.Reaction != "" {
 		fmt.Fprintf(w, "reaction: :%s:\n", d.Reaction)
 		return
