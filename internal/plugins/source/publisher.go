@@ -31,6 +31,7 @@ var (
 	_ port.Placer    = Publisher{}
 	_ port.Lander    = Publisher{}
 	_ port.Deliverer = Publisher{}
+	_ outbox.Bases   = Publisher{}
 )
 
 // Publish sends d to the plugin once. An error that may follow a post, the
@@ -111,4 +112,21 @@ func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
 	}
 	_, d := draft.ShapeOf(k)
 	return d
+}
+
+// Live asks the plugin now, never a cache, what a draft of kind on u would be written against; a plugin that
+// reads no basis answers "", and one that is not running fails, so no draft is taken as fresh unread.
+func (p Publisher) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	c, err := p.Kind.Client(p.ID)
+	if err != nil {
+		return "", err
+	}
+	caps, err := c.Capabilities(ctx)
+	if err != nil {
+		return "", err
+	}
+	if !slices.Contains(caps, src.CapabilityBasis) {
+		return "", nil
+	}
+	return c.Basis(ctx, Wire(u), kind)
 }

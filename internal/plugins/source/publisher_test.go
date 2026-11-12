@@ -95,7 +95,7 @@ var acmeFiles = fstest.MapFS{"drafts/react/schema.json": {Data: []byte(`{"type":
 
 // postingKind runs p as plugin acme, which posts comments, and answers its
 // publisher.
-func postingKind(t *testing.T, p posting) (psource.Publisher, psource.Units) {
+func postingKind(t *testing.T, p src.Source) (psource.Publisher, psource.Units) {
 	t.Helper()
 	k := kindOver(t, &change.Log{})
 	start(t, k, "acme", commentingManifest, p)
@@ -193,3 +193,29 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 type pinned time.Time
 
 func (c pinned) Now() time.Time { return time.Time(c) }
+
+// basing is a posting plugin that reads the live head of a unit.
+type basing struct {
+	posting
+	head string
+}
+
+var _ src.BasisReader = basing{}
+
+func (b basing) Basis(_ context.Context, u plugin.Unit, kind string) (string, error) {
+	return b.head + " " + u.Key + " " + kind, nil
+}
+
+func TestPublisherReadsTheLiveBasisOnlyOfAPluginThatReadsOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	own := unit.Unit{Provider: "acme", Key: "t1"}
+	reads, _ := postingKind(t, basing{posting: posting{Stub: sourcetest.NewStub()}, head: "c2"})
+	if got, err := reads.Live(ctx, own, "review"); err != nil || got != "c2 t1 review" {
+		t.Fatalf("live basis %q %v", got, err)
+	}
+	none, _ := postingKind(t, posting{Stub: sourcetest.NewStub()})
+	if got, err := none.Live(ctx, own, "review"); err != nil || got != "" {
+		t.Fatalf("a plugin with no basis answered %q %v", got, err)
+	}
+}

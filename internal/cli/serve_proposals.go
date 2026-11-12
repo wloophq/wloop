@@ -44,8 +44,9 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 // drafts, and applies their effects, runs elsewhere.
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []pluginModule, logf func(string, ...any)) *proposals.Job {
 	repeatAfter := time.Duration(cfg.Drafts.RepeatAfter)
-	svc := &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishersOf(mods), Clock: clockFunc(e.Now), Log: logf,
-		RepeatAfter: repeatAfter, Posts: deliveryPosts}
+	effects := publishersOf(mods)
+	svc := &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: effects, Clock: clockFunc(e.Now), Log: logf,
+		RepeatAfter: repeatAfter, Posts: deliveryPosts, Kinds: outboxKinds, Bases: publisherBases(effects)}
 	var srcs []proposals.Source
 	for _, m := range mods {
 		if m.Proposals != nil {

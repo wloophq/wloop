@@ -32,7 +32,9 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			targets = append(targets, m.ID)
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+	effects := publishers(pubs, cfg)
+	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: effects, Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+		Kinds: outboxKinds, Bases: publisherBases(effects), OnSent: e.draftSentHooks(),
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Silent: builtin.SilentEffect,
@@ -51,6 +53,37 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		d.GateReader = e.gateReader
 	}
 	return d
+}
+
+// outboxKinds are the draft kinds the plugins' manifests declare; nil checks none.
+var outboxKinds outbox.Kinds
+
+// publisherBases read a unit's live basis from the publisher of its provider; a publisher that reads none
+// answers "", and a provider with none fails, so no draft is taken as fresh unread.
+func publisherBases(effects outbox.Effects) outbox.Bases { return basesOf(effects) }
+
+type basesOf outbox.Effects
+
+func (b basesOf) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	fx, err := b(u.Provider)
+	if err != nil {
+		return "", err
+	}
+	if r, ok := fx.(outbox.Bases); ok {
+		return r.Live(ctx, u, kind)
+	}
+	return "", nil
+}
+
+// draftSentHooks complete, once a draft is sent, the turn that ended on it.
+func (e *Env) draftSentHooks() []func(context.Context, draft.Draft) error {
+	sent, ok := any(e.Turns).(interface {
+		DraftSent(ctx context.Context, d draft.Draft) error
+	})
+	if !ok || e.Turns == nil {
+		return nil
+	}
+	return []func(context.Context, draft.Draft) error{sent.DraftSent}
 }
 
 // deliveryPosts says whether a draft of d reaches people, as the plugins'
@@ -123,6 +156,13 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 		return v.Validate(ctx, d)
 	}
 	return nil
+}
+
+func (p pinnedEffects) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	if b, ok := p.Effects.(outbox.Bases); ok {
+		return b.Live(ctx, u, kind)
+	}
+	return "", nil
 }
 
 func (p pinnedEffects) Takes(target string) bool {

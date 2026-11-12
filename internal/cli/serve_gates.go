@@ -125,6 +125,12 @@ func (g draftGates) SupersedeForAgent(ctx context.Context, id int64, session str
 	return g.e.newGates(g.db, g.logf).SupersedeForAgent(ctx, id, session)
 }
 
+// ApproveOption resolves question, whose picked option points to the draft draft waits on, and approves that
+// draft at rev with the same resolver.
+func (g draftGates) ApproveOption(ctx context.Context, question, draft gate.Gate, rev int64, by gate.Resolver) error {
+	return g.e.newGates(g.db, g.logf).ApproveOption(ctx, question, draft, rev, by)
+}
+
 func (g draftGates) Withdraw(ctx context.Context, id int64, reason string) error {
 	return g.e.newGates(g.db, g.logf).Withdraw(ctx, id, reason)
 }
