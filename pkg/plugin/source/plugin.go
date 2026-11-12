@@ -184,6 +184,13 @@ func (s *server) Verify(ctx context.Context, r *pb.VerifyRequest) (*pb.VerifyRes
 	})
 }
 
+func (s *server) Basis(ctx context.Context, r *pb.BasisRequest) (*pb.BasisResponse, error) {
+	return serve[BasisReader](ctx, s.src, "basis", r.GetCall(), func(ctx context.Context, c BasisReader) (*pb.BasisResponse, error) {
+		b, err := c.Basis(ctx, unitGo(r.GetUnit()), r.GetKind())
+		return &pb.BasisResponse{Basis: b}, err
+	})
+}
+
 func (s *server) Landed(ctx context.Context, r *pb.LandedRequest) (*pb.LandedResponse, error) {
 	return serve[Lander](ctx, s.src, "lander", r.GetCall(), func(ctx context.Context, c Lander) (*pb.LandedResponse, error) {
 		u, ok, err := c.Landed(ctx, draftGo(r.GetDraft()))

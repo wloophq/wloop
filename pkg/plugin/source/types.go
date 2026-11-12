@@ -294,6 +294,15 @@ type Draft struct {
 	Origin    DraftOrigin
 	State     string
 	Evidence  Evidence
+	// Payload is what the kind's schema shapes beside Text, posted verbatim;
+	// nil for none.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, such as a head commit; ""
+	// for none.
+	Basis string
+	// Hold keeps the draft waiting for a person whatever the approval rules
+	// say.
+	Hold bool
 }
 
 // Placed is where a publisher puts a draft when it is proposed: the target a
