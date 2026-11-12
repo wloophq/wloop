@@ -1,6 +1,6 @@
 // Package publish posts the GitHub plugin's approved drafts on their pull
-// request: an issue comment, a review, a reply in a review thread or a
-// thread's resolution.
+// request: an issue comment, a review, a reply in a review thread, a
+// thread's resolution or a request for reviews.
 package publish
 
 import (
@@ -30,6 +30,7 @@ const (
 	deliveryReview  = "review"
 	deliveryReply   = "reply"
 	deliveryResolve = "resolve"
+	deliveryRequest = "request_review"
 )
 
 // verifyPages bounds how many pages of comments Verify reads.
@@ -54,7 +55,7 @@ type Publisher struct {
 	GH REST
 	// Threads nil refuses a resolve.
 	Threads Threads
-	Viewer func(ctx context.Context) (string, error)
+	Viewer  func(ctx context.Context) (string, error)
 	// People are the persons the unit's items name, for mentions of other
 	// providers.
 	People func(ctx context.Context, u sdk.Unit) ([]src.Person, error)
@@ -92,6 +93,8 @@ func (p *Publisher) Where(ctx context.Context, d src.Draft) (string, error) {
 		ref, _, _, err = p.prepareReply(ctx, d)
 	case deliveryResolve:
 		ref, _, err = prepareResolve(d)
+	case deliveryRequest:
+		ref, _, err = prepareRequest(d)
 	default:
 		ref, _, err = p.prepare(ctx, d)
 	}
@@ -230,6 +233,8 @@ func (p *Publisher) Publish(ctx context.Context, d src.Draft) (src.Evidence, err
 		return p.publishReply(ctx, d)
 	case deliveryResolve:
 		return p.publishResolve(ctx, d)
+	case deliveryRequest:
+		return p.publishRequest(ctx, d)
 	}
 	return p.publishComment(ctx, d)
 }
@@ -290,6 +295,8 @@ func (p *Publisher) Verify(ctx context.Context, d src.Draft, startedAt time.Time
 		return p.verifyReply(ctx, d, startedAt)
 	case deliveryResolve:
 		return p.verifyResolve(ctx, d)
+	case deliveryRequest:
+		return p.verifyRequest(ctx, d)
 	}
 	return p.verifyComment(ctx, d, startedAt)
 }

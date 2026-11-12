@@ -76,12 +76,14 @@ type fakePulls struct {
 	requests []string
 	posted   []json.RawMessage
 	resolved []string
+	// requested are the requested reviewers.
+	requested []string
 	// fail answers the next write with this status and body.
 	fail     int
 	failBody string
 }
 
-func newFakePulls(t *testing.T) (*fakePulls, *Publisher) {
+func newFakePulls(t testing.TB) (*fakePulls, *Publisher) {
 	t.Helper()
 	f := &fakePulls{viewer: "octocat", head: headA, now: time.Date(2026, 10, 22, 15, 0, 0, 0, time.UTC), next: 5000}
 	srv := httptest.NewServer(f)
@@ -124,7 +126,7 @@ func (f *fakePulls) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(raw, &fields)
 		f.next++
 		rv := ghReview{ID: f.next, HTMLURL: fmt.Sprintf("https://github.com/acme/api/pull/7#pullrequestreview-%d", f.next), Body: in.Body,
-			State: map[string]string{"APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED", "COMMENT": "COMMENTED"}[in.Event],
+			State:    map[string]string{"APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED", "COMMENT": "COMMENTED"}[in.Event],
 			CommitID: fields.CommitID, SubmittedAt: f.now, User: ghUser{f.viewer}}
 		f.reviews = append(f.reviews, rv)
 		_ = json.NewEncoder(w).Encode(rv)
@@ -165,6 +167,19 @@ func (f *fakePulls) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusNotFound)
 		io.WriteString(w, `{"message":"Not Found"}`)
+	case r.Method == http.MethodPost && r.URL.Path == pulls+"/requested_reviewers":
+		f.posted = append(f.posted, raw)
+		var in struct{ Reviewers []string }
+		_ = json.Unmarshal(raw, &in)
+		f.requested = append(f.requested, in.Reviewers...)
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, `{"number":7}`)
+	case r.Method == http.MethodGet && r.URL.Path == pulls+"/requested_reviewers":
+		users := []ghUser{}
+		for _, l := range f.requested {
+			users = append(users, ghUser{l})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"users": users, "teams": []any{}})
 	case r.Method == http.MethodPost && r.URL.Path == "/graphql":
 		f.graphQL(w, raw)
 	default:
@@ -243,7 +258,7 @@ func readFixture(kind string) ([]byte, error) {
 
 // fixture is the draft the testdata proposal of kind holds, as the host
 // sends it.
-func fixture(t *testing.T, kind, delivery string) src.Draft {
+func fixture(t testing.TB, kind, delivery string) src.Draft {
 	t.Helper()
 	raw, err := readFixture(kind)
 	if err != nil {
@@ -565,4 +580,46 @@ func TestCommentKindUnchanged(t *testing.T) {
 			t.Fatalf("%s with no delivery: %v", kind, err)
 		}
 	}
+}
+
+func TestRequestReviewPostsAndVerifies(t *testing.T) {
+	f, p := newFakePulls(t)
+	ctx := context.Background()
+	d := src.Draft{ID: 43, Unit: pr7.Unit(), Kind: "request_review", Delivery: "request_review", Payload: json.RawMessage(`{"reviewers":["ana","bob"]}`)}
+	if _, found, err := p.Verify(ctx, d, f.now); err != nil || found {
+		t.Fatalf("verified before the request: %v %v", found, err)
+	}
+	ev, err := p.Publish(ctx, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := f.writes(); len(w) != 1 || w[0] != "POST "+pulls+"/requested_reviewers" || ev.Permalink != pr7.URL() {
+		t.Fatalf("writes %v, evidence %+v", w, ev)
+	}
+	if got := f.lastPost(t)["reviewers"]; fmt.Sprint(got) != "[ana bob]" {
+		t.Fatalf("requested %v", got)
+	}
+	if _, found, err := p.Verify(ctx, d, f.now); err != nil || !found {
+		t.Fatalf("verified after the request: %v %v", found, err)
+	}
+	for name, payload := range map[string]string{"none": `{}`, "empty": `{"reviewers":[]}`, "a mention": `{"reviewers":["@ana"]}`,
+		"a team": `{"reviewers":["acme/core"]}`, "another field": `{"reviewers":["ana"],"team_reviewers":["core"]}`} {
+		bad := d
+		bad.Payload = json.RawMessage(payload)
+		if err := p.Validate(ctx, bad); err == nil {
+			t.Errorf("%s: validated", name)
+		}
+	}
+}
+
+func BenchmarkPublishReview(b *testing.B) {
+	f, p := newFakePulls(b)
+	d := fixture(b, "review", "review")
+	ctx := context.Background()
+	for b.Loop() {
+		if _, err := p.Publish(ctx, d); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ReportMetric(float64(len(f.requests))/float64(b.N), "requests/op")
 }
