@@ -309,15 +309,15 @@ func scanGate(row interface{ Scan(...any) error }) (gate.Gate, error) {
 }
 
 // The SQL that writes the draft gates' rows outside GateStore's methods lives here, with the gates store,
-// which alone writes a gate's status: migration 13's backfill and trigger, and a rehomed draft's gates.
+// which alone writes a gate's status: migrations 13's and 14's, and a rehomed draft's gates.
 const (
 	// draftGatesApproveTheirDraftsRevSQL gives an open or approved draft gate its draft's rev (migration 13).
 	draftGatesApproveTheirDraftsRevSQL = `UPDATE gates SET approved_rev = coalesce((SELECT d.rev FROM drafts d WHERE d.id = CAST(gates.subject AS INTEGER)), 0)
 	WHERE kind = 'draft' AND status IN ('open', 'approved')`
 	// draftGatesStampTheirSessionSQL stamps a draft gate's session among its sessions (migration 13).
 	draftGatesStampTheirSessionSQL = `UPDATE gates SET sessions = json_array(session) WHERE kind = 'draft' AND session != ''`
-	// draftRevKeepsApprovalSQL carries a draft gate's approved rev across a rev move that leaves everything
-	// the draft posts as it was (migration 13).
+	// draftRevKeepsApprovalSQL carried a draft gate's approved rev across a rev move that left everything the
+	// draft posts as it was (migration 13); migration 14 drops it, the draft's rev counting its content since.
 	draftRevKeepsApprovalSQL = `CREATE TRIGGER drafts_rev_keeps_approval AFTER UPDATE OF rev ON drafts
 WHEN NEW.rev != OLD.rev AND NEW.text = OLD.text AND NEW.payload = OLD.payload AND NEW.basis = OLD.basis
 AND NEW.target = OLD.target AND NEW.reaction = OLD.reaction AND NEW.broadcast = OLD.broadcast AND NEW.delivery = OLD.delivery
@@ -327,12 +327,15 @@ BEGIN
   WHERE provider = NEW.provider AND unit_key = NEW.unit_key AND kind = 'draft'
   AND subject = CAST(NEW.id AS TEXT) AND status IN ('open', 'approved') AND approved_rev = OLD.rev;
 END`
-	// rehomeDraftGatesSQL moves the gates of the drafts it moves along, so a draft's gate stays on its unit, and
-	// with them the rev a waiting or approved one approves when its draft's target pins where it posts; an
-	// untargeted draft posts where its new unit says, which a person approves again.
-	rehomeDraftGatesSQL = `UPDATE gates SET unit_key = ?1,
-		approved_rev = iif(status IN ('open', 'approved') AND approved_rev + 1 = (SELECT d.rev FROM drafts d
-			WHERE d.id = CAST(gates.subject AS INTEGER) AND d.target != ''),
-			approved_rev + 1, approved_rev)
+	// draftGatesAtContentRevsSQL renumbers a draft gate's approved rev as migration 14 renumbers revisions: a
+	// gate at its draft's rev approved its current content and takes the content rev; any other matches none.
+	draftGatesAtContentRevsSQL = `UPDATE gates SET approved_rev = CASE
+		WHEN approved_rev = (SELECT d.rev FROM drafts d WHERE d.id = CAST(gates.subject AS INTEGER))
+		THEN coalesce((SELECT max(r.rev) FROM v14_revisions r WHERE r.draft_id = CAST(gates.subject AS INTEGER)), 0)
+		ELSE 0 END
+	WHERE kind = 'draft'`
+	// rehomeDraftGatesSQL moves the gates of the drafts a rehome moves along, so a draft's gate stays on its
+	// unit; each still approves the rev it did, which the rehome's revision left behind.
+	rehomeDraftGatesSQL = `UPDATE gates SET unit_key = ?1
 		WHERE kind = 'draft' AND provider = ?2 AND unit_key = ?3`
 )

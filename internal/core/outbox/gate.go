@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Gates holds the decision each draft waits on: a draft gate whose Subject
@@ -79,9 +80,8 @@ func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {
 	return string(id), err
 }
 
-// atGateRev says whether held draft d is at the rev its gate g opened for; a draft starts at rev 1, so a
-// gate of rev 0 never matches. Any write after the gate opened, the adoption of its task included when
-// Gates places no task first, fails the draft's release.
+// atGateRev says whether held draft d is at the content rev its gate g opened for; a draft starts at rev 1,
+// so a gate of rev 0 never matches. A write that changes no content, the adoption of its task, keeps it.
 func atGateRev(d draft.Draft, g gate.Gate) bool {
 	return g.ApprovedRev >= 1 && d.Rev == g.ApprovedRev
 }
@@ -245,4 +245,48 @@ func (s *Service) DeliveryOf(ctx context.Context, g gate.Gate) (draft.State, err
 		return "", nil
 	}
 	return d.State, err
+}
+
+// Rehomed asks a person again for each draft of units that a move to another unit took past the rev its gate
+// approved or waits on: a held one waits on a new gate at its rev, and a queued one goes back to held under
+// one, so its old approval neither posts it nor fails it.
+func (s *Service) Rehomed(ctx context.Context, units ...unit.Unit) error {
+	var errs []error
+	for _, u := range units {
+		errs = append(errs, s.reask(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}, Unit: &u}))
+	}
+	return errors.Join(errs...)
+}
+
+// Reask is Rehomed of every unit, run at start: a move made before the outbox loaded, or one a stop cut
+// before Rehomed ran, leaves a draft's gate behind its rev.
+func (s *Service) Reask(ctx context.Context) error {
+	return s.reask(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}})
+}
+
+func (s *Service) reask(ctx context.Context, f Filter) error {
+	ds, err := s.Store.List(ctx, f)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range ds {
+		g, ok, err := s.GateOf(ctx, d)
+		switch {
+		case err != nil:
+			errs = append(errs, err)
+			continue
+		case ok && g.ApprovedRev == d.Rev:
+			continue
+		}
+		if d.State == draft.Queued {
+			d.State = draft.Held
+			if d, err = s.save(ctx, d, draft.Queued); err != nil {
+				errs = append(errs, ignoreConflict(err))
+				continue
+			}
+		}
+		errs = append(errs, s.waitAt(ctx, d, sessionsOf(g, ok, ""), ""))
+	}
+	return errors.Join(errs...)
 }

@@ -102,8 +102,8 @@ func TestRevisionsKept(t *testing.T) {
 	if d, err = s.Update(ctx, queued, draft.Held); err != nil {
 		t.Fatal(err)
 	}
-	if d.Rev != 4 || d.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-address"}) {
-		t.Fatalf("rev %d by %+v, want 4 by s-address", d.Rev, d.By)
+	if d.Rev != 3 || d.Version != 4 || d.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-address"}) {
+		t.Fatalf("rev %d version %d by %+v, want rev 3, a state move later version 4, by s-address", d.Rev, d.Version, d.By)
 	}
 	if got, err := s.Get(ctx, d.ID); err != nil || got.By != d.By {
 		t.Fatalf("stored author %+v %v", got.By, err)
@@ -263,7 +263,7 @@ func TestMigrationKeepsDrafts(t *testing.T) {
 		t.Fatalf("states %v, want %v", states, want)
 	}
 	failed, err := s.Get(ctx, 2)
-	if err != nil || failed.Text != "Ping @{github:octocat}" || failed.Error != "422 Unprocessable Entity" || failed.Rev != 4 || failed.By != (draft.Actor{Kind: draft.ActorPerson}) ||
+	if err != nil || failed.Text != "Ping @{github:octocat}" || failed.Error != "422 Unprocessable Entity" || failed.Rev != 2 || failed.By != (draft.Actor{Kind: draft.ActorPerson}) ||
 		!slices.Equal(failed.Effects, []string{"task.nudged"}) || failed.Origin.Rule != "github-nudge" {
 		t.Fatalf("the failed draft %+v %v", failed, err)
 	}
@@ -276,7 +276,7 @@ func TestMigrationKeepsDrafts(t *testing.T) {
 	created, updated := time.Date(2026, 11, 4, 11, 0, 0, 0, time.UTC), time.Date(2026, 11, 4, 11, 5, 0, 0, time.UTC)
 	want := []draft.Revision{
 		{Rev: 1, Text: "Ping", By: draft.Actor{Kind: draft.ActorRule}, At: created},
-		{Rev: 4, Text: "Ping @{github:octocat}", By: draft.Actor{Kind: draft.ActorPerson}, At: updated},
+		{Rev: 2, Text: "Ping @{github:octocat}", By: draft.Actor{Kind: draft.ActorPerson}, At: updated},
 	}
 	if err != nil || !reflect.DeepEqual(revs, want) {
 		t.Fatalf("the edited draft's revisions %+v %v, want %+v", revs, err, want)
@@ -290,7 +290,7 @@ func TestMigrationKeepsDrafts(t *testing.T) {
 	if err != nil || len(all) != 4 {
 		t.Fatalf("gates %+v %v", all, err)
 	}
-	wantRev := map[string]int64{"1": 1, "2": 4, "3": 3, "4": 2}
+	wantRev := map[string]int64{"1": 1, "2": 2, "3": 1, "4": 1}
 	wantSessions := map[string][]string{"1": {"s-address"}, "2": {}, "3": {"s-desk"}, "4": {}}
 	for _, g := range all {
 		if g.ApprovedRev != wantRev[g.Subject] || !slices.Equal(g.Sessions, wantSessions[g.Subject]) {
@@ -447,8 +447,8 @@ func TestATaskAdoptingAHeldDraftKeepsItsApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	adopted, err := db.Drafts().Get(ctx, d.ID)
-	if err != nil || adopted.Task != "t-1" || adopted.Rev == d.Rev {
-		t.Fatalf("the task did not adopt the draft: %+v %v", adopted, err)
+	if err != nil || adopted.Task != "t-1" || adopted.Rev != d.Rev || adopted.Version == d.Version {
+		t.Fatalf("the task did not adopt the draft as a write that keeps its content: %+v %v", adopted, err)
 	}
 	approvesAndSends(t, db, d.ID, g)
 }
@@ -458,31 +458,30 @@ var (
 	rehomedTo   = unit.Unit{Provider: "slack", Key: "T0123/C0123/seg/1700000000000100"}
 )
 
-func TestARehomedTargetedDraftKeepsItsApproval(t *testing.T) {
-	t.Parallel()
-	db, _ := openTemp(t)
-	d, g := heldWithGateTo(t, db, rehomedFrom, "thread:C0123/1700000000.000200")
-	if n, err := db.RehomeDrafts(context.Background(), map[unit.Unit]unit.Unit{rehomedFrom: rehomedTo}); err != nil || n != 1 {
-		t.Fatalf("moved %d %v", n, err)
-	}
-	approvesAndSends(t, db, d.ID, g)
-}
-
-func TestARehomedUntargetedDraftIsApprovedAgain(t *testing.T) {
+func TestARehomedDraftIsApprovedAgain(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	db, _ := openTemp(t)
-	d, g := heldWithGate(t, db, rehomedFrom)
-	if n, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{rehomedFrom: rehomedTo}); err != nil || n != 1 {
-		t.Fatalf("moved %d %v", n, err)
-	}
-	moved, err := db.Drafts().Get(ctx, d.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := db.Gates(func() time.Time { return noteAt }).Get(ctx, g.ID)
-	if err != nil || got.Unit != rehomedTo || got.ApprovedRev != g.ApprovedRev || got.ApprovedRev == moved.Rev {
-		t.Fatalf("an untargeted draft moved to rev %d and its gate on %s approves %d %v, want the old %d", moved.Rev, got.Unit, got.ApprovedRev, err, g.ApprovedRev)
+	for name, target := range map[string]string{"targeted": "thread:C0123/1700000000.000200", "untargeted": ""} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			db, _ := openTemp(t)
+			d, g := heldWithGateTo(t, db, rehomedFrom, target)
+			if n, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{rehomedFrom: rehomedTo}); err != nil || n != 1 {
+				t.Fatalf("moved %d %v", n, err)
+			}
+			moved, err := db.Drafts().Get(ctx, d.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := db.Gates(func() time.Time { return noteAt }).Get(ctx, g.ID)
+			if err != nil || got.Unit != rehomedTo || got.ApprovedRev != g.ApprovedRev || moved.Rev != d.Rev+1 {
+				t.Fatalf("a draft moved to rev %d and its gate on %s approves %d %v, want the old %d", moved.Rev, got.Unit, got.ApprovedRev, err, g.ApprovedRev)
+			}
+			revs, err := db.Drafts().Revisions(ctx, d.ID)
+			if err != nil || len(revs) != 2 || revs[1].Rev != moved.Rev {
+				t.Fatalf("the rehome's revision %+v %v", revs, err)
+			}
+		})
 	}
 }
 

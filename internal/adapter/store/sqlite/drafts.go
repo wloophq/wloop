@@ -31,15 +31,11 @@ const (
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced,
 	origin_session, why, language, broadcast, payload, basis, hold`
 	draftFields = draftContentFields + `, by_kind, by_session`
-	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
+	draftSelect = `SELECT id, rev, version, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
-	// updateDraft's author is the stored one while the content stays, and once it changes the one given, a
-	// person when none is; the expressions read the row as it was.
-	updateDraft = `UPDATE drafts SET (` + draftContentFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1),
-	by_kind = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_kind WHEN ? != '' THEN ? ELSE ? END,
-	by_session = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_session WHEN ? != '' THEN ? ELSE '' END
-	WHERE id = ? AND state = ? AND rev = ?`
+	insertDraft = `INSERT INTO drafts (` + draftFields + `, rev, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev, version) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	WHERE id = ? AND version = ?`
 )
 
 func draftTime(t time.Time) string {
@@ -88,7 +84,7 @@ func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
 	var provider, list, kind, originKind, state, delivery, effects, originProvider string
 	var evAt, created, updated, sending, applied, broadcast, payload, by string
-	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Task, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
+	if err := row.Scan(&d.ID, &d.Rev, &d.Version, &provider, &d.Unit.Key, &list, &d.Task, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason,
 		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced,
@@ -150,7 +146,7 @@ func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, err
 		if err != nil {
 			return err
 		}
-		d.ID, d.Rev = draft.ID(id), 1
+		d.ID, d.Rev, d.Version = draft.ID(id), 1, 1
 		if _, err := tx.ExecContext(ctx, insertRevision, revisionArgs(d, d.CreatedAt)...); err != nil {
 			return err
 		}
@@ -263,69 +259,52 @@ func (s draftStore) SettledAt(ctx context.Context, workflow string) (map[unit.Un
 }
 
 // updateArgs are updateDraft's arguments for writing d over the stored row at d's rev in state from.
-func updateArgs(d draft.Draft, from draft.State) []any {
-	args := draftArgs(d)
-	args = args[:len(args)-2]
-	kind, text, payload := string(d.By.Kind), d.Text, string(d.Payload)
-	args = append(args, text, payload, d.Basis, kind, kind, string(draft.ActorPerson),
-		text, payload, d.Basis, kind, d.By.Session)
-	return append(args, int64(d.ID), string(from), d.Rev)
-}
-
+// Update writes d over the stored row while it is at from and d.Version. Its Rev moves, and a revision by its
+// author is kept, only when its Content differs from the stored row's; otherwise the stored author stays.
 func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
+	d = shaped(d)
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
-		res, err := tx.ExecContext(ctx, updateDraft, updateArgs(d, from)...)
-		if err != nil {
-			return err
-		}
-		if n, err := res.RowsAffected(); err != nil || n == 1 {
-			if err != nil {
-				return err
-			}
-			next := d
-			next.Rev++
-			if next.By.Kind == "" {
-				next.By = draft.Actor{Kind: draft.ActorPerson}
-			}
-			if _, err := tx.ExecContext(ctx, insertChangedRevision, revisionArgs(next, d.UpdatedAt)...); err != nil {
-				return err
-			}
-			var by string
-			if err := tx.QueryRowContext(ctx, `SELECT by_kind, by_session FROM drafts WHERE id = ?`, int64(d.ID)).Scan(&by, &d.By.Session); err != nil {
-				return err
-			}
-			d.By.Kind = draft.ActorKind(by)
-			tx.Touch(port.TopicDrafts, d.Unit)
-			if pendingDraft(from) == pendingDraft(d.State) {
-				return nil
-			}
-			return touchDraftTask(ctx, tx, d.Task)
-		}
-		var state string
-		var rev int64
-		switch err := tx.QueryRowContext(ctx, `SELECT state, rev FROM drafts WHERE id = ?`, int64(d.ID)).Scan(&state, &rev); {
+		cur, err := scanDraft(tx.QueryRowContext(ctx, draftSelect+` WHERE id = ?`, int64(d.ID)))
+		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return fmt.Errorf("draft %d: %w", d.ID, outbox.ErrNotFound)
 		case err != nil:
 			return err
+		case cur.State != from || cur.Version != d.Version:
+			return fmt.Errorf("draft %d is %s version %d, not %s version %d: %w", d.ID, cur.State, cur.Version, from, d.Version, outbox.ErrConflict)
 		}
-		return fmt.Errorf("draft %d is %s rev %d, not %s rev %d: %w", d.ID, state, rev, from, d.Rev, outbox.ErrConflict)
+		next := d
+		next.Rev, next.Version = cur.Rev, cur.Version+1
+		if draft.SameContent(cur, d) {
+			next.By = cur.By
+		} else {
+			next.Rev++
+			if next.By.Kind == "" {
+				next.By = draft.Actor{Kind: draft.ActorPerson}
+			}
+			if _, err := tx.ExecContext(ctx, insertRevision, revisionArgs(next, d.UpdatedAt)...); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, updateDraft, append(draftArgs(next), next.Rev, next.Version, int64(d.ID), cur.Version)...); err != nil {
+			return err
+		}
+		d = next
+		tx.Touch(port.TopicDrafts, d.Unit)
+		if pendingDraft(from) == pendingDraft(d.State) {
+			return nil
+		}
+		return touchDraftTask(ctx, tx, d.Task)
 	})
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	d.Rev++
 	return normal(d), nil
 }
 
 const (
 	insertRevision = `INSERT INTO draft_revisions (draft_id, rev, text, payload, basis, by_kind, by_session, at)
 	VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
-	// insertChangedRevision writes a revision only when its content is not the newest stored one's.
-	insertChangedRevision = `INSERT INTO draft_revisions (draft_id, rev, text, payload, basis, by_kind, by_session, at)
-	SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8 WHERE NOT EXISTS (SELECT 1 FROM draft_revisions r
-		WHERE r.draft_id = ?1 AND r.text = ?3 AND r.payload = ?4 AND r.basis = ?5
-		AND r.rev = (SELECT max(rev) FROM draft_revisions WHERE draft_id = ?1))`
 	selectRevisions = `SELECT rev, text, payload, basis, by_kind, by_session, at FROM draft_revisions WHERE draft_id = ? ORDER BY rev`
 )
 

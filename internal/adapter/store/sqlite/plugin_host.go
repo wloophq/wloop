@@ -18,7 +18,11 @@ const (
 	unitEventsSQL = `SELECT provider, unit_key, kind, key, actor, at, data, anchor FROM events
 		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?1))
 		AND (?2 = '[]' OR kind IN (SELECT value FROM json_each(?2))) AND at >= ?3 ORDER BY at, id`
-	rehomeDraftSQL = `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE provider = ? AND unit_key = ?`
+	// rehomeDraftSQL moves a unit's drafts to another unit, which changes what each posts: a new revision.
+	rehomeDraftSQL = `UPDATE drafts SET unit_key = ?, rev = rev + 1, version = version + 1 WHERE provider = ? AND unit_key = ?`
+	// rehomedRevisionsSQL keeps the revision a rehome made of each draft now on the unit.
+	rehomedRevisionsSQL = `INSERT OR IGNORE INTO draft_revisions (draft_id, rev, text, payload, basis, by_kind, by_session, at)
+		SELECT id, rev, text, payload, basis, by_kind, by_session, updated_at FROM drafts WHERE provider = ? AND unit_key = ?`
 )
 
 // RecordSourceEvents stores the events a source plugin observed on its
@@ -148,6 +152,9 @@ func (db *DB) RehomeDrafts(ctx context.Context, moves map[unit.Unit]unit.Unit) (
 			if n > 0 {
 				moved += int(n)
 				tx.Touch(port.TopicDrafts, to)
+				if _, err := tx.ExecContext(ctx, rehomedRevisionsSQL, string(to.Provider), to.Key); err != nil {
+					return err
+				}
 			}
 			res, err = tx.ExecContext(ctx, rehomeDraftGatesSQL, to.Key, string(from.Provider), from.Key)
 			if err != nil {

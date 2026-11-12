@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -23,14 +22,12 @@ type memStore struct {
 	drafts []draft.Draft
 	// beforeUpdate runs inside Update before the compare, to stage a race.
 	beforeUpdate func(d draft.Draft)
-	// carry moves a draft gate's ApprovedRev across an Update that changes nothing posted, as the store does.
-	carry func(u unit.Unit, subject string, from, to int64)
 }
 
 func (m *memStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	d.ID, d.Rev = draft.ID(len(m.drafts)+1), 1
+	d.ID, d.Rev, d.Version = draft.ID(len(m.drafts)+1), 1, 1
 	d.Items = slices.Clone(d.Items)
 	m.drafts = append(m.drafts, d)
 	return d, nil
@@ -71,21 +68,15 @@ func (m *memStore) Update(ctx context.Context, d draft.Draft, from draft.State) 
 		return draft.Draft{}, ErrNotFound
 	}
 	cur := m.drafts[d.ID-1]
-	if cur.State != from || cur.Rev != d.Rev {
+	if cur.State != from || cur.Version != d.Version {
 		return draft.Draft{}, ErrConflict
 	}
-	d.Rev++
-	m.drafts[d.ID-1] = d
-	if m.carry != nil && samePost(cur, d) {
-		m.carry(d.Unit, strconv.FormatInt(int64(d.ID), 10), cur.Rev, d.Rev)
+	d.Version, d.Rev = cur.Version+1, cur.Rev
+	if !draft.SameContent(cur, d) {
+		d.Rev++
 	}
+	m.drafts[d.ID-1] = d
 	return d, nil
-}
-
-// samePost says whether a and b post the same, as the sqlite trigger that carries an approval compares them.
-func samePost(a, b draft.Draft) bool {
-	return a.Text == b.Text && string(a.Payload) == string(b.Payload) && a.Basis == b.Basis && a.Target == b.Target &&
-		a.Reaction == b.Reaction && a.Broadcast == b.Broadcast && a.Delivery == b.Delivery && a.Kind == b.Kind && a.Unit == b.Unit
 }
 
 type fakeClock struct{ now time.Time }
@@ -154,7 +145,6 @@ type env struct {
 func newEnv() *env {
 	e := &env{store: &memStore{}, fx: &fakeEffects{}, clock: &fakeClock{now: t0}, disabled: map[unit.ProviderID]bool{}}
 	e.gates = gatestest.NewStore(e.clock.Now)
-	e.store.carry = e.gates.CarryApprovedRev
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
 	e.svc = &Service{
 		Store: e.store,

@@ -196,3 +196,26 @@ func (d lateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID {
 	}
 	return dr.Unit.Provider
 }
+
+// rehomingDrafts move drafts between units in db, then ask the outbox to put each moved draft that its
+// approval no longer covers before a person again.
+type rehomingDrafts struct {
+	db *sqlite.DB
+	e  *Env
+}
+
+func (r rehomingDrafts) RehomeDrafts(ctx context.Context, moves map[unit.Unit]unit.Unit) (int, error) {
+	n, err := r.db.RehomeDrafts(ctx, moves)
+	if err != nil || n == 0 || r.e.hosted == nil {
+		return n, err
+	}
+	ob := r.e.hosted.outbox.Load()
+	if ob == nil {
+		return n, nil
+	}
+	to := make([]unit.Unit, 0, len(moves))
+	for _, u := range moves {
+		to = append(to, u)
+	}
+	return n, ob.Rehomed(ctx, to...)
+}

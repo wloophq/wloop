@@ -1,7 +1,6 @@
 package turns
 
 import (
-	"cmp"
 	"context"
 	"slices"
 	"strconv"
@@ -14,12 +13,11 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// DraftGates reads a draft, the gate it waited on and its content revisions, as the outbox keeps them.
+// DraftGates reads a draft and the gate it waited on, as the outbox keeps them.
 type DraftGates interface {
 	// Draft is draft id; false when there is none.
 	Draft(ctx context.Context, id draft.ID) (draft.Draft, bool, error)
 	GateOf(ctx context.Context, d draft.Draft) (gate.Gate, bool, error)
-	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)
 }
 
 // WithoutSourceWrites is p with writes, the command prefixes the plugins' manifests declare as writes to
@@ -88,15 +86,9 @@ func (s *Service) sentEnd(ctx context.Context, d draft.Draft) func(t turn.Turn, 
 		if err != nil {
 			return record.Record{}, false, err
 		}
-		sent, err := s.sentContent(ctx, d)
-		if err != nil {
-			return record.Record{}, false, err
-		}
 		pinned := o.Draft.Rev
-		if sent > 0 {
-			o.Draft.Rev = sent
-		}
-		o.Approved = found && sent > 0 && UserApproved(g, d) && sent <= pinned
+		o.Draft.Rev = d.Rev
+		o.Approved = found && UserApproved(g, d) && g.ApprovedRev == d.Rev && d.Rev <= pinned
 		return rec, true, nil
 	}
 }
@@ -221,20 +213,6 @@ func pointedDraft(q *record.Question, id int64) (record.DraftRef, bool) {
 		}
 	}
 	return record.DraftRef{}, false
-}
-
-// sentContent is the rev of d's last content revision, the content its approval posted: a draft's rev also
-// moves on writes that change no content, such as its queueing, and its gate's rev with it, so a pin
-// stands for the content of the last revision at or before it. 0 when none is known.
-func (s *Service) sentContent(ctx context.Context, d draft.Draft) (int64, error) {
-	if s.DraftGates == nil {
-		return 0, nil
-	}
-	revs, err := s.DraftGates.Revisions(ctx, d.ID)
-	if err != nil || len(revs) == 0 {
-		return 0, err
-	}
-	return slices.MaxFunc(revs, func(a, b draft.Revision) int { return cmp.Compare(a.Rev, b.Rev) }).Rev, nil
 }
 
 func (s *Service) draftGate(ctx context.Context, d draft.Draft) (gate.Gate, bool, error) {

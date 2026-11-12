@@ -26,7 +26,7 @@ import (
 type memDrafts struct{ ds []draft.Draft }
 
 func (m *memDrafts) Insert(_ context.Context, d draft.Draft) (draft.Draft, error) {
-	d.ID = draft.ID(len(m.ds) + 1)
+	d.ID, d.Rev, d.Version = draft.ID(len(m.ds)+1), 1, 1
 	m.ds = append(m.ds, d)
 	return d, nil
 }

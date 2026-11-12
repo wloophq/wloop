@@ -36,7 +36,7 @@ type memDrafts struct {
 func (m *memDrafts) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	d.ID = draft.ID(len(m.drafts) + 1)
+	d.ID, d.Rev, d.Version = draft.ID(len(m.drafts)+1), 1, 1
 	d.Items = slices.Clone(d.Items)
 	m.drafts = append(m.drafts, d)
 	return d, nil
@@ -76,10 +76,14 @@ func (m *memDrafts) Update(ctx context.Context, d draft.Draft, from draft.State)
 	if d.ID < 1 || int(d.ID) > len(m.drafts) {
 		return draft.Draft{}, outbox.ErrNotFound
 	}
-	if cur := m.drafts[d.ID-1]; cur.State != from || cur.Rev != d.Rev {
+	cur := m.drafts[d.ID-1]
+	if cur.State != from || cur.Version != d.Version {
 		return draft.Draft{}, outbox.ErrConflict
 	}
-	d.Rev++
+	d.Rev, d.Version = cur.Rev, cur.Version+1
+	if !draft.SameContent(cur, d) {
+		d.Rev++
+	}
 	m.drafts[d.ID-1] = d
 	return d, nil
 }
