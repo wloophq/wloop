@@ -72,6 +72,13 @@ func askedBook() turn.Book {
 		Records: []turn.Record{{TurnSeq: 1, Session: "s1", At: t0.Add(-time.Minute), Hash: "h", Record: optionsAsked()}}}
 }
 
+// pickedBook is askedBook once the person's answer picked the approve option, whose draft is 42.
+func pickedBook() turn.Book {
+	b := askedBook()
+	b.Answers = []turn.Answer{{TurnSeq: 1, OptionID: "approve", Route: turn.Approved, At: t0}}
+	return b
+}
+
 func TestTurnDoneByApproval(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
@@ -89,7 +96,7 @@ func TestTurnDoneByApproval(t *testing.T) {
 	} {
 		s, store, _, _, rec := newService(t)
 		s.DraftGates, s.DraftVerdict = draftGates{42: c.g}, eventVerdict
-		seq := store.Put(askedBook()).Turns[0].Seq
+		seq := store.Put(pickedBook()).Turns[0].Seq
 		if err := s.DraftSent(ctx, sentDraft(42, seq)); err != nil {
 			t.Fatal(err)
 		}
@@ -216,7 +223,7 @@ func TestASentDraftsVerdictIsWhatItPosted(t *testing.T) {
 	} {
 		s, store, _, _, _ := newService(t)
 		s.DraftGates, s.DraftVerdict = draftGates{42: draftGate("42", task.ActorPerson, "", "")}, c.verdict
-		seq := store.Put(askedBook()).Turns[0].Seq
+		seq := store.Put(pickedBook()).Turns[0].Seq
 		d := sentDraft(42, seq)
 		d.Payload = json.RawMessage(`{"event":"COMMENT"}`)
 		if err := s.DraftSent(ctx, d); err != nil {
@@ -236,7 +243,7 @@ func TestAnApprovalOfAnotherRevIsNotThePinnedOnes(t *testing.T) {
 	g := draftGate("42", task.ActorPerson, "", "")
 	g.ApprovedRev = 2
 	s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
-	seq := store.Put(askedBook()).Turns[0].Seq
+	seq := store.Put(pickedBook()).Turns[0].Seq
 	revised := sentDraft(42, seq)
 	revised.Rev = 2
 	if err := s.DraftSent(ctx, revised); err != nil {
@@ -252,7 +259,7 @@ func TestAnApprovalOfAnotherRevIsNotThePinnedOnes(t *testing.T) {
 func TestASentDraftWithNoPermalinkEndsTheTurnOnce(t *testing.T) {
 	ctx := context.Background()
 	s, store, _, _, rec := newService(t)
-	seq := store.Put(askedBook()).Turns[0].Seq
+	seq := store.Put(pickedBook()).Turns[0].Seq
 	d := sentDraft(42, seq)
 	d.Evidence.Permalink = ""
 	for range 3 {
@@ -329,7 +336,7 @@ func TestAQueuedDraftsWritesKeepThePinnedApprovalUntilItsContentChanges(t *testi
 		g := draftGate("42", task.ActorPerson, "", "")
 		g.ApprovedRev = c.rev
 		s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
-		seq := store.Put(askedBook()).Turns[0].Seq
+		seq := store.Put(pickedBook()).Turns[0].Seq
 		d := sentDraft(42, seq)
 		d.Rev, d.Version = c.rev, 9
 		if err := s.DraftSent(ctx, d); err != nil {

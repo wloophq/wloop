@@ -7,7 +7,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
@@ -49,5 +51,54 @@ func TestAResumedTurnsQuestionPinsItsChainsDrafts(t *testing.T) {
 	_ = r.gates.Resolve(ctx, od.gateOf(43).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
 	if len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(42).ID {
 		t.Errorf("approvals %+v, want draft 42's alone", od.approvals)
+	}
+}
+
+// TestAnotherUnitsTurnPinsNothing: draft 60 is on r7, proposed by turn 1 of r8. Turn 1 of r7 asks a question that
+// points to it: turn seqs are per unit, so the question pins nothing and draft 60's card approves on its own.
+func TestAnotherUnitsTurnPinsNothing(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t)
+	od := newOptionDrafts(t, r)
+	od.put(draft.Draft{ID: 60, Unit: r7, State: draft.Held, Rev: 1, Text: "another session's comment",
+		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Unit: r8, Session: "term_9"}}, "term_9")
+	r.started(r7)
+	r.record(t, r7, 1, askedRecord(&record.Question{Kind: "choice", Text: "Post it?", Options: []record.Option{
+		{ID: "post", Label: "Post", Consequence: "posts it", Draft: &record.DraftRef{ID: 60, Rev: 1}}, {ID: "hold", Label: "Hold", Consequence: "nothing"}}}))
+	r.live()
+	r.reconcile(t, r7)
+	if pinned, err := r.svc.PinnedDrafts(ctx); err != nil || pinned[60] != 0 {
+		t.Fatalf("pinned %v %v: r7's question pins draft 60, which r8's turn proposed", pinned, err)
+	}
+	if err := r.gates.Resolve(ctx, od.gateOf(60).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatalf("approving draft 60's card: %v", err)
+	}
+}
+
+// TestAReplacingTurnsQuestionPinsItsPredecessorsDrafts: turn 2 replaced asked turn 1 (replace_if_moved) and asks
+// again, pinning drafts 42 and 43 that turn 1 proposed. Approving draft 42's card picks its option and withdraws 43.
+func TestAReplacingTurnsQuestionPinsItsPredecessorsDrafts(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t)
+	od := newOptionDrafts(t, r)
+	od.put(heldDraft(42, r7, 1, 1), "term_1")
+	od.put(heldDraft(43, r7, 1, 1), "term_1")
+	b := r.started(r7)
+	t1 := b.Turns[0]
+	t2 := t1
+	t1.State, t1.ReplacedBy, t1.Before = turn.Replaced, 2, turn.Asked
+	t2.Seq, t2.ID, t2.State = 2, "def", turn.Started
+	b.Turns = []turn.Turn{t1, t2}
+	r.books.Put(b)
+	r.record(t, r7, 2, askedRecord(draftQuestion()))
+	r.live()
+	r.reconcile(t, r7)
+	m := r.only(t)
+	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatalf("approving draft 42's card: %v", err)
+	}
+	_ = r.gates.Resolve(ctx, od.gateOf(43).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
+	if got := r.gateOf(t, m); got.Status != gate.Answered || len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(42).ID {
+		t.Errorf("question %s, approvals %+v: want the question answered by draft 42's approval alone", got.Status, od.approvals)
 	}
 }

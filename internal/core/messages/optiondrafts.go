@@ -137,6 +137,7 @@ func (t *turnDrafts) of(ctx context.Context, id int64) (draft.Draft, gate.Gate, 
 			return draft.Draft{}, gate.Gate{}, false, err
 		}
 		b := books[t.m.Unit]
+		b.Unit = t.m.Unit
 		t.book = &b
 	}
 	return d, dg, t.book.Proposed(t.m.Origin.TurnSeq, d), nil

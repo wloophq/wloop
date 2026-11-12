@@ -1,6 +1,7 @@
 package turn
 
 import (
+	"cmp"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -28,13 +29,36 @@ func (b *Book) Chain(seq int64) []Turn {
 	return chain
 }
 
-// Proposed says whether turn seq, or a turn of its chain, proposed d: the drafts a resumed turn reads, revises
-// and asks about are its chain's.
+// Proposed says whether turn seq of b, or a turn it carries on, proposed d on b's unit: the drafts a turn that
+// resumes or replaces another reads, revises and asks about are that turn's too.
 func (b *Book) Proposed(seq int64, d draft.Draft) bool {
-	if !d.Origin.ByAgent() || d.Origin.TurnSeq == 0 {
+	if !d.Origin.ByAgent() || d.Origin.TurnSeq == 0 || cmp.Or(d.Origin.Unit, d.Unit) != b.Unit {
 		return false
 	}
-	return d.Origin.TurnSeq == seq || slices.ContainsFunc(b.Chain(seq), func(t Turn) bool { return t.Seq == d.Origin.TurnSeq })
+	return slices.Contains(b.lineage(seq), d.Origin.TurnSeq)
+}
+
+// lineage is seq and the seqs of the turns it carries on, through ResumeOf and ReplacedBy.
+func (b *Book) lineage(seq int64) []int64 {
+	out := []int64{seq}
+	for i := 0; i < len(out); i++ {
+		cur := out[i]
+		var prev []int64
+		if t, ok := b.bySeq(cur); ok && t.ResumeOf != 0 {
+			prev = append(prev, t.ResumeOf)
+		}
+		for _, t := range b.Turns {
+			if t.State == Replaced && t.ReplacedBy == cur {
+				prev = append(prev, t.Seq)
+			}
+		}
+		for _, p := range prev {
+			if !slices.Contains(out, p) {
+				out = append(out, p)
+			}
+		}
+	}
+	return out
 }
 
 // Endorsed says whether the user stands behind the verdict the turn

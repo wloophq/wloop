@@ -73,7 +73,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 // sentEnd is the record a turn ends with once sent draft d is in it, as DraftSent describes.
 func (s *Service) sentEnd(ctx context.Context, d draft.Draft) func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
 	return func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
-		rec, ok := sentRecord(t, last, int64(d.ID))
+		rec, ok := sentRecord(t, b, last, int64(d.ID))
 		if !ok {
 			return record.Record{}, false, nil
 		}
@@ -175,16 +175,18 @@ func (s *Service) settle(ctx context.Context, u unit.Unit, b *turn.Book, t turn.
 	return true, err
 }
 
-// sentRecord is the done record turn t, whose last record is last, ends with once draft id is sent;
-// false when t does not wait on that draft.
-func sentRecord(t turn.Turn, last record.Record, id int64) (record.Record, bool) {
+// sentRecord is the done record turn t of b, whose last record is last, ends with once draft id is sent;
+// false when t does not wait on that draft. An asked turn waits on a draft its question points to only once an
+// answer picked it: one sent otherwise (a rule queued it before the pin, a person retried it) leaves the
+// question to decide the other options.
+func sentRecord(t turn.Turn, b *turn.Book, last record.Record, id int64) (record.Record, bool) {
 	out := record.Outcome{}
 	if last.Outcome != nil {
 		out = *last.Outcome
 	}
 	switch {
 	case t.State == turn.Asked && last.State == record.Asked:
-		ref, ok := pointedDraft(last.Question, id)
+		ref, ok := approvedRef(b, t.Seq, last.Question, id)
 		if !ok {
 			return record.Record{}, false
 		}
@@ -221,20 +223,44 @@ func approvedRef(b *turn.Book, seq int64, q *record.Question, id int64) (record.
 	return record.DraftRef{}, false
 }
 
-// pointedDraft is the draft ref q's options, or its confirm, point to as draft id.
-func pointedDraft(q *record.Question, id int64) (record.DraftRef, bool) {
-	if q == nil {
-		return record.DraftRef{}, false
+// settlePicked ends turn seq on u, whose answer just picked a draft, when that draft was sent, failed or
+// dropped before the answer was stored, as DraftSent and DraftEnded would have.
+func (s *Service) settlePicked(ctx context.Context, u unit.Unit, seq int64) error {
+	if s.DraftGates == nil {
+		return nil
 	}
-	if q.Draft != nil && q.Draft.ID == id {
-		return *q.Draft, true
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	s.mu.Unlock()
+	if err != nil {
+		return err
 	}
+	last, ok := b.LastRecord(seq)
+	if !ok || last.Record.Question == nil {
+		return nil
+	}
+	q := last.Record.Question
+	refs := []*record.DraftRef{q.Draft}
 	for _, o := range q.Options {
-		if o.Draft != nil && o.Draft.ID == id {
-			return *o.Draft, true
-		}
+		refs = append(refs, o.Draft)
 	}
-	return record.DraftRef{}, false
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		if _, picked := approvedRef(&b, seq, q, ref.ID); !picked {
+			continue
+		}
+		d, ok, err := s.DraftGates.Draft(ctx, draft.ID(ref.ID))
+		if err != nil || !ok {
+			return err
+		}
+		if d.State == draft.Sent {
+			return s.DraftSent(ctx, d)
+		}
+		return s.DraftEnded(ctx, d)
+	}
+	return nil
 }
 
 func (s *Service) draftGate(ctx context.Context, d draft.Draft) (gate.Gate, bool, error) {

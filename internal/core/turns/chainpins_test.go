@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -32,7 +33,9 @@ func TestASentDraftOfAnEarlierTurnEndsTheResumedQuestion(t *testing.T) {
 	g := draftGate("42", task.ActorPerson, "", "")
 	g.ApprovedRev = 2
 	s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
-	store.Put(resumedAskedBook())
+	b := resumedAskedBook()
+	b.Answers = append(b.Answers, turn.Answer{TurnSeq: 2, OptionID: "approve", Route: turn.Approved, At: t0.Add(time.Minute)})
+	store.Put(b)
 	d := sentDraft(42, 1)
 	d.Rev = 2
 	if err := s.DraftSent(ctx, d); err != nil {
@@ -63,5 +66,49 @@ func TestAFailedDraftOfAnEarlierTurnFreesTheResumedQuestion(t *testing.T) {
 	last, _ := got.LastRecord(2)
 	if o := last.Record.Outcome; got.Turns[1].State != turn.Done || o == nil || o.Draft == nil || o.Draft.ID != 42 || o.Approved {
 		t.Fatalf("turn 2 %s, record %+v outcome %+v: want done on draft 42", got.Turns[1].State, last.Record, o)
+	}
+}
+
+// TestAnUnpickedPinsSendKeepsTheQuestion: draft 42, which turn 2's open question points to and no answer picked,
+// is sent anyway (a rule queued it before the pin, or a person retried it from failed). The question still
+// decides the other option's draft, so turn 2 still asks.
+func TestAnUnpickedPinsSendKeepsTheQuestion(t *testing.T) {
+	ctx := context.Background()
+	s, store, _, _, _ := newService(t)
+	g := draftGate("42", task.ActorWorkflow, "send", "")
+	g.ApprovedRev = 2
+	s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
+	store.Put(resumedAskedBook())
+	d := sentDraft(42, 1)
+	d.Rev = 2
+	if err := s.DraftSent(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	if got := bookOf(t, store, r7); got.Turns[1].State != turn.Asked || len(got.Records) != 2 {
+		t.Fatalf("turn 2 %s, records %+v: an unpicked draft's send ended the question", got.Turns[1].State, got.Records)
+	}
+}
+
+// TestAPickAfterItsDraftSentEndsTheTurn: the sender posts draft 42 between its approval and the answer that picked
+// it; the answer's route then ends the turn on the sent draft.
+func TestAPickAfterItsDraftSentEndsTheTurn(t *testing.T) {
+	ctx := context.Background()
+	s, store, _, _, _ := newService(t)
+	g := draftGate("42", task.ActorPerson, "", "")
+	g.ApprovedRev = 2
+	d := sentDraft(42, 1)
+	d.Rev = 2
+	s.DraftGates, s.DraftVerdict = storedDrafts{draftGates{42: g}, map[draft.ID]draft.Draft{42: d}}, eventVerdict
+	store.Put(resumedAskedBook())
+	if err := s.DraftSent(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, OptionID: "approve", Gate: 9, Message: 3, Source: turn.Cockpit, Approves: true}); err != nil {
+		t.Fatal(err)
+	}
+	got := bookOf(t, store, r7)
+	last, _ := got.LastRecord(2)
+	if o := last.Record.Outcome; got.Turns[1].State != turn.Done || o == nil || o.URL != d.Evidence.Permalink || !o.Approved {
+		t.Fatalf("turn 2 %s, outcome %+v: want done on sent draft 42", got.Turns[1].State, o)
 	}
 }
