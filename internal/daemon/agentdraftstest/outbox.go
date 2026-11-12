@@ -1,6 +1,7 @@
 // Package agentdraftstest is a fake of the outbox's agent API, which keeps drafts in memory and answers
-// by their state: a draft out of the caller's units or not of turn or session origin is out of scope, one
-// at another rev a conflict.
+// by their state as the outbox does: a revision is stamped with the caller's session, a draft out of the
+// caller's units or not of turn or session origin is out of scope, a rev below 1 invalid and another rev
+// a conflict.
 package agentdraftstest
 
 import (
@@ -91,7 +92,10 @@ func (o *Outbox) AgentAmend(_ context.Context, c outbox.Caller, id draft.ID, a o
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if a.Rev != d.Rev {
+	switch {
+	case a.Rev < 1:
+		return draft.Draft{}, outbox.ErrInvalid
+	case a.Rev != d.Rev:
 		return draft.Draft{}, outbox.ErrRevConflict
 	}
 	if a.Text != nil {
@@ -108,7 +112,7 @@ func (o *Outbox) AgentAmend(_ context.Context, c outbox.Caller, id draft.ID, a o
 	}
 	d.Rev++
 	o.drafts[id] = d
-	o.revs[id] = append(o.revs[id], draft.Revision{Rev: d.Rev, Text: d.Text, Payload: d.Payload, Basis: d.Basis, By: a.By, At: o.At})
+	o.revs[id] = append(o.revs[id], draft.Revision{Rev: d.Rev, Text: d.Text, Payload: d.Payload, Basis: d.Basis, By: draft.Actor{Kind: draft.ActorSession, Session: c.Session}, At: o.At})
 	return d, nil
 }
 
@@ -119,7 +123,10 @@ func (o *Outbox) AgentWithdraw(_ context.Context, c outbox.Caller, id draft.ID, 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if rev != d.Rev {
+	switch {
+	case rev < 1:
+		return draft.Draft{}, outbox.ErrInvalid
+	case rev != d.Rev:
 		return draft.Draft{}, outbox.ErrRevConflict
 	}
 	d.State, d.Reason = draft.Dropped, reason

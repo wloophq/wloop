@@ -193,6 +193,8 @@ func TestAgentDraftNoSessionRefused(t *testing.T) {
 		{http.MethodPost, api.AgentDrafts, "", `{"kind":"review","text":"x","session":"` + draftsSession + `"}`},
 		{http.MethodPatch, api.AgentDrafts, "s-hubot-2", `{"id":42,"rev":1,"text":"x","session":"` + draftsSession + `"}`},
 		{http.MethodPatch, api.AgentDrafts, "${ORCA_TERMINAL}", `{"id":42,"rev":1,"text":"x"}`},
+		{http.MethodPatch, api.AgentDrafts, draftsSession, `{"id":42,"text":"x"}`},
+		{http.MethodDelete, api.AgentDrafts, draftsSession, `{"id":42,"rev":0}`},
 	} {
 		if got := do(tc.method, tc.path, tc.header, tc.body); got != http.StatusBadRequest {
 			t.Errorf("%s with header %q and %s: %d, want 400", tc.method, tc.header, tc.body, got)
@@ -221,7 +223,9 @@ func TestAgentDraftProposeOnTheSessionsUnit(t *testing.T) {
 	t.Parallel()
 	ob := &agentdraftstest.Outbox{}
 	var proposed []unit.Unit
-	a := &AgentDrafts{Outbox: ob, Unit: func(_ context.Context, session string) (unit.Unit, bool, error) { return draftsPR7, session == draftsSession, nil },
+	a := &AgentDrafts{Outbox: ob, Unit: func(_ context.Context, session string) (unit.Unit, bool, error) {
+		return draftsPR7, session == draftsSession, nil
+	},
 		Proposer: func(_ context.Context, session string, u unit.Unit, p api.AgentDraftProposal) (draft.ID, error) {
 			proposed = append(proposed, u)
 			id := draft.ID(100 + len(proposed))

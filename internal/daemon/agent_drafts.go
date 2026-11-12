@@ -192,13 +192,13 @@ func (s *Server) handleAgentDrafts(w http.ResponseWriter, r *http.Request) {
 		got, err = a.Propose(context.WithoutCancel(ctx), session, p)
 	case http.MethodPatch:
 		var u api.AgentDraftUpdate
-		if !decodeAgentStrict(w, r, &u) || !draftIDGiven(w, u.ID) {
+		if !decodeAgentStrict(w, r, &u) || !draftIDGiven(w, u.ID, u.Rev) {
 			return
 		}
 		got, err = a.Update(context.WithoutCancel(ctx), session, u)
 	case http.MethodDelete:
 		var wd api.AgentDraftWithdrawal
-		if !decodeAgentStrict(w, r, &wd) || !draftIDGiven(w, wd.ID) {
+		if !decodeAgentStrict(w, r, &wd) || !draftIDGiven(w, wd.ID, wd.Rev) {
 			return
 		}
 		got, err = a.Withdraw(context.WithoutCancel(ctx), session, wd)
@@ -210,9 +210,13 @@ func (s *Server) handleAgentDrafts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, got)
 }
 
-func draftIDGiven(w http.ResponseWriter, id int64) bool {
-	if id <= 0 {
+func draftIDGiven(w http.ResponseWriter, id, rev int64) bool {
+	switch {
+	case id <= 0:
 		writeError(w, http.StatusBadRequest, "id: required, a draft's id")
+		return false
+	case rev <= 0:
+		writeError(w, http.StatusBadRequest, "rev: required, the rev you read")
 		return false
 	}
 	return true
