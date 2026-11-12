@@ -56,7 +56,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Ends: e.newTasks(db, cfg, ledger), Modules: mods, Appliers: e.draftAppliers()})},
 		Results: e.newTaskResults(e.newTasks(db, cfg, ledger), mods)}
 	if e.Turns != nil {
-		e.Turns.DraftGates, e.Turns.DraftVerdict = e.outbox, e.draftVerdict
+		e.Turns.DraftGates, e.Turns.DraftVerdict = turnDrafts{e.outbox}, e.draftVerdict
 	}
 	e.hosted.setOutbox(e.outbox)
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
@@ -298,4 +298,15 @@ func (p pinnedEffects) pinned(ctx context.Context, d draft.Draft) error {
 		return fmt.Errorf("turn %d is not a turn of %s", o.TurnSeq, u.Label())
 	}
 	return nil
+}
+
+// turnDrafts are the outbox's drafts as the turns read them.
+type turnDrafts struct{ *outbox.Service }
+
+func (t turnDrafts) Draft(ctx context.Context, id draft.ID) (draft.Draft, bool, error) {
+	d, err := t.Store.Get(ctx, id)
+	if errors.Is(err, outbox.ErrNotFound) {
+		return draft.Draft{}, false, nil
+	}
+	return d, err == nil, err
 }

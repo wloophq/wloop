@@ -86,6 +86,11 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 	if !got.result.IsZero() {
 		s.attachResult(context.WithoutCancel(ctx), got.Unit, got.result)
 	}
+	if o := r.Record.Outcome; got.Added && got.Note == "" && r.Record.State == record.Done && o != nil && o.Draft != nil && o.URL == "" {
+		if err := s.DraftRecorded(context.WithoutCancel(ctx), got.Unit, r.Turn, *o.Draft); err != nil {
+			s.logf("filling the url of turn %s from its sent draft %d: %v", r.Turn, o.Draft.ID, err)
+		}
+	}
 	return got, nil
 }
 
