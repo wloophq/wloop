@@ -343,3 +343,38 @@ func TestConfirmYesApprovesItsDraft(t *testing.T) {
 		}
 	}
 }
+
+// OptionDraft is what the gates service trusts to name the draft an answer approves; its own checks hold
+// whatever ApproveOption checks again.
+func TestOptionDraftNamesOnlyThePinSeen(t *testing.T) {
+	ctx := context.Background()
+	answer := messages.GateAnswer(messages.Answer{OptionID: "approve"})
+	for _, c := range []struct {
+		name   string
+		r      gates.Resolution
+		change func(od *optionDrafts)
+		ok     bool
+	}{
+		{"a person", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorPerson}, nil, true},
+		{"a session the user drives", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "driver"}, nil, true},
+		{"the session that revised it", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"}, nil, false},
+		{"the turn's session", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "term_1"}, nil, false},
+		{"a rule", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorWorkflow, Rule: "send"}, nil, false},
+		{"a rev other than the pin", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorPerson},
+			func(od *optionDrafts) { od.put(heldDraft(42, r7, 1, 2), "term_1") }, false},
+		{"an option without a draft", gates.Resolution{Intent: "answer", Answer: messages.GateAnswer(messages.Answer{OptionID: "hold"}), By: task.ActorPerson}, nil, false},
+	} {
+		r, od, m := draftRig(t, "driver", "reviser")
+		if c.change != nil {
+			c.change(od)
+		}
+		q := r.gateOf(t, m)
+		got, rev, ok, err := r.svc.OptionDraft(ctx, q, c.r)
+		if err != nil || ok != c.ok {
+			t.Fatalf("%s: ok %v %v", c.name, ok, err)
+		}
+		if ok && (got.ID != od.gateOf(42).ID || rev != 1) {
+			t.Fatalf("%s: gate %d rev %d", c.name, got.ID, rev)
+		}
+	}
+}
