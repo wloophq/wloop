@@ -96,6 +96,9 @@ type Draft struct {
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
 	Stale bool   `json:"stale,omitempty"`
+	// StaleUnknown says the unit's live basis could not be read in time, so Stale is not known; the approval
+	// stays offered, and approving and sending re-check it live.
+	StaleUnknown bool `json:"stale_unknown,omitempty"`
 	// TextLocked says the draft's kind lets no person change its text, which its publisher may not post.
 	TextLocked bool `json:"text_locked,omitempty"`
 	// Hold keeps every approval rule from releasing the draft.
