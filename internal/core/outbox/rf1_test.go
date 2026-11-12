@@ -295,8 +295,8 @@ func TestTheSenderRefusesAQueuedDraftPastItsGatesRev(t *testing.T) {
 	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	e.store.carry = nil
 	cur := e.get(d.ID)
+	cur.Text = "written after the approval"
 	if _, err := e.store.Update(ctx, cur, draft.Queued); err != nil {
 		t.Fatal(err)
 	}

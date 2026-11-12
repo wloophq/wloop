@@ -1,14 +1,12 @@
 package daemon
 
 import (
-	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -255,15 +253,14 @@ type draftEdit struct {
 
 // changes says whether e changes d.
 func (e draftEdit) changes(d draft.Draft) bool {
-	return e.Text != nil && *e.Text != d.Text || e.Payload != nil && !jsonEqual(*e.Payload, d.Payload)
-}
-
-func jsonEqual(a, b json.RawMessage) bool {
-	var x, y any
-	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
-		return bytes.Equal(a, b)
+	edited := d
+	if e.Text != nil {
+		edited.Text = *e.Text
 	}
-	return reflect.DeepEqual(x, y)
+	if e.Payload != nil {
+		edited.Payload = *e.Payload
+	}
+	return !draft.SameContent(d, edited)
 }
 
 // amend is a person's edit of draft id: the Outbox's, unless a test replaces it.

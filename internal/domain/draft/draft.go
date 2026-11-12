@@ -112,7 +112,12 @@ type Draft struct {
 	Evidence  Evidence // State "sent" only
 	Error     string   // State "failed" only, never a token
 	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
-	Rev       int64    // the stored row's version; every Update bumps it
+	// Rev is the draft's content revision: 1 as proposed, and one more for each write that changes its
+	// Content. A gate approves a draft at its Rev; a person and an agent revise it at the Rev they read.
+	Rev int64
+	// Version is the stored row's write counter, which every write bumps and checks, a state move as much as
+	// a revision.
+	Version int64
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time

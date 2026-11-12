@@ -79,9 +79,8 @@ func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {
 	return string(id), err
 }
 
-// atGateRev says whether held draft d is at the rev its gate g opened for; a draft starts at rev 1, so a
-// gate of rev 0 never matches. Any write after the gate opened, the adoption of its task included when
-// Gates places no task first, fails the draft's release.
+// atGateRev says whether held draft d is at the content rev its gate g opened for; a draft starts at rev 1,
+// so a gate of rev 0 never matches. A write that changes no content, the adoption of its task, keeps it.
 func atGateRev(d draft.Draft, g gate.Gate) bool {
 	return g.ApprovedRev >= 1 && d.Rev == g.ApprovedRev
 }

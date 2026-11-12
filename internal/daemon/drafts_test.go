@@ -407,7 +407,7 @@ func TestDraftActionStatuses(t *testing.T) {
 	if code, got, body := r.act(t, d.ID, "discard", `{}`); code != 200 || got.State != "dropped" || got.Reason != "user" {
 		t.Fatalf("discard: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "approve", `{"rev":2,"text":"x"}`); code != 409 || !strings.Contains(body, "rejected") {
+	if code, _, body := r.act(t, d.ID, "approve", `{"rev":1,"text":"x"}`); code != 409 || !strings.Contains(body, "rejected") {
 		t.Fatalf("approve of a dropped draft: %d %s", code, body)
 	}
 	if code := get(t, r.s, api.Drafts+"?id=x", nil); code != 400 {

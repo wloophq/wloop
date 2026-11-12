@@ -93,15 +93,13 @@ type SettledReader interface {
 }
 
 // Store keeps the drafts and their content revisions: Insert writes revision 1 by d.By, and Update writes a
-// revision by d.By when Text, Payload or Basis differ from the stored row.
+// revision by d.By when d's Content (draft.SameContent) differs from the stored row's.
 type Store interface {
-	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID, at Rev 1
+	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID, at Rev 1 and Version 1
 	Get(ctx context.Context, id draft.ID) (draft.Draft, error)      // ErrNotFound
 	List(ctx context.Context, f Filter) ([]draft.Draft, error)      // newest first
-	// Update writes d only while the stored state is from and the stored Rev is d.Rev, and returns
-	// d with Rev bumped; ErrConflict otherwise. An Update that changes nothing the draft posts (text,
-	// payload, basis, target, reaction, broadcast, delivery, kind, unit) carries its open or approved draft
-	// gate's ApprovedRev from the old rev to the new one, so a state move keeps the approval.
+	// Update writes d only while the stored state is from and the stored Version is d.Version, and returns d
+	// with Version bumped, and Rev bumped when its Content changed; ErrConflict otherwise.
 	Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error)
 	// Revisions are draft id's content revisions, oldest first; ErrNotFound when there is no such draft.
 	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)

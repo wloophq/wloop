@@ -40,26 +40,6 @@ func (g draftGates) GateOf(_ context.Context, d draft.Draft) (gate.Gate, bool, e
 	return got, ok, nil
 }
 
-// Revisions are one content revision per rev the draft's gate approved, as when every write changed content.
-func (g draftGates) Revisions(_ context.Context, id draft.ID) ([]draft.Revision, error) {
-	out := []draft.Revision{{Rev: 1}}
-	for rev := int64(2); rev <= g[id].ApprovedRev; rev++ {
-		out = append(out, draft.Revision{Rev: rev})
-	}
-	return out, nil
-}
-
-// movedGates are draftGates whose drafts' revs moved on writes that changed no content, such as queueing:
-// their content revisions are revs.
-type movedGates struct {
-	draftGates
-	revs []draft.Revision
-}
-
-func (m movedGates) Revisions(context.Context, draft.ID) ([]draft.Revision, error) {
-	return m.revs, nil
-}
-
 func optionsAsked() record.Record {
 	return record.Record{State: record.Asked, Summary: "Approve, or comment?", Resume: "r",
 		Outcome: &record.Outcome{Verdict: "APPROVE", NonBlocking: 2},
@@ -77,7 +57,7 @@ func eventVerdict(d draft.Draft) string {
 }
 
 func sentDraft(id draft.ID, seq int64) draft.Draft {
-	return draft.Draft{ID: id, Unit: r7, State: draft.Sent, Rev: 5, Text: "the body", Payload: json.RawMessage(`{"event":"APPROVE"}`),
+	return draft.Draft{ID: id, Unit: r7, State: draft.Sent, Rev: 1, Version: 5, Text: "the body", Payload: json.RawMessage(`{"event":"APPROVE"}`),
 		Origin:   draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq, Session: "proposer"},
 		Evidence: draft.Evidence{Ref: "c1", Permalink: "https://github.com/acme/api/pull/7#pullrequestreview-1"}}
 }
@@ -155,7 +135,9 @@ func TestADoneTurnsDraftFillsItsURL(t *testing.T) {
 	if got := bookOf(t, store, r7); len(got.Records) != 1 {
 		t.Fatalf("another draft of the turn fills nothing: %+v", got.Records)
 	}
-	if err := s.DraftSent(ctx, sentDraft(42, seq)); err != nil {
+	at2 := sentDraft(42, seq)
+	at2.Rev = 2
+	if err := s.DraftSent(ctx, at2); err != nil {
 		t.Fatal(err)
 	}
 	got := bookOf(t, store, r7)
@@ -255,7 +237,9 @@ func TestAnApprovalOfAnotherRevIsNotThePinnedOnes(t *testing.T) {
 	g.ApprovedRev = 2
 	s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
 	seq := store.Put(askedBook()).Turns[0].Seq
-	if err := s.DraftSent(ctx, sentDraft(42, seq)); err != nil {
+	revised := sentDraft(42, seq)
+	revised.Rev = 2
+	if err := s.DraftSent(ctx, revised); err != nil {
 		t.Fatal(err)
 	}
 	b := bookOf(t, store, r7)
@@ -331,28 +315,23 @@ func TestADraftThatOnlyPointsKeepsItsQuestion(t *testing.T) {
 	}
 }
 
-func TestAQueuedDraftsMovedRevKeepsThePinnedApproval(t *testing.T) {
+func TestAQueuedDraftsWritesKeepThePinnedApprovalUntilItsContentChanges(t *testing.T) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name     string
-		revs     []int64
-		approved bool
 		rev      int64
+		approved bool
 	}{
-		{"no content written since the pin", []int64{1}, true, 1},
-		{"content written after the pin", []int64{1, 4}, false, 4},
+		{"no content written since the pin, its queueing and claim moved only its version", 1, true},
+		{"content written after the pin", 4, false},
 	} {
 		s, store, _, _, _ := newService(t)
 		g := draftGate("42", task.ActorPerson, "", "")
-		g.ApprovedRev = 6
-		var revs []draft.Revision
-		for _, r := range c.revs {
-			revs = append(revs, draft.Revision{Rev: r})
-		}
-		s.DraftGates, s.DraftVerdict = movedGates{draftGates{42: g}, revs}, eventVerdict
+		g.ApprovedRev = c.rev
+		s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
 		seq := store.Put(askedBook()).Turns[0].Seq
 		d := sentDraft(42, seq)
-		d.Rev = 6
+		d.Rev, d.Version = c.rev, 9
 		if err := s.DraftSent(ctx, d); err != nil {
 			t.Fatal(err)
 		}

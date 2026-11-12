@@ -70,7 +70,7 @@ func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.R
 // approvedOption says whether g, m's answered gate, approved the draft the answer a picks, as
 // OptionDraft named it and the gates service approved it: the draft gate approved by g's own resolver, a
 // person or a session the user drives that neither proposed nor revised it. The pinned rev was checked
-// when the draft was approved; the gate's rev follows the draft's later writes, such as its queueing. It then
+// when the draft was approved, and stays the draft's until its content changes. It then
 // withdraws the drafts the other options point to, so the answer ends the turn on the draft's send instead
 // of resuming it; a call made again completes what is left.
 func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {

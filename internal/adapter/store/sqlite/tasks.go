@@ -421,7 +421,7 @@ func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
 		if u.Provider == task.UnitOf(e.ID).Provider {
 			continue
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE drafts SET task = ?1, rev = rev + 1 WHERE task = '' AND state = ?2 AND id IN (
+		res, err := tx.ExecContext(ctx, `UPDATE drafts SET task = ?1, version = version + 1 WHERE task = '' AND state = ?2 AND id IN (
 			SELECT CAST(subject AS INTEGER) FROM gates WHERE task_id IS NULL AND kind = ?3 AND status = ?4 AND provider = ?5 AND unit_key = ?6)`,
 			string(e.ID), string(draft.Held), string(gate.KindDraft), string(gate.Open), string(u.Provider), u.Key)
 		if err != nil {

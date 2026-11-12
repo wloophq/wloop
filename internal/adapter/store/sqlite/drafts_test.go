@@ -101,7 +101,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	full.Items, full.Rev = []string{}, 2
+	full.Items, full.Rev, full.Version = []string{}, 2, 2
 	if !reflect.DeepEqual(got, full) {
 		t.Fatalf("after update\n %+v\nwant\n %+v", got, full)
 	}
@@ -109,9 +109,9 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 		t.Fatalf("stale update: %v", err)
 	}
 	stale := full
-	stale.Rev = 1
+	stale.Version = 1
 	if _, err := s.Update(ctx, stale, draft.Sent); !errors.Is(err, outbox.ErrConflict) {
-		t.Fatalf("update of an older rev in the same state: %v", err)
+		t.Fatalf("update of an older version in the same state: %v", err)
 	}
 	if _, err := s.Update(ctx, draft.Draft{ID: 99, Unit: slackThread}, draft.Held); !errors.Is(err, outbox.ErrNotFound) {
 		t.Fatalf("update of a missing draft: %v", err)
