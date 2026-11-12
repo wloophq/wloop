@@ -27,7 +27,7 @@ type memStore struct {
 func (m *memStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	d.ID = draft.ID(len(m.drafts) + 1)
+	d.ID, d.Rev = draft.ID(len(m.drafts)+1), 1
 	d.Items = slices.Clone(d.Items)
 	m.drafts = append(m.drafts, d)
 	return d, nil
@@ -225,7 +225,7 @@ func (e *env) insertApproved(d draft.Draft) (draft.Draft, error) {
 	if err != nil {
 		return d, err
 	}
-	g := gateOf(d)
+	g := gateOf(d, nil)
 	g.Name, g.Intents, g.Intent, g.By = "draft", []string{"approve", "discard"}, "approve", task.ActorPerson
 	_, err = e.gates.RecordSent(context.Background(), g)
 	return d, err

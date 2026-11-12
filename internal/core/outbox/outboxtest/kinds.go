@@ -35,6 +35,16 @@ func (k Kinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	return draft.KindSpec{}, false
 }
 
+// ForDelivery is the first kind of Specs of provider with delivery, or the first of provider for "".
+func (k Kinds) ForDelivery(provider, delivery string) (draft.KindSpec, bool) {
+	for _, s := range k.Specs {
+		if s.Provider == provider && (delivery == "" || s.Delivery == delivery) {
+			return s, true
+		}
+	}
+	return draft.KindSpec{}, false
+}
+
 func (k Kinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {
 	key := spec.Provider + "/" + spec.Name
 	var fields map[string]json.RawMessage

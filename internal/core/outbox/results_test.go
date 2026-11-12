@@ -40,6 +40,7 @@ func fromTask(p Proposal) Proposal {
 
 func TestARecordedPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	e := newEnv()
+	e.svc.Posts = postsMessages
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
 	if _, err := e.svc.RecordSent(ctx, fromTask(reply("shipped")), draft.Evidence{Ref: "1.3"}); err != nil {
@@ -52,6 +53,7 @@ func TestARecordedPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 
 func TestASentPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 	e := newEnv()
+	e.svc.Posts = postsMessages
 	r := &postResults{intents: []string{"begin"}}
 	e.svc.Results = r
 	d := e.propose(fromTask(reply("shipped")))
@@ -82,6 +84,7 @@ func TestOnlyAPostOfAnAttachingTaskTurnAttaches(t *testing.T) {
 		"a turn on the post's own unit": onUnit, "a workflow's draft": auto} {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv()
+			e.svc.Posts = postsMessages
 			r := &postResults{intents: []string{"begin"}}
 			e.svc.Results = r
 			if _, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "1.3"}); err != nil {
@@ -106,6 +109,7 @@ func (l landing) Landed(context.Context, draft.Draft) (unit.Unit, bool, error) {
 
 func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	e := newEnv()
+	e.svc.Posts = postsMessages
 	posted := unit.Unit{Provider: "chat", Key: "T1/C1/1.5"}
 	chat := &fakeEffects{}
 	e.svc.Effects = func(p unit.ProviderID) (port.Effects, error) {
@@ -131,3 +135,5 @@ func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 		t.Fatalf("attached = %v, want %v", r.attached, posted)
 	}
 }
+
+func postsMessages(d draft.Delivery) bool { return d == draft.Message || d == draft.CommentDelivery }

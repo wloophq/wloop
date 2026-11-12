@@ -35,9 +35,59 @@ const (
 // everyStatus are the statuses a draft's gate may have.
 var everyStatus = []gate.Status{gate.Open, gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed, gate.Superseded}
 
-// gateOf is the gate d waits on, before it opens.
-func gateOf(d draft.Draft) gate.Gate {
-	return gate.Gate{Kind: gate.KindDraft, Unit: d.Unit, Task: task.ID(d.Task), Subject: strconv.FormatInt(int64(d.ID), 10), Session: d.Origin.Session}
+// gateOf is the gate d waits on at its stored rev, before it opens, stamped with the sessions that proposed
+// or revised it.
+func gateOf(d draft.Draft, sessions []string) gate.Gate {
+	if d.Origin.Session != "" && !slices.Contains(sessions, d.Origin.Session) {
+		sessions = append([]string{d.Origin.Session}, sessions...)
+	}
+	return gate.Gate{Kind: gate.KindDraft, Unit: d.Unit, Task: task.ID(d.Task), Subject: strconv.FormatInt(int64(d.ID), 10),
+		Session: d.Origin.Session, ApprovedRev: d.Rev, Sessions: sessions}
+}
+
+// sessionsOf are the sessions the gate a revision opens stamps: those prev, the draft's gate before it,
+// stamped, and session, the agent's that revises it.
+func sessionsOf(prev gate.Gate, ok bool, session string) []string {
+	var out []string
+	if ok {
+		out = append(out, prev.Sessions...)
+		if prev.Session != "" {
+			out = append(out, prev.Session)
+		}
+	}
+	if session != "" {
+		out = append(out, session)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// TaskPlacer is optional on Gates: the task a gate g would be placed on when it opens, so a draft takes it
+// before its gate opens at its rev.
+type TaskPlacer interface {
+	TaskOf(ctx context.Context, g gate.Gate) (task.ID, error)
+}
+
+// taskOf is the task the gate of d, which names none, opens on; "" when Gates cannot say before it opens,
+// and the draft then adopts its gate's.
+func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {
+	tp, ok := s.Gates.(TaskPlacer)
+	if !ok {
+		return "", nil
+	}
+	id, err := tp.TaskOf(ctx, gateOf(d, nil))
+	return string(id), err
+}
+
+// atGateRev says whether held draft d is at the rev its gate g opened for. When Gates places no task before
+// a gate opens, the draft adopts its gate's task after, which is one rev on; that write alone may follow
+// the gate's, since every revision of a held draft supersedes its gate first.
+func (s *Service) atGateRev(d draft.Draft, g gate.Gate) bool {
+	if d.Rev == g.ApprovedRev {
+		return true
+	}
+	_, places := s.Gates.(TaskPlacer)
+	return !places && d.Rev == g.ApprovedRev+1 && g.Task != "" && d.Task == string(g.Task)
 }
 
 // decided is the gates' Policy of the decision a draft's approval made.
@@ -86,11 +136,18 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 		_, err = s.drop(ctx, d, reasonGone)
 		return err
 	}
+	if !s.atGateRev(d, g) {
+		s.logf("draft %d failed on its release: its gate approved rev %d, it is at %d", d.ID, g.ApprovedRev, d.Rev)
+		return s.failHeld(ctx, d, fmt.Sprintf("it changed after its gate opened: its gate approved rev %d, it is at rev %d", g.ApprovedRev, d.Rev))
+	}
 	if !g.ByUser() {
 		if why := s.unreleasable(d); why != "" {
 			s.logf("draft %d failed on its release: %s", d.ID, why)
 			return s.failHeld(ctx, d, why)
 		}
+	}
+	if err := s.fresh(ctx, d); err != nil {
+		return s.failHeld(ctx, d, err.Error())
 	}
 	if err := s.publishable(ctx, &d); err != nil {
 		return s.failHeld(ctx, d, err.Error())
@@ -107,6 +164,9 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 
 // unreleasable is why no rule may release d now, "" when one may.
 func (s *Service) unreleasable(d draft.Draft) string {
+	if d.Hold {
+		return "it is held for a person, and a rule or a window released it"
+	}
 	if got := s.delivered(d).Delivery; got != d.Delivery {
 		return fmt.Sprintf("its publisher now posts it as a %s, not the %s its approval decided", got, d.Delivery)
 	}
