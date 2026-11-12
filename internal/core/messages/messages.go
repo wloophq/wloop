@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -230,19 +231,16 @@ func (s *Service) reconcile(ctx context.Context, units []unit.Unit) ([]message.M
 				errs = append(errs, s.close(ctx, m, closing(&b, m.Origin.TurnSeq)))
 				continue
 			}
+			if !samePins(w, m) {
+				errs = append(errs, s.close(ctx, m, ""))
+				continue
+			}
 			delete(want, k)
 			w.ID, w.TaskID, w.CreatedAt = m.ID, m.TaskID, m.CreatedAt
 			if !sameContent(w, m) {
-				repinned := !samePins(w, m)
 				if m, err = s.Store.Upsert(ctx, w); err != nil {
 					errs = append(errs, err)
 					continue
-				}
-				if repinned {
-					if err := s.supersedeOpen(ctx, m); err != nil {
-						errs = append(errs, err)
-						continue
-					}
 				}
 			}
 			gated = append(gated, m)
@@ -331,15 +329,18 @@ func sameContent(a, b message.Message) bool {
 // samePins says whether a and b point every option, and the confirm, to the same draft at the same rev:
 // an answer approves what the person saw, so a change to a pin is a new question with a new gate.
 func samePins(a, b message.Message) bool {
-	if !sameRef(a.Draft, b.Draft) || len(a.Options) != len(b.Options) {
-		return false
-	}
-	for i := range a.Options {
-		if a.Options[i].ID != b.Options[i].ID || !sameRef(a.Options[i].Draft, b.Options[i].Draft) {
-			return false
+	return sameRef(a.Draft, b.Draft) && maps.Equal(pins(a), pins(b))
+}
+
+// pins are m's option drafts by option id.
+func pins(m message.Message) map[string]record.DraftRef {
+	out := map[string]record.DraftRef{}
+	for _, o := range m.Options {
+		if o.Draft != nil {
+			out[o.ID] = *o.Draft
 		}
 	}
-	return true
+	return out
 }
 
 func sameRef(a, b *record.DraftRef) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
