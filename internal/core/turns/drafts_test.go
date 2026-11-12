@@ -20,6 +20,21 @@ import (
 
 type draftGates map[draft.ID]gate.Gate
 
+func (draftGates) Draft(context.Context, draft.ID) (draft.Draft, bool, error) {
+	return draft.Draft{}, false, nil
+}
+
+// storedDrafts are draftGates that also hold drafts.
+type storedDrafts struct {
+	draftGates
+	drafts map[draft.ID]draft.Draft
+}
+
+func (s storedDrafts) Draft(_ context.Context, id draft.ID) (draft.Draft, bool, error) {
+	d, ok := s.drafts[id]
+	return d, ok, nil
+}
+
 func (g draftGates) GateOf(_ context.Context, d draft.Draft) (gate.Gate, bool, error) {
 	got, ok := g[d.ID]
 	return got, ok, nil
@@ -346,5 +361,68 @@ func TestAQueuedDraftsMovedRevKeepsThePinnedApproval(t *testing.T) {
 		if o := last.Record.Outcome; o.Approved != c.approved || o.Draft.Rev != c.rev {
 			t.Fatalf("%s: outcome %+v, draft %+v", c.name, o, *o.Draft)
 		}
+	}
+}
+
+func doneOnDraft(rev int64) record.Record {
+	return record.Record{State: record.Done, Summary: "requested changes", Outcome: &record.Outcome{Verdict: "REQUEST_CHANGES", Draft: &record.DraftRef{ID: 42, Rev: rev}}}
+}
+
+// S1 live: a rule sends the draft before its turn records it; the record names a sent draft, and its url is
+// filled then. The other order is DraftSent's.
+func TestADoneRecordFillsTheURLOfAnAlreadySentDraft(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name          string
+		g             gate.Gate
+		sentFirst     bool
+		origin        int64
+		filled, endor bool
+	}{
+		{"a rule sent it before the record", draftGate("42", task.ActorWorkflow, "send", ""), true, 0, true, false},
+		{"the user approved it before the record", draftGate("42", task.ActorPerson, "", ""), true, 0, true, true},
+		{"the record came first", draftGate("42", task.ActorWorkflow, "send", ""), false, 0, true, false},
+		{"another turn's sent draft", draftGate("42", task.ActorPerson, "", ""), true, 99, false, false},
+	} {
+		s, store, _, _, rec := newService(t)
+		startedRound(t, s, "abc")
+		seq := bookOf(t, store, r7).Turns[0].Seq
+		d := sentDraft(42, seq)
+		d.Origin.Session = "proposer-of-another-turn"
+		if c.origin != 0 {
+			d.Origin.TurnSeq = c.origin
+		}
+		sd := storedDrafts{draftGates{42: c.g}, map[draft.ID]draft.Draft{}}
+		s.DraftGates, s.DraftVerdict = sd, eventVerdict
+		if c.sentFirst {
+			sd.drafts[42] = d
+			if err := s.DraftSent(ctx, d); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := s.RecordTurnEnd(ctx, turns.RecordRequest{Session: "term_1", Turn: "abc", Record: doneOnDraft(1)}); err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if !c.sentFirst {
+			sd.drafts[42] = d
+			for range 2 {
+				if err := s.DraftSent(ctx, d); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		b := bookOf(t, store, r7)
+		last, _ := b.LastRecord(seq)
+		o := last.Record.Outcome
+		if filled := o.URL == d.Evidence.Permalink; filled != c.filled {
+			t.Fatalf("%s: url %q, records %d", c.name, o.URL, len(b.Records))
+		}
+		if c.filled && (b.Endorsed(seq) == turn.EndorsedApproved) != c.endor {
+			t.Fatalf("%s: endorsed %q", c.name, b.Endorsed(seq))
+		}
+		if c.filled && (len(b.Records) != 2 || len(kinds(store.Events(), turns.KindTurnEnded)) != 2) {
+			t.Fatalf("%s: records %d, turn_ended %d", c.name, len(b.Records), len(kinds(store.Events(), turns.KindTurnEnded)))
+		}
+		_ = rec
 	}
 }

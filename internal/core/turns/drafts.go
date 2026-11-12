@@ -11,10 +11,13 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// DraftGates reads the gate a draft waited on and its content revisions, as outbox.Service does.
+// DraftGates reads a draft, the gate it waited on and its content revisions, as the outbox keeps them.
 type DraftGates interface {
+	// Draft is draft id; false when there is none.
+	Draft(ctx context.Context, id draft.ID) (draft.Draft, bool, error)
 	GateOf(ctx context.Context, d draft.Draft) (gate.Gate, bool, error)
 	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)
 }
@@ -40,7 +43,38 @@ func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 	if d.State != draft.Sent {
 		return nil
 	}
-	return s.settleDraft(ctx, d, func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
+	return s.settleDraft(ctx, d, s.sentEnd(ctx, d))
+}
+
+// DraftRecorded fills, when turn id on u has just recorded done with outcome.draft ref and no url, the url
+// of that draft if it is sent already, as DraftSent does when the send comes after the record: a rule may
+// release and post a draft before its turn records it. Only a draft of that turn, or of its session, on u
+// counts.
+func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref record.DraftRef) error {
+	if s.DraftGates == nil {
+		return nil
+	}
+	d, ok, err := s.DraftGates.Draft(ctx, draft.ID(ref.ID))
+	if err != nil || !ok || d.State != draft.Sent || d.Unit != u && d.Origin.Unit != u {
+		return err
+	}
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	t, ok := b.ByID(id)
+	if !ok || d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession ||
+		d.Origin.TurnSeq != t.Seq && (t.Session == "" || d.Origin.Session != t.Session) {
+		return nil
+	}
+	return s.settleTurn(ctx, u, t.Seq, s.sentEnd(ctx, d))
+}
+
+// sentEnd is the record a turn ends with once sent draft d is in it, as DraftSent describes.
+func (s *Service) sentEnd(ctx context.Context, d draft.Draft) func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
+	return func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
 		rec, ok := sentRecord(t, last, int64(d.ID))
 		if !ok {
 			return record.Record{}, false, nil
@@ -64,7 +98,7 @@ func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 		}
 		o.Approved = found && sent > 0 && UserApproved(g, d) && sent <= pinned
 		return rec, true, nil
-	})
+	}
 }
 
 // DraftEnded ends, when d failed or was dropped, the asked turn that waits on d because the user's answer
@@ -98,13 +132,20 @@ func (s *Service) settleDraft(ctx context.Context, d draft.Draft,
 	if u.IsZero() {
 		u = d.Unit
 	}
+	return s.settleTurn(ctx, u, d.Origin.TurnSeq, end)
+}
+
+// settleTurn records, for turn seq on u, the record end returns, unless it returns none or repeats the
+// turn's last record.
+func (s *Service) settleTurn(ctx context.Context, u unit.Unit, seq int64,
+	end func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error)) error {
 	s.mu.Lock()
 	b, err := s.book(ctx, u)
 	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
-	t, ok := bySeq(&b, d.Origin.TurnSeq)
+	t, ok := bySeq(&b, seq)
 	if !ok {
 		return nil
 	}
