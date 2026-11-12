@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/proposals"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -181,7 +182,7 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 	now := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
-	svc := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
+	svc := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(context.Background(), prop)
 	if err != nil {
 		t.Fatal(err)

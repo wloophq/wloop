@@ -9,12 +9,12 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -85,7 +85,7 @@ func TestDelegateOnAThreadTaskRunsActWithGuidanceAndMode(t *testing.T) {
 func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
-	r.s.deps.Outbox = &outbox.Service{Kinds: outboxtest.Shapes{}, Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
+	r.s.deps.Outbox = &outbox.Service{Kinds: bundledtest.Shapes{}, Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
 	r.put(t, unitTask("t-a", task.OriginDerived, actThread), unitTask("t-n", task.OriginUser))
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("t-a"), &v); code != 200 || v.Attention == nil {

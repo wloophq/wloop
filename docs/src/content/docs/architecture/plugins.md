@@ -125,19 +125,23 @@ schema   = "drafts/review/schema.json"
 preview  = "drafts/review/preview.md.tmpl"
 basis    = "agent"
 editable = ["text", "/event"]
+verdict  = "/event"
 [[source.draft_kinds.facts]]
 name    = "draft.github.review.event"
 pointer = "/event"
 ```
 
 - **Facts.** A fact's pointer must be required, a string and an `enum` in the schema, and the loader refuses anything else. Such a fact is trusted and read by rules as an allow-list.
-- **Posting.** The publisher posts a draft's payload verbatim and verifies it with `Verify` after a crash, by delivery. `Targeter` decides whether a target is inside the unit. A plugin that has a basis answers `Basis` with the live value, which propose and the publisher read.
-- **Session writes.** `[source.session] write_commands` lists the command prefixes that write to the source (GitHub's `gh api -X*`, `gh pr review`, `gh issue create`, `gh run rerun`); they are a policy denial and no sandbox (see [Security](/concepts/security/)); a session whose intent sets `[session] source_writes = false` is denied all of them, which is how review, address and nudge sessions write nothing.
+- **Payloads.** A payload is checked against its kind's schema at propose and at every revision, and one that holds an object key twice is refused: readers that keep the first value and readers that keep the last would show a person one value and post another.
+- **Verdicts.** A kind's `verdict` points at the required string enum its payload carries as the record verdict, such as a review's `/event`. The verdicts a turn's record may give are the enum values of the verdict fields of the draft kinds of the plugins its intent serves, so a third plugin's verdicts need no host edit; which of them end the work, and show the review done on the board, is the intent's `[record] concludes` in the profile.
+- **Card.** A draft's card reads its kind's payload schema from the loaded manifests, a discovered plugin's included.
+- **Posting.** The publisher posts a draft's payload verbatim and verifies it with `Verify` after a crash, by delivery. `Targeter` decides whether a target is inside the unit. A plugin with a kind whose `basis` is `agent` must serve `Drafter`, whose `Basis` answers the live value that propose and the publisher read; the host refuses to start one that does not, since every draft of that kind would read stale.
+- **Session writes.** `[source.session] write_commands` lists the command prefixes that write to the source (GitHub's `gh api -X*`, `gh pr review`, `gh issue create`, `gh run rerun`); they are a policy denial and no sandbox (see [Security](/concepts/security/)); a session whose intent sets `[session] source_writes = false` is denied all of them, which is how review, address and nudge sessions write nothing, and a `profile try` session is always denied them, with every git write.
 - **Previews.** A kind's `preview` template is a file of the plugin's profile layer, under `plugins/<id>/profile/drafts/<kind>/`.
 - **Tools.** A `[[source.tools]]` entry with `proposes = true` is a tool that proposes drafts (`github_draft`, `slack_draft`); the session policy allows it, and the core `draft_*` tools, without a prompt.
 - **Posting deliveries.** A delivery marked `posts` is one that posts a message, and its drafts wait for you unless a rule names the delivery.
 
-An archtest refuses, in the core, the domain and the agent adapter, any string literal equal to a name a bundled manifest declares.
+An archtest refuses, in the core, the domain, the agent adapters, the daemon, the command line, the web client, the API, its client and the transports: a string literal equal to a tool, a write command or a draft fact a bundled manifest declares; a draft kind or delivery a bundled manifest declares as a `draft.Kind` or `draft.Delivery` value, as a string literal compared with a string of one, or as two such literals in one list or map. A test that needs a conversation plugin's kinds without loading it reads `bundledtest.Shapes`, outside those trees.
 
 ## Plugin storage
 

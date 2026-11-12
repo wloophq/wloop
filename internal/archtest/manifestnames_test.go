@@ -97,6 +97,42 @@ func manifestNameHits(fset *token.FileSet, rel string, info *types.Info, f *ast.
 		return true
 	})
 	ast.Inspect(f, func(node ast.Node) bool {
+		switch x := node.(type) {
+		case *ast.BinaryExpr:
+			if x.Op == token.EQL || x.Op == token.NEQ {
+				for _, side := range [][2]ast.Expr{{x.X, x.Y}, {x.Y, x.X}} {
+					if v, ok := stringConst(info, side[0]); ok && slices.Contains(n.typed, v) && draftString(info, side[1]) {
+						hit(side[0], "compares a draft's kind or delivery with %q; it is its plugin manifest's", v)
+					}
+				}
+			}
+		case *ast.SwitchStmt:
+			if x.Tag != nil && draftString(info, x.Tag) {
+				for _, st := range x.Body.List {
+					for _, e := range st.(*ast.CaseClause).List {
+						if v, ok := stringConst(info, e); ok && slices.Contains(n.typed, v) {
+							hit(e, "compares a draft's kind or delivery with %q; it is its plugin manifest's", v)
+						}
+					}
+				}
+			}
+		case *ast.CompositeLit:
+			var named []string
+			for _, el := range x.Elts {
+				parts := []ast.Expr{el}
+				if kv, ok := el.(*ast.KeyValueExpr); ok {
+					parts = []ast.Expr{kv.Key, kv.Value}
+				}
+				for _, p := range parts {
+					if v, ok := stringConst(info, p); ok && slices.Contains(n.typed, v) && !slices.Contains(named, v) {
+						named = append(named, v)
+					}
+				}
+			}
+			if len(named) >= 2 {
+				hit(x, "lists the draft kinds or deliveries %q; they are their plugin manifests'", named)
+			}
+		}
 		e, ok := node.(ast.Expr)
 		if !ok {
 			return true
@@ -122,6 +158,30 @@ func manifestNameHits(fset *token.FileSet, rel string, info *types.Info, f *ast.
 		return true
 	})
 	return out
+}
+
+// stringConst is e's value when it is a string literal spelled in place, of any type.
+func stringConst(info *types.Info, e ast.Expr) (string, bool) {
+	if lit, ok := ast.Unparen(e).(*ast.BasicLit); !ok || lit.Kind != token.STRING {
+		return "", false
+	}
+	tv, ok := info.Types[e]
+	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
+		return "", false
+	}
+	return constant.StringVal(tv.Value), true
+}
+
+// draftString says whether e is string(x) of a draft.Kind or draft.Delivery x.
+func draftString(info *types.Info, e ast.Expr) bool {
+	call, ok := ast.Unparen(e).(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return false
+	}
+	if tv, ok := info.Types[call.Fun]; !ok || !tv.IsType() || tv.Type != types.Typ[types.String] {
+		return false
+	}
+	return namedDraftType(info, call.Args[0], "Kind") || namedDraftType(info, call.Args[0], "Delivery")
 }
 
 // draftListHits flags, in f, a use of a delivery constant of the draft package outside it, and a list of draft
@@ -170,15 +230,22 @@ func TestArchNoDeliveryList(t *testing.T) {
 	}
 }
 
-// TestArchNoManifestNamesInCore checks that the core, the domain and the agent adapters name no provider-owned
-// name a bundled plugin manifest declares: a tool, a write command or a draft fact (draft.<provider>.) in any
-// string, and a draft kind or delivery as a draft.Kind or draft.Delivery value.
+// manifestNameTrees are the trees that may not name what a plugin manifest declares: the core, the domain, the
+// daemon, its clients, its transports and the agent adapters.
+var manifestNameTrees = []string{"internal/core", "internal/domain", "internal/adapter/agent", "internal/daemon", "internal/cli", "internal/web",
+	"internal/api", "internal/transport", "internal/client"}
+
+// TestArchNoManifestNamesInCore checks that the core, the domain, the daemon, its clients, transports and API,
+// the command line and the agent adapters name no provider-owned name a bundled plugin manifest declares: a
+// tool, a write command or a draft fact (draft.<provider>.) in any string; a draft kind or delivery as a
+// draft.Kind or draft.Delivery value, and as a string literal compared with a string of one, or listed with
+// another such literal in one list or map.
 func TestArchNoManifestNamesInCore(t *testing.T) {
 	names := bundledManifestNames(t)
 	fset, files := typedFiles(t)
 	var hits []string
 	for _, tf := range files {
-		if !under(tf.rel, "internal/core", "internal/domain", "internal/adapter/agent") {
+		if !under(tf.rel, manifestNameTrees...) {
 			continue
 		}
 		hits = append(hits, manifestNameHits(fset, tf.rel, tf.info, tf.file, names)...)

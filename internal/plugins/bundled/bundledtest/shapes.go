@@ -1,4 +1,5 @@
-package outboxtest
+// Package bundledtest holds what tests read of the bundled plugins' vocabulary without loading them.
+package bundledtest
 
 import (
 	"cmp"
@@ -15,7 +16,7 @@ var shapes = map[string]string{
 	"react": "reaction", "comment": "comment", "edit": "edit", "delete": "delete",
 }
 
-// Shapes are the kinds a conversation plugin declares, for every provider: a reply, a nudge, a close and an
+// Shapes are the kinds the bundled conversation plugins declare, for every provider of a test outbox: a reply, a nudge, a close and an
 // ask_owner post a message, react a reaction, comment a comment, edit and delete change a message; a draft of
 // no kind is the kind its purpose names for its delivery, else a reply of a message, else its delivery's kind.
 type Shapes struct{}

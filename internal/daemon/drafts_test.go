@@ -25,13 +25,13 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 )
 
 var slackUnit = unit.Unit{Provider: "slack", Key: "C000AAA 1700000000.000100"}
@@ -142,7 +142,7 @@ func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock,
 		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
 	r.s.deps.Gates, r.s.deps.GateReader = svc, st
-	r.o = &outbox.Service{Kinds: outboxtest.Shapes{}, Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
+	r.o = &outbox.Service{Kinds: bundledtest.Shapes{}, Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
 		if p == unit.GitHub && !slices.Contains(off, p) {
 			return r.fx, nil
 		}

@@ -30,13 +30,21 @@ func TestArchNoManifestNamesInCoreFlagsAPlantedSlackDraft(t *testing.T) {
 	fset, f, info := plantedPkg(t, "m/internal/core/x", "package x\nvar tools = []string{\"slack_draft\"}\n")
 	flagged(t, "a planted tool name", manifestNameHits(fset, "internal/core/x/x.go", info, f, plantedNames), 1, `"slack_draft"`)
 
-	fset, f, info = plantedPkg(t, "m/internal/core/x", "package x\ntype T struct{ A string `slack_draft` }\nvar ok = []string{\"review\", \"message\", \"draft.slack.x\"}\n")
-	flagged(t, "a tag and core words", manifestNameHits(fset, "internal/core/x/x.go", info, f, plantedNames), 0, "")
+	fset, f, info = plantedPkg(t, "m/internal/core/x", "package x\ntype T struct{ A string `slack_draft` }\nvar ok = []string{\"review\", \"draft.slack.x\"}\nconst r = \"review\"\nconst c = \"message\"\nvar named = []string{r, c}\n")
+	flagged(t, "a tag, one core word and named constants", manifestNameHits(fset, "internal/core/x/x.go", info, f, plantedNames), 0, "")
+
+	fset, f, info = plantedPkg(t, "m/internal/core/x", "package x\nvar shapes = map[string]string{\"reply\": \"message\", \"review\": \"review\"}\nvar ks = []string{\"review\", \"message\"}\n")
+	flagged(t, "kinds and deliveries listed as strings", manifestNameHits(fset, "internal/core/x/x.go", info, f, plantedNames), 2, "lists the draft kinds or deliveries")
 
 	fset, f, info = plantedPkg(t, "m/internal/core/x", "package x\nvar a, b = \"gh pr review\", \"draft.github.review.event\"\n")
 	flagged(t, "a write command and a draft fact", manifestNameHits(fset, "internal/core/x/x.go", info, f, plantedNames), 2, "its plugin manifest declares")
 
-	src := "package draft\ntype Kind string\ntype Delivery string\nconst Review Kind = \"review\"\nvar d = Delivery(\"message\")\nvar k Kind = \"nudge\"\nvar s = string(Review)\n"
+	src := "package draft\ntype Kind string\ntype Delivery string\ntype Draft struct{ Kind Kind; Delivery Delivery }\n" +
+		"func f(d Draft) bool {\n\tswitch string(d.Delivery) {\n\tcase \"message\":\n\t\treturn true\n\t}\n\treturn string(d.Kind) == \"review\" || \"review\" != string(d.Kind)\n}\n"
+	fset, f, info = plantedPkg(t, draftPkg, src)
+	flagged(t, "a string of a kind compared with a kind's name", manifestNameHits(fset, "internal/daemon/x.go", info, f, plantedNames), 3, "compares a draft's kind or delivery")
+
+	src = "package draft\ntype Kind string\ntype Delivery string\nconst Review Kind = \"review\"\nvar d = Delivery(\"message\")\nvar k Kind = \"nudge\"\nvar s = string(Review)\n"
 	fset, f, info = plantedPkg(t, draftPkg, src)
 	flagged(t, "typed kinds and deliveries", manifestNameHits(fset, "internal/domain/draft/x.go", info, f, plantedNames), 3, "draft kind or delivery")
 }
