@@ -371,7 +371,10 @@ CREATE TABLE gates (
   -- the session whose turn produced the subject, which never resolves the gate; the session an agent resolved it through
   session TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT '',
   -- what the gate asks, as its opener worded it; '' reads its declaration's label
-  text TEXT NOT NULL DEFAULT ''
+  text TEXT NOT NULL DEFAULT '',
+  -- a draft gate's: the rev of its draft it approves, the only one posted; the sessions, a JSON list, that
+  -- proposed or revised its draft, none of which resolves it
+  approved_rev INTEGER NOT NULL DEFAULT 0, sessions TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);
@@ -447,13 +450,40 @@ CREATE TABLE drafts (
   -- why it was proposed, in the user's language when it was; the locale its text is written in
   why TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT '',
   -- a thread reply's: 'on' or 'off' for also posting it to its conversation; '' when it replies in no thread
-  broadcast TEXT NOT NULL DEFAULT ''
+  broadcast TEXT NOT NULL DEFAULT '',
+  -- what its kind's schema shapes beside text, as JSON, '' for none; what its proposer read the unit at;
+  -- 1 keeps it waiting for a person whatever its rules say
+  payload TEXT NOT NULL DEFAULT '', basis TEXT NOT NULL DEFAULT '', hold INTEGER NOT NULL DEFAULT 0,
+  -- who wrote its current content: person, session, rule or window, and the session of a session's
+  by_kind TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
 CREATE INDEX drafts_task ON drafts (task, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
 CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
+
+-- Each version of a draft's content, at the draft's rev that wrote it, the first at rev 1, and who wrote it.
+CREATE TABLE draft_revisions (
+  draft_id INTEGER NOT NULL REFERENCES drafts (id) ON DELETE CASCADE,
+  rev INTEGER NOT NULL,
+  text TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', basis TEXT NOT NULL DEFAULT '',
+  by_kind TEXT NOT NULL, by_session TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL,
+  PRIMARY KEY (draft_id, rev)
+) WITHOUT ROWID;
+
+-- A rev that moves with everything posted unchanged (a state, a task) moves the rev its draft's waiting or
+-- approved gate approves along: approval is of what is posted, and a change to any of it leaves the gate behind.
+CREATE TRIGGER drafts_rev_keeps_approval AFTER UPDATE OF rev ON drafts
+WHEN NEW.rev != OLD.rev AND NEW.text = OLD.text AND NEW.payload = OLD.payload AND NEW.basis = OLD.basis
+AND NEW.target = OLD.target AND NEW.reaction = OLD.reaction AND NEW.broadcast = OLD.broadcast AND NEW.delivery = OLD.delivery
+AND NEW.kind = OLD.kind AND NEW.provider = OLD.provider AND NEW.unit_key = OLD.unit_key
+BEGIN
+  UPDATE gates SET approved_rev = NEW.rev
+  WHERE provider = NEW.provider AND unit_key = NEW.unit_key AND kind = 'draft'
+  AND subject = CAST(NEW.id AS TEXT) AND status IN ('open', 'approved') AND approved_rev = OLD.rev;
+END;
 
 -- a workflow the user stopped on one unit, until they undo it
 CREATE TABLE workflow_skips (

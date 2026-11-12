@@ -24,15 +24,20 @@ var _ outbox.Store = draftStore{}
 func (db *DB) Drafts() outbox.Store { return draftStore{db} }
 
 const (
-	draftFields = `provider, unit_key, items, task, kind, target, text, reaction, original, edited,
+	draftContentFields = `provider, unit_key, items, task, kind, target, text, reaction, original, edited,
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced,
-	origin_session, why, language, broadcast`
+	origin_session, why, language, broadcast, payload, basis, hold`
+	draftFields        = draftContentFields + `, by_kind, by_session`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+	// updateDraft's author is the stored one while the content stays, and once it changes the one given, a
+	// person when none is; the expressions read the row as it was.
+	updateDraft = `UPDATE drafts SET (` + draftContentFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1),
+	by_kind = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_kind WHEN ? != '' THEN ? ELSE ? END,
+	by_session = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_session WHEN ? != '' THEN ? ELSE '' END
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -63,7 +68,8 @@ func draftArgs(d draft.Draft) []any {
 		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(d.State),
 		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason,
 		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects),
-		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session, d.Why, d.Language, string(d.Broadcast)}
+		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced, o.Session, d.Why, d.Language, string(d.Broadcast),
+		string(d.Payload), d.Basis, d.Hold, string(d.By.Kind), d.By.Session}
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
@@ -83,16 +89,20 @@ func shaped(d draft.Draft) draft.Draft {
 func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
 	var provider, list, kind, originKind, state, delivery, effects, originProvider string
-	var evAt, created, updated, sending, applied, broadcast string
+	var evAt, created, updated, sending, applied, broadcast, payload, by string
 	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Task, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason,
 		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced,
-		&d.Origin.Session, &d.Why, &d.Language, &broadcast); err != nil {
+		&d.Origin.Session, &d.Why, &d.Language, &broadcast, &payload, &d.Basis, &d.Hold, &by, &d.By.Session); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)
 	d.Delivery, d.Origin.Unit.Provider, d.Broadcast = draft.Delivery(delivery), unit.ProviderID(originProvider), draft.Broadcast(broadcast)
+	if payload != "" {
+		d.Payload = json.RawMessage(payload)
+	}
+	d.By.Kind = draft.ActorKind(by)
 	if err := json.Unmarshal([]byte(list), &d.Items); err != nil {
 		return draft.Draft{}, fmt.Errorf("the items of draft %d: %w", d.ID, err)
 	}
@@ -123,10 +133,16 @@ func normal(d draft.Draft) draft.Draft {
 	if d.Items == nil {
 		d.Items = []string{}
 	}
+	if len(d.Payload) == 0 {
+		d.Payload = nil
+	}
 	return d
 }
 
 func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
+	if d.By.Kind == "" {
+		d.By = proposer(d.Origin)
+	}
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		res, err := tx.ExecContext(ctx, insertDraft, draftArgs(d)...)
 		if err != nil {
@@ -136,7 +152,10 @@ func (s draftStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, err
 		if err != nil {
 			return err
 		}
-		d.ID, d.Rev = draft.ID(id), 0
+		d.ID, d.Rev = draft.ID(id), 1
+		if _, err := tx.ExecContext(ctx, insertRevision, revisionArgs(d, d.CreatedAt)...); err != nil {
+			return err
+		}
 		tx.Touch(port.TopicDrafts, d.Unit)
 		return touchDraftTask(ctx, tx, d.Task)
 	})
@@ -245,9 +264,19 @@ func (s draftStore) SettledAt(ctx context.Context, workflow string) (map[unit.Un
 	return out, rows.Err()
 }
 
+// updateArgs are updateDraft's arguments for writing d over the stored row at d's rev in state from.
+func updateArgs(d draft.Draft, from draft.State) []any {
+	args := draftArgs(d)
+	args = args[:len(args)-2]
+	kind, text, payload := string(d.By.Kind), d.Text, string(d.Payload)
+	args = append(args, text, payload, d.Basis, kind, kind, string(draft.ActorPerson),
+		text, payload, d.Basis, kind, d.By.Session)
+	return append(args, int64(d.ID), string(from), d.Rev)
+}
+
 func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
-		res, err := tx.ExecContext(ctx, updateDraft, append(draftArgs(d), int64(d.ID), string(from), d.Rev)...)
+		res, err := tx.ExecContext(ctx, updateDraft, updateArgs(d, from)...)
 		if err != nil {
 			return err
 		}
@@ -255,6 +284,19 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 			if err != nil {
 				return err
 			}
+			next := d
+			next.Rev++
+			if next.By.Kind == "" {
+				next.By = draft.Actor{Kind: draft.ActorPerson}
+			}
+			if _, err := tx.ExecContext(ctx, insertChangedRevision, revisionArgs(next, d.UpdatedAt)...); err != nil {
+				return err
+			}
+			var by string
+			if err := tx.QueryRowContext(ctx, `SELECT by_kind, by_session FROM drafts WHERE id = ?`, int64(d.ID)).Scan(&by, &d.By.Session); err != nil {
+				return err
+			}
+			d.By.Kind = draft.ActorKind(by)
 			tx.Touch(port.TopicDrafts, d.Unit)
 			if pendingDraft(from) == pendingDraft(d.State) {
 				return nil
@@ -278,6 +320,64 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 	return normal(d), nil
 }
 
+const (
+	insertRevision = `INSERT INTO draft_revisions (draft_id, rev, text, payload, basis, by_kind, by_session, at)
+	VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+	// insertChangedRevision writes a revision only when its content is not the newest stored one's.
+	insertChangedRevision = `INSERT INTO draft_revisions (draft_id, rev, text, payload, basis, by_kind, by_session, at)
+	SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8 WHERE NOT EXISTS (SELECT 1 FROM draft_revisions r
+		WHERE r.draft_id = ?1 AND r.text = ?3 AND r.payload = ?4 AND r.basis = ?5
+		AND r.rev = (SELECT max(rev) FROM draft_revisions WHERE draft_id = ?1))`
+	selectRevisions = `SELECT rev, text, payload, basis, by_kind, by_session, at FROM draft_revisions WHERE draft_id = ? ORDER BY rev`
+)
+
+func revisionArgs(d draft.Draft, at time.Time) []any {
+	return []any{int64(d.ID), d.Rev, d.Text, string(d.Payload), d.Basis, string(d.By.Kind), d.By.Session, draftTime(at)}
+}
+
+// proposer is who proposed a draft of o, for an Insert whose draft names no author.
+func proposer(o draft.Origin) draft.Actor {
+	switch {
+	case o.Session != "" || o.Kind == draft.OriginTurn || o.Kind == draft.OriginSession:
+		return draft.Actor{Kind: draft.ActorSession, Session: o.Session}
+	case o.Kind == draft.OriginAuto:
+		return draft.Actor{Kind: draft.ActorRule}
+	}
+	return draft.Actor{Kind: draft.ActorPerson}
+}
+
 func (s draftStore) Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error) {
-	panic("not implemented: T2")
+	var out []draft.Revision
+	err := s.db.Read(ctx, func(tx *sql.Tx) error {
+		var one int
+		switch err := tx.QueryRowContext(ctx, `SELECT 1 FROM drafts WHERE id = ?`, int64(id)).Scan(&one); {
+		case errors.Is(err, sql.ErrNoRows):
+			return fmt.Errorf("draft %d: %w", id, outbox.ErrNotFound)
+		case err != nil:
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, selectRevisions, int64(id))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		out = []draft.Revision{}
+		for rows.Next() {
+			var r draft.Revision
+			var payload, by, at string
+			if err := rows.Scan(&r.Rev, &r.Text, &payload, &r.Basis, &by, &r.By.Session, &at); err != nil {
+				return err
+			}
+			if payload != "" {
+				r.Payload = json.RawMessage(payload)
+			}
+			r.By.Kind = draft.ActorKind(by)
+			if r.At, err = parseDraftTime(at); err != nil {
+				return fmt.Errorf("the time of rev %d of draft %d: %w", r.Rev, id, err)
+			}
+			out = append(out, r)
+		}
+		return rows.Err()
+	})
+	return out, err
 }

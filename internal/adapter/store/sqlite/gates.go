@@ -34,7 +34,7 @@ var (
 func (db *DB) Gates(now func() time.Time) GateStore { return GateStore{db, now} }
 
 const gateColumns = `id, task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer,
-	by_actor, rule, deadline, default_intent, opened_at, closed_at, session, by_session, text`
+	by_actor, rule, deadline, default_intent, opened_at, closed_at, session, by_session, text, approved_rev, sessions`
 
 const (
 	gateOfIDSQL       = `SELECT ` + gateColumns + ` FROM gates WHERE id = ?`
@@ -75,7 +75,8 @@ func gatesWhereSQL(q gates.Query) (string, []any) {
 }
 
 const insertGateSQL = `INSERT INTO gates (task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer,
-	by_actor, rule, deadline, default_intent, opened_at, closed_at, session, by_session, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	by_actor, rule, deadline, default_intent, opened_at, closed_at, session, by_session, text, approved_rev, sessions)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 // Open stores g as open with a new ID and OpenedAt.
 func (s GateStore) Open(ctx context.Context, g gate.Gate) (gate.Gate, error) {
@@ -168,13 +169,17 @@ func insertGate(ctx context.Context, tx *sql.Tx, g gate.Gate) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	sessions, err := json.Marshal(nonNil(g.Sessions))
+	if err != nil {
+		return 0, err
+	}
 	var taskID any
 	if g.Task != "" {
 		taskID = string(g.Task)
 	}
 	res, err := tx.ExecContext(ctx, insertGateSQL, taskID, string(g.Unit.Provider), g.Unit.Key, string(g.Kind), g.Name, g.Subject,
 		string(g.Status), string(intents), g.Intent, g.Answer, string(g.By), g.Rule, eventTime(g.Deadline), g.Default,
-		eventTime(g.OpenedAt), eventTime(g.ClosedAt), g.Session, g.BySession, g.Text)
+		eventTime(g.OpenedAt), eventTime(g.ClosedAt), g.Session, g.BySession, g.Text, g.ApprovedRev, string(sessions))
 	if err != nil {
 		return 0, fmt.Errorf("a %s gate on %q: %w", g.Kind, g.Subject, err)
 	}
@@ -278,14 +283,17 @@ func (s GateStore) list(ctx context.Context, query string, args ...any) ([]gate.
 func scanGate(row interface{ Scan(...any) error }) (gate.Gate, error) {
 	var g gate.Gate
 	var taskID sql.NullString
-	var provider, kind, status, intents, by, deadline, opened, closed string
+	var provider, kind, status, intents, by, deadline, opened, closed, sessions string
 	if err := row.Scan(&g.ID, &taskID, &provider, &g.Unit.Key, &kind, &g.Name, &g.Subject, &status, &intents, &g.Intent, &g.Answer,
-		&by, &g.Rule, &deadline, &g.Default, &opened, &closed, &g.Session, &g.BySession, &g.Text); err != nil {
+		&by, &g.Rule, &deadline, &g.Default, &opened, &closed, &g.Session, &g.BySession, &g.Text, &g.ApprovedRev, &sessions); err != nil {
 		return gate.Gate{}, err
 	}
 	g.Task, g.Unit.Provider, g.Kind, g.Status, g.By = task.ID(taskID.String), unit.ProviderID(provider), gate.Kind(kind), gate.Status(status), task.Actor(by)
 	if err := json.Unmarshal([]byte(intents), &g.Intents); err != nil {
 		return gate.Gate{}, fmt.Errorf("the intents of gate %d: %w", g.ID, err)
+	}
+	if err := json.Unmarshal([]byte(sessions), &g.Sessions); err != nil {
+		return gate.Gate{}, fmt.Errorf("the sessions of gate %d: %w", g.ID, err)
 	}
 	for _, t := range []struct {
 		dst  *time.Time
