@@ -102,6 +102,7 @@ type draftHost struct {
 	session  src.Session
 	opened   []src.GateRequest
 	state    string
+	rev      int64
 	sessions []string
 }
 
@@ -116,7 +117,11 @@ func (h *draftHost) OpenGate(_ context.Context, req src.GateRequest) (src.GateRe
 	h.gmu.Lock()
 	defer h.gmu.Unlock()
 	h.opened = append(h.opened, req)
-	return src.GateRef{Gate: "draft", Draft: int64(41 + len(h.opened)), State: cmpOr(h.state, "held")}, nil
+	rev := h.rev
+	if rev == 0 {
+		rev = 1
+	}
+	return src.GateRef{Gate: "draft", Draft: int64(41 + len(h.opened)), State: cmpOr(h.state, "held"), Rev: rev}, nil
 }
 
 func cmpOr(a, b string) string {
@@ -223,9 +228,10 @@ func TestGithubDraftProposes(t *testing.T) {
 	args["why"] = "The retry loop never backs off."
 	args["effects"] = []string{EffectReviewed}
 	raw, _ := json.Marshal(args)
+	h.rev = 3
 	name, f := callDraft(t, p, "s1", string(raw))
-	if name != "proposed" || f["ID"] != float64(42) || f["Rev"] != float64(1) || f["Unit"] != "acme/api#7" {
-		t.Fatalf("answered %s %v", name, f)
+	if name != "proposed" || f["ID"] != float64(42) || f["Rev"] != float64(3) || f["Unit"] != "acme/api#7" {
+		t.Fatalf("answered %s %v, want the rev the host stored", name, f)
 	}
 	got := h.gates()
 	if len(got) != 1 || got[0].Session != "s1" {

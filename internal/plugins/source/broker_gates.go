@@ -125,7 +125,7 @@ func (g gates) open(ctx context.Context, p outbox.Proposal, session string) (src
 	if err != nil {
 		return src.GateRef{}, err
 	}
-	return src.GateRef{Gate: "draft", Draft: int64(d.ID), State: string(d.State)}, nil
+	return src.GateRef{Gate: "draft", Draft: int64(d.ID), State: string(d.State), Rev: d.Rev}, nil
 }
 
 // liveSession refuses a session the host does not know or that has closed.

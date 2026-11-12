@@ -248,6 +248,8 @@ type GateRef struct {
 	// State is the draft's state once the host's approval policy saw it:
 	// "proposed", "approved", or "discarded" under dry run.
 	State string
+	// Rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
+	Rev int64
 }
 
 // Event is an event on a unit, for the timelines of its tasks.

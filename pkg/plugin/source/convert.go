@@ -532,10 +532,10 @@ func workspaceGo(w *pb.Workspace) Workspace {
 }
 
 func gateRefGo(g *pb.GateRef) GateRef {
-	return GateRef{Gate: g.GetGate(), Draft: g.GetDraft(), State: g.GetState()}
+	return GateRef{Gate: g.GetGate(), Draft: g.GetDraft(), State: g.GetState(), Rev: g.GetRev()}
 }
 func gateRefPB(g GateRef) *pb.GateRef {
-	return &pb.GateRef{Gate: g.Gate, Draft: g.Draft, State: g.State}
+	return &pb.GateRef{Gate: g.Gate, Draft: g.Draft, State: g.State, Rev: g.Rev}
 }
 
 func callPB(c Call) *pb.Call {
