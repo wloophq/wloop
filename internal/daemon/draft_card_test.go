@@ -336,7 +336,7 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 	}
 	review := reviewDraftOf(draft.Held)
 	for p, ok := range map[string]bool{
-		`{"event":"COMMENT","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`: true,
+		`{"event":"COMMENT","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`:         true,
 		`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":43,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`: false,
 		`{"event":"REQUEST_CHANGES","comments":[]}`: false,
 		`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}],"draft":true}`: false,
