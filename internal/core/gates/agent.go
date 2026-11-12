@@ -71,6 +71,9 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	if q.Status != gate.Open {
 		return s.answered(q, d, r)
 	}
+	if err := s.answers(ctx, q, r); err != nil {
+		return err
+	}
 	if d.Status == gate.Open {
 		if err := s.approveDraft(ctx, d, r); err != nil {
 			return err
@@ -86,6 +89,27 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 		return err
 	}
 	return s.answered(q, d, r)
+}
+
+// answers refuses r unless it answers open question q: an intent q offers whose status is answered and
+// that takes the answer r carries, from a resolver q accepts. It runs before the draft is approved, so a
+// resolution the question would refuse approves nothing.
+func (s *Service) answers(ctx context.Context, q gate.Gate, r Resolution) error {
+	def, err := s.def(q)
+	if err != nil {
+		return err
+	}
+	in, err := withStatus(q, def, r)
+	if err != nil {
+		return err
+	}
+	if in.Status != gate.Answered || r.Answer == "" {
+		return fmt.Errorf("%w: intent %q of gate %d does not answer it, so it picks no option", ErrRefused, r.Intent, q.ID)
+	}
+	if r.By == task.ActorAgent {
+		return s.vouch(ctx, q, r.Session)
+	}
+	return nil
 }
 
 // answered refuses question q, resolved, unless r resolved it and its draft gate d is approved: the

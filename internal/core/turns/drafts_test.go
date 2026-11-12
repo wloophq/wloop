@@ -25,6 +25,26 @@ func (g draftGates) GateOf(_ context.Context, d draft.Draft) (gate.Gate, bool, e
 	return got, ok, nil
 }
 
+// Revisions are one content revision per rev the draft's gate approved, as when every write changed content.
+func (g draftGates) Revisions(_ context.Context, id draft.ID) ([]draft.Revision, error) {
+	out := []draft.Revision{{Rev: 1}}
+	for rev := int64(2); rev <= g[id].ApprovedRev; rev++ {
+		out = append(out, draft.Revision{Rev: rev})
+	}
+	return out, nil
+}
+
+// movedGates are draftGates whose drafts' revs moved on writes that changed no content, such as queueing:
+// their content revisions are revs.
+type movedGates struct {
+	draftGates
+	revs []draft.Revision
+}
+
+func (m movedGates) Revisions(context.Context, draft.ID) ([]draft.Revision, error) {
+	return m.revs, nil
+}
+
 func optionsAsked() record.Record {
 	return record.Record{State: record.Asked, Summary: "Approve, or comment?", Resume: "r",
 		Outcome: &record.Outcome{Verdict: "APPROVE", NonBlocking: 2},
@@ -293,5 +313,38 @@ func TestADraftThatOnlyPointsKeepsItsQuestion(t *testing.T) {
 	}
 	if b := bookOf(t, store, r7); b.Turns[0].State != turn.Asked || len(b.Records) != 1 {
 		t.Fatalf("an unanswered question ended: %+v", b.Turns[0])
+	}
+}
+
+func TestAQueuedDraftsMovedRevKeepsThePinnedApproval(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name     string
+		revs     []int64
+		approved bool
+		rev      int64
+	}{
+		{"no content written since the pin", []int64{1}, true, 1},
+		{"content written after the pin", []int64{1, 4}, false, 4},
+	} {
+		s, store, _, _, _ := newService(t)
+		g := draftGate("42", task.ActorPerson, "", "")
+		g.ApprovedRev = 6
+		var revs []draft.Revision
+		for _, r := range c.revs {
+			revs = append(revs, draft.Revision{Rev: r})
+		}
+		s.DraftGates, s.DraftVerdict = movedGates{draftGates{42: g}, revs}, eventVerdict
+		seq := store.Put(askedBook()).Turns[0].Seq
+		d := sentDraft(42, seq)
+		d.Rev = 6
+		if err := s.DraftSent(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+		b := bookOf(t, store, r7)
+		last, _ := b.LastRecord(seq)
+		if o := last.Record.Outcome; o.Approved != c.approved || o.Draft.Rev != c.rev {
+			t.Fatalf("%s: outcome %+v, draft %+v", c.name, o, *o.Draft)
+		}
 	}
 }

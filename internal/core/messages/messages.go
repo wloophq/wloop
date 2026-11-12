@@ -802,7 +802,7 @@ func (s *Service) Deliver(ctx context.Context, g gate.Gate) error {
 	if err != nil {
 		return err
 	}
-	approves, err := s.approveOption(ctx, g, m, a)
+	approves, err := s.approvedOption(ctx, g, m, a)
 	if err != nil {
 		return err
 	}

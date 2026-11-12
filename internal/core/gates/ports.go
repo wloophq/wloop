@@ -62,6 +62,12 @@ type Sessions interface {
 	UserDriven(ctx context.Context, id string) (bool, error)
 }
 
+// Options name the draft an answer to a question approves: the open draft gate and the rev the option the
+// answer picks pinned, in the question its person saw; false for an answer that approves none.
+type Options interface {
+	OptionDraft(ctx context.Context, question gate.Gate, r Resolution) (drafted gate.Gate, rev int64, ok bool, err error)
+}
+
 // Query narrows Where: a zero field matches every gate, but Statuses, which
 // matches the open gates when empty.
 type Query struct {
