@@ -90,6 +90,19 @@ func TestASessionsGateTakesItsOriginTaskAndItemsFromTheHostsBook(t *testing.T) {
 	}
 }
 
+func TestASessionsGateCarriesTheDraftsWhyPayloadBasisAndHold(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi", Why: "the loop never backs off",
+		Payload: []byte(`{"event":"COMMENT"}`), Basis: "h1", Hold: true}
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: d, Session: "live"}); err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.proposed[0]; p.Why != d.Why || string(p.Payload) != string(d.Payload) || p.Basis != "h1" || !p.Hold {
+		t.Fatalf("proposed %+v", p)
+	}
+}
+
 func TestTheGatesRefuseWhatThePluginCannotGrantItself(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

@@ -435,6 +435,8 @@ message Draft {
   string basis = 18;
   // hold keeps the draft waiting for a person whatever the approval rules say.
   bool hold = 19;
+  // why is why the proposer proposes the draft, for the person approving it.
+  string why = 20;
 }
 
 message Placement {

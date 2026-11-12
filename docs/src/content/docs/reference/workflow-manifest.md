@@ -115,7 +115,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs, one of the intent's runners; by default its first. |
 | `turn.start` | `open_question` | one of `hold`, `replace_if_moved` | `hold` | What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
-| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment`, `edit`, `review`, `reply`, `resolve`, `delete`, `unreaction` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
+| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment`, `edit`, `review`, `reply`, `resolve`, `request_review`, `delete`, `unreaction` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
 | `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation. |
 | `draft.propose` | `why` | file | `why.md.tmpl` | The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why. |
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |

@@ -212,6 +212,9 @@ var (
 	// failed in transport before the other side answered, which may have
 	// acted on it.
 	ErrNoAnswer = errors.New("no answer")
+	// ErrStale: a Publish refused a draft, posting nothing, because the
+	// unit moved past the basis the draft was written against.
+	ErrStale = errors.New("stale")
 )
 
 // Priority orders who may spend a rate-limited budget when it runs low.

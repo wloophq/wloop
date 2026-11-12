@@ -52,6 +52,8 @@ func (p posting) Publish(ctx context.Context, d src.Draft) (src.Evidence, error)
 		return src.Evidence{}, fmt.Errorf("%w on t1: HTTP 502", src.ErrMayHavePosted)
 	case "refused":
 		return src.Evidence{}, errors.New("commenting on t1: HTTP 422")
+	case "stale":
+		return src.Evidence{}, fmt.Errorf("%w: the head moved", src.ErrStale)
 	}
 	close(p.started)
 	<-ctx.Done()
@@ -125,6 +127,9 @@ func TestAPublishThatMayHavePostedAsksAConfirmBeforeARetry(t *testing.T) {
 		if err == nil || strings.HasPrefix(err.Error(), "may have been posted") != may {
 			t.Fatalf("%s: %v", text, err)
 		}
+	}
+	if _, err := pub.Publish(ctx, draft.Draft{Unit: own, Text: "stale"}); !errors.Is(err, outbox.ErrStale) || strings.HasPrefix(err.Error(), "may have been posted") {
+		t.Fatalf("a stale refusal: %v", err)
 	}
 	hctx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)

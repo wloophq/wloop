@@ -470,6 +470,7 @@
                     "review",
                     "reply",
                     "resolve",
+                    "request_review",
                     "delete",
                     "unreaction"
                   ],

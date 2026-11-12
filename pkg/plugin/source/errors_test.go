@@ -40,6 +40,13 @@ func (p publishing) Publish(ctx context.Context, d source.Draft) (source.Evidenc
 		return source.Evidence{}, errors.New("commenting on acme/api#12: HTTP 422")
 	case "unavailable":
 		return source.Evidence{}, fmt.Errorf("budget low: %w", source.ErrUnavailable)
+	case "stale":
+		return source.Evidence{}, fmt.Errorf("%w: the head moved", source.ErrStale)
+	case "why":
+		if d.Why != "the retry loop never backs off" || d.Basis != "h1" || !d.Hold || string(d.Payload) != `{"event":"COMMENT"}` {
+			return source.Evidence{}, fmt.Errorf("received %+v", d)
+		}
+		return source.Evidence{Ref: "1"}, nil
 	}
 	close(p.started)
 	<-ctx.Done()
@@ -59,6 +66,13 @@ func TestAPublishThatMayHavePostedSaysSoAcrossTheWire(t *testing.T) {
 		if _, err := c.Publish(ctx, source.Draft{Unit: pr, Text: text}); err == nil || errors.Is(err, source.ErrMayHavePosted) || errors.Is(err, source.ErrNoAnswer) {
 			t.Fatalf("%s: %v", text, err)
 		}
+	}
+	if _, err := c.Publish(ctx, source.Draft{Unit: pr, Text: "stale"}); !errors.Is(err, source.ErrStale) || errors.Is(err, source.ErrMayHavePosted) {
+		t.Fatalf("stale: %v", err)
+	}
+	if _, err := c.Publish(ctx, source.Draft{Unit: pr, Text: "why", Why: "the retry loop never backs off", Basis: "h1", Hold: true,
+		Payload: []byte(`{"event":"COMMENT"}`)}); err != nil {
+		t.Fatalf("a draft's why, basis, hold and payload across the wire: %v", err)
 	}
 	hctx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
