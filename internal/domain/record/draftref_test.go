@@ -14,11 +14,11 @@ func TestPublishesStillDecodes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !r.Question.Options[0].Publishes || r.Question.Options[0].Draft != nil || !r.Question.Endorses("publish", false) {
+	if !r.Question.Options[0].Publishes || r.Question.Options[0].Draft != nil {
 		t.Fatalf("old record: %+v", r.Question.Options)
 	}
 	confirm := `{"state":"asked","summary":"s","resume":"r","question":{"kind":"confirm","text":"q","publishes":true}}`
-	if r, err = Parse([]byte(confirm)); err != nil || !r.Question.Endorses("", true) {
+	if r, err = Parse([]byte(confirm)); err != nil || !r.Question.Publishes {
 		t.Fatalf("old confirm: %+v %v", r.Question, err)
 	}
 	pinned := `{"state":"asked","summary":"s","resume":"r","question":{"kind":"choice","text":"q","options":[` +
@@ -26,8 +26,8 @@ func TestPublishesStillDecodes(t *testing.T) {
 	if r, err = Parse([]byte(pinned)); err != nil {
 		t.Fatal(err)
 	}
-	if d := r.Question.Options[1].Draft; d == nil || *d != (DraftRef{ID: 43, Rev: 2}) || r.Question.Endorses("approve", false) {
-		t.Fatalf("a draft option is no endorsement by itself: %+v", r.Question.Options)
+	if d := r.Question.Options[1].Draft; d == nil || *d != (DraftRef{ID: 43, Rev: 2}) {
+		t.Fatalf("%+v", r.Question.Options)
 	}
 	if err := r.ValidateShape(); err != nil {
 		t.Fatal(err)

@@ -28,18 +28,20 @@ type OptionDrafts interface {
 	WithdrawHeld(ctx context.Context, id int64, reason string) error
 }
 
-// approveOption approves the draft the option a picks on question message m points to, when g, m's gate,
-// was resolved by the user, and withdraws the drafts the other options point to; it says whether it did,
-// so the answer ends the turn on the draft's send instead of resuming it. The draft must be held by m's
-// turn on m's unit at the option's rev, and the resolver must be neither a session that proposed or
-// revised it nor the turn's; else the pick resumes the turn as any answer does. A call made again after
-// the approval completes what is left.
+// approveOption approves the draft the option a picks on question message m points to, or a confirm's
+// draft its yes points to, when g, m's gate, was resolved by the user, and withdraws the drafts the other
+// options point to; it says whether it did, so the answer ends the turn on the draft's send instead of
+// resuming it. The draft must be held by m's turn on m's unit at the rev the question pinned, and the
+// resolver must be neither a session that proposed or revised it nor the turn's; else the pick resumes the
+// turn as any answer does. A call made again after the approval completes what is left.
 func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {
-	i := slices.IndexFunc(m.Options, func(o record.Option) bool { return o.ID == a.OptionID })
-	if s.Drafts == nil || m.Kind != message.Question || a.OptionID == "" || i < 0 || m.Options[i].Draft == nil {
+	if s.Drafts == nil || m.Kind != message.Question {
 		return false, nil
 	}
-	ref := *m.Options[i].Draft
+	ref, ok, err := s.pickedDraft(ctx, m, a)
+	if err != nil || !ok {
+		return false, err
+	}
 	if g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
 		return false, nil
 	}
@@ -52,6 +54,9 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 		return false, nil
 	}
 	switch {
+	case dg.Status == gate.Open && d.State == draft.Held && (ref.Rev != int64(d.Rev) || ref.Rev != dg.ApprovedRev):
+		s.logf("messages: draft %d is at rev %d, not the rev %d its question pinned; the turn resumes", ref.ID, d.Rev, ref.Rev)
+		return false, nil
 	case dg.Status == gate.Open && d.State == draft.Held:
 		r := gates.Resolution{Status: g.Status, Intent: g.Intent, Answer: g.Answer, By: g.By, Rule: g.Rule, Session: g.BySession}
 		err := s.Drafts.ApproveOption(ctx, g, r, dg, ref.Rev)
@@ -78,6 +83,31 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 		}
 	}
 	return true, nil
+}
+
+// pickedDraft is the draft a points to on m: its option's, or the confirm's on a yes, which the turn's
+// asked record holds since a message keeps no confirm draft.
+func (s *Service) pickedDraft(ctx context.Context, m message.Message, a Answer) (record.DraftRef, bool, error) {
+	if !m.Confirm {
+		i := slices.IndexFunc(m.Options, func(o record.Option) bool { return o.ID == a.OptionID })
+		if a.OptionID == "" || i < 0 || m.Options[i].Draft == nil {
+			return record.DraftRef{}, false, nil
+		}
+		return *m.Options[i].Draft, true, nil
+	}
+	if !a.Yes {
+		return record.DraftRef{}, false, nil
+	}
+	books, err := s.Books.Books(ctx, m.Unit)
+	if err != nil {
+		return record.DraftRef{}, false, err
+	}
+	b := books[m.Unit]
+	last, ok := b.LastRecord(m.Origin.TurnSeq)
+	if !ok || last.Record.State != record.Asked || last.Record.Question == nil || last.Record.Question.Kind != "confirm" || last.Record.Question.Draft == nil {
+		return record.DraftRef{}, false, nil
+	}
+	return *last.Record.Question.Draft, true, nil
 }
 
 // ofTurn is draft id and its gate when the draft is one m's turn proposed on m's unit; false otherwise.

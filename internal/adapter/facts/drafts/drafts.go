@@ -49,5 +49,8 @@ func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 	return out, nil
 }
 
-// stale says d's failure wrapped outbox.ErrStale; the store keeps a failure as its text alone.
-func stale(d draft.Draft) bool { return strings.Contains(d.Error, outbox.ErrStale.Error()) }
+// StalePrefix starts the failure the outbox stores for a draft whose send it refused as stale, a failure
+// that wraps outbox.ErrStale; a publisher's free text never counts.
+const StalePrefix = "stale:"
+
+func stale(d draft.Draft) bool { return strings.HasPrefix(d.Error, StalePrefix) }

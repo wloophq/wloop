@@ -261,3 +261,33 @@ func TestAnOptionPickCutShortCompletes(t *testing.T) {
 		t.Fatalf("%+v %v, approvals %+v, withdrawn %+v", route, err, od.approvals, od.withdrawn)
 	}
 }
+
+func TestConfirmYesApprovesItsDraft(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		a       messages.Answer
+		approve bool
+	}{
+		{"yes", messages.Answer{Yes: true, Source: turn.Cockpit}, true},
+		{"no", messages.Answer{No: true, Source: turn.Cockpit}, false},
+	} {
+		r := newRig(t)
+		od := &optionDrafts{drafts: map[int64]draft.Draft{}, gates: map[int64]gate.Gate{}}
+		od.put(heldDraft(42, r7, 1, 1), "term_1")
+		r.svc.Drafts = od
+		r.started(r7)
+		r.record(t, r7, 1, askedRecord(&record.Question{Kind: "confirm", Text: "Post the review?", Draft: &record.DraftRef{ID: 42, Rev: 1}}))
+		r.live()
+		r.reconcile(t, r7)
+		route, err := r.answer(r.only(t), c.a)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got := len(od.approvals) == 1 && route.Route == turn.Approved; got != c.approve {
+			t.Fatalf("%s: route %+v, approvals %+v", c.name, route, od.approvals)
+		}
+		if len(od.withdrawn) != 0 {
+			t.Fatalf("%s: withdrawn %+v", c.name, od.withdrawn)
+		}
+	}
+}

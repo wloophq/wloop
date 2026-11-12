@@ -2,6 +2,7 @@ package turns_test
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"slices"
 	"testing"
@@ -33,8 +34,15 @@ func optionsAsked() record.Record {
 		}}}
 }
 
+// eventVerdict reads a test kind's verdict from its payload's event, as a manifest's declaration would.
+func eventVerdict(d draft.Draft) string {
+	var p struct{ Event string }
+	_ = json.Unmarshal(d.Payload, &p)
+	return p.Event
+}
+
 func sentDraft(id draft.ID, seq int64) draft.Draft {
-	return draft.Draft{ID: id, Unit: r7, State: draft.Sent, Rev: 5, Text: "the body",
+	return draft.Draft{ID: id, Unit: r7, State: draft.Sent, Rev: 5, Text: "the body", Payload: json.RawMessage(`{"event":"APPROVE"}`),
 		Origin:   draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq, Session: "proposer"},
 		Evidence: draft.Evidence{Ref: "c1", Permalink: "https://github.com/acme/api/pull/7#pullrequestreview-1"}}
 }
@@ -65,7 +73,7 @@ func TestTurnDoneByApproval(t *testing.T) {
 		{"the gate of another draft", draftGate("43", task.ActorPerson, "", ""), false},
 	} {
 		s, store, _, _, rec := newService(t)
-		s.DraftGates = draftGates{42: c.g}
+		s.DraftGates, s.DraftVerdict = draftGates{42: c.g}, eventVerdict
 		seq := store.Put(askedBook()).Turns[0].Seq
 		if err := s.DraftSent(ctx, sentDraft(42, seq)); err != nil {
 			t.Fatal(err)
@@ -99,7 +107,9 @@ func TestTurnDoneByApproval(t *testing.T) {
 func TestADoneTurnsDraftFillsItsURL(t *testing.T) {
 	ctx := context.Background()
 	s, store, _, _, _ := newService(t)
-	s.DraftGates = draftGates{42: draftGate("42", task.ActorWorkflow, "send", "")}
+	g := draftGate("42", task.ActorWorkflow, "send", "")
+	g.ApprovedRev = 2
+	s.DraftGates = draftGates{42: g}
 	done := record.Record{State: record.Done, Summary: "requested changes", Outcome: &record.Outcome{Verdict: "REQUEST_CHANGES", Draft: &record.DraftRef{ID: 42, Rev: 2}}}
 	b := askedBook()
 	b.Turns[0].State, b.Records[0].Record = turn.Done, done
@@ -174,5 +184,114 @@ func TestSourceWritesFalseDeniesManifestCommands(t *testing.T) {
 func TestNoGitHubWritesRemoved(t *testing.T) {
 	if _, ok := reflect.TypeFor[turns.Policy]().FieldByName("NoGitHubWrites"); ok {
 		t.Fatal("a session policy names no provider: the manifests' write_commands deny their writes")
+	}
+}
+
+func TestASentDraftsVerdictIsWhatItPosted(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name    string
+		verdict func(draft.Draft) string
+		want    string
+	}{
+		{"the kind declares it", eventVerdict, "COMMENT"},
+		{"no kind declares it", nil, ""},
+	} {
+		s, store, _, _, _ := newService(t)
+		s.DraftGates, s.DraftVerdict = draftGates{42: draftGate("42", task.ActorPerson, "", "")}, c.verdict
+		seq := store.Put(askedBook()).Turns[0].Seq
+		d := sentDraft(42, seq)
+		d.Payload = json.RawMessage(`{"event":"COMMENT"}`)
+		if err := s.DraftSent(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+		b := bookOf(t, store, r7)
+		last, _ := b.LastRecord(seq)
+		if last.Record.Outcome.Verdict != c.want {
+			t.Fatalf("%s: verdict %q, the agent's APPROVE kept", c.name, last.Record.Outcome.Verdict)
+		}
+	}
+}
+
+func TestAnApprovalOfAnotherRevIsNotThePinnedOnes(t *testing.T) {
+	ctx := context.Background()
+	s, store, _, _, _ := newService(t)
+	g := draftGate("42", task.ActorPerson, "", "")
+	g.ApprovedRev = 2
+	s.DraftGates, s.DraftVerdict = draftGates{42: g}, eventVerdict
+	seq := store.Put(askedBook()).Turns[0].Seq
+	if err := s.DraftSent(ctx, sentDraft(42, seq)); err != nil {
+		t.Fatal(err)
+	}
+	b := bookOf(t, store, r7)
+	last, _ := b.LastRecord(seq)
+	if o := last.Record.Outcome; o.Approved || *o.Draft != (record.DraftRef{ID: 42, Rev: 2}) || b.Endorsed(seq) != turn.NotEndorsed {
+		t.Fatalf("outcome %+v draft %+v", o, *o.Draft)
+	}
+}
+
+func TestASentDraftWithNoPermalinkEndsTheTurnOnce(t *testing.T) {
+	ctx := context.Background()
+	s, store, _, _, rec := newService(t)
+	seq := store.Put(askedBook()).Turns[0].Seq
+	d := sentDraft(42, seq)
+	d.Evidence.Permalink = ""
+	for range 3 {
+		if err := s.DraftSent(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := bookOf(t, store, r7); len(got.Records) != 2 || len(kinds(rec.published, turns.KindTurnEnded)) != 1 {
+		t.Fatalf("records %d, published %+v", len(got.Records), rec.published)
+	}
+}
+
+func TestApprovedOptionDraftFailedFreesTheUnit(t *testing.T) {
+	ctx := context.Background()
+	for _, state := range []draft.State{draft.Failed, draft.Dropped} {
+		s, store, _, _, _ := newService(t)
+		seq := store.Put(askedBook()).Turns[0].Seq
+		if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, OptionID: "approve", Gate: 9, Message: 3, Source: turn.Cockpit, Approves: true}); err != nil {
+			t.Fatal(err)
+		}
+		other := sentDraft(43, seq)
+		other.State = state
+		if err := s.DraftEnded(ctx, other); err != nil {
+			t.Fatal(err)
+		}
+		if b := bookOf(t, store, r7); b.Turns[0].State != turn.Asked {
+			t.Fatalf("%s: the other option's draft ended the turn", state)
+		}
+		d := sentDraft(42, seq)
+		d.State = state
+		for range 2 {
+			if err := s.DraftEnded(ctx, d); err != nil {
+				t.Fatal(err)
+			}
+		}
+		b := bookOf(t, store, r7)
+		last, _ := b.LastRecord(seq)
+		if o := last.Record.Outcome; b.Turns[0].State != turn.Done || len(b.Records) != 2 || o.URL != "" || o.Approved || *o.Draft != (record.DraftRef{ID: 42, Rev: 1}) ||
+			b.QuestionAnswered(turn.Intent(dintent.Review)) {
+			t.Fatalf("%s: turn %s, records %+v", state, b.Turns[0].State, b.Records)
+		}
+		req := turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "next", Trigger: turn.Automated, Head: "h2", Records: true}
+		if _, err := s.Send(ctx, req); err != nil {
+			t.Fatalf("%s: an automated round after the draft %s: %v", state, state, err)
+		}
+	}
+}
+
+func TestADraftThatOnlyPointsKeepsItsQuestion(t *testing.T) {
+	ctx := context.Background()
+	s, store, _, _, _ := newService(t)
+	seq := store.Put(askedBook()).Turns[0].Seq
+	d := sentDraft(42, seq)
+	d.State = draft.Failed
+	if err := s.DraftEnded(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	if b := bookOf(t, store, r7); b.Turns[0].State != turn.Asked || len(b.Records) != 1 {
+		t.Fatalf("an unanswered question ended: %+v", b.Turns[0])
 	}
 }

@@ -119,18 +119,6 @@ func (d DraftRef) check(c *checker, field string) {
 
 func (o Option) Answer() string { return o.Label + " (option " + o.ID + ")" }
 
-func (q Question) Endorses(optionID string, yes bool) bool {
-	if q.Kind == "confirm" {
-		return q.Publishes && yes
-	}
-	for _, o := range q.Options {
-		if o.ID == optionID {
-			return o.Publishes
-		}
-	}
-	return false
-}
-
 type Artifact struct {
 	Kind  string `json:"kind"`
 	Body  string `json:"body"`
