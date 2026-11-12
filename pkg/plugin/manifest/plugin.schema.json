@@ -193,6 +193,10 @@
               "text_required": {
                 "description": "A draft of the kind needs a text.",
                 "type": "boolean"
+              },
+              "verdict": {
+                "description": "The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as \"/event\", which the schema makes a required string enum; empty posts none.",
+                "type": "string"
               }
             },
             "required": [

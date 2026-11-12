@@ -113,3 +113,24 @@ func TestRoundPolicyAllowsTheManifestsDraftTools(t *testing.T) {
 		t.Errorf("a probe may draft with %q", probe.DraftTools)
 	}
 }
+
+func TestHomeInstallAllowsTheManifestsAtOnceTools(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	got := te.specWith(te.cfg, "claude", "").AtOnceTools
+	var want []string
+	for _, s := range te.loadedSources() {
+		for _, tool := range s.Tools {
+			if tool.Posts == "now" {
+				want = append(want, brand.ToolPrefix()+tool.Name)
+			}
+		}
+	}
+	if len(want) == 0 || !slices.Equal(got, want) {
+		t.Fatalf("install allows %q at once, want the manifests' %q", got, want)
+	}
+	for _, d := range policies[policyRound](te.Env, "review", te.controlSurface(te.cfg)).DraftTools {
+		if slices.Contains(got, d) {
+			t.Errorf("%s both proposes and posts at once", d)
+		}
+	}
+}

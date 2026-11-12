@@ -15,6 +15,9 @@ type HomeSpec struct {
 	SessionVars []string
 	// ManagerHomes are the homes of this kind the workspace manager keeps.
 	ManagerHomes []string
+	// AtOnceTools are the tools that post as the user at once, as an agent names them, which an install
+	// allows without a prompt.
+	AtOnceTools []string
 	Now          func() time.Time
 }
 

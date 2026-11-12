@@ -33,7 +33,7 @@ func (e *Env) specWith(cfg config.Config, kind, callerHome string) setup.HomeSpe
 		}
 	}
 	return setup.HomeSpec{Command: e.loopCommand(), MCPURL: cfg.MCP.URL(), MCPKey: e.mcpKey(), UserHome: e.Home, CallerHome: callerHome,
-		SessionVars: sessionVars, ManagerHomes: uniq(managerHomes...), Now: e.Now}
+		SessionVars: sessionVars, ManagerHomes: uniq(managerHomes...), AtOnceTools: atOnceTools(e.loadedSources()), Now: e.Now}
 }
 
 func (e *Env) homeKind(agent string) (setup.HomeKind, error) {

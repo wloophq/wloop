@@ -81,7 +81,7 @@ func TestBuiltinHasNoProviderRows(t *testing.T) {
 			t.Errorf("event %s is of %s", k, p)
 		}
 	}
-	if !slices.Equal(BriefSubjects, []string{TaskSlot}) || !slices.Equal(DraftDeliveries, []string{"message", "reaction"}) {
+	if !slices.Equal(BriefSubjects, []string{TaskSlot}) || len(DraftDeliveries) > 0 {
 		t.Errorf("brief subjects %v, deliveries %v", BriefSubjects, DraftDeliveries)
 	}
 

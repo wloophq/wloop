@@ -131,8 +131,13 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 		if err := propose(`{"event":"COMMENT"}`, "c1"); err == nil {
 			t.Error("a review read at c1 was proposed while the head is c2")
 		}
-		if err := propose(`{"event":"COMMENT"}`, "c2"); err != nil {
-			t.Errorf("a review read at the live head: %v", err)
+		d, err := td.Client().ProposeDraft(context.Background(), s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One finding.",
+			Payload: json.RawMessage(`{"event":"COMMENT"}`), Basis: "c2", Why: "the export reads a dropped column"})
+		if err != nil {
+			t.Fatalf("a review read at the live head: %v", err)
+		}
+		if got, err := td.Client().Draft(context.Background(), d.ID); err != nil || got.Why != "the export reads a dropped column" {
+			t.Errorf("the draft's why %q %v, want the proposal's", got.Why, err)
 		}
 	})
 }

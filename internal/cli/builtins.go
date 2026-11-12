@@ -318,6 +318,19 @@ func draftTools(srcs []*manifest.Source) []string {
 	return append(out, coreDraftTools()...)
 }
 
+// atOnceTools are the tools srcs mark posts = "now", which post as the user at once, as an agent names them.
+func atOnceTools(srcs []*manifest.Source) []string {
+	var out []string
+	for _, s := range srcs {
+		for _, t := range s.Tools {
+			if t.Posts == "now" {
+				out = append(out, brand.ToolPrefix()+t.Name)
+			}
+		}
+	}
+	return out
+}
+
 // loadedSources are the [source] tables of every plugin: the discovered plugin's over the bundled one.
 func (e *Env) loadedSources() []*manifest.Source {
 	srcs, _ := bundled.Sources()

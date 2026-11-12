@@ -56,7 +56,7 @@ func (e *Env) agentProposer(hosted func(id string) *psource.Hosted) daemon.Agent
 		}
 		ref, err := b.Host().Gates.OpenGate(ctx, src.GateRequest{Session: session, Draft: src.Draft{
 			Unit: plugin.Unit{Provider: id, Key: u.Key}, Kind: p.Kind, Target: p.Target, Text: p.Text, Payload: p.Payload, Basis: p.Basis,
-			Hold: p.Hold, Items: p.Items, Effects: p.Effects,
+			Hold: p.Hold, Items: p.Items, Effects: p.Effects, Why: p.Why,
 		}})
 		return draft.ID(ref.Draft), err
 	}

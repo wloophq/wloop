@@ -231,7 +231,7 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 	if slices.Contains(settingsAllow(t, turns.Policy{TurnEnd: true, Drafts: true}), draftTool) {
 		t.Fatalf("a policy whose DraftTools do not list %s allows it", draftTool)
 	}
-	for _, tool := range []string{SlackSendTool, brand.ToolPrefix() + "slack_read", brand.ToolPrefix() + "slack_search"} {
+	for _, tool := range []string{slackSendTool, brand.ToolPrefix() + "slack_read", brand.ToolPrefix() + "slack_search"} {
 		if slices.Contains(with, tool) {
 			t.Fatalf("allow %v holds %s", with, tool)
 		}
@@ -240,12 +240,12 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 		t.Fatal("a DraftTools-only policy passes no settings")
 	}
 	doc := map[string]any{}
-	Home{}.installSettings(doc)
+	Home{AtOnceTools: testAtOnceTools}.installSettings(doc)
 	perms, _ := doc["permissions"].(map[string]any)
-	if ask, _ := perms["ask"].([]any); slices.Contains(ask, any(SlackSendTool)) {
+	if ask, _ := perms["ask"].([]any); slices.Contains(ask, any(slackSendTool)) {
 		t.Fatalf("installed ask %v", perms["ask"])
 	}
-	if allow, _ := perms["allow"].([]any); slices.Contains(allow, any(draftTool)) || !slices.Contains(allow, any(SlackSendTool)) {
+	if allow, _ := perms["allow"].([]any); slices.Contains(allow, any(draftTool)) || !slices.Contains(allow, any(slackSendTool)) {
 		t.Fatalf("installed allow %v", perms["allow"])
 	}
 }

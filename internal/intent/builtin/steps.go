@@ -1,7 +1,6 @@
 package builtin
 
 import (
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -42,7 +41,8 @@ const (
 
 // The values of draft.propose's arguments.
 var (
-	DraftDeliveries = []string{string(draft.Message), string(draft.Reaction)}
+	// DraftDeliveries are the deliveries the merged plugins declare, which Install sets.
+	DraftDeliveries []string
 	// DraftEmojiDeliveries are the deliveries that post an emoji, which
 	// need the reaction argument, and no text.
 	DraftEmojiDeliveries = []string{"reaction"}
