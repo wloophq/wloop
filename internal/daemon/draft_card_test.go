@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"os"
 	"strconv"
 	"strings"
@@ -345,5 +346,32 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 		if err := r.s.checkEditable(review, nil, &raw); (err == nil) != ok {
 			t.Errorf("payload %s: %v, want allowed %v", p, err, ok)
 		}
+	}
+}
+
+// TestDraftCardRendersItsKindsPreview renders the kind's preview template from the profile over the draft and
+// its payload, and serves none for a kind without one or a template that does not render.
+func TestDraftCardRendersItsKindsPreview(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	l := *r.s.loaded()
+	l.Previews = map[string]map[string]string{"github": {
+		"review": `{{.Payload.event}} on {{.Where}} with {{len .Payload.comments}} inline comments`,
+		"reply":  `{{.Nope}}`,
+	}}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	held := reviewDraftOf(draft.Held)
+	if got := r.s.draftView(context.Background(), held, gate.Gate{}).Preview; got != `REQUEST_CHANGES on #general in the thread "acme/api#7" with 2 inline comments` {
+		t.Errorf("review preview %q", got)
+	}
+	reply := held
+	reply.Kind = draft.Reply
+	if got := r.s.draftView(context.Background(), reply, gate.Gate{}).Preview; got != "" {
+		t.Errorf("a preview that does not render shows %q, want none", got)
+	}
+	other := held
+	other.Kind = "close"
+	if got := r.s.draftView(context.Background(), other, gate.Gate{}).Preview; got != "" {
+		t.Errorf("a kind without a preview shows %q", got)
 	}
 }

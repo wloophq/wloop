@@ -461,6 +461,8 @@ type Server struct {
 	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
+	// previews keeps the draft kinds' parsed preview templates, by their source.
+	previews sync.Map
 	// kindSchemas keeps the draft kinds' payload schemas a card read, by provider and kind.
 	kindSchemas sync.Map
 	// amender replaces the Outbox's Amend in tests.

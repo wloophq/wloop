@@ -711,6 +711,8 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .d-payload dd > .d-payload { margin: 0; padding-left: var(--space-8); border-left: 1px solid var(--rule); }
 .d-payload .pv { white-space: pre-wrap; }
 .d-payload .d-field { padding: var(--space-2) var(--space-4); background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); }
+.d-draft .d-preview { margin: var(--space-4) 0; font-weight: 500; }
+.d-draft .d-preview p { margin: 0; }
 .d-draft .d-note { margin: var(--space-6) 0 0; font-size: var(--text-meta); color: var(--muted); }
 .d-draft .d-note.err { color: var(--err); }
 .d-draft .d-links { margin-top: var(--space-6); }

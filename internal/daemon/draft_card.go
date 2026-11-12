@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -44,6 +45,7 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 		v.Payload = slices.Clone(d.Payload)
 		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload)
 	}
+	v.Preview = s.preview(d, publisher, v.Where)
 	v.Basis, v.Hold = d.Basis, d.Hold
 	if spec, ok := s.kindSpec(d); ok {
 		v.TextLocked = !slices.Contains(spec.Editable, editableText)
@@ -114,6 +116,36 @@ func (s *Server) notifyByRule(ctx context.Context, d draft.Draft) error {
 	}
 	s.notify(api.Notice{ID: fmt.Sprintf("draft:%d:by-rule", d.ID), Unit: d.Unit, Text: s.byRuleText(d, rule, s.draftWhere(ctx, d))})
 	return nil
+}
+
+// preview is d's summary line: its kind's preview template, from the profile, over d's fields and its payload;
+// "" when the kind has none or it does not render.
+func (s *Server) preview(d draft.Draft, provider, where string) string {
+	src := s.loaded().Previews[provider][string(d.Kind)]
+	if src == "" {
+		return ""
+	}
+	tmpl, ok := s.previews.Load(src)
+	if !ok {
+		parsed, err := template.New(string(d.Kind)).Option("missingkey=error").Parse(src)
+		if err != nil {
+			s.logf("drafts: the %s preview of %s does not parse: %v", d.Kind, provider, err)
+			return ""
+		}
+		tmpl, _ = s.previews.LoadOrStore(src, parsed)
+	}
+	var payload any
+	if len(d.Payload) > 0 {
+		_ = json.Unmarshal(d.Payload, &payload)
+	}
+	data := map[string]any{"Kind": string(d.Kind), "Purpose": d.Purpose, "Delivery": string(d.Delivery), "Target": d.Target, "Where": where,
+		"Text": d.Text, "Reaction": d.Reaction, "Basis": d.Basis, "Payload": payload}
+	var out strings.Builder
+	if err := tmpl.(*template.Template).Execute(&out, data); err != nil {
+		s.logf("drafts: the %s preview of draft %d: %v", d.Kind, d.ID, err)
+		return ""
+	}
+	return strings.TrimSpace(out.String())
 }
 
 // editableText is what a kind's editable names to let a person change a draft's text.

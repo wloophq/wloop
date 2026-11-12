@@ -251,3 +251,24 @@ done(walk(draft(input.draft), (x) => ["input", "select"].includes(x.tag)).length
 		t.Errorf("%d controls, want the verdict's only", got)
 	}
 }
+
+// TestCardShowsItsPreviewAboveTheFullPayload draws the kind's summary line as its card's lead, and keeps every
+// value of the payload below it; a draft without one draws no preview.
+func TestCardShowsItsPreviewAboveTheFullPayload(t *testing.T) {
+	var got struct {
+		Preview, None []string
+		Values        int
+	}
+	d := reviewDraft()
+	d.Preview = "Request changes with **2** inline comments"
+	runGate(t, `
+const c = draft(input.draft);
+done({ Preview: cls(c, "d-preview").map((x) => x.textContent), None: cls(draft(input.none), "d-preview").map((x) => x.textContent),
+  Values: cls(c, "pv").length });`, map[string]any{"draft": d, "none": reviewDraft()}, &got)
+	if !slices.Equal(got.Preview, []string{"Request changes with 2 inline comments"}) || len(got.None) != 0 {
+		t.Errorf("previews %q and %q, want the summary line rendered, none without one", got.Preview, got.None)
+	}
+	if got.Values != len(leaves(d.Fields)) {
+		t.Errorf("%d values with a preview, want the whole payload too", got.Values)
+	}
+}

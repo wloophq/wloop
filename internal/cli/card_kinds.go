@@ -27,4 +27,6 @@ func (k cardKinds) Schema(spec draft.KindSpec) (json.RawMessage, error) {
 }
 
 // cardDraftKinds are the card's kinds over the installed vocabulary.
-func cardDraftKinds() cardKinds { return cardKinds{manifestKinds: draftKinds, files: bundledplugins.Manifests} }
+func cardDraftKinds() cardKinds {
+	return cardKinds{manifestKinds: draftKinds, files: bundledplugins.Manifests}
+}

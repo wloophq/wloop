@@ -85,6 +85,9 @@ type Draft struct {
 	Names map[string]string `json:"names,omitempty"`
 	// ItemDetails are the items the draft is about, with their summaries.
 	ItemDetails []ItemView `json:"item_details,omitempty"`
+	// Preview is the draft's summary line, its kind's preview template over the draft, as markdown; "" when the
+	// kind has none.
+	Preview string `json:"preview,omitempty"`
 	// Payload is what the draft posts besides Text, verbatim, and Fields every value of it as its card shows
 	// it, in the payload's order; both empty for a draft of a kind with no payload.
 	Payload json.RawMessage `json:"payload,omitempty"`

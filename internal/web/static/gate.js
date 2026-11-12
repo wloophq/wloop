@@ -545,6 +545,7 @@ function draftCard(e, d, opts = {}) {
   const effects = draftEffects(d);
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),
+    d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:preview:${d.id}`, names: d.names || {} })) : null,
     opts.context ? draftContextView(opts.context) : null,
     draftWhere(d),
     d.author ? h("div", { class: "meta d-by" }, d.author) : null,
