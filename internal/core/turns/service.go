@@ -62,6 +62,9 @@ type Service struct {
 	// Results attaches a done record's outcome url to the turn's task when
 	// its intent's record.attach_url says so; nil attaches nothing.
 	Results Results
+	// DraftGates read the gate a sent draft waited on, for whether the user approved it; nil reads none,
+	// so no sent draft counts as the user's.
+	DraftGates DraftGates
 	// Usage is where EndHeadless writes a headless turn's usage; nil writes none.
 	Usage UsageWriter
 	// NewID mints session ids; nil mints random UUIDs.
