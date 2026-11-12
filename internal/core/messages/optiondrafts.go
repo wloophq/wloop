@@ -68,8 +68,9 @@ func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.R
 }
 
 // approvedOption says whether g, m's answered gate, approved the draft the answer a picks, as
-// OptionDraft named it and the gates service approved it: the draft gate approved at the pinned rev by g's
-// own resolver, a person or a session the user drives that neither proposed nor revised it. It then
+// OptionDraft named it and the gates service approved it: the draft gate approved by g's own resolver, a
+// person or a session the user drives that neither proposed nor revised it. The pinned rev was checked
+// when the draft was approved; the gate's rev follows the draft's later writes, such as its queueing. It then
 // withdraws the drafts the other options point to, so the answer ends the turn on the draft's send instead
 // of resuming it; a call made again completes what is left.
 func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {
@@ -86,7 +87,7 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 		return false, err
 	case !ok || turns.ProposedOrRevised(dg, d, g.BySession):
 		return false, nil
-	case dg.Status != gate.Approved || dg.ApprovedRev != ref.Rev || dg.By != g.By || dg.BySession != g.BySession || dg.Rule != "":
+	case dg.Status != gate.Approved || dg.By != g.By || dg.BySession != g.BySession || dg.Rule != "":
 		return false, nil
 	}
 	for _, o := range m.Options {
