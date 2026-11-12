@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
@@ -30,6 +31,12 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		if m.Publisher != nil {
 			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin}
 			targets = append(targets, m.ID)
+		}
+	}
+	for p, fx := range e.testPublishers {
+		pubs[p] = pinnedEffects{Effects: fx, turns: pin}
+		if !slices.Contains(targets, p) {
+			targets = append(targets, p)
 		}
 	}
 	effects := publishers(pubs, cfg)
