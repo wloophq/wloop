@@ -206,6 +206,18 @@ var (
 	ErrOutOfScope = errors.New("the draft is out of the caller's reach")
 )
 
+// StalePrefix starts the Error of a draft that failed because it is stale, from the live basis check or
+// from its publisher's refusal (ErrStale), and only of such a draft.
+const StalePrefix = "stale:"
+
+// failure is the Error a draft that failed with err stores.
+func failure(err error) string {
+	if errors.Is(err, ErrStale) {
+		return StalePrefix + " " + err.Error()
+	}
+	return err.Error()
+}
+
 // NotConfirmed is the Error of a draft Recover found in sending and Verify could not confirm.
 const NotConfirmed = "not confirmed after a restart"
 
@@ -1072,7 +1084,7 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 		err = place(ctx, fx, &d, false)
 	}
 	if err != nil {
-		d.State, d.Error = draft.Failed, err.Error()
+		d.State, d.Error = draft.Failed, failure(err)
 		_, err := s.save(ctx, d, draft.Queued)
 		if errors.Is(err, ErrConflict) {
 			return false, errClaimLost
@@ -1089,7 +1101,7 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	}
 	ev, pubErr := fx.Publish(ctx, d)
 	if pubErr != nil {
-		return false, s.fail(ctx, d, pubErr.Error())
+		return false, s.fail(ctx, d, failure(pubErr))
 	}
 	return s.settleSent(ctx, d, ev)
 }

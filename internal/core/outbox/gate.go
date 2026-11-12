@@ -151,7 +151,7 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 		}
 	}
 	if err := s.fresh(ctx, d); err != nil {
-		return s.failHeld(ctx, d, err.Error())
+		return s.failHeld(ctx, d, failure(err))
 	}
 	if err := s.publishable(ctx, &d); err != nil {
 		return s.failHeld(ctx, d, err.Error())

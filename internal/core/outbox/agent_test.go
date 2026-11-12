@@ -414,7 +414,7 @@ func TestApproveRefusesStale(t *testing.T) {
 	if err := e.decide(d.ID, "approve"); err != nil {
 		t.Fatal(err)
 	}
-	if got := e.get(d.ID); got.State != draft.Failed || !strings.Contains(got.Error, ErrStale.Error()) {
+	if got := e.get(d.ID); got.State != draft.Failed || !strings.HasPrefix(got.Error, StalePrefix) {
 		t.Fatalf("an approval of a stale draft: %+v", got)
 	}
 	if stale, err := e.svc.Stale(ctx, e.propose(prComment("hi"))); stale || err != nil {
@@ -437,8 +437,28 @@ func TestSendFailsStaleWithoutPublishing(t *testing.T) {
 	if sent != 0 || failed != 1 || err != nil || len(e.fx.published) != 0 {
 		t.Fatalf("Send = %d, %d, %v, published %v", sent, failed, err, e.fx.published)
 	}
-	if got := e.get(d.ID); got.State != draft.Failed || !strings.Contains(got.Error, ErrStale.Error()) || !got.SendingAt.IsZero() {
+	if got := e.get(d.ID); got.State != draft.Failed || !strings.HasPrefix(got.Error, StalePrefix) || !got.SendingAt.IsZero() {
 		t.Fatalf("%+v", got)
+	}
+	bases.Set(pull, head)
+	other := e.propose(review("COMMENT"))
+	if _, err := e.approve(other.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	e.fx.failWith = fmt.Errorf("github refused: %w", ErrStale)
+	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
+		t.Fatalf("failed %d", failed)
+	}
+	if got := e.get(other.ID); !strings.HasPrefix(got.Error, StalePrefix) {
+		t.Fatalf("a publisher's stale refusal: %q", got.Error)
+	}
+	e.fx.failWith = errBoom
+	third := e.propose(review("COMMENT"))
+	if _, err := e.approve(third.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _ = e.svc.Send(ctx); strings.HasPrefix(e.get(third.ID).Error, StalePrefix) {
+		t.Fatalf("another failure reads stale: %q", e.get(third.ID).Error)
 	}
 }
 
