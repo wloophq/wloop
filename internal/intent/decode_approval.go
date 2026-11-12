@@ -199,7 +199,8 @@ func compileRule(when string, mode gate.Mode, window time.Duration, kinds []gate
 	}
 	var untrusted *builtin.UntrustedError
 	var subjects *builtin.SubjectsError
-	if errors.As(draftErr, &untrusted) || errors.As(draftErr, &subjects) {
+	var allowList *builtin.AllowListError
+	if errors.As(draftErr, &untrusted) || errors.As(draftErr, &subjects) || errors.As(draftErr, &allowList) {
 		return r, "", fmt.Errorf("%w; %s", draftErr, reachesDrafts)
 	}
 	if failed := cmpErr(unitErr, draftErr); failed != nil && (len(r.kinds) == 0 || len(pinned) > 0) {
@@ -248,7 +249,8 @@ func withGateFacts(envs ...expr.Env) expr.Env {
 func (s *sheet) ruleProblem(path, when string, err error, env expr.Env) {
 	var untrusted *builtin.UntrustedError
 	var subjects *builtin.SubjectsError
-	if errors.As(err, &untrusted) || errors.As(err, &subjects) {
+	var allowList *builtin.AllowListError
+	if errors.As(err, &untrusted) || errors.As(err, &subjects) || errors.As(err, &allowList) {
 		s.add(path, "%s", err.Error())
 		return
 	}

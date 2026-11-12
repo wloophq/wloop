@@ -191,6 +191,18 @@ func Pinned(p workflow.Predicate, field string) []string {
 	return out
 }
 
+// Allowed are the values every match of p takes field among, as its
+// top-level conjunction's field == "literal" and field in ["literal", ...]
+// terms allow them; false when no such term bounds field.
+func Allowed(p workflow.Predicate, field string) ([]string, bool) {
+	w, ok := p.(predicate)
+	if !ok {
+		return nil, false
+	}
+	values, ok := w.p.allows[field]
+	return slices.Clone(values), ok
+}
+
 // Requires says whether every match of p has field equal to value: a term
 // field == "value" of p's top-level conjunction, which no other term can
 // bypass.

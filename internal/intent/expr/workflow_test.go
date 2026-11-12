@@ -249,3 +249,33 @@ func TestRequiresIsATermEveryMatchHolds(t *testing.T) {
 		}
 	}
 }
+
+func TestAllowedAreTheValuesATopLevelTermAllows(t *testing.T) {
+	env := Env{"draft.forge.review.event": String, "draft.delivery": String, "pr.mine": Bool}
+	for src, want := range map[string][]string{
+		`draft.forge.review.event == "COMMENT"`:                                       {"COMMENT"},
+		`"COMMENT" == draft.forge.review.event`:                                       {"COMMENT"},
+		`draft.forge.review.event in ["COMMENT", "REQUEST_CHANGES"]`:                  {"COMMENT", "REQUEST_CHANGES"},
+		`draft.delivery == "review" && draft.forge.review.event in ["COMMENT"]`:       {"COMMENT"},
+		`pr.mine && (draft.forge.review.event == "A" && draft.delivery == "review")`:  {"A"},
+		`draft.forge.review.event in ["A", "B"] && draft.forge.review.event == "B"`:   {"B"},
+		`draft.forge.review.event != "APPROVE"`:                                       nil,
+		`!(draft.forge.review.event in ["APPROVE"])`:                                  nil,
+		`draft.forge.review.event == "A" || pr.mine`:                                  nil,
+		`pr.mine ? draft.forge.review.event == "A" : true`:                            nil,
+		`draft.forge.review.event.startsWith("A")`:                                    nil,
+		`draft.forge.review.event in [draft.delivery]`:                                nil,
+		`draft.delivery == "review"`:                                                  nil,
+		`draft.forge.review.event in []`:                                              {},
+		`draft.forge.review.event in ["", "A"]`:                                       {"", "A"},
+	} {
+		p, err := CompileWorkflow(src, env)
+		if err != nil {
+			t.Fatalf("%s: %v", src, err)
+		}
+		got, ok := Allowed(p, "draft.forge.review.event")
+		if ok != (want != nil) || !slices.Equal(got, want) {
+			t.Errorf("%s: %q, %v; want %q", src, got, ok, want)
+		}
+	}
+}

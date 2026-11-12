@@ -32,6 +32,10 @@ type Program struct {
 	reads []string
 	marks []string // the marks the predicate's handled() calls name
 	pins  []string // field=literal terms every match requires
+	// allows are, by field, the string literals every match takes it among:
+	// its top-level conjunction's field == "literal" and field in [literals]
+	// terms, intersected.
+	allows map[string][]string
 }
 
 type Error struct {

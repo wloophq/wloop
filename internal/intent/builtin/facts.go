@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 var (
@@ -272,6 +274,8 @@ var otherFacts = []Fact{
 	wf("draft", "person_asks_you", expr.Bool, "Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people."),
 	wf("draft", "people_outside", expr.Int, "The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted."),
 	wf("draft", "target_joined", expr.Bool, "The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft."),
+	unitDraftFact("failed", "A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it."),
+	unitDraftFact("stale", "A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too."),
 	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
@@ -345,10 +349,61 @@ func Narrow(env expr.Env, providers []unit.ProviderID) {
 	}
 }
 
+// DraftFailed and DraftStale are the facts of a unit whose draft failed to
+// send, which every unit slot reads.
+const (
+	DraftFailed = DraftSlot + ".failed"
+	DraftStale  = DraftSlot + ".stale"
+)
+
+// unitDraftFact is a Bool fact of a unit's drafts, named draft.<name>,
+// read by every unit slot.
+func unitDraftFact(name, doc string) Fact {
+	f := wf(DraftSlot, name, expr.Bool, doc)
+	f.Subjects = coreUnitSlots
+	return f
+}
+
 // approvalFact is a fact of the draft a draft gate's rule reads,
 // named draft.<name>.
 func approvalFact(name string, t expr.Type, doc string) Fact {
 	return Fact{Name: DraftSlot + "." + name, Type: t, Slots: []FactSlot{ApprovalSlot}, Doc: doc}
+}
+
+// payloadFacts are the approval facts of provider p's draft kinds, each a
+// payload field the plugin posts verbatim, so trusted.
+func payloadFacts(p unit.ProviderID, kinds []manifest.DraftKind) []Fact {
+	var out []Fact
+	for _, k := range kinds {
+		for _, f := range k.Facts {
+			out = append(out, Fact{Name: f.Name, Type: expr.String, Slots: []FactSlot{ApprovalSlot}, Provider: p,
+				Doc: "The " + f.Pointer + " field of a " + k.Name + " draft's payload, which the plugin posts as is; absent, and so the empty string, for a draft of any other kind. A rule that sends reads it only as an allow-list: " + f.Name + ` == "<value>" or in ["<value>", ...] as a term of the top-level &&.`})
+		}
+	}
+	return out
+}
+
+// payloadFactName is why name cannot be a payload fact of provider p's
+// kind: it must be draft.<provider>.<kind>.<field>; "" when it is.
+func payloadFactName(p unit.ProviderID, kind, name string) string {
+	field, ok := strings.CutPrefix(name, DraftSlot+"."+string(p)+"."+kind+".")
+	if !ok || field == "" || strings.Contains(field, ".") {
+		return fmt.Sprintf("fact %s of draft kind %s is not named %s.%s.%s.<field>", name, kind, DraftSlot, p, kind)
+	}
+	return ""
+}
+
+// PayloadFact says whether name is a payload fact a merged plugin's draft
+// kind declares.
+func PayloadFact(name string) bool {
+	for _, kinds := range PluginDraftKinds {
+		for _, k := range kinds.Kinds {
+			if slices.ContainsFunc(k.Facts, func(f manifest.DraftKindFact) bool { return f.Name == name }) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DraftPurpose and DraftEffects are the approval facts an intent's rules

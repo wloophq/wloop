@@ -16,7 +16,7 @@ import (
 func TestTheApprovalFactsAreTheDraftsRuleFacts(t *testing.T) {
 	var declared []string
 	for _, f := range Facts {
-		if slices.Contains(f.Slots, ApprovalSlot) {
+		if slices.Contains(f.Slots, ApprovalSlot) && !PayloadFact(f.Name) {
 			declared = append(declared, f.Name)
 		}
 	}

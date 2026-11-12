@@ -122,9 +122,10 @@ func (a ApprovalConfig) validateGates(key string) error {
 		}
 		var subjects *builtin.SubjectsError
 		var untrusted *builtin.UntrustedError
+		var allowList *builtin.AllowListError
 		_, err = builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ModeOf(gate.Mode(r.Mode)), Window: time.Duration(r.Window)}, env)
 		switch {
-		case errors.As(err, &subjects):
+		case errors.As(err, &subjects), errors.As(err, &allowList):
 			return fmt.Errorf("%s.when: %w", at, err)
 		case errors.As(err, &untrusted) && !releases && !pinsAwayFromDrafts(p):
 			return fmt.Errorf("%s.when: %w; %s", at, err, reachesDrafts)
