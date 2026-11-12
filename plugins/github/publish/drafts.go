@@ -19,10 +19,6 @@ import (
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
 
-// ErrStale is a review's basis that is not its pull request's head: a push
-// since the agent read it.
-var ErrStale = errors.New("the review is stale")
-
 // threadPages bounds how many pages of review threads a resolve reads.
 const threadPages = 10
 
@@ -178,7 +174,7 @@ func (p *Publisher) publishReview(ctx context.Context, d src.Draft) (src.Evidenc
 		return src.Evidence{}, err
 	}
 	if head != req.CommitID {
-		return src.Evidence{}, fmt.Errorf("%w: it was written at %s, and the head of %s is %s", ErrStale, req.CommitID, ref, head)
+		return src.Evidence{}, fmt.Errorf("%w: the review was written at %s, and the head of %s is %s", src.ErrStale, req.CommitID, ref, head)
 	}
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -257,10 +253,13 @@ func (p *Publisher) prepareReply(ctx context.Context, d src.Draft) (pr.Ref, int6
 }
 
 // publishReply posts d as a reply in the review thread of the comment its
-// target names.
+// target names, once that comment reads as one of the pull request's.
 func (p *Publisher) publishReply(ctx context.Context, d src.Draft) (src.Evidence, error) {
 	ref, id, body, err := p.prepareReply(ctx, d)
 	if err != nil {
+		return src.Evidence{}, err
+	}
+	if _, err := p.reviewComment(ctx, ref, id); err != nil {
 		return src.Evidence{}, err
 	}
 	payload, err := json.Marshal(map[string]string{"body": body})

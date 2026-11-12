@@ -178,7 +178,7 @@ func (r *running) draft(ctx context.Context, call src.ToolCall) src.ToolResult {
 		}
 	}
 	d := src.Draft{Unit: ref.Unit(), Kind: a.Kind, Target: strings.TrimSpace(a.Target), Text: a.Text, Payload: a.Payload, Basis: a.Basis,
-		Hold: a.Hold, Effects: a.Effects}
+		Hold: a.Hold, Effects: a.Effects, Why: a.Why}
 	got, err := r.host.Gates.OpenGate(ctx, src.GateRequest{Draft: d, Session: call.Session})
 	if err != nil {
 		return failed(err)

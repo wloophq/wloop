@@ -220,6 +220,7 @@ func TestGithubDraftProposes(t *testing.T) {
 	}
 	delete(args, "unit")
 	args["hold"] = true
+	args["why"] = "The retry loop never backs off."
 	args["effects"] = []string{EffectReviewed}
 	raw, _ := json.Marshal(args)
 	name, f := callDraft(t, p, "s1", string(raw))
@@ -232,7 +233,7 @@ func TestGithubDraftProposes(t *testing.T) {
 	}
 	d := got[0].Draft
 	if d.Unit != ref7.Unit() || d.Kind != "review" || d.Basis != headA || !d.Hold || !slices.Equal(d.Effects, []string{EffectReviewed}) ||
-		!strings.Contains(string(d.Payload), `"REQUEST_CHANGES"`) || d.Text != args["text"] {
+		!strings.Contains(string(d.Payload), `"REQUEST_CHANGES"`) || d.Text != args["text"] || d.Why != args["why"] {
 		t.Fatalf("proposed %+v", d)
 	}
 

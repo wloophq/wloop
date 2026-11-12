@@ -157,6 +157,9 @@ func (f *fakePulls) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		_ = json.NewEncoder(w).Encode(out)
+	case r.Method == http.MethodGet && r.URL.Path == "/repos/acme/api/pulls/comments/5000000":
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, `{"message":"Server Error"}`)
 	case r.Method == http.MethodGet && commentPath.MatchString(r.URL.Path):
 		id, _ := strconv.ParseInt(commentPath.FindStringSubmatch(r.URL.Path)[1], 10, 64)
 		for _, c := range f.comments {
@@ -208,6 +211,9 @@ func (f *fakePulls) graphQL(w http.ResponseWriter, raw []byte) {
 	}
 	if strings.Contains(in.Query, "node(id:") {
 		switch in.Variables["id"] {
+		case "PRRT_boom":
+			w.WriteHeader(http.StatusBadGateway)
+			return
 		case "PRRT_kwDOAbCdEf4AAAAB":
 			io.WriteString(w, `{"data":{"node":{"pullRequest":{"number":7,"repository":{"nameWithOwner":"acme/api"}}}}}`)
 		case "PRRT_pr8":
@@ -348,7 +354,7 @@ func TestReviewRecheckLiveHead(t *testing.T) {
 		t.Fatalf("a push, then head %q %v", head, err)
 	}
 	_, err := p.Publish(ctx, d)
-	if !errors.Is(err, ErrStale) || errors.Is(err, src.ErrMayHavePosted) || !strings.Contains(err.Error(), headB) {
+	if !errors.Is(err, src.ErrStale) || errors.Is(err, src.ErrMayHavePosted) || !strings.Contains(err.Error(), headB) {
 		t.Fatalf("a review written at %s on head %s: %v", headA, headB, err)
 	}
 	if w := f.writes(); len(w) != 0 {
@@ -444,6 +450,14 @@ func TestReplyPosts(t *testing.T) {
 			t.Errorf("%s: published", name)
 		}
 	}
+	f.mu.Lock()
+	f.comments = append(f.comments, ghComment{ID: 3000000, PullRequestURL: "https://api.github.com/repos/acme/api/pulls/8", User: ghUser{"ana"}})
+	f.mu.Unlock()
+	other := d
+	other.Target = "comment:3000000"
+	if _, err := p.Publish(ctx, other); err == nil {
+		t.Error("replied to a comment of another pull request")
+	}
 	if n := len(f.writes()); n != 1 {
 		t.Fatalf("%d writes", n)
 	}
@@ -483,7 +497,7 @@ func TestVerifyReviewByCommitStateTime(t *testing.T) {
 	f.mu.Lock()
 	f.head = headB
 	f.mu.Unlock()
-	if _, err := p.Publish(ctx, withBody); !errors.Is(err, ErrStale) {
+	if _, err := p.Publish(ctx, withBody); !errors.Is(err, src.ErrStale) {
 		t.Fatal(err)
 	}
 	if _, found, err := p.Verify(ctx, d, started); err != nil || !found {
@@ -640,9 +654,16 @@ func TestWithinNamesOnlyThePullRequestsOwn(t *testing.T) {
 	ctx := context.Background()
 	f.comment(1234567, 0, "ana", "Is this safe?", f.now)
 	f.mu.Lock()
-	f.comments = append(f.comments, ghComment{ID: 3000000, PullRequestURL: "https://api.github.com/repos/acme/api/pulls/8", User: ghUser{"ana"}})
+	f.comments = append(f.comments, ghComment{ID: 3000000, PullRequestURL: "https://api.github.com/repos/acme/api/pulls/8", User: ghUser{"ana"}},
+		ghComment{ID: 4000000, PullRequestURL: "https://api.github.com/repos/acme/web/pulls/7", User: ghUser{"ana"}})
 	f.mu.Unlock()
+	for _, target := range []string{"comment:5000000", "thread:PRRT_boom"} {
+		if in, err := p.Within(ctx, pr7, target); err == nil {
+			t.Errorf("Within(%q) on an API failure = %v with no error", target, in)
+		}
+	}
 	for target, want := range map[string]bool{
+		"comment:4000000":              false,
 		"":                             true,
 		"acme/api#7":                   true,
 		"ACME/api#7":                   true,

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -35,7 +36,7 @@ var (
 // Publish sends d to the plugin once. An error that may follow a post, the
 // plugin's own or a call it never answered, starts with
 // src.ErrMayHavePosted's text, so the outbox asks a person to confirm a
-// retry.
+// retry; the plugin's stale refusal is outbox.ErrStale.
 func (p Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, error) {
 	c, err := p.Kind.Client(p.ID)
 	if err != nil {
@@ -44,6 +45,9 @@ func (p Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, 
 	ev, err := c.Publish(ctx, WireDraft(d))
 	if errors.Is(err, src.ErrNoAnswer) && !errors.Is(err, src.ErrMayHavePosted) {
 		err = fmt.Errorf("%w: the plugin did not answer: %w", src.ErrMayHavePosted, err)
+	}
+	if errors.Is(err, src.ErrStale) {
+		err = fmt.Errorf("%w: %w", outbox.ErrStale, err)
 	}
 	return draft.Evidence(ev), err
 }

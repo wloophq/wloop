@@ -315,7 +315,7 @@ func draftPB(d Draft) *pb.Draft {
 		Id: d.ID, Unit: unitPB(d.Unit), Items: d.Items, Task: d.Task, Kind: d.Kind, Purpose: d.Purpose,
 		Delivery: d.Delivery, Effects: d.Effects, Target: d.Target, Broadcast: d.Broadcast, Text: d.Text, Reaction: d.Reaction,
 		Replaced: d.Replaced, State: d.State, Evidence: draftEvidencePB(d.Evidence),
-		PayloadJson: d.Payload, Basis: d.Basis, Hold: d.Hold,
+		PayloadJson: d.Payload, Basis: d.Basis, Hold: d.Hold, Why: d.Why,
 		Origin: &pb.DraftOrigin{Kind: o.Kind, TurnSeq: o.TurnSeq, Intent: o.Intent, Workflow: o.Workflow, Rule: o.Rule, Key: o.Key, Unit: unitPB(o.Unit)},
 	}
 }
@@ -326,7 +326,7 @@ func draftGo(d *pb.Draft) Draft {
 		ID: d.GetId(), Unit: unitGo(d.GetUnit()), Items: d.GetItems(), Task: d.GetTask(), Kind: d.GetKind(), Purpose: d.GetPurpose(),
 		Delivery: d.GetDelivery(), Effects: d.GetEffects(), Target: d.GetTarget(), Broadcast: d.GetBroadcast(), Text: d.GetText(), Reaction: d.GetReaction(),
 		Replaced: d.GetReplaced(), State: d.GetState(), Evidence: draftEvidenceGo(d.GetEvidence()),
-		Payload: raw(d.GetPayloadJson()), Basis: d.GetBasis(), Hold: d.GetHold(),
+		Payload: raw(d.GetPayloadJson()), Basis: d.GetBasis(), Hold: d.GetHold(), Why: d.GetWhy(),
 		Origin: DraftOrigin{Kind: o.GetKind(), TurnSeq: o.GetTurnSeq(), Intent: o.GetIntent(), Workflow: o.GetWorkflow(), Rule: o.GetRule(), Key: o.GetKey(), Unit: unitGo(o.GetUnit())},
 	}
 }

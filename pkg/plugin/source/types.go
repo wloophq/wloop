@@ -303,6 +303,9 @@ type Draft struct {
 	// Hold keeps the draft waiting for a person whatever the approval rules
 	// say.
 	Hold bool
+	// Why is why the proposer proposes the draft, for the person approving
+	// it; "" for none.
+	Why string
 }
 
 // Placed is where a publisher puts a draft when it is proposed: the target a

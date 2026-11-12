@@ -2327,7 +2327,9 @@ type Draft struct {
 	// basis is what the proposer read the unit at, "" for none.
 	Basis string `protobuf:"bytes,18,opt,name=basis,proto3" json:"basis,omitempty"`
 	// hold keeps the draft waiting for a person whatever the approval rules say.
-	Hold          bool `protobuf:"varint,19,opt,name=hold,proto3" json:"hold,omitempty"`
+	Hold bool `protobuf:"varint,19,opt,name=hold,proto3" json:"hold,omitempty"`
+	// why is why the proposer proposes the draft, for the person approving it.
+	Why           string `protobuf:"bytes,20,opt,name=why,proto3" json:"why,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2493,6 +2495,13 @@ func (x *Draft) GetHold() bool {
 		return x.Hold
 	}
 	return false
+}
+
+func (x *Draft) GetWhy() string {
+	if x != nil {
+		return x.Why
+	}
+	return ""
 }
 
 type Placement struct {
@@ -10838,7 +10847,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\rDraftEvidence\x12\x10\n" +
 	"\x03ref\x18\x01 \x01(\tR\x03ref\x12\x1c\n" +
 	"\tpermalink\x18\x02 \x01(\tR\tpermalink\x12*\n" +
-	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\xa7\x04\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\xb9\x04\n" +
 	"\x05Draft\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12)\n" +
 	"\x04unit\x18\x02 \x01(\v2\x15.wloop.plugin.v1.UnitR\x04unit\x12\x14\n" +
@@ -10859,7 +10868,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\tbroadcast\x18\x10 \x01(\tR\tbroadcast\x12!\n" +
 	"\fpayload_json\x18\x11 \x01(\fR\vpayloadJson\x12\x14\n" +
 	"\x05basis\x18\x12 \x01(\tR\x05basis\x12\x12\n" +
-	"\x04hold\x18\x13 \x01(\bR\x04hold\"g\n" +
+	"\x04hold\x18\x13 \x01(\bR\x04hold\x12\x10\n" +
+	"\x03why\x18\x14 \x01(\tR\x03why\"g\n" +
 	"\tPlacement\x12\x12\n" +
 	"\x04repo\x18\x01 \x01(\tR\x04repo\x12\x1a\n" +
 	"\bcheckout\x18\x02 \x01(\tR\bcheckout\x12\x12\n" +
