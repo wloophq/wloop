@@ -79,10 +79,14 @@ func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {
 	return string(id), err
 }
 
-// atGateRev says whether held draft d is at the rev its gate g opened for. When Gates places no task before
+// atGateRev says whether held draft d is at the rev its gate g opened for; a draft starts at rev 1, so a
+// gate of rev 0 never matches. When Gates places no task before
 // a gate opens, the draft adopts its gate's task after, which is one rev on; that write alone may follow
 // the gate's, since every revision of a held draft supersedes its gate first.
 func (s *Service) atGateRev(d draft.Draft, g gate.Gate) bool {
+	if g.ApprovedRev < 1 {
+		return false
+	}
 	if d.Rev == g.ApprovedRev {
 		return true
 	}

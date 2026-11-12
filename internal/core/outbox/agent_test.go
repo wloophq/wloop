@@ -338,6 +338,14 @@ func TestFailedRevisedGoesHeld(t *testing.T) {
 // the held draft's Rev, or is 0, queues nothing.
 func TestSendPostsOnlyApprovedRev(t *testing.T) {
 	e, _ := reviewEnv()
+	zero := e.propose(review("COMMENT"))
+	g0 := e.gate(zero.ID)
+	g0.ApprovedRev, g0.Status, g0.By = 0, gate.Approved, task.ActorPerson
+	at0 := e.get(zero.ID)
+	at0.Rev = 0
+	if e.svc.atGateRev(at0, g0) {
+		t.Fatal("a gate of rev 0 matched")
+	}
 	d := e.propose(review("COMMENT"))
 	if g := e.gate(d.ID); g.ApprovedRev != d.Rev {
 		t.Fatalf("the gate opened for rev %d, the draft is at %d", g.ApprovedRev, d.Rev)
