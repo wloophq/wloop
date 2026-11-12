@@ -181,15 +181,9 @@ type DraftOrigin struct {
 	Unit string `json:"unit,omitempty"`
 }
 
-// The kinds of draft the user writes: a reply in the unit's conversation (a comment on a pull request) and
-// a reaction to it.
-const (
-	DraftReply = "reply"
-	DraftReact = "react"
-)
-
-// DraftCreate is a draft the user writes on Unit, for Task and its Items when set: Kind DraftReply with
-// Text, or DraftReact with Reaction. It waits in the Outbox for approval, unless Send approves it at once
+// DraftCreate is a draft the user writes on Unit, for Task and its Items when set: Text, a reply its plugin
+// posts as its default kind, or Reaction alone, which its plugin posts as its first kind that reacts; Kind
+// names another kind its plugin declares. It waits in the Outbox for approval, unless Send approves it at once
 // to go out through the same publisher. Source is cockpit, notification, tui or terminal.
 type DraftCreate struct {
 	Unit     unit.Unit `json:"unit"`

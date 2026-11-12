@@ -323,7 +323,7 @@ done({
 	}
 	want := []any{
 		map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
-		map[string]any{"path": "/api/tasks/t-0123456789abcdef/reply", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."}}},
+		map[string]any{"path": "/api/tasks/t-0123456789abcdef/reply", "body": map[string]any{"source": "cockpit", "args": map[string]any{"send": "draft", "text": "We ship Friday."}}},
 	}
 	if mustJS(t, got.Posts) != mustJS(t, want) {
 		t.Errorf("posts %v, want %v", got.Posts, want)
@@ -370,8 +370,8 @@ done({ Label: label, Checked: checked, Posts: posts.map((p) => p.body.args) });`
 		t.Errorf("served on: label %q, checked %v", on.Label, on.Checked)
 	}
 	wantOn := []any{
-		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday.", "broadcast": "true"},
-		map[string]any{"kind": "reply", "send": "now", "text": "Merged.", "broadcast": "false"},
+		map[string]any{"send": "draft", "text": "We ship Friday.", "broadcast": "true"},
+		map[string]any{"send": "now", "text": "Merged.", "broadcast": "false"},
 	}
 	if mustJS(t, on.Posts) != mustJS(t, wantOn) {
 		t.Errorf("served on: posts %v, want %v", on.Posts, wantOn)
@@ -385,8 +385,8 @@ done({ Label: label, Checked: checked, Posts: posts.map((p) => p.body.args) });`
 		t.Errorf("no thread to broadcast from: the composer offers %q", none.Label)
 	}
 	wantNone := []any{
-		map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."},
-		map[string]any{"kind": "reply", "send": "now", "text": "Merged."},
+		map[string]any{"send": "draft", "text": "We ship Friday."},
+		map[string]any{"send": "now", "text": "Merged."},
 	}
 	if mustJS(t, none.Posts) != mustJS(t, wantNone) {
 		t.Errorf("no thread: posts %v, want %v", none.Posts, wantNone)
@@ -515,7 +515,7 @@ done({ Primary: cls(compose, "primary")[0].textContent, Replies: buttons.slice(1
 		}
 		want := []any{
 			map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
-			map[string]any{"path": "/api/tasks/t-0123456789abcdef/respond", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": send, "text": "We ship Friday."}}},
+			map[string]any{"path": "/api/tasks/t-0123456789abcdef/respond", "body": map[string]any{"source": "cockpit", "args": map[string]any{"send": send, "text": "We ship Friday."}}},
 		}
 		if mustJS(t, got.Posts) != mustJS(t, want) {
 			t.Errorf("send %s: posts %v, want %v", send, got.Posts, want)

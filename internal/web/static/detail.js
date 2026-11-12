@@ -355,7 +355,7 @@ function replyArgs(c, send) {
   const text = c.text.trim();
   const reaction = c.reaction.trim().replace(/^:|:$/g, "");
   if (!text && !reaction) return null;
-  const args = text ? { kind: "reply", text } : { kind: "react", reaction };
+  const args = text ? { text } : { reaction };
   args.send = send ? "now" : "draft";
   return args;
 }

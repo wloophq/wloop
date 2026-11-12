@@ -375,9 +375,9 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		cr.Target = pos[0]
 	}
 	if *react != "" {
-		cr.Kind, cr.Reaction = api.DraftReact, *react
+		cr.Reaction = *react
 	} else {
-		cr.Kind, cr.Text = api.DraftReply, pos[1]
+		cr.Text = pos[1]
 	}
 	if !*send {
 		d, err := c.CreateDraft(ctx, cr)

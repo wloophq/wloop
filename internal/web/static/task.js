@@ -328,7 +328,7 @@ async function replyWith(e, verb, send) {
     detailEnv.notice(t("Write a message first"), true);
     return null;
   }
-  const args = { kind: "reply", text, send };
+  const args = { text, send };
   if (e.reply_broadcast) args.broadcast = String(replyBroadcasts(e));
   const out = await taskAct(e, verb, args);
   if (out) {

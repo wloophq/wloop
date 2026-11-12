@@ -270,7 +270,7 @@ func (e *Env) slackSendDraft(ctx context.Context, c *client.Client, u unit.Unit,
 		}
 		return nil
 	}
-	cr := api.DraftCreate{Unit: u, Kind: api.DraftReply, Text: req.Text, Target: req.Target, Source: string(dturn.Terminal)}
+	cr := api.DraftCreate{Unit: u, Text: req.Text, Target: req.Target, Source: string(dturn.Terminal)}
 	if req.Broadcast {
 		cr.Broadcast = string(draft.BroadcastOn)
 	}
