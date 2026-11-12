@@ -369,6 +369,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.target_joined` | bool | The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft. |
 | `draft.failed` | bool | A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it. |
 | `draft.stale` | bool | A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too. |
+| `draft.failed_kind` | string | The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind. |
+| `draft.failed_ref` | string | The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again. |
 
 ### Gates (`gate.*`)
 

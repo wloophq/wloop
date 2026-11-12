@@ -138,18 +138,6 @@ func TestParseRefusesUnknownFieldsAndBigFiles(t *testing.T) {
 	}
 }
 
-func TestEndorses(t *testing.T) {
-	q := asked().Question
-	q.Options[0].Publishes = true
-	if !q.Endorses("publish", false) || q.Endorses("hold", false) || q.Endorses("", true) {
-		t.Fatal("choice")
-	}
-	c := Question{Kind: "confirm", Text: "q", Publishes: true}
-	if !c.Endorses("", true) || c.Endorses("", false) || (Question{Kind: "confirm", Text: "q"}).Endorses("", true) {
-		t.Fatal("confirm")
-	}
-}
-
 func TestOptionAnswer(t *testing.T) {
 	if got := (Option{ID: "hold", Label: "Hold"}).Answer(); got != "Hold (option hold)" {
 		t.Fatal(got)

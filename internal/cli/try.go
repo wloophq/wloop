@@ -46,7 +46,7 @@ func tryPolicy(command string, stored []string) turns.Policy {
 	for _, sub := range []string{"rev-parse", "diff", "log", "show", "blame", "ls-files", "status", "fetch", "merge-base", "cat-file"} {
 		allow = append(allow, []string{"git", sub})
 	}
-	return turns.Policy{Strict: true, NoGitHubWrites: true, NoMCP: true, Allow: allow, Deny: deny, WritePaths: []string{dturn.ScratchDir}}
+	return turns.Policy{Strict: true, NoMCP: true, Allow: allow, Deny: deny, WritePaths: []string{dturn.ScratchDir}}
 }
 
 // roundPolicy lets an interactive round run the loop commands its
@@ -71,7 +71,7 @@ func probePolicy(command string, stored []string) turns.Policy {
 		allow = append(allow, []string{cmd, "turn", "end"}, []string{cmd, "turn", "answer"})
 	}
 	deny := [][]string{{"gh"}, {"git", "push"}, {"git", "commit"}, {"curl"}}
-	return turns.Policy{Allow: allow, Deny: deny, TurnEnd: true, WritePaths: []string{dturn.ScratchDir}, NoGitHubWrites: true}
+	return turns.Policy{Allow: allow, Deny: deny, TurnEnd: true, WritePaths: []string{dturn.ScratchDir}}
 }
 
 // storedTurnRules allow reading a stored turn of the stored intents only

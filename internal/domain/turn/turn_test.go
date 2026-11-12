@@ -160,7 +160,7 @@ func TestOpenQuestion(t *testing.T) {
 	}
 }
 
-func TestEndorsedBelongsToTheVerdict(t *testing.T) {
+func TestNoTriggerOrAnswerEndorsesAURLOnlyVerdict(t *testing.T) {
 	silent := record.Record{State: record.Asked, Summary: "s", Resume: "r", Question: &record.Question{Kind: "choice", Text: "q", Options: []record.Option{{ID: "nudge", Label: "N", Consequence: "c"}, {ID: "drop", Label: "D", Consequence: "c"}}}}
 	for _, c := range []struct {
 		name    string
@@ -170,10 +170,10 @@ func TestEndorsedBelongsToTheVerdict(t *testing.T) {
 		resume  bool
 		want    string
 	}{
-		{"by hand", "by-hand", askedRecord(true), nil, false, "yes: by hand"},
-		{"by hand, resumed", "by-hand", askedRecord(true), nil, true, "yes: by hand"},
-		{"chose publish", "automated", askedRecord(true), []Answer{{TurnSeq: 1, OptionID: "publish", Source: Cockpit, Route: Typed}}, false, "yes: the user approved"},
-		{"chose publish, then resumed (F9)", "automated", askedRecord(true), []Answer{{TurnSeq: 1, OptionID: "publish", Source: Notification, Route: Resumed}}, true, "yes: the user approved"},
+		{"by hand", "by-hand", askedRecord(true), nil, false, "no"},
+		{"by hand, resumed", "by-hand", askedRecord(true), nil, true, "no"},
+		{"chose publish", "automated", askedRecord(true), []Answer{{TurnSeq: 1, OptionID: "publish", Source: Cockpit, Route: Typed}}, false, "no"},
+		{"chose publish, then resumed (F9)", "automated", askedRecord(true), []Answer{{TurnSeq: 1, OptionID: "publish", Source: Notification, Route: Resumed}}, true, "no"},
 		{"chose hold, published anyway", "automated", askedRecord(true), []Answer{{TurnSeq: 1, OptionID: "hold", Source: Cockpit, Route: Typed}}, false, "no"},
 		{"silent author nudge", "automated", silent, []Answer{{TurnSeq: 1, OptionID: "nudge", Source: Notification, Route: Typed}}, false, "no"},
 		{"free text", "automated", askedRecord(true), []Answer{{TurnSeq: 1, Text: "go ahead", Source: Cockpit, Route: Typed}}, false, "no"},
@@ -306,7 +306,7 @@ func TestHistory(t *testing.T) {
 	if n := len([]rune(h[1].Triage)); n != 1500 || h[1].Summary != "fixed two" || h[1].Next != "watch CI" || h[1].Endorsed != "" {
 		t.Fatalf("done address: %d %+v", n, h[1])
 	}
-	if e := h[2]; e.Verdict != "APPROVE" || e.Endorsed != "yes: by hand" || e.Trigger != "by-hand" || !e.When.Equal(at(10)) ||
+	if e := h[2]; e.Verdict != "APPROVE" || e.Endorsed != "no" || e.Trigger != "by-hand" || !e.When.Equal(at(10)) ||
 		!slices.Equal(e.Said, []string{"ship it", "yes. and say thanks", "no. keep the draft", "be brief"}) {
 		t.Fatalf("review: %+v", e)
 	}

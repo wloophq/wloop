@@ -47,13 +47,14 @@ when      = '!turn.try'
 states    = ["done", "settled", "asked", "failed"]
 missing   = "missing-record"
 artifacts = ["review-draft"]
-outcome   = ["verdict", "url"]
+outcome   = ["verdict", "url", "draft"]
 outcome_doc = '''
 `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.'''
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.'''
 require = [
-  { state = "done", fields = ["verdict"] },
+  { state = "done", fields = ["verdict", "url"] },
   { state = "asked", artifact = "review-draft", fields = ["verdict"] },
 ]
 

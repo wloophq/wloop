@@ -1,10 +1,10 @@
 count: 24
 == review/first/by-hand/guidance
-id: b8ea4069e244
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn b8ea4069e244 https://github.com/acme/api/pull/7` and follow what it prints.
+id: e49e47a8217a
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn e49e47a8217a https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions b8ea4069e244 for review in acme/api.
+Instructions e49e47a8217a for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -193,8 +193,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -236,11 +237,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first/automated
-id: a39d25e2cb2a
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn a39d25e2cb2a https://github.com/acme/api/pull/7` and follow what it prints.
+id: 7eef336350ea
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 7eef336350ea https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions a39d25e2cb2a for review in acme/api.
+Instructions 7eef336350ea for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -423,8 +424,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -466,11 +468,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/changes-requested
-id: 5902c4aee53e
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 5902c4aee53e https://github.com/acme/api/pull/7` and follow what it prints.
+id: e31dd1e8ae2b
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn e31dd1e8ae2b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 5902c4aee53e for review in acme/api.
+Instructions e31dd1e8ae2b for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -699,8 +701,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -742,11 +745,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/no-review-read
-id: e341251b9cbb
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn e341251b9cbb https://github.com/acme/api/pull/7` and follow what it prints.
+id: f2cb558b6723
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn f2cb558b6723 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions e341251b9cbb for review in acme/api.
+Instructions f2cb558b6723 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -975,8 +978,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -1018,11 +1022,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first-planned/automated/reviewed-before
-id: 7b887c2b5249
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 7b887c2b5249 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 85a7899b004c
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 85a7899b004c https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 7b887c2b5249 for review in acme/api.
+Instructions 85a7899b004c for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -1251,8 +1255,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -1294,11 +1299,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/by-hand/approved
-id: dfc1a8e55b41
-prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn dfc1a8e55b41 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 03ee8471206d
+prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 03ee8471206d https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions dfc1a8e55b41 for review in acme/api.
+Instructions 03ee8471206d for review in acme/api.
 
 # Follow-up review of acme/api#7, asked for by you.
 
@@ -1527,8 +1532,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -1729,11 +1735,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/oss-first-time
-id: bd29de32a82d
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn bd29de32a82d https://github.com/acme/api/pull/7` and follow what it prints.
+id: 98301efff0fb
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 98301efff0fb https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/organization=acme/intent=review.md
-Instructions bd29de32a82d for review in acme/api.
+Instructions 98301efff0fb for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -1916,8 +1922,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -1965,11 +1972,11 @@ Welcome a first-time contributor by name before any finding.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/brief/tag-block
-id: cda1df8968b4
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn cda1df8968b4 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 893d3b07bbe2
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 893d3b07bbe2 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/tags/lang=go/intent=review.md
-Instructions cda1df8968b4 for review in acme/api.
+Instructions 893d3b07bbe2 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2152,8 +2159,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -2206,11 +2214,11 @@ Every exported identifier needs a doc comment.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/no-brief
-id: 608aec0ffe04
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 608aec0ffe04 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 2e2ce5f57b43
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 2e2ce5f57b43 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 608aec0ffe04 for review in acme/api.
+Instructions 2e2ce5f57b43 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2393,8 +2401,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -2436,11 +2445,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/delegates
-id: 8d1c1345ef69
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 8d1c1345ef69 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 25e1674e2cfa
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 25e1674e2cfa https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 8d1c1345ef69 for review in acme/api.
+Instructions 25e1674e2cfa for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -2623,8 +2632,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -3676,11 +3686,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered
-id: e66bbeed41d6
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn e66bbeed41d6 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 7d56aaa22bc0
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 7d56aaa22bc0 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions e66bbeed41d6 for review in acme/api.
+Instructions 7d56aaa22bc0 for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -3902,8 +3912,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -3945,11 +3956,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered-after-push
-id: 73093fed3ef0
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 73093fed3ef0 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 70bcb9b8a70f
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 70bcb9b8a70f https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 73093fed3ef0 for review in acme/api.
+Instructions 70bcb9b8a70f for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -4171,8 +4182,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -4556,11 +4568,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/history/injected
-id: 627b20049e6e
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 627b20049e6e https://github.com/acme/api/pull/7` and follow what it prints.
+id: d3f808dc409f
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn d3f808dc409f https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 627b20049e6e for review in acme/api.
+Instructions d3f808dc409f for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -4808,8 +4820,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves
@@ -4974,11 +4987,11 @@ notice from {{name}} that names the gate answered, without the answer; read it
 with the `task_read` tool, or run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
 == end
 == nudge/one-reviewer/guidance
-id: 601276213e9b
-prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 601276213e9b https://github.com/acme/api/pull/7` and follow what it prints.
+id: add9fdd11e4b
+prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn add9fdd11e4b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=nudge.md
-Instructions 601276213e9b for nudge in acme/api.
+Instructions add9fdd11e4b for nudge in acme/api.
 
 # Nudge on acme/api#7, asked for by you.
 
@@ -5098,7 +5111,7 @@ Never pass the JSON on the command line.
 - `summary`: one line, at most 200 characters, plain text: what the user
   reads in the list, on the card and in the notification. For a failure, what
   broke.
-- `outcome` (done): leave `url` out; it is filled when your comment draft is posted.
+- `outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted.
 - `resume` (failed): what a new session needs to finish this turn if
   this one is gone: what is done, what is left, local commits or files you
   wrote.
@@ -5119,11 +5132,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == nudge/maintainers
-id: 5c572221d085
-prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 5c572221d085 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4ff4102cfee1
+prompt: Nudge on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions nudge --turn 4ff4102cfee1 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=nudge.md
-Instructions 5c572221d085 for nudge in acme/api.
+Instructions 4ff4102cfee1 for nudge in acme/api.
 
 # Nudge on acme/api#7, asked for by you.
 
@@ -5282,7 +5295,7 @@ Never pass the JSON on the command line.
 - `summary`: one line, at most 200 characters, plain text: what the user
   reads in the list, on the card and in the notification. For a failure, what
   broke.
-- `outcome` (done): leave `url` out; it is filled when your comment draft is posted.
+- `outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted.
 - `resume` (failed): what a new session needs to finish this turn if
   this one is gone: what is done, what is left, local commits or files you
   wrote.
@@ -5303,11 +5316,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == review/follow-up/automated/re-requested-after-approval
-id: 8e57f53b40d8
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 8e57f53b40d8 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 84719db73d9d
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 84719db73d9d https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 8e57f53b40d8 for review in acme/api.
+Instructions 84719db73d9d for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -5540,8 +5553,9 @@ Never pass the JSON on the command line.
   reads in the list, on the card and in the notification. For a question,
   the decision itself; for a failure, what broke.
 - `outcome`: on `done` and on `asked`, the `verdict` your review draft
-  posts, `blocking` and `non_blocking`; leave `url` out: it is filled
-  when the draft is posted.
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
   `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
   choosing it approves), `confirm` (yes or no; `draft` when yes approves

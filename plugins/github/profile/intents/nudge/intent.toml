@@ -59,5 +59,6 @@ why  = "{{.pr.nudge.refusal}}"
 
 [record]
 states  = ["done", "failed"]
-outcome = ["url"]
-outcome_doc = "`outcome` (done): leave `url` out; it is filled when your comment draft is posted."
+outcome = ["url", "draft"]
+outcome_doc = "`outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted."
+require = [{ state = "done", fields = ["url"] }]

@@ -41,7 +41,7 @@ func TestLastVerdictIsTheNewestPublishedTurnBeyondTheHistory(t *testing.T) {
 	b.Turns = append(b.Turns, Turn{Seq: 13, Intent: "address", Trigger: ByHand, State: Done, SentAt: at(13)})
 	b.Records = append(b.Records, Record{TurnSeq: 13, Head: "h3", At: at(13), Record: approve})
 	got, ok := b.LastVerdict("review")
-	if !ok || got.Head != "h1" || got.Verdict != "APPROVE" || got.Endorsed != EndorsedByHand || !got.At.Equal(at(1)) {
+	if !ok || got.Head != "h1" || got.Verdict != "APPROVE" || got.Endorsed != NotEndorsed || !got.At.Equal(at(1)) {
 		t.Fatalf("%+v %v", got, ok)
 	}
 	if _, ok := (&Book{Unit: r7, Turns: b.Turns[1:12], Records: b.Records[1:12]}).LastVerdict("review"); ok {

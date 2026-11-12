@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -57,8 +58,34 @@ func keyQuery(m message.Message) (string, []any) {
 	return "", nil
 }
 
+// pinnedConfirm is how the options column holds a confirm's draft: a confirm has no options, and its
+// pin is part of what the person saw, so a message keeps it beside them.
+type pinnedConfirm struct {
+	Options []record.Option  `json:"options"`
+	Draft   *record.DraftRef `json:"draft"`
+}
+
+func encodeOptions(m message.Message) ([]byte, error) {
+	if m.Draft != nil {
+		return json.Marshal(pinnedConfirm{Options: nonNilOptions(m.Options), Draft: m.Draft})
+	}
+	return json.Marshal(nonNilOptions(m.Options))
+}
+
+func decodeOptions(raw string, m *message.Message) error {
+	if strings.HasPrefix(strings.TrimSpace(raw), "{") {
+		var p pinnedConfirm
+		if err := json.Unmarshal([]byte(raw), &p); err != nil {
+			return err
+		}
+		m.Options, m.Draft = p.Options, p.Draft
+		return nil
+	}
+	return json.Unmarshal([]byte(raw), &m.Options)
+}
+
 func (s *Messages) Upsert(ctx context.Context, m message.Message) (message.Message, error) {
-	options, err := json.Marshal(nonNilOptions(m.Options))
+	options, err := encodeOptions(m)
 	if err != nil {
 		return message.Message{}, err
 	}
@@ -182,7 +209,7 @@ func scanMessage(row rowScanner) (message.Message, error) {
 		return message.Message{}, err
 	}
 	m.Unit.Provider, m.Kind = unit.ProviderID(provider), message.Kind(kind)
-	if err := json.Unmarshal([]byte(options), &m.Options); err != nil {
+	if err := decodeOptions(options, &m); err != nil {
 		return message.Message{}, fmt.Errorf("the options of message %d: %w", m.ID, err)
 	}
 	if len(m.Options) == 0 {

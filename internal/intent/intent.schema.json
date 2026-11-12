@@ -516,7 +516,8 @@
           "items": {
             "enum": [
               "verdict",
-              "url"
+              "url",
+              "draft"
             ],
             "type": "string"
           },

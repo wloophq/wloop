@@ -68,7 +68,7 @@ func TestJudgeRunsWithNoToolsInDir(t *testing.T) {
 	if s.Worktree != dir || s.Home != "" {
 		t.Fatalf("session %+v", s)
 	}
-	if want := (turns.Policy{Strict: true, NoGitHubWrites: true, NoMCP: true}); !reflect.DeepEqual(s.Policy, want) {
+	if want := (turns.Policy{Strict: true, NoMCP: true}); !reflect.DeepEqual(s.Policy, want) {
 		t.Fatalf("policy %+v, want %+v", s.Policy, want)
 	}
 }

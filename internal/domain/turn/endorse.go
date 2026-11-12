@@ -3,7 +3,6 @@ package turn
 import "github.com/wloophq/wloop/internal/domain/record"
 
 const (
-	EndorsedByHand   = "yes: by hand"
 	EndorsedApproved = "yes: the user approved"
 	NotEndorsed      = "no"
 )
@@ -25,24 +24,15 @@ func (b *Book) Chain(seq int64) []Turn {
 }
 
 // Endorsed says whether the user stands behind the verdict the turn
-// published. A turn without a done verdict published nothing to endorse.
+// published: only the loop's record of a draft the user approved says so.
+// A url an agent wrote, a by-hand trigger and an answer endorse nothing, and
+// neither does a rule's or a window's release.
 func (b *Book) Endorsed(seq int64) string {
-	chain := b.Chain(seq)
-	if len(chain) == 0 || !b.published(seq) {
+	if !b.published(seq) {
 		return NotEndorsed
 	}
-	if chain[len(chain)-1].Trigger == ByHand {
-		return EndorsedByHand
-	}
-	for _, t := range chain {
-		for _, a := range b.Answers {
-			if a.TurnSeq != t.Seq || a.Source == Terminal || (a.Route != Typed && a.Route != Resumed) {
-				continue
-			}
-			if q, ok := b.answered(a); ok && q.Endorses(a.OptionID, a.Yes) {
-				return EndorsedApproved
-			}
-		}
+	if done, _ := b.LastRecord(seq); done.Record.Outcome.Draft != nil && done.Record.Outcome.Approved {
+		return EndorsedApproved
 	}
 	return NotEndorsed
 }
@@ -50,16 +40,4 @@ func (b *Book) Endorsed(seq int64) string {
 func (b *Book) published(seq int64) bool {
 	done, ok := b.LastRecord(seq)
 	return ok && done.Record.State == record.Done && done.Record.Outcome != nil && done.Record.Outcome.Verdict != ""
-}
-
-// answered is the question the answer answered: the newest asked record of
-// its turn at or before it.
-func (b *Book) answered(a Answer) (*record.Question, bool) {
-	for i := len(b.Records) - 1; i >= 0; i-- {
-		r := b.Records[i]
-		if r.TurnSeq == a.TurnSeq && r.Record.State == record.Asked && r.Record.Question != nil && !r.At.After(a.At) {
-			return r.Record.Question, true
-		}
-	}
-	return nil, false
 }

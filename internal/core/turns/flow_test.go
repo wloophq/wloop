@@ -97,7 +97,7 @@ func TestFlowRunsWithoutEditingTheCore(t *testing.T) {
 		}
 		b = bookOf(t, store, r7)
 		h := b.History(10)
-		if b.Turns[0].State != turn.Done || len(h) != 1 || h[0].Verdict != "APPROVE" || h[0].Endorsed != turn.EndorsedApproved {
+		if b.Turns[0].State != turn.Done || len(h) != 1 || h[0].Verdict != "APPROVE" || h[0].Endorsed != turn.NotEndorsed {
 			t.Fatalf("turn %+v, history %+v", b.Turns[0], h)
 		}
 		column(view.Done)

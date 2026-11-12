@@ -51,7 +51,7 @@ func TestHistoryMapsEndorsementTriageAndWhatTheUserSaid(t *testing.T) {
 		t.Fatalf("newest first: %+v", h)
 	}
 	first := h[2]
-	if first.Verdict != "APPROVE" || first.Endorsed != turn.EndorsedByHand || first.Summary != "approved" || first.Next != "the docs" || first.Trigger != "by-hand" || first.State != "done" {
+	if first.Verdict != "APPROVE" || first.Endorsed != turn.NotEndorsed || first.Summary != "approved" || first.Next != "the docs" || first.Trigger != "by-hand" || first.State != "done" {
 		t.Fatalf("%+v", first)
 	}
 	address := h[1]

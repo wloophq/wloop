@@ -343,7 +343,8 @@ func TestSchemaMatchesTheRecord(t *testing.T) {
 		t.Fatalf("arguments: %+v", in)
 	}
 	got := schemaFields(t, in.Properties["record"], "")
-	want := jsonFields(reflect.TypeFor[record.Record](), "")
+	// outcome.approved is the loop's own; Validate refuses it in an agent's record.
+	want := slices.DeleteFunc(jsonFields(reflect.TypeFor[record.Record](), ""), func(f string) bool { return f == "outcome.approved" })
 	slices.Sort(got)
 	slices.Sort(want)
 	if !slices.Equal(got, want) {

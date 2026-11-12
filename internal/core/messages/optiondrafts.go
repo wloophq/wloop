@@ -1,0 +1,114 @@
+package messages
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"strconv"
+
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/record"
+)
+
+// ReasonOtherOption is why a draft another option pointed to is withdrawn once one option's draft is approved.
+const ReasonOtherOption = "other_option"
+
+// OptionDrafts are the drafts a question's options point to, as the outbox and the gates service keep them.
+type OptionDrafts interface {
+	// DraftGate is draft id and the newest gate it waits or waited on; false when there is no such draft or gate.
+	DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error)
+	// ApproveOption resolves question with r and approves drafted at rev with the same resolver, as
+	// gates.Service.ApproveOption does.
+	ApproveOption(ctx context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error
+	// WithdrawHeld withdraws draft id while it is still held, with reason; one no longer held is left as it is.
+	WithdrawHeld(ctx context.Context, id int64, reason string) error
+}
+
+// approveOption approves the draft the option a picks on question message m points to, or a confirm's
+// draft its yes points to, when g, m's gate, was resolved by the user, and withdraws the drafts the other
+// options point to; it says whether it did, so the answer ends the turn on the draft's send instead of
+// resuming it. The draft must be held by m's turn on m's unit at the rev the question pinned, and the
+// resolver must be neither a session that proposed or revised it nor the turn's; else the pick resumes the
+// turn as any answer does. A call made again after the approval completes what is left.
+func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {
+	if s.Drafts == nil || m.Kind != message.Question {
+		return false, nil
+	}
+	ref, ok := pickedDraft(m, a)
+	if !ok {
+		return false, nil
+	}
+	if g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
+		return false, nil
+	}
+	d, dg, ok, err := s.ofTurn(ctx, m, ref.ID)
+	switch {
+	case err != nil:
+		return false, err
+	case !ok || turns.ProposedOrRevised(dg, d, g.BySession):
+		s.logf("messages: option %s of message %d points to draft %d, which its pick does not approve; the turn resumes", a.OptionID, m.ID, ref.ID)
+		return false, nil
+	}
+	switch {
+	case dg.Status == gate.Open && d.State == draft.Held && (ref.Rev != int64(d.Rev) || ref.Rev != dg.ApprovedRev):
+		s.logf("messages: draft %d is at rev %d, not the rev %d its question pinned; the turn resumes", ref.ID, d.Rev, ref.Rev)
+		return false, nil
+	case dg.Status == gate.Open && d.State == draft.Held:
+		r := gates.Resolution{Status: g.Status, Intent: g.Intent, Answer: g.Answer, By: g.By, Rule: g.Rule, Session: g.BySession}
+		err := s.Drafts.ApproveOption(ctx, g, r, dg, ref.Rev)
+		if errors.Is(err, gates.ErrRefused) {
+			s.logf("messages: the gates refused draft %d at rev %d for option %s of message %d: %v; the turn resumes", ref.ID, ref.Rev, a.OptionID, m.ID, err)
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+	case dg.Status == gate.Approved && dg.ApprovedRev == ref.Rev && dg.By == g.By && dg.BySession == g.BySession:
+	default:
+		return false, nil
+	}
+	for _, o := range m.Options {
+		if o.Draft == nil || o.Draft.ID == ref.ID {
+			continue
+		}
+		if _, _, ok, err := s.ofTurn(ctx, m, o.Draft.ID); err != nil || !ok {
+			continue
+		}
+		if err := s.Drafts.WithdrawHeld(ctx, o.Draft.ID, ReasonOtherOption); err != nil {
+			s.logf("messages: withdrawing draft %d of option %s of message %d: %v", o.Draft.ID, o.ID, m.ID, err)
+		}
+	}
+	return true, nil
+}
+
+// pickedDraft is the draft a points to on m, as m pinned it when the person saw it: its option's, or the
+// confirm's on a yes.
+func pickedDraft(m message.Message, a Answer) (record.DraftRef, bool) {
+	if m.Confirm {
+		if !a.Yes || m.Draft == nil {
+			return record.DraftRef{}, false
+		}
+		return *m.Draft, true
+	}
+	i := slices.IndexFunc(m.Options, func(o record.Option) bool { return o.ID == a.OptionID })
+	if a.OptionID == "" || i < 0 || m.Options[i].Draft == nil {
+		return record.DraftRef{}, false
+	}
+	return *m.Options[i].Draft, true
+}
+
+// ofTurn is draft id and its gate when the draft is one m's turn proposed on m's unit; false otherwise.
+func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draft.Draft, gate.Gate, bool, error) {
+	d, dg, ok, err := s.Drafts.DraftGate(ctx, id)
+	if err != nil || !ok {
+		return draft.Draft{}, gate.Gate{}, false, err
+	}
+	onUnit := d.Unit == m.Unit || d.Origin.Unit == m.Unit
+	byTurn := (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && d.Origin.TurnSeq == m.Origin.TurnSeq
+	ofDraft := dg.Kind == gate.KindDraft && dg.Subject == strconv.FormatInt(id, 10)
+	return d, dg, int64(d.ID) == id && onUnit && byTurn && ofDraft, nil
+}
