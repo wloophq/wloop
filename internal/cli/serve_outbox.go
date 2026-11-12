@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
@@ -43,7 +45,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	}
 	effects := publishers(pubs, cfg)
 	e.outbox = &outbox.Service{Store: endingDrafts{Store: db.Drafts(), ended: e.draftEnded, logf: logf}, Gates: draftGates{e, db, logf}, Effects: effects, Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
-		Kinds: draftKinds, Bases: publisherBases(effects), OnSent: []func(context.Context, draft.Draft) error{e.draftSent, e.ruleSent},
+		Kinds: draftKinds, Bases: recentBases(publisherBases(effects), clockFunc(e.Now), e.background, logf), OnSent: []func(context.Context, draft.Draft) error{e.draftSent, e.ruleSent},
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Silent: builtin.SilentEffect,
@@ -70,6 +72,17 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 // publisherBases read a unit's live basis from the publisher of its draft; a publisher that reads none
 // answers "", and a provider with none fails, so no draft is taken as fresh unread.
 func publisherBases(effects outbox.Effects) outbox.Bases { return basesOf(effects) }
+
+// recentBases share a unit's basis read among the drafts' cards for basisFresh, a read bounded by basisReadTimeout
+// and run on reads, which serve waits for.
+func recentBases(b outbox.Bases, clock port.Clock, reads *sync.WaitGroup, logf func(string, ...any)) *outbox.RecentBases {
+	return &outbox.RecentBases{Bases: b, Clock: clock, Fresh: basisFresh, ReadTimeout: basisReadTimeout, Reads: reads, Log: logf}
+}
+
+const (
+	basisFresh       = 30 * time.Second
+	basisReadTimeout = 10 * time.Second
+)
 
 type basesOf outbox.Effects
 
@@ -110,7 +123,8 @@ func (e *Env) draftVerdict(d draft.Draft) string {
 }
 
 // resumeDrafts point to the drafts the turns of seq's chain proposed on b's unit that are still held or failed,
-// with current the unit's basis now, "" when unknown; none while the daemon serves no outbox.
+// with current the unit's basis now, "" when unknown, and each one's staleness as the outbox tells it; none while
+// the daemon serves no outbox.
 func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current string) []instructions.Draft {
 	if e.outbox == nil {
 		return nil
@@ -128,7 +142,10 @@ func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current
 		agent := d.Origin.ByAgent()
 		return !agent || !slices.Contains(seqs, d.Origin.TurnSeq)
 	})
-	return instructions.Pointers(ds, current)
+	return instructions.Pointers(ds, current, func(d draft.Draft) bool {
+		stale, _ := e.outbox.Staleness(ctx, d)
+		return stale
+	})
 }
 
 // endingDrafts are the outbox's drafts, telling ended each draft that fails or is dropped as it is stored so.

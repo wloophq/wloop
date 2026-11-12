@@ -134,19 +134,21 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 	}
 	if !atGateRev(d, g) {
 		s.logf("draft %d failed on its release: its gate approved rev %d, it is at %d", d.ID, g.ApprovedRev, d.Rev)
-		return s.failHeld(ctx, d, fmt.Sprintf("it changed after its gate opened: its gate approved rev %d, it is at rev %d", g.ApprovedRev, d.Rev))
+		return s.failHeld(ctx, d, "", fmt.Sprintf("it changed after its gate opened: its gate approved rev %d, it is at rev %d", g.ApprovedRev, d.Rev))
 	}
 	if !g.ByUser() {
 		if why := s.unreleasable(d); why != "" {
 			s.logf("draft %d failed on its release: %s", d.ID, why)
-			return s.failHeld(ctx, d, why)
+			return s.failHeld(ctx, d, "", why)
 		}
 	}
 	if err := s.fresh(ctx, d); err != nil {
-		return s.failHeld(ctx, d, failure(err))
+		cause, msg := failure(err)
+		return s.failHeld(ctx, d, cause, msg)
 	}
 	if err := s.publishable(ctx, &d); err != nil {
-		return s.failHeld(ctx, d, failure(err))
+		cause, msg := failure(err)
+		return s.failHeld(ctx, d, cause, msg)
 	}
 	d.State = draft.Queued
 	if _, err = s.save(ctx, d, draft.Held); !errors.Is(err, ErrConflict) {
@@ -155,7 +157,7 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 	if d, err = s.Store.Get(ctx, id); err != nil || d.State != draft.Held {
 		return err
 	}
-	return s.failHeld(ctx, d, "it changed as its gate released it")
+	return s.failHeld(ctx, d, "", "it changed as its gate released it")
 }
 
 // unreleasable is why no rule may release d now, "" when one may.
@@ -175,8 +177,8 @@ func (s *Service) unreleasable(d draft.Draft) string {
 	return ""
 }
 
-func (s *Service) failHeld(ctx context.Context, d draft.Draft, reason string) error {
-	d.State, d.Error = draft.Failed, reason
+func (s *Service) failHeld(ctx context.Context, d draft.Draft, cause draft.Cause, reason string) error {
+	d.State, d.Cause, d.Error = draft.Failed, cause, reason
 	_, err := s.save(ctx, d, draft.Held)
 	return err
 }

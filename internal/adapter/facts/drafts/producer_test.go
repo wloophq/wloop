@@ -32,7 +32,6 @@ func (staleHead) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence
 }
 
 func TestStaleFactFromPublisherRefusalAfterRestart(t *testing.T) {
-	t.Skip("T3/T5: runs once the outbox stores a stale refusal with the prefix factdrafts.StalePrefix")
 	ctx := context.Background()
 	clock := at{time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)}
 	path := filepath.Join(t.TempDir(), "state", "store.db")

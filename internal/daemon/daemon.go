@@ -305,9 +305,6 @@ type Deps struct {
 	// Notices are what the workflows raise for the user, streamed to the
 	// event subscribers as they come; nil raises none.
 	Notices Notices
-	// Stale says whether a held draft's unit moved past its basis, a live
-	// read; nil asks the Outbox, when it can tell.
-	Stale func(ctx context.Context, d draft.Draft) (bool, error)
 
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
@@ -454,11 +451,6 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
-	// refusedStale keeps, by draft id, the rev an approval or a retry was refused at as stale.
-	refusedStale sync.Map
-	// basisReads are the live basis reads the drafts' cards share, by unit and kind; basisMu guards them.
-	basisMu    sync.Mutex
-	basisReads map[string]*basisRead
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.

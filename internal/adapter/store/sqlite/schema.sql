@@ -458,7 +458,9 @@ CREATE TABLE drafts (
   -- who wrote its current content: person, session, rule or window, and the session of a session's
   by_kind TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT '',
   -- the row's write counter, which every write bumps and checks; rev is its content's revision
-  version INTEGER NOT NULL DEFAULT 1
+  version INTEGER NOT NULL DEFAULT 1,
+  -- why it failed or its approval was refused, as its readers act on it: 'stale', 'unconfirmed' or ''
+  cause TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);

@@ -5,7 +5,6 @@ package factdrafts
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -49,7 +48,7 @@ func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 			continue
 		}
 		out[FactFailed] = true
-		if stale(d) {
+		if d.Cause == draft.CauseStale {
 			out[FactStale] = true
 		}
 		if newest == nil || newer(d, *newest) {
@@ -63,10 +62,6 @@ func (p Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 	return out, nil
 }
 
-// StalePrefix starts the failure the outbox stores for a draft whose send it refused as stale, a failure
-// that wraps outbox.ErrStale; a publisher's free text never counts.
-const StalePrefix = "stale:"
-
 // newer says whether a failed after b: it was updated later, or at once with a higher id.
 func newer(a, b draft.Draft) bool {
 	if !a.UpdatedAt.Equal(b.UpdatedAt) {
@@ -74,5 +69,3 @@ func newer(a, b draft.Draft) bool {
 	}
 	return a.ID > b.ID
 }
-
-func stale(d draft.Draft) bool { return strings.HasPrefix(d.Error, StalePrefix) }

@@ -30,7 +30,7 @@ The drafted verdict: {{.}}, {{$.Resume.Blocking}} blocking, {{$.Resume.NonBlocki
 {{- with .Resume.Drafts}}
 The drafts it left, which nothing posted yet; read one with `draft_read` before you revise or withdraw it:
 {{range .}}
-- draft {{.ID}}, a {{.Kind}}, {{.State}}{{with .Basis}}, written against `{{.}}`{{end}}{{if .Stale}}; the unit is now at `{{.CurrentBasis}}`, so it is stale{{end}}
+- draft {{.ID}}, a {{.Kind}}, {{.State}}{{with .Basis}}, written against `{{.}}`{{end}}{{if .Stale}}; {{with .CurrentBasis}}the unit is now at `{{.}}`, so {{end}}it is stale{{end}}
 {{- end}}
 {{end}}
 {{- with .Resume.ArtifactKind}}

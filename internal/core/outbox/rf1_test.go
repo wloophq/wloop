@@ -235,7 +235,7 @@ func TestPersonAmendRacingAgentGivesOneRevConflict(t *testing.T) {
 	}
 }
 
-func TestOnlyAStaleRefusalStartsAFailureWithTheStaleToken(t *testing.T) {
+func TestOnlyAStaleRefusalFailsADraftAsStale(t *testing.T) {
 	for name, c := range map[string]struct {
 		live     error
 		publish  error
@@ -243,7 +243,7 @@ func TestOnlyAStaleRefusalStartsAFailureWithTheStaleToken(t *testing.T) {
 		contains string
 	}{
 		"a live read that fails":             {live: errBoom, contains: "boom"},
-		"a publisher's text that says stale": {publish: fmt.Errorf("stale: whatever the API said"), contains: "error: stale:"},
+		"a publisher's text that says stale": {publish: fmt.Errorf("stale: whatever the API said"), contains: "stale: whatever"},
 		"a publisher's ErrStale":             {publish: fmt.Errorf("github refused: %w", ErrStale), stale: true},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -256,9 +256,9 @@ func TestOnlyAStaleRefusalStartsAFailureWithTheStaleToken(t *testing.T) {
 			if _, failed, _ := e.svc.Send(ctx); failed != 1 {
 				t.Fatalf("failed %d", failed)
 			}
-			got := e.get(d.ID).Error
-			if strings.HasPrefix(got, StalePrefix) != c.stale || !strings.Contains(got, c.contains) {
-				t.Fatalf("Error %q", got)
+			got := e.get(d.ID)
+			if (got.Cause == draft.CauseStale) != c.stale || !strings.Contains(got.Error, c.contains) {
+				t.Fatalf("cause %q, Error %q", got.Cause, got.Error)
 			}
 		})
 	}

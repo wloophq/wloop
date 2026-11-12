@@ -151,12 +151,29 @@ func TestRetryByHandPublishesOnce(t *testing.T) {
 }
 
 func TestRetryOfUnconfirmedPostNeedsConfirm(t *testing.T) {
-	for _, cause := range []string{NotConfirmed, "may have been posted: timeout"} {
+	for cause, fail := range map[string]func(e *env, d draft.Draft){
+		"may have been posted: timeout": func(e *env, _ draft.Draft) {
+			e.fx.failWith = errors.New("may have been posted: timeout")
+			e.svc.Send(ctx)
+		},
+		NotConfirmed: func(e *env, d draft.Draft) {
+			d = e.get(d.ID)
+			d.State, d.SendingAt = draft.Sending, t0
+			if _, err := e.store.Update(ctx, d, draft.Queued); err != nil {
+				t.Fatal(err)
+			}
+			if err := e.svc.Recover(ctx); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
 		e := newEnv()
 		d := e.propose(reply("x"))
 		e.approve(d.ID, nil)
-		e.fx.failWith = errors.New(cause)
-		e.svc.Send(ctx)
+		fail(e, d)
+		if got := e.get(d.ID); got.Cause != draft.CauseUnconfirmed || got.Error != cause {
+			t.Fatalf("%s: failed with cause %q, Error %q", cause, got.Cause, got.Error)
+		}
 		if _, err := e.svc.Retry(ctx, d.ID, false); !errors.Is(err, ErrNeedsConfirm) {
 			t.Fatalf("%s: retry without confirm: %v", cause, err)
 		}

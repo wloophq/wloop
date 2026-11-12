@@ -111,7 +111,9 @@ type Draft struct {
 	State     State
 	Evidence  Evidence // State "sent" only
 	Error     string   // State "failed" only, never a token
-	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	// Cause is why the draft failed, or why its approval was refused, when a reader acts on it; "" for any other.
+	Cause  Cause
+	Reason string // State "dropped": "user", "assigned", "moot", "dry_run", ...
 	// Rev is the draft's content revision: 1 as proposed, and one more for each write that changes its
 	// Content. A gate approves a draft at its Rev; a person and an agent revise it at the Rev they read.
 	Rev int64
@@ -140,6 +142,17 @@ type Draft struct {
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
+
+// Cause is why a draft failed, or why its approval was refused, as its readers act on it.
+type Cause string
+
+const (
+	// CauseStale: its unit moved past the basis it was written against, as a live read or its publisher
+	// found; it stands until its content is revised.
+	CauseStale Cause = "stale"
+	// CauseUnconfirmed: its post may have reached its provider, so posting it again takes a person's confirm.
+	CauseUnconfirmed Cause = "unconfirmed"
+)
 
 // ReasonClosedSilently is the Reason of a draft the user discarded and closed without its message: its
 // effects apply as if it was sent.

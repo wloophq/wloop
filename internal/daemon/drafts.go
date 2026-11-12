@@ -42,9 +42,6 @@ const (
 
 var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon runs without a store"}
 
-// mayHaveBeenPosted starts a publisher's error when the post may have reached its provider (#publisher).
-const mayHaveBeenPosted = "may have been posted"
-
 // draftHandlers are the handlers a draft task's verbs run, names of builtin.VerbHandlers, by the draft action
 // each runs.
 var draftHandlers = map[string]string{
@@ -227,7 +224,6 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 			return draft.Draft{}, badRequest{"retry takes the rev you saw"}
 		}
 		got, err = o.RetryBy(ctx, id, a.Confirm, actor.by())
-		s.noteStale(id, d.Rev, err)
 	default:
 		return draft.Draft{}, badRequest{fmt.Sprintf("unknown draft action %q", action)}
 	}
@@ -317,7 +313,6 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 		id := draft.ID(n)
 		d, err := o.Prepare(ctx, id, rev)
 		if err != nil {
-			s.noteStale(id, rev, err)
 			return err
 		}
 		if edit.changes(d) {
@@ -518,7 +513,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 func (s *Server) draftFacts(ctx context.Context, d draft.Draft) catalog.DraftFacts {
 	publisher := s.publisherOf(d)
 	f := catalog.DraftFacts{State: string(d.State), Provider: publisher, Disabled: !s.pluginEnabled(publisher),
-		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted),
+		MayHaveBeenPosted: d.Cause == draft.CauseUnconfirmed,
 		Effects:           slices.Clone(d.Effects)}
 	if d.Origin.Kind == draft.OriginAuto {
 		f.Workflow = d.Origin.Workflow

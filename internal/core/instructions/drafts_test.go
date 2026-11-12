@@ -16,7 +16,10 @@ func TestStaleDraftPointerOnly(t *testing.T) {
 			Error: "SECRET 422", Why: "SECRET why"},
 		{ID: 43, Kind: "thread_reply", State: draft.Held, Text: "SECRET reply"},
 	}
-	got := Pointers(ds, "c2")
+	staleAt := func(current string) func(draft.Draft) bool {
+		return func(d draft.Draft) bool { return d.Basis != "" && d.Basis != current }
+	}
+	got := Pointers(ds, "c2", staleAt("c2"))
 	want := []Draft{{ID: 42, Kind: "review", State: "failed", Basis: "c1", CurrentBasis: "c2", Stale: true}, {ID: 43, Kind: "thread_reply", State: "held", CurrentBasis: "c2"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v, want %+v", got, want)
@@ -28,7 +31,7 @@ func TestStaleDraftPointerOnly(t *testing.T) {
 	if strings.Contains(string(raw), "SECRET") {
 		t.Fatalf("a pointer carries the draft's words: %s", raw)
 	}
-	if fresh := Pointers(ds[:1], "c1"); fresh[0].Stale {
+	if fresh := Pointers(ds[:1], "c1", staleAt("c1")); fresh[0].Stale {
 		t.Fatalf("a draft at the current basis: %+v", fresh)
 	}
 	b := book()

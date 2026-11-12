@@ -54,7 +54,9 @@ func basisRig(t *testing.T, bases outbox.Bases, live func(string), at ...string)
 	t.Helper()
 	r := newOutboxRig(t)
 	t.Cleanup(r.s.Wait)
-	r.o.Bases = bases
+	var reads sync.WaitGroup
+	t.Cleanup(reads.Wait)
+	r.o.Bases = &outbox.RecentBases{Bases: bases, Clock: r.o.Clock, Fresh: 30 * time.Second, ReadTimeout: 10 * time.Second, Reads: &reads}
 	r.o.Kinds = outboxtest.Kinds{Specs: []draft.KindSpec{{Provider: "github", Name: "review", Delivery: "review", Basis: draft.BasisAgent, Editable: []string{"text"}}},
 		Defaults: map[string]string{"github": "comment"}}
 	var ds []draft.Draft

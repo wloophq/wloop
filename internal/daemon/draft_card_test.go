@@ -8,12 +8,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
@@ -36,19 +36,6 @@ func (k reviewKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	}
 	return draft.KindSpec{Provider: "github", Name: "review", Delivery: "review", Schema: "drafts/review/schema.json", Basis: draft.BasisAgent,
 		Editable: []string{"text", "/event"}, SchemaJSON: schema}, true
-}
-
-// staleCalls is a live basis check that answers stale and counts the drafts it read.
-type staleCalls struct {
-	mu  sync.Mutex
-	ids []draft.ID
-}
-
-func (s *staleCalls) check(_ context.Context, d draft.Draft) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.ids = append(s.ids, d.ID)
-	return true, nil
 }
 
 func reviewDraftOf(state draft.State) draft.Draft {
@@ -106,8 +93,8 @@ func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 func TestDraftCardReadsStaleLiveForHeldDraftsOnly(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	calls := &staleCalls{}
-	r.s.deps.Stale = calls.check
+	calls := &outboxtest.Bases{}
+	r.o.Bases = calls
 	held := r.s.draftView(context.Background(), reviewDraftOf(draft.Held), gate.Gate{})
 	none := reviewDraftOf(draft.Held)
 	none.ID, none.Basis = 43, ""
@@ -116,8 +103,8 @@ func TestDraftCardReadsStaleLiveForHeldDraftsOnly(t *testing.T) {
 	if !held.Stale || len(held.Notes) != 1 || held.Notes[0] != r.s.loaded().Gates.Drafts.Stale || held.Notes[0] == "" {
 		t.Errorf("held draft stale %v notes %q, want stale with the profile's note", held.Stale, held.Notes)
 	}
-	if len(calls.ids) != 1 || calls.ids[0] != 42 {
-		t.Errorf("read the basis of %v, want only the held draft with a basis", calls.ids)
+	if calls.Calls() != 1 {
+		t.Errorf("%d basis reads, want only the held draft with a basis's", calls.Calls())
 	}
 	hold := reviewDraftOf(draft.Held)
 	hold.Basis, hold.Hold = "", true
