@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/messages"
-	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
@@ -22,9 +20,8 @@ func TestReattackConfirmPinMovesUnderTheSameMessage(t *testing.T) {
 		{"no draft, answered after the agent added one", nil},
 	} {
 		r := newRig(t)
-		od := &optionDrafts{drafts: map[int64]draft.Draft{}, gates: map[int64]gate.Gate{}}
+		od := newOptionDrafts(t, r)
 		od.put(heldDraft(42, r7, 1, 1), "term_1")
-		r.svc.Drafts = od
 		r.started(r7)
 		r.record(t, r7, 1, askedRecord(&record.Question{Kind: "confirm", Text: "Post the review?", Draft: c.first}))
 		r.live()

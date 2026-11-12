@@ -14,6 +14,7 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -157,6 +158,7 @@ var profileGates = gateDefs{
 		{Name: "reply", Status: gate.Answered, Answer: true}, {Name: "dismiss", Status: gate.Dismissed}}},
 	{Name: "proposal", Kind: gate.KindProposal, Label: "Apply this proposal?", Intents: []gates.Intent{
 		{Name: "approve", Status: gate.Approved}, {Name: "reject", Status: gate.Rejected}}},
+	outboxtest.DraftGate,
 	{Name: "missing-record", Kind: gate.KindQuestion, Label: "The run stopped", Intents: []gates.Intent{
 		{Name: "answer", Status: gate.Answered, Answer: true}, {Name: "continue", Status: gate.Answered}, {Name: "dismiss", Status: gate.Dismissed}}},
 }

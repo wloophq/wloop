@@ -3,7 +3,6 @@ package messages_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"strconv"
 	"sync"
@@ -21,10 +20,10 @@ import (
 )
 
 type approval struct {
-	question, drafted int64
-	rev               int64
-	by                task.Actor
-	session           string
+	drafted int64
+	rev     int64
+	by      task.Actor
+	session string
 }
 
 type withdrawal struct {
@@ -32,43 +31,100 @@ type withdrawal struct {
 	reason string
 }
 
-// optionDrafts keeps drafts and their gates, and approves as gates.Service.ApproveOption promises a rev
-// check; it leaves the resolver unchecked, so the messages service's own check is what a test sees.
+// optionDrafts keeps drafts, opens their gates in the rig's gates store through the real gates service,
+// and records each approval that service publishes, so ApproveOption's contract is the real one.
 type optionDrafts struct {
 	mu        sync.Mutex
+	r         *rig
 	drafts    map[int64]draft.Draft
-	gates     map[int64]gate.Gate
+	gateIDs   map[int64]int64
+	override  map[int64]gate.Gate
 	approvals []approval
 	withdrawn []withdrawal
 }
 
+type holds struct{}
+
+func (holds) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeWait}, nil
+}
+
+// newOptionDrafts gives r's messages service option drafts, with r's gates service approving them before it
+// answers a question, the sessions driven ones the user drives.
+func newOptionDrafts(t *testing.T, r *rig, driven ...string) *optionDrafts {
+	t.Helper()
+	od := &optionDrafts{r: r, drafts: map[int64]draft.Draft{}, gateIDs: map[int64]int64{}, override: map[int64]gate.Gate{}}
+	r.gates = gates.New(gates.Deps{Store: r.gateStore, Reader: r.gateStore, Profile: profileGates, Tasks: gateTasks{r.taskStore, r.tasks}, Clock: r.clock,
+		Deliverer: r.svc, Decider: r.svc, Publisher: od, Options: r.svc, Log: t.Logf, Sessions: drivenSessions(driven)})
+	r.svc.Gates, r.svc.Drafts = serviceGates{r.gates, r.gateStore}, od
+	return od
+}
+
+// put stores d held, superseding the gate of its earlier rev, and opens the gate its rev waits on.
 func (o *optionDrafts) put(d draft.Draft, sessions ...string) {
+	ctx := context.Background()
+	o.mu.Lock()
+	old, had := o.gateIDs[int64(d.ID)]
+	o.mu.Unlock()
+	if had {
+		if _, err := o.r.gateStore.Resolve(ctx, old, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil && !errors.Is(err, gates.ErrResolved) {
+			panic(err)
+		}
+	}
+	g, err := o.r.gates.Open(ctx, gate.Gate{Kind: gate.KindDraft, Name: "draft", Unit: d.Unit, Subject: strconv.FormatInt(int64(d.ID), 10),
+		Session: d.Origin.Session, Sessions: sessions, ApprovedRev: d.Rev}, holds{})
+	if err != nil {
+		panic(err)
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	o.drafts[int64(d.ID)] = d
-	o.gates[int64(d.ID)] = gate.Gate{ID: 1000 + int64(d.ID), Kind: gate.KindDraft, Unit: d.Unit, Subject: strconv.FormatInt(int64(d.ID), 10), Status: gate.Open,
-		Session: d.Origin.Session, Sessions: sessions, ApprovedRev: d.Rev}
+	o.drafts[int64(d.ID)], o.gateIDs[int64(d.ID)] = d, g.ID
+}
+
+func (o *optionDrafts) gateOf(id int64) gate.Gate {
+	o.mu.Lock()
+	gid := o.gateIDs[id]
+	o.mu.Unlock()
+	g, err := o.r.gateStore.Get(context.Background(), gid)
+	if err != nil {
+		panic(err)
+	}
+	return g
+}
+
+// release resolves draft id's gate as a rule would, approved with no person.
+func (o *optionDrafts) release(id int64) {
+	if _, err := o.r.gateStore.Resolve(context.Background(), o.gateOf(id).ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorWorkflow, Rule: "send"}); err != nil {
+		panic(err)
+	}
 }
 
 func (o *optionDrafts) DraftGate(_ context.Context, id int64) (draft.Draft, gate.Gate, bool, error) {
 	o.mu.Lock()
-	defer o.mu.Unlock()
 	d, ok := o.drafts[id]
-	return d, o.gates[id], ok, nil
+	g, over := o.override[id]
+	o.mu.Unlock()
+	if !ok {
+		return draft.Draft{}, gate.Gate{}, false, nil
+	}
+	if over {
+		return d, g, true, nil
+	}
+	return d, o.gateOf(id), true, nil
 }
 
-func (o *optionDrafts) ApproveOption(_ context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error {
+// ApproveOption is the gates service's, for a test that wraps it.
+func (o *optionDrafts) ApproveOption(ctx context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error {
+	return o.r.gates.ApproveOption(ctx, question, r, drafted, rev)
+}
+
+// Publish is the outbox's consequence of an approved draft gate: the draft is queued.
+func (o *optionDrafts) Publish(_ context.Context, g gate.Gate) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	id, _ := strconv.ParseInt(drafted.Subject, 10, 64)
+	id, _ := strconv.ParseInt(g.Subject, 10, 64)
+	o.approvals = append(o.approvals, approval{g.ID, g.ApprovedRev, g.By, g.BySession})
 	d := o.drafts[id]
-	if drafted.ApprovedRev != rev {
-		return fmt.Errorf("%w: draft %d", gates.ErrRefused, id)
-	}
-	o.approvals = append(o.approvals, approval{question.ID, drafted.ID, rev, r.By, r.Session})
-	g := o.gates[id]
-	g.Status, g.By, g.BySession = gate.Approved, r.By, r.Session
-	o.gates[id] = g
 	d.State = draft.Queued
 	o.drafts[id] = d
 	return nil
@@ -100,16 +156,10 @@ func draftQuestion() *record.Question {
 func draftRig(t *testing.T, driven ...string) (*rig, *optionDrafts, message.Message) {
 	t.Helper()
 	r := newRig(t)
-	if len(driven) > 0 {
-		r.gates = gates.New(gates.Deps{Store: r.gateStore, Reader: r.gateStore, Profile: profileGates, Tasks: gateTasks{r.taskStore, r.tasks}, Clock: r.clock,
-			Deliverer: r.svc, Decider: r.svc, Log: t.Logf, Sessions: drivenSessions(driven)})
-		r.svc.Gates = serviceGates{r.gates, r.gateStore}
-	}
-	od := &optionDrafts{drafts: map[int64]draft.Draft{}, gates: map[int64]gate.Gate{}}
+	od := newOptionDrafts(t, r, driven...)
 	od.put(heldDraft(42, r7, 1, 1), "term_1", "reviser")
 	od.put(heldDraft(43, r7, 1, 1), "term_1")
 	od.put(heldDraft(50, r7, 9, 1), "other")
-	r.svc.Drafts = od
 	r.started(r7)
 	r.record(t, r7, 1, askedRecord(draftQuestion()))
 	r.live()
@@ -130,8 +180,11 @@ func TestOptionDraftApprovesWithoutResume(t *testing.T) {
 	if err != nil || route.Route != turn.Approved {
 		t.Fatalf("%+v %v", route, err)
 	}
-	if want := []approval{{q.ID, 1042, 1, task.ActorPerson, ""}}; !slices.Equal(od.approvals, want) {
+	if want := []approval{{od.gateOf(42).ID, 1, task.ActorPerson, ""}}; !slices.Equal(od.approvals, want) {
 		t.Fatalf("approvals %+v, want %+v", od.approvals, want)
+	}
+	if got := r.gateOf(t, m); got.ID != q.ID || got.Status != gate.Answered || got.By != task.ActorPerson {
+		t.Fatalf("the question gate %+v", got)
 	}
 	b := r.book(t, r7)
 	if len(r.sess.Typed()) != 0 || len(r.launch.launches) != 0 || b.Turns[0].State != turn.Asked || len(b.Answers) != 1 || b.Answers[0].Route != turn.Approved {
@@ -160,7 +213,7 @@ func TestOtherOptionDraftsWithdrawn(t *testing.T) {
 	if want := []withdrawal{{42, messages.ReasonOtherOption}}; !slices.Equal(od.withdrawn, want) {
 		t.Fatalf("withdrawn %+v, want %+v: another turn's draft is out of reach", od.withdrawn, want)
 	}
-	if len(od.approvals) != 1 || od.approvals[0].drafted != 1043 {
+	if len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(43).ID {
 		t.Fatalf("approvals %+v", od.approvals)
 	}
 }
@@ -198,9 +251,9 @@ func TestOptionDraftMustBeHeldOfTurn(t *testing.T) {
 		}},
 		{"a draft revised since", "approve", func(od *optionDrafts) { od.put(heldDraft(42, r7, 1, 2)) }},
 		{"a draft a rule released", "approve", func(od *optionDrafts) {
-			od.gates[42] = gate.Gate{ID: 1042, Kind: gate.KindDraft, Subject: "42", Status: gate.Approved, ApprovedRev: 1, By: task.ActorWorkflow, Rule: "send"}
+			od.release(42)
 		}},
-		{"a gate of another subject", "approve", func(od *optionDrafts) { g := od.gates[42]; g.Subject = "43"; od.gates[42] = g }},
+		{"a gate of another subject", "approve", func(od *optionDrafts) { g := od.gateOf(42); g.Subject = "43"; od.override[42] = g }},
 	} {
 		r, od, m := draftRig(t)
 		c.change(od)
@@ -253,9 +306,9 @@ func TestAnOptionDraftApprovesOnlyWithTheResolversAuthority(t *testing.T) {
 
 func TestAnOptionPickCutShortCompletes(t *testing.T) {
 	r, od, m := draftRig(t)
-	g := od.gates[42]
-	g.Status, g.ApprovedRev, g.By = gate.Approved, 1, task.ActorPerson
-	od.gates[42] = g
+	if _, err := r.gateStore.Resolve(context.Background(), od.gateOf(42).ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
 	route, err := r.answer(m, messages.Answer{OptionID: "approve", Source: turn.Cockpit})
 	if err != nil || route.Route != turn.Approved || len(od.approvals) != 0 || !slices.Equal(od.withdrawn, []withdrawal{{43, messages.ReasonOtherOption}}) {
 		t.Fatalf("%+v %v, approvals %+v, withdrawn %+v", route, err, od.approvals, od.withdrawn)
@@ -272,9 +325,8 @@ func TestConfirmYesApprovesItsDraft(t *testing.T) {
 		{"no", messages.Answer{No: true, Source: turn.Cockpit}, false},
 	} {
 		r := newRig(t)
-		od := &optionDrafts{drafts: map[int64]draft.Draft{}, gates: map[int64]gate.Gate{}}
+		od := newOptionDrafts(t, r)
 		od.put(heldDraft(42, r7, 1, 1), "term_1")
-		r.svc.Drafts = od
 		r.started(r7)
 		r.record(t, r7, 1, askedRecord(&record.Question{Kind: "confirm", Text: "Post the review?", Draft: &record.DraftRef{ID: 42, Rev: 1}}))
 		r.live()

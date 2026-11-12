@@ -122,6 +122,9 @@ type Deps struct {
 	Events Events
 	// Sessions says which sessions the user drives; nil refuses every agent.
 	Sessions Sessions
+	// Options name the draft an answer to a question approves, which ApproveOption approves before it answers
+	// the question; nil approves none.
+	Options Options
 
 	Log func(format string, args ...any)
 }
@@ -221,8 +224,36 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 // the intent's declaration in gates.toml. It then applies the one
 // consequence the gate's kind names.
 func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
+	if done, err := s.resolveOption(ctx, id, r); done || err != nil {
+		return err
+	}
 	_, err := s.resolve(ctx, id, r, s.d.Clock.Now())
 	return err
+}
+
+// resolveOption approves, through ApproveOption, the draft that r's answer to open question gate id picks,
+// and answers the question with it; done is false when r picks no draft, or when ApproveOption refuses it
+// before resolving anything, so the answer resolves the question as any answer does.
+func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (done bool, err error) {
+	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
+		return false, nil
+	}
+	q, err := s.d.Reader.Get(ctx, id)
+	if err != nil || q.Kind != gate.KindQuestion || q.Status != gate.Open {
+		return false, err
+	}
+	drafted, rev, ok, err := s.d.Options.OptionDraft(ctx, q, r)
+	if err != nil || !ok {
+		return false, err
+	}
+	err = s.ApproveOption(ctx, q, r, drafted, rev)
+	if errors.Is(err, ErrRefused) {
+		if now, gerr := s.d.Reader.Get(ctx, id); gerr == nil && now.Status == gate.Open {
+			s.logf("gate %d: the option's draft gate %d is not approved (%v); the answer resolves the question alone", id, drafted.ID, err)
+			return false, nil
+		}
+	}
+	return true, err
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or

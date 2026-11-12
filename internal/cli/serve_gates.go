@@ -29,9 +29,20 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
 			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db),
 			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e},
-			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}})
+			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}, Options: messageOptions{e}})
 	}
 	return e.gates
+}
+
+// messageOptions are the messages service's option drafts, read at each resolution: a daemon without one
+// approves none.
+type messageOptions struct{ e *Env }
+
+func (m messageOptions) OptionDraft(ctx context.Context, question gate.Gate, r gates.Resolution) (gate.Gate, int64, bool, error) {
+	if m.e.messages == nil {
+		return gate.Gate{}, 0, false, nil
+	}
+	return m.e.messages.OptionDraft(ctx, question, r)
 }
 
 // drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.
@@ -125,12 +136,6 @@ func (g draftGates) Supersede(ctx context.Context, id int64, by task.Actor) erro
 
 func (g draftGates) SupersedeForAgent(ctx context.Context, id int64, session string) (gate.Gate, error) {
 	return g.e.newGates(g.db, g.logf).SupersedeForAgent(ctx, id, session)
-}
-
-// ApproveOption resolves question with r, whose option points to drafted's draft at rev, and approves drafted
-// with the same resolver.
-func (g draftGates) ApproveOption(ctx context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error {
-	return g.e.newGates(g.db, g.logf).ApproveOption(ctx, question, r, drafted, rev)
 }
 
 func (g draftGates) Withdraw(ctx context.Context, id int64, reason string) error {
