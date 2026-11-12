@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -53,7 +55,7 @@ type Vocabulary struct {
 	tools              []Value
 	toolAnswers        []ToolAnswer
 	toolProviders      map[string]unit.ProviderID
-	draftKinds         map[unit.ProviderID]DraftKinds
+	draftKinds         *draft.Catalog
 	languageFacts      map[unit.ProviderID]string
 	membersFacts       map[unit.ProviderID]string
 	marks              []Mark
@@ -63,16 +65,30 @@ type Vocabulary struct {
 	predicates         map[unit.ProviderID][]manifest.Predicate
 }
 
-// DraftKinds are a plugin's draft kinds and the delivery of a draft whose
-// kind names none.
-type DraftKinds struct {
-	Kinds   []manifest.DraftKind
-	Default string
-}
+// DraftKinds are the merged plugins' draft kinds and deliveries; the host
+// derives a draft's kind, delivery and payload schema through them.
+var DraftKinds = &draft.Catalog{}
 
-// PluginDraftKinds are each merged plugin's draft kinds, by provider; the
-// host derives a draft's delivery from its kind through them.
-var PluginDraftKinds = map[unit.ProviderID]DraftKinds{}
+// DraftKinds are the draft kinds and deliveries of v's plugins.
+func (v *Vocabulary) DraftKinds() *draft.Catalog { return v.draftKinds }
+
+// draftSpecs are the draft kinds and deliveries src declares, as provider p's.
+func draftSpecs(p unit.ProviderID, src *manifest.Source) ([]draft.KindSpec, []draft.DeliverySpec) {
+	var ks []draft.KindSpec
+	for _, k := range src.DraftKinds {
+		spec := draft.KindSpec{Provider: string(p), Name: k.Name, Delivery: cmp.Or(k.Delivery, src.DefaultDelivery), Schema: k.Schema, Preview: k.Preview,
+			Basis: k.Basis, TextRequired: k.TextRequired, Editable: slices.Clone(k.Editable), SchemaJSON: slices.Clone(k.SchemaJSON)}
+		for _, f := range k.Facts {
+			spec.Facts = append(spec.Facts, draft.FactSpec{Name: f.Name, Pointer: f.Pointer})
+		}
+		ks = append(ks, spec)
+	}
+	var ds []draft.DeliverySpec
+	for _, d := range src.Deliveries {
+		ds = append(ds, draft.DeliverySpec{Provider: string(p), Name: d.Name, Posts: d.Posts})
+	}
+	return ks, ds
+}
 
 // LanguageFacts are, by provider, the fact that tells the language a unit's
 // people write in, as a plugin's language_fact names it; a provider absent
@@ -148,7 +164,7 @@ func Install(v *Vocabulary) {
 	Slots, Providers, BriefSubjects = v.slots, slices.Sorted(maps.Keys(v.slots)), v.briefSubjects
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
-	Tools, ToolAnswers, ToolProviders, PluginDraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
+	Tools, ToolAnswers, ToolProviders, DraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
 	LanguageFacts, MembersFacts = v.languageFacts, v.membersFacts
 	pluginDeliveries = v.pluginDeliveries
 	Marks = v.marks
@@ -260,6 +276,11 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 			}
 		}
 	}
+	if ks, ds := draftSpecs(p, src); len(ks) > 0 {
+		if _, err := draft.NewCatalog(ks, ds, nil); err != nil {
+			bad("%v", err)
+		}
+	}
 	for _, k := range src.ConfigReads {
 		if !slices.ContainsFunc(configGrammar, func(r Key) bool {
 			return r.Path == k || strings.HasPrefix(r.Path, k+".") || strings.HasPrefix(r.Path, k+"[]")
@@ -291,7 +312,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	steps := map[string][]unit.ProviderID{}
 	tools, answers := slices.Clone(coreTools), slices.Clone(coreToolAnswers)
 	toolProviders := map[string]unit.ProviderID{}
-	draftKinds := map[unit.ProviderID]DraftKinds{}
+	var kindSpecs []draft.KindSpec
+	var deliverySpecs []draft.DeliverySpec
+	defaultDeliveries := map[string]string{}
 	languageFacts, membersFacts := map[unit.ProviderID]string{}, map[unit.ProviderID]string{}
 	var marks []Mark
 	var signals []string
@@ -315,8 +338,10 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				answers = append(answers, ta)
 			}
 		}
-		if len(v.DraftKinds) > 0 || v.DefaultDelivery != "" {
-			draftKinds[id] = DraftKinds{Kinds: slices.Clone(v.DraftKinds), Default: v.DefaultDelivery}
+		ks, ds := draftSpecs(id, src)
+		kindSpecs, deliverySpecs = append(kindSpecs, ks...), append(deliverySpecs, ds...)
+		if v.DefaultDelivery != "" {
+			defaultDeliveries[string(id)] = v.DefaultDelivery
 		}
 		if v.LanguageFact != "" {
 			languageFacts[id] = v.LanguageFact
@@ -403,6 +428,8 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 			}
 		}
 	}
+	// fits refused every plugin whose kinds the catalog refuses.
+	draftKinds, _ := draft.NewCatalog(kindSpecs, deliverySpecs, defaultDeliveries)
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
 		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -38,6 +39,10 @@ type Manifest struct {
 	Protocol int
 	// Dir is the directory Load read the manifest from, empty after Parse.
 	Dir string
+	// Files is the plugin's directory, which holds the files the manifest
+	// names, such as its draft kinds' schemas; Load sets it to Dir, and a
+	// caller of Parse sets it before Source reads them.
+	Files fs.FS
 
 	tables map[plugin.Kind]map[string]any
 }
@@ -53,7 +58,7 @@ func Load(dir string) (*Manifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	m.Dir = dir
+	m.Dir, m.Files = dir, os.DirFS(dir)
 	return m, nil
 }
 

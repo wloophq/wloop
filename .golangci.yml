@@ -64,6 +64,10 @@ linters:
       - path: _test\.go
         linters: [staticcheck]
         text: "^(ST|S1|QF)"
+      # The draft package's kind and delivery words, deprecated for the
+      # manifests' catalog, until the lanes still calling them move off.
+      - linters: [staticcheck]
+        text: "SA1019: github.com/wloophq/wloop/internal/domain/draft\\.[A-Za-z]+ is deprecated"
       # Deliberate misspellings that test unknown keys and names.
       - path: (internal/config/config_test|internal/profile/path_test)\.go
         linters: [misspell]

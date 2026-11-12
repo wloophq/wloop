@@ -54,6 +54,7 @@ func start(t *testing.T, k *psource.Kind, id, extra string, impl src.Source) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Files = acmeFiles
 	l := plugintest.NewLauncher(t)
 	l.Add(id, map[plugin.Kind]plugin.Impl{src.Kind: src.New(impl)})
 	p, err := l.Launch(t.Context(), plugin.Spec{ID: id, Kinds: []plugin.Kind{src.Kind}})

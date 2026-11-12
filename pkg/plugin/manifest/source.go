@@ -126,6 +126,9 @@ type DraftKind struct {
 	TextRequired bool            `toml:"text_required" doc:"A draft of the kind needs a text."`
 	Editable     []string        `toml:"editable" doc:"What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\"."`
 	Facts        []DraftKindFact `toml:"facts" doc:"The payload fields an approval rule reads."`
+	// SchemaJSON is the content of Schema, which Source reads from the
+	// plugin's directory.
+	SchemaJSON json.RawMessage `toml:"-"`
 }
 
 // DraftKindFact is a payload field of a draft kind read as an approval fact.
@@ -294,7 +297,7 @@ func (m *Manifest) Source() (*Source, error) {
 		return nil, err
 	}
 	s.Provider = m.ID
-	if err := s.validate(); err != nil {
+	if err := errors.Join(s.validate(), s.readDraftKinds(m.Files)); err != nil {
 		return nil, fmt.Errorf("%s of %s, [source]: %w", File, m.ID, err)
 	}
 	return &s, nil

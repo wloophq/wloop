@@ -41,8 +41,9 @@ func buildRelease(t *testing.T, ids ...string) string {
 	for _, id := range ids {
 		to := filepath.Join(dir, "plugins", id)
 		build(filepath.Join(to, brand.PluginBinary(id)), "./plugins/"+id+"/cmd/"+brandtest.DefaultName+"-plugin-"+id)
-		if raw, err := exec.Command("cp", "-R", filepath.Join(root, "plugins", id, "plugin.toml"), filepath.Join(root, "plugins", id, "profile"), to).CombinedOutput(); err != nil {
-			t.Fatalf("copying %s's manifest and profile: %v\n%s", id, err, raw)
+		from := filepath.Join(root, "plugins", id)
+		if raw, err := exec.Command("cp", "-R", filepath.Join(from, "plugin.toml"), filepath.Join(from, "profile"), filepath.Join(from, "drafts"), to).CombinedOutput(); err != nil {
+			t.Fatalf("copying %s's manifest, profile and drafts: %v\n%s", id, err, raw)
 		}
 	}
 	return bin

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -84,7 +85,11 @@ name = "reaction"
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+schema = "drafts/react/schema.json"
 `
+
+// acmeFiles are the files acme's manifests name.
+var acmeFiles = fstest.MapFS{"drafts/react/schema.json": {Data: []byte(`{"type": "object", "properties": {}}`)}}
 
 // postingKind runs p as plugin acme, which posts comments, and answers its
 // publisher.
@@ -96,6 +101,7 @@ func postingKind(t *testing.T, p posting) (psource.Publisher, psource.Units) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Files = acmeFiles
 	s, err := m.Source()
 	if err != nil {
 		t.Fatal(err)
