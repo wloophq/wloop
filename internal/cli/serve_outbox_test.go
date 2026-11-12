@@ -104,7 +104,7 @@ func insertDraftGate(t *testing.T, db *sqlite.DB, d draft.Draft, deadline time.T
 	}
 	st := db.Gates(func() time.Time { return got.CreatedAt })
 	g := gate.Gate{Kind: gate.KindDraft, Name: "draft", Intents: []string{"approve", "discard"}, Unit: got.Unit,
-		Subject: strconv.FormatInt(int64(got.ID), 10)}
+		Subject: strconv.FormatInt(int64(got.ID), 10), ApprovedRev: got.Rev}
 	switch got.State {
 	case draft.Held:
 		if !deadline.IsZero() {
