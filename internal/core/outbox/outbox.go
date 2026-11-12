@@ -209,7 +209,8 @@ var (
 )
 
 // StalePrefix starts the Error of a draft that failed because it is stale, from the live basis check or
-// from its publisher's refusal (ErrStale), and only of such a draft.
+// from its publisher's refusal (ErrStale), and only of such a draft: every failure the outbox stores goes
+// through failure, which keeps the token off any other.
 const StalePrefix = "stale:"
 
 // failure is the Error a draft that failed with err stores: StalePrefix starts it only when err is ErrStale.
@@ -1219,7 +1220,7 @@ func (s *Service) Recover(ctx context.Context) error {
 		ev, found, verr := fx.Verify(ctx, d, d.SendingAt)
 		switch {
 		case verr != nil && strings.HasPrefix(verr.Error(), mayHaveBeenPosted):
-			err = s.fail(ctx, d, verr.Error())
+			err = s.fail(ctx, d, failure(verr))
 		case verr != nil || !found:
 			err = s.fail(ctx, d, NotConfirmed)
 		default:
