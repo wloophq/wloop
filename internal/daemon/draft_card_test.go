@@ -376,3 +376,18 @@ func TestDraftCardRendersItsKindsPreview(t *testing.T) {
 		t.Errorf("a kind without a preview shows %q", got)
 	}
 }
+
+// TestTheBundledReviewPreviewRendersAReviewWithNoInlineComments renders GitHub's shipped review preview over a
+// payload with no comments field, which its schema leaves optional.
+func TestTheBundledReviewPreviewRendersAReviewWithNoInlineComments(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	if r.s.loaded().Previews["github"]["review"] == "" {
+		t.Fatal("no bundled GitHub review preview")
+	}
+	d := reviewDraftOf(draft.Held)
+	d.Payload, d.Basis = json.RawMessage(`{"event":"COMMENT"}`), "c2abcdef0"
+	if got := r.s.draftView(context.Background(), d, gate.Gate{}).Preview; got != "COMMENT review at c2abcde" {
+		t.Errorf("review preview %q", got)
+	}
+}

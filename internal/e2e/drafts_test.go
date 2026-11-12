@@ -3,12 +3,13 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	ghplugin "github.com/wloophq/wloop/plugins/github"
 )
 
 func TestDrafts(t *testing.T) {
@@ -81,7 +82,6 @@ func TestDrafts(t *testing.T) {
 	})
 
 	t.Run("S4", func(t *testing.T) {
-		t.Skip("T11 waits on T13: a free answer resumes the turn, which cli.ServeForTest cannot launch (acme/api is not registered in its fake workspace manager and projects_dir is unset)")
 		r := newDraftsRig(t)
 		r.review()
 		d := r.propose("REQUEST_CHANGES", "The export reads a dropped column.", "c2", true)
@@ -189,8 +189,10 @@ func TestDrafts(t *testing.T) {
 	})
 
 	t.Run("S8", func(t *testing.T) {
-		t.Skip("T11 waits on T13: cli.ServeForTest runs no ingest, so acme/api#7 has no snapshot, the engine lists no GitHub unit and review-draft-failed never evaluates")
 		r := newDraftsRig(t)
+		if _, err := r.d.Action(r.ctx, draftsPR, ghplugin.ActionRefresh); err != nil {
+			t.Fatalf("reading %s in full: %v", draftsPR.Label(), err)
+		}
 		r.review()
 		withInline := json.RawMessage(`{"event":"REQUEST_CHANGES","comments":[{"path":"export.go","line":40,"body":"This reads the dropped column."}]}`)
 		d, err := r.c.ProposeDraft(r.ctx, r.s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One blocking finding.", Payload: withInline, Basis: "c2"})
@@ -205,18 +207,25 @@ func TestDrafts(t *testing.T) {
 			t.Fatalf("the draft failed with %q, want GitHub's message", failed.Error)
 		}
 		turns := len(r.book().Turns)
-		if err := r.d.Sweep(r.ctx); err != nil {
-			t.Fatalf("sweep: %v", err)
+		for range 2 {
+			if err := r.d.Sweep(r.ctx); err != nil {
+				t.Fatalf("sweep: %v", err)
+			}
+			r.advance(2 * time.Minute)
 		}
 		if b := r.book(); len(b.Turns) != turns+1 {
 			t.Fatalf("the failed send reopened no round: turns %+v", b.Turns)
 		}
 		r.resumed()
-		if text := r.instructions(); !strings.Contains(text, strconv.FormatInt(d.ID, 10)) || strings.Contains(text, "This reads the dropped column.") {
+		if text := r.instructions(); !strings.Contains(text, fmt.Sprintf("`draft.failed_ref`: `%d:", d.ID)) || strings.Contains(text, "This reads the dropped column.") {
 			t.Fatalf("the round's instructions carry no pointer to draft %d, or carry its text:\n%s", d.ID, text)
 		}
+		read, err := r.c.ReadDraft(r.ctx, r.s.Handle, d.ID)
+		if err != nil || read.State != "failed" {
+			t.Fatalf("read %+v %v", read, err)
+		}
 		text := "One blocking finding: export.go:40 reads the dropped column."
-		got, err := r.update(api.AgentDraftUpdate{ID: d.ID, Rev: d.Rev, Text: &text, Payload: json.RawMessage(`{"event":"REQUEST_CHANGES"}`)})
+		got, err := r.update(api.AgentDraftUpdate{ID: d.ID, Rev: read.Rev, Text: &text, Payload: json.RawMessage(`{"event":"REQUEST_CHANGES"}`)})
 		if err != nil || got.State != "held" {
 			t.Fatalf("update %+v %v", got, err)
 		}

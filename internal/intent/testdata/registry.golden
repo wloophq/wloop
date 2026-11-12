@@ -622,11 +622,10 @@ workflow/review-draft-failed.Summary = "Reopen the review round when its draft f
 workflow/review-draft-failed.Provider = "github"
 workflow/review-draft-failed.Slot = "pr"
 workflow/review-draft-failed.Trigger.Kind = "sweep"
-workflow/review-draft-failed.When = "draft.failed_kind == \"review\" && (draft.failed || draft.stale)"
+workflow/review-draft-failed.When = "draft.failed_kind == \"review\" && draft.failed_ref != \"\" && (draft.failed || draft.stale)"
 workflow/review-draft-failed.Steps[0].Use = "turn.start"
 workflow/review-draft-failed.Steps[0].Args[intent] = "review"
 workflow/review-draft-failed.Steps[0].Args[open_question] = "replace_if_moved"
-workflow/review-draft-failed.Steps[0].Args[stage] = "follow-up"
 workflow/review-draft-failed.Order = 15
 workflow/review-draft-failed.Key[0] = "draft.failed_ref"
 workflow/review-draft-failed.Approval.Mode = "delay"

@@ -24,7 +24,7 @@ func TestASenderPostsOnlyTheRevItsGateApproved(t *testing.T) {
 		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
 	r.s.deps.Gates, r.o.Gates = gs, rigGates{gs, st}
 	r.fx.fail = fmt.Errorf("422 Unprocessable Entity")
-	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "rule-approved rev 1",
+	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "rule-approved rev 1",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Send})})
 	if err != nil {
 		t.Fatal(err)

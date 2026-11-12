@@ -576,7 +576,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `session.close_orphan`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
-  - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.
+  - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first.
   - `runner` (one of `session`, `headless`): How the turn runs, one of the intent's runners; by default its first.
   - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:

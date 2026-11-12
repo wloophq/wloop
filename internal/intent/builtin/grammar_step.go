@@ -5,7 +5,7 @@ import "github.com/wloophq/wloop/internal/domain/items"
 // stepGrammar is the workflow steps' arguments, each row's Step its step.
 var stepGrammar = []Key{
 	required(stepKey(StepTurnStart, "intent", KindText, "", "The intent whose turn starts; it must serve the unit. Required.")),
-	stepEnum(StepTurnStart, "stage", Stages, "", "The pass over the unit: its first, or one after."),
+	stepEnum(StepTurnStart, "stage", Stages, "", "The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first."),
 	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs, one of the intent's runners; by default its first."),
 	stepEnum(StepTurnStart, "open_question", TurnOpenQuestion, TurnOpenQuestion[0], "What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way."),
 

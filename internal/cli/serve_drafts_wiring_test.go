@@ -349,3 +349,32 @@ func TestTheFailedDraftsReadOnceAPassSeeANewFailure(t *testing.T) {
 		t.Fatalf("another unit's failures: %v %v", got, err)
 	}
 }
+
+func TestServeEndsTheTurnAFailedOrDroppedDraftHeld(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pub := &basingPublisher{fail: errors.New("Unprocessable Entity")}
+	te, d, _ := servedOutboxOf(t, pub)
+	if _, ok := d.Outbox.Store.(endingDrafts); !ok {
+		t.Fatalf("the served outbox's store is %T: a failed or dropped draft ends no turn", d.Outbox.Store)
+	}
+	var ended []string
+	o := *d.Outbox
+	o.Store = endingDrafts{Store: te.db.Drafts(), logf: t.Logf, ended: func(_ context.Context, d draft.Draft) error {
+		ended = append(ended, fmt.Sprintf("%d %s", d.ID, d.State))
+		return nil
+	}}
+	queued := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "fails", State: draft.Queued})
+	held := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "withdrawn", State: draft.Held})
+	kept := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "stays", State: draft.Held})
+	if _, _, err := o.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := o.WithdrawHeld(ctx, held.ID, "other_option"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{fmt.Sprintf("%d failed", queued.ID), fmt.Sprintf("%d dropped", held.ID)}
+	if !slices.Equal(ended, want) {
+		t.Fatalf("ended %v, want %v; draft %d stays held and ends nothing", ended, want, kept.ID)
+	}
+}
