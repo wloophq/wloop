@@ -130,8 +130,8 @@ func (o *optionDrafts) Publish(_ context.Context, g gate.Gate) error {
 	return nil
 }
 
-// WithdrawHeld drops draft id as the outbox does: its open gate closes as superseded.
-func (o *optionDrafts) WithdrawHeld(ctx context.Context, id int64, reason string) error {
+// WithdrawOther drops draft id as the outbox does: its open gate closes as superseded.
+func (o *optionDrafts) WithdrawOther(ctx context.Context, id int64, reason string) error {
 	o.mu.Lock()
 	o.withdrawn = append(o.withdrawn, withdrawal{id, reason})
 	gid, ok := o.gateIDs[id]

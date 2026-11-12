@@ -368,10 +368,10 @@ func (o optionDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gat
 	return d, g, ok, err
 }
 
-func (o optionDrafts) WithdrawHeld(ctx context.Context, id int64, reason string) error {
+func (o optionDrafts) WithdrawOther(ctx context.Context, id int64, reason string) error {
 	if o.e.outbox == nil {
 		return errNoOutboxYet
 	}
-	_, err := o.e.outbox.WithdrawHeld(ctx, draft.ID(id), reason)
+	_, err := o.e.outbox.Withdraw(ctx, draft.ID(id), reason)
 	return err
 }

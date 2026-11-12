@@ -59,7 +59,7 @@ func (o outboxDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gat
 	return d, g, ok, err
 }
 
-func (o outboxDrafts) WithdrawHeld(context.Context, int64, string) error { return nil }
+func (o outboxDrafts) WithdrawOther(context.Context, int64, string) error { return nil }
 
 // TestAPinnedDraftIsItsQuestionsOnly serves a held draft an open question of its turn pins as that question's:
 // its card names the message, the Outbox leaves it out and it notifies nothing of its own; a draft no question

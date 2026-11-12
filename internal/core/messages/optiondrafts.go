@@ -21,8 +21,9 @@ const ReasonOtherOption = "other_option"
 type OptionDrafts interface {
 	// DraftGate is draft id and the newest gate it waits or waited on; false when there is no such draft or gate.
 	DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error)
-	// WithdrawHeld withdraws draft id while it is still held, with reason; one no longer held is left as it is.
-	WithdrawHeld(ctx context.Context, id int64, reason string) error
+	// WithdrawOther withdraws draft id, another option's, with reason, whatever it waits on: held, queued or
+	// failed; one sending or sent is left as it is.
+	WithdrawOther(ctx context.Context, id int64, reason string) error
 }
 
 // OptionDraft reports the pin r's answer to question gate question picks: the gate of the draft the option,
@@ -88,7 +89,7 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 		if _, _, ok, err := held.of(ctx, o.Draft.ID); err != nil || !ok {
 			continue
 		}
-		if err := s.Drafts.WithdrawHeld(ctx, o.Draft.ID, ReasonOtherOption); err != nil {
+		if err := s.Drafts.WithdrawOther(ctx, o.Draft.ID, ReasonOtherOption); err != nil {
 			s.logf("messages: withdrawing draft %d of option %s of message %d: %v", o.Draft.ID, o.ID, m.ID, err)
 		}
 	}
