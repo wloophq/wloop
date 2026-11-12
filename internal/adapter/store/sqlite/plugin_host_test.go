@@ -35,7 +35,7 @@ func init() {
 		writeCase{
 			method: "DB.RehomeDrafts",
 			seed: func(t *testing.T, e *noteEnv) {
-				if _, err := e.db.Drafts().Insert(context.Background(), draft.Draft{Unit: slackDM, Kind: draft.Reply, Text: "hi",
+				if _, err := e.db.Drafts().Insert(context.Background(), draft.Draft{Unit: slackDM, Kind: draft.Kind("reply"), Text: "hi",
 					Origin: draft.Origin{Kind: draft.OriginSession}, State: draft.Sent, CreatedAt: noteAt, UpdatedAt: noteAt}); err != nil {
 					t.Fatal(err)
 				}
@@ -87,7 +87,7 @@ func TestARehomedDraftKeepsItsGate(t *testing.T) {
 	db, _ := openTemp(t)
 	dm := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/1700000000.000200"}
 	seg := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/1700000000000100"}
-	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: dm, Kind: draft.Reply, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn},
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: dm, Kind: draft.Kind("reply"), Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn},
 		State: draft.Held, CreatedAt: noteAt, UpdatedAt: noteAt})
 	if err != nil {
 		t.Fatal(err)

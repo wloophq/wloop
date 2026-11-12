@@ -398,7 +398,7 @@ func heldWithGateTo(t *testing.T, db *DB, u unit.Unit, target string) (draft.Dra
 	t.Helper()
 	ctx := context.Background()
 	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
-	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: u, Kind: draft.Reply, Target: target, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn, Session: "s-1"},
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: u, Kind: draft.Kind("reply"), Target: target, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn, Session: "s-1"},
 		State: draft.Held, CreatedAt: at, UpdatedAt: at})
 	if err != nil {
 		t.Fatal(err)

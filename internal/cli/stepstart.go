@@ -79,6 +79,22 @@ func (e *Env) startOf(st workflow.Step, p unit.ProviderID) startArgs {
 	return a
 }
 
+// startArgsOf are c's turn.start arguments, with a review round of no stage taking the one u's plan holds due:
+// its follow-up, else its first.
+func (s *stepSet) startArgsOf(ctx context.Context, c stepCall) startArgs {
+	a := s.e.startOf(c.st, c.u.Provider)
+	if a.def.RoundKind != builtin.RoundKindReview || a.round != "" {
+		return a
+	}
+	if p, ok, err := s.plan(ctx, c.u, roundFollowup); err == nil && ok && p.NotDue == "" {
+		return a
+	}
+	if p, ok, err := s.plan(ctx, c.u, roundFirst); err == nil && ok && p.NotDue == "" {
+		a.round = roundFirst
+	}
+	return a
+}
+
 func isTurnStart(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }
 
 // candidate is the sweep's round the intent's role's round kind and the step's
@@ -237,7 +253,7 @@ func (s *stepSet) startCheck(ctx context.Context, c stepCall, o automation.Check
 // the loop lock, asks the brief queue for the brief and counts the caps in
 // the bound round state; otherwise it starts nothing and writes nothing.
 func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool) (string, startPlan, error) {
-	p := startPlan{args: s.e.startOf(c.st, c.u.Provider)}
+	p := startPlan{args: s.startArgsOf(ctx, c)}
 	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
 		return s.unitGuards(ctx, c, p)
 	}
@@ -528,7 +544,7 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if err != nil {
 		return err
 	}
-	args := s.e.startOf(c.st, c.u.Provider)
+	args := s.startArgsOf(ctx, c)
 	planned, ok, err := s.plan(ctx, c.u, args.candidate())
 	if err != nil || !ok || planned.NotDue != "" || planned.Observed {
 		return err
@@ -680,7 +696,7 @@ func (s *stepSet) startDismiss(ctx context.Context, c stepCall) error {
 	if err != nil {
 		return err
 	}
-	args := s.e.startOf(c.st, c.u.Provider)
+	args := s.startArgsOf(ctx, c)
 	if r := args.candidate(); r != "" {
 		planned, ok, err := s.plan(ctx, c.u, r)
 		if err != nil {

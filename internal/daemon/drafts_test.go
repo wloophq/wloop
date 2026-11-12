@@ -25,6 +25,7 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -141,12 +142,12 @@ func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock,
 		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
 	r.s.deps.Gates, r.s.deps.GateReader = svc, st
-	r.o = &outbox.Service{Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
+	r.o = &outbox.Service{Kinds: outboxtest.Shapes{}, Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
 		if p == unit.GitHub && !slices.Contains(off, p) {
 			return r.fx, nil
 		}
 		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
-	}, Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery }}
+	}, Posts: func(d draft.Delivery) bool { return d == draft.Delivery("comment") }}
 	r.o.OnSent = append(r.o.OnSent, r.s.RuleSent)
 	r.s.deps.Outbox = r.o
 	r.s.registerOutbox()
@@ -159,7 +160,7 @@ func (r *outboxRig) propose(t *testing.T, u unit.Unit, text string, mode draft.A
 	if mode == draft.Delay {
 		a.Window = time.Minute
 	}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Reply, Text: text,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Kind("reply"), Text: text,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(a)})
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +187,7 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 	t.Helper()
 	ctx := context.Background()
 	if d.Kind == "" {
-		d.Kind = draft.Reply
+		d.Kind = draft.Kind("reply")
 	}
 	d.Original = d.Text
 	d.CreatedAt, d.UpdatedAt = r.clock.Now(), r.clock.Now()
@@ -299,7 +300,7 @@ func TestDraftsListByState(t *testing.T) {
 func TestDraftsServeWhyAndLanguage(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Why: "w", Language: "pt",
+	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "any news?", Why: "w", Language: "pt",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})}); err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +436,7 @@ func TestADraftInAPersonsOwnConversationSaysWhichConversationItQuotes(t *testing
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	person := "github:octocat"
-	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Target: person,
+	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "any news?", Target: person,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: r7u.String() + ":" + person}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)
@@ -953,7 +954,7 @@ func TestDraftTitleNamesWhereItGoes(t *testing.T) {
 	if got := draftTitle(draft.Draft{Unit: u, Purpose: "reply", Text: "on it\nmore"}, "#general"); got != "reply on #general: on it" {
 		t.Errorf("title %q", got)
 	}
-	if got := draftTitle(draft.Draft{Unit: u, Purpose: "react", Delivery: draft.Reaction, Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
+	if got := draftTitle(draft.Draft{Unit: u, Purpose: "react", Delivery: draft.Delivery("reaction"), Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
 		t.Errorf("title %q", got)
 	}
 }
@@ -997,7 +998,7 @@ func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	r := newOutboxRig(t)
 	r.s.deps.Items = unitItems{r7u: {{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request,
 		WaitingOn: []items.Person{{Key: "slack:U0ANA", Name: "Ana Lima", Aliases: []string{"github:ana"}}}}}}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1"}, Kind: draft.Nudge, Text: "@{github:ana}, any news? cc @{github:bob}",
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1"}, Kind: draft.Kind("nudge"), Text: "@{github:ana}, any news? cc @{github:bob}",
 		Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
@@ -1031,7 +1032,7 @@ func mentioning(t *testing.T, r *outboxRig) draft.Draft {
 		{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UANA", Name: "Ana Lima"}}},
 		{ID: "i2", Summary: "Sign the deal", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UBRUNO", Name: "Bruno Melo"}}},
 	}}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Nudge,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Kind("nudge"),
 		Text: "@{slack:UANA} @{slack:UBRUNO}, any news?", Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
@@ -1269,7 +1270,7 @@ func silentRig(t *testing.T) (*outboxRig, *[]string) {
 
 func (r *outboxRig) proposeWith(t *testing.T, effects ...string) draft.Draft {
 	t.Helper()
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "Closing this out", Effects: effects,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "Closing this out", Effects: effects,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "wf", Rule: "wf", Key: strings.Join(effects, ",")}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)

@@ -24,7 +24,7 @@ func (f factIs) Holds(facts map[string]any, _ time.Time) (bool, error) {
 // commentRule is a rule whose when names comment delivery, as the loader
 // marks one that tests draft.delivery == "comment".
 func commentRule(when draft.Condition, a draft.Approval) draft.Rule {
-	return draft.Rule{When: when, Approval: a, Names: draft.CommentDelivery, Subjects: []string{"pr"}}
+	return draft.Rule{When: when, Approval: a, Names: draft.Delivery("comment"), Subjects: []string{"pr"}}
 }
 
 var (
@@ -46,7 +46,7 @@ func subjectOf(slot string, facts map[string]any) Facts {
 }
 
 func comment(text string) Proposal {
-	return Proposal{Unit: pull, Purpose: "review", Delivery: draft.CommentDelivery, Text: text,
+	return Proposal{Unit: pull, Purpose: "review", Delivery: draft.Delivery("comment"), Text: text,
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}}
 }
 
@@ -102,11 +102,11 @@ func TestADeliveryThatPostsWaitsUnlessARuleNamesIt(t *testing.T) {
 		want draft.State
 	}{
 		"a rule that names no delivery":  {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}, draft.Held},
-		"a rule that names its delivery": {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Names: draft.Message, Subjects: slackSubject}, draft.Queued},
+		"a rule that names its delivery": {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Names: draft.Delivery("message"), Subjects: slackSubject}, draft.Queued},
 	} {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv()
-			e.svc.Posts = func(d draft.Delivery) bool { return d == draft.Message }
+			e.svc.Posts = func(d draft.Delivery) bool { return d == draft.Delivery("message") }
 			e.svc.Facts = dm
 			withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{c.rule}})
 			if d := e.propose(reply("x")); d.State != c.want {
@@ -176,7 +176,7 @@ func TestAnAgentsPurposeNeverMatchesAPurposeRule(t *testing.T) {
 		e := newEnv()
 		withPolicy(e, pol)
 		p := reply("thanks!")
-		p.Kind, p.Purpose, p.Delivery, p.Origin.Kind = "", "thanks", draft.Message, kind
+		p.Kind, p.Purpose, p.Delivery, p.Origin.Kind = "", "thanks", draft.Delivery("message"), kind
 		if d := e.propose(p); d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("a %s draft labeled thanks: %+v", kind, d)
 		}

@@ -46,6 +46,7 @@ type Vocabulary struct {
 	briefSubjects      []string
 	workflowSlots      []string
 	deliveries         []string
+	emojiDeliveries    []string
 	pluginDeliveries   map[string]bool
 	events             map[string]unit.ProviderID
 	answering          map[unit.ProviderID]map[string]map[string]string
@@ -163,6 +164,7 @@ func Install(v *Vocabulary) {
 	Facts, ActionFacts, Effects, Roles, Steps = v.facts, v.actionFacts, v.effects, v.roles, v.steps
 	Slots, Providers, BriefSubjects = v.slots, slices.Sorted(maps.Keys(v.slots)), v.briefSubjects
 	WorkflowSlots, DraftDeliveries, EventProviders, AnsweringEvents = v.workflowSlots, v.deliveries, v.events, v.answering
+	DraftEmojiDeliveries = v.emojiDeliveries
 	PayloadProviders, RoundProviders, PluginTaskKinds = v.payloads, v.rounds, v.taskKinds
 	Tools, ToolAnswers, ToolProviders, DraftKinds = v.tools, v.toolAnswers, v.toolProviders, v.draftKinds
 	LanguageFacts, MembersFacts = v.languageFacts, v.membersFacts
@@ -310,6 +312,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	unitSlots := slices.Clone(coreUnitSlots)
 	deliveries := slices.Clone(coreDeliveries)
 	pluginDelivs := map[string]bool{}
+	var emojis []string
 	events := coreEventProviders()
 	answering := map[unit.ProviderID]map[string]map[string]string{}
 	payloads := map[string]unit.ProviderID{}
@@ -401,6 +404,9 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 				deliveries = append(deliveries, d.Name)
 			}
 			pluginDelivs[d.Name] = pluginDelivs[d.Name] || d.Posts
+			if d.Emoji && !slices.Contains(emojis, d.Name) {
+				emojis = append(emojis, d.Name)
+			}
 		}
 		if len(v.RowKinds) > 0 {
 			rowKinds[id] = slices.Clone(v.RowKinds)
@@ -442,7 +448,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	draftKinds, _ := draft.NewCatalog(kindSpecs, deliverySpecs, defaultDeliveries)
 	return &Vocabulary{facts: facts, actionFacts: actionFacts, effects: effects, roles: roles, steps: stepsWith(steps),
 		slots: slots, briefSubjects: briefSubjects, workflowSlots: slices.Concat(unitSlots, nonUnitSlots),
-		deliveries: deliveries, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
+		deliveries: deliveries, emojiDeliveries: emojis, pluginDeliveries: pluginDelivs, events: events, answering: answering, payloads: payloads, rounds: rounds, taskKinds: taskKinds,
 		tools: tools, toolAnswers: answers, toolProviders: toolProviders, draftKinds: draftKinds, languageFacts: languageFacts, membersFacts: membersFacts, marks: marks, linkSignals: signals,
 		situations: situations, signalsOf: signalsOf, predicates: predicates}
 }

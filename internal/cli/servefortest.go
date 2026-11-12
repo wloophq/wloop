@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -24,10 +26,12 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -44,6 +48,12 @@ type TestOptions struct {
 	Now func() time.Time
 	// Config edits the default configuration the daemon serves.
 	Config func(*config.Config)
+	// Repos are the repositories the test daemon's workspace manager holds, which a resumed or a new round's
+	// workspace checks out; ProjectsDir is the configuration's projects_dir, a temporary one when empty.
+	Repos       []wsdomain.Repo
+	ProjectsDir string
+	// Git runs the test daemon's git; nil runs none, and every git call fails.
+	Git gitx.Runner
 	// Plugins run, by plugin id, as serve runs that bundled plugin's process, such as the GitHub plugin over a
 	// fake GitHub; a plugin left out does not run.
 	Plugins map[string]src.Source
@@ -82,8 +92,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 	logf := func(format string, args ...any) { t.Logf(format, args...) }
 	e := (&Env{
 		Out: servedLog{t}, Err: servedLog{t},
-		Git:        gitx.Git{R: servedNoGit{}},
-		WS:         workspace.NewSet(&fake.Manager{}),
+		Git:        gitx.Git{R: cmp.Or[gitx.Runner](o.Git, servedNoGit{})},
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, errNoShell },
 		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, errNoShell },
 		ConfigPath: filepath.Join(dir, "config.toml"),
@@ -101,10 +110,12 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 	}).owning()
 	cfg := (&Env{}).defaultConfig()
 	cfg.Agent, cfg.HTTP.Port, cfg.WorkspaceManagers = "echo", 0, []string{"fake"}
+	cfg.ProjectsDir = cmp.Or(o.ProjectsDir, filepath.Join(dir, "projects"))
 	if o.Config != nil {
 		o.Config(&cfg)
 	}
 	e.LoadConfig = func() (config.Config, error) { return cfg, nil }
+	e.WS = workspace.NewSet(servedManager{Manager: &fake.Manager{RepoList: o.Repos}, e: e})
 	e.intents = newEnvIntents(e)
 	e.testPublishers = o.Publishers
 	e.noJobs = true
@@ -284,3 +295,31 @@ func (w servedLog) Write(p []byte) (int, error) {
 
 // testManager is the workspace manager of a test daemon, which gives its sessions their handles.
 const testManager = "fake"
+
+// servedManager is the test daemon's workspace manager: an agent session it starts reaches the loop's MCP tool
+// at once, as a scripted agent speaks for it.
+type servedManager struct {
+	*fake.Manager
+	e *Env
+}
+
+func (m servedManager) StartAgentSession(ctx context.Context, req workspace.StartRequest) (string, error) {
+	handle, err := m.Manager.StartAgentSession(ctx, req)
+	if err == nil {
+		err = m.e.Turns.MCPSeen(ctx, handle)
+	}
+	return handle, err
+}
+
+// Action runs action of u's plugin, running in the test daemon, as the host calls it, such as a read that
+// keeps u in the store as the plugin's ingestion does.
+func (d *TestDaemon) Action(ctx context.Context, u unit.Unit, action string) (json.RawMessage, error) {
+	if d.e.pluginKind == nil {
+		return nil, errors.New("the test daemon runs no plugin")
+	}
+	c, err := d.e.pluginKind.Client(string(u.Provider))
+	if err != nil {
+		return nil, err
+	}
+	return c.Action(ctx, src.ActionRequest{Unit: psource.Wire(u), Action: action})
+}

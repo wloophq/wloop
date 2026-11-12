@@ -29,17 +29,17 @@ var (
 func TestADefaultThatReleasesNeverReleasesAPost(t *testing.T) {
 	for _, def := range []Approval{none, window} {
 		p := Policy{Default: def}
-		for _, d := range []Delivery{CommentDelivery, Message} {
+		for _, d := range []Delivery{Delivery("comment"), Delivery("message")} {
 			got, err := p.Decide(Draft{Delivery: d}, Subject{Facts: nil}, true, time.Time{})
 			if err != nil || got.Approval != always || got.PostReleased {
 				t.Errorf("%s on a %s that posts: %+v %v", def.Mode, d, got, err)
 			}
 		}
-		if got, _ := p.Decide(Draft{Delivery: Reaction}, Subject{Facts: nil}, false, time.Time{}); got.Approval != def {
+		if got, _ := p.Decide(Draft{Delivery: Delivery("reaction")}, Subject{Facts: nil}, false, time.Time{}); got.Approval != def {
 			t.Errorf("%s on a reaction, which posts nothing: %+v", def.Mode, got)
 		}
 	}
-	if got, _ := (Policy{Default: Approval{Mode: DryRun}}).Decide(Draft{Delivery: CommentDelivery}, Subject{Facts: nil}, true, time.Time{}); got.Approval.Mode != DryRun {
+	if got, _ := (Policy{Default: Approval{Mode: DryRun}}).Decide(Draft{Delivery: Delivery("comment")}, Subject{Facts: nil}, true, time.Time{}); got.Approval.Mode != DryRun {
 		t.Errorf("observe on a comment: %+v", got)
 	}
 }
@@ -47,16 +47,16 @@ func TestADefaultThatReleasesNeverReleasesAPost(t *testing.T) {
 func TestARuleReleasesAPostOnlyWhenItNamesItsDelivery(t *testing.T) {
 	bot := factIs{"pr.author", "dependabot"}
 	facts := map[string]any{"pr.author": "dependabot"}
-	comment := Draft{Delivery: CommentDelivery}
+	comment := Draft{Delivery: Delivery("comment")}
 	unnamed := Policy{Default: always, Rules: []Rule{{When: bot, Approval: none}}}
 	if got, _ := unnamed.Decide(comment, Subject{Facts: facts}, true, time.Time{}); got.Approval != always || got.Rule != -1 {
 		t.Errorf("a rule that names no delivery: %+v", got)
 	}
-	other := Policy{Default: always, Rules: []Rule{{When: bot, Approval: none, Names: Message}}}
+	other := Policy{Default: always, Rules: []Rule{{When: bot, Approval: none, Names: Delivery("message")}}}
 	if got, _ := other.Decide(comment, Subject{Facts: facts}, true, time.Time{}); got.Approval != always || got.Rule != -1 {
 		t.Errorf("a rule that names another delivery: %+v", got)
 	}
-	named := Policy{Default: always, Rules: []Rule{{When: bot, Approval: window, Names: CommentDelivery}}}
+	named := Policy{Default: always, Rules: []Rule{{When: bot, Approval: window, Names: Delivery("comment")}}}
 	if got, _ := named.Decide(comment, Subject{Facts: facts}, true, time.Time{}); got.Approval != window || got.Rule != 0 || !got.PostReleased {
 		t.Errorf("a rule that names comment delivery: %+v", got)
 	}
@@ -72,7 +72,7 @@ func TestTheFirstMatchingRuleWinsElseTheDefault(t *testing.T) {
 		{When: factIs{"slack.started_by_me", true}, Approval: window},
 		{When: factIs{"slack.started_by_me", true}, Approval: none},
 	}}
-	msg := Draft{Delivery: Message}
+	msg := Draft{Delivery: Delivery("message")}
 	for _, c := range []struct {
 		facts map[string]any
 		want  Approval
@@ -90,7 +90,7 @@ func TestTheFirstMatchingRuleWinsElseTheDefault(t *testing.T) {
 
 func TestARuleThatFailsHoldsTheDraft(t *testing.T) {
 	p := Policy{Default: none, Rules: []Rule{{When: failing{}, Approval: none}}}
-	if got, err := p.Decide(Draft{Delivery: Message}, Subject{Facts: nil}, false, time.Time{}); err == nil || got.Approval != always {
+	if got, err := p.Decide(Draft{Delivery: Delivery("message")}, Subject{Facts: nil}, false, time.Time{}); err == nil || got.Approval != always {
 		t.Fatalf("%+v %v", got, err)
 	}
 }
@@ -98,12 +98,12 @@ func TestARuleThatFailsHoldsTheDraft(t *testing.T) {
 func TestAPurposeIsAFactOnlyWhenTheLoopNamedIt(t *testing.T) {
 	release := Policy{Default: always, Rules: []Rule{{When: factIs{"draft.purpose", "thanks"}, Approval: none}}}
 	for _, o := range []Origin{{Kind: OriginTurn, Intent: "reply"}, {Kind: OriginSession}, {Kind: OriginUser}} {
-		d := Draft{Delivery: Message, Purpose: "thanks", Origin: o}
+		d := Draft{Delivery: Delivery("message"), Purpose: "thanks", Origin: o}
 		if got, _ := release.Decide(d, Subject{Facts: nil}, false, time.Time{}); got.Approval != always {
 			t.Errorf("a %s draft labeled thanks: %+v", o.Kind, got)
 		}
 	}
-	d := Draft{Delivery: Message, Purpose: "thanks", Origin: Origin{Kind: OriginAuto, Workflow: "slack-thanks"}}
+	d := Draft{Delivery: Delivery("message"), Purpose: "thanks", Origin: Origin{Kind: OriginAuto, Workflow: "slack-thanks"}}
 	if got, _ := release.Decide(d, Subject{Facts: nil}, false, time.Time{}); got.Approval != none {
 		t.Errorf("a workflow's draft: %+v", got)
 	}
@@ -111,7 +111,7 @@ func TestAPurposeIsAFactOnlyWhenTheLoopNamedIt(t *testing.T) {
 
 func TestTheUnitsFactsNeverOverrideTheDraftsOwn(t *testing.T) {
 	p := Policy{Default: always, Rules: []Rule{{When: factIs{"draft.delivery", "message"}, Approval: none}}}
-	if got, _ := p.Decide(Draft{Delivery: Reaction}, Subject{Facts: map[string]any{"draft.delivery": "message"}}, false, time.Time{}); got.Approval != always {
+	if got, _ := p.Decide(Draft{Delivery: Delivery("reaction")}, Subject{Facts: map[string]any{"draft.delivery": "message"}}, false, time.Time{}); got.Approval != always {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -136,11 +136,11 @@ func TestARuleOverAnotherSubjectsFactsDoesNotApply(t *testing.T) {
 		{When: factIs{"draft.delivery", "message"}, Approval: window},
 	}}
 	pr := Subject{Slot: "pr", Facts: map[string]any{"pr.author": "someone"}}
-	if got, _ := p.Decide(Draft{Delivery: Message}, pr, false, time.Time{}); got.Approval != window || got.Rule != 1 {
+	if got, _ := p.Decide(Draft{Delivery: Delivery("message")}, pr, false, time.Time{}); got.Approval != window || got.Rule != 1 {
 		t.Fatalf("a slack rule on a pull request: %+v", got)
 	}
 	dm := Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}
-	if got, _ := p.Decide(Draft{Delivery: Message}, dm, false, time.Time{}); got.Approval != none || got.Rule != 0 {
+	if got, _ := p.Decide(Draft{Delivery: Delivery("message")}, dm, false, time.Time{}); got.Approval != none || got.Rule != 0 {
 		t.Fatalf("on its own subject: %+v", got)
 	}
 	if !p.ReadsSubject() || (Policy{Rules: p.Rules[1:]}).ReadsSubject() {

@@ -1,1 +1,1 @@
-{{.Payload.event}} review{{with .Payload.comments}} with {{len .}} inline comments{{end}} at {{printf "%.7s" .Basis}}
+{{.Payload.event}} review{{with index .Payload "comments"}} with {{len .}} inline comments{{end}} at {{printf "%.7s" .Basis}}

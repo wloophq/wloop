@@ -73,7 +73,7 @@ func TestAHeldNudgeUnderTheOldTaskKeyHoldsItsPerson(t *testing.T) {
 		Items: []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
 	if _, err := r.svc.Propose(context.Background(), outbox.Proposal{Unit: draftThread, Task: "t1", Items: []string{"i1"}, Purpose: "nudge",
-		Delivery: draft.Message, Text: "@ana?", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: "e1:" + ana.Key}}); err != nil {
+		Delivery: draft.Delivery("message"), Text: "@ana?", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: "e1:" + ana.Key}}); err != nil {
 		t.Fatal(err)
 	}
 	r.run(draftTask)

@@ -72,8 +72,8 @@ func TestASentPostAttachesItsUnitToTheTurnsTask(t *testing.T) {
 }
 
 func TestOnlyAPostOfAnAttachingTaskTurnAttaches(t *testing.T) {
-	react := fromTask(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Target: "https://example.test/p1"})
-	edit := fromTask(Proposal{Unit: thread, Kind: draft.Edit, Text: "fixed", Replaced: "fixd", Target: "https://example.test/p1"})
+	react := fromTask(Proposal{Unit: thread, Kind: draft.Kind("react"), Reaction: "eyes", Target: "https://example.test/p1"})
+	edit := fromTask(Proposal{Unit: thread, Kind: draft.Kind("edit"), Text: "fixed", Replaced: "fixd", Target: "https://example.test/p1"})
 	other := fromTask(reply("hi"))
 	other.Origin.Intent = "reply"
 	onUnit := fromTask(reply("hi"))
@@ -136,4 +136,6 @@ func TestADraftOnTheTaskAttachesTheUnitItsPostLandedIn(t *testing.T) {
 	}
 }
 
-func postsMessages(d draft.Delivery) bool { return d == draft.Message || d == draft.CommentDelivery }
+func postsMessages(d draft.Delivery) bool {
+	return d == draft.Delivery("message") || d == draft.Delivery("comment")
+}

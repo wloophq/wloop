@@ -12,17 +12,46 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
-// legacyShape is how the outbox shaped a draft before the manifests declared kinds: draft.ShapeOf and
-// draft.KindOf, then the delivery the provider's manifest gives the kind.
+// legacyKinds are the kinds the core named before the manifests declared them.
+var legacyKinds = []draft.Kind{"reply", "nudge", "close", "react", "ask_owner", "comment", "edit", "delete"}
+
+// shapeOf is the purpose and delivery the core gave a draft of kind k before the manifests declared kinds.
+func shapeOf(k draft.Kind) (string, draft.Delivery) {
+	switch k {
+	case "react":
+		return string(k), "reaction"
+	case "comment", "edit", "delete":
+		return string(k), draft.Delivery(k)
+	}
+	return string(k), "message"
+}
+
+// kindOf is the kind the core read for a purpose and a delivery before the manifests declared kinds.
+func kindOf(purpose string, d draft.Delivery) draft.Kind {
+	switch d {
+	case "reaction":
+		return "react"
+	case "comment", "edit", "delete":
+		return draft.Kind(d)
+	}
+	switch k := draft.Kind(purpose); k {
+	case "nudge", "close", "ask_owner":
+		return k
+	}
+	return "reply"
+}
+
+// legacyShape is how the outbox shaped a draft before the manifests declared kinds: shapeOf and kindOf, then
+// the delivery the provider's manifest gives the kind.
 func legacyShape(c *draft.Catalog, provider string, d draft.Draft) draft.Draft {
 	if d.Purpose == "" && d.Kind != "" {
-		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
+		d.Purpose, d.Delivery = shapeOf(d.Kind)
 	}
-	d.Delivery = cmp.Or(d.Delivery, draft.Message)
-	d.Kind = draft.KindOf(d.Purpose, d.Delivery)
+	d.Delivery = cmp.Or(d.Delivery, draft.Delivery("message"))
+	d.Kind = kindOf(d.Purpose, d.Delivery)
 	got := legacyDelivers(c, provider, d.Kind)
 	if got != d.Delivery {
-		d.Delivery, d.Kind = got, draft.KindOf(d.Purpose, got)
+		d.Delivery, d.Kind = got, kindOf(d.Purpose, got)
 	}
 	return d
 }
@@ -63,7 +92,7 @@ func TestKindsFromManifests(t *testing.T) {
 		t.Error("the installed catalog is not the installed vocabulary's")
 	}
 	var inputs []draft.Draft
-	for _, k := range draft.Kinds {
+	for _, k := range legacyKinds {
 		inputs = append(inputs, draft.Draft{Kind: k})
 	}
 	for _, purpose := range []string{"reply", "nudge", "close", "ask_owner", "thanks"} {
@@ -158,4 +187,11 @@ func BenchmarkShapeAndValidate(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestEmojiDeliveriesComeFromManifests(t *testing.T) {
+	got := slices.Sorted(slices.Values(DraftEmojiDeliveries))
+	if want := []string{"reaction", "unreaction"}; !slices.Equal(got, want) {
+		t.Fatalf("emoji deliveries %v, want the bundled Slack manifest's %v", got, want)
+	}
 }

@@ -429,7 +429,7 @@
                   "type": "string"
                 },
                 "stage": {
-                  "description": "The pass over the unit: its first, or one after.",
+                  "description": "The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first.",
                   "enum": [
                     "first",
                     "follow-up"

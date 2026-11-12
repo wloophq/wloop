@@ -158,6 +158,7 @@ func newEnv() *env {
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
 	e.svc = &Service{
 		Store: e.store,
+		Kinds: shapes{},
 		Gates: testGates{e.decider, e.gates},
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if e.disabled[p] {
@@ -166,7 +167,7 @@ func newEnv() *env {
 			return e.fx, nil
 		},
 		Clock: e.clock,
-		Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery },
+		Posts: func(d draft.Delivery) bool { return d == draft.Delivery("comment") },
 		Log: func(format string, args ...any) {
 			e.logMu.Lock()
 			defer e.logMu.Unlock()
@@ -257,7 +258,7 @@ func (e *env) get(id draft.ID) draft.Draft {
 }
 
 func reply(text string) Proposal {
-	return Proposal{Unit: thread, Kind: draft.Reply, Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "reply"}}
+	return Proposal{Unit: thread, Kind: draft.Kind("reply"), Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "reply"}}
 }
 
 var errBoom = errors.New("boom")

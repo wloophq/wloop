@@ -265,7 +265,7 @@ func TestAPluginsDraftCarriesNoDeliveryOfItsOwn(t *testing.T) {
 			t.Errorf("proposed %+v with the plugin's delivery", p)
 		}
 	}
-	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Reply {
+	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Kind("reply") {
 		t.Fatalf("proposed %+v", ds.proposed)
 	}
 }

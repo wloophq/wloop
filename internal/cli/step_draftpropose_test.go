@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
@@ -119,7 +120,7 @@ func newDraftRig(t testing.TB, wf workflow.Workflow, text string) *draftRig {
 		tasks: &memTasks{m: map[task.ID]task.Task{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
 	r.cfg.Profile = dir
 	clock := clockFunc(func() time.Time { return r.now })
-	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
+	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
 		Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil }})
 	r.deps = &draftDeps{Outbox: func() draftOutbox { return r.svc }, Tasks: r.tasks, Items: r.items,
 		Workflow: func(name string) (workflow.Workflow, bool) { return r.wf, name == r.wf.Name },
@@ -330,7 +331,7 @@ func TestAReactionWithNoPermalinkIsRefusedAtPropose(t *testing.T) {
 	done.Origin.Permalink = "https://example.test/i1"
 	r.items.set(draftThread, done)
 	r.run(draftThread)
-	if ds := r.drafts(); len(ds) != 1 || ds[0].Delivery != draft.Reaction || ds[0].Target != "https://example.test/i1" || ds[0].Reaction != "white_check_mark" {
+	if ds := r.drafts(); len(ds) != 1 || ds[0].Delivery != draft.Delivery("reaction") || ds[0].Target != "https://example.test/i1" || ds[0].Reaction != "white_check_mark" {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -395,7 +396,7 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 	}}}
 	tasks := coretasks.New(coretasks.Deps{Store: db.Tasks(), Clock: clock, States: taskstest.BundledStates})
 	newSvc := func() *outbox.Service {
-		return withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
+		return withDraftGates(db, clock.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
 			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Ends: tasks, Modules: []pluginModule{m}})}})
 	}
@@ -415,11 +416,11 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 		}
 		return e.Category
 	}
-	plain, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Kind: draft.Close, Text: "Closing.", Origin: draft.Origin{Kind: draft.OriginUser}})
+	plain, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Kind: draft.Kind("close"), Text: "Closing.", Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	react, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Purpose: "close", Delivery: draft.Reaction, Reaction: "white_check_mark",
+	react, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Purpose: "close", Delivery: draft.Delivery("reaction"), Reaction: "white_check_mark",
 		Effects: []string{"unit.closed"}, Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)

@@ -170,6 +170,7 @@ type Role struct {
 type Delivery struct {
 	Name  string `toml:"name" doc:"The delivery's name, such as \"comment\". Required."`
 	Posts bool   `toml:"posts" doc:"A draft with this delivery reaches people, so it waits for approval."`
+	Emoji bool   `toml:"emoji" doc:"A draft with this delivery adds or removes an emoji, named by its reaction, and has no text."`
 }
 
 // Job is a job the host schedules and runs through Ingest.

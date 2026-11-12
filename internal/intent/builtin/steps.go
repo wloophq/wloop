@@ -43,9 +43,9 @@ const (
 var (
 	// DraftDeliveries are the deliveries the merged plugins declare, which Install sets.
 	DraftDeliveries []string
-	// DraftEmojiDeliveries are the deliveries that post an emoji, which
-	// need the reaction argument, and no text.
-	DraftEmojiDeliveries = []string{"reaction"}
+	// DraftEmojiDeliveries are the deliveries the merged plugins mark emoji, which need the reaction argument,
+	// and no text; Install sets them.
+	DraftEmojiDeliveries []string
 	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
 	DraftPer             = []string{"unit", "person"}
 	DraftTargets         = []string{"unit", "item", DraftTargetPerson}

@@ -55,7 +55,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 	d := ds[0]
-	if d.Unit != r7u || d.Task != "t-1" || !slices.Equal(d.Items, []string{"it-t-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
+	if d.Unit != r7u || d.Task != "t-1" || !slices.Equal(d.Items, []string{"it-t-1"}) || d.Kind != draft.Kind("reply") || d.Text != "On it, thanks" ||
 		d.Origin.Kind != draft.OriginUser || d.State != draft.Held {
 		t.Fatalf("draft %+v", d)
 	}

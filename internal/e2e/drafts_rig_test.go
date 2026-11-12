@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,7 +47,7 @@ func (p *ghPublisher) Delivers(k draft.Kind) draft.Delivery {
 	case "resolve":
 		return "resolve"
 	}
-	return draft.CommentDelivery
+	return draft.Delivery("comment")
 }
 
 func (p *ghPublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence, error) {
@@ -103,6 +106,17 @@ var draftsPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
 const draftsURL = "https://github.com/acme/api/pull/7"
 
+// fullRead is the plugin's full read of acme/api#7, by its alias.
+var fullRead = regexp.MustCompile(`(pr\d+): repository\(owner: "acme", name: "api"\) \{ pullRequest\(number: 7\)`)
+
+// draftsNode is acme/api#7 read in full: open at head c2, by octocat, its review requested of the viewer.
+const draftsNode = `{"number":7,"title":"Add x","state":"OPEN","isDraft":false,"url":"https://github.com/acme/api/pull/7",
+ "createdAt":"2026-10-08T10:00:00Z","updatedAt":"2026-10-09T09:00:00Z","mergedAt":null,"closedAt":null,
+ "headRefName":"feat/x","baseRefName":"main","headRefOid":"c2","isCrossRepository":false,
+ "repository":{"nameWithOwner":"acme/api","visibility":"PRIVATE"},"author":{"login":"octocat"},"authorAssociation":"MEMBER",
+ "commits":{"nodes":[{"commit":{"oid":"c2","committedDate":"2026-10-08T10:00:00Z","parents":{"totalCount":1}}}]},
+ "reviews":{"nodes":[]},"comments":{"nodes":[]},"reviewRequests":{"nodes":[{"requestedReviewer":{"login":"me"}}]},"timelineItems":{"nodes":[]},"headCommit":{"nodes":[]}}`
+
 // ghAPI is the GitHub the real plugin reads in the scenarios: pull request acme/api#7, open at head c2, and
 // the viewer; any write, or any other read, fails.
 type ghAPI struct{}
@@ -119,6 +133,9 @@ func (ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
 		case strings.Contains(q, "mutation"):
 		case strings.Contains(q, "pr: repository"):
 			return []byte(draftsBasics), nil
+		case fullRead.MatchString(q):
+			return []byte(fmt.Sprintf(`{"data":{"rateLimit":{"cost":1,"remaining":4900,"limit":5000,"resetAt":"2026-10-20T13:00:00Z"},"viewer":{"login":"me"},%q:{"pullRequest":%s}}}`,
+				fullRead.FindStringSubmatch(q)[1], draftsNode)), nil
 		case strings.Contains(q, "viewer"):
 			return []byte(`{"data":{"viewer":{"login":"me"}}}`), nil
 		}
@@ -135,16 +152,22 @@ type draftsRig struct {
 	c   *client.Client
 	pub *ghPublisher
 	s   cli.TestSession
+	// elapsed is how far past draftsNow the daemon's clock stands.
+	elapsed atomic.Int64
 }
+
+// advance moves the daemon's clock on by d, as a window a scenario waits on passes.
+func (r *draftsRig) advance(d time.Duration) { r.elapsed.Add(int64(d)) }
 
 var draftsNow = time.Date(2026, 10, 9, 15, 0, 0, 0, time.UTC)
 
 func newDraftsRig(t *testing.T) *draftsRig {
 	t.Helper()
-	now := func() time.Time { return draftsNow }
 	r := &draftsRig{t: t, ctx: t.Context(), pub: &ghPublisher{head: "c2"}}
+	now := func() time.Time { return draftsNow.Add(time.Duration(r.elapsed.Load())) }
 	r.d = cli.ServeForTest(t, cli.TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: r.pub},
-		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{}), GH: ghAPI{}, Now: now}}})
+		Repos: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, Git: checkout{},
+		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{}), GH: ghAPI{}, Git: branches{}, Now: now}}})
 	r.c = r.d.Client()
 	return r
 }
@@ -289,4 +312,21 @@ func draftOption(id, label string, d api.AgentDraft) string {
 
 func doneOn(verdict string, d api.AgentDraft) string {
 	return fmt.Sprintf(`{"state":"done","summary":"recorded %s","outcome":{"verdict":%q,"draft":{"id":%d,"rev":%d}}}`, verdict, verdict, d.ID, d.Rev)
+}
+
+// checkout is the git of the pull request's checkout: every command succeeds and reads nothing.
+type checkout struct{}
+
+func (checkout) Run(context.Context, string, []string, ...string) ([]byte, error) { return nil, nil }
+
+// branches are the local branches of the pull request's checkout as the GitHub plugin plans a first round
+// over them: none is checked out, none has a tip, and every commit is there.
+type branches struct{}
+
+func (branches) Upstream(context.Context, string) (string, error)               { return "", nil }
+func (branches) LocalBranchTip(context.Context, string, string) (string, error) { return "", nil }
+func (branches) CheckedOutAt(context.Context, string, string) (string, error)   { return "", nil }
+func (branches) HasCommit(context.Context, string, string) (bool, error)        { return true, nil }
+func (branches) IsAncestor(context.Context, string, string, string) (bool, error) {
+	return true, nil
 }

@@ -181,8 +181,8 @@ func TestRuleSentNotifies(t *testing.T) {
 	sub := r.s.hub.subscribe("test")
 	ctx := context.Background()
 	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Wait},
-		Rules: []draft.Rule{{When: alwaysHolds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.CommentDelivery}}}
-	byRule, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "LGTM with one nit",
+		Rules: []draft.Rule{{When: alwaysHolds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.Delivery("comment")}}}
+	byRule, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "LGTM with one nit",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "rule"}, Policy: rule})
 	if err != nil {
 		t.Fatal(err)
@@ -308,7 +308,7 @@ func TestEditWithoutRevRefused(t *testing.T) {
 type lockedKinds struct{ reviewKinds }
 
 func (k lockedKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
-	if kind == string(draft.Reply) {
+	if kind == string(draft.Kind("reply")) {
 		return draft.KindSpec{Provider: provider, Name: kind, Delivery: "resolve"}, true
 	}
 	return k.reviewKinds.Lookup(provider, kind)
@@ -366,7 +366,7 @@ func TestDraftCardRendersItsKindsPreview(t *testing.T) {
 		t.Errorf("review preview %q", got)
 	}
 	reply := held
-	reply.Kind = draft.Reply
+	reply.Kind = draft.Kind("reply")
 	if got := r.s.draftView(context.Background(), reply, gate.Gate{}).Preview; got != "" {
 		t.Errorf("a preview that does not render shows %q, want none", got)
 	}
@@ -374,5 +374,20 @@ func TestDraftCardRendersItsKindsPreview(t *testing.T) {
 	other.Kind = "close"
 	if got := r.s.draftView(context.Background(), other, gate.Gate{}).Preview; got != "" {
 		t.Errorf("a kind without a preview shows %q", got)
+	}
+}
+
+// TestTheBundledReviewPreviewRendersAReviewWithNoInlineComments renders GitHub's shipped review preview over a
+// payload with no comments field, which its schema leaves optional.
+func TestTheBundledReviewPreviewRendersAReviewWithNoInlineComments(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	if r.s.loaded().Previews["github"]["review"] == "" {
+		t.Fatal("no bundled GitHub review preview")
+	}
+	d := reviewDraftOf(draft.Held)
+	d.Payload, d.Basis = json.RawMessage(`{"event":"COMMENT"}`), "c2abcdef0"
+	if got := r.s.draftView(context.Background(), d, gate.Gate{}).Preview; got != "COMMENT review at c2abcde" {
+		t.Errorf("review preview %q", got)
 	}
 }

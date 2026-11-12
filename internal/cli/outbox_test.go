@@ -85,12 +85,12 @@ func TestOutboxListGolden(t *testing.T) {
 	db := outboxDaemon(t, te, false)
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Thanks, merging now.\nSecond line stays out.", State: draft.Held,
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}})
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Target: "#general", Text: "Any news on this?", State: draft.Failed,
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("nudge"), Target: "#general", Text: "Any news on this?", State: draft.Failed,
 		Error: "may have been posted: timeout", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
 		CreatedAt: testNow.Add(time.Minute), UpdatedAt: testNow.Add(time.Minute)})
-	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Reply, Text: "Closing this.", Original: "Closing this.", State: draft.Held,
+	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("reply"), Text: "Closing this.", Original: "Closing this.", State: draft.Held,
 		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)}, testNow.Add(12*time.Minute))
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Close, Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("close"), Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
 		CreatedAt: testNow.Add(3 * time.Minute), UpdatedAt: testNow.Add(3 * time.Minute)})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "already out", State: draft.Sent})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "only watched", State: draft.Dropped, Reason: "observe"})
@@ -307,13 +307,13 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 		if code := te.run("outbox", "new", target, "Friday works"); code != 0 || !strings.Contains(te.out.String(), "draft 1 saved to the Outbox for your approval") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, 1); got.State != draft.Held || got.Kind != draft.Reply || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
+		if got := te.draftState(t, db, 1); got.State != draft.Held || got.Kind != draft.Kind("reply") || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
 			t.Fatalf("draft %+v", got)
 		}
 		if code := te.run("outbox", "new", target, "--react", ":eyes:"); code != 0 {
 			t.Fatalf("react: exit %d: %s", code, te.err)
 		}
-		if got := te.draftState(t, db, 2); got.Kind != draft.React || got.Reaction != "eyes" {
+		if got := te.draftState(t, db, 2); got.Kind != draft.Kind("react") || got.Reaction != "eyes" {
 			t.Fatalf("reaction %+v", got)
 		}
 	})
@@ -373,7 +373,7 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 func TestOutboxListLaysOutForATerminal(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Text: "@{github:ana}, any news?", State: draft.Held})
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("nudge"), Text: "@{github:ana}, any news?", State: draft.Held})
 	if code := te.run("outbox", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}

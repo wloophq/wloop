@@ -270,8 +270,8 @@ func TestServeNotifiesRuleSent(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Wait},
-		Rules: []draft.Rule{{When: holds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.CommentDelivery}}}
-	sent, err := d.e.outbox.Propose(ctx, outbox.Proposal{Unit: pr, Kind: draft.Reply, Text: "Thanks, merged the fix.",
+		Rules: []draft.Rule{{When: holds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.Delivery("comment")}}}
+	sent, err := d.e.outbox.Propose(ctx, outbox.Proposal{Unit: pr, Kind: draft.Kind("reply"), Text: "Thanks, merged the fix.",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: rule})
 	if err != nil {
 		t.Fatal(err)
@@ -347,5 +347,34 @@ func TestTheFailedDraftsReadOnceAPassSeeANewFailure(t *testing.T) {
 	other := unit.Unit{Provider: threadUnit.Provider, Key: "C1 0009"}
 	if got, err := f.List(ctx, outbox.Filter{Unit: &other, States: []draft.State{draft.Failed}}); err != nil || len(got) != 0 {
 		t.Fatalf("another unit's failures: %v %v", got, err)
+	}
+}
+
+func TestServeEndsTheTurnAFailedOrDroppedDraftHeld(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pub := &basingPublisher{fail: errors.New("Unprocessable Entity")}
+	te, d, _ := servedOutboxOf(t, pub)
+	if _, ok := d.Outbox.Store.(endingDrafts); !ok {
+		t.Fatalf("the served outbox's store is %T: a failed or dropped draft ends no turn", d.Outbox.Store)
+	}
+	var ended []string
+	o := *d.Outbox
+	o.Store = endingDrafts{Store: te.db.Drafts(), logf: t.Logf, ended: func(_ context.Context, d draft.Draft) error {
+		ended = append(ended, fmt.Sprintf("%d %s", d.ID, d.State))
+		return nil
+	}}
+	queued := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "fails", State: draft.Queued})
+	held := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "withdrawn", State: draft.Held})
+	kept := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "stays", State: draft.Held})
+	if _, _, err := o.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := o.WithdrawHeld(ctx, held.ID, "other_option"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{fmt.Sprintf("%d failed", queued.ID), fmt.Sprintf("%d dropped", held.ID)}
+	if !slices.Equal(ended, want) {
+		t.Fatalf("ended %v, want %v; draft %d stays held and ends nothing", ended, want, kept.ID)
 	}
 }

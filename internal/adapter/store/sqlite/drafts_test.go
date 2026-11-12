@@ -67,7 +67,7 @@ func init() {
 }
 
 func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
-	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Nudge, Target: "#general", Broadcast: draft.BroadcastOn,
+	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Kind("nudge"), Target: "#general", Broadcast: draft.BroadcastOn,
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true, Replaced: "pong",
 		Origin: draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA",
 			Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}, Session: "s-worker"},
@@ -185,7 +185,7 @@ func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
 	gst := db.Gates(clock.Now)
 	gs := outboxtest.GatesOn(gst, gst, clock.Now)
 	gs.Bind(svc)
-	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Items: []string{"i1"}, Kind: draft.Reply, Text: "done",
+	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Items: []string{"i1"}, Kind: draft.Kind("reply"), Text: "done",
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1}})
 	if err != nil {
 		t.Fatal(err)
@@ -272,7 +272,7 @@ func TestEditDuringApproveConflicts(t *testing.T) {
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
 	svc, gs := draftService(db, fx)
-	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: "A", Origin: draft.Origin{Kind: draft.OriginTurn}})
+	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: "A", Origin: draft.Origin{Kind: draft.OriginTurn}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func TestStaleSendClaimConflicts(t *testing.T) {
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
 	svc, gs := draftService(db, fx)
-	d, _ := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: "old", Origin: draft.Origin{Kind: draft.OriginTurn}})
+	d, _ := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: "old", Origin: draft.Origin{Kind: draft.OriginTurn}})
 	if err := gs.Approve(ctx, d.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ func TestConcurrentSendAcrossHandlesPublishesOnce(t *testing.T) {
 	}
 	const n = 100
 	for i := range n {
-		d, err := svcs[0].Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: fmt.Sprint(i), Origin: draft.Origin{Kind: draft.OriginTurn}})
+		d, err := svcs[0].Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: fmt.Sprint(i), Origin: draft.Origin{Kind: draft.OriginTurn}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -394,21 +394,21 @@ func TestADraftStoresItsShapeAndEffects(t *testing.T) {
 	s := db.Drafts()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	byKind := sampleDraft(slackThread, at)
-	byKind.Kind = draft.Nudge
+	byKind.Kind = draft.Kind("nudge")
 	d, err := s.Insert(ctx, byKind)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.Get(ctx, d.ID); got.Purpose != "nudge" || got.Delivery != draft.Message || got.Effects == nil || len(got.Effects) > 0 || !reflect.DeepEqual(got, d) {
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "nudge" || got.Delivery != "" || got.Effects == nil || len(got.Effects) > 0 || !reflect.DeepEqual(got, d) {
 		t.Fatalf("shaped from its kind: %+v\ninsert returned %+v", got, d)
 	}
 	shaped := sampleDraft(slackThread, at)
-	shaped.Kind, shaped.Purpose, shaped.Delivery, shaped.Effects = draft.React, "close", draft.Reaction, []string{"unit.closed"}
+	shaped.Kind, shaped.Purpose, shaped.Delivery, shaped.Effects = draft.Kind("react"), "close", draft.Delivery("reaction"), []string{"unit.closed"}
 	d, err = s.Insert(ctx, shaped)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.Get(ctx, d.ID); got.Purpose != "close" || got.Delivery != draft.Reaction || !slices.Equal(got.Effects, []string{"unit.closed"}) {
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "close" || got.Delivery != draft.Delivery("reaction") || !slices.Equal(got.Effects, []string{"unit.closed"}) {
 		t.Fatalf("%+v", got)
 	}
 }

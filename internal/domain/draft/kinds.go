@@ -44,7 +44,6 @@ type KindSpec struct {
 // ErrEmptyText is wrapped by CheckText.
 var ErrEmptyText = errors.New("empty text")
 
-// CheckText refuses a blank text for a kind that requires one.
 // VerdictOf is the record verdict d, a draft of kind s, posts: the payload field s.Verdict points to; "" when
 // the kind posts none or the payload lacks it.
 func (s KindSpec) VerdictOf(d Draft) string {
@@ -60,6 +59,7 @@ func (s KindSpec) VerdictOf(d Draft) string {
 	return out
 }
 
+// CheckText refuses a blank text for a kind that requires one.
 func (s KindSpec) CheckText(text string) error {
 	if s.TextRequired && strings.TrimSpace(text) == "" {
 		return fmt.Errorf("%w: a %s draft of %s needs a text", ErrEmptyText, s.Name, s.Provider)

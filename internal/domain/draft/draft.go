@@ -17,78 +17,9 @@ type ID int64
 // Kind is a draft kind's name, which its plugin's manifest declares.
 type Kind string
 
-// The kinds the core named before the manifests declared them.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-const (
-	Reply    Kind = "reply"
-	Nudge    Kind = "nudge"
-	Close    Kind = "close"
-	React    Kind = "react"
-	AskOwner Kind = "ask_owner"
-	Comment  Kind = "comment"
-	Edit     Kind = "edit"
-	Delete   Kind = "delete"
-)
-
-// Kinds are the kinds the core named.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit, Delete}
-
-// Valid says whether k is one of Kinds.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
-
-// ConversationKinds are the kinds slack_draft offers on a conversation: all
-// but a review comment, an edit and a deletion, which slack_edit and slack_delete
-// make at once.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
-
-// Emoji says whether a draft of kind k posts an emoji, and no text.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-func (k Kind) Emoji() bool {
-	_, d := ShapeOf(k)
-	return d == Reaction
-}
-
 // Delivery is how a draft reaches the provider, as its plugin's manifest
 // declares it.
 type Delivery string
-
-// The deliveries the core named before the manifests declared them.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-const (
-	Message         Delivery = "message"
-	Reaction        Delivery = "reaction"
-	CommentDelivery Delivery = "comment"
-	// EditDelivery replaces the text of a message the user posted.
-	EditDelivery Delivery = "edit"
-	// DeleteDelivery removes a message the user posted.
-	DeleteDelivery Delivery = "delete"
-)
-
-// ShapeOf is the purpose and delivery of a draft of kind k.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-func ShapeOf(k Kind) (purpose string, d Delivery) {
-	switch k {
-	case React:
-		return string(k), Reaction
-	case Comment:
-		return string(k), CommentDelivery
-	case Edit:
-		return string(k), EditDelivery
-	case Delete:
-		return string(k), DeleteDelivery
-	}
-	return string(k), Message
-}
 
 // Broadcast says whether a thread reply is also posted to its conversation.
 // It is NoBroadcast when the draft replies in no thread, as its publisher
@@ -108,27 +39,6 @@ func (b Broadcast) Valid() bool { return b == NoBroadcast || b == BroadcastOff |
 type Placed struct {
 	Target    string
 	Broadcast Broadcast
-}
-
-// KindOf is the kind readers of Kind see for a purpose and a delivery.
-//
-// Deprecated: kinds and deliveries are manifest data; use a Catalog.
-func KindOf(purpose string, d Delivery) Kind {
-	switch d {
-	case Reaction:
-		return React
-	case CommentDelivery:
-		return Comment
-	case EditDelivery:
-		return Edit
-	case DeleteDelivery:
-		return Delete
-	}
-	switch k := Kind(purpose); k {
-	case Nudge, Close, AskOwner:
-		return k
-	}
-	return Reply
 }
 
 // State is where a draft's delivery stands; whether it may be posted at all

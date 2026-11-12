@@ -42,7 +42,7 @@ func TestOutboxSendsOnlyApprovedDrafts(t *testing.T) {
 	}
 	withPolicy(e, observe)
 	dry := e.propose(reply("dry run"))
-	forged, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "queued with no gate",
+	forged, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Delivery("message"), Text: "queued with no gate",
 		State: draft.Queued, CreatedAt: t0, UpdatedAt: t0})
 	if err != nil {
 		t.Fatal(err)

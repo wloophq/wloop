@@ -228,7 +228,7 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 	if !slices.Contains(with, draftTool) {
 		t.Fatalf("allow %v lacks %s", with, draftTool)
 	}
-	if slices.Contains(settingsAllow(t, turns.Policy{TurnEnd: true, Drafts: true}), draftTool) {
+	if slices.Contains(settingsAllow(t, turns.Policy{TurnEnd: true}), draftTool) {
 		t.Fatalf("a policy whose DraftTools do not list %s allows it", draftTool)
 	}
 	for _, tool := range []string{slackSendTool, brand.ToolPrefix() + "slack_read", brand.ToolPrefix() + "slack_search"} {

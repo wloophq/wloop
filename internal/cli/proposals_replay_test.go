@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -118,7 +119,7 @@ func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
 	r.slack = newSlackFacts(db, clock)
-	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
+	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: clock,
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if p != slackPlugin {
 				return nil, fmt.Errorf("%s: %w", p, outbox.ErrDisabled)

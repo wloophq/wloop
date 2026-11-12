@@ -29,8 +29,8 @@ func bundledPublisher(t *testing.T, id string) psource.Publisher {
 func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
 	t.Parallel()
 	p := bundledPublisher(t, "github")
-	for k, want := range map[draft.Kind]draft.Delivery{draft.Reply: draft.CommentDelivery, draft.Nudge: draft.CommentDelivery, draft.Close: draft.CommentDelivery,
-		draft.AskOwner: draft.CommentDelivery, draft.Comment: draft.CommentDelivery, draft.React: draft.Reaction, draft.Edit: draft.EditDelivery} {
+	for k, want := range map[draft.Kind]draft.Delivery{draft.Kind("reply"): draft.Delivery("comment"), draft.Kind("nudge"): draft.Delivery("comment"), draft.Kind("close"): draft.Delivery("comment"),
+		draft.Kind("ask_owner"): draft.Delivery("comment"), draft.Kind("comment"): draft.Delivery("comment"), draft.Kind("react"): draft.Delivery("reaction"), draft.Kind("edit"): draft.Delivery("edit")} {
 		if got := p.Delivers(k); got != want {
 			t.Errorf("%s: %s, want %s", k, got, want)
 		}
@@ -40,8 +40,8 @@ func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
 func TestSlackDeliversItsKindsAsItsManifestNamesThem(t *testing.T) {
 	t.Parallel()
 	p := bundledPublisher(t, "slack")
-	for k, want := range map[draft.Kind]draft.Delivery{draft.Reply: draft.Message, draft.Nudge: draft.Message, draft.Comment: draft.Message,
-		draft.React: draft.Reaction, draft.Edit: draft.EditDelivery, draft.Delete: draft.DeleteDelivery} {
+	for k, want := range map[draft.Kind]draft.Delivery{draft.Kind("reply"): draft.Delivery("message"), draft.Kind("nudge"): draft.Delivery("message"), draft.Kind("comment"): draft.Delivery("message"),
+		draft.Kind("react"): draft.Delivery("reaction"), draft.Kind("edit"): draft.Delivery("edit"), draft.Kind("delete"): draft.Delivery("delete")} {
 		if got := p.Delivers(k); got != want {
 			t.Errorf("%s: %s, want %s", k, got, want)
 		}

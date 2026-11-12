@@ -233,7 +233,7 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 		t.Fatalf("published %v", e.fx.published)
 	}
 
-	auto := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
+	auto := Proposal{Unit: thread, Kind: draft.Kind("nudge"), Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 	first := e.propose(auto)
 	if again, err := e.svc.Propose(ctx, auto); !errors.Is(err, ErrDuplicate) || again.ID != first.ID {
 		t.Fatalf("a second sweep observed the same key again: %+v %v", again, err)
@@ -291,7 +291,7 @@ func TestObservedKeyRecordsAgainAfterRepeatAfter(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
 	e.svc.RepeatAfter = 24 * time.Hour
-	auto := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
+	auto := Proposal{Unit: thread, Kind: draft.Kind("nudge"), Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 	first := e.propose(auto)
 	e.clock.now = t0.Add(23 * time.Hour)
 	if again, err := e.svc.Propose(ctx, auto); !errors.Is(err, ErrDuplicate) || again.ID != first.ID {
@@ -353,7 +353,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 	})
 	t.Run("auto drafts keep their rule's policy", func(t *testing.T) {
 		e := newEnv()
-		p := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Target: "U0OTHER", Policy: none,
+		p := Proposal{Unit: thread, Kind: draft.Kind("nudge"), Text: "ping", Target: "U0OTHER", Policy: none,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 		if d := e.propose(p); d.State != draft.Queued {
 			t.Fatalf("%+v", d)

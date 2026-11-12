@@ -64,7 +64,7 @@ func TestProposingADraftChangesItsTasksPage(t *testing.T) {
 	r.s.deps.Drafts = r.o
 	r.put(t, unitTask("t-a", task.OriginDerived, r7u))
 	before := r.page(t, "view=inbox")
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Task: "t-a", Kind: draft.Reply, Text: "any news?",
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Task: "t-a", Kind: draft.Kind("reply"), Text: "any news?",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestDraftsFilteredByTask(t *testing.T) {
 	r.put(t, unitTask("t-a", task.OriginDerived, r7u), unitTask("t-b", task.OriginDerived, r7u))
 	ctx := context.Background()
 	propose := func(taskID, text string) draft.Draft {
-		d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Task: taskID, Kind: draft.Reply, Text: text,
+		d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Task: taskID, Kind: draft.Kind("reply"), Text: text,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 		if err != nil {
 			t.Fatal(err)
