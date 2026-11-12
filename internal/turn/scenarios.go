@@ -109,12 +109,13 @@ var addressRules = []string{
 	"wins over the verdicts below, own findings included.",
 	"Scope is the pull request's stated goal, not the lines it touched.",
 	"name it for the user to file as an issue",
+	"- Change, test and commit as the guide says.\n",
 }
 
 // Every scenario carries none of these; the turns that record also carry
 // recordMust, the others recordMustNot.
 var (
-	everyMustNot  = []string{"--workspace-status", "orca ", "Append the round", "r<k> held", "settle <url>", "notes.md", "--sha", ".local/state", "state/" + brand.StateDir(), "as this session"}
+	everyMustNot  = []string{"commit as the guide says, as a", "--workspace-status", "orca ", "Append the round", "r<k> held", "settle <url>", "notes.md", "--sha", ".local/state", "state/" + brand.StateDir(), "as this session"}
 	recordMust    = []string{"turn_end", "### Earlier turns"}
 	recordMustNot = []string{"turn_end", "turn end"}
 )

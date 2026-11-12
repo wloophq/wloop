@@ -2672,11 +2672,11 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 0cd0762fd849
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 0cd0762fd849 https://github.com/acme/api/pull/7` and follow what it prints.
+id: dd6ba85cbc93
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn dd6ba85cbc93 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 0cd0762fd849 for address in acme/api.
+Instructions dd6ba85cbc93 for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
@@ -2865,7 +2865,7 @@ Everything else goes ahead without asking.
 
 ### 5. Apply
 
-- Change, test and commit as the guide says, as a `comment` draft.
+- Change, test and commit as the guide says.
 - Stage by path (`git add <file>`), never `git add -A` or `-a`, so work in
   progress stays out of the round's commits.
 - Never skip the repository's hooks (`--no-verify`).
@@ -3005,11 +3005,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: f357055da7ff
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn f357055da7ff https://github.com/acme/api/pull/7` and follow what it prints.
+id: 46f1840f9e19
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 46f1840f9e19 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions f357055da7ff for address in acme/api.
+Instructions 46f1840f9e19 for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
@@ -3196,7 +3196,7 @@ Everything else goes ahead without asking.
 
 ### 5. Apply
 
-- Change, test and commit as the guide says, as a `comment` draft.
+- Change, test and commit as the guide says.
 - Stage by path (`git add <file>`), never `git add -A` or `-a`, so work in
   progress stays out of the round's commits.
 - Never skip the repository's hooks (`--no-verify`).
@@ -3349,11 +3349,11 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: d0030b596776
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn d0030b596776 https://github.com/acme/api/pull/7` and follow what it prints.
+id: c279efa990f4
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn c279efa990f4 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions d0030b596776 for address in acme/api.
+Instructions c279efa990f4 for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
@@ -3536,7 +3536,7 @@ Everything else goes ahead without asking.
 
 ### 5. Apply
 
-- Change, test and commit as the guide says, as a `comment` draft.
+- Change, test and commit as the guide says.
 - Stage by path (`git add <file>`), never `git add -A` or `-a`, so work in
   progress stays out of the round's commits.
 - Never skip the repository's hooks (`--no-verify`).
@@ -4214,11 +4214,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: 80a7fa714f3e
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 80a7fa714f3e https://github.com/acme/api/pull/7` and follow what it prints.
+id: f440b4ca347c
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn f440b4ca347c https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 80a7fa714f3e for address in acme/api.
+Instructions f440b4ca347c for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
@@ -4416,7 +4416,7 @@ Everything else goes ahead without asking.
 
 ### 5. Apply
 
-- Change, test and commit as the guide says, as a `comment` draft.
+- Change, test and commit as the guide says.
 - Stage by path (`git add <file>`), never `git add -A` or `-a`, so work in
   progress stays out of the round's commits.
 - Never skip the repository's hooks (`--no-verify`).
