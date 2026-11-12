@@ -315,7 +315,7 @@ func TestApproveWithEditedText(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "Thanks, merging", draft.Wait)
-	code, got, body := r.act(t, d.ID, "approve", `{"rev":0,"text":"Thanks! Merging now."}`)
+	code, got, body := r.act(t, d.ID, "approve", `{"rev":1,"text":"Thanks! Merging now."}`)
 	if code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
@@ -388,7 +388,7 @@ func TestDraftActionStatuses(t *testing.T) {
 		code   int
 		has    string
 	}{
-		{"retry of a held draft", d.ID, "retry", `{"rev":0}`, 409, "held"},
+		{"retry of a held draft", d.ID, "retry", `{"rev":1}`, 409, "held"},
 		{"unknown id", 999, "approve", `{}`, 404, "draft:999"},
 		{"empty text", d.ID, "edit", `{"text":"  "}`, 400, "empty text"},
 		{"edit without text", d.ID, "edit", `{}`, 400, "text"},
@@ -403,7 +403,7 @@ func TestDraftActionStatuses(t *testing.T) {
 	if code, got, body := r.act(t, d.ID, "discard", `{}`); code != 200 || got.State != "dropped" || got.Reason != "user" {
 		t.Fatalf("discard: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "approve", `{"rev":1,"text":"x"}`); code != 409 || !strings.Contains(body, "rejected") {
+	if code, _, body := r.act(t, d.ID, "approve", `{"rev":2,"text":"x"}`); code != 409 || !strings.Contains(body, "rejected") {
 		t.Fatalf("approve of a dropped draft: %d %s", code, body)
 	}
 	if code := get(t, r.s, api.Drafts+"?id=x", nil); code != 400 {
@@ -454,7 +454,7 @@ func TestEnabledPluginWithoutPublisherAnswers409(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
-	code, _, body := r.act(t, d.ID, "approve", `{"rev":0}`)
+	code, _, body := r.act(t, d.ID, "approve", `{"rev":1}`)
 	var e struct{ Error, Plugin string }
 	json.Unmarshal([]byte(body), &e)
 	if code != 409 || e.Plugin != "slack" {
@@ -506,7 +506,7 @@ func TestApprovedDraftPublishesOnWake(t *testing.T) {
 	if w := clock.next(t); w != draftWatchdog {
 		t.Fatalf("idle wait %v", w)
 	}
-	if code, _, body := r.act(t, d.ID, "approve", `{"rev":0}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "approve", `{"rev":1}`); code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
 	select {
@@ -598,7 +598,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	a := r.propose(t, r7u, "one", draft.Wait)
 	b := r.propose(t, r7u, "two\nsecond line", draft.Wait)
 	sent := r.propose(t, r7u, "three", draft.Wait)
-	if code, _, body := r.act(t, sent.ID, "approve", `{"rev":0}`); code != 200 {
+	if code, _, body := r.act(t, sent.ID, "approve", `{"rev":1}`); code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
 	if _, _, err := r.o.Send(context.Background()); err != nil {
@@ -674,7 +674,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	a := r.propose(t, r7u, "approve me", draft.Wait)
-	if code, body := r.verb(t, a.ID, "approve", `{"rev":"0","text":"approved text"}`); code != 200 || !strings.Contains(body, `"state":"next"`) {
+	if code, body := r.verb(t, a.ID, "approve", `{"rev":"1","text":"approved text"}`); code != 200 || !strings.Contains(body, `"state":"next"`) {
 		t.Fatalf("approve: %d %s", code, body)
 	}
 	if got, _ := r.o.Store.Get(ctx, a.ID); got.State != draft.Queued || got.Text != "approved text" {
@@ -1173,7 +1173,7 @@ func TestAnAgentCannotChangeADraftThroughItsGate(t *testing.T) {
 	d := r.propose(t, r7u, "the person's text", draft.Wait)
 	g, _, _ := r.o.GateOf(ctx, d)
 	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
-	for _, body := range []string{`{"source":"claude","args":{"text":"agent text"}}`, `{"source":"claude","args":{"text":"agent text","rev":"0"}}`, `{"source":"claude"}`} {
+	for _, body := range []string{`{"source":"claude","args":{"text":"agent text"}}`, `{"source":"claude","args":{"text":"agent text","rev":"1"}}`, `{"source":"claude"}`} {
 		if rec := postFrom(t, r.s, "term_1", path, body); rec.Code != 403 {
 			t.Fatalf("an agent session's approval %s: %d %s", body, rec.Code, rec.Body)
 		}
@@ -1201,7 +1201,7 @@ func TestApprovingWithOtherTextApprovesTheGateItsEditOpened(t *testing.T) {
 	d := r.propose(t, r7u, "first", draft.Wait)
 	g, _, _ := r.o.GateOf(ctx, d)
 	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
-	if rec := post(t, r.s, path, `{"source":"cockpit","args":{"text":"second","rev":"0"}}`); rec.Code != 200 {
+	if rec := post(t, r.s, path, `{"source":"cockpit","args":{"text":"second","rev":"1"}}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	got, _ := r.o.Store.Get(ctx, d.ID)

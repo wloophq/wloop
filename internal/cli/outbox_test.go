@@ -180,7 +180,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 		if got := te.draftState(t, db, d.ID); got.State != draft.Queued || got.Text != text || got.Edited {
 			t.Fatalf("approved %+v", got)
 		}
-		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":"0"`) {
+		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":"1"`) {
 			t.Fatalf("posted %v, want the rev shown", bodies)
 		}
 	})
@@ -211,7 +211,7 @@ func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 	if got := te.draftState(t, db, d.ID); got.State != draft.Queued {
 		t.Fatalf("retried %+v", got)
 	}
-	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":"0"`) {
+	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":"1"`) {
 		t.Fatalf("posted %v, want the rev shown", bodies)
 	}
 }
