@@ -7,7 +7,7 @@ provider = "github"
 skill = true
 why     = "{{.pr.address.reason}}"
 workspace = "author"
-session   = { strategy = "reuse_live", title = "triage", name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}' }
+session   = { strategy = "reuse_live", title = "triage", name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}', source_writes = false }
 intake    = true
 start_line = "starting the address round"
 owner_only = true
@@ -73,3 +73,11 @@ states    = ["done", "asked", "failed"]
 missing   = "missing-record"
 artifacts = ["triage"]
 history_artifact = "triage"
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "reply"'
+mode = "send"
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "resolve"'
+mode = "send"

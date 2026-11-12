@@ -77,32 +77,15 @@ func TestHeadlineNamesIntentRoundAndTrigger(t *testing.T) {
 
 func TestADryRunIsNeverAFollowUp(t *testing.T) {
 	c := completed(t, Context{Intent: Intent(dintent.Review), Trigger: Automated, Payload: withPrior(pr(), "APPROVED"), Plain: true})
-	if c.Round != "first" || c.FollowUpApproval || c.Records {
-		t.Fatalf("a dry run reviews as a first round and records nothing: %q %v %v", c.Round, c.FollowUpApproval, c.Records)
+	if c.Round != "first" || c.Records {
+		t.Fatalf("a dry run reviews as a first round and records nothing: %q %v", c.Round, c.Records)
 	}
 }
 
 func TestOnlyIntentsWithTheRoundDimensionHaveARound(t *testing.T) {
 	for _, i := range []Intent{Intent(dintent.Address), Intent(dintent.Nudge), Intent(dintent.Probe)} {
-		if c := completed(t, Context{Intent: i, Trigger: Automated, Planned: PlannedFollowUp, Payload: withPrior(pr(), "APPROVED"), Owned: true}); c.Round != "" || c.FollowUpApproval {
-			t.Errorf("%s: round %q, follow-up approval %v", i, c.Round, c.FollowUpApproval)
-		}
-	}
-}
-
-func TestTheFollowUpApprovalRuleIsTheSweepFollowUps(t *testing.T) {
-	for _, c := range []struct {
-		ctx  Context
-		want bool
-	}{
-		{Context{Intent: Intent(dintent.Review), Trigger: Automated, Planned: PlannedFollowUp, Payload: pr()}, true},
-		{Context{Intent: Intent(dintent.Review), Trigger: Automated, Payload: withPrior(pr(), "APPROVED")}, true},
-		{Context{Intent: Intent(dintent.Review), Trigger: Automated, Planned: PlannedFirst, Payload: withPrior(pr(), "APPROVED")}, false},
-		{Context{Intent: Intent(dintent.Review), Payload: withPrior(pr(), "APPROVED")}, false},
-		{Context{Intent: Intent(dintent.Review), Trigger: Automated, Payload: pr()}, false},
-	} {
-		if got := completed(t, c.ctx).FollowUpApproval; got != c.want {
-			t.Errorf("%+v: %v, want %v", c.ctx, got, c.want)
+		if c := completed(t, Context{Intent: i, Trigger: Automated, Planned: PlannedFollowUp, Payload: withPrior(pr(), "APPROVED"), Owned: true}); c.Round != "" {
+			t.Errorf("%s: round %q", i, c.Round)
 		}
 	}
 }

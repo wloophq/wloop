@@ -190,7 +190,7 @@ type Context struct {
 	Planned Planned
 	Plain   bool
 	Owned   bool
-	// NeedsTakeOver, Round, FollowUpApproval, Headline and Records are
+	// NeedsTakeOver, Round, Headline and Records are
 	// filled by Complete from the intent's manifest.
 	NeedsTakeOver      bool
 	Queued             bool
@@ -200,7 +200,6 @@ type Context struct {
 	Facts              TurnFacts
 	Def                dintent.Def
 	Round              string
-	FollowUpApproval   bool
 	Headline           string
 	Records            bool
 	AutomatedReviewers []string

@@ -315,7 +315,7 @@ func (s *sandbox) followUp(t *testing.T, r pr.Ref) {
 		t.Fatalf("the follow-up's trigger is %s", follow.Trigger)
 	}
 	text := b.instructions(follow.ID)
-	for _, want := range []string{"### Earlier turns", s1.Record.Summary, "endorsed:", "#### Follow-up approval rule"} {
+	for _, want := range []string{"### Earlier turns", s1.Record.Summary, "endorsed:"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the follow-up's instructions lack %q", want)
 		}
