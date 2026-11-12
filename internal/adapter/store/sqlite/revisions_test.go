@@ -1,23 +1,386 @@
 package sqlite
 
-import "testing"
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+var acmePull = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+
+func reviewDraft(at time.Time) draft.Draft {
+	return draft.Draft{Unit: acmePull, Kind: "review", Purpose: "review", Delivery: "review", Text: "Two findings.", Original: "Two findings.",
+		Origin:  draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Session: "s-review"},
+		Payload: json.RawMessage(`{"event":"REQUEST_CHANGES","comments":[{"path":"a.go","line":3,"body":"nil map"}]}`),
+		Basis:   "c0ffee", Hold: true, State: draft.Held, CreatedAt: at, UpdatedAt: at}
+}
 
 func TestDraftPayloadRoundTrips(t *testing.T) {
-	t.Skip("T2")
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	s := db.Drafts()
+	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	in, err := s.Insert(ctx, reviewDraft(at))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Rev != 1 || in.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-review"}) {
+		t.Fatalf("inserted at rev %d by %+v, want rev 1 by its proposer", in.Rev, in.By)
+	}
+	got, err := s.Get(ctx, in.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, in) {
+		t.Fatalf("read back\n%+v\nwant\n%+v", got, in)
+	}
+	if string(got.Payload) != string(reviewDraft(at).Payload) || got.Basis != "c0ffee" || !got.Hold {
+		t.Fatalf("payload %s basis %q hold %v", got.Payload, got.Basis, got.Hold)
+	}
+	listed, err := s.List(ctx, outbox.Filter{Unit: &acmePull})
+	if err != nil || len(listed) != 1 || !reflect.DeepEqual(listed[0], in) {
+		t.Fatalf("listed %+v %v", listed, err)
+	}
+
+	got.Payload, got.Basis, got.Hold = json.RawMessage(`{"event":"COMMENT"}`), "beef", false
+	up, err := s.Update(ctx, got, draft.Held)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := s.Get(ctx, in.ID)
+	if err != nil || !reflect.DeepEqual(again, up) || string(again.Payload) != `{"event":"COMMENT"}` || again.Basis != "beef" || again.Hold {
+		t.Fatalf("after update %+v %v", again, err)
+	}
+
+	plain, err := s.Insert(ctx, sampleDraft(slackThread, at))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Get(ctx, plain.ID); err != nil || got.Payload != nil || got.Basis != "" || got.Hold {
+		t.Fatalf("a draft without a payload reads %s %q %v, %v", got.Payload, got.Basis, got.Hold, err)
+	}
 }
 
 func TestRevisionsKept(t *testing.T) {
-	t.Skip("T2")
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	s := db.Drafts()
+	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	d, err := s.Insert(ctx, reviewDraft(at))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	person := d
+	person.Text, person.Edited, person.By, person.UpdatedAt = "One finding.", true, draft.Actor{Kind: draft.ActorPerson}, at.Add(time.Minute)
+	if d, err = s.Update(ctx, person, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	agent := d
+	agent.Payload, agent.Basis, agent.By, agent.UpdatedAt = json.RawMessage(`{"event":"APPROVE"}`), "f00d", draft.Actor{Kind: draft.ActorSession, Session: "s-address"}, at.Add(2*time.Minute)
+	if d, err = s.Update(ctx, agent, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	queued := d
+	queued.State, queued.UpdatedAt = draft.Queued, at.Add(3*time.Minute)
+	if d, err = s.Update(ctx, queued, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	if d.Rev != 4 || d.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-address"}) {
+		t.Fatalf("rev %d by %+v, want 4 by s-address", d.Rev, d.By)
+	}
+	if got, err := s.Get(ctx, d.ID); err != nil || got.By != d.By {
+		t.Fatalf("stored author %+v %v", got.By, err)
+	}
+
+	revs, err := s.Revisions(ctx, d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []draft.Revision{
+		{Rev: 1, Text: "Two findings.", Payload: reviewDraft(at).Payload, Basis: "c0ffee", By: draft.Actor{Kind: draft.ActorSession, Session: "s-review"}, At: at},
+		{Rev: 2, Text: "One finding.", Payload: reviewDraft(at).Payload, Basis: "c0ffee", By: draft.Actor{Kind: draft.ActorPerson}, At: at.Add(time.Minute)},
+		{Rev: 3, Text: "One finding.", Payload: json.RawMessage(`{"event":"APPROVE"}`), Basis: "f00d", By: draft.Actor{Kind: draft.ActorSession, Session: "s-address"}, At: at.Add(2 * time.Minute)},
+	}
+	if !reflect.DeepEqual(revs, want) {
+		t.Fatalf("revisions\n%+v\nwant\n%+v", revs, want)
+	}
+
+	if _, err := s.Revisions(ctx, 999); !errors.Is(err, outbox.ErrNotFound) {
+		t.Fatalf("a missing draft's revisions: %v, want ErrNotFound", err)
+	}
+	auto, err := s.Insert(ctx, sampleDraft(slackThread, at))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revs, err := s.Revisions(ctx, auto.ID); err != nil || len(revs) != 1 || revs[0].By != (draft.Actor{Kind: draft.ActorSession, Session: "s-worker"}) {
+		t.Fatalf("a session's proposal: %+v %v", revs, err)
+	}
+}
+
+func TestARevisionNamesItsProposer(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		origin draft.Origin
+		want   draft.Actor
+	}{
+		{draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"}, draft.Actor{Kind: draft.ActorRule}},
+		{draft.Origin{Kind: draft.OriginUser}, draft.Actor{Kind: draft.ActorPerson}},
+		{draft.Origin{Kind: draft.OriginTurn, TurnSeq: 2}, draft.Actor{Kind: draft.ActorSession}},
+	} {
+		d := reviewDraft(at)
+		d.Origin = c.origin
+		in, err := db.Drafts().Insert(ctx, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if revs, err := db.Drafts().Revisions(ctx, in.ID); err != nil || len(revs) != 1 || revs[0].By != c.want {
+			t.Errorf("%s: %+v %v, want by %+v", c.origin.Kind, revs, err, c.want)
+		}
+	}
 }
 
 func TestApprovedRevStored(t *testing.T) {
-	t.Skip("T2")
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	gs := db.Gates(func() time.Time { return time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC) })
+	open, err := gs.Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acmePull, Subject: "1", Intents: []string{"approve", "drop"},
+		Session: "s-review", ApprovedRev: 2, Sessions: []string{"s-review", "s-address"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open.ApprovedRev != 2 || !slices.Equal(open.Sessions, []string{"s-review", "s-address"}) {
+		t.Fatalf("opened %+v", open)
+	}
+	got, err := gs.Get(ctx, open.ID)
+	if err != nil || got.ApprovedRev != 2 || !slices.Equal(got.Sessions, []string{"s-review", "s-address"}) {
+		t.Fatalf("read back %+v %v", got, err)
+	}
+	listed, err := gs.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: acmePull})
+	if err != nil || len(listed) != 1 || !reflect.DeepEqual(listed[0], got) {
+		t.Fatalf("listed %+v %v", listed, err)
+	}
+	resolved, err := gs.Resolve(ctx, open.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: "person"})
+	if err != nil || resolved.ApprovedRev != 2 || !slices.Equal(resolved.Sessions, []string{"s-review", "s-address"}) {
+		t.Fatalf("resolved %+v %v", resolved, err)
+	}
+	if again, err := gs.Get(ctx, open.ID); err != nil || again.ApprovedRev != 2 || again.Status != gate.Approved {
+		t.Fatalf("after resolve %+v %v", again, err)
+	}
+	sent, err := gs.RecordSent(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acmePull, Subject: "2", Intents: []string{"approve"}, ApprovedRev: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := gs.Get(ctx, sent.ID); err != nil || got.ApprovedRev != 5 || got.Sessions == nil || len(got.Sessions) != 0 {
+		t.Fatalf("recorded send %+v %v", got, err)
+	}
+}
+
+// storeAtV12 is a store at version 12 holding drafts in every state a send
+// passes through, their gates, and turn records that endorse with publishes.
+func storeAtV12(t *testing.T) string {
+	t.Helper()
+	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v12.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := storeAt(t, schemaSet{12, string(frozen), nil})
+	const cols = `provider, unit_key, kind, target, text, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, state,
+		evidence_ref, evidence_permalink, evidence_at, error, reason, created_at, updated_at, rev, purpose, delivery, effects, origin_session, broadcast`
+	rawExec(t, path,
+		`INSERT INTO drafts (`+cols+`) VALUES
+		('github', 'acme/api#7', 'reply', '', 'Thanks, fixed.', 'Thanks, fixed.', 0, 'turn', 3, 'address', 'address', '', '', 'held',
+		 '', '', '', '', '', '2026-11-04T10:00:00.000000000Z', '2026-11-04T10:00:00.000000000Z', 0, 'reply', 'comment', '[]', 's-address', ''),
+		('github', 'acme/api#7', 'reply', '', 'Ping @{github:octocat}', 'Ping', 1, 'auto', 0, '', 'github-nudge', 'github-nudge', 'github-nudge:acme/api#7', 'failed',
+		 '', '', '', '422 Unprocessable Entity', '', '2026-11-04T11:00:00.000000000Z', '2026-11-04T11:05:00.000000000Z', 3, 'nudge', 'comment', '["task.nudged"]', '', ''),
+		('slack', 'C0123/1.2', 'reply', '', 'Done.', 'Done.', 0, 'session', 0, '', '', '', '', 'sent',
+		 'C0123/1.3', 'https://acme.slack.com/archives/C0123/p13', '2026-11-04T12:01:00.000000000Z', '', '', '2026-11-04T12:00:00.000000000Z', '2026-11-04T12:01:00.000000000Z', 2, 'reply', 'message', '[]', 's-desk', 'off'),
+		('github', 'acme/api#7', 'reply', '', 'Shipped.', 'Shipped.', 0, 'user', 0, '', '', '', '', 'queued',
+		 '', '', '', '', '', '2026-11-04T13:00:00.000000000Z', '2026-11-04T13:00:00.000000000Z', 1, 'reply', 'comment', '[]', '', '')`,
+		`INSERT INTO gates (provider, unit_key, kind, subject, status, intents, intent, by_actor, opened_at, closed_at, session) VALUES
+		('github', 'acme/api#7', 'draft', '1', 'open', '["approve","drop"]', '', '', '2026-11-04T10:00:00.000000000Z', '', 's-address'),
+		('github', 'acme/api#7', 'draft', '2', 'approved', '["approve","drop"]', 'approve', 'person', '2026-11-04T11:00:00.000000000Z', '2026-11-04T11:01:00.000000000Z', ''),
+		('slack', 'C0123/1.2', 'draft', '3', 'approved', '["approve","drop"]', 'approve', 'person', '2026-11-04T12:00:00.000000000Z', '2026-11-04T12:00:30.000000000Z', 's-desk'),
+		('github', 'acme/api#7', 'draft', '4', 'approved', '["approve","drop"]', 'approve', 'person', '2026-11-04T13:00:00.000000000Z', '2026-11-04T13:00:10.000000000Z', '')`,
+		`INSERT INTO turn_records (turn_seq, provider, unit_key, session, hash, at, record) VALUES
+		(3, 'github', 'acme/api#7', 's-address', 'h1', '2026-11-04T10:00:00.000000000Z',
+		 '{"question":{"kind":"confirm","text":"Post the reply?","publishes":true}}'),
+		(4, 'github', 'acme/api#7', 's-address', 'h2', '2026-11-04T10:30:00.000000000Z',
+		 '{"question":{"kind":"choice","text":"Which?","options":[{"id":"a","label":"Post","consequence":"posts it","publishes":true},{"id":"b","label":"Skip","consequence":"nothing"}]}}')`,
+	)
+	return path
 }
 
 func TestMigrationKeepsDrafts(t *testing.T) {
-	t.Skip("T2")
+	t.Parallel()
+	ctx := context.Background()
+	path := storeAtV12(t)
+	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
+		t.Fatal(err)
+	}
+	if v := versionOf(t, path); v != SchemaVersion {
+		t.Fatalf("version %d", v)
+	}
+	db, err := current.open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := db.Drafts()
+
+	list, err := s.List(ctx, outbox.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	states := map[draft.State]int{}
+	for _, d := range list {
+		states[d.State]++
+		if d.Payload != nil || d.Basis != "" || d.Hold {
+			t.Errorf("draft %d gained payload %s basis %q hold %v", d.ID, d.Payload, d.Basis, d.Hold)
+		}
+	}
+	if want := map[draft.State]int{draft.Held: 1, draft.Failed: 1, draft.Sent: 1, draft.Queued: 1}; !reflect.DeepEqual(states, want) {
+		t.Fatalf("states %v, want %v", states, want)
+	}
+	failed, err := s.Get(ctx, 2)
+	if err != nil || failed.Text != "Ping @{github:octocat}" || failed.Error != "422 Unprocessable Entity" || failed.Rev != 4 || failed.By != (draft.Actor{Kind: draft.ActorPerson}) ||
+		!slices.Equal(failed.Effects, []string{"task.nudged"}) || failed.Origin.Rule != "github-nudge" {
+		t.Fatalf("the failed draft %+v %v", failed, err)
+	}
+	sent, err := s.Get(ctx, 3)
+	if err != nil || sent.Evidence.Permalink != "https://acme.slack.com/archives/C0123/p13" || sent.Broadcast != draft.BroadcastOff {
+		t.Fatalf("the sent draft %+v %v", sent, err)
+	}
+
+	revs, err := s.Revisions(ctx, 2)
+	created, updated := time.Date(2026, 11, 4, 11, 0, 0, 0, time.UTC), time.Date(2026, 11, 4, 11, 5, 0, 0, time.UTC)
+	want := []draft.Revision{
+		{Rev: 1, Text: "Ping", By: draft.Actor{Kind: draft.ActorRule}, At: created},
+		{Rev: 4, Text: "Ping @{github:octocat}", By: draft.Actor{Kind: draft.ActorPerson}, At: updated},
+	}
+	if err != nil || !reflect.DeepEqual(revs, want) {
+		t.Fatalf("the edited draft's revisions %+v %v, want %+v", revs, err, want)
+	}
+	if revs, err := s.Revisions(ctx, 1); err != nil || len(revs) != 1 || revs[0].By != (draft.Actor{Kind: draft.ActorSession, Session: "s-address"}) {
+		t.Fatalf("the held draft's revisions %+v %v", revs, err)
+	}
+
+	gs := db.Gates(func() time.Time { return time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC) })
+	all, err := gs.Where(ctx, gates.Query{Kind: gate.KindDraft, Statuses: []gate.Status{gate.Open, gate.Approved}})
+	if err != nil || len(all) != 4 {
+		t.Fatalf("gates %+v %v", all, err)
+	}
+	wantRev := map[string]int64{"1": 1, "2": 4, "3": 3, "4": 2}
+	wantSessions := map[string][]string{"1": {"s-address"}, "2": {}, "3": {"s-desk"}, "4": {}}
+	for _, g := range all {
+		if g.ApprovedRev != wantRev[g.Subject] || !slices.Equal(g.Sessions, wantSessions[g.Subject]) {
+			t.Errorf("gate of draft %s: approved rev %d sessions %v, want %d %v", g.Subject, g.ApprovedRev, g.Sessions, wantRev[g.Subject], wantSessions[g.Subject])
+		}
+	}
+
+	held, err := s.Get(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var heldGate gate.Gate
+	for _, g := range all {
+		if g.Subject == "1" {
+			heldGate = g
+		}
+	}
+	if heldGate.ApprovedRev != held.Rev || held.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-address"}) {
+		t.Fatalf("the held draft at rev %d by %+v cannot be approved by its gate at rev %d", held.Rev, held.By, heldGate.ApprovedRev)
+	}
+	if _, err := gs.Resolve(ctx, heldGate.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: "person"}); err != nil {
+		t.Fatal(err)
+	}
+	if approved, err := gs.Get(ctx, heldGate.ID); err != nil || approved.ApprovedRev != held.Rev {
+		t.Fatalf("approved %+v %v", approved, err)
+	}
+	for _, step := range []struct{ from, to draft.State }{{draft.Held, draft.Queued}, {draft.Queued, draft.Sending}, {draft.Sending, draft.Sent}} {
+		held.State = step.to
+		if held, err = s.Update(ctx, held, step.from); err != nil {
+			t.Fatalf("%s to %s: %v", step.from, step.to, err)
+		}
+	}
+	queued, err := s.Get(ctx, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued.State = draft.Sending
+	if _, err := s.Update(ctx, queued, draft.Queued); err != nil {
+		t.Fatalf("the queued draft: %v", err)
+	}
+	failed.State, failed.Error = draft.Held, ""
+	if _, err := s.Update(ctx, failed, draft.Failed); err != nil {
+		t.Fatalf("the failed draft back to held: %v", err)
+	}
+
+	books, err := New(db).Books(ctx, acmePull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recs := books[acmePull].Records
+	if len(recs) != 2 || recs[0].Record.Question == nil || !recs[0].Record.Question.Publishes ||
+		recs[1].Record.Question == nil || len(recs[1].Record.Question.Options) != 2 || !recs[1].Record.Question.Options[0].Publishes {
+		t.Fatalf("records %+v", recs)
+	}
+}
+
+func TestAPlanToVersion13IsNotReadableAtVersion12(t *testing.T) {
+	t.Parallel()
+	path := storeAtV12(t)
+	p, err := current.plan(path, t.TempDir(), migrateOpts(path).Now())
+	if err != nil || !p.Pending() || p.ReadableAfter() {
+		t.Fatalf("%+v %v: a release at version 12 would ignore holds and revisions", p, err)
+	}
 }
 
 func TestGateSessionsStored(t *testing.T) {
-	t.Skip("T2")
+	t.Parallel()
+	ctx := context.Background()
+	db, path := openTemp(t)
+	now := func() time.Time { return time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC) }
+	opened, err := db.Gates(now).Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acmePull, Subject: "1", Intents: []string{"approve"},
+		Session: "s-review", ApprovedRev: 1, Sessions: []string{"s-review", "s-address"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	none, err := db.Gates(now).Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acmePull, Subject: "2", Intents: []string{"approve"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	got, err := reopened.Gates(now).Get(ctx, opened.ID)
+	if err != nil || !slices.Equal(got.Sessions, []string{"s-review", "s-address"}) || got.Session != "s-review" || got.ApprovedRev != 1 {
+		t.Fatalf("after reopening %+v %v", got, err)
+	}
+	if got, err := reopened.Gates(now).Get(ctx, none.ID); err != nil || got.Sessions == nil || len(got.Sessions) != 0 {
+		t.Fatalf("a gate no session stamps reads %#v %v", got.Sessions, err)
+	}
 }

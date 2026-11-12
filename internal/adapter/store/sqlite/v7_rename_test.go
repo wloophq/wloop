@@ -330,6 +330,7 @@ var notTaskColumns = map[string]string{
 	"messages.options":           "a question's options",
 	"drafts.items":               "the item ids a draft covers",
 	"drafts.effects":             "the effect names of a draft",
+	"gates.sessions":             "the agent sessions that proposed or revised a draft gate's draft",
 	"slack_objects.reasons":      "why a Slack object is watched",
 	"slack_messages.files":       "a Slack message's files",
 	"slack_messages.links":       "the links in a Slack message",

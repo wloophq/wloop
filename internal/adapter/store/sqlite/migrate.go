@@ -97,6 +97,7 @@ var migrations = []migration{
 	{to: 12, name: "draft_broadcast", compatible: 10, up: execAll(
 		`ALTER TABLE drafts ADD COLUMN broadcast TEXT NOT NULL DEFAULT ''`,
 	)},
+	{to: 13, name: "draft_revisions", up: v13Revisions},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

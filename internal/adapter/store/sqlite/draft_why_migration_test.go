@@ -72,7 +72,8 @@ func TestVersion11AddsWhyAndLanguageToDrafts(t *testing.T) {
 func TestAPlanToVersion11KeepsTheStoreReadableAtVersion10(t *testing.T) {
 	t.Parallel()
 	path := storeAtV10(t)
-	p, err := current.plan(path, t.TempDir(), migrateOpts(path).Now())
+	release11 := schemaSet{11, "", migrations[:10]}
+	p, err := release11.plan(path, t.TempDir(), migrateOpts(path).Now())
 	if err != nil || !p.Pending() || p.Compatible != 10 {
 		t.Fatalf("%+v %v, want compatible 10", p, err)
 	}
