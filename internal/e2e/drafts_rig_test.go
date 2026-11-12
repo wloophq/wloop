@@ -14,15 +14,20 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/cli"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	ghplugin "github.com/wloophq/wloop/plugins/github"
+	"github.com/wloophq/wloop/plugins/github/api/apitest"
 )
 
 // ghPublisher is the GitHub publisher of the drafts scenarios: it posts into a list, refuses a draft whose basis
-// is not the live head as the real one re-reads it, and fails the next post with fail.
+// is not the live head as the real one re-reads it, reads its head as the live basis, and fails the next post
+// with fail.
 type ghPublisher struct {
 	mu       sync.Mutex
 	head     string
@@ -55,6 +60,12 @@ func (p *ghPublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence,
 	p.posts = append(p.posts, d)
 	return draft.Evidence{Ref: strconv.FormatInt(int64(d.ID), 10),
 		Permalink: fmt.Sprintf("https://github.com/acme/api/pull/7#pullrequestreview-%d", 9000+d.ID)}, nil
+}
+
+func (p *ghPublisher) Live(context.Context, unit.Unit, string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.head, nil
 }
 
 func (p *ghPublisher) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence, bool, error) {
@@ -92,65 +103,74 @@ var draftsPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
 const draftsURL = "https://github.com/acme/api/pull/7"
 
-// session is an agent session that took a turn: Handle is its process handle, which the agent route reads,
-// Round the turn it runs.
-type session struct{ Handle, Round string }
+// ghAPI is the GitHub the real plugin reads in the scenarios: pull request acme/api#7, open at head c2, and
+// the viewer; any write, or any other read, fails.
+type ghAPI struct{}
 
-// servedDaemon is what the scenarios need of cli.ServeForTest (T13): a daemon built by serve's composition
-// root, over the echo agent and a fake workspace manager, with the GitHub module's publisher and the plugins'
-// live bases replaced.
-type servedDaemon interface {
-	Client() *client.Client
-	// Review starts a review turn on url and the session that takes it.
-	Review(t testing.TB, url string) session
-	// Latest is the session that took the newest turn typed, once its session start ran.
-	Latest(t testing.TB) session
-	// EndTurn records raw as s's turn on url, as `turn end --file` does.
-	EndTurn(t testing.TB, s session, url, raw string)
-	// Send runs the outbox's sender once; Sweep runs the workflows once.
-	Send(ctx context.Context) error
-	Sweep(ctx context.Context) error
-	Book(t testing.TB, u unit.Unit) dturn.Book
-	// Instructions are the stored instructions of turn round.
-	Instructions(t testing.TB, round string) string
+const draftsBasics = `{"data":{"pr":{"pullRequest":{"number":7,"title":"Add x","state":"OPEN","headRefName":"feat/x","headRefOid":"c2","repository":{"nameWithOwner":"acme/api"}}}}}`
+
+func (ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "auth" && args[1] == "status" {
+		return nil, nil
+	}
+	if len(args) >= 2 && args[0] == "api" && args[1] == "graphql" {
+		q := args[len(args)-1]
+		switch {
+		case strings.Contains(q, "mutation"):
+		case strings.Contains(q, "pr: repository"):
+			return []byte(draftsBasics), nil
+		case strings.Contains(q, "viewer"):
+			return []byte(`{"data":{"viewer":{"login":"me"}}}`), nil
+		}
+	}
+	return nil, fmt.Errorf("the scenarios' GitHub does not answer gh %s", strings.Join(args, " "))
 }
 
-// draftsRig is the scripted agent and the person of the scenarios, over a served daemon.
+// draftsRig is the scripted agent and the person of the scenarios, over the daemon serve composes, with the
+// real GitHub plugin over ghAPI and the GitHub module's publisher a ghPublisher.
 type draftsRig struct {
-	t     *testing.T
-	ctx   context.Context
-	d     servedDaemon
-	c     *client.Client
-	pub   *ghPublisher
-	bases *outboxtest.Bases
-	s     session
+	t   *testing.T
+	ctx context.Context
+	d   *cli.TestDaemon
+	c   *client.Client
+	pub *ghPublisher
+	s   cli.TestSession
 }
 
-// waits skips a scenario until the tasks it names have merged.
-func waits(t *testing.T, on ...string) {
-	t.Helper()
-	t.Skip("T11 waits on " + strings.Join(on, "; "))
-}
+var draftsNow = time.Date(2026, 10, 9, 15, 0, 0, 0, time.UTC)
 
 func newDraftsRig(t *testing.T) *draftsRig {
 	t.Helper()
-	r := &draftsRig{t: t, ctx: t.Context(), pub: &ghPublisher{head: "c2"}, bases: &outboxtest.Bases{}}
-	r.bases.Set(draftsPR, "c2")
-	r.d = serveForTest(t, r.pub, r.bases)
+	now := func() time.Time { return draftsNow }
+	r := &draftsRig{t: t, ctx: t.Context(), pub: &ghPublisher{head: "c2"}}
+	r.d = cli.ServeForTest(t, cli.TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: r.pub},
+		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{}), GH: ghAPI{}, Now: now}}})
 	r.c = r.d.Client()
 	return r
 }
 
-// serveForTest becomes cli.ServeForTest(t, cli.TestOptions{Publishers: {github: pub}, Bases: bases,
-// PRs: {draftsURL: "c2"}}) once T13 merges.
-func serveForTest(t *testing.T, _ *ghPublisher, _ *outboxtest.Bases) servedDaemon {
-	t.Skip("T11 waits on T13: cli.ServeForTest")
-	return nil
+func (r *draftsRig) review() { r.s = r.d.Start(r.t, draftsPR, "review") }
+
+// resumed follows the session to the pull request's newest turn, a resume or a round a workflow reopened.
+func (r *draftsRig) resumed() {
+	r.t.Helper()
+	b := r.book()
+	if len(b.Turns) == 0 {
+		r.t.Fatal("no turn")
+	}
+	r.s.Round = b.Turns[len(b.Turns)-1].ID
 }
 
-func (r *draftsRig) review() { r.s = r.d.Review(r.t, draftsURL) }
-
-func (r *draftsRig) resumed() { r.s = r.d.Latest(r.t) }
+// instructions are the stored instructions of the session's turn, as the agent reads them.
+func (r *draftsRig) instructions() string {
+	r.t.Helper()
+	b := r.book()
+	got, err := r.c.StartTurn(r.ctx, r.s.Handle, api.TurnStartRequest{Turn: r.s.Round, Intent: string(b.Turns[len(b.Turns)-1].Intent)})
+	if err != nil {
+		r.t.Fatalf("instructions of %s: %v", r.s.Round, err)
+	}
+	return got.Text
+}
 
 // propose is the scripted agent proposing a review with event, read at basis.
 func (r *draftsRig) propose(event, text, basis string, hold bool) api.AgentDraft {
@@ -167,7 +187,9 @@ func (r *draftsRig) update(u api.AgentDraftUpdate) (api.AgentDraft, error) {
 	return r.c.UpdateDraft(r.ctx, r.s.Handle, u)
 }
 
-func (r *draftsRig) end(raw string) { r.d.EndTurn(r.t, r.s, draftsURL, raw) }
+func (r *draftsRig) end(raw string) {
+	r.d.EndTurn(r.t, r.s, api.TurnEndRequest{Turn: r.s.Round, PR: draftsURL, Record: json.RawMessage(raw)})
+}
 
 func (r *draftsRig) send() {
 	r.t.Helper()
@@ -199,23 +221,27 @@ func (r *draftsRig) editPayload(id, rev int64, payload string) error {
 	return err
 }
 
-// answer is the person answering the open question on the pull request: an option's id picks it.
+// answer is the person answering, from the cockpit, the question the pull request's turn asks once the daemon
+// has opened its gate: an option's id picks it.
 func (r *draftsRig) answer(text string) {
 	r.t.Helper()
-	gs, err := r.c.Gates(r.ctx)
-	if err != nil {
-		r.t.Fatal(err)
-	}
-	for _, g := range gs {
-		if g.Kind != "question" || g.Unit != draftsPR.String() {
-			continue
+	var gs []api.GateView
+	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		var err error
+		if gs, err = r.c.Gates(r.ctx); err != nil {
+			r.t.Fatal(err)
 		}
-		for _, in := range g.Intents {
-			if in.Answer {
-				if _, err := r.c.ResolveGate(r.ctx, g.ID, in.ID, api.TaskRequest{Args: map[string]string{"answer": text}, Source: "cli"}); err != nil {
-					r.t.Fatalf("answering %q: %v", text, err)
+		for _, g := range gs {
+			if g.Kind != "question" || g.Unit != draftsPR.String() {
+				continue
+			}
+			for _, in := range g.Intents {
+				if in.Answer {
+					if _, err := r.c.ResolveGate(r.ctx, g.ID, in.ID, api.TaskRequest{Args: map[string]string{"answer": text}, Source: "cockpit"}); err != nil {
+						r.t.Fatalf("answering %q: %v", text, err)
+					}
+					return
 				}
-				return
 			}
 		}
 	}
