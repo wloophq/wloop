@@ -23,7 +23,8 @@ import (
 type approval struct {
 	question, drafted int64
 	rev               int64
-	by                gate.Resolver
+	by                task.Actor
+	session           string
 }
 
 type withdrawal struct {
@@ -46,7 +47,7 @@ func (o *optionDrafts) put(d draft.Draft, sessions ...string) {
 	defer o.mu.Unlock()
 	o.drafts[int64(d.ID)] = d
 	o.gates[int64(d.ID)] = gate.Gate{ID: 1000 + int64(d.ID), Kind: gate.KindDraft, Unit: d.Unit, Subject: strconv.FormatInt(int64(d.ID), 10), Status: gate.Open,
-		Session: d.Origin.Session, Sessions: sessions}
+		Session: d.Origin.Session, Sessions: sessions, ApprovedRev: d.Rev}
 }
 
 func (o *optionDrafts) DraftGate(_ context.Context, id int64) (draft.Draft, gate.Gate, bool, error) {
@@ -56,17 +57,17 @@ func (o *optionDrafts) DraftGate(_ context.Context, id int64) (draft.Draft, gate
 	return d, o.gates[id], ok, nil
 }
 
-func (o *optionDrafts) ApproveOption(_ context.Context, question, drafted gate.Gate, rev int64, by gate.Resolver) error {
+func (o *optionDrafts) ApproveOption(_ context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	id, _ := strconv.ParseInt(drafted.Subject, 10, 64)
 	d := o.drafts[id]
-	if d.Rev != rev {
+	if drafted.ApprovedRev != rev {
 		return fmt.Errorf("%w: draft %d", gates.ErrRefused, id)
 	}
-	o.approvals = append(o.approvals, approval{question.ID, drafted.ID, rev, by})
+	o.approvals = append(o.approvals, approval{question.ID, drafted.ID, rev, r.By, r.Session})
 	g := o.gates[id]
-	g.Status, g.ApprovedRev, g.By, g.BySession = gate.Approved, rev, by.By, by.Session
+	g.Status, g.By, g.BySession = gate.Approved, r.By, r.Session
 	o.gates[id] = g
 	d.State = draft.Queued
 	o.drafts[id] = d
@@ -129,7 +130,7 @@ func TestOptionDraftApprovesWithoutResume(t *testing.T) {
 	if err != nil || route.Route != turn.Approved {
 		t.Fatalf("%+v %v", route, err)
 	}
-	if want := []approval{{q.ID, 1042, 1, gate.Resolver{By: task.ActorPerson}}}; !slices.Equal(od.approvals, want) {
+	if want := []approval{{q.ID, 1042, 1, task.ActorPerson, ""}}; !slices.Equal(od.approvals, want) {
 		t.Fatalf("approvals %+v, want %+v", od.approvals, want)
 	}
 	b := r.book(t, r7)
@@ -232,8 +233,8 @@ func TestAnOptionDraftApprovesOnlyWithTheResolversAuthority(t *testing.T) {
 		if got := len(od.approvals) == 1; got != c.approve {
 			t.Fatalf("%s: approvals %+v", c.name, od.approvals)
 		}
-		if c.approve && od.approvals[0].by != (gate.Resolver{By: task.ActorAgent, Session: "driver"}) {
-			t.Fatalf("%s: approved as %+v", c.name, od.approvals[0].by)
+		if c.approve && (od.approvals[0].by != task.ActorAgent || od.approvals[0].session != "driver") {
+			t.Fatalf("%s: approved as %+v", c.name, od.approvals[0])
 		}
 		if !c.approve && len(od.withdrawn) != 0 {
 			t.Fatalf("%s: withdrawn %+v", c.name, od.withdrawn)

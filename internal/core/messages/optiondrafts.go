@@ -21,8 +21,9 @@ const ReasonOtherOption = "other_option"
 type OptionDrafts interface {
 	// DraftGate is draft id and the newest gate it waits or waited on; false when there is no such draft or gate.
 	DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error)
-	// ApproveOption approves drafted at rev with by, who resolved question, as gates.Service.ApproveOption does.
-	ApproveOption(ctx context.Context, question, drafted gate.Gate, rev int64, by gate.Resolver) error
+	// ApproveOption resolves question with r and approves drafted at rev with the same resolver, as
+	// gates.Service.ApproveOption does.
+	ApproveOption(ctx context.Context, question gate.Gate, r gates.Resolution, drafted gate.Gate, rev int64) error
 	// WithdrawHeld withdraws draft id while it is still held, with reason; one no longer held is left as it is.
 	WithdrawHeld(ctx context.Context, id int64, reason string) error
 }
@@ -50,10 +51,10 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 		s.logf("messages: option %s of message %d points to draft %d, which its pick does not approve; the turn resumes", a.OptionID, m.ID, ref.ID)
 		return false, nil
 	}
-	by := gate.Resolver{By: g.By, Session: g.BySession}
 	switch {
 	case dg.Status == gate.Open && d.State == draft.Held:
-		err := s.Drafts.ApproveOption(ctx, g, dg, ref.Rev, by)
+		r := gates.Resolution{Status: g.Status, Intent: g.Intent, Answer: g.Answer, By: g.By, Rule: g.Rule, Session: g.BySession}
+		err := s.Drafts.ApproveOption(ctx, g, r, dg, ref.Rev)
 		if errors.Is(err, gates.ErrRefused) {
 			s.logf("messages: the gates refused draft %d at rev %d for option %s of message %d: %v; the turn resumes", ref.ID, ref.Rev, a.OptionID, m.ID, err)
 			return false, nil
@@ -61,7 +62,7 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 		if err != nil {
 			return false, err
 		}
-	case dg.Status == gate.Approved && dg.ApprovedRev == ref.Rev && dg.By == by.By && dg.BySession == by.Session:
+	case dg.Status == gate.Approved && dg.ApprovedRev == ref.Rev && dg.By == g.By && dg.BySession == g.BySession:
 	default:
 		return false, nil
 	}
