@@ -76,6 +76,8 @@ type Outcome struct {
 	URL         string `json:"url"`
 	Blocking    int    `json:"blocking"`
 	NonBlocking int    `json:"non_blocking"`
+	// Draft is the draft the turn ended on; its send fills URL.
+	Draft *DraftRef `json:"draft,omitempty"`
 }
 
 type Question struct {
