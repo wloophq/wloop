@@ -863,8 +863,11 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev)); code != 409 || !strings.Contains(body, "changed since you saw it") {
 		t.Fatalf("task verb: %d %s", code, body)
 	}
-	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 200 {
-		t.Fatalf("current rev: %d %s", code, body)
+	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 409 {
+		t.Fatalf("a retry of the edit, which waits on its own gate: %d %s", code, body)
+	}
+	if code, body := r.verb(t, d.ID, "approve", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 200 {
+		t.Fatalf("approving the edit at its rev: %d %s", code, body)
 	}
 }
 

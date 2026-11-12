@@ -138,7 +138,8 @@ func TestAnApprovedDraftIsPostedThroughTheGitHubPlugin(t *testing.T) {
 	}
 
 	now := time.Date(2026, 10, 22, 15, 0, 0, 0, time.UTC)
-	gs := outboxtest.NewGates(func() time.Time { return now })
+	gst := db.Gates(func() time.Time { return now })
+	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
 	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
