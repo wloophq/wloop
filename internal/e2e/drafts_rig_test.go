@@ -254,7 +254,9 @@ func (r *draftsRig) questionOpen() bool {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	return slices.ContainsFunc(gs, func(g api.GateView) bool { return g.Kind == "question" && g.Unit == draftsPR.String() && g.Status == "open" })
+	return slices.ContainsFunc(gs, func(g api.GateView) bool {
+		return g.Kind == "question" && g.Unit == draftsPR.String() && g.Status == "open"
+	})
 }
 
 // answer is the person answering, from the cockpit, the question the pull request's turn asks once the daemon
