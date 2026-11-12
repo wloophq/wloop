@@ -66,6 +66,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session.title` | string |  | The session's title: 1 to 12 lowercase letters. |
 | `session.name` | template |  | What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
+| `session.source_writes` | bool | `true` | The session may run the commands the plugins' manifests declare as writes to their source, under [source.session] write_commands; false denies them, so the agent proposes drafts instead. |
 | `target` | table |  | What a run with no unit does. |
 | `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent. |
 | `target.title` | template |  | The captured task's title, over .guidance, with firstLine or title. |
@@ -203,7 +204,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 |---|---|---|---|
 | `effects` | list of `plan.cleared`, `turn.guidance_handed`, `turn.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
-| `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
+| `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
 | `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |
 
 An intent with `builds` is a builder: it needs `prompt` and holds no role. Any other needs `workspace`, `[session]`, `[headline]` and `[record]`.

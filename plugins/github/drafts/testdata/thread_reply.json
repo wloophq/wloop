@@ -1,0 +1,7 @@
+{
+ "unit": "github/acme/api#7",
+ "kind": "thread_reply",
+ "target": "comment:1234567",
+ "text": "Fixed in the last push.",
+ "payload": {}
+}

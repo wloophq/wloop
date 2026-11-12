@@ -85,6 +85,7 @@ type mSession struct {
 	Title         *string `toml:"title"`
 	Name          *string `toml:"name"`
 	CloseWhenDone bool    `toml:"close_when_done"`
+	SourceWrites  *bool   `toml:"source_writes"`
 }
 
 type mBrief struct {

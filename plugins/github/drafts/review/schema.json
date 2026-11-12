@@ -1,0 +1,67 @@
+{
+ "type": "object",
+ "required": [
+  "event"
+ ],
+ "additionalProperties": false,
+ "properties": {
+  "event": {
+   "type": "string",
+   "enum": [
+    "APPROVE",
+    "REQUEST_CHANGES",
+    "COMMENT"
+   ],
+   "description": "The review's verdict, posted as its event."
+  },
+  "comments": {
+   "type": "array",
+   "description": "The review's inline comments, posted with it in one call.",
+   "items": {
+    "type": "object",
+    "required": [
+     "path",
+     "line",
+     "body"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The file, relative to the repository root."
+     },
+     "line": {
+      "type": "integer",
+      "description": "The line of the diff the comment ends on."
+     },
+     "side": {
+      "type": "string",
+      "enum": [
+       "LEFT",
+       "RIGHT"
+      ],
+      "description": "The side of the diff the line is on; RIGHT when absent."
+     },
+     "start_line": {
+      "type": "integer",
+      "description": "The line a multi-line comment starts on."
+     },
+     "start_side": {
+      "type": "string",
+      "enum": [
+       "LEFT",
+       "RIGHT"
+      ],
+      "description": "The side of the diff the line is on; RIGHT when absent."
+     },
+     "body": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The comment, in Markdown."
+     }
+    }
+   }
+  }
+ }
+}

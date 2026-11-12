@@ -145,13 +145,86 @@ name = "reaction"
 [[source.deliveries]]
 name = "edit"
 
+[[source.deliveries]]
+name = "review"
+posts = true
+
+[[source.deliveries]]
+name = "reply"
+posts = true
+
+[[source.deliveries]]
+name = "resolve"
+
+[[source.draft_kinds]]
+name = "comment"
+delivery = "comment"
+schema = "drafts/comment/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "reply"
+delivery = "comment"
+schema = "drafts/reply/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "nudge"
+delivery = "comment"
+schema = "drafts/nudge/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "close"
+delivery = "comment"
+schema = "drafts/close/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "ask_owner"
+delivery = "comment"
+schema = "drafts/ask_owner/schema.json"
+text_required = true
+editable = ["text"]
+
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+schema = "drafts/react/schema.json"
 
 [[source.draft_kinds]]
 name = "edit"
 delivery = "edit"
+schema = "drafts/edit/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "review"
+delivery = "review"
+schema = "drafts/review/schema.json"
+basis = "agent"
+editable = ["text", "/event"]
+
+[[source.draft_kinds.facts]]
+name = "draft.github.review.event"
+pointer = "/event"
+
+[[source.draft_kinds]]
+name = "thread_reply"
+delivery = "reply"
+schema = "drafts/thread_reply/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "resolve"
+delivery = "resolve"
+schema = "drafts/resolve/schema.json"
 
 [[source.roles]]
 name = "pr.review"
@@ -274,7 +347,7 @@ doc = "A pull request with a review turn and no review workspace closed or merge
 
 [[source.effects]]
 name = "pr.reviewed"
-applies = ["turn"]
+applies = ["turn", "draft"]
 doc = "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted."
 
 [[source.effects]]
@@ -818,3 +891,63 @@ usage = "<yyyy-mm-dd>"
 
 [[source.commands]]
 name = "teams"
+
+[[source.tools]]
+name = "github_draft"
+doc = "Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval."
+proposes = true
+input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
+
+[[source.tools.answers]]
+name = "failed"
+doc = "GitHub or the daemon failed the call."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_kind"
+doc = "A problem: kind is none of the kinds."
+fields = [{ name = "Kinds" }]
+
+[[source.tools.answers]]
+name = "problem_text_required"
+doc = "A problem: the kind needs a text, and it is missing or empty."
+
+[[source.tools.answers]]
+name = "problem_payload"
+doc = "A problem: the payload does not fit the kind's schema."
+fields = [{ name = "Error" }]
+
+[[source.tools.answers]]
+name = "problem_basis_required"
+doc = "A problem: the kind needs the head commit the agent read as basis."
+
+[[source.tools.answers]]
+name = "stale"
+doc = "The basis is not the pull request's head now; nothing was drafted."
+fields = [{ name = "Basis" }, { name = "Head" }]
+
+[[source.tools.answers]]
+name = "proposed"
+doc = "The draft waits for the user's approval."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+
+[[source.tools.answers]]
+name = "approved"
+doc = "A rule of the user's approved the draft, and it will be posted."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+
+[[source.tools.answers]]
+name = "dry_run"
+doc = "The draft's approval is a dry run: it is stored and never posted."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+
+[source.session]
+write_commands = [
+  "gh api -X POST", "gh api -X PATCH", "gh api -X PUT", "gh api -X DELETE",
+  "gh api * -X POST", "gh api * -X PATCH", "gh api * -X PUT", "gh api * -X DELETE",
+  "gh api --method POST", "gh api --method PATCH", "gh api --method PUT", "gh api --method DELETE",
+  "gh api * --method POST", "gh api * --method PATCH", "gh api * --method PUT", "gh api * --method DELETE",
+  "gh api * -f", "gh api * -F", "gh api * --field", "gh api * --raw-field", "gh api * --input",
+  "gh pr review", "gh pr comment", "gh pr merge", "gh pr close", "gh pr reopen", "gh pr edit", "gh pr ready",
+  "gh issue comment", "gh issue close", "gh issue edit",
+]

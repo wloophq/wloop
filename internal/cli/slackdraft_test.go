@@ -841,7 +841,11 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 			t.Errorf("%s: description %q", tl.Name, tl.Description)
 		}
 	}
-	if want := builtin.ValueNames(builtin.Tools); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
+	served := func(name string) bool {
+		_, plugin := builtin.ToolProviders[name]
+		return !plugin || slices.ContainsFunc(w.srv.Plugins, func(p mcp.PluginTool) bool { return p.Name == name })
+	}
+	if want := slices.DeleteFunc(builtin.ValueNames(builtin.Tools), func(n string) bool { return !served(n) }); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
 		t.Errorf("listed %v, tools.toml describes %v", names, want)
 	}
 	for _, call := range []struct{ tool, args string }{{"slack_send_message", `{}`}, {"slack_draft", `{"kind":"nope"}`}, {"turn_end", `[]`}} {

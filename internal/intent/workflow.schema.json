@@ -467,7 +467,11 @@
                     "reaction",
                     "comment",
                     "edit",
-                    "delete"
+                    "review",
+                    "reply",
+                    "resolve",
+                    "delete",
+                    "unreaction"
                   ],
                   "type": "string"
                 },
@@ -477,6 +481,7 @@
                     "enum": [
                       "task.nudged",
                       "unit.closed",
+                      "pr.reviewed",
                       "pr.nudged"
                     ],
                     "type": "string"

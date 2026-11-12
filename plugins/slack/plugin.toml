@@ -38,17 +38,58 @@ name = "edit"
 [[source.deliveries]]
 name = "delete"
 
+[[source.deliveries]]
+name = "unreaction"
+
+[[source.draft_kinds]]
+name = "reply"
+delivery = "message"
+schema = "drafts/reply/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "nudge"
+delivery = "message"
+schema = "drafts/nudge/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "close"
+delivery = "message"
+schema = "drafts/close/schema.json"
+text_required = true
+editable = ["text"]
+
+[[source.draft_kinds]]
+name = "ask_owner"
+delivery = "message"
+schema = "drafts/ask_owner/schema.json"
+text_required = true
+editable = ["text"]
+
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+schema = "drafts/react/schema.json"
+
+[[source.draft_kinds]]
+name = "unreact"
+delivery = "unreaction"
+schema = "drafts/unreact/schema.json"
 
 [[source.draft_kinds]]
 name = "edit"
 delivery = "edit"
+schema = "drafts/edit/schema.json"
+text_required = true
+editable = ["text"]
 
 [[source.draft_kinds]]
 name = "delete"
 delivery = "delete"
+schema = "drafts/delete/schema.json"
 
 [[source.facts]]
 name = "slack.channel"
@@ -354,7 +395,8 @@ fields = [{ name = "Text" }]
 [[source.tools]]
 name = "slack_draft"
 doc = "Proposes a Slack message or reaction for the user's approval."
-input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"}},"additionalProperties":false}'
+proposes = true
+input = '{"type":"object","properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["reply","nudge","close","ask_owner","react"]},"target":{"type":"string"},"items":{"type":"array","items":{"type":"string"}},"reaction":{"type":"string"},"effects":{"type":"array","items":{"type":"string"}},"broadcast":{"type":"boolean"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"}},"additionalProperties":false}'
 
 [[source.tools.answers]]
 name = "not_logged_in"

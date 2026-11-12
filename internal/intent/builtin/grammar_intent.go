@@ -74,6 +74,7 @@ var intentGrammar = []Key{
 	{Path: "session.title", In: SurfaceIntent, Kind: KindText, Doc: "The session's title: 1 to 12 lowercase letters."},
 	{Path: "session.name", In: SurfaceIntent, Kind: KindTemplate, Doc: "What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it."},
 	{Path: "session.close_when_done", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "The session closes when its turn is done."},
+	{Path: "session.source_writes", In: SurfaceIntent, Kind: KindBool, Default: "true", Doc: "The session may run the commands the plugins' manifests declare as writes to their source, under [source.session] write_commands; false denies them, so the agent proposes drafts instead."},
 	{Path: "intake", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "Runs through numbered intake."},
 	{Path: "start_line", In: SurfaceIntent, Kind: KindText, Doc: "The intake's first line."},
 	{Path: "owner_only", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "The unit must be yours or taken over."},
