@@ -41,7 +41,7 @@ type gateDrafts struct {
 
 func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
 	d.proposed = append(d.proposed, p)
-	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held)}, nil
+	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held), Rev: 3}, nil
 }
 
 func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
@@ -197,8 +197,8 @@ func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testi
 		t.Fatal(err)
 	}
 	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession, Session: "bare"}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
-		ref.State != string(draft.Held) {
-		t.Fatalf("proposed %+v as %q, want t2 with the session origin", p, ref.State)
+		ref.State != string(draft.Held) || ref.Rev != 3 {
+		t.Fatalf("proposed %+v as %q at rev %d, want t2 with the session origin at the rev the outbox stored", p, ref.State, ref.Rev)
 	}
 	for name, req := range map[string]src.GateRequest{
 		"items":            {Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Items: []string{"i1"}}, Session: "bare"},

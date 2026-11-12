@@ -190,7 +190,7 @@ func (r *running) draft(ctx context.Context, call src.ToolCall) src.ToolResult {
 	case stateDropped:
 		name = "dry_run"
 	}
-	return answer(name, fields{"ID": got.Draft, "Rev": 1, "Unit": ref.String()}, false)
+	return answer(name, fields{"ID": got.Draft, "Rev": got.Rev, "Unit": ref.String()}, false)
 }
 
 // threads answers the unresolved review threads and the latest reviews of

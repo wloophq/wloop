@@ -146,6 +146,14 @@ func (g draftGates) RecordSent(ctx context.Context, gt gate.Gate) (gate.Gate, er
 	return g.e.newGates(g.db, g.logf).RecordSent(ctx, gt)
 }
 
+// TaskOf is the task the gates service opens gt on, so a draft takes it before its gate opens and is not
+// written again, at a new rev, to adopt it.
+func (g draftGates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
+	return g.e.newGates(g.db, g.logf).TaskOf(ctx, gt)
+}
+
+var _ outbox.TaskPlacer = draftGates{}
+
 func (g draftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	g.e.newGates(g.db, g.logf)
 	return g.e.gateReader.Where(ctx, q)

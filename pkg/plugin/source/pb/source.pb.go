@@ -8584,7 +8584,9 @@ type GateRef struct {
 	Draft int64                  `protobuf:"varint,2,opt,name=draft,proto3" json:"draft,omitempty"`
 	// state is the draft's state once the host's approval policy saw it:
 	// proposed, approved, or discarded under dry run.
-	State         string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	State string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	// rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
+	Rev           int64 `protobuf:"varint,4,opt,name=rev,proto3" json:"rev,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8638,6 +8640,13 @@ func (x *GateRef) GetState() string {
 		return x.State
 	}
 	return ""
+}
+
+func (x *GateRef) GetRev() int64 {
+	if x != nil {
+		return x.Rev
+	}
+	return 0
 }
 
 // OpenGateRequest proposes a draft. With a session, the host sets its origin,
@@ -11333,11 +11342,12 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\bturn_seq\x18\x03 \x01(\x03R\aturnSeq\x12\x16\n" +
 	"\x06intent\x18\x04 \x01(\tR\x06intent\x12\x12\n" +
 	"\x04role\x18\x05 \x01(\tR\x04role\x12'\n" +
-	"\x0fallowed_effects\x18\x06 \x03(\tR\x0eallowedEffects\"I\n" +
+	"\x0fallowed_effects\x18\x06 \x03(\tR\x0eallowedEffects\"[\n" +
 	"\aGateRef\x12\x12\n" +
 	"\x04gate\x18\x01 \x01(\tR\x04gate\x12\x14\n" +
 	"\x05draft\x18\x02 \x01(\x03R\x05draft\x12\x14\n" +
-	"\x05state\x18\x03 \x01(\tR\x05state\"Y\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12\x10\n" +
+	"\x03rev\x18\x04 \x01(\x03R\x03rev\"Y\n" +
 	"\x0fOpenGateRequest\x12,\n" +
 	"\x05draft\x18\x01 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\x12\x18\n" +
 	"\asession\x18\x02 \x01(\tR\asession\"@\n" +
