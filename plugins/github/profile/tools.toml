@@ -33,6 +33,8 @@ description = "Read the unresolved review threads of the pull request of your tu
 [github_threads.answers]
 refused = "github_threads refused: {{.Error}}."
 bad_arguments = "Nothing was read: github_threads takes no arguments{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was read; fix these and call github_threads again:
+{{.Problems}}"""
 failed = "Reading the threads failed: {{.Error}}"
 threads = """The unresolved review threads and latest reviews of {{.Unit}}:
 {{.JSON}}"""
