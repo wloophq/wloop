@@ -547,3 +547,27 @@ func TestEveryDSNSetsTheBusyTimeoutFirst(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlesOnOneStoreShareTheirWriteLock(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	a, path := openTemp(t)
+	b, err := Open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { b.Close() })
+	defer func() {
+		if r := recover(); r != "sqlite: Write inside Write" {
+			t.Fatalf("recovered %v: a second handle's Write inside the first's did not queue on the same lock", r)
+		}
+		if _, err := b.Write(ctx, func(*Tx) error { return nil }); err != nil {
+			t.Fatalf("a Write after the panic: %v", err)
+		}
+	}()
+	a.Write(ctx, func(*Tx) error {
+		_, err := b.Write(ctx, func(*Tx) error { return nil })
+		t.Errorf("the second handle wrote beside the first: %v", err)
+		return nil
+	})
+}
