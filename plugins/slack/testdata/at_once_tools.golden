@@ -45,3 +45,13 @@ answer failed error=true {"Error":"cannot post to the target: C100 ts 1699999999
 call conversations.info channel=C100
 call conversations.history channel=C100 inclusive=true latest=1699999999.000100 limit=2 oldest=1699999999.000100
 call conversations.replies channel=C100 inclusive=true latest=1699999999.000100 limit=2 oldest=1699999999.000100 ts=1699999999.000100
+== slack_edit {"message":"C100/1700000777.000100","text":"gone"}
+answer failed error=true {"Error":"cannot post to the target: no message 1700000777.000100 in C100"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100
+call conversations.replies channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100 ts=1700000777.000100
+== slack_delete {"message":"C100/1700000777.000100"}
+answer failed error=true {"Error":"cannot post to the target: no message 1700000777.000100 in C100"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100
+call conversations.replies channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100 ts=1700000777.000100

@@ -522,6 +522,8 @@ func TestAtOnceToolsUnchanged(t *testing.T) {
 		{ToolEdit, `{"message":"C100/` + toolReply + `","text":"On it, done by _noon_"}`},
 		{ToolDelete, `{"message":"https://acme.slack.com/archives/C100/p1700000100000200"}`},
 		{ToolEdit, `{"message":"C100/` + toolThread + `","text":"not mine"}`},
+		{ToolEdit, `{"message":"C100/1700000777.000100","text":"gone"}`},
+		{ToolDelete, `{"message":"C100/1700000777.000100"}`},
 	} {
 		f := newToolFixture(t, true)
 		f.srv.Handle("chat.delete", func(url.Values) any { return map[string]any{} })
