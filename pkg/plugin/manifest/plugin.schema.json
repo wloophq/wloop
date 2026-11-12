@@ -113,6 +113,10 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "emoji": {
+                "description": "A draft with this delivery adds or removes an emoji, named by its reaction, and has no text.",
+                "type": "boolean"
+              },
               "name": {
                 "description": "The delivery's name, such as \"comment\". Required.",
                 "type": "string"

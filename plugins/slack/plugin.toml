@@ -31,6 +31,7 @@ posts = true
 
 [[source.deliveries]]
 name = "reaction"
+emoji = true
 
 [[source.deliveries]]
 name = "edit"
@@ -40,6 +41,7 @@ name = "delete"
 
 [[source.deliveries]]
 name = "unreaction"
+emoji = true
 
 [[source.draft_kinds]]
 name = "reply"

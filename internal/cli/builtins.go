@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
@@ -315,7 +316,7 @@ func draftTools(srcs []*manifest.Source) []string {
 			}
 		}
 	}
-	return append(out, coreDraftTools()...)
+	return append(out, mcp.DraftTools()...)
 }
 
 // atOnceTools are the tools srcs mark posts = "now", which post as the user at once, as an agent names them.
@@ -427,9 +428,4 @@ func inputSet(v any) bool {
 		return len(v) > 0
 	}
 	return true
-}
-
-// coreDraftTools are the loop's own tools that read, revise or withdraw an agent's draft, as an agent names them.
-func coreDraftTools() []string {
-	return []string{brand.ToolPrefix() + "draft_read", brand.ToolPrefix() + "draft_update", brand.ToolPrefix() + "draft_withdraw"}
 }

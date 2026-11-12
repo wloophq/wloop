@@ -188,3 +188,10 @@ func BenchmarkShapeAndValidate(b *testing.B) {
 		}
 	})
 }
+
+func TestEmojiDeliveriesComeFromManifests(t *testing.T) {
+	got := slices.Sorted(slices.Values(DraftEmojiDeliveries))
+	if want := []string{"reaction", "unreaction"}; !slices.Equal(got, want) {
+		t.Fatalf("emoji deliveries %v, want the bundled Slack manifest's %v", got, want)
+	}
+}

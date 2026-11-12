@@ -139,6 +139,7 @@ every = "5m"
 |---|---|---|
 | `name` | string | The delivery's name, such as "comment". Required. |
 | `posts` | bool | A draft with this delivery reaches people, so it waits for approval. |
+| `emoji` | bool | A draft with this delivery adds or removes an emoji, named by its reaction, and has no text. |
 
 ## `[[source.draft_kinds]]`
 
