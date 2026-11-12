@@ -580,7 +580,9 @@ type scoping struct {
 	within func(target string) (bool, error)
 }
 
-func (s scoping) Within(_ context.Context, _ unit.Unit, target string) (bool, error) { return s.within(target) }
+func (s scoping) Within(_ context.Context, _ unit.Unit, target string) (bool, error) {
+	return s.within(target)
+}
 
 func TestTargeterDecidesWithinUnit(t *testing.T) {
 	isComment := func(t string) (bool, error) { return strings.HasPrefix(t, "comment:"), nil }

@@ -242,7 +242,7 @@ func TestOnlyAStaleRefusalStartsAFailureWithTheStaleToken(t *testing.T) {
 		stale    bool
 		contains string
 	}{
-		"a live read that fails":            {live: errBoom, contains: "boom"},
+		"a live read that fails":             {live: errBoom, contains: "boom"},
 		"a publisher's text that says stale": {publish: fmt.Errorf("stale: whatever the API said"), contains: "error: stale:"},
 		"a publisher's ErrStale":             {publish: fmt.Errorf("github refused: %w", ErrStale), stale: true},
 	} {
