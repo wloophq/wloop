@@ -59,6 +59,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `session.title` (string): The session's title: 1 to 12 lowercase letters.
 - `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
+- `session.source_writes` (bool, default `true`): The session may run the commands the plugins' manifests declare as writes to their source, under [source.session] write_commands; false denies them, so the agent proposes drafts instead.
 - `target` (table): What a run with no unit does.
 - `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent.
 - `target.title` (template): The captured task's title, over .guidance, with firstLine or title.
@@ -177,9 +178,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
-- `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
+- `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): The effects its agents may declare on their drafts.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 
@@ -575,7 +577,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
-  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `delete`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
+  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `review`, `reply`, `resolve`, `delete`, `unreaction`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
   - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.
   - `why` (file, default `why.md.tmpl`): The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.
   - `reaction` (string): The emoji name, with delivery reaction.
@@ -583,9 +585,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
   - `target` (one of `unit`, `item`, `person`, default `unit`): Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text.
   - `to` (one of `all`, `members`, `non_members`, default `all`): Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both.
-  - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
+  - `effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): What sending the draft applies.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
@@ -641,6 +644,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
+  - `github_draft`: Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
@@ -699,6 +703,19 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `turn_answers` (`Answers`): A part of read: answers to the session's turns stored before each answer named its message.
   - `option` (`ID`, `Label`): A part of conversation: one option of the message.
   - `answer` (`Option`, `Label`, `Choice`, `Text`, `At`): A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.
+- `github_draft`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `failed` (`Error`): GitHub or the daemon failed the call.
+  - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
+  - `problem_text_required`: A problem: the kind needs a text, and it is missing or empty.
+  - `problem_payload` (`Error`): A problem: the payload does not fit the kind's schema.
+  - `problem_basis_required`: A problem: the kind needs the head commit the agent read as basis.
+  - `stale` (`Basis`, `Head`): The basis is not the pull request's head now; nothing was drafted.
+  - `proposed` (`ID`: number, `Rev`: number, `Unit`): The draft waits for the user's approval.
+  - `approved` (`ID`: number, `Rev`: number, `Unit`): A rule of the user's approved the draft, and it will be posted.
+  - `dry_run` (`ID`: number, `Rev`: number, `Unit`): The draft's approval is a dry run: it is stored and never posted.
 - `slack_send_message`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

@@ -16,6 +16,10 @@ const (
 	AgentSessionsStop   = "/api/agent/sessions/stop"
 	AgentSessionsPrompt = "/api/agent/sessions/prompt"
 	AgentAnswer         = "/api/agent/answer"
+	// AgentDrafts is the caller's drafts: POST an AgentDraftProposal proposes one, GET ?id=<id> reads one,
+	// PATCH an AgentDraftUpdate revises one at the rev it read, DELETE an AgentDraftWithdrawal withdraws one;
+	// each answers an AgentDraft.
+	AgentDrafts = "/api/agent/drafts"
 )
 
 type TurnStartRequest struct {

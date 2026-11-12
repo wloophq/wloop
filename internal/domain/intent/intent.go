@@ -174,6 +174,9 @@ type Session struct {
 	// name facts; empty renders as Title.
 	Name          Text
 	CloseWhenDone bool
+	// NoSourceWrites denies the session every command the plugins' manifests declare as a write to their
+	// source.
+	NoSourceWrites bool
 }
 
 type Brief struct {

@@ -60,7 +60,7 @@ func WireDraft(d draft.Draft) src.Draft {
 		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: src.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent, Workflow: d.Origin.Workflow,
 			Rule: d.Origin.Rule, Key: d.Origin.Key, Unit: wireOrZero(d.Origin.Unit)},
-		State: string(d.State), Evidence: src.Evidence(d.Evidence)}
+		State: string(d.State), Evidence: src.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 }
 
 func wireOrZero(u unit.Unit) plugin.Unit {
@@ -85,7 +85,7 @@ func (c Units) Draft(d src.Draft) (draft.Draft, error) {
 		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: draft.Origin{Kind: draft.OriginKind(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Key: d.Origin.Key},
-		Evidence: draft.Evidence(d.Evidence)}
+		Evidence: draft.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 	if d.Origin.Unit != (plugin.Unit{}) {
 		if out.Origin.Unit, err = c.Of(d.Origin.Unit); err != nil {
 			return draft.Draft{}, err

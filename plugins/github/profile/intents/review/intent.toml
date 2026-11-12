@@ -14,6 +14,9 @@ profile   = "review"
 dims      = ["stage"]
 effects   = ["pr.reviewed", "turn.guidance_handed", "turn.round_sent", "plan.cleared"]
 
+[drafts]
+allowed_effects = ["pr.reviewed"]
+
 [help]
 target   = "a pull request URL"
 summary  = "Review someone else's pull request in its own worktree"

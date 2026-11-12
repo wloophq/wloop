@@ -20,14 +20,15 @@ type Client struct {
 }
 
 var (
-	_ Ingester  = (*Client)(nil)
-	_ Presenter = (*Client)(nil)
-	_ Publisher = (*Client)(nil)
-	_ Lander    = (*Client)(nil)
-	_ Briefer   = (*Client)(nil)
-	_ Planner   = (*Client)(nil)
-	_ Tooler    = (*Client)(nil)
-	_ CLIRunner = (*Client)(nil)
+	_ Ingester    = (*Client)(nil)
+	_ Presenter   = (*Client)(nil)
+	_ Publisher   = (*Client)(nil)
+	_ BasisReader = (*Client)(nil)
+	_ Lander      = (*Client)(nil)
+	_ Briefer     = (*Client)(nil)
+	_ Planner     = (*Client)(nil)
+	_ Tooler      = (*Client)(nil)
+	_ CLIRunner   = (*Client)(nil)
 )
 
 // NewClient is the source client of c, a dispensed source kind.
@@ -138,6 +139,13 @@ func (c *Client) Verify(ctx context.Context, d Draft, startedAt time.Time) (Evid
 		return c.c.Verify(ctx, &pb.VerifyRequest{Call: call, Draft: draftPB(d), StartedAt: ts(startedAt)})
 	})
 	return draftEvidenceGo(r.GetEvidence()), r.GetPosted(), err
+}
+
+func (c *Client) Basis(ctx context.Context, u plugin.Unit, kind string) (string, error) {
+	r, err := via(ctx, func(call *pb.Call) (*pb.BasisResponse, error) {
+		return c.c.Basis(ctx, &pb.BasisRequest{Call: call, Unit: unitPB(u), Kind: kind})
+	})
+	return r.GetBasis(), err
 }
 
 func (c *Client) Landed(ctx context.Context, d Draft) (plugin.Unit, bool, error) {

@@ -204,9 +204,10 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		s.add("session.title", "is required")
 	case m.Session != nil:
 		d.Session = dintent.Session{
-			Strategy:      s.required("session.strategy", m.Session.Strategy),
-			Title:         s.required("session.title", m.Session.Title),
-			CloseWhenDone: m.Session.CloseWhenDone,
+			Strategy:       s.required("session.strategy", m.Session.Strategy),
+			Title:          s.required("session.title", m.Session.Title),
+			CloseWhenDone:  m.Session.CloseWhenDone,
+			NoSourceWrites: m.Session.SourceWrites != nil && !*m.Session.SourceWrites,
 		}
 		if m.Session.Name != nil || s.defaults.SessionName != "" {
 			d.Session.Name = s.text("session.name", m.Session.Name, s.defaults.SessionName)

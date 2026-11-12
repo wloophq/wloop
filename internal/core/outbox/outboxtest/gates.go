@@ -142,3 +142,7 @@ func (p publisher) Publish(ctx context.Context, g gate.Gate) error {
 	}
 	return nil
 }
+
+func (g *Gates) SupersedeForAgent(ctx context.Context, id int64, session string) (gate.Gate, error) {
+	return g.Service.SupersedeForAgent(ctx, id, session)
+}

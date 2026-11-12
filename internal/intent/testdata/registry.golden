@@ -398,6 +398,7 @@ intent/review.Source.Dir = "plugins/github/profile/intents/review"
 intent/review.Bundled = true
 intent/review.Provider = "github"
 intent/review.Role = "pr.review"
+intent/review.AllowedEffects[0] = "pr.reviewed"
 intent/review.RoundKind = "review"
 intent/review.Why.Src = "{{.pr.review.reason}}"
 intent/review.Skill = true

@@ -3,6 +3,7 @@
 package draft
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -187,6 +188,15 @@ type Draft struct {
 	// Language is the locale Text is written in. Both "" for a draft no
 	// workflow step wrote.
 	Why, Language string
+	// Payload is what the kind's schema shapes beside Text, posted
+	// verbatim; nil for a kind without one.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, such as a head commit,
+	// for a kind whose KindSpec.Basis is BasisAgent; "" none.
+	Basis string
+	// Hold keeps the draft waiting for a person whatever its approval
+	// rules say, except under dry_run.
+	Hold bool
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }

@@ -1,0 +1,23 @@
+{
+ "unit": "github/acme/api#7",
+ "kind": "review",
+ "text": "Two findings block the merge.",
+ "basis": "4f9c2d17a0b3e6c58d21f0a9b7e4c3d2a1f0e9b8",
+ "payload": {
+  "event": "REQUEST_CHANGES",
+  "comments": [
+   {
+    "path": "api/handler.go",
+    "line": 42,
+    "side": "RIGHT",
+    "body": "This drops the error from `Save`; return it."
+   },
+   {
+    "path": "api/handler.go",
+    "start_line": 50,
+    "line": 58,
+    "body": "The retry loop never backs off."
+   }
+  ]
+ }
+}

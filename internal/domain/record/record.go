@@ -83,14 +83,26 @@ type Question struct {
 	Text      string   `json:"text"`
 	Options   []Option `json:"options,omitempty"`
 	Recommend string   `json:"recommend,omitempty"`
-	Publishes bool     `json:"publishes,omitempty"`
+	// Publishes is the endorsement of records that predate Draft, kept so they still decode.
+	Publishes bool `json:"publishes,omitempty"`
+	// Draft is the held draft a confirm question's yes approves, at its rev; nil for none.
+	Draft *DraftRef `json:"draft,omitempty"`
 }
 
 type Option struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
 	Consequence string `json:"consequence"`
-	Publishes   bool   `json:"publishes,omitempty"`
+	// Publishes is the endorsement of records that predate Draft, kept so they still decode.
+	Publishes bool `json:"publishes,omitempty"`
+	// Draft is the held draft picking the option approves, at its rev; nil for none.
+	Draft *DraftRef `json:"draft,omitempty"`
+}
+
+// DraftRef points to a draft of the turn at the rev its agent stands by.
+type DraftRef struct {
+	ID  int64 `json:"id"`
+	Rev int64 `json:"rev"`
 }
 
 func (o Option) Answer() string { return o.Label + " (option " + o.ID + ")" }

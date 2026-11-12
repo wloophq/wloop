@@ -103,3 +103,5 @@ type clockOf func() time.Time
 func (c clockOf) Now() time.Time { return c() }
 
 func outboxGateQuery() gates.Query { return gates.Query{Kind: gate.KindDraft} }
+
+func (m *memDrafts) Revisions(context.Context, draft.ID) ([]draft.Revision, error) { return nil, nil }

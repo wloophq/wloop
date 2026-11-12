@@ -6,6 +6,7 @@ package outbox
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -54,6 +55,14 @@ type Proposal struct {
 	// Why is why the draft is proposed, in the user's language; Language
 	// is the locale Text is written in.
 	Why, Language string
+	// Payload is what the kind's schema shapes beside Text; nil for none.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, checked against the live
+	// value for a kind whose basis the agent states.
+	Basis string
+	// Hold keeps the draft waiting for a person whatever its approval
+	// rules say, except under dry_run.
+	Hold bool
 }
 
 type Filter struct {
@@ -90,6 +99,22 @@ type Store interface {
 	// Update writes d only while the stored state is from and the stored Rev is d.Rev, and returns
 	// d with Rev bumped; ErrConflict otherwise.
 	Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error)
+	// Revisions are draft id's content revisions, oldest first; ErrNotFound when there is no such draft.
+	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)
+}
+
+// Kinds are the draft kinds the plugins' manifests declare.
+type Kinds interface {
+	// Lookup is the kind name of provider; false when its manifest declares none.
+	Lookup(provider, kind string) (draft.KindSpec, bool)
+	// Validate refuses a payload that does not fit spec's schema, wrapping ErrInvalid.
+	Validate(spec draft.KindSpec, payload json.RawMessage) error
+}
+
+// Bases read the live basis of a unit, never a cached one.
+type Bases interface {
+	// Live is what a draft of kind on u would be written against now, such as a pull request's head.
+	Live(ctx context.Context, u unit.Unit, kind string) (string, error)
 }
 
 // Effects returns the publishing capability of a provider; an error wrapping
@@ -149,6 +174,10 @@ type Service struct {
 	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
 	// none does.
 	Silent func(name string) bool
+	// Kinds are the manifests' draft kinds; nil checks none.
+	Kinds Kinds
+	// Bases read the live basis a proposal's is checked against; nil checks none.
+	Bases Bases
 }
 
 var (
@@ -159,6 +188,12 @@ var (
 	ErrNeedsConfirm = errors.New("the draft may have been posted; retry needs confirm")
 	ErrInvalid      = errors.New("invalid draft")
 	ErrNoGates      = errors.New("the outbox has no gates to hold its drafts")
+	// ErrStale: the unit moved past the basis the draft was written against.
+	ErrStale = errors.New("the draft is stale: the unit changed since it was written")
+	// ErrRevConflict: the draft is at another rev than the one its reviser read.
+	ErrRevConflict = errors.New("the draft changed since it was read")
+	// ErrOutOfScope: the draft is not the calling agent's to change.
+	ErrOutOfScope = errors.New("the draft is out of the caller's reach")
 )
 
 // NotConfirmed is the Error of a draft Recover found in sending and Verify could not confirm.
@@ -556,11 +591,18 @@ func (s *Service) SetBroadcast(ctx context.Context, id draft.ID, on bool) (draft
 	return s.Amend(ctx, id, Amendment{Broadcast: &on})
 }
 
-// Amendment is what a person changes on a draft: its text, a thread reply's
-// broadcast, or both; nil leaves it.
+// Amendment is what a person or an agent changes on a draft: its text, a
+// thread reply's broadcast, its payload, or several; nil leaves it.
 type Amendment struct {
 	Text      *string
 	Broadcast *bool
+	Payload   *json.RawMessage
+	// Basis is what the reviser read the unit at, checked live as a proposal's.
+	Basis *string
+	// Rev is the rev the reviser read; 0 takes the stored one.
+	Rev int64
+	// By is who revises it; zero is a person.
+	By draft.Actor
 }
 
 // Amend applies a to held or failed draft id at once, both changes or

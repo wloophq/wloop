@@ -224,3 +224,5 @@ type factsOf map[unit.Unit]task.UnitFacts
 func (f factsOf) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
 	return f[u], true, nil
 }
+
+func (m *memDrafts) Revisions(context.Context, draft.ID) ([]draft.Revision, error) { return nil, nil }

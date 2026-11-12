@@ -28,6 +28,12 @@ type Source struct {
 	UI          *UI       `toml:"ui" doc:"What clients show of the plugin; every label lives in its profile layer."`
 	Commands    []Command `toml:"commands" doc:"The commands the plugin binary serves in CLI mode, which run without the daemon."`
 	Tools       []Tool    `toml:"tools" doc:"The MCP tools the plugin serves through CallTool."`
+	Session     Session   `toml:"session" doc:"What the agent sessions of an intent that sets source_writes = false may not run."`
+}
+
+// Session is what the plugin tells the host about the agent sessions it serves.
+type Session struct {
+	WriteCommands []string `toml:"write_commands" doc:"The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be *; a session whose intent sets source_writes = false runs none of them."`
 }
 
 // SourceVocabulary is what a source plugin adds to the host's tables before
@@ -111,9 +117,21 @@ type Situation struct {
 
 // DraftKind is a kind of a plugin's drafts.
 type DraftKind struct {
-	Name     string `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
-	Purpose  string `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
-	Delivery string `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+	Name         string          `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
+	Purpose      string          `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
+	Delivery     string          `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+	Schema       string          `toml:"schema" doc:"The JSON schema of the kind's payload, a path in the plugin's directory such as \"drafts/review/schema.json\"; the publisher posts the payload verbatim."`
+	Preview      string          `toml:"preview" doc:"The template of the summary line a draft of the kind shows, a path in the plugin's directory; the card shows the whole payload besides."`
+	Basis        string          `toml:"basis" doc:"Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none." enum:"agent"`
+	TextRequired bool            `toml:"text_required" doc:"A draft of the kind needs a text."`
+	Editable     []string        `toml:"editable" doc:"What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\"."`
+	Facts        []DraftKindFact `toml:"facts" doc:"The payload fields an approval rule reads."`
+}
+
+// DraftKindFact is a payload field of a draft kind read as an approval fact.
+type DraftKindFact struct {
+	Name    string `toml:"name" doc:"The fact's name, draft.<provider>.<kind>.<field>. Required."`
+	Pointer string `toml:"pointer" doc:"The JSON pointer to the field in the payload, which the schema makes a required string enum. Required."`
 }
 
 // Predicate is a predicate the plugin's profile layer sets, over the facts the plugin hands the host when it
@@ -167,11 +185,12 @@ type Command struct {
 
 // Tool is an MCP tool the plugin serves.
 type Tool struct {
-	Name    string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
-	Doc     string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
-	Input   string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
-	Posts   string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
-	Answers []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
+	Name     string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
+	Doc      string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
+	Input    string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
+	Posts    string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
+	Proposes bool     `toml:"proposes" doc:"The tool only proposes drafts the user approves, so a session policy may allow it without a prompt."`
+	Answers  []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
 }
 
 // Answer is one answer of a tool, worded by tools.toml.
