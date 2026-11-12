@@ -9,7 +9,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // TestVocabularyIsOutboxKinds checks the outbox's kinds are the bundled manifests': each payload fixture fits
@@ -55,32 +54,3 @@ func TestVocabularyIsOutboxKinds(t *testing.T) {
 	}
 }
 
-// TestVocabularyNamesTheKindOfADelivery checks a draft with no kind takes its provider's first kind of its
-// delivery, or its first kind with none, and that an undeclared delivery has none.
-func TestVocabularyNamesTheKindOfADelivery(t *testing.T) {
-	var k outbox.Kinds = draftKinds
-	first := map[string]draft.KindSpec{}
-	for _, s := range builtin.DraftKinds.Kinds() {
-		if _, ok := first[s.Provider+"/"+s.Delivery]; !ok {
-			first[s.Provider+"/"+s.Delivery] = s
-		}
-		if _, ok := first[s.Provider+"/"]; !ok {
-			first[s.Provider+"/"] = s
-		}
-	}
-	if len(first) == 0 {
-		t.Fatal("no kinds installed")
-	}
-	for key, want := range first {
-		got, ok := k.ForDelivery(want.Provider, want.Delivery)
-		if key == want.Provider+"/" {
-			got, ok = k.ForDelivery(want.Provider, "")
-		}
-		if !ok || got.Name != want.Name {
-			t.Errorf("%s: %+v %v, want %s", key, got, ok, want.Name)
-		}
-	}
-	if _, ok := k.ForDelivery("slack", "carrier_pigeon"); ok {
-		t.Error("an undeclared delivery has a kind")
-	}
-}

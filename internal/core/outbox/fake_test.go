@@ -187,7 +187,7 @@ func (e *env) decide(id draft.ID, intent string) error {
 // approve approves draft id's gate as a person, as the daemon does: the draft prepared at its rev, then its gate.
 func (e *env) approve(id draft.ID, text *string) (draft.Draft, error) {
 	if text != nil && *text != e.get(id).Text {
-		if _, err := e.svc.Edit(context.Background(), id, *text); err != nil {
+		if _, err := e.svc.Edit(context.Background(), id, *text, e.get(id).Rev); err != nil {
 			return draft.Draft{}, err
 		}
 	}

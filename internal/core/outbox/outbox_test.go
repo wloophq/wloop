@@ -48,14 +48,14 @@ func TestConcurrentDecisionsResolveTheGateOnce(t *testing.T) {
 func TestEditKeepsTheOriginal(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("first"))
-	got, err := e.svc.Edit(ctx, d.ID, "second")
+	got, err := e.svc.Edit(ctx, d.ID, "second", e.get(d.ID).Rev)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Text != "second" || got.Original != "first" || !got.Edited {
 		t.Fatalf("edited %+v", got)
 	}
-	back, err := e.svc.Edit(ctx, d.ID, "first")
+	back, err := e.svc.Edit(ctx, d.ID, "first", e.get(d.ID).Rev)
 	if err != nil || back.Edited {
 		t.Fatalf("edit back to the original: %+v %v", back, err)
 	}
@@ -64,15 +64,15 @@ func TestEditKeepsTheOriginal(t *testing.T) {
 	if _, err := e.approve(failed.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Edit(ctx, failed.ID, "x"); !errors.Is(err, draft.ErrTransition) {
+	if _, err := e.svc.Edit(ctx, failed.ID, "x", e.get(failed.ID).Rev); !errors.Is(err, draft.ErrTransition) {
 		t.Errorf("edit of an approved draft: %v", err)
 	}
 	e.fx.failWith = errBoom
 	e.svc.Send(ctx)
-	if got, err := e.svc.Edit(ctx, failed.ID, "fixed"); err != nil || got.Text != "fixed" || got.Original != "will fail" {
+	if got, err := e.svc.Edit(ctx, failed.ID, "fixed", e.get(failed.ID).Rev); err != nil || got.Text != "fixed" || got.Original != "will fail" {
 		t.Errorf("edit of a failed draft: %+v %v", got, err)
 	}
-	if _, err := e.svc.Edit(ctx, d.ID, " "); !errors.Is(err, ErrInvalid) {
+	if _, err := e.svc.Edit(ctx, d.ID, " ", e.get(d.ID).Rev); !errors.Is(err, ErrInvalid) {
 		t.Errorf("blank edit: %v", err)
 	}
 }
@@ -575,7 +575,7 @@ func TestOutboxLogHasNoText(t *testing.T) {
 	b := e.propose(reply(secret + " b"))
 	c := e.propose(reply(secret + " c"))
 	edited := secret + " edited"
-	e.svc.Edit(ctx, a.ID, edited)
+	e.svc.Edit(ctx, a.ID, edited, e.get(a.ID).Rev)
 	e.approve(a.ID, &edited)
 	e.approve(b.ID, nil)
 	e.decide(c.ID, "discard")

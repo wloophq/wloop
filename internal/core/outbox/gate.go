@@ -80,18 +80,10 @@ func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {
 }
 
 // atGateRev says whether held draft d is at the rev its gate g opened for; a draft starts at rev 1, so a
-// gate of rev 0 never matches. When Gates places no task before
-// a gate opens, the draft adopts its gate's task after, which is one rev on; that write alone may follow
-// the gate's, since every revision of a held draft supersedes its gate first.
-func (s *Service) atGateRev(d draft.Draft, g gate.Gate) bool {
-	if g.ApprovedRev < 1 {
-		return false
-	}
-	if d.Rev == g.ApprovedRev {
-		return true
-	}
-	_, places := s.Gates.(TaskPlacer)
-	return !places && d.Rev == g.ApprovedRev+1 && g.Task != "" && d.Task == string(g.Task)
+// gate of rev 0 never matches. Any write after the gate opened, the adoption of its task included when
+// Gates places no task first, fails the draft's release.
+func atGateRev(d draft.Draft, g gate.Gate) bool {
+	return g.ApprovedRev >= 1 && d.Rev == g.ApprovedRev
 }
 
 // decided is the gates' Policy of the decision a draft's approval made.
@@ -140,7 +132,7 @@ func (s *Service) Publish(ctx context.Context, g gate.Gate) error {
 		_, err = s.drop(ctx, d, reasonGone)
 		return err
 	}
-	if !s.atGateRev(d, g) {
+	if !atGateRev(d, g) {
 		s.logf("draft %d failed on its release: its gate approved rev %d, it is at %d", d.ID, g.ApprovedRev, d.Rev)
 		return s.failHeld(ctx, d, fmt.Sprintf("it changed after its gate opened: its gate approved rev %d, it is at rev %d", g.ApprovedRev, d.Rev))
 	}

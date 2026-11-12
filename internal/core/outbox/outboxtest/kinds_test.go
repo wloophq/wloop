@@ -42,3 +42,33 @@ func TestTheFakeBasesAnswerTheLastSet(t *testing.T) {
 		t.Fatalf("Live = %q, %v after %d calls", got, err, b.Calls())
 	}
 }
+
+func TestTheFakeKindsShapeAsTheCatalog(t *testing.T) {
+	t.Parallel()
+	k := Kinds{Specs: []draft.KindSpec{
+		{Provider: "chat", Name: "react", Delivery: "reaction"},
+		{Provider: "chat", Name: "reply", Delivery: "message"},
+		{Provider: "chat", Name: "nudge", Delivery: "message"},
+	}, Defaults: map[string]string{"chat": "message"}}
+	for _, c := range []struct {
+		name string
+		in   draft.Draft
+		kind draft.Kind
+	}{
+		{"no kind and no delivery takes the default delivery, not the first kind", draft.Draft{Purpose: "thanks"}, "reply"},
+		{"an undeclared delivery takes the default", draft.Draft{Purpose: "thanks", Delivery: "fax"}, "reply"},
+		{"a purpose naming a kind", draft.Draft{Purpose: "nudge"}, "nudge"},
+		{"a named kind", draft.Draft{Kind: "react"}, "react"},
+	} {
+		got, err := k.Shape("chat", c.in)
+		if err != nil || got.Kind != c.kind {
+			t.Errorf("%s: %+v %v", c.name, got, err)
+		}
+	}
+	if _, err := k.Shape("chat", draft.Draft{Kind: "approve"}); !errors.Is(err, outbox.ErrInvalid) {
+		t.Errorf("an undeclared kind: %v", err)
+	}
+	if got, err := k.Shape("task", draft.Draft{Kind: "reply", Text: "x"}); err != nil || got.Purpose != "reply" {
+		t.Errorf("a provider with no kinds: %+v %v", got, err)
+	}
+}

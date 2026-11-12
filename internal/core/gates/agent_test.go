@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/gates"
@@ -219,5 +220,25 @@ func TestApproveOptionLosesARevisionRaceAfterTheQuestion(t *testing.T) {
 	gd, _ := store.Get(ctx, d.ID)
 	if gq.Status != gate.Answered || gd.Status != gate.Superseded || len(cons.Calls) != 0 {
 		t.Fatalf("question %s, draft %s, consequences %v", gq.Status, gd.Status, cons.Calls)
+	}
+}
+
+func TestAResolvedAnswerNeverApprovesALaterRevision(t *testing.T) {
+	ctx := context.Background()
+	now := opened
+	f := newFixtureAt(t, nil, bundled, func() time.Time { now = now.Add(time.Second); return now })
+	d := f.draftGate(t)
+	q := f.question(t, "s-worker")
+	r := answer(task.ActorPerson, "")
+	if err := f.svc.Resolve(ctx, q.ID, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.SupersedeForAgent(ctx, d.ID, "s-worker"); err != nil {
+		t.Fatal(err)
+	}
+	d2 := f.open(t, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "42", Session: "s-worker", ApprovedRev: 4,
+		Sessions: []string{"s-worker"}}, waits)
+	if err := f.svc.ApproveOption(ctx, q, r, d2, 4); !errors.Is(err, gates.ErrRefused) || f.get(t, d2.ID).Status != gate.Open {
+		t.Fatalf("the answer about rev 3 approved rev 4: %v", err)
 	}
 }

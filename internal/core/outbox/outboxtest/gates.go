@@ -26,7 +26,10 @@ type Gates struct {
 	outbox  atomic.Pointer[outbox.Service]
 }
 
-var _ outbox.Gates = (*Gates)(nil)
+var (
+	_ outbox.Gates      = (*Gates)(nil)
+	_ outbox.TaskPlacer = (*Gates)(nil)
+)
 
 // NewGates are gates in memory, stamped by now.
 func NewGates(now func() time.Time) *Gates {
@@ -58,6 +61,11 @@ func (g *Gates) Supersede(ctx context.Context, id int64, by task.Actor) error {
 
 func (g *Gates) RecordSent(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
 	return g.Service.RecordSent(ctx, gt)
+}
+
+// TaskOf is the task the gates service would open gt on.
+func (g *Gates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
+	return g.Service.TaskOf(ctx, gt)
 }
 
 func (g *Gates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {

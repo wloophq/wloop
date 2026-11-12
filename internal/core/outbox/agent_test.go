@@ -1,6 +1,7 @@
 package outbox
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,12 +36,27 @@ func (k specKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	return k.Specs[i], true
 }
 
-func (k specKinds) ForDelivery(provider, delivery string) (draft.KindSpec, bool) {
-	i := slices.IndexFunc(k.Specs, func(s draft.KindSpec) bool { return s.Provider == provider && (delivery == "" || s.Delivery == delivery) })
-	if i < 0 {
-		return draft.KindSpec{}, false
+// Shape is outboxtest.Kinds' Shape, with no default deliveries.
+func (k specKinds) Shape(provider string, d draft.Draft) (draft.Draft, error) {
+	mine := slices.DeleteFunc(slices.Clone(k.Specs), func(s draft.KindSpec) bool { return s.Provider != provider })
+	if len(mine) == 0 {
+		d.Purpose = cmp.Or(d.Purpose, string(d.Kind))
+		return d, nil
 	}
-	return k.Specs[i], true
+	name := string(d.Kind)
+	if name == "" {
+		if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Name == d.Purpose }); i >= 0 {
+			name = d.Purpose
+		} else if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Delivery == string(d.Delivery) }); i >= 0 {
+			name = mine[i].Name
+		}
+	}
+	spec, ok := k.Lookup(provider, name)
+	if !ok {
+		return d, fmt.Errorf("%w: no kind %q of %s", ErrInvalid, name, provider)
+	}
+	d.Kind, d.Purpose, d.Delivery = draft.Kind(spec.Name), cmp.Or(d.Purpose, spec.Name), draft.Delivery(spec.Delivery)
+	return d, nil
 }
 
 func (k specKinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {
@@ -151,12 +167,12 @@ func TestProposeVerifiesBasisLive(t *testing.T) {
 		t.Fatalf("no basis: %v", err)
 	}
 	bases.Err = errBoom
-	if _, err := e.svc.Propose(ctx, review("COMMENT")); !errors.Is(err, ErrStale) {
-		t.Fatalf("a live read that fails: %v", err)
+	if _, err := e.svc.Propose(ctx, review("COMMENT")); !errors.Is(err, errBoom) || errors.Is(err, ErrStale) {
+		t.Fatalf("a live read that fails: %v, want it refused and not stale", err)
 	}
 	e.svc.Bases = nil
-	if _, err := e.svc.Propose(ctx, review("COMMENT")); !errors.Is(err, ErrStale) {
-		t.Fatalf("no live reader: %v, want it to fail closed", err)
+	if _, err := e.svc.Propose(ctx, review("COMMENT")); !errors.Is(err, ErrNoBases) || errors.Is(err, ErrStale) {
+		t.Fatalf("no live reader: %v, want it refused and not stale", err)
 	}
 	if ds, _ := e.svc.List(ctx, Filter{}); len(ds) != 1 {
 		t.Fatalf("stored %d drafts, want the fresh one alone", len(ds))
@@ -236,7 +252,7 @@ func TestHoldReappliedOnRevision(t *testing.T) {
 	if !got.Hold || got.State != draft.Held || e.gate(d.ID).Status != gate.Open || e.approval(d.ID) != waiting {
 		t.Fatalf("revised: %+v, gate %+v", got, e.gate(d.ID))
 	}
-	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("No findings.")}); err != nil {
+	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("No findings."), Rev: e.get(d.ID).Rev}); err != nil {
 		t.Fatal(err)
 	}
 	if !e.get(d.ID).Hold || e.approval(d.ID) != waiting {
@@ -276,7 +292,7 @@ func TestAgentRevisionOpensWaitingGate(t *testing.T) {
 	if sent, _, _ := e.svc.Send(ctx); sent != 0 || e.get(d.ID).State != draft.Held {
 		t.Fatalf("the old window released the revision: sent %d, %s", sent, e.get(d.ID).State)
 	}
-	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("Edited by hand.")}); err != nil {
+	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("Edited by hand."), Rev: e.get(d.ID).Rev}); err != nil {
 		t.Fatal(err)
 	}
 	if by := e.get(d.ID).By; by.Kind != draft.ActorPerson {
@@ -343,7 +359,7 @@ func TestSendPostsOnlyApprovedRev(t *testing.T) {
 	g0.ApprovedRev, g0.Status, g0.By = 0, gate.Approved, task.ActorPerson
 	at0 := e.get(zero.ID)
 	at0.Rev = 0
-	if e.svc.atGateRev(at0, g0) {
+	if atGateRev(at0, g0) {
 		t.Fatal("a gate of rev 0 matched")
 	}
 	d := e.propose(review("COMMENT"))
@@ -368,32 +384,37 @@ func TestSendPostsOnlyApprovedRev(t *testing.T) {
 
 type noPlacer struct{ Gates }
 
-func TestAGateWithNoTaskPlacerToleratesOnlyTheAdoptionOfItsTask(t *testing.T) {
-	e, _ := reviewEnv()
-	d := e.propose(review("COMMENT"))
-	g := e.gate(d.ID)
-	g.Task = "t-1"
+func TestAGateWithNoTaskPlacerFailsAnAdoptedDraftClosed(t *testing.T) {
+	onTaskUnit := func() Proposal {
+		p := reply("shipped")
+		p.Unit = task.UnitOf("t-1")
+		return p
+	}
+	e := newEnv()
+	d := e.propose(onTaskUnit())
+	if d.Task != "t-1" || e.gate(d.ID).ApprovedRev != d.Rev {
+		t.Fatalf("with a TaskPlacer the draft takes its task before its gate: %+v, gate %+v", d, e.gate(d.ID))
+	}
+	if _, err := e.approve(d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent, _, _ := e.svc.Send(ctx); sent != 1 {
+		t.Fatalf("sent %d", sent)
+	}
+	e = newEnv()
 	e.svc.Gates = noPlacer{e.svc.Gates}
-	adopted := e.get(d.ID)
-	adopted.Task = "t-1"
-	cur, err := e.store.Update(ctx, adopted, draft.Held)
-	if err != nil {
+	d = e.propose(onTaskUnit())
+	if g := e.gate(d.ID); d.Task != "t-1" || g.ApprovedRev == d.Rev {
+		t.Fatalf("the adoption: %+v, gate %+v", d, g)
+	}
+	if err := e.decide(d.ID, "approve"); err != nil {
 		t.Fatal(err)
 	}
-	if !e.svc.atGateRev(cur, g) {
-		t.Fatal("the adoption of its gate's task refused the draft")
+	if got := e.get(d.ID); got.State != draft.Failed {
+		t.Fatalf("an approval of rev %d released rev %d: %+v", e.gate(d.ID).ApprovedRev, got.Rev, got)
 	}
-	other := g
-	other.Task = "t-2"
-	if e.svc.atGateRev(cur, other) {
-		t.Fatal("another task passed")
-	}
-	cur.Text = "sneaked"
-	if cur, err = e.store.Update(ctx, cur, draft.Held); err != nil {
-		t.Fatal(err)
-	}
-	if e.svc.atGateRev(cur, g) {
-		t.Fatal("a second write passed")
+	if sent, _, _ := e.svc.Send(ctx); sent != 0 || len(e.fx.published) != 0 {
+		t.Fatalf("published %v", e.fx.published)
 	}
 }
 
@@ -421,7 +442,7 @@ func TestApproveRefusesStale(t *testing.T) {
 		t.Fatalf("a draft with no basis: %v, %v", stale, err)
 	}
 	e.svc.Bases = nil
-	if stale, err := e.svc.Stale(ctx, e.get(d.ID)); !stale || !errors.Is(err, ErrStale) {
+	if stale, err := e.svc.Stale(ctx, e.get(d.ID)); stale || !errors.Is(err, ErrNoBases) {
 		t.Fatalf("no live reader: %v, %v", stale, err)
 	}
 }
@@ -472,7 +493,7 @@ func TestAmendRevConflict(t *testing.T) {
 		t.Fatalf("withdraw at rev 0: %v", err)
 	}
 	read := e.get(d.ID).Rev
-	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("a person's words")}); err != nil {
+	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("a person's words"), Rev: e.get(d.ID).Rev}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.svc.AgentAmend(ctx, worker, d.ID, Amendment{Text: ptr("the agent's words"), Rev: read}); !errors.Is(err, ErrRevConflict) {

@@ -47,13 +47,15 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 
 // ApproveOption resolves question gate question with r, the option picked (Intent, Answer) and who picked
 // it (By, Session: a person, or an agent through a session the user drives), when that option points to
-// drafted's draft at rev; then it approves drafted with the same resolver. It reads both gates again from
-// the store first, trusting neither value the caller passes, and resolves nothing when drafted is no
-// longer open (or approved already) at rev, is on another unit than the question, came from another
-// session than the question's, or stamps r.Session among its Sessions, or when r is a rule's: each is
-// ErrRefused. When the draft's approval loses a race after the question resolved, as a revision landing
-// between them, it returns that error, and the question's answer stands as a free answer. Each step is
-// idempotent, so a call cut short completes when it is made again with the same r.
+// drafted's draft at rev, the rev the option pinned, never the draft's current one; then it approves
+// drafted with the same resolver. It reads both gates again from the store first, trusting neither value
+// the caller passes, and resolves nothing when drafted is no longer open (or approved already) at rev, is
+// on another unit than the question, came from another session than the question's, or stamps r.Session
+// among its Sessions, or when r is a rule's: each is ErrRefused. A question already resolved approves only
+// a draft gate that opened before its answer. When the draft's approval loses a race after the question
+// resolved, as a revision landing between them, it returns that error, and the question's answer stands
+// as a free answer. Each step is idempotent, so a call cut short completes when it is made again with the
+// same r.
 func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64) error {
 	q, err := s.d.Reader.Get(ctx, question.ID)
 	if err != nil {
@@ -76,6 +78,9 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	}
 	if q.Intent != r.Intent || q.Answer != r.Answer || q.By != r.By {
 		return fmt.Errorf("%w: question gate %d was resolved otherwise", ErrResolved, q.ID)
+	}
+	if d.OpenedAt.After(q.ClosedAt) {
+		return fmt.Errorf("%w: draft gate %d opened after question gate %d was answered, so the answer is not about it", ErrRefused, d.ID, q.ID)
 	}
 	if d.Status == gate.Approved {
 		return nil

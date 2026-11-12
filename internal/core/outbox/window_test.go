@@ -61,7 +61,7 @@ func TestEditStopsTheWindow(t *testing.T) {
 	d := e.propose(reply("x"))
 	first := e.gate(d.ID)
 	e.clock.now = t0.Add(time.Minute)
-	got, err := e.svc.Edit(ctx, d.ID, "better")
+	got, err := e.svc.Edit(ctx, d.ID, "better", e.get(d.ID).Rev)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestAnEditRacingItsWindowNeverPostsUnapprovedText(t *testing.T) {
 		wg.Go(func() { e.tick() })
 	}
 	for i := 0; i < len(ids); i += 2 {
-		wg.Go(func() { e.svc.Edit(ctx, ids[i], "edited") })
+		wg.Go(func() { e.svc.Edit(ctx, ids[i], "edited", e.get(ids[i]).Rev) })
 	}
 	wg.Wait()
 	for range 4 {
