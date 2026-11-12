@@ -59,6 +59,7 @@ async function resolveGate(e, g, id, option) {
   } catch (err) {
     markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: intent.label, error: err.message }), true);
+    detailEnv.changed();
     return null;
   }
 }
@@ -223,6 +224,10 @@ function gateCard(e, g, opts = {}) {
   const deflt = intents.find((x) => x.id === g.default);
   const answer = intents.find((x) => x.answer);
   const title = g.text || g.name || g.kind;
+  const buttons = intents.map((x, i) => h("button", {
+    type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
+    onclick: () => resolveGate(e, g, x.id),
+  }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label));
   return h("article", { class: "ask d-gate", "data-gate": String(g.id), "data-kind": g.kind, "aria-label": title },
     h("header", { class: "hd" },
       h("i", { class: "dot", "aria-hidden": "true" }),
@@ -239,11 +244,9 @@ function gateCard(e, g, opts = {}) {
       gateOptions(g, answer),
       subject.draft ? pinnedDraft(subject, subject.draft, `gate:${g.id}:confirm`) : null,
       answer ? gateAnswer(e, g, answer) : null,
-      h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
-        type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
-        onclick: () => resolveGate(e, g, x.id),
-      }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label)),
-      answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null)));
+      h("div", { class: "d-actions" }, ...buttons,
+      answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null),
+      actionResult(buttons)));
 }
 
 // gateAt is the gate whose card holds el, with its task, among sources: each a task and the gates the page
@@ -470,6 +473,7 @@ async function resolveDraft(d, intent, label, args) {
   } catch (err) {
     markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: label, error: err.message }), true);
+    detailEnv.changed();
   }
 }
 
@@ -563,6 +567,7 @@ function draftCard(e, d, opts = {}) {
   const why = d.state === "dropped" && d.reason_text ? `: ${d.reason_text}` : "";
   const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st}${why})` : "");
   const effects = draftEffects(d);
+  const buttons = draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf));
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),
     d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:preview:${d.id}`, names: d.names || {} })) : null,
@@ -580,6 +585,7 @@ function draftCard(e, d, opts = {}) {
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,
     d.error ? h("p", { class: "err" }, d.error) : null,
     windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf))),
+    h("div", { class: "d-actions" }, ...buttons),
+    actionResult(buttons),
     draftLinks(e, d, scope));
 }

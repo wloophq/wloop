@@ -235,6 +235,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 			return draft.Draft{}, badRequest{"retry takes the rev you saw"}
 		}
 		got, err = o.Retry(ctx, id, a.Confirm)
+		s.noteStale(id, d.Rev, err)
 	default:
 		return draft.Draft{}, badRequest{fmt.Sprintf("unknown draft action %q", action)}
 	}
@@ -325,6 +326,7 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 		id := draft.ID(n)
 		d, err := o.Prepare(ctx, id, rev)
 		if err != nil {
+			s.noteStale(id, rev, err)
 			return err
 		}
 		if edit.changes(d) {
@@ -393,7 +395,7 @@ func writeDraftError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, outbox.ErrNeedsConfirm):
 		writeError(w, http.StatusConflict, err.Error()+": pass confirm once you checked it was not posted")
-	case errors.Is(err, outbox.ErrConflict), errors.Is(err, gates.ErrResolved):
+	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrStale), errors.Is(err, gates.ErrResolved):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, gates.ErrRefused):
 		writeError(w, http.StatusForbidden, err.Error())
@@ -469,7 +471,7 @@ func taskDraftError(err error) error {
 		return fmt.Errorf("%w: %w", coretasks.ErrNoTask, err)
 	case errors.Is(err, outbox.ErrNeedsConfirm):
 		return fmt.Errorf("%w: %w: pass the confirm argument once you checked it was not posted", coretasks.ErrVerb, err)
-	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrDisabled), errors.Is(err, gates.ErrResolved),
+	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrStale), errors.Is(err, outbox.ErrDisabled), errors.Is(err, gates.ErrResolved),
 		errors.Is(err, gates.ErrRefused), errors.Is(err, gates.ErrNoGate), errors.Is(err, gates.ErrIntent):
 		return fmt.Errorf("%w: %w", coretasks.ErrVerb, err)
 	case errors.Is(err, outbox.ErrInvalid), errors.As(err, &bad):

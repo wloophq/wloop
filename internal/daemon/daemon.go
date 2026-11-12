@@ -457,6 +457,8 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
+	// refusedStale keeps, by draft id, the rev an approval or a retry was refused at as stale.
+	refusedStale sync.Map
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.

@@ -70,6 +70,7 @@ async function taskAct(task, verb, args) {
     return out || {};
   } catch (err) {
     detailEnv.notice(t("{verb} {task} failed: {error}", { verb, task: task.title || task.id, error: err.message }), true);
+    detailEnv.changed();
     return null;
   }
 }
