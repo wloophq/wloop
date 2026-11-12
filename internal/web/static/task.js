@@ -194,7 +194,7 @@ function taskBrief(e) {
 function taskGates(e) {
   const own = isDraftTask(e) ? draftOf(e) : null;
   const drafts = (taskState.id === e.id ? taskState.drafts : []).filter((d) => (!own || d.id !== own.id) && !d.pinned_by);
-  const pinnedGate = (g) => g.kind === "draft" && !!subjectOf(g).pinned_by;
+  const pinnedGate = (g) => !!subjectOf(g).pinned_by;
   const gates = (e.gates || []).filter((g) => g.status === "open" && !(own && g.subject === own) && !pinnedGate(g) && !drafts.some((d) => d.gate && d.gate === g.id));
   if (!gates.length && !own && !drafts.length) return null;
   return h("section", { class: "d-gates", "aria-label": t("Open gates") },
