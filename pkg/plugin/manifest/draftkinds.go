@@ -52,14 +52,16 @@ func (s *Source) readDraftKinds(files fs.FS) error {
 			if field, ok := strings.CutPrefix(f.Name, prefix); !ok || !nameRe.MatchString(field) || strings.Contains(field, ".") {
 				bad(*k, "fact %q is not named %s<field>", f.Name, prefix)
 			}
-			if err := schema.enum(f.Pointer); err != nil {
+			if _, err := schema.enum(f.Pointer); err != nil {
 				bad(*k, "fact %q: %v", f.Name, err)
 			}
 		}
 		if k.Verdict != "" {
-			if err := schema.enum(k.Verdict); err != nil {
+			verdicts, err := schema.enum(k.Verdict)
+			if err != nil {
 				bad(*k, "verdict: %v", err)
 			}
+			k.Verdicts = verdicts
 		}
 		for _, e := range k.Editable {
 			if e == editableText {
@@ -124,25 +126,28 @@ func (s draftSchema) at(pointer string) (map[string]any, bool, error) {
 	return node, required, nil
 }
 
-// enum refuses a pointer to anything but a required string with an enum.
-func (s draftSchema) enum(pointer string) error {
+// enum is the values of the required string enum pointer reaches, and refuses a pointer to anything else.
+func (s draftSchema) enum(pointer string) ([]string, error) {
 	prop, required, err := s.at(pointer)
 	switch {
 	case err != nil:
-		return err
+		return nil, err
 	case !required:
-		return fmt.Errorf("%q is not required, and an absent value would read as none", pointer)
+		return nil, fmt.Errorf("%q is not required, and an absent value would read as none", pointer)
 	case prop["type"] != "string":
-		return fmt.Errorf("%q is not a string", pointer)
+		return nil, fmt.Errorf("%q is not a string", pointer)
 	}
 	values, _ := prop["enum"].([]any)
 	if len(values) == 0 {
-		return fmt.Errorf("%q has no enum", pointer)
+		return nil, fmt.Errorf("%q has no enum", pointer)
 	}
+	out := make([]string, 0, len(values))
 	for _, v := range values {
-		if _, ok := v.(string); !ok {
-			return fmt.Errorf("%q has an enum value that is not a string", pointer)
+		str, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("%q has an enum value that is not a string", pointer)
 		}
+		out = append(out, str)
 	}
-	return nil
+	return out, nil
 }

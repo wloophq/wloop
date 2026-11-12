@@ -3,7 +3,6 @@ package draft
 import (
 	"encoding/json"
 	"errors"
-	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -166,16 +165,5 @@ func TestAKindsVerdictIsThePayloadFieldItPointsTo(t *testing.T) {
 	}
 	if got := (KindSpec{}).VerdictOf(Draft{Payload: json.RawMessage(`{"event":"APPROVE"}`)}); got != "" {
 		t.Errorf("a kind that posts no verdict: %q", got)
-	}
-}
-
-func TestAKindsVerdictValuesAreItsSchemasEnum(t *testing.T) {
-	k := KindSpec{Verdict: "/event", SchemaJSON: json.RawMessage(`{"type":"object","properties":{"event":{"type":"string","enum":["LGTM","NEEDS_WORK"]}}}`)}
-	if got := k.VerdictValues(); !slices.Equal(got, []string{"LGTM", "NEEDS_WORK"}) {
-		t.Fatalf("verdicts %v", got)
-	}
-	k.Verdict = ""
-	if got := k.VerdictValues(); got != nil {
-		t.Fatalf("a kind that posts no verdict: %v", got)
 	}
 }

@@ -78,7 +78,7 @@ func Verdicts(serves func(unit.ProviderID) bool) []string {
 		if !serves(unit.ProviderID(k.Provider)) {
 			continue
 		}
-		for _, v := range k.VerdictValues() {
+		for _, v := range k.Verdicts {
 			if !slices.Contains(out, v) {
 				out = append(out, v)
 			}
@@ -95,7 +95,7 @@ func draftSpecs(p unit.ProviderID, src *manifest.Source) ([]draft.KindSpec, []dr
 	var ks []draft.KindSpec
 	for _, k := range src.DraftKinds {
 		spec := draft.KindSpec{Provider: string(p), Name: k.Name, Delivery: cmp.Or(k.Delivery, src.DefaultDelivery), Schema: k.Schema, Preview: k.Preview,
-			Basis: k.Basis, TextRequired: k.TextRequired, Editable: slices.Clone(k.Editable), SchemaJSON: slices.Clone(k.SchemaJSON), Verdict: k.Verdict}
+			Basis: k.Basis, TextRequired: k.TextRequired, Editable: slices.Clone(k.Editable), SchemaJSON: slices.Clone(k.SchemaJSON), Verdict: k.Verdict, Verdicts: slices.Clone(k.Verdicts)}
 		for _, f := range k.Facts {
 			spec.Facts = append(spec.Facts, draft.FactSpec{Name: f.Name, Pointer: f.Pointer})
 		}
