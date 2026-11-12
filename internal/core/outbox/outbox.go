@@ -385,6 +385,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
+	sub.Kind = draft.KindSpec{}
 	if s.Kinds != nil {
 		sub.Kind, _ = s.Kinds.Lookup(string(d.Unit.Provider), string(d.Kind))
 	}

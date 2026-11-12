@@ -200,7 +200,10 @@ func compileRule(when string, mode gate.Mode, window time.Duration, kinds []gate
 	var untrusted *builtin.UntrustedError
 	var subjects *builtin.SubjectsError
 	var allowList *builtin.AllowListError
-	if errors.As(draftErr, &untrusted) || errors.As(draftErr, &subjects) || errors.As(draftErr, &allowList) {
+	if errors.As(draftErr, &allowList) {
+		return r, "", draftErr
+	}
+	if errors.As(draftErr, &untrusted) || errors.As(draftErr, &subjects) {
 		return r, "", fmt.Errorf("%w; %s", draftErr, reachesDrafts)
 	}
 	if failed := cmpErr(unitErr, draftErr); failed != nil && (len(r.kinds) == 0 || len(pinned) > 0) {
