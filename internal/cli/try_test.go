@@ -56,7 +56,7 @@ func TestTrySettingsDenyEveryWrite(t *testing.T) {
 	t.Parallel()
 	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored(), bundledWrites()).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
 	for _, want := range []string{"Bash(gh api * --method*)", "Bash(gh api * -X*)", "Bash(gh api * -f*)", "Bash(gh api * --input*)",
-		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(open claude://*)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
+		"Bash(gh pr comment*)", "Bash(gh pr review*)", "Bash(git push *)", "Bash(open claude://*)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("deny lacks %s:\n%s", want, raw)
 		}
