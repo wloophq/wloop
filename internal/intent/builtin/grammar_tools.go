@@ -73,6 +73,8 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("turn_end", "problem_turn_required", "A problem: turn is missing or empty."),
 		answer("turn_end", "problem_record_required", "A problem: record is missing."),
 		answer("turn_end", "problem_record", "A problem: record does not decode.", str("Error")),
+		answer("turn_end", "problem_pin", "A problem: the question pins, at Where, draft Draft, which no answer decides: its state, \"\" when there is no such draft, is not held, or its gate's status, \"\" when it has none, is not open.",
+			str("Where"), num("Draft"), str("State"), str("Gate")),
 		answer("turn_end", "refused_record", "The turn refused the record.", str("Reason")),
 		answer("turn_end", "store_failed", "The record could not be stored.", str("Error")),
 		answer("turn_end", "recorded", "The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, \"\" when none.",

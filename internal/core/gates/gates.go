@@ -311,6 +311,22 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 	return true, s.ApproveOption(ctx, q, pick, g, rev)
 }
 
+// Decides refuses, with ErrRefused, a retry of the draft of draft gate drafted while a question decides it: an open
+// question pins it, or one is about to open, or the question that pins it was answered with another option.
+func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
+	if s.d.Options == nil {
+		return nil
+	}
+	q, answer, _, ok, err := s.d.Options.Pinning(ctx, drafted)
+	switch {
+	case err != nil || !ok:
+		return err
+	case q.ID != 0 && q.Status == gate.Answered && q.Answer == answer:
+		return nil
+	}
+	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
+}
+
 // Supersede closes open gate id as superseded by by, its subject gone or
 // replaced, with no consequence: the subject's owner settles the subject.
 // It refuses an agent: no agent closes an open gate. A person supersedes

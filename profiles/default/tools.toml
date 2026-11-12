@@ -57,6 +57,7 @@ problem_turn_type = "turn: a string, the id on the first line of the turn's inst
 problem_turn_required = "turn: required; the id on the first line of the turn's instructions"
 problem_record_required = "record: required"
 problem_record = "record: {{.Error}}"
+problem_pin = "{{.Where}}: draft {{.Draft}} {{if not .State}}does not exist{{else if ne .State \"held\"}}is {{.State}}{{else}}no longer waits for the user (its gate is {{or .Gate \"gone\"}}){{end}}, so the user's answer cannot decide it; propose the draft again with hold and point to the new one, or leave it out of the question"
 refused_record = "{{.Name}} refused the record: {{.Reason}}."
 store_failed = "{{.Name}} could not store the record: {{.Error}}; call turn_end again."
 recorded = "Recorded {{.State}} for {{.Unit}}{{with .Note}}, but {{.}}{{end}}.{{with .Dropped}} {{.}}{{end}} End your turn.{{with .Ledger}} Ledger: {{.}}.{{end}}"

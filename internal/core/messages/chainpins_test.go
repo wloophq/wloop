@@ -2,6 +2,7 @@ package messages_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 
@@ -100,5 +101,23 @@ func TestAReplacingTurnsQuestionPinsItsPredecessorsDrafts(t *testing.T) {
 	_ = r.gates.Resolve(ctx, od.gateOf(43).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson})
 	if got := r.gateOf(t, m); got.Status != gate.Answered || len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(42).ID {
 		t.Errorf("question %s, approvals %+v: want the question answered by draft 42's approval alone", got.Status, od.approvals)
+	}
+}
+
+// TestAQuestionDecidesItsPinnedDraftsRetry: while a question pins drafts 42 and 43, a retry of either is refused;
+// once its answer picked 42, the question no longer decides it.
+func TestAQuestionDecidesItsPinnedDraftsRetry(t *testing.T) {
+	ctx := context.Background()
+	r, od, m := draftRig(t)
+	for _, id := range []int64{42, 43} {
+		if err := r.gates.Decides(ctx, od.gateOf(id)); !errors.Is(err, gates.ErrRefused) {
+			t.Fatalf("a retry of draft %d its open question pins: %v", id, err)
+		}
+	}
+	if _, err := r.answer(m, messages.Answer{OptionID: "approve", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.gates.Decides(ctx, od.gateOf(42)); err != nil {
+		t.Fatalf("a retry of draft 42, which the answer picked: %v", err)
 	}
 }

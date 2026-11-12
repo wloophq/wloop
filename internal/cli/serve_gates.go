@@ -161,6 +161,12 @@ func (g draftGates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
 
 var _ outbox.TaskPlacer = draftGates{}
 
+func (g draftGates) Decides(ctx context.Context, drafted gate.Gate) error {
+	return g.e.newGates(g.db, g.logf).Decides(ctx, drafted)
+}
+
+var _ outbox.QuestionPins = draftGates{}
+
 func (g draftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	g.e.newGates(g.db, g.logf)
 	return g.e.gateReader.Where(ctx, q)

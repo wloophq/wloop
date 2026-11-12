@@ -1,9 +1,12 @@
 package turns
 
 import (
+	"cmp"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -277,4 +280,63 @@ func UserApproved(g gate.Gate, d draft.Draft) bool {
 		return false
 	}
 	return !g.Stamps(g.BySession)
+}
+
+// UnheldPin is a pin of a record's question, at Where in the record, on draft Draft that no answer decides: its
+// State is not held, or its gate's status Gate is not open ("" when it has none). State is "" when there is no
+// such draft.
+type UnheldPin struct {
+	Where       string
+	Draft       int64
+	State, Gate string
+}
+
+// UnheldPins refuses a record whose question pins drafts no answer decides.
+type UnheldPins []UnheldPin
+
+func (p UnheldPins) Error() string {
+	out := make([]string, len(p))
+	for i, u := range p {
+		out[i] = fmt.Sprintf("%s: draft %d is %s, gate %s", u.Where, u.Draft, cmp.Or(u.State, "missing"), cmp.Or(u.Gate, "none"))
+	}
+	return "unheld pins: " + strings.Join(out, "; ")
+}
+
+// decidedPins refuses q when an option, or its confirm, pins a draft that is not held with its gate open: the
+// person's answer decides only such a draft, and one a rule released posts whatever they pick.
+func (s *Service) decidedPins(ctx context.Context, q *record.Question) error {
+	if q == nil || s.DraftGates == nil {
+		return nil
+	}
+	type pin struct {
+		where string
+		ref   *record.DraftRef
+	}
+	pins := []pin{{"question.draft", q.Draft}}
+	for i, o := range q.Options {
+		pins = append(pins, pin{fmt.Sprintf("question.options[%d].draft", i), o.Draft})
+	}
+	var bad UnheldPins
+	for _, p := range pins {
+		if p.ref == nil {
+			continue
+		}
+		d, ok, err := s.DraftGates.Draft(ctx, draft.ID(p.ref.ID))
+		if err != nil {
+			return err
+		}
+		var g gate.Gate
+		if ok {
+			if g, _, err = s.DraftGates.GateOf(ctx, d); err != nil {
+				return err
+			}
+		}
+		if !ok || d.State != draft.Held || g.Status != gate.Open {
+			bad = append(bad, UnheldPin{Where: p.where, Draft: p.ref.ID, State: string(d.State), Gate: string(g.Status)})
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return bad
 }

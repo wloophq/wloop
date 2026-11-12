@@ -2,11 +2,14 @@ package turns_test
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -110,5 +113,38 @@ func TestAPickAfterItsDraftSentEndsTheTurn(t *testing.T) {
 	last, _ := got.LastRecord(2)
 	if o := last.Record.Outcome; got.Turns[1].State != turn.Done || o == nil || o.URL != d.Evidence.Permalink || !o.Approved {
 		t.Fatalf("turn 2 %s, outcome %+v: want done on sent draft 42", got.Turns[1].State, o)
+	}
+}
+
+// TestAQuestionPinsOnlyADraftItsAnswerDecides: a question's option may point only to a draft held with its gate
+// open; one a rule already released, or one sent, posts whatever the person picks, so turn_end refuses the record
+// and names each such pin.
+func TestAQuestionPinsOnlyADraftItsAnswerDecides(t *testing.T) {
+	ctx := context.Background()
+	open := gate.Gate{Kind: gate.KindDraft, Subject: "43", Status: gate.Open}
+	for _, c := range []struct {
+		name string
+		d42  draft.State
+		g42  gate.Status
+		want []turns.UnheldPin
+	}{
+		{"both held and open", draft.Held, gate.Open, nil},
+		{"one queued by a rule", draft.Queued, gate.Approved, []turns.UnheldPin{{Where: "question.options[0].draft", Draft: 42, State: "queued", Gate: "approved"}}},
+		{"one held whose gate is superseded", draft.Held, gate.Superseded, []turns.UnheldPin{{Where: "question.options[0].draft", Draft: 42, State: "held", Gate: "superseded"}}},
+	} {
+		s, store, _, _, _ := newService(t)
+		startedRound(t, s, "abc")
+		seq := bookOf(t, store, r7).Turns[0].Seq
+		d42, d43 := sentDraft(42, seq), sentDraft(43, seq)
+		d42.State, d43.State = c.d42, draft.Held
+		g42 := open
+		g42.Subject, g42.Status = "42", c.g42
+		s.DraftGates = storedDrafts{draftGates{42: g42, 43: open}, map[draft.ID]draft.Draft{42: d42, 43: d43}}
+		_, err := s.RecordTurnEnd(ctx, turns.RecordRequest{Session: "term_1", Turn: "abc", Record: optionsAsked()})
+		var got turns.UnheldPins
+		errors.As(err, &got)
+		if !slices.Equal(got, c.want) || (c.want == nil) != (err == nil) {
+			t.Errorf("%s: %v, want %+v", c.name, err, c.want)
+		}
 	}
 }

@@ -196,6 +196,11 @@ func (s *Service) recordTurnEnd(ctx context.Context, r RecordRequest, byHeadless
 	if err := r.Record.Validate(rules); err != nil {
 		return Recorded{}, nil, nil, err
 	}
+	if note == "" {
+		if err := s.decidedPins(ctx, r.Record.Question); err != nil {
+			return Recorded{}, nil, nil, err
+		}
+	}
 	if err := opsOnUnit(r.Record, b.Unit); err != nil {
 		return Recorded{}, nil, nil, err
 	}

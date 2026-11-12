@@ -232,6 +232,12 @@ func TestToolCallRecords(t *testing.T) {
 		t.Fatalf("problems: %+v", r.Result)
 	}
 
+	ft.err = turns.UnheldPins{{Where: "question.options[1].draft", Draft: 43, State: "queued", Gate: "approved"}}
+	r = decodeResult(t, call(t, s, sid, "term_1", body))
+	if text := r.Result.Content[0].Text; !r.Result.IsError || !strings.Contains(text, "record.question.options[1].draft: draft 43 is queued") || !strings.Contains(text, "hold") {
+		t.Fatalf("unheld pins: %+v", r.Result)
+	}
+
 	ft.err = errors.New("database is locked")
 	r = decodeResult(t, call(t, s, sid, "term_1", body))
 	if !r.Result.IsError || !strings.Contains(r.Result.Content[0].Text, "database is locked") {
