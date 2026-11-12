@@ -79,7 +79,7 @@ func (s *Server) runStartup(ctx context.Context) {
 func (s *Server) afterReconcile(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
-		if strings.HasPrefix(p, "/api/") && p != "/api/health" && !strings.HasPrefix(p, api.AgentPrefix) {
+		if strings.HasPrefix(p, "/api/") && p != "/api/health" && !strings.HasPrefix(p, api.AgentPrefix) && !s.userAPIOpen() {
 			select {
 			case <-s.reconcile.ready:
 			case <-r.Context().Done():
@@ -88,6 +88,15 @@ func (s *Server) afterReconcile(h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) userAPIOpen() bool {
+	select {
+	case <-s.reconcile.ready:
+		return true
+	default:
+		return false
+	}
 }
 
 // reconcileWarnings are the warnings the reconcile adds to health.

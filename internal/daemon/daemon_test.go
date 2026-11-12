@@ -841,6 +841,21 @@ func TestRowFeedStartsWhenTheUserAPIOpens(t *testing.T) {
 	waitFor(t, func() bool { return s.hub.position() != (api.Since{}) })
 }
 
+func TestAnOpenUserAPIServesARequestWhoseContextEnded(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for range 64 {
+		served := false
+		h := s.afterReconcile(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { served = true }))
+		h.ServeHTTP(httptest.NewRecorder(), apiRequest(http.MethodGet, api.Rows, nil).WithContext(ctx))
+		if !served {
+			t.Fatal("an open user API dropped a request whose context had ended")
+		}
+	}
+}
+
 func TestAUserAPIReadOutlastsTheReconcileWait(t *testing.T) {
 	t.Parallel()
 	if client.ReadTimeout <= ReconcileWait {
