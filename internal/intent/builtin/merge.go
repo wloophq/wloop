@@ -70,6 +70,23 @@ type Vocabulary struct {
 // derives a draft's kind, delivery and payload schema through them.
 var DraftKinds = &draft.Catalog{}
 
+// Verdicts are the verdicts the draft kinds of the merged plugins serves takes declare, in their order, once
+// each.
+func Verdicts(serves func(unit.ProviderID) bool) []string {
+	var out []string
+	for _, k := range DraftKinds.Kinds() {
+		if !serves(unit.ProviderID(k.Provider)) {
+			continue
+		}
+		for _, v := range k.VerdictValues() {
+			if !slices.Contains(out, v) {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
 // DraftKinds are the draft kinds and deliveries of v's plugins.
 func (v *Vocabulary) DraftKinds() *draft.Catalog { return v.draftKinds }
 

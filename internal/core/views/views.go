@@ -385,7 +385,7 @@ func (s *Service) desired(ctx context.Context, b turn.Book, applied map[view.Key
 	if s.Facts != nil {
 		f = s.authorFacts(ctx, b, last, view.HasTurn(b, author), facts)
 	}
-	ri := view.Review(b, review)
+	ri := view.Review(b, review, s.concludes(view.ReviewRole))
 	if f != nil && f.Finished() && (ri.Status != view.None || f.ReviewWorkspace) {
 		ri.Status, ri.Unread = view.Completed, false
 	}
@@ -488,6 +488,20 @@ func (s *Service) board(role view.Role) []turn.Intent {
 	for _, d := range s.Intents.All() {
 		if d.Board == string(role) {
 			out = append(out, turn.Intent(d.Name))
+		}
+	}
+	return out
+}
+
+// concludes are the verdicts that end the work of the intents of role's board.
+func (s *Service) concludes(role view.Role) []string {
+	var out []string
+	if s.Intents == nil {
+		return nil
+	}
+	for _, d := range s.Intents.All() {
+		if d.Board == string(role) {
+			out = append(out, d.Record.Concludes...)
 		}
 	}
 	return out

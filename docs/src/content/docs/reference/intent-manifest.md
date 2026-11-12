@@ -176,6 +176,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
 | `record.outcome` | list of `verdict`, `url`, `draft` |  | The outcome fields a record may carry. |
 | `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
+| `record.concludes` | list of strings |  | The outcome verdicts that end the work a turn is about, such as an approval, which the board shows done; each is a verdict the intent's plugins' draft kinds declare. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |
 | `record.require[]` | table |  | What a record in a state must carry; record.requires is the record kind a run owes. |

@@ -59,6 +59,30 @@ func (s KindSpec) VerdictOf(d Draft) string {
 	return out
 }
 
+// VerdictValues are the verdicts a draft of kind s may post: the enum its schema gives the field s.Verdict
+// points to; none when the kind posts no verdict.
+func (s KindSpec) VerdictValues() []string {
+	if s.Verdict == "" || len(s.SchemaJSON) == 0 {
+		return nil
+	}
+	var node map[string]any
+	if json.Unmarshal(s.SchemaJSON, &node) != nil {
+		return nil
+	}
+	for _, tok := range strings.Split(strings.TrimPrefix(s.Verdict, "/"), "/") {
+		props, _ := node["properties"].(map[string]any)
+		node, _ = props[strings.ReplaceAll(strings.ReplaceAll(tok, "~1", "/"), "~0", "~")].(map[string]any)
+	}
+	var out []string
+	enum, _ := node["enum"].([]any)
+	for _, v := range enum {
+		if str, ok := v.(string); ok {
+			out = append(out, str)
+		}
+	}
+	return out
+}
+
 // CheckText refuses a blank text for a kind that requires one.
 func (s KindSpec) CheckText(text string) error {
 	if s.TextRequired && strings.TrimSpace(text) == "" {

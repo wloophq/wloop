@@ -503,6 +503,13 @@
           "description": "On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.",
           "type": "boolean"
         },
+        "concludes": {
+          "description": "The outcome verdicts that end the work a turn is about, such as an approval, which the board shows done; each is a verdict the intent's plugins' draft kinds declare.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "history_artifact": {
           "description": "The artifact the unit's history shows.",
           "type": "string"

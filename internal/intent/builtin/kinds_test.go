@@ -195,3 +195,13 @@ func TestEmojiDeliveriesComeFromManifests(t *testing.T) {
 		t.Fatalf("emoji deliveries %v, want the bundled Slack manifest's %v", got, want)
 	}
 }
+
+func TestVerdictsAreTheServedPluginsKindsVerdicts(t *testing.T) {
+	github := func(p unit.ProviderID) bool { return p == "github" }
+	if got := Verdicts(github); !slices.Equal(slices.Sorted(slices.Values(got)), []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}) {
+		t.Fatalf("github's verdicts %v", got)
+	}
+	if got := Verdicts(func(p unit.ProviderID) bool { return p == "slack" }); len(got) != 0 {
+		t.Fatalf("slack declares no verdict: %v", got)
+	}
+}

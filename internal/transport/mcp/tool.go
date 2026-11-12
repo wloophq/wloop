@@ -79,7 +79,7 @@ func inputSchema() *schema {
 		"state":   enum(string(record.Done), string(record.Settled), string(record.Asked), string(record.Failed)),
 		"summary": str(record.SummaryMax),
 		"outcome": object(map[string]*schema{
-			"verdict":      enum("APPROVE", "COMMENT", "REQUEST_CHANGES"),
+			"verdict":      str(record.VerdictMax),
 			"url":          str(record.URLMax),
 			"blocking":     count(),
 			"non_blocking": count(),

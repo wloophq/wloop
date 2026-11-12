@@ -270,6 +270,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			Artifacts:       orEmpty(r.Artifacts, nil),
 			Outcome:         orEmpty(r.Outcome, nil),
 			OutcomeDoc:      r.OutcomeDoc,
+			Verdicts:        verdictsOf(r.Outcome, d.Serves),
+			Concludes:       orEmpty(r.Concludes, nil),
 			HistoryArtifact: r.HistoryArtifact,
 			AttachURL:       r.AttachURL,
 			Requires:        str(r.Requires, ""),
@@ -370,4 +372,13 @@ func servedSlots(d dintent.Def) []string {
 		}
 	}
 	return out
+}
+
+// verdictsOf are the verdicts a record of an intent whose outcome lists outcome may give: those the draft kinds
+// of the plugins it serves declare, none when its outcome carries no verdict.
+func verdictsOf(outcome []string, serves func(dunit.ProviderID) bool) []string {
+	if !slices.Contains(outcome, "verdict") {
+		return nil
+	}
+	return builtin.Verdicts(serves)
 }

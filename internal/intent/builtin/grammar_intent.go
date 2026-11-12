@@ -139,6 +139,7 @@ var intentGrammar = []Key{
 	{Path: "record.artifacts", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(record.ArtifactKinds...), Doc: "The artifacts a record may carry."},
 	{Path: "record.outcome", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(record.OutcomeFields...), Doc: "The outcome fields a record may carry."},
 	{Path: "record.attach_url", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome."},
+	{Path: "record.concludes", In: SurfaceIntent, Kind: KindList, Elem: KindText, Doc: "The outcome verdicts that end the work a turn is about, such as an approval, which the board shows done; each is a verdict the intent's plugins' draft kinds declare."},
 	{Path: "record.outcome_doc", In: SurfaceIntent, Kind: KindText, Doc: "What the outcome holds, for the instructions."},
 	{Path: "record.history_artifact", In: SurfaceIntent, Kind: KindText, Doc: "The artifact the unit's history shows."},
 	{Path: "record.require[]", In: SurfaceIntent, Kind: KindTable, Doc: "What a record in a state must carry; record.requires is the record kind a run owes."},
