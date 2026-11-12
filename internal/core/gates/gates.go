@@ -122,6 +122,9 @@ type Deps struct {
 	Events Events
 	// Sessions says which sessions the user drives; nil refuses every agent.
 	Sessions Sessions
+	// Options report the draft an answer to a question picks, which ApproveOption approves before it answers
+	// the question; nil approves none.
+	Options Options
 
 	Log func(format string, args ...any)
 }
@@ -131,6 +134,9 @@ type Service struct {
 	d Deps
 
 	mu sync.Mutex
+	// deciding are the question gates an option's approval decides now (ApproveOption): no other decision on
+	// one of them runs until it ends.
+	deciding map[int64]bool
 	// running are the gates whose consequence runs now, which the tick does
 	// not replay.
 	running map[int64]bool
@@ -139,7 +145,7 @@ type Service struct {
 }
 
 func New(d Deps) *Service {
-	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}}
+	return &Service{d: d, running: map[int64]bool{}, cut: map[int64]gate.Gate{}, deciding: map[int64]bool{}}
 }
 
 // Cut are the resolved gates whose at-most-once consequence began and was
@@ -210,19 +216,120 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 	if err != nil || !release {
 		return opened, err
 	}
-	return s.close(ctx, opened, r)
+	closed, err := s.close(ctx, opened, r)
+	if errors.Is(err, errForQuestion) {
+		return opened, nil
+	}
+	return closed, err
 }
 
 // Resolve closes open gate id with r. It accepts a person's intent, an
 // agent's through a session the user drives whose turns did not produce the
 // gate's subject, the Default of a gate whose Deadline passed with the rule
-// window, and a rule the service's trusted Policy holds for the gate now; it
-// refuses anything else, an unattended agent's or a plugin's above all. Status comes from
+// window, and a rule the service's trusted Policy holds for the gate now, but
+// for a draft a question pins, which only the pick approves; it refuses
+// anything else, an unattended agent's or a plugin's above all. Status comes from
 // the intent's declaration in gates.toml. It then applies the one
 // consequence the gate's kind names.
 func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
+	if s.isDeciding(id) {
+		return fmt.Errorf("%w: question gate %d is being decided", ErrResolved, id)
+	}
+	if done, err := s.resolveOption(ctx, id, r); done || err != nil {
+		return err
+	}
+	if done, err := s.resolvePinned(ctx, id, r); done || err != nil {
+		return err
+	}
 	_, err := s.resolve(ctx, id, r, s.d.Clock.Now())
 	return err
+}
+
+// resolveOption approves, through ApproveOption, the draft that r's answer to open question gate id picks,
+// and answers the question with it; done is false when r picks no draft, or when ApproveOption refuses it
+// before resolving anything, so the answer resolves the question as any answer does. A pick whose resolver
+// proposed or revised the draft (Gate.Stamps) is refused outright: the question stays open.
+func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (done bool, err error) {
+	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
+		return false, nil
+	}
+	q, err := s.d.Reader.Get(ctx, id)
+	if err != nil || q.Kind != gate.KindQuestion || q.Status != gate.Open {
+		return false, err
+	}
+	if s.answers(ctx, q, r) != nil {
+		return false, nil
+	}
+	drafted, rev, ok, err := s.d.Options.OptionDraft(ctx, q, r)
+	if err != nil || !ok {
+		return false, err
+	}
+	err = s.ApproveOption(ctx, q, r, drafted, rev)
+	if errors.Is(err, ErrRefused) && !errors.Is(err, errStamped) {
+		if now, gerr := s.d.Reader.Get(ctx, id); gerr == nil && now.Status == gate.Open {
+			s.logf("gate %d: the option's draft gate %d is not approved (%v); the answer resolves the question alone", id, drafted.ID, err)
+			return false, nil
+		}
+	}
+	return true, err
+}
+
+// resolvePinned answers, as a pick of the option that pins it, the open question whose message pins the draft of
+// draft gate id at its rev, when r approves that draft: a question is one decision, so approving a draft it pins,
+// by any route, is picking its option, which approves the draft (ApproveOption, which refuses a resolver who
+// proposed or revised it) and answers the question, whose other options' drafts are then withdrawn. done is false
+// for any other resolution, and when no open question pins the draft at its rev.
+func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (done bool, err error) {
+	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
+		return false, nil
+	}
+	g, err := s.d.Reader.Get(ctx, id)
+	if err != nil || g.Kind != gate.KindDraft || g.Status != gate.Open {
+		return false, err
+	}
+	def, err := s.def(g)
+	if err != nil {
+		return false, nil
+	}
+	if rs, err := withStatus(g, def, r); err != nil || rs.Status != gate.Approved {
+		return false, nil
+	}
+	q, answer, rev, ok, err := s.d.Options.Pinning(ctx, g)
+	switch {
+	case err != nil || !ok:
+		return false, err
+	case q.ID == 0:
+		return true, fmt.Errorf("%w: a question about to open decides draft gate %d: answer it once it opens", ErrRefused, id)
+	case rev != g.ApprovedRev:
+		return true, fmt.Errorf("%w: open question gate %d decides draft gate %d, which it pinned at rev %d: answer the question", ErrRefused, q.ID, id, rev)
+	}
+	qdef, err := s.def(q)
+	if err != nil {
+		return false, err
+	}
+	i := slices.IndexFunc(qdef.Intents, func(in Intent) bool { return in.Answer && slices.Contains(q.Intents, in.Name) })
+	if i < 0 {
+		return false, fmt.Errorf("%w: question gate %d takes no answer that picks the option pinning draft gate %d", ErrIntent, q.ID, id)
+	}
+	pick := Resolution{Intent: qdef.Intents[i].Name, Answer: answer, By: r.By, Session: r.Session}
+	s.logf("gate %d: approving its draft picks the option of question gate %d that pins it", id, q.ID)
+	return true, s.ApproveOption(ctx, q, pick, g, rev)
+}
+
+// Decides refuses, with ErrRefused, a retry of the draft of draft gate drafted while a question decides it: an open
+// question pins it, or one is about to open, or the question that pins it was answered with another option.
+func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
+	if s.d.Options == nil {
+		return nil
+	}
+	q, answer, _, ok, err := s.d.Options.Pinning(ctx, drafted)
+	switch {
+	case err != nil || !ok:
+		return err
+	case q.ID != 0 && q.Status == gate.Answered && q.Answer == answer:
+		return nil
+	}
+	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or
@@ -341,7 +448,7 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 			continue
 		}
 		switch {
-		case user && g.Session != "" && g.Session == session:
+		case user && g.Stamps(session):
 			_, err = s.d.Store.Resolve(ctx, g.ID, Resolution{Status: gate.Superseded, By: by, Session: session})
 		case user:
 			def, _ := s.def(g)
@@ -397,7 +504,8 @@ func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error
 }
 
 // Tick resolves every open gate whose Deadline is not after now to its
-// Default, with the rule window, then runs the consequence of each resolved
+// Default, with the rule window, but a draft gate a question pins, which it
+// leaves to the question, then runs the consequence of each resolved
 // gate whose consequence never ran, as when the daemon stopped between the
 // gate's resolution and its consequence.
 func (s *Service) Tick(ctx context.Context, now time.Time) error {
@@ -407,7 +515,7 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 	}
 	var errs []error
 	for _, g := range due {
-		if _, err := s.resolve(ctx, g.ID, Resolution{Rule: RuleWindow}, now); err != nil {
+		if _, err := s.resolve(ctx, g.ID, Resolution{Rule: RuleWindow}, now); err != nil && !errors.Is(err, errForQuestion) {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
 		}
 	}
@@ -496,8 +604,8 @@ func (s *Service) vouch(ctx context.Context, g gate.Gate, session string) error 
 	if session == "" || s.d.Sessions == nil {
 		return fmt.Errorf("%w: an agent resolves a gate only through a session the user drives", ErrRefused)
 	}
-	if g.Session == session {
-		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, which does not resolve it", ErrRefused, g.ID, session)
+	if g.Stamps(session) {
+		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, or that session revised it, so it does not resolve it", ErrRefused, g.ID, session)
 	}
 	driven, err := s.d.Sessions.UserDriven(ctx, session)
 	switch {
@@ -527,7 +635,22 @@ func (s *Service) released(g gate.Gate, def Def, dec Decision) (Resolution, bool
 	return Resolution{Status: want, Intent: in.Name, By: task.ActorWorkflow, Rule: cmp.Or(dec.Rule, string(dec.Mode))}, true
 }
 
+// errForQuestion marks an approval of a draft gate refused because a question pins the draft.
+var errForQuestion = errors.New("its question decides it")
+
+// close resolves g with r and applies its consequence. It is the one path every resolution takes, so it refuses
+// there any approval of a draft gate whose draft a question pins but the answer that picks it: a person's or a
+// session's (Resolve turns those into the pick first), a rule's at the gate's open or later, a window's.
 func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Gate, error) {
+	if g.Kind == gate.KindDraft && r.Status == gate.Approved && !r.pick && s.d.Options != nil {
+		q, _, _, pinned, err := s.d.Options.Pinning(ctx, g)
+		if err != nil {
+			return gate.Gate{}, err
+		}
+		if pinned {
+			return gate.Gate{}, fmt.Errorf("%w: %w: question gate %d pins the draft of gate %d", ErrRefused, errForQuestion, q.ID, g.ID)
+		}
+	}
 	if !s.claim(g.ID) {
 		return gate.Gate{}, fmt.Errorf("%w: %d resolves now", ErrResolved, g.ID)
 	}
@@ -832,4 +955,26 @@ func resolvedEvent(g gate.Gate) port.Event {
 		u = task.UnitOf(g.Task)
 	}
 	return port.Event{Unit: u, Kind: gate.EventResolved, Key: fmt.Sprintf("%s/%d", g.Name, g.ID), Actor: string(g.By), Session: g.BySession, Data: g.Intent, At: g.ClosedAt}
+}
+
+// claimQuestion claims question gate id for the decision of one of its options; false when another decision
+// holds it. release ends the claim.
+func (s *Service) claimQuestion(id int64) (release func(), ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deciding[id] {
+		return nil, false
+	}
+	s.deciding[id] = true
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		delete(s.deciding, id)
+	}, true
+}
+
+func (s *Service) isDeciding(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deciding[id]
 }

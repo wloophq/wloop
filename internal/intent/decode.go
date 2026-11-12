@@ -85,6 +85,7 @@ type mSession struct {
 	Title         *string `toml:"title"`
 	Name          *string `toml:"name"`
 	CloseWhenDone bool    `toml:"close_when_done"`
+	SourceWrites  *bool   `toml:"source_writes"`
 }
 
 type mBrief struct {
@@ -140,6 +141,7 @@ type mRecord struct {
 	Artifacts       []string   `toml:"artifacts"`
 	Outcome         []string   `toml:"outcome"`
 	OutcomeDoc      string     `toml:"outcome_doc"`
+	Concludes       []string   `toml:"concludes"`
 	HistoryArtifact string     `toml:"history_artifact"`
 	Require         []mRequire `toml:"require"`
 	AttachURL       bool       `toml:"attach_url"`

@@ -118,6 +118,9 @@ type Loaded struct {
 	// UI are each plugin's words of its manifest's views, facets and
 	// situations, from its layers' ui.toml, by plugin id.
 	UI map[string]UITexts
+	// Previews are the summary-line templates of the draft kinds, by provider and kind, read from the plugins'
+	// profile layers at the paths their manifests' preview keys name.
+	Previews map[string]map[string]string
 	// Strings are the clients' texts in Locale, by their English text; Formats the Go clients' date and
 	// number formats in Locale.
 	Strings map[string]i18n.Forms
@@ -229,6 +232,9 @@ func LoadIn(locale string, layers []profile.Layer, bundled fs.FS, base *template
 			keyTexts, keyProblems := loadKeys(layers, r)
 			notices, noticeProblems := loadNotices(layers, r)
 			ui, uiProblems := loadUI(layers, r)
+			previews, previewProblems := loadPreviews(layers, r)
+			uiProblems = append(uiProblems, previewProblems...)
+			l.Previews = previews
 			var stringProblems Problems
 			l.Strings, l.Formats, stringProblems = loadStrings(layers, r)
 			l.StringsStamp = stringsStamp(locale, l.Strings, l.Formats)

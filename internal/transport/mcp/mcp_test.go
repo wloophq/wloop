@@ -232,6 +232,12 @@ func TestToolCallRecords(t *testing.T) {
 		t.Fatalf("problems: %+v", r.Result)
 	}
 
+	ft.err = turns.UnheldPins{{Where: "question.options[1].draft", Draft: 43, State: "queued", Gate: "approved"}}
+	r = decodeResult(t, call(t, s, sid, "term_1", body))
+	if text := r.Result.Content[0].Text; !r.Result.IsError || !strings.Contains(text, "record.question.options[1].draft: draft 43 is queued") || !strings.Contains(text, "hold") {
+		t.Fatalf("unheld pins: %+v", r.Result)
+	}
+
 	ft.err = errors.New("database is locked")
 	r = decodeResult(t, call(t, s, sid, "term_1", body))
 	if !r.Result.IsError || !strings.Contains(r.Result.Content[0].Text, "database is locked") {
@@ -343,7 +349,8 @@ func TestSchemaMatchesTheRecord(t *testing.T) {
 		t.Fatalf("arguments: %+v", in)
 	}
 	got := schemaFields(t, in.Properties["record"], "")
-	want := jsonFields(reflect.TypeFor[record.Record](), "")
+	// outcome.approved is the loop's own; Validate refuses it in an agent's record.
+	want := slices.DeleteFunc(jsonFields(reflect.TypeFor[record.Record](), ""), func(f string) bool { return f == "outcome.approved" })
 	slices.Sort(got)
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
@@ -427,8 +434,8 @@ func TestTurnEndEnumsAreTheFullTables(t *testing.T) {
 	if got, want := rec.Properties["state"].Enum, []string{"done", "settled", "asked", "failed"}; !slices.Equal(got, want) {
 		t.Errorf("state enum %v, want %v", got, want)
 	}
-	if got, want := rec.Properties["outcome"].Properties["verdict"].Enum, []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}; !slices.Equal(got, want) {
-		t.Errorf("verdict enum %v, want %v", got, want)
+	if v := rec.Properties["outcome"].Properties["verdict"]; len(v.Enum) != 0 || v.Type != "string" {
+		t.Errorf("verdict %+v, want a string its intent's plugins check", v)
 	}
 	if got, want := rec.Properties["question"].Properties["kind"].Enum, []string{"choice", "confirm", "free"}; !slices.Equal(got, want) {
 		t.Errorf("question kind enum %v, want %v", got, want)

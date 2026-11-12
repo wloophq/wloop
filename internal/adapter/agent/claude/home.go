@@ -26,12 +26,6 @@ import (
 // names it in permission rules.
 var TurnEndTool = brand.ToolPrefix() + "turn_end"
 
-// SlackSendTool posts as the user at once, without asking.
-var SlackSendTool = brand.ToolPrefix() + "slack_send_message"
-
-// SlackPostTools post, react, edit or delete on Slack as the user at once, so install allows them.
-var SlackPostTools = []string{SlackSendTool, brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit", brand.ToolPrefix() + "slack_delete"}
-
 const (
 	orcaHookPort  = "ORCA_AGENT_HOOK_PORT"
 	hookTimeout   = 10
@@ -60,8 +54,10 @@ type Home struct {
 	Command, MCPURL, DefaultHome string
 	// MCPKey is the secret the MCP endpoint requires, "" before install writes one.
 	MCPKey string
-	Sh     ShellFunc
-	Now    func() time.Time
+	// AtOnceTools are the tools that post as the user at once, which install allows.
+	AtOnceTools []string
+	Sh          ShellFunc
+	Now         func() time.Time
 }
 
 func (h Home) isDefault(home string) bool { return isDefault(home, h.DefaultHome) }
@@ -349,11 +345,11 @@ func (h Home) Check(_ context.Context, home string) ([]setup.Finding, error) {
 		perm = "missing"
 	}
 	out = append(out, finding("permission "+TurnEndTool, perm))
-	for _, tool := range SlackPostTools {
+	for _, tool := range h.AtOnceTools {
 		post := ""
 		switch {
 		case slices.Contains(permissionList(settings.doc, "ask"), any(tool)):
-			post = "permissions.ask holds it, so Claude Code asks before every Slack post"
+			post = "permissions.ask holds it, so Claude Code asks before every post it makes"
 		case !slices.Contains(allowList(settings.doc), any(tool)):
 			post = "missing"
 		}
@@ -435,7 +431,7 @@ func (h Home) installSettings(doc map[string]any) []string {
 	if addPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "add permission "+TurnEndTool)
 	}
-	for _, tool := range SlackPostTools {
+	for _, tool := range h.AtOnceTools {
 		if addPermission(doc, "allow", tool) {
 			out = append(out, "add permission "+tool)
 		}
@@ -541,7 +537,7 @@ func (h Home) removeSettings(doc map[string]any) []string {
 	if dropPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "remove permission "+TurnEndTool)
 	}
-	for _, tool := range SlackPostTools {
+	for _, tool := range h.AtOnceTools {
 		if dropPermission(doc, "allow", tool) {
 			out = append(out, "remove permission "+tool)
 		}

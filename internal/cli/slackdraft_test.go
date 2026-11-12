@@ -304,7 +304,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	}
 	d := ds[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: newest.Seq, Intent: "reply", Workflow: newest.Workflow}
-	if d.Unit != u || d.State != draft.Held || noSession(d.Origin) != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
+	if d.Unit != u || d.State != draft.Held || noSession(d.Origin) != want || d.Kind != draft.Kind("reply") || d.Text != "on it, **today**" || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
@@ -719,7 +719,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 			t.Fatalf("record %d %+v", i, d)
 		}
 	}
-	if d := ds[0]; d.Kind != draft.Edit || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" || d.Evidence.Ref != sessThreaded+"/"+sessReply {
+	if d := ds[0]; d.Kind != draft.Kind("edit") || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" || d.Evidence.Ref != sessThreaded+"/"+sessReply {
 		t.Fatalf("edit record %+v", d)
 	}
 
@@ -786,7 +786,7 @@ func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *test
 	if len(ds) != 1 {
 		t.Fatalf("records %+v", ds)
 	}
-	if d := ds[0]; d.State != draft.Sent || d.Kind != draft.Delete || d.Purpose != "delete" || d.Text != "posted twice" ||
+	if d := ds[0]; d.State != draft.Sent || d.Kind != draft.Kind("delete") || d.Purpose != "delete" || d.Text != "posted twice" ||
 		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || noSession(d.Origin) != origin || d.Evidence.Ref != ref {
 		t.Fatalf("delete record %+v", d)
 	}
@@ -841,7 +841,11 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 			t.Errorf("%s: description %q", tl.Name, tl.Description)
 		}
 	}
-	if want := builtin.ValueNames(builtin.Tools); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
+	served := func(name string) bool {
+		_, plugin := builtin.ToolProviders[name]
+		return !plugin || slices.ContainsFunc(w.srv.Plugins, func(p mcp.PluginTool) bool { return p.Name == name })
+	}
+	if want := slices.DeleteFunc(builtin.ValueNames(builtin.Tools), func(n string) bool { return !served(n) }); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
 		t.Errorf("listed %v, tools.toml describes %v", names, want)
 	}
 	for _, call := range []struct{ tool, args string }{{"slack_send_message", `{}`}, {"slack_draft", `{"kind":"nope"}`}, {"turn_end", `[]`}} {

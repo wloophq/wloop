@@ -29,6 +29,7 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/task"
 
@@ -374,6 +375,8 @@ type Deps struct {
 	// publishes the approved drafts.
 	Outbox     *outbox.Service
 	SendDrafts bool
+	// AgentDrafts serve an agent session's calls on drafts; nil answers 503 to api.AgentDrafts.
+	AgentDrafts *AgentDrafts
 	// Headless starts headless turns; nil answers 503 to the act route.
 	Headless Headless
 	// OmniboxAsk runs the omnibox's read-only agent call; nil answers 503 to the ask route.
@@ -448,12 +451,22 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
+	// pins are the drafts the open questions pin, read at pinsAt; pinsMu guards them.
+	pinsMu sync.Mutex
+	pins   map[int64]int64
+	pinsAt time.Time
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.
 	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
+	// previews keeps the draft kinds' parsed preview templates, by their source.
+	previews sync.Map
+	// kindSchemas keeps the draft kinds' payload schemas a card read, by provider and kind.
+	kindSchemas sync.Map
+	// amender replaces the Outbox's Amend in tests.
+	amender func(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error)
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.

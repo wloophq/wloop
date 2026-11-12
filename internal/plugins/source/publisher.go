@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -29,13 +29,14 @@ var (
 	_ port.Locator   = Publisher{}
 	_ port.Placer    = Publisher{}
 	_ port.Lander    = Publisher{}
-	_ port.Deliverer = Publisher{}
+	_ port.Basis     = Publisher{}
+	_ port.Scoper    = Publisher{}
 )
 
 // Publish sends d to the plugin once. An error that may follow a post, the
 // plugin's own or a call it never answered, starts with
 // src.ErrMayHavePosted's text, so the outbox asks a person to confirm a
-// retry.
+// retry; the plugin's stale refusal is outbox.ErrStale.
 func (p Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, error) {
 	c, err := p.Kind.Client(p.ID)
 	if err != nil {
@@ -44,6 +45,9 @@ func (p Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, 
 	ev, err := c.Publish(ctx, WireDraft(d))
 	if errors.Is(err, src.ErrNoAnswer) && !errors.Is(err, src.ErrMayHavePosted) {
 		err = fmt.Errorf("%w: the plugin did not answer: %w", src.ErrMayHavePosted, err)
+	}
+	if errors.Is(err, src.ErrStale) {
+		err = fmt.Errorf("%w: %w", outbox.ErrStale, err)
 	}
 	return draft.Evidence(ev), err
 }
@@ -95,16 +99,21 @@ func (p Publisher) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, 
 	return out, err == nil, err
 }
 
-// Delivers is the delivery the manifest's draft kind k names, else its
-// default delivery: a plugin posts every draft as one of its own
-// deliveries. A manifest with neither posts k as its shape says.
-func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
-	if i := slices.IndexFunc(p.Source.DraftKinds, func(m manifest.DraftKind) bool { return m.Name == string(k) }); i >= 0 && p.Source.DraftKinds[i].Delivery != "" {
-		return draft.Delivery(p.Source.DraftKinds[i].Delivery)
+// Live asks the plugin now, never a cache, what a draft of kind on u would be written against; a plugin that
+// checks no draft answers "", and one that is not running fails, so no draft is taken as fresh unread.
+func (p Publisher) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	c, ok, err := drafterOf(ctx, p.Kind, p.ID)
+	if err != nil || !ok {
+		return "", err
 	}
-	if p.Source.DefaultDelivery != "" {
-		return draft.Delivery(p.Source.DefaultDelivery)
+	return c.Basis(ctx, Wire(u), kind)
+}
+
+// Within asks the plugin whether target lies inside u; a plugin that checks no draft takes none inside.
+func (p Publisher) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
+	c, ok, err := drafterOf(ctx, p.Kind, p.ID)
+	if err != nil || !ok {
+		return false, err
 	}
-	_, d := draft.ShapeOf(k)
-	return d
+	return c.Within(ctx, Wire(u), target)
 }

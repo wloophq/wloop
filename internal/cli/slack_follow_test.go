@@ -188,5 +188,7 @@ func TestAPluginLoadedUnderAHandBuiltEnvRunsOnItsBackgroundWork(t *testing.T) {
 	te := newSlackTestEnv(t)
 	startSlackDaemon(t, te)
 	eventually(t, "the slack plugin loaded", func() bool { return len(te.pluginKind.Loading()) == 0 })
+	// Loading empties before the Loaded hook adds its work; Stop waits for the hook.
+	te.pluginKind.Stop(context.Background(), string(slackPlugin))
 	te.Env.background.Wait()
 }

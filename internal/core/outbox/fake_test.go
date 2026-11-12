@@ -27,7 +27,7 @@ type memStore struct {
 func (m *memStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	d.ID = draft.ID(len(m.drafts) + 1)
+	d.ID, d.Rev, d.Version = draft.ID(len(m.drafts)+1), 1, 1
 	d.Items = slices.Clone(d.Items)
 	m.drafts = append(m.drafts, d)
 	return d, nil
@@ -67,10 +67,14 @@ func (m *memStore) Update(ctx context.Context, d draft.Draft, from draft.State) 
 	if d.ID < 1 || int(d.ID) > len(m.drafts) {
 		return draft.Draft{}, ErrNotFound
 	}
-	if cur := m.drafts[d.ID-1]; cur.State != from || cur.Rev != d.Rev {
+	cur := m.drafts[d.ID-1]
+	if cur.State != from || cur.Version != d.Version {
 		return draft.Draft{}, ErrConflict
 	}
-	d.Rev++
+	d.Version, d.Rev = cur.Version+1, cur.Rev
+	if !draft.SameContent(cur, d) {
+		d.Rev++
+	}
 	m.drafts[d.ID-1] = d
 	return d, nil
 }
@@ -144,6 +148,7 @@ func newEnv() *env {
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
 	e.svc = &Service{
 		Store: e.store,
+		Kinds: newShapes(),
 		Gates: testGates{e.decider, e.gates},
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if e.disabled[p] {
@@ -152,7 +157,7 @@ func newEnv() *env {
 			return e.fx, nil
 		},
 		Clock: e.clock,
-		Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery },
+		Posts: func(d draft.Delivery) bool { return d == draft.Delivery("comment") },
 		Log: func(format string, args ...any) {
 			e.logMu.Lock()
 			defer e.logMu.Unlock()
@@ -187,7 +192,7 @@ func (e *env) decide(id draft.ID, intent string) error {
 // approve approves draft id's gate as a person, as the daemon does: the draft prepared at its rev, then its gate.
 func (e *env) approve(id draft.ID, text *string) (draft.Draft, error) {
 	if text != nil && *text != e.get(id).Text {
-		if _, err := e.svc.Edit(context.Background(), id, *text); err != nil {
+		if _, err := e.svc.Edit(context.Background(), id, *text, e.get(id).Rev); err != nil {
 			return draft.Draft{}, err
 		}
 	}
@@ -225,7 +230,7 @@ func (e *env) insertApproved(d draft.Draft) (draft.Draft, error) {
 	if err != nil {
 		return d, err
 	}
-	g := gateOf(d)
+	g := gateOf(d, nil)
 	g.Name, g.Intents, g.Intent, g.By = "draft", []string{"approve", "discard"}, "approve", task.ActorPerson
 	_, err = e.gates.RecordSent(context.Background(), g)
 	return d, err
@@ -243,7 +248,7 @@ func (e *env) get(id draft.ID) draft.Draft {
 }
 
 func reply(text string) Proposal {
-	return Proposal{Unit: thread, Kind: draft.Reply, Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "reply"}}
+	return Proposal{Unit: thread, Kind: draft.Kind("reply"), Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "reply"}}
 }
 
 var errBoom = errors.New("boom")
@@ -269,3 +274,5 @@ type testGates struct {
 func (g testGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	return g.r.Where(ctx, q)
 }
+
+func (m *memStore) Revisions(context.Context, draft.ID) ([]draft.Revision, error) { return nil, nil }

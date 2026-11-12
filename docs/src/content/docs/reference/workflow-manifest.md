@@ -111,11 +111,12 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.dismiss` | `reason` | string |  | The reason the dismissed turn records. |
 | `answer.refuse` | `reason` | string |  | The reason the refused answer records. |
 | `turn.start` | `intent` | string |  | The intent whose turn starts; it must serve the unit. Required. |
-| `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit: its first, or one after. |
+| `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first. |
+| `turn.start` | `due` | one of `plan`, `when` | `plan` | When the round is due: plan, when the unit's plan holds it due; when, whenever the workflow's when matches, as a round to retry what a failed round left, whatever the plan holds. |
 | `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs, one of the intent's runners; by default its first. |
 | `turn.start` | `open_question` | one of `hold`, `replace_if_moved` | `hold` | What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
-| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment`, `edit`, `delete` | `message` | How the draft posts: the core's message or reaction, or a delivery a plugin declares. |
+| `draft.propose` | `delivery` | one of `comment`, `reaction`, `edit`, `review`, `reply`, `resolve`, `request_review`, `message`, `delete`, `unreaction` |  | How the draft posts, a delivery the plugin that posts it declares; empty is that plugin's default delivery. |
 | `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation. |
 | `draft.propose` | `why` | file | `why.md.tmpl` | The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why. |
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
@@ -123,7 +124,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
 | `draft.propose` | `target` | one of `unit`, `item`, `person` | `unit` | Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text. |
 | `draft.propose` | `to` | one of `all`, `members`, `non_members` | `all` | Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both. |
-| `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
+| `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
 | `draft.propose` | `ended` | one of `hold`, `repeat` | `hold` | What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft. |

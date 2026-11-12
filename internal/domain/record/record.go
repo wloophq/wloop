@@ -47,11 +47,8 @@ const (
 	ResumeMax      = 4000
 	NextMax        = 1000
 	URLMax         = 500
+	VerdictMax     = 60
 	LedgerMax      = 50
-)
-
-var (
-	verdicts = []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}
 )
 
 type Record struct {
@@ -76,6 +73,12 @@ type Outcome struct {
 	URL         string `json:"url"`
 	Blocking    int    `json:"blocking"`
 	NonBlocking int    `json:"non_blocking"`
+	// Draft is the draft the turn ended on; its send fills URL.
+	Draft *DraftRef `json:"draft,omitempty"`
+	// Approved says a person, or a session the user drives, approved Draft, so the user stands behind
+	// what it posted; a rule's or a window's release never sets it. Only the loop's own record sets it:
+	// an agent's is refused.
+	Approved bool `json:"approved,omitempty"`
 }
 
 type Question struct {
@@ -83,29 +86,35 @@ type Question struct {
 	Text      string   `json:"text"`
 	Options   []Option `json:"options,omitempty"`
 	Recommend string   `json:"recommend,omitempty"`
-	Publishes bool     `json:"publishes,omitempty"`
+	// Publishes is the endorsement of records that predate Draft, kept so they still decode.
+	Publishes bool `json:"publishes,omitempty"`
+	// Draft is the held draft a confirm question's yes approves, at its rev; nil for none.
+	Draft *DraftRef `json:"draft,omitempty"`
 }
 
 type Option struct {
 	ID          string `json:"id"`
 	Label       string `json:"label"`
 	Consequence string `json:"consequence"`
-	Publishes   bool   `json:"publishes,omitempty"`
+	// Publishes is the endorsement of records that predate Draft, kept so they still decode.
+	Publishes bool `json:"publishes,omitempty"`
+	// Draft is the held draft picking the option approves, at its rev; nil for none.
+	Draft *DraftRef `json:"draft,omitempty"`
+}
+
+// DraftRef points to a draft of the turn at the rev its agent stands by.
+type DraftRef struct {
+	ID  int64 `json:"id"`
+	Rev int64 `json:"rev"`
+}
+
+func (d DraftRef) check(c *checker, field string) {
+	if d.ID <= 0 || d.Rev <= 0 {
+		c.bad(field, "a draft's id and rev, both positive")
+	}
 }
 
 func (o Option) Answer() string { return o.Label + " (option " + o.ID + ")" }
-
-func (q Question) Endorses(optionID string, yes bool) bool {
-	if q.Kind == "confirm" {
-		return q.Publishes && yes
-	}
-	for _, o := range q.Options {
-		if o.ID == optionID {
-			return o.Publishes
-		}
-	}
-	return false
-}
 
 type Artifact struct {
 	Kind  string `json:"kind"`
@@ -193,7 +202,7 @@ func (r Record) ValidateShape() error { return r.validate(nil) }
 var ArtifactKinds = []string{"review-draft", "triage"}
 
 // OutcomeFields are the outcome fields a rule can list or require.
-var OutcomeFields = []string{"verdict", "url"}
+var OutcomeFields = []string{"verdict", "url", "draft"}
 
 func (r Record) validate(rules *dintent.RecordRules) error {
 	c := &checker{}
@@ -219,10 +228,27 @@ func (r Record) validate(rules *dintent.RecordRules) error {
 		if rules != nil {
 			checkListed(c, o, rules.Outcome)
 		}
-		if o.Verdict != "" && !slices.Contains(verdicts, o.Verdict) {
-			c.bad("outcome.verdict", "APPROVE, COMMENT or REQUEST_CHANGES, not %q", o.Verdict)
+		switch {
+		case o.Verdict == "" || rules == nil || slices.Contains(rules.Verdicts, o.Verdict):
+		case len(rules.Verdicts) == 0:
+			c.bad("outcome.verdict", "the plugins of this turn's intent declare no verdict")
+		default:
+			c.bad("outcome.verdict", "one of %s, not %q", strings.Join(rules.Verdicts, ", "), o.Verdict)
 		}
+		c.text("outcome.verdict", o.Verdict, 0, VerdictMax, false)
 		c.text("outcome.url", o.URL, 0, URLMax, false)
+		if o.Draft != nil {
+			switch {
+			case r.State != Done:
+				c.bad("outcome.draft", "only with done")
+			case rules != nil && !slices.Contains(rules.Outcome, "draft"):
+				c.bad("outcome.draft", "this turn's intent records no draft")
+			}
+			o.Draft.check(c, "outcome.draft")
+		}
+		if o.Approved {
+			c.bad("outcome.approved", "only the loop records an approval")
+		}
 		if o.Blocking < 0 {
 			c.bad("outcome.blocking", "zero or more")
 		}
@@ -320,7 +346,8 @@ func (r Record) checkRequired(c *checker, rules *dintent.RecordRules) {
 				c.bad("outcome."+f, "no such outcome field; one of %s", joinOr(OutcomeFields))
 				continue
 			}
-			if f == "verdict" && (r.Outcome == nil || r.Outcome.Verdict == "") || f == "url" && (r.Outcome == nil || r.Outcome.URL == "") {
+			if f == "verdict" && (r.Outcome == nil || r.Outcome.Verdict == "") || f == "url" && (r.Outcome == nil || r.Outcome.URL == "" && r.Outcome.Draft == nil) ||
+				f == "draft" && (r.Outcome == nil || r.Outcome.Draft == nil) {
 				doc := strings.Join(strings.Fields(rules.OutcomeDoc), " ")
 				if req.Artifact != "" {
 					doc = ""
@@ -357,7 +384,7 @@ func (q Question) check(c *checker) {
 		if len(q.Options) < 2 || len(q.Options) > 5 {
 			c.bad("question.options", "2 to 5 options, not %d", len(q.Options))
 		}
-		seen := map[string]bool{}
+		seen, drafts := map[string]bool{}, map[int64]bool{}
 		for i, o := range q.Options {
 			f := fmt.Sprintf("question.options[%d]", i)
 			switch {
@@ -369,6 +396,16 @@ func (q Question) check(c *checker) {
 			seen[o.ID] = true
 			c.text(f+".label", o.Label, 1, LabelMax, false)
 			c.text(f+".consequence", o.Consequence, 1, ConsequenceMax, false)
+			if o.Draft != nil {
+				o.Draft.check(c, f+".draft")
+				if drafts[o.Draft.ID] {
+					c.bad(f+".draft", "draft %d is another option's", o.Draft.ID)
+				}
+				drafts[o.Draft.ID] = true
+			}
+		}
+		if q.Draft != nil {
+			c.bad("question.draft", "only on a confirm; a choice's options carry theirs")
 		}
 		if q.Recommend != "" && !seen[q.Recommend] {
 			c.bad("question.recommend", "names no option: %q", q.Recommend)
@@ -379,6 +416,12 @@ func (q Question) check(c *checker) {
 		}
 		if q.Publishes && q.Kind != "confirm" {
 			c.bad("question.publishes", "only on a confirm")
+		}
+		switch {
+		case q.Draft != nil && q.Kind != "confirm":
+			c.bad("question.draft", "only on a confirm")
+		case q.Draft != nil:
+			q.Draft.check(c, "question.draft")
 		}
 		if q.Kind == "confirm" && q.Recommend != "" && q.Recommend != "yes" && q.Recommend != "no" {
 			c.bad("question.recommend", "yes or no for a confirm")

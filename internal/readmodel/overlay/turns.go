@@ -98,6 +98,10 @@ func QuestionOf(t *turn.Turn, last *turn.Record) (*api.QuestionView, bool) {
 	q.RecordID = last.ID
 	if rq := last.Record.Question; rq != nil {
 		q.Kind, q.Text, q.Options, q.Recommend, q.Publishes = rq.Kind, rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Publishes
+		if rq.Draft != nil {
+			ref := *rq.Draft
+			q.Draft = &ref
+		}
 	}
 	if o := last.Record.Outcome; o != nil {
 		q.Verdict, q.Blocking, q.NonBlocking = o.Verdict, o.Blocking, o.NonBlocking

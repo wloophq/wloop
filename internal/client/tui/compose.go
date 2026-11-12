@@ -56,7 +56,8 @@ func (m *Model) SetDrafts(id string, ds []api.Draft) {
 	}
 }
 
-// listedDrafts are the drafts the open detail lists: those made for its task but the one it shows itself.
+// listedDrafts are the drafts the open detail lists: those made for its task but the one it shows itself and those
+// an open question pins, which its question shows.
 func (m *Model) listedDrafts() []api.Draft {
 	if m.detailID == "" || m.draftsFor != m.detailID {
 		return nil
@@ -65,7 +66,7 @@ func (m *Model) listedDrafts() []api.Draft {
 	if m.opened != nil && draftOn(*m.opened) != nil {
 		shown = draftOn(*m.opened).ID
 	}
-	return slices.DeleteFunc(slices.Clone(m.drafts), func(d api.Draft) bool { return d.ID == shown })
+	return slices.DeleteFunc(slices.Clone(m.drafts), func(d api.Draft) bool { return d.ID == shown || d.PinnedBy != 0 })
 }
 
 // pickDraft takes a digit on an open detail that lists drafts and asks no question as the pick of that
@@ -170,7 +171,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
-		c.args = map[string]string{"text": text}
+		c.args = map[string]string{"text": text, "rev": strconv.FormatInt(d.Rev, 10)}
 		return m.send(c)
 	}
 	if strings.Contains(d.Text, "\n") {

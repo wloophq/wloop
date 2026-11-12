@@ -182,14 +182,14 @@ func TestADraftAWorkerWritesIsItsOwnSubject(t *testing.T) {
 		t.Errorf("a worker approved the draft it wrote unattended once the user drove it: %d %s", rec.Code, rec.Body)
 	}
 	_, own := write("term_2", "")
-	if own.Session != "" {
-		t.Fatalf("the draft a session the user drives writes is the user's, its gate %+v", own)
+	if own.Session != mine {
+		t.Fatalf("the draft a session the user drives writes is the session's, its gate %+v", own)
 	}
-	if rec := postFrom(t, r.s, "term_2", fmt.Sprintf("/api/gates/%d/approve", own.ID), `{"source":"claude"}`); rec.Code != 200 {
-		t.Errorf("a session the user drives approving the draft it wrote for them: %d %s", rec.Code, rec.Body)
+	if rec := postFrom(t, r.s, "term_2", fmt.Sprintf("/api/gates/%d/approve", own.ID), `{"source":"claude"}`); rec.Code != 403 {
+		t.Errorf("a session the user drives approved the draft it wrote: %d %s", rec.Code, rec.Body)
 	}
-	if _, g := write("term_2", `,"send":true`); g.Status != gate.Approved || g.By != task.ActorAgent || g.BySession != mine {
-		t.Errorf("a draft a session the user drives sends at once: %+v", g)
+	if _, g := write("term_2", `,"send":true`); g.Status != gate.Open || g.Session != mine {
+		t.Errorf("a draft a session the user drives asks to send, under the default policy: %+v", g)
 	}
 }
 

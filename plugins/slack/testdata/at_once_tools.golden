@@ -1,0 +1,57 @@
+== slack_send_message {"target":"C100/1700000100.000200","text":"Shipping **today**, @dana","broadcast":true}
+answer posted error=false {"Channel":"C100","Conversation":"#general","Parent":"Can someone review the launch plan?","Permalink":"https://acme.slack.com/archives/C100/p1700000900000100","TS":"1700000900.000100","Text":"Shipping *today*, \u003c@U001\u003e"}
+call conversations.info channel=C100
+call conversations.replies channel=C100 limit=1 ts=1700000100.000200
+call chat.postMessage channel=C100 reply_broadcast=true text=Shipping *today*, <@U001> thread_ts=1699999999.000100
+call chat.getPermalink channel=C100 message_ts=1700000900.000100
+call users.list limit=200
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1699999999.000100"},"Items":null,"Task":"","Kind":"reply","Purpose":"reply","Delivery":"message","Effects":null,"Target":"C100/1700000100.000200","Broadcast":"","Text":"Shipping **today**, @dana","Reaction":"","Replaced":"","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000900.000100","Permalink":"https://acme.slack.com/archives/C100/p1700000900000100","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_send_message"}
+== slack_send_message {"target":"C100","text":"Top level"}
+answer posted error=false {"Channel":"C100","Conversation":"#general","Parent":"","Permalink":"https://acme.slack.com/archives/C100/p1700000900000100","TS":"1700000900.000100","Text":"Top level"}
+call conversations.info channel=C100
+call chat.postMessage channel=C100 text=Top level
+call chat.getPermalink channel=C100 message_ts=1700000900.000100
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1700000900.000100"},"Items":null,"Task":"","Kind":"reply","Purpose":"reply","Delivery":"message","Effects":null,"Target":"C100","Broadcast":"","Text":"Top level","Reaction":"","Replaced":"","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000900.000100","Permalink":"https://acme.slack.com/archives/C100/p1700000900000100","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_send_message"}
+== slack_react {"message":"C100/1700000100.000200","emoji":":eyes:"}
+answer reacted error=false {"Conversation":"#general","Emoji":"eyes","Message":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200"}
+call conversations.info channel=C100
+call conversations.replies channel=C100 limit=1 ts=1700000100.000200
+call reactions.add channel=C100 name=eyes timestamp=1700000100.000200
+call chat.getPermalink channel=C100 message_ts=1700000100.000200
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1699999999.000100"},"Items":null,"Task":"","Kind":"react","Purpose":"react","Delivery":"reaction","Effects":null,"Target":"C100/1700000100.000200","Broadcast":"","Text":"","Reaction":"eyes","Replaced":"","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_react"}
+== slack_react {"message":"C100/1700000100.000200","emoji":"eyes","remove":true}
+answer removed error=false {"Conversation":"#general","Emoji":"eyes","Message":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200"}
+call conversations.info channel=C100
+call conversations.replies channel=C100 limit=1 ts=1700000100.000200
+call reactions.remove channel=C100 name=eyes timestamp=1700000100.000200
+call chat.getPermalink channel=C100 message_ts=1700000100.000200
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1699999999.000100"},"Items":null,"Task":"","Kind":"react","Purpose":"unreact","Delivery":"reaction","Effects":null,"Target":"C100/1700000100.000200","Broadcast":"","Text":"","Reaction":"eyes","Replaced":"","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_react"}
+== slack_edit {"message":"C100/1700000100.000200","text":"On it, done by _noon_"}
+answer edited error=false {"Conversation":"#general","Message":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200","Replaced":"On it","Text":"On it, done by _noon_"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000100.000200 limit=2 oldest=1700000100.000200
+call conversations.replies channel=C100 limit=1 ts=1700000100.000200
+call chat.update blocks=[] channel=C100 text=On it, done by _noon_ ts=1700000100.000200
+call chat.getPermalink channel=C100 message_ts=1700000100.000200
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1699999999.000100"},"Items":null,"Task":"","Kind":"edit","Purpose":"edit","Delivery":"edit","Effects":null,"Target":"C100/1700000100.000200","Broadcast":"","Text":"On it, done by _noon_","Reaction":"","Replaced":"On it","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_edit"}
+== slack_delete {"message":"https://acme.slack.com/archives/C100/p1700000100000200"}
+answer deleted error=false {"Conversation":"#general","Deleted":"On it","Message":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000100.000200 limit=2 oldest=1700000100.000200
+call chat.delete channel=C100 ts=1700000100.000200
+recorded {"Draft":{"ID":0,"Unit":{"provider":"slack","key":"T000/C100/1699999999.000100"},"Items":null,"Task":"","Kind":"delete","Purpose":"delete","Delivery":"delete","Effects":null,"Target":"https://acme.slack.com/archives/C100/p1700000100000200","Broadcast":"","Text":"On it","Reaction":"","Replaced":"","Origin":{"Kind":"","TurnSeq":0,"Intent":"","Workflow":"","Rule":"","Key":"","Unit":{}},"State":"sent","Evidence":{"Ref":"C100/1700000100.000200","Permalink":"https://acme.slack.com/archives/C100/p1700000100000200","At":"0001-01-01T00:00:00Z"},"Payload":null,"Basis":"","Hold":false,"Why":""},"Session":"session-1","Tool":"slack_delete"}
+== slack_edit {"message":"C100/1699999999.000100","text":"not mine"}
+answer failed error=true {"Error":"cannot post to the target: C100 ts 1699999999.000100 is not the user's; an edit replaces only the user's own messages"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1699999999.000100 limit=2 oldest=1699999999.000100
+call conversations.replies channel=C100 inclusive=true latest=1699999999.000100 limit=2 oldest=1699999999.000100 ts=1699999999.000100
+== slack_edit {"message":"C100/1700000777.000100","text":"gone"}
+answer failed error=true {"Error":"cannot post to the target: no message 1700000777.000100 in C100"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100
+call conversations.replies channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100 ts=1700000777.000100
+== slack_delete {"message":"C100/1700000777.000100"}
+answer failed error=true {"Error":"cannot post to the target: no message 1700000777.000100 in C100"}
+call conversations.info channel=C100
+call conversations.history channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100
+call conversations.replies channel=C100 inclusive=true latest=1700000777.000100 limit=2 oldest=1700000777.000100 ts=1700000777.000100

@@ -13,9 +13,11 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -510,5 +512,38 @@ func TestAMergeRecordThatCannotBeReadFailsTheReadAndTheCreateOfTheMergedTask(t *
 	}
 	if err := ms.s.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: x}}); err == nil {
 		t.Fatal("the merged task was created again past a merge record no one can read")
+	}
+}
+
+// TestAMergeAndASplitMoveADraftsVersionNotItsRev moves a held draft between tasks: its content and its rev stay,
+// so its gate still approves it, and its version moves, so a writer holding it from before loses its write.
+func TestAMergeAndASplitMoveADraftsVersionNotItsRev(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	ms := openMerge(t)
+	x, y := ms.seed(t)
+	before, err := ms.db.Drafts().Get(ctx, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := ms.merge(t, x, y, mergeAt)
+	merged, err := ms.db.Drafts().Get(ctx, 11)
+	if err != nil || merged.Rev != before.Rev || merged.Version != before.Version+1 || merged.Task != string(yID) {
+		t.Fatalf("after the merge %+v %v, was rev %d version %d", merged, err, before.Rev, before.Version)
+	}
+	stale := before
+	stale.Error = "a writer that read it before the merge"
+	if _, err := ms.db.Drafts().Update(ctx, stale, draft.Held); !errors.Is(err, outbox.ErrConflict) {
+		t.Fatalf("a write from before the merge: %v", err)
+	}
+	if err := ms.split(t, r, mergeAt.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	split, err := ms.db.Drafts().Get(ctx, 11)
+	if err != nil || split.Rev != before.Rev || split.Version != merged.Version+1 || split.Task != string(xID) {
+		t.Fatalf("after the split %+v %v", split, err)
+	}
+	if _, err := ms.db.Drafts().Update(ctx, merged, draft.Held); !errors.Is(err, outbox.ErrConflict) {
+		t.Fatalf("a write from before the split: %v", err)
 	}
 }

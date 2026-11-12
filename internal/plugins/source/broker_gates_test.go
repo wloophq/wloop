@@ -41,7 +41,7 @@ type gateDrafts struct {
 
 func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
 	d.proposed = append(d.proposed, p)
-	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held)}, nil
+	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held), Rev: 3}, nil
 }
 
 func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
@@ -87,6 +87,19 @@ func TestASessionsGateTakesItsOriginTaskAndItemsFromTheHostsBook(t *testing.T) {
 	p := ds.proposed[0]
 	if p.Origin.Kind != draft.OriginTurn || p.Origin.TurnSeq != 7 || p.Origin.Session != "live" || p.Origin.Rule != "" || p.Task != "task-1" || len(p.Items) != 1 || p.Items[0] != "i1" {
 		t.Fatalf("proposed %+v, want the turn's origin and session, task and items", p)
+	}
+}
+
+func TestASessionsGateCarriesTheDraftsWhyPayloadBasisAndHold(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi", Why: "the loop never backs off",
+		Payload: []byte(`{"event":"COMMENT"}`), Basis: "h1", Hold: true}
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: d, Session: "live"}); err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.proposed[0]; p.Why != d.Why || string(p.Payload) != string(d.Payload) || p.Basis != "h1" || !p.Hold {
+		t.Fatalf("proposed %+v", p)
 	}
 }
 
@@ -184,8 +197,8 @@ func TestASessionWithNoTurnDraftsOnThePluginsUnitWithTheSessionAsOrigin(t *testi
 		t.Fatal(err)
 	}
 	if p := ds.proposed[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession, Session: "bare"}) || p.Unit.Key != "t2" || len(p.Items) != 0 || p.Task != "" ||
-		ref.State != string(draft.Held) {
-		t.Fatalf("proposed %+v as %q, want t2 with the session origin", p, ref.State)
+		ref.State != string(draft.Held) || ref.Rev != 3 {
+		t.Fatalf("proposed %+v as %q at rev %d, want t2 with the session origin at the rev the outbox stored", p, ref.State, ref.Rev)
 	}
 	for name, req := range map[string]src.GateRequest{
 		"items":            {Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Items: []string{"i1"}}, Session: "bare"},
@@ -252,7 +265,7 @@ func TestAPluginsDraftCarriesNoDeliveryOfItsOwn(t *testing.T) {
 			t.Errorf("proposed %+v with the plugin's delivery", p)
 		}
 	}
-	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Reply {
+	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Kind("reply") {
 		t.Fatalf("proposed %+v", ds.proposed)
 	}
 }

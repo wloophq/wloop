@@ -23,6 +23,15 @@ func (e *UntrustedError) Error() string {
 	return fmt.Sprintf("reads %s, which a rule that releases a gate may not, nor any rule of a draft gate: a third party's text or an agent sets its value", e.Fact)
 }
 
+// AllowListError refuses a rule that releases and reads a payload fact
+// other than as an allow-list: an absent fact reads as the empty string, so
+// a rule such as fact != "APPROVE" would release a draft that lacks it.
+type AllowListError struct{ Fact string }
+
+func (e *AllowListError) Error() string {
+	return fmt.Sprintf(`reads %s, which a rule that sends reads only as an allow-list of values that are not empty: %s == "<value>" or %s in ["<value>", ...] as a term of the top-level &&`, e.Fact, e.Fact, e.Fact)
+}
+
 // SubjectsError refuses a rule's when that reads the facts of two subjects,
 // which no draft has.
 type SubjectsError struct{ Subjects []string }
@@ -50,10 +59,16 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 	if workflow.ReadsMarks(p) {
 		return draft.Rule{}, ErrRuleMarks
 	}
-	var subjects []string
+	var subjects, payload []string
 	for _, name := range p.Reads() {
 		if IsUntrusted(name) || env.Untrusted(name) {
 			return draft.Rule{}, &UntrustedError{Fact: name}
+		}
+		if PayloadFact(name) {
+			if values, ok := expr.Allowed(p, name); a.Releases() && (!ok || slices.Contains(values, "")) {
+				return draft.Rule{}, &AllowListError{Fact: name}
+			}
+			payload = append(payload, name)
 		}
 		f, ok := workflowFact(name)
 		switch {
@@ -66,7 +81,7 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 		slices.Sort(subjects)
 		return draft.Rule{}, &SubjectsError{Subjects: subjects}
 	}
-	rule := draft.Rule{When: condition{p}, Approval: a, Subjects: subjects}
+	rule := draft.Rule{When: condition{p}, Approval: a, Subjects: subjects, Payload: payload}
 	if named := expr.Pinned(p, DraftDelivery); len(named) == 1 {
 		rule.Names = draft.Delivery(named[0])
 	}

@@ -15,6 +15,7 @@ import (
 // treeJS builds h(...) as a plain tree and reads it back.
 const treeJS = `
 function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+function actionResult() { return null; }
 function text(n) { if (Array.isArray(n)) return n.map(text).join(""); return n && typeof n === "object" ? (n.children || []).map(text).join("") : n === undefined || n === null ? "" : String(n); }
 function all(n, pred, out = []) {
   if (Array.isArray(n)) { n.forEach((x) => all(x, pred, out)); return out; }

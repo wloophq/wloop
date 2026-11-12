@@ -48,14 +48,14 @@ func TestConcurrentDecisionsResolveTheGateOnce(t *testing.T) {
 func TestEditKeepsTheOriginal(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("first"))
-	got, err := e.svc.Edit(ctx, d.ID, "second")
+	got, err := e.svc.Edit(ctx, d.ID, "second", e.get(d.ID).Rev)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Text != "second" || got.Original != "first" || !got.Edited {
 		t.Fatalf("edited %+v", got)
 	}
-	back, err := e.svc.Edit(ctx, d.ID, "first")
+	back, err := e.svc.Edit(ctx, d.ID, "first", e.get(d.ID).Rev)
 	if err != nil || back.Edited {
 		t.Fatalf("edit back to the original: %+v %v", back, err)
 	}
@@ -64,15 +64,15 @@ func TestEditKeepsTheOriginal(t *testing.T) {
 	if _, err := e.approve(failed.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Edit(ctx, failed.ID, "x"); !errors.Is(err, draft.ErrTransition) {
+	if _, err := e.svc.Edit(ctx, failed.ID, "x", e.get(failed.ID).Rev); !errors.Is(err, draft.ErrTransition) {
 		t.Errorf("edit of an approved draft: %v", err)
 	}
 	e.fx.failWith = errBoom
 	e.svc.Send(ctx)
-	if got, err := e.svc.Edit(ctx, failed.ID, "fixed"); err != nil || got.Text != "fixed" || got.Original != "will fail" {
+	if got, err := e.svc.Edit(ctx, failed.ID, "fixed", e.get(failed.ID).Rev); err != nil || got.Text != "fixed" || got.Original != "will fail" {
 		t.Errorf("edit of a failed draft: %+v %v", got, err)
 	}
-	if _, err := e.svc.Edit(ctx, d.ID, " "); !errors.Is(err, ErrInvalid) {
+	if _, err := e.svc.Edit(ctx, d.ID, " ", e.get(d.ID).Rev); !errors.Is(err, ErrInvalid) {
 		t.Errorf("blank edit: %v", err)
 	}
 }
@@ -151,17 +151,38 @@ func TestRetryByHandPublishesOnce(t *testing.T) {
 }
 
 func TestRetryOfUnconfirmedPostNeedsConfirm(t *testing.T) {
-	for _, cause := range []string{NotConfirmed, "may have been posted: timeout"} {
+	for cause, fail := range map[string]func(e *env, d draft.Draft){
+		"may have been posted: timeout": func(e *env, _ draft.Draft) {
+			e.fx.failWith = errors.New("may have been posted: timeout")
+			e.svc.Send(ctx)
+		},
+		NotConfirmed: func(e *env, d draft.Draft) {
+			d = e.get(d.ID)
+			d.State, d.SendingAt = draft.Sending, t0
+			if _, err := e.store.Update(ctx, d, draft.Queued); err != nil {
+				t.Fatal(err)
+			}
+			if err := e.svc.Recover(ctx); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
 		e := newEnv()
 		d := e.propose(reply("x"))
 		e.approve(d.ID, nil)
-		e.fx.failWith = errors.New(cause)
-		e.svc.Send(ctx)
+		fail(e, d)
+		if got := e.get(d.ID); got.Cause != draft.CauseUnconfirmed || got.Error != cause {
+			t.Fatalf("%s: failed with cause %q, Error %q", cause, got.Cause, got.Error)
+		}
 		if _, err := e.svc.Retry(ctx, d.ID, false); !errors.Is(err, ErrNeedsConfirm) {
 			t.Fatalf("%s: retry without confirm: %v", cause, err)
 		}
 		if e.get(d.ID).State != draft.Failed {
 			t.Fatalf("%s: state %s", cause, e.get(d.ID).State)
+		}
+		session := draft.Actor{Kind: draft.ActorSession, Session: "s1"}
+		if _, err := e.svc.RetryBy(ctx, d.ID, true, session); !errors.Is(err, gates.ErrRefused) || e.get(d.ID).State != draft.Failed {
+			t.Fatalf("%s: a session's confirm: %v, state %s", cause, err, e.get(d.ID).State)
 		}
 		if got, err := e.svc.Retry(ctx, d.ID, true); err != nil || got.State != draft.Queued {
 			t.Fatalf("%s: retry with confirm %+v %v", cause, got, err)
@@ -276,8 +297,8 @@ func TestStaleClaimDoesNotPostOldText(t *testing.T) {
 		t.Fatalf("stale claim sent %d %v %v", sent, err, e.fx.published)
 	}
 	e.svc.Send(ctx)
-	if got := e.get(d.ID); got.State != draft.Sent || got.Text != "new" {
-		t.Fatalf("%+v", got)
+	if got := e.get(d.ID); got.State != draft.Failed || len(e.fx.published) != 0 {
+		t.Fatalf("text no gate approved was posted: %+v, published %v", got, e.fx.published)
 	}
 }
 
@@ -366,7 +387,7 @@ func TestProposeValidatesTheTarget(t *testing.T) {
 func TestAutoProposalsDoNotStack(t *testing.T) {
 	e := newEnv()
 	auto := func(key string) Proposal {
-		return Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping",
+		return Proposal{Unit: thread, Kind: draft.Kind("nudge"), Text: "ping",
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: key}}
 	}
 	first := e.propose(auto("stalled-nudge:e1:slack:U000AAA"))
@@ -391,13 +412,13 @@ func TestAutoProposalsDoNotStack(t *testing.T) {
 
 func TestProposeNeedsText(t *testing.T) {
 	e := newEnv()
-	for _, p := range []Proposal{reply(""), reply("  \n"), {Unit: thread, Kind: "shout", Text: "x"}, {Kind: draft.Reply, Text: "x"},
-		{Unit: thread, Kind: draft.React}} {
+	for _, p := range []Proposal{reply(""), reply("  \n"), {Unit: thread, Kind: "shout", Text: "x"}, {Kind: draft.Kind("reply"), Text: "x"},
+		{Unit: thread, Kind: draft.Kind("react")}} {
 		if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%+v: %v", p, err)
 		}
 	}
-	if _, err := e.svc.Propose(ctx, Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes"}); err != nil {
+	if _, err := e.svc.Propose(ctx, Proposal{Unit: thread, Kind: draft.Kind("react"), Reaction: "eyes"}); err != nil {
 		t.Errorf("react without text: %v", err)
 	}
 }
@@ -485,7 +506,7 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 	ap := &fakeApplier{}
 	e.svc.Evidence = EvidenceTo(ap.apply)
 	p := reply("closing")
-	p.Kind, p.Items = draft.Close, []string{"i1", "i2"}
+	p.Kind, p.Items = draft.Kind("close"), []string{"i1", "i2"}
 	d := e.propose(p)
 	e.approve(d.ID, nil)
 	e.clock.now = t0.Add(time.Minute)
@@ -541,12 +562,12 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 func TestRecordSentKeepsADeletionWithTheTextItRemoved(t *testing.T) {
 	e := newEnv()
 	for _, text := range []string{"posted twice", ""} {
-		p := Proposal{Unit: thread, Kind: draft.Delete, Text: text, Target: "C1/1.2"}
+		p := Proposal{Unit: thread, Kind: draft.Kind("delete"), Text: text, Target: "C1/1.2"}
 		d, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "C1/1.2"})
 		if err != nil {
 			t.Fatalf("a deletion of %q: %v", text, err)
 		}
-		if got := e.get(d.ID); got.Kind != draft.Delete || got.Delivery != draft.DeleteDelivery || got.Text != text || got.State != draft.Sent {
+		if got := e.get(d.ID); got.Kind != draft.Kind("delete") || got.Delivery != draft.Delivery("delete") || got.Text != text || got.State != draft.Sent {
 			t.Fatalf("%+v", got)
 		}
 	}
@@ -575,7 +596,7 @@ func TestOutboxLogHasNoText(t *testing.T) {
 	b := e.propose(reply(secret + " b"))
 	c := e.propose(reply(secret + " c"))
 	edited := secret + " edited"
-	e.svc.Edit(ctx, a.ID, edited)
+	e.svc.Edit(ctx, a.ID, edited, e.get(a.ID).Rev)
 	e.approve(a.ID, &edited)
 	e.approve(b.ID, nil)
 	e.decide(c.ID, "discard")

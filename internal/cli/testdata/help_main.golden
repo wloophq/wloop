@@ -70,6 +70,7 @@ TROUBLESHOOTING
 FOR AGENTS AND SCRIPTS
   instructions           Run a turn by hand from an agent session
   turn end/answer        Record how a turn ended; read your answer
+  draft                  Propose, read, revise or withdraw your drafts
   hook                   The agent hooks install writes
   serve                  Run the daemon
   app                    macOS: the menu bar and notifications

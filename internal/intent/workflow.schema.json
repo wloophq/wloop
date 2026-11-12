@@ -407,6 +407,15 @@
             "then": {
               "additionalProperties": false,
               "properties": {
+                "due": {
+                  "default": "plan",
+                  "description": "When the round is due: plan, when the unit's plan holds it due; when, whenever the workflow's when matches, as a round to retry what a failed round left, whatever the plan holds.",
+                  "enum": [
+                    "plan",
+                    "when"
+                  ],
+                  "type": "string"
+                },
                 "intent": {
                   "description": "The intent whose turn starts; it must serve the unit. Required.",
                   "type": "string"
@@ -429,7 +438,7 @@
                   "type": "string"
                 },
                 "stage": {
-                  "description": "The pass over the unit: its first, or one after.",
+                  "description": "The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first.",
                   "enum": [
                     "first",
                     "follow-up"
@@ -460,14 +469,18 @@
               "additionalProperties": false,
               "properties": {
                 "delivery": {
-                  "default": "message",
-                  "description": "How the draft posts: the core's message or reaction, or a delivery a plugin declares.",
+                  "description": "How the draft posts, a delivery the plugin that posts it declares; empty is that plugin's default delivery.",
                   "enum": [
-                    "message",
-                    "reaction",
                     "comment",
+                    "reaction",
                     "edit",
-                    "delete"
+                    "review",
+                    "reply",
+                    "resolve",
+                    "request_review",
+                    "message",
+                    "delete",
+                    "unreaction"
                   ],
                   "type": "string"
                 },
@@ -477,6 +490,7 @@
                     "enum": [
                       "task.nudged",
                       "unit.closed",
+                      "pr.reviewed",
                       "pr.nudged"
                     ],
                     "type": "string"

@@ -210,3 +210,8 @@ func (ghForge) View(context.Context, src.ViewRequest) (json.RawMessage, error) {
 func (f ghForge) RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error) {
 	return (&ghplugin.Plugin{GH: f.gh}).RunCLI(ctx, req, stdout, stderr)
 }
+
+// fakeGitHubPlugin is the real GitHub plugin over a fake GitHub, as ServeForTest runs it.
+func fakeGitHubPlugin(gh *fakeGH, now func() time.Time) src.Source {
+	return &ghplugin.Plugin{API: apitest.Options(quietGH{gh}), GH: quietGH{gh}, Now: now}
+}

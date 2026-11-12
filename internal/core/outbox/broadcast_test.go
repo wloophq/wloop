@@ -53,14 +53,14 @@ func TestTurningTheBroadcastOffWaitsForAPersonAgain(t *testing.T) {
 	withPlacer(e, "").broadcast = draft.BroadcastOn
 	d := e.propose(reply("done"))
 	first := e.gate(d.ID)
-	got, err := e.svc.SetBroadcast(ctx, d.ID, false)
+	got, err := e.svc.SetBroadcast(ctx, d.ID, false, e.get(d.ID).Rev)
 	if err != nil || got.Broadcast != draft.BroadcastOff || e.get(d.ID).Broadcast != draft.BroadcastOff {
 		t.Fatalf("set: %+v %v", got, err)
 	}
 	if old, _ := e.gates.Get(ctx, first.ID); old.Status != gate.Superseded || e.approval(d.ID) != waiting {
 		t.Fatalf("the windowed gate %+v", old)
 	}
-	if got, err := e.svc.SetBroadcast(ctx, d.ID, true); err != nil || got.Broadcast != draft.BroadcastOn {
+	if got, err := e.svc.SetBroadcast(ctx, d.ID, true, e.get(d.ID).Rev); err != nil || got.Broadcast != draft.BroadcastOn {
 		t.Fatalf("set on: %+v %v", got, err)
 	}
 }
@@ -68,7 +68,7 @@ func TestTurningTheBroadcastOffWaitsForAPersonAgain(t *testing.T) {
 func TestADraftThatRepliesInNoThreadHasNoBroadcastToSet(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("done"))
-	if _, err := e.svc.SetBroadcast(ctx, d.ID, true); !errors.Is(err, ErrInvalid) {
+	if _, err := e.svc.SetBroadcast(ctx, d.ID, true, e.get(d.ID).Rev); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("set: %v", err)
 	}
 	if e.get(d.ID).Broadcast != draft.NoBroadcast {
@@ -81,7 +81,7 @@ func TestApprovingAndSendingKeepTheBroadcastThePersonSet(t *testing.T) {
 	pl := withPlacer(e, "")
 	pl.broadcast = draft.BroadcastOn
 	d := e.propose(reply("done"))
-	if _, err := e.svc.SetBroadcast(ctx, d.ID, false); err != nil {
+	if _, err := e.svc.SetBroadcast(ctx, d.ID, false, e.get(d.ID).Rev); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.approve(d.ID, nil); err != nil {
@@ -102,7 +102,7 @@ func TestAHeldDraftStoredWithNoBroadcastIsPlacedOnceAtStart(t *testing.T) {
 	withPolicy(e, window(10*time.Minute))
 	old := e.propose(reply("done"))
 	firstGate := e.gate(old.ID)
-	reaction := e.propose(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
+	reaction := e.propose(Proposal{Unit: thread, Kind: draft.Kind("react"), Reaction: "eyes", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
 	pl := withPlacer(e, "")
 	pl.broadcast = draft.BroadcastOn
 	if err := e.svc.PlaceBroadcasts(ctx); err != nil {
@@ -112,8 +112,11 @@ func TestAHeldDraftStoredWithNoBroadcastIsPlacedOnceAtStart(t *testing.T) {
 	if got.Broadcast != draft.BroadcastOn || got.State != draft.Held {
 		t.Fatalf("placed %+v", got)
 	}
-	if g := e.gate(old.ID); g.ID != firstGate.ID || g.Status != gate.Open || g.Deadline != firstGate.Deadline {
-		t.Fatalf("the gate changed: %+v, was %+v", g, firstGate)
+	if g := e.gate(old.ID); g.ID == firstGate.ID || g.Status != gate.Open || !g.Deadline.IsZero() || g.ApprovedRev != got.Rev {
+		t.Fatalf("the placed draft waits on %+v, was %+v", g, firstGate)
+	}
+	if was, _ := e.gates.Get(ctx, firstGate.ID); was.Status != gate.Superseded {
+		t.Fatalf("the unplaced draft's gate is %s", was.Status)
 	}
 	if e.get(reaction.ID).Broadcast != draft.NoBroadcast {
 		t.Fatalf("a reaction placed %q", e.get(reaction.ID).Broadcast)
@@ -148,7 +151,7 @@ func TestAnAmendOfTextAndBroadcastChangesBothOrNeither(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("done"))
 	text, on := "better", true
-	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on}); !errors.Is(err, ErrInvalid) {
+	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on, Rev: e.get(d.ID).Rev}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("amend: %v", err)
 	}
 	if got := e.get(d.ID); got.Text != "done" || got.Rev != d.Rev {
@@ -157,7 +160,7 @@ func TestAnAmendOfTextAndBroadcastChangesBothOrNeither(t *testing.T) {
 	withPlacer(e, "").broadcast = draft.BroadcastOff
 	d = e.propose(reply("again"))
 	first := e.gate(d.ID)
-	got, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on})
+	got, err := e.svc.Amend(ctx, d.ID, Amendment{Text: &text, Broadcast: &on, Rev: e.get(d.ID).Rev})
 	if err != nil || got.Text != "better" || got.Broadcast != draft.BroadcastOn || got.Rev != d.Rev+1 {
 		t.Fatalf("amend: %+v %v", got, err)
 	}
@@ -179,7 +182,7 @@ func TestBroadcastOfIsWhatProposingWouldPlaceAndStoresNothing(t *testing.T) {
 	if err != nil || b != draft.BroadcastOn {
 		t.Fatalf("broadcast %q %v", b, err)
 	}
-	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || pl.asked[0].Delivery != draft.Message || pl.asked[0].Kind != draft.Reply {
+	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || pl.asked[0].Delivery != draft.Delivery("message") || pl.asked[0].Kind != draft.Kind("reply") {
 		t.Fatalf("asked %+v", pl.asked)
 	}
 	if ds, _ := e.svc.Store.List(ctx, Filter{}); len(ds) != 0 {

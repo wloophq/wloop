@@ -36,6 +36,9 @@ func bundledSources() []*manifest.Source {
 		if err != nil {
 			panic(err)
 		}
+		if m.Files, err = fs.Sub(plugins.Manifests, d.Name()); err != nil {
+			panic(err)
+		}
 		s, err := m.Source()
 		if err != nil {
 			panic(err)

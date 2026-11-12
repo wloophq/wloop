@@ -7,12 +7,15 @@ provider = "github"
 skill = true
 why     = "{{.pr.review.reason}}"
 workspace = "review"
-session   = { strategy = "reuse_live", title = "review", name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}' }
+session   = { strategy = "reuse_live", title = "review", name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}', source_writes = false }
 intake    = true
 start_line = "starting the review"
 profile   = "review"
 dims      = ["stage"]
 effects   = ["pr.reviewed", "turn.guidance_handed", "turn.round_sent", "plan.cleared"]
+
+[drafts]
+allowed_effects = ["pr.reviewed"]
 
 [help]
 target   = "a pull request URL"
@@ -44,15 +47,29 @@ when      = '!turn.try'
 states    = ["done", "settled", "asked", "failed"]
 missing   = "missing-record"
 artifacts = ["review-draft"]
-outcome   = ["verdict", "url"]
+outcome   = ["verdict", "url", "draft"]
+concludes = ["APPROVE"]
 outcome_doc = '''
-`outcome`: on `done`, the published `verdict`, the review's `url`,
-  `blocking` and `non_blocking`; on `asked` with a held draft, the `verdict`
-  the draft would publish and its counts.'''
+`outcome`: on `done` and on `asked`, the `verdict` your review draft
+  posts, `blocking` and `non_blocking`, and on `done` the `draft` you
+  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  draft is posted.'''
 require = [
   { state = "done", fields = ["verdict", "url"] },
   { state = "asked", artifact = "review-draft", fields = ["verdict"] },
 ]
 
 [resume]
-changed = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."
+changed = "Review the commits since; if they change anything the draft says, update the draft with the new head as its basis and ask again (record `asked`) before an approval is posted."
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "review" && draft.github.review.event in ["COMMENT", "REQUEST_CHANGES"]'
+mode = "send"
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "reply"'
+mode = "send"
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "resolve"'
+mode = "send"

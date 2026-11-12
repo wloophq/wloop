@@ -1,5 +1,6 @@
-// Package publish posts the GitHub plugin's approved drafts as issue
-// comments on their pull request.
+// Package publish posts the GitHub plugin's approved drafts on their pull
+// request: an issue comment, a review, a reply in a review thread, a
+// thread's resolution or a request for reviews.
 package publish
 
 import (
@@ -23,10 +24,13 @@ import (
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
 
-// The deliveries plugin.toml declares that the publisher refuses.
+// The deliveries plugin.toml declares that the publisher posts.
 const (
-	deliveryReaction = "reaction"
-	deliveryEdit     = "edit"
+	deliveryComment = "comment"
+	deliveryReview  = "review"
+	deliveryReply   = "reply"
+	deliveryResolve = "resolve"
+	deliveryRequest = "request_review"
 )
 
 // verifyPages bounds how many pages of comments Verify reads.
@@ -40,10 +44,18 @@ type REST interface {
 	REST(ctx context.Context, r api.Request) (api.Response, error)
 }
 
-// Publisher posts GitHub drafts as issue comments on their pull request.
+// Threads reads a pull request's review threads and resolves one.
+type Threads interface {
+	GraphQL(ctx context.Context, query string, vars map[string]any) (map[string]json.RawMessage, map[string]string, error)
+	ResolveReviewThread(ctx context.Context, threadID string) error
+}
+
+// Publisher posts GitHub drafts on their pull request, by delivery.
 type Publisher struct {
-	GH     REST
-	Viewer func(ctx context.Context) (string, error)
+	GH REST
+	// Threads nil refuses a resolve.
+	Threads Threads
+	Viewer  func(ctx context.Context) (string, error)
 	// People are the persons the unit's items name, for mentions of other
 	// providers.
 	People func(ctx context.Context, u sdk.Unit) ([]src.Person, error)
@@ -63,16 +75,29 @@ type issueComment struct {
 	} `json:"user"`
 }
 
-// Validate refuses a draft GitHub cannot take as a comment on the draft's
-// own pull request.
+// Validate refuses a draft GitHub cannot take on the draft's own pull
+// request as its delivery posts it.
 func (p *Publisher) Validate(ctx context.Context, d src.Draft) error {
-	_, _, err := p.prepare(ctx, d)
+	_, err := p.Where(ctx, d)
 	return err
 }
 
-// Where names the pull request d comments on.
+// Where names the pull request d posts on.
 func (p *Publisher) Where(ctx context.Context, d src.Draft) (string, error) {
-	ref, _, err := p.prepare(ctx, d)
+	var ref pr.Ref
+	var err error
+	switch d.Delivery {
+	case deliveryReview:
+		ref, _, err = p.prepareReview(ctx, d)
+	case deliveryReply:
+		ref, _, _, err = p.prepareReply(ctx, d)
+	case deliveryResolve:
+		ref, _, err = prepareResolve(d)
+	case deliveryRequest:
+		ref, _, err = prepareRequest(d)
+	default:
+		ref, _, err = p.prepare(ctx, d)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -82,25 +107,18 @@ func (p *Publisher) Where(ctx context.Context, d src.Draft) (string, error) {
 // Place keeps a draft on its own pull request.
 func (p *Publisher) Place(context.Context, src.Draft) (src.Placed, error) { return src.Placed{}, nil }
 
+// prepare is the pull request a comment draft posts on and its body; a
+// draft with no delivery is a comment, as one stored before deliveries.
 func (p *Publisher) prepare(ctx context.Context, d src.Draft) (pr.Ref, string, error) {
-	if d.Unit.Provider != pr.Provider {
-		return pr.Ref{}, "", fmt.Errorf("github publishes only github units, not %s:%s", d.Unit.Provider, d.Unit.Key)
-	}
-	if d.Delivery == deliveryReaction || d.Delivery == deliveryEdit {
+	if d.Delivery != "" && d.Delivery != deliveryComment {
 		return pr.Ref{}, "", fmt.Errorf("github cannot publish a %s draft", d.Delivery)
 	}
-	ref, err := pr.ParseKey(d.Unit.Key)
+	ref, err := selfRef(d)
 	if err != nil {
 		return pr.Ref{}, "", err
 	}
-	if d.Target != "" {
-		t, err := pr.ParseKey(d.Target)
-		if err != nil {
-			return pr.Ref{}, "", fmt.Errorf("target %q is not owner/repo#n", d.Target)
-		}
-		if !strings.EqualFold(t.String(), ref.String()) {
-			return pr.Ref{}, "", fmt.Errorf("target %s is not the draft's pull request %s", t, ref)
-		}
+	if err := noPayload(d); err != nil {
+		return pr.Ref{}, "", err
 	}
 	body, err := p.body(ctx, d)
 	if err != nil {
@@ -179,10 +197,52 @@ func (p *Publisher) names(ctx context.Context, u sdk.Unit) (map[string]string, e
 	return out, nil
 }
 
-// Publish posts d as a comment. A nudge then records its nudged event, as
-// the nudge intent does, so the comment reads as a nudge; a refused post
-// records none.
+// unitRef is the pull request d is on.
+func unitRef(d src.Draft) (pr.Ref, error) {
+	if d.Unit.Provider != pr.Provider {
+		return pr.Ref{}, fmt.Errorf("github publishes only github units, not %s:%s", d.Unit.Provider, d.Unit.Key)
+	}
+	return pr.ParseKey(d.Unit.Key)
+}
+
+// selfRef is the pull request d is on, which its target, when it names
+// one, names too.
+func selfRef(d src.Draft) (pr.Ref, error) {
+	ref, err := unitRef(d)
+	if err != nil {
+		return pr.Ref{}, err
+	}
+	if d.Target != "" {
+		t, err := pr.ParseKey(d.Target)
+		if err != nil {
+			return pr.Ref{}, fmt.Errorf("target %q is not owner/repo#n", d.Target)
+		}
+		if !strings.EqualFold(t.String(), ref.String()) {
+			return pr.Ref{}, fmt.Errorf("target %s is not the draft's pull request %s", t, ref)
+		}
+	}
+	return ref, nil
+}
+
+// Publish posts d as its delivery says.
 func (p *Publisher) Publish(ctx context.Context, d src.Draft) (src.Evidence, error) {
+	switch d.Delivery {
+	case deliveryReview:
+		return p.publishReview(ctx, d)
+	case deliveryReply:
+		return p.publishReply(ctx, d)
+	case deliveryResolve:
+		return p.publishResolve(ctx, d)
+	case deliveryRequest:
+		return p.publishRequest(ctx, d)
+	}
+	return p.publishComment(ctx, d)
+}
+
+// publishComment posts d as a comment. A nudge then records its nudged
+// event, as the nudge intent does, so the comment reads as a nudge; a
+// refused post records none.
+func (p *Publisher) publishComment(ctx context.Context, d src.Draft) (src.Evidence, error) {
 	ref, body, err := p.prepare(ctx, d)
 	if err != nil {
 		return src.Evidence{}, err
@@ -225,19 +285,43 @@ func (p *Publisher) recordNudge(ctx context.Context, d src.Draft, ref pr.Ref, bo
 	}
 }
 
-// Verify looks for the viewer's comment with d's body among those since
-// startedAt.
+// Verify says whether d was posted at or after startedAt, as its delivery
+// posts it.
 func (p *Publisher) Verify(ctx context.Context, d src.Draft, startedAt time.Time) (src.Evidence, bool, error) {
+	switch d.Delivery {
+	case deliveryReview:
+		return p.verifyReview(ctx, d, startedAt)
+	case deliveryReply:
+		return p.verifyReply(ctx, d, startedAt)
+	case deliveryResolve:
+		return p.verifyResolve(ctx, d)
+	case deliveryRequest:
+		return p.verifyRequest(ctx, d)
+	}
+	return p.verifyComment(ctx, d, startedAt)
+}
+
+func (p *Publisher) viewer(ctx context.Context) (string, error) {
+	viewer, err := p.Viewer(ctx)
+	if err != nil {
+		return "", err
+	}
+	if viewer == "" {
+		return "", errors.New("github: no viewer stored yet")
+	}
+	return viewer, nil
+}
+
+// verifyComment looks for the viewer's comment with d's body among those
+// since startedAt.
+func (p *Publisher) verifyComment(ctx context.Context, d src.Draft, startedAt time.Time) (src.Evidence, bool, error) {
 	ref, body, err := p.prepare(ctx, d)
 	if err != nil {
 		return src.Evidence{}, false, err
 	}
-	viewer, err := p.Viewer(ctx)
+	viewer, err := p.viewer(ctx)
 	if err != nil {
 		return src.Evidence{}, false, err
-	}
-	if viewer == "" {
-		return src.Evidence{}, false, errors.New("github: no viewer stored yet")
 	}
 	from := startedAt.Add(-clockSkew)
 	q := url.Values{"since": {from.UTC().Format(time.RFC3339)}, "per_page": {"100"}}

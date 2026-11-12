@@ -59,6 +59,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `session.title` (string): The session's title: 1 to 12 lowercase letters.
 - `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
+- `session.source_writes` (bool, default `true`): The session may run the commands the plugins' manifests declare as writes to their source, under [source.session] write_commands; false denies them, so the agent proposes drafts instead.
 - `target` (table): What a run with no unit does.
 - `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent.
 - `target.title` (template): The captured task's title, over .guidance, with firstLine or title.
@@ -151,8 +152,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.when` (predicate, default `true`): When the turn records its outcome.
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.
-- `record.outcome` (list of `verdict`, `url`): The outcome fields a record may carry.
+- `record.outcome` (list of `verdict`, `url`, `draft`): The outcome fields a record may carry.
 - `record.attach_url` (bool, default `false`): On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome.
+- `record.concludes` (list of strings): The outcome verdicts that end the work a turn is about, such as an approval, which the board shows done; each is a verdict the intent's plugins' draft kinds declare.
 - `record.outcome_doc` (string): What the outcome holds, for the instructions.
 - `record.history_artifact` (string): The artifact the unit's history shows.
 - `record.require[]` (table): What a record in a state must carry; record.requires is the record kind a run owes.
@@ -177,9 +179,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
-- `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
+- `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): The effects its agents may declare on their drafts.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 
@@ -446,6 +449,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
 - `drafts.by_hand_about` (string, localized): One line under that title.
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
+- `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
+- `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.
+- `drafts.authors` (table by name): Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing.
+- `drafts.authors.<name>` (string, localized): The author's words, such as "Revised by an agent"; the key is person, session, rule or window.
 - `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
@@ -570,12 +577,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `session.close_orphan`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
-  - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.
+  - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after; empty is the one the unit's plan holds due, one after before its first.
+  - `due` (one of `plan`, `when`, default `plan`): When the round is due: plan, when the unit's plan holds it due; when, whenever the workflow's when matches, as a round to retry what a failed round left, whatever the plan holds.
   - `runner` (one of `session`, `headless`): How the turn runs, one of the intent's runners; by default its first.
   - `open_question` (one of `hold`, `replace_if_moved`, default `hold`): What an open question of the intent's newest turn does to a round of the unit's plan: hold waits for its answer; replace_if_moved runs a round planned on a head other than the one the question was asked on, which replaces the asked turn, supersedes its gate and carries the question in the new turn's history. An answer on its way holds the round either way.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
-  - `delivery` (one of `message`, `reaction`, `comment`, `edit`, `delete`, default `message`): How the draft posts: the core's message or reaction, or a delivery a plugin declares.
+  - `delivery` (one of `comment`, `reaction`, `edit`, `review`, `reply`, `resolve`, `request_review`, `message`, `delete`, `unreaction`): How the draft posts, a delivery the plugin that posts it declares; empty is that plugin's default delivery.
   - `text` (file, default `text.md.tmpl`): The template of the draft's text, beside the manifest, rendered in the language of the draft's conversation.
   - `why` (file, default `why.md.tmpl`): The template of why the draft is proposed, beside the manifest, rendered in the user's language over the same data as the text; a workflow with no such file proposes with no why.
   - `reaction` (string): The emoji name, with delivery reaction.
@@ -583,9 +591,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
   - `target` (one of `unit`, `item`, `person`, default `unit`): Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text.
   - `to` (one of `all`, `members`, `non_members`, default `all`): Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both.
-  - `effects` (list of `task.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
+  - `effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): What sending the draft applies.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
@@ -641,10 +650,15 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
+  - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
+  - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again.
+  - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
+  - `github_draft`: Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval.
+  - `github_threads`: Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
-  - `slack_draft`: Proposes a Slack message or reaction for the user's approval.
+  - `slack_draft`: Proposes a Slack message, a reaction or its removal, or an edit or deletion of the user's message, for the user's approval.
   - `slack_react`: Adds or removes a reaction on a Slack message as the user, now.
   - `slack_edit`: Replaces the text of one of the user's Slack messages, now.
   - `slack_delete`: Deletes one of the user's Slack messages, now.
@@ -665,6 +679,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_turn_required`: A problem: turn is missing or empty.
   - `problem_record_required`: A problem: record is missing.
   - `problem_record` (`Error`): A problem: record does not decode.
+  - `problem_pin` (`Where`, `Draft`: number, `State`, `Gate`): A problem: the question pins, at Where, draft Draft, which no answer decides: its state, "" when there is no such draft, is not held, or its gate's status, "" when it has none, is not open.
   - `refused_record` (`Reason`): The turn refused the record.
   - `store_failed` (`Error`): The record could not be stored.
   - `recorded` (`State`, `Unit`, `Note`, `Dropped`, `Ledger`): The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, "" when none.
@@ -699,6 +714,52 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `turn_answers` (`Answers`): A part of read: answers to the session's turns stored before each answer named its message.
   - `option` (`ID`, `Label`): A part of conversation: one option of the message.
   - `answer` (`Option`, `Label`, `Choice`, `Text`, `At`): A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.
+- `draft_read`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `read` (`Draft`): The draft, as JSON.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `failed` (`Error`): The call failed.
+- `draft_update`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `updated` (`Draft`): The revised draft, as JSON.
+  - `rev_conflict` (`Error`): The draft is at another rev than the one given.
+  - `stale` (`Error`): The basis given is not the unit's live one.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `failed` (`Error`): The call failed.
+- `draft_withdraw`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `withdrawn` (`Draft`): The withdrawn draft, as JSON.
+  - `rev_conflict` (`Error`): The draft is at another rev than the one given.
+  - `not_found` (`Error`): No such draft.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
+  - `failed` (`Error`): The call failed.
+- `github_draft`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `failed` (`Error`): GitHub or the daemon failed the call.
+  - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
+  - `problem_text_required`: A problem: the kind needs a text, and it is missing or empty.
+  - `problem_payload` (`Error`): A problem: the payload does not fit the kind's schema.
+  - `problem_basis_required`: A problem: the kind needs the head commit the agent read as basis.
+  - `stale` (`Basis`, `Head`): The basis is not the pull request's head now; nothing was drafted.
+  - `proposed` (`ID`: number, `Rev`: number, `Unit`): The draft waits for the user's approval.
+  - `approved` (`ID`: number, `Rev`: number, `Unit`): A rule of the user's approved the draft, and it will be posted.
+  - `dry_run` (`ID`: number, `Rev`: number, `Unit`): The draft's approval is a dry run: it is stored and never posted.
+- `github_threads`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `failed` (`Error`): GitHub or the daemon failed the call.
+  - `threads` (`Unit`, `JSON`): The threads and reviews, as JSON.
 - `slack_send_message`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -737,7 +798,10 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
-  - `problem_reaction_required`: A problem: a react draft has no reaction.
+  - `problem_reaction_required`: A problem: a react or unreact draft has no reaction.
+  - `problem_message`: A problem: an edit or delete draft's target is not a message ref or permalink.
+  - `problem_message_gone`: A problem: Slack holds no message at an edit or delete draft's target.
+  - `problem_message_not_yours`: A problem: the message an edit or delete draft targets is not the user's.
   - `problem_text_required`: A problem: text is missing or empty.
   - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user's approval.
   - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it, and it will be posted.
@@ -783,7 +847,10 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `chat_queued`: Tells the person that their chat message waits for the busy agent of a live session of the task, which is told of it when it stops.
   - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
   - `draft_sent`: Tells the person that the reply they sent at once, Draft, is approved and goes out.
+  - `draft_by_rule`: Tells the person that a rule of theirs, Rule (its name as the gates record it, such as "workflows/review gates.approval rule 0"), posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.
   - `draft_saved`: Tells the person that the reply they wrote, Draft, waits for their approval.
+  - `draft_rule_sends`: Tells an agent session that asked to send the reply it wrote, Draft, that a rule of the user's, Rule (its name as the gates record it), sends it.
+  - `draft_waits`: Tells an agent session that asked to send the reply it wrote, Draft, that no rule of the user's sends it: it waits for the user's approval.
   - `reply_placeholder`: The placeholder of a notification's input that saves a reply for approval.
   - `reply_button`: The button of a notification's input that saves a reply for approval.
   - `send_reply_placeholder`: The placeholder of a notification's input that sends a reply at once.
@@ -797,6 +864,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `notify_draft_for_me`: The button of an Inbox task's notification that delegates it to an agent headless.
   - `notify_reply`: The button of a notification whose text input saves a reply for approval, or answers an agent.
   - `notify_send_reply`: The button of a notification whose text input sends a reply at once.
+  - `notify_pinned`: The line a question's notification adds when an answer to it approves a draft: the notification offers no such answer, and the question's card shows the draft.
   - `notify_question`: The title of the notification of an agent's open question.
   - `notify_proposal`: The title of the notification of an open proposal.
   - `notify_post`: The title of the notification of an agent's open post.
@@ -825,7 +893,10 @@ The fields each notice reads besides `Name` and `Command`:
   - `chat_queued`
   - `chat_started` (`Intent`, `Resumed`)
   - `draft_sent` (`Draft`: number)
+  - `draft_by_rule` (`Draft`: number, `Where`, `Rule`, `Link`)
   - `draft_saved` (`Draft`: number)
+  - `draft_rule_sends` (`Draft`: number, `Rule`)
+  - `draft_waits` (`Draft`: number)
   - `reply_placeholder`
   - `reply_button`
   - `send_reply_placeholder`
@@ -839,6 +910,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `notify_draft_for_me`
   - `notify_reply`
   - `notify_send_reply`
+  - `notify_pinned`
   - `notify_question`
   - `notify_proposal`
   - `notify_post`
@@ -944,6 +1016,14 @@ The fields each notice reads besides `Name` and `Command`:
   - `first_field`: Its data up to the first colon.
   - `short_sha`: The first seven characters of a commit id.
   - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
+- `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
+- `drafts.<name>` (table): One draft kind's words.
+- `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
+- `drafts.<name>.fields.<name>` (table): One field's words.
+- `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.
+- `drafts.<name>.fields.<name>.markdown` (bool, default `false`): The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.
+- `drafts.<name>.fields.<name>.values` (table by name): The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.
+- `drafts.<name>.fields.<name>.values.<name>` (string, localized): The value's word.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.
 - `detail.<name>` (table): One field's words.
 - `detail.<name>.label` (string, localized): The field's name. Required.

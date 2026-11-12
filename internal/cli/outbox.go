@@ -26,7 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown> --rev <n>] [--yes] | edit <id> <markdown> --rev <n> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
 
 // outboxInteractive says whether e reads from a terminal; tests replace it.
 var outboxInteractive = func(e *Env) bool {
@@ -197,6 +197,7 @@ func mentionsOf(text string) []string {
 // printDraft writes d whole, with text as what would post.
 func printDraft(w io.Writer, d api.Draft, text string) {
 	fmt.Fprintf(w, "draft %d (%s): a %s on %s\n", d.ID, d.State, d.Kind, d.Unit)
+	fmt.Fprintf(w, "rev:      %d\n", d.Rev)
 	fmt.Fprintf(w, "target:   %s\n", draftTarget(d))
 	if d.Permalink == "" {
 		fmt.Fprintf(w, "to:       %s\n", draftWhere(d))
@@ -223,6 +224,15 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	}
 	if ms := mentionsOf(text); len(ms) > 0 {
 		fmt.Fprintf(w, "mentions: %s\n", strings.Join(ms, ", "))
+	}
+	if d.Preview != "" {
+		fmt.Fprintf(w, "preview:  %s\n", d.Preview)
+	}
+	if len(d.Fields) > 0 {
+		fmt.Fprintln(w, "payload:")
+		for _, l := range payloadLines(d.Fields, "  ") {
+			fmt.Fprintln(w, l)
+		}
 	}
 	if d.Reaction != "" {
 		fmt.Fprintf(w, "reaction: :%s:\n", d.Reaction)
@@ -298,6 +308,7 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	fs.SetOutput(e.Err)
 	text := fs.String("text", "", "the text to post instead of the draft's")
 	yes := fs.Bool("yes", false, "approve without asking, after showing the draft")
+	rev := fs.Int64("rev", -1, "with --text: the rev of the draft you read, as outbox show prints it")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -313,18 +324,20 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	if err != nil {
 		return err
 	}
-	shown := d.Text
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "text" {
-			shown = *text
+	shown, seen := d.Text, d.Rev
+	if flagSet(fs, "text") {
+		shown = *text
+		if *rev < 0 {
+			return usageError{usage: outboxUsage, why: "approve --text takes --rev, the rev of the draft you read (outbox show prints it)"}
 		}
-	})
+		seen = *rev
+	}
 	printDraft(e.Out, d, shown)
 	if !*yes && !e.confirmed("Approve and post this?") {
 		fmt.Fprintln(e.Out, "Not approved.")
 		return exitCode(1)
 	}
-	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(seen, 10)}); err != nil {
 		return err
 	}
 	got, err := c.Draft(ctx, id)
@@ -362,9 +375,9 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		cr.Target = pos[0]
 	}
 	if *react != "" {
-		cr.Kind, cr.Reaction = api.DraftReact, *react
+		cr.Reaction = *react
 	} else {
-		cr.Kind, cr.Text = api.DraftReply, pos[1]
+		cr.Text = pos[1]
 	}
 	if !*send {
 		d, err := c.CreateDraft(ctx, cr)
@@ -377,7 +390,7 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 	if err := e.namedAgent("new --send"); err != nil {
 		return err
 	}
-	return e.sendUserDraft(ctx, c, cr, *yes, func() error { return e.userAtTerminal("new --send", *yes) }, true)
+	return e.sendUserDraft(ctx, c, cr, *yes || e.sessionHandle() != "", func() error { return e.userAtTerminal("new --send", *yes) }, true)
 }
 
 // sendUserDraft creates cr and approves it: at once with yes, else once ready says the user is at a
@@ -389,6 +402,10 @@ func (e *Env) sendUserDraft(ctx context.Context, c *client.Client, cr api.DraftC
 		d, err := c.CreateDraft(ctx, cr)
 		if err != nil {
 			return err
+		}
+		if d.State == string(draft.Held) && len(d.Notes) > 0 {
+			fmt.Fprintln(e.Out, d.Notes[len(d.Notes)-1])
+			return nil
 		}
 		return e.reportPosted(ctx, c, d, d.Where)
 	}
@@ -491,14 +508,27 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 }
 
 func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	if len(args) != 2 {
-		return usageError{usage: outboxUsage}
-	}
-	id, err := draftArg(args[:1])
+	fs := flag.NewFlagSet("outbox edit", flag.ContinueOnError)
+	fs.SetOutput(e.Err)
+	rev := fs.Int64("rev", -1, "the rev of the draft you read, as outbox show prints it")
+	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
 	}
-	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1]}); err != nil {
+	if len(pos) != 2 {
+		return usageError{usage: outboxUsage}
+	}
+	if *rev < 0 {
+		return usageError{usage: outboxUsage, why: "edit takes --rev, the rev of the draft you read (outbox show prints it)"}
+	}
+	if err := e.namedAgent("edit"); err != nil {
+		return err
+	}
+	id, err := draftArg(pos[:1])
+	if err != nil {
+		return err
+	}
+	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": pos[1], "rev": strconv.FormatInt(*rev, 10)}); err != nil {
 		return err
 	}
 	fmt.Fprintf(e.Out, "draft %d edited\n", id)
@@ -511,6 +541,9 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	reason := fs.String("reason", "", "why a draft its gate approved is dropped")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
+		return err
+	}
+	if err := e.namedAgent("discard"); err != nil {
 		return err
 	}
 	id, err := draftArg(pos)
@@ -531,4 +564,11 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	}
 	fmt.Fprintf(e.Out, "draft %d discarded\n", id)
 	return nil
+}
+
+// flagSet says whether name was given on fs's command line.
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
 }

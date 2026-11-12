@@ -554,6 +554,10 @@ type testEnv struct {
 	// served ends every context serving gave.
 	served     context.Context
 	stopServed context.CancelFunc
+	// hosts stops each plugin host servePlugins started, before stopServing
+	// waits for the background work their plugins add.
+	hostsMu sync.Mutex
+	hosts   []func()
 }
 
 // testRegistry knows every stored session as having the loop's MCP tool but
@@ -694,7 +698,24 @@ func (te *testEnv) serving(ctx context.Context) context.Context {
 // them.
 func (te *testEnv) stopServing() {
 	te.stopServed()
+	te.hostsMu.Lock()
+	hosts := te.hosts
+	te.hosts = nil
+	te.hostsMu.Unlock()
+	for _, stop := range hosts {
+		stop()
+	}
 	te.Env.background.Wait()
+}
+
+// servePlugins is servePlugins on te's Env, on a context serving binds to
+// the test; stopServing stops the host it starts.
+func (te *testEnv) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) (stop func()) {
+	stop = te.Env.servePlugins(te.serving(ctx), db, cfg, logf)
+	te.hostsMu.Lock()
+	te.hosts = append(te.hosts, stop)
+	te.hostsMu.Unlock()
+	return stop
 }
 
 // serveDeps is serveDeps on te's Env, on a context serving binds to the test.

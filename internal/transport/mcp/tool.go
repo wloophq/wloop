@@ -58,13 +58,18 @@ func boolean() *schema { return &schema{Type: "boolean"} }
 // inputSchema is turn_end's arguments; record follows domain/record's
 // Record field for field.
 func inputSchema() *schema {
+	one := 1
+	draftRef := object(map[string]*schema{
+		"id":  {Type: "integer", Minimum: &one},
+		"rev": {Type: "integer", Minimum: &one},
+	}, "id", "rev")
 	option := object(map[string]*schema{
 		"id":          str(20),
 		"label":       str(record.LabelMax),
 		"consequence": str(record.ConsequenceMax),
 		"publishes":   boolean(),
+		"draft":       draftRef,
 	}, "id", "label", "consequence")
-	one := 1
 	item := object(map[string]*schema{
 		"path": str(record.PathMax),
 		"line": {Type: "integer", Minimum: &one},
@@ -74,10 +79,11 @@ func inputSchema() *schema {
 		"state":   enum(string(record.Done), string(record.Settled), string(record.Asked), string(record.Failed)),
 		"summary": str(record.SummaryMax),
 		"outcome": object(map[string]*schema{
-			"verdict":      enum("APPROVE", "COMMENT", "REQUEST_CHANGES"),
+			"verdict":      str(record.VerdictMax),
 			"url":          str(record.URLMax),
 			"blocking":     count(),
 			"non_blocking": count(),
+			"draft":        draftRef,
 		}),
 		"question": object(map[string]*schema{
 			"kind":      enum("choice", "confirm", "free"),
@@ -85,6 +91,7 @@ func inputSchema() *schema {
 			"options":   {Type: "array", Items: option, MinItems: 2, MaxItems: 5},
 			"recommend": str(record.RecommendMax),
 			"publishes": boolean(),
+			"draft":     draftRef,
 		}, "kind", "text"),
 		"artifact": object(map[string]*schema{
 			"kind":  enum(record.ArtifactKinds...),
@@ -246,6 +253,13 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 		return s.fixThese(ctx, toolName, problems)
 	}
 	got, err := s.Turns.RecordTurnEnd(ctx, turns.RecordRequest{Session: handle, Turn: id, Via: "mcp", Record: rec})
+	var pins turns.UnheldPins
+	if errors.As(err, &pins) {
+		for _, p := range pins {
+			problems = append(problems, s.say(ctx, toolName, "problem_pin", fields{"Where": "record." + p.Where, "Draft": p.Draft, "State": p.State, "Gate": p.Gate}))
+		}
+		return s.fixThese(ctx, toolName, problems)
+	}
 	var bad record.Problems
 	if errors.As(err, &bad) {
 		return s.fixThese(ctx, toolName, bad)

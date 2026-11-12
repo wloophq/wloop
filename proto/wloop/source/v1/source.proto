@@ -35,6 +35,13 @@ service SourceService {
   rpc Place(PlaceRequest) returns (PlaceResponse);
   rpc Publish(PublishRequest) returns (PublishResponse);
   rpc Verify(VerifyRequest) returns (VerifyResponse);
+  // Basis is what a draft of kind on unit would be written against now, read
+  // live from the source, such as a pull request's head.
+  rpc Basis(BasisRequest) returns (BasisResponse);
+  // Within says whether target, a draft target of the plugin's grammar,
+  // lies inside unit, such as a review comment of the pull request or a
+  // message of the thread.
+  rpc Within(WithinRequest) returns (WithinResponse);
 
   // Lander.
   rpc Landed(LandedRequest) returns (LandedResponse);
@@ -421,6 +428,15 @@ message Draft {
   // broadcast is "on" or "off" for a thread reply also posted, or not, to its
   // conversation, "" for a draft that replies in no thread.
   string broadcast = 16;
+  // payload_json is what the kind's schema shapes beside text, posted
+  // verbatim; empty for none.
+  bytes payload_json = 17;
+  // basis is what the proposer read the unit at, "" for none.
+  string basis = 18;
+  // hold keeps the draft waiting for a person whatever the approval rules say.
+  bool hold = 19;
+  // why is why the proposer proposes the draft, for the person approving it.
+  string why = 20;
 }
 
 message Placement {
@@ -573,6 +589,26 @@ message VerifyRequest {
 message VerifyResponse {
   DraftEvidence evidence = 1;
   bool posted = 2;
+}
+
+message BasisRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string kind = 3;
+}
+
+message BasisResponse {
+  string basis = 1;
+}
+
+message WithinRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+  string target = 3;
+}
+
+message WithinResponse {
+  bool within = 1;
 }
 
 message LandedRequest {
@@ -1064,6 +1100,8 @@ message GateRef {
   // state is the draft's state once the host's approval policy saw it:
   // proposed, approved, or discarded under dry run.
   string state = 3;
+  // rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
+  int64 rev = 4;
 }
 
 // OpenGateRequest proposes a draft. With a session, the host sets its origin,

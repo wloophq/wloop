@@ -2,12 +2,14 @@ package source_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -51,6 +53,8 @@ func (p posting) Publish(ctx context.Context, d src.Draft) (src.Evidence, error)
 		return src.Evidence{}, fmt.Errorf("%w on t1: HTTP 502", src.ErrMayHavePosted)
 	case "refused":
 		return src.Evidence{}, errors.New("commenting on t1: HTTP 422")
+	case "stale":
+		return src.Evidence{}, fmt.Errorf("%w: the head moved", src.ErrStale)
 	}
 	close(p.started)
 	<-ctx.Done()
@@ -84,11 +88,15 @@ name = "reaction"
 [[source.draft_kinds]]
 name = "react"
 delivery = "reaction"
+schema = "drafts/react/schema.json"
 `
+
+// acmeFiles are the files acme's manifests name.
+var acmeFiles = fstest.MapFS{"drafts/react/schema.json": {Data: []byte(`{"type": "object", "properties": {}}`)}}
 
 // postingKind runs p as plugin acme, which posts comments, and answers its
 // publisher.
-func postingKind(t *testing.T, p posting) (psource.Publisher, psource.Units) {
+func postingKind(t *testing.T, p src.Source) (psource.Publisher, psource.Units) {
 	t.Helper()
 	k := kindOver(t, &change.Log{})
 	start(t, k, "acme", commentingManifest, p)
@@ -96,6 +104,7 @@ func postingKind(t *testing.T, p posting) (psource.Publisher, psource.Units) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Files = acmeFiles
 	s, err := m.Source()
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +128,9 @@ func TestAPublishThatMayHavePostedAsksAConfirmBeforeARetry(t *testing.T) {
 		if err == nil || strings.HasPrefix(err.Error(), "may have been posted") != may {
 			t.Fatalf("%s: %v", text, err)
 		}
+	}
+	if _, err := pub.Publish(ctx, draft.Draft{Unit: own, Text: "stale"}); !errors.Is(err, outbox.ErrStale) || strings.HasPrefix(err.Error(), "may have been posted") {
+		t.Fatalf("a stale refusal: %v", err)
 	}
 	hctx, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
@@ -168,13 +180,21 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	now := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
-	gs := outboxtest.NewGates(func() time.Time { return now })
-	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
+	gst := db.Gates(func() time.Time { return now })
+	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
+	kinds, err := draft.NewCatalog([]draft.KindSpec{
+		{Provider: "acme", Name: "react", Delivery: "reaction", SchemaJSON: json.RawMessage(`{"type":"object"}`)},
+		{Provider: "acme", Name: "comment", Delivery: "comment", SchemaJSON: json.RawMessage(`{"type":"object"}`)},
+	}, []draft.DeliverySpec{{Provider: "acme", Name: "comment", Posts: true}, {Provider: "acme", Name: "reaction"}}, map[string]string{"acme": "comment"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := gs.Bind(&outbox.Service{Kinds: kinds, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(context.Background(), prop)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != draft.Held || d.Delivery != draft.CommentDelivery {
+	if d.State != draft.Held || d.Delivery != draft.Delivery("comment") {
 		t.Fatalf("proposed %+v, want a held comment", d)
 	}
 }
@@ -182,3 +202,41 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 type pinned time.Time
 
 func (c pinned) Now() time.Time { return time.Time(c) }
+
+// basing is a posting plugin that reads the live head of a unit.
+type basing struct {
+	posting
+	head string
+}
+
+var _ src.Drafter = basing{}
+
+func (b basing) Basis(_ context.Context, u plugin.Unit, kind string) (string, error) {
+	return b.head + " " + u.Key + " " + kind, nil
+}
+
+func (b basing) Within(_ context.Context, u plugin.Unit, target string) (bool, error) {
+	return target == u.Key+"/comment", nil
+}
+
+func TestPublisherChecksDraftsOnlyThroughAPluginThatChecksThem(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	own := unit.Unit{Provider: "acme", Key: "t1"}
+	reads, _ := postingKind(t, basing{posting: posting{Stub: sourcetest.NewStub()}, head: "c2"})
+	if got, err := reads.Live(ctx, own, "review"); err != nil || got != "c2 t1 review" {
+		t.Fatalf("live basis %q %v", got, err)
+	}
+	for target, want := range map[string]bool{"t1/comment": true, "t2/comment": false} {
+		if got, err := reads.Within(ctx, own, target); err != nil || got != want {
+			t.Errorf("%s within %s: %v %v", target, own.Key, got, err)
+		}
+	}
+	none, _ := postingKind(t, posting{Stub: sourcetest.NewStub()})
+	if got, err := none.Live(ctx, own, "review"); err != nil || got != "" {
+		t.Fatalf("a plugin with no basis answered %q %v", got, err)
+	}
+	if in, err := none.Within(ctx, own, "t1/comment"); err != nil || in {
+		t.Fatalf("a plugin that checks no draft took a target inside: %v %v", in, err)
+	}
+}

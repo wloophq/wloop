@@ -492,8 +492,9 @@ func TestServeDepsBriefOnlyWhenEnabled(t *testing.T) {
 	if d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil); d.Brief != nil {
 		t.Fatal("briefs while brief.enabled is false")
 	}
-	te.cfg.Brief.Enabled = true
-	if d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil); d.Brief == nil {
+	on := te.cfg
+	on.Brief.Enabled = true
+	if d := te.serveDeps(context.Background(), storeDB, on, func(string, ...any) {}, &lock.Mutex{}, nil); d.Brief == nil {
 		t.Fatal("no briefs while brief.enabled is true")
 	}
 }

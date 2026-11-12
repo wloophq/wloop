@@ -4,6 +4,7 @@
 package gate
 
 import (
+	"slices"
 	"strconv"
 	"time"
 
@@ -81,11 +82,25 @@ type Gate struct {
 	// Text is what the gate asks, in the words its opener rendered from the profile; "" leaves its
 	// declaration's label.
 	Text string
+	// ApprovedRev is a draft gate's draft's Rev while held, which the outbox sets when it opens the gate
+	// after saving the draft; approval keeps it. It is compared where the draft leaves held (the outbox's
+	// Publish) and in ApproveOption, never at send: content changes only while a draft is held or failed,
+	// and a revision opens a new gate. 0, as on a gate opened before it existed, never matches.
+	ApprovedRev int64
+	// Sessions are every session that proposed or revised the gate's draft, none of which resolves it.
+	Sessions []string
 }
 
 // ByUser says whether the user resolved g: a person, or an agent through a session the user drives.
 func (g Gate) ByUser() bool {
 	return g.Rule == "" && (g.By == task.ActorPerson || g.By == task.ActorAgent && g.BySession != "")
+}
+
+// Stamps says whether session produced g's subject (Session) or proposed or revised its draft (Sessions), so
+// it never resolves g nor answers through it; "" stamps nothing. The outbox stamps a draft's origin session
+// among Sessions when its gate opens.
+func (g Gate) Stamps(session string) bool {
+	return session != "" && (g.Session == session || slices.Contains(g.Sessions, session))
 }
 
 // ProposalSubject is the Subject of a gate on item proposal id when no

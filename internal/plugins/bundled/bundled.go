@@ -42,6 +42,9 @@ func Manifests() ([]*manifest.Manifest, error) {
 		if m.ID != d.Name() {
 			return nil, fmt.Errorf("bundled plugin %s: its manifest's id is %s", d.Name(), m.ID)
 		}
+		if m.Files, err = fs.Sub(plugins.Manifests, d.Name()); err != nil {
+			return nil, err
+		}
 		out = append(out, m)
 	}
 	return out, nil

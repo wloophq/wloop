@@ -8,7 +8,9 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -27,9 +29,27 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
 			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db),
 			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e},
-			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}})
+			Deliverer: daemonConsequences{e}, Decider: daemonConsequences{e}, Sessions: drivenSessions{e}, Options: messageOptions{e}})
 	}
 	return e.gates
+}
+
+// messageOptions are the messages service's option drafts, read at each resolution: a daemon without one
+// approves none.
+type messageOptions struct{ e *Env }
+
+func (m messageOptions) OptionDraft(ctx context.Context, question gate.Gate, r gates.Resolution) (gate.Gate, int64, bool, error) {
+	if m.e.messages == nil {
+		return gate.Gate{}, 0, false, nil
+	}
+	return m.e.messages.OptionDraft(ctx, question, r)
+}
+
+func (m messageOptions) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
+	if m.e.messages == nil {
+		return gate.Gate{}, "", 0, false, nil
+	}
+	return m.e.messages.Pinning(ctx, drafted)
 }
 
 // drivenSessions are the turns service's sessions, read at each resolution: a daemon without one drives none.
@@ -121,6 +141,10 @@ func (g draftGates) Supersede(ctx context.Context, id int64, by task.Actor) erro
 	return g.e.newGates(g.db, g.logf).Supersede(ctx, id, by)
 }
 
+func (g draftGates) SupersedeForAgent(ctx context.Context, id int64, session string) (gate.Gate, error) {
+	return g.e.newGates(g.db, g.logf).SupersedeForAgent(ctx, id, session)
+}
+
 func (g draftGates) Withdraw(ctx context.Context, id int64, reason string) error {
 	return g.e.newGates(g.db, g.logf).Withdraw(ctx, id, reason)
 }
@@ -128,6 +152,20 @@ func (g draftGates) Withdraw(ctx context.Context, id int64, reason string) error
 func (g draftGates) RecordSent(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
 	return g.e.newGates(g.db, g.logf).RecordSent(ctx, gt)
 }
+
+// TaskOf is the task the gates service opens gt on, so a draft takes it before its gate opens and is not
+// written again, at a new rev, to adopt it.
+func (g draftGates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
+	return g.e.newGates(g.db, g.logf).TaskOf(ctx, gt)
+}
+
+var _ outbox.TaskPlacer = draftGates{}
+
+func (g draftGates) Decides(ctx context.Context, drafted gate.Gate) error {
+	return g.e.newGates(g.db, g.logf).Decides(ctx, drafted)
+}
+
+var _ outbox.QuestionPins = draftGates{}
 
 func (g draftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	g.e.newGates(g.db, g.logf)
@@ -309,4 +347,31 @@ func proposalText(loaded func() *intentload.Loaded, logf func(string, ...any)) f
 		}
 		return text
 	}
+}
+
+// optionDrafts are the drafts a question's options point to, in the daemon's outbox, read at each pick: the
+// outbox is built after the messages.
+type optionDrafts struct{ draftGates }
+
+func (o optionDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error) {
+	if o.e.outbox == nil {
+		return draft.Draft{}, gate.Gate{}, false, errNoOutboxYet
+	}
+	d, err := o.e.outbox.Store.Get(ctx, draft.ID(id))
+	if errors.Is(err, outbox.ErrNotFound) {
+		return draft.Draft{}, gate.Gate{}, false, nil
+	}
+	if err != nil {
+		return draft.Draft{}, gate.Gate{}, false, err
+	}
+	g, ok, err := o.e.outbox.GateOf(ctx, d)
+	return d, g, ok, err
+}
+
+func (o optionDrafts) WithdrawOther(ctx context.Context, id int64, reason string) error {
+	if o.e.outbox == nil {
+		return errNoOutboxYet
+	}
+	_, err := o.e.outbox.Withdraw(ctx, draft.ID(id), reason)
+	return err
 }

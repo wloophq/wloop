@@ -67,7 +67,7 @@ func init() {
 }
 
 func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
-	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Nudge, Target: "#general", Broadcast: draft.BroadcastOn,
+	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Task: "e1", Kind: draft.Kind("nudge"), Target: "#general", Broadcast: draft.BroadcastOn,
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true, Replaced: "pong",
 		Origin: draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA",
 			Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}, Session: "s-worker"},
@@ -101,7 +101,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	full.Items, full.Rev = []string{}, 1
+	full.Items, full.Rev, full.Version = []string{}, 2, 2
 	if !reflect.DeepEqual(got, full) {
 		t.Fatalf("after update\n %+v\nwant\n %+v", got, full)
 	}
@@ -109,9 +109,9 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 		t.Fatalf("stale update: %v", err)
 	}
 	stale := full
-	stale.Rev = 0
+	stale.Version = 1
 	if _, err := s.Update(ctx, stale, draft.Sent); !errors.Is(err, outbox.ErrConflict) {
-		t.Fatalf("update of an older rev in the same state: %v", err)
+		t.Fatalf("update of an older version in the same state: %v", err)
 	}
 	if _, err := s.Update(ctx, draft.Draft{ID: 99, Unit: slackThread}, draft.Held); !errors.Is(err, outbox.ErrNotFound) {
 		t.Fatalf("update of a missing draft: %v", err)
@@ -182,9 +182,10 @@ func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
 			return err
 		}),
 	}
-	gs := outboxtest.NewGates(clock.Now)
+	gst := db.Gates(clock.Now)
+	gs := outboxtest.GatesOn(gst, gst, clock.Now)
 	gs.Bind(svc)
-	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Items: []string{"i1"}, Kind: draft.Reply, Text: "done",
+	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Items: []string{"i1"}, Kind: draft.Kind("reply"), Text: "done",
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1}})
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +272,7 @@ func TestEditDuringApproveConflicts(t *testing.T) {
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
 	svc, gs := draftService(db, fx)
-	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: "A", Origin: draft.Origin{Kind: draft.OriginTurn}})
+	d, err := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: "A", Origin: draft.Origin{Kind: draft.OriginTurn}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +281,7 @@ func TestEditDuringApproveConflicts(t *testing.T) {
 	go func() { approved <- gs.Approve(ctx, d.ID) }()
 	<-fx.entered
 	fx.entered = nil
-	if _, err := svc.Edit(ctx, d.ID, "B"); err != nil {
+	if _, err := svc.Edit(ctx, d.ID, "B", d.Rev); err != nil {
 		t.Fatal(err)
 	}
 	close(fx.release)
@@ -307,7 +308,7 @@ func TestStaleSendClaimConflicts(t *testing.T) {
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
 	svc, gs := draftService(db, fx)
-	d, _ := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: "old", Origin: draft.Origin{Kind: draft.OriginTurn}})
+	d, _ := svc.Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: "old", Origin: draft.Origin{Kind: draft.OriginTurn}})
 	if err := gs.Approve(ctx, d.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -325,8 +326,11 @@ func TestStaleSendClaimConflicts(t *testing.T) {
 		t.Fatalf("claim from a stale snapshot: %v", err)
 	}
 	svc.Send(ctx)
-	if !slices.Equal(fx.published[d.ID], []string{"new"}) {
-		t.Fatalf("published %v", fx.published)
+	if len(fx.published[d.ID]) != 0 {
+		t.Fatalf("published %v, text no gate approved", fx.published)
+	}
+	if got, _ := db.Drafts().Get(ctx, d.ID); got.State != draft.Failed {
+		t.Fatalf("the draft changed after its approval is %s, want failed", got.State)
 	}
 }
 
@@ -348,7 +352,7 @@ func TestConcurrentSendAcrossHandlesPublishesOnce(t *testing.T) {
 	}
 	const n = 100
 	for i := range n {
-		d, err := svcs[0].Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Reply, Text: fmt.Sprint(i), Origin: draft.Origin{Kind: draft.OriginTurn}})
+		d, err := svcs[0].Propose(ctx, outbox.Proposal{Unit: slackThread, Kind: draft.Kind("reply"), Text: fmt.Sprint(i), Origin: draft.Origin{Kind: draft.OriginTurn}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,21 +394,21 @@ func TestADraftStoresItsShapeAndEffects(t *testing.T) {
 	s := db.Drafts()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	byKind := sampleDraft(slackThread, at)
-	byKind.Kind = draft.Nudge
+	byKind.Kind = draft.Kind("nudge")
 	d, err := s.Insert(ctx, byKind)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.Get(ctx, d.ID); got.Purpose != "nudge" || got.Delivery != draft.Message || got.Effects == nil || len(got.Effects) > 0 || !reflect.DeepEqual(got, d) {
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "nudge" || got.Delivery != "" || got.Effects == nil || len(got.Effects) > 0 || !reflect.DeepEqual(got, d) {
 		t.Fatalf("shaped from its kind: %+v\ninsert returned %+v", got, d)
 	}
 	shaped := sampleDraft(slackThread, at)
-	shaped.Kind, shaped.Purpose, shaped.Delivery, shaped.Effects = draft.React, "close", draft.Reaction, []string{"unit.closed"}
+	shaped.Kind, shaped.Purpose, shaped.Delivery, shaped.Effects = draft.Kind("react"), "close", draft.Delivery("reaction"), []string{"unit.closed"}
 	d, err = s.Insert(ctx, shaped)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.Get(ctx, d.ID); got.Purpose != "close" || got.Delivery != draft.Reaction || !slices.Equal(got.Effects, []string{"unit.closed"}) {
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "close" || got.Delivery != draft.Delivery("reaction") || !slices.Equal(got.Effects, []string{"unit.closed"}) {
 		t.Fatalf("%+v", got)
 	}
 }

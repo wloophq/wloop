@@ -127,6 +127,14 @@ summary = "Fechar a execução parada sem retomá-la."
 by_hand = "Escritos à mão"
 by_hand_about = "Respostas e reações que você mesmo escreveu, esperando o envio."
 quoted = "Cita um item de {conversation}, uma conversa da qual a pessoa não participa."
+stale = "Escrito sobre uma versão anterior de onde vai ser publicado, então não pode ser aprovado: revise ou descarte."
+hold = "Retido para você: nenhuma regra sua o envia."
+
+[drafts.authors]
+person = "Escrito por último por você"
+session = "Escrito por último por um agente"
+rule = "Escrito por último pela sua regra"
+window = "Escrito por último quando a janela passou"
 
 [drafts.purposes]
 nudge = "Cutucar"

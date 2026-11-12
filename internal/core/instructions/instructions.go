@@ -6,6 +6,7 @@ package instructions
 import (
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
@@ -34,6 +35,29 @@ type OpenItem struct{ ID, Kind, Summary, WaitingOn, Since string }
 type Option struct {
 	ID, Label string
 	Publishes bool
+	// Draft is the draft the option points to; nil for none.
+	Draft *record.DraftRef
+}
+
+// Draft points to a draft of the unit: what the agent reads it by, never its text, which draft_read
+// gives. Basis is what the draft was written against, CurrentBasis the unit's now; they differ on a
+// stale draft.
+type Draft struct {
+	ID                 int64
+	Kind, State, Basis string
+	CurrentBasis       string
+	Stale              bool
+}
+
+// Pointers point to ds, with current the unit's basis now, "" when unknown, and stale whether a draft is
+// stale, as the outbox tells it.
+func Pointers(ds []draft.Draft, current string, stale func(draft.Draft) bool) []Draft {
+	out := make([]Draft, 0, len(ds))
+	for _, d := range ds {
+		out = append(out, Draft{ID: int64(d.ID), Kind: string(d.Kind), State: string(d.State), Basis: d.Basis, CurrentBasis: current,
+			Stale: stale(d)})
+	}
+	return out
 }
 
 type Question struct {
@@ -55,6 +79,9 @@ type Resume struct {
 	ArtifactKind, ArtifactBody       string
 	Items                            []Item
 	Notes, Head, CurrentHead, Answer string
+	// Drafts point to the drafts the turn's caller hands the next one, such as a failed or stale one to
+	// revise or withdraw.
+	Drafts []Draft
 }
 
 // History is b's earlier turns, each naming its ledger ops with the outcome
@@ -118,7 +145,7 @@ func fill(r *Resume, asked record.Record) {
 	if q := asked.Question; q != nil {
 		r.Question = &Question{Text: q.Text, Recommend: q.Recommend}
 		for _, o := range q.Options {
-			r.Question.Options = append(r.Question.Options, Option{ID: o.ID, Label: o.Label, Publishes: o.Publishes})
+			r.Question.Options = append(r.Question.Options, Option{ID: o.ID, Label: o.Label, Publishes: o.Publishes, Draft: o.Draft})
 		}
 	}
 	if o := asked.Outcome; o != nil {

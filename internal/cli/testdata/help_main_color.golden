@@ -70,6 +70,7 @@ A work loop for the reviews and pull requests that reach you.
 [bold]FOR AGENTS AND SCRIPTS[/]
   [cyan]instructions[/]           Run a turn by hand from an agent session
   [cyan]turn end/answer[/]        Record how a turn ended; read your answer
+  [cyan]draft[/]                  Propose, read, revise or withdraw your drafts
   [cyan]hook[/]                   The agent hooks install writes
   [cyan]serve[/]                  Run the daemon
   [cyan]app[/]                    macOS: the menu bar and notifications

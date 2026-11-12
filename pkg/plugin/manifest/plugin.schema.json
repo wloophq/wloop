@@ -113,6 +113,10 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "emoji": {
+                "description": "A draft with this delivery adds or removes an emoji, named by its reaction, and has no text.",
+                "type": "boolean"
+              },
               "name": {
                 "description": "The delivery's name, such as \"comment\". Required.",
                 "type": "string"
@@ -134,16 +138,68 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "basis": {
+                "description": "Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none.",
+                "enum": [
+                  "agent"
+                ],
+                "type": "string"
+              },
               "delivery": {
                 "description": "How it is posted, one of deliveries; empty is default_delivery.",
                 "type": "string"
+              },
+              "editable": {
+                "description": "What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\".",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "facts": {
+                "description": "The payload fields an approval rule reads.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "description": "The fact's name, draft.\u003cprovider\u003e.\u003ckind\u003e.\u003cfield\u003e. Required.",
+                      "type": "string"
+                    },
+                    "pointer": {
+                      "description": "The JSON pointer to the field in the payload, which the schema makes a required string enum. Required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "pointer"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               },
               "name": {
                 "description": "The kind's name, such as \"nudge\". Required.",
                 "type": "string"
               },
+              "preview": {
+                "description": "The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides.",
+                "type": "string"
+              },
               "purpose": {
                 "description": "What a draft of the kind is for; empty is its name.",
+                "type": "string"
+              },
+              "schema": {
+                "description": "The JSON schema of the kind's payload, a path in the plugin's directory such as \"drafts/review/schema.json\"; the publisher posts the payload verbatim.",
+                "type": "string"
+              },
+              "text_required": {
+                "description": "A draft of the kind needs a text.",
+                "type": "boolean"
+              },
+              "verdict": {
+                "description": "The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as \"/event\", which the schema makes a required string enum; empty posts none.",
                 "type": "string"
               }
             },
@@ -495,6 +551,20 @@
           },
           "type": "array"
         },
+        "session": {
+          "additionalProperties": false,
+          "description": "What the agent sessions of an intent that sets source_writes = false may not run.",
+          "properties": {
+            "write_commands": {
+              "description": "The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
         "signals": {
           "description": "The link signals the plugin reports, read as task.link_signal.\u003cname\u003e.",
           "items": {
@@ -620,6 +690,14 @@
                   "now"
                 ],
                 "type": "string"
+              },
+              "proposes": {
+                "description": "The tool only proposes drafts the user approves, so a session policy may allow it without a prompt.",
+                "type": "boolean"
+              },
+              "reads": {
+                "description": "The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt.",
+                "type": "boolean"
               }
             },
             "required": [

@@ -40,7 +40,7 @@ type sandbox struct {
 	l   *live
 	prs []pr.Ref
 	// answered is a review chain whose held draft an answer through the API
-	// published, for S5 to check.
+	// approved, which the daemon then posted, for S5 to check.
 	answered *answeredChain
 }
 
@@ -218,14 +218,14 @@ func lastRecord(b liveBook, seq int64) (turn.Record, bool) {
 	return turn.Record{}, false
 }
 
-// option is the option an answer picks: the one that publishes, else the
+// option is the option an answer picks: the one that points to a draft, whose pick approves it, else the
 // recommended one, else the first.
 func option(q *record.Question) string {
 	if q == nil || len(q.Options) == 0 {
 		return ""
 	}
 	for _, o := range q.Options {
-		if o.Publishes {
+		if o.Draft != nil {
 			return o.ID
 		}
 	}
@@ -238,8 +238,9 @@ func option(q *record.Question) string {
 }
 
 // settle waits for turn seq's chain to end; a question on the way is
-// answered through the API from source. It returns the final record and
-// whether a held review draft was answered.
+// answered through the API from source. A turn done on a draft ends once the
+// draft's send fills its url. It returns the final record and whether an
+// option pointing to a held draft was picked.
 func (s *sandbox) settle(t *testing.T, r pr.Ref, seq int64, source turn.Source) (turn.Record, bool) {
 	t.Helper()
 	answeredDraft := false
@@ -252,6 +253,9 @@ func (s *sandbox) settle(t *testing.T, r pr.Ref, seq int64, source turn.Source) 
 		}
 		switch rec.Record.State {
 		case record.Done, record.Settled:
+			if o := rec.Record.Outcome; o != nil && o.Draft != nil && o.URL == "" {
+				return false, fmt.Sprintf("done on draft %d, waiting for its send", o.Draft.ID)
+			}
 			final = rec
 			return true, ""
 		case record.Failed:
@@ -264,7 +268,7 @@ func (s *sandbox) settle(t *testing.T, r pr.Ref, seq int64, source turn.Source) 
 			if id == "" {
 				t.Fatalf("turn %d asks without options: %+v", seq, rec.Record)
 			}
-			if rec.Record.Artifact != nil && rec.Record.Artifact.Kind == "review-draft" {
+			if i := slices.IndexFunc(rec.Record.Question.Options, func(o record.Option) bool { return o.ID == id }); i >= 0 && rec.Record.Question.Options[i].Draft != nil {
 				answeredDraft = true
 				s.answered = &answeredChain{url: r.URL(), seq: seq, asked: rec.TurnSeq, optionID: id}
 			}
@@ -315,7 +319,7 @@ func (s *sandbox) followUp(t *testing.T, r pr.Ref) {
 		t.Fatalf("the follow-up's trigger is %s", follow.Trigger)
 	}
 	text := b.instructions(follow.ID)
-	for _, want := range []string{"### Earlier turns", s1.Record.Summary, "endorsed:", "#### Follow-up approval rule"} {
+	for _, want := range []string{"### Earlier turns", s1.Record.Summary, "endorsed:"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the follow-up's instructions lack %q", want)
 		}
@@ -470,8 +474,8 @@ func (s *sandbox) addressRounds(t *testing.T) {
 func (s *sandbox) heldQuestion(t *testing.T) {
 	if s.answered != nil {
 		b := bookOf(t, s.answered.url)
-		if a, ok := b.answer(s.answered.asked, s.answered.optionID); !ok || a.Route != turn.Typed || a.Source != turn.TUI {
-			t.Errorf("the earlier answer %s reads %+v, want typed from tui", s.answered.optionID, a)
+		if a, ok := b.answer(s.answered.asked, s.answered.optionID); !ok || a.Route != turn.Approved || a.Source != turn.TUI {
+			t.Errorf("the earlier answer %s reads %+v, want approved from tui", s.answered.optionID, a)
 		}
 		if got := b.Endorsed(s.answered.seq); got != turn.EndorsedApproved {
 			t.Errorf("the answered automated chain reads endorsed %q, want %q", got, turn.EndorsedApproved)
@@ -479,10 +483,11 @@ func (s *sandbox) heldQuestion(t *testing.T) {
 		return
 	}
 	r := s.openBotPR(t, s.l.name("s5"))
-	command(t, "review", r.URL(), "Do not publish. Record state asked with your drafted review as a review-draft artifact and a choice whose publishing options carry publishes: true.")
+	command(t, "review", r.URL(), "Propose your review with github_draft and hold: true, so it waits for the user. Then record state asked "+
+		"with your drafted review as a review-draft artifact and a choice whose posting option points to that draft (its id and rev) and whose other option posts nothing.")
 	var asked turn.Record
 	var seq int64
-	waitFor(t, roundWait, "the review asks with its held draft", func() (bool, string) {
+	waitFor(t, roundWait, "the review asks with an option pointing to its held draft", func() (bool, string) {
 		b := bookOf(t, r.URL())
 		x, ok := newTurn(b, turn.Intent(dintent.Review), 0)
 		if !ok {
@@ -490,7 +495,8 @@ func (s *sandbox) heldQuestion(t *testing.T) {
 		}
 		seq = x.Seq
 		rec, ok := lastRecord(b, x.Seq)
-		if ok && rec.Record.State == record.Asked && rec.Record.Question != nil && len(rec.Record.Question.Options) > 0 {
+		if ok && rec.Record.State == record.Asked && rec.Record.Question != nil &&
+			slices.ContainsFunc(rec.Record.Question.Options, func(o record.Option) bool { return o.Draft != nil }) {
 			asked = rec
 			return true, ""
 		}
@@ -499,23 +505,23 @@ func (s *sandbox) heldQuestion(t *testing.T) {
 	id := option(asked.Record.Question)
 	s.l.answer(t, r, id, turn.TUI)
 	var final turn.Record
-	waitFor(t, roundWait, "the answered review publishes", func() (bool, string) {
+	waitFor(t, roundWait, "the daemon posts the draft the answer approved and the turn ends done", func() (bool, string) {
 		b := bookOf(t, r.URL())
-		if a, ok := b.answer(asked.TurnSeq, id); ok && a.Route != turn.Pending && a.Route != turn.Queued && a.Route != turn.Typed {
-			t.Fatalf("the answer went %s, want typed", a.Route)
+		if a, ok := b.answer(asked.TurnSeq, id); ok && a.Route != turn.Pending && a.Route != turn.Approved {
+			t.Fatalf("the answer went %s, want approved: it approves the draft and resumes nothing", a.Route)
 		}
 		rec, ok := lastRecord(b, seq)
-		if ok && rec.Record.State == record.Done {
+		if ok && rec.Record.State == record.Done && rec.Record.Outcome != nil && rec.Record.Outcome.URL != "" {
 			final = rec
 			return true, ""
 		}
 		return false, fmt.Sprintf("records %+v", b.Records)
 	})
-	if final.Record.Outcome == nil || !slices.Contains(reviewURLs(t, r.Number), final.Record.Outcome.URL) {
-		t.Fatalf("the published review is not on GitHub: %+v", final.Record.Outcome)
+	if o := final.Record.Outcome; o.Draft == nil || !o.Approved || !slices.Contains(reviewURLs(t, r.Number), o.URL) {
+		t.Fatalf("the posted review is not on GitHub, or not the approved draft: %+v", o)
 	}
-	if b := bookOf(t, r.URL()); b.Endorsed(seq) != turn.EndorsedByHand {
-		t.Errorf("endorsed %q, want %q", b.Endorsed(seq), turn.EndorsedByHand)
+	if b := bookOf(t, r.URL()); b.Endorsed(seq) != turn.EndorsedApproved {
+		t.Errorf("endorsed %q, want %q: the user approved the posted draft", b.Endorsed(seq), turn.EndorsedApproved)
 	}
 }
 

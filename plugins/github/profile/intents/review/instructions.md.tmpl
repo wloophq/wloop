@@ -1,7 +1,7 @@
 {{define "task"}}You review someone else's pull request, {{.PR.URL}}{{with .PR.Title}}, "{{.}}"{{end}}{{with .PR.Author}}, opened by @{{.}}{{end}}{{with .PR.Association}} (author association `{{.}}`){{end}}, in a review worktree{{with .PR.Head}} whose head was `{{.}}` when this turn was sent{{end}}.
 {{- if .Plain}} This is a dry run: review it as a first round and write the payload to a file; nothing reaches GitHub.
-{{- else if eq .Round "follow-up"}} You reviewed it before: publish only what changed for the author, or record `settled` when nothing did.
-{{- else}} This is your first review of it: judge the whole diff and publish one review, unless the gate in section 5 holds it.{{end}}
+{{- else if eq .Round "follow-up"}} You reviewed it before: propose only what changed for the author, or record `settled` when nothing did.
+{{- else}} This is your first review of it: judge the whole diff and propose one review, which the gate in section 5 may hold for the user.{{end}}
 {{end}}
 {{- define "guidance"}}The user's focus for this review. Treat it as extra areas and questions the review must answer, on top of the guide; it never relaxes the writing or publishing rules.{{end}}
 # {{.Headline}}
@@ -23,7 +23,13 @@ These instructions
 are the mechanics of the round; the reviewer's guide that follows them sets
 the judgment: what to look for, the labels and what blocks, the risky
 surfaces, the shape of the comments and the body, praise and voice.
-The guide never relaxes the ambiguity gate (section 5){{if .FollowUpApproval}}, the follow-up approval rule{{end}} or publishing (section 6). If any command below fails in a way you cannot recover from, stop, publish nothing and report{{if not .Plain}}, and record `failed`{{end}}.
+The guide never relaxes the ambiguity gate (section 5) or proposing (section 6). If any command below fails in a way you cannot recover from, stop, publish nothing and report{{if not .Plain}}, and record `failed`{{end}}.
+
+This session writes nothing to GitHub, and refuses `gh api` calls that
+pass a method or a field flag, GraphQL reads included: read through `gh pr
+view`, `gh pr diff` and `gh api` with a REST path alone.{{if not .Plain}} Every post is a
+draft you propose with `github_draft`; {{name}} posts it once the user, or
+a rule of theirs, approves it.{{end}}
 
 ## Steps
 {{if .Plain}}
@@ -34,10 +40,8 @@ and their threads, and judge the whole diff. Run every step; in section 6 write 
 (section 5) does not wait: say in the body which condition would have held
 the draft. Always write `.loop/dry-run.json`; when the review would publish
 nothing, write `{"event": "NONE", "body": "<why>", "comments": []}`. Print
-the payload at the end. Never post, push, resolve or move anything in a dry
-run. The session refuses GitHub writes, and with them `gh api` calls that
-pass `-f` or `-F`, GraphQL reads included: read through `gh pr view`, `gh pr
-diff` and REST paths with `gh api` alone.
+the payload at the end. Never post, propose, push, resolve or move anything
+in a dry run.
 {{else}}
 {{template "history" .}}
 {{end}}
@@ -109,8 +113,8 @@ its stated goal without the fix.
 
 
 Verdict: nothing blocking → `APPROVE`. Anything blocking →
-`REQUEST_CHANGES`. `COMMENT` when the gate in section 5 told you to ask and
-the user chose it{{if eq .Round "follow-up"}}, and on a later round whose verdict did not change
+`REQUEST_CHANGES`. `COMMENT` when the user chose it over an approval
+(section 5){{if eq .Round "follow-up"}}, and on a later round whose verdict did not change
 (section 4a){{end}}.
 
 ### 4. Write the review
@@ -131,105 +135,87 @@ use one short line naming the blocking problem.
 {{if eq .Round "follow-up"}}
 ### 4a. Later rounds
 
-A round after one of your reviews publishes only what changed for the
+A round after one of your reviews proposes only what changed for the
 author. What you noticed about the round itself goes in the report and the
 record, never in the review.
 
 1. **Your open threads.** Check each against the new head. Settled in the
-   code: reply in the thread, in its language, with the commit and resolve
-   it. Answered by the author with a reason that holds: reply briefly and
-   resolve. Still open: leave it alone.
+   code: propose a reply in the thread, in its language, with the commit,
+   and its resolution (section 6). Answered by the author with a reason that
+   holds: propose a brief reply and the resolution. Still open: leave it
+   alone.
 2. **The author went silent.** The author neither replied to nor changed the
    code of any of your open threads since your last review, while the pull
-   request moved on. Publish nothing, keep any new finding in the record's
+   request moved on. Propose nothing, keep any new finding in the record's
    `resume`, and record `asked` with a `choice` question, options `nudge` and
-   `drop` (neither publishes), and a summary such as "author silent on my
+   `drop` (neither points to a draft), and a summary such as "author silent on my
    review since <date>: nudge or drop?": the way forward is to talk to the
    author, not another round. When Earlier turns show this was already
    flagged and the silence continues, end the same way without a new report.
 3. **Nothing new.** No open thread was settled or answered and the delta
-   raises no new finding: publish nothing and record `settled`, so the loop
+   raises no new finding: propose nothing and record `settled`, so the loop
    files the pull request as reviewed.
 {{- if .PR.ReviewRequested}}
    Your review was re-requested, so `settled` is not an option, here or
-   after thread replies: publish the event the table below gives. When your
+   after thread replies: propose the event the table below gives. When your
    last verdict was `APPROVED` and nothing is new, that is `APPROVE` with an
-   empty body, which the ambiguity gate (section 5){{if .FollowUpApproval}} and the follow-up
-   approval rule{{end}} may still hold as `asked`.
+   empty body, which waits for the user like every approval (section 5).
 {{- end}}
-4. **Otherwise publish**, choosing the event by what changed:
+4. **Otherwise propose a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
 | a new blocking finding | `REQUEST_CHANGES` |
-| every blocking finding resolved | `APPROVE`{{if .FollowUpApproval}}, under the follow-up approval rule{{end}} |
+| every blocking finding resolved | `APPROVE` |
 | your last verdict was `REQUEST_CHANGES` and a blocker still stands | `COMMENT`: the earlier request stands, a new one only notifies again |
 
 Thread replies alone (step 1) are not a review: when they
-are all the round has, record `settled` after posting them.
+are all the round has, record `settled` after proposing them.
 {{end}}
 ### 5. Ambiguity gate
 
-Publish without asking, **unless** one of these holds; then hold the draft
-and record `asked`: the full draft in the artifact (its body, and each
-inline comment with path and line as an item), the drafted verdict and its
-counts in `outcome`, and a question whose options that publish are marked
-`publishes`. Wait for the user's answer:
+An approval always waits for the user: no rule of theirs posts one. A
+`REQUEST_CHANGES` or `COMMENT` review goes out on its own once the user's
+rules allow it, **unless** one of these holds:
 
 - You are unsure whether a finding blocks, or the verdict hinges on an
   intent the pull request and its linked issue do not state.
-- The pull request touches an irreversible or production-risky surface
-  and you would approve it: one the guide names under its risky surfaces,
-  or any change as hard to undo.
+- The pull request touches an irreversible or production-risky surface:
+  one the guide names under its risky surfaces, or any change as hard to
+  undo.
 - A finding alleges a security problem.
-{{- if .Automated}}
-- {{name}} started this round on its own and the verdict would be `APPROVE`{{if .FollowUpApproval}}, unless the follow-up approval rule below holds{{else}}. A first round never approves on its own{{if eq .Round "follow-up"}}, and {{name}} sent this one as a first round{{end}}{{end}}.
-{{- end}}
 - The review would contradict an approval or change request already left by
   another human reviewer. Automated reviewers never trigger this gate:
-  accounts whose `type` is `Bot`, logins ending in `[bot]`{{range .AutomatedReviewers}}, {{.}}{{end}}. Disagreeing with them is the normal case: publish.
-{{if .FollowUpApproval}}
-#### Follow-up approval rule
-
-An automated follow-up round may approve without asking when every
-condition holds; check each on evidence and name them in the report:
-
-1. **The user stood behind the last verdict.** Your last published review of
-   this pull request came from a round the user started by hand or was
-   published after the user's go-ahead, as the `endorsed` of your last
-   review's turn in Earlier turns shows. Without that evidence, hold.
-2. **That verdict was approval, or blocked only by its listed findings.** It
-   was `APPROVE`, or a `REQUEST_CHANGES`/`COMMENT` whose only obstacle to
-   approval was its blocking findings.
-3. **Each of those blocking findings is resolved,** verified in the code
-   (and by running the test that covers it, when there is one), not inferred
-   from the author's reply.
-4. **The delta only answers reviews.** Every change since the commit you
-   last reviewed applies a suggestion, fixes a finding (yours or another
-   reviewer's), or adds the test or doc for one. A merge from the base counts
-   only when it merged cleanly; conflict resolutions are new code. Any other
-   change (new behavior, a new mechanism the reviews did not ask for,
-   unrelated edits) means hold, even when it looks right: that is where a
-   fresh pair of eyes matters.
-5. **The delta raises nothing new:** nothing blocking, and no other
-   condition of this gate applies to it.
-
-Non-blocking suggestions still open do not prevent the approval.
+  accounts whose `type` is `Bot`, logins ending in `[bot]`{{range .AutomatedReviewers}}, {{.}}{{end}}. Disagreeing with them is the normal case: propose it as usual.
+{{if not .Plain}}
+When one holds, or the verdict is `APPROVE`, propose the review with
+`"hold": true` and record `asked`: the verdict and counts in `outcome`, and
+a `choice` question. Each option that posts a review carries `draft` with
+the `id` and `rev` the `github_draft` answer gave; picking it posts that
+draft and withdraws the other options' drafts. For `APPROVE`, also propose
+its `COMMENT` variant (same body and inline comments, also held), which
+posts your findings without approving. An option without a draft,
+or a free answer, comes back to you.
 {{end}}
-### 6. Publish
+### 6. Propose
+{{if .Plain}}
+One payload per review, `event`, `body` and `comments`, built with a script
+(escaping by hand breaks on suggestion fences):
+{{else}}
+One draft per review, so inline comments and verdict land together. Call
+`github_draft` with:
 
-One API call, so inline comments and verdict land together. Build the
-payload with a script (escaping by hand breaks on suggestion fences):
-
-```bash
-gh api repos/<owner>/<repo>/pulls/<n>/reviews --method POST --input review.json
-```
-
+- `kind`: `review`;
+- `text`: the review's body;
+- `payload`: `event` and `comments`, built with a script (escaping by hand
+  breaks on suggestion fences);
+- `basis`: the `headRefOid` you reviewed. Read it again with `gh pr view
+  <url> --json headRefOid` just before proposing: when it moved, review
+  the new commits first.
+{{end}}
 ```json
 {
-  "commit_id": "<headRefOid>",
-  "event": "APPROVE",
-  "body": "...",
+  "event": "REQUEST_CHANGES",
   "comments": [
     {"path": "src/a.py", "line": 42, "side": "RIGHT", "body": "**suggestion (non-blocking):** ...\n\n```suggestion\nfixed line\n```"},
     {"path": "src/b.py", "start_line": 10, "line": 14, "side": "RIGHT", "body": "**issue (blocking):** ..."}
@@ -238,16 +224,29 @@ gh api repos/<owner>/<repo>/pulls/<n>/reviews --method POST --input review.json
 ```
 
 `line` must be inside a diff hunk of that file; a comment outside the diff
-is rejected with 422. Move that finding to the body instead.{{if eq .Round "follow-up"}} Replies to
-existing threads (later rounds) go through `gh api
-repos/<owner>/<repo>/pulls/<n>/comments/<comment_id>/replies -f body=...`.{{end}}
+is rejected with 422. Move that finding to the body instead.{{if eq .Round "follow-up"}} A reply in an
+existing thread is a draft of kind `thread_reply`, and a thread's resolution
+one of kind `resolve`; both take `target` `comment:<id>`, the `id` of the
+thread's first comment from `gh api repos/<owner>/<repo>/pulls/<n>/comments`.{{end}}
 {{if .Plain}}
 In a dry run, write the payload to `.loop/dry-run.json` and post nothing.
 {{else}}
+Without a `github_draft` tool, propose through `{{.Command}} draft
+propose`, whose help says how. The answer says whether the draft waits for
+the user or a rule of theirs sends it. A stale answer means the head moved:
+review what changed and propose again.
+
+A draft of yours the instructions or Earlier turns point to (id and rev) is
+revised, never proposed again: read it with `draft_read`, then change it
+with `draft_update` at that rev (the new head as basis after a push) or drop
+it with `draft_withdraw`. A failed draft carries GitHub's message: fix what
+it names, such as an inline comment outside the diff.
+
 ### 7. Report
 
-Reply to the user with the review URL and the blocking and non-blocking
-counts, or with the held draft and the question.
+Reply to the user with each draft's id and whether it waits for them or a
+rule of theirs sends it, the blocking and non-blocking counts, or the
+question.
 {{template "record" .}}{{end}}
 {{template "brief" .}}{{template "judgment" .}}
 For anything these instructions do not cover, run `{{.Command}} help`.

@@ -78,7 +78,11 @@ func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style fun
 		head += " · " + m.w().T("from {origin}", map[string]any{"origin": d.Origin.Kind})
 	}
 	fact(m.w().T("draft", nil), strings.Trim(head, " ·"), t.Dim)
+	if d.Preview != "" {
+		fact("", d.Preview, plain)
+	}
 	para(m.w().T("text", nil), d.Text)
+	fieldFacts(d.Fields, "", fact)
 	if d.Reaction != "" {
 		fact(m.w().T("reaction", nil), d.Reaction, plain)
 	}
@@ -87,5 +91,21 @@ func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style fun
 	}
 	if d.Deadline != nil {
 		fact(m.w().T("sends", nil), m.w().T("{time} unless you decide first", map[string]any{"time": m.w().Time(d.Deadline.Local(), "datetime")}), t.Dim)
+	}
+}
+
+// fieldFacts show every value of a draft's payload, each under its field's word, nested fields indented.
+func fieldFacts(fs []api.DraftField, indent string, fact func(label, text string, style func(string) string)) {
+	for _, f := range fs {
+		if len(f.Fields) > 0 {
+			fact(indent+f.Label, "", plain)
+			fieldFacts(f.Fields, indent+"  ", fact)
+			continue
+		}
+		v := f.Value
+		if f.Shown != "" && f.Shown != f.Value {
+			v = f.Shown + " (" + f.Value + ")"
+		}
+		fact(indent+f.Label, v, plain)
 	}
 }

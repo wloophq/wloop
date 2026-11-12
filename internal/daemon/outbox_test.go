@@ -34,7 +34,7 @@ func (r *outboxRig) proposeAs(t *testing.T, p outbox.Proposal) draft.Draft {
 		p.Unit = r7u
 	}
 	if p.Kind == "" && p.Purpose == "" {
-		p.Kind = draft.Reply
+		p.Kind = draft.Kind("reply")
 	}
 	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Wait})
 	d, err := r.o.Propose(context.Background(), p)

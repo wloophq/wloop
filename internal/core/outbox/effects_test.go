@@ -106,7 +106,7 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	if got := l.names(); len(got) != 2 {
 		t.Fatalf("applied again: %v", got)
 	}
-	stored, err := e.insertApproved(draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
+	stored, err := e.insertApproved(draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Delivery("message"), Text: "an effect nobody implements now",
 		State: draft.Queued, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 	e.store.drafts = append(e.store.drafts, before)
 
 	delete(l.fail, "task.nudged")
-	restarted := &Service{Store: e.store, Effects: e.svc.Effects, Clock: e.clock,
+	restarted := &Service{Store: e.store, Kinds: e.svc.Kinds, Effects: e.svc.Effects, Clock: e.clock,
 		Applier: EffectApplier{Store: memApplied{e.store}, Effects: l.lookup, Clock: e.clock}}
 	for range 2 {
 		if err := restarted.Recover(ctx); err != nil {
@@ -167,10 +167,11 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 func TestNoEffectIsDerivedFromKind(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
-	for _, k := range draft.Kinds {
+	for k := range testKinds {
+		k := draft.Kind(k)
 		p := reply("closing")
 		p.Kind = k
-		if k == draft.React {
+		if k == draft.Kind("react") {
 			p.Reaction = "white_check_mark"
 		}
 		if d := e.sendNow(t, p); d.State != draft.Sent || len(d.Effects) != 0 {
@@ -189,22 +190,22 @@ func TestDuplicateReadsPurposeDeliveryAndRepeatAfter(t *testing.T) {
 			Policy: draft.Fixed(draft.Approval{Mode: a}), RepeatAfter: time.Hour,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "closure", Rule: "closure", Key: thread.String()}}
 	}
-	first := e.propose(auto("close", draft.Message, draft.Wait))
-	if d, err := e.svc.Propose(ctx, auto("close", draft.Message, draft.Wait)); !errors.Is(err, ErrDuplicate) || d.ID != first.ID {
+	first := e.propose(auto("close", draft.Delivery("message"), draft.Wait))
+	if d, err := e.svc.Propose(ctx, auto("close", draft.Delivery("message"), draft.Wait)); !errors.Is(err, ErrDuplicate) || d.ID != first.ID {
 		t.Fatalf("same purpose and delivery: %+v %v", d, err)
 	}
-	for _, p := range []Proposal{auto("close", draft.Reaction, draft.Wait), auto("thanks", draft.Message, draft.Wait)} {
+	for _, p := range []Proposal{auto("close", draft.Delivery("reaction"), draft.Wait), auto("thanks", draft.Delivery("message"), draft.Wait)} {
 		if _, err := e.svc.Propose(ctx, p); err != nil {
 			t.Fatalf("%s %s: %v", p.Purpose, p.Delivery, err)
 		}
 	}
-	observed := e.propose(auto("observed", draft.Message, draft.DryRun))
+	observed := e.propose(auto("observed", draft.Delivery("message"), draft.DryRun))
 	e.clock.now = t0.Add(59 * time.Minute)
-	if _, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.DryRun)); !errors.Is(err, ErrDuplicate) {
+	if _, err := e.svc.Propose(ctx, auto("observed", draft.Delivery("message"), draft.DryRun)); !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("inside RepeatAfter: %v", err)
 	}
 	e.clock.now = t0.Add(time.Hour)
-	if d, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.DryRun)); err != nil || d.ID == observed.ID {
+	if d, err := e.svc.Propose(ctx, auto("observed", draft.Delivery("message"), draft.DryRun)); err != nil || d.ID == observed.ID {
 		t.Fatalf("past RepeatAfter: %+v %v", d, err)
 	}
 }
@@ -212,7 +213,7 @@ func TestDuplicateReadsPurposeDeliveryAndRepeatAfter(t *testing.T) {
 func TestACommentDraftWaitsForAPersonWhateverItsMode(t *testing.T) {
 	e := newEnv()
 	for _, mode := range []draft.Approval{{Mode: draft.Send}, {Mode: draft.Delay, Window: time.Minute}} {
-		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Policy: draft.Fixed(mode),
+		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.Delivery("comment"), Text: "any news?", Policy: draft.Fixed(mode),
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
 		d := e.propose(p)
 		if d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {

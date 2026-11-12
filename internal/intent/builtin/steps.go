@@ -1,7 +1,6 @@
 package builtin
 
 import (
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -42,10 +41,11 @@ const (
 
 // The values of draft.propose's arguments.
 var (
-	DraftDeliveries = []string{string(draft.Message), string(draft.Reaction)}
-	// DraftEmojiDeliveries are the deliveries that post an emoji, which
-	// need the reaction argument, and no text.
-	DraftEmojiDeliveries = []string{"reaction"}
+	// DraftDeliveries are the deliveries the merged plugins declare, which Install sets.
+	DraftDeliveries []string
+	// DraftEmojiDeliveries are the deliveries the merged plugins mark emoji, which need the reaction argument,
+	// and no text; Install sets them.
+	DraftEmojiDeliveries []string
 	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
 	DraftPer             = []string{"unit", "person"}
 	DraftTargets         = []string{"unit", "item", DraftTargetPerson}
@@ -62,6 +62,13 @@ var (
 
 // TurnRunners are the values of turn.start's runner.
 var TurnRunners = []string{"session", "headless"}
+
+// TurnDue are the values of turn.start's due, its default first: plan sends a round only when the unit's plan
+// holds it due; when sends one whenever the workflow's when matches.
+var TurnDue = []string{"plan", TurnDueWhen}
+
+// TurnDueWhen is the due of a turn.start whose workflow's when alone decides that its round is due.
+const TurnDueWhen = "when"
 
 // TurnOpenQuestion are the values of turn.start's open_question, its default first.
 var TurnOpenQuestion = []string{"hold", QuestionReplaceIfMoved}

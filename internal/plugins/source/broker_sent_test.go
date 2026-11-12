@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -26,7 +27,7 @@ import (
 type memDrafts struct{ ds []draft.Draft }
 
 func (m *memDrafts) Insert(_ context.Context, d draft.Draft) (draft.Draft, error) {
-	d.ID = draft.ID(len(m.ds) + 1)
+	d.ID, d.Rev, d.Version = draft.ID(len(m.ds)+1), 1, 1
 	m.ds = append(m.ds, d)
 	return d, nil
 }
@@ -64,7 +65,7 @@ func TestSlackToolPostIsARecordedSentGate(t *testing.T) {
 	now := func() time.Time { return at }
 	gs := outboxtest.NewGates(now)
 	store := &memDrafts{}
-	ob := gs.Bind(&outbox.Service{Store: store, Clock: clockOf(now),
+	ob := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: store, Clock: clockOf(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return nil, outbox.ErrDisabled }})
 	thread := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000000.000100"}
 	book := dturn.Book{Unit: thread, Turns: []dturn.Turn{{Seq: 3, Intent: "reply", Session: "live"}}}
@@ -103,3 +104,5 @@ type clockOf func() time.Time
 func (c clockOf) Now() time.Time { return c() }
 
 func outboxGateQuery() gates.Query { return gates.Query{Kind: gate.KindDraft} }
+
+func (m *memDrafts) Revisions(context.Context, draft.ID) ([]draft.Revision, error) { return nil, nil }

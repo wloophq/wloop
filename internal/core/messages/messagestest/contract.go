@@ -16,6 +16,27 @@ func Contract(t *testing.T, newStore func(t *testing.T) message.Store) {
 	t.Run("ledger proposals key by proposal", func(t *testing.T) { ledgerKeysByProposal(t, newStore(t)) })
 	t.Run("workflow proposals key by rule while open", func(t *testing.T) { workflowKeysWhileOpen(t, newStore(t)) })
 	t.Run("an id updates its row", func(t *testing.T) { idUpdates(t, newStore(t)) })
+	t.Run("pins keep their drafts", func(t *testing.T) { pinsKept(t, newStore(t)) })
+}
+
+func pinsKept(t *testing.T, s message.Store) {
+	ctx := context.Background()
+	q := message.Message{Unit: u, Kind: message.Question, Text: "Post the review?", Confirm: true, Draft: &record.DraftRef{ID: 42, Rev: 1},
+		Origin: message.Origin{Kind: message.OriginTurn, TurnSeq: 3, Session: "term_1"}, CreatedAt: at}
+	first, err := s.Upsert(ctx, q)
+	if err != nil || first.Draft == nil || *first.Draft != (record.DraftRef{ID: 42, Rev: 1}) {
+		t.Fatalf("confirm pin: %+v %v", first, err)
+	}
+	q.ID, q.Draft = first.ID, &record.DraftRef{ID: 42, Rev: 2}
+	if got, err := s.Upsert(ctx, q); err != nil || got.Draft == nil || got.Draft.Rev != 2 {
+		t.Fatalf("a re-pinned confirm: %+v %v", got, err)
+	}
+	q.Confirm, q.Draft = false, nil
+	q.Options = []record.Option{{ID: "a", Label: "A", Consequence: "c", Draft: &record.DraftRef{ID: 43, Rev: 1}}, {ID: "b", Label: "B", Consequence: "c"}}
+	got, err := s.Upsert(ctx, q)
+	if err != nil || got.Draft != nil || len(got.Options) != 2 || got.Options[0].Draft == nil || *got.Options[0].Draft != (record.DraftRef{ID: 43, Rev: 1}) {
+		t.Fatalf("option pins: %+v %v", got, err)
+	}
 }
 
 var (

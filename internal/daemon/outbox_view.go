@@ -56,7 +56,8 @@ func (v gatesView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error)
 
 // gateTask is the task gate g stands as in a view: a draft's own task, which takes the properties of the task
 // the gate is on that it does not set itself, so the area and contexts narrow it as they do that task; else
-// the task the gate is on; false for a gate on no task.
+// the task the gate is on, as for a held draft an open question pins, which only that question decides; false for a
+// gate on no task.
 func (s *Server) gateTask(ctx context.Context, g gateIn) (task.Task, bool, error) {
 	var on task.Task
 	if g.gate.Task != "" {
@@ -66,7 +67,7 @@ func (s *Server) gateTask(ctx context.Context, g gateIn) (task.Task, bool, error
 			return task.Task{}, false, err
 		}
 	}
-	if g.draft == nil {
+	if g.draft == nil || g.draft.State == draft.Held && s.openPins(ctx)[int64(g.draft.ID)] != 0 {
 		return on, on.ID != "", nil
 	}
 	e, err := draftTask(*g.draft, g.gate, s.unitLabel(g.draft.Unit), s.loaded().Tasks)

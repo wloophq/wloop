@@ -14,6 +14,7 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -21,8 +22,11 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/turn"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
 // The workspace builtins whose role links a worktree to the pull request.
@@ -268,12 +272,78 @@ const policyRound = builtin.PolicyRound
 // policies are the agent policies a manifest's policy names, for a session
 // of intent; none may run or read the managers' control surface.
 var policies = map[string]func(e *Env, intent dintent.Name, control turns.Control) turns.Policy{
-	policyRound: func(e *Env, _ dintent.Name, control turns.Control) turns.Policy {
-		return roundPolicy(e.loopCommand(), prIntents(e.loadedIntents().Registry)).Denied(control)
+	policyRound: func(e *Env, intent dintent.Name, control turns.Control) turns.Policy {
+		p := roundPolicy(e.loopCommand(), prIntents(e.loadedIntents().Registry))
+		p.DraftTools = draftTools(e.loadedSources())
+		return e.withoutSourceWrites(intent, p).Denied(control)
 	},
 	builtin.PolicyProbe: func(e *Env, intent dintent.Name, control turns.Control) turns.Policy {
-		return probePolicy(e.loopCommand(), []string{string(intent)}).Denied(control)
+		return e.withoutSourceWrites(intent, probePolicy(e.loopCommand(), []string{string(intent)})).Denied(control)
 	},
+}
+
+// withoutSourceWrites is p denying, when intent's manifest sets source_writes = false, every command a loaded
+// plugin's manifest declares as a write to its source.
+func (e *Env) withoutSourceWrites(intent dintent.Name, p turns.Policy) turns.Policy {
+	d, ok := e.loadedIntents().Registry.Get(intent)
+	if !ok {
+		return p
+	}
+	return p.WithoutSourceWrites(d.Session, writeCommands(e.loadedSources()))
+}
+
+// writeCommands are the command prefixes srcs declare as writes to their sources, as words.
+func writeCommands(srcs []*manifest.Source) [][]string {
+	var out [][]string
+	for _, s := range srcs {
+		for _, c := range s.Session.WriteCommands {
+			if words := strings.Fields(c); len(words) > 0 && !slices.ContainsFunc(out, func(o []string) bool { return slices.Equal(o, words) }) {
+				out = append(out, words)
+			}
+		}
+	}
+	return out
+}
+
+// draftTools are the tools a session may call without a prompt because they only propose or read drafts the
+// user approves: those srcs mark so, and the loop's own draft tools, as an agent names them.
+func draftTools(srcs []*manifest.Source) []string {
+	var out []string
+	for _, s := range srcs {
+		for _, t := range s.Tools {
+			if t.Proposes {
+				out = append(out, brand.ToolPrefix()+t.Name)
+			}
+		}
+	}
+	return append(out, mcp.DraftTools()...)
+}
+
+// atOnceTools are the tools srcs mark posts = "now", which post as the user at once, as an agent names them.
+func atOnceTools(srcs []*manifest.Source) []string {
+	var out []string
+	for _, s := range srcs {
+		for _, t := range s.Tools {
+			if t.Posts == "now" {
+				out = append(out, brand.ToolPrefix()+t.Name)
+			}
+		}
+	}
+	return out
+}
+
+// loadedSources are the [source] tables of every plugin: the discovered plugin's over the bundled one.
+func (e *Env) loadedSources() []*manifest.Source {
+	srcs, _ := bundled.Sources()
+	for _, p := range e.plugins {
+		s, err := p.Manifest.Source()
+		if err != nil {
+			continue
+		}
+		srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
+		srcs = append(srcs, s)
+	}
+	return srcs
 }
 
 // cliBuiltins are the builtin names the command line implements: the

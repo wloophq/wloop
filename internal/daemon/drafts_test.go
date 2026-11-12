@@ -31,6 +31,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 )
 
 var slackUnit = unit.Unit{Provider: "slack", Key: "C000AAA 1700000000.000100"}
@@ -141,12 +142,13 @@ func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock,
 		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
 	r.s.deps.Gates, r.s.deps.GateReader = svc, st
-	r.o = &outbox.Service{Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
+	r.o = &outbox.Service{Kinds: bundledtest.Shapes{}, Store: r.db.Drafts(), Gates: rigGates{svc, st}, Clock: r.clock, Effects: func(p unit.ProviderID) (port.Effects, error) {
 		if p == unit.GitHub && !slices.Contains(off, p) {
 			return r.fx, nil
 		}
 		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
-	}, Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery }}
+	}, Posts: func(d draft.Delivery) bool { return d == draft.Delivery("comment") }}
+	r.o.OnSent = append(r.o.OnSent, r.s.RuleSent)
 	r.s.deps.Outbox = r.o
 	r.s.registerOutbox()
 	return r
@@ -158,7 +160,7 @@ func (r *outboxRig) propose(t *testing.T, u unit.Unit, text string, mode draft.A
 	if mode == draft.Delay {
 		a.Window = time.Minute
 	}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Reply, Text: text,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Kind("reply"), Text: text,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(a)})
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +187,7 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 	t.Helper()
 	ctx := context.Background()
 	if d.Kind == "" {
-		d.Kind = draft.Reply
+		d.Kind = draft.Kind("reply")
 	}
 	d.Original = d.Text
 	d.CreatedAt, d.UpdatedAt = r.clock.Now(), r.clock.Now()
@@ -193,7 +195,7 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := gate.Gate{Kind: gate.KindDraft, Unit: got.Unit, Subject: strconv.FormatInt(int64(got.ID), 10)}
+	g := gate.Gate{Kind: gate.KindDraft, Unit: got.Unit, Subject: strconv.FormatInt(int64(got.ID), 10), ApprovedRev: got.Rev}
 	switch got.State {
 	case draft.Held:
 		_, err = r.s.deps.Gates.Open(ctx, g, nil)
@@ -298,7 +300,7 @@ func TestDraftsListByState(t *testing.T) {
 func TestDraftsServeWhyAndLanguage(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Why: "w", Language: "pt",
+	if _, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "any news?", Why: "w", Language: "pt",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})}); err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +317,7 @@ func TestApproveWithEditedText(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "Thanks, merging", draft.Wait)
-	code, got, body := r.act(t, d.ID, "approve", `{"rev":0,"text":"Thanks! Merging now."}`)
+	code, got, body := r.act(t, d.ID, "approve", `{"rev":1,"text":"Thanks! Merging now."}`)
 	if code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
@@ -347,10 +349,10 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	d := r.propose(t, r7u, "hello", draft.Wait)
-	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true}`); code != 400 || !strings.Contains(body, "no thread") {
+	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"rev":1}`); code != 400 || !strings.Contains(body, "no thread") {
 		t.Fatalf("broadcast on a draft in no thread: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true}`); code != 400 {
+	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true,"rev":1}`); code != 400 {
 		t.Fatalf("text and a refused broadcast: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Text != "hello" {
@@ -361,14 +363,15 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	if _, err := r.o.Store.Update(ctx, d, draft.Held); err != nil {
 		t.Fatal(err)
 	}
-	code, got, body := r.act(t, d.ID, "edit", `{"broadcast":false}`)
+	cur, _ := r.o.Store.Get(ctx, d.ID)
+	code, got, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"broadcast":false,"rev":%d}`, cur.Rev))
 	if code != 200 || got.Broadcast != "off" {
 		t.Fatalf("broadcast off: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOff || stored.Text != "hello" {
 		t.Fatalf("stored %+v", stored)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"text":"hello there"}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"broadcast":true,"text":"hello there","rev":%d}`, got.Rev)); code != 200 {
 		t.Fatalf("text and broadcast: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOn || stored.Text != "hello there" {
@@ -388,10 +391,11 @@ func TestDraftActionStatuses(t *testing.T) {
 		code   int
 		has    string
 	}{
-		{"retry of a held draft", d.ID, "retry", `{"rev":0}`, 409, "held"},
+		{"retry of a held draft", d.ID, "retry", `{"rev":1}`, 409, "held"},
 		{"unknown id", 999, "approve", `{}`, 404, "draft:999"},
-		{"empty text", d.ID, "edit", `{"text":"  "}`, 400, "empty text"},
-		{"edit without text", d.ID, "edit", `{}`, 400, "text"},
+		{"empty text", d.ID, "edit", `{"text":"  ","rev":1}`, 400, "empty text"},
+		{"edit without text", d.ID, "edit", `{"rev":1}`, 400, "text"},
+		{"edit without rev", d.ID, "edit", `{"text":"x"}`, 400, "rev"},
 		{"unknown verb", d.ID, "post", `{}`, 400, "unknown verb"},
 	}
 	for _, c := range cases {
@@ -432,7 +436,7 @@ func TestADraftInAPersonsOwnConversationSaysWhichConversationItQuotes(t *testing
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	person := "github:octocat"
-	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "any news?", Target: person,
+	quoting, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "any news?", Target: person,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "nudges", Rule: "nudges", Key: r7u.String() + ":" + person}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)
@@ -454,7 +458,7 @@ func TestEnabledPluginWithoutPublisherAnswers409(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Held})
-	code, _, body := r.act(t, d.ID, "approve", `{"rev":0}`)
+	code, _, body := r.act(t, d.ID, "approve", `{"rev":1}`)
 	var e struct{ Error, Plugin string }
 	json.Unmarshal([]byte(body), &e)
 	if code != 409 || e.Plugin != "slack" {
@@ -506,7 +510,7 @@ func TestApprovedDraftPublishesOnWake(t *testing.T) {
 	if w := clock.next(t); w != draftWatchdog {
 		t.Fatalf("idle wait %v", w)
 	}
-	if code, _, body := r.act(t, d.ID, "approve", `{"rev":0}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "approve", `{"rev":1}`); code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
 	select {
@@ -598,7 +602,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	a := r.propose(t, r7u, "one", draft.Wait)
 	b := r.propose(t, r7u, "two\nsecond line", draft.Wait)
 	sent := r.propose(t, r7u, "three", draft.Wait)
-	if code, _, body := r.act(t, sent.ID, "approve", `{"rev":0}`); code != 200 {
+	if code, _, body := r.act(t, sent.ID, "approve", `{"rev":1}`); code != 200 {
 		t.Fatalf("%d %s", code, body)
 	}
 	if _, _, err := r.o.Send(context.Background()); err != nil {
@@ -674,7 +678,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	a := r.propose(t, r7u, "approve me", draft.Wait)
-	if code, body := r.verb(t, a.ID, "approve", `{"rev":"0","text":"approved text"}`); code != 200 || !strings.Contains(body, `"state":"next"`) {
+	if code, body := r.verb(t, a.ID, "approve", `{"rev":"1","text":"approved text"}`); code != 200 || !strings.Contains(body, `"state":"next"`) {
 		t.Fatalf("approve: %d %s", code, body)
 	}
 	if got, _ := r.o.Store.Get(ctx, a.ID); got.State != draft.Queued || got.Text != "approved text" {
@@ -690,7 +694,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	if got, _ := r.o.Store.Get(ctx, b.ID); got.State != draft.Dropped || got.Reason != "user" {
 		t.Fatalf("dismissed %+v", got)
 	}
-	c := r.stored(t, draft.Draft{Unit: r7u, Text: "maybe out", State: draft.Failed, Error: outbox.NotConfirmed})
+	c := r.stored(t, draft.Draft{Unit: r7u, Text: "maybe out", State: draft.Failed, Error: outbox.NotConfirmed, Cause: draft.CauseUnconfirmed})
 	code, body := r.verb(t, c.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, c.Rev))
 	if code != 409 || !strings.Contains(body, "confirm") {
 		t.Fatalf("retry without confirm: %d %s", code, body)
@@ -698,7 +702,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	if code, body := r.verb(t, c.ID, "retry", fmt.Sprintf(`{"confirm":"true","rev":"%d"}`, c.Rev)); code != 200 {
 		t.Fatalf("retry: %d %s", code, body)
 	}
-	if code, body := r.verb(t, c.ID, "edit", `{"text":"x"}`); code != 409 {
+	if code, body := r.verb(t, c.ID, "edit", fmt.Sprintf(`{"text":"x","rev":"%d"}`, c.Rev)); code != 409 {
 		t.Fatalf("edit of an approved draft: %d %s", code, body)
 	}
 	if code, body := r.verb(t, 999, "approve", `{}`); code != 404 {
@@ -793,7 +797,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 			d := r.propose(t, r7u, "as seen", draft.Wait)
 			var seen api.Draft
 			r.getDraft(t, d.ID, &seen)
-			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone"}`); code != 200 {
+			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone","rev":1}`); code != 200 {
 				t.Fatalf("edit: %d %s", code, body)
 			}
 			var code int
@@ -851,7 +855,7 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 	if code, _, body := r.act(t, d.ID, "retry", `{}`); code != 400 || !strings.Contains(body, "rev") {
 		t.Fatalf("no rev: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped"}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"text":"swapped","rev":%d}`, d.Rev)); code != 200 {
 		t.Fatalf("edit: %d %s", code, body)
 	}
 	if code, _, body := r.act(t, d.ID, "retry", fmt.Sprintf(`{"rev":%d}`, d.Rev)); code != 409 || !strings.Contains(body, "changed since you saw it") {
@@ -860,8 +864,11 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev)); code != 409 || !strings.Contains(body, "changed since you saw it") {
 		t.Fatalf("task verb: %d %s", code, body)
 	}
-	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 200 {
-		t.Fatalf("current rev: %d %s", code, body)
+	if code, body := r.verb(t, d.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 409 {
+		t.Fatalf("a retry of the edit, which waits on its own gate: %d %s", code, body)
+	}
+	if code, body := r.verb(t, d.ID, "approve", fmt.Sprintf(`{"rev":"%d"}`, d.Rev+1)); code != 200 {
+		t.Fatalf("approving the edit at its rev: %d %s", code, body)
 	}
 }
 
@@ -947,7 +954,7 @@ func TestDraftTitleNamesWhereItGoes(t *testing.T) {
 	if got := draftTitle(draft.Draft{Unit: u, Purpose: "reply", Text: "on it\nmore"}, "#general"); got != "reply on #general: on it" {
 		t.Errorf("title %q", got)
 	}
-	if got := draftTitle(draft.Draft{Unit: u, Purpose: "react", Delivery: draft.Reaction, Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
+	if got := draftTitle(draft.Draft{Unit: u, Purpose: "react", Delivery: draft.Delivery("reaction"), Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
 		t.Errorf("title %q", got)
 	}
 }
@@ -991,7 +998,7 @@ func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 	r := newOutboxRig(t)
 	r.s.deps.Items = unitItems{r7u: {{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request,
 		WaitingOn: []items.Person{{Key: "slack:U0ANA", Name: "Ana Lima", Aliases: []string{"github:ana"}}}}}}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1"}, Kind: draft.Nudge, Text: "@{github:ana}, any news? cc @{github:bob}",
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1"}, Kind: draft.Kind("nudge"), Text: "@{github:ana}, any news? cc @{github:bob}",
 		Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
@@ -1025,7 +1032,7 @@ func mentioning(t *testing.T, r *outboxRig) draft.Draft {
 		{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UANA", Name: "Ana Lima"}}},
 		{ID: "i2", Summary: "Sign the deal", State: items.Open, Kind: items.Request, WaitingOn: []items.Person{{Key: "slack:UBRUNO", Name: "Bruno Melo"}}},
 	}}
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Nudge,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Items: []string{"i1", "i2"}, Kind: draft.Kind("nudge"),
 		Text: "@{slack:UANA} @{slack:UBRUNO}, any news?", Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
@@ -1173,7 +1180,7 @@ func TestAnAgentCannotChangeADraftThroughItsGate(t *testing.T) {
 	d := r.propose(t, r7u, "the person's text", draft.Wait)
 	g, _, _ := r.o.GateOf(ctx, d)
 	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
-	for _, body := range []string{`{"source":"claude","args":{"text":"agent text"}}`, `{"source":"claude","args":{"text":"agent text","rev":"0"}}`, `{"source":"claude"}`} {
+	for _, body := range []string{`{"source":"claude","args":{"text":"agent text"}}`, `{"source":"claude","args":{"text":"agent text","rev":"1"}}`, `{"source":"claude"}`} {
 		if rec := postFrom(t, r.s, "term_1", path, body); rec.Code != 403 {
 			t.Fatalf("an agent session's approval %s: %d %s", body, rec.Code, rec.Body)
 		}
@@ -1201,7 +1208,7 @@ func TestApprovingWithOtherTextApprovesTheGateItsEditOpened(t *testing.T) {
 	d := r.propose(t, r7u, "first", draft.Wait)
 	g, _, _ := r.o.GateOf(ctx, d)
 	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
-	if rec := post(t, r.s, path, `{"source":"cockpit","args":{"text":"second","rev":"0"}}`); rec.Code != 200 {
+	if rec := post(t, r.s, path, `{"source":"cockpit","args":{"text":"second","rev":"1"}}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	got, _ := r.o.Store.Get(ctx, d.ID)
@@ -1263,7 +1270,7 @@ func silentRig(t *testing.T) (*outboxRig, *[]string) {
 
 func (r *outboxRig) proposeWith(t *testing.T, effects ...string) draft.Draft {
 	t.Helper()
-	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "Closing this out", Effects: effects,
+	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "Closing this out", Effects: effects,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "wf", Rule: "wf", Key: strings.Join(effects, ",")}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)

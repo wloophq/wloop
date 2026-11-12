@@ -1,0 +1,40 @@
+[github_draft]
+description = "Propose a GitHub post on the pull request of your turn, to be made as the user once they, or a rule of theirs, approve it in the {{.Name}} Outbox. It posts nothing itself: a comment, a review with its verdict and inline comments, a reply in a review thread, a thread's resolution, or a request for reviews. A review states the head commit you read as basis; a push since makes it stale, and it is not posted."
+
+[github_draft.params]
+"kind" = "comment, review, thread_reply, resolve or request_review"
+"target" = "empty for the pull request; comment:<id> for a thread_reply or a resolve, the REST id of a review comment in the thread, as github_threads lists them"
+"text" = "the comment, the review's body or the reply, in Markdown; empty for a resolve"
+"payload" = "what the kind's schema shapes beside text: for a review, its event (APPROVE, REQUEST_CHANGES or COMMENT) and its inline comments; for a request_review, its reviewers, GitHub logins without @"
+"basis" = "for a review, the head commit you read the pull request at"
+"hold" = "true to wait for the user even where a rule of theirs would send it"
+"effects" = "what sending it does besides posting; empty for none"
+"effects[]" = "an effect name your intent lists in drafts.allowed_effects"
+"why" = "why you propose it, for the user approving it"
+
+[github_draft.answers]
+refused = "github_draft refused: {{.Error}}."
+bad_arguments = "Nothing was drafted: the arguments are not an object with kind, and target, text, payload, basis, hold and effects when needed{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was drafted; fix these and call github_draft again:
+{{.Problems}}"""
+failed = "Nothing was drafted: {{.Error}}"
+problem_kind = "kind: one of {{.Kinds}}"
+problem_text_required = "text: required for this kind, not empty"
+problem_payload = "payload: {{.Error}}"
+problem_basis_required = "basis: required for a review, the head commit you read"
+stale = "Nothing was drafted: you read the pull request at {{.Basis}}, and its head is {{.Head}} now; read what changed and propose again."
+proposed = "Proposed draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}: it will be posted once the user approves it in the {{.Name}} Outbox; nothing was posted."
+approved = "Draft {{.ID}} (rev {{.Rev}}) on {{.Unit}} is approved by a rule of the user's and will be posted; nothing was posted yet."
+dry_run = "Draft {{.ID}} (rev {{.Rev}}) on {{.Unit}} is a dry run: its approval stores drafts and never sends them, so it will not be posted."
+
+[github_threads]
+description = "Read the unresolved review threads of the pull request of your turn, each with its comments and their REST ids, which a thread_reply or a resolve targets as comment:<id>, and each reviewer's latest review. It writes nothing."
+
+[github_threads.answers]
+refused = "github_threads refused: {{.Error}}."
+bad_arguments = "Nothing was read: github_threads takes no arguments{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was read; fix these and call github_threads again:
+{{.Problems}}"""
+failed = "Reading the threads failed: {{.Error}}"
+threads = """The unresolved review threads and latest reviews of {{.Unit}}:
+{{.JSON}}"""

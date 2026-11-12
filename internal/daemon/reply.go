@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -104,7 +105,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(d)}})
+	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(ctx, d, c.Send)}})
 }
 
 // replyDraft is the draft a reply on e writes: on its first unit, for the task and its items there.
@@ -129,8 +130,7 @@ func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 		return ""
 	}
 	c := replyDraft(e)
-	c.Kind = api.DraftReply
-	kind, err := userDraftKind(c)
+	kind, err := s.userDraftKind(c)
 	if err != nil {
 		return ""
 	}
@@ -194,8 +194,15 @@ func sendArg(raw string) (bool, error) {
 	return false, fmt.Errorf("%w: send is \"now\" or \"draft\", not %q", coretasks.ErrArgs, raw)
 }
 
-// userDraftLine says where a user's draft went, as the profile words it.
-func (s *Server) userDraftLine(d draft.Draft) string {
+// userDraftLine says where a draft written on a person's route went, as the profile words it: a session's
+// asked to be sent says whether a rule of the user's sent it or it waits for them.
+func (s *Server) userDraftLine(ctx context.Context, d draft.Draft, send bool) string {
+	if send && d.Origin.Session != "" {
+		if g, ok, err := s.deps.Outbox.GateOf(ctx, d); err == nil && ok && g.Status == gate.Approved && !g.ByUser() {
+			return s.notice(builtin.NoticeDraftRuleSends, map[string]any{"Draft": int64(d.ID), "Rule": g.Rule})
+		}
+		return s.notice(builtin.NoticeDraftWaits, map[string]any{"Draft": int64(d.ID)})
+	}
 	if d.State == draft.Queued {
 		return s.notice(builtin.NoticeDraftSent, map[string]any{"Draft": int64(d.ID)})
 	}
@@ -241,11 +248,17 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 		writeDraftError(w, err)
 		return
 	}
-	writeJSON(w, s.draftDetail(ctx, d, g, nil))
+	detail := s.draftDetail(ctx, d, g, nil)
+	if c.Send && d.Origin.ByAgent() {
+		detail.Notes = append(detail.Notes, s.userDraftLine(ctx, d, true))
+	}
+	writeJSON(w, detail)
 }
 
-// writeUserDraft proposes the draft the user wrote, under the wait policy whatever the unit's, and approves its
-// gate right away when c.Send: the same approval and publish path a draft takes from the Outbox.
+// writeUserDraft proposes the draft written on a person's route. A person's waits whatever the unit's policy,
+// and c.Send approves its gate right away: the same approval and publish path a draft takes from the Outbox.
+// An agent session's is the session's, stamped so it never resolves its gate, and c.Send leaves it to the
+// user's approval policy, as any agent's draft: a rule of theirs sends it, or it waits for them.
 func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q requester) (draft.Draft, error) {
 	if c.Send && !q.user() {
 		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once %s", gates.ErrRefused, unattended("is approved: it"))
@@ -262,7 +275,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	case !s.pluginEnabled(c.Unit.Provider):
 		return draft.Draft{}, pluginOff{c.Unit.Provider}
 	}
-	kind, err := userDraftKind(c)
+	kind, err := s.userDraftKind(c)
 	if err != nil {
 		return draft.Draft{}, err
 	}
@@ -275,53 +288,68 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	}
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
-	origin := draft.Origin{Kind: draft.OriginUser}
-	if !q.user() {
-		origin.Session = q.Session
+	origin, policy := draft.Origin{Kind: draft.OriginUser}, draft.Fixed(draft.Approval{Mode: draft.Wait})
+	if q.Actor == task.ActorAgent {
+		origin = s.sessionOrigin(ctx, q.Session, c.Unit)
+		if c.Send {
+			policy = nil
+		}
 	}
 	o := s.deps.Outbox
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
-		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Broadcast: broadcast, Origin: origin, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Broadcast: broadcast, Origin: origin, Policy: policy})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}
-	if err != nil || !c.Send {
+	if err != nil || !c.Send || origin.ByAgent() {
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := s.decideDraft(ctx, d, gate.Approved, nil, q)
+	got, err := s.decideDraft(ctx, d, gate.Approved, draftEdit{}, q)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}
 	return got, nil
 }
 
-func userDraftKind(c api.DraftCreate) (draft.Kind, error) {
-	switch k := userKind(c); k {
-	case api.DraftReply:
-		if c.Reaction != "" {
-			return "", badRequest{"a reply takes text, not a reaction"}
-		}
-		return draft.Kind(k), nil
-	case api.DraftReact:
-		if strings.TrimSpace(c.Text) != "" {
-			return "", badRequest{"a reaction takes an emoji, not text"}
-		}
-		return draft.Kind(k), nil
-	default:
-		return "", badRequest{fmt.Sprintf("a draft you write is a %s or a %s, not %q", api.DraftReply, api.DraftReact, k)}
+// userDraftKind is the kind of the draft c asks for, as its publisher's manifest declares it: the kind it names,
+// else, for a reaction alone, the first kind posted as an emoji, else the publisher's default kind, as the
+// outbox's kinds read them.
+func (s *Server) userDraftKind(c api.DraftCreate) (draft.Kind, error) {
+	text, reaction := strings.TrimSpace(c.Text) != "", strings.TrimSpace(c.Reaction) != ""
+	if s.deps.Outbox == nil || s.deps.Outbox.Kinds == nil {
+		return draft.Kind(c.Kind), nil
 	}
-}
-
-// userKind is the kind c names, else react for a reaction alone and reply otherwise.
-func userKind(c api.DraftCreate) string {
+	k := s.deps.Outbox.Kinds
+	provider := string(s.publisherOf(draft.Draft{Unit: c.Unit, Target: strings.TrimSpace(c.Target)}))
+	emoji := func(d string) bool { return slices.Contains(builtin.DraftEmojiDeliveries, d) }
 	switch {
 	case c.Kind != "":
-		return c.Kind
-	case c.Reaction != "" && strings.TrimSpace(c.Text) == "":
-		return api.DraftReact
+		spec, ok := k.Lookup(provider, c.Kind)
+		switch {
+		case !ok:
+			return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind %q", provider, c.Kind)}
+		case emoji(spec.Delivery) && text:
+			return "", badRequest{"a reaction takes an emoji, not text"}
+		case !emoji(spec.Delivery) && reaction:
+			return "", badRequest{"a reply takes text, not a reaction"}
+		}
+		return draft.Kind(c.Kind), nil
+	case text && reaction:
+		return "", badRequest{"a draft you write takes text or a reaction, not both"}
+	case reaction:
+		for _, d := range builtin.DraftEmojiDeliveries {
+			if got, err := k.Shape(provider, draft.Draft{Delivery: draft.Delivery(d)}); err == nil && string(got.Delivery) == d {
+				return got.Kind, nil
+			}
+		}
+		return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind that reacts", provider)}
 	}
-	return api.DraftReply
+	got, err := k.Shape(provider, draft.Draft{})
+	if err != nil || got.Kind == "" {
+		return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind to reply with", provider)}
+	}
+	return got.Kind, nil
 }
 
 // targetIn refuses a draft target that does not land in u: the target is a
@@ -343,4 +371,26 @@ func (s *Server) targetIn(ctx context.Context, target string, u unit.Unit) error
 		return badRequest{fmt.Sprintf("the target %q is a message of %s, not of %s", target, got.Label(), u.Label())}
 	}
 	return nil
+}
+
+// sessionOrigin is the origin of a draft session writes on u: the session's newest turn, whose intent's and
+// workflow's approval policy a rule of the user's reads, or the session alone when it has none.
+func (s *Server) sessionOrigin(ctx context.Context, session string, u unit.Unit) draft.Origin {
+	o := draft.Origin{Kind: draft.OriginSession, Session: session}
+	if s.deps.Turns == nil || s.deps.Turns.Store == nil {
+		return o
+	}
+	b, ok, err := s.deps.Turns.Store.BookOf(ctx, turns.Key{Session: session})
+	if err != nil || !ok {
+		return o
+	}
+	t, ok := b.OfSession(session)
+	if !ok {
+		return o
+	}
+	o.TurnSeq, o.Intent, o.Workflow = t.Seq, string(t.Intent), t.Workflow
+	if b.Unit != u {
+		o.Unit = b.Unit
+	}
+	return o
 }

@@ -55,11 +55,25 @@ type Resolution struct {
 	By      task.Actor
 	Rule    string
 	Session string
+	// pick marks the approval of a draft gate by the answer that picks it, the only one a question that pins
+	// the draft lets through (close).
+	pick bool
 }
 
 // Sessions says whether the user drives an agent's session, by its stable id.
 type Sessions interface {
 	UserDriven(ctx context.Context, id string) (bool, error)
+}
+
+// Options report the pin an answer to a question picks, in the question its person saw: the gate of the draft
+// the option points to and the rev it pinned; false for an answer that picks none. Whether the answer approves
+// that draft is the gates service's alone (ApproveOption).
+type Options interface {
+	OptionDraft(ctx context.Context, question gate.Gate, r Resolution) (drafted gate.Gate, rev int64, ok bool, err error)
+	// Pinning is the question gate, open or answered while its message still settles, whose message pins draft
+	// gate drafted's draft, in an option or its confirm, the answer that picks that pin and the rev it pinned;
+	// false when no open message pins it. question is zero while the message's question gate is not opened yet.
+	Pinning(ctx context.Context, drafted gate.Gate) (question gate.Gate, answer string, rev int64, ok bool, err error)
 }
 
 // Query narrows Where: a zero field matches every gate, but Statuses, which

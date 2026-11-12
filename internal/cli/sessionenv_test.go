@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ func nudgeCommand(t *testing.T, env map[string]string) string {
 	if len(m.Commands) != 1 {
 		t.Fatalf("commands %v", m.Commands)
 	}
-	return m.Commands[0]
+	return strings.NewReplacer(filepath.Dir(te.ConfigPath), "/config", te.StateDir, "/state").Replace(m.Commands[0])
 }
 
 func TestAgentSessionCarriesTheDaemonsXDGDirs(t *testing.T) {

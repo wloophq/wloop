@@ -88,6 +88,9 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) err
 		}
 		r.Items, r.Task = turns.ItemsOf(prev), turns.TaskOf(prev)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
+		if r.Resume != nil {
+			r.Resume.Drafts = e.resumeDrafts(ctx, b, l.ResumeOf, "")
+		}
 		if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
 			return err
 		}

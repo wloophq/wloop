@@ -16,10 +16,10 @@ var LocalizedFiles = []string{"text.md.tmpl", "why.md.tmpl"}
 var PersonNotices = []string{
 	NoticeReplyPlaceholder, NoticeReplyButton, NoticeSendReplyPlaceholder, NoticeSendReplyButton,
 	NoticeAnswerPlaceholder, NoticeAnswerButton, NoticeDigestTitle, NoticeDigestNew, NoticeDigestView,
-	NoticeNotifyInbox, NoticeNotifyDraftForMe, NoticeNotifyReply, NoticeNotifySendReply, NoticeNotifyQuestion,
+	NoticeNotifyInbox, NoticeNotifyDraftForMe, NoticeNotifyReply, NoticeNotifySendReply, NoticeNotifyQuestion, NoticeNotifyPinned,
 	NoticeNotifyProposal, NoticeNotifyPost, NoticeNotifyYes, NoticeNotifyNo, NoticeNotifyRecommended,
 	NoticeNotifyDraft, NoticeNotifyDraftFailed, NoticeNotifyOpen, NoticeNotifyDiscard,
-	NoticeDraftSent, NoticeDraftSaved, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
+	NoticeDraftSent, NoticeDraftSaved, NoticeDraftRuleSends, NoticeDraftWaits, NoticeDraftByRule, NoticeChatTyped, NoticeChatQueued, NoticeChatStarted,
 	NoticeTaskMerged, NoticeNothingToPick, NoticeWorkflowUnknown, NoticeConfigUnavailable, NoticeSkipsUnavailable,
 }
 

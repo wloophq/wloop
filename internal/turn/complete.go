@@ -13,7 +13,7 @@ import (
 
 // Complete fills what the intent's manifest decides about the turn: its
 // definition, its inputs normalized and zero-filled, NeedsTakeOver, Round,
-// FollowUpApproval, Headline and Records. It is idempotent.
+// Headline and Records. It is idempotent.
 func Complete(c Context, l *intentload.Loaded) (Context, error) {
 	d, err := definition(l, c.Intent)
 	if err != nil {
@@ -34,13 +34,12 @@ func Complete(c Context, l *intentload.Loaded) (Context, error) {
 		}
 	}
 	c.NeedsTakeOver = d.OwnerOnly && !c.Owned && !takeOverSet(d, c.Inputs)
-	c.Round, c.FollowUpApproval = "", false
+	c.Round = ""
 	if slices.Contains(d.Dims, dintent.DimStage) {
 		c.Round = "first"
 		if (c.prior() != nil || c.Planned == PlannedFollowUp) && !c.Plain {
 			c.Round = "follow-up"
 		}
-		c.FollowUpApproval = c.Automated() && c.Round == "follow-up" && c.Planned != PlannedFirst
 	}
 	p := l.Programs[d.Name]
 	f := turnFacts{&c}

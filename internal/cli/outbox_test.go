@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"io"
 	"net/http"
 	"os"
@@ -38,6 +39,7 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool, edits ...func(*da
 	}
 	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf, Intents: te.loadedIntents}, db, te.cfg, mods, t.Logf)
 	d = te.serveOutbox(d, db, te.cfg, mods, t.Logf)
+	d.Outbox.Kinds = bundledtest.Shapes{}
 	for _, edit := range edits {
 		edit(&d)
 	}
@@ -85,12 +87,12 @@ func TestOutboxListGolden(t *testing.T) {
 	db := outboxDaemon(t, te, false)
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Thanks, merging now.\nSecond line stays out.", State: draft.Held,
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}})
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Target: "#general", Text: "Any news on this?", State: draft.Failed,
-		Error: "may have been posted: timeout", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("nudge"), Target: "#general", Text: "Any news on this?", State: draft.Failed,
+		Error: "may have been posted: timeout", Cause: draft.CauseUnconfirmed, Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
 		CreatedAt: testNow.Add(time.Minute), UpdatedAt: testNow.Add(time.Minute)})
-	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Reply, Text: "Closing this.", Original: "Closing this.", State: draft.Held,
+	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("reply"), Text: "Closing this.", Original: "Closing this.", State: draft.Held,
 		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)}, testNow.Add(12*time.Minute))
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Close, Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("close"), Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
 		CreatedAt: testNow.Add(3 * time.Minute), UpdatedAt: testNow.Add(3 * time.Minute)})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "already out", State: draft.Sent})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "only watched", State: draft.Dropped, Reason: "observe"})
@@ -148,11 +150,13 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			}
 			return ""
 		}
-		if code := te.run("outbox", "approve", "1", "--yes"); code == 0 || !strings.Contains(te.err.String(), "agent session") {
-			t.Fatalf("exit %d: %s", code, te.err)
+		for _, args := range [][]string{{"outbox", "approve", "1", "--yes"}, {"outbox", "edit", "1", "agent words", "--rev", "0"}, {"outbox", "discard", "1"}} {
+			if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "agent session") {
+				t.Fatalf("%v: exit %d: %s", args, code, te.err)
+			}
 		}
-		if got := te.draftState(t, db, d.ID); got.State != draft.Held {
-			t.Fatal("an agent approved it")
+		if got := te.draftState(t, db, d.ID); got.State != draft.Held || got.Text != d.Text {
+			t.Fatal("an agent's shell changed it")
 		}
 	})
 	t.Run("answered no", func(t *testing.T) {
@@ -180,13 +184,13 @@ func TestOutboxApproveConfirms(t *testing.T) {
 		if got := te.draftState(t, db, d.ID); got.State != draft.Queued || got.Text != text || got.Edited {
 			t.Fatalf("approved %+v", got)
 		}
-		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":"0"`) {
+		if bodies := posted(); len(bodies) != 1 || !strings.Contains(bodies[0], `"rev":"1"`) {
 			t.Fatalf("posted %v, want the rev shown", bodies)
 		}
 	})
 	t.Run("yes with text", func(t *testing.T) {
 		te, db, d := seed(t, true)
-		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this."); code != 0 {
+		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this.", "--rev", "1"); code != 0 {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
 		if !strings.Contains(te.out.String(), "  Only this.") || strings.Contains(te.out.String(), "Third line") {
@@ -201,7 +205,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, true)
-	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "maybe out", State: draft.Failed, Error: "may have been posted: timeout"})
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "maybe out", State: draft.Failed, Error: "may have been posted: timeout", Cause: draft.CauseUnconfirmed})
 	if code := te.run("outbox", "retry", "1", "--yes"); code == 0 || !strings.Contains(te.err.String(), "confirm") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -211,7 +215,7 @@ func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 	if got := te.draftState(t, db, d.ID); got.State != draft.Queued {
 		t.Fatalf("retried %+v", got)
 	}
-	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":"0"`) {
+	if bodies := posted(); len(bodies) != 2 || !strings.Contains(bodies[1], `"rev":"1"`) {
 		t.Fatalf("posted %v, want the rev shown", bodies)
 	}
 }
@@ -220,7 +224,7 @@ func TestOutboxEditAndDiscard(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
 	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "1", "better text"); code != 0 {
+	if code := te.run("outbox", "edit", "1", "better text", "--rev", "1"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := te.draftState(t, db, d.ID); got.Text != "better text" || got.State != draft.Held {
@@ -305,13 +309,13 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 		if code := te.run("outbox", "new", target, "Friday works"); code != 0 || !strings.Contains(te.out.String(), "draft 1 saved to the Outbox for your approval") {
 			t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 		}
-		if got := te.draftState(t, db, 1); got.State != draft.Held || got.Kind != draft.Reply || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
+		if got := te.draftState(t, db, 1); got.State != draft.Held || got.Kind != draft.Kind("reply") || got.Text != "Friday works" || got.Origin.Kind != draft.OriginUser || got.Unit != threadUnit {
 			t.Fatalf("draft %+v", got)
 		}
 		if code := te.run("outbox", "new", target, "--react", ":eyes:"); code != 0 {
 			t.Fatalf("react: exit %d: %s", code, te.err)
 		}
-		if got := te.draftState(t, db, 2); got.Kind != draft.React || got.Reaction != "eyes" {
+		if got := te.draftState(t, db, 2); got.Kind != draft.Kind("react") || got.Reaction != "eyes" {
 			t.Fatalf("reaction %+v", got)
 		}
 	})
@@ -371,7 +375,7 @@ func TestOutboxNewSavesOrSends(t *testing.T) {
 func TestOutboxListLaysOutForATerminal(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
-	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Nudge, Text: "@{github:ana}, any news?", State: draft.Held})
+	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("nudge"), Text: "@{github:ana}, any news?", State: draft.Held})
 	if code := te.run("outbox", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -515,7 +519,7 @@ handler = "edit"
 		t.Fatalf("retried %+v", got)
 	}
 	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "2", "better"); code != 0 {
+	if code := te.run("outbox", "edit", "2", "better", "--rev", "1"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := postedPaths(); len(got) != 2 || got[1] != "/api/tasks/draft:2/retry" {
@@ -523,5 +527,63 @@ handler = "edit"
 	}
 	if got := te.draftState(t, db, held.ID); got.Text != "better" {
 		t.Fatalf("edited %+v", got)
+	}
+}
+
+// TestOutboxEditAndApproveTextSendTheRevShown makes a person's change name the rev they read: without --rev it
+// is a usage error, and an agent's revision after outbox show gives a conflict and keeps the revision.
+func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, true)
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "as shown", State: draft.Held})
+	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "Rev         1") {
+		t.Fatalf("show: exit %d: %s", code, te.out)
+	}
+	for _, args := range [][]string{{"outbox", "edit", "1", "mine"}, {"outbox", "approve", "1", "--yes", "--text", "mine"}} {
+		if code := te.run(args...); code != 2 || !strings.Contains(te.err.String(), "--rev") {
+			t.Errorf("%v without --rev: exit %d: %s", args, code, te.err)
+		}
+	}
+	d.Text = "the agent's revision"
+	if _, err := db.Drafts().Update(context.Background(), d, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"outbox", "edit", "1", "mine", "--rev", "1"}, {"outbox", "approve", "1", "--yes", "--text", "mine", "--rev", "1"}} {
+		if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "changed since you saw it") {
+			t.Errorf("%v after a revision: exit %d: %s", args, code, te.err)
+		}
+	}
+	if got := te.draftState(t, db, d.ID); got.Text != "the agent's revision" || got.State != draft.Held {
+		t.Fatalf("stored %+v, want the agent's revision held", got)
+	}
+}
+
+// TestASessionShellsNewSendWaitsForTheUsersPolicy: outbox new --send from the shell of a session the user drives
+// writes the session's draft, never the person's, and under the default policy it waits; the command says so.
+func TestASessionShellsNewSendWaitsForTheUsersPolicy(t *testing.T) {
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, false, func(d *daemon.Deps) { d.Turns = te.Turns })
+	knowThreads(t)
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	mine, err := te.Turns.Resolve(ctx, "fake", "term_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.Getenv = func(k string) string {
+		switch k {
+		case fake.HandleVar:
+			return "term_2"
+		case "CLAUDE_CODE_SESSION_ID":
+			return "agent-term_2"
+		}
+		return ""
+	}
+	if code := te.run("outbox", "new", "thread:"+threadUnit.Key, "Shipped", "--send"); code != 0 || !strings.Contains(te.out.String(), "waits for the user's approval") {
+		t.Fatalf("exit %d: %s %s", code, te.out, te.err)
+	}
+	got := te.draftState(t, db, 1)
+	if got.State != draft.Held || got.Origin.Session != mine || got.By != (draft.Actor{Kind: draft.ActorSession, Session: mine}) {
+		t.Fatalf("the session's draft %+v by %+v", got, got.By)
 	}
 }

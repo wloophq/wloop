@@ -15,7 +15,7 @@ import (
 // renderBundled renders the bundled workflow's file in locale over its, to person.
 func renderBundled(t *testing.T, workflowName, file, locale string, person items.Person, its ...items.Item) string {
 	t.Helper()
-	tmpl, _, err := draftTemplate(profile.Chain(config.Config{}), turn.BundledFS(), workflowName, file, draft.Message, locale)
+	tmpl, _, err := draftTemplate(profile.Chain(config.Config{}), turn.BundledFS(), workflowName, file, draft.Delivery("message"), locale)
 	if err != nil {
 		t.Fatal(err)
 	}

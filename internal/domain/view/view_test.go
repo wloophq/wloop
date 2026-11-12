@@ -51,7 +51,7 @@ func TestReviewTable(t *testing.T) {
 		{"settled", turn.Settled, &record.Record{State: record.Settled, Summary: "nothing new"}, Reviewed, false, "nothing new"},
 		{"dismissed", turn.Dismissed, asked, Reviewed, false, "publish?"},
 	} {
-		got := Review(book(turn.Intent(dintent.Review), c.state, c.rec), reviewBoard)
+		got := Review(book(turn.Intent(dintent.Review), c.state, c.rec), reviewBoard, []string{"APPROVE"})
 		want := Item{Unit: r7, Role: ReviewRole, Status: c.status, Unread: c.unread, Summary: c.summary}
 		if got != want {
 			t.Errorf("%s: %+v, want %+v", c.name, got, want)
@@ -59,11 +59,20 @@ func TestReviewTable(t *testing.T) {
 	}
 	b := book(turn.Intent(dintent.Review), turn.Asked, asked)
 	b.Turns = append(b.Turns, turn.Turn{Seq: 2, Intent: turn.Intent(dintent.Nudge), State: turn.Started})
-	if got := Review(b, reviewBoard); got.Status != NeedsMe {
+	if got := Review(b, reviewBoard, []string{"APPROVE"}); got.Status != NeedsMe {
 		t.Errorf("a newer nudge turn moved the review: %+v", got)
 	}
-	if got := Review(book(turn.Intent(dintent.Address), turn.Asked, asked), reviewBoard); got.Status != None || got.Role != ReviewRole {
+	if got := Review(book(turn.Intent(dintent.Address), turn.Asked, asked), reviewBoard, []string{"APPROVE"}); got.Status != None || got.Role != ReviewRole {
 		t.Errorf("no review turn: %+v", got)
+	}
+}
+
+func TestAReviewIsDoneOnTheVerdictsItsProfileConcludesOn(t *testing.T) {
+	if got := Review(book(turn.Intent(dintent.Review), turn.Done, done("LGTM")), reviewBoard, []string{"LGTM"}); got.Status != Done {
+		t.Errorf("a concluding verdict: %+v", got)
+	}
+	if got := Review(book(turn.Intent(dintent.Review), turn.Done, done("APPROVE")), reviewBoard, nil); got.Status != Reviewed {
+		t.Errorf("a verdict no profile concludes on: %+v", got)
 	}
 }
 
@@ -113,7 +122,7 @@ func TestASuspiciousQuestionSaysSoOnTheCard(t *testing.T) {
 func TestAWithdrawnTurnHasNoView(t *testing.T) {
 	for _, intent := range []turn.Intent{turn.Intent(dintent.Review), turn.Intent(dintent.Address)} {
 		b := book(intent, turn.Withdrawn, nil)
-		if it := Review(b, reviewBoard); it.Status != None {
+		if it := Review(b, reviewBoard, []string{"APPROVE"}); it.Status != None {
 			t.Fatalf("%s: review item %+v", intent, it)
 		}
 		if it := Author(b, authorBoard, NeedsMe, nil); it.Status != None {

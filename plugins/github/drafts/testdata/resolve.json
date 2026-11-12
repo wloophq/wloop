@@ -1,0 +1,6 @@
+{
+ "unit": "github/acme/api#7",
+ "kind": "resolve",
+ "target": "comment:1234567",
+ "payload": {}
+}

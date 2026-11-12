@@ -40,7 +40,7 @@ func TestUnitComposerPostsADraft(t *testing.T) {
 		t.Fatalf("posts %+v", got.Posts)
 	}
 	b := got.Posts[0]["body"].(map[string]any)
-	if b["text"] != "Thanks, merged" || b["send"] != true || b["kind"] != "reply" || b["source"] != "cockpit" || b["unit"].(map[string]any)["provider"] != "slack" {
+	if b["text"] != "Thanks, merged" || b["send"] != true || b["kind"] != nil || b["source"] != "cockpit" || b["unit"].(map[string]any)["provider"] != "slack" {
 		t.Fatalf("body %+v", b)
 	}
 	if strings.Contains(got.Text, "reacts") {

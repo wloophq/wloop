@@ -21,9 +21,9 @@ Never pass the JSON on the command line.
 {{- end}}
 {{- if $asks}}
 - `question` (asked): `kind` is `choice` (2 to 5 `options`, each `id`,
-  `label`, `consequence`, and `publishes: true` on each option that publishes
-  the drafted review), `confirm` (yes or no; `publishes: true` when yes
-  publishes it) or `free`; `text` is the whole question with its context;
+  `label`, `consequence`, and `draft`: the `id` and `rev` of the draft
+  choosing it approves), `confirm` (yes or no; `draft` when yes approves
+  one) or `free`; `text` is the whole question with its context;
   `recommend` is your choice. The user may answer from a notification that
   shows only the summary, the verdict, the counts and the options: make
   those enough to decide.

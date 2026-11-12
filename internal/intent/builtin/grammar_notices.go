@@ -14,7 +14,13 @@ var Notices = []ToolAnswer{
 	{Name: NoticeChatStarted, Doc: "Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.",
 		Fields: []AnswerField{str("Intent"), {Name: "Resumed"}}},
 	{Name: NoticeDraftSent, Doc: "Tells the person that the reply they sent at once, Draft, is approved and goes out.", Fields: []AnswerField{num("Draft")}},
+	{Name: NoticeDraftByRule, Doc: "Tells the person that a rule of theirs, Rule (its name as the gates record it, such as \"workflows/review gates.approval rule 0\"), posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.",
+		Fields: []AnswerField{num("Draft"), str("Where"), str("Rule"), str("Link")}},
 	{Name: NoticeDraftSaved, Doc: "Tells the person that the reply they wrote, Draft, waits for their approval.", Fields: []AnswerField{num("Draft")}},
+	{Name: NoticeDraftRuleSends, Doc: "Tells an agent session that asked to send the reply it wrote, Draft, that a rule of the user's, Rule (its name as the gates record it), sends it.",
+		Fields: []AnswerField{num("Draft"), str("Rule")}},
+	{Name: NoticeDraftWaits, Doc: "Tells an agent session that asked to send the reply it wrote, Draft, that no rule of the user's sends it: it waits for the user's approval.",
+		Fields: []AnswerField{num("Draft")}},
 	{Name: NoticeReplyPlaceholder, Doc: "The placeholder of a notification's input that saves a reply for approval."},
 	{Name: NoticeReplyButton, Doc: "The button of a notification's input that saves a reply for approval."},
 	{Name: NoticeSendReplyPlaceholder, Doc: "The placeholder of a notification's input that sends a reply at once."},
@@ -30,6 +36,7 @@ var Notices = []ToolAnswer{
 	{Name: NoticeNotifyDraftForMe, Doc: "The button of an Inbox task's notification that delegates it to an agent headless."},
 	{Name: NoticeNotifyReply, Doc: "The button of a notification whose text input saves a reply for approval, or answers an agent."},
 	{Name: NoticeNotifySendReply, Doc: "The button of a notification whose text input sends a reply at once."},
+	{Name: NoticeNotifyPinned, Doc: "The line a question's notification adds when an answer to it approves a draft: the notification offers no such answer, and the question's card shows the draft."},
 	{Name: NoticeNotifyQuestion, Doc: "The title of the notification of an agent's open question."},
 	{Name: NoticeNotifyProposal, Doc: "The title of the notification of an open proposal."},
 	{Name: NoticeNotifyPost, Doc: "The title of the notification of an agent's open post."},
@@ -70,6 +77,9 @@ const (
 	NoticeChatStarted          = "chat_started"
 	NoticeDraftSent            = "draft_sent"
 	NoticeDraftSaved           = "draft_saved"
+	NoticeDraftRuleSends       = "draft_rule_sends"
+	NoticeDraftWaits           = "draft_waits"
+	NoticeDraftByRule          = "draft_by_rule"
 	NoticeReplyPlaceholder     = "reply_placeholder"
 	NoticeReplyButton          = "reply_button"
 	NoticeSendReplyPlaceholder = "send_reply_placeholder"
@@ -84,6 +94,7 @@ const (
 	NoticeNotifyReply          = "notify_reply"
 	NoticeNotifySendReply      = "notify_send_reply"
 	NoticeNotifyQuestion       = "notify_question"
+	NoticeNotifyPinned         = "notify_pinned"
 	NoticeNotifyProposal       = "notify_proposal"
 	NoticeNotifyPost           = "notify_post"
 	NoticeNotifyYes            = "notify_yes"

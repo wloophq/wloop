@@ -46,7 +46,7 @@ func Judge(ctx context.Context, r turns.HeadlessAgent, dir string, s turn.Scenar
 	}
 	out, err := r.Headless(ctx, turns.AgentSession{
 		Worktree: dir,
-		Policy:   turns.Policy{Strict: true, NoGitHubWrites: true, NoMCP: true},
+		Policy:   turns.Policy{Strict: true, NoMCP: true},
 	}, fmt.Sprintf(judgePrompt, s.Expect, rendered.Text))
 	if err != nil {
 		return Result{}, fmt.Errorf("%s: %w", s.Name, err)

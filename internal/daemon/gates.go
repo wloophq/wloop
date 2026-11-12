@@ -169,7 +169,7 @@ func writeGateError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, gates.ErrNoGate):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, gates.ErrResolved), errors.Is(err, messages.ErrNotApplied):
+	case errors.Is(err, gates.ErrResolved), errors.Is(err, messages.ErrNotApplied), errors.Is(err, outbox.ErrStale):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -398,21 +398,31 @@ func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent str
 		return err
 	}
 	rev := d.Rev
+	var edit draftEdit
 	if raw, ok := args["rev"]; ok {
 		if rev, err = strconv.ParseInt(raw, 10, 64); err != nil || rev < 0 {
 			return badRequest{fmt.Sprintf("rev is the draft's revision, not %q", raw)}
 		}
 	}
-	var text *string
+	if _, ok := args["rev"]; ok {
+		edit.Rev = &rev
+	}
 	if t, ok := args["text"]; ok {
-		text = &t
+		edit.Text = &t
+	}
+	if raw, ok := args["payload"]; ok {
+		if !json.Valid([]byte(raw)) {
+			return badRequest{fmt.Sprintf("payload is the draft's payload as JSON, not %q", raw)}
+		}
+		p := json.RawMessage(raw)
+		edit.Payload = &p
 	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
 		if p := s.deps.Outbox.PublisherOf(d); !s.pluginEnabled(p) {
 			return pluginOff{p}
 		}
 	}
-	err = s.resolveDraftGate(ctx, g, intent, rev, text, actor)
+	err = s.resolveDraftGate(ctx, g, intent, rev, edit, actor)
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{s.deps.Outbox.PublisherOf(d), err}
 	}

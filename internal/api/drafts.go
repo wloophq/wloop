@@ -85,6 +85,59 @@ type Draft struct {
 	Names map[string]string `json:"names,omitempty"`
 	// ItemDetails are the items the draft is about, with their summaries.
 	ItemDetails []ItemView `json:"item_details,omitempty"`
+	// Preview is the draft's summary line, its kind's preview template over the draft, as markdown; "" when the
+	// kind has none.
+	Preview string `json:"preview,omitempty"`
+	// Payload is what the draft posts besides Text, verbatim, and Fields every value of it as its card shows
+	// it, in the payload's order; both empty for a draft of a kind with no payload.
+	Payload json.RawMessage `json:"payload,omitempty"`
+	Fields  []DraftField    `json:"fields,omitempty"`
+	// Basis is what the draft was written against, such as a pull request's head; Stale says its unit moved
+	// past it, so approving it is refused.
+	Basis string `json:"basis,omitempty"`
+	Stale bool   `json:"stale,omitempty"`
+	// PinnedBy is the open question message whose option or confirm pins the draft: only an answer to that
+	// question decides it, so clients show the draft under that option and offer no card of its own; 0 for none.
+	PinnedBy int64 `json:"pinned_by,omitempty"`
+	// StaleUnknown says the unit's live basis could not be read in time, so Stale is not known; the approval
+	// stays offered, and approving and sending re-check it live.
+	StaleUnknown bool `json:"stale_unknown,omitempty"`
+	// TextLocked says the draft's kind lets no person change its text, which its publisher may not post.
+	TextLocked bool `json:"text_locked,omitempty"`
+	// Hold keeps every approval rule from releasing the draft.
+	Hold bool `json:"hold,omitempty"`
+	// By is who wrote the draft's current content (person, session, rule or window), Author that in the
+	// profile's words (gates.toml's drafts.authors); both "" when unknown.
+	By     string `json:"by,omitempty"`
+	Author string `json:"author,omitempty"`
+	// ByRule is the approval rule of the user's that sent the draft, "" when none did.
+	ByRule string `json:"by_rule,omitempty"`
+	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,
+	// notices.toml's draft_by_rule), in that order, and, on the draft an agent session just wrote and asked to
+	// send, last, notices.toml's draft_rule_sends or draft_waits.
+	Notes []string `json:"notes,omitempty"`
+}
+
+// DraftField is a value of a draft's payload as its card shows it: Label is the plugin's word for its key
+// (ui.toml's drafts.<kind>.fields), else the key, or the item's position in a list. A scalar has Value, as
+// posted, and Shown, its word when the plugin words it; an object or a list has Fields. Editable says a
+// person may change it, to one of Options, its schema's enum; a field with no enum is never editable on the card.
+type DraftField struct {
+	Pointer  string        `json:"pointer"`
+	Label    string        `json:"label"`
+	Value    string        `json:"value,omitempty"`
+	Shown    string        `json:"shown,omitempty"`
+	Fields   []DraftField  `json:"fields,omitempty"`
+	Editable bool          `json:"editable,omitempty"`
+	Options  []DraftOption `json:"options,omitempty"`
+	// Markdown says Value is Markdown, which the card renders as it renders the draft's text.
+	Markdown bool `json:"markdown,omitempty"`
+}
+
+// DraftOption is a value an editable field takes, with its word.
+type DraftOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 // OutboxPage is the Outbox's drafts in groups, the largest first, then by title.
@@ -134,15 +187,9 @@ type DraftOrigin struct {
 	Unit string `json:"unit,omitempty"`
 }
 
-// The kinds of draft the user writes: a reply in the unit's conversation (a comment on a pull request) and
-// a reaction to it.
-const (
-	DraftReply = "reply"
-	DraftReact = "react"
-)
-
-// DraftCreate is a draft the user writes on Unit, for Task and its Items when set: Kind DraftReply with
-// Text, or DraftReact with Reaction. It waits in the Outbox for approval, unless Send approves it at once
+// DraftCreate is a draft the user writes on Unit, for Task and its Items when set: Text, a reply its plugin
+// posts as its default kind, or Reaction alone, which its plugin posts as its first kind that reacts; Kind
+// names another kind its plugin declares. It waits in the Outbox for approval, unless Send approves it at once
 // to go out through the same publisher. Source is cockpit, notification, tui or terminal.
 type DraftCreate struct {
 	Unit     unit.Unit `json:"unit"`
@@ -161,14 +208,15 @@ type DraftCreate struct {
 	Source    string `json:"source"`
 }
 
-// DraftOf is the draft of e's first draft gate, its subject; false when e has none.
+// DraftOf is the draft of e's first draft gate, its subject, that no open question pins; false when e has none.
+// A pinned draft is its question's to decide, which shows it under the option that pins it.
 func (e TaskView) DraftOf() (Draft, bool) {
 	for _, g := range e.Gates {
 		if g.Kind != GateKindDraft || len(g.Subject) == 0 {
 			continue
 		}
 		var d Draft
-		if json.Unmarshal(g.Subject, &d) == nil {
+		if json.Unmarshal(g.Subject, &d) == nil && d.PinnedBy == 0 {
 			return d, true
 		}
 	}

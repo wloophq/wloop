@@ -149,6 +149,10 @@ func (s *Server) routes() []route {
 		{"POST " + api.AgentSessionsStop, s.handleSessionStop},
 		{"POST " + api.AgentSessionsPrompt, s.handleSessionPrompt},
 		{"GET " + api.AgentAnswer, s.handleTurnAnswer},
+		{"GET " + api.AgentDrafts, s.handleAgentDrafts},
+		{"POST " + api.AgentDrafts, s.handleAgentDrafts},
+		{"PATCH " + api.AgentDrafts, s.handleAgentDrafts},
+		{"DELETE " + api.AgentDrafts, s.handleAgentDrafts},
 
 		{"POST " + api.AdminDryRunTurn, s.handleDryRunTurn},
 		{"GET " + api.AdminDoctor, s.handleDoctor},

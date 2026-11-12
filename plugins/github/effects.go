@@ -21,6 +21,9 @@ const (
 	EffectAddressed = "pr.addressed"
 )
 
+// deliveryReview is the delivery plugin.toml declares for a review.
+const deliveryReview = "review"
+
 // applyTurnEffect applies a turn effect of the plugin's rounds: pr.reviewed
 // marks the reviews a launched review round covered once its agent took
 // it, pr.addressed the reviews so far and the head's checks and conflict an
@@ -118,4 +121,22 @@ func (r *running) recordNudged(ctx context.Context, req src.EffectRequest) error
 	}
 	return r.host.Recorder.RecordEvents(ctx, []src.Event{{Unit: req.Unit, Kind: pr.KindNudged, Key: req.Turn.ID, At: r.now(),
 		Data: []byte(strings.Join(who, ", "))}})
+}
+
+// applyReviewedDraft marks the review a sent review draft posted as
+// reviewed at the draft's basis, the head its agent read, so the planner
+// starts no round on it again and a push since still starts one.
+func (p *Plugin) applyReviewedDraft(ctx context.Context, req src.EffectRequest) error {
+	d := req.Draft
+	if d.Delivery != deliveryReview || d.Basis == "" || d.Evidence.At.IsZero() {
+		return fmt.Errorf("%w: %s marks a posted review, not draft %d", src.ErrUnfit, EffectReviewed, d.ID)
+	}
+	r, err := p.running()
+	if err != nil {
+		return err
+	}
+	if r.host.Recorder == nil {
+		return nil
+	}
+	return r.host.Recorder.SetMarks(ctx, req.Unit, map[string]string{plan.MarkReviewed: change.Fingerprint(d.Evidence.At, d.Basis)})
 }

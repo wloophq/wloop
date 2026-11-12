@@ -9,21 +9,23 @@ import (
 // of their manifests, for tests that build a turns.Service.
 func Intents() *dintent.Registry {
 	return dintent.NewRegistry([]dintent.Def{
-		{Name: dintent.Review, Role: "pr.review", UserFacing: true, Board: "review", Answerable: true, Reconcile: "my_review", Session: dintent.Session{Title: "review"},
+		{Name: dintent.Review, Role: "pr.review", UserFacing: true, Board: "review", Answerable: true, Reconcile: "my_review", Session: dintent.Session{Title: "review", NoSourceWrites: true},
 			Record: dintent.RecordRules{
-				States: []string{"done", "settled", "asked", "failed"}, Missing: "missing-record", Artifacts: []string{"review-draft"}, Outcome: []string{"verdict", "url"},
-				OutcomeDoc: "`outcome`: on `done`, the published `verdict`, the review's `url`,\n  `blocking` and `non_blocking`; on `asked` with a held draft, the `verdict`\n  the draft would publish and its counts.",
+				States: []string{"done", "settled", "asked", "failed"}, Missing: "missing-record", Artifacts: []string{"review-draft"}, Outcome: []string{"verdict", "url", "draft"},
+				Verdicts: []string{"APPROVE", "REQUEST_CHANGES", "COMMENT"}, Concludes: []string{"APPROVE"},
+				OutcomeDoc: "`outcome`: on `done` and on `asked`, the `verdict` your review draft\n  posts, `blocking` and `non_blocking`, and on `done` the `draft` you\n  proposed (its `id` and `rev`); leave `url` out: it is filled when the\n  draft is posted.",
 				Require: []dintent.Require{
 					{State: "done", Fields: []string{"verdict", "url"}},
 					{State: "asked", Artifact: "review-draft", Fields: []string{"verdict"}},
 				},
 			}},
-		{Name: dintent.Address, Role: "pr.address", UserFacing: true, Board: "author", Answerable: true, Session: dintent.Session{Title: "triage"},
+		{Name: dintent.Address, Role: "pr.address", UserFacing: true, Board: "author", Answerable: true, Session: dintent.Session{Title: "triage", NoSourceWrites: true},
 			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Missing: "missing-record", Artifacts: []string{"triage"}, HistoryArtifact: "triage"}},
-		{Name: dintent.Nudge, Role: "pr.nudge", UserFacing: true, Session: dintent.Session{Title: "nudge", CloseWhenDone: true},
+		{Name: dintent.Nudge, Role: "pr.nudge", UserFacing: true, Session: dintent.Session{Title: "nudge", CloseWhenDone: true, NoSourceWrites: true},
 			Record: dintent.RecordRules{
-				States: []string{"done", "failed"}, Outcome: []string{"url"}, OutcomeDoc: "`outcome` (done): `url`, the comment's URL.",
-				Require: []dintent.Require{{State: "done", Fields: []string{"url"}}},
+				States: []string{"done", "failed"}, Outcome: []string{"url", "draft"},
+				OutcomeDoc: "`outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted.",
+				Require:    []dintent.Require{{State: "done", Fields: []string{"url"}}},
 			}},
 		{Name: dintent.Probe, Role: "probe", Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Missing: "missing-record"}},
 		{Name: dintent.Act, Role: "headless", UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Runners: []string{"headless", "session"}, Verb: "delegate",

@@ -487,7 +487,7 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	e.task(waiting("t-01", chatA, monday))
 	put := func(wf string, s draft.State, at time.Time) {
 		t.Helper()
-		d := draft.Draft{Unit: chatA, Task: "t-01", Kind: draft.Nudge, Purpose: "nudge", Delivery: draft.Message, Text: "x", Original: "x",
+		d := draft.Draft{Unit: chatA, Task: "t-01", Kind: draft.Kind("nudge"), Purpose: "nudge", Delivery: draft.Delivery("message"), Text: "x", Original: "x",
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "t-01:chat:U1"},
 			State:  s, CreatedAt: at, UpdatedAt: at}
 		if s == draft.Dropped {

@@ -82,6 +82,45 @@
       "description": "How a field of the plugin's unit detail shows, by field.",
       "type": "object"
     },
+    "drafts": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One draft kind's words.",
+        "properties": {
+          "fields": {
+            "additionalProperties": {
+              "additionalProperties": false,
+              "description": "One field's words.",
+              "properties": {
+                "label": {
+                  "description": "The field's name on the card.",
+                  "type": "string"
+                },
+                "markdown": {
+                  "default": false,
+                  "description": "The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.",
+                  "type": "boolean"
+                },
+                "values": {
+                  "additionalProperties": {
+                    "description": "The value's word.",
+                    "type": "string"
+                  },
+                  "description": "The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.",
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "description": "The payload's fields, by the key they have in the payload, at any depth.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.",
+      "type": "object"
+    },
     "events": {
       "additionalProperties": {
         "additionalProperties": false,

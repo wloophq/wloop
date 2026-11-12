@@ -1,0 +1,365 @@
+package e2e
+
+import (
+	"cmp"
+	"context"
+	"encoding/json"
+	"fmt"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/cli"
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	ghplugin "github.com/wloophq/wloop/plugins/github"
+	"github.com/wloophq/wloop/plugins/github/api/apitest"
+)
+
+// ghPublisher is the GitHub publisher of the drafts scenarios: it posts into a list, refuses a draft whose basis
+// is not the live head as the real one re-reads it, reads its head as the live basis, and fails the next post
+// with fail.
+type ghPublisher struct {
+	mu       sync.Mutex
+	head     string
+	posts    []draft.Draft
+	failNext error
+}
+
+func (p *ghPublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if d.Basis != "" && d.Basis != p.head {
+		return draft.Evidence{}, fmt.Errorf("%w: the head is %s, the draft read %s", outbox.ErrStale, p.head, d.Basis)
+	}
+	if err := p.failNext; err != nil {
+		p.failNext = nil
+		return draft.Evidence{}, err
+	}
+	p.posts = append(p.posts, d)
+	return draft.Evidence{Ref: strconv.FormatInt(int64(d.ID), 10),
+		Permalink: fmt.Sprintf("https://github.com/acme/api/pull/7#pullrequestreview-%d", 9000+d.ID)}, nil
+}
+
+func (p *ghPublisher) Live(context.Context, unit.Unit, string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.head, nil
+}
+
+func (p *ghPublisher) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence, bool, error) {
+	return draft.Evidence{}, false, nil
+}
+
+func (p *ghPublisher) push(head string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.head = head
+}
+
+func (p *ghPublisher) fail(err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.failNext = err
+}
+
+// posted are the drafts posted, "<id> <event>" for a review and "<id> <kind>" for any other.
+func (p *ghPublisher) posted() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []string
+	for _, d := range p.posts {
+		var pl struct {
+			Event string `json:"event"`
+		}
+		_ = json.Unmarshal(d.Payload, &pl)
+		out = append(out, fmt.Sprintf("%d %s", d.ID, cmp.Or(pl.Event, string(d.Kind))))
+	}
+	return out
+}
+
+var draftsPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+
+const draftsURL = "https://github.com/acme/api/pull/7"
+
+// fullRead is the plugin's full read of acme/api#7, by its alias.
+var fullRead = regexp.MustCompile(`(pr\d+): repository\(owner: "acme", name: "api"\) \{ pullRequest\(number: 7\)`)
+
+// draftsNode is acme/api#7 read in full: open at head c2, by octocat, its review requested of the viewer.
+const draftsNode = `{"number":7,"title":"Add x","state":"OPEN","isDraft":false,"url":"https://github.com/acme/api/pull/7",
+ "createdAt":"2026-10-08T10:00:00Z","updatedAt":"2026-10-09T09:00:00Z","mergedAt":null,"closedAt":null,
+ "headRefName":"feat/x","baseRefName":"main","headRefOid":"c2","isCrossRepository":false,
+ "repository":{"nameWithOwner":"acme/api","visibility":"PRIVATE"},"author":{"login":"octocat"},"authorAssociation":"MEMBER",
+ "commits":{"nodes":[{"commit":{"oid":"c2","committedDate":"2026-10-08T10:00:00Z","parents":{"totalCount":1}}}]},
+ "reviews":{"nodes":[]},"comments":{"nodes":[]},"reviewRequests":{"nodes":[{"requestedReviewer":{"login":"me"}}]},"timelineItems":{"nodes":[]},"headCommit":{"nodes":[]}}`
+
+// ghAPI is the GitHub the real plugin reads in the scenarios: pull request acme/api#7, open at head c2, and
+// the viewer; any write, or any other read, fails.
+type ghAPI struct{}
+
+const draftsBasics = `{"data":{"pr":{"pullRequest":{"number":7,"title":"Add x","state":"OPEN","headRefName":"feat/x","headRefOid":"c2","repository":{"nameWithOwner":"acme/api"}}}}}`
+
+func (ghAPI) Run(_ context.Context, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "auth" && args[1] == "status" {
+		return nil, nil
+	}
+	if len(args) >= 2 && args[0] == "api" && args[1] == "graphql" {
+		q := args[len(args)-1]
+		switch {
+		case strings.Contains(q, "mutation"):
+		case strings.Contains(q, "pr: repository"):
+			return []byte(draftsBasics), nil
+		case fullRead.MatchString(q):
+			return []byte(fmt.Sprintf(`{"data":{"rateLimit":{"cost":1,"remaining":4900,"limit":5000,"resetAt":"2026-10-20T13:00:00Z"},"viewer":{"login":"me"},%q:{"pullRequest":%s}}}`,
+				fullRead.FindStringSubmatch(q)[1], draftsNode)), nil
+		case strings.Contains(q, "viewer"):
+			return []byte(`{"data":{"viewer":{"login":"me"}}}`), nil
+		}
+	}
+	return nil, fmt.Errorf("the scenarios' GitHub does not answer gh %s", strings.Join(args, " "))
+}
+
+// draftsRig is the scripted agent and the person of the scenarios, over the daemon serve composes, with the
+// real GitHub plugin over ghAPI and the GitHub module's publisher a ghPublisher.
+type draftsRig struct {
+	t   *testing.T
+	ctx context.Context
+	d   *cli.TestDaemon
+	c   *client.Client
+	pub *ghPublisher
+	s   cli.TestSession
+	// elapsed is how far past draftsNow the daemon's clock stands.
+	elapsed atomic.Int64
+}
+
+// advance moves the daemon's clock on by d, as a window a scenario waits on passes.
+func (r *draftsRig) advance(d time.Duration) { r.elapsed.Add(int64(d)) }
+
+var draftsNow = time.Date(2026, 10, 9, 15, 0, 0, 0, time.UTC)
+
+func newDraftsRig(t *testing.T) *draftsRig {
+	t.Helper()
+	r := &draftsRig{t: t, ctx: t.Context(), pub: &ghPublisher{head: "c2"}}
+	now := func() time.Time { return draftsNow.Add(time.Duration(r.elapsed.Load())) }
+	r.d = cli.ServeForTest(t, cli.TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: r.pub},
+		Repos: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, Git: checkout{},
+		Plugins: map[string]src.Source{string(unit.GitHub): &ghplugin.Plugin{API: apitest.Options(ghAPI{}), GH: ghAPI{}, Git: branches{}, Now: now}}})
+	r.c = r.d.Client()
+	return r
+}
+
+func (r *draftsRig) review() { r.s = r.d.Start(r.t, draftsPR, "review") }
+
+// resumed follows the session to the pull request's newest turn, a resume or a round a workflow reopened.
+func (r *draftsRig) resumed() {
+	r.t.Helper()
+	b := r.book()
+	if len(b.Turns) == 0 {
+		r.t.Fatal("no turn")
+	}
+	r.s.Round = b.Turns[len(b.Turns)-1].ID
+}
+
+// instructions are the stored instructions of the session's turn, as the agent reads them.
+func (r *draftsRig) instructions() string {
+	r.t.Helper()
+	b := r.book()
+	got, err := r.c.StartTurn(r.ctx, r.s.Handle, api.TurnStartRequest{Turn: r.s.Round, Intent: string(b.Turns[len(b.Turns)-1].Intent)})
+	if err != nil {
+		r.t.Fatalf("instructions of %s: %v", r.s.Round, err)
+	}
+	return got.Text
+}
+
+// propose is the scripted agent proposing a review with event, read at basis.
+func (r *draftsRig) propose(event, text, basis string, hold bool) api.AgentDraft {
+	r.t.Helper()
+	d, err := r.c.ProposeDraft(r.ctx, r.s.Handle, api.AgentDraftProposal{Kind: "review", Text: text,
+		Payload: json.RawMessage(fmt.Sprintf(`{"event":%q}`, event)), Basis: basis, Hold: hold})
+	if err != nil {
+		r.t.Fatalf("propose %s: %v", event, err)
+	}
+	return d
+}
+
+func (r *draftsRig) update(u api.AgentDraftUpdate) (api.AgentDraft, error) {
+	return r.c.UpdateDraft(r.ctx, r.s.Handle, u)
+}
+
+func (r *draftsRig) end(raw string) {
+	r.d.EndTurn(r.t, r.s, api.TurnEndRequest{Turn: r.s.Round, PR: draftsURL, Record: json.RawMessage(raw)})
+}
+
+func (r *draftsRig) send() {
+	r.t.Helper()
+	if err := r.d.Send(r.ctx); err != nil {
+		r.t.Fatalf("send: %v", err)
+	}
+}
+
+func (r *draftsRig) draft(id int64) api.Draft {
+	r.t.Helper()
+	d, err := r.c.Draft(r.ctx, id)
+	if err != nil {
+		r.t.Fatalf("draft %d: %v", id, err)
+	}
+	return d
+}
+
+// approve is the person approving draft id at rev on its card.
+func (r *draftsRig) approve(id, rev int64) error {
+	r.t.Helper()
+	_, err := r.c.ResolveGate(r.ctx, r.draft(id).Gate, "approve", api.TaskRequest{Args: map[string]string{"rev": strconv.FormatInt(rev, 10)}, Source: "cli"})
+	return err
+}
+
+// editPayload is the person changing draft id's payload on its card, at rev.
+func (r *draftsRig) editPayload(id, rev int64, payload string) error {
+	_, err := r.c.TaskDo(r.ctx, "draft:"+strconv.FormatInt(id, 10), "edit",
+		api.TaskRequest{Args: map[string]string{"rev": strconv.FormatInt(rev, 10), "payload": payload}, Source: "cli"})
+	return err
+}
+
+// pinned waits until the daemon serves draft id as pinned by an open question and that question's gate is open,
+// as the person sees it on the task; it fails the test when that never comes.
+func (r *draftsRig) pinned(id int64) api.Draft {
+	r.t.Helper()
+	for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+		d := r.draft(id)
+		if d.PinnedBy != 0 && r.questionOpen() {
+			return d
+		}
+		if time.Now().After(deadline) {
+			r.t.Fatalf("draft %d is served as no open question's: %+v", id, d)
+		}
+	}
+}
+
+// questionOpen says whether the pull request's question gate is open.
+func (r *draftsRig) questionOpen() bool {
+	r.t.Helper()
+	gs, err := r.c.Gates(r.ctx)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return slices.ContainsFunc(gs, func(g api.GateView) bool {
+		return g.Kind == "question" && g.Unit == draftsPR.String() && g.Status == "open"
+	})
+}
+
+// answer is the person answering, from the cockpit, the question the pull request's turn asks once the daemon
+// has opened its gate: an option's id picks it.
+func (r *draftsRig) answer(text string) {
+	r.t.Helper()
+	var gs []api.GateView
+	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		var err error
+		if gs, err = r.c.Gates(r.ctx); err != nil {
+			r.t.Fatal(err)
+		}
+		for _, g := range gs {
+			if g.Kind != "question" || g.Unit != draftsPR.String() {
+				continue
+			}
+			for _, in := range g.Intents {
+				if in.Answer {
+					if _, err := r.c.ResolveGate(r.ctx, g.ID, in.ID, api.TaskRequest{Args: map[string]string{"answer": text}, Source: "cockpit"}); err != nil {
+						r.t.Fatalf("answering %q: %v", text, err)
+					}
+					return
+				}
+			}
+		}
+	}
+	r.t.Fatalf("no open question on %s in %+v", draftsPR, gs)
+}
+
+func (r *draftsRig) book() dturn.Book { return r.d.Book(r.t, draftsPR) }
+
+// lastOutcomeURL is the url of the last record of the pull request's newest turn.
+func (r *draftsRig) lastOutcomeURL() string {
+	b := r.book()
+	if len(b.Turns) == 0 {
+		return ""
+	}
+	rec, ok := b.LastRecord(b.Turns[len(b.Turns)-1].Seq)
+	if !ok || rec.Record.Outcome == nil {
+		return ""
+	}
+	return rec.Record.Outcome.URL
+}
+
+func (r *draftsRig) wantPosted(want ...string) {
+	r.t.Helper()
+	if got := r.pub.posted(); !slices.Equal(got, want) {
+		r.t.Fatalf("posted %q, want %q", got, want)
+	}
+}
+
+func (r *draftsRig) wantState(id int64, state string) api.Draft {
+	r.t.Helper()
+	d := r.draft(id)
+	if d.State != state {
+		r.t.Fatalf("draft %d is %s (%s %s), want %s", id, d.State, d.Error, d.Reason, state)
+	}
+	return d
+}
+
+func choice(text string, opts ...string) string {
+	return fmt.Sprintf(`{"kind":"choice","text":%q,"options":[%s]}`, text, strings.Join(opts, ","))
+}
+
+func draftOption(id, label string, d api.AgentDraft) string {
+	return fmt.Sprintf(`{"id":%q,"label":%q,"consequence":"posts draft %d","draft":{"id":%d,"rev":%d}}`, id, label, d.ID, d.ID, d.Rev)
+}
+
+func doneOn(verdict string, d api.AgentDraft) string {
+	return fmt.Sprintf(`{"state":"done","summary":"recorded %s","outcome":{"verdict":%q,"draft":{"id":%d,"rev":%d}}}`, verdict, verdict, d.ID, d.Rev)
+}
+
+// checkout is the git of the pull request's checkout: every command succeeds and reads nothing.
+type checkout struct{}
+
+func (checkout) Run(context.Context, string, []string, ...string) ([]byte, error) { return nil, nil }
+
+// branches are the local branches of the pull request's checkout as the GitHub plugin plans a first round
+// over them: none is checked out, none has a tip, and every commit is there.
+type branches struct{}
+
+func (branches) Upstream(context.Context, string) (string, error)               { return "", nil }
+func (branches) LocalBranchTip(context.Context, string, string) (string, error) { return "", nil }
+func (branches) CheckedOutAt(context.Context, string, string) (string, error)   { return "", nil }
+func (branches) HasCommit(context.Context, string, string) (bool, error)        { return true, nil }
+func (branches) IsAncestor(context.Context, string, string, string) (bool, error) {
+	return true, nil
+}
+
+// sweepPastTheWindow runs the workflows, then again once the plan gate's window has passed, as the daemon's
+// sweep does over time, and waits until the pull request's book holds turns turns: the daemon's gates loop,
+// not the sweep, resolves a plan gate whose window passed and starts its round.
+func (r *draftsRig) sweepPastTheWindow(turns int) dturn.Book {
+	r.t.Helper()
+	for range 2 {
+		if err := r.d.Sweep(r.ctx); err != nil {
+			r.t.Fatalf("sweep: %v", err)
+		}
+		r.advance(2 * time.Minute)
+	}
+	for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+		if b := r.book(); len(b.Turns) >= turns || time.Now().After(deadline) {
+			return b
+		}
+	}
+}

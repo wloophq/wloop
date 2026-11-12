@@ -6,6 +6,7 @@ package outbox
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -39,9 +40,9 @@ type Proposal struct {
 	// Subject is the subject the proposer read, whose facts the policy's
 	// rules read; nil: Service.Facts reads the unit's.
 	Subject *draft.Subject
-	// Purpose and Delivery are the draft's shape; "" derives them from Kind
-	// (draft.ShapeOf), and a set Purpose with no Kind derives Kind
-	// (draft.KindOf).
+	// Purpose and Delivery are the draft's shape. A Kind its publisher's
+	// manifest declares gives the Delivery; with no Kind, a Purpose that names
+	// a declared kind is that kind, and any other takes the kind of Delivery.
 	Purpose  string
 	Delivery draft.Delivery
 	// Effects are applied once the draft is sent, names of builtin.Effects.
@@ -54,6 +55,14 @@ type Proposal struct {
 	// Why is why the draft is proposed, in the user's language; Language
 	// is the locale Text is written in.
 	Why, Language string
+	// Payload is what the kind's schema shapes beside Text; nil for none.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, checked against the live
+	// value for a kind whose basis the agent states.
+	Basis string
+	// Hold keeps the draft waiting for a person whatever its approval
+	// rules say, except under dry_run.
+	Hold bool
 }
 
 type Filter struct {
@@ -83,13 +92,38 @@ type SettledReader interface {
 	SettledAt(ctx context.Context, workflow string) (map[unit.Unit]time.Time, error)
 }
 
+// Store keeps the drafts and their content revisions: Insert writes revision 1 by d.By, and Update writes a
+// revision by d.By when d's Content (draft.SameContent) differs from the stored row's.
 type Store interface {
-	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID
+	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID, at Rev 1 and Version 1
 	Get(ctx context.Context, id draft.ID) (draft.Draft, error)      // ErrNotFound
 	List(ctx context.Context, f Filter) ([]draft.Draft, error)      // newest first
-	// Update writes d only while the stored state is from and the stored Rev is d.Rev, and returns
-	// d with Rev bumped; ErrConflict otherwise.
+	// Update writes d only while the stored state is from and the stored Version is d.Version, and returns d
+	// with Version bumped, and Rev bumped when its Content changed; ErrConflict otherwise.
 	Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error)
+	// Revisions are draft id's content revisions, oldest first; ErrNotFound when there is no such draft.
+	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)
+}
+
+// Kinds are the draft kinds the plugins' manifests declare.
+type Kinds interface {
+	// Lookup is the kind name of provider, the provider of the draft's publisher (Service.PublisherOf),
+	// never of its unit; false when its manifest declares none. Lookup and Validate run only on propose
+	// and amend, never on send, show or Recover, so a stored draft keeps its stored delivery.
+	Lookup(provider, kind string) (draft.KindSpec, bool)
+	// Shape is d with its kind, purpose and delivery as provider's manifest declares them (draft.Catalog's
+	// Shape): a kind provider does not declare is refused, and a provider that declares none leaves d as it
+	// is.
+	Shape(provider string, d draft.Draft) (draft.Draft, error)
+	// Validate refuses a payload that does not fit spec's schema, wrapping ErrInvalid.
+	Validate(spec draft.KindSpec, payload json.RawMessage) error
+}
+
+// Bases read the live basis of a unit, never a cached one.
+type Bases interface {
+	// Live is what a draft of kind on u, which publisher posts (Service.PublisherOf), would be written
+	// against now, such as a pull request's head; publisher's manifest declares kind.
+	Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error)
 }
 
 // Effects returns the publishing capability of a provider; an error wrapping
@@ -149,6 +183,12 @@ type Service struct {
 	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
 	// none does.
 	Silent func(name string) bool
+	// Kinds are the manifests' draft kinds, the only source of a kind's delivery; nil declares none, so a draft
+	// keeps the kind, purpose and delivery its proposer gave.
+	Kinds Kinds
+	// Bases read the live basis of a draft whose kind's basis the agent states; with nil, such a draft is
+	// refused, never passed.
+	Bases Bases
 }
 
 var (
@@ -159,37 +199,60 @@ var (
 	ErrNeedsConfirm = errors.New("the draft may have been posted; retry needs confirm")
 	ErrInvalid      = errors.New("invalid draft")
 	ErrNoGates      = errors.New("the outbox has no gates to hold its drafts")
+	// ErrNoBases: a draft states a basis and nothing reads the live one.
+	ErrNoBases = errors.New("nothing reads a live basis")
+	// ErrStale: the unit moved past the basis the draft was written against.
+	ErrStale = errors.New("the draft is stale: the unit changed since it was written")
+	// ErrRevConflict: the draft is at another rev than the one its reviser read; it is also an ErrConflict.
+	ErrRevConflict = fmt.Errorf("the draft changed since it was read: %w", ErrConflict)
+	// ErrOutOfScope: the draft is not the calling agent's to change.
+	ErrOutOfScope = errors.New("the draft is out of the caller's reach")
 )
+
+// failure is the cause and the Error of a draft that failed with err: CauseStale only when err is ErrStale,
+// CauseUnconfirmed when its publisher says the post may have reached its provider.
+func failure(err error) (draft.Cause, string) {
+	switch msg := err.Error(); {
+	case errors.Is(err, ErrStale):
+		return draft.CauseStale, msg
+	case strings.HasPrefix(msg, mayHaveBeenPosted):
+		return draft.CauseUnconfirmed, msg
+	default:
+		return "", msg
+	}
+}
 
 // NotConfirmed is the Error of a draft Recover found in sending and Verify could not confirm.
 const NotConfirmed = "not confirmed after a restart"
 
+// mayHaveBeenPosted starts a publisher's error when its post may have reached its provider.
 const mayHaveBeenPosted = "may have been posted"
 
 // Propose stores the draft p proposes as held and opens its gate under
 // p's approval: a policy that releases it queues it at once, a dry_run drops
 // it, a delay gives the gate its window.
 func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) {
-	if err := checkKind(p.Kind); err != nil {
-		return draft.Draft{}, err
-	}
 	if s.Gates == nil {
 		return draft.Draft{}, ErrNoGates
 	}
 	now := s.Clock.Now()
-	d := s.delivered(shaped(draft.Draft{
+	d, spec, declared, err := s.shape(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
-	}))
-	if err := checkContent(d); err != nil {
+		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: draft.ProposerOf(p.Origin),
+	})
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	if err := s.checkContent(ctx, d, spec, declared); err != nil {
 		return draft.Draft{}, err
 	}
 	dec, err := s.decide(ctx, p, d, now)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if targetsOutside(d) && dec.Approval.Mode != draft.DryRun {
+	if (d.Hold || s.targetsOutside(ctx, d)) && dec.Approval.Mode != draft.DryRun {
 		dec = draft.Decision{Approval: waiting, Rule: -1}
 	}
 	if dup, ok, err := s.duplicate(ctx, d, dec.Approval, p.RepeatAfter, now); err != nil || ok {
@@ -201,12 +264,17 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err := s.implemented(d); err != nil {
 		return draft.Draft{}, err
 	}
+	if d.Task == "" {
+		if d.Task, err = s.taskOf(ctx, d); err != nil {
+			return draft.Draft{}, err
+		}
+	}
 	d, err = s.Store.Insert(ctx, d)
 	if err != nil {
 		return draft.Draft{}, err
 	}
 	s.logf("draft %d proposed: %s on %s by %s, approval %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind, dec.Approval.Mode)
-	g, err := s.Gates.Open(ctx, gateOf(d), decided(dec))
+	g, err := s.Gates.Open(ctx, gateOf(d, nil), decided(dec))
 	if err != nil {
 		return d, errors.Join(fmt.Errorf("opening the gate of draft %d: %w", d.ID, err), s.ungated(ctx, d))
 	}
@@ -223,31 +291,65 @@ func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
-// shaped is d with its purpose and delivery derived from its kind when it
-// names none, and its kind, which only readers of the API see, from them.
-func shaped(d draft.Draft) draft.Draft {
-	if d.Purpose == "" && d.Kind != "" {
-		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
+// undeclared is the catalog of a Service with no Kinds: it declares no kind.
+var undeclared = &draft.Catalog{}
+
+func (s *Service) kinds() Kinds {
+	if s.Kinds == nil {
+		return undeclared
 	}
-	if d.Delivery == "" {
-		d.Delivery = draft.Message
-	}
-	d.Kind = draft.KindOf(d.Purpose, d.Delivery)
-	return d
+	return s.Kinds
 }
 
-// delivered is d with the delivery its provider's publisher posts it as.
-func (s *Service) delivered(d draft.Draft) draft.Draft {
-	fx, err := s.publisher(d)
+// shape is d shaped by the kind its publisher's manifest declares, with that kind's spec; declared is false
+// for a publisher whose manifest declares no kinds.
+func (s *Service) shape(d draft.Draft) (draft.Draft, draft.KindSpec, bool, error) {
+	kinds, provider := s.kinds(), string(s.PublisherOf(d))
+	got, err := kinds.Shape(provider, d)
 	if err != nil {
-		return d
+		return d, draft.KindSpec{}, false, invalid(err)
 	}
-	if dl, ok := fx.(port.Deliverer); ok && d.Delivery != "" {
-		if got := dl.Delivers(cmp.Or(d.Kind, draft.KindOf(d.Purpose, d.Delivery))); got != d.Delivery {
-			d.Delivery, d.Kind = got, draft.KindOf(d.Purpose, got)
-		}
+	spec, declared := s.KindOf(got)
+	if spec.Basis != draft.BasisAgent {
+		got.Basis = ""
 	}
-	return d
+	return got, spec, declared, nil
+}
+
+func invalid(err error) error {
+	if errors.Is(err, ErrInvalid) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", ErrInvalid, err)
+}
+
+// KindOf is d's kind as the manifest of its publisher (PublisherOf), never of its unit, declares it now;
+// false when that manifest declares none of that name.
+func (s *Service) KindOf(d draft.Draft) (draft.KindSpec, bool) {
+	return s.kinds().Lookup(string(s.PublisherOf(d)), string(d.Kind))
+}
+
+// spec is the kind of stored draft d as its publisher's manifest declares it now; declared is false for a
+// publisher that declares no kinds, and a kind it no longer declares is ErrInvalid.
+func (s *Service) spec(d draft.Draft) (draft.KindSpec, bool, error) {
+	if spec, ok := s.KindOf(d); ok {
+		return spec, true, nil
+	}
+	kinds, provider := s.kinds(), string(s.PublisherOf(d))
+	if _, err := kinds.Shape(provider, draft.Draft{Kind: d.Kind, Purpose: d.Purpose, Delivery: d.Delivery}); err != nil {
+		return draft.KindSpec{}, false, invalid(err)
+	}
+	return draft.KindSpec{}, false, nil
+}
+
+// current is stored draft d with the delivery its kind posts as, as its publisher's manifest declares it now;
+// false, and d as it is, when that manifest no longer declares its kind.
+func (s *Service) current(d draft.Draft) (draft.Draft, bool) {
+	got, err := s.kinds().Shape(string(s.PublisherOf(d)), d)
+	if err != nil {
+		return d, false
+	}
+	return got, true
 }
 
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
@@ -269,7 +371,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, a draft.Approval
 		repeatAfter = s.RepeatAfter
 	}
 	for _, o := range found {
-		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
+		if o, _ = s.current(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
 		if o.State != draft.Dropped || o.Reason == reasonDryRun && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
@@ -279,20 +381,108 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, a draft.Approval
 	return draft.Draft{}, false, nil
 }
 
-func checkContent(d draft.Draft) error {
+// checkContent refuses d, of kind spec, when its fields do not make a draft its kind posts, and a basis
+// that is not the live one with ErrStale; a draft of an undeclared kind has no payload.
+func (s *Service) checkContent(ctx context.Context, d draft.Draft, spec draft.KindSpec, declared bool) error {
+	if err := checkFields(d, spec); err != nil {
+		return err
+	}
+	if !declared {
+		if len(d.Payload) > 0 {
+			return fmt.Errorf("%w: %s declares no kind that takes a payload", ErrInvalid, d.Unit.Provider)
+		}
+		return nil
+	}
+	if err := s.kinds().Validate(spec, d.Payload); err != nil {
+		return invalid(err)
+	}
+	if spec.Basis != draft.BasisAgent {
+		return nil
+	}
+	if strings.TrimSpace(d.Basis) == "" {
+		return fmt.Errorf("%w: a %s draft states the basis it was written against", ErrInvalid, d.Kind)
+	}
+	return s.fresh(ctx, d)
+}
+
+func checkFields(d draft.Draft, spec draft.KindSpec) error {
 	switch {
 	case d.Unit.IsZero():
 		return fmt.Errorf("%w: no unit", ErrInvalid)
-	case !slices.Contains(deliveries, d.Delivery):
-		return fmt.Errorf("%w: unknown delivery %q", ErrInvalid, d.Delivery)
-	case d.Delivery == draft.Reaction && strings.TrimSpace(d.Reaction) == "":
-		return fmt.Errorf("%w: a reaction needs an emoji", ErrInvalid)
-	case d.Delivery != draft.Reaction && d.Delivery != draft.DeleteDelivery && strings.TrimSpace(d.Text) == "":
+	case spec.TextRequired && strings.TrimSpace(d.Text) == "":
 		return fmt.Errorf("%w: empty text", ErrInvalid)
+	case !spec.TextRequired && strings.TrimSpace(d.Text) == "" && strings.TrimSpace(d.Reaction) == "" && len(d.Payload) == 0 &&
+		strings.TrimSpace(d.Target) == "":
+		return fmt.Errorf("%w: an empty draft", ErrInvalid)
 	case strings.TrimSpace(d.Purpose) == "":
 		return fmt.Errorf("%w: no purpose", ErrInvalid)
 	case !d.Broadcast.Valid():
 		return fmt.Errorf("%w: unknown broadcast %q", ErrInvalid, d.Broadcast)
+	}
+	return nil
+}
+
+// Stale says whether the unit moved past the basis draft d was written against, read live now; false for a
+// draft with no basis. A failed read, or no reader, is an error and says nothing of staleness.
+func (s *Service) Stale(ctx context.Context, d draft.Draft) (bool, error) {
+	return s.staleBy(ctx, d, s.liveBasis)
+}
+
+// Staleness says whether draft d is stale, and known whether that can be told. A draft refused or failed as
+// stale (draft.CauseStale) is, until its content is revised; one with no basis is not; any other compares
+// its basis with the unit's, a recent read when Bases keep one (Recent), else a live one. A read that fails
+// or does not answer before ctx ends leaves it unknown. It serves every reader but the checks that refuse a
+// stale draft: a draft's card, its gate's options and a turn's instructions.
+func (s *Service) Staleness(ctx context.Context, d draft.Draft) (stale, known bool) {
+	if d.Cause == draft.CauseStale {
+		return true, true
+	}
+	read := s.liveBasis
+	if r, ok := s.Bases.(Recent); ok {
+		read = r.Recent
+	}
+	stale, err := s.staleBy(ctx, d, read)
+	return stale, err == nil
+}
+
+func (s *Service) liveBasis(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
+	return s.Bases.Live(ctx, publisher, u, kind)
+}
+
+func (s *Service) staleBy(ctx context.Context, d draft.Draft, read func(context.Context, unit.ProviderID, unit.Unit, string) (string, error)) (bool, error) {
+	if d.Basis == "" {
+		return false, nil
+	}
+	if s.Bases == nil {
+		return false, fmt.Errorf("%w: nothing reads the live basis of draft %d", ErrNoBases, d.ID)
+	}
+	live, err := read(ctx, s.PublisherOf(d), d.Unit, string(d.Kind))
+	if err != nil {
+		return false, fmt.Errorf("reading the live basis of %s: %w", d.Unit, err)
+	}
+	return live != d.Basis, nil
+}
+
+// refused stores CauseStale on held or failed draft d when err refused it as stale, so every reader of
+// Staleness tells it until its content is revised; a write that loses a race leaves the next refusal to.
+func (s *Service) refused(ctx context.Context, d draft.Draft, err error) {
+	if !errors.Is(err, ErrStale) || d.Cause == draft.CauseStale || d.State != draft.Held && d.State != draft.Failed {
+		return
+	}
+	d.Cause = draft.CauseStale
+	if _, serr := s.save(ctx, d, d.State); serr != nil {
+		s.logf("draft %d: keeping its stale refusal: %v", d.ID, serr)
+	}
+}
+
+// fresh refuses d with ErrStale when Stale says it is, and with Stale's error when it cannot say.
+func (s *Service) fresh(ctx context.Context, d draft.Draft) error {
+	stale, err := s.Stale(ctx, d)
+	switch {
+	case err != nil:
+		return err
+	case stale:
+		return fmt.Errorf("%w: it was written against %s", ErrStale, d.Basis)
 	}
 	return nil
 }
@@ -311,17 +501,6 @@ func (s *Service) implemented(d draft.Draft) error {
 	}
 	return nil
 }
-
-// checkKind refuses a kind, the input word of agents and the API, that
-// names no shape.
-func checkKind(k draft.Kind) error {
-	if k != "" && !k.Valid() {
-		return fmt.Errorf("%w: unknown kind %q", ErrInvalid, k)
-	}
-	return nil
-}
-
-var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery, draft.EditDelivery, draft.DeleteDelivery}
 
 // decide is the approval of d under p's policy. A policy that does not
 // validate, a rule that cannot be read, or a rule that reads the unit's
@@ -346,6 +525,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
+	sub.Kind, _ = s.KindOf(d)
 	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)
@@ -376,11 +556,38 @@ func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) 
 	return pol, nil
 }
 
-// targetsOutside reports an agent's draft aimed at another conversation or person than its unit's,
-// which only the user may approve: an injected instruction must not post elsewhere as the user.
-func targetsOutside(d draft.Draft) bool {
+// targetsOutside reports an agent's draft aimed at another conversation or person than the unit of the
+// turn that proposed it, which only the user may approve: an injected instruction must not post elsewhere
+// as the user. The draft's publisher's Scoper decides what is within that unit; a draft on another unit
+// than its turn's is outside unless it is within the turn's, and one on another provider's always is. A
+// publisher with no Scoper, a Scoper that cannot say, and a publisher of another provider than the unit's
+// keep the draft outside.
+func (s *Service) targetsOutside(ctx context.Context, d draft.Draft) bool {
+	if !d.Origin.ByAgent() {
+		return false
+	}
 	t := strings.TrimSpace(d.Target)
-	return (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && t != "" && !strings.EqualFold(t, d.Unit.Key)
+	if own := d.Origin.Unit; !own.IsZero() && own != d.Unit {
+		return own.Provider != d.Unit.Provider || !s.within(ctx, d, own, cmp.Or(t, d.Unit.Key))
+	}
+	if t == "" || strings.EqualFold(t, d.Unit.Key) {
+		return false
+	}
+	return !s.within(ctx, d, d.Unit, t)
+}
+
+// within says whether d's publisher, the provider of u, scopes target within u.
+func (s *Service) within(ctx context.Context, d draft.Draft, u unit.Unit, target string) bool {
+	if s.PublisherOf(d) != u.Provider {
+		return false
+	}
+	fx, err := s.publisher(d)
+	sc, ok := fx.(port.Scoper)
+	if err != nil || !ok {
+		return false
+	}
+	in, err := sc.Within(ctx, u, target)
+	return err == nil && in
 }
 
 // posts says whether d's delivery reaches people.
@@ -446,11 +653,11 @@ func (s *Service) PublisherOf(d draft.Draft) unit.ProviderID {
 // BroadcastOf is the broadcast the draft p proposes would take: the one its publisher's Placer places, NoBroadcast
 // when it replies in no thread or its publisher places nothing. It stores nothing and opens no gate.
 func (s *Service) BroadcastOf(ctx context.Context, p Proposal) (draft.Broadcast, error) {
-	if err := checkKind(p.Kind); err != nil {
+	d, _, _, err := s.shape(draft.Draft{Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target,
+		Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction, Origin: p.Origin, Purpose: p.Purpose, Delivery: p.Delivery})
+	if err != nil {
 		return draft.NoBroadcast, err
 	}
-	d := s.delivered(shaped(draft.Draft{Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target,
-		Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction, Origin: p.Origin, Purpose: p.Purpose, Delivery: p.Delivery}))
 	fx, err := s.publisher(d)
 	if err != nil {
 		return draft.NoBroadcast, err
@@ -527,6 +734,9 @@ func (s *Service) load(ctx context.Context, id draft.ID, to draft.State, states 
 
 func (s *Service) save(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
 	d.UpdatedAt = s.Clock.Now()
+	if d.State != draft.Held && d.State != draft.Failed {
+		d.Cause = ""
+	}
 	got, err := s.Store.Update(ctx, d, from)
 	if err != nil {
 		return draft.Draft{}, fmt.Errorf("draft %d %s -> %s: %w", d.ID, from, d.State, err)
@@ -535,84 +745,189 @@ func (s *Service) save(ctx context.Context, d draft.Draft, from draft.State) (dr
 	return got, nil
 }
 
-func setText(d *draft.Draft, text string) error {
-	if d.Delivery != draft.Reaction && strings.TrimSpace(text) == "" {
-		return fmt.Errorf("%w: empty text", ErrInvalid)
-	}
-	d.Text, d.Edited = text, text != d.Original
-	return nil
+// Edit sets the text of held or failed draft id, which the person read at rev. A held draft waits for a
+// person again: its gate is superseded first, so no window and no approval given to the old text releases
+// the new one, and a gate that waits opens.
+func (s *Service) Edit(ctx context.Context, id draft.ID, text string, rev int64) (draft.Draft, error) {
+	return s.Amend(ctx, id, Amendment{Text: &text, Rev: rev})
 }
 
-// Edit sets the text of held or failed draft id. A held draft waits for a
-// person again: its gate is superseded first, so no window and no approval
-// given to the old text releases the new one, and a gate that waits opens.
-func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Draft, error) {
-	return s.Amend(ctx, id, Amendment{Text: &text})
+// SetBroadcast turns on or off whether held or failed draft id, a thread reply the person read at rev, is
+// also posted to its conversation; its gate is handled as Edit's.
+func (s *Service) SetBroadcast(ctx context.Context, id draft.ID, on bool, rev int64) (draft.Draft, error) {
+	return s.Amend(ctx, id, Amendment{Broadcast: &on, Rev: rev})
 }
 
-// SetBroadcast turns on or off whether held or failed draft id, a thread
-// reply, is also posted to its conversation; its gate is handled as Edit's.
-func (s *Service) SetBroadcast(ctx context.Context, id draft.ID, on bool) (draft.Draft, error) {
-	return s.Amend(ctx, id, Amendment{Broadcast: &on})
-}
-
-// Amendment is what a person changes on a draft: its text, a thread reply's
-// broadcast, or both; nil leaves it.
+// Amendment is what a person or an agent changes on a draft: its text, a
+// thread reply's broadcast, its payload, its basis, or several; nil leaves it.
 type Amendment struct {
 	Text      *string
 	Broadcast *bool
+	Payload   *json.RawMessage
+	// Basis is what the reviser read the unit at, checked live as a proposal's.
+	Basis *string
+	// Rev is the rev the reviser read, at least 1: a draft at another is ErrRevConflict.
+	Rev int64
+	// By is who revises it; zero is a person. AgentAmend sets it from its Caller.
+	By draft.Actor
 }
 
-// Amend applies a to held or failed draft id at once, both changes or
-// neither; its gate is handled as Edit's.
+// Amend applies a, a person's at a.Rev, to held or failed draft id at once, all changes or none; its gate is
+// handled as Edit's. A rev below 1 is ErrInvalid, a draft at another rev ErrRevConflict. An amendment by a
+// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped, so it never approves
+// what it wrote. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
 func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
+	if a.By.Kind != "" && a.By.Kind != draft.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: %w: %s %s changes draft %d through draft_update, not a person's edit",
+			gates.ErrRefused, ErrOutOfScope, a.By.Kind, a.By.Session, id)
+	}
+	if a.Rev < 1 {
+		return draft.Draft{}, fmt.Errorf("%w: a person revises a draft at the rev they read, at least 1", ErrInvalid)
+	}
 	d, err := s.load(ctx, id, "", draft.Held, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if a.Text != nil {
-		if err := setText(&d, *a.Text); err != nil {
+	if a.Rev != d.Rev {
+		return draft.Draft{}, fmt.Errorf("draft %d is at rev %d, not %d: %w", id, d.Rev, a.Rev, ErrRevConflict)
+	}
+	a.By = draft.Actor{Kind: draft.ActorPerson}
+	got, err := s.revise(ctx, d, a, "")
+	return got, revConflict(err)
+}
+
+// revise applies a to d, held or failed and read at its stored rev. A held draft's open gate is superseded
+// first, so no window and no approval given to the old content releases the new, and a waiting gate opens
+// for the new rev, stamped with every session that proposed or revised the draft. A revision of a failed
+// draft, a person's or an agent's, takes it back to held under such a gate: no earlier approval covers it.
+func (s *Service) revise(ctx context.Context, d draft.Draft, a Amendment, session string) (draft.Draft, error) {
+	if err := s.amended(ctx, &d, a); err != nil {
+		return draft.Draft{}, err
+	}
+	from := d.State
+	prev, hadGate, err := s.GateOf(ctx, d)
+	if err != nil {
+		return draft.Draft{}, err
+	}
+	reopen := false
+	d.Cause = ""
+	switch {
+	case from == draft.Held && hadGate && prev.Status != gate.Open:
+		return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", d.ID, ErrConflict)
+	case from == draft.Held && hadGate:
+		if err := s.supersede(ctx, prev, session); err != nil {
 			return draft.Draft{}, err
 		}
+		reopen = true
+	case from == draft.Failed:
+		d.State, d.Error, reopen = draft.Held, "", true
+	}
+	saved, serr := s.save(ctx, d, from)
+	if !reopen {
+		return saved, serr
+	}
+	at := saved
+	if serr != nil {
+		var gerr error
+		if at, gerr = s.Store.Get(ctx, d.ID); gerr != nil || at.State != draft.Held {
+			return at, errors.Join(serr, gerr)
+		}
+	}
+	return saved, errors.Join(serr, s.waitAt(ctx, at, sessionsOf(prev, hadGate, session), session))
+}
+
+// waitAt opens a waiting gate for held draft at, read after its last write, stamped with sessions and the
+// session that wrote its content. An open gate at its rev that stamps them all is kept; any other open gate,
+// a concurrent reviser's, is superseded by caller, the reviser's session ("" a person), and its stamps carried, so no session that revised the draft
+// resolves the gate it waits on.
+func (s *Service) waitAt(ctx context.Context, at draft.Draft, sessions []string, caller string) error {
+	if at.By.Session != "" {
+		sessions = append(sessions, at.By.Session)
+	}
+	latest, ok, err := s.GateOf(ctx, at)
+	if err != nil {
+		return err
+	}
+	if ok && latest.Status == gate.Open {
+		if latest.ApprovedRev == at.Rev && stampsAll(latest, sessions) {
+			return nil
+		}
+		if err := s.supersede(ctx, latest, caller); err != nil {
+			return err
+		}
+		sessions = append(sessions, sessionsOf(latest, true, "")...)
+	}
+	slices.Sort(sessions)
+	sessions = slices.Compact(sessions)
+	if _, err := s.Gates.Open(ctx, gateOf(at, sessions), decided(draft.Decision{Approval: waiting, Rule: -1})); err != nil {
+		return errors.Join(fmt.Errorf("reopening the gate of draft %d: %w", at.ID, err), s.ungated(ctx, at))
+	}
+	return nil
+}
+
+func stampsAll(g gate.Gate, sessions []string) bool {
+	for _, sn := range sessions {
+		if sn != g.Session && !slices.Contains(g.Sessions, sn) {
+			return false
+		}
+	}
+	return true
+}
+
+// amended applies a to d: its text, broadcast, payload and basis, each checked as a proposal's, and a
+// person's only where d's kind lets them.
+func (s *Service) amended(ctx context.Context, d *draft.Draft, a Amendment) error {
+	spec, declared, err := s.spec(*d)
+	if err != nil {
+		return err
+	}
+	before := *d
+	if a.Text != nil {
+		d.Text, d.Edited = *a.Text, *a.Text != d.Original
 	}
 	if a.Broadcast != nil {
 		if d.Broadcast == draft.NoBroadcast {
-			return draft.Draft{}, fmt.Errorf("%w: draft %d replies in no thread, so it has nothing to broadcast", ErrInvalid, id)
+			return fmt.Errorf("%w: draft %d replies in no thread, so it has nothing to broadcast", ErrInvalid, d.ID)
 		}
 		d.Broadcast = draft.BroadcastOff
 		if *a.Broadcast {
 			d.Broadcast = draft.BroadcastOn
 		}
 	}
-	reopen := false
-	if d.State == draft.Held {
-		g, ok, err := s.GateOf(ctx, d)
-		if err != nil {
-			return draft.Draft{}, err
-		}
-		if ok && g.Status != gate.Open {
-			return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", id, ErrConflict)
-		}
-		if ok {
-			if err := s.Gates.Supersede(ctx, g.ID, task.ActorPerson); errors.Is(err, gates.ErrResolved) {
-				return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", id, ErrConflict)
-			} else if err != nil {
-				return draft.Draft{}, err
-			}
-			reopen = true
+	if a.Payload != nil {
+		d.Payload = slices.Clone(*a.Payload)
+	}
+	if a.Basis != nil {
+		d.Basis = strings.TrimSpace(*a.Basis)
+	}
+	if declared && a.By.Kind == draft.ActorPerson {
+		if err := spec.CheckEdit(before, *d); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	}
-	saved, err := s.save(ctx, d, d.State)
-	if reopen {
-		if _, gerr := s.Gates.Open(ctx, gateOf(d), decided(draft.Decision{Approval: waiting, Rule: -1})); gerr != nil {
-			return saved, errors.Join(err, fmt.Errorf("reopening the gate of draft %d: %w", id, gerr), s.ungated(ctx, d))
-		}
+	if a.Text == nil && a.Payload == nil && a.Basis == nil {
+		return checkFields(*d, spec)
 	}
-	return saved, err
+	d.By = a.By
+	return s.checkContent(ctx, *d, spec, declared)
+}
+
+// supersede closes g, the open gate of a draft being revised, by a person, or by the agent session.
+func (s *Service) supersede(ctx context.Context, g gate.Gate, session string) error {
+	var err error
+	if session == "" {
+		err = s.Gates.Supersede(ctx, g.ID, task.ActorPerson)
+	} else {
+		_, err = s.Gates.SupersedeForAgent(ctx, g.ID, session)
+	}
+	if errors.Is(err, gates.ErrResolved) {
+		return fmt.Errorf("gate %d: %w: it decided its draft meanwhile", g.ID, ErrConflict)
+	}
+	return err
 }
 
 // Prepare readies held draft id for a person to approve its gate: the
-// draft at rev, which its publisher must take. It writes nothing. The caller
+// draft at rev, which its publisher must take, and not stale. It writes nothing. The caller
 // reads the gate it resolves before it prepares: an edit after the person saw
 // the draft supersedes that gate, and a person who changes the text approves
 // through Edit's new gate.
@@ -623,6 +938,10 @@ func (s *Service) Prepare(ctx context.Context, id draft.ID, rev int64) (draft.Dr
 	}
 	if d.Rev != rev {
 		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", ErrConflict, id, rev, d.Rev)
+	}
+	if err := s.fresh(ctx, d); err != nil {
+		s.refused(ctx, d, err)
+		return draft.Draft{}, err
 	}
 	return d, s.publishable(ctx, &d)
 }
@@ -687,29 +1006,52 @@ func (s *Service) drop(ctx context.Context, d draft.Draft, reason string) (draft
 	return s.save(ctx, d, from)
 }
 
-// Retry: failed -> queued. A draft that failed as "not confirmed after a restart" or with an Error
-// starting "may have been posted" needs confirm true, else ErrNeedsConfirm.
+// Retry: failed -> queued, only at the rev its gate approved, else ErrConflict, and only when no question decides
+// it (QuestionPins). A draft that failed as "not
+// confirmed after a restart" or with an Error starting "may have been posted" needs confirm true, else
+// ErrNeedsConfirm.
 func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.Draft, error) {
+	return s.RetryBy(ctx, id, confirm, draft.Actor{Kind: draft.ActorPerson})
+}
+
+// RetryBy is Retry by by: confirm, the word that the draft was not posted, is a person's alone, and an agent
+// session's is refused (gates.ErrRefused), whether or not it proposed the draft.
+func (s *Service) RetryBy(ctx context.Context, id draft.ID, confirm bool, by draft.Actor) (draft.Draft, error) {
+	if confirm && by.Kind != "" && by.Kind != draft.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: only the person confirms draft %d was not posted, not %s %s", gates.ErrRefused, id, by.Kind, by.Session)
+	}
 	d, err := s.load(ctx, id, draft.Queued, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if !confirm && (d.Error == NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)) {
+	if !confirm && d.Cause == draft.CauseUnconfirmed {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w", id, ErrNeedsConfirm)
 	}
+	if err := s.approved(ctx, d); err != nil {
+		return draft.Draft{}, fmt.Errorf("draft %d: %w: %w", id, ErrConflict, err)
+	}
+	if qp, ok := s.Gates.(QuestionPins); ok {
+		g, _, err := s.GateOf(ctx, d)
+		if err != nil {
+			return draft.Draft{}, err
+		}
+		if err := qp.Decides(ctx, g); err != nil {
+			return draft.Draft{}, err
+		}
+	}
 	if err := s.publishable(ctx, &d); err != nil {
+		s.refused(ctx, d, err)
 		return draft.Draft{}, err
 	}
 	d.State, d.Error = draft.Queued, ""
 	return s.save(ctx, d, draft.Failed)
 }
 
-// List is the drafts f selects, each with the delivery its provider's
-// publisher posts it as.
+// List is the drafts f selects, each with the delivery its kind posts as now (current).
 func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 	ds, err := s.Store.List(ctx, f)
 	for i := range ds {
-		ds[i] = s.delivered(ds[i])
+		ds[i], _ = s.current(ds[i])
 	}
 	return ds, err
 }
@@ -718,9 +1060,6 @@ func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 // session), by p.Tool, as sent, with a gate already approved by the agent
 // that made it. It resolves no gate: no agent resolves an open one.
 func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence) (draft.Draft, error) {
-	if err := checkKind(p.Kind); err != nil {
-		return draft.Draft{}, err
-	}
 	if s.Gates == nil {
 		return draft.Draft{}, ErrNoGates
 	}
@@ -731,20 +1070,23 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 	if ev.At.IsZero() {
 		ev.At = now
 	}
-	d := s.delivered(shaped(draft.Draft{
+	d, spec, _, err := s.shape(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
 		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
-	}))
-	if err := checkContent(d); err != nil {
+	})
+	if err != nil {
 		return draft.Draft{}, err
 	}
-	d, err := s.Store.Insert(ctx, d)
+	if err := checkFields(d, spec); err != nil {
+		return draft.Draft{}, err
+	}
+	d, err = s.Store.Insert(ctx, d)
 	if err != nil {
 		return draft.Draft{}, err
 	}
 	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind)
-	g := gateOf(d)
+	g := gateOf(d, nil)
 	g.By, g.Rule = task.ActorAgent, p.Tool
 	var errs []error
 	if _, err := s.Gates.RecordSent(ctx, g); err != nil {
@@ -781,10 +1123,10 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 	return errors.Join(errs...)
 }
 
-// attachPost attaches the unit of d, a post, to the task its turn is on
+// attachPost attaches the unit of d, a post as Posts says, to the task its turn is on
 // when the turn's intent attaches its posts.
 func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
-	if s.Results == nil || !slices.Contains(posts, d.Delivery) || d.Origin.Intent == "" {
+	if s.Results == nil || s.Posts == nil || !s.Posts(d.Delivery) || d.Origin.Intent == "" {
 		return nil
 	}
 	id, ok := task.IDOf(d.Origin.Unit)
@@ -816,9 +1158,6 @@ func (s *Service) landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, e
 	return l.Landed(ctx, d)
 }
 
-// posts are the deliveries that post a message; a reaction, an edit or a deletion is none.
-var posts = []draft.Delivery{draft.Message, draft.CommentDelivery}
-
 // Send is the sender pass: the effects of the sent drafts not applied yet,
 // then every approved draft -> sending -> sent | failed, one Publish each, no retry.
 func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
@@ -849,7 +1188,8 @@ func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
 
 var errClaimLost = errors.New("another pass or decision took the draft")
 
-// sendOne reports whether d was sent; a nil error with false means d is now failed.
+// sendOne reports whether d was sent; a nil error with false means d is now failed, as a stale one is,
+// unpublished.
 // A draft approved before it was placed is placed here, and its target stored with the claim.
 // A draft that cannot be published fails unclaimed: Recover verifies only what was claimed.
 func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
@@ -858,10 +1198,14 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 		err = s.approved(ctx, d)
 	}
 	if err == nil {
+		err = s.fresh(ctx, d)
+	}
+	if err == nil {
 		err = place(ctx, fx, &d, false)
 	}
 	if err != nil {
-		d.State, d.Error = draft.Failed, err.Error()
+		d.State = draft.Failed
+		d.Cause, d.Error = failure(err)
 		_, err := s.save(ctx, d, draft.Queued)
 		if errors.Is(err, ErrConflict) {
 			return false, errClaimLost
@@ -878,12 +1222,13 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	}
 	ev, pubErr := fx.Publish(ctx, d)
 	if pubErr != nil {
-		return false, s.fail(ctx, d, pubErr.Error())
+		cause, msg := failure(pubErr)
+		return false, s.fail(ctx, d, cause, msg)
 	}
 	return s.settleSent(ctx, d, ev)
 }
 
-// approved refuses d, queued, unless its gate approved it.
+// approved refuses d, queued or failed, unless its gate approved it at its rev.
 func (s *Service) approved(ctx context.Context, d draft.Draft) error {
 	g, ok, err := s.GateOf(ctx, d)
 	switch {
@@ -891,14 +1236,16 @@ func (s *Service) approved(ctx context.Context, d draft.Draft) error {
 		return err
 	case !ok || g.Status != gate.Approved:
 		return errNotApproved
+	case g.ApprovedRev < 1 || g.ApprovedRev != d.Rev:
+		return fmt.Errorf("%w: it approved rev %d, the draft is at rev %d", errNotApproved, g.ApprovedRev, d.Rev)
 	}
 	return nil
 }
 
 var errNotApproved = errors.New("its gate did not approve it")
 
-func (s *Service) fail(ctx context.Context, d draft.Draft, reason string) error {
-	d.State, d.Error = draft.Failed, reason
+func (s *Service) fail(ctx context.Context, d draft.Draft, cause draft.Cause, reason string) error {
+	d.State, d.Cause, d.Error = draft.Failed, cause, reason
 	_, err := s.save(ctx, d, draft.Sending)
 	return err
 }
@@ -937,9 +1284,9 @@ func (s *Service) Recover(ctx context.Context) error {
 		ev, found, verr := fx.Verify(ctx, d, d.SendingAt)
 		switch {
 		case verr != nil && strings.HasPrefix(verr.Error(), mayHaveBeenPosted):
-			err = s.fail(ctx, d, verr.Error())
+			err = s.fail(ctx, d, draft.CauseUnconfirmed, verr.Error())
 		case verr != nil || !found:
-			err = s.fail(ctx, d, NotConfirmed)
+			err = s.fail(ctx, d, draft.CauseUnconfirmed, NotConfirmed)
 		default:
 			_, err = s.settleSent(ctx, d, ev)
 		}
@@ -953,11 +1300,13 @@ func (s *Service) Recover(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// PlaceBroadcasts runs at daemon start: every held or failed message draft
+// PlaceBroadcasts runs at daemon start: every held or failed draft but a reaction
 // stored with no broadcast, as a version before broadcasts left it, takes the
-// broadcast its publisher's Placer gives it now. Its gate stays as it is. A
-// draft placed in no thread, or whose publisher cannot place it now, keeps
-// none and is asked again at the next start.
+// broadcast its publisher's Placer gives it now. A held draft is placed only
+// while its gate is open, and then waits on a new gate at its new rev, so no
+// approval of the unplaced draft posts the broadcast; a person retries a
+// failed one. A draft placed in no thread, or whose publisher cannot place it
+// now, keeps none and is asked again at the next start.
 func (s *Service) PlaceBroadcasts(ctx context.Context) error {
 	ds, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held, draft.Failed}})
 	if err != nil {
@@ -965,7 +1314,15 @@ func (s *Service) PlaceBroadcasts(ctx context.Context) error {
 	}
 	var errs []error
 	for _, d := range ds {
-		if d.Delivery != draft.Message || d.Broadcast != draft.NoBroadcast {
+		if d.Broadcast != draft.NoBroadcast || d.Reaction != "" {
+			continue
+		}
+		prev, gated, err := s.GateOf(ctx, d)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if d.State == draft.Held && (!gated || prev.Status != gate.Open) {
 			continue
 		}
 		fx, err := s.publisher(d)
@@ -985,11 +1342,42 @@ func (s *Service) PlaceBroadcasts(ctx context.Context) error {
 			continue
 		}
 		d.Broadcast = got.Broadcast
+		if d.State == draft.Held {
+			errs = append(errs, s.placeHeld(ctx, d, prev))
+			continue
+		}
 		if _, err := s.save(ctx, d, d.State); err != nil && !errors.Is(err, ErrConflict) {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// placeHeld stores held draft d's placement under a new waiting gate: prev, its open gate, is superseded
+// first, as a person's edit supersedes it, so its task is not ended in between, and no instant has two
+// open gates. A prev decided meanwhile leaves d unplaced; a write that loses to another leaves the stored
+// draft waiting on a gate at its rev.
+func (s *Service) placeHeld(ctx context.Context, d draft.Draft, prev gate.Gate) error {
+	if err := s.Gates.Supersede(ctx, prev.ID, task.ActorPerson); errors.Is(err, gates.ErrResolved) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	at, serr := s.save(ctx, d, draft.Held)
+	if serr != nil {
+		var gerr error
+		if at, gerr = s.Store.Get(ctx, d.ID); gerr != nil || at.State != draft.Held {
+			return errors.Join(ignoreConflict(serr), gerr)
+		}
+	}
+	return errors.Join(ignoreConflict(serr), s.waitAt(ctx, at, sessionsOf(prev, true, ""), ""))
+}
+
+func ignoreConflict(err error) error {
+	if errors.Is(err, ErrConflict) {
+		return nil
+	}
+	return err
 }
 
 // EvidenceOps are the items ledger ops that record sent draft d on each of its items;

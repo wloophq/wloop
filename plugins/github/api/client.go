@@ -538,17 +538,47 @@ func limitOf(h http.Header) Limit {
 	return l
 }
 
+// statusError is r as a *StatusError, its message GitHub's with the details
+// of its errors, such as why a 422 refused a review's inline comment.
 func statusError(r Response) *StatusError {
 	var body struct {
-		Message string `json:"message"`
+		Message string            `json:"message"`
+		Errors  []json.RawMessage `json:"errors"`
 	}
 	msg := ""
 	if json.Unmarshal(r.Body, &body) == nil {
 		msg = body.Message
+		if d := errorDetails(body.Errors); d != "" {
+			msg = strings.TrimPrefix(msg+": "+d, ": ")
+		}
 	} else {
 		msg = cut(strings.TrimSpace(string(r.Body)), 200)
 	}
 	return &StatusError{Status: r.Status, Message: msg}
+}
+
+// errorDetails joins the errors of a REST answer, each a string or an
+// object with a message, or a field and a code.
+func errorDetails(errs []json.RawMessage) string {
+	var out []string
+	for _, raw := range errs {
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			out = append(out, s)
+			continue
+		}
+		var e struct{ Message, Field, Code string }
+		if json.Unmarshal(raw, &e) != nil {
+			continue
+		}
+		switch {
+		case e.Message != "":
+			out = append(out, e.Message)
+		case e.Code != "":
+			out = append(out, strings.TrimPrefix(e.Field+" "+e.Code, " "))
+		}
+	}
+	return cut(strings.Join(out, "; "), 500)
 }
 
 func (c *Client) currentToken(ctx context.Context) (string, error) {

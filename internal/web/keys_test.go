@@ -450,6 +450,7 @@ func actPrelude(t *testing.T) string {
 	src := appJS(t)
 	var b strings.Builder
 	b.WriteString(keyJS(t))
+	b.WriteString(actionJS(t))
 	b.WriteString(jsConst(t, src, "API_VERSION"))
 	b.WriteString(jsConst(t, src, "PLAN_ACTS"))
 	b.WriteString(jsConst(t, src, "itemLabel"))

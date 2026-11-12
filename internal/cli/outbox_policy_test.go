@@ -69,7 +69,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	book := dturn.Book{Unit: u}
 	var origins []draft.Origin
 	for _, d := range defs {
-		if p := d.DraftApproval; p != nil && (p.Default.Mode != draft.Wait || len(p.Rules) != 0) {
+		if p := d.DraftApproval; p != nil && (p.Default.Mode != draft.Wait || !releasesOnlyNamedDeliveries(*p)) {
 			t.Errorf("intent %s declares %+v", d.Name, *p)
 		}
 		seq := int64(len(book.Turns) + 1)
@@ -86,10 +86,22 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	}
 	pol := outbox.Resolver{Manifests: outboxManifests{loaded: te.loadedIntents, books: policyBooks{u: book}}}
 	for _, o := range origins {
-		if a, err := pol.For(context.Background(), u, o); err != nil || a.Default.Mode != draft.Wait || len(a.Rules) != 0 {
+		if a, err := pol.For(context.Background(), u, o); err != nil || a.Default.Mode != draft.Wait || !releasesOnlyNamedDeliveries(a) {
 			t.Errorf("%+v resolves to %+v, %v", o, a, err)
 		}
 	}
+}
+
+// releasesOnlyNamedDeliveries says that every rule of p that releases a
+// draft pins its delivery, as the review and address intents' rules for
+// thread replies and resolutions do.
+func releasesOnlyNamedDeliveries(p draft.Policy) bool {
+	for _, r := range p.Rules {
+		if r.Approval.Releases() && r.Names == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
@@ -124,7 +136,7 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 		{"a session draft reads its turn's intent", draft.Origin{Kind: draft.OriginSession, TurnSeq: 5}, draft.Approval{Mode: draft.Send}},
 	} {
 		a, err := pol.For(context.Background(), u, c.o)
-		if err != nil || a.Default != c.want || len(a.Rules) != 0 {
+		if err != nil || a.Default != c.want || !releasesOnlyNamedDeliveries(a) {
 			t.Errorf("%s: %+v, %v", c.name, a, err)
 		}
 	}

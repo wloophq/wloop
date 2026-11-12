@@ -281,7 +281,7 @@ func withOutbox(r *tasksRig, drafts ...draft.Draft) *fakeOutbox {
 }
 
 func proposed(id int64, task string) draft.Draft {
-	return draft.Draft{ID: draft.ID(id), Unit: r7u, Task: task, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Held,
+	return draft.Draft{ID: draft.ID(id), Unit: r7u, Task: task, Kind: draft.Kind("comment"), Purpose: "comment", Delivery: draft.Delivery("comment"), Text: "Thanks, merging.\nmore", State: draft.Held,
 		CreatedAt: tasksNow.Add(-time.Hour), UpdatedAt: tasksNow.Add(-time.Duration(id) * time.Minute)}
 }
 

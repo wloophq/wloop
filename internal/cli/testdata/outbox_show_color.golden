@@ -11,7 +11,8 @@
 [dim]To        [/]  acme/api#7
 [dim]Origin    [/]  rule stalled-nudge, 26h ago
 [dim]Approval  [/]  wait
+[dim]Rev       [/]  0
 
 [dim]{{command}} outbox approve 12[/]
 [dim]{{command}} outbox discard 12[/]
-[dim]{{command}} outbox edit 12 <markdown>[/]
+[dim]{{command}} outbox edit 12 <markdown> --rev 0[/]

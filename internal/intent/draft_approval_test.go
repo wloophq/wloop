@@ -126,13 +126,13 @@ window = "10m"`)
 	if p == nil || p.Default.Mode != draft.Wait || len(p.Rules) != 2 {
 		t.Fatalf("%+v", p)
 	}
-	if r := p.Rules[0]; r.Names != draft.CommentDelivery || r.Approval.Mode != draft.Send {
+	if r := p.Rules[0]; r.Names != draft.Delivery("comment") || r.Approval.Mode != draft.Send {
 		t.Errorf("rule 0: %+v", r)
 	}
 	if r := p.Rules[1]; r.Names != "" || r.Approval != (draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}) {
 		t.Errorf("rule 1: %+v", r)
 	}
-	comment := draft.Draft{Delivery: draft.CommentDelivery, Origin: draft.Origin{Kind: draft.OriginTurn, Intent: "ask-author"}}
+	comment := draft.Draft{Delivery: draft.Delivery("comment"), Origin: draft.Origin{Kind: draft.OriginTurn, Intent: "ask-author"}}
 	for name, c := range map[string]struct {
 		d     draft.Draft
 		facts map[string]any
@@ -140,10 +140,10 @@ window = "10m"`)
 	}{
 		"a bot's pull request":            {comment, map[string]any{"pr.author": "dependabot[bot]"}, draft.Send},
 		"a comment on the docs":           {comment, map[string]any{"pr.repo": "acme/docs"}, draft.Wait},
-		"a message on the docs":           {draft.Draft{Delivery: draft.Message}, map[string]any{"pr.repo": "acme/docs"}, draft.Delay},
+		"a message on the docs":           {draft.Draft{Delivery: draft.Delivery("message")}, map[string]any{"pr.repo": "acme/docs"}, draft.Delay},
 		"a comment on another repository": {comment, map[string]any{"pr.repo": "acme/widgets"}, draft.Wait},
 	} {
-		got, err := p.Decide(c.d, draft.Subject{Slot: "pr", Facts: c.facts}, c.d.Delivery == draft.CommentDelivery, time.Time{})
+		got, err := p.Decide(c.d, draft.Subject{Slot: "pr", Facts: c.facts}, c.d.Delivery == draft.Delivery("comment"), time.Time{})
 		if err != nil || got.Approval.Mode != c.want {
 			t.Errorf("%s: %+v %v, want %s", name, got, err, c.want)
 		}

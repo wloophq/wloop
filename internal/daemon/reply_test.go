@@ -55,7 +55,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 	d := ds[0]
-	if d.Unit != r7u || d.Task != "t-1" || !slices.Equal(d.Items, []string{"it-t-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
+	if d.Unit != r7u || d.Task != "t-1" || !slices.Equal(d.Items, []string{"it-t-1"}) || d.Kind != draft.Kind("reply") || d.Text != "On it, thanks" ||
 		d.Origin.Kind != draft.OriginUser || d.State != draft.Held {
 		t.Fatalf("draft %+v", d)
 	}
@@ -157,7 +157,8 @@ func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 		{"no unit", `{"text":"x","source":"cockpit"}`, 400},
 		{"another unit's task", `{"unit":{"provider":"github","key":"acme/api#9"},"task":"t-1","text":"x","source":"cockpit"}`, 400},
 		{"no such task", `{"unit":{"provider":"github","key":"acme/api#7"},"task":"t-9","text":"x","source":"cockpit"}`, 404},
-		{"an unknown kind", `{"unit":{"provider":"github","key":"acme/api#7"},"kind":"nudge","text":"x","source":"cockpit"}`, 400},
+		{"an unknown kind", `{"unit":{"provider":"github","key":"acme/api#7"},"kind":"bogus","text":"x","source":"cockpit"}`, 400},
+		{"text and a reaction", `{"unit":{"provider":"github","key":"acme/api#7"},"text":"x","reaction":"eyes","source":"cockpit"}`, 400},
 	} {
 		if rec := post(t, r.s, api.Drafts, c.body); rec.Code != c.code {
 			t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body)

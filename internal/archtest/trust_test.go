@@ -9,9 +9,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -47,7 +50,9 @@ func ruleTrustedFacts(plants []trustPlant) []string {
 // workflows.<name>.gates.approval. The untrusted facts are the table's,
 // the brief's extra fields, a classification's output and a task property
 // an agent or a plugin writes, so an agent or a thread's text never
-// releases a send or a run.
+// releases a send or a run. A draft kind's payload facts are trusted, as
+// its plugin posts the payload verbatim, and a rule that releases reads one
+// only as an allow-list, so a draft that lacks it is never released.
 func TestApprovalRulesReadTrustedFacts(t *testing.T) {
 	t.Parallel()
 	var plants []trustPlant
@@ -59,6 +64,79 @@ func TestApprovalRulesReadTrustedFacts(t *testing.T) {
 	for _, b := range ruleTrustedFacts(plants) {
 		t.Error(b)
 	}
+	for _, b := range payloadFactRules(t) {
+		t.Error(b)
+	}
+}
+
+// payloadFactRules flags a payload fact a releasing allow-list rule of an
+// intent cannot read, or that the rule reads to release a draft that lacks
+// it or holds a value it does not list, and a releasing deny-list rule
+// that loads.
+func payloadFactRules(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	host, base := anyIntent(t)
+	b, err := turn.Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	load := func(rules string) (*intentload.Loaded, []string) {
+		root := t.TempDir()
+		write(t, filepath.Join(root, "intents", host, "intent.toml"), base+fmt.Sprintf("\n[gates.approval]\nmode = %q\n%s", gate.ModeWait, rules))
+		l, problems := intentload.Load([]profile.Layer{{Name: "user", Source: root, Dir: root}}, turn.BundledFS(), b, turn.CheckTemplate)
+		var msgs []string
+		for _, p := range problems {
+			msgs = append(msgs, p.Field+": "+p.Msg)
+		}
+		return l, msgs
+	}
+	n := 0
+	for _, spec := range builtin.DraftKinds.Kinds() {
+		p, k := unit.ProviderID(spec.Provider), spec
+		{
+			for _, f := range k.Facts {
+				n++
+				on := fmt.Sprintf("draft.delivery == %q", k.Delivery)
+				allow := fmt.Sprintf("[[gates.approval.rule]]\nwhen = '%s && %s in [\"listed\"]'\nmode = %q\n", on, f.Name, gate.ModeSend)
+				l, problems := load(allow)
+				if len(problems) > 0 || l == nil {
+					out = append(out, fmt.Sprintf("intent %s does not load an allow-list rule that sends and reads %s, a trusted payload fact: %v (R-trust)", host, f.Name, problems))
+					continue
+				}
+				def, _ := l.Registry.Get(dintent.Name(host))
+				if def.DraftApproval == nil {
+					out = append(out, fmt.Sprintf("intent %s has no draft approval", host))
+					continue
+				}
+				d := draft.Draft{Unit: unit.Unit{Provider: p, Key: "acme/api#7"}, Kind: draft.Kind(k.Name), Delivery: draft.Delivery(k.Delivery)}
+				for payload, sends := range map[string]bool{
+					payloadAt(f.Pointer, "listed"): true, payloadAt(f.Pointer, "other"): false, `{}`: false, ``: false,
+				} {
+					d.Payload = []byte(payload)
+					dec, err := def.DraftApproval.Decide(d, draft.Subject{Kind: spec}, true, time.Time{})
+					if got := dec.Approval.Releases() && err == nil; got != sends {
+						out = append(out, fmt.Sprintf("%s in [\"listed\"] over payload %q sends %v, want %v: %+v, %v (R-trust)", f.Name, payload, got, sends, dec, err))
+					}
+				}
+				deny := fmt.Sprintf("[[gates.approval.rule]]\nwhen = '%s && %s != \"other\"'\nmode = %q\n", on, f.Name, gate.ModeSend)
+				if _, problems := load(deny); !slices.ContainsFunc(problems, func(m string) bool {
+					return strings.Contains(m, f.Name) && strings.Contains(m, "allow-list") && !strings.Contains(m, "gate.kind")
+				}) {
+					out = append(out, fmt.Sprintf("intent %s loads a deny-list rule that sends and reads %s, which a draft that lacks it satisfies: %v (R-trust)", host, f.Name, problems))
+				}
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("no bundled draft kind declares a payload fact")
+	}
+	return out
+}
+
+// payloadAt is a JSON object that holds value at the one-token pointer ptr.
+func payloadAt(ptr, value string) string {
+	return fmt.Sprintf(`{%q: %q}`, strings.TrimPrefix(ptr, "/"), value)
 }
 
 // untrustedFacts are the untrusted facts of a workflow of slot, each with

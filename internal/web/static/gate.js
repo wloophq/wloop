@@ -15,11 +15,13 @@ function subjectOf(g) {
   return g && g.subject && typeof g.subject === "object" ? g.subject : {};
 }
 
-// gateOption is the option picked on g's card: the person's pick, else the recommended one; "" for none.
+// gateOption is the option picked on g's card: the person's pick, else the recommended one unless it pins a
+// draft, which is sent only once the person picks it; "" for none.
 function gateOption(g) {
   if (gateState.picked.has(g.id)) return gateState.picked.get(g.id);
   const subject = subjectOf(g);
-  return (subject.options || []).some((o) => o.id === subject.recommend) ? subject.recommend : "";
+  const recommended = (subject.options || []).find((o) => o.id === subject.recommend);
+  return recommended && !recommended.draft ? recommended.id : "";
 }
 
 // markResolving dims the card drawn for selector while its decision is on its way; a failed one comes back.
@@ -57,6 +59,7 @@ async function resolveGate(e, g, id, option) {
   } catch (err) {
     markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: intent.label, error: err.message }), true);
+    detailEnv.changed();
     return null;
   }
 }
@@ -69,10 +72,11 @@ function gateOptions(g, answer) {
   if (!answer || !opts.length) return null;
   const picked = gateOption(g);
   const ordered = [...opts.filter((o) => o.id === subject.recommend), ...opts.filter((o) => o.id !== subject.recommend)];
-  return h("div", { class: "opts" }, ...ordered.map((o) => {
+  return h("div", { class: "opts" }, ...ordered.flatMap((o) => {
     const on = o.id === picked;
-    return h("button", {
+    return [h("button", {
       type: "button", class: "opt" + (on ? " on" : ""), "aria-pressed": String(on), "data-focus": `gate:${g.id}:option:${o.id}`,
+      "data-pin": o.draft ? `${o.draft.id}@${o.draft.rev}` : undefined,
       onclick: () => {
         gateState.picked.set(g.id, on ? "" : o.id);
         detailEnv.render();
@@ -81,8 +85,24 @@ function gateOptions(g, answer) {
     h("span", { class: "r", "aria-hidden": "true" }),
     h("span", { class: "lb" }, o.label),
     o.id === subject.recommend ? h("span", { class: "rec" }, t("recommended")) : null,
-    o.consequence ? h("span", { class: "cs" }, o.consequence) : null);
+    o.consequence ? h("span", { class: "cs" }, o.consequence) : null),
+    o.draft ? pinnedDraft(subject, o.draft, `gate:${g.id}:option:${o.id}`) : null];
   }));
+}
+
+// pinnedDraft is the draft an answer approves, at the rev the question pinned in ref, as its own card shows it:
+// its preview, its text and its whole payload, with a note when it changed since or is gone. The person sees
+// what they approve, never only the agent's words for it.
+function pinnedDraft(subject, ref, scope) {
+  const d = (subject.pinned || []).find((x) => x.id === ref.id);
+  if (!d) return h("div", { class: "d-pin" }, h("p", { class: "d-note err" }, t("Approves draft #{id}, which is gone.", { id: ref.id })));
+  return h("div", { class: "d-pin", "data-draft": String(ref.id), "data-rev": String(ref.rev) },
+    h("p", { class: "d-note" }, t("Approves draft #{id} at rev {rev}:", { id: ref.id, rev: ref.rev })),
+    d.rev !== ref.rev ? h("p", { class: "d-note err" }, t("It changed since the question pinned it and is now at rev {rev}: below is what it says now.", { rev: d.rev })) : null,
+    d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:pin-preview`, names: d.names || {} })) : null,
+    draftWhere(d),
+    d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:pin`, names: d.names || {} }) : null,
+    payloadView(d, `pin:${ref.id}`, false, scope));
 }
 
 // gateAnswer is the free-text answer of a gate whose intent answer takes one; Cmd+Enter or Ctrl+Enter sends it.
@@ -204,6 +224,10 @@ function gateCard(e, g, opts = {}) {
   const deflt = intents.find((x) => x.id === g.default);
   const answer = intents.find((x) => x.answer);
   const title = g.text || g.name || g.kind;
+  const buttons = intents.map((x, i) => h("button", {
+    type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
+    onclick: () => resolveGate(e, g, x.id),
+  }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label));
   return h("article", { class: "ask d-gate", "data-gate": String(g.id), "data-kind": g.kind, "aria-label": title },
     h("header", { class: "hd" },
       h("i", { class: "dot", "aria-hidden": "true" }),
@@ -218,12 +242,11 @@ function gateCard(e, g, opts = {}) {
       g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: fmtDate(g.deadline, "datetime") })
         : t("Until {time}", { time: fmtDate(g.deadline, "datetime") })) : null,
       gateOptions(g, answer),
+      subject.draft ? pinnedDraft(subject, subject.draft, `gate:${g.id}:confirm`) : null,
       answer ? gateAnswer(e, g, answer) : null,
-      h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
-        type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,
-        onclick: () => resolveGate(e, g, x.id),
-      }, i < 9 ? h("kbd", {}, String(i + 1)) : null, " ", x.label)),
-      answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null)));
+      h("div", { class: "d-actions" }, ...buttons,
+      answer ? h("span", { class: "keyhint" }, h("kbd", {}, "⌘↵"), " ", answer.label) : null),
+      actionResult(buttons)));
 }
 
 // gateAt is the gate whose card holds el, with its task, among sources: each a task and the gates the page
@@ -293,6 +316,82 @@ function offeredDraftActions(d) {
   });
 }
 
+// payloadView is every value d's payload posts, under its field's word, as the daemon serves them: a worded value
+// keeps its raw one in its title. While d is being edited under key, each editable field is a control.
+function payloadView(d, key, editing, scope) {
+  const fields = d.fields || [];
+  return fields.length ? h("dl", { class: "d-payload" }, ...fields.flatMap((f) => payloadField(f, key, editing, scope))) : null;
+}
+
+function payloadField(f, key, editing, scope) {
+  let value;
+  if ((f.fields || []).length) value = h("dl", { class: "d-payload" }, ...f.fields.flatMap((x) => payloadField(x, key, editing, scope)));
+  else if (editing && f.editable && (f.options || []).length) value = fieldControl(f, key, scope);
+  else if (f.markdown) value = h("div", { class: "pv md", "data-value": f.value }, renderMarkdown(f.value, { key: `${scope}:field:${key}:${f.pointer}` }));
+  else value = h("span", { class: "pv", "data-value": f.value, title: f.shown && f.shown !== f.value ? f.value : undefined }, f.shown || f.value);
+  return [h("dt", {}, f.label), h("dd", { "data-pointer": f.pointer }, value)];
+}
+
+// fieldControl changes editable field f of the draft edited under key: a select over its options, else a line.
+function fieldControl(f, key, scope) {
+  const edits = detailState.payloads.get(key) || {};
+  const current = f.pointer in edits ? edits[f.pointer] : f.value;
+  const set = (ev) => { detailState.payloads.set(key, { ...(detailState.payloads.get(key) || {}), [f.pointer]: ev.target.value }); };
+  const attrs = { class: "d-field", "aria-label": f.label, "data-focus": `${scope}:field:${key}:${f.pointer}` };
+  return h("select", { ...attrs, onchange: set }, ...f.options.map((o) => h("option", { value: o.value, selected: o.value === current }, o.label)));
+}
+
+// editableFields says whether d has a payload field a person may change.
+function editableFields(fields) {
+  return (fields || []).some((f) => (f.editable && (f.options || []).length) || editableFields(f.fields));
+}
+
+// draftEditable says whether a person may change anything of d: its text, unless its kind locks it, or a field.
+function draftEditable(d) {
+  return !d.text_locked || editableFields(d.fields);
+}
+
+// editedText is the text arg of an approval of d edited under key; none when its kind locks its text.
+function editedText(d, key) {
+  return d.text_locked ? {} : { text: detailState.editing.get(key) };
+}
+
+// editConflict is what the card of d, edited under key since an older rev, shows: that it changed meanwhile, who
+// wrote it and its current text, so an approval never replaces a revision the person did not see. The edits of
+// its fields are dropped, since they were made over values that may have changed.
+function editConflict(d, key) {
+  const since = detailState.editRevs.get(key);
+  if (since === undefined || since === d.rev) return null;
+  detailState.payloads.delete(key);
+  return h("div", { class: "d-conflict" },
+    h("p", { class: "d-note err" }, t("This draft changed since you began editing it; your edit replaces what it says now:"), d.author ? " " + d.author : ""),
+    d.text ? renderMarkdown(d.text, { key: `conflict:${key}`, names: d.names || {} }) : null);
+}
+
+// editedPayload is the payload arg of an approval of d edited under key: d's payload with the fields changed,
+// none when nothing changed.
+function editedPayload(d, key) {
+  const edits = Object.entries(detailState.payloads.get(key) || {});
+  if (!edits.length || !d.payload) return {};
+  const out = JSON.parse(JSON.stringify(d.payload));
+  for (const [pointer, v] of edits) setPointer(out, pointer, v);
+  return { payload: JSON.stringify(out) };
+}
+
+// setPointer sets the value at JSON pointer in doc.
+function setPointer(doc, pointer, v) {
+  const path = pointer.split("/").slice(1).map((p) => p.replaceAll("~1", "/").replaceAll("~0", "~"));
+  const last = path.pop();
+  path.reduce((at, p) => at[p], doc)[last] = v;
+}
+
+// stopEditing forgets the edits of the draft edited under key.
+function stopEditing(key) {
+  detailState.editing.delete(key);
+  detailState.payloads.delete(key);
+  detailState.editRevs.delete(key);
+}
+
 // windowLine says when the window of d's gate sends it, "" when it has none.
 function windowLine(d) {
   return d.deadline ? t("Sends at {time} unless you decide first", { time: fmtDate(d.deadline, "datetime") }) : "";
@@ -304,7 +403,7 @@ function draftWhere(d) {
   const pending = ["held", "failed", "queued", "sending"].includes(d.state);
   const lang = d.language ? [" · ", h("span", { class: "lang", lang: d.language }, fmtLanguage(d.language))] : null;
   if (d.where) return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.where), lang);
-  return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
+  return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.label || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
 }
 
 // broadcastToggle is the checkbox that also posts thread reply d to its conversation, which d's publisher offers
@@ -315,7 +414,7 @@ function broadcastToggle(d, scope) {
   const id = "draft:" + d.id;
   return h("label", { class: "meta broadcast" },
     h("input", { type: "checkbox", checked: d.broadcast === "on", disabled: !pending, "data-focus": `${scope}:broadcast:${id}`,
-      onchange: (ev) => taskAct({ id, title: d.title || id }, verbFor("edit"), { broadcast: String(!!ev.target.checked) }) }),
+      onchange: (ev) => taskAct({ id, title: d.title || id }, verbFor("edit"), { broadcast: String(!!ev.target.checked), rev: String(d.rev) }) }),
     " ", t("Also send to the conversation"));
 }
 
@@ -370,11 +469,12 @@ async function resolveDraft(d, intent, label, args) {
   try {
     await detailEnv.post("/api/gates/" + encodeURIComponent(d.gate) + "/" + encodeURIComponent(intent), verbBody({ ...args, rev: String(d.rev) }));
     detailEnv.notice(`${label}: ${d.where || d.target || d.unit}`);
-    detailState.editing.delete("draft:" + d.id);
+    stopEditing("draft:" + d.id);
     detailEnv.changed();
   } catch (err) {
     markResolving(card, false);
     detailEnv.notice(t("{action} failed: {error}", { action: label, error: err.message }), true);
+    detailEnv.changed();
   }
 }
 
@@ -390,8 +490,16 @@ function draftActions(e, d) {
   return [...acts, ...(editing ? [] : offeredDraftActions(d))].filter(Boolean);
 }
 
-const editDraft = (key, d) => () => { detailState.editing.set(key, d.text || ""); detailEnv.render(); };
-const cancelEdit = (key) => ({ label: t("Cancel"), enabled: true, focus: "cancel:" + key, run: () => { detailState.editing.delete(key); detailEnv.render(); } });
+const editDraft = (key, d) => () => {
+  detailState.editing.set(key, d.text || "");
+  detailState.payloads.delete(key);
+  detailState.editRevs.set(key, d.rev);
+  detailEnv.render();
+};
+const cancelEdit = (key) => ({ label: t("Cancel"), enabled: true, focus: "cancel:" + key, run: () => { stopEditing(key); detailEnv.render(); } });
+
+// staleOff turns action a off on stale draft d, with the reason the daemon worded.
+const staleOff = (d, a) => (a && d.stale ? { ...a, enabled: false, reason: (d.notes || [])[0], title: (d.notes || [])[0] } : a);
 
 // ownDraftActions are the actions of the draft e, its own task, carries, through the task's verbs.
 function ownDraftActions(e, d, key, editing) {
@@ -403,11 +511,11 @@ function ownDraftActions(e, d, key, editing) {
     return { label, run, enabled: st.enabled, reason: st.reason, title, focus: `${v}:${e.id}`, ...extra };
   };
   const primary = { primary: true, key: "queue:primary" };
-  if (editing) return [verb(approve, gateWord(e, d, "approved", approve), () => approveEdited(e), primary), cancelEdit(key)];
+  if (editing) return [staleOff(d, verb(approve, gateWord(e, d, "approved", approve), () => approveEdited(e), primary)), cancelEdit(key)];
   return [
-    d.state === "failed" ? verb(retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), primary)
-      : verb(approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), primary),
-    verb(edit || approve, draftWord("draft.edit"), editDraft(key, d), { key: "queue:edit", focus: `open:${edit || approve}:${e.id}` }),
+    staleOff(d, d.state === "failed" ? verb(retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), primary)
+      : verb(approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), primary)),
+    draftEditable(d) ? verb(edit || approve, draftWord("draft.edit"), editDraft(key, d), { key: "queue:edit", focus: `open:${edit || approve}:${e.id}` }) : null,
     verb(drop, gateWord(e, d, "rejected", drop), () => taskAct(e, drop, {}), { key: "queue:discard" }),
   ];
 }
@@ -421,16 +529,17 @@ function gateDraftActions(e, d, key, editing) {
   const act = (label, focus, run, extra) => ({ label, run, enabled: true, focus: `${focus}:${key}`, ...extra });
   const primary = { primary: true, key: "queue:primary" };
   if (editing) {
-    return [intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, { text: detailState.editing.get(key) }), primary) : null,
-      cancelEdit(key)];
+    return [intents.approved ? staleOff(d, act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel,
+      { ...editedText(d, key), ...editedPayload(d, key) }), primary)) : null,
+    cancelEdit(key)];
   }
   const retry = verbFor("retry");
   const drop = verbFor("drop");
   const dropLabel = gateWord(e, d, "rejected", drop);
   return [
-    d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
-      : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null,
-    intents.approved ? act(draftWord("draft.edit"), "open:" + approve, editDraft(key, d), { key: "queue:edit" }) : null,
+    staleOff(d, d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
+      : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null),
+    intents.approved && draftEditable(d) ? act(draftWord("draft.edit"), "open:" + approve, editDraft(key, d), { key: "queue:edit" }) : null,
     intents.rejected ? act(dropLabel, drop, () => resolveDraft(d, intents.rejected, dropLabel, {}), { key: "queue:discard" }) : null,
   ];
 }
@@ -459,18 +568,40 @@ function draftCard(e, d, opts = {}) {
   const why = d.state === "dropped" && d.reason_text ? `: ${d.reason_text}` : "";
   const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st}${why})` : "");
   const effects = draftEffects(d);
+  const buttons = draftDecided(d) ? [] : draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf));
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),
+    d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:preview:${d.id}`, names: d.names || {} })) : null,
     opts.context ? draftContextView(opts.context) : null,
     draftWhere(d),
+    d.author ? h("div", { class: "meta d-by" }, d.author) : null,
     broadcastToggle(d, scope),
-    editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
+    editing ? editConflict(d, key) : null,
+    editing && !d.text_locked ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),
-    d.why ? h("p", { class: "why" }, d.why) : null,
+    payloadView(d, key, editing, scope),
+    ...(d.notes || []).map((n) => h("p", { class: "d-note" + (d.stale ? " err" : "") }, n)),
+    d.why ? h("p", { class: "why" }, t("Why it was proposed: {why}", { why: d.why })) : null,
     d.quoted ? h("p", { class: "why" }, d.quoted) : null,
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,
     d.error ? h("p", { class: "err" }, d.error) : null,
     windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf))),
+    posted(d),
+    buttons.length ? h("div", { class: "d-actions" }, ...buttons) : null,
+    actionResult(buttons),
     draftLinks(e, d, scope));
+}
+
+// draftDecided says d left the person's hands for good: posted, or dropped; its card then offers no action.
+function draftDecided(d) {
+  return d.state === "sent" || d.state === "dropped";
+}
+
+// posted is the line that says when sent draft d was posted, linked to the post itself.
+function posted(d) {
+  if (d.state !== "sent") return null;
+  const link = safeURL(d.permalink);
+  const when = d.updated_at ? fmtDate(d.updated_at, "datetime") : "";
+  const text = when ? t("Posted {time}", { time: when }) : t("Posted");
+  return h("p", { class: "d-posted" }, link ? h("a", { href: link, target: "_blank", rel: "noopener noreferrer", class: "ext" }, text) : text);
 }

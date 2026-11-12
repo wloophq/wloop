@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
@@ -191,15 +192,20 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	if err != nil || len(props) != 1 || props[0].Unit != ref.Unit() || !strings.Contains(props[0].Text, "@{github:bob}") {
 		t.Fatalf("proposals %+v %v, want the nudge of bob on #7", props, err)
 	}
-	gs := outboxtest.NewGates(func() time.Time { return now })
+	gst := db.Gates(func() time.Time { return now })
+	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
-	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinnedClock(now),
+	vocab, err := builtin.Merge(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := gs.Bind(&outbox.Service{Kinds: vocab.DraftKinds(), Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(ctx, props[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != draft.Held || d.Delivery != draft.CommentDelivery {
+	if d.State != draft.Held || d.Delivery != draft.Delivery("comment") {
 		t.Fatalf("proposed %+v, want a held comment", d)
 	}
 	if _, err := svc.Propose(ctx, props[0]); !errors.Is(err, outbox.ErrDuplicate) {

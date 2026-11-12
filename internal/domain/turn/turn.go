@@ -103,6 +103,9 @@ const (
 	Resumed Route = "resumed"
 	Refused Route = "refused"
 	Direct  Route = "direct"
+	// Approved is an answer whose option approved the draft it points to: no session reads it, and the
+	// turn ends when the draft is sent.
+	Approved Route = "approved"
 )
 
 // Noticed says that the answer's session was told of it: typed into it, or noticed through its Stop hook.

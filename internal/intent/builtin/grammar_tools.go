@@ -11,6 +11,9 @@ var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
 	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
 	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read."},
+	{Name: "draft_read", Doc: "Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions."},
+	{Name: "draft_update", Doc: "Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again."},
+	{Name: "draft_withdraw", Doc: "Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read."},
 }
 
 // ToolData is what every tools.toml text reads.
@@ -63,13 +66,15 @@ func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 // ToolAnswers are the texts each tool answers with, which tools.toml words
 // under [<tool>.answers].
 var ToolAnswers = func() []ToolAnswer {
-	out := answersOf([]string{"turn_end", "task_post", "task_read"})
-	return append(out,
+	out := answersOf([]string{"turn_end", "task_post", "task_read", "draft_read", "draft_update", "draft_withdraw"})
+	out = append(out,
 		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", str("Keys")),
 		answer("turn_end", "problem_turn_type", "A problem: turn is not a string."),
 		answer("turn_end", "problem_turn_required", "A problem: turn is missing or empty."),
 		answer("turn_end", "problem_record_required", "A problem: record is missing."),
 		answer("turn_end", "problem_record", "A problem: record does not decode.", str("Error")),
+		answer("turn_end", "problem_pin", "A problem: the question pins, at Where, draft Draft, which no answer decides: its state, \"\" when there is no such draft, is not held, or its gate's status, \"\" when it has none, is not open.",
+			str("Where"), num("Draft"), str("State"), str("Gate")),
 		answer("turn_end", "refused_record", "The turn refused the record.", str("Reason")),
 		answer("turn_end", "store_failed", "The record could not be stored.", str("Error")),
 		answer("turn_end", "recorded", "The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, \"\" when none.",
@@ -103,7 +108,22 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("task_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
 		answer("task_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
 			str("Option"), str("Label"), str("Choice"), str("Text"), str("At")),
+
+		answer("draft_read", "read", "The draft, as JSON.", str("Draft")),
+		answer("draft_update", "updated", "The revised draft, as JSON.", str("Draft")),
+		answer("draft_withdraw", "withdrawn", "The withdrawn draft, as JSON.", str("Draft")),
+		answer("draft_update", "rev_conflict", "The draft is at another rev than the one given.", str("Error")),
+		answer("draft_withdraw", "rev_conflict", "The draft is at another rev than the one given.", str("Error")),
+		answer("draft_update", "stale", "The basis given is not the unit's live one.", str("Error")),
 	)
+	for _, tool := range []string{"draft_read", "draft_update", "draft_withdraw"} {
+		out = append(out,
+			answer(tool, "not_found", "No such draft.", str("Error")),
+			answer(tool, "out_of_scope", "The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.", str("Error")),
+			answer(tool, "failed", "The call failed.", str("Error")),
+		)
+	}
+	return out
 }()
 
 // AnswerOf is tool's answer name, false when the tool has none.

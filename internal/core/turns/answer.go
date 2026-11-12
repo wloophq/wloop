@@ -36,6 +36,9 @@ type AnswerRequest struct {
 	Gate int64
 	// BySession is the session an agent answered through, "" for a person.
 	BySession string
+	// Approves says the answer's option approved the draft it points to: the answer is stored, routed
+	// approved and delivered to no session; the turn ends when the draft is sent.
+	Approves bool
 }
 
 func (r AnswerRequest) answer(seq int64) turn.Answer {
@@ -78,6 +81,13 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 		s.mu.Unlock()
 	}
 
+	if r.Approves {
+		route := AnswerResult{Route: turn.Approved}
+		if err := s.saveRoute(ctx, r.Unit, q, a.ID, route); err != nil {
+			return route, err
+		}
+		return route, s.settlePicked(ctx, r.Unit, q.Seq)
+	}
 	route := AnswerResult{Route: turn.Resumed}
 	if !q.State.Stopped() {
 		if route, err = s.route(ctx, q, false, false); err != nil {

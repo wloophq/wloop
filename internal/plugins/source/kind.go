@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
@@ -115,6 +117,10 @@ func (k *Kind) Start(ctx context.Context, m *manifest.Manifest, c *plugin.Client
 		return fmt.Errorf("start %s: %w", m.ID, err)
 	}
 	a := &attached{client: src.NewClient(c), server: server, broker: broker, done: make(chan struct{})}
+	if err := readsItsBases(ctx, a.client, s); err != nil {
+		server.Close()
+		return fmt.Errorf("start %s: %w", m.ID, err)
+	}
 	a.notified = a.client
 	for _, n := range s.Notify {
 		a.notify = append(a.notify, plugin.Topic(n))
@@ -266,4 +272,26 @@ type subscriber struct {
 
 type notifier interface {
 	Notify(ctx context.Context, units []plugin.Unit, topics []plugin.Topic) error
+}
+
+// readsItsBases refuses a plugin whose manifest declares a draft kind with basis = "agent" while it serves no
+// Drafter: the host could read no live basis for that kind, and every draft of it would read stale.
+func readsItsBases(ctx context.Context, c *src.Client, s *manifest.Source) error {
+	var basis []string
+	for _, k := range s.DraftKinds {
+		if k.Basis == draft.BasisAgent {
+			basis = append(basis, k.Name)
+		}
+	}
+	if len(basis) == 0 {
+		return nil
+	}
+	caps, err := c.Capabilities(ctx)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(caps, src.CapabilityDrafter) {
+		return fmt.Errorf("its draft kinds %s take a basis, and it serves no %s to read it", strings.Join(basis, ", "), src.CapabilityDrafter)
+	}
+	return nil
 }

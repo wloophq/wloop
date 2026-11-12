@@ -107,3 +107,15 @@ process.stdout.write(JSON.stringify(out));`, viewsCatalog(), &got)
 		}
 	}
 }
+
+// TestARoutesPathFormOpensItsTask reads "#task/draft:1606", as the open command is given it, as the task route
+// "#task=draft:1606", and a path of another key the same way.
+func TestARoutesPathFormOpensItsTask(t *testing.T) {
+	var got struct{ Task, Same, Unit, View string }
+	nodeRun(t, routesPrelude(t), nil, `
+process.stdout.write(JSON.stringify({ Task: readRoute("#task/draft:1606").task, Same: readRoute("#task=draft:1606").task,
+  Unit: readRoute("#unit/github/acme%2Fapi%237").unit, View: readRoute("#view/outbox").view }));`, nil, &got)
+	if got.Task != "draft:1606" || got.Same != got.Task || got.Unit == "" || got.View != "outbox" {
+		t.Fatalf("got %+v, want the path forms read as their parameters", got)
+	}
+}

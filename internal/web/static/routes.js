@@ -62,8 +62,23 @@ function routeView(p) {
 }
 
 // readRoute is the route a hash names; view is "" when it names none.
+// routeParams are hash's parameters; a path such as "task/draft:12" or "unit/github/acme%2Fapi%237" is that one
+// parameter, as "task=draft:12" would be.
+function routeParams(hash) {
+  const raw = String(hash || "").replace(/^#/, "");
+  const path = raw.match(/^(task|unit|view|queue)\/(.+)$/);
+  if (!path) return new URLSearchParams(raw);
+  let value = path[2];
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    // a malformed escape stays as typed
+  }
+  return new URLSearchParams([[path[1], value]]);
+}
+
 function readRoute(hash) {
-  const p = new URLSearchParams(String(hash || "").replace(/^#/, ""));
+  const p = routeParams(hash);
   const ctx = (p.get("ctx") || "").split(",").map((c) => c.trim()).filter(Boolean);
   return {
     view: routeView(p),

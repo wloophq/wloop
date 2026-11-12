@@ -264,7 +264,7 @@ func TestNudgedEffectWritesLastNudge(t *testing.T) {
 	}
 	r.sync(twThread)
 	d, err := r.svc.Propose(ctx, outbox.Proposal{Unit: twThread, Task: string(task.DerivedID(twThread, "i1")), Items: []string{"i1", "i2"}, Purpose: "nudge",
-		Delivery: draft.Message, Text: "any news?", Effects: []string{"task.nudged"}, Origin: draft.Origin{Kind: draft.OriginUser}})
+		Delivery: draft.Delivery("message"), Text: "any news?", Effects: []string{"task.nudged"}, Origin: draft.Origin{Kind: draft.OriginUser}})
 	if err != nil {
 		t.Fatal(err)
 	}

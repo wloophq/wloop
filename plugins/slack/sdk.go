@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -422,7 +423,7 @@ func DraftOf(d src.Draft) draft.Draft {
 		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: draft.Origin{Kind: draft.OriginKind(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Key: d.Origin.Key, Unit: unit.Of(d.Origin.Unit)},
-		State: draft.State(d.State), Evidence: draft.Evidence(d.Evidence)}
+		State: draft.State(d.State), Evidence: draft.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 }
 
 // WireDraft is d as the host carries it.
@@ -431,9 +432,27 @@ func WireDraft(d draft.Draft) src.Draft {
 		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: src.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent, Workflow: d.Origin.Workflow,
 			Rule: d.Origin.Rule, Key: d.Origin.Key},
-		State: string(d.State), Evidence: src.Evidence(d.Evidence)}
+		State: string(d.State), Evidence: src.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 	if !d.Origin.Unit.IsZero() {
 		out.Origin.Unit = d.Origin.Unit.Wire()
 	}
 	return out
+}
+
+// Basis is none: no Slack kind is written against a basis.
+func (s *Plugin) Basis(context.Context, sdk.Unit, string) (string, error) { return "", nil }
+
+// Within says whether target, a message ref or permalink, is a message of
+// u; "" is u itself.
+func (s *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return true, nil
+	}
+	p, err := s.running()
+	if err != nil {
+		return false, err
+	}
+	got, ok, err := p.resolve(ctx, target)
+	return ok && got == unit.Of(u), err
 }

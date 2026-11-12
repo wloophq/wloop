@@ -27,6 +27,12 @@ draft_sent = "Draft {{.Draft}} approved; it goes out in a moment."
 
 draft_saved = "Draft {{.Draft}} saved for your approval."
 
+draft_rule_sends = "Draft {{.Draft}} goes out: an approval rule of the user's sends it ({{.Rule}})."
+
+draft_waits = "Draft {{.Draft}} waits for the user's approval: no approval rule of theirs sends it."
+
+draft_by_rule = "Posted by one of your approval rules to {{.Where}}."
+
 reply_placeholder = "Your reply, saved for your approval"
 
 reply_button = "Save"
@@ -56,6 +62,7 @@ notify_reply = "Reply"
 notify_send_reply = "Send reply"
 
 notify_question = "Agent asks"
+notify_pinned = "An answer approves a draft: open the question to see it before you answer."
 
 notify_proposal = "Proposal"
 

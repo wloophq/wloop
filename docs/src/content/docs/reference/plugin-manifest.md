@@ -72,6 +72,7 @@ every = "5m"
 | `ui` | table | What clients show of the plugin; every label lives in its profile layer. |
 | `commands` | array of tables | The commands the plugin binary serves in CLI mode, which run without the daemon. |
 | `tools` | array of tables | The MCP tools the plugin serves through CallTool. |
+| `session` | table | What the agent sessions of an intent that sets source_writes = false may not run. |
 
 ## `[source.codec]`
 
@@ -138,6 +139,7 @@ every = "5m"
 |---|---|---|
 | `name` | string | The delivery's name, such as "comment". Required. |
 | `posts` | bool | A draft with this delivery reaches people, so it waits for approval. |
+| `emoji` | bool | A draft with this delivery adds or removes an emoji, named by its reaction, and has no text. |
 
 ## `[[source.draft_kinds]]`
 
@@ -146,6 +148,20 @@ every = "5m"
 | `name` | string | The kind's name, such as "nudge". Required. |
 | `purpose` | string | What a draft of the kind is for; empty is its name. |
 | `delivery` | string | How it is posted, one of deliveries; empty is default_delivery. |
+| `schema` | string | The JSON schema of the kind's payload, a path in the plugin's directory such as "drafts/review/schema.json"; the publisher posts the payload verbatim. |
+| `preview` | string | The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides. |
+| `basis` | one of `agent` | Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none. |
+| `text_required` | bool | A draft of the kind needs a text. |
+| `editable` | list of strings | What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as "/event". |
+| `facts` | array of tables | The payload fields an approval rule reads. |
+| `verdict` | string | The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as "/event", which the schema makes a required string enum; empty posts none. |
+
+## `[[source.draft_kinds.facts]]`
+
+| Key | Kind | Meaning |
+|---|---|---|
+| `name` | string | The fact's name, draft.<provider>.<kind>.<field>. Required. |
+| `pointer` | string | The JSON pointer to the field in the payload, which the schema makes a required string enum. Required. |
 
 ## `[[source.signals]]`
 
@@ -257,6 +273,8 @@ every = "5m"
 | `doc` | string | What the tool does, for the reference pages. Required. |
 | `input` | string | The JSON schema of the tool's arguments, an object. Required. |
 | `posts` | one of `now` | The tool posts at once, recorded as a sent draft; empty posts nothing. |
+| `proposes` | bool | The tool only proposes drafts the user approves, so a session policy may allow it without a prompt. |
+| `reads` | bool | The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt. |
 | `answers` | array of tables | The answers the tool returns, which tools.toml words. |
 
 ## `[[source.tools.answers]]`
@@ -273,5 +291,11 @@ every = "5m"
 |---|---|---|
 | `name` | string | The field's name, as the template reads it. Required. |
 | `number` | bool | The field is a number; otherwise text. |
+
+## `[source.session]`
+
+| Key | Kind | Meaning |
+|---|---|---|
+| `write_commands` | list of strings | The command prefixes that write to the plugin's source, such as "gh pr review", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them. |
 
 This page is generated from `pkg/plugin/manifest` by `make docs-ref`.

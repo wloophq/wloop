@@ -33,6 +33,8 @@ const (
 	SourceService_Place_FullMethodName         = "/wloop.source.v1.SourceService/Place"
 	SourceService_Publish_FullMethodName       = "/wloop.source.v1.SourceService/Publish"
 	SourceService_Verify_FullMethodName        = "/wloop.source.v1.SourceService/Verify"
+	SourceService_Basis_FullMethodName         = "/wloop.source.v1.SourceService/Basis"
+	SourceService_Within_FullMethodName        = "/wloop.source.v1.SourceService/Within"
 	SourceService_Landed_FullMethodName        = "/wloop.source.v1.SourceService/Landed"
 	SourceService_Checkout_FullMethodName      = "/wloop.source.v1.SourceService/Checkout"
 	SourceService_WriteState_FullMethodName    = "/wloop.source.v1.SourceService/WriteState"
@@ -78,6 +80,13 @@ type SourceServiceClient interface {
 	Place(ctx context.Context, in *PlaceRequest, opts ...grpc.CallOption) (*PlaceResponse, error)
 	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error)
 	Verify(ctx context.Context, in *VerifyRequest, opts ...grpc.CallOption) (*VerifyResponse, error)
+	// Basis is what a draft of kind on unit would be written against now, read
+	// live from the source, such as a pull request's head.
+	Basis(ctx context.Context, in *BasisRequest, opts ...grpc.CallOption) (*BasisResponse, error)
+	// Within says whether target, a draft target of the plugin's grammar,
+	// lies inside unit, such as a review comment of the pull request or a
+	// message of the thread.
+	Within(ctx context.Context, in *WithinRequest, opts ...grpc.CallOption) (*WithinResponse, error)
 	// Lander.
 	Landed(ctx context.Context, in *LandedRequest, opts ...grpc.CallOption) (*LandedResponse, error)
 	Checkout(ctx context.Context, in *CheckoutRequest, opts ...grpc.CallOption) (*CheckoutResponse, error)
@@ -244,6 +253,26 @@ func (c *sourceServiceClient) Verify(ctx context.Context, in *VerifyRequest, opt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyResponse)
 	err := c.cc.Invoke(ctx, SourceService_Verify_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sourceServiceClient) Basis(ctx context.Context, in *BasisRequest, opts ...grpc.CallOption) (*BasisResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BasisResponse)
+	err := c.cc.Invoke(ctx, SourceService_Basis_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sourceServiceClient) Within(ctx context.Context, in *WithinRequest, opts ...grpc.CallOption) (*WithinResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WithinResponse)
+	err := c.cc.Invoke(ctx, SourceService_Within_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -437,6 +466,13 @@ type SourceServiceServer interface {
 	Place(context.Context, *PlaceRequest) (*PlaceResponse, error)
 	Publish(context.Context, *PublishRequest) (*PublishResponse, error)
 	Verify(context.Context, *VerifyRequest) (*VerifyResponse, error)
+	// Basis is what a draft of kind on unit would be written against now, read
+	// live from the source, such as a pull request's head.
+	Basis(context.Context, *BasisRequest) (*BasisResponse, error)
+	// Within says whether target, a draft target of the plugin's grammar,
+	// lies inside unit, such as a review comment of the pull request or a
+	// message of the thread.
+	Within(context.Context, *WithinRequest) (*WithinResponse, error)
 	// Lander.
 	Landed(context.Context, *LandedRequest) (*LandedResponse, error)
 	Checkout(context.Context, *CheckoutRequest) (*CheckoutResponse, error)
@@ -510,6 +546,12 @@ func (UnimplementedSourceServiceServer) Publish(context.Context, *PublishRequest
 }
 func (UnimplementedSourceServiceServer) Verify(context.Context, *VerifyRequest) (*VerifyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Verify not implemented")
+}
+func (UnimplementedSourceServiceServer) Basis(context.Context, *BasisRequest) (*BasisResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Basis not implemented")
+}
+func (UnimplementedSourceServiceServer) Within(context.Context, *WithinRequest) (*WithinResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Within not implemented")
 }
 func (UnimplementedSourceServiceServer) Landed(context.Context, *LandedRequest) (*LandedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Landed not implemented")
@@ -825,6 +867,42 @@ func _SourceService_Verify_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SourceServiceServer).Verify(ctx, req.(*VerifyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SourceService_Basis_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BasisRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SourceServiceServer).Basis(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SourceService_Basis_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SourceServiceServer).Basis(ctx, req.(*BasisRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SourceService_Within_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WithinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SourceServiceServer).Within(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SourceService_Within_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SourceServiceServer).Within(ctx, req.(*WithinRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1154,6 +1232,14 @@ var SourceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Verify",
 			Handler:    _SourceService_Verify_Handler,
+		},
+		{
+			MethodName: "Basis",
+			Handler:    _SourceService_Basis_Handler,
+		},
+		{
+			MethodName: "Within",
+			Handler:    _SourceService_Within_Handler,
 		},
 		{
 			MethodName: "Landed",

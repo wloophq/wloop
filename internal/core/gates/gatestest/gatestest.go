@@ -45,7 +45,7 @@ func (s *Store) Open(_ context.Context, g gate.Gate) (gate.Gate, error) {
 	g.Status = gate.Open
 	g.OpenedAt = s.Now()
 	g.Intent, g.By, g.Rule, g.Answer, g.ClosedAt = "", "", "", "", time.Time{}
-	g.Intents = slices.Clone(g.Intents)
+	g.Intents, g.Sessions = slices.Clone(g.Intents), slices.Clone(g.Sessions)
 	s.gates = append(s.gates, g)
 	return clone(g), nil
 }
@@ -193,7 +193,7 @@ func (s *Store) filter(keep func(gate.Gate) bool) []gate.Gate {
 }
 
 func clone(g gate.Gate) gate.Gate {
-	g.Intents = slices.Clone(g.Intents)
+	g.Intents, g.Sessions = slices.Clone(g.Intents), slices.Clone(g.Sessions)
 	return g
 }
 
@@ -417,6 +417,34 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 			t.Fatalf("open %+v", opened)
 		}
 	})
+}
+
+// DraftGateContract is the suite a gates store passes that keeps what the outbox's authority reads on a
+// draft gate: the rev it opened for, which approval keeps, and every session that proposed or revised its
+// draft, which never resolves it. open is as StoreContract's.
+func DraftGateContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Reader, gates.Sent)) {
+	ctx := context.Background()
+	s, r, _ := open(t)
+	g := gate.Gate{Task: "t-01", Kind: gate.KindDraft, Name: "draft", Subject: "7", Intents: []string{"approve", "discard"},
+		Session: "s-worker", ApprovedRev: 3, Sessions: []string{"s-reviser", "s-worker"}}
+	opened, err := s.Open(ctx, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := r.Get(ctx, opened.ID); err != nil || got.ApprovedRev != 3 || !slices.Equal(got.Sessions, g.Sessions) {
+		t.Fatalf("opened %+v %v", got, err)
+	}
+	if _, err := s.Resolve(ctx, opened.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Get(ctx, opened.ID)
+	if err != nil || got.Status != gate.Approved || got.ApprovedRev != 3 || !slices.Equal(got.Sessions, g.Sessions) {
+		t.Fatalf("approved %+v %v", got, err)
+	}
+	listed, err := r.Where(ctx, gates.Query{Kind: gate.KindDraft, Statuses: []gate.Status{gate.Approved}})
+	if err != nil || len(listed) != 1 || listed[0].ApprovedRev != 3 || !slices.Equal(listed[0].Sessions, g.Sessions) {
+		t.Fatalf("listed %+v %v", listed, err)
+	}
 }
 
 // Epoch is the clock a StoreContract store reads.

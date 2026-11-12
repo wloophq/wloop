@@ -270,31 +270,18 @@ func (r *tasksRig) subscribe(t *testing.T) *subscriber {
 	t.Cleanup(func() { cancel(); wg.Wait() })
 	sub := r.s.hub.subscribe("test")
 	t.Cleanup(func() { r.s.hub.unsubscribe(sub) })
-	waitFeedListening(t, r.log, sub)
+	waitFeedListening(t, r.s)
 	return sub
 }
 
-// waitFeedListening notes changes until the feed publishes one, so a change
-// the test makes next cannot land before the feed subscribed to the log.
-func waitFeedListening(t *testing.T, log *change.Log, sub *subscriber) {
+// waitFeedListening waits until the tasks feed attached, so every change the test makes next reaches it.
+func waitFeedListening(t *testing.T, s *Server) {
 	t.Helper()
-	deadline := time.After(10 * time.Second)
-	for {
-		log.NoteAll(taskInputs)
-		retry := time.After(4 * syncQuiet)
-		for waiting := true; waiting; {
-			select {
-			case <-sub.signal:
-				if c, ok := sub.take(); ok && c.Counters != nil {
-					return
-				}
-			case <-retry:
-				waiting = false
-			case <-deadline:
-				t.Fatal("the tasks feed never published")
-			}
-		}
-	}
+	waitFor(t, func() bool {
+		s.moved.mu.Lock()
+		defer s.moved.mu.Unlock()
+		return s.moved.attached
+	})
 }
 
 // nextChange is the first change of sub that carries counters.

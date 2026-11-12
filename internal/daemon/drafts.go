@@ -42,9 +42,6 @@ const (
 
 var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon runs without a store"}
 
-// mayHaveBeenPosted starts a publisher's error when the post may have reached its provider (#publisher).
-const mayHaveBeenPosted = "may have been posted"
-
 // draftHandlers are the handlers a draft task's verbs run, names of builtin.VerbHandlers, by the draft action
 // each runs.
 var draftHandlers = map[string]string{
@@ -172,11 +169,12 @@ type noPublisher struct {
 func (n noPublisher) Error() string { return n.err.Error() }
 func (n noPublisher) Unwrap() error { return n.err }
 
-// draftAction is what a draft verb takes: Text an approval posts or an edit sets, Broadcast an edit's turn of a
-// thread reply's broadcast, Reason a discard's, Confirm a retry's of a draft that may have been posted, Rev the
-// draft's version the caller showed.
+// draftAction is what a draft verb takes: Text and Payload an approval posts or an edit sets, Broadcast an
+// edit's turn of a thread reply's broadcast, Reason a discard's, Confirm a retry's of a draft that may have been
+// posted, Rev the draft's version the caller showed.
 type draftAction struct {
 	Text      *string
+	Payload   *json.RawMessage
 	Broadcast *bool
 	Reason    string
 	Confirm   bool
@@ -206,15 +204,21 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"approve takes the rev you saw"}
 		}
-		got, err = s.decideDraft(ctx, d, gate.Approved, a.Text, actor)
+		got, err = s.decideDraft(ctx, d, gate.Approved, draftEdit{a.Text, a.Payload, a.Rev}, actor)
 	case "edit":
-		if a.Text == nil && a.Broadcast == nil {
-			return draft.Draft{}, badRequest{"edit takes the draft's new text or broadcast"}
+		if a.Text == nil && a.Payload == nil && a.Broadcast == nil {
+			return draft.Draft{}, badRequest{"edit takes the draft's new text, payload or broadcast"}
 		}
-		got, err = o.Amend(ctx, id, outbox.Amendment{Text: a.Text, Broadcast: a.Broadcast})
+		if a.Rev == nil {
+			return draft.Draft{}, badRequest{"edit takes the rev you saw"}
+		}
+		if err := s.questionDecides(ctx, d, actor); err != nil {
+			return draft.Draft{}, err
+		}
+		got, err = s.amend(ctx, id, actor.amendment(a.Text, a.Payload, a.Broadcast, a.Rev))
 	case "discard":
 		if d.State == draft.Held {
-			got, err = s.decideDraft(ctx, d, gate.Rejected, nil, actor)
+			got, err = s.decideDraft(ctx, d, gate.Rejected, draftEdit{}, actor)
 		} else {
 			got, err = o.Discard(ctx, id, a.Reason)
 		}
@@ -222,7 +226,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"retry takes the rev you saw"}
 		}
-		got, err = o.Retry(ctx, id, a.Confirm)
+		got, err = o.RetryBy(ctx, id, a.Confirm, actor.by())
 	default:
 		return draft.Draft{}, badRequest{fmt.Sprintf("unknown draft action %q", action)}
 	}
@@ -232,9 +236,37 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 	return got, err
 }
 
+// draftEdit is what a person changes on a draft as they approve it; nil leaves it.
+type draftEdit struct {
+	Text    *string
+	Payload *json.RawMessage
+	// Rev is the rev the person saw; an edit that changes the draft needs it.
+	Rev *int64
+}
+
+// changes says whether e changes d.
+func (e draftEdit) changes(d draft.Draft) bool {
+	edited := d
+	if e.Text != nil {
+		edited.Text = *e.Text
+	}
+	if e.Payload != nil {
+		edited.Payload = *e.Payload
+	}
+	return !draft.SameContent(d, edited)
+}
+
+// amend is a person's edit of draft id: the Outbox's, unless a test replaces it.
+func (s *Server) amend(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error) {
+	if s.amender != nil {
+		return s.amender(ctx, id, a)
+	}
+	return s.deps.Outbox.Amend(ctx, id, a)
+}
+
 // decideDraft resolves the open gate of held draft d, as actor, with its first intent gates.toml gives the status
-// want; an approval posts text when it is set. It runs under draftMu.
-func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Status, text *string, actor requester) (draft.Draft, error) {
+// want; an approval posts edit's text and payload when they are set. It runs under draftMu.
+func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Status, edit draftEdit, actor requester) (draft.Draft, error) {
 	o := s.deps.Outbox
 	if s.deps.Gates == nil {
 		return draft.Draft{}, errGatesUnavailable
@@ -252,7 +284,7 @@ func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Statu
 	if !ok {
 		return draft.Draft{}, fmt.Errorf("%w: gate %s offers no %s intent", gates.ErrIntent, g.Name, want)
 	}
-	if err := s.resolveDraftGate(ctx, g, intent, d.Rev, text, actor); err != nil {
+	if err := s.resolveDraftGate(ctx, g, intent, d.Rev, edit, actor); err != nil {
 		return draft.Draft{}, err
 	}
 	return o.Store.Get(ctx, d.ID)
@@ -260,14 +292,20 @@ func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Statu
 
 // resolveDraftGate resolves draft gate g with intent as actor, under draftMu. Only the user, a person or an agent
 // through a session they drive that did not propose the draft, resolves a draft's gate here, refused before
-// anything is written. An approval readies its draft at rev; with text other than the draft's, it edits the draft
-// first, which supersedes g, and approves the gate that edit opened.
-func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, text *string, actor requester) error {
+// anything is written. An approval readies its draft at rev; with text or a payload other than the draft's, it
+// edits the draft at rev first, which supersedes g, and approves the gate that edit opened.
+func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, edit draftEdit, actor requester) error {
 	switch {
 	case !actor.user():
 		return fmt.Errorf("%w: draft gate %d %s", gates.ErrRefused, g.ID, unattended("is resolved: it"))
 	case actor.Actor == task.ActorAgent && g.Session == actor.Session:
 		return fmt.Errorf("%w: draft gate %d holds a draft session %s proposed, which it does not resolve", gates.ErrRefused, g.ID, actor.Session)
+	}
+	if (edit.Text != nil || edit.Payload != nil) && edit.Rev == nil {
+		return badRequest{"an approval that changes the draft takes the rev you saw"}
+	}
+	if g.Status != gate.Open {
+		return fmt.Errorf("%w: draft gate %d is %s", gates.ErrResolved, g.ID, g.Status)
 	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
 		o := s.deps.Outbox
@@ -280,8 +318,11 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 		if err != nil {
 			return err
 		}
-		if text != nil && *text != d.Text {
-			if d, err = o.Edit(ctx, id, *text); err != nil {
+		if edit.changes(d) {
+			if err := s.questionDecides(ctx, d, actor); err != nil {
+				return err
+			}
+			if d, err = s.amend(ctx, id, actor.amendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
 				return err
 			}
 			ng, ok, err := o.GateOf(ctx, d)
@@ -340,7 +381,7 @@ func writeDraftError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, outbox.ErrNeedsConfirm):
 		writeError(w, http.StatusConflict, err.Error()+": pass confirm once you checked it was not posted")
-	case errors.Is(err, outbox.ErrConflict), errors.Is(err, gates.ErrResolved):
+	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrStale), errors.Is(err, gates.ErrResolved):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, gates.ErrRefused):
 		writeError(w, http.StatusForbidden, err.Error())
@@ -363,6 +404,13 @@ func (s *Server) draftVerb(handler string) coretasks.VerbHandler {
 		var a draftAction
 		if text, ok := req.Args["text"]; ok {
 			a.Text = &text
+		}
+		if raw, ok := req.Args["payload"]; ok {
+			if !json.Valid([]byte(raw)) {
+				return coretasks.Result{}, fmt.Errorf("%w: payload is the draft's payload as JSON, not %q", coretasks.ErrArgs, raw)
+			}
+			p := json.RawMessage(raw)
+			a.Payload = &p
 		}
 		a.Reason = req.Args["reason"]
 		if raw, ok := req.Args["broadcast"]; ok {
@@ -409,7 +457,7 @@ func taskDraftError(err error) error {
 		return fmt.Errorf("%w: %w", coretasks.ErrNoTask, err)
 	case errors.Is(err, outbox.ErrNeedsConfirm):
 		return fmt.Errorf("%w: %w: pass the confirm argument once you checked it was not posted", coretasks.ErrVerb, err)
-	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrDisabled), errors.Is(err, gates.ErrResolved),
+	case errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrStale), errors.Is(err, outbox.ErrDisabled), errors.Is(err, gates.ErrResolved),
 		errors.Is(err, gates.ErrRefused), errors.Is(err, gates.ErrNoGate), errors.Is(err, gates.ErrIntent):
 		return fmt.Errorf("%w: %w", coretasks.ErrVerb, err)
 	case errors.Is(err, outbox.ErrInvalid), errors.As(err, &bad):
@@ -458,6 +506,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 	}
 	v.Actions = catalog.DraftStates(s.loaded(), s.draftFacts(ctx, d))
 	v.Where = s.draftWhere(ctx, d)
+	s.cardFields(ctx, d, g, &v)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
 	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link
 	if quotes(d) {
@@ -470,7 +519,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft, g gate.Gate) api.
 func (s *Server) draftFacts(ctx context.Context, d draft.Draft) catalog.DraftFacts {
 	publisher := s.publisherOf(d)
 	f := catalog.DraftFacts{State: string(d.State), Provider: publisher, Disabled: !s.pluginEnabled(publisher),
-		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted),
+		MayHaveBeenPosted: d.Cause == draft.CauseUnconfirmed,
 		Effects:           slices.Clone(d.Effects)}
 	if d.Origin.Kind == draft.OriginAuto {
 		f.Workflow = d.Origin.Workflow
@@ -685,6 +734,9 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	if err := o.PlaceBroadcasts(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: placing broadcasts: %v", err)
 	}
+	if err := o.Reask(rctx); err != nil && ctx.Err() == nil {
+		s.logf("drafts: asking again for drafts moved past their gate's rev: %v", err)
+	}
 	s.adoptDrafts(rctx)
 	scope.End()
 	for {
@@ -801,8 +853,18 @@ func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, acto
 			return draft.Draft{}, conflict{msg: st.Reason, refusal: catalog.DraftRefusal(catalog.DraftCloseSilently, s.draftFacts(ctx, d))}
 		}
 	}
-	if _, err := s.decideDraft(ctx, d, gate.Rejected, nil, actor); err != nil {
+	if _, err := s.decideDraft(ctx, d, gate.Rejected, draftEdit{}, actor); err != nil {
 		return draft.Draft{}, err
 	}
 	return o.CloseSilently(ctx, id)
+}
+
+// questionDecides refuses a person's change of held draft d while an open question pins it: the question is its one
+// decision, and a change would leave the question's pin behind it. The agent revises a pinned draft through its own
+// route, after which the question's pick of the old pin resumes its turn.
+func (s *Server) questionDecides(ctx context.Context, d draft.Draft, actor requester) error {
+	if actor.Actor == task.ActorAgent || d.State != draft.Held || s.openPins(ctx)[int64(d.ID)] == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: an open question decides draft %d: answer the question", gates.ErrRefused, d.ID)
 }

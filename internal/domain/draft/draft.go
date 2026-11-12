@@ -3,6 +3,7 @@
 package draft
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -13,61 +14,12 @@ import (
 
 type ID int64
 
-type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit", "delete"
+// Kind is a draft kind's name, which its plugin's manifest declares.
+type Kind string
 
-const (
-	Reply    Kind = "reply"
-	Nudge    Kind = "nudge"
-	Close    Kind = "close"
-	React    Kind = "react"
-	AskOwner Kind = "ask_owner"
-	Comment  Kind = "comment"
-	Edit     Kind = "edit"
-	Delete   Kind = "delete"
-)
-
-var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit, Delete}
-
-func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
-
-// ConversationKinds are the kinds slack_draft offers on a conversation: all
-// but a review comment, an edit and a deletion, which slack_edit and slack_delete
-// make at once.
-var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
-
-// Emoji says whether a draft of kind k posts an emoji, and no text.
-func (k Kind) Emoji() bool {
-	_, d := ShapeOf(k)
-	return d == Reaction
-}
-
-// Delivery is how a draft reaches the provider.
-type Delivery string // "message", "reaction", "comment", "edit", "delete"
-
-const (
-	Message         Delivery = "message"
-	Reaction        Delivery = "reaction"
-	CommentDelivery Delivery = "comment"
-	// EditDelivery replaces the text of a message the user posted.
-	EditDelivery Delivery = "edit"
-	// DeleteDelivery removes a message the user posted.
-	DeleteDelivery Delivery = "delete"
-)
-
-// ShapeOf is the purpose and delivery of a draft of kind k.
-func ShapeOf(k Kind) (purpose string, d Delivery) {
-	switch k {
-	case React:
-		return string(k), Reaction
-	case Comment:
-		return string(k), CommentDelivery
-	case Edit:
-		return string(k), EditDelivery
-	case Delete:
-		return string(k), DeleteDelivery
-	}
-	return string(k), Message
-}
+// Delivery is how a draft reaches the provider, as its plugin's manifest
+// declares it.
+type Delivery string
 
 // Broadcast says whether a thread reply is also posted to its conversation.
 // It is NoBroadcast when the draft replies in no thread, as its publisher
@@ -87,25 +39,6 @@ func (b Broadcast) Valid() bool { return b == NoBroadcast || b == BroadcastOff |
 type Placed struct {
 	Target    string
 	Broadcast Broadcast
-}
-
-// KindOf is the kind readers of Kind see for a purpose and a delivery.
-func KindOf(purpose string, d Delivery) Kind {
-	switch d {
-	case Reaction:
-		return React
-	case CommentDelivery:
-		return Comment
-	case EditDelivery:
-		return Edit
-	case DeleteDelivery:
-		return Delete
-	}
-	switch k := Kind(purpose); k {
-	case Nudge, Close, AskOwner:
-		return k
-	}
-	return Reply
 }
 
 // State is where a draft's delivery stands; whether it may be posted at all
@@ -178,8 +111,15 @@ type Draft struct {
 	State     State
 	Evidence  Evidence // State "sent" only
 	Error     string   // State "failed" only, never a token
-	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
-	Rev       int64    // the stored row's version; every Update bumps it
+	// Cause is why the draft failed, or why its approval was refused, when a reader acts on it; "" for any other.
+	Cause  Cause
+	Reason string // State "dropped": "user", "assigned", "moot", "dry_run", ...
+	// Rev is the draft's content revision: 1 as proposed, and one more for each write that changes its
+	// Content. A gate approves a draft at its Rev; a person and an agent revise it at the Rev they read.
+	Rev int64
+	// Version is the stored row's write counter, which every write bumps and checks, a state move as much as
+	// a revision.
+	Version int64
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time
@@ -187,9 +127,32 @@ type Draft struct {
 	// Language is the locale Text is written in. Both "" for a draft no
 	// workflow step wrote.
 	Why, Language string
+	// Payload is what the kind's schema shapes beside Text, posted
+	// verbatim; nil for a kind without one.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, such as a head commit,
+	// for a kind whose KindSpec.Basis is BasisAgent; "" none.
+	Basis string
+	// Hold keeps the draft waiting for a person whatever its approval
+	// rules say, except under dry_run.
+	Hold bool
+	// By is who wrote the current content (Text, Payload, Basis); the outbox sets it on Propose, Amend
+	// and AgentAmend.
+	By Actor
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
+
+// Cause is why a draft failed, or why its approval was refused, as its readers act on it.
+type Cause string
+
+const (
+	// CauseStale: its unit moved past the basis it was written against, as a live read or its publisher
+	// found; it stands until its content is revised.
+	CauseStale Cause = "stale"
+	// CauseUnconfirmed: its post may have reached its provider, so posting it again takes a person's confirm.
+	CauseUnconfirmed Cause = "unconfirmed"
+)
 
 // ReasonClosedSilently is the Reason of a draft the user discarded and closed without its message: its
 // effects apply as if it was sent.

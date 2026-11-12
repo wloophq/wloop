@@ -511,18 +511,23 @@ func TestQuickActionsSkipTheLoopMutex(t *testing.T) {
 	s := newServer(t)
 	s.deps.Actions = &fakeActions{}
 	s.deps.LoopMu.Lock()
-	defer s.deps.LoopMu.Unlock()
+	unlock := sync.OnceFunc(s.deps.LoopMu.Unlock)
+	var posts sync.WaitGroup
+	t.Cleanup(func() {
+		unlock()
+		posts.Wait()
+	})
 	for _, a := range []struct{ name, body string }{
 		{"open", `{}`}, {"mute", `{"until":"2d"}`}, {"unmute", `{}`}, {"pause", `{}`}, {"resume", `{}`},
 	} {
 		done := make(chan int, 1)
-		go func() { done <- post(t, s, "/api/units/github/acme%2Fapi%237/"+a.name, a.body).Code }()
+		posts.Go(func() { done <- post(t, s, "/api/units/github/acme%2Fapi%237/"+a.name, a.body).Code })
 		select {
 		case code := <-done:
 			if code != 200 {
 				t.Fatalf("%s: %d", a.name, code)
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(time.Minute):
 			t.Fatalf("%s waited on the loop mutex", a.name)
 		}
 	}

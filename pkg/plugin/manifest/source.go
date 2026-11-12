@@ -28,6 +28,12 @@ type Source struct {
 	UI          *UI       `toml:"ui" doc:"What clients show of the plugin; every label lives in its profile layer."`
 	Commands    []Command `toml:"commands" doc:"The commands the plugin binary serves in CLI mode, which run without the daemon."`
 	Tools       []Tool    `toml:"tools" doc:"The MCP tools the plugin serves through CallTool."`
+	Session     Session   `toml:"session" doc:"What the agent sessions of an intent that sets source_writes = false may not run."`
+}
+
+// Session is what the plugin tells the host about the agent sessions it serves.
+type Session struct {
+	WriteCommands []string `toml:"write_commands" doc:"The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them."`
 }
 
 // SourceVocabulary is what a source plugin adds to the host's tables before
@@ -111,9 +117,27 @@ type Situation struct {
 
 // DraftKind is a kind of a plugin's drafts.
 type DraftKind struct {
-	Name     string `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
-	Purpose  string `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
-	Delivery string `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+	Name         string          `toml:"name" doc:"The kind's name, such as \"nudge\". Required."`
+	Purpose      string          `toml:"purpose" doc:"What a draft of the kind is for; empty is its name."`
+	Delivery     string          `toml:"delivery" doc:"How it is posted, one of deliveries; empty is default_delivery."`
+	Schema       string          `toml:"schema" doc:"The JSON schema of the kind's payload, a path in the plugin's directory such as \"drafts/review/schema.json\"; the publisher posts the payload verbatim."`
+	Preview      string          `toml:"preview" doc:"The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides."`
+	Basis        string          `toml:"basis" doc:"Who states what a draft of the kind was written against: agent, which the host checks against the live value when it is proposed; empty for none." enum:"agent"`
+	TextRequired bool            `toml:"text_required" doc:"A draft of the kind needs a text."`
+	Editable     []string        `toml:"editable" doc:"What a person may change on a draft of the kind: text, or a JSON pointer into its payload such as \"/event\"."`
+	Facts        []DraftKindFact `toml:"facts" doc:"The payload fields an approval rule reads."`
+	Verdict      string          `toml:"verdict" doc:"The JSON pointer to the payload field whose value is the record verdict a sent draft of the kind posts, such as \"/event\", which the schema makes a required string enum; empty posts none."`
+	// Verdicts are the values of the enum Verdict points to, which Source reads from the schema.
+	Verdicts []string `toml:"-"`
+	// SchemaJSON is the content of Schema, which Source reads from the
+	// plugin's directory.
+	SchemaJSON json.RawMessage `toml:"-"`
+}
+
+// DraftKindFact is a payload field of a draft kind read as an approval fact.
+type DraftKindFact struct {
+	Name    string `toml:"name" doc:"The fact's name, draft.<provider>.<kind>.<field>. Required."`
+	Pointer string `toml:"pointer" doc:"The JSON pointer to the field in the payload, which the schema makes a required string enum. Required."`
 }
 
 // Predicate is a predicate the plugin's profile layer sets, over the facts the plugin hands the host when it
@@ -148,6 +172,7 @@ type Role struct {
 type Delivery struct {
 	Name  string `toml:"name" doc:"The delivery's name, such as \"comment\". Required."`
 	Posts bool   `toml:"posts" doc:"A draft with this delivery reaches people, so it waits for approval."`
+	Emoji bool   `toml:"emoji" doc:"A draft with this delivery adds or removes an emoji, named by its reaction, and has no text."`
 }
 
 // Job is a job the host schedules and runs through Ingest.
@@ -167,11 +192,13 @@ type Command struct {
 
 // Tool is an MCP tool the plugin serves.
 type Tool struct {
-	Name    string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
-	Doc     string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
-	Input   string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
-	Posts   string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
-	Answers []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
+	Name     string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
+	Doc      string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
+	Input    string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
+	Posts    string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
+	Proposes bool     `toml:"proposes" doc:"The tool only proposes drafts the user approves, so a session policy may allow it without a prompt."`
+	Reads    bool     `toml:"reads" doc:"The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt."`
+	Answers  []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
 }
 
 // Answer is one answer of a tool, worded by tools.toml.
@@ -275,7 +302,7 @@ func (m *Manifest) Source() (*Source, error) {
 		return nil, err
 	}
 	s.Provider = m.ID
-	if err := s.validate(); err != nil {
+	if err := errors.Join(s.validate(), s.readDraftKinds(m.Files)); err != nil {
 		return nil, fmt.Errorf("%s of %s, [source]: %w", File, m.ID, err)
 	}
 	return &s, nil

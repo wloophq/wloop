@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -103,6 +104,8 @@ type Service struct {
 	// ProposalText words a ledger proposal's message, as the profile's proposal gate does; nil leaves it
 	// without text.
 	ProposalText func(p coreitems.Proposal) string
+	// Drafts are the drafts a question's options point to; nil approves none, so every pick resumes its turn.
+	Drafts OptionDrafts
 	// ChatDeps serve the chat on the tasks; zero serves none.
 	ChatDeps ChatDeps
 
@@ -228,6 +231,10 @@ func (s *Service) reconcile(ctx context.Context, units []unit.Unit) ([]message.M
 				errs = append(errs, s.close(ctx, m, closing(&b, m.Origin.TurnSeq)))
 				continue
 			}
+			if !samePins(w, m) {
+				errs = append(errs, s.close(ctx, m, ""))
+				continue
+			}
 			delete(want, k)
 			w.ID, w.TaskID, w.CreatedAt = m.ID, m.TaskID, m.CreatedAt
 			if !sameContent(w, m) {
@@ -316,7 +323,32 @@ func postable(b *turn.Book, m message.Message) bool {
 
 func sameContent(a, b message.Message) bool {
 	return a.Text == b.Text && a.Recommend == b.Recommend && a.Confirm == b.Confirm && a.Origin.Session == b.Origin.Session &&
-		slices.Equal(a.Options, b.Options)
+		slices.EqualFunc(a.Options, b.Options, sameOption) && samePins(a, b)
+}
+
+// samePins says whether a and b point every option, and the confirm, to the same draft at the same rev:
+// an answer approves what the person saw, so a change to a pin is a new question with a new gate.
+func samePins(a, b message.Message) bool {
+	return sameRef(a.Draft, b.Draft) && maps.Equal(pins(a), pins(b))
+}
+
+// pins are m's option drafts by option id.
+func pins(m message.Message) map[string]record.DraftRef {
+	out := map[string]record.DraftRef{}
+	for _, o := range m.Options {
+		if o.Draft != nil {
+			out[o.ID] = *o.Draft
+		}
+	}
+	return out
+}
+
+func sameRef(a, b *record.DraftRef) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
+
+func sameOption(a, b record.Option) bool {
+	da, db := a.Draft, b.Draft
+	a.Draft, b.Draft = nil, nil
+	return a == b && sameRef(da, db)
 }
 
 // questionOf is the open question message the book calls for on u, as the unit's row shows it: the turn an
@@ -337,6 +369,10 @@ func questionOf(u unit.Unit, b turn.Book, answerable []string, now time.Time) (m
 	case recorded && last.Record.Question != nil:
 		rq := last.Record.Question
 		m.Text, m.Options, m.Recommend, m.Confirm = rq.Text, slices.Clone(rq.Options), rq.Recommend, rq.Kind == "confirm"
+		if m.Confirm && rq.Draft != nil {
+			pin := *rq.Draft
+			m.Draft = &pin
+		}
 	case recorded:
 		m.Text = strings.TrimSpace(firstOf(last.Record.Summary, last.Record.Resume))
 	}
@@ -383,16 +419,32 @@ func closing(b *turn.Book, seq int64) string {
 	return ""
 }
 
-// close supersedes m's open gate and closes m with answer.
+// close supersedes m's open gate and closes m with answer. A gated that read m open runs alongside it: the gate
+// it opens before the second supersede is superseded there, and one it opens after reads m closed and
+// supersedes itself.
 func (s *Service) close(ctx context.Context, m message.Message, answer string) error {
-	if g, ok, err := s.openGate(ctx, m); err != nil {
+	if err := s.supersedeOpen(ctx, m); err != nil {
 		return err
-	} else if ok {
-		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
-			return fmt.Errorf("superseding the gate of message %d: %w", m.ID, err)
-		}
 	}
-	return s.closeMessage(ctx, m, answer)
+	if err := s.holdPins(ctx, m); err != nil {
+		return err
+	}
+	if err := s.closeMessage(ctx, m, answer); err != nil {
+		return err
+	}
+	return s.supersedeOpen(ctx, m)
+}
+
+// supersedeOpen supersedes m's open gate, if it has one.
+func (s *Service) supersedeOpen(ctx context.Context, m message.Message) error {
+	g, ok, err := s.openGate(ctx, m)
+	if err != nil || !ok {
+		return err
+	}
+	if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+		return fmt.Errorf("superseding the gate of message %d: %w", m.ID, err)
+	}
+	return nil
 }
 
 // closeMessage closes m with answer, and the message task an earlier version opened for it: done when
@@ -475,6 +527,14 @@ func (s *Service) gated(ctx context.Context, m message.Message) (message.Message
 	g, err := s.Gates.Open(ctx, gate.Gate{Kind: m.Kind.Gate(), Unit: m.Unit, Task: task.ID(m.TaskID), Subject: subjectOf(m), Session: m.Origin.Session}, nil)
 	if err != nil {
 		return m, fmt.Errorf("opening the gate of message %d: %w", m.ID, err)
+	}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil {
+		return m, err
+	} else if !ok || !cur.Open() {
+		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+			return m, fmt.Errorf("superseding the gate of message %d, closed as it opened: %w", m.ID, err)
+		}
+		return m, nil
 	}
 	if m.Unit.IsZero() && m.TaskID == "" && g.Task != "" {
 		if err := s.Tasks.Retitle(ctx, g.Task, title(m.Text)); err != nil {
@@ -745,8 +805,12 @@ func (s *Service) Deliver(ctx context.Context, g gate.Gate) error {
 	if err != nil {
 		return err
 	}
+	approves, err := s.approvedOption(ctx, g, m, a)
+	if err != nil {
+		return err
+	}
 	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Text: a.Text, OptionID: a.OptionID,
-		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession})
+		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession, Approves: approves})
 	var refused turns.Refusal
 	if err != nil && !errors.As(err, &refused) {
 		return err

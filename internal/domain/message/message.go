@@ -61,8 +61,10 @@ type Message struct {
 	Options   []record.Option
 	Recommend string
 	Confirm   bool // a yes/no question
-	Origin    Origin
-	Answer    string // the answer as stored, one line
+	// Draft is the held draft a confirm's yes approves, at the rev the question pinned; nil for none.
+	Draft  *record.DraftRef
+	Origin Origin
+	Answer string // the answer as stored, one line
 
 	// ClosedAt is when its gate closed, zero while it is open.
 	CreatedAt, ClosedAt time.Time

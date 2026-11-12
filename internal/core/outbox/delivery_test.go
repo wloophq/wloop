@@ -2,38 +2,30 @@ package outbox
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// commenting posts every draft that is not a reaction as a comment.
-type commenting struct{ *fakeEffects }
-
-func (commenting) Delivers(k draft.Kind) draft.Delivery {
-	if k == draft.React {
-		return draft.Reaction
-	}
-	return draft.CommentDelivery
-}
-
+// withCommentingPulls makes the pull requests' manifest post every message kind as a comment.
 func withCommentingPulls(e *env) {
-	e.svc.Effects = func(p unit.ProviderID) (port.Effects, error) {
-		if p == pull.Provider {
-			return commenting{e.fx}, nil
+	comments := map[string]string{}
+	for k, d := range testKinds {
+		if d == "message" {
+			comments[k] = "comment"
 		}
-		return e.fx, nil
 	}
+	e.svc.Kinds = shapesWith(map[string]map[string]string{string(pull.Provider): comments})
 }
 
 func prReply(text string) Proposal {
-	return Proposal{Unit: pull, Kind: draft.Reply, Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}}
+	return Proposal{Unit: pull, Kind: draft.Kind("reply"), Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}}
 }
 
 func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T) {
@@ -42,7 +34,7 @@ func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T
 		withCommentingPulls(e)
 		withPolicy(e, draft.Fixed(mode))
 		d := e.propose(prReply("LGTM, merging"))
-		if d.Delivery != draft.CommentDelivery || d.Kind != draft.Comment || d.State != draft.Held ||
+		if d.Delivery != draft.Delivery("comment") || d.Kind != draft.Kind("reply") || d.State != draft.Held ||
 			e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
@@ -58,7 +50,7 @@ func TestARuleReleasingMessagesNeverReleasesWhatItsPluginPostsAsAComment(t *test
 	}
 	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(noneA),
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "k"}}
-	if d := e.propose(nudge); d.Delivery != draft.CommentDelivery || d.Purpose != "nudge" || d.State != draft.Held {
+	if d := e.propose(nudge); d.Delivery != draft.Delivery("comment") || d.Purpose != "nudge" || d.State != draft.Held {
 		t.Fatalf("a plugin rule's nudge: %+v", d)
 	}
 }
@@ -68,12 +60,12 @@ func TestADraftWhosePublisherChangedItsDeliveryFailsOnItsWindow(t *testing.T) {
 	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(window5),
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "k"}}
 	d := e.propose(nudge)
-	if d.Delivery != draft.Message || e.approval(d.ID) != window5 {
+	if d.Delivery != draft.Delivery("message") || e.approval(d.ID) != window5 {
 		t.Fatalf("%+v %+v", d, e.approval(d.ID))
 	}
 	withCommentingPulls(e)
 	ds, err := e.svc.List(ctx, Filter{})
-	if err != nil || len(ds) != 1 || ds[0].Delivery != draft.CommentDelivery || ds[0].Kind != draft.Comment {
+	if err != nil || len(ds) != 1 || ds[0].Delivery != draft.Delivery("comment") || ds[0].Kind != draft.Kind("nudge") {
 		t.Fatalf("listed %+v %v", ds, err)
 	}
 	if _, err := e.svc.Propose(ctx, nudge); err == nil {
@@ -169,4 +161,24 @@ type notFact struct {
 
 func (f notFact) Holds(facts map[string]any, _ time.Time) (bool, error) {
 	return facts[f.name] != f.value, nil
+}
+
+func TestADraftWhoseKindItsPublisherNoLongerDeclaresFailsOnItsWindow(t *testing.T) {
+	e := newEnv()
+	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(window5),
+		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "k"}}
+	d := e.propose(nudge)
+	c, err := draft.NewCatalog([]draft.KindSpec{{Provider: string(pull.Provider), Name: "comment", Delivery: "comment", SchemaJSON: json.RawMessage(`{"type":"object"}`)}},
+		[]draft.DeliverySpec{{Provider: string(pull.Provider), Name: "comment", Posts: true}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.svc.Kinds = c
+	e.clock.now = t0.Add(time.Hour)
+	if err := e.tick(); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.get(d.ID); got.State != draft.Failed || !strings.Contains(got.Error, "no longer declares its kind nudge") {
+		t.Fatalf("a window released a draft of a kind its publisher no longer declares: %+v", got)
+	}
 }

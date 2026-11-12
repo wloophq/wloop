@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -30,7 +31,8 @@ type Drafts interface {
 
 const stampToken = "20060102T150405.000000000"
 
-// notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry.
+// notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry; a held draft an open
+// question pins notifies through that question only.
 var notifiedDrafts = []draft.State{draft.Held, draft.Failed}
 
 // attention is e's notification, nil when it posts none: an Inbox task notifies once, a task anywhere else once
@@ -328,6 +330,9 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 	case dmessage.Question:
 		a.Title = s.notice(builtin.NoticeNotifyQuestion, nil)
 		a.Actions = slices.Concat(s.choices(m), []api.AttentionAction{{ID: "answer:text", Title: s.notice(builtin.NoticeNotifyReply, nil), TextInput: true}}, dismiss)
+		if pins(m) {
+			a.Body = strings.TrimSpace(a.Body + "\n\n" + s.notice(builtin.NoticeNotifyPinned, nil))
+		}
 		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
 		a.Title = s.notice(builtin.NoticeNotifyProposal, nil)
@@ -362,14 +367,25 @@ func (s *Server) handlerVerb(h string) (task.Verb, string) {
 	return task.Verb(h), h
 }
 
-// choices are a message's one-tap answers, the recommended one first.
+// pins says whether an answer to m approves a draft, which a notification does not show.
+func pins(m dmessage.Message) bool {
+	return m.Draft != nil || slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.Draft != nil })
+}
+
+// choices are a message's one-tap answers, the recommended one first; an answer that approves a pinned draft is
+// none, since the notification does not show the draft: the person answers it on the question's card.
 func (s *Server) choices(m dmessage.Message) []api.AttentionAction {
 	var out []api.AttentionAction
-	if m.Confirm {
+	switch {
+	case m.Confirm && m.Draft != nil:
+		out = []api.AttentionAction{{ID: "answer:no", Title: s.notice(builtin.NoticeNotifyNo, nil)}}
+	case m.Confirm:
 		out = []api.AttentionAction{{ID: "answer:yes", Title: s.notice(builtin.NoticeNotifyYes, nil)}, {ID: "answer:no", Title: s.notice(builtin.NoticeNotifyNo, nil)}}
-	} else {
+	default:
 		for _, o := range m.Options {
-			out = append(out, api.AttentionAction{ID: "answer:option:" + o.ID, Title: o.Label})
+			if o.Draft == nil {
+				out = append(out, api.AttentionAction{ID: "answer:option:" + o.ID, Title: o.Label})
+			}
 		}
 	}
 	rec := "answer:option:" + m.Recommend
@@ -413,7 +429,8 @@ func (ev *taskViewer) openDrafts(ctx context.Context) []draft.Draft {
 	if err != nil {
 		ev.s.logf("notifications: drafts: %v", err)
 	}
-	ev.drafts = ds
+	pins := ev.s.openPins(ctx)
+	ev.drafts = slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.State == draft.Held && pins[int64(d.ID)] != 0 })
 	if ev.drafts == nil {
 		ev.drafts = []draft.Draft{}
 	}

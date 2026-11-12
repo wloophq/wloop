@@ -119,7 +119,7 @@ type exchange struct {
 // do sends x through an in-flight slot, then the pauses, the budget and the
 // breaker, retrying a gateway status, a network failure or an attempt
 // timeout up to x.attempts with full-jitter backoff. A Mutation is retried
-// only when its request never left. An empty GraphQL answer is retried once
+// only when its request never left. An empty answer to a GraphQL read is retried once
 // on top of x.attempts and leaves the breaker as it was.
 func (c *Client) do(ctx context.Context, x exchange) (Response, error) {
 	p := PriorityOf(ctx)
@@ -138,7 +138,7 @@ func (c *Client) do(ctx context.Context, x exchange) (Response, error) {
 		c.observe(x.res, resp.Limit)
 		var te *transportError
 		network := errors.As(err, &te) && ctx.Err() == nil
-		empty := err == nil && x.op == "graphql" && emptyAnswer(resp)
+		empty := err == nil && x.op == "graphql" && !x.mutation && emptyAnswer(resp)
 		c.settle(err, network, empty, probe)
 		var rl *RateLimitedError
 		if err == nil {

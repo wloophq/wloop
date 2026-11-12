@@ -5,7 +5,7 @@ role    = "pr.nudge"
 provider = "github"
 skill = true
 workspace = "linked_else_main"
-session   = { strategy = "new", title = "nudge", close_when_done = true }
+session   = { strategy = "new", title = "nudge", close_when_done = true, source_writes = false }
 answerable = false
 profile   = "nudge"
 brief     = { render = false, wait = false }
@@ -51,7 +51,7 @@ hidden  = true
 
 [action]
 note    = "Nudge {{join .pr.nudge.who \", \"}}"
-confirm = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+confirm = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent drafts one comment, posted under your name once you approve it."
 
 [[action.refuse]]
 when = '!(pr.nudge.refusal == "")'
@@ -59,6 +59,6 @@ why  = "{{.pr.nudge.refusal}}"
 
 [record]
 states  = ["done", "failed"]
-outcome = ["url"]
-outcome_doc = "`outcome` (done): `url`, the comment's URL."
+outcome = ["url", "draft"]
+outcome_doc = "`outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted."
 require = [{ state = "done", fields = ["url"] }]

@@ -371,7 +371,10 @@ CREATE TABLE gates (
   -- the session whose turn produced the subject, which never resolves the gate; the session an agent resolved it through
   session TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT '',
   -- what the gate asks, as its opener worded it; '' reads its declaration's label
-  text TEXT NOT NULL DEFAULT ''
+  text TEXT NOT NULL DEFAULT '',
+  -- a draft gate's: the rev of its draft it approves, the only one posted; the sessions, a JSON list, that
+  -- proposed or revised its draft, none of which resolves it
+  approved_rev INTEGER NOT NULL DEFAULT 0, sessions TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);
@@ -434,6 +437,7 @@ CREATE TABLE drafts (
   evidence_ref TEXT NOT NULL DEFAULT '', evidence_permalink TEXT NOT NULL DEFAULT '', evidence_at TEXT NOT NULL DEFAULT '',
   error TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sending_at TEXT NOT NULL DEFAULT '',
+  -- its content's revision: 1 as proposed, one more for each write that changes what it posts
   rev INTEGER NOT NULL DEFAULT 0,
   purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]',
   -- when the effects of a sent draft were applied; '' while they are not
@@ -447,13 +451,32 @@ CREATE TABLE drafts (
   -- why it was proposed, in the user's language when it was; the locale its text is written in
   why TEXT NOT NULL DEFAULT '', language TEXT NOT NULL DEFAULT '',
   -- a thread reply's: 'on' or 'off' for also posting it to its conversation; '' when it replies in no thread
-  broadcast TEXT NOT NULL DEFAULT ''
+  broadcast TEXT NOT NULL DEFAULT '',
+  -- what its kind's schema shapes beside text, as JSON, '' for none; what its proposer read the unit at;
+  -- 1 keeps it waiting for a person whatever its rules say
+  payload TEXT NOT NULL DEFAULT '', basis TEXT NOT NULL DEFAULT '', hold INTEGER NOT NULL DEFAULT 0,
+  -- who wrote its current content: person, session, rule or window, and the session of a session's
+  by_kind TEXT NOT NULL DEFAULT '', by_session TEXT NOT NULL DEFAULT '',
+  -- the row's write counter, which every write bumps and checks; rev is its content's revision
+  version INTEGER NOT NULL DEFAULT 1,
+  -- why it failed or its approval was refused, as its readers act on it: 'stale', 'unconfirmed' or ''
+  cause TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
 CREATE INDEX drafts_task ON drafts (task, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
 CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
+
+-- Each revision of a draft's content, at its rev, the first at rev 1, and who wrote it.
+CREATE TABLE draft_revisions (
+  draft_id INTEGER NOT NULL REFERENCES drafts (id) ON DELETE CASCADE,
+  rev INTEGER NOT NULL,
+  text TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '', basis TEXT NOT NULL DEFAULT '',
+  by_kind TEXT NOT NULL, by_session TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL,
+  PRIMARY KEY (draft_id, rev)
+) WITHOUT ROWID;
 
 -- a workflow the user stopped on one unit, until they undo it
 CREATE TABLE workflow_skips (

@@ -2548,7 +2548,7 @@
         "id": "nudge",
         "enabled": true,
         "note": "Nudge the maintainers (no reviewer requested)",
-        "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent posts one comment under your name."
+        "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent drafts one comment, posted under your name once you approve it."
       },
       {
         "id": "take_over",

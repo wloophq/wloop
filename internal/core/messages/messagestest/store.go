@@ -58,7 +58,7 @@ func (s *Store) Upsert(_ context.Context, m message.Message) (message.Message, e
 	if m.TaskID != "" {
 		r.TaskID = m.TaskID
 	}
-	r.Text, r.Recommend, r.Confirm, r.Origin.Session = m.Text, m.Recommend, m.Confirm, m.Origin.Session
+	r.Text, r.Recommend, r.Confirm, r.Draft, r.Origin.Session = m.Text, m.Recommend, m.Confirm, m.Draft, m.Origin.Session
 	r.Options = slices.Clone(m.Options)
 	if len(r.Options) == 0 {
 		r.Options = nil
