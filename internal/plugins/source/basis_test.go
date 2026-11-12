@@ -2,6 +2,7 @@ package source_test
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -9,6 +10,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	"github.com/wloophq/wloop/pkg/plugin/plugintest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
@@ -66,5 +70,39 @@ func TestAPublisherReadsItsPluginsBasisLive(t *testing.T) {
 	}
 	if in, err := plain.Within(ctx, unit.Unit{Provider: "plain", Key: "x"}, "comment:1"); err != nil || in {
 		t.Fatalf("a plugin with no drafter: %v %v", in, err)
+	}
+}
+
+// TestAPluginWhoseKindsTakeABasisMustReadIt refuses to start a plugin whose manifest declares a kind with
+// basis = "agent" while the plugin serves no Drafter: every draft of that kind would read stale.
+func TestAPluginWhoseKindsTakeABasisMustReadIt(t *testing.T) {
+	const kinds = "default_delivery = \"comment\"\n[[source.deliveries]]\nname = \"comment\"\nposts = true\n" +
+		"[[source.draft_kinds]]\nname = \"react\"\ndelivery = \"comment\"\nschema = \"drafts/react/schema.json\"\nbasis = \"agent\"\n"
+	launch := func(impl src.Source) error {
+		k := kindOver(t, &change.Log{})
+		m, err := manifest.Parse([]byte("id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\ncodec = {keys = [\"{name}\"]}\n" + kinds))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.Files = acmeFiles
+		l := plugintest.NewLauncher(t)
+		l.Add("acme", map[plugin.Kind]plugin.Impl{src.Kind: src.New(impl)})
+		p, err := l.Launch(t.Context(), plugin.Spec{ID: "acme", Kinds: []plugin.Kind{src.Kind}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := p.Kind(src.Kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = k.Start(t.Context(), m, c)
+		t.Cleanup(func() { k.Stop(context.Background(), "acme") })
+		return err
+	}
+	if err := launch(sourcetest.NewStub()); err == nil || !strings.Contains(err.Error(), "react") {
+		t.Fatalf("a plugin with a basis kind and no Drafter started: %v", err)
+	}
+	if err := launch(&heads{Stub: sourcetest.NewStub(), head: "a1"}); err != nil {
+		t.Fatalf("a plugin that reads its basis: %v", err)
 	}
 }
