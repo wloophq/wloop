@@ -756,6 +756,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
   - `problem_reaction_required`: A problem: a react or unreact draft has no reaction.
   - `problem_message`: A problem: an edit or delete draft's target is not a message ref or permalink.
+  - `problem_message_gone`: A problem: Slack holds no message at an edit or delete draft's target.
+  - `problem_message_not_yours`: A problem: the message an edit or delete draft targets is not the user's.
   - `problem_text_required`: A problem: text is missing or empty.
   - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user's approval.
   - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it, and it will be posted.
