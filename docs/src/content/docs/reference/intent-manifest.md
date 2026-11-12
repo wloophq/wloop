@@ -174,7 +174,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.when` | predicate | `true` | When the turn records its outcome. |
 | `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
-| `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
+| `record.outcome` | list of `verdict`, `url`, `draft` |  | The outcome fields a record may carry. |
 | `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |

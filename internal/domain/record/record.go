@@ -205,7 +205,7 @@ func (r Record) ValidateShape() error { return r.validate(nil) }
 var ArtifactKinds = []string{"review-draft", "triage"}
 
 // OutcomeFields are the outcome fields a rule can list or require.
-var OutcomeFields = []string{"verdict", "url"}
+var OutcomeFields = []string{"verdict", "url", "draft"}
 
 func (r Record) validate(rules *dintent.RecordRules) error {
 	c := &checker{}
@@ -239,8 +239,8 @@ func (r Record) validate(rules *dintent.RecordRules) error {
 			switch {
 			case r.State != Done:
 				c.bad("outcome.draft", "only with done")
-			case rules != nil && !slices.Contains(rules.Outcome, "url"):
-				c.bad("outcome.draft", "this turn's intent records no url, which a draft stands for")
+			case rules != nil && !slices.Contains(rules.Outcome, "draft"):
+				c.bad("outcome.draft", "this turn's intent records no draft")
 			}
 			o.Draft.check(c, "outcome.draft")
 		}
@@ -344,7 +344,8 @@ func (r Record) checkRequired(c *checker, rules *dintent.RecordRules) {
 				c.bad("outcome."+f, "no such outcome field; one of %s", joinOr(OutcomeFields))
 				continue
 			}
-			if f == "verdict" && (r.Outcome == nil || r.Outcome.Verdict == "") || f == "url" && (r.Outcome == nil || r.Outcome.URL == "" && r.Outcome.Draft == nil) {
+			if f == "verdict" && (r.Outcome == nil || r.Outcome.Verdict == "") || f == "url" && (r.Outcome == nil || r.Outcome.URL == "" && r.Outcome.Draft == nil) ||
+				f == "draft" && (r.Outcome == nil || r.Outcome.Draft == nil) {
 				doc := strings.Join(strings.Fields(rules.OutcomeDoc), " ")
 				if req.Artifact != "" {
 					doc = ""

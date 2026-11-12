@@ -367,6 +367,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
 | `draft.people_outside` | int | The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted. |
 | `draft.target_joined` | bool | The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft. |
+| `draft.failed_kind` | string | The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind. |
+| `draft.failed_ref` | string | The unit's newest draft that failed to send, as <id>:<rev>; empty when none failed. A workflow keys on it so that each failure, a revised draft's included, runs it again. |
 
 ### Gates (`gate.*`)
 

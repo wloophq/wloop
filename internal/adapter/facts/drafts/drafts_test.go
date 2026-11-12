@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -55,9 +56,42 @@ func TestFailedSendIsUnitFact(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := (workflow.Facts{FactFailed: c.failed, FactStale: c.stale}); !equal(got, want) {
+		if want := (workflow.Facts{FactFailed: c.failed, FactStale: c.stale, FactFailedKind: got[FactFailedKind], FactFailedRef: got[FactFailedRef]}); !equal(got, want) {
 			t.Errorf("%s: %v, want %v", c.name, got, want)
 		}
+	}
+}
+
+func TestFailedKindAndRefNameTheNewestFailure(t *testing.T) {
+	at := func(m int) time.Time { return time.Date(2026, 10, 18, 12, m, 0, 0, time.UTC) }
+	review := failed(7, draft.OriginTurn, "422")
+	review.Kind, review.Rev, review.UpdatedAt = "review", 3, at(5)
+	reply := failed(8, draft.OriginSession, "422")
+	reply.Kind, reply.Rev, reply.UpdatedAt = "thread_reply", 1, at(2)
+	nudge := failed(9, draft.OriginAuto, "422")
+	nudge.Kind, nudge.Rev, nudge.UpdatedAt = "comment", 1, at(9)
+	for _, c := range []struct {
+		name      string
+		drafts    stored
+		kind, ref string
+	}{
+		{"none", nil, "", ""},
+		{"the newest of a turn's and a session's", stored{reply, review, nudge}, "review", "7:3"},
+		{"a reply alone", stored{reply}, "thread_reply", "8:1"},
+	} {
+		got, err := Provider{Drafts: c.drafts}.Facts(context.Background(), pr7)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got[FactFailedKind] != c.kind || got[FactFailedRef] != c.ref {
+			t.Errorf("%s: kind %v ref %v, want %q %q", c.name, got[FactFailedKind], got[FactFailedRef], c.kind, c.ref)
+		}
+	}
+	again := review
+	again.Rev, again.UpdatedAt = 4, at(7)
+	got, _ := Provider{Drafts: stored{again}}.Facts(context.Background(), pr7)
+	if got[FactFailedRef] != "7:4" {
+		t.Fatalf("a revised draft that failed again: %v", got[FactFailedRef])
 	}
 }
 

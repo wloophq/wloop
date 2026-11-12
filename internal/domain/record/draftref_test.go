@@ -2,6 +2,8 @@ package record
 
 import (
 	"errors"
+
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"slices"
 	"strings"
 	"testing"
@@ -52,7 +54,7 @@ func TestOptionDraftsAreChecked(t *testing.T) {
 
 func TestOutcomeDraftStandsForTheURL(t *testing.T) {
 	review := rulesFor("review")
-	review.Outcome = []string{"verdict", "url"}
+	review.Outcome = []string{"verdict", "url", "draft"}
 	done := Record{State: Done, Summary: "drafted", Outcome: &Outcome{Verdict: "REQUEST_CHANGES", Draft: &DraftRef{ID: 7, Rev: 1}}}
 	if err := done.Validate(review); err != nil {
 		t.Fatalf("done with a draft instead of a url: %v", err)
@@ -68,7 +70,19 @@ func TestOutcomeDraftStandsForTheURL(t *testing.T) {
 	}
 	noURL := Record{State: Done, Summary: "drafted", Outcome: &Outcome{Draft: &DraftRef{ID: 7, Rev: 1}}}
 	if p := problemsOf(t, noURL.Validate(rulesFor(""))); !hasProblem(p, "outcome.draft") {
-		t.Fatalf("a draft where the intent records no url: %v", p)
+		t.Fatalf("a draft where the intent records none: %v", p)
+	}
+}
+
+func TestAnIntentMayRequireTheDraft(t *testing.T) {
+	rules := rulesFor("")
+	rules.Outcome = []string{"url", "draft"}
+	rules.Require = []dintent.Require{{State: "done", Fields: []string{"draft"}}}
+	if p := problemsOf(t, Record{State: Done, Summary: "s", Outcome: &Outcome{URL: "u"}}.Validate(rules)); !hasProblem(p, "outcome.draft") {
+		t.Fatalf("a url where the draft is required: %v", p)
+	}
+	if err := (Record{State: Done, Summary: "s", Outcome: &Outcome{Draft: &DraftRef{ID: 1, Rev: 1}}}).Validate(rules); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -78,7 +92,7 @@ func TestOnlyTheLoopRecordsAnApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	review := rulesFor("review")
-	review.Outcome = []string{"verdict", "url"}
+	review.Outcome = []string{"verdict", "url", "draft"}
 	if p := problemsOf(t, r.Validate(review)); !hasProblem(p, "outcome.approved") {
 		t.Fatalf("an agent's approved outcome: %v", p)
 	}
