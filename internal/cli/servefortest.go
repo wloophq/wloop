@@ -67,6 +67,7 @@ type TestDaemon struct {
 	ctx    context.Context
 	loopMu *lock.Mutex
 	handle atomic.Int64
+	ws     *fake.Manager
 }
 
 // TestSession is an agent session that runs a turn: the handle it calls the daemon with, and the turn's id.
@@ -115,7 +116,8 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 		o.Config(&cfg)
 	}
 	e.LoadConfig = func() (config.Config, error) { return cfg, nil }
-	e.WS = workspace.NewSet(servedManager{Manager: &fake.Manager{RepoList: o.Repos}, e: e})
+	ws := &fake.Manager{RepoList: o.Repos}
+	e.WS = workspace.NewSet(servedManager{Manager: ws, e: e})
 	e.intents = newEnvIntents(e)
 	e.testPublishers = o.Publishers
 	e.noJobs = true
@@ -159,7 +161,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 		db.Close()
 		unlockStore()
 	})
-	d := &TestDaemon{e: e, client: client.New(e.Socket), ctx: ctx, loopMu: loopMu}
+	d := &TestDaemon{e: e, client: client.New(e.Socket), ctx: ctx, loopMu: loopMu, ws: ws}
 	deadline := time.Now().Add(time.Minute)
 	for {
 		if _, err := d.client.Health(ctx); err == nil {
@@ -215,6 +217,20 @@ func (e *Env) serveTestPlugins(t testing.TB, ctx context.Context, db *sqlite.DB,
 		}
 	}
 	return stop
+}
+
+// Launched is the session the daemon last launched a turn of u in, as its workspace manager typed the turn's
+// prompt there: the handle the scripted agent calls the daemon with, and u's newest turn.
+func (d *TestDaemon) Launched(t testing.TB, u unit.Unit) TestSession {
+	t.Helper()
+	if len(d.ws.Prompts) == 0 {
+		t.Fatal("the test daemon launched no session")
+	}
+	b := d.Book(t, u)
+	if len(b.Turns) == 0 {
+		t.Fatalf("%s has no turn", u.Label())
+	}
+	return TestSession{Handle: d.ws.Prompts[len(d.ws.Prompts)-1].Handle, Round: b.Turns[len(b.Turns)-1].ID, Unit: u}
 }
 
 // Client is the daemon's client, as a person's clients speak to it.

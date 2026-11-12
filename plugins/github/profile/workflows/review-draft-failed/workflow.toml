@@ -7,6 +7,7 @@ key = ["draft.failed_ref"]
 [[step]]
 use = "turn.start"
 intent = "review"
+due = "when"
 open_question = "replace_if_moved"
 
 [[gates.approval.rule]]

@@ -407,6 +407,15 @@
             "then": {
               "additionalProperties": false,
               "properties": {
+                "due": {
+                  "default": "plan",
+                  "description": "When the round is due: plan, when the unit's plan holds it due; when, whenever the workflow's when matches, as a round to retry what a failed round left, whatever the plan holds.",
+                  "enum": [
+                    "plan",
+                    "when"
+                  ],
+                  "type": "string"
+                },
                 "intent": {
                   "description": "The intent whose turn starts; it must serve the unit. Required.",
                   "type": "string"

@@ -330,3 +330,15 @@ func (branches) HasCommit(context.Context, string, string) (bool, error)        
 func (branches) IsAncestor(context.Context, string, string, string) (bool, error) {
 	return true, nil
 }
+
+// sweepPastTheWindow runs the workflows, then again once the plan gate's window has passed, as the daemon's
+// sweep does over time.
+func (r *draftsRig) sweepPastTheWindow() {
+	r.t.Helper()
+	for range 2 {
+		if err := r.d.Sweep(r.ctx); err != nil {
+			r.t.Fatalf("sweep: %v", err)
+		}
+		r.advance(2 * time.Minute)
+	}
+}
