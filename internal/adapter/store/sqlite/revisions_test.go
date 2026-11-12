@@ -390,9 +390,15 @@ func TestGateSessionsStored(t *testing.T) {
 // heldWithGate is a held draft on u that no task holds, and its open gate at its rev.
 func heldWithGate(t *testing.T, db *DB, u unit.Unit) (draft.Draft, gate.Gate) {
 	t.Helper()
+	return heldWithGateTo(t, db, u, "")
+}
+
+// heldWithGateTo is heldWithGate with the draft's target.
+func heldWithGateTo(t *testing.T, db *DB, u unit.Unit, target string) (draft.Draft, gate.Gate) {
+	t.Helper()
 	ctx := context.Background()
 	at := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
-	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: u, Kind: draft.Reply, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn, Session: "s-1"},
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: u, Kind: draft.Reply, Target: target, Text: "hi", Origin: draft.Origin{Kind: draft.OriginTurn, Session: "s-1"},
 		State: draft.Held, CreatedAt: at, UpdatedAt: at})
 	if err != nil {
 		t.Fatal(err)
@@ -447,17 +453,37 @@ func TestATaskAdoptingAHeldDraftKeepsItsApproval(t *testing.T) {
 	approvesAndSends(t, db, d.ID, g)
 }
 
-func TestARehomedHeldDraftKeepsItsApproval(t *testing.T) {
+var (
+	rehomedFrom = unit.Unit{Provider: "slack", Key: "T0123/C0123/1700000000.000200"}
+	rehomedTo   = unit.Unit{Provider: "slack", Key: "T0123/C0123/seg/1700000000000100"}
+)
+
+func TestARehomedTargetedDraftKeepsItsApproval(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	db, _ := openTemp(t)
-	dm := unit.Unit{Provider: "slack", Key: "T0123/C0123/1700000000.000200"}
-	seg := unit.Unit{Provider: "slack", Key: "T0123/C0123/seg/1700000000000100"}
-	d, g := heldWithGate(t, db, dm)
-	if n, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{dm: seg}); err != nil || n != 1 {
+	d, g := heldWithGateTo(t, db, rehomedFrom, "thread:C0123/1700000000.000200")
+	if n, err := db.RehomeDrafts(context.Background(), map[unit.Unit]unit.Unit{rehomedFrom: rehomedTo}); err != nil || n != 1 {
 		t.Fatalf("moved %d %v", n, err)
 	}
 	approvesAndSends(t, db, d.ID, g)
+}
+
+func TestARehomedUntargetedDraftIsApprovedAgain(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	d, g := heldWithGate(t, db, rehomedFrom)
+	if n, err := db.RehomeDrafts(ctx, map[unit.Unit]unit.Unit{rehomedFrom: rehomedTo}); err != nil || n != 1 {
+		t.Fatalf("moved %d %v", n, err)
+	}
+	moved, err := db.Drafts().Get(ctx, d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.Gates(func() time.Time { return noteAt }).Get(ctx, g.ID)
+	if err != nil || got.Unit != rehomedTo || got.ApprovedRev != g.ApprovedRev || got.ApprovedRev == moved.Rev {
+		t.Fatalf("an untargeted draft moved to rev %d and its gate on %s approves %d %v, want the old %d", moved.Rev, got.Unit, got.ApprovedRev, err, g.ApprovedRev)
+	}
 }
 
 func TestAChangeToWhatIsPostedLeavesTheOldApprovalBehind(t *testing.T) {
