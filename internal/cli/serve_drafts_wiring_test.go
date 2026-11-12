@@ -28,6 +28,10 @@ func (p *basingPublisher) Live(_ context.Context, u unit.Unit, kind string) (str
 	return p.head + " " + u.Key + " " + kind, nil
 }
 
+func (p *basingPublisher) Within(_ context.Context, u unit.Unit, target string) (bool, error) {
+	return target == u.Key+" 0002", nil
+}
+
 func (p *basingPublisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, error) {
 	if p.fail != nil {
 		return draft.Evidence{}, p.fail
@@ -76,6 +80,19 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 	}
 	if got, err := d.Outbox.Bases.Live(ctx, unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, "review"); err == nil {
 		t.Fatalf("a provider that publishes nothing answered the basis %q", got)
+	}
+	fx, err := d.Outbox.Effects(threadUnit.Provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, ok := fx.(port.Scoper)
+	if !ok {
+		t.Fatal("the served publisher says nothing of a target's unit")
+	}
+	for target, want := range map[string]bool{threadUnit.Key + " 0002": true, "C2 0001": false} {
+		if in, err := sc.Within(ctx, threadUnit, target); err != nil || in != want {
+			t.Errorf("%s within %s: %v %v", target, threadUnit.Key, in, err)
+		}
 	}
 	t.Run("kinds", func(t *testing.T) {
 		t.Skip("T13 waits on T1: the manifests' draft kinds as outbox.Kinds")

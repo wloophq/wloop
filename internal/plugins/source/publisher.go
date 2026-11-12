@@ -32,6 +32,7 @@ var (
 	_ port.Lander    = Publisher{}
 	_ port.Deliverer = Publisher{}
 	_ outbox.Bases   = Publisher{}
+	_ port.Scoper    = Publisher{}
 )
 
 // Publish sends d to the plugin once. An error that may follow a post, the
@@ -115,18 +116,33 @@ func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
 }
 
 // Live asks the plugin now, never a cache, what a draft of kind on u would be written against; a plugin that
-// reads no basis answers "", and one that is not running fails, so no draft is taken as fresh unread.
+// checks no draft answers "", and one that is not running fails, so no draft is taken as fresh unread.
 func (p Publisher) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
+	c, ok, err := p.drafter(ctx)
+	if err != nil || !ok {
+		return "", err
+	}
+	return c.Basis(ctx, Wire(u), kind)
+}
+
+// Within asks the plugin whether target lies inside u; a plugin that checks no draft takes none inside.
+func (p Publisher) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
+	c, ok, err := p.drafter(ctx)
+	if err != nil || !ok {
+		return false, err
+	}
+	return c.Within(ctx, Wire(u), target)
+}
+
+// drafter is the plugin's client when it checks drafts.
+func (p Publisher) drafter(ctx context.Context) (*src.Client, bool, error) {
 	c, err := p.Kind.Client(p.ID)
 	if err != nil {
-		return "", err
+		return nil, false, err
 	}
 	caps, err := c.Capabilities(ctx)
 	if err != nil {
-		return "", err
+		return nil, false, err
 	}
-	if !slices.Contains(caps, src.CapabilityBasis) {
-		return "", nil
-	}
-	return c.Basis(ctx, Wire(u), kind)
+	return c, slices.Contains(caps, src.CapabilityDrafter), nil
 }

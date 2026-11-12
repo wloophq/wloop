@@ -200,13 +200,17 @@ type basing struct {
 	head string
 }
 
-var _ src.BasisReader = basing{}
+var _ src.Drafter = basing{}
 
 func (b basing) Basis(_ context.Context, u plugin.Unit, kind string) (string, error) {
 	return b.head + " " + u.Key + " " + kind, nil
 }
 
-func TestPublisherReadsTheLiveBasisOnlyOfAPluginThatReadsOne(t *testing.T) {
+func (b basing) Within(_ context.Context, u plugin.Unit, target string) (bool, error) {
+	return target == u.Key+"/comment", nil
+}
+
+func TestPublisherChecksDraftsOnlyThroughAPluginThatChecksThem(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	own := unit.Unit{Provider: "acme", Key: "t1"}
@@ -214,8 +218,16 @@ func TestPublisherReadsTheLiveBasisOnlyOfAPluginThatReadsOne(t *testing.T) {
 	if got, err := reads.Live(ctx, own, "review"); err != nil || got != "c2 t1 review" {
 		t.Fatalf("live basis %q %v", got, err)
 	}
+	for target, want := range map[string]bool{"t1/comment": true, "t2/comment": false} {
+		if got, err := reads.Within(ctx, own, target); err != nil || got != want {
+			t.Errorf("%s within %s: %v %v", target, own.Key, got, err)
+		}
+	}
 	none, _ := postingKind(t, posting{Stub: sourcetest.NewStub()})
 	if got, err := none.Live(ctx, own, "review"); err != nil || got != "" {
 		t.Fatalf("a plugin with no basis answered %q %v", got, err)
+	}
+	if in, err := none.Within(ctx, own, "t1/comment"); err != nil || in {
+		t.Fatalf("a plugin that checks no draft took a target inside: %v %v", in, err)
 	}
 }

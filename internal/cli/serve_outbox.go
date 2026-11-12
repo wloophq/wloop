@@ -172,6 +172,13 @@ func (p pinnedEffects) Live(ctx context.Context, u unit.Unit, kind string) (stri
 	return "", nil
 }
 
+func (p pinnedEffects) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
+	if sc, ok := p.Effects.(port.Scoper); ok {
+		return sc.Within(ctx, u, target)
+	}
+	return false, nil
+}
+
 func (p pinnedEffects) Takes(target string) bool {
 	t, ok := p.Effects.(port.Targeter)
 	return ok && t.Takes(target)
