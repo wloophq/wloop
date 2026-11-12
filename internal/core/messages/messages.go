@@ -383,16 +383,29 @@ func closing(b *turn.Book, seq int64) string {
 	return ""
 }
 
-// close supersedes m's open gate and closes m with answer.
+// close supersedes m's open gate and closes m with answer. A gated that read m open runs alongside it: the gate
+// it opens before the second supersede is superseded there, and one it opens after reads m closed and
+// supersedes itself.
 func (s *Service) close(ctx context.Context, m message.Message, answer string) error {
-	if g, ok, err := s.openGate(ctx, m); err != nil {
+	if err := s.supersedeOpen(ctx, m); err != nil {
 		return err
-	} else if ok {
-		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
-			return fmt.Errorf("superseding the gate of message %d: %w", m.ID, err)
-		}
 	}
-	return s.closeMessage(ctx, m, answer)
+	if err := s.closeMessage(ctx, m, answer); err != nil {
+		return err
+	}
+	return s.supersedeOpen(ctx, m)
+}
+
+// supersedeOpen supersedes m's open gate, if it has one.
+func (s *Service) supersedeOpen(ctx context.Context, m message.Message) error {
+	g, ok, err := s.openGate(ctx, m)
+	if err != nil || !ok {
+		return err
+	}
+	if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+		return fmt.Errorf("superseding the gate of message %d: %w", m.ID, err)
+	}
+	return nil
 }
 
 // closeMessage closes m with answer, and the message task an earlier version opened for it: done when
@@ -475,6 +488,14 @@ func (s *Service) gated(ctx context.Context, m message.Message) (message.Message
 	g, err := s.Gates.Open(ctx, gate.Gate{Kind: m.Kind.Gate(), Unit: m.Unit, Task: task.ID(m.TaskID), Subject: subjectOf(m), Session: m.Origin.Session}, nil)
 	if err != nil {
 		return m, fmt.Errorf("opening the gate of message %d: %w", m.ID, err)
+	}
+	if cur, ok, err := s.Store.Message(ctx, m.ID); err != nil {
+		return m, err
+	} else if !ok || !cur.Open() {
+		if err := s.Gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+			return m, fmt.Errorf("superseding the gate of message %d, closed as it opened: %w", m.ID, err)
+		}
+		return m, nil
 	}
 	if m.Unit.IsZero() && m.TaskID == "" && g.Task != "" {
 		if err := s.Tasks.Retitle(ctx, g.Task, title(m.Text)); err != nil {
