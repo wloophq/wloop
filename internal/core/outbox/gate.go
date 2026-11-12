@@ -253,29 +253,40 @@ func (s *Service) DeliveryOf(ctx context.Context, g gate.Gate) (draft.State, err
 func (s *Service) Rehomed(ctx context.Context, units ...unit.Unit) error {
 	var errs []error
 	for _, u := range units {
-		ds, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}, Unit: &u})
-		if err != nil {
+		errs = append(errs, s.reask(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}, Unit: &u}))
+	}
+	return errors.Join(errs...)
+}
+
+// Reask is Rehomed of every unit, run at start: a move made before the outbox loaded, or one a stop cut
+// before Rehomed ran, leaves a draft's gate behind its rev.
+func (s *Service) Reask(ctx context.Context) error {
+	return s.reask(ctx, Filter{States: []draft.State{draft.Held, draft.Queued}})
+}
+
+func (s *Service) reask(ctx context.Context, f Filter) error {
+	ds, err := s.Store.List(ctx, f)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, d := range ds {
+		g, ok, err := s.GateOf(ctx, d)
+		switch {
+		case err != nil:
 			errs = append(errs, err)
 			continue
+		case ok && g.ApprovedRev == d.Rev:
+			continue
 		}
-		for _, d := range ds {
-			g, ok, err := s.GateOf(ctx, d)
-			switch {
-			case err != nil:
-				errs = append(errs, err)
-				continue
-			case ok && g.ApprovedRev == d.Rev:
+		if d.State == draft.Queued {
+			d.State = draft.Held
+			if d, err = s.save(ctx, d, draft.Queued); err != nil {
+				errs = append(errs, ignoreConflict(err))
 				continue
 			}
-			if d.State == draft.Queued {
-				d.State = draft.Held
-				if d, err = s.save(ctx, d, draft.Queued); err != nil {
-					errs = append(errs, ignoreConflict(err))
-					continue
-				}
-			}
-			errs = append(errs, s.waitAt(ctx, d, sessionsOf(g, ok, ""), ""))
 		}
+		errs = append(errs, s.waitAt(ctx, d, sessionsOf(g, ok, ""), ""))
 	}
 	return errors.Join(errs...)
 }

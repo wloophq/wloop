@@ -745,6 +745,9 @@ func (s *Server) sendDrafts(ctx context.Context) {
 	if err := o.PlaceBroadcasts(rctx); err != nil && ctx.Err() == nil {
 		s.logf("drafts: placing broadcasts: %v", err)
 	}
+	if err := o.Reask(rctx); err != nil && ctx.Err() == nil {
+		s.logf("drafts: asking again for drafts moved past their gate's rev: %v", err)
+	}
 	s.adoptDrafts(rctx)
 	scope.End()
 	for {
