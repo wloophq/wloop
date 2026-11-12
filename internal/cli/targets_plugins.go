@@ -2,10 +2,8 @@ package cli
 
 import (
 	"context"
-	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 )
 
@@ -13,15 +11,7 @@ import (
 // targets it posts to, by provider: the discovered plugin's over the
 // bundled one.
 func (e *Env) pluginTargets() map[unit.ProviderID]*manifest.Compiled {
-	srcs, _ := bundled.Sources()
-	for _, p := range e.plugins {
-		s, err := p.Manifest.Source()
-		if err != nil {
-			continue
-		}
-		srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
-		srcs = append(srcs, s)
-	}
+	srcs := e.loadedSources()
 	out := map[unit.ProviderID]*manifest.Compiled{}
 	for _, s := range srcs {
 		if s.Codec.TargetsRe == "" {
@@ -72,14 +62,7 @@ func (r addressResolver) Resolve(ctx context.Context, address string) (string, b
 // pluginTaskKind is the kind the plugin of p, the discovered one over the
 // bundled one, gives the tasks of its units: the first its manifest names.
 func (e *Env) pluginTaskKind(p unit.ProviderID) string {
-	srcs, _ := bundled.Sources()
-	for _, pl := range e.plugins {
-		if s, err := pl.Manifest.Source(); err == nil {
-			srcs = slices.DeleteFunc(srcs, func(b *manifest.Source) bool { return b.Provider == s.Provider })
-			srcs = append(srcs, s)
-		}
-	}
-	for _, s := range srcs {
+	for _, s := range e.loadedSources() {
 		if unit.ProviderID(s.Provider) == p && len(s.Kinds) > 0 {
 			return s.Kinds[0]
 		}
