@@ -1,6 +1,11 @@
 package turn
 
-import "github.com/wloophq/wloop/internal/domain/record"
+import (
+	"slices"
+
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/record"
+)
 
 const (
 	EndorsedApproved = "yes: the user approved"
@@ -21,6 +26,15 @@ func (b *Book) Chain(seq int64) []Turn {
 		seq = t.ResumeOf
 	}
 	return chain
+}
+
+// Proposed says whether turn seq, or a turn of its chain, proposed d: the drafts a resumed turn reads, revises
+// and asks about are its chain's.
+func (b *Book) Proposed(seq int64, d draft.Draft) bool {
+	if !d.Origin.ByAgent() || d.Origin.TurnSeq == 0 {
+		return false
+	}
+	return d.Origin.TurnSeq == seq || slices.ContainsFunc(b.Chain(seq), func(t Turn) bool { return t.Seq == d.Origin.TurnSeq })
 }
 
 // Endorsed says whether the user stands behind the verdict the turn

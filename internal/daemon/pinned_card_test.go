@@ -10,11 +10,25 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
+
+// noBooks hold no turn book: a draft counts as its question's turn's by its own seq alone.
+type noBooks struct{}
+
+func (noBooks) BookOf(context.Context, turns.Key) (turn.Book, bool, error) {
+	return turn.Book{}, false, nil
+}
+
+func (noBooks) Books(context.Context, ...unit.Unit) (map[unit.Unit]turn.Book, error) {
+	return map[unit.Unit]turn.Book{}, nil
+}
 
 // openMessages are open messages in memory.
 type openMessages []dmessage.Message
@@ -65,7 +79,7 @@ func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	pinned, free := propose("Approve it"), propose("Unrelated")
 	q := dmessage.Message{ID: 9, Unit: r7u, Kind: dmessage.Question, Text: "Approve?", Origin: dmessage.Origin{Kind: dmessage.OriginTurn, TurnSeq: 3},
 		Options: []record.Option{{ID: "approve", Label: "Approve", Draft: &record.DraftRef{ID: int64(pinned.ID), Rev: pinned.Rev}}, {ID: "hold", Label: "Hold"}}}
-	r.s.deps.Messages = &messages.Service{Store: openMessages{q}, Drafts: outboxDrafts{r}}
+	r.s.deps.Messages = &messages.Service{Store: openMessages{q}, Books: noBooks{}, Drafts: outboxDrafts{r}}
 	r.s.deps.Drafts = r.o
 	var res api.DraftsResponse
 	get(t, r.s, api.Drafts+"?id="+strconv.FormatInt(int64(pinned.ID), 10)+","+strconv.FormatInt(int64(free.ID), 10), &res)

@@ -30,12 +30,12 @@ func (p Policy) WithoutSourceWrites(s dintent.Session, writes [][]string) Policy
 	return p
 }
 
-// DraftSent ends the turn d.Origin.TurnSeq names now that d is sent: an asked turn whose question
+// DraftSent ends the turn of d's chain that waits on d now that d is sent: an asked turn whose question
 // points to d ends done, and a done turn whose outcome left d in its url's place gets d's url. The url is
 // d's evidence permalink and the verdict the one DraftVerdict reads from d, never the agent's. The outcome
 // says the user approved d only when d's gate was resolved by a person, or a session the user drives that
 // neither proposed nor revised d, at the rev the turn pinned; a rule's or a window's release never does.
-// A draft of no turn, or of a turn that points elsewhere, ends nothing, and a call made again changes
+// A draft of no turn, or of a chain whose turns point elsewhere, ends nothing, and a call made again changes
 // nothing more.
 func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 	if d.State != draft.Sent {
@@ -46,8 +46,8 @@ func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 
 // DraftRecorded fills, when turn id on u has just recorded done with outcome.draft ref and no url, the url
 // of that draft if it is sent already, as DraftSent does when the send comes after the record: a rule may
-// release and post a draft before its turn records it. Only a draft of that turn, or of its session, on u
-// counts.
+// release and post a draft before its turn records it. Only a draft of that turn's chain, or of its session,
+// on u counts.
 func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref record.DraftRef) error {
 	if s.DraftGates == nil {
 		return nil
@@ -64,7 +64,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 	}
 	t, ok := b.ByID(id)
 	if !ok || !d.Origin.ByAgent() ||
-		d.Origin.TurnSeq != t.Seq && (t.Session == "" || d.Origin.Session != t.Session) {
+		!b.Proposed(t.Seq, d) && (t.Session == "" || d.Origin.Session != t.Session) {
 		return nil
 	}
 	return s.settleTurn(ctx, u, t.Seq, s.sentEnd(ctx, d))
@@ -113,18 +113,29 @@ func (s *Service) DraftEnded(ctx context.Context, d draft.Draft) error {
 	})
 }
 
-// settleDraft records, for the turn d.Origin.TurnSeq names, the record end returns, unless it returns
-// none or repeats the turn's last record.
+// settleDraft records, for the newest turn of a chain that proposed d whose end returns a record, that
+// record, unless it repeats the turn's last record: the turn that proposed d, or a turn resuming it that
+// asks about d.
 func (s *Service) settleDraft(ctx context.Context, d draft.Draft,
 	end func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error)) error {
-	if d.Origin.TurnSeq == 0 {
-		return nil
-	}
 	u := d.Origin.Unit
 	if u.IsZero() {
 		u = d.Unit
 	}
-	return s.settleTurn(ctx, u, d.Origin.TurnSeq, end)
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	for i := len(b.Turns) - 1; i >= 0; i-- {
+		if t := b.Turns[i]; b.Proposed(t.Seq, d) {
+			if settled, err := s.settle(ctx, u, &b, t, end); settled || err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // settleTurn records, for turn seq on u, the record end returns, unless it returns none or repeats the
@@ -141,16 +152,27 @@ func (s *Service) settleTurn(ctx context.Context, u unit.Unit, seq int64,
 	if !ok {
 		return nil
 	}
+	_, err = s.settle(ctx, u, &b, *t, end)
+	return err
+}
+
+// settle records, for turn t of b, the record end returns, unless it repeats the turn's last record; false
+// when end returns none.
+func (s *Service) settle(ctx context.Context, u unit.Unit, b *turn.Book, t turn.Turn,
+	end func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error)) (bool, error) {
 	last, ok := b.LastRecord(t.Seq)
 	if !ok {
-		return nil
+		return false, nil
 	}
-	rec, ok, err := end(*t, &b, last.Record)
-	if err != nil || !ok || rec.Hash() == last.Record.Hash() {
-		return err
+	rec, ok, err := end(t, b, last.Record)
+	if err != nil || !ok {
+		return false, err
 	}
-	_, err = s.closeTurn(ctx, u, *t, last.ID, rec)
-	return err
+	if rec.Hash() == last.Record.Hash() {
+		return true, nil
+	}
+	_, err = s.closeTurn(ctx, u, t, last.ID, rec)
+	return true, err
 }
 
 // sentRecord is the done record turn t, whose last record is last, ends with once draft id is sent;
