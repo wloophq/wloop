@@ -261,6 +261,9 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if d.Messages != nil {
 		srv.Tasks = d.Messages
 	}
+	if d.AgentDrafts != nil {
+		srv.Drafts = d.AgentDrafts
+	}
 	d.MCP = srv
 	return d
 }
@@ -396,6 +399,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = e.serveTasks(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)
+	d = e.serveAgentDrafts(d, db, cfg, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
 	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
