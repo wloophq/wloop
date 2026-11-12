@@ -294,6 +294,6 @@ every = "5m"
 
 | Key | Kind | Meaning |
 |---|---|---|
-| `write_commands` | list of strings | The command prefixes that write to the plugin's source, such as "gh pr review", words separated by spaces, a word may be *; a session whose intent sets source_writes = false runs none of them. |
+| `write_commands` | list of strings | The command prefixes that write to the plugin's source, such as "gh pr review", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them. |
 
 This page is generated from `pkg/plugin/manifest` by `make docs-ref`.

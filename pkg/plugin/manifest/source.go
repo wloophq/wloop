@@ -33,7 +33,7 @@ type Source struct {
 
 // Session is what the plugin tells the host about the agent sessions it serves.
 type Session struct {
-	WriteCommands []string `toml:"write_commands" doc:"The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be *; a session whose intent sets source_writes = false runs none of them."`
+	WriteCommands []string `toml:"write_commands" doc:"The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them."`
 }
 
 // SourceVocabulary is what a source plugin adds to the host's tables before

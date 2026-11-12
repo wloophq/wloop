@@ -548,7 +548,7 @@
           "description": "What the agent sessions of an intent that sets source_writes = false may not run.",
           "properties": {
             "write_commands": {
-              "description": "The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be *; a session whose intent sets source_writes = false runs none of them.",
+              "description": "The command prefixes that write to the plugin's source, such as \"gh pr review\", words separated by spaces, a word may be * or end in *, as -X* for any explicit method; a session whose intent sets source_writes = false runs none of them.",
               "items": {
                 "type": "string"
               },
