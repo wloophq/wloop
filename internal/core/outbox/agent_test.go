@@ -30,6 +30,8 @@ func TestFailedRevisedGoesHeld(t *testing.T) {
 	t.Skip("T3")
 }
 
+// TestSendPostsOnlyApprovedRev asserts at Publish, where the draft leaves held: a gate whose ApprovedRev is not
+// the held draft's Rev, or is 0, queues nothing.
 func TestSendPostsOnlyApprovedRev(t *testing.T) {
 	t.Skip("T3")
 }

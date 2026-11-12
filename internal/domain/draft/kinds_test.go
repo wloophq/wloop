@@ -9,3 +9,7 @@ func TestTextRequiredFromSpec(t *testing.T) {
 func TestPostsFromManifests(t *testing.T) {
 	t.Skip("T1")
 }
+
+func TestLookupByPublisherProvider(t *testing.T) {
+	t.Skip("T1")
+}

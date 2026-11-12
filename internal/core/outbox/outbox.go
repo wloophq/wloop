@@ -92,6 +92,8 @@ type SettledReader interface {
 	SettledAt(ctx context.Context, workflow string) (map[unit.Unit]time.Time, error)
 }
 
+// Store keeps the drafts and their content revisions: Insert writes revision 1 by d.By, and Update writes a
+// revision by d.By when Text, Payload or Basis differ from the stored row.
 type Store interface {
 	Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) // assigns ID
 	Get(ctx context.Context, id draft.ID) (draft.Draft, error)      // ErrNotFound
@@ -105,7 +107,9 @@ type Store interface {
 
 // Kinds are the draft kinds the plugins' manifests declare.
 type Kinds interface {
-	// Lookup is the kind name of provider; false when its manifest declares none.
+	// Lookup is the kind name of provider, the provider of the draft's publisher (Service.PublisherOf),
+	// never of its unit; false when its manifest declares none. Lookup and Validate run only on propose
+	// and amend, never on send, show or Recover, so a stored draft keeps its stored delivery.
 	Lookup(provider, kind string) (draft.KindSpec, bool)
 	// Validate refuses a payload that does not fit spec's schema, wrapping ErrInvalid.
 	Validate(spec draft.KindSpec, payload json.RawMessage) error
@@ -599,7 +603,8 @@ type Amendment struct {
 	Payload   *json.RawMessage
 	// Basis is what the reviser read the unit at, checked live as a proposal's.
 	Basis *string
-	// Rev is the rev the reviser read; 0 takes the stored one.
+	// Rev is the rev the reviser read; 0 takes the stored one on a person's Amend, and AgentAmend refuses
+	// it.
 	Rev int64
 	// By is who revises it; zero is a person.
 	By draft.Actor

@@ -450,7 +450,7 @@ func TestEveryCapabilityHasAtMostFiveMethods(t *testing.T) {
 	capabilities := []reflect.Type{
 		reflect.TypeFor[source.Ingester](), reflect.TypeFor[source.Presenter](), reflect.TypeFor[source.Publisher](),
 		reflect.TypeFor[source.Lander](), reflect.TypeFor[source.Briefer](), reflect.TypeFor[source.Planner](),
-		reflect.TypeFor[source.Tooler](), reflect.TypeFor[source.CLIRunner](), reflect.TypeFor[source.BasisReader](),
+		reflect.TypeFor[source.Tooler](), reflect.TypeFor[source.CLIRunner](), reflect.TypeFor[source.Drafter](),
 	}
 	brokers := []reflect.Type{
 		reflect.TypeFor[source.Reporter](), reflect.TypeFor[source.Ledger](), reflect.TypeFor[source.Reader](),
@@ -504,5 +504,5 @@ type everything struct {
 	source.Planner
 	source.Tooler
 	source.CLIRunner
-	source.BasisReader
+	source.Drafter
 }
