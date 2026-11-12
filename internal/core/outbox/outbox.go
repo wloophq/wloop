@@ -506,6 +506,10 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
+	sub.Kind = draft.KindSpec{}
+	if s.Kinds != nil {
+		sub.Kind, _ = s.Kinds.Lookup(string(d.Unit.Provider), string(d.Kind))
+	}
 	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)

@@ -172,11 +172,11 @@ func (f notFact) Holds(facts map[string]any, _ time.Time) (bool, error) {
 
 func TestRuleFactsJoinNoFactsAndKeepTheCallersMap(t *testing.T) {
 	d := Draft{Delivery: "reply"}
-	if got := withRuleFacts(d, nil); len(got) != 4 || got["draft.delivery"] != "reply" {
+	if got := withRuleFacts(d, nil, nil); len(got) != 4 || got["draft.delivery"] != "reply" {
 		t.Fatalf("without facts: %v", got)
 	}
 	facts := map[string]any{"pr.draft": true}
-	got := withRuleFacts(d, facts)
+	got := withRuleFacts(d, facts, nil)
 	if len(got) != 5 || got["pr.draft"] != true || len(facts) != 1 {
 		t.Fatalf("facts %v, joined %v", facts, got)
 	}

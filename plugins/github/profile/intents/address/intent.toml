@@ -75,6 +75,10 @@ artifacts = ["triage"]
 history_artifact = "triage"
 
 [[gates.approval.rule]]
+when = 'draft.delivery == "review" && draft.github.review.event in ["COMMENT", "REQUEST_CHANGES"]'
+mode = "send"
+
+[[gates.approval.rule]]
 when = 'draft.delivery == "reply"'
 mode = "send"
 

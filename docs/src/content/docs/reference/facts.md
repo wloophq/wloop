@@ -367,6 +367,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
 | `draft.people_outside` | int | The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted. |
 | `draft.target_joined` | bool | The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft. |
+| `draft.failed` | bool | A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it. |
+| `draft.stale` | bool | A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too. |
 
 ### Gates (`gate.*`)
 
@@ -412,6 +414,7 @@ A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts o
 | `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's. |
 | `draft.effects` | list | The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.purpose` | string | The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not. |
+| `draft.github.review.event` | string | The /event field of a review draft's payload, which the plugin posts as is; absent, and so the empty string, for a draft of any other kind. A rule that sends reads it only as an allow-list: draft.github.review.event == "<value>" or in ["<value>", ...] as a term of the top-level &&. |
 
 ## Workflow steps
 

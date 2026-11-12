@@ -61,6 +61,10 @@ require = [
 changed = "Review the commits since; if they change anything the draft says, update the draft with the new head as its basis and ask again (record `asked`) before an approval is posted."
 
 [[gates.approval.rule]]
+when = 'draft.delivery == "review" && draft.github.review.event in ["COMMENT", "REQUEST_CHANGES"]'
+mode = "send"
+
+[[gates.approval.rule]]
 when = 'draft.delivery == "reply"'
 mode = "send"
 

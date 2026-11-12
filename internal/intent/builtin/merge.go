@@ -218,6 +218,13 @@ func fits(p unit.ProviderID, src *manifest.Source, all map[unit.ProviderID]*mani
 			bad("fact %s is a core fact", f.Name)
 		}
 	}
+	for _, k := range v.DraftKinds {
+		for _, f := range k.Facts {
+			if why := payloadFactName(p, k.Name, f.Name); why != "" {
+				bad("%s", why)
+			}
+		}
+	}
 	for _, e := range v.Effects {
 		if slices.ContainsFunc(coreEffects, func(c Effect) bool { return c.Name == e.Name }) {
 			bad("effect %s is a core effect", e.Name)
@@ -343,6 +350,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		if v.DefaultDelivery != "" {
 			defaultDeliveries[string(id)] = v.DefaultDelivery
 		}
+		facts = append(facts, payloadFacts(id, v.DraftKinds)...)
 		if v.LanguageFact != "" {
 			languageFacts[id] = v.LanguageFact
 		}
@@ -421,6 +429,8 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 			switch {
 			case f.Slot == BriefSlot:
 				rows[i].Subjects = briefSubjects
+			case f.Name == DraftFailed || f.Name == DraftStale:
+				rows[i].Subjects = slices.Clone(unitSlots[len(coreUnitSlots):])
 			case f.Name == RowKindFact && len(rowKinds) > 0:
 				rows[i].Enum = rowKinds
 			case f.Name == DraftDelivery:

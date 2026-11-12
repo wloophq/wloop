@@ -63,7 +63,7 @@ func compileOf(src string, env Env, marks bool, want *cel.Type) (*Program, error
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	p := &Program{src: src, prg: prg, env: env, reads: reads(ast.NativeRep(), env), pins: pins(ast.NativeRep())}
+	p := &Program{src: src, prg: prg, env: env, reads: reads(ast.NativeRep(), env), pins: pins(ast.NativeRep()), allows: allows(ast.NativeRep())}
 	if marks {
 		if p.marks, err = handledNames(ast.NativeRep()); err != nil {
 			return nil, &Error{Col: 1, Msg: err.Error()}
@@ -380,6 +380,68 @@ func depth(s string) int {
 		}
 	}
 	return d
+}
+
+// allows are, by field, the string literals each match takes it among, from
+// a's top-level conjunction: a field == "literal" term allows one, a field in
+// ["literal", ...] term those it lists, and two terms their intersection.
+func allows(a *celast.AST) map[string][]string {
+	out := map[string][]string{}
+	add := func(field string, values []string) {
+		if prev, ok := out[field]; ok {
+			values = slices.DeleteFunc(values, func(v string) bool { return !slices.Contains(prev, v) })
+		}
+		out[field] = values
+	}
+	field := func(e celast.Expr) string {
+		if ref, ok := a.ReferenceMap()[e.ID()]; ok {
+			return ref.Name
+		}
+		return ""
+	}
+	literal := func(e celast.Expr) (string, bool) {
+		if e.Kind() != celast.LiteralKind {
+			return "", false
+		}
+		s, ok := e.AsLiteral().(types.String)
+		return string(s), ok
+	}
+	var walk func(e celast.Expr)
+	walk = func(e celast.Expr) {
+		if e.Kind() != celast.CallKind {
+			return
+		}
+		call := e.AsCall()
+		args := call.Args()
+		switch call.FunctionName() {
+		case "_&&_":
+			for _, arg := range args {
+				walk(arg)
+			}
+		case "_==_":
+			for i, arg := range args {
+				if v, ok := literal(args[1-i]); ok && field(arg) != "" {
+					add(field(arg), []string{v})
+				}
+			}
+		case "@in":
+			f := field(args[0])
+			if f == "" || args[1].Kind() != celast.ListKind {
+				return
+			}
+			values := []string{}
+			for _, el := range args[1].AsList().Elements() {
+				v, ok := literal(el)
+				if !ok {
+					return
+				}
+				values = append(values, v)
+			}
+			add(f, values)
+		}
+	}
+	walk(a.Expr())
+	return out
 }
 
 // pins are the field == "literal" terms of a's top-level conjunction, as

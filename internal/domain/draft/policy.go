@@ -1,8 +1,12 @@
 package draft
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -23,6 +27,9 @@ type Policy struct {
 type Subject struct {
 	Slot  string
 	Facts map[string]any
+	// Kind is the draft's kind as its plugin declares it, whose Facts are
+	// the payload facts the rules read; the zero KindSpec gives none.
+	Kind KindSpec
 }
 
 // Rule is one [gates.approval] rule of a draft gate.
@@ -36,6 +43,10 @@ type Rule struct {
 	// Subjects are the slots of the subject facts When reads; the rule
 	// applies only to a draft whose subject is of that slot.
 	Subjects []string
+	// Payload are the payload facts When reads. A rule that releases never
+	// applies to a draft that lacks one, and a draft whose own kind
+	// declares one its payload does not hold waits.
+	Payload []string
 }
 
 // Condition is a rule's compiled when over the facts RuleFacts and the
@@ -95,13 +106,24 @@ type Decision struct {
 // delivery, and a draft that posts no such rule releases waits for a
 // person unless the approval is dry_run.
 func (p Policy) Decide(d Draft, s Subject, posts bool, now time.Time) (Decision, error) {
-	var all map[string]any
+	var all, payload map[string]any
 	for i, r := range p.Rules {
 		if posts && r.Approval.Releases() && r.Names != d.Delivery || !ofSlot(r.Subjects, s.Slot) {
 			continue
 		}
 		if all == nil {
-			all = withRuleFacts(d, s.Facts)
+			if slices.ContainsFunc(p.Rules, func(r Rule) bool { return len(r.Payload) > 0 }) {
+				payload = d.PayloadFacts(s.Kind)
+			}
+			all = withRuleFacts(d, s.Facts, payload)
+		}
+		if missing := absent(r.Payload, payload); len(missing) > 0 {
+			if own := d.ownFacts(missing); own != "" {
+				return Decision{Approval: Approval{Mode: Wait}, Rule: i}, fmt.Errorf("draft approval rule %d reads %s, which the draft's payload does not hold", i, own)
+			}
+			if r.Approval.Releases() {
+				continue
+			}
 		}
 		ok, err := r.When.Holds(all, now)
 		if err != nil {
@@ -126,13 +148,84 @@ func ofSlot(subjects []string, slot string) bool {
 	return true
 }
 
-func withRuleFacts(d Draft, facts map[string]any) map[string]any {
+func withRuleFacts(d Draft, facts, payload map[string]any) map[string]any {
 	out := maps.Clone(facts)
 	if out == nil {
 		out = map[string]any{}
 	}
 	maps.Copy(out, d.RuleFacts())
+	maps.Copy(out, payload)
 	return out
+}
+
+func absent(names []string, facts map[string]any) []string {
+	var out []string
+	for _, n := range names {
+		if _, ok := facts[n]; !ok {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// ownFacts is the first of names a FactSpec of d's own kind would name,
+// draft.<provider>.<kind>.<field>; "" for none.
+func (d Draft) ownFacts(names []string) string {
+	prefix := "draft." + string(d.Unit.Provider) + "." + string(d.Kind) + "."
+	for _, n := range names {
+		if strings.HasPrefix(n, prefix) {
+			return n
+		}
+	}
+	return ""
+}
+
+// PayloadFacts are the payload facts of d that spec declares, each the
+// string its pointer reaches in d's payload; none when spec is not d's
+// kind, and a fact whose pointer reaches no string is absent.
+func (d Draft) PayloadFacts(spec KindSpec) map[string]any {
+	out := map[string]any{}
+	if len(spec.Facts) == 0 || spec.Provider != string(d.Unit.Provider) || spec.Name != string(d.Kind) || len(d.Payload) == 0 {
+		return out
+	}
+	var doc any
+	if json.Unmarshal(d.Payload, &doc) != nil {
+		return out
+	}
+	for _, f := range spec.Facts {
+		if v, ok := pointAt(doc, f.Pointer).(string); ok {
+			out[f.Name] = v
+		}
+	}
+	return out
+}
+
+// pointAt is what the JSON pointer ptr (RFC 6901) reaches in doc; nil for
+// nothing.
+func pointAt(doc any, ptr string) any {
+	if ptr == "" {
+		return doc
+	}
+	rest, ok := strings.CutPrefix(ptr, "/")
+	if !ok {
+		return nil
+	}
+	for _, tok := range strings.Split(rest, "/") {
+		tok = strings.ReplaceAll(strings.ReplaceAll(tok, "~1", "/"), "~0", "~")
+		switch v := doc.(type) {
+		case map[string]any:
+			doc = v[tok]
+		case []any:
+			i, err := strconv.Atoi(tok)
+			if err != nil || i < 0 || i >= len(v) || tok != strconv.Itoa(i) {
+				return nil
+			}
+			doc = v[i]
+		default:
+			return nil
+		}
+	}
+	return doc
 }
 
 // RuleFacts are the facts of d a rule reads: its delivery, as its plugin
