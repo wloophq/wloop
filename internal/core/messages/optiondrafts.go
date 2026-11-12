@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
@@ -236,4 +237,62 @@ func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
 		}
 	}
 	return out, nil
+}
+
+// holdPins makes each draft question m pins that still waits on a window wait for a person alone, before m closes:
+// a window is the user's consent to the draft on its own, and once the question was asked about the draft, no rule
+// releases it. A gate with no deadline opens for the draft before its windowed gates are superseded, so the draft's
+// task never sees it without an open gate, and a call cut short completes when made again. A picked draft is
+// approved, and the other options' drafts withdrawn, by then: only a draft no answer picked is left waiting.
+func (s *Service) holdPins(ctx context.Context, m message.Message) error {
+	if s.Drafts == nil || m.Kind != message.Question {
+		return nil
+	}
+	held := s.turnDrafts(m)
+	refs := []*record.DraftRef{m.Draft}
+	for _, o := range m.Options {
+		refs = append(refs, o.Draft)
+	}
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		_, dg, ok, err := held.of(ctx, ref.ID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		open, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: dg.Unit})
+		if err != nil {
+			return err
+		}
+		open = slices.DeleteFunc(open, func(g gate.Gate) bool { return g.Subject != dg.Subject })
+		windowed := slices.DeleteFunc(slices.Clone(open), func(g gate.Gate) bool { return g.Deadline.IsZero() })
+		if len(windowed) == 0 {
+			continue
+		}
+		if len(windowed) == len(open) {
+			w := windowed[len(windowed)-1]
+			wait := gate.Gate{Task: w.Task, Unit: w.Unit, Kind: w.Kind, Name: w.Name, Subject: w.Subject, Intents: w.Intents,
+				Session: w.Session, Text: w.Text, ApprovedRev: w.ApprovedRev, Sessions: w.Sessions}
+			if _, err := s.Gates.Open(ctx, wait, forThePerson{}); err != nil {
+				return err
+			}
+		}
+		for _, w := range windowed {
+			if err := s.Gates.Supersede(ctx, w.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// forThePerson holds every gate for a person.
+type forThePerson struct{}
+
+func (forThePerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeWait}, nil
 }

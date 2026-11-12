@@ -81,13 +81,25 @@ func (o *optionDrafts) put(d draft.Draft, sessions ...string) {
 	o.drafts[int64(d.ID)], o.gateIDs[int64(d.ID)] = d, g.ID
 }
 
+// gateOf is the newest gate of draft id, as the outbox reads it: the one its rev, or a later reopening, opened.
 func (o *optionDrafts) gateOf(id int64) gate.Gate {
+	ctx := context.Background()
 	o.mu.Lock()
 	gid := o.gateIDs[id]
 	o.mu.Unlock()
-	g, err := o.r.gateStore.Get(context.Background(), gid)
+	g, err := o.r.gateStore.Get(ctx, gid)
 	if err != nil {
 		panic(err)
+	}
+	all := []gate.Status{gate.Open, gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed, gate.Superseded}
+	gs, err := o.r.gateStore.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: g.Unit, Statuses: all})
+	if err != nil {
+		panic(err)
+	}
+	for _, n := range slices.Backward(gs) {
+		if n.Subject == g.Subject {
+			return n
+		}
 	}
 	return g
 }

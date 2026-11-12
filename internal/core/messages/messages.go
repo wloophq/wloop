@@ -426,6 +426,9 @@ func (s *Service) close(ctx context.Context, m message.Message, answer string) e
 	if err := s.supersedeOpen(ctx, m); err != nil {
 		return err
 	}
+	if err := s.holdPins(ctx, m); err != nil {
+		return err
+	}
 	if err := s.closeMessage(ctx, m, answer); err != nil {
 		return err
 	}
