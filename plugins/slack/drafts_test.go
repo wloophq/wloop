@@ -552,7 +552,7 @@ func TestEveryKindHasAPreview(t *testing.T) {
 	var names []string
 	for _, k := range m.Source.DraftKinds {
 		names = append(names, k.Name)
-		body, err := os.ReadFile(k.Preview)
+		body, err := os.ReadFile(filepath.Join("profile", k.Preview))
 		if err != nil {
 			t.Fatalf("%s: %v", k.Name, err)
 		}

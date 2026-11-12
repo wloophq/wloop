@@ -179,7 +179,7 @@
                 "type": "string"
               },
               "preview": {
-                "description": "The template of the summary line a draft of the kind shows, a path in the plugin's directory; the card shows the whole payload besides.",
+                "description": "The template of the summary line a draft of the kind shows, a path in the plugin's profile layer, which a user profile overrides; the card shows the whole payload besides.",
                 "type": "string"
               },
               "purpose": {
