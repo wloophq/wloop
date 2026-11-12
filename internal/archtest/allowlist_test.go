@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/turn"
-	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	"github.com/wloophq/wloop/plugins"
 	"github.com/wloophq/wloop/profiles"
 )
@@ -102,16 +101,11 @@ func shippedDecisions(def dintent.Def, sends []shippedSend) []string {
 		return []string{fmt.Sprintf("intent %s has no draft approval", def.Name)}
 	}
 	var out []string
-	kinds := builtin.PluginDraftKinds[def.Provider].Kinds
 	for _, c := range sends {
-		i := slices.IndexFunc(kinds, func(k manifest.DraftKind) bool { return k.Name == c.kind })
-		if i < 0 {
+		spec, ok := builtin.DraftKinds.Lookup(string(def.Provider), c.kind)
+		if !ok {
 			out = append(out, fmt.Sprintf("%s declares no draft kind %s", def.Provider, c.kind))
 			continue
-		}
-		spec := draft.KindSpec{Provider: string(def.Provider), Name: c.kind, Delivery: kinds[i].Delivery}
-		for _, f := range kinds[i].Facts {
-			spec.Facts = append(spec.Facts, draft.FactSpec{Name: f.Name, Pointer: f.Pointer})
 		}
 		d := draft.Draft{Unit: unit.Unit{Provider: def.Provider, Key: "acme/api#7"}, Kind: draft.Kind(c.kind), Delivery: draft.Delivery(spec.Delivery), Payload: []byte(c.payload)}
 		dec, err := def.DraftApproval.Decide(d, draft.Subject{Kind: spec}, builtin.DeliveryPosts(spec.Delivery), time.Time{})

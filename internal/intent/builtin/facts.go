@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/facet"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -394,11 +395,9 @@ func payloadFactName(p unit.ProviderID, kind, name string) string {
 // PayloadFact says whether name is a payload fact a merged plugin's draft
 // kind declares.
 func PayloadFact(name string) bool {
-	for _, kinds := range PluginDraftKinds {
-		for _, k := range kinds.Kinds {
-			if slices.ContainsFunc(k.Facts, func(f manifest.DraftKindFact) bool { return f.Name == name }) {
-				return true
-			}
+	for _, k := range DraftKinds.Kinds() {
+		if slices.ContainsFunc(k.Facts, func(f draft.FactSpec) bool { return f.Name == name }) {
+			return true
 		}
 	}
 	return false

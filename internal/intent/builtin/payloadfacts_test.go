@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"errors"
-	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -16,11 +15,9 @@ import (
 // delivery of its kind.
 func anyPayloadFact(t *testing.T) (fact, delivery string) {
 	t.Helper()
-	for _, p := range slices.Sorted(maps.Keys(PluginDraftKinds)) {
-		for _, k := range PluginDraftKinds[p].Kinds {
-			if len(k.Facts) > 0 {
-				return k.Facts[0].Name, k.Delivery
-			}
+	for _, k := range DraftKinds.Kinds() {
+		if len(k.Facts) > 0 {
+			return k.Facts[0].Name, k.Delivery
 		}
 	}
 	t.Fatal("no bundled plugin declares a payload fact")
@@ -29,8 +26,9 @@ func anyPayloadFact(t *testing.T) (fact, delivery string) {
 
 func TestEveryPayloadFactIsATrustedApprovalFact(t *testing.T) {
 	n := 0
-	for p, kinds := range PluginDraftKinds {
-		for _, k := range kinds.Kinds {
+	for _, k := range DraftKinds.Kinds() {
+		p := k.Provider
+		{
 			for _, f := range k.Facts {
 				n++
 				if !PayloadFact(f.Name) || IsUntrusted(f.Name) {
@@ -60,7 +58,9 @@ func TestADraftKindFactIsNamedForItsKind(t *testing.T) {
 		s := &manifest.Source{}
 		s.Provider = "forge"
 		s.Slot = "forge"
-		s.DraftKinds = []manifest.DraftKind{{Name: "review", Delivery: "review", Facts: []manifest.DraftKindFact{{Name: name, Pointer: "/event"}}}}
+		s.Deliveries = []manifest.Delivery{{Name: "review"}}
+		s.DraftKinds = []manifest.DraftKind{{Name: "review", Delivery: "review", Facts: []manifest.DraftKindFact{{Name: name, Pointer: "/event"}},
+			SchemaJSON: []byte(`{"type": "object", "required": ["event"], "properties": {"event": {"type": "string", "enum": ["COMMENT"]}}}`)}}
 		return s
 	}
 	if _, err := Merge(src("draft.forge.review.event")); err != nil {

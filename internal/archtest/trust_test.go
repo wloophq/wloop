@@ -92,12 +92,9 @@ func payloadFactRules(t *testing.T) []string {
 		return l, msgs
 	}
 	n := 0
-	for _, p := range slices.Sorted(maps.Keys(builtin.PluginDraftKinds)) {
-		for _, k := range builtin.PluginDraftKinds[p].Kinds {
-			spec := draft.KindSpec{Provider: string(p), Name: k.Name, Delivery: k.Delivery}
-			for _, f := range k.Facts {
-				spec.Facts = append(spec.Facts, draft.FactSpec{Name: f.Name, Pointer: f.Pointer})
-			}
+	for _, spec := range builtin.DraftKinds.Kinds() {
+		p, k := unit.ProviderID(spec.Provider), spec
+		{
 			for _, f := range k.Facts {
 				n++
 				on := fmt.Sprintf("draft.delivery == %q", k.Delivery)
@@ -123,7 +120,9 @@ func payloadFactRules(t *testing.T) []string {
 					}
 				}
 				deny := fmt.Sprintf("[[gates.approval.rule]]\nwhen = '%s && %s != \"other\"'\nmode = %q\n", on, f.Name, gate.ModeSend)
-				if _, problems := load(deny); !slices.ContainsFunc(problems, func(m string) bool { return strings.Contains(m, f.Name) && strings.Contains(m, "allow-list") && !strings.Contains(m, "gate.kind") }) {
+				if _, problems := load(deny); !slices.ContainsFunc(problems, func(m string) bool {
+					return strings.Contains(m, f.Name) && strings.Contains(m, "allow-list") && !strings.Contains(m, "gate.kind")
+				}) {
 					out = append(out, fmt.Sprintf("intent %s loads a deny-list rule that sends and reads %s, which a draft that lacks it satisfies: %v (R-trust)", host, f.Name, problems))
 				}
 			}
