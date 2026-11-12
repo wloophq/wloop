@@ -277,3 +277,7 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 	d.Rev++
 	return normal(d), nil
 }
+
+func (s draftStore) Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error) {
+	panic("not implemented: T2")
+}

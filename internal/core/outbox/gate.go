@@ -18,6 +18,8 @@ import (
 type Gates interface {
 	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
 	Supersede(ctx context.Context, id int64, by task.Actor) error
+	// SupersedeForAgent closes open draft gate id because session revised its draft.
+	SupersedeForAgent(ctx context.Context, id int64, session string) (gate.Gate, error)
 	RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error)
 	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

@@ -1,0 +1,59 @@
+{
+  "id": 42,
+  "rev": 4,
+  "unit": "github/acme/api#7",
+  "kind": "review",
+  "delivery": "review",
+  "text": "Moved the finding to the body.",
+  "payload": {
+    "event": "REQUEST_CHANGES",
+    "comments": [
+      {
+        "path": "api/handler.go",
+        "line": 42,
+        "body": "This drops the error."
+      }
+    ]
+  },
+  "basis": "4f9c2d1",
+  "hold": true,
+  "state": "held",
+  "revisions": [
+    {
+      "rev": 1,
+      "text": "Two blocking findings.",
+      "payload": {
+        "event": "REQUEST_CHANGES",
+        "comments": [
+          {
+            "path": "api/handler.go",
+            "line": 42,
+            "body": "This drops the error."
+          }
+        ]
+      },
+      "basis": "1a2b3c4",
+      "by": "session",
+      "session": "s-octocat-1",
+      "at": "2026-03-02T14:05:00Z"
+    },
+    {
+      "rev": 4,
+      "text": "Moved the finding to the body.",
+      "payload": {
+        "event": "REQUEST_CHANGES",
+        "comments": [
+          {
+            "path": "api/handler.go",
+            "line": 42,
+            "body": "This drops the error."
+          }
+        ]
+      },
+      "basis": "4f9c2d1",
+      "by": "session",
+      "session": "s-octocat-1",
+      "at": "2026-03-02T15:05:00Z"
+    }
+  ]
+}

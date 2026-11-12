@@ -1,0 +1,18 @@
+{
+  "unit": "github/acme/api#7",
+  "kind": "review",
+  "text": "Two blocking findings.",
+  "payload": {
+    "event": "REQUEST_CHANGES",
+    "comments": [
+      {
+        "path": "api/handler.go",
+        "line": 42,
+        "body": "This drops the error."
+      }
+    ]
+  },
+  "basis": "4f9c2d1",
+  "hold": true,
+  "why": "The handler drops errors."
+}

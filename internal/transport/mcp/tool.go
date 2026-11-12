@@ -58,13 +58,18 @@ func boolean() *schema { return &schema{Type: "boolean"} }
 // inputSchema is turn_end's arguments; record follows domain/record's
 // Record field for field.
 func inputSchema() *schema {
+	one := 1
+	draftRef := object(map[string]*schema{
+		"id":  {Type: "integer", Minimum: &one},
+		"rev": {Type: "integer", Minimum: &one},
+	}, "id", "rev")
 	option := object(map[string]*schema{
 		"id":          str(20),
 		"label":       str(record.LabelMax),
 		"consequence": str(record.ConsequenceMax),
 		"publishes":   boolean(),
+		"draft":       draftRef,
 	}, "id", "label", "consequence")
-	one := 1
 	item := object(map[string]*schema{
 		"path": str(record.PathMax),
 		"line": {Type: "integer", Minimum: &one},
@@ -85,6 +90,7 @@ func inputSchema() *schema {
 			"options":   {Type: "array", Items: option, MinItems: 2, MaxItems: 5},
 			"recommend": str(record.RecommendMax),
 			"publishes": boolean(),
+			"draft":     draftRef,
 		}, "kind", "text"),
 		"artifact": object(map[string]*schema{
 			"kind":  enum(record.ArtifactKinds...),

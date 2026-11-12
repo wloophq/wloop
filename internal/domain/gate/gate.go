@@ -81,6 +81,17 @@ type Gate struct {
 	// Text is what the gate asks, in the words its opener rendered from the profile; "" leaves its
 	// declaration's label.
 	Text string
+	// ApprovedRev is the rev of its draft a draft gate approved, the only one the outbox posts; 0 for any
+	// other gate.
+	ApprovedRev int64
+	// Sessions are every session that proposed or revised the gate's draft, none of which resolves it.
+	Sessions []string
+}
+
+// Resolver is who resolves a gate: a person, or an agent through Session, a session the user drives.
+type Resolver struct {
+	By      task.Actor
+	Session string
 }
 
 // ByUser says whether the user resolved g: a person, or an agent through a session the user drives.

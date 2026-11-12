@@ -542,6 +542,7 @@ var reads = []string{
 	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.All", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 	"draftStore.SettledAt",
+	"draftStore.Revisions",
 }
 
 // notesAll are the write methods that note Change.All.

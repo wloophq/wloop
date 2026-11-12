@@ -269,3 +269,5 @@ type testGates struct {
 func (g testGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	return g.r.Where(ctx, q)
 }
+
+func (m *memStore) Revisions(context.Context, draft.ID) ([]draft.Revision, error) { return nil, nil }
