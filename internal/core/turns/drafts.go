@@ -123,10 +123,10 @@ func UserApproved(g gate.Gate, d draft.Draft) bool {
 	if g.Kind != gate.KindDraft || g.Subject != strconv.FormatInt(int64(d.ID), 10) || g.Status != gate.Approved || !g.ByUser() {
 		return false
 	}
-	return !draftSession(g, d, g.BySession)
+	return !ProposedOrRevised(g, d, g.BySession)
 }
 
-// draftSession says whether session, when not "", proposed or revised d, whose gate is g.
-func draftSession(g gate.Gate, d draft.Draft, session string) bool {
+// ProposedOrRevised says whether session, when not "", proposed or revised d, whose gate is g.
+func ProposedOrRevised(g gate.Gate, d draft.Draft, session string) bool {
 	return session != "" && (session == g.Session || session == d.Origin.Session || slices.Contains(g.Sessions, session))
 }

@@ -103,6 +103,8 @@ type Service struct {
 	// ProposalText words a ledger proposal's message, as the profile's proposal gate does; nil leaves it
 	// without text.
 	ProposalText func(p coreitems.Proposal) string
+	// Drafts are the drafts a question's options point to; nil approves none, so every pick resumes its turn.
+	Drafts OptionDrafts
 	// ChatDeps serve the chat on the tasks; zero serves none.
 	ChatDeps ChatDeps
 
@@ -316,7 +318,13 @@ func postable(b *turn.Book, m message.Message) bool {
 
 func sameContent(a, b message.Message) bool {
 	return a.Text == b.Text && a.Recommend == b.Recommend && a.Confirm == b.Confirm && a.Origin.Session == b.Origin.Session &&
-		slices.Equal(a.Options, b.Options)
+		slices.EqualFunc(a.Options, b.Options, sameOption)
+}
+
+func sameOption(a, b record.Option) bool {
+	da, db := a.Draft, b.Draft
+	a.Draft, b.Draft = nil, nil
+	return a == b && (da == nil) == (db == nil) && (da == nil || *da == *db)
 }
 
 // questionOf is the open question message the book calls for on u, as the unit's row shows it: the turn an
@@ -766,8 +774,12 @@ func (s *Service) Deliver(ctx context.Context, g gate.Gate) error {
 	if err != nil {
 		return err
 	}
+	approves, err := s.approveOption(ctx, g, m, a)
+	if err != nil {
+		return err
+	}
 	d.Route, err = s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Gate: g.ID, Text: a.Text, OptionID: a.OptionID,
-		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession})
+		Yes: a.Yes, No: a.No, Source: d.Source, BySession: g.BySession, Approves: approves})
 	var refused turns.Refusal
 	if err != nil && !errors.As(err, &refused) {
 		return err
