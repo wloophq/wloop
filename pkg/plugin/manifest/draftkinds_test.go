@@ -132,3 +132,18 @@ func TestDraftKindFilesRefuse(t *testing.T) {
 		}
 	})
 }
+
+func TestVerdictPointerMustBeRequiredEnum(t *testing.T) {
+	kind := func(pointer string) string {
+		return "[[source.draft_kinds]]\nname = \"review\"\ndelivery = \"review\"\nschema = \"drafts/review/schema.json\"\nverdict = \"" + pointer + "\"\n"
+	}
+	s, err := draftSource(t, kind("/event"), reviewFiles())
+	if err != nil || s.DraftKinds[0].Verdict != "/event" {
+		t.Fatalf("a required enum verdict: %v", err)
+	}
+	for pointer, want := range map[string]string{"/note": "not required", "/free": "not required", "/nope": "no property"} {
+		if _, err := draftSource(t, kind(pointer), reviewFiles()); err == nil || !strings.Contains(err.Error(), "verdict") || !strings.Contains(err.Error(), want) {
+			t.Errorf("verdict %s: %v, want an error naming %q", pointer, err, want)
+		}
+	}
+}

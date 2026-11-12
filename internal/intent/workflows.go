@@ -804,8 +804,8 @@ func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 			}
 			continue
 		}
-		t, known := builtin.FactType(k)
-		if !known || slot == "" || !strings.HasPrefix(k, slot+".") {
+		t, _ := builtin.FactType(k)
+		if !builtin.OfSlot(k, slot) {
 			s.add(p, "%s is not a fact of the %s slot", k, slot)
 			continue
 		}

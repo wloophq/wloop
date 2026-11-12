@@ -1,0 +1,16 @@
+summary = "Reopen the review round when its draft failed to post or went stale"
+provider = "github"
+when = 'draft.failed_kind == "review" && (draft.failed || draft.stale)'
+order = 15
+key = ["draft.failed_ref"]
+
+[[step]]
+use = "turn.start"
+intent = "review"
+stage = "follow-up"
+open_question = "replace_if_moved"
+
+[[gates.approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "delay"
+window = "60s"

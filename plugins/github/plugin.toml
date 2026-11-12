@@ -218,6 +218,7 @@ schema = "drafts/review/schema.json"
 preview = "drafts/review/preview.md.tmpl"
 basis = "agent"
 editable = ["text", "/event"]
+verdict = "/event"
 
 [[source.draft_kinds.facts]]
 name = "draft.github.review.event"

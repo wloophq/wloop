@@ -56,6 +56,11 @@ func (s *Source) readDraftKinds(files fs.FS) error {
 				bad(*k, "fact %q: %v", f.Name, err)
 			}
 		}
+		if k.Verdict != "" {
+			if err := schema.enum(k.Verdict); err != nil {
+				bad(*k, "verdict: %v", err)
+			}
+		}
 		for _, e := range k.Editable {
 			if e == editableText {
 				continue
