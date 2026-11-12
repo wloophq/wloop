@@ -70,7 +70,7 @@ func (a Applied) Key() Key { return Key{a.Unit, a.Role} }
 
 // Review projects the newest turn of intents, those whose board is review;
 // a turn of any other intent never moves a review item.
-func Review(b turn.Book, intents []turn.Intent) Item {
+func Review(b turn.Book, intents []turn.Intent, concludes []string) Item {
 	it := Item{Unit: b.Unit, Role: ReviewRole}
 	t, ok := newest(b, intents)
 	if !ok {
@@ -84,7 +84,7 @@ func Review(b turn.Book, intents []turn.Intent) Item {
 		it.Status, it.Unread = NeedsMe, true
 	case turn.Done:
 		it.Status = Reviewed
-		if r, ok := b.LastRecord(t.Seq); ok && r.Record.Outcome != nil && r.Record.Outcome.Verdict == "APPROVE" {
+		if r, ok := b.LastRecord(t.Seq); ok && r.Record.Outcome != nil && slices.Contains(concludes, r.Record.Outcome.Verdict) {
 			it.Status = Done
 		}
 	case turn.Settled, turn.Dismissed:

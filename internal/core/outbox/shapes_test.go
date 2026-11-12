@@ -1,58 +1,62 @@
 package outbox
 
 import (
-	"cmp"
 	"encoding/json"
 	"fmt"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 )
 
-// testShapes are the kinds of every provider in this package's tests: what a conversation plugin declares,
-// each kind's delivery, and message for a draft that names no kind.
-var testShapes = map[string]string{
+// testProviders are the providers this package's tests post drafts on.
+var testProviders = []string{"github", "slack", "chat"}
+
+// testKinds are, by kind, the delivery of the kinds every test provider declares, as a conversation plugin's
+// manifest would; a draft of no kind takes message, every provider's default delivery.
+var testKinds = map[string]string{
 	"reply": "message", "nudge": "message", "close": "message", "ask_owner": "message",
 	"react": "reaction", "comment": "comment", "edit": "edit", "delete": "delete",
 }
 
-type shapes struct{}
+// shapes are the test providers' kinds in a draft.Catalog, built as the manifests' merge builds one.
+type shapes struct{ c *draft.Catalog }
 
-func (shapes) Lookup(_, kind string) (draft.KindSpec, bool) {
-	d, ok := testShapes[kind]
-	if !ok {
-		return draft.KindSpec{}, false
+func newShapes() shapes {
+	var kinds []draft.KindSpec
+	var deliveries []draft.DeliverySpec
+	defaults := map[string]string{}
+	for _, p := range testProviders {
+		for _, d := range []string{"message", "reaction", "comment", "edit", "delete"} {
+			deliveries = append(deliveries, draft.DeliverySpec{Provider: p, Name: d, Posts: d == "message" || d == "comment"})
+		}
+		for _, k := range []string{"reply", "nudge", "close", "ask_owner", "react", "comment", "edit", "delete"} {
+			d := testKinds[k]
+			kinds = append(kinds, draft.KindSpec{Provider: p, Name: k, Delivery: d, TextRequired: d != "reaction" && d != "delete",
+				SchemaJSON: json.RawMessage(`{"type":"object","properties":{}}`)})
+		}
+		defaults[p] = "message"
 	}
-	return draft.KindSpec{Name: kind, Delivery: d, TextRequired: d != "reaction" && d != "delete"}, true
+	c, err := draft.NewCatalog(kinds, deliveries, defaults)
+	if err != nil {
+		panic(err)
+	}
+	return shapes{c}
+}
+
+func (s shapes) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	return s.c.Lookup(provider, kind)
 }
 
 func (s shapes) Shape(provider string, d draft.Draft) (draft.Draft, error) {
-	name := string(d.Kind)
-	if name == "" {
-		name = kindOfShape(d.Purpose, string(cmp.Or(d.Delivery, "message")))
+	got, err := s.c.Shape(provider, d)
+	if err != nil {
+		return d, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
-	spec, ok := s.Lookup(provider, name)
-	if !ok {
-		return d, fmt.Errorf("%w: unknown kind %q", ErrInvalid, name)
-	}
-	d.Kind, d.Purpose, d.Delivery = draft.Kind(spec.Name), cmp.Or(d.Purpose, spec.Name), draft.Delivery(spec.Delivery)
-	return d, nil
+	return got, nil
 }
 
-// kindOfShape is the kind of a purpose and a delivery: the purpose when it is a kind of that delivery, else
-// the first message kind for a message, else the kind of the delivery.
-func kindOfShape(purpose, delivery string) string {
-	if testShapes[purpose] == delivery {
-		return purpose
+func (s shapes) Validate(spec draft.KindSpec, payload json.RawMessage) error {
+	if err := s.c.Validate(spec, payload); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
-	if delivery == "message" {
-		return "reply"
-	}
-	for _, k := range []string{"react", "comment", "edit", "delete"} {
-		if testShapes[k] == delivery {
-			return k
-		}
-	}
-	return ""
+	return nil
 }
-
-func (shapes) Validate(draft.KindSpec, json.RawMessage) error { return nil }

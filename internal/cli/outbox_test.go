@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"io"
 	"net/http"
 	"os"
@@ -38,6 +39,7 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool, edits ...func(*da
 	}
 	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf, Intents: te.loadedIntents}, db, te.cfg, mods, t.Logf)
 	d = te.serveOutbox(d, db, te.cfg, mods, t.Logf)
+	d.Outbox.Kinds = bundledtest.Shapes{}
 	for _, edit := range edits {
 		edit(&d)
 	}

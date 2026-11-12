@@ -412,7 +412,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d.UnitEnded = unitsEnded(mods)
 	e.viewFacts().set(authorFacts(mods))
 	notices := &noticeFeed{}
-	d.Notices, d.DraftKinds = notices, cardDraftKinds()
+	d.Notices, d.DraftKinds = notices, draftKinds
 	ed := engineDeps{DB: db, Modules: mods, Pub: notices, Log: logf, Briefs: queue}
 	if !e.noJobs {
 		if a, err := e.asker(cfg, filepath.Join(e.StateDir, "classify")); err == nil {

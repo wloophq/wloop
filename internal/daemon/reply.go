@@ -129,8 +129,7 @@ func (s *Server) replyBroadcast(ctx context.Context, e task.Task) string {
 		return ""
 	}
 	c := replyDraft(e)
-	c.Kind = api.DraftReply
-	kind, err := userDraftKind(c)
+	kind, err := s.userDraftKind(c)
 	if err != nil {
 		return ""
 	}
@@ -262,7 +261,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	case !s.pluginEnabled(c.Unit.Provider):
 		return draft.Draft{}, pluginOff{c.Unit.Provider}
 	}
-	kind, err := userDraftKind(c)
+	kind, err := s.userDraftKind(c)
 	if err != nil {
 		return draft.Draft{}, err
 	}
@@ -296,32 +295,44 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	return got, nil
 }
 
-func userDraftKind(c api.DraftCreate) (draft.Kind, error) {
-	switch k := userKind(c); k {
-	case api.DraftReply:
-		if c.Reaction != "" {
-			return "", badRequest{"a reply takes text, not a reaction"}
-		}
-		return draft.Kind(k), nil
-	case api.DraftReact:
-		if strings.TrimSpace(c.Text) != "" {
-			return "", badRequest{"a reaction takes an emoji, not text"}
-		}
-		return draft.Kind(k), nil
-	default:
-		return "", badRequest{fmt.Sprintf("a draft you write is a %s or a %s, not %q", api.DraftReply, api.DraftReact, k)}
+// userDraftKind is the kind of the draft c asks for, as its publisher's manifest declares it: the kind it names,
+// else, for a reaction alone, the first kind posted as an emoji, else the publisher's default kind, as the
+// outbox's kinds read them.
+func (s *Server) userDraftKind(c api.DraftCreate) (draft.Kind, error) {
+	text, reaction := strings.TrimSpace(c.Text) != "", strings.TrimSpace(c.Reaction) != ""
+	if s.deps.Outbox == nil || s.deps.Outbox.Kinds == nil {
+		return draft.Kind(c.Kind), nil
 	}
-}
-
-// userKind is the kind c names, else react for a reaction alone and reply otherwise.
-func userKind(c api.DraftCreate) string {
+	k := s.deps.Outbox.Kinds
+	provider := string(s.publisherOf(draft.Draft{Unit: c.Unit, Target: strings.TrimSpace(c.Target)}))
+	emoji := func(d string) bool { return slices.Contains(builtin.DraftEmojiDeliveries, d) }
 	switch {
 	case c.Kind != "":
-		return c.Kind
-	case c.Reaction != "" && strings.TrimSpace(c.Text) == "":
-		return api.DraftReact
+		spec, ok := k.Lookup(provider, c.Kind)
+		switch {
+		case !ok:
+			return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind %q", provider, c.Kind)}
+		case emoji(spec.Delivery) && text:
+			return "", badRequest{"a reaction takes an emoji, not text"}
+		case !emoji(spec.Delivery) && reaction:
+			return "", badRequest{"a reply takes text, not a reaction"}
+		}
+		return draft.Kind(c.Kind), nil
+	case text && reaction:
+		return "", badRequest{"a draft you write takes text or a reaction, not both"}
+	case reaction:
+		for _, d := range builtin.DraftEmojiDeliveries {
+			if got, err := k.Shape(provider, draft.Draft{Delivery: draft.Delivery(d)}); err == nil && string(got.Delivery) == d {
+				return got.Kind, nil
+			}
+		}
+		return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind that reacts", provider)}
 	}
-	return api.DraftReply
+	got, err := k.Shape(provider, draft.Draft{})
+	if err != nil || got.Kind == "" {
+		return "", badRequest{fmt.Sprintf("the %s plugin declares no draft kind to reply with", provider)}
+	}
+	return got.Kind, nil
 }
 
 // targetIn refuses a draft target that does not land in u: the target is a

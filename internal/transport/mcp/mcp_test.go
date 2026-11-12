@@ -428,8 +428,8 @@ func TestTurnEndEnumsAreTheFullTables(t *testing.T) {
 	if got, want := rec.Properties["state"].Enum, []string{"done", "settled", "asked", "failed"}; !slices.Equal(got, want) {
 		t.Errorf("state enum %v, want %v", got, want)
 	}
-	if got, want := rec.Properties["outcome"].Properties["verdict"].Enum, []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}; !slices.Equal(got, want) {
-		t.Errorf("verdict enum %v, want %v", got, want)
+	if v := rec.Properties["outcome"].Properties["verdict"]; len(v.Enum) != 0 || v.Type != "string" {
+		t.Errorf("verdict %+v, want a string its intent's plugins check", v)
 	}
 	if got, want := rec.Properties["question"].Properties["kind"].Enum, []string{"choice", "confirm", "free"}; !slices.Equal(got, want) {
 		t.Errorf("question kind enum %v, want %v", got, want)

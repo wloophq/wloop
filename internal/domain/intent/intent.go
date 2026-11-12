@@ -250,9 +250,14 @@ type Refuse struct {
 type Join struct{ DiffersOn []string }
 
 type RecordRules struct {
-	States          []string // done settled asked failed
-	Artifacts       []string
-	Outcome         []string // verdict url
+	States    []string // done settled asked failed
+	Artifacts []string
+	Outcome   []string // verdict url
+	// Verdicts are the verdicts a record may give: the values of the verdict field of the draft kinds of the
+	// plugins the intent serves, as their manifests declare them.
+	Verdicts []string
+	// Concludes are the verdicts that end the work a turn of the intent is about, which the board shows done.
+	Concludes       []string
 	OutcomeDoc      string
 	HistoryArtifact string
 	Require         []Require

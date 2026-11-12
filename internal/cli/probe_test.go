@@ -111,7 +111,7 @@ func TestProbePolicyDeniesWrites(t *testing.T) {
 	if strings.Contains(raw, "disableAllHooks") {
 		t.Errorf("the probe disables the home's hooks:\n%s", raw)
 	}
-	if !probePolicy("p", probeStored).TurnEnd || !roundPolicy("p", bundledStored()).TurnEnd || tryPolicy("p", bundledStored()).TurnEnd {
+	if !probePolicy("p", probeStored).TurnEnd || !roundPolicy("p", bundledStored()).TurnEnd || tryPolicy("p", bundledStored(), bundledWrites()).TurnEnd {
 		t.Error("only the probe and round policies let the session end its turn")
 	}
 	cmd, err := claude.Agent{}.Command(turns.AgentSession{Home: "/h", Model: "haiku", Policy: probePolicy(brand.Name, probeStored)})

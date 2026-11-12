@@ -167,7 +167,7 @@ func TestEffectsAreAppliedOnceAcrossARestart(t *testing.T) {
 func TestNoEffectIsDerivedFromKind(t *testing.T) {
 	e := newEnv()
 	l := withApplier(e)
-	for k := range testShapes {
+	for k := range testKinds {
 		k := draft.Kind(k)
 		p := reply("closing")
 		p.Kind = k

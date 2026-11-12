@@ -141,6 +141,7 @@ type mRecord struct {
 	Artifacts       []string   `toml:"artifacts"`
 	Outcome         []string   `toml:"outcome"`
 	OutcomeDoc      string     `toml:"outcome_doc"`
+	Concludes       []string   `toml:"concludes"`
 	HistoryArtifact string     `toml:"history_artifact"`
 	Require         []mRequire `toml:"require"`
 	AttachURL       bool       `toml:"attach_url"`

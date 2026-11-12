@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
@@ -123,7 +124,7 @@ func TestAPluginKilledDuringPublishLeavesTheDraftMayHavePostedAndUnsentAgain(t *
 	now := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
-	svc := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
+	svc := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	ctx := context.Background()
 	d, err := svc.Propose(ctx, outbox.Proposal{Unit: unit.Unit{Provider: "acme", Key: "t1"}, Purpose: "reply", Text: "on its way",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "acme-reply", Key: "k"}})

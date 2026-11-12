@@ -7,9 +7,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/domain/task"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -58,7 +58,7 @@ func TestTheCatalogServesTheReplyVerbsSend(t *testing.T) {
 func TestANotificationOffersTheReplyItsProfileSendsFirst(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
-	r.s.deps.Outbox = &outbox.Service{Kinds: outboxtest.Shapes{}, Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
+	r.s.deps.Outbox = &outbox.Service{Kinds: bundledtest.Shapes{}, Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
 	r.s.deps.Intents = draftReplies(t)
 	r.put(t, unitTask("t-a", task.OriginDerived, actThread))
 	var v api.TaskView

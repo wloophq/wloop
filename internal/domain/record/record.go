@@ -47,11 +47,8 @@ const (
 	ResumeMax      = 4000
 	NextMax        = 1000
 	URLMax         = 500
+	VerdictMax     = 60
 	LedgerMax      = 50
-)
-
-var (
-	verdicts = []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}
 )
 
 type Record struct {
@@ -231,9 +228,14 @@ func (r Record) validate(rules *dintent.RecordRules) error {
 		if rules != nil {
 			checkListed(c, o, rules.Outcome)
 		}
-		if o.Verdict != "" && !slices.Contains(verdicts, o.Verdict) {
-			c.bad("outcome.verdict", "APPROVE, COMMENT or REQUEST_CHANGES, not %q", o.Verdict)
+		switch {
+		case o.Verdict == "" || rules == nil || slices.Contains(rules.Verdicts, o.Verdict):
+		case len(rules.Verdicts) == 0:
+			c.bad("outcome.verdict", "the plugins of this turn's intent declare no verdict")
+		default:
+			c.bad("outcome.verdict", "one of %s, not %q", strings.Join(rules.Verdicts, ", "), o.Verdict)
 		}
+		c.text("outcome.verdict", o.Verdict, 0, VerdictMax, false)
 		c.text("outcome.url", o.URL, 0, URLMax, false)
 		if o.Draft != nil {
 			switch {

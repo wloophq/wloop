@@ -32,8 +32,9 @@ type KindSpec struct {
 	// Facts are the payload fields an approval rule reads.
 	Facts []FactSpec
 	// Verdict is the JSON pointer to the payload field whose value is the record verdict a sent draft of the
-	// kind posts; "" posts none.
-	Verdict string
+	// kind posts; "" posts none. Verdicts are the values its schema allows there.
+	Verdict  string
+	Verdicts []string
 	// SchemaJSON is the content of Schema.
 	SchemaJSON json.RawMessage
 	// Posts says a draft of the kind reaches people, as its delivery's

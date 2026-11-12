@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
@@ -28,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -120,7 +120,7 @@ func newDraftRig(t testing.TB, wf workflow.Workflow, text string) *draftRig {
 		tasks: &memTasks{m: map[task.ID]task.Task{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
 	r.cfg.Profile = dir
 	clock := clockFunc(func() time.Time { return r.now })
-	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
+	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Kinds: bundledtest.Shapes{}, Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
 		Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil }})
 	r.deps = &draftDeps{Outbox: func() draftOutbox { return r.svc }, Tasks: r.tasks, Items: r.items,
 		Workflow: func(name string) (workflow.Workflow, bool) { return r.wf, name == r.wf.Name },
@@ -396,7 +396,7 @@ func TestUnitClosedEndsTheUnitsTasksOnce(t *testing.T) {
 	}}}
 	tasks := coretasks.New(coretasks.Deps{Store: db.Tasks(), Clock: clock, States: taskstest.BundledStates})
 	newSvc := func() *outbox.Service {
-		return withDraftGates(db, clock.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: clock,
+		return withDraftGates(db, clock.Now, &outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
 			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Ends: tasks, Modules: []pluginModule{m}})}})
 	}

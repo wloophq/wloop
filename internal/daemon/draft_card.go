@@ -26,11 +26,10 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// DraftKinds are the draft kinds the plugins' manifests declare, as a draft's card reads them: a kind's spec
-// and its payload's schema.
+// DraftKinds are the draft kinds the loaded plugins' manifests declare, as a draft's card reads them: a kind's
+// spec, which holds its payload's schema.
 type DraftKinds interface {
 	Lookup(provider, kind string) (draft.KindSpec, bool)
-	Schema(spec draft.KindSpec) (json.RawMessage, error)
 }
 
 // cardFields fills v, d's view, with what its card shows of d beyond its text: its payload field by field, its
@@ -284,7 +283,7 @@ func (s *Server) payloadFields(provider, kind string, payload json.RawMessage) [
 	w := payloadWalk{words: s.loaded().UI[provider].Drafts[kind].Fields}
 	if k := s.deps.DraftKinds; k != nil {
 		if spec, ok := k.Lookup(provider, kind); ok {
-			w.editable, w.schema = spec.Editable, s.kindSchema(k, spec)
+			w.editable, w.schema = spec.Editable, s.kindSchema(spec)
 		}
 	}
 	if root.kind == nodeScalar {
@@ -294,17 +293,13 @@ func (s *Server) payloadFields(provider, kind string, payload json.RawMessage) [
 }
 
 // kindSchema is spec's payload schema, read once while it reads.
-func (s *Server) kindSchema(k DraftKinds, spec draft.KindSpec) map[string]any {
+func (s *Server) kindSchema(spec draft.KindSpec) map[string]any {
 	key := spec.Provider + "/" + spec.Name
 	if m, ok := s.kindSchemas.Load(key); ok {
 		return m.(map[string]any)
 	}
-	raw, err := k.Schema(spec)
-	if err != nil {
-		return nil
-	}
 	var m map[string]any
-	if json.Unmarshal(raw, &m) != nil {
+	if len(spec.SchemaJSON) == 0 || json.Unmarshal(spec.SchemaJSON, &m) != nil {
 		return nil
 	}
 	s.kindSchemas.Store(key, m)

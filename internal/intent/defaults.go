@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -270,10 +271,17 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			Artifacts:       orEmpty(r.Artifacts, nil),
 			Outcome:         orEmpty(r.Outcome, nil),
 			OutcomeDoc:      r.OutcomeDoc,
+			Verdicts:        verdictsOf(r.Outcome, d.Serves),
+			Concludes:       orEmpty(r.Concludes, nil),
 			HistoryArtifact: r.HistoryArtifact,
 			AttachURL:       r.AttachURL,
 			Requires:        str(r.Requires, ""),
 			Missing:         str(r.Missing, ""),
+		}
+		for i, v := range d.Record.Concludes {
+			if !slices.Contains(d.Record.Verdicts, v) {
+				s.add(fmt.Sprintf("record.concludes[%d]", i), "%q is not a verdict this intent's records give: %s", v, cmp.Or(strings.Join(d.Record.Verdicts, ", "), "none"))
+			}
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{
@@ -370,4 +378,13 @@ func servedSlots(d dintent.Def) []string {
 		}
 	}
 	return out
+}
+
+// verdictsOf are the verdicts a record of an intent whose outcome lists outcome may give: those the draft kinds
+// of the plugins it serves declare, none when its outcome carries no verdict.
+func verdictsOf(outcome []string, serves func(dunit.ProviderID) bool) []string {
+	if !slices.Contains(outcome, "verdict") {
+		return nil
+	}
+	return builtin.Verdicts(serves)
 }

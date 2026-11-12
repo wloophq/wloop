@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -138,8 +139,8 @@ func TestVerdictPointerMustBeRequiredEnum(t *testing.T) {
 		return "[[source.draft_kinds]]\nname = \"review\"\ndelivery = \"review\"\nschema = \"drafts/review/schema.json\"\nverdict = \"" + pointer + "\"\n"
 	}
 	s, err := draftSource(t, kind("/event"), reviewFiles())
-	if err != nil || s.DraftKinds[0].Verdict != "/event" {
-		t.Fatalf("a required enum verdict: %v", err)
+	if err != nil || s.DraftKinds[0].Verdict != "/event" || !slices.Equal(s.DraftKinds[0].Verdicts, []string{"APPROVE", "COMMENT"}) {
+		t.Fatalf("a required enum verdict: %+v %v", s.DraftKinds[0], err)
 	}
 	for pointer, want := range map[string]string{"/note": "not required", "/free": "not required", "/nope": "no property"} {
 		if _, err := draftSource(t, kind(pointer), reviewFiles()); err == nil || !strings.Contains(err.Error(), "verdict") || !strings.Contains(err.Error(), want) {

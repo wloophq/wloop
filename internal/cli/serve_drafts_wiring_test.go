@@ -131,6 +131,9 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 		if err := propose(`{"event":"COMMENT"}`, "c1"); err == nil {
 			t.Error("a review read at c1 was proposed while the head is c2")
 		}
+		if err := propose(`{"event":"COMMENT","event":"APPROVE"}`, "c2"); err == nil {
+			t.Error("a review that names its event twice was proposed")
+		}
 		d, err := td.Client().ProposeDraft(context.Background(), s.Handle, api.AgentDraftProposal{Kind: "review", Text: "One finding.",
 			Payload: json.RawMessage(`{"event":"COMMENT"}`), Basis: "c2", Why: "the export reads a dropped column"})
 		if err != nil {
@@ -138,6 +141,10 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 		}
 		if got, err := td.Client().Draft(context.Background(), d.ID); err != nil || got.Why != "the export reads a dropped column" {
 			t.Errorf("the draft's why %q %v, want the proposal's", got.Why, err)
+		}
+		twice := json.RawMessage(`{"event":"COMMENT","event":"APPROVE"}`)
+		if _, err := td.Client().UpdateDraft(context.Background(), s.Handle, api.AgentDraftUpdate{ID: d.ID, Rev: d.Rev, Payload: twice}); err == nil {
+			t.Error("a revision that names its event twice was taken")
 		}
 	})
 }

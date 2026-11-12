@@ -29,6 +29,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
@@ -194,7 +195,7 @@ func TestGitHubNudgeDraftsThroughTheOutbox(t *testing.T) {
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
-	svc := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: pinnedClock(now),
+	svc := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(ctx, props[0])
 	if err != nil {

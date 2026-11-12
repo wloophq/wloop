@@ -160,3 +160,21 @@ func TestCompileRefusesAnEnumNoAnswerCanBeComparedTo(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateJSONRefusesADuplicateKey(t *testing.T) {
+	s, err := Compile([]byte(`{"type":"object","properties":{"event":{"type":"string"},"comments":{"type":"array","items":{"type":"object","properties":{"body":{"type":"string"}}}}}}`), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{
+		`{"event":"COMMENT","event":"APPROVE"}`,
+		`{"comments":[{"body":"a","body":"b"}]}`,
+	} {
+		if err := s.ValidateJSON([]byte(raw)); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "twice") {
+			t.Errorf("%s: %v, want a duplicate key refused", raw, err)
+		}
+	}
+	if err := s.ValidateJSON([]byte(`{"event":"COMMENT","comments":[{"body":"a"},{"body":"b"}]}`)); err != nil {
+		t.Errorf("one key per object: %v", err)
+	}
+}

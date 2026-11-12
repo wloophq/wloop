@@ -21,19 +21,19 @@ import (
 const reviewPayload = `{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},` +
 	`{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`
 
-// reviewKinds is the GitHub manifest's review kind, with the schema it ships.
+// reviewKinds is the GitHub manifest's review kind, with the schema it ships, as the manifest loader reads it.
 type reviewKinds struct{}
 
 func (k reviewKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	if provider != "github" || kind != "review" {
 		return draft.KindSpec{}, false
 	}
+	schema, err := os.ReadFile("../../plugins/github/drafts/review/schema.json")
+	if err != nil {
+		return draft.KindSpec{}, false
+	}
 	return draft.KindSpec{Provider: "github", Name: "review", Delivery: "review", Schema: "drafts/review/schema.json", Basis: draft.BasisAgent,
-		Editable: []string{"text", "/event"}}, true
-}
-
-func (k reviewKinds) Schema(spec draft.KindSpec) (json.RawMessage, error) {
-	return os.ReadFile("../../plugins/github/" + spec.Schema)
+		Editable: []string{"text", "/event"}, SchemaJSON: schema}, true
 }
 
 // staleCalls is a live basis check that answers stale and counts the drafts it read.

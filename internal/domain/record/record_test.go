@@ -13,7 +13,7 @@ var artifacts = []string{"review-draft", "triage"}
 func rulesFor(intent string) dintent.RecordRules {
 	switch intent {
 	case "review":
-		return dintent.RecordRules{States: []string{"done", "settled", "asked", "failed"}, Artifacts: artifacts, Require: []dintent.Require{
+		return dintent.RecordRules{States: []string{"done", "settled", "asked", "failed"}, Artifacts: artifacts, Verdicts: []string{"APPROVE", "COMMENT", "REQUEST_CHANGES"}, Require: []dintent.Require{
 			{State: "done", Fields: []string{"verdict", "url"}},
 			{State: "asked", Artifact: "review-draft", Fields: []string{"verdict"}},
 		}}
@@ -147,7 +147,7 @@ func TestOptionAnswer(t *testing.T) {
 func TestOutcomeIsChecked(t *testing.T) {
 	r := Record{State: Done, Summary: "approved", Outcome: &Outcome{Verdict: "LGTM", URL: "u\u2066x", Blocking: -1}}
 	err := r.Validate(rulesFor("review"))
-	for _, want := range []string{"outcome.verdict: APPROVE, COMMENT or REQUEST_CHANGES", "outcome.url: control character", "outcome.blocking: zero or more"} {
+	for _, want := range []string{"outcome.verdict: one of APPROVE, COMMENT, REQUEST_CHANGES, not \"LGTM\"", "outcome.url: control character", "outcome.blocking: zero or more"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in %v", want, err)
 		}
@@ -164,6 +164,7 @@ func TestValidateFollowsTheRules(t *testing.T) {
 		States:    []string{"done", "asked"},
 		Artifacts: []string{"triage"},
 		Outcome:   []string{"url", "verdict"},
+		Verdicts:  []string{"COMMENT"},
 		Require: []dintent.Require{
 			{State: "done", Fields: []string{"url"}},
 			{State: "asked", Artifact: "triage", Fields: []string{"verdict"}},
@@ -242,7 +243,7 @@ func TestValidateShapeIgnoresIntent(t *testing.T) {
 		{"settled is accepted", Record{State: Settled, Summary: "s"}, ""},
 		{"no verdict is needed", Record{State: Done, Summary: "s"}, ""},
 		{"an artifact kind outside the table is refused", Record{State: Done, Summary: "s", Artifact: &Artifact{Kind: "ask-author-note", Body: "b"}}, `artifact.kind: review-draft or triage, not "ask-author-note"`},
-		{"the enum is still checked", Record{State: Done, Summary: "s", Outcome: &Outcome{Verdict: "LGTM"}}, "outcome.verdict"},
+		{"a verdict is its intent's plugins' to check", Record{State: Done, Summary: "s", Outcome: &Outcome{Verdict: "LGTM"}}, ""},
 		{"the states are still checked", Record{State: UnrecordedState, Summary: "s"}, "state: done, settled, asked or failed"},
 	} {
 		err := c.r.ValidateShape()
@@ -299,5 +300,27 @@ func TestAnArtifactOfAnIntentWithNoneSaysSo(t *testing.T) {
 	r := Record{State: Asked, Summary: "s", Resume: "r", Question: &Question{Kind: "confirm", Text: "q"}, Artifact: &Artifact{Kind: "triage", Body: "b"}}
 	if err := r.Validate(rules); err == nil || !strings.Contains(err.Error(), "artifact.kind: this turn's intent records no artifact") {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestAVerdictIsOneItsPluginsDeclare(t *testing.T) {
+	rec := func(v string) Record {
+		return Record{State: Done, Summary: "s", Outcome: &Outcome{Verdict: v, URL: "u"}}
+	}
+	rules := rulesFor("review")
+	rules.Outcome = []string{"verdict", "url"}
+	if err := rec("COMMENT").Validate(rules); err != nil {
+		t.Fatalf("a declared verdict: %v", err)
+	}
+	if err := rec("MERGE").Validate(rules); err == nil || !strings.Contains(err.Error(), "outcome.verdict") {
+		t.Fatalf("a verdict no plugin declares: %v", err)
+	}
+	rules.Verdicts = []string{"LGTM"}
+	if err := rec("LGTM").Validate(rules); err != nil {
+		t.Fatalf("a third plugin's verdict: %v", err)
+	}
+	rules.Verdicts = nil
+	if err := rec("COMMENT").Validate(rules); err == nil {
+		t.Fatal("a verdict taken while the intent's plugins declare none")
 	}
 }
