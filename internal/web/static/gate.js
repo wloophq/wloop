@@ -69,10 +69,11 @@ function gateOptions(g, answer) {
   if (!answer || !opts.length) return null;
   const picked = gateOption(g);
   const ordered = [...opts.filter((o) => o.id === subject.recommend), ...opts.filter((o) => o.id !== subject.recommend)];
-  return h("div", { class: "opts" }, ...ordered.map((o) => {
+  return h("div", { class: "opts" }, ...ordered.flatMap((o) => {
     const on = o.id === picked;
-    return h("button", {
+    return [h("button", {
       type: "button", class: "opt" + (on ? " on" : ""), "aria-pressed": String(on), "data-focus": `gate:${g.id}:option:${o.id}`,
+      "data-pin": o.draft ? `${o.draft.id}@${o.draft.rev}` : undefined,
       onclick: () => {
         gateState.picked.set(g.id, on ? "" : o.id);
         detailEnv.render();
@@ -81,8 +82,24 @@ function gateOptions(g, answer) {
     h("span", { class: "r", "aria-hidden": "true" }),
     h("span", { class: "lb" }, o.label),
     o.id === subject.recommend ? h("span", { class: "rec" }, t("recommended")) : null,
-    o.consequence ? h("span", { class: "cs" }, o.consequence) : null);
+    o.consequence ? h("span", { class: "cs" }, o.consequence) : null),
+    o.draft ? pinnedDraft(subject, o.draft, `gate:${g.id}:option:${o.id}`) : null];
   }));
+}
+
+// pinnedDraft is the draft an answer approves, at the rev the question pinned in ref, as its own card shows it:
+// its preview, its text and its whole payload, with a note when it changed since or is gone. The person sees
+// what they approve, never only the agent's words for it.
+function pinnedDraft(subject, ref, scope) {
+  const d = (subject.pinned || []).find((x) => x.id === ref.id);
+  if (!d) return h("div", { class: "d-pin" }, h("p", { class: "d-note err" }, t("Approves draft #{id}, which is gone.", { id: ref.id })));
+  return h("div", { class: "d-pin", "data-draft": String(ref.id), "data-rev": String(ref.rev) },
+    h("p", { class: "d-note" }, t("Approves draft #{id} at rev {rev}:", { id: ref.id, rev: ref.rev })),
+    d.rev !== ref.rev ? h("p", { class: "d-note err" }, t("It changed since the question pinned it and is now at rev {rev}: below is what it says now.", { rev: d.rev })) : null,
+    d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:pin-preview`, names: d.names || {} })) : null,
+    draftWhere(d),
+    d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:pin`, names: d.names || {} }) : null,
+    payloadView(d, `pin:${ref.id}`, false, scope));
 }
 
 // gateAnswer is the free-text answer of a gate whose intent answer takes one; Cmd+Enter or Ctrl+Enter sends it.
@@ -218,6 +235,7 @@ function gateCard(e, g, opts = {}) {
       g.deadline ? h("p", { class: "meta" }, deflt ? t("{action} at {time} unless you pick another", { action: deflt.label, time: fmtDate(g.deadline, "datetime") })
         : t("Until {time}", { time: fmtDate(g.deadline, "datetime") })) : null,
       gateOptions(g, answer),
+      subject.draft ? pinnedDraft(subject, subject.draft, `gate:${g.id}:confirm`) : null,
       answer ? gateAnswer(e, g, answer) : null,
       h("div", { class: "d-actions" }, ...intents.map((x, i) => h("button", {
         type: "button", class: "act" + (i === 0 ? " primary" : ""), "data-focus": `gate:${g.id}:${x.id}`, "aria-keyshortcuts": i < 9 ? String(i + 1) : undefined,

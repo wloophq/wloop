@@ -194,14 +194,20 @@ func choiceID(q *api.QuestionView, answer string) string {
 }
 
 // answerChoices are the one-tap answers: each option, or Yes and No for a
-// confirm, the recommended one first.
+// confirm, the recommended one first; an answer that approves a pinned draft
+// is none, since a notification does not show the draft.
 func answerChoices(q *api.QuestionView) []api.AttentionAction {
 	var out []api.AttentionAction
-	if q.Kind == "confirm" {
+	switch {
+	case q.Kind == "confirm" && q.Draft != nil:
+		out = []api.AttentionAction{{ID: "answer:no", Title: "No"}}
+	case q.Kind == "confirm":
 		out = []api.AttentionAction{{ID: "answer:yes", Title: "Yes"}, {ID: "answer:no", Title: "No"}}
-	} else {
+	default:
 		for _, o := range q.Options {
-			out = append(out, api.AttentionAction{ID: choiceID(q, o.ID), Title: o.Label})
+			if o.Draft == nil {
+				out = append(out, api.AttentionAction{ID: choiceID(q, o.ID), Title: o.Label})
+			}
 		}
 	}
 	if q.Recommend == "" {

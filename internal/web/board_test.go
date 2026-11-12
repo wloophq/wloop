@@ -944,7 +944,7 @@ const document = { getElementById: () => null };
 			Body map[string]any `json:"body"`
 		} `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const view = (n) => { const all = walk(n); return {
@@ -1016,7 +1016,7 @@ const document = { getElementById: () => null };
 		Ready bool             `json:"ready"`
 		Posts []map[string]any `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const click = async (label, note) => {
@@ -1063,7 +1063,7 @@ const document = { getElementById: () => null };
 		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
 	}
 	var got map[string][]bool
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const buttons = () => walk(questionBlock(input)).filter((x) => x.tag === "button" && !text(x).startsWith("Send answer"));
@@ -1993,7 +1993,7 @@ const document = { getElementById: () => null };
 		Open    bool     `json:"open"`
 		Queued  bool     `json:"queued"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const block = questionBlock(input.queued);

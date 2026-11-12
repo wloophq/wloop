@@ -1913,17 +1913,24 @@ function optionButton(r, o, recommended) {
     { option_id: o.id }, { primary: recommended, title: o.consequence });
 }
 
+// questionChoices are the one-click answers of a row's question; an answer that approves a pinned draft is none,
+// since the row does not show the draft: the person answers it on the question's card.
 function questionChoices(r, q) {
   if (q.kind === "confirm") {
     return [
-      turnButton(r, "yes", recommendedLabel(t("Yes"), q.recommend === "yes"), "answer", { yes: true }, { primary: q.recommend === "yes" }),
+      q.draft ? null : turnButton(r, "yes", recommendedLabel(t("Yes"), q.recommend === "yes"), "answer", { yes: true }, { primary: q.recommend === "yes" }),
       turnButton(r, "no", recommendedLabel(t("No"), q.recommend === "no"), "answer", { no: true }, { primary: q.recommend === "no" }),
-    ];
+    ].filter(Boolean);
   }
   if (q.kind !== "choice") return [];
   const opts = q.options || [];
   const ordered = [...opts.filter((o) => o.id === q.recommend), ...opts.filter((o) => o.id !== q.recommend)];
-  return ordered.map((o) => optionButton(r, o, o.id === q.recommend));
+  return ordered.filter((o) => !o.draft).map((o) => optionButton(r, o, o.id === q.recommend));
+}
+
+// questionPins says whether an answer to q approves a draft.
+function questionPins(q) {
+  return !!q.draft || (q.options || []).some((o) => o.draft);
 }
 
 function artifactBlock(a) {
@@ -1965,6 +1972,7 @@ function questionBlock(d) {
     !asked && !q.queued && last ? [h("div", { class: "muted small" }, t("Last message")), h("pre", { class: "q-text" }, last)] : null,
     asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, t("Agent recommends: {answer}", { answer: q.recommend })) : null,
     choices.length ? h("div", { class: "q-options" }, choices) : null,
+    asked && questionPins(q) ? h("p", { class: "d-note" }, t("An answer approves a draft: open the question's task to see it before you answer.")) : null,
     answerBlock(r, choices.length > 0),
     h("div", { class: "q-turn" },
       turnButton(r, "continue", t("Continue"), "continue", {}, { title: t("The agent goes on with the turn without an answer") }),

@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/texts"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -542,25 +543,32 @@ func questionLabel(w *texts.Catalog, name string, q *api.QuestionView) string {
 
 // answerRequest reads a number alone as a choice's option and y, yes, n or
 // no alone, in any case, as a confirm's answer; anything else is a free
-// answer.
-func answerRequest(q *api.QuestionView, text string) api.ActionRequest {
-	req := api.ActionRequest{Guidance: text, Source: Source}
+// answer. pin is the draft the answer would approve, which a row does not
+// show, so the caller refuses it.
+func answerRequest(q *api.QuestionView, text string) (req api.ActionRequest, pin *record.DraftRef) {
+	req = api.ActionRequest{Guidance: text, Source: Source}
 	if q.Queued {
-		return req
+		return req, nil
 	}
 	if q.Kind == "confirm" {
 		switch strings.ToLower(text) {
 		case "y", "yes":
-			return api.ActionRequest{Yes: true, Source: req.Source}
+			return api.ActionRequest{Yes: true, Source: req.Source}, q.Draft
 		case "n", "no":
-			return api.ActionRequest{No: true, Source: req.Source}
+			return api.ActionRequest{No: true, Source: req.Source}, nil
 		}
 	}
 	if n, err := strconv.Atoi(text); err == nil && n >= 1 && n <= len(q.Options) {
 		o := q.Options[n-1]
 		req.Guidance, req.OptionID = o.Answer(), o.ID
+		pin = o.Draft
 	}
-	return req
+	return req, pin
+}
+
+// unseenPin is the status that refuses an answer approving draft pin, which the view does not show.
+func (m *Model) unseenPin(pin *record.DraftRef) string {
+	return m.w().T("this answer approves draft #{id}, which this view does not show: open its task to see it", map[string]any{"id": pin.ID})
 }
 
 // actionState is the row's state of the action id; false when the row does
@@ -622,7 +630,12 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 				m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord("answer"), "task": p.cmd.Label})
 				return Command{}, false
 			}
-			c.Req = answerRequest(p.question, text)
+			req, pin := answerRequest(p.question, text)
+			if pin != nil {
+				m.status = m.unseenPin(pin)
+				return Command{}, false
+			}
+			c.Req = req
 		case in.Kind == "duration":
 			c.Req.Until, c.Req.UntilState = text, text == "" && in.UntilState
 		case text == "" && in.Required:

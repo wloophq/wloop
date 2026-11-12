@@ -15,8 +15,10 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -328,7 +330,8 @@ func (s *Server) gateMessage(ctx context.Context, raw string) (int64, bool) {
 // messageView is m as a question, post or proposal gate serves it, with the user's answers to it.
 func (s *Server) messageView(ctx context.Context, m dmessage.Message) api.Message {
 	v := api.Message{ID: m.ID, Unit: m.Unit, Kind: string(m.Kind), Text: m.Text, Options: m.Options, Recommend: m.Recommend, Confirm: m.Confirm,
-		Origin: m.Origin.Kind, CreatedAt: m.CreatedAt}
+		Draft: m.Draft, Origin: m.Origin.Kind, CreatedAt: m.CreatedAt}
+	v.Pinned = s.pinnedDrafts(ctx, m)
 	c, err := s.deps.Messages.Conversation(ctx, m)
 	if err != nil {
 		s.logf("the answers to message %d: %v", m.ID, err)
@@ -343,3 +346,37 @@ func (s *Server) messageView(ctx context.Context, m dmessage.Message) api.Messag
 type pluginOff struct{ provider unit.ProviderID }
 
 func (p pluginOff) Error() string { return string(p.provider) + " is disabled" }
+
+// pinnedDrafts are the drafts m's confirm and options pin, each once, as their cards serve them now; a draft
+// that is gone is left out.
+func (s *Server) pinnedDrafts(ctx context.Context, m dmessage.Message) []api.Draft {
+	o := s.deps.Outbox
+	if o == nil {
+		return nil
+	}
+	refs := []*record.DraftRef{m.Draft}
+	for _, opt := range m.Options {
+		refs = append(refs, opt.Draft)
+	}
+	var out []api.Draft
+	seen := map[int64]bool{}
+	for _, ref := range refs {
+		if ref == nil || seen[ref.ID] {
+			continue
+		}
+		seen[ref.ID] = true
+		d, err := o.Store.Get(ctx, draft.ID(ref.ID))
+		if err != nil {
+			if !errors.Is(err, outbox.ErrNotFound) {
+				s.logf("the draft message %d pins: %v", m.ID, err)
+			}
+			continue
+		}
+		g, _, err := o.GateOf(ctx, d)
+		if err != nil {
+			s.logf("the gate of the draft message %d pins: %v", m.ID, err)
+		}
+		out = append(out, s.draftView(ctx, d, g))
+	}
+	return out
+}

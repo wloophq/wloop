@@ -32,6 +32,7 @@ var Notices = []ToolAnswer{
 	{Name: NoticeNotifyDraftForMe, Doc: "The button of an Inbox task's notification that delegates it to an agent headless."},
 	{Name: NoticeNotifyReply, Doc: "The button of a notification whose text input saves a reply for approval, or answers an agent."},
 	{Name: NoticeNotifySendReply, Doc: "The button of a notification whose text input sends a reply at once."},
+	{Name: NoticeNotifyPinned, Doc: "The line a question's notification adds when an answer to it approves a draft: the notification offers no such answer, and the question's card shows the draft."},
 	{Name: NoticeNotifyQuestion, Doc: "The title of the notification of an agent's open question."},
 	{Name: NoticeNotifyProposal, Doc: "The title of the notification of an open proposal."},
 	{Name: NoticeNotifyPost, Doc: "The title of the notification of an agent's open post."},
@@ -87,6 +88,7 @@ const (
 	NoticeNotifyReply          = "notify_reply"
 	NoticeNotifySendReply      = "notify_send_reply"
 	NoticeNotifyQuestion       = "notify_question"
+	NoticeNotifyPinned         = "notify_pinned"
 	NoticeNotifyProposal       = "notify_proposal"
 	NoticeNotifyPost           = "notify_post"
 	NoticeNotifyYes            = "notify_yes"

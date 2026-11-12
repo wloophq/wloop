@@ -859,6 +859,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `notify_draft_for_me`: The button of an Inbox task's notification that delegates it to an agent headless.
   - `notify_reply`: The button of a notification whose text input saves a reply for approval, or answers an agent.
   - `notify_send_reply`: The button of a notification whose text input sends a reply at once.
+  - `notify_pinned`: The line a question's notification adds when an answer to it approves a draft: the notification offers no such answer, and the question's card shows the draft.
   - `notify_question`: The title of the notification of an agent's open question.
   - `notify_proposal`: The title of the notification of an open proposal.
   - `notify_post`: The title of the notification of an agent's open post.
@@ -902,6 +903,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `notify_draft_for_me`
   - `notify_reply`
   - `notify_send_reply`
+  - `notify_pinned`
   - `notify_question`
   - `notify_proposal`
   - `notify_post`

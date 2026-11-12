@@ -545,8 +545,14 @@ type Message struct {
 	Options   []record.Option `json:"options,omitempty"`
 	Recommend string          `json:"recommend,omitempty"`
 	Confirm   bool            `json:"confirm,omitempty"`
-	Origin    string          `json:"origin"`
-	CreatedAt time.Time       `json:"created_at"`
+	// Draft is the held draft a confirm's yes approves, at the rev the question pinned; nil for none.
+	Draft *record.DraftRef `json:"draft,omitempty"`
+	// Pinned are the drafts the confirm and the options pin, each as its card serves it now, so a person sees
+	// what an answer approves; a pinned draft that is gone is absent, and one whose Rev is not its pin's
+	// changed since the question pinned it.
+	Pinned    []Draft   `json:"pinned,omitempty"`
+	Origin    string    `json:"origin"`
+	CreatedAt time.Time `json:"created_at"`
 	// Answers are the user's answers to the message, oldest first, each with when the agent read it.
 	Answers []TurnAnswer `json:"answers,omitempty"`
 }

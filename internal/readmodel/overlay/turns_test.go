@@ -76,3 +76,13 @@ func TestALaterQuestionOfTheTurnShowsAgain(t *testing.T) {
 		t.Fatalf("situation %+v", s)
 	}
 }
+
+// TestAQuestionCarriesItsConfirmPin serves the draft a confirm's yes approves on the row's question, so a client
+// knows a yes approves a draft it does not show.
+func TestAQuestionCarriesItsConfirmPin(t *testing.T) {
+	pin := &record.DraftRef{ID: 42, Rev: 3}
+	q, ok := QuestionOf(&turn.Turn{State: turn.Asked}, &turn.Record{ID: 1, Record: record.Record{Question: &record.Question{Kind: "confirm", Text: "Post it?", Draft: pin}}})
+	if !ok || q.Draft == nil || *q.Draft != *pin || q.Draft == pin {
+		t.Fatalf("question %+v, want a copy of the confirm's pin", q)
+	}
+}
