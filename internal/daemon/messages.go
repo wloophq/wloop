@@ -207,7 +207,8 @@ func (s *Server) taskGate(ctx context.Context, e task.Task, role builtin.GateRol
 }
 
 // answerFor is the answer a verb of role gives question or post gate g: the request's own when it answers, the
-// message's recommended option or a confirm's yes when it approves; "" when it gives none.
+// message's recommended option or a confirm's yes when it approves, unless that answer approves a pinned draft,
+// which the surface that runs the verb does not show; "" when it gives none.
 func (s *Server) answerFor(ctx context.Context, g gate.Gate, ar api.ActionRequest, role builtin.GateRole) string {
 	m, ok := s.messageOf(ctx, g)
 	if role == builtin.GateTakesText {
@@ -219,9 +220,9 @@ func (s *Server) answerFor(ctx context.Context, g gate.Gate, ar api.ActionReques
 	switch {
 	case !ok:
 		return ""
-	case m.Recommend != "" && slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.ID == m.Recommend }):
+	case m.Recommend != "" && slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.ID == m.Recommend && o.Draft == nil }):
 		return messages.GateAnswer(messages.Answer{OptionID: m.Recommend})
-	case m.Confirm:
+	case m.Confirm && m.Draft == nil:
 		return messages.GateAnswer(messages.Answer{Yes: true})
 	}
 	return ""
