@@ -357,14 +357,19 @@ func decodeNode(dec *json.Decoder) (node, error) {
 // amendment is a change of a draft q asks for on a person's route, by q: a session's is refused by the outbox,
 // which an agent's revision reaches only through draft_update.
 func (q requester) amendment(text *string, payload *json.RawMessage, broadcast *bool, rev *int64) outbox.Amendment {
-	a := outbox.Amendment{Text: text, Payload: payload, Broadcast: broadcast, By: draft.Actor{Kind: draft.ActorPerson}}
-	if q.Actor == task.ActorAgent {
-		a.By = draft.Actor{Kind: draft.ActorSession, Session: q.Session}
-	}
+	a := outbox.Amendment{Text: text, Payload: payload, Broadcast: broadcast, By: q.by()}
 	if rev != nil {
 		a.Rev = *rev
 	}
 	return a
+}
+
+// by is q as the outbox names who acts on a draft.
+func (q requester) by() draft.Actor {
+	if q.Actor == task.ActorAgent {
+		return draft.Actor{Kind: draft.ActorSession, Session: q.Session}
+	}
+	return draft.Actor{Kind: draft.ActorPerson}
 }
 
 // noteStale remembers that draft id was refused at rev as stale, so its card says so and keeps its approval off

@@ -160,8 +160,9 @@ func (Agent) Settings(p turns.Policy) string {
 		settings.Permissions.Deny = append(settings.Permissions.Deny, "Edit(/"+d.Path+"/.git/**)")
 	}
 	for _, d := range p.DenyPaths {
-		// An absolute path takes Claude Code's //abs rule form.
-		settings.Permissions.Deny = append(settings.Permissions.Deny, "Read(/"+d+"/**)", "Edit(/"+d+"/**)")
+		// An absolute path takes Claude Code's //abs rule form; the path itself is denied, a file's, and what
+		// is under it, a directory's.
+		settings.Permissions.Deny = append(settings.Permissions.Deny, "Read(/"+d+")", "Edit(/"+d+")", "Read(/"+d+"/**)", "Edit(/"+d+"/**)")
 	}
 	raw, _ := json.Marshal(settings)
 	return string(raw)

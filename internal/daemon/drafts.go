@@ -226,7 +226,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"retry takes the rev you saw"}
 		}
-		got, err = o.Retry(ctx, id, a.Confirm)
+		got, err = o.RetryBy(ctx, id, a.Confirm, actor.by())
 		s.noteStale(id, d.Rev, err)
 	default:
 		return draft.Draft{}, badRequest{fmt.Sprintf("unknown draft action %q", action)}

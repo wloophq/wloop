@@ -978,6 +978,15 @@ func (s *Service) drop(ctx context.Context, d draft.Draft, reason string) (draft
 // confirmed after a restart" or with an Error starting "may have been posted" needs confirm true, else
 // ErrNeedsConfirm.
 func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.Draft, error) {
+	return s.RetryBy(ctx, id, confirm, draft.Actor{Kind: draft.ActorPerson})
+}
+
+// RetryBy is Retry by by: confirm, the word that the draft was not posted, is a person's alone, and an agent
+// session's is refused (gates.ErrRefused), whether or not it proposed the draft.
+func (s *Service) RetryBy(ctx context.Context, id draft.ID, confirm bool, by draft.Actor) (draft.Draft, error) {
+	if confirm && by.Kind != "" && by.Kind != draft.ActorPerson {
+		return draft.Draft{}, fmt.Errorf("%w: only the person confirms draft %d was not posted, not %s %s", gates.ErrRefused, id, by.Kind, by.Session)
+	}
 	d, err := s.load(ctx, id, draft.Queued, draft.Failed)
 	if err != nil {
 		return draft.Draft{}, err
