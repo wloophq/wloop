@@ -41,7 +41,7 @@ func (s *Service) Delete(ctx context.Context, d Delete) (Deleted, error) {
 		return Deleted{}, err
 	}
 	link = s.Stored.InThread(ctx, link)
-	m, err := s.message(ctx, res.Channel, link.TS, link.ThreadTS)
+	m, err := s.existing(ctx, res.Channel, link.TS, link.ThreadTS)
 	if err != nil {
 		return Deleted{}, loggedOut(err)
 	}

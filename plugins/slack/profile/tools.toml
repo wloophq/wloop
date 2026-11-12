@@ -69,28 +69,32 @@ problem_limit = "limit: an integer from 1 to {{.Max}}"
 found = "{{.Text}}"
 
 [slack_draft]
-description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on; broadcast decides whether the reply also shows in the conversation. From a turn on a task, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; a typed <@<user id>>, an @handle or an email that names one person becomes that mention, any other mention, channel or special token posts as text, and a broadcast or group mention is refused."
+description = "Propose a Slack message, a reaction or its removal (unreact), or an edit or deletion of one of the user's messages, to be made as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on; broadcast decides whether the reply also shows in the conversation. From a turn on a task, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; a typed <@<user id>>, an @handle or an email that names one person becomes that mention, any other mention, channel or special token posts as text, and a broadcast or group mention is refused."
 
 [slack_draft.params]
-"text" = "the message, in Markdown; empty for a reaction"
+"text" = "the message, or an edit's new text, in Markdown; empty for a reaction or a deletion"
 "kind" = "what the draft is; defaults to reply"
-"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name (a reaction: the newest message an item started at); else a message ref (<conversation>/<ts>) or permalink, #channel, channel id or user id"
+"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name (a reaction: the newest message an item started at); else a message ref (<conversation>/<ts>) or permalink, #channel, channel id or user id. An edit or a deletion names the user's message it changes, by its ref or permalink"
 "items" = "the unit's items the draft answers; none outside the turn's Slack unit"
 "items[]" = "an item id of the unit"
-"reaction" = "the emoji name of a react draft, without colons"
+"reaction" = "the emoji name of a react or unreact draft, without colons"
 "effects" = "what sending it does besides posting, such as unit.closed for a closing post; empty for none, and none outside the turn's Slack unit"
 "effects[]" = "an effect name your intent lists in drafts.allowed_effects"
 "broadcast" = "a reply in a thread: true to also post it to the conversation, false not to; left out, the user's default: on in a direct message, where a reply in an older thread does not show, and off in a channel. The user can turn it before approving"
+"payload" = "the kind's fields beside text; Slack's kinds have none, so leave it out or pass {}"
+"basis" = "what the draft was written against; Slack's kinds have none, so leave it out"
+"hold" = "true to keep the draft waiting for the user even when one of their rules would send it, such as when you are unsure"
 
 [slack_draft.answers]
 refused = "slack_draft refused: {{.Error}}."
-bad_arguments = "Nothing was drafted: the arguments are not an object with text, and kind, target, items, reaction and effects when needed{{with .Error}} ({{.}}){{end}}."
+bad_arguments = "Nothing was drafted: the arguments are not an object with text, and kind, target, items, reaction, effects, broadcast and hold when needed{{with .Error}} ({{.}}){{end}}."
 fix_these = """Nothing was drafted; fix these and call slack_draft again:
 {{.Problems}}"""
 not_logged_in = "not logged in to Slack; run \"{{.Command}} slack login\""
 failed = "Nothing was drafted: {{.Error}}"
 problem_kind = "kind: one of {{.Kinds}}"
-problem_reaction_required = "reaction: required for a react draft"
+problem_reaction_required = "reaction: required for a react or unreact draft"
+problem_message = "target: required for an edit or a deletion, the ref (<conversation>/<ts>) or permalink of the user's message it changes"
 problem_text_required = "text: required, not empty"
 proposed = "Proposed draft {{.ID}} on {{.Unit}}: it will be posted to {{or .Where \"its conversation\"}} once the user approves it in the {{.Name}} Outbox; nothing was posted."
 approved = "Draft {{.ID}} on {{.Unit}} is approved by its policy and will be posted to {{or .Where \"its conversation\"}}; nothing was posted yet."

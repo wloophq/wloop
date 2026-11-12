@@ -649,23 +649,6 @@ func TestFinalTextKeepsOnlyConvertedMentions(t *testing.T) {
 	}
 }
 
-func TestAnEditOrADeletionIsNeverPublishedAsADraft(t *testing.T) {
-	for _, k := range []draft.Kind{draft.Edit, draft.Delete} {
-		ps := newPubSlack(t)
-		d := threadDraft(k, "the text")
-		d.Target = "https://acme.slack.com/archives/" + pubConv + "/p" + strings.ReplaceAll(pubReply, ".", "")
-		if err := ps.publisher().Validate(context.Background(), d); err == nil || !strings.Contains(err.Error(), "at once") {
-			t.Fatalf("%s: Validate = %v", k, err)
-		}
-		if _, err := ps.publisher().Publish(context.Background(), d); err == nil || len(ps.calls("chat.postMessage")) != 0 || len(ps.calls("chat.delete")) != 0 {
-			t.Fatalf("%s: Publish = %v", k, err)
-		}
-		if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
-			t.Fatalf("%s: Where = %q %v", k, where, err)
-		}
-	}
-}
-
 func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
 	started := time.Unix(1700000300, 0)
 	ps := newPubSlack(t)

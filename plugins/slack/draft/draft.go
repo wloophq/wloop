@@ -3,6 +3,7 @@
 package draft
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -13,40 +14,32 @@ import (
 
 type ID int64
 
-type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit", "delete"
+type Kind string // "reply", "nudge", "close", "react", "unreact", "ask_owner", "comment", "edit", "delete"
 
 const (
 	Reply    Kind = "reply"
 	Nudge    Kind = "nudge"
 	Close    Kind = "close"
 	React    Kind = "react"
+	Unreact  Kind = "unreact"
 	AskOwner Kind = "ask_owner"
 	Comment  Kind = "comment"
 	Edit     Kind = "edit"
 	Delete   Kind = "delete"
 )
 
-var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit, Delete}
+var Kinds = []Kind{Reply, Nudge, Close, React, Unreact, AskOwner, Comment, Edit, Delete}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
-// ConversationKinds are the kinds slack_draft offers on a conversation: all
-// but a review comment, an edit and a deletion, which slack_edit and slack_delete
-// make at once.
-var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
-
-// Emoji says whether a draft of kind k posts an emoji, and no text.
-func (k Kind) Emoji() bool {
-	_, d := ShapeOf(k)
-	return d == Reaction
-}
-
 // Delivery is how a draft reaches the provider.
-type Delivery string // "message", "reaction", "comment", "edit", "delete"
+type Delivery string // "message", "reaction", "unreaction", "comment", "edit", "delete"
 
 const (
-	Message         Delivery = "message"
-	Reaction        Delivery = "reaction"
+	Message  Delivery = "message"
+	Reaction Delivery = "reaction"
+	// Unreaction removes the user's reaction from a message.
+	Unreaction      Delivery = "unreaction"
 	CommentDelivery Delivery = "comment"
 	// EditDelivery replaces the text of a message the user posted.
 	EditDelivery Delivery = "edit"
@@ -54,11 +47,19 @@ const (
 	DeleteDelivery Delivery = "delete"
 )
 
+// Emoji says whether a delivery adds or removes an emoji.
+func (d Delivery) Emoji() bool { return d == Reaction || d == Unreaction }
+
+// ChangesAMessage says whether a delivery edits or deletes a message.
+func (d Delivery) ChangesAMessage() bool { return d == EditDelivery || d == DeleteDelivery }
+
 // ShapeOf is the purpose and delivery of a draft of kind k.
 func ShapeOf(k Kind) (purpose string, d Delivery) {
 	switch k {
 	case React:
 		return string(k), Reaction
+	case Unreact:
+		return string(k), Unreaction
 	case Comment:
 		return string(k), CommentDelivery
 	case Edit:
@@ -92,6 +93,8 @@ func KindOf(purpose string, d Delivery) Kind {
 	switch d {
 	case Reaction:
 		return React
+	case Unreaction:
+		return Unreact
 	case CommentDelivery:
 		return Comment
 	case EditDelivery:
@@ -163,7 +166,7 @@ type Draft struct {
 	Target    string    // plugin target grammar; "" means the unit itself (its thread, its PR)
 	Broadcast Broadcast // a thread reply also posted to its conversation; NoBroadcast when it replies in no thread
 	Text      string    // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both; Kind "delete": the text of the message it removed, as Slack held it
-	Reaction  string    // Kind "react" only: emoji name without colons
+	Reaction  string    // Kind "react" or "unreact" only: emoji name without colons
 	Replaced  string    // Kind "edit" only: the text the edit replaced
 	Original  string    // Text as proposed
 	Edited    bool      // Text != Original
@@ -173,6 +176,12 @@ type Draft struct {
 	Error     string   // State "failed" only, never a token
 	Reason    string   // State "dropped": "user", "assigned", "moot", "dry_run", ...
 	Rev       int64    // the stored row's version; every Update bumps it
+	// Payload is what the kind's schema shapes beside Text, nil for none.
+	Payload json.RawMessage
+	// Basis is what the proposer read the unit at, "" for none.
+	Basis string
+	// Hold keeps the draft waiting for the user whatever their approval rules say.
+	Hold bool
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
 	// zero while they are not.
 	EffectsAppliedAt time.Time

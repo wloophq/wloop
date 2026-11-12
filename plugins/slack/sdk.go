@@ -422,7 +422,7 @@ func DraftOf(d src.Draft) draft.Draft {
 		Delivery: draft.Delivery(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: draft.Broadcast(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: draft.Origin{Kind: draft.OriginKind(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Key: d.Origin.Key, Unit: unit.Of(d.Origin.Unit)},
-		State: draft.State(d.State), Evidence: draft.Evidence(d.Evidence)}
+		State: draft.State(d.State), Evidence: draft.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 }
 
 // WireDraft is d as the host carries it.
@@ -431,7 +431,7 @@ func WireDraft(d draft.Draft) src.Draft {
 		Delivery: string(d.Delivery), Effects: d.Effects, Target: d.Target, Broadcast: string(d.Broadcast), Text: d.Text, Reaction: d.Reaction, Replaced: d.Replaced,
 		Origin: src.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent, Workflow: d.Origin.Workflow,
 			Rule: d.Origin.Rule, Key: d.Origin.Key},
-		State: string(d.State), Evidence: src.Evidence(d.Evidence)}
+		State: string(d.State), Evidence: src.Evidence(d.Evidence), Payload: d.Payload, Basis: d.Basis, Hold: d.Hold}
 	if !d.Origin.Unit.IsZero() {
 		out.Origin.Unit = d.Origin.Unit.Wire()
 	}
