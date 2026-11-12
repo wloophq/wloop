@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/shell"
 )
@@ -35,9 +34,6 @@ func (k Agent) defaultHome() string {
 // without CLAUDE_CONFIG_DIR; an Orca terminal sets it to its profile home.
 func (k Agent) usesDefault(home string) bool { return isDefault(home, k.defaultHome()) }
 
-// SlackDraftTools only store drafts the user approves, so a session policy may allow them.
-var SlackDraftTools = []string{brand.ToolPrefix() + "slack_draft"}
-
 func (Agent) Name() string { return "claude" }
 
 func (Agent) Binary() string { return "claude" }
@@ -55,7 +51,7 @@ func (Agent) Resume(home, agentSession string) string {
 }
 
 func emptyPolicy(p turns.Policy) bool {
-	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && !p.NoGitHubWrites && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.Dirs) == 0 && len(p.DenyPaths) == 0
+	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && len(p.DraftTools) == 0 && !p.NoGitHubWrites && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.Dirs) == 0 && len(p.DenyPaths) == 0
 }
 
 // IsDefaultHome says whether home is the default home, "" included.
@@ -142,9 +138,7 @@ func (Agent) Settings(p turns.Policy) string {
 	if p.TurnEnd {
 		settings.Permissions.Allow = append(settings.Permissions.Allow, TurnEndTool)
 	}
-	if p.Drafts {
-		settings.Permissions.Allow = append(settings.Permissions.Allow, SlackDraftTools...)
-	}
+	settings.Permissions.Allow = append(settings.Permissions.Allow, p.DraftTools...)
 	for _, d := range p.WritePaths {
 		settings.Permissions.Allow = append(settings.Permissions.Allow, "Edit(./"+d+"/**)")
 	}
