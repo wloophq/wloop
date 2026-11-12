@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -569,5 +570,49 @@ func TestAnUpdateWithoutAnAuthorKeepsTheStoredOne(t *testing.T) {
 	}
 	if got, err := db.Drafts().Get(ctx, d.ID); err != nil || got.By != (draft.Actor{Kind: draft.ActorPerson}) {
 		t.Fatalf("stored %+v %v", got.By, err)
+	}
+}
+
+// TestVersion13GivesADraftItsVersionAndCause reads a failed draft's cause from the errors a version 12
+// release wrote, leaves any other error as it is, and counts each draft's writes from its old rev.
+func TestVersion13GivesADraftItsVersionAndCause(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v12.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := storeAt(t, schemaSet{12, string(frozen), nil})
+	const failedRow = `INSERT INTO drafts (id, provider, unit_key, items, kind, text, original, origin_kind, state, created_at, updated_at, purpose, delivery, effects, rev, error)
+		VALUES (%d, 'slack', 'C0123/1.2', '[]', 'reply', 'hi', 'hi', 'turn', 'failed', '2026-11-04T10:00:00.000000000Z', '2026-11-04T10:00:00.000000000Z', 'reply', 'message', '[]', %d, '%s')`
+	want := map[int64]struct {
+		rev   int64
+		error string
+		cause draft.Cause
+	}{
+		1: {0, "not confirmed after a restart", draft.CauseUnconfirmed},
+		2: {3, "may have been posted: the call timed out", draft.CauseUnconfirmed},
+		3: {5, "stale: whatever the API said", ""},
+	}
+	for id, w := range want {
+		rawExec(t, path, fmt.Sprintf(failedRow, id, w.rev, w.error))
+	}
+	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
+		t.Fatal(err)
+	}
+	db, err := current.open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for id, w := range want {
+		d, err := db.Drafts().Get(ctx, draft.ID(id))
+		if err != nil || d.Cause != w.cause || d.Error != w.error || d.Rev != 1 || d.Version != w.rev+1 {
+			t.Errorf("draft %d: rev %d version %d cause %q error %q %v, want rev 1 version %d %q %q", id, d.Rev, d.Version, d.Cause, d.Error, err, w.rev+1, w.cause, w.error)
+		}
+	}
+	var n int
+	if err := db.R().QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'trigger'`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("%d triggers %v, want none", n, err)
 	}
 }
