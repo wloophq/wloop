@@ -81,7 +81,7 @@ func (s *Server) draftRead(ctx context.Context, session string, arguments json.R
 
 func (s *Server) draftUpdate(ctx context.Context, session string, arguments json.RawMessage) any {
 	var a api.AgentDraftUpdate
-	if err := decodeStrict(arguments, &a); err != nil || a.ID <= 0 {
+	if err := decodeStrict(arguments, &a); err != nil || a.ID <= 0 || a.Rev < 1 {
 		return s.badArguments(ctx, draftUpdateName, err)
 	}
 	d, err := s.Drafts.Update(ctx, session, a)
@@ -90,7 +90,7 @@ func (s *Server) draftUpdate(ctx context.Context, session string, arguments json
 
 func (s *Server) draftWithdraw(ctx context.Context, session string, arguments json.RawMessage) any {
 	var a api.AgentDraftWithdrawal
-	if err := decodeStrict(arguments, &a); err != nil || a.ID <= 0 {
+	if err := decodeStrict(arguments, &a); err != nil || a.ID <= 0 || a.Rev < 1 {
 		return s.badArguments(ctx, draftWithdrawName, err)
 	}
 	d, err := s.Drafts.Withdraw(ctx, session, a)

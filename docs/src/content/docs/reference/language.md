@@ -644,9 +644,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
-  - `draft_read`: Reads a draft the session's turns may change: its content, delivery state and revisions.
-  - `draft_update`: Revises a draft of the session's turns at the rev it read; the revision waits for the user's approval again.
-  - `draft_withdraw`: Withdraws a draft of the session's turns at the rev it read.
+  - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
+  - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again.
+  - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
   - `github_draft`: Proposes a GitHub comment, review, review thread reply or thread resolution for the user's approval.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
@@ -712,7 +712,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `read` (`Draft`): The draft, as JSON.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `draft_update`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
@@ -722,7 +722,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `stale` (`Error`): The basis given is not the unit's live one.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `draft_withdraw`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
@@ -731,7 +731,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `withdrawn` (`Draft`): The withdrawn draft, as JSON.
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `not_found` (`Error`): No such draft.
-  - `out_of_scope` (`Error`): The draft is not of the session's turns or not on their unit.
+  - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
 - `github_draft`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.

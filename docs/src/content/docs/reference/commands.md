@@ -1183,7 +1183,7 @@ Propose, read, revise or withdraw your drafts.
 {{command}} draft withdraw <id> --rev <rev> [--reason <r>]
 ```
 
-An agent session's drafts, as the MCP draft tools reach them: {{name}} posts a draft only once the user, or a rule of the user's, approves it. propose drafts on this session's turn's unit unless `--unit` names another; read, update and withdraw reach only drafts of this session's turns on that unit, and update and withdraw apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
+An agent session's drafts, as the MCP draft tools reach them: {{name}} posts a draft only once the user, or a rule of the user's, approves it. propose drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or proposed from it, update and withdraw only those an agent proposed there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
 
 | Flag | Description |
 | --- | --- |

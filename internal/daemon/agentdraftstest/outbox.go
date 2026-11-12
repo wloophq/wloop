@@ -1,12 +1,13 @@
 // Package agentdraftstest is a fake of the outbox's agent API, which keeps drafts in memory and answers
-// by their state as the outbox does: a revision is stamped with the caller's session, a draft out of the
-// caller's units or not of turn or session origin is out of scope, a rev below 1 invalid and another rev
-// a conflict.
+// by their state as the outbox does: a session reaches a draft on its units or proposed from one of them;
+// it revises or withdraws one of those of turn or session origin, held or failed, at the draft's rev, at
+// least 1, stamped with its session.
 package agentdraftstest
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -69,8 +70,29 @@ func (o *Outbox) reach(c outbox.Caller, id draft.ID) (draft.Draft, error) {
 	switch {
 	case !ok:
 		return draft.Draft{}, outbox.ErrNotFound
-	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession, !slices.Contains(c.Units, d.Unit):
-		return draft.Draft{}, outbox.ErrOutOfScope
+	case c.Session == "":
+		return draft.Draft{}, fmt.Errorf("no agent session: %w", outbox.ErrOutOfScope)
+	case !slices.Contains(c.Units, d.Unit) && (d.Origin.Unit.IsZero() || !slices.Contains(c.Units, d.Origin.Unit)):
+		return draft.Draft{}, fmt.Errorf("draft %d is on %s: %w", id, d.Unit, outbox.ErrOutOfScope)
+	}
+	return d, nil
+}
+
+func (o *Outbox) load(c outbox.Caller, id draft.ID, rev int64) (draft.Draft, error) {
+	if rev < 1 {
+		o.callers = append(o.callers, c)
+		return draft.Draft{}, fmt.Errorf("%w: an agent revises a draft at the rev it read, at least 1", outbox.ErrInvalid)
+	}
+	d, err := o.reach(c, id)
+	switch {
+	case err != nil:
+		return draft.Draft{}, err
+	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession:
+		return draft.Draft{}, fmt.Errorf("draft %d is of %s origin, which no agent revises: %w", id, d.Origin.Kind, outbox.ErrOutOfScope)
+	case d.State != draft.Held && d.State != draft.Failed:
+		return draft.Draft{}, fmt.Errorf("draft %d is %s: %w: %w", id, d.State, outbox.ErrConflict, draft.ErrTransition)
+	case d.Rev != rev:
+		return draft.Draft{}, fmt.Errorf("draft %d is at rev %d, not %d: %w", id, d.Rev, rev, outbox.ErrRevConflict)
 	}
 	return d, nil
 }
@@ -88,15 +110,9 @@ func (o *Outbox) AgentRead(_ context.Context, c outbox.Caller, id draft.ID) (dra
 func (o *Outbox) AgentAmend(_ context.Context, c outbox.Caller, id draft.ID, a outbox.Amendment) (draft.Draft, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	d, err := o.reach(c, id)
+	d, err := o.load(c, id, a.Rev)
 	if err != nil {
 		return draft.Draft{}, err
-	}
-	switch {
-	case a.Rev < 1:
-		return draft.Draft{}, outbox.ErrInvalid
-	case a.Rev != d.Rev:
-		return draft.Draft{}, outbox.ErrRevConflict
 	}
 	if a.Text != nil {
 		d.Text = *a.Text
@@ -119,15 +135,9 @@ func (o *Outbox) AgentAmend(_ context.Context, c outbox.Caller, id draft.ID, a o
 func (o *Outbox) AgentWithdraw(_ context.Context, c outbox.Caller, id draft.ID, rev int64, reason string) (draft.Draft, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	d, err := o.reach(c, id)
+	d, err := o.load(c, id, rev)
 	if err != nil {
 		return draft.Draft{}, err
-	}
-	switch {
-	case rev < 1:
-		return draft.Draft{}, outbox.ErrInvalid
-	case rev != d.Rev:
-		return draft.Draft{}, outbox.ErrRevConflict
 	}
 	d.State, d.Reason = draft.Dropped, reason
 	o.drafts[id] = d

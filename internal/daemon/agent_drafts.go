@@ -44,6 +44,7 @@ var (
 	ErrNoAgentSession = errors.New("the call names no agent session")
 	// ErrNoDraftUnit refuses a proposal that names no unit from a session with no turn.
 	ErrNoDraftUnit = errors.New("unit: required, this session has no turn whose unit the draft would post on")
+	errNoRev       = fmt.Errorf("%w: rev: required, the rev you read, at least 1", outbox.ErrInvalid)
 )
 
 func (a *AgentDrafts) caller(ctx context.Context, session string) (outbox.Caller, error) {
@@ -106,6 +107,9 @@ func (a *AgentDrafts) Update(ctx context.Context, session string, u api.AgentDra
 	if err != nil {
 		return api.AgentDraft{}, err
 	}
+	if u.Rev < 1 {
+		return api.AgentDraft{}, errNoRev
+	}
 	am := outbox.Amendment{Text: u.Text, Basis: u.Basis, Rev: u.Rev, By: draft.Actor{Kind: draft.ActorSession, Session: c.Session}}
 	if len(u.Payload) > 0 {
 		payload := u.Payload
@@ -122,6 +126,9 @@ func (a *AgentDrafts) Withdraw(ctx context.Context, session string, w api.AgentD
 	c, err := a.caller(ctx, session)
 	if err != nil {
 		return api.AgentDraft{}, err
+	}
+	if w.Rev < 1 {
+		return api.AgentDraft{}, errNoRev
 	}
 	reason := w.Reason
 	if reason == "" {

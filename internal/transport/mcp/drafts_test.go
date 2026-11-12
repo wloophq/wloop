@@ -62,6 +62,22 @@ func TestDraftToolsOverMCP(t *testing.T) {
 			t.Errorf("%s %s %s: %+v, want out of scope", tc.handle, tc.tool, tc.args, got)
 		}
 	}
+	if got := run("term_1", "draft_read", `{"id":43}`); got.Result.IsError {
+		t.Errorf("a person's draft on the session's unit is readable: %+v", got)
+	}
+	for _, tc := range []struct{ tool, args string }{
+		{"draft_update", `{"id":41,"text":"no rev"}`},
+		{"draft_update", `{"id":41,"rev":0,"text":"rev 0"}`},
+		{"draft_withdraw", `{"id":41}`},
+		{"draft_withdraw", `{"id":41,"rev":0}`},
+	} {
+		if got := run("term_1", tc.tool, tc.args); !got.Result.IsError {
+			t.Errorf("%s %s: %+v, want refused", tc.tool, tc.args, got)
+		}
+	}
+	if d := ob.Get(41); d.Rev != 1 || d.State != draft.Held || d.Text != "Two findings." {
+		t.Fatalf("a call with no rev changed the draft: %+v", d)
+	}
 	ob.Edit(41, "The person's words.")
 	if got := run("term_1", "draft_update", `{"id":41,"rev":1,"text":"stale agent words"}`); !got.Result.IsError || !strings.Contains(got.Result.Content[0].Text, "changed since it was read") {
 		t.Fatalf("rev conflict: %+v", got)

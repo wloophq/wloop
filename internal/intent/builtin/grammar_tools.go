@@ -11,9 +11,9 @@ var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
 	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
 	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read."},
-	{Name: "draft_read", Doc: "Reads a draft the session's turns may change: its content, delivery state and revisions."},
-	{Name: "draft_update", Doc: "Revises a draft of the session's turns at the rev it read; the revision waits for the user's approval again."},
-	{Name: "draft_withdraw", Doc: "Withdraws a draft of the session's turns at the rev it read."},
+	{Name: "draft_read", Doc: "Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions."},
+	{Name: "draft_update", Doc: "Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again."},
+	{Name: "draft_withdraw", Doc: "Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read."},
 }
 
 // ToolData is what every tools.toml text reads.
@@ -117,7 +117,7 @@ var ToolAnswers = func() []ToolAnswer {
 	for _, tool := range []string{"draft_read", "draft_update", "draft_withdraw"} {
 		out = append(out,
 			answer(tool, "not_found", "No such draft.", str("Error")),
-			answer(tool, "out_of_scope", "The draft is not of the session's turns or not on their unit.", str("Error")),
+			answer(tool, "out_of_scope", "The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.", str("Error")),
 			answer(tool, "failed", "The call failed.", str("Error")),
 		)
 	}

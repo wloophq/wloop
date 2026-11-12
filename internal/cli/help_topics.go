@@ -588,8 +588,9 @@ func helpGroups(manager string) []helpGroup {
 				Usage: []string{"draft propose --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold]",
 					"draft read <id>", "draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>]", "draft withdraw <id> --rev <rev> [--reason <r>]"},
 				About: "An agent session's drafts, as the MCP draft tools reach them: " + name + " posts a draft only once the user, or a rule of the user's, approves it. " +
-					"propose drafts on this session's turn's unit unless --unit names another; read, update and withdraw reach only drafts of this session's turns on that unit, " +
-					"and update and withdraw apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.",
+					"propose drafts on this session's turn's unit unless --unit names another; read reaches any draft on that unit or proposed from it, " +
+					"update and withdraw only those an agent proposed there, never a person's or a workflow's; " +
+					"both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.",
 				Flags: []helpFlag{
 					{"--kind <kind>", "A draft kind the unit's plugin declares"},
 					{"--rev <rev>", "The rev you read"},

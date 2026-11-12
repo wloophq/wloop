@@ -29,7 +29,9 @@ func (draftSessions) MCPSeen(context.Context, string) error { return nil }
 func (draftSessions) RecordTurnEnd(context.Context, turns.RecordRequest) (turns.Recorded, error) {
 	return turns.Recorded{}, nil
 }
-func (draftSessions) SessionOfHandle(_ context.Context, h string) (string, bool, error) { return h, true, nil }
+func (draftSessions) SessionOfHandle(_ context.Context, h string) (string, bool, error) {
+	return h, true, nil
+}
 
 // draftPorts are one fake outbox behind the daemon's agent route over a Unix socket, and another, seeded
 // the same, behind the MCP draft tools.
@@ -129,7 +131,8 @@ func TestDraftCLIAndMCPSameAnswer(t *testing.T) {
 		{[]string{"read", "42"}, "draft_read", `{"id":42}`, true, ""},
 		{[]string{"update", "42", "--rev", "1", "--payload", `{"event":"COMMENT"}`, "--basis", "5a0d3e2"}, "draft_update", `{"id":42,"rev":1,"payload":{"event":"COMMENT"},"basis":"5a0d3e2"}`, true, ""},
 		{[]string{"update", "42", "--rev", "1", "--text", "late"}, "draft_update", `{"id":42,"rev":1,"text":"late"}`, false, "changed since it was read"},
-		{[]string{"read", "43"}, "draft_read", `{"id":43}`, false, "out of the caller's reach"},
+		{[]string{"read", "43"}, "draft_read", `{"id":43}`, true, ""},
+		{[]string{"update", "43", "--rev", "1", "--text", "mine now"}, "draft_update", `{"id":43,"rev":1,"text":"mine now"}`, false, "out of the caller's reach"},
 		{[]string{"withdraw", "42", "--rev", "2", "--reason", "other_option"}, "draft_withdraw", `{"id":42,"rev":2,"reason":"other_option"}`, true, ""},
 		{[]string{"read", "99"}, "draft_read", `{"id":99}`, false, "no such draft"},
 	} {

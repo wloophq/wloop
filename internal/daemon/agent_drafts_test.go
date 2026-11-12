@@ -78,23 +78,46 @@ func TestAgentDraftOutOfScope(t *testing.T) {
 	ob.Put(heldDraft(42, draftsPR8, draft.OriginTurn))
 	ob.Put(heldDraft(43, draftsPR7, draft.OriginUser))
 	ob.Put(heldDraft(44, draftsPR7, draft.OriginAuto))
+	slackThread := unit.Unit{Provider: "slack", Key: "C0123/1712.0001"}
+	crossUnit := heldDraft(45, slackThread, draft.OriginTurn)
+	crossUnit.Origin.Unit = draftsPR7
+	ob.Put(crossUnit)
+	ob.Put(heldDraft(46, slackThread, draft.OriginTurn))
+	sent := heldDraft(47, draftsPR7, draft.OriginTurn)
+	sent.State = draft.Sent
+	ob.Put(sent)
 	_, sock := agentDraftsDaemon(t, ob, map[string]unit.Unit{draftsSession: draftsPR7, "s-hubot-2": draftsPR8})
 	c := client.New(sock)
 	ctx := context.Background()
 	text := "Moved the finding to the body."
-	for _, id := range []int64{42, 43, 44} {
-		if _, err := c.ReadDraft(ctx, draftsSession, id); !strings.Contains(statusOf(err), outbox.ErrOutOfScope.Error()) {
+	outOfScope := func(err error) bool { return strings.Contains(statusOf(err), outbox.ErrOutOfScope.Error()) }
+	for _, id := range []int64{43, 44} {
+		if got, err := c.ReadDraft(ctx, draftsSession, id); err != nil || got.ID != id {
+			t.Errorf("read %d on the session's unit: %+v, %v", id, got, err)
+		}
+	}
+	for _, id := range []int64{42, 46} {
+		if _, err := c.ReadDraft(ctx, draftsSession, id); !outOfScope(err) {
 			t.Errorf("read %d: %v, want out of scope", id, err)
 		}
-		if _, err := c.UpdateDraft(ctx, draftsSession, api.AgentDraftUpdate{ID: id, Rev: 1, Text: &text}); !strings.Contains(statusOf(err), outbox.ErrOutOfScope.Error()) {
+	}
+	for _, id := range []int64{42, 43, 44, 46} {
+		if _, err := c.UpdateDraft(ctx, draftsSession, api.AgentDraftUpdate{ID: id, Rev: 1, Text: &text}); !outOfScope(err) {
 			t.Errorf("update %d: %v, want out of scope", id, err)
 		}
-		if _, err := c.WithdrawDraft(ctx, draftsSession, api.AgentDraftWithdrawal{ID: id, Rev: 1}); !strings.Contains(statusOf(err), outbox.ErrOutOfScope.Error()) {
+		if _, err := c.WithdrawDraft(ctx, draftsSession, api.AgentDraftWithdrawal{ID: id, Rev: 1}); !outOfScope(err) {
 			t.Errorf("withdraw %d: %v, want out of scope", id, err)
 		}
 		if d := ob.Get(draft.ID(id)); d.Rev != 1 || d.State != draft.Held || d.Text != "Two blocking findings." {
 			t.Errorf("draft %d changed: %+v", id, d)
 		}
+	}
+	if _, err := c.UpdateDraft(ctx, draftsSession, api.AgentDraftUpdate{ID: 47, Rev: 1, Text: &text}); !strings.Contains(statusOf(err), outbox.ErrConflict.Error()) ||
+		ob.Get(47).Text != "Two blocking findings." {
+		t.Errorf("update of a sent draft: %v, want a conflict", err)
+	}
+	if got, err := c.UpdateDraft(ctx, draftsSession, api.AgentDraftUpdate{ID: 45, Rev: 1, Text: &text}); err != nil || got.Rev != 2 || got.Unit != "slack/C0123/1712.0001" {
+		t.Errorf("update of a draft proposed from the session's unit: %+v, %v", got, err)
 	}
 	if _, err := c.UpdateDraft(ctx, "s-hubot-2", api.AgentDraftUpdate{ID: 41, Rev: 1, Text: &text}); !strings.Contains(statusOf(err), outbox.ErrOutOfScope.Error()) {
 		t.Errorf("another session's unit: %v, want out of scope", err)
@@ -229,8 +252,12 @@ func TestAgentDraftProposeOnTheSessionsUnit(t *testing.T) {
 		Proposer: func(_ context.Context, session string, u unit.Unit, p api.AgentDraftProposal) (draft.ID, error) {
 			proposed = append(proposed, u)
 			id := draft.ID(100 + len(proposed))
+			origin := draft.Origin{Kind: draft.OriginTurn, Session: session}
+			if u != draftsPR7 {
+				origin.Unit = draftsPR7
+			}
 			ob.Put(draft.Draft{ID: id, Unit: u, Kind: draft.Kind(p.Kind), Text: p.Text, Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, State: draft.Held,
-				Origin: draft.Origin{Kind: draft.OriginTurn, Session: session}})
+				Origin: origin})
 			return id, nil
 		}}
 	ctx := context.Background()
@@ -241,8 +268,11 @@ func TestAgentDraftProposeOnTheSessionsUnit(t *testing.T) {
 	if got, err := a.Propose(ctx, draftsSession, api.AgentDraftProposal{Unit: "github/acme/api#8", Kind: "comment", Text: "x"}); err != nil || proposed[1] != draftsPR8 || got.ID != 102 {
 		t.Fatalf("on another unit the host allows: %+v, %v, proposed %v", got, err, proposed)
 	}
-	if _, err := a.Read(ctx, draftsSession, 102); !errors.Is(err, outbox.ErrOutOfScope) {
-		t.Fatalf("a later read of a draft off the session's unit: %v", err)
+	if got, err := a.Read(ctx, draftsSession, 102); err != nil || got.ID != 102 {
+		t.Fatalf("a later read of a draft proposed from the session's unit: %+v, %v", got, err)
+	}
+	if _, err := a.Read(ctx, "s-hubot-2", 102); !errors.Is(err, outbox.ErrOutOfScope) {
+		t.Fatalf("another session's read off its unit: %v", err)
 	}
 	if _, err := a.Propose(ctx, "s-nobody-3", api.AgentDraftProposal{Kind: "comment", Text: "x"}); !errors.Is(err, ErrNoDraftUnit) {
 		t.Fatalf("no turn, no unit: %v", err)
