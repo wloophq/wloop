@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 const anyObject = `{"type": "object", "properties": {}}`
@@ -128,6 +130,28 @@ func TestNewCatalogRefuses(t *testing.T) {
 	}
 }
 
+// TestLookupByPublisherProvider checks a draft is shaped by the kinds of the provider that publishes it, which
+// the caller names, never by its unit's: a draft on a task unit that a chat plugin posts takes the chat's kinds.
 func TestLookupByPublisherProvider(t *testing.T) {
-	t.Skip("T1")
+	c, err := NewCatalog([]KindSpec{
+		{Provider: "acme", Name: "react", Delivery: "reaction", SchemaJSON: json.RawMessage(anyObject)},
+		{Provider: "pulls", Name: "react", Delivery: "emoji", SchemaJSON: json.RawMessage(anyObject)},
+		{Provider: "pulls", Name: "comment", Delivery: "comment", TextRequired: true, SchemaJSON: json.RawMessage(anyObject)},
+	}, []DeliverySpec{{Provider: "acme", Name: "reaction"}, {Provider: "pulls", Name: "emoji"}, {Provider: "pulls", Name: "comment", Posts: true}},
+		map[string]string{"pulls": "comment"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	onPull := Draft{Unit: unit.Unit{Provider: "pulls", Key: "o/r#1"}, Kind: "react", Target: "C1/1.2"}
+	got, err := c.Shape("acme", onPull)
+	if err != nil || got.Delivery != "reaction" {
+		t.Errorf("a pull request draft acme posts: %+v, %v", got, err)
+	}
+	onTask := Draft{Unit: unit.Unit{Provider: "task", Key: "t-1"}, Kind: "comment"}
+	if _, err := c.Shape("acme", onTask); !errors.Is(err, ErrUnknownKind) {
+		t.Errorf("a kind only the unit's provider declares: %v", err)
+	}
+	if got, err := c.Shape("pulls", onTask); err != nil || got.Delivery != "comment" {
+		t.Errorf("a task draft pulls posts: %+v, %v", got, err)
+	}
 }
