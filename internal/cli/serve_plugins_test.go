@@ -19,12 +19,19 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	"github.com/wloophq/wloop/pkg/plugin/plugintest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
 func githubDisabled(cfg *config.Config) {
@@ -248,5 +255,29 @@ func TestPluginsServeWhetherTheyReact(t *testing.T) {
 	}
 	if want := map[unit.ProviderID]bool{linear: true, wiki: false, unit.GitHub: false}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("reacts %v, want %v", got, want)
+	}
+}
+
+func TestStopServingStopsThePluginHostsBeforeWaitingForTheirWork(t *testing.T) {
+	te := newTestEnv(t, nil)
+	m, err := manifest.Parse([]byte("id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\ncodec = {keys = [\"{name}\"]}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.plugins = recordedPlugins(t, te.StateDir, host.Plugin{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary("acme"), Bundled: true})
+	l := plugintest.NewLauncher(t)
+	l.Add("acme", map[plugin.Kind]plugin.Impl{src.Kind: src.New(sourcetest.NewStub())})
+	te.pluginLauncher = l
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	t.Cleanup(te.servePlugins(context.Background(), db, te.cfg, t.Logf))
+	eventually(t, "the plugin runs", func() bool { _, err := te.pluginKind.Client("acme"); return err == nil })
+
+	te.stopServing()
+	if _, err := te.pluginKind.Client("acme"); err == nil {
+		t.Fatal("stopServing waited for the background work while the plugin host that adds to it still ran")
 	}
 }
