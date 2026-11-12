@@ -56,6 +56,11 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 // that loses its approval to a race (a revision) leaves the question open. Each step is idempotent, so a
 // call cut short completes when it is made again with the same r.
 func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64) error {
+	release, ok := s.claimQuestion(question.ID)
+	if !ok {
+		return fmt.Errorf("%w: question gate %d is being decided", ErrResolved, question.ID)
+	}
+	defer release()
 	q, err := s.d.Reader.Get(ctx, question.ID)
 	if err != nil {
 		return err

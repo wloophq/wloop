@@ -67,8 +67,9 @@ type Sessions interface {
 // that draft is the gates service's alone (ApproveOption).
 type Options interface {
 	OptionDraft(ctx context.Context, question gate.Gate, r Resolution) (drafted gate.Gate, rev int64, ok bool, err error)
-	// Pinning is the open question gate whose message pins draft gate drafted's draft, in an option or its
-	// confirm, the answer that picks that pin and the rev it pinned; false when no open question pins it.
+	// Pinning is the question gate, open or answered while its message still settles, whose message pins draft
+	// gate drafted's draft, in an option or its confirm, the answer that picks that pin and the rev it pinned;
+	// false when no open message pins it.
 	Pinning(ctx context.Context, drafted gate.Gate) (question gate.Gate, answer string, rev int64, ok bool, err error)
 }
 

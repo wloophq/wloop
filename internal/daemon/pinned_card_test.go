@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -83,6 +84,14 @@ func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	}
 	if len(listed) != 1 || listed[0] != int64(free.ID) {
 		t.Errorf("the Outbox lists %v, want only the draft no question pins", listed)
+	}
+	edit := api.TaskRequest{Args: map[string]string{"text": "a person's change", "rev": strconv.FormatInt(pinned.Rev, 10)}, Source: "cli"}
+	body, _ := json.Marshal(edit)
+	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(pinned.ID), 10), "edit"), string(body)); rec.Code == 200 {
+		t.Errorf("a person edited a draft an open question pins: %s", rec.Body)
+	}
+	if stored, _ := r.o.Store.Get(ctx, pinned.ID); stored.Text != "Approve it" {
+		t.Errorf("the pinned draft's text %q after a refused edit", stored.Text)
 	}
 	var notified []draft.ID
 	for _, d := range r.s.taskViews(ctx, r.s.deps.Tasks, false).openDrafts(ctx) {

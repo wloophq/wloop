@@ -120,8 +120,10 @@ func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draf
 	return d, dg, int64(d.ID) == id && onUnit && byTurn && ofDraft, nil
 }
 
-// Pinning is the open question gate whose message pins the draft of draft gate drafted, in an option or its
-// confirm, the answer that picks it and the rev it pinned; false when no open question of the draft's turn pins it.
+// Pinning is the question gate whose open message pins the draft of draft gate drafted, in an option or its
+// confirm, the answer that picks it and the rev it pinned; false when no open message of the draft's turn pins it.
+// A question answered while its message still settles (its other options' drafts not yet withdrawn) still names
+// the pin, so an approval in that window meets the answered question, not a free draft.
 func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, string, int64, bool, error) {
 	if s.Drafts == nil || drafted.Kind != gate.KindDraft {
 		return gate.Gate{}, "", 0, false, nil
@@ -145,12 +147,12 @@ func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, st
 			}
 			continue
 		}
-		gs, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: m.Unit})
+		gs, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindQuestion, Unit: m.Unit, Statuses: []gate.Status{gate.Open, gate.Answered}})
 		if err != nil {
 			return gate.Gate{}, "", 0, false, err
 		}
 		for _, g := range gs {
-			if g.Status == gate.Open && g.Subject == strconv.FormatInt(m.ID, 10) {
+			if g.Subject == strconv.FormatInt(m.ID, 10) {
 				return g, GateAnswer(answer), ref.Rev, true, nil
 			}
 		}
