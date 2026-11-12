@@ -64,8 +64,9 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 		t.Fatalf("github enabled: builds %d, deps %+v", builds.Load(), on)
 	}
 
-	githubDisabled(&te.cfg)
-	d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
+	off := te.cfg
+	githubDisabled(&off)
+	d := te.serveDeps(context.Background(), db, off, t.Logf, &lock.Mutex{}, nil)
 	if builds.Load() != 1 {
 		t.Fatalf("a disabled plugin was built")
 	}
@@ -95,8 +96,8 @@ func TestPluginsRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	plugin := func() api.Plugin {
-		d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
+	plugin := func(cfg config.Config) api.Plugin {
+		d := te.serveDeps(context.Background(), db, cfg, t.Logf, &lock.Mutex{}, nil)
 		d.Startup = nil
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", api.Plugins, nil)
@@ -116,11 +117,12 @@ func TestPluginsRoute(t *testing.T) {
 		}
 		return ps[0]
 	}
-	if got := plugin(); !got.Enabled {
+	if got := plugin(te.cfg); !got.Enabled {
 		t.Fatalf("github enabled: %+v", got)
 	}
-	githubDisabled(&te.cfg)
-	if got := plugin(); got.Enabled || got.UI != nil {
+	off := te.cfg
+	githubDisabled(&off)
+	if got := plugin(off); got.Enabled || got.UI != nil {
 		t.Fatalf("github disabled: %+v", got)
 	}
 }
