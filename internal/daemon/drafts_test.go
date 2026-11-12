@@ -347,10 +347,10 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	d := r.propose(t, r7u, "hello", draft.Wait)
-	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true}`); code != 400 || !strings.Contains(body, "no thread") {
+	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"rev":0}`); code != 400 || !strings.Contains(body, "no thread") {
 		t.Fatalf("broadcast on a draft in no thread: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true}`); code != 400 {
+	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true,"rev":0}`); code != 400 {
 		t.Fatalf("text and a refused broadcast: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Text != "hello" {
@@ -361,14 +361,15 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	if _, err := r.o.Store.Update(ctx, d, draft.Held); err != nil {
 		t.Fatal(err)
 	}
-	code, got, body := r.act(t, d.ID, "edit", `{"broadcast":false}`)
+	cur, _ := r.o.Store.Get(ctx, d.ID)
+	code, got, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"broadcast":false,"rev":%d}`, cur.Rev))
 	if code != 200 || got.Broadcast != "off" {
 		t.Fatalf("broadcast off: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOff || stored.Text != "hello" {
 		t.Fatalf("stored %+v", stored)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"text":"hello there"}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"broadcast":true,"text":"hello there","rev":%d}`, got.Rev)); code != 200 {
 		t.Fatalf("text and broadcast: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Broadcast != draft.BroadcastOn || stored.Text != "hello there" {
@@ -390,8 +391,9 @@ func TestDraftActionStatuses(t *testing.T) {
 	}{
 		{"retry of a held draft", d.ID, "retry", `{"rev":0}`, 409, "held"},
 		{"unknown id", 999, "approve", `{}`, 404, "draft:999"},
-		{"empty text", d.ID, "edit", `{"text":"  "}`, 400, "empty text"},
-		{"edit without text", d.ID, "edit", `{}`, 400, "text"},
+		{"empty text", d.ID, "edit", `{"text":"  ","rev":0}`, 400, "empty text"},
+		{"edit without text", d.ID, "edit", `{"rev":0}`, 400, "text"},
+		{"edit without rev", d.ID, "edit", `{"text":"x"}`, 400, "rev"},
 		{"unknown verb", d.ID, "post", `{}`, 400, "unknown verb"},
 	}
 	for _, c := range cases {
@@ -698,7 +700,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	if code, body := r.verb(t, c.ID, "retry", fmt.Sprintf(`{"confirm":"true","rev":"%d"}`, c.Rev)); code != 200 {
 		t.Fatalf("retry: %d %s", code, body)
 	}
-	if code, body := r.verb(t, c.ID, "edit", `{"text":"x"}`); code != 409 {
+	if code, body := r.verb(t, c.ID, "edit", fmt.Sprintf(`{"text":"x","rev":"%d"}`, c.Rev)); code != 409 {
 		t.Fatalf("edit of an approved draft: %d %s", code, body)
 	}
 	if code, body := r.verb(t, 999, "approve", `{}`); code != 404 {
@@ -793,7 +795,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 			d := r.propose(t, r7u, "as seen", draft.Wait)
 			var seen api.Draft
 			r.getDraft(t, d.ID, &seen)
-			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone"}`); code != 200 {
+			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone","rev":0}`); code != 200 {
 				t.Fatalf("edit: %d %s", code, body)
 			}
 			var code int
@@ -851,7 +853,7 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 	if code, _, body := r.act(t, d.ID, "retry", `{}`); code != 400 || !strings.Contains(body, "rev") {
 		t.Fatalf("no rev: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped"}`); code != 200 {
+	if code, _, body := r.act(t, d.ID, "edit", fmt.Sprintf(`{"text":"swapped","rev":%d}`, d.Rev)); code != 200 {
 		t.Fatalf("edit: %d %s", code, body)
 	}
 	if code, _, body := r.act(t, d.ID, "retry", fmt.Sprintf(`{"rev":%d}`, d.Rev)); code != 409 || !strings.Contains(body, "changed since you saw it") {

@@ -206,6 +206,7 @@
 "Also send to the conversation" = "Also send to the conversation"
 "destination unknown" = "destination unknown"
 "Draft" = "Draft"
+"This draft changed since you began editing it; your edit replaces what it says now:" = "This draft changed since you began editing it; your edit replaces what it says now:"
 "Draft text" = "Draft text"
 "Draft {id} approved; it goes out in a moment" = "Draft {id} approved; it goes out in a moment"
 "Draft {id} saved to the Outbox for your approval" = "Draft {id} saved to the Outbox for your approval"

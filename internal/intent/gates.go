@@ -44,6 +44,10 @@ type DraftWords struct {
 	Purposes, States, Reasons map[string]string
 	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
 	Quoted string
+	// Stale says a draft was written against what its unit no longer is; Hold that no rule sends it.
+	Stale, Hold string
+	// Authors say who wrote a draft's current content, by actor kind.
+	Authors map[string]string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -219,9 +223,12 @@ type mDraftWords struct {
 	ByHand      *string           `toml:"by_hand"`
 	ByHandAbout *string           `toml:"by_hand_about"`
 	Quoted      *string           `toml:"quoted"`
+	Stale       *string           `toml:"stale"`
+	Hold        *string           `toml:"hold"`
 	Purposes    map[string]string `toml:"purposes"`
 	States      map[string]string `toml:"states"`
 	Reasons     map[string]string `toml:"reasons"`
+	Authors     map[string]string `toml:"authors"`
 }
 
 type mGate struct {
@@ -374,8 +381,13 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	if m.ByHandAbout != nil {
 		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
 	}
-	if m.Quoted != nil {
-		w.Quoted = strings.TrimSpace(*m.Quoted)
+	for _, f := range []struct {
+		to   *string
+		from *string
+	}{{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
+		if f.from != nil {
+			*f.to = strings.TrimSpace(*f.from)
+		}
 	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
 	states := make([]string, len(draft.States))
@@ -400,6 +412,16 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 		known = append(known, name)
 	}
 	w.Reasons = mergeWords(w.Reasons, m.Reasons, known)
+	actors := []string{string(draft.ActorPerson), string(draft.ActorSession), string(draft.ActorRule), string(draft.ActorWindow)}
+	known = nil
+	for _, name := range declared(s, "drafts.authors", m.Authors) {
+		if !slices.Contains(actors, name) {
+			s.add("drafts.authors."+name, "names no author%s; the authors are %s", expr.DidYouMean(name, actors), strings.Join(actors, ", "))
+			continue
+		}
+		known = append(known, name)
+	}
+	w.Authors = mergeWords(w.Authors, m.Authors, known)
 }
 
 // mergeWords is into with the words of names in m laid over it, an empty word taking one off.

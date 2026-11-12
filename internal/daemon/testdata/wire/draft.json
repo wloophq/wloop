@@ -53,5 +53,6 @@
   "rev": 0,
   "created_at": "2026-10-08T10:00:00Z",
   "updated_at": "2026-10-08T10:00:00Z",
-  "label": "acme/api#7"
+  "label": "acme/api#7",
+  "preview": "Closing comment on the pull request"
 }

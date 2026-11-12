@@ -146,8 +146,8 @@ func helpGroups(manager string) []helpGroup {
 				Usage: []string{
 					"outbox [list] [--color <when>]", "outbox show <id> [--color <when>]",
 					"outbox new <unit|message> <markdown> [--send [--yes]]", "outbox new <unit|message> --react <emoji> [--send [--yes]]",
-					"outbox approve <id> [--text <markdown>] [--yes]", "outbox retry <id> [--confirm] [--yes]",
-					"outbox edit <id> <markdown>", "outbox discard <id> [--reason <why>]",
+					"outbox approve <id> [--text <markdown> --rev <n>] [--yes]", "outbox retry <id> [--confirm] [--yes]",
+					"outbox edit <id> <markdown> --rev <n>", "outbox discard <id> [--reason <why>]",
 				},
 				About: "List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. " +
 					"Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. " +

@@ -329,9 +329,9 @@ Drafts waiting for your approval, and yours.
 {{command}} outbox show <id> [--color <when>]
 {{command}} outbox new <unit|message> <markdown> [--send [--yes]]
 {{command}} outbox new <unit|message> --react <emoji> [--send [--yes]]
-{{command}} outbox approve <id> [--text <markdown>] [--yes]
+{{command}} outbox approve <id> [--text <markdown> --rev <n>] [--yes]
 {{command}} outbox retry <id> [--confirm] [--yes]
-{{command}} outbox edit <id> <markdown>
+{{command}} outbox edit <id> <markdown> --rev <n>
 {{command}} outbox discard <id> [--reason <why>]
 ```
 

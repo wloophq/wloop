@@ -70,6 +70,13 @@ var uiGrammar = []Key{
 		return []Value{{Name: "", Doc: "Its data as it is."}, {Name: "none", Doc: "No data."}, {Name: "first_field", Doc: "Its data up to the first colon."},
 			{Name: "short_sha", Doc: "The first seven characters of a commit id."}, {Name: "requested", Doc: "Whom it asks or stops asking: shown as from that person or team, not as data."}}
 	}, Doc: "How the event's data shows on a timeline."},
+	{Path: "drafts", In: SurfaceUI, Kind: KindMap, Doc: "The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself."},
+	{Path: "drafts.*", In: SurfaceUI, Kind: KindTable, Doc: "One draft kind's words."},
+	{Path: "drafts.*.fields", In: SurfaceUI, Kind: KindMap, Doc: "The payload's fields, by the key they have in the payload, at any depth."},
+	{Path: "drafts.*.fields.*", In: SurfaceUI, Kind: KindTable, Doc: "One field's words."},
+	{Path: "drafts.*.fields.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The field's name on the card."},
+	{Path: "drafts.*.fields.*.values", In: SurfaceUI, Kind: KindMap, Doc: "The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip."},
+	{Path: "drafts.*.fields.*.values.*", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The value's word."},
 	{Path: "detail", In: SurfaceUI, Kind: KindTable, Doc: "How a field of the plugin's unit detail shows, by field."},
 	{Path: "detail.*", In: SurfaceUI, Kind: KindTable, Doc: "One field's words."},
 	{Path: "detail.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Required: true, Doc: "The field's name. Required."},

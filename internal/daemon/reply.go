@@ -289,7 +289,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := s.decideDraft(ctx, d, gate.Approved, nil, q)
+	got, err := s.decideDraft(ctx, d, gate.Approved, draftEdit{}, q)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}

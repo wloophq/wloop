@@ -58,12 +58,24 @@
       "additionalProperties": false,
       "description": "The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.",
       "properties": {
+        "authors": {
+          "additionalProperties": {
+            "description": "The author's words, such as \"Revised by an agent\"; the key is person, session, rule or window.",
+            "type": "string"
+          },
+          "description": "Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing.",
+          "type": "object"
+        },
         "by_hand": {
           "description": "The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.",
           "type": "string"
         },
         "by_hand_about": {
           "description": "One line under that title.",
+          "type": "string"
+        },
+        "hold": {
+          "description": "What a draft's card says of a held draft its proposer asked no approval rule to send.",
           "type": "string"
         },
         "purposes": {
@@ -85,6 +97,10 @@
           },
           "description": "Why a dropped draft was withdrawn, by reason, as the Outbox says it.",
           "type": "object"
+        },
+        "stale": {
+          "description": "What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.",
+          "type": "string"
         },
         "states": {
           "additionalProperties": {
