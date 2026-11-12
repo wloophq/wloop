@@ -51,7 +51,7 @@ func TestDraftToolsAllowedFromManifests(t *testing.T) {
 		}
 	}
 	for _, tool := range want {
-		if slices.Contains(settingsAllow(t, turns.Policy{TurnEnd: true, Drafts: true}), tool) {
+		if slices.Contains(settingsAllow(t, turns.Policy{TurnEnd: true}), tool) {
 			t.Errorf("a policy with no DraftTools allows %s", tool)
 		}
 	}

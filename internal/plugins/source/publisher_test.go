@@ -181,12 +181,12 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 	now := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
-	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
+	svc := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(context.Background(), prop)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.State != draft.Held || d.Delivery != draft.CommentDelivery {
+	if d.State != draft.Held || d.Delivery != draft.Delivery("comment") {
 		t.Fatalf("proposed %+v, want a held comment", d)
 	}
 }

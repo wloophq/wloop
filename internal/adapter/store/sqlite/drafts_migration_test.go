@@ -62,7 +62,7 @@ func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
 	}
 }
 
-func TestADraftAnOlderReleaseWroteReadsWithTheShapeOfItsKind(t *testing.T) {
+func TestADraftWithAKindAloneReadsItAsItsPurpose(t *testing.T) {
 	t.Parallel()
 	db, path := openTemp(t)
 	db.Close()
@@ -73,7 +73,7 @@ func TestADraftAnOlderReleaseWroteReadsWithTheShapeOfItsKind(t *testing.T) {
 	}
 	defer db.Close()
 	d, err := db.Drafts().Get(context.Background(), 1)
-	if err != nil || d.Purpose != "react" || d.Delivery != "reaction" || d.Effects == nil {
+	if err != nil || d.Kind != "react" || d.Purpose != "react" || d.Delivery != "" || d.Effects == nil {
 		t.Fatalf("%+v %v", d, err)
 	}
 }

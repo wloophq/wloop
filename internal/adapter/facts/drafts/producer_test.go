@@ -45,7 +45,7 @@ func TestStaleFactFromPublisherRefusalAfterRestart(t *testing.T) {
 	gs := outboxtest.GatesOn(st, st, clock.Now)
 	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: clock,
 		Effects: func(unit.ProviderID) (port.Effects, error) { return staleHead{}, nil }})
-	d, err := svc.Propose(ctx, outbox.Proposal{Unit: pr7, Kind: draft.Reply, Text: "the review", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3}})
+	d, err := svc.Propose(ctx, outbox.Proposal{Unit: pr7, Kind: draft.Kind("reply"), Text: "the review", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3}})
 	if err != nil {
 		t.Fatal(err)
 	}

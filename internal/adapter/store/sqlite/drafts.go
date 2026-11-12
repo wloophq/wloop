@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -72,16 +73,11 @@ func draftArgs(d draft.Draft) []any {
 		string(d.Payload), d.Basis, d.Hold, string(d.By.Kind), d.By.Session}
 }
 
-// shaped is d with the purpose and delivery of its kind when it names
-// neither, as a draft an older release wrote does, and Effects never nil;
-// a stored kind is kept.
+// shaped is d with its kind as its purpose when it names none, and its purpose as its kind, and Effects
+// never nil; the migration gave a draft an older release wrote its purpose and delivery.
 func shaped(d draft.Draft) draft.Draft {
-	if d.Purpose == "" && d.Delivery == "" {
-		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
-	}
-	if d.Kind == "" {
-		d.Kind = draft.KindOf(d.Purpose, d.Delivery)
-	}
+	d.Purpose = cmp.Or(d.Purpose, string(d.Kind))
+	d.Kind = cmp.Or(d.Kind, draft.Kind(d.Purpose))
 	if d.Effects == nil {
 		d.Effects = []string{}
 	}

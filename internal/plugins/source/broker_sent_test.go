@@ -64,7 +64,7 @@ func TestSlackToolPostIsARecordedSentGate(t *testing.T) {
 	now := func() time.Time { return at }
 	gs := outboxtest.NewGates(now)
 	store := &memDrafts{}
-	ob := gs.Bind(&outbox.Service{Store: store, Clock: clockOf(now),
+	ob := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: store, Clock: clockOf(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return nil, outbox.ErrDisabled }})
 	thread := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000000.000100"}
 	book := dturn.Book{Unit: thread, Turns: []dturn.Turn{{Seq: 3, Intent: "reply", Session: "live"}}}

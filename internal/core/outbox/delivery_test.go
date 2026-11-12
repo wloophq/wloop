@@ -17,10 +17,10 @@ import (
 type commenting struct{ *fakeEffects }
 
 func (commenting) Delivers(k draft.Kind) draft.Delivery {
-	if k == draft.React {
-		return draft.Reaction
+	if k == draft.Kind("react") {
+		return draft.Delivery("reaction")
 	}
-	return draft.CommentDelivery
+	return draft.Delivery("comment")
 }
 
 func withCommentingPulls(e *env) {
@@ -33,7 +33,7 @@ func withCommentingPulls(e *env) {
 }
 
 func prReply(text string) Proposal {
-	return Proposal{Unit: pull, Kind: draft.Reply, Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}}
+	return Proposal{Unit: pull, Kind: draft.Kind("reply"), Text: text, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}}
 }
 
 func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T) {
@@ -42,7 +42,7 @@ func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T
 		withCommentingPulls(e)
 		withPolicy(e, draft.Fixed(mode))
 		d := e.propose(prReply("LGTM, merging"))
-		if d.Delivery != draft.CommentDelivery || d.Kind != draft.Comment || d.State != draft.Held ||
+		if d.Delivery != draft.Delivery("comment") || d.Kind != draft.Kind("comment") || d.State != draft.Held ||
 			e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
@@ -58,7 +58,7 @@ func TestARuleReleasingMessagesNeverReleasesWhatItsPluginPostsAsAComment(t *test
 	}
 	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(noneA),
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "k"}}
-	if d := e.propose(nudge); d.Delivery != draft.CommentDelivery || d.Purpose != "nudge" || d.State != draft.Held {
+	if d := e.propose(nudge); d.Delivery != draft.Delivery("comment") || d.Purpose != "nudge" || d.State != draft.Held {
 		t.Fatalf("a plugin rule's nudge: %+v", d)
 	}
 }
@@ -68,12 +68,12 @@ func TestADraftWhosePublisherChangedItsDeliveryFailsOnItsWindow(t *testing.T) {
 	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(window5),
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "k"}}
 	d := e.propose(nudge)
-	if d.Delivery != draft.Message || e.approval(d.ID) != window5 {
+	if d.Delivery != draft.Delivery("message") || e.approval(d.ID) != window5 {
 		t.Fatalf("%+v %+v", d, e.approval(d.ID))
 	}
 	withCommentingPulls(e)
 	ds, err := e.svc.List(ctx, Filter{})
-	if err != nil || len(ds) != 1 || ds[0].Delivery != draft.CommentDelivery || ds[0].Kind != draft.Comment {
+	if err != nil || len(ds) != 1 || ds[0].Delivery != draft.Delivery("comment") || ds[0].Kind != draft.Kind("comment") {
 		t.Fatalf("listed %+v %v", ds, err)
 	}
 	if _, err := e.svc.Propose(ctx, nudge); err == nil {

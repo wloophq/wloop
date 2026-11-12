@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -82,7 +83,7 @@ func publishing(pub *recordingPublisher) compiledPlugin {
 func insertDraft(t *testing.T, db *sqlite.DB, d draft.Draft) draft.Draft {
 	t.Helper()
 	if d.Kind == "" {
-		d.Kind = draft.Reply
+		d.Kind = draft.Kind("reply")
 	}
 	if d.Original == "" {
 		d.Original = d.Text
@@ -226,7 +227,7 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 	fx := pinnedEffects{Effects: pub, turns: outboxManifests{loaded: te.loadedIntents, books: books}}
 	ctx := context.Background()
 	turnOn := func(u unit.Unit, seq int64) draft.Draft {
-		return draft.Draft{ID: 1, Unit: u, Kind: draft.Reply, Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq}}
+		return draft.Draft{ID: 1, Unit: u, Kind: draft.Kind("reply"), Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq}}
 	}
 	if err := fx.Validate(ctx, turnOn(threadUnit, 7)); err != nil {
 		t.Fatalf("its own unit: %v", err)
@@ -239,20 +240,20 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 			t.Errorf("%s: published: %v", name, err)
 		}
 	}
-	session := draft.Draft{Unit: other, Kind: draft.Reply, Text: "x", Origin: draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}}
+	session := draft.Draft{Unit: other, Kind: draft.Kind("reply"), Text: "x", Origin: draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}}
 	if err := fx.Validate(ctx, session); err == nil {
 		t.Error("a session draft with another unit's turn validated")
 	}
 	for _, o := range []draft.Origin{{Kind: draft.OriginAuto, Rule: "r"}, {Kind: draft.OriginUser}, {Kind: draft.OriginSession}} {
-		if err := fx.Validate(ctx, draft.Draft{Unit: other, Kind: draft.Reply, Text: "x", Origin: o}); err != nil {
+		if err := fx.Validate(ctx, draft.Draft{Unit: other, Kind: draft.Kind("reply"), Text: "x", Origin: o}); err != nil {
 			t.Errorf("%s: %v", o.Kind, err)
 		}
 	}
 	if calls := pub.seen(); len(calls) != 0 {
 		t.Fatalf("published %v", calls)
 	}
-	o := withDraftGates(te.db, te.Now, &outbox.Service{Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }})
-	if _, err := o.Propose(ctx, outbox.Proposal{Unit: other, Kind: draft.Reply, Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7}}); !errors.Is(err, outbox.ErrInvalid) {
+	o := withDraftGates(te.db, te.Now, &outbox.Service{Kinds: outboxtest.Shapes{}, Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }})
+	if _, err := o.Propose(ctx, outbox.Proposal{Unit: other, Kind: draft.Kind("reply"), Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7}}); !errors.Is(err, outbox.ErrInvalid) {
 		t.Fatalf("propose on another unit: %v", err)
 	}
 }
@@ -264,10 +265,10 @@ func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 		t.Fatal(err)
 	}
 	gh := pinnedEffects{Effects: psource.Publisher{ID: string(unit.GitHub), Source: s}}
-	if got := gh.Delivers(draft.Reply); got != draft.CommentDelivery {
+	if got := gh.Delivers(draft.Kind("reply")); got != draft.Delivery("comment") {
 		t.Errorf("github: %s", got)
 	}
-	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Reply); got != "" {
+	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Kind("reply")); got != "" {
 		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }

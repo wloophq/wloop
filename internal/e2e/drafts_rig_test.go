@@ -44,7 +44,7 @@ func (p *ghPublisher) Delivers(k draft.Kind) draft.Delivery {
 	case "resolve":
 		return "resolve"
 	}
-	return draft.CommentDelivery
+	return draft.Delivery("comment")
 }
 
 func (p *ghPublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence, error) {

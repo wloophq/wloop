@@ -167,8 +167,8 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
 	}
-	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "t-01", Kind: draft.Nudge, Purpose: "nudge",
-		Delivery: draft.Message, Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
+	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "t-01", Kind: draft.Kind("nudge"), Purpose: "nudge",
+		Delivery: draft.Delivery("message"), Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
 		State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 		t.Fatalf("the next pass after the item resolved plans the close task: %v", got)
 	}
 	woke("a draft", func() {
-		if _, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: subjectThread, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Text: "x", Original: "x",
+		if _, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: subjectThread, Kind: draft.Kind("close"), Purpose: "close", Delivery: draft.Delivery("message"), Text: "x", Original: "x",
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-close"}, State: draft.Held,
 			CreatedAt: testNow, UpdatedAt: testNow}); err != nil {
 			t.Fatal(err)

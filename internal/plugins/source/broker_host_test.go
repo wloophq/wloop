@@ -79,7 +79,7 @@ func TestTheBrokerRehomesAPluginsDrafts(t *testing.T) {
 	h, db := hostOver(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
-	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: unit.Unit{Provider: "acme", Key: "t1"}, Kind: draft.Reply, Text: "hi",
+	d, err := db.Drafts().Insert(ctx, draft.Draft{Unit: unit.Unit{Provider: "acme", Key: "t1"}, Kind: draft.Kind("reply"), Text: "hi",
 		Origin: draft.Origin{Kind: draft.OriginSession}, State: draft.Sent, CreatedAt: at, UpdatedAt: at})
 	if err != nil {
 		t.Fatal(err)

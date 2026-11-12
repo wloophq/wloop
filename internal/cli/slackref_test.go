@@ -151,7 +151,7 @@ func TestOutboxNewReactsToTheMessageItNames(t *testing.T) {
 		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Kind != draft.React || ds[0].Target != ref {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Kind != draft.Kind("react") || ds[0].Target != ref {
 		t.Fatalf("drafts %+v", ds)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {

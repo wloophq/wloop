@@ -270,8 +270,8 @@ func TestServeNotifiesRuleSent(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Wait},
-		Rules: []draft.Rule{{When: holds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.CommentDelivery}}}
-	sent, err := d.e.outbox.Propose(ctx, outbox.Proposal{Unit: pr, Kind: draft.Reply, Text: "Thanks, merged the fix.",
+		Rules: []draft.Rule{{When: holds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.Delivery("comment")}}}
+	sent, err := d.e.outbox.Propose(ctx, outbox.Proposal{Unit: pr, Kind: draft.Kind("reply"), Text: "Thanks, merged the fix.",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: rule})
 	if err != nil {
 		t.Fatal(err)

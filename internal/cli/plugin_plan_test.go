@@ -226,7 +226,7 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	if !ok {
 		t.Fatal("the plugin's draft effect has no applier")
 	}
-	if err := fx(context.Background(), draft.Draft{ID: 4, Unit: sc.ref.Unit(), Kind: draft.Nudge}); err != nil {
+	if err := fx(context.Background(), draft.Draft{ID: 4, Unit: sc.ref.Unit(), Kind: draft.Kind("nudge")}); err != nil {
 		t.Fatal(err)
 	}
 	last := p.applied()[len(p.applied())-1]

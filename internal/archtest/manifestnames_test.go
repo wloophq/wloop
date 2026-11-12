@@ -156,7 +156,6 @@ func draftListHits(fset *token.FileSet, rel string, info *types.Info, f *ast.Fil
 // Outside the draft package nothing names its delivery constants, and no Go file outside the plugins lists
 // draft kinds or deliveries.
 func TestArchNoDeliveryList(t *testing.T) {
-	t.Skip("T13 unskips after T2,T3,T6,T7,T9 merge")
 	fset, files := typedFiles(t)
 	var hits []string
 	for _, tf := range files {
@@ -175,7 +174,6 @@ func TestArchNoDeliveryList(t *testing.T) {
 // name a bundled plugin manifest declares: a tool, a write command or a draft fact (draft.<provider>.) in any
 // string, and a draft kind or delivery as a draft.Kind or draft.Delivery value.
 func TestArchNoManifestNamesInCore(t *testing.T) {
-	t.Skip("T13 unskips after T2,T3,T6,T7,T9 merge")
 	names := bundledManifestNames(t)
 	fset, files := typedFiles(t)
 	var hits []string

@@ -141,7 +141,7 @@ func TestAnApprovedDraftIsPostedThroughTheGitHubPlugin(t *testing.T) {
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
-	svc := gs.Bind(&outbox.Service{Store: db.Drafts(), Clock: pinnedClock(now),
+	svc := gs.Bind(&outbox.Service{Kinds: outboxtest.Shapes{}, Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	u := pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
 	propose := func(key, text string) draft.Draft {
@@ -151,7 +151,7 @@ func TestAnApprovedDraftIsPostedThroughTheGitHubPlugin(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if d.State != draft.Held || d.Delivery != draft.CommentDelivery {
+		if d.State != draft.Held || d.Delivery != draft.Delivery("comment") {
 			t.Fatalf("proposed %+v, want a held comment", d)
 		}
 		return d

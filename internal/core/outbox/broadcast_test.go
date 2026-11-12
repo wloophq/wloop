@@ -102,7 +102,7 @@ func TestAHeldDraftStoredWithNoBroadcastIsPlacedOnceAtStart(t *testing.T) {
 	withPolicy(e, window(10*time.Minute))
 	old := e.propose(reply("done"))
 	firstGate := e.gate(old.ID)
-	reaction := e.propose(Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
+	reaction := e.propose(Proposal{Unit: thread, Kind: draft.Kind("react"), Reaction: "eyes", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}})
 	pl := withPlacer(e, "")
 	pl.broadcast = draft.BroadcastOn
 	if err := e.svc.PlaceBroadcasts(ctx); err != nil {
@@ -182,7 +182,7 @@ func TestBroadcastOfIsWhatProposingWouldPlaceAndStoresNothing(t *testing.T) {
 	if err != nil || b != draft.BroadcastOn {
 		t.Fatalf("broadcast %q %v", b, err)
 	}
-	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || pl.asked[0].Delivery != draft.Message || pl.asked[0].Kind != draft.Reply {
+	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || pl.asked[0].Delivery != draft.Delivery("message") || pl.asked[0].Kind != draft.Kind("reply") {
 		t.Fatalf("asked %+v", pl.asked)
 	}
 	if ds, _ := e.svc.Store.List(ctx, Filter{}); len(ds) != 0 {

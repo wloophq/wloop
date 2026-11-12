@@ -31,7 +31,7 @@ func TestFinalAttackDrivenReviserApprovesItsOwnRevision(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r, worker, mine, _ := finalRig(t)
-	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "the worker's text",
+	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "the worker's text",
 		Origin: draft.Origin{Kind: draft.OriginSession, Session: worker}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestFinalAttackDrivenSessionApprovesWithItsOwnText(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r, worker, mine, _ := finalRig(t)
-	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Reply, Text: "the worker's text",
+	d, err := r.o.Propose(ctx, outbox.Proposal{Unit: r7u, Kind: draft.Kind("reply"), Text: "the worker's text",
 		Origin: draft.Origin{Kind: draft.OriginSession, Session: worker}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if err != nil {
 		t.Fatal(err)

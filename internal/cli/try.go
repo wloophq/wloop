@@ -58,7 +58,7 @@ func roundPolicy(command string, stored []string) turns.Policy {
 		allow = append(allow, storedTurnRules(cmd, stored)...)
 		allow = append(allow, []string{cmd, "turn", "end"}, []string{cmd, "turn", "answer"}, []string{cmd, "config", "get"})
 	}
-	return turns.Policy{Allow: allow, TurnEnd: true, Drafts: true, WritePaths: []string{dturn.ScratchDir}}
+	return turns.Policy{Allow: allow, TurnEnd: true, WritePaths: []string{dturn.ScratchDir}}
 }
 
 // probePolicy lets a probe session read its turn and record it, and nothing

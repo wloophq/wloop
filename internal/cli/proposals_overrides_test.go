@@ -54,7 +54,7 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 	userProfile(t, r.te, map[string]string{"workflows/slack-closure/workflow.toml": manifest})
 	r.slack.startedByMe(rpD)
 	d := firstDayClosure(t, r)
-	if d.Delivery != draft.Reaction || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" || d.Text != "" {
+	if d.Delivery != draft.Delivery("reaction") || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" || d.Text != "" {
 		t.Fatalf("closure %+v", d)
 	}
 	if err := approveDraft(ctx, r.svc, d.ID); err != nil {
@@ -305,7 +305,7 @@ window = "1h"
 		t.Fatal(err)
 	}
 	pol := draftApproval(cfg, w, nil, draft.Approval{Mode: draft.Wait})
-	d := draft.Draft{Delivery: draft.Message, Purpose: "thanks", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name}}
+	d := draft.Draft{Delivery: draft.Delivery("message"), Purpose: "thanks", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name}}
 	for name, c := range map[string]struct {
 		facts map[string]any
 		want  draft.Approval
@@ -340,7 +340,7 @@ mode = "send"
 	}
 	w := workflow.Workflow{Name: "slack-thanks", Slot: "slack"}
 	pol := draftApproval(cfg, w, nil, draft.Approval{Mode: draft.Wait})
-	if got, err := pol.Decide(draft.Draft{Delivery: draft.Message}, draft.Subject{Slot: "slack"}, false, time.Time{}); err != nil || got.Approval.Mode != draft.Wait || len(pol.Rules) != 0 {
+	if got, err := pol.Decide(draft.Draft{Delivery: draft.Delivery("message")}, draft.Subject{Slot: "slack"}, false, time.Time{}); err != nil || got.Approval.Mode != draft.Wait || len(pol.Rules) != 0 {
 		t.Fatalf("%+v %v", got, err)
 	}
 	l := *newTestEnv(t, nil).loadedIntents()

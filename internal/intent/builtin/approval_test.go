@@ -49,8 +49,8 @@ func TestAnApprovalRuleNamesADeliveryByItsConjunction(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
 	none := draft.Approval{Mode: draft.Send}
 	for when, want := range map[string]draft.Delivery{
-		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: draft.CommentDelivery,
-		`draft.delivery == "message"`:                                   draft.Message,
+		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: draft.Delivery("comment"),
+		`draft.delivery == "message"`:                                   draft.Delivery("message"),
 		`pr.repo == "acme/docs"`:                                        "",
 		`draft.delivery == "comment" || pr.repo == "acme/docs"`:         "",
 	} {

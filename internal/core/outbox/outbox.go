@@ -308,7 +308,7 @@ func proposer(o draft.Origin) draft.Actor {
 
 func (s *Service) kinds() Kinds {
 	if s.Kinds == nil {
-		return legacyKinds{}
+		return noKinds{}
 	}
 	return s.Kinds
 }

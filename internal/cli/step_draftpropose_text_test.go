@@ -40,7 +40,7 @@ func templateLayers(t *testing.T, user map[string]string) ([]profile.Layer, fs.F
 
 func renderTemplate(t *testing.T, layers []profile.Layer, bundled fs.FS, locale string, data any) (string, string) {
 	t.Helper()
-	tmpl, written, err := draftTemplate(layers, bundled, "wf", defaultDraftText, draft.Message, locale)
+	tmpl, written, err := draftTemplate(layers, bundled, "wf", defaultDraftText, draft.Delivery("message"), locale)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func BenchmarkADraftsLanguageAndTemplate(b *testing.B) {
 	layers := profile.Chain(config.Config{})
 	for b.Loop() {
 		lang := draftLanguage(workflow.Facts{"slack.language": "pt"}, "slack.language", "en", intentload.Locales(layers, turn.BundledFS()))
-		if _, _, err := draftTemplate(layers, turn.BundledFS(), "task-not-mine", defaultDraftText, draft.Message, lang); err != nil {
+		if _, _, err := draftTemplate(layers, turn.BundledFS(), "task-not-mine", defaultDraftText, draft.Delivery("message"), lang); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -124,7 +124,7 @@ func TestASlackDraftTemplateIsFoundUnderAUserGithubDirectory(t *testing.T) {
 	layers := append(profile.BundledChain(), profile.Layer{Name: "user", Source: dir, Dir: dir}, profile.Layer{Name: "user:github", Source: gh, Dir: gh})
 	for _, file := range []string{defaultDraftText, defaultDraftWhy} {
 		for _, locale := range []string{"en", "pt-BR"} {
-			tmpl, written, err := draftTemplate(layers, turn.BundledFS(), "slack-stalled-nudge", file, draft.Message, locale)
+			tmpl, written, err := draftTemplate(layers, turn.BundledFS(), "slack-stalled-nudge", file, draft.Delivery("message"), locale)
 			if err != nil || tmpl == nil || written != locale {
 				t.Errorf("%s in %s: %v %v %q", file, locale, tmpl, err, written)
 			}
@@ -135,7 +135,7 @@ func TestASlackDraftTemplateIsFoundUnderAUserGithubDirectory(t *testing.T) {
 func TestADraftTemplateNoLayerHoldsIsNotFound(t *testing.T) {
 	t.Parallel()
 	layers, bundled := templateLayers(t, nil)
-	if _, _, err := draftTemplate(layers, bundled, "nope", defaultDraftText, draft.Message, "en"); !errors.Is(err, fs.ErrNotExist) {
+	if _, _, err := draftTemplate(layers, bundled, "nope", defaultDraftText, draft.Delivery("message"), "en"); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("err %v, want not exist", err)
 	}
 }

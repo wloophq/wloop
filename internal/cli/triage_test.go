@@ -126,7 +126,7 @@ func TestAcknowledgeSetsPromisedAndProposesAReply(t *testing.T) {
 	if len(ds) != 1 {
 		t.Fatalf("replies %+v, want one", ds)
 	}
-	if want := "Looking into it, by " + by.Local().Format("15:04") + "."; ds[0].Delivery != draft.Message || ds[0].Unit != thread ||
+	if want := "Looking into it, by " + by.Local().Format("15:04") + "."; ds[0].Delivery != draft.Delivery("message") || ds[0].Unit != thread ||
 		ds[0].Task != "t-by" || ds[0].Text != want+"\n" && ds[0].Text != want {
 		t.Errorf("the reply: %+v, want %q on %s", ds[0], want, thread)
 	}
@@ -138,7 +138,7 @@ func TestAcknowledgeSetsPromisedAndProposesAReply(t *testing.T) {
 		t.Fatalf("acknowledged with no time: state %s, promised %v", reacted.State, reacted.Prop("promised").Time)
 	}
 	ds, gs = r.drafts(t, "task-acknowledge-react")
-	if len(ds) != 1 || ds[0].Delivery != draft.Reaction || ds[0].Reaction != "eyes" || ds[0].Task != "t-react" ||
+	if len(ds) != 1 || ds[0].Delivery != draft.Delivery("reaction") || ds[0].Reaction != "eyes" || ds[0].Task != "t-react" ||
 		ds[0].Target != "https://example.test/archives/C000AAA/p2.2" || gs[0].Status != gate.Open {
 		t.Fatalf("the reaction: %+v %+v", ds, gs)
 	}
@@ -160,7 +160,7 @@ func TestNotMineProposesARedirect(t *testing.T) {
 		t.Fatalf("not mine left the task in %s", got.State)
 	}
 	ds, gs := r.drafts(t, "task-not-mine")
-	if len(ds) != 1 || ds[0].Delivery != draft.Message || ds[0].Unit != thread || ds[0].Task != "t-1" || ds[0].Text == "" {
+	if len(ds) != 1 || ds[0].Delivery != draft.Delivery("message") || ds[0].Unit != thread || ds[0].Task != "t-1" || ds[0].Text == "" {
 		t.Fatalf("the redirect: %+v", ds)
 	}
 	if gs[0].Status != gate.Open {

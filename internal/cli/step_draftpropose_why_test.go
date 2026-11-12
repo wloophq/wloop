@@ -124,7 +124,7 @@ func TestEveryBundledDraftWorkflowHasAWhy(t *testing.T) {
 				if file == defaultDraftText && slices.Contains(builtin.DraftEmojiDeliveries, string(delivery)) {
 					continue
 				}
-				tmpl, written, err := draftTemplate(profile.BundledChain(), turn.BundledFS(), name, file, draft.Message, locale)
+				tmpl, written, err := draftTemplate(profile.BundledChain(), turn.BundledFS(), name, file, draft.Delivery("message"), locale)
 				if err != nil {
 					t.Errorf("%s %s in %s: %v", name, file, locale, err)
 					continue
@@ -148,7 +148,7 @@ func TestAClosureWordsEachResolutionInItsLanguage(t *testing.T) {
 		"pt-BR": "- The deck: respondido\n- The budget: sem efeito\n- The copy: resolvido",
 		"en":    "- The deck: answered\n- The budget: moot\n- The copy: resolved",
 	} {
-		tmpl, written, err := draftTemplate(profile.BundledChain(), turn.BundledFS(), "slack-closure", defaultDraftText, draft.Message, locale)
+		tmpl, written, err := draftTemplate(profile.BundledChain(), turn.BundledFS(), "slack-closure", defaultDraftText, draft.Delivery("message"), locale)
 		if err != nil || written != locale {
 			t.Fatalf("%s: written in %q, %v", locale, written, err)
 		}

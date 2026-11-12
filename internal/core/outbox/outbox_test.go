@@ -366,7 +366,7 @@ func TestProposeValidatesTheTarget(t *testing.T) {
 func TestAutoProposalsDoNotStack(t *testing.T) {
 	e := newEnv()
 	auto := func(key string) Proposal {
-		return Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping",
+		return Proposal{Unit: thread, Kind: draft.Kind("nudge"), Text: "ping",
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: key}}
 	}
 	first := e.propose(auto("stalled-nudge:e1:slack:U000AAA"))
@@ -391,13 +391,13 @@ func TestAutoProposalsDoNotStack(t *testing.T) {
 
 func TestProposeNeedsText(t *testing.T) {
 	e := newEnv()
-	for _, p := range []Proposal{reply(""), reply("  \n"), {Unit: thread, Kind: "shout", Text: "x"}, {Kind: draft.Reply, Text: "x"},
-		{Unit: thread, Kind: draft.React}} {
+	for _, p := range []Proposal{reply(""), reply("  \n"), {Unit: thread, Kind: "shout", Text: "x"}, {Kind: draft.Kind("reply"), Text: "x"},
+		{Unit: thread, Kind: draft.Kind("react")}} {
 		if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%+v: %v", p, err)
 		}
 	}
-	if _, err := e.svc.Propose(ctx, Proposal{Unit: thread, Kind: draft.React, Reaction: "eyes"}); err != nil {
+	if _, err := e.svc.Propose(ctx, Proposal{Unit: thread, Kind: draft.Kind("react"), Reaction: "eyes"}); err != nil {
 		t.Errorf("react without text: %v", err)
 	}
 }
@@ -485,7 +485,7 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 	ap := &fakeApplier{}
 	e.svc.Evidence = EvidenceTo(ap.apply)
 	p := reply("closing")
-	p.Kind, p.Items = draft.Close, []string{"i1", "i2"}
+	p.Kind, p.Items = draft.Kind("close"), []string{"i1", "i2"}
 	d := e.propose(p)
 	e.approve(d.ID, nil)
 	e.clock.now = t0.Add(time.Minute)
@@ -541,12 +541,12 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 func TestRecordSentKeepsADeletionWithTheTextItRemoved(t *testing.T) {
 	e := newEnv()
 	for _, text := range []string{"posted twice", ""} {
-		p := Proposal{Unit: thread, Kind: draft.Delete, Text: text, Target: "C1/1.2"}
+		p := Proposal{Unit: thread, Kind: draft.Kind("delete"), Text: text, Target: "C1/1.2"}
 		d, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "C1/1.2"})
 		if err != nil {
 			t.Fatalf("a deletion of %q: %v", text, err)
 		}
-		if got := e.get(d.ID); got.Kind != draft.Delete || got.Delivery != draft.DeleteDelivery || got.Text != text || got.State != draft.Sent {
+		if got := e.get(d.ID); got.Kind != draft.Kind("delete") || got.Delivery != draft.Delivery("delete") || got.Text != text || got.State != draft.Sent {
 			t.Fatalf("%+v", got)
 		}
 	}
