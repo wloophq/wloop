@@ -113,6 +113,31 @@ A round launches from its plugin's plan. The sweep evaluates workflows over the 
 - **No command reaches GitHub but through its plugin.** No production file of `internal/cli` imports GitHub's client or `gh`'s runner, and the host holds no GitHub client and no credential: nothing under `internal/` names GitHub's API. `doctor` and `init` ask the plugin whether `gh` is installed and logged in (`auth`, exit 127 when `gh` is missing), and `init` reads its scope suggestions from the plugin's `reviewed-repos <yyyy-mm-dd>` and `teams`; with no plugin running, a command runs the plugin's binary in CLI mode, and what only the running plugin answers (the viewer, a pull request's basics) is unavailable. Explore's searches, the failed steps of a pull request's checks, one pull request read for its row and the API's budget are the plugin's views (`explore`, `explore.recent`, `checks`, `candidate`, `budget`); the host's presenter adds what reads its own state, such as the row's actions and the brief. The daemon's health and the brief queue read the budget the plugin last named after each of its jobs. The unit a checkout holds is the plugin's `Locate`. The marks a review round that went out writes are `ReviewedMarks`.
 - **An answer in the source closes an asked turn.** An intent whose role reconciles with `my_review` closes its asked turn as done once the user's event of a kind the manifest marks `answers_asked_turn` (GitHub's `review`) is recorded after the turn's last record, with a state its `verdicts` turn into the record's verdict.
 
+## Drafts a plugin declares
+
+A plugin declares its draft kinds and deliveries in its manifest, and the core names none. A kind is keyed by provider and name, with its delivery, a JSON schema for its payload, a preview template, a basis (`agent` or none), whether text is required, the fields a person may edit and the facts it exposes:
+
+```toml
+[[source.draft_kinds]]
+name     = "review"
+delivery = "review"
+schema   = "drafts/review/schema.json"
+preview  = "drafts/review/preview.md.tmpl"
+basis    = "agent"
+editable = ["text", "/event"]
+[[source.draft_kinds.facts]]
+name    = "draft.github.review.event"
+pointer = "/event"
+```
+
+- **Facts.** A fact's pointer must be required, a string and an `enum` in the schema, and the loader refuses anything else. Such a fact is trusted and read by rules as an allow-list.
+- **Posting.** The publisher posts a draft's payload verbatim and verifies it with `Verify` after a crash, by delivery. `Targeter` decides whether a target is inside the unit. A plugin that has a basis answers `Basis` with the live value, which propose and the publisher read.
+- **Session writes.** `[source.session] write_commands` lists the command prefixes that write to the source (GitHub's `gh api -X POST`, `gh pr review`); a session whose intent sets `[session] source_writes = false` is denied all of them, which is how review, address and nudge sessions write nothing.
+- **Tools.** A `[[source.tools]]` entry with `proposes = true` is a tool that proposes drafts; the session policy allows it, and the core `draft_*` tools, without a prompt.
+- **Posting deliveries.** A delivery marked `posts` is one that posts a message, and its drafts wait for you unless a rule names the delivery.
+
+An archtest refuses, in the core, the domain and the agent adapter, any string literal equal to a name a bundled manifest declares.
+
 ## Plugin storage
 
 The plugins' tables live in their own stores. Before its transaction, the version 7 migration writes `<state>/plugins/<id>/import.db` for each plugin in a transaction of its own that writes that file alone: the plugin's tables with their definitions, checked row for row against the core's counts, synced, then renamed from `import.db.tmp`. A WAL store commits apart from the files attached to it, so only a complete export carries the name, and a migration run again keeps it. The migration's last step (`v7PluginStores`) then drops the tables from the core; a failure between the two leaves both copies (`TestAnExportIsDurableBeforeTheCoreDropsItsTables`). Each plugin imports its file on its first start (`TestV7PluginStoresExportsAndDrops`, `TestCoreSchemaHasNoPluginTables`). GitHub's export holds `pull_requests`, `pr_seen`, `pr_details`, `fetches`, GitHub's `meta` rows and its `overrides` rows; Slack's holds `segment_map`, `extraction_*`, `slack_*` and `extraction_briefs`, the brief each Slack unit uses. The core keeps `fetches` (the log of its workspaces' fetches), `overrides` and GitHub's viewer in `meta`, which it still reads. Host tests seed pull requests through `inventorytest`, which creates its own tables in the test's store. No query names a plugin's table and a core table, and no transaction does (`TestNoQueryJoinsPluginAndCoreTables`, which reads a function literal passed to `Write` and a function taking a `*Tx` with the functions it hands the transaction to). A plugin's store reaches the host's data through the broker and writes its own tables apart, and a reader that needs both reads each apart.

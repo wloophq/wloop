@@ -64,6 +64,37 @@ An address round stops the same way before a deep change of direction, an irreve
 
 ## The Outbox
 
+### Drafts the daemon posts
+
+A draft is a kind of its plugin, which declares its kinds, deliveries and schemas in its manifest: GitHub's comment, review (events COMMENT, REQUEST_CHANGES and APPROVE, with inline comments), thread reply and resolve; Slack's message, reaction, unreaction, edit and delete. A draft carries its payload, which its kind's schema checks, and the daemon posts exactly that payload. The card shows all of it.
+
+Four properties make the post safe:
+
+- **The gate approves a revision.** A gate records the rev it approved and the sender posts only that rev. A person's edit makes a new rev and a new gate. An agent's revision of a draft also supersedes its gate and opens one that waits, and a failed draft an agent revises goes back to held.
+- **A proposer never resolves its gate.** The gate stamps every session that proposed or revised the draft; none of them may resolve it, and a person or a session you drive that did not touch it may.
+- **A basis ties a draft to what the agent read.** A review's basis is the head it was read at. Propose checks it against the live head, a stale draft cannot be approved, and the publisher re-reads the live head before it posts, refusing on a mismatch.
+- **Rules are allow-lists over the payload.** A kind declares the payload fields a rule may read (a GitHub review's event, as `draft.github.review.event`). They are trusted, because they are what is posted, and a rule reads them as an allow-list: an absent fact never releases a draft. `hold` on a draft keeps it out of every rule, except under `dry_run`.
+
+The bundled review and address intents ship these rules, and APPROVE matches none of them:
+
+```toml
+[[gates.approval.rule]]
+when = 'draft.delivery == "review" && draft.github.review.event in ["COMMENT", "REQUEST_CHANGES"]'
+mode = "send"
+[[gates.approval.rule]]
+when = 'draft.delivery == "reply"'
+mode = "send"
+[[gates.approval.rule]]
+when = 'draft.delivery == "resolve"'
+mode = "send"
+```
+
+A session reaches its drafts through `mcp__{{name}}__draft_read`, `draft_update` and `draft_withdraw`, the proposing tool of the plugin (`github_draft`, `slack_draft`) and `{{command}} draft propose|read|update|withdraw`, which give the same results. An agent updates or withdraws only a draft of its own turn or session, on its unit; a person's draft and a workflow's are out of reach, and an update at a stale rev is refused as a conflict.
+
+A question's option may point to a draft, pinned to its id and rev. When you pick the option, the gate of the draft is approved as you, the drafts of the other options are withdrawn, and the turn completes with the posted draft's permalink. A send that fails after the turn completed becomes a fact on the unit (`draft.failed`, `draft.stale`), which a workflow reads to reopen the round.
+
+A post you can see after it ran is announced: a draft a rule sent notifies "posted by your rule".
+
 Every outbound post that an agent or a rule proposes (a reply, a nudge, a closing message, a Slack reaction) is a **draft** first, held by a **draft gate**: the gate holds the decision (approve or discard, in `gates.toml`'s words), the draft keeps only its delivery.
 
 ```text
@@ -180,6 +211,6 @@ On a terminal the list groups the drafts by purpose (nudges, closings, replies, 
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they find no terminal, and when they detect an agent session's environment that names no workspace manager's handle; from a session that names one, the daemon takes the command for yours only when you drive that session. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 
-The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tools an agent uses to post, react, edit or delete on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved by the agent with the tool as its rule, tracked or not, with the turn that made it, an edit's record keeps the text it replaced and a deletion's the text the message held, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
+The review, address and nudge rounds on pull requests write nothing to GitHub from their session: they propose drafts, and the daemon's publisher posts a draft once its gate approves it, under the approval window and the ambiguity gate above. The tools an agent uses to post, react, edit or delete on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved by the agent with the tool as its rule, tracked or not, with the turn that made it, an edit's record keeps the text it replaced and a deletion's the text the message held, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
 
 A draft or a post names the turn that proposed it, and that turn's unit when it is not the draft's: a pull request's turn that drafts in a team's Slack thread shows in the Outbox as `turn <n> (<intent>) on <owner>/<repo>#<n>`. Such a draft answers none of the turn's items, declares no effect and, aimed outside the turn's unit, waits for you.
