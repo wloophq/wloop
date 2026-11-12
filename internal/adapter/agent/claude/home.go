@@ -57,7 +57,7 @@ type Home struct {
 	// AtOnceTools are the tools that post as the user at once, which install allows.
 	AtOnceTools []string
 	Sh          ShellFunc
-	Now    func() time.Time
+	Now         func() time.Time
 }
 
 func (h Home) isDefault(home string) bool { return isDefault(home, h.DefaultHome) }

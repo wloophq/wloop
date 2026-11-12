@@ -18,7 +18,7 @@ type HomeSpec struct {
 	// AtOnceTools are the tools that post as the user at once, as an agent names them, which an install
 	// allows without a prompt.
 	AtOnceTools []string
-	Now          func() time.Time
+	Now         func() time.Time
 }
 
 // HomeKind is one agent's configuration homes.
