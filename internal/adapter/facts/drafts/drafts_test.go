@@ -44,7 +44,11 @@ func TestFailedSendIsUnitFact(t *testing.T) {
 		{"a workflow's nudge failed", stored{failed(1, draft.OriginAuto, unprocessable)}, false, false},
 		{"a person's draft failed stale", stored{failed(1, draft.OriginUser, outbox.ErrStale)}, false, false},
 		{"a held and a sent draft", stored{{ID: 1, Unit: pr7, State: draft.Held, Origin: draft.Origin{Kind: draft.OriginTurn}}, {ID: 2, Unit: pr7, State: draft.Sent, Origin: draft.Origin{Kind: draft.OriginTurn}}}, false, false},
-		{"another unit's", stored{func() draft.Draft { d := failed(1, draft.OriginTurn, outbox.ErrStale); d.Unit.Key = "acme/api#8"; return d }()}, false, false},
+		{"another unit's", stored{func() draft.Draft {
+			d := failed(1, draft.OriginTurn, outbox.ErrStale)
+			d.Unit.Key = "acme/api#8"
+			return d
+		}()}, false, false},
 	} {
 		got, err := Provider{Drafts: c.drafts}.Facts(context.Background(), pr7)
 		if err != nil {

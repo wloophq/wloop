@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
