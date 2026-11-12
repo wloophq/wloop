@@ -51,7 +51,7 @@ func (Agent) Resume(home, agentSession string) string {
 }
 
 func emptyPolicy(p turns.Policy) bool {
-	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && len(p.DraftTools) == 0 && !p.NoGitHubWrites && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.Dirs) == 0 && len(p.DenyPaths) == 0
+	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && len(p.DraftTools) == 0 && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.Dirs) == 0 && len(p.DenyPaths) == 0
 }
 
 // IsDefaultHome says whether home is the default home, "" included.

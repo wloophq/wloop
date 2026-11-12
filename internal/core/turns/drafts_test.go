@@ -1,6 +1,9 @@
 package turns
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestTurnDoneByApproval(t *testing.T) {
 	t.Skip("T9")
@@ -15,5 +18,7 @@ func TestSourceWritesFalseDeniesManifestCommands(t *testing.T) {
 }
 
 func TestNoGitHubWritesRemoved(t *testing.T) {
-	t.Skip("T9")
+	if _, ok := reflect.TypeFor[Policy]().FieldByName("NoGitHubWrites"); ok {
+		t.Fatal("a session policy names no provider: the manifests' write_commands deny their writes")
+	}
 }

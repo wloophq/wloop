@@ -113,7 +113,7 @@ func commandBefore(k Agent, s turns.AgentSession) string {
 		parts = append(parts, "--model", shell.Quote(s.Model))
 	}
 	p := s.Policy
-	if len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && !p.NoGitHubWrites && !p.NoMCP && !p.Strict {
+	if len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && !p.Drafts && !p.NoMCP && !p.Strict {
 		return strings.Join(parts, " ")
 	}
 	parts = append(parts, "--settings", shell.Quote(k.Settings(p)))
@@ -134,8 +134,8 @@ func TestPolicyWithoutDossierUnchanged(t *testing.T) {
 		{Home: "/h/p's", Model: "opus"},
 		{Policy: turns.Policy{TurnEnd: true}},
 		{Policy: turns.Policy{Drafts: true}},
-		{Policy: turns.Policy{Allow: [][]string{{"gh", "pr", "view"}}, Deny: [][]string{{"git", "push"}}, WritePaths: []string{".scratch"}, TurnEnd: true, NoGitHubWrites: true}},
-		{Policy: turns.Policy{Strict: true, NoMCP: true, NoGitHubWrites: true}, Model: "haiku"},
+		{Policy: turns.Policy{Allow: [][]string{{"gh", "pr", "view"}}, Deny: [][]string{{"git", "push"}}, WritePaths: []string{".scratch"}, TurnEnd: true}},
+		{Policy: turns.Policy{Strict: true, NoMCP: true}, Model: "haiku"},
 	} {
 		got, err := k.Command(s)
 		if want := commandBefore(k, s); err != nil || got != want {

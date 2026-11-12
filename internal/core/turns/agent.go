@@ -22,9 +22,8 @@ type Policy struct {
 	// Drafts lets the session call the loop's slack_draft tool without a prompt; it posts nothing.
 	Drafts bool
 	// DraftTools are the tools that propose or revise a draft, which the session may call without a prompt.
-	DraftTools     []string
-	NoGitHubWrites bool
-	NoMCP          bool
+	DraftTools []string
+	NoMCP      bool
 	// Strict makes the policy the only permissions: the user's permission
 	// mode, hooks and the worktree's own settings do not apply. A hook that
 	// rewrites a command takes it out of the allow rules.
