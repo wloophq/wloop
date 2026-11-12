@@ -118,7 +118,7 @@ func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
 // Live asks the plugin now, never a cache, what a draft of kind on u would be written against; a plugin that
 // checks no draft answers "", and one that is not running fails, so no draft is taken as fresh unread.
 func (p Publisher) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	c, ok, err := p.drafter(ctx)
+	c, ok, err := drafterOf(ctx, p.Kind, p.ID)
 	if err != nil || !ok {
 		return "", err
 	}
@@ -127,22 +127,9 @@ func (p Publisher) Live(ctx context.Context, u unit.Unit, kind string) (string, 
 
 // Within asks the plugin whether target lies inside u; a plugin that checks no draft takes none inside.
 func (p Publisher) Within(ctx context.Context, u unit.Unit, target string) (bool, error) {
-	c, ok, err := p.drafter(ctx)
+	c, ok, err := drafterOf(ctx, p.Kind, p.ID)
 	if err != nil || !ok {
 		return false, err
 	}
 	return c.Within(ctx, Wire(u), target)
-}
-
-// drafter is the plugin's client when it checks drafts.
-func (p Publisher) drafter(ctx context.Context) (*src.Client, bool, error) {
-	c, err := p.Kind.Client(p.ID)
-	if err != nil {
-		return nil, false, err
-	}
-	caps, err := c.Capabilities(ctx)
-	if err != nil {
-		return nil, false, err
-	}
-	return c, slices.Contains(caps, src.CapabilityDrafter), nil
 }

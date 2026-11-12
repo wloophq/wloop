@@ -147,6 +147,7 @@ func newOutboxRig(t testing.TB, off ...unit.ProviderID) *outboxRig {
 		}
 		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
 	}, Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery }}
+	r.o.OnSent = append(r.o.OnSent, r.s.RuleSent)
 	r.s.deps.Outbox = r.o
 	r.s.registerOutbox()
 	return r

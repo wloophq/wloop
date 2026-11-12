@@ -104,8 +104,8 @@ func (s *Server) stale(ctx context.Context, d draft.Draft) bool {
 	return stale
 }
 
-// notifyByRule tells the user that a rule of theirs posted d, once it is sent.
-func (s *Server) notifyByRule(ctx context.Context, d draft.Draft) error {
+// RuleSent tells the user that a rule of theirs posted d, once it is sent; the composition root runs it after each send.
+func (s *Server) RuleSent(ctx context.Context, d draft.Draft) error {
 	g, ok, err := s.deps.Outbox.GateOf(ctx, d)
 	if err != nil || !ok {
 		return err

@@ -29,19 +29,19 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	var targets []unit.ProviderID
 	for _, m := range mods {
 		if m.Publisher != nil {
-			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin}
+			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin, provider: m.ID}
 			targets = append(targets, m.ID)
 		}
 	}
 	for p, fx := range e.testPublishers {
-		pubs[p] = pinnedEffects{Effects: fx, turns: pin}
+		pubs[p] = pinnedEffects{Effects: fx, turns: pin, provider: p}
 		if !slices.Contains(targets, p) {
 			targets = append(targets, p)
 		}
 	}
 	effects := publishers(pubs, cfg)
 	e.outbox = &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: effects, Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
-		Kinds: outboxKinds, Bases: publisherBases(effects), OnSent: e.draftSentHooks(),
+		Kinds: draftKinds, Bases: publisherBases(effects), OnSent: append(e.draftSentHooks(), e.ruleSent),
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Silent: builtin.SilentEffect,
@@ -61,9 +61,6 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	}
 	return d
 }
-
-// outboxKinds are the draft kinds the plugins' manifests declare; nil checks none.
-var outboxKinds outbox.Kinds
 
 // publisherBases read a unit's live basis from the publisher of its provider; a publisher that reads none
 // answers "", and a provider with none fails, so no draft is taken as fresh unread.
@@ -91,6 +88,17 @@ func (e *Env) draftSentHooks() []func(context.Context, draft.Draft) error {
 		return nil
 	}
 	return []func(context.Context, draft.Draft) error{sent.DraftSent}
+}
+
+// ruleSent tells the user, through the daemon serving now, that a rule of theirs posted d.
+func (e *Env) ruleSent(ctx context.Context, d draft.Draft) error {
+	if e.linkStates == nil {
+		return nil
+	}
+	if s := e.linkStates.Load(); s != nil {
+		return s.RuleSent(ctx, d)
+	}
+	return nil
 }
 
 // deliveryPosts says whether a draft of d reaches people, as the plugins'
@@ -145,11 +153,18 @@ type turnReader interface {
 type pinnedEffects struct {
 	port.Effects
 	turns turnReader
+	// provider is the plugin whose manifest's kinds name a draft's delivery when its publisher names none.
+	provider unit.ProviderID
 }
 
 func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
 	if dl, ok := p.Effects.(port.Deliverer); ok {
 		return dl.Delivers(k)
+	}
+	if p.provider != "" {
+		if d, err := draftKinds.Shape(string(p.provider), draft.Draft{Kind: k}); err == nil {
+			return d.Delivery
+		}
 	}
 	_, d := draft.ShapeOf(k)
 	return d

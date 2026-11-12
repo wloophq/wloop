@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -24,8 +26,14 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
+	"github.com/wloophq/wloop/internal/plugins/host"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/plugintest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // TestOptions are what ServeForTest puts in place of the outside world in the daemon serve composes.
@@ -37,6 +45,9 @@ type TestOptions struct {
 	Now func() time.Time
 	// Config edits the default configuration the daemon serves.
 	Config func(*config.Config)
+	// Plugins run, by plugin id, as serve runs that bundled plugin's process, such as the GitHub plugin over a
+	// fake GitHub; a plugin left out does not run.
+	Plugins map[string]src.Source
 }
 
 // TestDaemon is a daemon serve composed over a temporary home, with no collector, sweep loop or sender of its
@@ -113,6 +124,8 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 	e.linkStates = new(atomic.Pointer[daemon.Server])
 	e.Rounds = sqlite.NewRounds(db)
 	e.cfg = e.configHolder(cfg)
+	e.meter = meter.NewRegistry(nil)
+	stopPlugins := e.serveTestPlugins(t, ctx, db, cfg, o.Plugins, logf)
 	loopMu := &lock.Mutex{}
 	deps := serveDeps(ctx, e, db, cfg, logf, loopMu, &daemon.AppState{})
 	deps.Startup, deps.StateDir = nil, e.StateDir
@@ -128,6 +141,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 			t.Errorf("the test daemon: %v", err)
 		}
 		srv.Wait()
+		stopPlugins()
 		e.background.Wait()
 		db.Close()
 	})
@@ -141,6 +155,52 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+// serveTestPlugins runs impls as serve runs the bundled plugins of their ids, and waits until each is loaded.
+func (e *Env) serveTestPlugins(t testing.TB, ctx context.Context, db *sqlite.DB, cfg config.Config, impls map[string]src.Source,
+	logf func(string, ...any),
+) (stop func()) {
+	t.Helper()
+	if len(impls) == 0 {
+		return func() {}
+	}
+	manifests, err := bundled.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := plugintest.NewLauncher(t)
+	sums := host.Checksums{}
+	for _, m := range manifests {
+		impl, ok := impls[m.ID]
+		if !ok {
+			continue
+		}
+		e.plugins = append(e.plugins, host.Plugin{Manifest: m, Dir: t.TempDir(), Binary: brand.PluginBinary(m.ID), Bundled: true})
+		sum := sha256.Sum256([]byte(m.ID))
+		sums[m.ID] = sum[:]
+		l.Add(m.ID, map[plugin.Kind]plugin.Impl{src.Kind: src.New(impl)})
+	}
+	if err := writeChecksums(host.ChecksumsFile(e.StateDir), sums); err != nil {
+		t.Fatal(err)
+	}
+	e.pluginLauncher = l
+	e.noJobs = false
+	stop = e.servePlugins(ctx, db, cfg, logf)
+	e.noJobs = true
+	deadline := time.Now().Add(time.Minute)
+	for id := range impls {
+		for {
+			if _, err := e.pluginKind.Client(id); err == nil {
+				break
+			} else if time.Now().After(deadline) {
+				stop()
+				t.Fatalf("plugin %s never loaded: %v", id, err)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	return stop
 }
 
 // Client is the daemon's client, as a person's clients speak to it.

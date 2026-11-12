@@ -46,7 +46,7 @@ func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []pluginModule
 	repeatAfter := time.Duration(cfg.Drafts.RepeatAfter)
 	effects := publishersOf(mods)
 	svc := &outbox.Service{Store: db.Drafts(), Gates: draftGates{e, db, logf}, Effects: effects, Clock: clockFunc(e.Now), Log: logf,
-		RepeatAfter: repeatAfter, Posts: deliveryPosts, Kinds: outboxKinds, Bases: publisherBases(effects)}
+		RepeatAfter: repeatAfter, Posts: deliveryPosts, Kinds: draftKinds, Bases: publisherBases(effects)}
 	var srcs []proposals.Source
 	for _, m := range mods {
 		if m.Proposals != nil {

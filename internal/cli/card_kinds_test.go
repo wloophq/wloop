@@ -33,7 +33,3 @@ func TestCardKindsAreTheOutboxKinds(t *testing.T) {
 		t.Error("an undeclared kind is found")
 	}
 }
-
-func TestServeNotifiesRuleSent(t *testing.T) {
-	t.Skip("T13: M2 of reviews/T8.md")
-}

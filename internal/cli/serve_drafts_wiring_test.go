@@ -2,12 +2,16 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -15,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // basingPublisher is a recordingPublisher that reads a unit's live head, and fails every post with fail when set.
@@ -95,9 +100,17 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 		}
 	}
 	t.Run("kinds", func(t *testing.T) {
-		t.Skip("T13 waits on T1: the manifests' draft kinds as outbox.Kinds")
-		if d.Outbox.Kinds == nil || proposing.Kinds == nil {
-			t.Fatal("the outbox checks no draft kind")
+		for name, k := range map[string]outbox.Kinds{"sender": d.Outbox.Kinds, "proposals": proposing.Kinds} {
+			if k == nil {
+				t.Fatalf("%s: the outbox checks no draft kind", name)
+			}
+			spec, ok := k.Lookup(string(unit.GitHub), "review")
+			if !ok || spec.Delivery != "review" {
+				t.Fatalf("%s: the GitHub review kind is %+v %v", name, spec, ok)
+			}
+			if err := k.Validate(spec, json.RawMessage(`{"event":"MERGE"}`)); !errors.Is(err, outbox.ErrInvalid) {
+				t.Fatalf("%s: a review with no such event: %v", name, err)
+			}
 		}
 	})
 	t.Run("through the daemon", func(t *testing.T) {
@@ -134,5 +147,49 @@ func TestDraftSentCompletesTurn(t *testing.T) {
 	te, d, _ := servedOutboxOf(t, &basingPublisher{})
 	if te.Turns == nil || len(d.Outbox.OnSent) == 0 {
 		t.Fatal("a sent draft completes no turn")
+	}
+}
+
+// holds is a rule condition that holds for every draft.
+type holds struct{}
+
+func (holds) Holds(map[string]any, time.Time) (bool, error) { return true, nil }
+
+func TestServeNotifiesRuleSent(t *testing.T) {
+	t.Parallel()
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	now := func() time.Time { return testNow }
+	d := ServeForTest(t, TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: &basingPublisher{head: "c2"}},
+		Plugins: map[string]src.Source{string(unit.GitHub): fakeGitHubPlugin(&fakeGH{basics: openBasics}, now)}})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	events, err := d.Client().Events(ctx, "test", api.Since{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Wait},
+		Rules: []draft.Rule{{When: holds{}, Approval: draft.Approval{Mode: draft.Send}, Names: draft.CommentDelivery}}}
+	sent, err := d.e.outbox.Propose(ctx, outbox.Proposal{Unit: pr, Kind: draft.Reply, Text: "Thanks, merged the fix.",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: "k"}, Policy: rule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("draft:%d:by-rule", sent.ID)
+	deadline := time.After(time.Minute)
+	for {
+		select {
+		case ch, ok := <-events:
+			if !ok {
+				t.Fatal("the event stream ended before the notice")
+			}
+			if slices.ContainsFunc(ch.Notices, func(n api.Notice) bool { return n.ID == want }) {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("no notice %s", want)
+		}
 	}
 }
