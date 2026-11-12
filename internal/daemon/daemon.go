@@ -459,6 +459,9 @@ type Server struct {
 	draftWheres sync.Map
 	// refusedStale keeps, by draft id, the rev an approval or a retry was refused at as stale.
 	refusedStale sync.Map
+	// basisReads are the live basis reads the drafts' cards share, by unit and kind; basisMu guards them.
+	basisMu    sync.Mutex
+	basisReads map[string]*basisRead
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.

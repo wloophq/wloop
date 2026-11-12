@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -30,11 +31,6 @@ import (
 type DraftKinds interface {
 	Lookup(provider, kind string) (draft.KindSpec, bool)
 	Schema(spec draft.KindSpec) (json.RawMessage, error)
-}
-
-// staler is the outbox's live check of a draft's basis.
-type staler interface {
-	Stale(ctx context.Context, d draft.Draft) (bool, error)
 }
 
 // cardFields fills v, d's view, with what its card shows of d beyond its text: its payload field by field, its
@@ -54,7 +50,9 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 	v.By = string(d.By.Kind)
 	v.Author = words.Authors[v.By]
 	if d.State == draft.Held && d.Basis != "" {
-		v.Stale = s.stale(ctx, d)
+		var known bool
+		v.Stale, known = s.stale(ctx, d)
+		v.StaleUnknown = !known
 	}
 	if v.Stale && words.Stale != "" {
 		v.Notes = append(v.Notes, words.Stale)
@@ -79,19 +77,13 @@ func (s *Server) byRuleText(d draft.Draft, rule, where string) string {
 		"Link": d.Evidence.Permalink})
 }
 
-// stale is whether held draft d's unit moved past its basis, read live by the outbox within the page's lookup
-// deadline; false when it cannot tell, since approving re-checks it.
-func (s *Server) stale(ctx context.Context, d draft.Draft) bool {
+// stale is whether held draft d's unit moved past its basis, and known whether that could be told: a refusal of d
+// as stale at its rev tells it; else the unit's live basis, read once per unit and kind for every draft of it within
+// basisFresh, and waited for only until the page's lookup deadline. A read that failed or has not answered yet
+// leaves it unknown, which offers the approval: approving and sending re-check the basis live.
+func (s *Server) stale(ctx context.Context, d draft.Draft) (stale, known bool) {
 	if rev, ok := s.refusedStale.Load(d.ID); ok && rev.(int64) == d.Rev {
-		return true
-	}
-	check := s.deps.Stale
-	if check == nil {
-		st, ok := any(s.deps.Outbox).(staler)
-		if !ok {
-			return false
-		}
-		check = st.Stale
+		return true, true
 	}
 	by := time.Now().Add(s.whereTimeout())
 	if page, ok := ctx.Value(whereByKey{}).(time.Time); ok && page.Before(by) {
@@ -99,12 +91,65 @@ func (s *Server) stale(ctx context.Context, d draft.Draft) bool {
 	}
 	ctx, cancel := context.WithDeadline(ctx, by)
 	defer cancel()
-	stale, err := check(ctx, d)
-	if err != nil {
-		s.logf("drafts: the basis of draft %d: %v", d.ID, err)
-		return false
+	if check := s.deps.Stale; check != nil {
+		stale, err := check(ctx, d)
+		return stale, err == nil
 	}
-	return stale
+	o := s.deps.Outbox
+	if o == nil || o.Bases == nil {
+		return false, false
+	}
+	r := s.basisRead(o.Bases, d.Unit, string(d.Kind))
+	select {
+	case <-r.done:
+	case <-ctx.Done():
+		return false, false
+	}
+	if r.err != nil {
+		return false, false
+	}
+	return r.live != d.Basis, true
+}
+
+// basisFresh is how long a unit's live basis read serves its drafts' cards; basisReadTimeout bounds one read.
+const (
+	basisFresh       = 30 * time.Second
+	basisReadTimeout = 10 * time.Second
+)
+
+// basisRead is one live read of a unit's basis: done closes when live or err is set, at when it was started.
+type basisRead struct {
+	done chan struct{}
+	live string
+	err  error
+	at   time.Time
+}
+
+// basisRead is the live read of u's basis for kind its cards share: the one in flight, else the last one while it
+// is fresh, else a new one, which runs past the page that started it so the next page finds its answer.
+func (s *Server) basisRead(bases outbox.Bases, u unit.Unit, kind string) *basisRead {
+	key := u.String() + "\x00" + kind
+	now := time.Now()
+	s.basisMu.Lock()
+	defer s.basisMu.Unlock()
+	if r, ok := s.basisReads[key]; ok && now.Sub(r.at) < basisFresh {
+		return r
+	}
+	if s.basisReads == nil {
+		s.basisReads = map[string]*basisRead{}
+	}
+	r := &basisRead{done: make(chan struct{}), at: now}
+	s.basisReads[key] = r
+	s.ran.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), basisReadTimeout)
+		defer cancel()
+		r.live, r.err = bases.Live(ctx, u, kind)
+		if r.err != nil && !errors.Is(r.err, context.DeadlineExceeded) && !errors.Is(r.err, context.Canceled) {
+			s.logf("drafts: the live basis of %s: %v", u, r.err)
+		}
+		close(r.done)
+	})
+	return r
 }
 
 // RuleSent tells the user that a rule of theirs posted d, once it is sent; the composition root runs it after each send.
