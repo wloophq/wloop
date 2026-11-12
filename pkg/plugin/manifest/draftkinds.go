@@ -104,6 +104,9 @@ func (s draftSchema) at(pointer string) (map[string]any, bool, error) {
 	node, required := s.root, true
 	for _, tok := range strings.Split(pointer[1:], "/") {
 		tok = strings.ReplaceAll(strings.ReplaceAll(tok, "~1", "/"), "~0", "~")
+		if node["type"] != "object" {
+			return nil, false, fmt.Errorf("%q passes through a value that is not an object", pointer)
+		}
 		props, _ := node["properties"].(map[string]any)
 		next, ok := props[tok].(map[string]any)
 		if !ok {

@@ -69,11 +69,18 @@ func TestFactPointerMustBeRequiredEnum(t *testing.T) {
 	for _, c := range []struct{ name, schema, want string }{
 		{"a required string with no enum", `{"type": "object", "required": ["x"], "properties": {"x": {"type": "string"}}}`, "no enum"},
 		{"a required enum that is not a string", `{"type": "object", "required": ["x"], "properties": {"x": {"type": "integer", "enum": [1, 2]}}}`, "not a string"},
+		{"an enum under a string parent", `{"type": "object", "required": ["a"], "properties": {"a": {"type": "string", "required": ["x"], "properties": {"x": {"type": "string", "enum": ["x"]}}}}}`, "not an object"},
+		{"an enum under a array parent", `{"type": "object", "required": ["a"], "properties": {"a": {"type": "array", "required": ["x"], "properties": {"x": {"type": "string", "enum": ["x"]}}}}}`, "not an object"},
+		{"an enum under a null parent", `{"type": "object", "required": ["a"], "properties": {"a": {"type": "null", "required": ["x"], "properties": {"x": {"type": "string", "enum": ["x"]}}}}}`, "not an object"},
 		{"a string enum with a number in it", `{"type": "object", "required": ["x"], "properties": {"x": {"type": "string", "enum": ["a", 2]}}}`, "not a string"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			files := fstest.MapFS{"drafts/review/schema.json": {Data: []byte(c.schema)}}
-			if _, err := draftSource(t, reviewKind("draft.acme.review.x", "/x"), files); err == nil || !strings.Contains(err.Error(), c.want) {
+			pointer := "/x"
+			if strings.Contains(c.schema, `"required": ["a"]`) {
+				pointer = "/a/x"
+			}
+			if _, err := draftSource(t, reviewKind("draft.acme.review.x", pointer), files); err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Errorf("Source = %v, want an error naming %q", err, c.want)
 			}
 		})
