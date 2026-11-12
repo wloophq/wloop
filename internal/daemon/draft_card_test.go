@@ -66,7 +66,12 @@ func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.s.deps.DraftKinds = reviewKinds{}
-	v := r.s.draftView(context.Background(), reviewDraftOf(draft.Sent), gate.Gate{})
+	d := reviewDraftOf(draft.Sent)
+	d.By = draft.Actor{Kind: draft.ActorSession, Session: "s-1"}
+	v := r.s.draftView(context.Background(), d, gate.Gate{})
+	if v.By != "session" || v.Author == "" || v.Author != r.s.loaded().Gates.Drafts.Authors["session"] {
+		t.Errorf("by %q author %q, want the session and the profile's words for it", v.By, v.Author)
+	}
 	got := map[string]api.DraftField{}
 	flatValues(v.Fields, got)
 	want := map[string]string{"/event": "REQUEST_CHANGES", "/comments/0/path": "api/handler.go", "/comments/0/line": "42", "/comments/0/side": "RIGHT",

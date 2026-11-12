@@ -209,6 +209,12 @@ quoted = "Quotes an item of {conversation}, a conversation they are not in."
 stale = "Written against an older version of where it posts, so it cannot be approved: revise or discard it."
 hold = "Held for you: no rule of yours sends it."
 
+[drafts.authors]
+person = "Last written by you"
+session = "Last written by an agent"
+rule = "Last written by your rule"
+window = "Last written when its window passed"
+
 [drafts.purposes]
 nudge = "Nudge"
 close = "Close"

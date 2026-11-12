@@ -450,6 +450,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
 - `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
 - `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.
+- `drafts.authors` (table by name): Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing.
+- `drafts.authors.<name>` (string, localized): The author's words, such as "Revised by an agent"; the key is person, session, rule or window.
 - `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.

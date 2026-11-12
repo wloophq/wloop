@@ -95,6 +95,10 @@ type Draft struct {
 	Stale bool   `json:"stale,omitempty"`
 	// Hold keeps every approval rule from releasing the draft.
 	Hold bool `json:"hold,omitempty"`
+	// By is who wrote the draft's current content (person, session, rule or window), Author that in the
+	// profile's words (gates.toml's drafts.authors); both "" when unknown.
+	By     string `json:"by,omitempty"`
+	Author string `json:"author,omitempty"`
 	// ByRule is the approval rule of the user's that sent the draft, "" when none did.
 	ByRule string `json:"by_rule,omitempty"`
 	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,

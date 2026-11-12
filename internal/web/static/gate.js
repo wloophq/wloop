@@ -517,6 +517,7 @@ function draftCard(e, d, opts = {}) {
     h("div", { class: "d-sub" }, head),
     opts.context ? draftContextView(opts.context) : null,
     draftWhere(d),
+    d.author ? h("div", { class: "meta d-by" }, d.author) : null,
     broadcastToggle(d, scope),
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),

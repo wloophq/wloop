@@ -32,6 +32,8 @@ var gatesGrammar = []Key{
 	{Path: "drafts.quoted", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation."},
 	{Path: "drafts.stale", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off."},
 	{Path: "drafts.hold", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a held draft its proposer asked no approval rule to send."},
+	{Path: "drafts.authors", In: SurfaceGates, Kind: KindMap, Doc: "Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing."},
+	{Path: "drafts.authors.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The author's words, such as \"Revised by an agent\"; the key is person, session, rule or window."},
 	{Path: "drafts.purposes", In: SurfaceGates, Kind: KindMap, Doc: "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named."},
 	{Path: "drafts.purposes.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The purpose's word, such as \"Nudge\"."},
 	{Path: "drafts.states", In: SurfaceGates, Kind: KindMap, Doc: "Where a draft's delivery stands, by state, as its card says it."},

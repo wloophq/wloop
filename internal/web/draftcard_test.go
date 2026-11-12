@@ -55,6 +55,7 @@ func TestCardShowsFullPayload(t *testing.T) {
 		Text           string
 	}
 	d := reviewDraft()
+	d.By, d.Author = "session", "Last written by an agent"
 	runGate(t, `
 const c = draft(input.draft);
 const shown = cls(c, "pv");
@@ -63,7 +64,7 @@ done({ Values: shown.map((x) => attr(x, "data-value")), Labels: walk(c, (x) => x
 	if want := leaves(d.Fields); !slices.Equal(got.Values, want) {
 		t.Errorf("the card shows the values\n %q\nwant every value the draft posts\n %q", got.Values, want)
 	}
-	for _, s := range []string{"Request changes", "Back off\nbetween tries.", "api/retry.go", "Two findings block the merge."} {
+	for _, s := range []string{"Last written by an agent", "Request changes", "Back off\nbetween tries.", "api/retry.go", "Two findings block the merge."} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the card lacks %q: %q", s, got.Text)
 		}

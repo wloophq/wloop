@@ -130,6 +130,12 @@ quoted = "Cita um item de {conversation}, uma conversa da qual a pessoa não par
 stale = "Escrito sobre uma versão anterior de onde vai ser publicado, então não pode ser aprovado: revise ou descarte."
 hold = "Retido para você: nenhuma regra sua o envia."
 
+[drafts.authors]
+person = "Escrito por último por você"
+session = "Escrito por último por um agente"
+rule = "Escrito por último pela sua regra"
+window = "Escrito por último quando a janela passou"
+
 [drafts.purposes]
 nudge = "Cutucar"
 close = "Encerrar"

@@ -45,6 +45,8 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 	}
 	v.Basis, v.Hold = d.Basis, d.Hold
 	words := s.loaded().Gates.Drafts
+	v.By = string(d.By.Kind)
+	v.Author = words.Authors[v.By]
 	if d.State == draft.Held && d.Basis != "" {
 		v.Stale = s.stale(ctx, d)
 	}
