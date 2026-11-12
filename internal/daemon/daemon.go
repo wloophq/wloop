@@ -451,6 +451,10 @@ type Server struct {
 	presentersOnce sync.Once
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
+	// pins are the drafts the open questions pin, read at pinsAt; pinsMu guards them.
+	pinsMu sync.Mutex
+	pins   map[int64]int64
+	pinsAt time.Time
 	// replyBroadcasts keeps, by replyKey, the broadcast a task's reply would take and when it was asked.
 	replyBroadcasts sync.Map
 	// lookupsSwept is when keepLookup last swept draftWheres and replyBroadcasts, in Unix nanoseconds.

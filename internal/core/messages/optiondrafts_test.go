@@ -130,10 +130,18 @@ func (o *optionDrafts) Publish(_ context.Context, g gate.Gate) error {
 	return nil
 }
 
-func (o *optionDrafts) WithdrawHeld(_ context.Context, id int64, reason string) error {
+// WithdrawHeld drops draft id as the outbox does: its open gate closes as superseded.
+func (o *optionDrafts) WithdrawHeld(ctx context.Context, id int64, reason string) error {
 	o.mu.Lock()
-	defer o.mu.Unlock()
 	o.withdrawn = append(o.withdrawn, withdrawal{id, reason})
+	gid, ok := o.gateIDs[id]
+	o.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	if _, err := o.r.gateStore.Resolve(ctx, gid, gates.Resolution{Status: gate.Superseded, By: task.ActorWorkflow}); err != nil && !errors.Is(err, gates.ErrResolved) {
+		return err
+	}
 	return nil
 }
 

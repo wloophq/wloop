@@ -96,6 +96,9 @@ type Draft struct {
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
 	Stale bool   `json:"stale,omitempty"`
+	// PinnedBy is the open question message whose option or confirm pins the draft: only an answer to that
+	// question decides it, so clients show the draft under that option and offer no card of its own; 0 for none.
+	PinnedBy int64 `json:"pinned_by,omitempty"`
 	// StaleUnknown says the unit's live basis could not be read in time, so Stale is not known; the approval
 	// stays offered, and approving and sending re-check it live.
 	StaleUnknown bool `json:"stale_unknown,omitempty"`
@@ -203,14 +206,15 @@ type DraftCreate struct {
 	Source    string `json:"source"`
 }
 
-// DraftOf is the draft of e's first draft gate, its subject; false when e has none.
+// DraftOf is the draft of e's first draft gate, its subject, that no open question pins; false when e has none.
+// A pinned draft is its question's to decide, which shows it under the option that pins it.
 func (e TaskView) DraftOf() (Draft, bool) {
 	for _, g := range e.Gates {
 		if g.Kind != GateKindDraft || len(g.Subject) == 0 {
 			continue
 		}
 		var d Draft
-		if json.Unmarshal(g.Subject, &d) == nil {
+		if json.Unmarshal(g.Subject, &d) == nil && d.PinnedBy == 0 {
 			return d, true
 		}
 	}

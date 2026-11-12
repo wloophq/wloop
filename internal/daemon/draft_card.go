@@ -34,6 +34,9 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload, spec, declared)
 	}
 	v.Preview = s.preview(d, publisher, v.Where)
+	if d.State == draft.Held {
+		v.PinnedBy = s.openPins(ctx)[int64(d.ID)]
+	}
 	v.Basis, v.Hold = d.Basis, d.Hold
 	if declared {
 		v.TextLocked = !slices.Contains(spec.Editable, draft.EditableText)
@@ -305,4 +308,27 @@ func (q requester) by() draft.Actor {
 		return draft.Actor{Kind: draft.ActorSession, Session: q.Session}
 	}
 	return draft.Actor{Kind: draft.ActorPerson}
+}
+
+// pinsFresh is how long the drafts the open questions pin serve the cards of a page, read once for all of them.
+const pinsFresh = time.Second
+
+// openPins are the drafts the open questions pin, by draft id, with the message that pins each; read at most
+// once per pinsFresh, so a page of many drafts reads the open questions once.
+func (s *Server) openPins(ctx context.Context) map[int64]int64 {
+	m := s.deps.Messages
+	if m == nil {
+		return nil
+	}
+	s.pinsMu.Lock()
+	defer s.pinsMu.Unlock()
+	if now := time.Now(); s.pins == nil || now.Sub(s.pinsAt) >= pinsFresh {
+		pins, err := m.PinnedDrafts(ctx)
+		if err != nil {
+			s.logf("drafts: the drafts the open questions pin: %v", err)
+			return s.pins
+		}
+		s.pins, s.pinsAt = pins, now
+	}
+	return s.pins
 }

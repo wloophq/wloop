@@ -31,7 +31,11 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	ev := s.taskViews(r.Context(), s.deps.Tasks, false)
 	ctx := whereBy(r.Context(), time.Now().Add(s.whereBudget()))
 	out := make([]api.OutboxDraft, 0, len(ps))
+	pins := s.openPins(r.Context())
 	for _, p := range ps {
+		if p.Draft.State == draft.Held && pins[int64(p.Draft.ID)] != 0 {
+			continue
+		}
 		d := s.draftDetail(ctx, p.Draft, p.Gate, ev.unitItems())
 		c, err := ev.draftContext(ctx, d)
 		if err != nil {
