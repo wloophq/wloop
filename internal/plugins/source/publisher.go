@@ -103,7 +103,7 @@ func (p Publisher) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, 
 
 // Delivers is the delivery the manifest's draft kind k names, else its
 // default delivery: a plugin posts every draft as one of its own
-// deliveries. A manifest with neither posts k as its shape says.
+// deliveries. A manifest with neither leaves the draft's own, "".
 func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
 	if i := slices.IndexFunc(p.Source.DraftKinds, func(m manifest.DraftKind) bool { return m.Name == string(k) }); i >= 0 && p.Source.DraftKinds[i].Delivery != "" {
 		return draft.Delivery(p.Source.DraftKinds[i].Delivery)
@@ -111,8 +111,7 @@ func (p Publisher) Delivers(k draft.Kind) draft.Delivery {
 	if p.Source.DefaultDelivery != "" {
 		return draft.Delivery(p.Source.DefaultDelivery)
 	}
-	_, d := draft.ShapeOf(k)
-	return d
+	return ""
 }
 
 // Live asks the plugin now, never a cache, what a draft of kind on u would be written against; a plugin that

@@ -68,7 +68,7 @@ func draftTemplate(layers []profile.Layer, bundled fs.FS, workflowName, file str
 // draftWhy is the workflow's why template file, in the user's locale; nil when the workflow keeps no file
 // of the default name.
 func draftWhy(layers []profile.Layer, workflowName, file, locale string) (*template.Template, error) {
-	t, _, err := draftTemplate(layers, turn.BundledFS(), workflowName, file, draft.Message, locale)
+	t, _, err := draftTemplate(layers, turn.BundledFS(), workflowName, file, "", locale)
 	if errors.Is(err, fs.ErrNotExist) && file == defaultDraftWhy {
 		return nil, nil
 	}

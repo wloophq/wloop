@@ -267,7 +267,7 @@ func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 	if got := gh.Delivers(draft.Reply); got != draft.CommentDelivery {
 		t.Errorf("github: %s", got)
 	}
-	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Reply); got != draft.Message {
+	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Reply); got != "" {
 		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }

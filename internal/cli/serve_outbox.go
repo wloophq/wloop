@@ -31,12 +31,12 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	var targets []unit.ProviderID
 	for _, m := range mods {
 		if m.Publisher != nil {
-			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin, provider: m.ID}
+			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin}
 			targets = append(targets, m.ID)
 		}
 	}
 	for p, fx := range e.testPublishers {
-		pubs[p] = pinnedEffects{Effects: fx, turns: pin, provider: p}
+		pubs[p] = pinnedEffects{Effects: fx, turns: pin}
 		if !slices.Contains(targets, p) {
 			targets = append(targets, p)
 		}
@@ -211,21 +211,13 @@ type turnReader interface {
 type pinnedEffects struct {
 	port.Effects
 	turns turnReader
-	// provider is the plugin whose manifest's kinds name a draft's delivery when its publisher names none.
-	provider unit.ProviderID
 }
 
 func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
 	if dl, ok := p.Effects.(port.Deliverer); ok {
 		return dl.Delivers(k)
 	}
-	if p.provider != "" {
-		if d, err := draftKinds.Shape(string(p.provider), draft.Draft{Kind: k}); err == nil {
-			return d.Delivery
-		}
-	}
-	_, d := draft.ShapeOf(k)
-	return d
+	return ""
 }
 
 func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {

@@ -330,3 +330,22 @@ func servedWithGitHub(t *testing.T, pub port.Effects) *TestDaemon {
 	return ServeForTest(t, TestOptions{Now: now, Publishers: map[unit.ProviderID]port.Effects{unit.GitHub: pub},
 		Plugins: map[string]src.Source{string(unit.GitHub): fakeGitHubPlugin(&fakeGH{basics: openBasics}, now)}})
 }
+
+func TestTheFailedDraftsReadOnceAPassSeeANewFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te, _, log := servedOutboxOf(t, &basingPublisher{})
+	f := &failedDrafts{store: te.db.Drafts(), changes: log}
+	q := outbox.Filter{Unit: &threadUnit, States: []draft.State{draft.Failed}}
+	if got, err := f.List(ctx, q); err != nil || len(got) != 0 {
+		t.Fatalf("before any failure: %v %v", got, err)
+	}
+	failed := insertDraft(t, te.db, draft.Draft{Unit: threadUnit, Text: "x", State: draft.Failed, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1}})
+	if got, err := f.List(ctx, q); err != nil || len(got) != 1 || got[0].ID != failed.ID {
+		t.Fatalf("after a failure the change log noted: %v %v", got, err)
+	}
+	other := unit.Unit{Provider: threadUnit.Provider, Key: "C1 0009"}
+	if got, err := f.List(ctx, outbox.Filter{Unit: &other, States: []draft.State{draft.Failed}}); err != nil || len(got) != 0 {
+		t.Fatalf("another unit's failures: %v %v", got, err)
+	}
+}

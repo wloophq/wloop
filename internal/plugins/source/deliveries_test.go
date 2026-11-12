@@ -48,13 +48,12 @@ func TestSlackDeliversItsKindsAsItsManifestNamesThem(t *testing.T) {
 	}
 }
 
-func TestAManifestWithNoDeliveriesPostsAKindAsItsShape(t *testing.T) {
+func TestAManifestWithNoDeliveriesLeavesADraftsOwn(t *testing.T) {
 	t.Parallel()
 	p := psource.Publisher{ID: "acme", Source: &manifest.Source{}}
-	if got := p.Delivers(draft.React); got != draft.Reaction {
-		t.Fatalf("react: %s", got)
-	}
-	if got := p.Delivers(draft.Reply); got != draft.Message {
-		t.Fatalf("reply: %s", got)
+	for _, k := range []draft.Kind{"react", "reply"} {
+		if got := p.Delivers(k); got != "" {
+			t.Errorf("%s: %s", k, got)
+		}
 	}
 }
