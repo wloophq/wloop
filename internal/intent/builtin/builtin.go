@@ -74,7 +74,7 @@ func BoardOf(workspace string) string {
 // ReservedNames are names a user intent may not take: CLI commands, built-in action ids, profile words, dimensions.
 // The loader checks them against user layers only.
 var ReservedNames = []string{
-	"app", "brief", "config", "doctor", "eval-correlation", "eval-instructions", "explore", "help", "hook", "init", "install",
+	"app", "brief", "config", "doctor", "draft", "eval-correlation", "eval-instructions", "explore", "help", "hook", "init", "install",
 	"instructions", "intake", "mute", "open", "outbox", "pause", "plan", "profile", "remove", "resume",
 	"serve", "slack", "status", "store", "take-over", "task", "timings", "track", "trust", "tui", "turn", "uninstall", "unmute", "untrack",
 	"version", "workflows",
