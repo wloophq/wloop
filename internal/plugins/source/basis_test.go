@@ -27,6 +27,10 @@ func (h *heads) Basis(_ context.Context, u plugin.Unit, kind string) (string, er
 	return h.head, nil
 }
 
+func (h *heads) Within(_ context.Context, u plugin.Unit, target string) (bool, error) {
+	return target == "comment:1" && u.Key == "pr7", nil
+}
+
 func TestBasesReadThePluginLive(t *testing.T) {
 	k := kindOver(t, &change.Log{})
 	h := &heads{Stub: sourcetest.NewStub(), head: "a1"}
@@ -52,5 +56,14 @@ func TestBasesReadThePluginLive(t *testing.T) {
 	}
 	if _, err := b.Live(ctx, unit.Unit{Provider: "gone", Key: "x"}, "review"); err == nil {
 		t.Fatal("a basis of a plugin not running")
+	}
+	if in, err := b.Within(ctx, u, "comment:1"); err != nil || !in {
+		t.Fatalf("a target the plugin places inside: %v %v", in, err)
+	}
+	if in, err := b.Within(ctx, u, "comment:2"); err != nil || in {
+		t.Fatalf("a target the plugin places outside: %v %v", in, err)
+	}
+	if in, err := b.Within(ctx, unit.Unit{Provider: "plain", Key: "x"}, "comment:1"); err != nil || in {
+		t.Fatalf("a plugin with no drafter: %v %v", in, err)
 	}
 }

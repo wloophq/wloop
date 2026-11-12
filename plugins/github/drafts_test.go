@@ -186,7 +186,7 @@ func TestBasisLive(t *testing.T) {
 	t.Parallel()
 	p, gh, _ := startedLive(t)
 	ctx := context.Background()
-	if !slices.Contains(src.Capabilities(p), src.CapabilityBasis) {
+	if !slices.Contains(src.Capabilities(p), src.CapabilityDrafter) {
 		t.Fatal("the plugin is no basis reader")
 	}
 	if got, err := p.Basis(ctx, ref7.Unit(), "review"); err != nil || got != headA {

@@ -206,6 +206,17 @@ func (f *fakePulls) graphQL(w http.ResponseWriter, raw []byte) {
 		io.WriteString(w, `{"data":{"resolveReviewThread":null},"errors":[{"message":"Could not resolve to a node","path":["resolveReviewThread"]}]}`)
 		return
 	}
+	if strings.Contains(in.Query, "node(id:") {
+		switch in.Variables["id"] {
+		case "PRRT_kwDOAbCdEf4AAAAB":
+			io.WriteString(w, `{"data":{"node":{"pullRequest":{"number":7,"repository":{"nameWithOwner":"acme/api"}}}}}`)
+		case "PRRT_pr8":
+			io.WriteString(w, `{"data":{"node":{"pullRequest":{"number":8,"repository":{"nameWithOwner":"acme/api"}}}}}`)
+		default:
+			io.WriteString(w, `{"data":{"node":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node","path":["node"]}]}`)
+		}
+		return
+	}
 	if in.Variables["owner"] != "acme" || in.Variables["repo"] != "api" || in.Variables["number"] != float64(7) {
 		io.WriteString(w, `{"data":{"repository":null}}`)
 		return
@@ -622,4 +633,36 @@ func BenchmarkPublishReview(b *testing.B) {
 		}
 	}
 	b.ReportMetric(float64(len(f.requests))/float64(b.N), "requests/op")
+}
+
+func TestWithinNamesOnlyThePullRequestsOwn(t *testing.T) {
+	f, p := newFakePulls(t)
+	ctx := context.Background()
+	f.comment(1234567, 0, "ana", "Is this safe?", f.now)
+	f.mu.Lock()
+	f.comments = append(f.comments, ghComment{ID: 3000000, PullRequestURL: "https://api.github.com/repos/acme/api/pulls/8", User: ghUser{"ana"}})
+	f.mu.Unlock()
+	for target, want := range map[string]bool{
+		"":                             true,
+		"acme/api#7":                   true,
+		"ACME/api#7":                   true,
+		"acme/api#8":                   false,
+		"comment:1234567":              true,
+		"comment:3000000":              false,
+		"comment:999":                  false,
+		"comment:x":                    false,
+		"thread:PRRT_kwDOAbCdEf4AAAAB": true,
+		"thread:PRRT_pr8":              false,
+		"thread:PRRT_none":             false,
+		"thread:":                      false,
+		"#general":                     false,
+	} {
+		got, err := p.Within(ctx, pr7, target)
+		if err != nil || got != want {
+			t.Errorf("Within(%q) = %v %v, want %v", target, got, err, want)
+		}
+	}
+	if w := f.writes(); len(w) != 0 {
+		t.Fatalf("writes %v", w)
+	}
 }

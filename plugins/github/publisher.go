@@ -6,12 +6,13 @@ import (
 
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/publish"
 )
 
 var (
-	_ src.Publisher   = (*Plugin)(nil)
-	_ src.BasisReader = (*Plugin)(nil)
+	_ src.Publisher = (*Plugin)(nil)
+	_ src.Drafter   = (*Plugin)(nil)
 )
 
 func (p *Plugin) publisher() (*publish.Publisher, error) {
@@ -100,4 +101,18 @@ func (p *Plugin) Basis(ctx context.Context, u sdk.Unit, _ string) (string, error
 		return "", err
 	}
 	return pub.Head(ctx, ref)
+}
+
+// Within says whether target lies inside u's pull request: the pull
+// request, one of its review comments or one of its review threads.
+func (p *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, error) {
+	ref, ok := pr.RefOf(u)
+	if !ok {
+		return false, nil
+	}
+	pub, err := p.publisher()
+	if err != nil {
+		return false, err
+	}
+	return pub.Within(ctx, ref, target)
 }

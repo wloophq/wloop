@@ -345,8 +345,7 @@ func (p *Publisher) reviewComment(ctx context.Context, ref pr.Ref, id int64) (re
 	if err := json.Unmarshal(resp.Body, &c); err != nil || c.ID != id {
 		return reviewComment{}, fmt.Errorf("reading review comment %d of %s: GitHub's answer names another", id, ref)
 	}
-	own := fmt.Sprintf("/repos/%s/%s/pulls/%d", ref.Owner, ref.Repo, ref.Number)
-	if u, err := url.Parse(c.PullRequestURL); err != nil || !strings.HasSuffix(strings.ToLower(u.Path), strings.ToLower(own)) {
+	if !ownPull(ref, c.PullRequestURL) {
 		return reviewComment{}, fmt.Errorf("review comment %d is not one of %s", id, ref)
 	}
 	return c, nil
