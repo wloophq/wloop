@@ -288,3 +288,31 @@ empty = "Nothing waits only for the merge."
 clause = { one = "{counter} waits for a reviewer", other = "{counter} wait for a reviewer" }
 queue = "Pick a reviewer"
 empty = "No pull request waits for a reviewer."
+
+# The words of a review draft's payload on its card.
+[drafts.review.fields.event]
+label = "Verdict"
+values = { APPROVE = "Approve", REQUEST_CHANGES = "Request changes", COMMENT = "Comment" }
+
+[drafts.review.fields.comments]
+label = "Inline comments"
+
+[drafts.review.fields.path]
+label = "File"
+
+[drafts.review.fields.line]
+label = "Line"
+
+[drafts.review.fields.start_line]
+label = "From line"
+
+[drafts.review.fields.side]
+label = "Side"
+values = { LEFT = "old", RIGHT = "new" }
+
+[drafts.review.fields.start_side]
+label = "From side"
+values = { LEFT = "old", RIGHT = "new" }
+
+[drafts.review.fields.body]
+label = "Comment"

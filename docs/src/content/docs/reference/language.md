@@ -448,6 +448,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
 - `drafts.by_hand_about` (string, localized): One line under that title.
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
+- `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
+- `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.
 - `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
@@ -810,6 +812,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `chat_queued`: Tells the person that their chat message waits for the busy agent of a live session of the task, which is told of it when it stops.
   - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
   - `draft_sent`: Tells the person that the reply they sent at once, Draft, is approved and goes out.
+  - `draft_by_rule`: Tells the person that a rule of theirs, Rule, posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.
   - `draft_saved`: Tells the person that the reply they wrote, Draft, waits for their approval.
   - `reply_placeholder`: The placeholder of a notification's input that saves a reply for approval.
   - `reply_button`: The button of a notification's input that saves a reply for approval.
@@ -852,6 +855,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `chat_queued`
   - `chat_started` (`Intent`, `Resumed`)
   - `draft_sent` (`Draft`: number)
+  - `draft_by_rule` (`Draft`: number, `Where`, `Rule`, `Link`)
   - `draft_saved` (`Draft`: number)
   - `reply_placeholder`
   - `reply_button`
@@ -971,6 +975,13 @@ The fields each notice reads besides `Name` and `Command`:
   - `first_field`: Its data up to the first colon.
   - `short_sha`: The first seven characters of a commit id.
   - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
+- `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
+- `drafts.<name>` (table): One draft kind's words.
+- `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
+- `drafts.<name>.fields.<name>` (table): One field's words.
+- `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.
+- `drafts.<name>.fields.<name>.values` (table by name): The words of the field's values, by value, such as an enum's; the card keeps the value itself in its tooltip.
+- `drafts.<name>.fields.<name>.values.<name>` (string, localized): The value's word.
 - `detail` (table): How a field of the plugin's unit detail shows, by field.
 - `detail.<name>` (table): One field's words.
 - `detail.<name>.label` (string, localized): The field's name. Required.

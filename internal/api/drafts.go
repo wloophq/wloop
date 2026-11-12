@@ -85,6 +85,41 @@ type Draft struct {
 	Names map[string]string `json:"names,omitempty"`
 	// ItemDetails are the items the draft is about, with their summaries.
 	ItemDetails []ItemView `json:"item_details,omitempty"`
+	// Payload is what the draft posts besides Text, verbatim, and Fields every value of it as its card shows
+	// it, in the payload's order; both empty for a draft of a kind with no payload.
+	Payload json.RawMessage `json:"payload,omitempty"`
+	Fields  []DraftField    `json:"fields,omitempty"`
+	// Basis is what the draft was written against, such as a pull request's head; Stale says its unit moved
+	// past it, so approving it is refused.
+	Basis string `json:"basis,omitempty"`
+	Stale bool   `json:"stale,omitempty"`
+	// Hold keeps every approval rule from releasing the draft.
+	Hold bool `json:"hold,omitempty"`
+	// ByRule is the approval rule of the user's that sent the draft, "" when none did.
+	ByRule string `json:"by_rule,omitempty"`
+	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,
+	// notices.toml's draft_by_rule), in that order.
+	Notes []string `json:"notes,omitempty"`
+}
+
+// DraftField is a value of a draft's payload as its card shows it: Label is the plugin's word for its key
+// (ui.toml's drafts.<kind>.fields), else the key, or the item's position in a list. A scalar has Value, as
+// posted, and Shown, its word when the plugin words it; an object or a list has Fields. Editable says a
+// person may change it, to one of Options, its schema's enum.
+type DraftField struct {
+	Pointer  string        `json:"pointer"`
+	Label    string        `json:"label"`
+	Value    string        `json:"value,omitempty"`
+	Shown    string        `json:"shown,omitempty"`
+	Fields   []DraftField  `json:"fields,omitempty"`
+	Editable bool          `json:"editable,omitempty"`
+	Options  []DraftOption `json:"options,omitempty"`
+}
+
+// DraftOption is a value an editable field takes, with its word.
+type DraftOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 // OutboxPage is the Outbox's drafts in groups, the largest first, then by title.

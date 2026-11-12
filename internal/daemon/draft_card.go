@@ -1,0 +1,261 @@
+package daemon
+
+import (
+	"bytes"
+	"cmp"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+)
+
+// DraftKinds are the draft kinds the plugins' manifests declare, as a draft's card reads them: a kind's spec
+// and its payload's schema.
+type DraftKinds interface {
+	Lookup(provider, kind string) (draft.KindSpec, bool)
+	Schema(spec draft.KindSpec) (json.RawMessage, error)
+}
+
+// staler is the outbox's live check of a draft's basis.
+type staler interface {
+	Stale(ctx context.Context, d draft.Draft) (bool, error)
+}
+
+// cardFields fills v, d's view, with what its card shows of d beyond its text: its payload field by field, its
+// basis, whether it is stale, its hold, and the profile's notes on how it stands; g is d's gate.
+func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *api.Draft) {
+	publisher := string(s.publisherOf(d))
+	if len(d.Payload) > 0 {
+		v.Payload = slices.Clone(d.Payload)
+		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload)
+	}
+	v.Basis, v.Hold = d.Basis, d.Hold
+	words := s.loaded().Gates.Drafts
+	if d.State == draft.Held && d.Basis != "" {
+		v.Stale = s.stale(ctx, d)
+	}
+	if v.Stale && words.Stale != "" {
+		v.Notes = append(v.Notes, words.Stale)
+	}
+	if d.Hold && d.State == draft.Held && words.Hold != "" {
+		v.Notes = append(v.Notes, words.Hold)
+	}
+	if rule, ok := byRule(g); ok && d.State == draft.Sent {
+		v.ByRule = rule
+		v.Notes = append(v.Notes, s.byRuleText(d, rule, v.Where))
+	}
+}
+
+// byRule is the rule of the user's that released g, false when a person, an agent, a window or nothing did.
+func byRule(g gate.Gate) (string, bool) {
+	ok := g.Status == gate.Approved && g.By == task.ActorWorkflow && g.Rule != "" && g.Rule != gates.RuleWindow
+	return g.Rule, ok
+}
+
+func (s *Server) byRuleText(d draft.Draft, rule, where string) string {
+	return s.notice(builtin.NoticeDraftByRule, map[string]any{"Draft": int64(d.ID), "Where": cmp.Or(where, d.Target, d.Unit.Label()), "Rule": rule,
+		"Link": d.Evidence.Permalink})
+}
+
+// stale is whether held draft d's unit moved past its basis, read live by the outbox within the page's lookup
+// deadline; false when it cannot tell, since approving re-checks it.
+func (s *Server) stale(ctx context.Context, d draft.Draft) bool {
+	check := s.deps.Stale
+	if check == nil {
+		st, ok := any(s.deps.Outbox).(staler)
+		if !ok {
+			return false
+		}
+		check = st.Stale
+	}
+	by := time.Now().Add(s.whereTimeout())
+	if page, ok := ctx.Value(whereByKey{}).(time.Time); ok && page.Before(by) {
+		by = page
+	}
+	ctx, cancel := context.WithDeadline(ctx, by)
+	defer cancel()
+	stale, err := check(ctx, d)
+	if err != nil {
+		s.logf("drafts: the basis of draft %d: %v", d.ID, err)
+		return false
+	}
+	return stale
+}
+
+// notifyByRule tells the user that a rule of theirs posted d, once it is sent.
+func (s *Server) notifyByRule(ctx context.Context, d draft.Draft) error {
+	g, ok, err := s.deps.Outbox.GateOf(ctx, d)
+	if err != nil || !ok {
+		return err
+	}
+	rule, ok := byRule(g)
+	if !ok {
+		return nil
+	}
+	s.notify(api.Notice{ID: fmt.Sprintf("draft:%d:by-rule", d.ID), Unit: d.Unit, Text: s.byRuleText(d, rule, s.draftWhere(ctx, d))})
+	return nil
+}
+
+// payloadFields are the values of payload, a draft of kind's of provider, in its order, each under the plugin's
+// word for its key, with the kind's editable fields' options from its schema.
+func (s *Server) payloadFields(provider, kind string, payload json.RawMessage) []api.DraftField {
+	root, err := decodeOrdered(json.NewDecoder(bytes.NewReader(payload)))
+	if err != nil {
+		s.logf("drafts: a %s payload does not decode: %v", kind, err)
+		return []api.DraftField{{Pointer: "", Label: kind, Value: string(payload)}}
+	}
+	w := payloadWalk{words: s.loaded().UI[provider].Drafts[kind].Fields}
+	if k := s.deps.DraftKinds; k != nil {
+		if spec, ok := k.Lookup(provider, kind); ok {
+			w.editable = spec.Editable
+			if raw, err := k.Schema(spec); err == nil {
+				_ = json.Unmarshal(raw, &w.schema)
+			}
+		}
+	}
+	if root.kind == nodeScalar {
+		return []api.DraftField{w.field(root, "", kind, w.schema)}
+	}
+	return w.children(root, "", "", w.schema)
+}
+
+type payloadWalk struct {
+	words    map[string]intent.UIDraftField
+	editable []string
+	schema   map[string]any
+}
+
+func (w payloadWalk) children(n node, pointer, key string, schema map[string]any) []api.DraftField {
+	out := make([]api.DraftField, 0, len(n.vals))
+	for i, v := range n.vals {
+		if n.kind == nodeArray {
+			p := pointer + "/" + strconv.Itoa(i)
+			f := w.field(v, p, key, schemaAt(schema, "items"))
+			f.Label = strconv.Itoa(i + 1)
+			out = append(out, f)
+			continue
+		}
+		k := n.keys[i]
+		out = append(out, w.field(v, pointer+"/"+escapePointer(k), k, schemaAt(schemaAt(schema, "properties"), k)))
+	}
+	return out
+}
+
+// field is n, the value of key at pointer, whose schema is schema.
+func (w payloadWalk) field(n node, pointer, key string, schema map[string]any) api.DraftField {
+	words := w.words[key]
+	f := api.DraftField{Pointer: pointer, Label: cmp.Or(words.Label, key)}
+	if n.kind != nodeScalar {
+		f.Fields = w.children(n, pointer, key, schema)
+		return f
+	}
+	f.Value, f.Shown = n.scalar, words.Values[n.scalar]
+	if slices.Contains(w.editable, pointer) {
+		f.Editable = true
+		enum, _ := schema["enum"].([]any)
+		for _, e := range enum {
+			if v, ok := e.(string); ok {
+				f.Options = append(f.Options, api.DraftOption{Value: v, Label: cmp.Or(words.Values[v], v)})
+			}
+		}
+	}
+	return f
+}
+
+func schemaAt(schema map[string]any, key string) map[string]any {
+	m, _ := schema[key].(map[string]any)
+	return m
+}
+
+func escapePointer(k string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(k, "~", "~0"), "/", "~1")
+}
+
+type nodeKind int
+
+const (
+	nodeScalar nodeKind = iota
+	nodeObject
+	nodeArray
+)
+
+// node is a JSON value that keeps its object's keys in the order they were written.
+type node struct {
+	kind   nodeKind
+	scalar string
+	keys   []string
+	vals   []node
+}
+
+func decodeOrdered(dec *json.Decoder) (node, error) {
+	dec.UseNumber()
+	n, err := decodeNode(dec)
+	if err != nil {
+		return node{}, err
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return node{}, errors.New("more than one value")
+	}
+	return n, nil
+}
+
+func decodeNode(dec *json.Decoder) (node, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return node{}, err
+	}
+	switch t := tok.(type) {
+	case json.Delim:
+		n := node{kind: nodeArray}
+		if t == '{' {
+			n.kind = nodeObject
+		}
+		for dec.More() {
+			if n.kind == nodeObject {
+				k, err := dec.Token()
+				if err != nil {
+					return node{}, err
+				}
+				n.keys = append(n.keys, k.(string))
+			}
+			v, err := decodeNode(dec)
+			if err != nil {
+				return node{}, err
+			}
+			n.vals = append(n.vals, v)
+		}
+		_, err := dec.Token()
+		return n, err
+	case string:
+		return node{scalar: t}, nil
+	case json.Number:
+		return node{scalar: t.String()}, nil
+	case bool:
+		return node{scalar: strconv.FormatBool(t)}, nil
+	default:
+		return node{scalar: "null"}, nil
+	}
+}
+
+// personAmendment is a person's edit of a draft's text, payload or broadcast, at the rev they saw.
+func personAmendment(text *string, payload *json.RawMessage, broadcast *bool, rev *int64) outbox.Amendment {
+	a := outbox.Amendment{Text: text, Payload: payload, Broadcast: broadcast, By: draft.Actor{Kind: draft.ActorPerson}}
+	if rev != nil {
+		a.Rev = *rev
+	}
+	return a
+}

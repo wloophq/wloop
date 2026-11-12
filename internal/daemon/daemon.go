@@ -29,6 +29,7 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	"github.com/wloophq/wloop/internal/domain/task"
 
@@ -304,6 +305,12 @@ type Deps struct {
 	// Notices are what the workflows raise for the user, streamed to the
 	// event subscribers as they come; nil raises none.
 	Notices Notices
+	// DraftKinds are the manifests' draft kinds a draft's card reads; nil
+	// shows a payload with nothing editable.
+	DraftKinds DraftKinds
+	// Stale says whether a held draft's unit moved past its basis, a live
+	// read; nil asks the Outbox, when it can tell.
+	Stale func(ctx context.Context, d draft.Draft) (bool, error)
 
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
@@ -454,6 +461,8 @@ type Server struct {
 	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
+	// amender replaces the Outbox's Amend in tests.
+	amender func(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error)
 	// pauseMu serializes every read-modify-write of the pause.
 	pauseMu sync.Mutex
 	// track reads a pull request before it is tracked; nil tracks unread.

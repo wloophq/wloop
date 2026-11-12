@@ -27,7 +27,9 @@ type UITexts struct {
 	Events     map[string]UIEvent  `toml:"events"`
 	Menubar    map[string]string   `toml:"menubar"`
 	Detail     map[string]UIField  `toml:"detail"`
-	LensRaw    map[string]string   `toml:"lens"`
+	// Drafts are the words of a draft's payload on its card, by draft kind.
+	Drafts  map[string]UIDraft `toml:"drafts"`
+	LensRaw map[string]string  `toml:"lens"`
 	// Lens are the plugin's own row words, those it leaves out empty.
 	Lens    RowWords `toml:"-"`
 	NounRaw any      `toml:"noun"`
@@ -49,6 +51,17 @@ type UIDecision struct {
 type UIField struct {
 	Label string `toml:"label"`
 	Title string `toml:"title"`
+}
+
+// UIDraft is a draft kind's words: its payload's fields, by the key they have in it.
+type UIDraft struct {
+	Fields map[string]UIDraftField `toml:"fields"`
+}
+
+// UIDraftField is a payload field's name and its values' words, by value.
+type UIDraftField struct {
+	Label  string            `toml:"label"`
+	Values map[string]string `toml:"values"`
 }
 
 // UISearch is a custom view's search: the queries it runs at a press, the
@@ -277,6 +290,16 @@ func mergeUI(into, over UITexts) UITexts {
 		return a
 	})
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
+	into.Drafts = mergeMap(into.Drafts, over.Drafts, func(a, b UIDraft) UIDraft {
+		a.Fields = mergeMap(a.Fields, b.Fields, func(x, y UIDraftField) UIDraftField {
+			if y.Label != "" {
+				x.Label = y.Label
+			}
+			x.Values = mergeMap(x.Values, y.Values, func(_, v string) string { return v })
+			return x
+		})
+		return a
+	})
 	into.Menubar = mergeMap(into.Menubar, over.Menubar, func(_, y string) string { return y })
 	if over.Noun != nil {
 		into.Noun = over.Noun

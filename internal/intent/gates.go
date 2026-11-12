@@ -44,6 +44,8 @@ type DraftWords struct {
 	Purposes, States, Reasons map[string]string
 	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
 	Quoted string
+	// Stale says a draft was written against what its unit no longer is; Hold that no rule sends it.
+	Stale, Hold string
 }
 
 // GateApproval is gates.toml's [approval]: the first rule whose When holds
@@ -219,6 +221,8 @@ type mDraftWords struct {
 	ByHand      *string           `toml:"by_hand"`
 	ByHandAbout *string           `toml:"by_hand_about"`
 	Quoted      *string           `toml:"quoted"`
+	Stale       *string           `toml:"stale"`
+	Hold        *string           `toml:"hold"`
 	Purposes    map[string]string `toml:"purposes"`
 	States      map[string]string `toml:"states"`
 	Reasons     map[string]string `toml:"reasons"`
@@ -374,8 +378,13 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	if m.ByHandAbout != nil {
 		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
 	}
-	if m.Quoted != nil {
-		w.Quoted = strings.TrimSpace(*m.Quoted)
+	for _, f := range []struct {
+		to   *string
+		from *string
+	}{{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
+		if f.from != nil {
+			*f.to = strings.TrimSpace(*f.from)
+		}
 	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
 	states := make([]string, len(draft.States))

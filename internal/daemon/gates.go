@@ -403,16 +403,23 @@ func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent str
 			return badRequest{fmt.Sprintf("rev is the draft's revision, not %q", raw)}
 		}
 	}
-	var text *string
+	var edit draftEdit
 	if t, ok := args["text"]; ok {
-		text = &t
+		edit.Text = &t
+	}
+	if raw, ok := args["payload"]; ok {
+		if !json.Valid([]byte(raw)) {
+			return badRequest{fmt.Sprintf("payload is the draft's payload as JSON, not %q", raw)}
+		}
+		p := json.RawMessage(raw)
+		edit.Payload = &p
 	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
 		if p := s.deps.Outbox.PublisherOf(d); !s.pluginEnabled(p) {
 			return pluginOff{p}
 		}
 	}
-	err = s.resolveDraftGate(ctx, g, intent, rev, text, actor)
+	err = s.resolveDraftGate(ctx, g, intent, rev, edit, actor)
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{s.deps.Outbox.PublisherOf(d), err}
 	}

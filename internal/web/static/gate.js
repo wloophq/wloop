@@ -293,6 +293,56 @@ function offeredDraftActions(d) {
   });
 }
 
+// payloadView is every value d's payload posts, under its field's word, as the daemon serves them: a worded value
+// keeps its raw one in its title. While d is being edited under key, each editable field is a control.
+function payloadView(d, key, editing, scope) {
+  const fields = d.fields || [];
+  return fields.length ? h("dl", { class: "d-payload" }, ...fields.flatMap((f) => payloadField(f, key, editing, scope))) : null;
+}
+
+function payloadField(f, key, editing, scope) {
+  let value;
+  if ((f.fields || []).length) value = h("dl", { class: "d-payload" }, ...f.fields.flatMap((x) => payloadField(x, key, editing, scope)));
+  else if (editing && f.editable) value = fieldControl(f, key, scope);
+  else value = h("span", { class: "pv", "data-value": f.value, title: f.shown && f.shown !== f.value ? f.value : undefined }, f.shown || f.value);
+  return [h("dt", {}, f.label), h("dd", { "data-pointer": f.pointer }, value)];
+}
+
+// fieldControl changes editable field f of the draft edited under key: a select over its options, else a line.
+function fieldControl(f, key, scope) {
+  const edits = detailState.payloads.get(key) || {};
+  const current = f.pointer in edits ? edits[f.pointer] : f.value;
+  const set = (ev) => { detailState.payloads.set(key, { ...(detailState.payloads.get(key) || {}), [f.pointer]: ev.target.value }); };
+  const attrs = { class: "d-field", "aria-label": f.label, "data-focus": `${scope}:field:${key}:${f.pointer}` };
+  if ((f.options || []).length) {
+    return h("select", { ...attrs, onchange: set }, ...f.options.map((o) => h("option", { value: o.value, selected: o.value === current }, o.label)));
+  }
+  return h("input", { ...attrs, type: "text", value: current, oninput: set });
+}
+
+// editedPayload is the payload arg of an approval of d edited under key: d's payload with the fields changed,
+// none when nothing changed.
+function editedPayload(d, key) {
+  const edits = Object.entries(detailState.payloads.get(key) || {});
+  if (!edits.length || !d.payload) return {};
+  const out = JSON.parse(JSON.stringify(d.payload));
+  for (const [pointer, v] of edits) setPointer(out, pointer, v);
+  return { payload: JSON.stringify(out) };
+}
+
+// setPointer sets the value at JSON pointer in doc.
+function setPointer(doc, pointer, v) {
+  const path = pointer.split("/").slice(1).map((p) => p.replaceAll("~1", "/").replaceAll("~0", "~"));
+  const last = path.pop();
+  path.reduce((at, p) => at[p], doc)[last] = v;
+}
+
+// stopEditing forgets the edits of the draft edited under key.
+function stopEditing(key) {
+  detailState.editing.delete(key);
+  detailState.payloads.delete(key);
+}
+
 // windowLine says when the window of d's gate sends it, "" when it has none.
 function windowLine(d) {
   return d.deadline ? t("Sends at {time} unless you decide first", { time: fmtDate(d.deadline, "datetime") }) : "";
@@ -370,7 +420,7 @@ async function resolveDraft(d, intent, label, args) {
   try {
     await detailEnv.post("/api/gates/" + encodeURIComponent(d.gate) + "/" + encodeURIComponent(intent), verbBody({ ...args, rev: String(d.rev) }));
     detailEnv.notice(`${label}: ${d.where || d.target || d.unit}`);
-    detailState.editing.delete("draft:" + d.id);
+    stopEditing("draft:" + d.id);
     detailEnv.changed();
   } catch (err) {
     markResolving(card, false);
@@ -390,8 +440,11 @@ function draftActions(e, d) {
   return [...acts, ...(editing ? [] : offeredDraftActions(d))].filter(Boolean);
 }
 
-const editDraft = (key, d) => () => { detailState.editing.set(key, d.text || ""); detailEnv.render(); };
-const cancelEdit = (key) => ({ label: t("Cancel"), enabled: true, focus: "cancel:" + key, run: () => { detailState.editing.delete(key); detailEnv.render(); } });
+const editDraft = (key, d) => () => { detailState.editing.set(key, d.text || ""); detailState.payloads.delete(key); detailEnv.render(); };
+const cancelEdit = (key) => ({ label: t("Cancel"), enabled: true, focus: "cancel:" + key, run: () => { stopEditing(key); detailEnv.render(); } });
+
+// staleOff turns action a off on stale draft d, with the reason the daemon worded.
+const staleOff = (d, a) => (a && d.stale ? { ...a, enabled: false, reason: (d.notes || [])[0], title: (d.notes || [])[0] } : a);
 
 // ownDraftActions are the actions of the draft e, its own task, carries, through the task's verbs.
 function ownDraftActions(e, d, key, editing) {
@@ -403,10 +456,10 @@ function ownDraftActions(e, d, key, editing) {
     return { label, run, enabled: st.enabled, reason: st.reason, title, focus: `${v}:${e.id}`, ...extra };
   };
   const primary = { primary: true, key: "queue:primary" };
-  if (editing) return [verb(approve, gateWord(e, d, "approved", approve), () => approveEdited(e), primary), cancelEdit(key)];
+  if (editing) return [staleOff(d, verb(approve, gateWord(e, d, "approved", approve), () => approveEdited(e), primary)), cancelEdit(key)];
   return [
-    d.state === "failed" ? verb(retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), primary)
-      : verb(approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), primary),
+    staleOff(d, d.state === "failed" ? verb(retry, draftWord("draft.retry"), () => taskAct(e, retry, { rev: String(d.rev) }), primary)
+      : verb(approve, gateWord(e, d, "approved", approve), () => taskAct(e, approve, { rev: String(d.rev) }), primary)),
     verb(edit || approve, draftWord("draft.edit"), editDraft(key, d), { key: "queue:edit", focus: `open:${edit || approve}:${e.id}` }),
     verb(drop, gateWord(e, d, "rejected", drop), () => taskAct(e, drop, {}), { key: "queue:discard" }),
   ];
@@ -421,15 +474,16 @@ function gateDraftActions(e, d, key, editing) {
   const act = (label, focus, run, extra) => ({ label, run, enabled: true, focus: `${focus}:${key}`, ...extra });
   const primary = { primary: true, key: "queue:primary" };
   if (editing) {
-    return [intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, { text: detailState.editing.get(key) }), primary) : null,
-      cancelEdit(key)];
+    return [intents.approved ? staleOff(d, act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel,
+      { text: detailState.editing.get(key), ...editedPayload(d, key) }), primary)) : null,
+    cancelEdit(key)];
   }
   const retry = verbFor("retry");
   const drop = verbFor("drop");
   const dropLabel = gateWord(e, d, "rejected", drop);
   return [
-    d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
-      : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null,
+    staleOff(d, d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
+      : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null),
     intents.approved ? act(draftWord("draft.edit"), "open:" + approve, editDraft(key, d), { key: "queue:edit" }) : null,
     intents.rejected ? act(dropLabel, drop, () => resolveDraft(d, intents.rejected, dropLabel, {}), { key: "queue:discard" }) : null,
   ];
@@ -466,6 +520,8 @@ function draftCard(e, d, opts = {}) {
     broadcastToggle(d, scope),
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": t("Draft text"), "data-focus": `${scope}:draft-text:${key}`, oninput: (ev) => detailState.editing.set(key, ev.target.value) }, detailState.editing.get(key))
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),
+    payloadView(d, key, editing, scope),
+    ...(d.notes || []).map((n) => h("p", { class: "d-note" + (d.stale ? " err" : "") }, n)),
     d.why ? h("p", { class: "why" }, d.why) : null,
     d.quoted ? h("p", { class: "why" }, d.quoted) : null,
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,

@@ -322,3 +322,30 @@ empty = "Nada espera só o merge."
 clause = { one = "{counter} espera um revisor", other = "{counter} esperam um revisor" }
 queue = "Escolher revisor"
 empty = "Nenhum pull request espera um revisor."
+
+[drafts.review.fields.event]
+label = "Veredito"
+values = { APPROVE = "Aprovar", REQUEST_CHANGES = "Pedir mudanças", COMMENT = "Comentar" }
+
+[drafts.review.fields.comments]
+label = "Comentários na linha"
+
+[drafts.review.fields.path]
+label = "Arquivo"
+
+[drafts.review.fields.line]
+label = "Linha"
+
+[drafts.review.fields.start_line]
+label = "Da linha"
+
+[drafts.review.fields.side]
+label = "Lado"
+values = { LEFT = "antigo", RIGHT = "novo" }
+
+[drafts.review.fields.start_side]
+label = "Do lado"
+values = { LEFT = "antigo", RIGHT = "novo" }
+
+[drafts.review.fields.body]
+label = "Comentário"

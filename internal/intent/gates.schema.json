@@ -66,6 +66,10 @@
           "description": "One line under that title.",
           "type": "string"
         },
+        "hold": {
+          "description": "What a draft's card says of a held draft its proposer asked no approval rule to send.",
+          "type": "string"
+        },
         "purposes": {
           "additionalProperties": {
             "description": "The purpose's word, such as \"Nudge\".",
@@ -85,6 +89,10 @@
           },
           "description": "Why a dropped draft was withdrawn, by reason, as the Outbox says it.",
           "type": "object"
+        },
+        "stale": {
+          "description": "What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.",
+          "type": "string"
         },
         "states": {
           "additionalProperties": {
