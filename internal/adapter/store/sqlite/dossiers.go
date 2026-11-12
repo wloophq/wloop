@@ -189,5 +189,5 @@ func OpenReadOnly(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB{w: r, r: r}, nil
+	return &DB{w: r, r: r, writer: &writeLock{}}, nil
 }

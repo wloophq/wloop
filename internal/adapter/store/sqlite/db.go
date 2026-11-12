@@ -40,11 +40,61 @@ type Noter interface {
 // DB is the store: one writer connection, reached only through Write, and a
 // read-only pool of ReadConns connections.
 type DB struct {
-	w, r *sql.DB
-	mu   sync.Mutex
+	w, r   *sql.DB
+	writer *writeLock
+	// file is the store's absolute path, which keys writer.
+	file      string
+	closeOnce sync.Once
+	log       Noter
+}
+
+// writeLock serializes the write transactions of every handle this process has
+// open on one store file. A waiter on it wakes when it frees; on SQLite's file
+// lock alone a handle polls with growing sleeps and, against handles that take
+// the lock back at once, can miss every free moment until busy_timeout ends.
+type writeLock struct {
+	mu sync.Mutex
 	// holder is the goroutine that holds mu, for the nested-Write panic.
 	holder atomic.Uint64
-	log    Noter
+	// handles is how many open handles share it, under writeLocks.mu.
+	handles int
+}
+
+// writeLocks are the write locks of the store files open in this process, by
+// absolute path.
+var writeLocks = struct {
+	mu    sync.Mutex
+	files map[string]*writeLock
+}{files: map[string]*writeLock{}}
+
+func acquireWriteLock(path string) (*writeLock, string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, "", err
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	writeLocks.mu.Lock()
+	defer writeLocks.mu.Unlock()
+	l := writeLocks.files[abs]
+	if l == nil {
+		l = &writeLock{}
+		writeLocks.files[abs] = l
+	}
+	l.handles++
+	return l, abs, nil
+}
+
+func releaseWriteLock(path string, l *writeLock) {
+	if path == "" {
+		return
+	}
+	writeLocks.mu.Lock()
+	defer writeLocks.mu.Unlock()
+	if l.handles--; l.handles == 0 {
+		delete(writeLocks.files, path)
+	}
 }
 
 // Open opens the store at path, creating it at SchemaVersion when it holds
@@ -101,7 +151,13 @@ func (set schemaSet) open(path string, log Noter) (*DB, error) {
 	if log == nil {
 		log = change.NewLog(change.DefaultWindow, nil)
 	}
-	return &DB{w: w, r: r, log: log}, nil
+	writer, file, err := acquireWriteLock(path)
+	if err != nil {
+		w.Close()
+		r.Close()
+		return nil, err
+	}
+	return &DB{w: w, r: r, writer: writer, file: file, log: log}, nil
 }
 
 // storeMode is the mode of the store and its WAL and shared memory: they
@@ -137,6 +193,7 @@ const closeWait = 2 * time.Second
 // in flight to release their connections, so the store's files stop
 // changing once it returns. Connections still open then are an error.
 func (db *DB) Close() error {
+	db.closeOnce.Do(func() { releaseWriteLock(db.file, db.writer) })
 	err := errors.Join(db.r.Close(), db.w.Close())
 	for deadline := time.Now().Add(closeWait); time.Now().Before(deadline); time.Sleep(time.Millisecond) {
 		if db.r.Stats().OpenConnections+db.w.Stats().OpenConnections == 0 {
@@ -233,8 +290,9 @@ func (tx *Tx) TouchAll(t port.Topic) {
 	tx.all = true
 }
 
-// Write runs fn in one write transaction under db.mu. After COMMIT, when fn
-// touched anything, it notes the log (still under db.mu, so log order is
+// Write runs fn in one write transaction under the store file's write lock,
+// which every handle this process has open on it shares. After COMMIT, when fn
+// touched anything, it notes the log (still under the lock, so log order is
 // commit order) and returns that Change; otherwise the zero Change. An error
 // from fn rolls back and notes nothing. A nested Write panics.
 func (db *DB) Write(ctx context.Context, fn func(tx *Tx) error) (port.Change, error) {
@@ -261,20 +319,20 @@ func (db *DB) Write(ctx context.Context, fn func(tx *Tx) error) (port.Change, er
 	}
 }
 
-// lock takes db.mu for the calling goroutine and returns its unlock; a
-// goroutine that already holds it panics.
+// lock takes the store file's write lock for the calling goroutine and returns
+// its unlock; a goroutine that already holds it, through any handle, panics.
 func (db *DB) lock() (unlock func()) {
-	g := goid()
-	if !db.mu.TryLock() {
-		if db.holder.Load() == g {
+	l, g := db.writer, goid()
+	if !l.mu.TryLock() {
+		if l.holder.Load() == g {
 			panic("sqlite: Write inside Write")
 		}
-		db.mu.Lock()
+		l.mu.Lock()
 	}
-	db.holder.Store(g)
+	l.holder.Store(g)
 	return func() {
-		db.holder.Store(0)
-		db.mu.Unlock()
+		l.holder.Store(0)
+		l.mu.Unlock()
 	}
 }
 
