@@ -4,6 +4,7 @@
 package gate
 
 import (
+	"slices"
 	"strconv"
 	"time"
 
@@ -93,6 +94,13 @@ type Gate struct {
 // ByUser says whether the user resolved g: a person, or an agent through a session the user drives.
 func (g Gate) ByUser() bool {
 	return g.Rule == "" && (g.By == task.ActorPerson || g.By == task.ActorAgent && g.BySession != "")
+}
+
+// Stamps says whether session produced g's subject (Session) or proposed or revised its draft (Sessions), so
+// it never resolves g nor answers through it; "" stamps nothing. The outbox stamps a draft's origin session
+// among Sessions when its gate opens.
+func (g Gate) Stamps(session string) bool {
+	return session != "" && (g.Session == session || slices.Contains(g.Sessions, session))
 }
 
 // ProposalSubject is the Subject of a gate on item proposal id when no

@@ -7,12 +7,10 @@ import (
 	"strconv"
 
 	"github.com/wloophq/wloop/internal/core/gates"
-	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 // ReasonOtherOption is why a draft another option pointed to is withdrawn once one option's draft is approved.
@@ -26,20 +24,13 @@ type OptionDrafts interface {
 	WithdrawHeld(ctx context.Context, id int64, reason string) error
 }
 
-// OptionDraft is the draft gate r's answer to question gate question approves, and the rev its option
-// pinned, which the gates service approves through ApproveOption before it answers the question: the
-// draft the option, or a confirm's yes, points to in the message the person saw, held by that message's
-// turn on its unit at the pinned rev, for a resolver that is a person or a session the user drives that is
-// neither the turn's nor one that proposed or revised the draft. False for any other answer, which then
-// resolves the question alone and resumes the turn.
+// OptionDraft reports the pin r's answer to question gate question picks: the gate of the draft the option,
+// or a confirm's yes, points to in the message the person saw, held by that message's turn on its unit, and
+// the rev the option pinned. The gates service owns the rest of the option's approval (ApproveOption):
+// whether the draft's gate still waits at that rev and whether r's resolver may approve it. False for an
+// answer that picks no held draft, which then resolves the question alone and resumes the turn.
 func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.Resolution) (gate.Gate, int64, bool, error) {
-	if s.Drafts == nil || question.Kind != gate.KindQuestion || r.Rule != "" {
-		return gate.Gate{}, 0, false, nil
-	}
-	switch {
-	case r.By == task.ActorPerson:
-		r.Session = ""
-	case r.By != task.ActorAgent || r.Session == "" || r.Session == question.Session:
+	if s.Drafts == nil || question.Kind != gate.KindQuestion {
 		return gate.Gate{}, 0, false, nil
 	}
 	m, err := s.subject(ctx, question)
@@ -57,20 +48,17 @@ func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.R
 	switch {
 	case err != nil:
 		return gate.Gate{}, 0, false, err
-	case !ok || turns.ProposedOrRevised(dg, d, r.Session):
-		s.logf("messages: message %d points to draft %d, which this answer does not approve; the turn resumes", m.ID, ref.ID)
-		return gate.Gate{}, 0, false, nil
-	case dg.Status != gate.Open || d.State != draft.Held || ref.Rev != int64(d.Rev) || ref.Rev != dg.ApprovedRev:
-		s.logf("messages: draft %d is not held at the rev %d message %d pinned; the turn resumes", ref.ID, ref.Rev, m.ID)
+	case !ok || d.State != draft.Held:
+		s.logf("messages: message %d points to draft %d, which its turn does not hold on its unit; the turn resumes", m.ID, ref.ID)
 		return gate.Gate{}, 0, false, nil
 	}
 	return dg, ref.Rev, true, nil
 }
 
 // approvedOption says whether g, m's answered gate, approved the draft the answer a picks, as
-// OptionDraft named it and the gates service approved it: the draft gate approved by g's own resolver, a
-// person or a session the user drives that neither proposed nor revised it. The pinned rev was checked
-// when the draft was approved, and stays the draft's until its content changes. It then
+// OptionDraft named it: the draft gate approved by g's own resolver. The gates service let that resolver
+// approve it (a person, or a session the user drives the gate does not stamp) at the pinned rev, which stays
+// the draft's until its content changes. It then
 // withdraws the drafts the other options point to, so the answer ends the turn on the draft's send instead
 // of resuming it; a call made again completes what is left.
 func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {
@@ -81,11 +69,11 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 	if !ok || g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
 		return false, nil
 	}
-	d, dg, ok, err := s.ofTurn(ctx, m, ref.ID)
+	_, dg, ok, err := s.ofTurn(ctx, m, ref.ID)
 	switch {
 	case err != nil:
 		return false, err
-	case !ok || turns.ProposedOrRevised(dg, d, g.BySession):
+	case !ok:
 		return false, nil
 	case dg.Status != gate.Approved || dg.By != g.By || dg.BySession != g.BySession || dg.Rule != "":
 		return false, nil

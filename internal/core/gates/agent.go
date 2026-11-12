@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -49,9 +48,9 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 // the user drives) picked points to at rev, the rev the option pinned, then resolves question gate
 // question with r, the option picked (Intent, Answer) and who picked it (By, Session). It reads both gates
 // again from the store first, trusting neither value the caller passes, and resolves nothing when drafted
-// is no longer open (or approved already) at rev, is on another unit than the question, came from another
-// session than the question's, or stamps r.Session among its Sessions, or when r is a rule's: each is
-// ErrRefused. The draft is approved before the question is answered, so an answered question names the
+// is no longer open (or approved already by r's resolver) at rev, is on another unit than the question, came
+// from another session than the question's, or stamps r.Session (gate.Gate.Stamps), or when r is a rule's:
+// each is ErrRefused. The draft is approved before the question is answered, so an answered question names the
 // one draft its answer approved: a later call on an answered question completes only with that draft gate
 // approved, and refuses any other draft gate, another option's or a revision's, with ErrRefused. A draft
 // that loses its approval to a race (a revision) leaves the question open. Each step is idempotent, so a
@@ -70,6 +69,9 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	}
 	if q.Status != gate.Open {
 		return s.answered(q, d, r)
+	}
+	if d.Status == gate.Approved && (d.Rule != "" || d.By != r.By || d.BySession != sessionOf(r)) {
+		return fmt.Errorf("%w: the draft of gate %d was approved otherwise than by this answer", ErrRefused, d.ID)
 	}
 	if err := s.answers(ctx, q, r); err != nil {
 		return err
@@ -160,7 +162,7 @@ func (s *Service) pinned(q, d gate.Gate, r Resolution, rev int64) error {
 		return fmt.Errorf("%w: the draft of gate %d is not of the session that asked", ErrRefused, d.ID)
 	case r.By != task.ActorPerson && r.By != task.ActorAgent:
 		return fmt.Errorf("%w: an option is picked by a person or a session the user drives, not by %s", ErrRefused, r.By)
-	case r.Session != "" && stamped(d, r.Session):
+	case d.Stamps(r.Session):
 		return fmt.Errorf("%w: session %s proposed or revised the draft of gate %d", ErrRefused, r.Session, d.ID)
 	}
 	return nil
@@ -171,9 +173,4 @@ func sessionOf(r Resolution) string {
 		return ""
 	}
 	return r.Session
-}
-
-// stamped says whether session proposed or revised the subject of g.
-func stamped(g gate.Gate, session string) bool {
-	return session != "" && (g.Session == session || slices.Contains(g.Sessions, session))
 }
