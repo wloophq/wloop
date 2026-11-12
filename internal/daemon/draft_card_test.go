@@ -237,7 +237,7 @@ func agentRevised(t *testing.T, r *outboxRig) (draft.Draft, int64) {
 		t.Fatal(err)
 	}
 	text := "Agent revision"
-	if d, err = r.o.Amend(ctx, d.ID, outbox.Amendment{Text: &text}); err != nil || d.Rev != 1 {
+	if d, err = r.o.Amend(ctx, d.ID, outbox.Amendment{Text: &text, Rev: d.Rev}); err != nil || d.Rev != 1 {
 		t.Fatalf("agent revision: %+v %v", d, err)
 	}
 	return d, seen.ID
