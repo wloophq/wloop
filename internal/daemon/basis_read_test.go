@@ -26,7 +26,7 @@ type gatedBases struct {
 	calls   int
 }
 
-func (b *gatedBases) Live(ctx context.Context, _ unit.Unit, _ string) (string, error) {
+func (b *gatedBases) Live(ctx context.Context, _ unit.ProviderID, _ unit.Unit, _ string) (string, error) {
 	b.mu.Lock()
 	b.calls++
 	hold, release := b.hold, b.release

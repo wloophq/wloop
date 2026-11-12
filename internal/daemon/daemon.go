@@ -305,9 +305,6 @@ type Deps struct {
 	// Notices are what the workflows raise for the user, streamed to the
 	// event subscribers as they come; nil raises none.
 	Notices Notices
-	// DraftKinds are the manifests' draft kinds a draft's card reads; nil
-	// shows a payload with nothing editable.
-	DraftKinds DraftKinds
 	// Stale says whether a held draft's unit moved past its basis, a live
 	// read; nil asks the Outbox, when it can tell.
 	Stale func(ctx context.Context, d draft.Draft) (bool, error)

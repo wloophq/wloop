@@ -67,18 +67,18 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	return d
 }
 
-// publisherBases read a unit's live basis from the publisher of its provider; a publisher that reads none
+// publisherBases read a unit's live basis from the publisher of its draft; a publisher that reads none
 // answers "", and a provider with none fails, so no draft is taken as fresh unread.
 func publisherBases(effects outbox.Effects) outbox.Bases { return basesOf(effects) }
 
 type basesOf outbox.Effects
 
-func (b basesOf) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	fx, err := b(u.Provider)
+func (b basesOf) Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
+	fx, err := b(publisher)
 	if err != nil {
 		return "", err
 	}
-	if r, ok := fx.(outbox.Bases); ok {
+	if r, ok := fx.(port.Basis); ok {
 		return r.Live(ctx, u, kind)
 	}
 	return "", nil
@@ -102,7 +102,7 @@ func (e *Env) draftEnded(ctx context.Context, d draft.Draft) error {
 
 // draftVerdict is the record verdict d posted, as the kind's manifest of the plugin that posted it declares.
 func (e *Env) draftVerdict(d draft.Draft) string {
-	spec, ok := draftKinds.Lookup(string(e.outbox.PublisherOf(d)), string(d.Kind))
+	spec, ok := e.outbox.KindOf(d)
 	if !ok {
 		return ""
 	}
@@ -231,7 +231,7 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 }
 
 func (p pinnedEffects) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	if b, ok := p.Effects.(outbox.Bases); ok {
+	if b, ok := p.Effects.(port.Basis); ok {
 		return b.Live(ctx, u, kind)
 	}
 	return "", nil

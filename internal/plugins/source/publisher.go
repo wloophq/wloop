@@ -31,7 +31,7 @@ var (
 	_ port.Placer    = Publisher{}
 	_ port.Lander    = Publisher{}
 	_ port.Deliverer = Publisher{}
-	_ outbox.Bases   = Publisher{}
+	_ port.Basis     = Publisher{}
 	_ port.Scoper    = Publisher{}
 )
 

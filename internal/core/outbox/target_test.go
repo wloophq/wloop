@@ -1,6 +1,8 @@
 package outbox
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -127,5 +129,46 @@ func TestATargetTwoProvidersTakeNamesNeither(t *testing.T) {
 	}
 	if len(chat.published) != 0 {
 		t.Fatal("published")
+	}
+}
+
+// publishersBases are live bases that record which publisher each read asked.
+type publishersBases struct{ asked []unit.ProviderID }
+
+func (b *publishersBases) Live(_ context.Context, publisher unit.ProviderID, _ unit.Unit, _ string) (string, error) {
+	b.asked = append(b.asked, publisher)
+	return "c1", nil
+}
+
+func TestADraftsKindFactsAndBasisAreItsPublishers(t *testing.T) {
+	e := newEnv()
+	byTarget(e)
+	const fact = "draft.chat.review.event"
+	c, err := draft.NewCatalog([]draft.KindSpec{{Provider: "chat", Name: "review", Delivery: "note", Basis: draft.BasisAgent,
+		Facts: []draft.FactSpec{{Name: fact, Pointer: "/event"}}, SchemaJSON: json.RawMessage(`{"type":"object"}`)}},
+		[]draft.DeliverySpec{{Provider: "chat", Name: "note"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.svc.Kinds = c
+	bases := &publishersBases{}
+	e.svc.Bases = bases
+	p := onTask("#general")
+	p.Origin = draft.Origin{Kind: draft.OriginAuto, Rule: "r", Key: "k"}
+	p.Policy = &draft.Policy{Default: draft.Approval{Mode: draft.Wait},
+		Rules: []draft.Rule{{When: factIs{fact, "COMMENT"}, Approval: noneA, Payload: []string{fact}}}}
+	p.Kind, p.Basis, p.Payload = draft.Kind("review"), "c1", json.RawMessage(`{"event":"COMMENT"}`)
+	d, err := e.svc.Propose(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec, ok := e.svc.KindOf(d); !ok || spec.Provider != "chat" {
+		t.Fatalf("KindOf = %+v %v, want the target publisher's kind", spec, ok)
+	}
+	if len(bases.asked) == 0 || slices.ContainsFunc(bases.asked, func(p unit.ProviderID) bool { return p != "chat" }) {
+		t.Fatalf("the basis was read from %v, want the publisher chat", bases.asked)
+	}
+	if e.approval(d.ID) != noneA {
+		t.Fatalf("approval %+v: the rule over the publisher kind's payload fact did not apply", e.approval(d.ID))
 	}
 }

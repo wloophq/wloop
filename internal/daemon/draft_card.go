@@ -25,23 +25,18 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// DraftKinds are the draft kinds the loaded plugins' manifests declare, as a draft's card reads them: a kind's
-// spec, which holds its payload's schema.
-type DraftKinds interface {
-	Lookup(provider, kind string) (draft.KindSpec, bool)
-}
-
 // cardFields fills v, d's view, with what its card shows of d beyond its text: its payload field by field, its
 // basis, whether it is stale, its hold, and the profile's notes on how it stands; g is d's gate.
 func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *api.Draft) {
 	publisher := string(s.publisherOf(d))
+	spec, declared := s.kindSpec(d)
 	if len(d.Payload) > 0 {
 		v.Payload = slices.Clone(d.Payload)
-		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload)
+		v.Fields = s.payloadFields(publisher, string(d.Kind), d.Payload, spec, declared)
 	}
 	v.Preview = s.preview(d, publisher, v.Where)
 	v.Basis, v.Hold = d.Basis, d.Hold
-	if spec, ok := s.kindSpec(d); ok {
+	if declared {
 		v.TextLocked = !slices.Contains(spec.Editable, draft.EditableText)
 	}
 	words := s.loaded().Gates.Drafts
@@ -97,7 +92,7 @@ func (s *Server) stale(ctx context.Context, d draft.Draft) (stale, known bool) {
 	if o == nil || o.Bases == nil {
 		return false, false
 	}
-	r := s.basisRead(o.Bases, d.Unit, string(d.Kind))
+	r := s.basisRead(o.Bases, o.PublisherOf(d), d.Unit, string(d.Kind))
 	select {
 	case <-r.done:
 	case <-ctx.Done():
@@ -125,8 +120,8 @@ type basisRead struct {
 
 // basisRead is the live read of u's basis for kind its cards share: the one in flight, else the last one while it
 // is fresh, else a new one, which runs past the page that started it so the next page finds its answer.
-func (s *Server) basisRead(bases outbox.Bases, u unit.Unit, kind string) *basisRead {
-	key := u.String() + "\x00" + kind
+func (s *Server) basisRead(bases outbox.Bases, publisher unit.ProviderID, u unit.Unit, kind string) *basisRead {
+	key := string(publisher) + "\x00" + u.String() + "\x00" + kind
 	now := time.Now()
 	s.basisMu.Lock()
 	defer s.basisMu.Unlock()
@@ -141,7 +136,7 @@ func (s *Server) basisRead(bases outbox.Bases, u unit.Unit, kind string) *basisR
 	s.ran.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), basisReadTimeout)
 		defer cancel()
-		r.live, r.err = bases.Live(ctx, u, kind)
+		r.live, r.err = bases.Live(ctx, publisher, u, kind)
 		if r.err != nil && !errors.Is(r.err, context.DeadlineExceeded) && !errors.Is(r.err, context.Canceled) {
 			s.logf("drafts: the live basis of %s: %v", u, r.err)
 		}
@@ -194,27 +189,26 @@ func (s *Server) preview(d draft.Draft, provider, where string) string {
 	return strings.TrimSpace(out.String())
 }
 
-// kindSpec is d's kind as its publisher's manifest declares it; false when none does or no kinds are served.
+// kindSpec is d's kind as its publisher's manifest declares it (outbox.Service.KindOf); false when none does or
+// no outbox is served.
 func (s *Server) kindSpec(d draft.Draft) (draft.KindSpec, bool) {
-	if s.deps.DraftKinds == nil {
+	if s.deps.Outbox == nil {
 		return draft.KindSpec{}, false
 	}
-	return s.deps.DraftKinds.Lookup(string(s.publisherOf(d)), string(d.Kind))
+	return s.deps.Outbox.KindOf(d)
 }
 
 // payloadFields are the values of payload, a draft of kind's of provider, in its order, each under the plugin's
-// word for its key, with the kind's editable fields' options from its schema.
-func (s *Server) payloadFields(provider, kind string, payload json.RawMessage) []api.DraftField {
+// word for its key, with the editable fields' options from spec's schema when the kind is declared.
+func (s *Server) payloadFields(provider, kind string, payload json.RawMessage, spec draft.KindSpec, declared bool) []api.DraftField {
 	root, err := decodeOrdered(json.NewDecoder(bytes.NewReader(payload)))
 	if err != nil {
 		s.logf("drafts: a %s payload does not decode: %v", kind, err)
 		return []api.DraftField{{Pointer: "", Label: kind, Value: string(payload)}}
 	}
 	w := payloadWalk{words: s.loaded().UI[provider].Drafts[kind].Fields}
-	if k := s.deps.DraftKinds; k != nil {
-		if spec, ok := k.Lookup(provider, kind); ok {
-			w.editable, w.schema = spec.Editable, s.kindSchema(spec)
-		}
+	if declared {
+		w.editable, w.schema = spec.Editable, s.kindSchema(spec)
 	}
 	if root.kind == nodeScalar {
 		return []api.DraftField{w.field(root, "", kind, w.schema)}

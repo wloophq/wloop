@@ -22,12 +22,13 @@ import (
 const reviewPayload = `{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},` +
 	`{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`
 
-// reviewKinds is the GitHub manifest's review kind, with the schema it ships, as the manifest loader reads it.
-type reviewKinds struct{}
+// reviewKinds are the test outbox's kinds and the GitHub manifest's review kind, with the schema it ships, as the
+// manifest loader reads it.
+type reviewKinds struct{ bundledtest.Shapes }
 
 func (k reviewKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	if provider != "github" || kind != "review" {
-		return draft.KindSpec{}, false
+		return k.Shapes.Lookup(provider, kind)
 	}
 	schema, err := os.ReadFile("../../plugins/github/drafts/review/schema.json")
 	if err != nil {
@@ -68,7 +69,7 @@ func flatValues(fs []api.DraftField, out map[string]api.DraftField) {
 func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.s.deps.DraftKinds = reviewKinds{}
+	r.o.Kinds = reviewKinds{}
 	d := reviewDraftOf(draft.Sent)
 	d.By = draft.Actor{Kind: draft.ActorSession, Session: "s-1"}
 	v := r.s.draftView(context.Background(), d, gate.Gate{})
@@ -229,7 +230,7 @@ func TestRuleSentNotifies(t *testing.T) {
 // worded and checked for its editable fields.
 func BenchmarkDraftCardFields(b *testing.B) {
 	r := newOutboxRig(b)
-	r.s.deps.DraftKinds = reviewKinds{}
+	r.o.Kinds = reviewKinds{}
 	d := reviewDraftOf(draft.Sent)
 	for b.Loop() {
 		for range 500 {
@@ -314,26 +315,15 @@ func TestEditWithoutRevRefused(t *testing.T) {
 	}
 }
 
-// lockedShapes are the outbox's kinds with a reply's text locked, as lockedKinds declare it.
-type lockedShapes struct{ bundledtest.Shapes }
+// lockedShapes are the review kinds with a reply locked as GitHub's resolve is, its text no person's to change.
+type lockedShapes struct{ reviewKinds }
 
 func (k lockedShapes) Lookup(provider, kind string) (draft.KindSpec, bool) {
-	spec, ok := k.Shapes.Lookup(provider, kind)
+	spec, ok := k.reviewKinds.Lookup(provider, kind)
 	if kind == "reply" {
 		spec.Editable = nil
 	}
 	return spec, ok
-}
-
-// lockedKinds declares a reply locked as GitHub's resolve is, its text no person's to change, and its review, whose text and /event are a
-// person's to change.
-type lockedKinds struct{ reviewKinds }
-
-func (k lockedKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
-	if kind == string(draft.Kind("reply")) {
-		return draft.KindSpec{Provider: provider, Name: kind, Delivery: "resolve"}, true
-	}
-	return k.reviewKinds.Lookup(provider, kind)
 }
 
 // TestEditRefusesWhatTheKindLocks refuses a person's text on a kind whose editable lacks text, through the edit
@@ -342,8 +332,7 @@ func (k lockedKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.s.deps.DraftKinds = lockedKinds{}
-	r.o.Kinds = lockedShapes{bundledtest.Shapes{}}
+	r.o.Kinds = lockedShapes{}
 	d := r.propose(t, r7u, "thread resolved", draft.Wait)
 	id := strconv.FormatInt(int64(d.ID), 10)
 	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "1"})); rec.Code != 400 {

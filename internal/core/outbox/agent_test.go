@@ -99,7 +99,7 @@ func (b *liveBases) Set(u unit.Unit, basis string) {
 	b.live[u] = basis
 }
 
-func (b *liveBases) Live(_ context.Context, u unit.Unit, _ string) (string, error) {
+func (b *liveBases) Live(_ context.Context, _ unit.ProviderID, u unit.Unit, _ string) (string, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.calls++

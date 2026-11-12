@@ -42,7 +42,7 @@ import (
 // TestOptions are what ServeForTest puts in place of the outside world in the daemon serve composes.
 type TestOptions struct {
 	// Publishers stand, by provider, for the Publisher of the plugin module serve builds, pinned to their turns
-	// as serve pins a plugin's; one that is an outbox.Bases reads its units' live basis.
+	// as serve pins a plugin's; one that is a port.Basis reads its units' live basis.
 	Publishers map[unit.ProviderID]port.Effects
 	// Now is the daemon's clock; nil is a fixed instant.
 	Now func() time.Time

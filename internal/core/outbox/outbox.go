@@ -121,8 +121,9 @@ type Kinds interface {
 
 // Bases read the live basis of a unit, never a cached one.
 type Bases interface {
-	// Live is what a draft of kind on u would be written against now, such as a pull request's head.
-	Live(ctx context.Context, u unit.Unit, kind string) (string, error)
+	// Live is what a draft of kind on u, which publisher posts (Service.PublisherOf), would be written
+	// against now, such as a pull request's head; publisher's manifest declares kind.
+	Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error)
 }
 
 // Effects returns the publishing capability of a provider; an error wrapping
@@ -308,7 +309,7 @@ func (s *Service) shape(d draft.Draft) (draft.Draft, draft.KindSpec, bool, error
 	if err != nil {
 		return d, draft.KindSpec{}, false, invalid(err)
 	}
-	spec, declared := kinds.Lookup(provider, string(got.Kind))
+	spec, declared := s.KindOf(got)
 	if spec.Basis != draft.BasisAgent {
 		got.Basis = ""
 	}
@@ -322,13 +323,19 @@ func invalid(err error) error {
 	return fmt.Errorf("%w: %w", ErrInvalid, err)
 }
 
+// KindOf is d's kind as the manifest of its publisher (PublisherOf), never of its unit, declares it now;
+// false when that manifest declares none of that name.
+func (s *Service) KindOf(d draft.Draft) (draft.KindSpec, bool) {
+	return s.kinds().Lookup(string(s.PublisherOf(d)), string(d.Kind))
+}
+
 // spec is the kind of stored draft d as its publisher's manifest declares it now; declared is false for a
 // publisher that declares no kinds, and a kind it no longer declares is ErrInvalid.
 func (s *Service) spec(d draft.Draft) (draft.KindSpec, bool, error) {
-	kinds, provider := s.kinds(), string(s.PublisherOf(d))
-	if spec, ok := kinds.Lookup(provider, string(d.Kind)); ok {
+	if spec, ok := s.KindOf(d); ok {
 		return spec, true, nil
 	}
+	kinds, provider := s.kinds(), string(s.PublisherOf(d))
 	if _, err := kinds.Shape(provider, draft.Draft{Kind: d.Kind, Purpose: d.Purpose, Delivery: d.Delivery}); err != nil {
 		return draft.KindSpec{}, false, invalid(err)
 	}
@@ -438,7 +445,7 @@ func (s *Service) Stale(ctx context.Context, d draft.Draft) (bool, error) {
 	if s.Bases == nil {
 		return false, fmt.Errorf("%w: nothing reads the live basis of draft %d", ErrNoBases, d.ID)
 	}
-	live, err := s.Bases.Live(ctx, d.Unit, string(d.Kind))
+	live, err := s.Bases.Live(ctx, s.PublisherOf(d), d.Unit, string(d.Kind))
 	if err != nil {
 		return false, fmt.Errorf("reading the live basis of %s: %w", d.Unit, err)
 	}
@@ -495,10 +502,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
-	sub.Kind = draft.KindSpec{}
-	if s.Kinds != nil {
-		sub.Kind, _ = s.Kinds.Lookup(string(d.Unit.Provider), string(d.Kind))
-	}
+	sub.Kind, _ = s.KindOf(d)
 	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)

@@ -127,3 +127,11 @@ func TestOtherProviderFactAbsent(t *testing.T) {
 		t.Errorf("a rule over forge's fact stopped a chat draft its own rule sends: %+v, %v", got, err)
 	}
 }
+
+func TestPayloadFactsAreOfThePublishersKindOnAnotherProvidersUnit(t *testing.T) {
+	onTask := reviewDraft(`{"event":"COMMENT"}`)
+	onTask.Unit = unit.Unit{Provider: "task", Key: "e1"}
+	if got := onTask.PayloadFacts(reviewSpec); got[reviewEvent] != "COMMENT" {
+		t.Errorf("a draft its publisher forge posts from a task reads %v, want forge's review facts", got)
+	}
+}

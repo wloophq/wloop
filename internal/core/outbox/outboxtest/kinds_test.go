@@ -38,7 +38,7 @@ func TestTheFakeBasesAnswerTheLastSet(t *testing.T) {
 	b := &Bases{}
 	b.Set(u, "abc")
 	b.Set(u, "def")
-	if got, err := b.Live(context.Background(), u, "review"); err != nil || got != "def" || b.Calls() != 1 {
+	if got, err := b.Live(context.Background(), u.Provider, u, "review"); err != nil || got != "def" || b.Calls() != 1 {
 		t.Fatalf("Live = %q, %v after %d calls", got, err, b.Calls())
 	}
 }

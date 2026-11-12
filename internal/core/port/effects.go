@@ -31,6 +31,12 @@ type Scoper interface {
 	Within(ctx context.Context, u unit.Unit, target string) (bool, error)
 }
 
+// Basis is optional: an Effects value that implements it reads, live, what a draft of kind on u would be
+// written against now, such as a pull request's head.
+type Basis interface {
+	Live(ctx context.Context, u unit.Unit, kind string) (string, error)
+}
+
 // Locator is optional: an Effects value that implements it names, for the user approving d, the
 // conversation or person d posts to.
 type Locator interface {
