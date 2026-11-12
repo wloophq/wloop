@@ -341,7 +341,7 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 			continue
 		}
 		switch {
-		case user && g.Session != "" && g.Session == session:
+		case user && stamped(g, session):
 			_, err = s.d.Store.Resolve(ctx, g.ID, Resolution{Status: gate.Superseded, By: by, Session: session})
 		case user:
 			def, _ := s.def(g)
@@ -496,8 +496,8 @@ func (s *Service) vouch(ctx context.Context, g gate.Gate, session string) error 
 	if session == "" || s.d.Sessions == nil {
 		return fmt.Errorf("%w: an agent resolves a gate only through a session the user drives", ErrRefused)
 	}
-	if g.Session == session {
-		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, which does not resolve it", ErrRefused, g.ID, session)
+	if stamped(g, session) {
+		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, or that session revised it, so it does not resolve it", ErrRefused, g.ID, session)
 	}
 	driven, err := s.d.Sessions.UserDriven(ctx, session)
 	switch {
