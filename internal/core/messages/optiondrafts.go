@@ -61,7 +61,7 @@ func (s *Service) approveOption(ctx context.Context, g gate.Gate, m message.Mess
 		if err != nil {
 			return false, err
 		}
-	case dg.Status == gate.Approved && dg.ApprovedRev == ref.Rev && dg.By == by.By && dg.BySession == by.Session && dg.Rule == "":
+	case dg.Status == gate.Approved && dg.ApprovedRev == ref.Rev && dg.By == by.By && dg.BySession == by.Session:
 	default:
 		return false, nil
 	}
