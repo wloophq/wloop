@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -53,7 +54,7 @@ func tryEnv(t *testing.T, a *tryAgent) *testEnv {
 
 func TestTrySettingsDenyEveryWrite(t *testing.T) {
 	t.Parallel()
-	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
+	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored(), bundledWrites()).Denied(turns.Control{Commands: [][]string{{"open", "claude://*"}}}))
 	for _, want := range []string{"Bash(gh api * --method*)", "Bash(gh api * -X*)", "Bash(gh api * -f*)", "Bash(gh api * --input*)",
 		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(open claude://*)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
@@ -133,16 +134,43 @@ func TestTryWithoutDryRunOutputFails(t *testing.T) {
 
 func TestTryPolicyCoversFlagFirstAndAttachedForms(t *testing.T) {
 	t.Parallel()
-	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()))
-	for _, want := range []string{"Bash(gh api -X*)", "Bash(gh api --method*)", "Bash(gh api * --method*)", "Bash(gh api -f*)", "Bash(gh issue *)",
-		"Bash(gh release *)", "Bash(gh workflow *)", "Bash(git -C *)", "Bash(git -c *)", "Bash(git config *)", "Edit(./.loop/**)", `"disableAllHooks":true`} {
+	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored(), bundledWrites()))
+	for _, want := range []string{"Bash(git -C *)", "Bash(git -c *)", "Bash(git config *)", "Edit(./.loop/**)", `"disableAllHooks":true`} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("lacks %s", want)
+		}
+	}
+	deny := denyRules(t, raw)
+	for _, cmd := range []string{"gh api -X POST repos/acme/api/issues", "gh api -XPOST repos/acme/api/issues", "gh api repos/acme/api/issues --method=POST",
+		"gh issue create --title x", "gh release create v1", "gh workflow run ci", "gh pr review 7 --approve", "gh repo delete acme/api"} {
+		if !slices.ContainsFunc(deny, matchesRule(cmd)) {
+			t.Errorf("a dry run may run %q", cmd)
 		}
 	}
 	if strings.Contains(raw, `"Bash(git *)"`) || !strings.Contains(raw, "Bash(git diff *)") {
 		t.Error("every git command is allowed")
 	}
+}
+
+// TestTryPolicyDeniesTheManifestsWriteCommands denies a dry run every command a manifest declares as a write.
+func TestTryPolicyDeniesTheManifestsWriteCommands(t *testing.T) {
+	t.Parallel()
+	writes := [][]string{{"acme", "post*"}, {"acme", "* delete*"}}
+	p := tryPolicy("p", nil, writes)
+	for _, w := range writes {
+		if !slices.ContainsFunc(p.Deny, func(d []string) bool { return slices.Equal(d, w) }) {
+			t.Errorf("a dry run may run %q", w)
+		}
+	}
+}
+
+// bundledWrites are the bundled manifests' write commands, as words.
+func bundledWrites() [][]string {
+	srcs, err := bundled.Sources()
+	if err != nil {
+		panic(err)
+	}
+	return writeCommands(srcs)
 }
 
 func TestRoundSessionsMayRunLoop(t *testing.T) {
@@ -163,7 +191,7 @@ func TestRoundSessionsMayRunLoop(t *testing.T) {
 
 func TestRoundSessionsReadOnlyStoredTurns(t *testing.T) {
 	t.Parallel()
-	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored())} {
+	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored(), bundledWrites())} {
 		raw := claude.Agent{}.Settings(policy)
 		var want []string
 		for _, intent := range []string{"act", "address", "attach", "chat", "nudge", "review", "start"} {
@@ -184,7 +212,7 @@ func TestRoundSessionsReadOnlyStoredTurns(t *testing.T) {
 func TestNoAllowRuleLetsARoundSessionRunATurnByHand(t *testing.T) {
 	t.Parallel()
 	url := "https://github.com/acme/api/pull/7"
-	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored())} {
+	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored(), bundledWrites())} {
 		rules := allowRules(t, claude.Agent{}.Settings(policy))
 		if !slices.ContainsFunc(rules, matchesRule("'/bin/"+brand.Name+"' instructions review --turn abc123abc123 "+url)) {
 			t.Errorf("%s: the round prompt's command is not allowed", name)
@@ -255,7 +283,7 @@ func TestSessionPoliciesDenyEveryManagersControlButItsBinary(t *testing.T) {
 		for name, p := range map[string]turns.Policy{
 			"round": policies[policyRound](te.Env, "review", control),
 			"probe": policies["probe"](te.Env, "ask-author", control),
-			"try":   tryPolicy("p", bundledStored()).Denied(control),
+			"try":   tryPolicy("p", bundledStored(), bundledWrites()).Denied(control),
 		} {
 			zed := managers[0] == "zed"
 			if has(p, "zed-cli") || has(p, "zed", "ctl") != zed || slices.Contains(p.DenyPaths, "/zed/sock") != zed || has(p, "orca") || has(p, "") {

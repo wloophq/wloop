@@ -192,8 +192,12 @@ func (s *Schema) Source() []byte { return s.src }
 // field that does not fit.
 func (s *Schema) Validate(v any) error { return s.root.validate(v, "$") }
 
-// ValidateJSON decodes raw and validates it.
+// ValidateJSON decodes raw and validates it. An object that holds a key twice is invalid: decoders disagree on
+// which value counts, so what a person is shown and what is posted could differ.
 func (s *Schema) ValidateJSON(raw []byte) error {
+	if err := uniqueKeys(json.NewDecoder(bytes.NewReader(raw)), "$"); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var v any
@@ -204,6 +208,39 @@ func (s *Schema) ValidateJSON(raw []byte) error {
 		return fmt.Errorf("%w: text after the value", ErrInvalid)
 	}
 	return s.Validate(v)
+}
+
+// uniqueKeys walks the next value of dec and refuses an object that holds a key twice; a value that does not
+// decode is left to the decoder that follows.
+func uniqueKeys(dec *json.Decoder, path string) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil
+	}
+	d, ok := tok.(json.Delim)
+	if !ok {
+		return nil
+	}
+	seen := map[string]bool{}
+	for i := 0; dec.More(); i++ {
+		at := fmt.Sprintf("%s[%d]", path, i)
+		if d == '{' {
+			k, err := dec.Token()
+			if err != nil {
+				return nil
+			}
+			key, _ := k.(string)
+			if seen[key] {
+				return fmt.Errorf("%s: key %q twice", path, key)
+			}
+			seen[key], at = true, path+"."+key
+		}
+		if err := uniqueKeys(dec, at); err != nil {
+			return err
+		}
+	}
+	_, _ = dec.Token()
+	return nil
 }
 
 func (n *node) validate(v any, path string) error {
