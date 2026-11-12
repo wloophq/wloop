@@ -163,10 +163,14 @@ func (s *Service) pinned(q, d gate.Gate, r Resolution, rev int64) error {
 	case r.By != task.ActorPerson && r.By != task.ActorAgent:
 		return fmt.Errorf("%w: an option is picked by a person or a session the user drives, not by %s", ErrRefused, r.By)
 	case d.Stamps(r.Session):
-		return fmt.Errorf("%w: session %s proposed or revised the draft of gate %d", ErrRefused, r.Session, d.ID)
+		return fmt.Errorf("%w: %w: session %s proposed or revised the draft of gate %d", ErrRefused, errStamped, r.Session, d.ID)
 	}
 	return nil
 }
+
+// errStamped marks an option refused because its resolver proposed or revised the draft: such a pick is no
+// answer at all, unlike a stale pin, whose person did choose.
+var errStamped = errors.New("the resolver proposed or revised the option's draft")
 
 func sessionOf(r Resolution) string {
 	if r.By == task.ActorPerson {

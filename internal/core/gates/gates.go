@@ -233,7 +233,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // resolveOption approves, through ApproveOption, the draft that r's answer to open question gate id picks,
 // and answers the question with it; done is false when r picks no draft, or when ApproveOption refuses it
-// before resolving anything, so the answer resolves the question as any answer does.
+// before resolving anything, so the answer resolves the question as any answer does. A pick whose resolver
+// proposed or revised the draft (Gate.Stamps) is refused outright: the question stays open.
 func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (done bool, err error) {
 	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
 		return false, nil
@@ -250,7 +251,7 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 		return false, err
 	}
 	err = s.ApproveOption(ctx, q, r, drafted, rev)
-	if errors.Is(err, ErrRefused) {
+	if errors.Is(err, ErrRefused) && !errors.Is(err, errStamped) {
 		if now, gerr := s.d.Reader.Get(ctx, id); gerr == nil && now.Status == gate.Open {
 			s.logf("gate %d: the option's draft gate %d is not approved (%v); the answer resolves the question alone", id, drafted.ID, err)
 			return false, nil
