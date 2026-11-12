@@ -186,7 +186,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 	})
 	t.Run("yes with text", func(t *testing.T) {
 		te, db, d := seed(t, true)
-		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this."); code != 0 {
+		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this.", "--rev", "0"); code != 0 {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
 		if !strings.Contains(te.out.String(), "  Only this.") || strings.Contains(te.out.String(), "Third line") {
@@ -220,7 +220,7 @@ func TestOutboxEditAndDiscard(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
 	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "1", "better text"); code != 0 {
+	if code := te.run("outbox", "edit", "1", "better text", "--rev", "0"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := te.draftState(t, db, d.ID); got.Text != "better text" || got.State != draft.Held {
@@ -515,7 +515,7 @@ handler = "edit"
 		t.Fatalf("retried %+v", got)
 	}
 	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "2", "better"); code != 0 {
+	if code := te.run("outbox", "edit", "2", "better", "--rev", "0"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := postedPaths(); len(got) != 2 || got[1] != "/api/tasks/draft:2/retry" {
@@ -523,5 +523,33 @@ handler = "edit"
 	}
 	if got := te.draftState(t, db, held.ID); got.Text != "better" {
 		t.Fatalf("edited %+v", got)
+	}
+}
+
+// TestOutboxEditAndApproveTextSendTheRevShown makes a person's change name the rev they read: without --rev it
+// is a usage error, and an agent's revision after outbox show gives a conflict and keeps the revision.
+func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, true)
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "as shown", State: draft.Held})
+	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "Rev         0") {
+		t.Fatalf("show: exit %d: %s", code, te.out)
+	}
+	for _, args := range [][]string{{"outbox", "edit", "1", "mine"}, {"outbox", "approve", "1", "--yes", "--text", "mine"}} {
+		if code := te.run(args...); code != 2 || !strings.Contains(te.err.String(), "--rev") {
+			t.Errorf("%v without --rev: exit %d: %s", args, code, te.err)
+		}
+	}
+	d.Text = "the agent's revision"
+	if _, err := db.Drafts().Update(context.Background(), d, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"outbox", "edit", "1", "mine", "--rev", "0"}, {"outbox", "approve", "1", "--yes", "--text", "mine", "--rev", "0"}} {
+		if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "changed since you saw it") {
+			t.Errorf("%v after a revision: exit %d: %s", args, code, te.err)
+		}
+	}
+	if got := te.draftState(t, db, d.ID); got.Text != "the agent's revision" || got.State != draft.Held {
+		t.Fatalf("stored %+v, want the agent's revision held", got)
 	}
 }

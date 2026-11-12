@@ -6,6 +6,7 @@ import (
 	"io"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -248,7 +249,7 @@ func draftCommands(d api.Draft) []string {
 		line := fmt.Sprintf("%s outbox %s %d", brand.Command, verb, d.ID)
 		switch {
 		case verb == "edit":
-			line += " <markdown>"
+			line += fmt.Sprintf(" <markdown> --rev %d", d.Rev)
 		case verb == "retry" && a.Confirm != "":
 			line += " --confirm"
 		}
@@ -310,6 +311,7 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 	}
 	field("Origin", draftOrigin(d)+", "+draftAge(d, now)+" ago")
 	field("Approval", approvalOf(d))
+	field("Rev", strconv.FormatInt(d.Rev, 10))
 	if d.Deadline != nil {
 		field("Deadline", d.Deadline.Local().Format("2006-01-02 15:04 MST"))
 	}

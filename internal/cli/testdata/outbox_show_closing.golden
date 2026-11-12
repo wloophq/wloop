@@ -9,7 +9,8 @@ DM with Ana Lima: rollout
 To          destination unknown
 Origin      rule closure, 3h ago
 Approval    wait
+Rev         0
 
 {{command}} outbox approve 11
 {{command}} outbox discard 11
-{{command}} outbox edit 11 <markdown>
+{{command}} outbox edit 11 <markdown> --rev 0

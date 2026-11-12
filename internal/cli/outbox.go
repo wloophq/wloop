@@ -26,7 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown> --rev <n>] [--yes] | edit <id> <markdown> --rev <n> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
 
 // outboxInteractive says whether e reads from a terminal; tests replace it.
 var outboxInteractive = func(e *Env) bool {
@@ -197,6 +197,7 @@ func mentionsOf(text string) []string {
 // printDraft writes d whole, with text as what would post.
 func printDraft(w io.Writer, d api.Draft, text string) {
 	fmt.Fprintf(w, "draft %d (%s): a %s on %s\n", d.ID, d.State, d.Kind, d.Unit)
+	fmt.Fprintf(w, "rev:      %d\n", d.Rev)
 	fmt.Fprintf(w, "target:   %s\n", draftTarget(d))
 	if d.Permalink == "" {
 		fmt.Fprintf(w, "to:       %s\n", draftWhere(d))
@@ -298,6 +299,7 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	fs.SetOutput(e.Err)
 	text := fs.String("text", "", "the text to post instead of the draft's")
 	yes := fs.Bool("yes", false, "approve without asking, after showing the draft")
+	rev := fs.Int64("rev", -1, "with --text: the rev of the draft you read, as outbox show prints it")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -313,18 +315,20 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	if err != nil {
 		return err
 	}
-	shown := d.Text
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "text" {
-			shown = *text
+	shown, seen := d.Text, d.Rev
+	if flagSet(fs, "text") {
+		shown = *text
+		if *rev < 0 {
+			return usageError{usage: outboxUsage, why: "approve --text takes --rev, the rev of the draft you read (outbox show prints it)"}
 		}
-	})
+		seen = *rev
+	}
 	printDraft(e.Out, d, shown)
 	if !*yes && !e.confirmed("Approve and post this?") {
 		fmt.Fprintln(e.Out, "Not approved.")
 		return exitCode(1)
 	}
-	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(seen, 10)}); err != nil {
 		return err
 	}
 	got, err := c.Draft(ctx, id)
@@ -491,18 +495,24 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 }
 
 func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) error {
-	if len(args) != 2 {
+	fs := flag.NewFlagSet("outbox edit", flag.ContinueOnError)
+	fs.SetOutput(e.Err)
+	rev := fs.Int64("rev", -1, "the rev of the draft you read, as outbox show prints it")
+	pos, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 2 {
 		return usageError{usage: outboxUsage}
 	}
-	id, err := draftArg(args[:1])
+	if *rev < 0 {
+		return usageError{usage: outboxUsage, why: "edit takes --rev, the rev of the draft you read (outbox show prints it)"}
+	}
+	id, err := draftArg(pos[:1])
 	if err != nil {
 		return err
 	}
-	d, err := c.Draft(ctx, id)
-	if err != nil {
-		return err
-	}
-	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1], "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": pos[1], "rev": strconv.FormatInt(*rev, 10)}); err != nil {
 		return err
 	}
 	fmt.Fprintf(e.Out, "draft %d edited\n", id)
@@ -535,4 +545,11 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	}
 	fmt.Fprintf(e.Out, "draft %d discarded\n", id)
 	return nil
+}
+
+// flagSet says whether name was given on fs's command line.
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
 }
