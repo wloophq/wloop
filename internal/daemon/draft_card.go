@@ -121,16 +121,31 @@ func (s *Server) payloadFields(provider, kind string, payload json.RawMessage) [
 	w := payloadWalk{words: s.loaded().UI[provider].Drafts[kind].Fields}
 	if k := s.deps.DraftKinds; k != nil {
 		if spec, ok := k.Lookup(provider, kind); ok {
-			w.editable = spec.Editable
-			if raw, err := k.Schema(spec); err == nil {
-				_ = json.Unmarshal(raw, &w.schema)
-			}
+			w.editable, w.schema = spec.Editable, s.kindSchema(k, spec)
 		}
 	}
 	if root.kind == nodeScalar {
 		return []api.DraftField{w.field(root, "", kind, w.schema)}
 	}
 	return w.children(root, "", "", w.schema)
+}
+
+// kindSchema is spec's payload schema, read once while it reads.
+func (s *Server) kindSchema(k DraftKinds, spec draft.KindSpec) map[string]any {
+	key := spec.Provider + "/" + spec.Name
+	if m, ok := s.kindSchemas.Load(key); ok {
+		return m.(map[string]any)
+	}
+	raw, err := k.Schema(spec)
+	if err != nil {
+		return nil
+	}
+	var m map[string]any
+	if json.Unmarshal(raw, &m) != nil {
+		return nil
+	}
+	s.kindSchemas.Store(key, m)
+	return m
 }
 
 type payloadWalk struct {

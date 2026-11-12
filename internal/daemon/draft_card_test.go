@@ -20,7 +20,7 @@ const reviewPayload = `{"event":"REQUEST_CHANGES","comments":[{"path":"api/handl
 	`{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`
 
 // reviewKinds is the GitHub manifest's review kind, with the schema it ships.
-type reviewKinds struct{ t *testing.T }
+type reviewKinds struct{}
 
 func (k reviewKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	if provider != "github" || kind != "review" {
@@ -65,7 +65,7 @@ func flatValues(fs []api.DraftField, out map[string]api.DraftField) {
 func TestDraftCardServesEveryPayloadValue(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.s.deps.DraftKinds = reviewKinds{t}
+	r.s.deps.DraftKinds = reviewKinds{}
 	v := r.s.draftView(context.Background(), reviewDraftOf(draft.Sent), gate.Gate{})
 	got := map[string]api.DraftField{}
 	flatValues(v.Fields, got)
@@ -207,3 +207,17 @@ func TestRuleSentNotifies(t *testing.T) {
 	}
 }
 
+
+// BenchmarkDraftCardFields is the cost the card's fields add to a page of 500 review drafts: each payload decoded,
+// worded and checked for its editable fields.
+func BenchmarkDraftCardFields(b *testing.B) {
+	r := newOutboxRig(b)
+	r.s.deps.DraftKinds = reviewKinds{}
+	d := reviewDraftOf(draft.Sent)
+	for b.Loop() {
+		for range 500 {
+			var v api.Draft
+			r.s.cardFields(context.Background(), d, gate.Gate{}, &v)
+		}
+	}
+}

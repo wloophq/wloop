@@ -461,6 +461,8 @@ type Server struct {
 	lookupsSwept atomic.Int64
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.
 	whereLookup, wherePage time.Duration
+	// kindSchemas keeps the draft kinds' payload schemas a card read, by provider and kind.
+	kindSchemas sync.Map
 	// amender replaces the Outbox's Amend in tests.
 	amender func(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error)
 	// pauseMu serializes every read-modify-write of the pause.
