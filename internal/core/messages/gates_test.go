@@ -5,8 +5,11 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -252,4 +255,95 @@ func TestAnAnswerWhoseResumeFailsIsLoggedAndItsQuestionAsksAgain(t *testing.T) {
 	if _, err := r.answer(r.only(t), messages.Answer{OptionID: "publish", Source: turn.Cockpit}); err != nil || len(r.launch.launches) != 1 {
 		t.Fatalf("the second answer = %v, launches %+v", err, r.launch.launches)
 	}
+}
+
+// TestAReconcileRacingADecisionLeavesNoGateOnTheClosedMessage holds a reconcile that saw a proposal's message
+// open, with its gate decided, right before it opens the message a new gate, while the decision closes the
+// message: wherever the decision's close is when the reconcile goes on, no gate stays open on the closed
+// message, which would read the decided proposal open again.
+func TestAReconcileRacingADecisionLeavesNoGateOnTheClosedMessage(t *testing.T) {
+	for _, closing := range []bool{false, true} {
+		name := map[bool]string{false: "the decision closed the message", true: "the decision is closing the message"}[closing]
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t)
+			ctx := context.Background()
+			r.ledger.proposals = []coreitems.Proposal{{ID: 4, Unit: r7, Item: "i2", Op: items.Op{Op: items.OpResolve, Item: "i2"}, State: coreitems.ProposalOpen}}
+			if err := r.svc.ReconcileProposals(ctx); err != nil {
+				t.Fatal(err)
+			}
+			m := r.only(t)
+			g, err := r.gateStore.Resolve(ctx, r.gateOf(t, m).ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson})
+			if err != nil {
+				t.Fatal(err)
+			}
+			held := &holdingStore{Store: r.msgs, checked: make(chan struct{}), goOn: make(chan struct{}), closing: make(chan struct{}), close: make(chan struct{})}
+			r.svc.Store = held
+			reconciled := make(chan error, 1)
+			go func() { reconciled <- r.svc.ReconcileProposals(context.WithValue(ctx, reconcilerKey{}, true)) }()
+			<-held.checked
+			decided := make(chan error, 1)
+			decideCtx := ctx
+			if closing {
+				decideCtx = context.WithValue(ctx, deciderKey{}, true)
+			}
+			go func() { decided <- r.svc.Decide(decideCtx, g) }()
+			if closing {
+				<-held.closing
+				close(held.goOn)
+				wait(t, reconciled)
+				close(held.close)
+				wait(t, decided)
+			} else {
+				close(held.close)
+				wait(t, decided)
+				close(held.goOn)
+				wait(t, reconciled)
+			}
+			if got := r.message(t, m.ID); got.Open() {
+				t.Fatalf("message %+v", got)
+			}
+			if open := r.openGates(t, gate.KindProposal); len(open) != 0 {
+				t.Fatalf("open gates on the decided proposal %+v", open)
+			}
+		})
+	}
+}
+
+func wait(t *testing.T, done <-chan error) {
+	t.Helper()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+type reconcilerKey struct{}
+
+type deciderKey struct{}
+
+// holdingStore holds the reconciler's first read of a message, after it reads, until goOn, and the decider's
+// close, before it closes, until close.
+type holdingStore struct {
+	message.Store
+	once           sync.Once
+	checked, goOn  chan struct{}
+	closing, close chan struct{}
+}
+
+func (s *holdingStore) Message(ctx context.Context, id int64) (message.Message, bool, error) {
+	m, ok, err := s.Store.Message(ctx, id)
+	if ctx.Value(reconcilerKey{}) != nil {
+		s.once.Do(func() {
+			close(s.checked)
+			<-s.goOn
+		})
+	}
+	return m, ok, err
+}
+
+func (s *holdingStore) Close(ctx context.Context, id int64, answer string, at time.Time) error {
+	if ctx.Value(deciderKey{}) != nil {
+		close(s.closing)
+		<-s.close
+	}
+	return s.Store.Close(ctx, id, answer, at)
 }
