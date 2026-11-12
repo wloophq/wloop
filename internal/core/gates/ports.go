@@ -55,6 +55,9 @@ type Resolution struct {
 	By      task.Actor
 	Rule    string
 	Session string
+	// pick marks the approval of a draft gate by the answer that picks it, the only one a question that pins
+	// the draft lets through (close).
+	pick bool
 }
 
 // Sessions says whether the user drives an agent's session, by its stable id.
