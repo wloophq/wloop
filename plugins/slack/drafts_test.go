@@ -576,3 +576,29 @@ func formOf(v url.Values) string {
 	}
 	return strings.Join(parts, " ")
 }
+
+func TestWithinTheUnitsThread(t *testing.T) {
+	t.Parallel()
+	f := newToolFixture(t, true)
+	ctx := context.Background()
+	if !slices.Contains(src.Capabilities(f.s), src.CapabilityDrafter) {
+		t.Fatalf("capabilities %v", src.Capabilities(f.s))
+	}
+	u := dslack.ThreadUnit(toolTeam, "C100", toolThread).Wire()
+	for target, want := range map[string]bool{
+		"":                  true,
+		"C100/" + toolReply: true,
+		"https://acme.slack.com/archives/C100/p" + strings.ReplaceAll(toolThread, ".", ""): true,
+		"C100/" + toolOther: false,
+		"C100":              false,
+		"#general":          false,
+		"U001":              false,
+	} {
+		if got, err := f.s.Within(ctx, u, target); err != nil || got != want {
+			t.Errorf("Within(%q) = %v %v, want %v", target, got, err, want)
+		}
+	}
+	if b, err := f.s.Basis(ctx, u, "reply"); err != nil || b != "" {
+		t.Fatalf("Basis = %q %v", b, err)
+	}
+}

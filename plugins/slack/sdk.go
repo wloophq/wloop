@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -436,4 +437,22 @@ func WireDraft(d draft.Draft) src.Draft {
 		out.Origin.Unit = d.Origin.Unit.Wire()
 	}
 	return out
+}
+
+// Basis is none: no Slack kind is written against a basis.
+func (s *Plugin) Basis(context.Context, sdk.Unit, string) (string, error) { return "", nil }
+
+// Within says whether target, a message ref or permalink, is a message of
+// u; "" is u itself.
+func (s *Plugin) Within(ctx context.Context, u sdk.Unit, target string) (bool, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return true, nil
+	}
+	p, err := s.running()
+	if err != nil {
+		return false, err
+	}
+	got, ok, err := p.resolve(ctx, target)
+	return ok && got == unit.Of(u), err
 }
