@@ -83,6 +83,7 @@ func inputSchema() *schema {
 			"url":          str(record.URLMax),
 			"blocking":     count(),
 			"non_blocking": count(),
+			"draft":        draftRef,
 		}),
 		"question": object(map[string]*schema{
 			"kind":      enum("choice", "confirm", "free"),
