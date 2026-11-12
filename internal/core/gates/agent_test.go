@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
@@ -180,5 +181,43 @@ func TestApproveOptionIdempotent(t *testing.T) {
 	other.Answer = "Something else"
 	if err := f.svc.ApproveOption(ctx, q, other, d, 3); !errors.Is(err, gates.ErrResolved) {
 		t.Fatalf("another answer to the resolved question: %v", err)
+	}
+}
+
+// revisingDeliverer supersedes draft gate id, as an agent's revision does, while it delivers a question's
+// answer.
+type revisingDeliverer struct {
+	svc *gates.Service
+	id  int64
+}
+
+func (d *revisingDeliverer) Deliver(ctx context.Context, g gate.Gate) error {
+	_, err := d.svc.SupersedeForAgent(ctx, d.id, "s-worker")
+	return err
+}
+
+func TestApproveOptionLosesARevisionRaceAfterTheQuestion(t *testing.T) {
+	ctx := context.Background()
+	store := gatestest.NewStore(fixedNow)
+	cons := &gatestest.Consequences{}
+	rev := &revisingDeliverer{}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Clock: clock{fixedNow}, Publisher: cons, Deliverer: rev})
+	rev.svc = svc
+	d, err := svc.Open(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acme, Subject: "42", Session: "s-worker", ApprovedRev: 3, Sessions: []string{"s-worker"}}, waits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev.id = d.ID
+	q, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: acme, Subject: "9", Session: "s-worker"}, waits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ApproveOption(ctx, q, answer(task.ActorPerson, ""), d, 3); !errors.Is(err, gates.ErrResolved) {
+		t.Fatalf("ApproveOption = %v, want the draft's approval to lose", err)
+	}
+	gq, _ := store.Get(ctx, q.ID)
+	gd, _ := store.Get(ctx, d.ID)
+	if gq.Status != gate.Answered || gd.Status != gate.Superseded || len(cons.Calls) != 0 {
+		t.Fatalf("question %s, draft %s, consequences %v", gq.Status, gd.Status, cons.Calls)
 	}
 }

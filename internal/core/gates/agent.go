@@ -45,12 +45,15 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 	return s.taskOf(ctx, g.Unit, cmp.Or(g.Text, def.Label))
 }
 
-// ApproveOption resolves question gate question with r, a person's or an agent's through a session the user
-// drives who picked an option pointing to draft gate drafted's draft at rev, then approves drafted with
-// r's resolver. Before it resolves anything it refuses, with ErrRefused, a drafted gate that is not the
-// open (or already approved) gate of rev, that is on another unit than the question, that a session other
-// than the question's produced, or whose Sessions hold r's session. Each step is idempotent, so a call cut
-// short completes when it is made again with the same r.
+// ApproveOption resolves question gate question with r, the option picked (Intent, Answer) and who picked
+// it (By, Session: a person, or an agent through a session the user drives), when that option points to
+// drafted's draft at rev; then it approves drafted with the same resolver. It reads both gates again from
+// the store first, trusting neither value the caller passes, and resolves nothing when drafted is no
+// longer open (or approved already) at rev, is on another unit than the question, came from another
+// session than the question's, or stamps r.Session among its Sessions, or when r is a rule's: each is
+// ErrRefused. When the draft's approval loses a race after the question resolved, as a revision landing
+// between them, it returns that error, and the question's answer stands as a free answer. Each step is
+// idempotent, so a call cut short completes when it is made again with the same r.
 func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64) error {
 	q, err := s.d.Reader.Get(ctx, question.ID)
 	if err != nil {

@@ -257,8 +257,9 @@ func TestAgentRevisionOpensWaitingGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got.Payload) != `{"event":"APPROVE"}` {
-		t.Fatalf("revised payload %s", got.Payload)
+	if string(got.Payload) != `{"event":"APPROVE"}` || got.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-reviser"}) ||
+		d.By != (draft.Actor{Kind: draft.ActorSession, Session: "s-worker"}) {
+		t.Fatalf("revised payload %s by %+v, proposed by %+v", got.Payload, got.By, d.By)
 	}
 	g := e.gate(d.ID)
 	if old, _ := e.gates.Get(ctx, first.ID); old.Status != gate.Superseded {
@@ -277,6 +278,9 @@ func TestAgentRevisionOpensWaitingGate(t *testing.T) {
 	}
 	if _, err := e.svc.Amend(ctx, d.ID, Amendment{Text: ptr("Edited by hand.")}); err != nil {
 		t.Fatal(err)
+	}
+	if by := e.get(d.ID).By; by.Kind != draft.ActorPerson {
+		t.Fatalf("a person's edit is by %+v", by)
 	}
 	if after := e.gate(d.ID); !slices.Contains(after.Sessions, "s-reviser") || !slices.Contains(after.Sessions, "s-worker") {
 		t.Fatalf("a person's edit dropped the sessions its gate stamps: %+v", after)
@@ -584,5 +588,36 @@ func TestAttachPostCoversNewDeliveries(t *testing.T) {
 	}
 	if len(r.attached) != 1 {
 		t.Fatalf("a delivery the manifests do not mark posts attached: %v", r.attached)
+	}
+}
+
+func TestWithinErrorIsOutside(t *testing.T) {
+	yes := func(string) (bool, error) { return true, nil }
+	for _, c := range []struct {
+		name   string
+		within func(string) (bool, error)
+		unit   unit.Unit
+	}{
+		{"a scoper that fails", func(string) (bool, error) { return true, errBoom }, pull},
+		{"a publisher of another provider than the unit's", yes, taskUnit},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e, _ := reviewEnv()
+			withPolicy(e, sendsPosts)
+			sc := scoping{e.fx, c.within}
+			e.svc.Effects = func(p unit.ProviderID) (port.Effects, error) {
+				if p == unit.Task {
+					return nil, ErrDisabled
+				}
+				return taking{sc.fakeEffects, func(string) bool { return true }}, nil
+			}
+			e.svc.Targets = []unit.ProviderID{unit.GitHub}
+			p := prComment("Fixed in the last push.")
+			p.Unit, p.Target = c.unit, "comment:991"
+			d := e.propose(p)
+			if d.State != draft.Held || e.approval(d.ID) != waiting {
+				t.Fatalf("%+v", d)
+			}
+		})
 	}
 }

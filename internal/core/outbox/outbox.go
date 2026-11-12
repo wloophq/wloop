@@ -223,7 +223,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
-		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold,
+		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: proposer(p.Origin),
 	})
 	if err != nil {
 		return draft.Draft{}, err
@@ -272,6 +272,17 @@ func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
 	d.State, d.Reason = draft.Dropped, reasonUngated
 	_, err := s.save(ctx, d, draft.Held)
 	return err
+}
+
+// proposer is who wrote the content a proposal of origin o brings.
+func proposer(o draft.Origin) draft.Actor {
+	switch {
+	case o.Session != "" || o.Kind == draft.OriginTurn || o.Kind == draft.OriginSession:
+		return draft.Actor{Kind: draft.ActorSession, Session: o.Session}
+	case o.Kind == draft.OriginUser:
+		return draft.Actor{Kind: draft.ActorPerson}
+	}
+	return draft.Actor{Kind: draft.ActorRule}
 }
 
 func (s *Service) kinds() Kinds {
@@ -505,12 +516,15 @@ func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) 
 
 // targetsOutside reports an agent's draft aimed at another conversation or person than its unit's,
 // which only the user may approve: an injected instruction must not post elsewhere as the user. Its
-// publisher's Scoper decides what is within the unit; without one, only the unit itself is, and a Scoper
-// that cannot say keeps the draft outside.
+// publisher's Scoper decides what is within the unit. A publisher with no Scoper, a Scoper that cannot say,
+// and a publisher of another provider than the unit's keep the draft outside.
 func (s *Service) targetsOutside(ctx context.Context, d draft.Draft) bool {
 	t := strings.TrimSpace(d.Target)
 	if d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession || t == "" || strings.EqualFold(t, d.Unit.Key) {
 		return false
+	}
+	if s.PublisherOf(d) != d.Unit.Provider {
+		return true
 	}
 	fx, err := s.publisher(d)
 	sc, ok := fx.(port.Scoper)
@@ -786,6 +800,7 @@ func (s *Service) amended(ctx context.Context, d *draft.Draft, a Amendment) erro
 	if a.Text == nil && a.Payload == nil && a.Basis == nil {
 		return checkFields(*d, spec)
 	}
+	d.By = a.By
 	return s.checkContent(ctx, *d, spec)
 }
 
