@@ -285,3 +285,20 @@ func TestAResolvedAnswerNeverApprovesALaterRevision(t *testing.T) {
 		t.Fatalf("the answer about rev 3 approved rev 4: %v", err)
 	}
 }
+
+func TestAnAnswerDoesNotClaimADraftAnotherResolverApproved(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, nil, bundled)
+	f.drive("s-other")
+	d := f.draftGate(t)
+	q := f.question(t, "s-worker")
+	if err := f.svc.Resolve(ctx, d.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ApproveOption(ctx, q, answer(task.ActorAgent, "s-other"), d, 3); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("an answer by another resolver than the draft's approval: %v, want ErrRefused", err)
+	}
+	if f.get(t, q.ID).Status != gate.Open {
+		t.Fatal("the question was answered with a draft another resolver approved")
+	}
+}

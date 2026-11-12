@@ -122,7 +122,7 @@ type Deps struct {
 	Events Events
 	// Sessions says which sessions the user drives; nil refuses every agent.
 	Sessions Sessions
-	// Options name the draft an answer to a question approves, which ApproveOption approves before it answers
+	// Options report the draft an answer to a question picks, which ApproveOption approves before it answers
 	// the question; nil approves none.
 	Options Options
 
@@ -233,7 +233,8 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // resolveOption approves, through ApproveOption, the draft that r's answer to open question gate id picks,
 // and answers the question with it; done is false when r picks no draft, or when ApproveOption refuses it
-// before resolving anything, so the answer resolves the question as any answer does.
+// before resolving anything, so the answer resolves the question as any answer does. A pick whose resolver
+// proposed or revised the draft (Gate.Stamps) is refused outright: the question stays open.
 func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (done bool, err error) {
 	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
 		return false, nil
@@ -250,7 +251,7 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 		return false, err
 	}
 	err = s.ApproveOption(ctx, q, r, drafted, rev)
-	if errors.Is(err, ErrRefused) {
+	if errors.Is(err, ErrRefused) && !errors.Is(err, errStamped) {
 		if now, gerr := s.d.Reader.Get(ctx, id); gerr == nil && now.Status == gate.Open {
 			s.logf("gate %d: the option's draft gate %d is not approved (%v); the answer resolves the question alone", id, drafted.ID, err)
 			return false, nil
@@ -375,7 +376,7 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 			continue
 		}
 		switch {
-		case user && stamped(g, session):
+		case user && g.Stamps(session):
 			_, err = s.d.Store.Resolve(ctx, g.ID, Resolution{Status: gate.Superseded, By: by, Session: session})
 		case user:
 			def, _ := s.def(g)
@@ -530,7 +531,7 @@ func (s *Service) vouch(ctx context.Context, g gate.Gate, session string) error 
 	if session == "" || s.d.Sessions == nil {
 		return fmt.Errorf("%w: an agent resolves a gate only through a session the user drives", ErrRefused)
 	}
-	if stamped(g, session) {
+	if g.Stamps(session) {
 		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, or that session revised it, so it does not resolve it", ErrRefused, g.ID, session)
 	}
 	driven, err := s.d.Sessions.UserDriven(ctx, session)

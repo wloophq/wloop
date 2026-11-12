@@ -22,7 +22,7 @@ func (s *Service) Revisions(ctx context.Context, id draft.ID) ([]draft.Revision,
 	return s.Store.Revisions(ctx, id)
 }
 
-// AgentRead is draft id, delivered, and its revisions, for c: a draft on, or proposed from, one of c's units.
+// AgentRead is draft id, with the delivery its kind posts as now, and its revisions, for c: a draft on, or proposed from, one of c's units.
 // A draft out of c's reach is ErrOutOfScope.
 func (s *Service) AgentRead(ctx context.Context, c Caller, id draft.ID) (draft.Draft, []draft.Revision, error) {
 	d, err := s.Store.Get(ctx, id)
@@ -36,7 +36,8 @@ func (s *Service) AgentRead(ctx context.Context, c Caller, id draft.ID) (draft.D
 	if err != nil {
 		return draft.Draft{}, nil, err
 	}
-	return s.delivered(d), revs, nil
+	d, _ = s.current(d)
+	return d, revs, nil
 }
 
 // AgentAmend applies a to held or failed draft id for c, at a.Rev, stamping a.By from c: a rev below 1 is

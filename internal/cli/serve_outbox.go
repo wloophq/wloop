@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
@@ -43,7 +45,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	}
 	effects := publishers(pubs, cfg)
 	e.outbox = &outbox.Service{Store: endingDrafts{Store: db.Drafts(), ended: e.draftEnded, logf: logf}, Gates: draftGates{e, db, logf}, Effects: effects, Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
-		Kinds: draftKinds, Bases: publisherBases(effects), OnSent: []func(context.Context, draft.Draft) error{e.draftSent, e.ruleSent},
+		Kinds: draftKinds, Bases: recentBases(publisherBases(effects), clockFunc(e.Now), e.background, logf), OnSent: []func(context.Context, draft.Draft) error{e.draftSent, e.ruleSent},
 		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Silent: builtin.SilentEffect,
@@ -67,18 +69,29 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	return d
 }
 
-// publisherBases read a unit's live basis from the publisher of its provider; a publisher that reads none
+// publisherBases read a unit's live basis from the publisher of its draft; a publisher that reads none
 // answers "", and a provider with none fails, so no draft is taken as fresh unread.
 func publisherBases(effects outbox.Effects) outbox.Bases { return basesOf(effects) }
 
+// recentBases share a unit's basis read among the drafts' cards for basisFresh, a read bounded by basisReadTimeout
+// and run on reads, which serve waits for.
+func recentBases(b outbox.Bases, clock port.Clock, reads *sync.WaitGroup, logf func(string, ...any)) *outbox.RecentBases {
+	return &outbox.RecentBases{Bases: b, Clock: clock, Fresh: basisFresh, ReadTimeout: basisReadTimeout, Reads: reads, Log: logf}
+}
+
+const (
+	basisFresh       = 30 * time.Second
+	basisReadTimeout = 10 * time.Second
+)
+
 type basesOf outbox.Effects
 
-func (b basesOf) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	fx, err := b(u.Provider)
+func (b basesOf) Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
+	fx, err := b(publisher)
 	if err != nil {
 		return "", err
 	}
-	if r, ok := fx.(outbox.Bases); ok {
+	if r, ok := fx.(port.Basis); ok {
 		return r.Live(ctx, u, kind)
 	}
 	return "", nil
@@ -102,7 +115,7 @@ func (e *Env) draftEnded(ctx context.Context, d draft.Draft) error {
 
 // draftVerdict is the record verdict d posted, as the kind's manifest of the plugin that posted it declares.
 func (e *Env) draftVerdict(d draft.Draft) string {
-	spec, ok := draftKinds.Lookup(string(e.outbox.PublisherOf(d)), string(d.Kind))
+	spec, ok := e.outbox.KindOf(d)
 	if !ok {
 		return ""
 	}
@@ -110,7 +123,8 @@ func (e *Env) draftVerdict(d draft.Draft) string {
 }
 
 // resumeDrafts point to the drafts the turns of seq's chain proposed on b's unit that are still held or failed,
-// with current the unit's basis now, "" when unknown; none while the daemon serves no outbox.
+// with current the unit's basis now, "" when unknown, and each one's staleness as the outbox tells it; none while
+// the daemon serves no outbox.
 func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current string) []instructions.Draft {
 	if e.outbox == nil {
 		return nil
@@ -128,7 +142,10 @@ func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current
 		agent := d.Origin.ByAgent()
 		return !agent || !slices.Contains(seqs, d.Origin.TurnSeq)
 	})
-	return instructions.Pointers(ds, current)
+	return instructions.Pointers(ds, current, func(d draft.Draft) bool {
+		stale, _ := e.outbox.Staleness(ctx, d)
+		return stale
+	})
 }
 
 // endingDrafts are the outbox's drafts, telling ended each draft that fails or is dropped as it is stored so.
@@ -213,13 +230,6 @@ type pinnedEffects struct {
 	turns turnReader
 }
 
-func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
-	if dl, ok := p.Effects.(port.Deliverer); ok {
-		return dl.Delivers(k)
-	}
-	return ""
-}
-
 func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 	if err := p.pinned(ctx, d); err != nil {
 		return err
@@ -231,7 +241,7 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 }
 
 func (p pinnedEffects) Live(ctx context.Context, u unit.Unit, kind string) (string, error) {
-	if b, ok := p.Effects.(outbox.Bases); ok {
+	if b, ok := p.Effects.(port.Basis); ok {
 		return b.Live(ctx, u, kind)
 	}
 	return "", nil

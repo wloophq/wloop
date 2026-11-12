@@ -83,10 +83,10 @@ func TestServeWiresKindsAndBases(t *testing.T) {
 			t.Fatalf("%s: the outbox reads no live basis", name)
 		}
 	}
-	if got, err := d.Outbox.Bases.Live(ctx, threadUnit, "review"); err != nil || got != "c2 "+threadUnit.Key+" review" {
+	if got, err := d.Outbox.Bases.Live(ctx, threadUnit.Provider, threadUnit, "review"); err != nil || got != "c2 "+threadUnit.Key+" review" {
 		t.Fatalf("the served outbox read the basis %q %v, want the publisher's live head", got, err)
 	}
-	if got, err := d.Outbox.Bases.Live(ctx, unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, "review"); err == nil {
+	if got, err := d.Outbox.Bases.Live(ctx, unit.GitHub, unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, "review"); err == nil {
 		t.Fatalf("a provider that publishes nothing answered the basis %q", got)
 	}
 	fx, err := d.Outbox.Effects(threadUnit.Provider)

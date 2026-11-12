@@ -25,8 +25,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/plugins/bundled"
-	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
@@ -142,7 +142,11 @@ func TestAnApprovedDraftIsPostedThroughTheGitHubPlugin(t *testing.T) {
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
 	pub := psource.Publisher{ID: m.ID, Source: s, Units: units, Kind: kind}
-	svc := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: pinnedClock(now),
+	vocab, err := builtin.Merge(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := gs.Bind(&outbox.Service{Kinds: vocab.DraftKinds(), Store: db.Drafts(), Clock: pinnedClock(now),
 		Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	u := pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
 	propose := func(key, text string) draft.Draft {

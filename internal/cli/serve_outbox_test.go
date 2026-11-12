@@ -27,7 +27,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
-	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -255,21 +254,6 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 	o := withDraftGates(te.db, te.Now, &outbox.Service{Kinds: bundledtest.Shapes{}, Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }})
 	if _, err := o.Propose(ctx, outbox.Proposal{Unit: other, Kind: draft.Kind("reply"), Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7}}); !errors.Is(err, outbox.ErrInvalid) {
 		t.Fatalf("propose on another unit: %v", err)
-	}
-}
-
-func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
-	t.Parallel()
-	s, err := (&Env{}).pluginSource(unit.GitHub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gh := pinnedEffects{Effects: psource.Publisher{ID: string(unit.GitHub), Source: s}}
-	if got := gh.Delivers(draft.Kind("reply")); got != draft.Delivery("comment") {
-		t.Errorf("github: %s", got)
-	}
-	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Kind("reply")); got != "" {
-		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }
 

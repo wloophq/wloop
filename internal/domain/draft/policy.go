@@ -118,7 +118,7 @@ func (p Policy) Decide(d Draft, s Subject, posts bool, now time.Time) (Decision,
 			all = withRuleFacts(d, s.Facts, payload)
 		}
 		if missing := absent(r.Payload, payload); len(missing) > 0 {
-			if own := d.ownFacts(missing); own != "" {
+			if own := d.ownFacts(s.Kind, missing); own != "" {
 				return Decision{Approval: Approval{Mode: Wait}, Rule: i}, fmt.Errorf("draft approval rule %d reads %s, which the draft's payload does not hold", i, own)
 			}
 			if r.Approval.Releases() {
@@ -168,24 +168,25 @@ func absent(names []string, facts map[string]any) []string {
 	return out
 }
 
-// ownFacts is the first of names a FactSpec of d's own kind would name,
-// draft.<provider>.<kind>.<field>; "" for none.
-func (d Draft) ownFacts(names []string) string {
-	prefix := "draft." + string(d.Unit.Provider) + "." + string(d.Kind) + "."
+// ownFacts is the first of names a FactSpec of d's own kind would name, draft.<provider>.<kind>.<field>, the
+// provider being spec's, the publisher's that declares d's kind, or any with no spec; "" for none.
+func (d Draft) ownFacts(spec KindSpec, names []string) string {
 	for _, n := range names {
-		if strings.HasPrefix(n, prefix) {
+		parts := strings.SplitN(n, ".", 4)
+		if len(parts) == 4 && parts[0] == "draft" && parts[2] == string(d.Kind) && (spec.Provider == "" || parts[1] == spec.Provider) {
 			return n
 		}
 	}
 	return ""
 }
 
-// PayloadFacts are the payload facts of d that spec declares, each the
-// string its pointer reaches in d's payload; none when spec is not d's
-// kind, and a fact whose pointer reaches no string is absent.
+// PayloadFacts are the payload facts of d that spec, d's kind as its
+// publisher's manifest declares it, declares, each the string its pointer
+// reaches in d's payload; none when spec is not of d's kind, and a fact
+// whose pointer reaches no string is absent.
 func (d Draft) PayloadFacts(spec KindSpec) map[string]any {
 	out := map[string]any{}
-	if len(spec.Facts) == 0 || spec.Provider != string(d.Unit.Provider) || spec.Name != string(d.Kind) || len(d.Payload) == 0 {
+	if len(spec.Facts) == 0 || spec.Name != string(d.Kind) || len(d.Payload) == 0 {
 		return out
 	}
 	var doc any

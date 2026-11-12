@@ -49,12 +49,13 @@ type Draft struct {
 	Stale              bool
 }
 
-// Pointers point to ds, with current the unit's basis now, "" when unknown.
-func Pointers(ds []draft.Draft, current string) []Draft {
+// Pointers point to ds, with current the unit's basis now, "" when unknown, and stale whether a draft is
+// stale, as the outbox tells it.
+func Pointers(ds []draft.Draft, current string, stale func(draft.Draft) bool) []Draft {
 	out := make([]Draft, 0, len(ds))
 	for _, d := range ds {
 		out = append(out, Draft{ID: int64(d.ID), Kind: string(d.Kind), State: string(d.State), Basis: d.Basis, CurrentBasis: current,
-			Stale: d.Basis != "" && current != "" && d.Basis != current})
+			Stale: stale(d)})
 	}
 	return out
 }

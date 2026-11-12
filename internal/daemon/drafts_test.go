@@ -694,7 +694,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	if got, _ := r.o.Store.Get(ctx, b.ID); got.State != draft.Dropped || got.Reason != "user" {
 		t.Fatalf("dismissed %+v", got)
 	}
-	c := r.stored(t, draft.Draft{Unit: r7u, Text: "maybe out", State: draft.Failed, Error: outbox.NotConfirmed})
+	c := r.stored(t, draft.Draft{Unit: r7u, Text: "maybe out", State: draft.Failed, Error: outbox.NotConfirmed, Cause: draft.CauseUnconfirmed})
 	code, body := r.verb(t, c.ID, "retry", fmt.Sprintf(`{"rev":"%d"}`, c.Rev))
 	if code != 409 || !strings.Contains(body, "confirm") {
 		t.Fatalf("retry without confirm: %d %s", code, body)

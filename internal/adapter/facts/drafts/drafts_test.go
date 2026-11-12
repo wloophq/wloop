@@ -30,9 +30,14 @@ func failed(id draft.ID, origin draft.OriginKind, failure string) draft.Draft {
 	return draft.Draft{ID: id, Unit: pr7, State: draft.Failed, Origin: draft.Origin{Kind: origin, TurnSeq: 3}, Error: failure}
 }
 
+func failedStale(id draft.ID, origin draft.OriginKind) draft.Draft {
+	d := failed(id, origin, "the draft is stale: head moved from c1 to c2")
+	d.Cause = draft.CauseStale
+	return d
+}
+
 func TestFailedSendIsUnitFact(t *testing.T) {
 	unprocessable := "422 Unprocessable Entity: pull_request_review_thread.line must be part of the diff"
-	staleHead := StalePrefix + " head moved from c1 to c2"
 	for _, c := range []struct {
 		name          string
 		drafts        stored
@@ -40,14 +45,14 @@ func TestFailedSendIsUnitFact(t *testing.T) {
 	}{
 		{"none", nil, false, false},
 		{"a turn's draft failed", stored{failed(1, draft.OriginTurn, unprocessable)}, true, false},
-		{"a session's draft failed stale", stored{failed(1, draft.OriginSession, staleHead)}, true, true},
+		{"a session's draft failed stale", stored{failedStale(1, draft.OriginSession)}, true, true},
 		{"a failure whose text only says stale", stored{failed(1, draft.OriginTurn, outbox.ErrStale.Error())}, true, false},
-		{"a publisher's text quoting the token", stored{failed(1, draft.OriginTurn, "422: comment body: "+staleHead)}, true, false},
+		{"a publisher's text that says stale", stored{failed(1, draft.OriginTurn, "stale: 422: comment body")}, true, false},
 		{"a workflow's nudge failed", stored{failed(1, draft.OriginAuto, unprocessable)}, false, false},
-		{"a person's draft failed stale", stored{failed(1, draft.OriginUser, staleHead)}, false, false},
+		{"a person's draft failed stale", stored{failedStale(1, draft.OriginUser)}, false, false},
 		{"a held and a sent draft", stored{{ID: 1, Unit: pr7, State: draft.Held, Origin: draft.Origin{Kind: draft.OriginTurn}}, {ID: 2, Unit: pr7, State: draft.Sent, Origin: draft.Origin{Kind: draft.OriginTurn}}}, false, false},
 		{"another unit's", stored{func() draft.Draft {
-			d := failed(1, draft.OriginTurn, staleHead)
+			d := failedStale(1, draft.OriginTurn)
 			d.Unit.Key = "acme/api#8"
 			return d
 		}()}, false, false},

@@ -280,7 +280,7 @@ func TestAnOptionDraftApprovesOnlyWithTheResolversAuthority(t *testing.T) {
 		r, od, m := draftRig(t, "driver", "reviser")
 		q := r.gateOf(t, m)
 		c.res.Answer = messages.GateAnswer(messages.Answer{OptionID: "approve"})
-		if err := r.gates.Resolve(ctx, q.ID, c.res); err != nil {
+		if err := r.gates.Resolve(ctx, q.ID, c.res); (err == nil) != c.approve || !c.approve && !errors.Is(err, gates.ErrRefused) {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 		if got := len(od.approvals) == 1; got != c.approve {
@@ -344,9 +344,9 @@ func TestConfirmYesApprovesItsDraft(t *testing.T) {
 	}
 }
 
-// OptionDraft is what the gates service trusts to name the draft an answer approves; its own checks hold
-// whatever ApproveOption checks again.
-func TestOptionDraftNamesOnlyThePinSeen(t *testing.T) {
+// OptionDraft names the pin an answer picks, and ApproveOption, the one owner of the rest, approves it only at
+// the pinned rev and for a resolver the draft's gate allows.
+func TestAnOptionApprovesOnlyThePinSeenForAResolverItsGateAllows(t *testing.T) {
 	ctx := context.Background()
 	answer := messages.GateAnswer(messages.Answer{OptionID: "approve"})
 	for _, c := range []struct {
@@ -370,11 +370,15 @@ func TestOptionDraftNamesOnlyThePinSeen(t *testing.T) {
 		}
 		q := r.gateOf(t, m)
 		got, rev, ok, err := r.svc.OptionDraft(ctx, q, c.r)
-		if err != nil || ok != c.ok {
-			t.Fatalf("%s: ok %v %v", c.name, ok, err)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
 		}
 		if ok && (got.ID != od.gateOf(42).ID || rev != 1) {
 			t.Fatalf("%s: gate %d rev %d", c.name, got.ID, rev)
+		}
+		approved := ok && r.gates.ApproveOption(ctx, q, c.r, got, rev) == nil
+		if approved != c.ok || approved != (od.gateOf(42).Status == gate.Approved) {
+			t.Fatalf("%s: approved %v, draft gate %s", c.name, approved, od.gateOf(42).Status)
 		}
 	}
 }
@@ -400,5 +404,21 @@ func TestApproveOptionApprovesNothingForAResolutionThatDoesNotAnswer(t *testing.
 		if got := rg.gateOf(t, m); got.Status != gate.Open {
 			t.Errorf("%+v: question %s", r, got.Status)
 		}
+	}
+}
+
+// A session that revised the option's draft picks it: no answer at all, so the question stays open and the turn
+// hears nothing; a pin gone stale is still the person's answer.
+func TestAPickByTheDraftsReviserIsRefusedOutright(t *testing.T) {
+	ctx := context.Background()
+	answer := messages.GateAnswer(messages.Answer{OptionID: "approve"})
+	r, od, m := draftRig(t, "driver", "reviser")
+	q := r.gateOf(t, m)
+	err := r.gates.Resolve(ctx, q.ID, gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"})
+	if !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("the reviser's pick: %v, want ErrRefused", err)
+	}
+	if got := r.gateOf(t, m); got.Status != gate.Open || od.gateOf(42).Status != gate.Open || len(r.sess.Typed()) != 0 {
+		t.Fatalf("question %s, draft gate %s, typed %v: want both open and the turn untouched", got.Status, od.gateOf(42).Status, r.sess.Typed())
 	}
 }

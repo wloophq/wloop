@@ -31,17 +31,16 @@ type Scoper interface {
 	Within(ctx context.Context, u unit.Unit, target string) (bool, error)
 }
 
+// Basis is optional: an Effects value that implements it reads, live, what a draft of kind on u would be
+// written against now, such as a pull request's head.
+type Basis interface {
+	Live(ctx context.Context, u unit.Unit, kind string) (string, error)
+}
+
 // Locator is optional: an Effects value that implements it names, for the user approving d, the
 // conversation or person d posts to.
 type Locator interface {
 	Where(ctx context.Context, d draft.Draft) (string, error)
-}
-
-// Deliverer is optional: an Effects value that implements it says how it
-// posts a draft of kind k, whatever delivery its proposer asked for, which
-// the draft then carries, so its approval reads what the provider will show.
-type Deliverer interface {
-	Delivers(k draft.Kind) draft.Delivery
 }
 
 // Placer is optional: an Effects value that implements it places a draft when

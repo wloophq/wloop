@@ -75,3 +75,43 @@ func TestVersion14MakesADraftsRevCountItsContent(t *testing.T) {
 		}
 	}
 }
+
+// TestVersion14GivesAFailedDraftItsCause reads the cause of each failed draft from the prefix migration 13's
+// release wrote into its error, and leaves a publisher's text that only says stale as it is.
+func TestVersion14GivesAFailedDraftItsCause(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v13.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := storeAt(t, schemaSet{13, string(frozen), nil})
+	const failedRow = `INSERT INTO drafts (id, provider, unit_key, items, kind, text, original, origin_kind, state, created_at, updated_at, purpose, delivery, effects, rev, error)
+		VALUES (%d, 'acme', 'C0123/1.2', '[]', 'reply', 'hi', 'hi', 'turn', 'failed', '2026-11-04T10:00:00.000000000Z', '2026-11-04T10:00:00.000000000Z', 'reply', 'message', '[]', 1, '%s')`
+	want := map[int64]struct {
+		stored, error string
+		cause         draft.Cause
+	}{
+		1: {"stale: the draft is stale: it was written against c1", "the draft is stale: it was written against c1", draft.CauseStale},
+		2: {"not confirmed after a restart", "not confirmed after a restart", draft.CauseUnconfirmed},
+		3: {"may have been posted: the call timed out", "may have been posted: the call timed out", draft.CauseUnconfirmed},
+		4: {"error: stale: whatever the API said", "error: stale: whatever the API said", ""},
+	}
+	for id, w := range want {
+		rawExec(t, path, fmt.Sprintf(failedRow, id, w.stored))
+	}
+	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
+		t.Fatal(err)
+	}
+	db, err := current.open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for id, w := range want {
+		d, err := db.Drafts().Get(ctx, draft.ID(id))
+		if err != nil || d.Cause != w.cause || d.Error != w.error {
+			t.Errorf("draft %d: cause %q error %q %v, want %q %q", id, d.Cause, d.Error, err, w.cause, w.error)
+		}
+	}
+}

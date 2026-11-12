@@ -121,8 +121,9 @@ type Kinds interface {
 
 // Bases read the live basis of a unit, never a cached one.
 type Bases interface {
-	// Live is what a draft of kind on u would be written against now, such as a pull request's head.
-	Live(ctx context.Context, u unit.Unit, kind string) (string, error)
+	// Live is what a draft of kind on u, which publisher posts (Service.PublisherOf), would be written
+	// against now, such as a pull request's head; publisher's manifest declares kind.
+	Live(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error)
 }
 
 // Effects returns the publishing capability of a provider; an error wrapping
@@ -182,8 +183,8 @@ type Service struct {
 	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
 	// none does.
 	Silent func(name string) bool
-	// Kinds are the manifests' draft kinds; nil reads the kinds the draft package still enumerates, as serve
-	// does until it wires the manifests' Kinds.
+	// Kinds are the manifests' draft kinds, the only source of a kind's delivery; nil declares none, so a draft
+	// keeps the kind, purpose and delivery its proposer gave.
 	Kinds Kinds
 	// Bases read the live basis of a draft whose kind's basis the agent states; with nil, such a draft is
 	// refused, never passed.
@@ -208,26 +209,23 @@ var (
 	ErrOutOfScope = errors.New("the draft is out of the caller's reach")
 )
 
-// StalePrefix starts the Error of a draft that failed because it is stale, from the live basis check or
-// from its publisher's refusal (ErrStale), and only of such a draft: every failure the outbox stores goes
-// through failure, which keeps the token off any other.
-const StalePrefix = "stale:"
-
-// failure is the Error a draft that failed with err stores: StalePrefix starts it only when err is ErrStale.
-func failure(err error) string {
+// failure is the cause and the Error of a draft that failed with err: CauseStale only when err is ErrStale,
+// CauseUnconfirmed when its publisher says the post may have reached its provider.
+func failure(err error) (draft.Cause, string) {
 	switch msg := err.Error(); {
 	case errors.Is(err, ErrStale):
-		return StalePrefix + " " + msg
-	case strings.HasPrefix(msg, StalePrefix):
-		return "error: " + msg
+		return draft.CauseStale, msg
+	case strings.HasPrefix(msg, mayHaveBeenPosted):
+		return draft.CauseUnconfirmed, msg
 	default:
-		return msg
+		return "", msg
 	}
 }
 
 // NotConfirmed is the Error of a draft Recover found in sending and Verify could not confirm.
 const NotConfirmed = "not confirmed after a restart"
 
+// mayHaveBeenPosted starts a publisher's error when its post may have reached its provider.
 const mayHaveBeenPosted = "may have been posted"
 
 // Propose stores the draft p proposes as held and opens its gate under
@@ -293,26 +291,29 @@ func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
+// undeclared is the catalog of a Service with no Kinds: it declares no kind.
+var undeclared = &draft.Catalog{}
+
 func (s *Service) kinds() Kinds {
 	if s.Kinds == nil {
-		return noKinds{}
+		return undeclared
 	}
 	return s.Kinds
 }
 
-// shape is d shaped by the kind its publisher's manifest declares, and delivered as its publisher posts
-// it, with that kind's spec; declared is false for a publisher whose manifest declares no kinds.
+// shape is d shaped by the kind its publisher's manifest declares, with that kind's spec; declared is false
+// for a publisher whose manifest declares no kinds.
 func (s *Service) shape(d draft.Draft) (draft.Draft, draft.KindSpec, bool, error) {
 	kinds, provider := s.kinds(), string(s.PublisherOf(d))
 	got, err := kinds.Shape(provider, d)
 	if err != nil {
 		return d, draft.KindSpec{}, false, invalid(err)
 	}
-	spec, declared := kinds.Lookup(provider, string(got.Kind))
+	spec, declared := s.KindOf(got)
 	if spec.Basis != draft.BasisAgent {
 		got.Basis = ""
 	}
-	return s.delivered(got), spec, declared, nil
+	return got, spec, declared, nil
 }
 
 func invalid(err error) error {
@@ -322,41 +323,33 @@ func invalid(err error) error {
 	return fmt.Errorf("%w: %w", ErrInvalid, err)
 }
 
+// KindOf is d's kind as the manifest of its publisher (PublisherOf), never of its unit, declares it now;
+// false when that manifest declares none of that name.
+func (s *Service) KindOf(d draft.Draft) (draft.KindSpec, bool) {
+	return s.kinds().Lookup(string(s.PublisherOf(d)), string(d.Kind))
+}
+
 // spec is the kind of stored draft d as its publisher's manifest declares it now; declared is false for a
 // publisher that declares no kinds, and a kind it no longer declares is ErrInvalid.
 func (s *Service) spec(d draft.Draft) (draft.KindSpec, bool, error) {
-	kinds, provider := s.kinds(), string(s.PublisherOf(d))
-	if spec, ok := kinds.Lookup(provider, string(d.Kind)); ok {
+	if spec, ok := s.KindOf(d); ok {
 		return spec, true, nil
 	}
+	kinds, provider := s.kinds(), string(s.PublisherOf(d))
 	if _, err := kinds.Shape(provider, draft.Draft{Kind: d.Kind, Purpose: d.Purpose, Delivery: d.Delivery}); err != nil {
 		return draft.KindSpec{}, false, invalid(err)
 	}
 	return draft.KindSpec{}, false, nil
 }
 
-// delivered is d with the delivery its provider's publisher posts it as, and the kind its purpose takes for
-// that delivery.
-func (s *Service) delivered(d draft.Draft) draft.Draft {
-	fx, err := s.publisher(d)
+// current is stored draft d with the delivery its kind posts as, as its publisher's manifest declares it now;
+// false, and d as it is, when that manifest no longer declares its kind.
+func (s *Service) current(d draft.Draft) (draft.Draft, bool) {
+	got, err := s.kinds().Shape(string(s.PublisherOf(d)), d)
 	if err != nil {
-		return d
+		return d, false
 	}
-	dl, ok := fx.(port.Deliverer)
-	if !ok || d.Delivery == "" || d.Kind == "" {
-		return d
-	}
-	got := dl.Delivers(d.Kind)
-	if got == "" || got == d.Delivery {
-		return d
-	}
-	d.Delivery = got
-	re := d
-	re.Kind = ""
-	if shaped, err := s.kinds().Shape(string(s.PublisherOf(d)), re); err == nil && shaped.Delivery == got {
-		d.Kind = shaped.Kind
-	}
-	return d
+	return got, true
 }
 
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
@@ -378,7 +371,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, a draft.Approval
 		repeatAfter = s.RepeatAfter
 	}
 	for _, o := range found {
-		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
+		if o, _ = s.current(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
 		if o.State != draft.Dropped || o.Reason == reasonDryRun && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
@@ -429,20 +422,57 @@ func checkFields(d draft.Draft, spec draft.KindSpec) error {
 	return nil
 }
 
-// Stale says whether the unit moved past the basis draft d was written against, read live; false for a
+// Stale says whether the unit moved past the basis draft d was written against, read live now; false for a
 // draft with no basis. A failed read, or no reader, is an error and says nothing of staleness.
 func (s *Service) Stale(ctx context.Context, d draft.Draft) (bool, error) {
+	return s.staleBy(ctx, d, s.liveBasis)
+}
+
+// Staleness says whether draft d is stale, and known whether that can be told. A draft refused or failed as
+// stale (draft.CauseStale) is, until its content is revised; one with no basis is not; any other compares
+// its basis with the unit's, a recent read when Bases keep one (Recent), else a live one. A read that fails
+// or does not answer before ctx ends leaves it unknown. It serves every reader but the checks that refuse a
+// stale draft: a draft's card, its gate's options and a turn's instructions.
+func (s *Service) Staleness(ctx context.Context, d draft.Draft) (stale, known bool) {
+	if d.Cause == draft.CauseStale {
+		return true, true
+	}
+	read := s.liveBasis
+	if r, ok := s.Bases.(Recent); ok {
+		read = r.Recent
+	}
+	stale, err := s.staleBy(ctx, d, read)
+	return stale, err == nil
+}
+
+func (s *Service) liveBasis(ctx context.Context, publisher unit.ProviderID, u unit.Unit, kind string) (string, error) {
+	return s.Bases.Live(ctx, publisher, u, kind)
+}
+
+func (s *Service) staleBy(ctx context.Context, d draft.Draft, read func(context.Context, unit.ProviderID, unit.Unit, string) (string, error)) (bool, error) {
 	if d.Basis == "" {
 		return false, nil
 	}
 	if s.Bases == nil {
 		return false, fmt.Errorf("%w: nothing reads the live basis of draft %d", ErrNoBases, d.ID)
 	}
-	live, err := s.Bases.Live(ctx, d.Unit, string(d.Kind))
+	live, err := read(ctx, s.PublisherOf(d), d.Unit, string(d.Kind))
 	if err != nil {
 		return false, fmt.Errorf("reading the live basis of %s: %w", d.Unit, err)
 	}
 	return live != d.Basis, nil
+}
+
+// refused stores CauseStale on held or failed draft d when err refused it as stale, so every reader of
+// Staleness tells it until its content is revised; a write that loses a race leaves the next refusal to.
+func (s *Service) refused(ctx context.Context, d draft.Draft, err error) {
+	if !errors.Is(err, ErrStale) || d.Cause == draft.CauseStale || d.State != draft.Held && d.State != draft.Failed {
+		return
+	}
+	d.Cause = draft.CauseStale
+	if _, serr := s.save(ctx, d, d.State); serr != nil {
+		s.logf("draft %d: keeping its stale refusal: %v", d.ID, serr)
+	}
 }
 
 // fresh refuses d with ErrStale when Stale says it is, and with Stale's error when it cannot say.
@@ -495,10 +525,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
-	sub.Kind = draft.KindSpec{}
-	if s.Kinds != nil {
-		sub.Kind, _ = s.Kinds.Lookup(string(d.Unit.Provider), string(d.Kind))
-	}
+	sub.Kind, _ = s.KindOf(d)
 	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)
@@ -707,6 +734,9 @@ func (s *Service) load(ctx context.Context, id draft.ID, to draft.State, states 
 
 func (s *Service) save(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error) {
 	d.UpdatedAt = s.Clock.Now()
+	if d.State != draft.Held && d.State != draft.Failed {
+		d.Cause = ""
+	}
 	got, err := s.Store.Update(ctx, d, from)
 	if err != nil {
 		return draft.Draft{}, fmt.Errorf("draft %d %s -> %s: %w", d.ID, from, d.State, err)
@@ -780,6 +810,7 @@ func (s *Service) revise(ctx context.Context, d draft.Draft, a Amendment, sessio
 		return draft.Draft{}, err
 	}
 	reopen := false
+	d.Cause = ""
 	switch {
 	case from == draft.Held && hadGate && prev.Status != gate.Open:
 		return draft.Draft{}, fmt.Errorf("draft %d: %w: its gate decided it meanwhile", d.ID, ErrConflict)
@@ -909,6 +940,7 @@ func (s *Service) Prepare(ctx context.Context, id draft.ID, rev int64) (draft.Dr
 		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", ErrConflict, id, rev, d.Rev)
 	}
 	if err := s.fresh(ctx, d); err != nil {
+		s.refused(ctx, d, err)
 		return draft.Draft{}, err
 	}
 	return d, s.publishable(ctx, &d)
@@ -991,25 +1023,25 @@ func (s *Service) RetryBy(ctx context.Context, id draft.ID, confirm bool, by dra
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if !confirm && (d.Error == NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)) {
+	if !confirm && d.Cause == draft.CauseUnconfirmed {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w", id, ErrNeedsConfirm)
 	}
 	if err := s.approved(ctx, d); err != nil {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w: %w", id, ErrConflict, err)
 	}
 	if err := s.publishable(ctx, &d); err != nil {
+		s.refused(ctx, d, err)
 		return draft.Draft{}, err
 	}
 	d.State, d.Error = draft.Queued, ""
 	return s.save(ctx, d, draft.Failed)
 }
 
-// List is the drafts f selects, each with the delivery its provider's
-// publisher posts it as.
+// List is the drafts f selects, each with the delivery its kind posts as now (current).
 func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 	ds, err := s.Store.List(ctx, f)
 	for i := range ds {
-		ds[i] = s.delivered(ds[i])
+		ds[i], _ = s.current(ds[i])
 	}
 	return ds, err
 }
@@ -1162,7 +1194,8 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 		err = place(ctx, fx, &d, false)
 	}
 	if err != nil {
-		d.State, d.Error = draft.Failed, failure(err)
+		d.State = draft.Failed
+		d.Cause, d.Error = failure(err)
 		_, err := s.save(ctx, d, draft.Queued)
 		if errors.Is(err, ErrConflict) {
 			return false, errClaimLost
@@ -1179,7 +1212,8 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	}
 	ev, pubErr := fx.Publish(ctx, d)
 	if pubErr != nil {
-		return false, s.fail(ctx, d, failure(pubErr))
+		cause, msg := failure(pubErr)
+		return false, s.fail(ctx, d, cause, msg)
 	}
 	return s.settleSent(ctx, d, ev)
 }
@@ -1200,8 +1234,8 @@ func (s *Service) approved(ctx context.Context, d draft.Draft) error {
 
 var errNotApproved = errors.New("its gate did not approve it")
 
-func (s *Service) fail(ctx context.Context, d draft.Draft, reason string) error {
-	d.State, d.Error = draft.Failed, reason
+func (s *Service) fail(ctx context.Context, d draft.Draft, cause draft.Cause, reason string) error {
+	d.State, d.Cause, d.Error = draft.Failed, cause, reason
 	_, err := s.save(ctx, d, draft.Sending)
 	return err
 }
@@ -1240,9 +1274,9 @@ func (s *Service) Recover(ctx context.Context) error {
 		ev, found, verr := fx.Verify(ctx, d, d.SendingAt)
 		switch {
 		case verr != nil && strings.HasPrefix(verr.Error(), mayHaveBeenPosted):
-			err = s.fail(ctx, d, failure(verr))
+			err = s.fail(ctx, d, draft.CauseUnconfirmed, verr.Error())
 		case verr != nil || !found:
-			err = s.fail(ctx, d, NotConfirmed)
+			err = s.fail(ctx, d, draft.CauseUnconfirmed, NotConfirmed)
 		default:
 			_, err = s.settleSent(ctx, d, ev)
 		}

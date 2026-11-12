@@ -99,7 +99,7 @@ func (b *liveBases) Set(u unit.Unit, basis string) {
 	b.live[u] = basis
 }
 
-func (b *liveBases) Live(_ context.Context, u unit.Unit, _ string) (string, error) {
+func (b *liveBases) Live(_ context.Context, _ unit.ProviderID, u unit.Unit, _ string) (string, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.calls++
@@ -435,10 +435,18 @@ func TestApproveRefusesStale(t *testing.T) {
 	if stale, err := e.svc.Stale(ctx, e.get(d.ID)); !stale || err != nil {
 		t.Fatalf("Stale = %v, %v", stale, err)
 	}
+	bases.Err = errBoom
+	if got := e.get(d.ID); got.State != draft.Held || got.Cause != draft.CauseStale {
+		t.Fatalf("a refused approval of a stale draft leaves %s with cause %q, want held and stale", got.State, got.Cause)
+	}
+	if stale, known := e.svc.Staleness(ctx, e.get(d.ID)); !stale || !known {
+		t.Fatalf("Staleness after the refusal, its unit unread = %v, %v", stale, known)
+	}
+	bases.Err = nil
 	if err := e.decide(d.ID, "approve"); err != nil {
 		t.Fatal(err)
 	}
-	if got := e.get(d.ID); got.State != draft.Failed || !strings.HasPrefix(got.Error, StalePrefix) {
+	if got := e.get(d.ID); got.State != draft.Failed || got.Cause != draft.CauseStale {
 		t.Fatalf("an approval of a stale draft: %+v", got)
 	}
 	if stale, err := e.svc.Stale(ctx, e.propose(prComment("hi"))); stale || err != nil {
@@ -461,7 +469,7 @@ func TestSendFailsStaleWithoutPublishing(t *testing.T) {
 	if sent != 0 || failed != 1 || err != nil || len(e.fx.published) != 0 {
 		t.Fatalf("Send = %d, %d, %v, published %v", sent, failed, err, e.fx.published)
 	}
-	if got := e.get(d.ID); got.State != draft.Failed || !strings.HasPrefix(got.Error, StalePrefix) || !got.SendingAt.IsZero() {
+	if got := e.get(d.ID); got.State != draft.Failed || got.Cause != draft.CauseStale || !got.SendingAt.IsZero() {
 		t.Fatalf("%+v", got)
 	}
 	bases.Set(pull, head)
@@ -473,7 +481,7 @@ func TestSendFailsStaleWithoutPublishing(t *testing.T) {
 	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
 		t.Fatalf("failed %d", failed)
 	}
-	if got := e.get(other.ID); !strings.HasPrefix(got.Error, StalePrefix) {
+	if got := e.get(other.ID); got.Cause != draft.CauseStale {
 		t.Fatalf("a publisher's stale refusal: %q", got.Error)
 	}
 	e.fx.failWith = errBoom
@@ -481,8 +489,8 @@ func TestSendFailsStaleWithoutPublishing(t *testing.T) {
 	if _, err := e.approve(third.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _ = e.svc.Send(ctx); strings.HasPrefix(e.get(third.ID).Error, StalePrefix) {
-		t.Fatalf("another failure reads stale: %q", e.get(third.ID).Error)
+	if _, _, _ = e.svc.Send(ctx); e.get(third.ID).Cause != "" {
+		t.Fatalf("another failure reads stale: %q", e.get(third.ID).Cause)
 	}
 }
 

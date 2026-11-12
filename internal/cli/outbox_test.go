@@ -88,7 +88,7 @@ func TestOutboxListGolden(t *testing.T) {
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Thanks, merging now.\nSecond line stays out.", State: draft.Held,
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review"}})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("nudge"), Target: "#general", Text: "Any news on this?", State: draft.Failed,
-		Error: "may have been posted: timeout", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
+		Error: "may have been posted: timeout", Cause: draft.CauseUnconfirmed, Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
 		CreatedAt: testNow.Add(time.Minute), UpdatedAt: testNow.Add(time.Minute)})
 	insertDraftGate(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Kind("reply"), Text: "Closing this.", Original: "Closing this.", State: draft.Held,
 		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)}, testNow.Add(12*time.Minute))
@@ -205,7 +205,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 func TestOutboxRetryNeedsConfirmAndATerminal(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, true)
-	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "maybe out", State: draft.Failed, Error: "may have been posted: timeout"})
+	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "maybe out", State: draft.Failed, Error: "may have been posted: timeout", Cause: draft.CauseUnconfirmed})
 	if code := te.run("outbox", "retry", "1", "--yes"); code == 0 || !strings.Contains(te.err.String(), "confirm") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}

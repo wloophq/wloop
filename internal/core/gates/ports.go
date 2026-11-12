@@ -62,8 +62,9 @@ type Sessions interface {
 	UserDriven(ctx context.Context, id string) (bool, error)
 }
 
-// Options name the draft an answer to a question approves: the open draft gate and the rev the option the
-// answer picks pinned, in the question its person saw; false for an answer that approves none.
+// Options report the pin an answer to a question picks, in the question its person saw: the gate of the draft
+// the option points to and the rev it pinned; false for an answer that picks none. Whether the answer approves
+// that draft is the gates service's alone (ApproveOption).
 type Options interface {
 	OptionDraft(ctx context.Context, question gate.Gate, r Resolution) (drafted gate.Gate, rev int64, ok bool, err error)
 }
