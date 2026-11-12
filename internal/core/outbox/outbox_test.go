@@ -276,8 +276,8 @@ func TestStaleClaimDoesNotPostOldText(t *testing.T) {
 		t.Fatalf("stale claim sent %d %v %v", sent, err, e.fx.published)
 	}
 	e.svc.Send(ctx)
-	if got := e.get(d.ID); got.State != draft.Sent || got.Text != "new" {
-		t.Fatalf("%+v", got)
+	if got := e.get(d.ID); got.State != draft.Failed || len(e.fx.published) != 0 {
+		t.Fatalf("text no gate approved was posted: %+v, published %v", got, e.fx.published)
 	}
 }
 

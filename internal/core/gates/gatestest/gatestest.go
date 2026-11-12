@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Store is an in-memory gates.Store, gates.Reader, gates.Sent and
@@ -75,6 +76,20 @@ func (s *Store) Resolve(_ context.Context, id int64, r gates.Resolution) (gate.G
 		s.mark(id)
 	}
 	return clone(*g), nil
+}
+
+// CarryApprovedRev moves the ApprovedRev of the open or approved draft gates of subject on u from from to to,
+// as a drafts store does when a write changes nothing its draft posts.
+func (s *Store) CarryApprovedRev(u unit.Unit, subject string, from, to int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.gates {
+		g := &s.gates[i]
+		if g.Kind == gate.KindDraft && g.Unit == u && g.Subject == subject && g.ApprovedRev == from &&
+			(g.Status == gate.Open || g.Status == gate.Approved) {
+			g.ApprovedRev = to
+		}
+	}
 }
 
 func (s *Store) mark(id int64) {

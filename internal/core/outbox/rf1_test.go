@@ -288,3 +288,54 @@ func TestPlacingAHeldDraftNeverHasTwoOpenGates(t *testing.T) {
 		t.Fatalf("placed %+v, gate %+v", got, e.gate(d.ID))
 	}
 }
+
+func TestTheSenderRefusesAQueuedDraftPastItsGatesRev(t *testing.T) {
+	e := newEnv()
+	d := e.propose(reply("approved"))
+	if _, err := e.approve(d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	e.store.carry = nil
+	cur := e.get(d.ID)
+	if _, err := e.store.Update(ctx, cur, draft.Queued); err != nil {
+		t.Fatal(err)
+	}
+	if sent, failed, _ := e.svc.Send(ctx); sent != 0 || failed != 1 || len(e.fx.published) != 0 {
+		t.Fatalf("a queued draft at rev %d under a gate of rev %d: sent %d, failed %d", e.get(d.ID).Rev, e.gate(d.ID).ApprovedRev, sent, failed)
+	}
+	if _, err := e.svc.Retry(ctx, d.ID, true); !errors.Is(err, ErrConflict) {
+		t.Fatalf("a retry past the gate's rev: %v", err)
+	}
+}
+
+func TestAPersonsEditOfAFailedDraftWaitsOnANewGate(t *testing.T) {
+	e := newEnv()
+	withPolicy(e, draft.Fixed(noneA))
+	d := e.propose(reply("rule-sent"))
+	ruled := e.gate(d.ID)
+	e.fx.failWith = errBoom
+	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
+		t.Fatalf("failed %d", failed)
+	}
+	got, err := e.svc.Edit(ctx, d.ID, "a person's words", e.get(d.ID).Rev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := e.gate(d.ID)
+	if got.State != draft.Held || g.ID == ruled.ID || g.Status != gate.Open || g.ApprovedRev != got.Rev || e.approval(d.ID) != waiting {
+		t.Fatalf("edited %+v, waits on %+v", got, g)
+	}
+	e.fx.failWith = nil
+	if _, err := e.svc.Retry(ctx, d.ID, true); err == nil {
+		t.Fatal("a retry released the person's edit under the rule's approval")
+	}
+	if sent, _, _ := e.svc.Send(ctx); sent != 0 {
+		t.Fatalf("sent %d", sent)
+	}
+	if _, err := e.approve(d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent, _, _ := e.svc.Send(ctx); sent != 1 {
+		t.Fatalf("a person's approval of the edit: sent %d", sent)
+	}
+}

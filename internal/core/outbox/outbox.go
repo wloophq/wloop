@@ -99,7 +99,9 @@ type Store interface {
 	Get(ctx context.Context, id draft.ID) (draft.Draft, error)      // ErrNotFound
 	List(ctx context.Context, f Filter) ([]draft.Draft, error)      // newest first
 	// Update writes d only while the stored state is from and the stored Rev is d.Rev, and returns
-	// d with Rev bumped; ErrConflict otherwise.
+	// d with Rev bumped; ErrConflict otherwise. An Update that changes nothing the draft posts (text,
+	// payload, basis, target, reaction, broadcast, delivery, kind, unit) carries its open or approved draft
+	// gate's ApprovedRev from the old rev to the new one, so a state move keeps the approval.
 	Update(ctx context.Context, d draft.Draft, from draft.State) (draft.Draft, error)
 	// Revisions are draft id's content revisions, oldest first; ErrNotFound when there is no such draft.
 	Revisions(ctx context.Context, id draft.ID) ([]draft.Revision, error)
@@ -773,8 +775,8 @@ func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Dr
 
 // revise applies a to d, held or failed and read at its stored rev. A held draft's open gate is superseded
 // first, so no window and no approval given to the old content releases the new, and a waiting gate opens
-// for the new rev, stamped with every session that proposed or revised the draft. An agent's revision
-// (session set) of a failed draft takes it back to held under such a gate.
+// for the new rev, stamped with every session that proposed or revised the draft. A revision of a failed
+// draft, a person's or an agent's, takes it back to held under such a gate: no earlier approval covers it.
 func (s *Service) revise(ctx context.Context, d draft.Draft, a Amendment, session string) (draft.Draft, error) {
 	if err := s.amended(ctx, &d, a); err != nil {
 		return draft.Draft{}, err
@@ -793,7 +795,7 @@ func (s *Service) revise(ctx context.Context, d draft.Draft, a Amendment, sessio
 			return draft.Draft{}, err
 		}
 		reopen = true
-	case from == draft.Failed && session != "":
+	case from == draft.Failed:
 		d.State, d.Error, reopen = draft.Held, "", true
 	}
 	saved, serr := s.save(ctx, d, from)
@@ -972,8 +974,9 @@ func (s *Service) drop(ctx context.Context, d draft.Draft, reason string) (draft
 	return s.save(ctx, d, from)
 }
 
-// Retry: failed -> queued. A draft that failed as "not confirmed after a restart" or with an Error
-// starting "may have been posted" needs confirm true, else ErrNeedsConfirm.
+// Retry: failed -> queued, only at the rev its gate approved, else ErrConflict. A draft that failed as "not
+// confirmed after a restart" or with an Error starting "may have been posted" needs confirm true, else
+// ErrNeedsConfirm.
 func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.Draft, error) {
 	d, err := s.load(ctx, id, draft.Queued, draft.Failed)
 	if err != nil {
@@ -981,6 +984,9 @@ func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.D
 	}
 	if !confirm && (d.Error == NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)) {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w", id, ErrNeedsConfirm)
+	}
+	if err := s.approved(ctx, d); err != nil {
+		return draft.Draft{}, fmt.Errorf("draft %d: %w: %w", id, ErrConflict, err)
 	}
 	if err := s.publishable(ctx, &d); err != nil {
 		return draft.Draft{}, err
@@ -1169,7 +1175,7 @@ func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	return s.settleSent(ctx, d, ev)
 }
 
-// approved refuses d, queued, unless its gate approved it.
+// approved refuses d, queued or failed, unless its gate approved it at its rev.
 func (s *Service) approved(ctx context.Context, d draft.Draft) error {
 	g, ok, err := s.GateOf(ctx, d)
 	switch {
@@ -1177,6 +1183,8 @@ func (s *Service) approved(ctx context.Context, d draft.Draft) error {
 		return err
 	case !ok || g.Status != gate.Approved:
 		return errNotApproved
+	case g.ApprovedRev < 1 || g.ApprovedRev != d.Rev:
+		return fmt.Errorf("%w: it approved rev %d, the draft is at rev %d", errNotApproved, g.ApprovedRev, d.Rev)
 	}
 	return nil
 }

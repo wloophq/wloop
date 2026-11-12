@@ -384,16 +384,17 @@ func TestSendPostsOnlyApprovedRev(t *testing.T) {
 
 type noPlacer struct{ Gates }
 
-func TestAGateWithNoTaskPlacerFailsAnAdoptedDraftClosed(t *testing.T) {
+func TestAnAdoptionKeepsItsGatesApprovalAndAContentWriteDoesNot(t *testing.T) {
 	onTaskUnit := func() Proposal {
 		p := reply("shipped")
 		p.Unit = task.UnitOf("t-1")
 		return p
 	}
 	e := newEnv()
+	e.svc.Gates = noPlacer{e.svc.Gates}
 	d := e.propose(onTaskUnit())
-	if d.Task != "t-1" || e.gate(d.ID).ApprovedRev != d.Rev {
-		t.Fatalf("with a TaskPlacer the draft takes its task before its gate: %+v, gate %+v", d, e.gate(d.ID))
+	if g := e.gate(d.ID); d.Task != "t-1" || g.ApprovedRev != d.Rev {
+		t.Fatalf("the adoption, which changes nothing posted, carries the gate's rev: %+v, gate %+v", d, g)
 	}
 	if _, err := e.approve(d.ID, nil); err != nil {
 		t.Fatal(err)
@@ -402,19 +403,21 @@ func TestAGateWithNoTaskPlacerFailsAnAdoptedDraftClosed(t *testing.T) {
 		t.Fatalf("sent %d", sent)
 	}
 	e = newEnv()
-	e.svc.Gates = noPlacer{e.svc.Gates}
 	d = e.propose(onTaskUnit())
-	if g := e.gate(d.ID); d.Task != "t-1" || g.ApprovedRev == d.Rev {
-		t.Fatalf("the adoption: %+v, gate %+v", d, g)
+	g := e.gate(d.ID)
+	cur := e.get(d.ID)
+	cur.Text = "sneaked"
+	if _, err := e.store.Update(ctx, cur, draft.Held); err != nil {
+		t.Fatal(err)
+	}
+	if e.gate(d.ID).ApprovedRev != g.ApprovedRev {
+		t.Fatal("a content write carried the gate's rev")
 	}
 	if err := e.decide(d.ID, "approve"); err != nil {
 		t.Fatal(err)
 	}
-	if got := e.get(d.ID); got.State != draft.Failed {
-		t.Fatalf("an approval of rev %d released rev %d: %+v", e.gate(d.ID).ApprovedRev, got.Rev, got)
-	}
-	if sent, _, _ := e.svc.Send(ctx); sent != 0 || len(e.fx.published) != 0 {
-		t.Fatalf("published %v", e.fx.published)
+	if got := e.get(d.ID); got.State != draft.Failed || len(e.fx.published) != 0 {
+		t.Fatalf("an approval of rev %d released rev %d: %+v", g.ApprovedRev, got.Rev, got)
 	}
 }
 
