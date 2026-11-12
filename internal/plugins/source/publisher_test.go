@@ -2,6 +2,7 @@ package source_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -19,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/proposals"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -182,7 +182,14 @@ func TestAPluginsProposalsAreItsOwnRulesWithNoDeliveryOfTheirOwn(t *testing.T) {
 	now := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
 	gst := db.Gates(func() time.Time { return now })
 	gs := outboxtest.GatesOn(gst, gst, func() time.Time { return now })
-	svc := gs.Bind(&outbox.Service{Kinds: bundledtest.Shapes{}, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
+	kinds, err := draft.NewCatalog([]draft.KindSpec{
+		{Provider: "acme", Name: "react", Delivery: "reaction", SchemaJSON: json.RawMessage(`{"type":"object"}`)},
+		{Provider: "acme", Name: "comment", Delivery: "comment", SchemaJSON: json.RawMessage(`{"type":"object"}`)},
+	}, []draft.DeliverySpec{{Provider: "acme", Name: "comment", Posts: true}, {Provider: "acme", Name: "reaction"}}, map[string]string{"acme": "comment"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := gs.Bind(&outbox.Service{Kinds: kinds, Store: db.Drafts(), Clock: pinned(now), Effects: func(unit.ProviderID) (port.Effects, error) { return pub, nil }})
 	d, err := svc.Propose(context.Background(), prop)
 	if err != nil {
 		t.Fatal(err)

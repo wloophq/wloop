@@ -38,18 +38,6 @@ type ghPublisher struct {
 	failNext error
 }
 
-func (p *ghPublisher) Delivers(k draft.Kind) draft.Delivery {
-	switch k {
-	case "review":
-		return "review"
-	case "thread_reply":
-		return "reply"
-	case "resolve":
-		return "resolve"
-	}
-	return draft.Delivery("comment")
-}
-
 func (p *ghPublisher) Publish(_ context.Context, d draft.Draft) (draft.Evidence, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

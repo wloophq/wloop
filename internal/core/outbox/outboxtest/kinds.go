@@ -1,7 +1,6 @@
 package outboxtest
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,38 +38,40 @@ func (k Kinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	return draft.KindSpec{}, false
 }
 
-// Shape mirrors draft.Catalog's Shape over Specs, with Defaults as each provider's default delivery.
+// Shape is draft.Catalog's Shape over Specs, with Defaults as each provider's default delivery.
 func (k Kinds) Shape(provider string, d draft.Draft) (draft.Draft, error) {
-	mine := slices.DeleteFunc(slices.Clone(k.Specs), func(s draft.KindSpec) bool { return s.Provider != provider })
-	if len(mine) == 0 {
-		d.Purpose = cmp.Or(d.Purpose, string(d.Kind))
-		return d, nil
+	c, err := k.catalog()
+	if err != nil {
+		return d, err
 	}
-	name := string(d.Kind)
-	if name == "" {
-		name = k.kindOf(mine, d.Purpose, string(d.Delivery), k.Defaults[provider])
+	got, err := c.Shape(provider, d)
+	if err != nil {
+		return d, fmt.Errorf("%w: %w", outbox.ErrInvalid, err)
 	}
-	spec, ok := k.Lookup(provider, name)
-	if !ok {
-		return d, fmt.Errorf("%w: %w: %q of %s", outbox.ErrInvalid, draft.ErrUnknownKind, cmp.Or(name, d.Purpose), provider)
-	}
-	d.Kind, d.Purpose, d.Delivery = draft.Kind(spec.Name), cmp.Or(d.Purpose, spec.Name), draft.Delivery(spec.Delivery)
-	return d, nil
+	return got, nil
 }
 
-func (Kinds) kindOf(mine []draft.KindSpec, purpose, delivery, fallback string) string {
-	declared := slices.ContainsFunc(mine, func(s draft.KindSpec) bool { return s.Delivery == delivery })
-	if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Name == purpose }); i >= 0 &&
-		(delivery == "" || !declared || mine[i].Delivery == delivery) {
-		return purpose
+// catalog is Specs in a draft.Catalog, each delivery a spec or Defaults names declared, and a spec with no
+// schema taking any object.
+func (k Kinds) catalog() (*draft.Catalog, error) {
+	specs := slices.Clone(k.Specs)
+	var deliveries []draft.DeliverySpec
+	declare := func(provider, name string) {
+		dl := draft.DeliverySpec{Provider: provider, Name: name}
+		if name != "" && !slices.Contains(deliveries, dl) {
+			deliveries = append(deliveries, dl)
+		}
 	}
-	if !declared {
-		delivery = fallback
+	for i, s := range specs {
+		if len(s.SchemaJSON) == 0 {
+			specs[i].SchemaJSON = json.RawMessage(`{"type":"object"}`)
+		}
+		declare(s.Provider, s.Delivery)
 	}
-	if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Delivery == delivery }); i >= 0 {
-		return mine[i].Name
+	for p, d := range k.Defaults {
+		declare(p, d)
 	}
-	return ""
+	return draft.NewCatalog(specs, deliveries, k.Defaults)
 }
 
 func (k Kinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {

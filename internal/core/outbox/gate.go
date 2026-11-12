@@ -163,8 +163,11 @@ func (s *Service) unreleasable(d draft.Draft) string {
 	if d.Hold {
 		return "it is held for a person, and a rule or a window released it"
 	}
-	if got := s.delivered(d).Delivery; got != d.Delivery {
-		return fmt.Sprintf("its publisher now posts it as a %s, not the %s its approval decided", got, d.Delivery)
+	switch got, ok := s.current(d); {
+	case !ok:
+		return fmt.Sprintf("its publisher no longer declares its kind %s", d.Kind)
+	case got.Delivery != d.Delivery:
+		return fmt.Sprintf("its publisher now posts it as a %s, not the %s its approval decided", got.Delivery, d.Delivery)
 	}
 	if s.Broken != nil && d.Origin.Workflow != "" && slices.Contains(s.Broken(), d.Origin.Workflow) {
 		return fmt.Sprintf("its workflow %s does not load", d.Origin.Workflow)

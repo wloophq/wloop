@@ -20,7 +20,11 @@ var testKinds = map[string]string{
 // shapes are the test providers' kinds in a draft.Catalog, built as the manifests' merge builds one.
 type shapes struct{ c *draft.Catalog }
 
-func newShapes() shapes {
+func newShapes() shapes { return shapesWith(nil) }
+
+// shapesWith are the test providers' kinds with the deliveries over gives, by provider and kind, in place of
+// testKinds'.
+func shapesWith(over map[string]map[string]string) shapes {
 	var kinds []draft.KindSpec
 	var deliveries []draft.DeliverySpec
 	defaults := map[string]string{}
@@ -30,6 +34,9 @@ func newShapes() shapes {
 		}
 		for _, k := range []string{"reply", "nudge", "close", "ask_owner", "react", "comment", "edit", "delete"} {
 			d := testKinds[k]
+			if o, ok := over[p][k]; ok {
+				d = o
+			}
 			spec := draft.KindSpec{Provider: p, Name: k, Delivery: d, TextRequired: d != "reaction" && d != "delete",
 				SchemaJSON: json.RawMessage(`{"type":"object","properties":{}}`)}
 			if spec.TextRequired {

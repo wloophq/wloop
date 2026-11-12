@@ -213,13 +213,6 @@ type pinnedEffects struct {
 	turns turnReader
 }
 
-func (p pinnedEffects) Delivers(k draft.Kind) draft.Delivery {
-	if dl, ok := p.Effects.(port.Deliverer); ok {
-		return dl.Delivers(k)
-	}
-	return ""
-}
-
 func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 	if err := p.pinned(ctx, d); err != nil {
 		return err

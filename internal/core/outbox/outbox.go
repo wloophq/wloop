@@ -183,8 +183,8 @@ type Service struct {
 	// Silent says whether effect name applies without its draft's post, so CloseSilently may apply it; nil:
 	// none does.
 	Silent func(name string) bool
-	// Kinds are the manifests' draft kinds; nil reads the kinds the draft package still enumerates, as serve
-	// does until it wires the manifests' Kinds.
+	// Kinds are the manifests' draft kinds, the only source of a kind's delivery; nil declares none, so a draft
+	// keeps the kind, purpose and delivery its proposer gave.
 	Kinds Kinds
 	// Bases read the live basis of a draft whose kind's basis the agent states; with nil, such a draft is
 	// refused, never passed.
@@ -294,15 +294,18 @@ func (s *Service) ungated(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
+// undeclared is the catalog of a Service with no Kinds: it declares no kind.
+var undeclared = &draft.Catalog{}
+
 func (s *Service) kinds() Kinds {
 	if s.Kinds == nil {
-		return noKinds{}
+		return undeclared
 	}
 	return s.Kinds
 }
 
-// shape is d shaped by the kind its publisher's manifest declares, and delivered as its publisher posts
-// it, with that kind's spec; declared is false for a publisher whose manifest declares no kinds.
+// shape is d shaped by the kind its publisher's manifest declares, with that kind's spec; declared is false
+// for a publisher whose manifest declares no kinds.
 func (s *Service) shape(d draft.Draft) (draft.Draft, draft.KindSpec, bool, error) {
 	kinds, provider := s.kinds(), string(s.PublisherOf(d))
 	got, err := kinds.Shape(provider, d)
@@ -313,7 +316,7 @@ func (s *Service) shape(d draft.Draft) (draft.Draft, draft.KindSpec, bool, error
 	if spec.Basis != draft.BasisAgent {
 		got.Basis = ""
 	}
-	return s.delivered(got), spec, declared, nil
+	return got, spec, declared, nil
 }
 
 func invalid(err error) error {
@@ -342,28 +345,14 @@ func (s *Service) spec(d draft.Draft) (draft.KindSpec, bool, error) {
 	return draft.KindSpec{}, false, nil
 }
 
-// delivered is d with the delivery its provider's publisher posts it as, and the kind its purpose takes for
-// that delivery.
-func (s *Service) delivered(d draft.Draft) draft.Draft {
-	fx, err := s.publisher(d)
+// current is stored draft d with the delivery its kind posts as, as its publisher's manifest declares it now;
+// false, and d as it is, when that manifest no longer declares its kind.
+func (s *Service) current(d draft.Draft) (draft.Draft, bool) {
+	got, err := s.kinds().Shape(string(s.PublisherOf(d)), d)
 	if err != nil {
-		return d
+		return d, false
 	}
-	dl, ok := fx.(port.Deliverer)
-	if !ok || d.Delivery == "" || d.Kind == "" {
-		return d
-	}
-	got := dl.Delivers(d.Kind)
-	if got == "" || got == d.Delivery {
-		return d
-	}
-	d.Delivery = got
-	re := d
-	re.Kind = ""
-	if shaped, err := s.kinds().Shape(string(s.PublisherOf(d)), re); err == nil && shaped.Delivery == got {
-		d.Kind = shaped.Kind
-	}
-	return d
+	return got, true
 }
 
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
@@ -385,7 +374,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, a draft.Approval
 		repeatAfter = s.RepeatAfter
 	}
 	for _, o := range found {
-		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
+		if o, _ = s.current(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
 		if o.State != draft.Dropped || o.Reason == reasonDryRun && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
@@ -1008,12 +997,11 @@ func (s *Service) RetryBy(ctx context.Context, id draft.ID, confirm bool, by dra
 	return s.save(ctx, d, draft.Failed)
 }
 
-// List is the drafts f selects, each with the delivery its provider's
-// publisher posts it as.
+// List is the drafts f selects, each with the delivery its kind posts as now (current).
 func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 	ds, err := s.Store.List(ctx, f)
 	for i := range ds {
-		ds[i] = s.delivered(ds[i])
+		ds[i], _ = s.current(ds[i])
 	}
 	return ds, err
 }

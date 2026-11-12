@@ -43,13 +43,6 @@ type Locator interface {
 	Where(ctx context.Context, d draft.Draft) (string, error)
 }
 
-// Deliverer is optional: an Effects value that implements it says how it
-// posts a draft of kind k, whatever delivery its proposer asked for, which
-// the draft then carries, so its approval reads what the provider will show.
-type Deliverer interface {
-	Delivers(k draft.Kind) draft.Delivery
-}
-
 // Placer is optional: an Effects value that implements it places a draft when
 // it is proposed: where a draft with no target posts, which the draft then
 // stores as its Target ("" keeps the unit itself), and its Broadcast, which

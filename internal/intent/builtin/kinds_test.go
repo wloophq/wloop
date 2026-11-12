@@ -205,3 +205,20 @@ func TestVerdictsAreTheServedPluginsKindsVerdicts(t *testing.T) {
 		t.Fatalf("slack declares no verdict: %v", got)
 	}
 }
+
+// TestBundledKindsDeliverAsTheirManifestsNameThem reads each bundled kind's delivery from the catalog, the one
+// source of a kind's delivery: GitHub posts every text kind as a comment, Slack as a message.
+func TestBundledKindsDeliverAsTheirManifestsNameThem(t *testing.T) {
+	c := Installed().DraftKinds()
+	for p, want := range map[string]map[string]string{
+		"github": {"reply": "comment", "nudge": "comment", "close": "comment", "ask_owner": "comment", "comment": "comment", "react": "reaction", "edit": "edit"},
+		"slack":  {"reply": "message", "nudge": "message", "react": "reaction", "edit": "edit", "delete": "delete"},
+	} {
+		for k, dl := range want {
+			got, err := c.Shape(p, draft.Draft{Kind: draft.Kind(k)})
+			if err != nil || string(got.Delivery) != dl {
+				t.Errorf("%s of %s delivers %q (%v), want %q", k, p, got.Delivery, err, dl)
+			}
+		}
+	}
+}
