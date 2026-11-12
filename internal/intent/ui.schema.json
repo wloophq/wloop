@@ -96,6 +96,11 @@
                   "description": "The field's name on the card.",
                   "type": "string"
                 },
+                "markdown": {
+                  "default": false,
+                  "description": "The field's value is Markdown, such as an inline comment's body: the card renders it as it renders the draft's text.",
+                  "type": "boolean"
+                },
                 "values": {
                   "additionalProperties": {
                     "description": "The value's word.",

@@ -130,6 +130,8 @@ type DraftField struct {
 	Fields   []DraftField  `json:"fields,omitempty"`
 	Editable bool          `json:"editable,omitempty"`
 	Options  []DraftOption `json:"options,omitempty"`
+	// Markdown says Value is Markdown, which the card renders as it renders the draft's text.
+	Markdown bool `json:"markdown,omitempty"`
 }
 
 // DraftOption is a value an editable field takes, with its word.

@@ -327,6 +327,7 @@ function payloadField(f, key, editing, scope) {
   let value;
   if ((f.fields || []).length) value = h("dl", { class: "d-payload" }, ...f.fields.flatMap((x) => payloadField(x, key, editing, scope)));
   else if (editing && f.editable && (f.options || []).length) value = fieldControl(f, key, scope);
+  else if (f.markdown) value = h("div", { class: "pv md", "data-value": f.value }, renderMarkdown(f.value, { key: `${scope}:field:${key}:${f.pointer}` }));
   else value = h("span", { class: "pv", "data-value": f.value, title: f.shown && f.shown !== f.value ? f.value : undefined }, f.shown || f.value);
   return [h("dt", {}, f.label), h("dd", { "data-pointer": f.pointer }, value)];
 }
@@ -402,7 +403,7 @@ function draftWhere(d) {
   const pending = ["held", "failed", "queued", "sending"].includes(d.state);
   const lang = d.language ? [" · ", h("span", { class: "lang", lang: d.language }, fmtLanguage(d.language))] : null;
   if (d.where) return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.where), lang);
-  return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
+  return h("div", { class: "meta" }, t("To"), " ", h("span", { class: "ref" }, d.target || d.label || d.unit || ""), pending ? " (" + t("destination unknown") + ")" : "", lang);
 }
 
 // broadcastToggle is the checkbox that also posts thread reply d to its conversation, which d's publisher offers
@@ -567,7 +568,7 @@ function draftCard(e, d, opts = {}) {
   const why = d.state === "dropped" && d.reason_text ? `: ${d.reason_text}` : "";
   const head = (purpose ? t("Draft {purpose}", { purpose }) : t("Draft")) + (st ? ` (${st}${why})` : "");
   const effects = draftEffects(d);
-  const buttons = draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf));
+  const buttons = draftDecided(d) ? [] : draftActions(e, d).map((a) => draftActionButton(a, scope, opts.keyOf));
   return h("section", { class: "d-draft", "data-draft": String(d.id), "aria-label": t("Draft") },
     h("div", { class: "d-sub" }, head),
     d.preview ? h("div", { class: "d-preview" }, renderMarkdown(d.preview, { key: `${scope}:preview:${d.id}`, names: d.names || {} })) : null,
@@ -580,12 +581,27 @@ function draftCard(e, d, opts = {}) {
       : d.text ? renderMarkdown(d.text, { fold: 6, key: `${scope}:draft:${d.id}`, names: d.names || {} }) : h("p", { class: "draft-text" }, d.reaction ? `:${d.reaction}:` : ""),
     payloadView(d, key, editing, scope),
     ...(d.notes || []).map((n) => h("p", { class: "d-note" + (d.stale ? " err" : "") }, n)),
-    d.why ? h("p", { class: "why" }, d.why) : null,
+    d.why ? h("p", { class: "why" }, t("Why it was proposed: {why}", { why: d.why })) : null,
     d.quoted ? h("p", { class: "why" }, d.quoted) : null,
     effects.length ? h("ul", { class: "effects" }, ...effects.map((x) => h("li", {}, x))) : null,
     d.error ? h("p", { class: "err" }, d.error) : null,
     windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
-    h("div", { class: "d-actions" }, ...buttons),
+    posted(d),
+    buttons.length ? h("div", { class: "d-actions" }, ...buttons) : null,
     actionResult(buttons),
     draftLinks(e, d, scope));
+}
+
+// draftDecided says d left the person's hands for good: posted, or dropped; its card then offers no action.
+function draftDecided(d) {
+  return d.state === "sent" || d.state === "dropped";
+}
+
+// posted is the line that says when sent draft d was posted, linked to the post itself.
+function posted(d) {
+  if (d.state !== "sent") return null;
+  const link = safeURL(d.permalink);
+  const when = d.updated_at ? fmtDate(d.updated_at, "datetime") : "";
+  const text = when ? t("Posted {time}", { time: when }) : t("Posted");
+  return h("p", { class: "d-posted" }, link ? h("a", { href: link, target: "_blank", rel: "noopener noreferrer", class: "ext" }, text) : text);
 }

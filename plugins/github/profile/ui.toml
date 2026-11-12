@@ -316,3 +316,4 @@ values = { LEFT = "old", RIGHT = "new" }
 
 [drafts.review.fields.body]
 label = "Comment"
+markdown = true

@@ -197,11 +197,18 @@ function taskGates(e) {
   const pinnedGate = (g) => !!subjectOf(g).pinned_by;
   const gates = (e.gates || []).filter((g) => g.status === "open" && !(own && g.subject === own) && !pinnedGate(g) && !drafts.some((d) => d.gate && d.gate === g.id));
   if (!gates.length && !own && !drafts.length) return null;
+  const heading = !gates.length && !drafts.length && own && !["held", "failed"].includes(own.state) ? draftStateWord(own.state) : t("Waiting on you");
   return h("section", { class: "d-gates", "aria-label": t("Open gates") },
-    h("h2", { class: "d-sub" }, t("Waiting on you")),
+    h("h2", { class: "d-sub" }, heading),
     ...gates.map((g) => gateCard(e, g)),
     own && own.pinned_by ? pinnedNote(own) : own ? draftCard(e, own, { scope: "detail" }) : null,
     ...drafts.map((d) => draftCard(e, d, { scope: "detail" })));
+}
+
+// draftStateWord is the profile's word for a draft's state, capitalized as a heading.
+function draftStateWord(state) {
+  const w = (catalogWords().draft_states || {})[state] || state;
+  return w.charAt(0).toUpperCase() + w.slice(1);
 }
 
 // pinnedNote stands for draft d's card on its own task while an open question pins it: the question decides it,

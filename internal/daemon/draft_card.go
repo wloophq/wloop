@@ -205,6 +205,7 @@ func (w payloadWalk) field(n node, pointer, key string, schema map[string]any) a
 		return f
 	}
 	f.Value, f.Shown = n.scalar, words.Values[n.scalar]
+	f.Markdown = words.Markdown != nil && *words.Markdown
 	if slices.Contains(w.editable, pointer) {
 		enum, _ := schema["enum"].([]any)
 		for _, e := range enum {

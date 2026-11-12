@@ -53,3 +53,44 @@ done({ Gates: cls(box, "d-gate").map((x) => attr(x, "data-gate")), Drafts: cls(b
 		t.Errorf("the pinned draft's own task says %q, want the note that its question decides it", got.Own)
 	}
 }
+
+// TestASentDraftsDetailShowsItsPost draws a sent draft's own task under its state's heading, with no action, the
+// line that it was posted linked to the post, why it was proposed labeled as such, its unit by its label, and an
+// inline comment's Markdown body rendered.
+func TestASentDraftsDetailShowsItsPost(t *testing.T) {
+	var got struct {
+		Heading, Posted, Href, Why, Where string
+		Buttons                           int
+		Strong                            []string
+	}
+	d := reviewDraft()
+	d.State, d.Task, d.Gate, d.Intents, d.Where, d.Target, d.Label = "sent", "t-1", 0, nil, "", "", "acme/api#7"
+	d.Unit, d.Permalink, d.Why = "github/acme/api#7", "https://example.test/acme/api/pull/7#review-1", "REQUEST_CHANGES held for the user"
+	d.UpdatedAt = d.CreatedAt
+	d.Fields[1].Fields[0].Fields[3].Value, d.Fields[1].Fields[0].Fields[3].Markdown = "Return the **error**.", true
+	own := d
+	runGate(t, `
+const e = { id: "draft:7", title: "draft", gates: [{ kind: "draft", status: "approved", subject: input.own }], verbs: [{ verb: "approve", enabled: false, reason: "sent" }, { verb: "edit", enabled: false, reason: "sent" }] };
+taskState.id = "draft:7"; taskState.drafts = [];
+const box = taskGates(e);
+const posted = cls(box, "d-posted")[0];
+const link = walk(posted, (x) => x.tag === "a")[0];
+done({ Heading: cls(box, "d-sub")[0].textContent, Buttons: walk(box, (x) => x.tag === "button").length, Posted: posted.textContent,
+  Href: link ? attr(link, "href") : "", Why: cls(box, "why").map((x) => x.textContent).join(""), Where: cls(box, "ref")[0].textContent,
+  Strong: walk(box, (x) => x.tag === "strong").map((x) => x.textContent) });`, map[string]any{"own": own}, &got)
+	if got.Heading != "Sent" {
+		t.Errorf("heading %q, want the sent state's word", got.Heading)
+	}
+	if got.Buttons != 0 || got.Href != d.Permalink || got.Posted == "" {
+		t.Errorf("%d buttons, posted %q linked to %q: want no action and the post's link", got.Buttons, got.Posted, got.Href)
+	}
+	if got.Why != "Why it was proposed: REQUEST_CHANGES held for the user" {
+		t.Errorf("why %q, want it labeled as the proposal's reason", got.Why)
+	}
+	if got.Where != "acme/api#7" {
+		t.Errorf("where %q, want the unit's label", got.Where)
+	}
+	if !slices.Equal(got.Strong, []string{"error"}) {
+		t.Errorf("strong %q, want the comment's Markdown rendered", got.Strong)
+	}
+}
