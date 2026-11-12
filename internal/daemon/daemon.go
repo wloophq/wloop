@@ -374,6 +374,8 @@ type Deps struct {
 	// publishes the approved drafts.
 	Outbox     *outbox.Service
 	SendDrafts bool
+	// AgentDrafts serve an agent session's calls on drafts; nil answers 503 to api.AgentDrafts.
+	AgentDrafts *AgentDrafts
 	// Headless starts headless turns; nil answers 503 to the act route.
 	Headless Headless
 	// OmniboxAsk runs the omnibox's read-only agent call; nil answers 503 to the ask route.

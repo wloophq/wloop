@@ -59,6 +59,8 @@ type Server struct {
 	// Plugins are the tools the plugins' manifests declare.
 	Plugins []PluginTool
 	Tasks   Tasks // set by internal/cli/serve.go; nil hides task_post and task_read
+	// Drafts are the agent route's calls on drafts; nil hides draft_read, draft_update and draft_withdraw.
+	Drafts Drafts
 	// Texts are the tools' descriptions, the profile's tools.toml; nil
 	// describes none.
 	Texts func() map[string]ToolText
@@ -282,6 +284,9 @@ func (s *Server) tools() []registered {
 	r := []registered{{turnEndTool(), true, s.turnEnd}}
 	if s.Tasks != nil {
 		r = append(r, registered{taskPostTool(), true, s.taskPost}, registered{taskReadTool(), true, s.taskRead})
+	}
+	if s.Drafts != nil {
+		r = append(r, s.draftTools()...)
 	}
 	return append(r, s.pluginTools()...)
 }

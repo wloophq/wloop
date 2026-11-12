@@ -1151,7 +1151,7 @@ See [Turns and rounds](/concepts/turns/).
 Record how a turn ended; read your answer.
 
 ```sh
-{{command}} turn end <url> --turn <id> --file <path>
+{{command}} turn end <url> --turn <id> --file <path> [--draft <id>:<rev>]
 {{command}} turn answer <url> [--gate <id>]
 ```
 
@@ -1161,12 +1161,44 @@ end records how this session's turn ended, from a JSON file, when the session ha
 | --- | --- |
 | `--turn <id>` | The id on the first line of the turn's instructions |
 | `--file <path>` | The JSON file that holds the record |
+| `--draft <id>:<rev>` | The draft the turn ended on, which sets the record's outcome.draft |
 
 Examples:
 
 ```sh
 {{command}} turn end https://github.com/acme/api/pull/7 --turn 66ea4cdcae20 --file /tmp/record.json
 {{command}} turn answer https://github.com/acme/api/pull/7
+```
+
+See [Turns and rounds](/concepts/turns/).
+
+### draft
+
+Propose, read, revise or withdraw your drafts.
+
+```sh
+{{command}} draft propose --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold]
+{{command}} draft read <id>
+{{command}} draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>]
+{{command}} draft withdraw <id> --rev <rev> [--reason <r>]
+```
+
+An agent session's drafts, as the MCP draft tools reach them: {{name}} posts a draft only once the user, or a rule of the user's, approves it. propose drafts on this session's turn's unit unless `--unit` names another; read reaches any draft on that unit or proposed from it, update and withdraw only those an agent proposed there, never a person's or a workflow's; both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.
+
+| Flag | Description |
+| --- | --- |
+| `--kind <kind>` | A draft kind the unit's plugin declares |
+| `--rev <rev>` | The rev you read |
+| `--payload <json>` | What the kind's schema shapes beside the text |
+| `--basis <b>` | What you read the unit at, such as a pull request's head commit |
+| `--hold` | Keep the draft waiting for the user whatever the approval rules say |
+
+Examples:
+
+```sh
+{{command}} draft read 42
+{{command}} draft update 42 --rev 3 --payload '{"event":"COMMENT"}'
+{{command}} draft withdraw 43 --rev 1 --reason other_option
 ```
 
 See [Turns and rounds](/concepts/turns/).

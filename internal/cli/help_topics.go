@@ -571,14 +571,34 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"turn end", "turn answer"},
 				Summary: "Record how a turn ended; read your answer",
-				Usage:   []string{"turn end <url> --turn <id> --file <path>", "turn answer <url> [--gate <id>]"},
+				Usage:   []string{"turn end <url> --turn <id> --file <path> [--draft <id>:<rev>]", "turn answer <url> [--gate <id>]"},
 				About: "end records how this session's turn ended, from a JSON file, when the session has no " + name + " MCP tool; the file is deleted once stored. " +
 					"answer prints the user's answers to this session's gates that it has not read, or, with --gate, every answer that resolved that gate, and marks them read.",
 				Flags: []helpFlag{
 					{"--turn <id>", "The id on the first line of the turn's instructions"},
 					{"--file <path>", "The JSON file that holds the record"},
+					{"--draft <id>:<rev>", "The draft the turn ended on, which sets the record's outcome.draft"},
 				},
 				Examples: []string{"turn end " + pr + " --turn 66ea4cdcae20 --file /tmp/record.json", "turn answer " + pr},
+				Docs:     "concepts/turns",
+			},
+			{
+				Names:   []string{"draft"},
+				Summary: "Propose, read, revise or withdraw your drafts",
+				Usage: []string{"draft propose --kind <kind> [--unit <provider>/<key>] [--text <t> | --text-file <path>] [--payload <json> | --payload-file <path>] [--basis <b>] [--hold]",
+					"draft read <id>", "draft update <id> --rev <rev> [--text <t>] [--payload <json>] [--basis <b>]", "draft withdraw <id> --rev <rev> [--reason <r>]"},
+				About: "An agent session's drafts, as the MCP draft tools reach them: " + name + " posts a draft only once the user, or a rule of the user's, approves it. " +
+					"propose drafts on this session's turn's unit unless --unit names another; read reaches any draft on that unit or proposed from it, " +
+					"update and withdraw only those an agent proposed there, never a person's or a workflow's; " +
+					"both apply at the rev read, so a revision made meanwhile is never overwritten. Each prints the draft as JSON.",
+				Flags: []helpFlag{
+					{"--kind <kind>", "A draft kind the unit's plugin declares"},
+					{"--rev <rev>", "The rev you read"},
+					{"--payload <json>", "What the kind's schema shapes beside the text"},
+					{"--basis <b>", "What you read the unit at, such as a pull request's head commit"},
+					{"--hold", "Keep the draft waiting for the user whatever the approval rules say"},
+				},
+				Examples: []string{"draft read 42", "draft update 42 --rev 3 --payload '{\"event\":\"COMMENT\"}'", "draft withdraw 43 --rev 1 --reason other_option"},
 				Docs:     "concepts/turns",
 			},
 			{

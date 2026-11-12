@@ -129,3 +129,62 @@ turn_answers = """Answers to your turn's question:
 {{.Answers}}"""
 option = "- {{.ID}}: {{.Label}}"
 answer = "- {{.At}}: {{if .Option}}option {{.Option}}{{with .Label}} ({{.}}){{end}}{{end}}{{if and .Option .Choice}}, {{end}}{{.Choice}}{{if and (or .Option .Choice) .Text}}, with the note: {{end}}{{.Text}}"
+
+[draft_read]
+description = "Read a draft on your turn's unit, or one proposed from it, such as a reply in a thread your turn drafted: its content, payload, basis, rev, delivery state and revisions. Read it before you update or withdraw it, and pass the rev it shows."
+
+[draft_read.params]
+"id" = "the draft's id"
+
+[draft_read.answers]
+refused = "draft_read refused: {{.Error}}."
+bad_arguments = "Nothing was read: the arguments are an object with the draft's id{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was read; fix these and call draft_read again:
+{{.Problems}}"""
+read = "{{.Draft}}"
+not_found = "Nothing was read: {{.Error}}."
+out_of_scope = "Nothing was read: {{.Error}}; draft_read reads only drafts on your turn's unit or proposed from it."
+failed = "{{.Name}} could not read the draft: {{.Error}}"
+
+[draft_update]
+description = "Revise a draft an agent proposed on your turn's unit, or proposed from it, such as a reply in a thread your turn drafted, at the rev you read with draft_read. A field you leave out stays as it is. The revision waits for the user's approval again, whatever approved the draft before; a failed draft goes back to waiting."
+
+[draft_update.params]
+"id" = "the draft's id"
+"rev" = "the rev you read"
+"text" = "the new text"
+"payload" = "the new payload, whole, as the draft's kind shapes it"
+"basis" = "what you read the unit at, such as the pull request's head commit, for a kind that takes one"
+
+[draft_update.answers]
+refused = "draft_update refused: {{.Error}}."
+bad_arguments = "Nothing was revised: the arguments are an object with id, rev, and text, payload or basis{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was revised; fix these and call draft_update again:
+{{.Problems}}"""
+updated = """Revised; it waits for the user's approval:
+{{.Draft}}"""
+rev_conflict = "Nothing was revised: {{.Error}}. Read it again with draft_read and revise the rev it shows."
+stale = "Nothing was revised: {{.Error}}. Read the unit again and pass the basis you read."
+not_found = "Nothing was revised: {{.Error}}."
+out_of_scope = "Nothing was revised: {{.Error}}; draft_update revises only drafts an agent proposed on your turn's unit or from it, never a person's or a workflow's."
+failed = "{{.Name}} could not revise the draft: {{.Error}}"
+
+[draft_withdraw]
+description = "Withdraw a draft an agent proposed on your turn's unit, or proposed from it, at the rev you read with draft_read, so it is never posted."
+
+[draft_withdraw.params]
+"id" = "the draft's id"
+"rev" = "the rev you read"
+"reason" = "why, such as superseded; superseded when left out"
+
+[draft_withdraw.answers]
+refused = "draft_withdraw refused: {{.Error}}."
+bad_arguments = "Nothing was withdrawn: the arguments are an object with id and rev{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was withdrawn; fix these and call draft_withdraw again:
+{{.Problems}}"""
+withdrawn = """Withdrawn:
+{{.Draft}}"""
+rev_conflict = "Nothing was withdrawn: {{.Error}}. Read it again with draft_read and withdraw the rev it shows."
+not_found = "Nothing was withdrawn: {{.Error}}."
+out_of_scope = "Nothing was withdrawn: {{.Error}}; draft_withdraw withdraws only drafts an agent proposed on your turn's unit or from it, never a person's or a workflow's."
+failed = "{{.Name}} could not withdraw the draft: {{.Error}}"

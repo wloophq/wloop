@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
+	"github.com/wloophq/wloop/internal/domain/record"
 )
 
 type fakeAgent struct {
@@ -231,6 +232,29 @@ func TestTurnCommandsTakeAUnitArgument(t *testing.T) {
 		errw.Reset()
 		if code := Answer(context.Background(), inTerm, []string{bad}, &out, &errw, a, ports); code != 1 {
 			t.Errorf("%q: exit %d", bad, code)
+		}
+	}
+}
+
+func TestTurnEndDraftFlagSetsTheOutcomesDraft(t *testing.T) {
+	path := recordFile(t, `{"state":"done","summary":"reviewed","outcome":{"verdict":"REQUEST_CHANGES","blocking":2}}`)
+	a := &fakeAgent{ended: api.TurnEnded{PR: url, State: "done", Added: true}}
+	var out, errw bytes.Buffer
+	if code := End(context.Background(), inTerm, []string{url, "--turn", "abc123abc123", "--file", path, "--draft", "42:3"}, &out, &errw, a, ports); code != 0 {
+		t.Fatalf("exit %d: %s", code, errw.String())
+	}
+	rec, err := record.Parse(a.ends[0].Record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Outcome == nil || rec.Outcome.Draft == nil || *rec.Outcome.Draft != (record.DraftRef{ID: 42, Rev: 3}) || rec.Outcome.Blocking != 2 || rec.Outcome.Verdict != "REQUEST_CHANGES" {
+		t.Fatalf("sent %s", a.ends[0].Record)
+	}
+	for _, bad := range []string{"42", "42:x", "0:1", "42:0"} {
+		path := recordFile(t, `{"state":"done","summary":"reviewed"}`)
+		a := &fakeAgent{}
+		if code := End(context.Background(), inTerm, []string{url, "--turn", "abc123abc123", "--file", path, "--draft", bad}, &out, &errw, a, ports); code != 2 || len(a.ends) != 0 {
+			t.Errorf("--draft %s: exit %d, sent %d", bad, code, len(a.ends))
 		}
 	}
 }

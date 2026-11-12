@@ -777,6 +777,7 @@ func commands() map[string]command {
 		"slack":             runSlack,
 		"outbox":            runOutbox,
 		"task":              runTask,
+		"draft":             func(ctx context.Context, e *Env, args []string) error { return exitCode(runDraft(ctx, e, args)) },
 		"version":           version,
 		"--version":         version,
 		"-v":                version,
