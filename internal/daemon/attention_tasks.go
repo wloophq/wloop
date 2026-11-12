@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
+	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -328,6 +329,9 @@ func (s *Server) messageNotice(e task.Task, m dmessage.Message, record int64) (a
 	case dmessage.Question:
 		a.Title = s.notice(builtin.NoticeNotifyQuestion, nil)
 		a.Actions = slices.Concat(s.choices(m), []api.AttentionAction{{ID: "answer:text", Title: s.notice(builtin.NoticeNotifyReply, nil), TextInput: true}}, dismiss)
+		if pins(m) {
+			a.Body = strings.TrimSpace(a.Body + "\n\n" + s.notice(builtin.NoticeNotifyPinned, nil))
+		}
 		return api.QuestionCategory(max(record, 0)), strconv.FormatInt(max(record, 0), 10), a
 	case dmessage.Proposal:
 		a.Title = s.notice(builtin.NoticeNotifyProposal, nil)
@@ -362,14 +366,25 @@ func (s *Server) handlerVerb(h string) (task.Verb, string) {
 	return task.Verb(h), h
 }
 
-// choices are a message's one-tap answers, the recommended one first.
+// pins says whether an answer to m approves a draft, which a notification does not show.
+func pins(m dmessage.Message) bool {
+	return m.Draft != nil || slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.Draft != nil })
+}
+
+// choices are a message's one-tap answers, the recommended one first; an answer that approves a pinned draft is
+// none, since the notification does not show the draft: the person answers it on the question's card.
 func (s *Server) choices(m dmessage.Message) []api.AttentionAction {
 	var out []api.AttentionAction
-	if m.Confirm {
+	switch {
+	case m.Confirm && m.Draft != nil:
+		out = []api.AttentionAction{{ID: "answer:no", Title: s.notice(builtin.NoticeNotifyNo, nil)}}
+	case m.Confirm:
 		out = []api.AttentionAction{{ID: "answer:yes", Title: s.notice(builtin.NoticeNotifyYes, nil)}, {ID: "answer:no", Title: s.notice(builtin.NoticeNotifyNo, nil)}}
-	} else {
+	default:
 		for _, o := range m.Options {
-			out = append(out, api.AttentionAction{ID: "answer:option:" + o.ID, Title: o.Label})
+			if o.Draft == nil {
+				out = append(out, api.AttentionAction{ID: "answer:option:" + o.ID, Title: o.Label})
+			}
 		}
 	}
 	rec := "answer:option:" + m.Recommend

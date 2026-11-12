@@ -25,6 +25,11 @@ type askCard struct {
 	options   []record.Option
 	recommend string
 	confirm   bool
+	// draft is the draft the confirm's yes approves; pinned the drafts the
+	// confirm and options pin, as their cards serve them, when the card
+	// shows them.
+	draft  *record.DraftRef
+	pinned []api.Draft
 	// task is the task whose answer verb takes the answer; row the row
 	// whose answer action does, when no task does; gate the task's open
 	// gate whose intents the digits pick, when no question does.
@@ -86,7 +91,7 @@ func (m *Model) shownDetail(e api.TaskView) api.TaskView {
 // open gate but a draft's, whose intents the digits pick.
 func (m *Model) questionCard(e api.TaskView) (askCard, bool) {
 	if msg, _, ok := e.MessageOf(); ok && (len(msg.Options) > 0 || msg.Confirm) {
-		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, task: e.ID}, true
+		return askCard{text: msg.Text, options: msg.Options, recommend: msg.Recommend, confirm: msg.Confirm, task: e.ID, draft: msg.Draft, pinned: msg.Pinned}, true
 	}
 	for _, u := range e.Units {
 		if r, ok := m.rowOf(u); ok && r.Question != nil {
@@ -116,7 +121,7 @@ func (m *Model) rowCard(r api.Row) askCard {
 	if q.Queued {
 		return askCard{text: queuedAnswer(m.w()), row: &r}
 	}
-	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r}
+	return askCard{text: cmp.Or(q.Text, q.LastMessage), options: q.Options, recommend: q.Recommend, confirm: q.Kind == "confirm", row: &r, draft: q.Draft}
 }
 
 // activeCard is the question the digits answer: the open task detail's,
@@ -150,8 +155,14 @@ func (c askCard) answers(w *texts.Catalog) []string {
 		}
 		return out
 	}
+	approves := func(pin *record.DraftRef) string {
+		if pin == nil {
+			return ""
+		}
+		return " · " + w.T("approves draft #{id}", map[string]any{"id": pin.ID})
+	}
 	if c.confirm {
-		return []string{w.T("yes", nil), w.T("no", nil)}
+		return []string{w.T("yes", nil) + approves(c.draft), w.T("no", nil)}
 	}
 	out := make([]string, len(c.options))
 	for i, o := range c.options {
@@ -159,8 +170,27 @@ func (c askCard) answers(w *texts.Catalog) []string {
 		if o.ID == c.recommend {
 			out[i] += " (" + w.T("recommended", nil) + ")"
 		}
+		out[i] += approves(o.Draft)
 	}
 	return out
+}
+
+// pin is the draft answer n of the card approves; nil for none.
+func (c askCard) pin(n int) *record.DraftRef {
+	switch {
+	case c.gate != nil:
+		return nil
+	case c.confirm && n == 1:
+		return c.draft
+	case !c.confirm && n >= 1 && n <= len(c.options):
+		return c.options[n-1].Draft
+	}
+	return nil
+}
+
+// shows says whether the card shows the draft pin names.
+func (c askCard) shows(pin *record.DraftRef) bool {
+	return slices.ContainsFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
 }
 
 // answer picks the card's answer n.
@@ -171,6 +201,10 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	}
 	if n < 1 || n > len(c.answers(m.w())) {
 		m.status = m.w().T("no option {n}", map[string]any{"n": n})
+		return Command{}, false
+	}
+	if pin := c.pin(n); pin != nil && !c.shows(pin) {
+		m.status = m.unseenPin(pin)
 		return Command{}, false
 	}
 	if c.row != nil {
@@ -184,7 +218,7 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 			m.status = st.Reason
 			return Command{}, false
 		}
-		req := answerRequest(r.Question, fmt.Sprint(n))
+		req, _ := answerRequest(r.Question, fmt.Sprint(n))
 		if c.confirm {
 			req = api.ActionRequest{Yes: n == 1, No: n == 2, Source: Source}
 		}
@@ -298,6 +332,9 @@ func (m *Model) taskDetail(e api.TaskView, width int, now time.Time) []string {
 		fact(m.w().T("asks", nil), cmp.Or(card.text, m.w().T("the agent stopped", nil)), t.Yellow)
 		for i, a := range card.answers(m.w()) {
 			fact("", fmt.Sprintf("%d. %s", i+1, a), plain)
+			if pin := card.pin(i + 1); pin != nil {
+				m.pinFacts(card, pin, fact, para)
+			}
 		}
 	} else if msg, _, ok := e.MessageOf(); ok && !carded {
 		fact(m.w().T("message", nil), msg.Text, plain)
@@ -565,4 +602,20 @@ func servedWord(words map[string]string, name string) string {
 		return w
 	}
 	return name
+}
+
+// pinFacts show the draft pin names as the card holds it: its draft facts, and a line when it changed since the
+// question pinned it or is gone.
+func (m *Model) pinFacts(c askCard, pin *record.DraftRef, fact func(label, text string, style func(string) string), para func(label, text string)) {
+	i := slices.IndexFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
+	if i < 0 {
+		fact("", m.w().T("Approves draft #{id}, which is gone.", map[string]any{"id": pin.ID}), m.t.Red)
+		return
+	}
+	d := c.pinned[i]
+	fact("", m.w().T("Approves draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": pin.Rev}), m.t.Dim)
+	if d.Rev != pin.Rev {
+		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}: below is what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
+	}
+	m.draftFacts(&d, fact, para)
 }

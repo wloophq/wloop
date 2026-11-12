@@ -10,6 +10,7 @@ An `article.ask.d-gate` on `raise`, `rule-strong` border, `radius-lg`:
 - the agent's message as safe markdown (`renderMarkdown`), folded after its first four blocks behind **Read all**; raw HTML stays text and only `https://` links are links;
 - the delivery and the deadline on `meta` lines; a deadline with a default reads "Approve at 14:00 unless you pick another";
 - for a question whose answer intent takes text and whose message offers options, one `button.opt` per option, radio-like (`aria-pressed`): the label, **recommended** on the one the agent recommends, its consequence below when it has one. The recommended option comes first and starts picked; with none recommended, none is;
+- under an option whose pick approves a draft, and under a confirm whose yes does, that draft (`d-pin`) as its own card shows it, from the message's `pinned`: which draft and rev the answer approves, its preview, where it posts, its text and every value of its payload, with an `err` note when it changed since the question pinned it or is gone. A row's question and a notification offer no one-click answer that approves a draft; they send the person to this card;
 - the answer box when an intent takes an answer; `⌘↵` (or Ctrl+Enter) in it runs that intent;
 - one button per intent in the gate's order. The first intent is `primary`; each of the first nine carries its digit in a `kbd`, and that digit picks it while the card has the focus. The answer intent sends the option picked, then the text typed.
 

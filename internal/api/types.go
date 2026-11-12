@@ -148,17 +148,20 @@ const (
 // QuestionView is a turn that waits on the user: asked, failed or
 // unrecorded, with its last record's question and outcome.
 type QuestionView struct {
-	RecordID    int64           `json:"record_id"`
-	State       string          `json:"state"`
-	Kind        string          `json:"kind"`
-	Text        string          `json:"text"`
-	Options     []record.Option `json:"options,omitempty"`
-	Recommend   string          `json:"recommend,omitempty"`
-	Publishes   bool            `json:"publishes,omitempty"`
-	Verdict     string          `json:"verdict,omitempty"`
-	Blocking    int             `json:"blocking"`
-	NonBlocking int             `json:"non_blocking"`
-	LastMessage string          `json:"last_message,omitempty"`
+	RecordID  int64           `json:"record_id"`
+	State     string          `json:"state"`
+	Kind      string          `json:"kind"`
+	Text      string          `json:"text"`
+	Options   []record.Option `json:"options,omitempty"`
+	Recommend string          `json:"recommend,omitempty"`
+	Publishes bool            `json:"publishes,omitempty"`
+	// Draft is the held draft a confirm's yes approves, at the rev the question pinned; nil for none. A row
+	// does not carry the pinned drafts: a client sends a person to the question's card to see them.
+	Draft       *record.DraftRef `json:"draft,omitempty"`
+	Verdict     string           `json:"verdict,omitempty"`
+	Blocking    int              `json:"blocking"`
+	NonBlocking int              `json:"non_blocking"`
+	LastMessage string           `json:"last_message,omitempty"`
 	// Queued says the user's answer waits for the agent's busy session.
 	Queued bool `json:"queued,omitempty"`
 }

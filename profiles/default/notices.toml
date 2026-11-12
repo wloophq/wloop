@@ -58,6 +58,7 @@ notify_reply = "Reply"
 notify_send_reply = "Send reply"
 
 notify_question = "Agent asks"
+notify_pinned = "An answer approves a draft: open the question to see it before you answer."
 
 notify_proposal = "Proposal"
 
