@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -111,7 +112,9 @@ func (p Policy) Decide(d Draft, s Subject, posts bool, now time.Time) (Decision,
 			continue
 		}
 		if all == nil {
-			payload = d.PayloadFacts(s.Kind)
+			if slices.ContainsFunc(p.Rules, func(r Rule) bool { return len(r.Payload) > 0 }) {
+				payload = d.PayloadFacts(s.Kind)
+			}
 			all = withRuleFacts(d, s.Facts, payload)
 		}
 		if missing := absent(r.Payload, payload); len(missing) > 0 {
