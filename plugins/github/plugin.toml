@@ -163,7 +163,7 @@ name = "request_review"
 name = "comment"
 delivery = "comment"
 schema = "drafts/comment/schema.json"
-preview = "drafts/comment/preview.md.tmpl"
+preview = "profile/drafts/comment/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -171,7 +171,7 @@ editable = ["text"]
 name = "reply"
 delivery = "comment"
 schema = "drafts/reply/schema.json"
-preview = "drafts/reply/preview.md.tmpl"
+preview = "profile/drafts/reply/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -179,7 +179,7 @@ editable = ["text"]
 name = "nudge"
 delivery = "comment"
 schema = "drafts/nudge/schema.json"
-preview = "drafts/nudge/preview.md.tmpl"
+preview = "profile/drafts/nudge/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -187,7 +187,7 @@ editable = ["text"]
 name = "close"
 delivery = "comment"
 schema = "drafts/close/schema.json"
-preview = "drafts/close/preview.md.tmpl"
+preview = "profile/drafts/close/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -195,7 +195,7 @@ editable = ["text"]
 name = "ask_owner"
 delivery = "comment"
 schema = "drafts/ask_owner/schema.json"
-preview = "drafts/ask_owner/preview.md.tmpl"
+preview = "profile/drafts/ask_owner/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -215,7 +215,7 @@ editable = ["text"]
 name = "review"
 delivery = "review"
 schema = "drafts/review/schema.json"
-preview = "drafts/review/preview.md.tmpl"
+preview = "profile/drafts/review/preview.md.tmpl"
 basis = "agent"
 editable = ["text", "/event"]
 
@@ -227,7 +227,7 @@ pointer = "/event"
 name = "thread_reply"
 delivery = "reply"
 schema = "drafts/thread_reply/schema.json"
-preview = "drafts/thread_reply/preview.md.tmpl"
+preview = "profile/drafts/thread_reply/preview.md.tmpl"
 text_required = true
 editable = ["text"]
 
@@ -235,13 +235,13 @@ editable = ["text"]
 name = "resolve"
 delivery = "resolve"
 schema = "drafts/resolve/schema.json"
-preview = "drafts/resolve/preview.md.tmpl"
+preview = "profile/drafts/resolve/preview.md.tmpl"
 
 [[source.draft_kinds]]
 name = "request_review"
 delivery = "request_review"
 schema = "drafts/request_review/schema.json"
-preview = "drafts/request_review/preview.md.tmpl"
+preview = "profile/drafts/request_review/preview.md.tmpl"
 
 [[source.roles]]
 name = "pr.review"
