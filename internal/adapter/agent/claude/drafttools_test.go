@@ -1,36 +1,26 @@
 package claude
 
 import (
-	"io/fs"
 	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/transport/mcp"
-	"github.com/wloophq/wloop/pkg/plugin/manifest"
-	"github.com/wloophq/wloop/plugins"
 )
 
 // proposingTools are the tools the bundled manifests mark proposes = true, as an agent calls them.
 func proposingTools(t *testing.T) (proposes, others []string) {
 	t.Helper()
-	paths, err := fs.Glob(plugins.Manifests, "*/plugin.toml")
-	if err != nil || len(paths) == 0 {
-		t.Fatalf("manifests %v: %v", paths, err)
+	ms, err := bundled.Manifests()
+	if err != nil || len(ms) == 0 {
+		t.Fatalf("manifests %d: %v", len(ms), err)
 	}
-	for _, p := range paths {
-		raw, err := fs.ReadFile(plugins.Manifests, p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		m, err := manifest.Parse(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, m := range ms {
 		s, err := m.Source()
 		if err != nil {
-			continue
+			t.Fatalf("plugin %s: %v", m.ID, err)
 		}
 		for _, tool := range s.Tools {
 			if tool.Proposes {
