@@ -186,7 +186,7 @@ func TestOutboxApproveConfirms(t *testing.T) {
 	})
 	t.Run("yes with text", func(t *testing.T) {
 		te, db, d := seed(t, true)
-		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this.", "--rev", "0"); code != 0 {
+		if code := te.run("outbox", "approve", "1", "--yes", "--text", "Only this.", "--rev", "1"); code != 0 {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
 		if !strings.Contains(te.out.String(), "  Only this.") || strings.Contains(te.out.String(), "Third line") {
@@ -220,7 +220,7 @@ func TestOutboxEditAndDiscard(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false)
 	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "1", "better text", "--rev", "0"); code != 0 {
+	if code := te.run("outbox", "edit", "1", "better text", "--rev", "1"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := te.draftState(t, db, d.ID); got.Text != "better text" || got.State != draft.Held {
@@ -515,7 +515,7 @@ handler = "edit"
 		t.Fatalf("retried %+v", got)
 	}
 	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
-	if code := te.run("outbox", "edit", "2", "better", "--rev", "0"); code != 0 {
+	if code := te.run("outbox", "edit", "2", "better", "--rev", "1"); code != 0 {
 		t.Fatalf("edit: exit %d: %s", code, te.err)
 	}
 	if got := postedPaths(); len(got) != 2 || got[1] != "/api/tasks/draft:2/retry" {
@@ -532,7 +532,7 @@ func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, true)
 	d := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "as shown", State: draft.Held})
-	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "Rev         0") {
+	if code := te.run("outbox", "show", "1"); code != 0 || !strings.Contains(te.out.String(), "Rev         1") {
 		t.Fatalf("show: exit %d: %s", code, te.out)
 	}
 	for _, args := range [][]string{{"outbox", "edit", "1", "mine"}, {"outbox", "approve", "1", "--yes", "--text", "mine"}} {
@@ -544,7 +544,7 @@ func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
 	if _, err := db.Drafts().Update(context.Background(), d, draft.Held); err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{{"outbox", "edit", "1", "mine", "--rev", "0"}, {"outbox", "approve", "1", "--yes", "--text", "mine", "--rev", "0"}} {
+	for _, args := range [][]string{{"outbox", "edit", "1", "mine", "--rev", "1"}, {"outbox", "approve", "1", "--yes", "--text", "mine", "--rev", "1"}} {
 		if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "changed since you saw it") {
 			t.Errorf("%v after a revision: exit %d: %s", args, code, te.err)
 		}

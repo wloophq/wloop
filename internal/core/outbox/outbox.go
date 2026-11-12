@@ -726,7 +726,6 @@ func (s *Service) save(ctx context.Context, d draft.Draft, from draft.State) (dr
 	return got, nil
 }
 
-
 // Edit sets the text of held or failed draft id, which the person read at rev. A held draft waits for a
 // person again: its gate is superseded first, so no window and no approval given to the old text releases
 // the new one, and a gate that waits opens.

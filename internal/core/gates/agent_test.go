@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"

@@ -32,16 +32,7 @@ var v13Revisions = execAll(
 	SELECT id, rev, text, 'person', updated_at FROM drafts WHERE edited = 1 AND text != original AND rev > 1`,
 	`UPDATE drafts SET (by_kind, by_session) = (SELECT r.by_kind, r.by_session FROM draft_revisions r
 		WHERE r.draft_id = drafts.id ORDER BY r.rev DESC LIMIT 1)`,
-	`UPDATE gates SET approved_rev = coalesce((SELECT d.rev FROM drafts d WHERE d.id = CAST(gates.subject AS INTEGER)), 0)
-	WHERE kind = 'draft' AND status IN ('open', 'approved')`,
-	`UPDATE gates SET sessions = json_array(session) WHERE kind = 'draft' AND session != ''`,
-	`CREATE TRIGGER drafts_rev_keeps_approval AFTER UPDATE OF rev ON drafts
-WHEN NEW.rev != OLD.rev AND NEW.text = OLD.text AND NEW.payload = OLD.payload AND NEW.basis = OLD.basis
-AND NEW.target = OLD.target AND NEW.reaction = OLD.reaction AND NEW.broadcast = OLD.broadcast AND NEW.delivery = OLD.delivery
-AND NEW.kind = OLD.kind AND NEW.provider = OLD.provider AND NEW.unit_key = OLD.unit_key
-BEGIN
-  UPDATE gates SET approved_rev = NEW.rev
-  WHERE provider = NEW.provider AND unit_key = NEW.unit_key AND kind = 'draft'
-  AND subject = CAST(NEW.id AS TEXT) AND status IN ('open', 'approved') AND approved_rev = OLD.rev;
-END`,
+	draftGatesApproveTheirDraftsRevSQL,
+	draftGatesStampTheirSessionSQL,
+	draftRevKeepsApprovalSQL,
 )
