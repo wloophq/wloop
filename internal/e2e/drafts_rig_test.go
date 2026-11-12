@@ -332,13 +332,19 @@ func (branches) IsAncestor(context.Context, string, string, string) (bool, error
 }
 
 // sweepPastTheWindow runs the workflows, then again once the plan gate's window has passed, as the daemon's
-// sweep does over time.
-func (r *draftsRig) sweepPastTheWindow() {
+// sweep does over time, and waits until the pull request's book holds turns turns: the daemon's gates loop,
+// not the sweep, resolves a plan gate whose window passed and starts its round.
+func (r *draftsRig) sweepPastTheWindow(turns int) dturn.Book {
 	r.t.Helper()
 	for range 2 {
 		if err := r.d.Sweep(r.ctx); err != nil {
 			r.t.Fatalf("sweep: %v", err)
 		}
 		r.advance(2 * time.Minute)
+	}
+	for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+		if b := r.book(); len(b.Turns) >= turns || time.Now().After(deadline) {
+			return b
+		}
 	}
 }
