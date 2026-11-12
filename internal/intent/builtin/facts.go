@@ -350,18 +350,16 @@ func Narrow(env expr.Env, providers []unit.ProviderID) {
 }
 
 // DraftFailed and DraftStale are the facts of a unit whose draft failed to
-// send, which every unit slot reads.
+// send, which every plugin's unit slot reads: a plugin publishes drafts.
 const (
 	DraftFailed = DraftSlot + ".failed"
 	DraftStale  = DraftSlot + ".stale"
 )
 
 // unitDraftFact is a Bool fact of a unit's drafts, named draft.<name>,
-// read by every unit slot.
+// which Merge gives every plugin's unit slot to read.
 func unitDraftFact(name, doc string) Fact {
-	f := wf(DraftSlot, name, expr.Bool, doc)
-	f.Subjects = coreUnitSlots
-	return f
+	return wf(DraftSlot, name, expr.Bool, doc)
 }
 
 // approvalFact is a fact of the draft a draft gate's rule reads,

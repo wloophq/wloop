@@ -430,7 +430,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 			case f.Slot == BriefSlot:
 				rows[i].Subjects = briefSubjects
 			case f.Name == DraftFailed || f.Name == DraftStale:
-				rows[i].Subjects = slices.Clone(unitSlots)
+				rows[i].Subjects = slices.Clone(unitSlots[len(coreUnitSlots):])
 			case f.Name == RowKindFact && len(rowKinds) > 0:
 				rows[i].Enum = rowKinds
 			case f.Name == DraftDelivery:

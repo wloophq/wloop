@@ -116,10 +116,15 @@ func TestAReleasingRuleReadsAPayloadFactOnlyAsAnAllowList(t *testing.T) {
 	}
 }
 
-func TestEveryUnitSlotReadsDraftFailedAndStale(t *testing.T) {
-	slots := UnitSlots()
-	if len(slots) <= len(coreUnitSlots) {
-		t.Fatalf("no plugin unit slot: %v", slots)
+func TestEveryPluginUnitSlotReadsDraftFailedAndStale(t *testing.T) {
+	var slots []string
+	for p, slot := range Slots {
+		if _, core := coreSlots()[p]; !core {
+			slots = append(slots, slot)
+		}
+	}
+	if len(slots) == 0 {
+		t.Fatal("no plugin unit slot")
 	}
 	for _, slot := range slots {
 		env := WorkflowEnv(slot)
