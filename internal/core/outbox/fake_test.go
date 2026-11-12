@@ -158,7 +158,7 @@ func newEnv() *env {
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e}})
 	e.svc = &Service{
 		Store: e.store,
-		Kinds: shapes{},
+		Kinds: newShapes(),
 		Gates: testGates{e.decider, e.gates},
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if e.disabled[p] {

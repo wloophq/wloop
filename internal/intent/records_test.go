@@ -140,3 +140,21 @@ func TestAnIntentWithoutARecordTableLoadsAndOwesNothing(t *testing.T) {
 		t.Fatalf("its rules %+v %v", rules, err)
 	}
 }
+
+func TestConcludesAreVerdictsTheIntentsPluginsDeclare(t *testing.T) {
+	l, problems := loadRecordIntent(t, "states = [\"done\"]\noutcome = [\"verdict\"]\nconcludes = [\"APPROVE\"]\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if d, _ := l.Registry.Get("ask-author"); len(d.Record.Concludes) != 1 || d.Record.Concludes[0] != "APPROVE" {
+		t.Fatalf("concludes %v", d.Record.Concludes)
+	}
+	for record, want := range map[string]string{
+		"states = [\"done\"]\noutcome = [\"verdict\"]\nconcludes = [\"APPROVED\"]\n": "record.concludes[0]",
+		"states = [\"done\"]\nconcludes = [\"APPROVE\"]\n":                           "record.concludes[0]",
+	} {
+		if _, problems := loadRecordIntent(t, record); !strings.Contains(problems.Error(), want) {
+			t.Errorf("%q: problems %v, want %s", record, problems, want)
+		}
+	}
+}

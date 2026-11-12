@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -276,6 +277,11 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			AttachURL:       r.AttachURL,
 			Requires:        str(r.Requires, ""),
 			Missing:         str(r.Missing, ""),
+		}
+		for i, v := range d.Record.Concludes {
+			if !slices.Contains(d.Record.Verdicts, v) {
+				s.add(fmt.Sprintf("record.concludes[%d]", i), "%q is not a verdict this intent's records give: %s", v, cmp.Or(strings.Join(d.Record.Verdicts, ", "), "none"))
+			}
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{
