@@ -11,6 +11,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
 // ReasonOtherOption is why a draft another option pointed to is withdrawn once one option's draft is approved.
@@ -20,12 +22,14 @@ const ReasonOtherOption = "other_option"
 type OptionDrafts interface {
 	// DraftGate is draft id and the newest gate it waits or waited on; false when there is no such draft or gate.
 	DraftGate(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error)
-	// WithdrawHeld withdraws draft id while it is still held, with reason; one no longer held is left as it is.
-	WithdrawHeld(ctx context.Context, id int64, reason string) error
+	// WithdrawOther withdraws draft id, another option's, with reason, whatever it waits on: held, queued or
+	// failed; one sending or sent is left as it is.
+	WithdrawOther(ctx context.Context, id int64, reason string) error
 }
 
 // OptionDraft reports the pin r's answer to question gate question picks: the gate of the draft the option,
-// or a confirm's yes, points to in the message the person saw, held by that message's turn on its unit, and
+// or a confirm's yes, points to in the message the person saw, held by that message's turn, or a turn of its
+// chain, on its unit, and
 // the rev the option pinned. The gates service owns the rest of the option's approval (ApproveOption):
 // whether the draft's gate still waits at that rev and whether r's resolver may approve it. False for an
 // answer that picks no held draft, which then resolves the question alone and resumes the turn.
@@ -44,7 +48,7 @@ func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.R
 	if !ok {
 		return gate.Gate{}, 0, false, nil
 	}
-	d, dg, ok, err := s.ofTurn(ctx, m, ref.ID)
+	d, dg, ok, err := s.turnDrafts(m).of(ctx, ref.ID)
 	switch {
 	case err != nil:
 		return gate.Gate{}, 0, false, err
@@ -69,7 +73,8 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 	if !ok || g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
 		return false, nil
 	}
-	_, dg, ok, err := s.ofTurn(ctx, m, ref.ID)
+	held := s.turnDrafts(m)
+	_, dg, ok, err := held.of(ctx, ref.ID)
 	switch {
 	case err != nil:
 		return false, err
@@ -82,10 +87,10 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 		if o.Draft == nil || o.Draft.ID == ref.ID {
 			continue
 		}
-		if _, _, ok, err := s.ofTurn(ctx, m, o.Draft.ID); err != nil || !ok {
+		if _, _, ok, err := held.of(ctx, o.Draft.ID); err != nil || !ok {
 			continue
 		}
-		if err := s.Drafts.WithdrawHeld(ctx, o.Draft.ID, ReasonOtherOption); err != nil {
+		if err := s.Drafts.WithdrawOther(ctx, o.Draft.ID, ReasonOtherOption); err != nil {
 			s.logf("messages: withdrawing draft %d of option %s of message %d: %v", o.Draft.ID, o.ID, m.ID, err)
 		}
 	}
@@ -108,20 +113,41 @@ func pickedDraft(m message.Message, a Answer) (record.DraftRef, bool) {
 	return *m.Options[i].Draft, true
 }
 
-// ofTurn is draft id and its gate when the draft is one m's turn proposed on m's unit; false otherwise.
-func (s *Service) ofTurn(ctx context.Context, m message.Message, id int64) (draft.Draft, gate.Gate, bool, error) {
-	d, dg, ok, err := s.Drafts.DraftGate(ctx, id)
+// turnDrafts are the drafts m's turn holds, reading the turn's book once.
+type turnDrafts struct {
+	s    *Service
+	m    message.Message
+	book *turn.Book
+}
+
+func (s *Service) turnDrafts(m message.Message) *turnDrafts { return &turnDrafts{s: s, m: m} }
+
+// of is draft id and its gate when the draft is one m's turn, or a turn of its chain, proposed on m's unit;
+// false otherwise.
+func (t *turnDrafts) of(ctx context.Context, id int64) (draft.Draft, gate.Gate, bool, error) {
+	d, dg, ok, err := t.s.Drafts.DraftGate(ctx, id)
 	if err != nil || !ok {
 		return draft.Draft{}, gate.Gate{}, false, err
 	}
-	onUnit := d.Concerns(m.Unit)
-	byTurn := d.Origin.ByAgent() && d.Origin.TurnSeq == m.Origin.TurnSeq
 	ofDraft := dg.Kind == gate.KindDraft && dg.Subject == strconv.FormatInt(id, 10)
-	return d, dg, int64(d.ID) == id && onUnit && byTurn && ofDraft, nil
+	if int64(d.ID) != id || !d.Concerns(t.m.Unit) || !ofDraft {
+		return d, dg, false, nil
+	}
+	if t.book == nil {
+		books, err := t.s.Books.Books(ctx, t.m.Unit)
+		if err != nil {
+			return draft.Draft{}, gate.Gate{}, false, err
+		}
+		b := books[t.m.Unit]
+		b.Unit = t.m.Unit
+		t.book = &b
+	}
+	return d, dg, t.book.Proposed(t.m.Origin.TurnSeq, d), nil
 }
 
 // Pinning is the question gate whose open message pins the draft of draft gate drafted, in an option or its
-// confirm, the answer that picks it and the rev it pinned; false when no open message of the draft's turn pins it.
+// confirm, the answer that picks it and the rev it pinned; false when no open message of the draft's turn, or of a
+// turn resuming it, pins it.
 // A question answered while its message still settles (its other options' drafts not yet withdrawn) still names
 // the pin, so an approval in that window meets the answered question, not a free draft; the gate is zero while
 // the message's question gate is not opened yet.
@@ -142,7 +168,7 @@ func (s *Service) Pinning(ctx context.Context, drafted gate.Gate) (gate.Gate, st
 		if !ok {
 			continue
 		}
-		if _, _, ofTurn, err := s.ofTurn(ctx, m, id); err != nil || !ofTurn {
+		if _, _, held, err := s.turnDrafts(m).of(ctx, id); err != nil || !held {
 			if err != nil {
 				return gate.Gate{}, "", 0, false, err
 			}
@@ -179,8 +205,8 @@ func pinOf(m message.Message, id int64) (Answer, record.DraftRef, bool) {
 }
 
 // PinnedDrafts are the drafts the open questions pin, in an option or a confirm, each with the id of the message
-// that pins it: a draft its question's turn holds on the question's unit, which only an answer to that question
-// decides.
+// that pins it: a draft its question's turn, or a turn of its chain, holds on the question's unit, which only an
+// answer to that question decides.
 func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
 	if s.Drafts == nil {
 		return nil, nil
@@ -194,6 +220,7 @@ func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
 		if m.Kind != message.Question {
 			continue
 		}
+		held := s.turnDrafts(m)
 		refs := []*record.DraftRef{m.Draft}
 		for _, o := range m.Options {
 			refs = append(refs, o.Draft)
@@ -202,7 +229,7 @@ func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
 			if ref == nil {
 				continue
 			}
-			if _, _, ok, err := s.ofTurn(ctx, m, ref.ID); err != nil {
+			if _, _, ok, err := held.of(ctx, ref.ID); err != nil {
 				return nil, err
 			} else if ok {
 				out[ref.ID] = m.ID
@@ -210,4 +237,62 @@ func (s *Service) PinnedDrafts(ctx context.Context) (map[int64]int64, error) {
 		}
 	}
 	return out, nil
+}
+
+// holdPins makes each draft question m pins that still waits on a window wait for a person alone, before m closes:
+// a window is the user's consent to the draft on its own, and once the question was asked about the draft, no rule
+// releases it. A gate with no deadline opens for the draft before its windowed gates are superseded, so the draft's
+// task never sees it without an open gate, and a call cut short completes when made again. A picked draft is
+// approved, and the other options' drafts withdrawn, by then: only a draft no answer picked is left waiting.
+func (s *Service) holdPins(ctx context.Context, m message.Message) error {
+	if s.Drafts == nil || m.Kind != message.Question {
+		return nil
+	}
+	held := s.turnDrafts(m)
+	refs := []*record.DraftRef{m.Draft}
+	for _, o := range m.Options {
+		refs = append(refs, o.Draft)
+	}
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		_, dg, ok, err := held.of(ctx, ref.ID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		open, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: dg.Unit})
+		if err != nil {
+			return err
+		}
+		open = slices.DeleteFunc(open, func(g gate.Gate) bool { return g.Subject != dg.Subject })
+		windowed := slices.DeleteFunc(slices.Clone(open), func(g gate.Gate) bool { return g.Deadline.IsZero() })
+		if len(windowed) == 0 {
+			continue
+		}
+		if len(windowed) == len(open) {
+			w := windowed[len(windowed)-1]
+			wait := gate.Gate{Task: w.Task, Unit: w.Unit, Kind: w.Kind, Name: w.Name, Subject: w.Subject, Intents: w.Intents,
+				Session: w.Session, Text: w.Text, ApprovedRev: w.ApprovedRev, Sessions: w.Sessions}
+			if _, err := s.Gates.Open(ctx, wait, forThePerson{}); err != nil {
+				return err
+			}
+		}
+		for _, w := range windowed {
+			if err := s.Gates.Supersede(ctx, w.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// forThePerson holds every gate for a person.
+type forThePerson struct{}
+
+func (forThePerson) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeWait}, nil
 }

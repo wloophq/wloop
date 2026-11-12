@@ -161,6 +161,12 @@ func (g draftGates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {
 
 var _ outbox.TaskPlacer = draftGates{}
 
+func (g draftGates) Decides(ctx context.Context, drafted gate.Gate) error {
+	return g.e.newGates(g.db, g.logf).Decides(ctx, drafted)
+}
+
+var _ outbox.QuestionPins = draftGates{}
+
 func (g draftGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
 	g.e.newGates(g.db, g.logf)
 	return g.e.gateReader.Where(ctx, q)
@@ -362,10 +368,10 @@ func (o optionDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gat
 	return d, g, ok, err
 }
 
-func (o optionDrafts) WithdrawHeld(ctx context.Context, id int64, reason string) error {
+func (o optionDrafts) WithdrawOther(ctx context.Context, id int64, reason string) error {
 	if o.e.outbox == nil {
 		return errNoOutboxYet
 	}
-	_, err := o.e.outbox.WithdrawHeld(ctx, draft.ID(id), reason)
+	_, err := o.e.outbox.Withdraw(ctx, draft.ID(id), reason)
 	return err
 }

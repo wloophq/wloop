@@ -69,6 +69,12 @@ type TaskPlacer interface {
 	TaskOf(ctx context.Context, g gate.Gate) (task.ID, error)
 }
 
+// QuestionPins is optional on Gates: Decides refuses, with an error wrapping gates.ErrRefused, a retry of the
+// draft of drafted gate drafted that a question decides, one it pins and its answer has not picked.
+type QuestionPins interface {
+	Decides(ctx context.Context, drafted gate.Gate) error
+}
+
 // taskOf is the task the gate of d, which names none, opens on; "" when Gates cannot say before it opens,
 // and the draft then adopts its gate's.
 func (s *Service) taskOf(ctx context.Context, d draft.Draft) (string, error) {

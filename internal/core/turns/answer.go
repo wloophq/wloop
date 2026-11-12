@@ -83,7 +83,10 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 
 	if r.Approves {
 		route := AnswerResult{Route: turn.Approved}
-		return route, s.saveRoute(ctx, r.Unit, q, a.ID, route)
+		if err := s.saveRoute(ctx, r.Unit, q, a.ID, route); err != nil {
+			return route, err
+		}
+		return route, s.settlePicked(ctx, r.Unit, q.Seq)
 	}
 	route := AnswerResult{Route: turn.Resumed}
 	if !q.State.Stopped() {

@@ -134,14 +134,7 @@ func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current
 	if err != nil {
 		return nil
 	}
-	var seqs []int64
-	for _, t := range b.Chain(seq) {
-		seqs = append(seqs, t.Seq)
-	}
-	ds = slices.DeleteFunc(ds, func(d draft.Draft) bool {
-		agent := d.Origin.ByAgent()
-		return !agent || !slices.Contains(seqs, d.Origin.TurnSeq)
-	})
+	ds = slices.DeleteFunc(ds, func(d draft.Draft) bool { return !b.Proposed(seq, d) })
 	return instructions.Pointers(ds, current, func(d draft.Draft) bool {
 		stale, _ := e.outbox.Staleness(ctx, d)
 		return stale

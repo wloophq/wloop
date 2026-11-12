@@ -18,7 +18,7 @@ func TestAttackApprovalOfAnotherRevEndorsesThePinnedVerdict(t *testing.T) {
 	g := draftGate("42", task.ActorPerson, "", "")
 	g.ApprovedRev = 2
 	s.DraftGates = draftGates{42: g}
-	seq := store.Put(askedBook()).Turns[0].Seq
+	seq := store.Put(pickedBook()).Turns[0].Seq
 	d := sentDraft(42, seq)
 	d.Rev = 2
 	if err := s.DraftSent(ctx, d); err != nil {
@@ -41,7 +41,7 @@ func TestAttackAgentVerdictRidesOnTheUsersApproval(t *testing.T) {
 	ctx := context.Background()
 	s, store, _, _, _ := newService(t)
 	s.DraftGates = draftGates{42: draftGate("42", task.ActorPerson, "", "")}
-	seq := store.Put(askedBook()).Turns[0].Seq
+	seq := store.Put(pickedBook()).Turns[0].Seq
 	d := sentDraft(42, seq)
 	d.Rev = 1
 	d.Payload = []byte(`{"event":"COMMENT"}`)

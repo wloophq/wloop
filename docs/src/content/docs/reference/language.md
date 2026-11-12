@@ -679,6 +679,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_turn_required`: A problem: turn is missing or empty.
   - `problem_record_required`: A problem: record is missing.
   - `problem_record` (`Error`): A problem: record does not decode.
+  - `problem_pin` (`Where`, `Draft`: number, `State`, `Gate`): A problem: the question pins, at Where, draft Draft, which no answer decides: its state, "" when there is no such draft, is not held, or its gate's status, "" when it has none, is not open.
   - `refused_record` (`Reason`): The turn refused the record.
   - `store_failed` (`Error`): The record could not be stored.
   - `recorded` (`State`, `Unit`, `Note`, `Dropped`, `Ledger`): The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, "" when none.

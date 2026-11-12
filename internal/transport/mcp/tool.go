@@ -253,6 +253,13 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 		return s.fixThese(ctx, toolName, problems)
 	}
 	got, err := s.Turns.RecordTurnEnd(ctx, turns.RecordRequest{Session: handle, Turn: id, Via: "mcp", Record: rec})
+	var pins turns.UnheldPins
+	if errors.As(err, &pins) {
+		for _, p := range pins {
+			problems = append(problems, s.say(ctx, toolName, "problem_pin", fields{"Where": "record." + p.Where, "Draft": p.Draft, "State": p.State, "Gate": p.Gate}))
+		}
+		return s.fixThese(ctx, toolName, problems)
+	}
 	var bad record.Problems
 	if errors.As(err, &bad) {
 		return s.fixThese(ctx, toolName, bad)

@@ -1,9 +1,12 @@
 package turns
 
 import (
+	"cmp"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -30,12 +33,12 @@ func (p Policy) WithoutSourceWrites(s dintent.Session, writes [][]string) Policy
 	return p
 }
 
-// DraftSent ends the turn d.Origin.TurnSeq names now that d is sent: an asked turn whose question
+// DraftSent ends the turn of d's chain that waits on d now that d is sent: an asked turn whose question
 // points to d ends done, and a done turn whose outcome left d in its url's place gets d's url. The url is
 // d's evidence permalink and the verdict the one DraftVerdict reads from d, never the agent's. The outcome
 // says the user approved d only when d's gate was resolved by a person, or a session the user drives that
 // neither proposed nor revised d, at the rev the turn pinned; a rule's or a window's release never does.
-// A draft of no turn, or of a turn that points elsewhere, ends nothing, and a call made again changes
+// A draft of no turn, or of a chain whose turns point elsewhere, ends nothing, and a call made again changes
 // nothing more.
 func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 	if d.State != draft.Sent {
@@ -46,8 +49,8 @@ func (s *Service) DraftSent(ctx context.Context, d draft.Draft) error {
 
 // DraftRecorded fills, when turn id on u has just recorded done with outcome.draft ref and no url, the url
 // of that draft if it is sent already, as DraftSent does when the send comes after the record: a rule may
-// release and post a draft before its turn records it. Only a draft of that turn, or of its session, on u
-// counts.
+// release and post a draft before its turn records it. Only a draft of that turn's chain, or of its session,
+// on u counts.
 func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref record.DraftRef) error {
 	if s.DraftGates == nil {
 		return nil
@@ -64,7 +67,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 	}
 	t, ok := b.ByID(id)
 	if !ok || !d.Origin.ByAgent() ||
-		d.Origin.TurnSeq != t.Seq && (t.Session == "" || d.Origin.Session != t.Session) {
+		!b.Proposed(t.Seq, d) && (t.Session == "" || d.Origin.Session != t.Session) {
 		return nil
 	}
 	return s.settleTurn(ctx, u, t.Seq, s.sentEnd(ctx, d))
@@ -73,7 +76,7 @@ func (s *Service) DraftRecorded(ctx context.Context, u unit.Unit, id string, ref
 // sentEnd is the record a turn ends with once sent draft d is in it, as DraftSent describes.
 func (s *Service) sentEnd(ctx context.Context, d draft.Draft) func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
 	return func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error) {
-		rec, ok := sentRecord(t, last, int64(d.ID))
+		rec, ok := sentRecord(t, b, last, int64(d.ID))
 		if !ok {
 			return record.Record{}, false, nil
 		}
@@ -113,18 +116,29 @@ func (s *Service) DraftEnded(ctx context.Context, d draft.Draft) error {
 	})
 }
 
-// settleDraft records, for the turn d.Origin.TurnSeq names, the record end returns, unless it returns
-// none or repeats the turn's last record.
+// settleDraft records, for the newest turn of a chain that proposed d whose end returns a record, that
+// record, unless it repeats the turn's last record: the turn that proposed d, or a turn resuming it that
+// asks about d.
 func (s *Service) settleDraft(ctx context.Context, d draft.Draft,
 	end func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error)) error {
-	if d.Origin.TurnSeq == 0 {
-		return nil
-	}
 	u := d.Origin.Unit
 	if u.IsZero() {
 		u = d.Unit
 	}
-	return s.settleTurn(ctx, u, d.Origin.TurnSeq, end)
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	for i := len(b.Turns) - 1; i >= 0; i-- {
+		if t := b.Turns[i]; b.Proposed(t.Seq, d) {
+			if settled, err := s.settle(ctx, u, &b, t, end); settled || err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // settleTurn records, for turn seq on u, the record end returns, unless it returns none or repeats the
@@ -141,28 +155,41 @@ func (s *Service) settleTurn(ctx context.Context, u unit.Unit, seq int64,
 	if !ok {
 		return nil
 	}
-	last, ok := b.LastRecord(t.Seq)
-	if !ok {
-		return nil
-	}
-	rec, ok, err := end(*t, &b, last.Record)
-	if err != nil || !ok || rec.Hash() == last.Record.Hash() {
-		return err
-	}
-	_, err = s.closeTurn(ctx, u, *t, last.ID, rec)
+	_, err = s.settle(ctx, u, &b, *t, end)
 	return err
 }
 
-// sentRecord is the done record turn t, whose last record is last, ends with once draft id is sent;
-// false when t does not wait on that draft.
-func sentRecord(t turn.Turn, last record.Record, id int64) (record.Record, bool) {
+// settle records, for turn t of b, the record end returns, unless it repeats the turn's last record; false
+// when end returns none.
+func (s *Service) settle(ctx context.Context, u unit.Unit, b *turn.Book, t turn.Turn,
+	end func(t turn.Turn, b *turn.Book, last record.Record) (record.Record, bool, error)) (bool, error) {
+	last, ok := b.LastRecord(t.Seq)
+	if !ok {
+		return false, nil
+	}
+	rec, ok, err := end(t, b, last.Record)
+	if err != nil || !ok {
+		return false, err
+	}
+	if rec.Hash() == last.Record.Hash() {
+		return true, nil
+	}
+	_, err = s.closeTurn(ctx, u, t, last.ID, rec)
+	return true, err
+}
+
+// sentRecord is the done record turn t of b, whose last record is last, ends with once draft id is sent;
+// false when t does not wait on that draft. An asked turn waits on a draft its question points to only once an
+// answer picked it: one sent otherwise (a rule queued it before the pin, a person retried it) leaves the
+// question to decide the other options.
+func sentRecord(t turn.Turn, b *turn.Book, last record.Record, id int64) (record.Record, bool) {
 	out := record.Outcome{}
 	if last.Outcome != nil {
 		out = *last.Outcome
 	}
 	switch {
 	case t.State == turn.Asked && last.State == record.Asked:
-		ref, ok := pointedDraft(last.Question, id)
+		ref, ok := approvedRef(b, t.Seq, last.Question, id)
 		if !ok {
 			return record.Record{}, false
 		}
@@ -199,20 +226,44 @@ func approvedRef(b *turn.Book, seq int64, q *record.Question, id int64) (record.
 	return record.DraftRef{}, false
 }
 
-// pointedDraft is the draft ref q's options, or its confirm, point to as draft id.
-func pointedDraft(q *record.Question, id int64) (record.DraftRef, bool) {
-	if q == nil {
-		return record.DraftRef{}, false
+// settlePicked ends turn seq on u, whose answer just picked a draft, when that draft was sent, failed or
+// dropped before the answer was stored, as DraftSent and DraftEnded would have.
+func (s *Service) settlePicked(ctx context.Context, u unit.Unit, seq int64) error {
+	if s.DraftGates == nil {
+		return nil
 	}
-	if q.Draft != nil && q.Draft.ID == id {
-		return *q.Draft, true
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	s.mu.Unlock()
+	if err != nil {
+		return err
 	}
+	last, ok := b.LastRecord(seq)
+	if !ok || last.Record.Question == nil {
+		return nil
+	}
+	q := last.Record.Question
+	refs := []*record.DraftRef{q.Draft}
 	for _, o := range q.Options {
-		if o.Draft != nil && o.Draft.ID == id {
-			return *o.Draft, true
-		}
+		refs = append(refs, o.Draft)
 	}
-	return record.DraftRef{}, false
+	for _, ref := range refs {
+		if ref == nil {
+			continue
+		}
+		if _, picked := approvedRef(&b, seq, q, ref.ID); !picked {
+			continue
+		}
+		d, ok, err := s.DraftGates.Draft(ctx, draft.ID(ref.ID))
+		if err != nil || !ok {
+			return err
+		}
+		if d.State == draft.Sent {
+			return s.DraftSent(ctx, d)
+		}
+		return s.DraftEnded(ctx, d)
+	}
+	return nil
 }
 
 func (s *Service) draftGate(ctx context.Context, d draft.Draft) (gate.Gate, bool, error) {
@@ -229,4 +280,63 @@ func UserApproved(g gate.Gate, d draft.Draft) bool {
 		return false
 	}
 	return !g.Stamps(g.BySession)
+}
+
+// UnheldPin is a pin of a record's question, at Where in the record, on draft Draft that no answer decides: its
+// State is not held, or its gate's status Gate is not open ("" when it has none). State is "" when there is no
+// such draft.
+type UnheldPin struct {
+	Where       string
+	Draft       int64
+	State, Gate string
+}
+
+// UnheldPins refuses a record whose question pins drafts no answer decides.
+type UnheldPins []UnheldPin
+
+func (p UnheldPins) Error() string {
+	out := make([]string, len(p))
+	for i, u := range p {
+		out[i] = fmt.Sprintf("%s: draft %d is %s, gate %s", u.Where, u.Draft, cmp.Or(u.State, "missing"), cmp.Or(u.Gate, "none"))
+	}
+	return "unheld pins: " + strings.Join(out, "; ")
+}
+
+// decidedPins refuses q when an option, or its confirm, pins a draft that is not held with its gate open: the
+// person's answer decides only such a draft, and one a rule released posts whatever they pick.
+func (s *Service) decidedPins(ctx context.Context, q *record.Question) error {
+	if q == nil || s.DraftGates == nil {
+		return nil
+	}
+	type pin struct {
+		where string
+		ref   *record.DraftRef
+	}
+	pins := []pin{{"question.draft", q.Draft}}
+	for i, o := range q.Options {
+		pins = append(pins, pin{fmt.Sprintf("question.options[%d].draft", i), o.Draft})
+	}
+	var bad UnheldPins
+	for _, p := range pins {
+		if p.ref == nil {
+			continue
+		}
+		d, ok, err := s.DraftGates.Draft(ctx, draft.ID(p.ref.ID))
+		if err != nil {
+			return err
+		}
+		var g gate.Gate
+		if ok {
+			if g, _, err = s.DraftGates.GateOf(ctx, d); err != nil {
+				return err
+			}
+		}
+		if !ok || d.State != draft.Held || g.Status != gate.Open {
+			bad = append(bad, UnheldPin{Where: p.where, Draft: p.ref.ID, State: string(d.State), Gate: string(g.Status)})
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return bad
 }

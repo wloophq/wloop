@@ -98,6 +98,13 @@ func (s *Server) agentTurns(w http.ResponseWriter) bool {
 func writeAgentError(w http.ResponseWriter, err error) {
 	var problems record.Problems
 	var refusal turns.Refusal
+	var pins turns.UnheldPins
+	if errors.As(err, &pins) {
+		for _, p := range pins {
+			problems = append(problems, turns.UnheldPins{p}.Error())
+		}
+		err = problems
+	}
 	switch {
 	case errors.As(err, &problems):
 		w.Header().Set("Content-Type", "application/json")

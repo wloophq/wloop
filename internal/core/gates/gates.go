@@ -216,14 +216,19 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 	if err != nil || !release {
 		return opened, err
 	}
-	return s.close(ctx, opened, r)
+	closed, err := s.close(ctx, opened, r)
+	if errors.Is(err, errForQuestion) {
+		return opened, nil
+	}
+	return closed, err
 }
 
 // Resolve closes open gate id with r. It accepts a person's intent, an
 // agent's through a session the user drives whose turns did not produce the
 // gate's subject, the Default of a gate whose Deadline passed with the rule
-// window, and a rule the service's trusted Policy holds for the gate now; it
-// refuses anything else, an unattended agent's or a plugin's above all. Status comes from
+// window, and a rule the service's trusted Policy holds for the gate now, but
+// for a draft a question pins, which only the pick approves; it refuses
+// anything else, an unattended agent's or a plugin's above all. Status comes from
 // the intent's declaration in gates.toml. It then applies the one
 // consequence the gate's kind names.
 func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
@@ -309,6 +314,22 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 	pick := Resolution{Intent: qdef.Intents[i].Name, Answer: answer, By: r.By, Session: r.Session}
 	s.logf("gate %d: approving its draft picks the option of question gate %d that pins it", id, q.ID)
 	return true, s.ApproveOption(ctx, q, pick, g, rev)
+}
+
+// Decides refuses, with ErrRefused, a retry of the draft of draft gate drafted while a question decides it: an open
+// question pins it, or one is about to open, or the question that pins it was answered with another option.
+func (s *Service) Decides(ctx context.Context, drafted gate.Gate) error {
+	if s.d.Options == nil {
+		return nil
+	}
+	q, answer, _, ok, err := s.d.Options.Pinning(ctx, drafted)
+	switch {
+	case err != nil || !ok:
+		return err
+	case q.ID != 0 && q.Status == gate.Answered && q.Answer == answer:
+		return nil
+	}
+	return fmt.Errorf("%w: question gate %d decides draft gate %d: answer the question", ErrRefused, q.ID, drafted.ID)
 }
 
 // Supersede closes open gate id as superseded by by, its subject gone or
@@ -483,7 +504,8 @@ func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error
 }
 
 // Tick resolves every open gate whose Deadline is not after now to its
-// Default, with the rule window, then runs the consequence of each resolved
+// Default, with the rule window, but a draft gate a question pins, which it
+// leaves to the question, then runs the consequence of each resolved
 // gate whose consequence never ran, as when the daemon stopped between the
 // gate's resolution and its consequence.
 func (s *Service) Tick(ctx context.Context, now time.Time) error {
@@ -493,7 +515,7 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 	}
 	var errs []error
 	for _, g := range due {
-		if _, err := s.resolve(ctx, g.ID, Resolution{Rule: RuleWindow}, now); err != nil {
+		if _, err := s.resolve(ctx, g.ID, Resolution{Rule: RuleWindow}, now); err != nil && !errors.Is(err, errForQuestion) {
 			errs = append(errs, fmt.Errorf("gate %d: %w", g.ID, err))
 		}
 	}
@@ -613,7 +635,22 @@ func (s *Service) released(g gate.Gate, def Def, dec Decision) (Resolution, bool
 	return Resolution{Status: want, Intent: in.Name, By: task.ActorWorkflow, Rule: cmp.Or(dec.Rule, string(dec.Mode))}, true
 }
 
+// errForQuestion marks an approval of a draft gate refused because a question pins the draft.
+var errForQuestion = errors.New("its question decides it")
+
+// close resolves g with r and applies its consequence. It is the one path every resolution takes, so it refuses
+// there any approval of a draft gate whose draft a question pins but the answer that picks it: a person's or a
+// session's (Resolve turns those into the pick first), a rule's at the gate's open or later, a window's.
 func (s *Service) close(ctx context.Context, g gate.Gate, r Resolution) (gate.Gate, error) {
+	if g.Kind == gate.KindDraft && r.Status == gate.Approved && !r.pick && s.d.Options != nil {
+		q, _, _, pinned, err := s.d.Options.Pinning(ctx, g)
+		if err != nil {
+			return gate.Gate{}, err
+		}
+		if pinned {
+			return gate.Gate{}, fmt.Errorf("%w: %w: question gate %d pins the draft of gate %d", ErrRefused, errForQuestion, q.ID, g.ID)
+		}
+	}
 	if !s.claim(g.ID) {
 		return gate.Gate{}, fmt.Errorf("%w: %d resolves now", ErrResolved, g.ID)
 	}

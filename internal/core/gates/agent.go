@@ -141,7 +141,7 @@ func (s *Service) approveDraft(ctx context.Context, d gate.Gate, r Resolution) e
 	if !ok {
 		return fmt.Errorf("%w: draft gate %d has no approving intent", ErrIntent, d.ID)
 	}
-	_, err = s.resolve(ctx, d.ID, Resolution{Intent: approve.Name, By: r.By, Session: r.Session}, s.d.Clock.Now())
+	_, err = s.resolve(ctx, d.ID, Resolution{Intent: approve.Name, By: r.By, Session: r.Session, pick: true}, s.d.Clock.Now())
 	if errors.Is(err, ErrResolved) {
 		if got, gerr := s.d.Reader.Get(ctx, d.ID); gerr == nil && got.Status == gate.Approved && got.By == r.By && got.BySession == sessionOf(r) {
 			return nil

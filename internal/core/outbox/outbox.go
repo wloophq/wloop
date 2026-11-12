@@ -1006,7 +1006,8 @@ func (s *Service) drop(ctx context.Context, d draft.Draft, reason string) (draft
 	return s.save(ctx, d, from)
 }
 
-// Retry: failed -> queued, only at the rev its gate approved, else ErrConflict. A draft that failed as "not
+// Retry: failed -> queued, only at the rev its gate approved, else ErrConflict, and only when no question decides
+// it (QuestionPins). A draft that failed as "not
 // confirmed after a restart" or with an Error starting "may have been posted" needs confirm true, else
 // ErrNeedsConfirm.
 func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.Draft, error) {
@@ -1028,6 +1029,15 @@ func (s *Service) RetryBy(ctx context.Context, id draft.ID, confirm bool, by dra
 	}
 	if err := s.approved(ctx, d); err != nil {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w: %w", id, ErrConflict, err)
+	}
+	if qp, ok := s.Gates.(QuestionPins); ok {
+		g, _, err := s.GateOf(ctx, d)
+		if err != nil {
+			return draft.Draft{}, err
+		}
+		if err := qp.Decides(ctx, g); err != nil {
+			return draft.Draft{}, err
+		}
 	}
 	if err := s.publishable(ctx, &d); err != nil {
 		s.refused(ctx, d, err)
