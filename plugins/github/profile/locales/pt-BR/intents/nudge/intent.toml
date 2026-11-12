@@ -9,7 +9,7 @@ help = "sobre o que perguntar"
 
 [action]
 note = "Cutucar {{join .pr.nudge.who \", \"}}"
-confirm = "Cutucar {{join .pr.nudge.who \", \"}} em {{.pr.slug}}? Um agente publica um comentário em seu nome."
+confirm = "Cutucar {{join .pr.nudge.who \", \"}} em {{.pr.slug}}? Um agente redige um comentário, publicado em seu nome quando você o aprovar."
 
 [[action.refuse]]
 why = "{{.pr.nudge.refusal}}"

@@ -1,4 +1,4 @@
-{{define "task"}}Ask whoever {{.PR.URL}} waits on for the next step, in one comment under the user's name.
+{{define "task"}}Ask whoever {{.PR.URL}} waits on for the next step, in one comment you propose to post under the user's name.
 
 {{.Inputs.situation}}{{end}}
 {{- define "guidance"}}Guidance is what to ask about: a topic, a thread, a focus ("the migration
@@ -46,7 +46,10 @@ change anything under "Always"; where it contradicts a rule there, follow
 the rule and say so in your report.
 
 Run no other command than the `gh` commands in these instructions and the
-record step's.
+record step's, and call no other tool than `github_draft` and the record
+step's. This session writes nothing to GitHub: it refuses every command that
+comments or changes anything there. The comment is a draft you propose;
+{{name}} posts it once the user approves it.
 
 {{if .Automated -}}
 A workflow of the user's started this nudge. The comment goes out under the
@@ -67,7 +70,7 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments --jq '.[] | {user: .user.login, c
 
 The first shows the state, the requested reviewers, each reviewer's latest
 review (`submittedAt`), the conversation comments and the commits; the second
-the replies in review threads, which the first does not list. Post nothing
+the replies in review threads, which the first does not list. Propose nothing
 and end the turn with one line saying why, recorded `done` with that line
 as the summary, when:
 
@@ -138,20 +141,16 @@ read as "the maintainers".
   or worktree names.
 - No deadline or consequence the facts do not carry.
 
-### 3. Post and report
+### 3. Propose and report
 
-```bash
-gh pr comment <url> --body-file - <<'EOF'
-<the-comment>
-EOF
-```
+Call `github_draft` with `kind` `comment`, no `target`, and the comment as
+`text`. If this session has no such tool, propose through
+`{{.Command}} draft propose`, whose help says how.
 
-Post exactly one comment. Never review, approve, request changes, edit labels
-or reviewers, push, or touch the checkout. `gh pr comment` prints the new
-comment's URL. Never retry the post: if the command fails or its outcome is
-unclear, look for your text among the pull request's comments
-(`gh pr view <url> --json comments`), and report what you find without
-posting again. Reply to the user with the comment's URL and the text posted,
-then record `done` with the comment's URL in `outcome.url`.
+Propose exactly one comment. Never review, approve, request changes, edit
+labels or reviewers, push, or touch the checkout. Never propose it twice:
+if the call fails or its outcome is unclear, report what you know without
+proposing again. Reply to the user with the draft's id and the text
+proposed, then record `done`.
 {{template "record" .}}
 {{template "judgment" .}}

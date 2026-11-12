@@ -3,7 +3,7 @@ description = "Propose a GitHub post on the pull request of your turn, to be mad
 
 [github_draft.params]
 "kind" = "comment, review, thread_reply or resolve"
-"target" = "empty for the pull request; comment:<id> for the review comment a thread_reply answers; thread:<id> for the thread a resolve resolves"
+"target" = "empty for the pull request; for a thread_reply or a resolve, comment:<id>, the id of the thread's first comment as gh api repos/<owner>/<repo>/pulls/<n>/comments lists it"
 "text" = "the comment, the review's body or the reply, in Markdown; empty for a resolve"
 "payload" = "what the kind's schema shapes beside text: for a review, its event (APPROVE, REQUEST_CHANGES or COMMENT) and its inline comments"
 "basis" = "for a review, the head commit you read the pull request at"
