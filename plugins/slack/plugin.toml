@@ -429,6 +429,14 @@ name = "problem_message"
 doc = "A problem: an edit or delete draft's target is not a message ref or permalink."
 
 [[source.tools.answers]]
+name = "problem_message_gone"
+doc = "A problem: Slack holds no message at an edit or delete draft's target."
+
+[[source.tools.answers]]
+name = "problem_message_not_yours"
+doc = "A problem: the message an edit or delete draft targets is not the user's."
+
+[[source.tools.answers]]
 name = "problem_text_required"
 doc = "A problem: text is missing or empty."
 

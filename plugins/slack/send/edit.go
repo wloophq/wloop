@@ -94,6 +94,9 @@ func (s *Service) message(ctx context.Context, channel, ts, threadTS string) (wi
 	}
 	for _, read := range reads {
 		page, err := read()
+		if c := code(err); c == "thread_not_found" || c == "message_not_found" {
+			continue
+		}
 		if err != nil {
 			return wireMessage{}, false, err
 		}

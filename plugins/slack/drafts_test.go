@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/auth"
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
@@ -41,20 +42,40 @@ func newLiveSlack(t *testing.T, msgs ...map[string]any) *pubSlack {
 		ps.order = append(ps.order, m)
 		ps.mu.Unlock()
 	}
-	read := func(method string) func(url.Values) any {
+	// As Slack: history holds the top-level messages, replies the thread
+	// of ts, or thread_not_found when Slack holds no message at ts.
+	read := func(method string, keep func(v url.Values, m map[string]any) bool) func(url.Values) any {
 		return func(v url.Values) any {
 			note(method)
 			ps.mu.Lock()
 			defer ps.mu.Unlock()
-			out := make([]map[string]any, len(ps.history))
-			for i, m := range ps.history {
-				out[i] = maps.Clone(m)
+			var out []map[string]any
+			for _, m := range ps.history {
+				if keep(v, m) {
+					out = append(out, maps.Clone(m))
+				}
+			}
+			if method == "conversations.replies" && len(out) == 0 {
+				return map[string]any{"ok": false, "error": "thread_not_found"}
 			}
 			return map[string]any{"messages": out}
 		}
 	}
-	api.Handle("conversations.history", read("conversations.history"))
-	api.Handle("conversations.replies", read("conversations.replies"))
+	threadOf := func(m map[string]any) any {
+		if t, ok := m["thread_ts"]; ok && t != "" {
+			return t
+		}
+		return m["ts"]
+	}
+	api.Handle("conversations.history", read("conversations.history", func(_ url.Values, m map[string]any) bool { return threadOf(m) == m["ts"] }))
+	api.Handle("conversations.replies", read("conversations.replies", func(v url.Values, m map[string]any) bool {
+		for _, held := range ps.history {
+			if held["ts"] == v.Get("ts") {
+				return threadOf(m) == threadOf(held)
+			}
+		}
+		return false
+	}))
 	api.Handle("chat.update", func(v url.Values) any {
 		note("chat.update")
 		ps.mu.Lock()
@@ -319,12 +340,19 @@ func TestVerifyDelete(t *testing.T) {
 		t.Fatalf("evidence %+v", ev)
 	}
 
-	tomb := posted(pubReply, "USLACKBOT", "This message was deleted.")
+	tomb := posted(pubParent, "USLACKBOT", "This message was deleted.")
 	tomb["subtype"] = "tombstone"
-	ps = newLiveSlack(t, tomb)
-	if _, ok, err := ps.publisher().Verify(ctx, d, verifyStart); err != nil || !ok {
+	ps = newLiveSlack(t, tomb, posted(pubReply, other, "a reply"))
+	if _, ok, err := ps.publisher().Verify(ctx, changeDraft(draft.Delete, messageRef(pubParent), ""), verifyStart); err != nil || !ok {
 		t.Fatalf("a deleted parent's tombstone: Verify = %v %v", ok, err)
 	}
+
+	top := map[string]any{"ts": pubPosted, "user": me, "text": "top level"}
+	ps = newLiveSlack(t, top)
+	verifyAround(t, ps, changeDraft(draft.Delete, messageRef(pubPosted), ""))
+
+	ps = newLiveSlack(t, top)
+	verifyAround(t, ps, changeDraft(draft.Delete, pubDM+"/"+pubPosted, ""))
 
 	ps = newLiveSlack(t, posted(pubReply, me, "On it"))
 	ps.f.api.Handle("conversations.history", func(url.Values) any { return slacktest.Response{Status: http.StatusServiceUnavailable, Body: "x"} })
@@ -371,17 +399,33 @@ func TestSlackDraftKeepsMentionsAndCrossUnit(t *testing.T) {
 	turnUnit := dslack.ThreadUnit(toolTeam, "C100", toolThread).Wire()
 	otherUnit := dslack.ThreadUnit(toolTeam, "C100", toolOther).Wire()
 	elsewhere := "C100/" + toolOther
+	const mineTS = "1700000600.000100"
+	mineElsewhere := "C100/" + mineTS
+	thread := []map[string]any{
+		{"type": "message", "ts": toolThread, "thread_ts": toolThread, "user": "U001", "text": "Can someone review the launch plan?"},
+		{"type": "message", "ts": toolReply, "thread_ts": toolThread, "user": "U000", "text": "On it"},
+	}
+	otherThread := []map[string]any{
+		{"type": "message", "ts": toolOther, "thread_ts": toolOther, "user": "U001", "text": "Another thread"},
+		{"type": "message", "ts": mineTS, "thread_ts": toolOther, "user": "U000", "text": "Mine over there"},
+	}
+	f.srv.Handle("conversations.replies", func(v url.Values) any {
+		if ts := v.Get("ts"); ts == toolOther || ts == mineTS {
+			return map[string]any{"messages": otherThread}
+		}
+		return map[string]any{"messages": thread}
+	})
 	for _, tc := range []struct {
 		args string
 		want src.Draft
 	}{
 		{`{"text":"thanks @dana"}`, src.Draft{Unit: turnUnit, Kind: "reply", Delivery: "message", Text: "thanks @{slack:U001}"}},
-		{`{"kind":"edit","target":"` + elsewhere + `","text":"ping @dana"}`,
-			src.Draft{Unit: otherUnit, Kind: "edit", Delivery: "edit", Target: elsewhere, Text: "ping @{slack:U001}"}},
+		{`{"kind":"edit","target":"` + mineElsewhere + `","text":"ping @dana"}`,
+			src.Draft{Unit: otherUnit, Kind: "edit", Delivery: "edit", Target: mineElsewhere, Text: "ping @{slack:U001}"}},
 		{`{"kind":"unreact","target":"` + elsewhere + `","reaction":"eyes"}`,
 			src.Draft{Unit: otherUnit, Kind: "unreact", Delivery: "unreaction", Target: elsewhere, Reaction: "eyes"}},
 		{`{"kind":"delete","target":"C100/` + toolReply + `","text":"ignored"}`,
-			src.Draft{Unit: turnUnit, Kind: "delete", Delivery: "delete", Target: "C100/" + toolReply}},
+			src.Draft{Unit: turnUnit, Kind: "delete", Delivery: "delete", Target: "C100/" + toolReply, Text: "On it"}},
 	} {
 		before := len(f.h.Gates())
 		r := f.call(t, ToolDraft, tc.args)
@@ -408,7 +452,7 @@ func TestSlackDraftKeepsMentionsAndCrossUnit(t *testing.T) {
 			t.Errorf("%s: %q %v, want %v", args, r.Answer, got, want)
 		}
 	}
-	r := f.call(t, ToolDraft, `{"kind":"edit","target":"`+elsewhere+`","text":"x","items":["i1"]}`)
+	r := f.call(t, ToolDraft, `{"kind":"edit","target":"`+mineElsewhere+`","text":"x","items":["i1"]}`)
 	if msg, _ := toolFields(t, r)["Error"].(string); r.Answer != "failed" || !strings.HasPrefix(msg, "items:") {
 		t.Errorf("an edit elsewhere answering the turn's items: %q %s", r.Answer, r.Fields)
 	}
@@ -417,6 +461,43 @@ func TestSlackDraftKeepsMentionsAndCrossUnit(t *testing.T) {
 	}
 	if len(f.srv.Calls("chat.update"))+len(f.srv.Calls("chat.delete"))+len(f.srv.Calls("reactions.remove"))+len(f.srv.Calls("chat.postMessage")) != 0 {
 		t.Fatal("slack_draft wrote to Slack")
+	}
+}
+
+func TestSlackDraftReadsTheMessageItChanges(t *testing.T) {
+	t.Parallel()
+	f := newToolFixture(t, true)
+	for _, tc := range []struct{ args, text, replaced string }{
+		{`{"kind":"edit","target":"C100/` + toolReply + `","text":"On it, done"}`, "On it, done", "On it"},
+		{`{"kind":"delete","target":"C100/` + toolReply + `"}`, "On it", ""},
+	} {
+		before := len(f.h.Gates())
+		if r := f.call(t, ToolDraft, tc.args); r.Answer != "proposed" {
+			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
+		}
+		if g := f.h.Gates()[before].Draft; g.Text != tc.text || g.Replaced != tc.replaced {
+			t.Errorf("%s: text %q replaced %q, want %q %q", tc.args, g.Text, g.Replaced, tc.text, tc.replaced)
+		}
+	}
+	f.srv.Handle("conversations.replies", func(v url.Values) any {
+		if v.Get("ts") == toolThread {
+			return map[string]any{"messages": []map[string]any{{"ts": toolThread, "thread_ts": toolThread, "user": "U001", "text": "theirs"}}}
+		}
+		return map[string]any{"ok": false, "error": "thread_not_found"}
+	})
+	before := len(f.h.Gates())
+	for args, want := range map[string]string{
+		`{"kind":"edit","target":"C100/` + toolThread + `","text":"x"}`: "problem_message_not_yours",
+		`{"kind":"delete","target":"C100/` + toolThread + `"}`:          "problem_message_not_yours",
+		`{"kind":"delete","target":"C100/1700000777.000100"}`:           "problem_message_gone",
+	} {
+		r := f.call(t, ToolDraft, args)
+		if got := toolProblems(t, r); r.Answer != "fix_these" || !slices.Equal(got, []string{want}) {
+			t.Errorf("%s: %q %v, want %s", args, r.Answer, got, want)
+		}
+	}
+	if n := len(f.h.Gates()); n != before {
+		t.Fatalf("a draft of a message not the user's opened %d gates", n-before)
 	}
 }
 
@@ -600,5 +681,27 @@ func TestWithinTheUnitsThread(t *testing.T) {
 	}
 	if b, err := f.s.Basis(ctx, u, "reply"); err != nil || b != "" {
 		t.Fatalf("Basis = %q %v", b, err)
+	}
+}
+
+// TestAtOnceToolsPostNow: the manifest marks exactly the at-once tools
+// posts = "now", which a session policy reads instead of naming them.
+func TestAtOnceToolsPostNow(t *testing.T) {
+	m, err := manifest.Load(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := m.Source()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var now []string
+	for _, tool := range s.Tools {
+		if tool.Posts == "now" {
+			now = append(now, tool.Name)
+		}
+	}
+	if want := []string{ToolSend, ToolReact, ToolEdit, ToolDelete}; !slices.Equal(now, want) {
+		t.Fatalf("posts = \"now\" on %v, want %v", now, want)
 	}
 }

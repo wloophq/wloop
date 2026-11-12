@@ -505,11 +505,45 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	if !ok {
 		return notLoggedIn()
 	}
+	if d.Delivery.ChangesAMessage() {
+		problem, err := t.changed(ctx, s, &d)
+		switch {
+		case err != nil:
+			return failed(err)
+		case problem != "":
+			return fixThese([]Problem{{Answer: problem}})
+		}
+	}
 	res, err := t.propose(ctx, s, d)
 	if err != nil {
 		return failed(err)
 	}
 	return res
+}
+
+// changed reads the message an edit or a deletion d changes, so its card
+// shows the text it replaces or removes: a problem when Slack holds no such
+// message or the user did not post it.
+func (t tools) changed(ctx context.Context, s *send.Service, d *draft.Draft) (problem string, err error) {
+	tok, err := t.p.slack.Tokens.Load()
+	if err != nil {
+		return "", err
+	}
+	m, ok, err := s.Read(ctx, d.Target)
+	switch {
+	case err != nil:
+		return "", err
+	case !ok:
+		return "problem_message_gone", nil
+	case m.User != tok.User:
+		return "problem_message_not_yours", nil
+	}
+	if d.Delivery == draft.DeleteDelivery {
+		d.Text = m.Text
+	} else {
+		d.Replaced = m.Text
+	}
+	return "", nil
 }
 
 // propose opens the gate of d for the session: on the unit of the
