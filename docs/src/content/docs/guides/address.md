@@ -5,7 +5,7 @@ description: Let an agent triage the reviews, failing checks and conflicts of a 
 
 An **address round** runs in the author workspace of a pull request you develop. The procedure verifies each review comment on its own, applies what holds, pushes, replies in every thread, resolves the settled ones and asks the reviewers for another look. It stops and asks you first when something is ambiguous or risky: a deep change of direction, an irreversible surface, a blocking request it would decline.
 
-A triage rule in the repository's `AGENTS.md` or `CLAUDE.md` wins over the round's own verdicts. Scope is the pull request's stated goal, not the lines it touched, and a real problem outside it becomes an issue the round files and links in its report.
+A triage rule in the repository's `AGENTS.md` or `CLAUDE.md` wins over the round's own verdicts. Scope is the pull request's stated goal, not the lines it touched, and a real problem outside it is named in the round's report for you to file as an issue.
 
 ## On its own
 
@@ -18,7 +18,7 @@ With a workspace for your pull request (linked to it, or on its head branch), th
 
 Each round waits in the [approval window](/concepts/approval/) first. A round waits while the agent is stopped on a permission prompt or a question. An agent mid-turn gets the prompt queued. Local work that is not on the pull request (uncommitted changes, unpushed commits) is named in the prompt, the round goes to the live session that knows it, and the procedure never commits or discards it.
 
-For failing checks, the procedure fixes what the pull request broke, reruns a flaky or infrastructure failure once, and verifies a quality gate's findings like review comments. It never gets a check green by disabling it, editing CI or dismissing a finding; a check that fails again after its rerun comes to you.
+For failing checks, the procedure fixes what the pull request broke, names a flaky or infrastructure failure's run for you to rerun, and verifies a quality gate's findings like review comments. It never gets a check green by disabling it, editing CI or dismissing a finding; a check it cannot fix comes to you.
 
 For a conflict, the procedure merges the base of the repository the pull request targets into the branch (never a rebase or a force-push), resolves each conflict, runs the tests that cover what it touched, pushes and says so in the report. A conflict it cannot resolve with confidence comes to you, with the merge aborted, and so does a checkout with local work it does not know. A round that only merged the base in posts no comment: the push speaks for itself.
 
