@@ -27,6 +27,16 @@ func (k manifestKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	return k.catalog().Lookup(provider, kind)
 }
 
+// ForDelivery is provider's first declared kind with delivery, or its first kind for "".
+func (k manifestKinds) ForDelivery(provider, delivery string) (draft.KindSpec, bool) {
+	for _, s := range k.catalog().Kinds() {
+		if s.Provider == provider && (delivery == "" || s.Delivery == delivery) {
+			return s, true
+		}
+	}
+	return draft.KindSpec{}, false
+}
+
 func (k manifestKinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {
 	if err := k.catalog().Validate(spec, payload); err != nil {
 		return fmt.Errorf("%w: %w", outbox.ErrInvalid, err)

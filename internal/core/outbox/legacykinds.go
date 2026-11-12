@@ -16,7 +16,7 @@ var legacyDeliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.Com
 
 func (legacyKinds) Lookup(_, kind string) (draft.KindSpec, bool) {
 	k := draft.Kind(kind)
-	if !k.Valid() {
+	if !slices.Contains(draft.Kinds, k) {
 		return draft.KindSpec{}, false
 	}
 	_, d := draft.ShapeOf(k)
