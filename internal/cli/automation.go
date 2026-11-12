@@ -11,7 +11,6 @@ import (
 
 	rmoverlay "github.com/wloophq/wloop/internal/readmodel/overlay"
 
-	factdrafts "github.com/wloophq/wloop/internal/adapter/facts/drafts"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
@@ -158,7 +157,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		if e.changes != nil {
 			units.failed.changes = e.changes
 		}
-		units.drafted = &factdrafts.Provider{Drafts: units.failed}
+		units.drafted = failedDraftFacts(units.failed)
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
@@ -571,7 +570,7 @@ type unitSet struct {
 	// briefed adds the brief.* facts; nil adds none.
 	briefed *briefedFacts
 	// drafted adds the facts of the unit's failed drafts, which failed reads once a pass; nil adds none.
-	drafted *factdrafts.Provider
+	drafted unitFacter
 	failed  *failedDrafts
 	// blocks lifts the answered start blocks first; nil lifts none.
 	blocks *startBlocks
@@ -844,10 +843,20 @@ func (s *unitSet) Due() time.Time {
 	return due
 }
 
+// unitFacter reads facts of a unit.
+type unitFacter interface {
+	Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
+}
+
+// draftLister lists drafts, as the outbox's store does.
+type draftLister interface {
+	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
+}
+
 // failedDrafts answer the draft facts' reads of a unit's failed drafts from one read of every failed draft
 // a pass, which Refresh starts, read again once the change log notes a draft change.
 type failedDrafts struct {
-	store   factdrafts.Drafts
+	store   draftLister
 	changes port.Changes
 	mu      sync.Mutex
 	read    bool

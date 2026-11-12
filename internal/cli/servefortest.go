@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/agent/echo"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -94,7 +93,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 		Now:        now,
 		Getenv:     func(string) string { return "" },
 		Harness:    harnessOf(nil, defaultManagers()),
-		Agents:     map[string]turns.Agent{"echo": &echo.Agent{}},
+		Agents:     testAgents(),
 		Exit:       func(code int) { t.Errorf("exit %d", code) },
 		Reexec:     func() error { return errors.New("no reexec in a test daemon") },
 
@@ -110,12 +109,15 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 	e.testPublishers = o.Publishers
 	e.noJobs = true
 
+	if err := os.MkdirAll(e.StateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	e.changes = change.NewLog(change.DefaultWindow, logf)
-	db, err := sqlite.Open(filepath.Join(e.StateDir, storeFile), e.changes)
-	if err != nil {
+	db, unlockStore, err := e.openStore(ctx, logf)
+	if err != nil || db == nil {
 		cancel()
-		t.Fatal(err)
+		t.Fatalf("opening the test daemon's store: %v", err)
 	}
 	store := inventory.New(db)
 	store.UseClock(e.Now)
@@ -144,6 +146,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 		stopPlugins()
 		e.background.Wait()
 		db.Close()
+		unlockStore()
 	})
 	d := &TestDaemon{e: e, client: client.New(e.Socket), ctx: ctx, loopMu: loopMu}
 	deadline := time.Now().Add(time.Minute)
