@@ -163,6 +163,10 @@ func TestRetryOfUnconfirmedPostNeedsConfirm(t *testing.T) {
 		if e.get(d.ID).State != draft.Failed {
 			t.Fatalf("%s: state %s", cause, e.get(d.ID).State)
 		}
+		session := draft.Actor{Kind: draft.ActorSession, Session: "s1"}
+		if _, err := e.svc.RetryBy(ctx, d.ID, true, session); !errors.Is(err, gates.ErrRefused) || e.get(d.ID).State != draft.Failed {
+			t.Fatalf("%s: a session's confirm: %v, state %s", cause, err, e.get(d.ID).State)
+		}
 		if got, err := e.svc.Retry(ctx, d.ID, true); err != nil || got.State != draft.Queued {
 			t.Fatalf("%s: retry with confirm %+v %v", cause, got, err)
 		}

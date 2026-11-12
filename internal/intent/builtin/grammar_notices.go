@@ -17,6 +17,10 @@ var Notices = []ToolAnswer{
 	{Name: NoticeDraftByRule, Doc: "Tells the person that a rule of theirs, Rule (its name as the gates record it, such as \"workflows/review gates.approval rule 0\"), posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.",
 		Fields: []AnswerField{num("Draft"), str("Where"), str("Rule"), str("Link")}},
 	{Name: NoticeDraftSaved, Doc: "Tells the person that the reply they wrote, Draft, waits for their approval.", Fields: []AnswerField{num("Draft")}},
+	{Name: NoticeDraftRuleSends, Doc: "Tells an agent session that asked to send the reply it wrote, Draft, that a rule of the user's, Rule (its name as the gates record it), sends it.",
+		Fields: []AnswerField{num("Draft"), str("Rule")}},
+	{Name: NoticeDraftWaits, Doc: "Tells an agent session that asked to send the reply it wrote, Draft, that no rule of the user's sends it: it waits for the user's approval.",
+		Fields: []AnswerField{num("Draft")}},
 	{Name: NoticeReplyPlaceholder, Doc: "The placeholder of a notification's input that saves a reply for approval."},
 	{Name: NoticeReplyButton, Doc: "The button of a notification's input that saves a reply for approval."},
 	{Name: NoticeSendReplyPlaceholder, Doc: "The placeholder of a notification's input that sends a reply at once."},
@@ -73,6 +77,8 @@ const (
 	NoticeChatStarted          = "chat_started"
 	NoticeDraftSent            = "draft_sent"
 	NoticeDraftSaved           = "draft_saved"
+	NoticeDraftRuleSends       = "draft_rule_sends"
+	NoticeDraftWaits           = "draft_waits"
 	NoticeDraftByRule          = "draft_by_rule"
 	NoticeReplyPlaceholder     = "reply_placeholder"
 	NoticeReplyButton          = "reply_button"

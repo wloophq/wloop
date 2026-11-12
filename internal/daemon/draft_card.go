@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,7 +42,7 @@ func (s *Server) cardFields(ctx context.Context, d draft.Draft, g gate.Gate, v *
 	v.Preview = s.preview(d, publisher, v.Where)
 	v.Basis, v.Hold = d.Basis, d.Hold
 	if spec, ok := s.kindSpec(d); ok {
-		v.TextLocked = !slices.Contains(spec.Editable, editableText)
+		v.TextLocked = !slices.Contains(spec.Editable, draft.EditableText)
 	}
 	words := s.loaded().Gates.Drafts
 	v.By = string(d.By.Kind)
@@ -195,81 +194,12 @@ func (s *Server) preview(d draft.Draft, provider, where string) string {
 	return strings.TrimSpace(out.String())
 }
 
-// editableText is what a kind's editable names to let a person change a draft's text.
-const editableText = "text"
-
 // kindSpec is d's kind as its publisher's manifest declares it; false when none does or no kinds are served.
 func (s *Server) kindSpec(d draft.Draft) (draft.KindSpec, bool) {
 	if s.deps.DraftKinds == nil {
 		return draft.KindSpec{}, false
 	}
 	return s.deps.DraftKinds.Lookup(string(s.publisherOf(d)), string(d.Kind))
-}
-
-// checkEditable refuses a person's change of d its kind does not let a person make: text other than d's on a
-// kind whose editable lacks text, or a payload value changed outside its editable pointers.
-func (s *Server) checkEditable(d draft.Draft, text *string, payload *json.RawMessage) error {
-	spec, ok := s.kindSpec(d)
-	if !ok {
-		return nil
-	}
-	if text != nil && *text != d.Text && !slices.Contains(spec.Editable, editableText) {
-		return badRequest{fmt.Sprintf("a %s draft's text is not yours to change", d.Kind)}
-	}
-	if payload == nil {
-		return nil
-	}
-	var before, after any
-	if len(d.Payload) > 0 {
-		if err := json.Unmarshal(d.Payload, &before); err != nil {
-			return badRequest{fmt.Sprintf("draft %d's payload does not decode: %v", d.ID, err)}
-		}
-	}
-	if err := json.Unmarshal(*payload, &after); err != nil {
-		return badRequest{fmt.Sprintf("payload is the draft's payload as JSON: %v", err)}
-	}
-	for _, p := range changedPointers("", before, after) {
-		if !slices.ContainsFunc(spec.Editable, func(e string) bool { return e != editableText && (p == e || strings.HasPrefix(p, e+"/")) }) {
-			return badRequest{fmt.Sprintf("%q of a %s draft is not yours to change", p, d.Kind)}
-		}
-	}
-	return nil
-}
-
-// changedPointers are the JSON pointers under at where a and b differ, as deep as both are objects or lists of
-// one length.
-func changedPointers(at string, a, b any) []string {
-	switch x := a.(type) {
-	case map[string]any:
-		y, ok := b.(map[string]any)
-		if !ok {
-			break
-		}
-		var out []string
-		for k := range x {
-			out = append(out, changedPointers(at+"/"+escapePointer(k), x[k], y[k])...)
-		}
-		for k := range y {
-			if _, seen := x[k]; !seen {
-				out = append(out, at+"/"+escapePointer(k))
-			}
-		}
-		return out
-	case []any:
-		y, ok := b.([]any)
-		if !ok || len(x) != len(y) {
-			break
-		}
-		var out []string
-		for i := range x {
-			out = append(out, changedPointers(at+"/"+strconv.Itoa(i), x[i], y[i])...)
-		}
-		return out
-	}
-	if reflect.DeepEqual(a, b) {
-		return nil
-	}
-	return []string{at}
 }
 
 // payloadFields are the values of payload, a draft of kind's of provider, in its order, each under the plugin's
@@ -424,13 +354,22 @@ func decodeNode(dec *json.Decoder) (node, error) {
 	}
 }
 
-// personAmendment is a person's edit of a draft's text, payload or broadcast, at the rev they saw.
-func personAmendment(text *string, payload *json.RawMessage, broadcast *bool, rev *int64) outbox.Amendment {
-	a := outbox.Amendment{Text: text, Payload: payload, Broadcast: broadcast, By: draft.Actor{Kind: draft.ActorPerson}}
+// amendment is a change of a draft q asks for on a person's route, by q: a session's is refused by the outbox,
+// which an agent's revision reaches only through draft_update.
+func (q requester) amendment(text *string, payload *json.RawMessage, broadcast *bool, rev *int64) outbox.Amendment {
+	a := outbox.Amendment{Text: text, Payload: payload, Broadcast: broadcast, By: q.by()}
 	if rev != nil {
 		a.Rev = *rev
 	}
 	return a
+}
+
+// by is q as the outbox names who acts on a draft.
+func (q requester) by() draft.Actor {
+	if q.Actor == task.ActorAgent {
+		return draft.Actor{Kind: draft.ActorSession, Session: q.Session}
+	}
+	return draft.Actor{Kind: draft.ActorPerson}
 }
 
 // noteStale remembers that draft id was refused at rev as stale, so its card says so and keeps its approval off

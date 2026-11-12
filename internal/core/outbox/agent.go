@@ -99,7 +99,7 @@ func (s *Service) agentLoad(ctx context.Context, c Caller, id draft.ID, rev int6
 	if err := c.reaches(d); err != nil {
 		return draft.Draft{}, err
 	}
-	if d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession {
+	if !d.Origin.ByAgent() {
 		return draft.Draft{}, fmt.Errorf("draft %d is of %s origin, which no agent revises: %w", id, d.Origin.Kind, ErrOutOfScope)
 	}
 	if d.State != draft.Held && d.State != draft.Failed {
@@ -117,7 +117,7 @@ func (c Caller) reaches(d draft.Draft) error {
 	switch {
 	case c.Session == "":
 		return fmt.Errorf("no agent session: %w", ErrOutOfScope)
-	case !slices.Contains(c.Units, d.Unit) && (d.Origin.Unit.IsZero() || !slices.Contains(c.Units, d.Origin.Unit)):
+	case !slices.ContainsFunc(c.Units, d.Concerns):
 		return fmt.Errorf("draft %d is on %s: %w", d.ID, d.Unit, ErrOutOfScope)
 	}
 	return nil

@@ -87,7 +87,7 @@ func (o *Outbox) load(c outbox.Caller, id draft.ID, rev int64) (draft.Draft, err
 	switch {
 	case err != nil:
 		return draft.Draft{}, err
-	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginSession:
+	case !d.Origin.ByAgent():
 		return draft.Draft{}, fmt.Errorf("draft %d is of %s origin, which no agent revises: %w", id, d.Origin.Kind, outbox.ErrOutOfScope)
 	case d.State != draft.Held && d.State != draft.Failed:
 		return draft.Draft{}, fmt.Errorf("draft %d is %s: %w: %w", id, d.State, outbox.ErrConflict, draft.ErrTransition)

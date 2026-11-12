@@ -28,7 +28,12 @@ func (Shapes) Lookup(_, kind string) (draft.KindSpec, bool) {
 	if !ok {
 		return draft.KindSpec{}, false
 	}
-	return draft.KindSpec{Name: kind, Delivery: d, TextRequired: d != "reaction" && d != "delete"}, true
+	text := d != "reaction" && d != "delete"
+	spec := draft.KindSpec{Name: kind, Delivery: d, TextRequired: text}
+	if text {
+		spec.Editable = []string{draft.EditableText}
+	}
+	return spec, true
 }
 
 func (s Shapes) Shape(provider string, d draft.Draft) (draft.Draft, error) {

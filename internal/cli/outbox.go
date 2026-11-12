@@ -390,7 +390,7 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 	if err := e.namedAgent("new --send"); err != nil {
 		return err
 	}
-	return e.sendUserDraft(ctx, c, cr, *yes, func() error { return e.userAtTerminal("new --send", *yes) }, true)
+	return e.sendUserDraft(ctx, c, cr, *yes || e.sessionHandle() != "", func() error { return e.userAtTerminal("new --send", *yes) }, true)
 }
 
 // sendUserDraft creates cr and approves it: at once with yes, else once ready says the user is at a
@@ -402,6 +402,10 @@ func (e *Env) sendUserDraft(ctx context.Context, c *client.Client, cr api.DraftC
 		d, err := c.CreateDraft(ctx, cr)
 		if err != nil {
 			return err
+		}
+		if d.State == string(draft.Held) && len(d.Notes) > 0 {
+			fmt.Fprintln(e.Out, d.Notes[len(d.Notes)-1])
+			return nil
 		}
 		return e.reportPosted(ctx, c, d, d.Where)
 	}

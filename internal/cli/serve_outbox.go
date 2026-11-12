@@ -125,7 +125,7 @@ func (e *Env) resumeDrafts(ctx context.Context, b dturn.Book, seq int64, current
 		seqs = append(seqs, t.Seq)
 	}
 	ds = slices.DeleteFunc(ds, func(d draft.Draft) bool {
-		agent := d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession
+		agent := d.Origin.ByAgent()
 		return !agent || !slices.Contains(seqs, d.Origin.TurnSeq)
 	})
 	return instructions.Pointers(ds, current)

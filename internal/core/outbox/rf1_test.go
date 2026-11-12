@@ -339,3 +339,22 @@ func TestAPersonsEditOfAFailedDraftWaitsOnANewGate(t *testing.T) {
 		t.Fatalf("a person's approval of the edit: sent %d", sent)
 	}
 }
+
+func TestAmendIsAPersonsAndOnlyWhatTheKindLetsThem(t *testing.T) {
+	e, _ := reviewEnv()
+	d := e.propose(review("COMMENT"))
+	session := Amendment{Text: ptr("a session's words"), Rev: d.Rev, By: draft.Actor{Kind: draft.ActorSession, Session: "s-driven"}}
+	if _, err := e.svc.Amend(ctx, d.ID, session); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("a session's amendment through the person's Amend: %v", err)
+	}
+	locked := Amendment{Payload: payload(`{"event":"COMMENT","comments":[{"path":"a.go","body":"x"}]}`), Rev: d.Rev}
+	if _, err := e.svc.Amend(ctx, d.ID, locked); !errors.Is(err, ErrInvalid) || !errors.Is(err, draft.ErrNotEditable) {
+		t.Fatalf("a person's change outside the kind's editable: %v", err)
+	}
+	if got := e.get(d.ID); got.Text != d.Text || string(got.Payload) != string(d.Payload) || got.Rev != d.Rev {
+		t.Fatalf("a refused amendment changed the draft: %+v", got)
+	}
+	if got, err := e.svc.Amend(ctx, d.ID, Amendment{Payload: payload(`{"event":"REQUEST_CHANGES"}`), Rev: d.Rev}); err != nil || got.By.Kind != draft.ActorPerson {
+		t.Fatalf("a person's change of the event: %+v %v", got, err)
+	}
+}

@@ -557,3 +557,33 @@ func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
 		t.Fatalf("stored %+v, want the agent's revision held", got)
 	}
 }
+
+// TestASessionShellsNewSendWaitsForTheUsersPolicy: outbox new --send from the shell of a session the user drives
+// writes the session's draft, never the person's, and under the default policy it waits; the command says so.
+func TestASessionShellsNewSendWaitsForTheUsersPolicy(t *testing.T) {
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	db := outboxDaemon(t, te, false, func(d *daemon.Deps) { d.Turns = te.Turns })
+	knowThreads(t)
+	te.Harness.SessionEnvs["fake"] = fake.SessionEnv{}
+	mine, err := te.Turns.Resolve(ctx, "fake", "term_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.Getenv = func(k string) string {
+		switch k {
+		case fake.HandleVar:
+			return "term_2"
+		case "CLAUDE_CODE_SESSION_ID":
+			return "agent-term_2"
+		}
+		return ""
+	}
+	if code := te.run("outbox", "new", "thread:"+threadUnit.Key, "Shipped", "--send"); code != 0 || !strings.Contains(te.out.String(), "waits for the user's approval") {
+		t.Fatalf("exit %d: %s %s", code, te.out, te.err)
+	}
+	got := te.draftState(t, db, 1)
+	if got.State != draft.Held || got.Origin.Session != mine || got.By != (draft.Actor{Kind: draft.ActorSession, Session: mine}) {
+		t.Fatalf("the session's draft %+v by %+v", got, got.By)
+	}
+}

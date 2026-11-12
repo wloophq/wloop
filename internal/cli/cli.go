@@ -508,14 +508,38 @@ func (e *Env) controlBinary(cfg config.Config) string {
 	return ""
 }
 
-// controlSurface is what drives every manager of cfg, which a session the loop
-// starts may neither run nor read. The managers' own binaries stay out of it,
-// so a session can open the manager's browser or hand work to another worktree.
+// controlSurface is what drives every manager of cfg, and what holds the user's approval rules, which a session
+// the loop starts may neither run nor read. The managers' own binaries stay out of it, so a session can open
+// the manager's browser or hand work to another worktree.
 func (e *Env) controlSurface(cfg config.Config) turns.Control {
 	var c turns.Control
 	for _, k := range e.enabledEntries(cfg) {
 		c.Commands = append(c.Commands, k.Control...)
 		c.Paths = append(c.Paths, k.ControlPaths...)
+	}
+	r := e.rulesSurface(cfg)
+	c.Commands, c.Paths = append(c.Commands, r.Commands...), append(c.Paths, r.Paths...)
+	return c
+}
+
+// rulesSurface is what holds the user's approval rules and decisions: the profile, the configuration, the
+// store and its backups, and the loop's commands that write them. A session that wrote a rule there would
+// release its own drafts.
+func (e *Env) rulesSurface(cfg config.Config) turns.Control {
+	var c turns.Control
+	for _, cmd := range slices.Compact([]string{brand.Command, e.loopCommand(), strings.Trim(e.loopCommand(), "'")}) {
+		c.Commands = append(c.Commands, []string{cmd, "config", "set"}, []string{cmd, "config", "unset"}, []string{cmd, "store"},
+			[]string{cmd, "profile", "add"})
+	}
+	if e.ConfigPath != "" {
+		c.Paths = append(c.Paths, e.ConfigPath, filepath.Dir(e.ConfigPath))
+	}
+	if cfg.Profile != "" {
+		c.Paths = append(c.Paths, cfg.Profile)
+	}
+	if e.StateDir != "" {
+		store := e.storePath()
+		c.Paths = append(c.Paths, store, store+"-wal", store+"-shm", filepath.Join(e.StateDir, "backups"))
 	}
 	return c
 }
