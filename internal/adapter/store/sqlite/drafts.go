@@ -29,7 +29,7 @@ const (
 	evidence_ref, evidence_permalink, evidence_at, error, reason,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced,
 	origin_session, why, language, broadcast, payload, basis, hold`
-	draftFields        = draftContentFields + `, by_kind, by_session`
+	draftFields = draftContentFields + `, by_kind, by_session`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
 	insertDraft = `INSERT INTO drafts (` + draftFields + `, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`

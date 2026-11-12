@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"os"
 	"strconv"
@@ -143,26 +144,26 @@ func TestCardEditPayloadMakesNewRev(t *testing.T) {
 	if code, body := edit(map[string]string{"payload": `{"event":"COMMENT"}`}); code != 400 || !strings.Contains(body, "rev") {
 		t.Fatalf("a payload edit without its rev: %d %s", code, body)
 	}
-	if code, body := edit(map[string]string{"payload": `{"event":`, "rev": "0"}); code != 400 {
+	if code, body := edit(map[string]string{"payload": `{"event":`, "rev": "1"}); code != 400 {
 		t.Fatalf("a payload that is no JSON: %d %s", code, body)
 	}
-	if code, body := edit(map[string]string{"payload": `{"event":"COMMENT"}`, "rev": "0"}); code != 200 {
+	if code, body := edit(map[string]string{"payload": `{"event":"COMMENT"}`, "rev": "1"}); code != 200 {
 		t.Fatalf("edit: %d %s", code, body)
 	}
 	stored, _ := r.o.Store.Get(context.Background(), d.ID)
-	if len(seen) != 1 || seen[0].Payload == nil || string(*seen[0].Payload) != `{"event":"COMMENT"}` || seen[0].Rev != 0 ||
-		seen[0].By.Kind != draft.ActorPerson || stored.Rev != 1 {
-		t.Fatalf("amended %+v, stored rev %d: want the payload at rev 0 by a person, and rev 1", seen, stored.Rev)
+	if len(seen) != 1 || seen[0].Payload == nil || string(*seen[0].Payload) != `{"event":"COMMENT"}` || seen[0].Rev != 1 ||
+		seen[0].By.Kind != draft.ActorPerson || stored.Rev != 2 {
+		t.Fatalf("amended %+v, stored rev %d: want the payload at rev 1 by a person, and rev 2", seen, stored.Rev)
 	}
 	g, _, _ := r.o.GateOf(context.Background(), stored)
-	body, _ := json.Marshal(api.TaskRequest{Args: map[string]string{"rev": "1", "payload": `{"event":"APPROVE"}`}, Source: "cli"})
+	body, _ := json.Marshal(api.TaskRequest{Args: map[string]string{"rev": "2", "payload": `{"event":"APPROVE"}`}, Source: "cli"})
 	if rec := post(t, r.s, api.GatesPath+"/"+strconv.FormatInt(g.ID, 10)+"/approve", string(body)); rec.Code != 200 {
 		t.Fatalf("approve with a payload: %d %s", rec.Code, rec.Body.String())
 	}
-	if len(seen) != 2 || string(*seen[1].Payload) != `{"event":"APPROVE"}` || seen[1].Rev != 1 || seen[1].By.Kind != draft.ActorPerson {
-		t.Fatalf("approval amended %+v, want the payload at rev 1 by a person", seen)
+	if len(seen) != 2 || string(*seen[1].Payload) != `{"event":"APPROVE"}` || seen[1].Rev != 2 || seen[1].By.Kind != draft.ActorPerson {
+		t.Fatalf("approval amended %+v, want the payload at rev 2 by a person", seen)
 	}
-	if sent, _ := r.o.Store.Get(context.Background(), d.ID); sent.State != draft.Queued || sent.Rev <= 1 {
+	if sent, _ := r.o.Store.Get(context.Background(), d.ID); sent.State != draft.Queued || sent.Rev <= 2 {
 		t.Fatalf("approved draft %s at rev %d, want queued past the edit's rev", sent.State, sent.Rev)
 	}
 }
@@ -187,7 +188,7 @@ func TestRuleSentNotifies(t *testing.T) {
 		t.Fatal(err)
 	}
 	byHand := r.propose(t, r7u, "approved by hand", draft.Wait)
-	if code, _, body := r.act(t, byHand.ID, "approve", `{"rev":0}`); code != 200 {
+	if code, _, body := r.act(t, byHand.ID, "approve", fmt.Sprintf(`{"rev":%d}`, byHand.Rev)); code != 200 {
 		t.Fatalf("approve: %d %s", code, body)
 	}
 	if sent, failed, err := r.o.Send(ctx); err != nil || sent != 2 || failed != 0 {
@@ -227,7 +228,7 @@ func BenchmarkDraftCardFields(b *testing.B) {
 	}
 }
 
-// agentRevised is a held draft a person saw at rev 0 under gate seen, which an agent then revised to rev 1.
+// agentRevised is a held draft a person saw at rev 1 under gate seen, which an agent then revised to rev 2.
 func agentRevised(t *testing.T, r *outboxRig) (draft.Draft, int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -237,7 +238,7 @@ func agentRevised(t *testing.T, r *outboxRig) (draft.Draft, int64) {
 		t.Fatal(err)
 	}
 	text := "Agent revision"
-	if d, err = r.o.Amend(ctx, d.ID, outbox.Amendment{Text: &text, Rev: d.Rev}); err != nil || d.Rev != 1 {
+	if d, err = r.o.Amend(ctx, d.ID, outbox.Amendment{Text: &text, Rev: d.Rev}); err != nil || d.Rev != 2 {
 		t.Fatalf("agent revision: %+v %v", d, err)
 	}
 	return d, seen.ID
@@ -260,17 +261,17 @@ func TestGateApproveEditWithoutRevRefused(t *testing.T) {
 		args map[string]string
 		code int
 	}{
-		{map[string]string{"text": "Person's edit of rev 0"}, 400},
+		{map[string]string{"text": "Person's edit of rev 1"}, 400},
 		{map[string]string{"payload": `{"event":"COMMENT"}`}, 400},
-		{map[string]string{"text": "Person's edit of rev 0", "rev": "0"}, 409},
-		{map[string]string{"text": "Person's edit of rev 0", "rev": "1"}, 409},
+		{map[string]string{"text": "Person's edit of rev 1", "rev": "1"}, 409},
+		{map[string]string{"text": "Person's edit of rev 1", "rev": "2"}, 409},
 	} {
 		if rec := post(t, r.s, path, taskArgs(c.args)); rec.Code != c.code {
 			t.Errorf("approve %v on the superseded gate: %d %s, want %d", c.args, rec.Code, rec.Body.String(), c.code)
 		}
 	}
 	stored, _ := r.o.Store.Get(context.Background(), d.ID)
-	if stored.Text != "Agent revision" || stored.State != draft.Held || stored.Rev != 1 {
+	if stored.Text != "Agent revision" || stored.State != draft.Held || stored.Rev != 2 {
 		t.Fatalf("stored %q %s rev %d, want the agent's revision still held", stored.Text, stored.State, stored.Rev)
 	}
 }
@@ -286,9 +287,9 @@ func TestEditWithoutRevRefused(t *testing.T) {
 		args map[string]string
 		code int
 	}{
-		{map[string]string{"text": "Person's edit of rev 0"}, 400},
+		{map[string]string{"text": "Person's edit of rev 1"}, 400},
 		{map[string]string{"broadcast": "true"}, 400},
-		{map[string]string{"text": "Person's edit of rev 0", "rev": "0"}, 409},
+		{map[string]string{"text": "Person's edit of rev 1", "rev": "1"}, 409},
 	} {
 		if rec := post(t, r.s, path, taskArgs(c.args)); rec.Code != c.code {
 			t.Errorf("edit %v: %d %s, want %d", c.args, rec.Code, rec.Body.String(), c.code)
@@ -297,7 +298,7 @@ func TestEditWithoutRevRefused(t *testing.T) {
 	if stored, _ := r.o.Store.Get(context.Background(), d.ID); stored.Text != "Agent revision" {
 		t.Fatalf("stored %q, want the agent's revision", stored.Text)
 	}
-	if rec := post(t, r.s, path, taskArgs(map[string]string{"text": "Seen and changed", "rev": "1"})); rec.Code != 200 {
+	if rec := post(t, r.s, path, taskArgs(map[string]string{"text": "Seen and changed", "rev": "2"})); rec.Code != 200 {
 		t.Fatalf("an edit at the rev seen: %d %s", rec.Code, rec.Body.String())
 	}
 }
@@ -322,11 +323,11 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 	r.s.deps.DraftKinds = lockedKinds{}
 	d := r.propose(t, r7u, "thread resolved", draft.Wait)
 	id := strconv.FormatInt(int64(d.ID), 10)
-	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "0"})); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "1"})); rec.Code != 400 {
 		t.Errorf("text on a resolve draft: %d %s", rec.Code, rec.Body.String())
 	}
 	g, _, _ := r.o.GateOf(context.Background(), d)
-	if rec := post(t, r.s, api.GatesPath+"/"+strconv.FormatInt(g.ID, 10)+"/approve", taskArgs(map[string]string{"text": "a sentence", "rev": "0"})); rec.Code != 400 {
+	if rec := post(t, r.s, api.GatesPath+"/"+strconv.FormatInt(g.ID, 10)+"/approve", taskArgs(map[string]string{"text": "a sentence", "rev": "1"})); rec.Code != 400 {
 		t.Errorf("approving a resolve draft with text: %d %s", rec.Code, rec.Body.String())
 	}
 	if stored, _ := r.o.Store.Get(context.Background(), d.ID); stored.Text != d.Text || stored.State != draft.Held || stored.Rev != d.Rev {

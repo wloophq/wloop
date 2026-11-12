@@ -347,10 +347,10 @@ func TestEditTurnsAThreadReplysBroadcastOnAndOff(t *testing.T) {
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	d := r.propose(t, r7u, "hello", draft.Wait)
-	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"rev":0}`); code != 400 || !strings.Contains(body, "no thread") {
+	if code, _, body := r.act(t, d.ID, "edit", `{"broadcast":true,"rev":1}`); code != 400 || !strings.Contains(body, "no thread") {
 		t.Fatalf("broadcast on a draft in no thread: %d %s", code, body)
 	}
-	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true,"rev":0}`); code != 400 {
+	if code, _, body := r.act(t, d.ID, "edit", `{"text":"changed","broadcast":true,"rev":1}`); code != 400 {
 		t.Fatalf("text and a refused broadcast: %d %s", code, body)
 	}
 	if stored, _ := r.o.Store.Get(ctx, d.ID); stored.Text != "hello" {
@@ -391,8 +391,8 @@ func TestDraftActionStatuses(t *testing.T) {
 	}{
 		{"retry of a held draft", d.ID, "retry", `{"rev":1}`, 409, "held"},
 		{"unknown id", 999, "approve", `{}`, 404, "draft:999"},
-		{"empty text", d.ID, "edit", `{"text":"  ","rev":0}`, 400, "empty text"},
-		{"edit without text", d.ID, "edit", `{"rev":0}`, 400, "text"},
+		{"empty text", d.ID, "edit", `{"text":"  ","rev":1}`, 400, "empty text"},
+		{"edit without text", d.ID, "edit", `{"rev":1}`, 400, "text"},
 		{"edit without rev", d.ID, "edit", `{"text":"x"}`, 400, "rev"},
 		{"unknown verb", d.ID, "post", `{}`, 400, "unknown verb"},
 	}
@@ -795,7 +795,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 			d := r.propose(t, r7u, "as seen", draft.Wait)
 			var seen api.Draft
 			r.getDraft(t, d.ID, &seen)
-			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone","rev":0}`); code != 200 {
+			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone","rev":1}`); code != 200 {
 				t.Fatalf("edit: %d %s", code, body)
 			}
 			var code int
