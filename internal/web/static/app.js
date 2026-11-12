@@ -3062,12 +3062,13 @@ async function applyChange(c) {
   const route = readHash();
   const { view, pr } = route;
   const planned = new Set((state.plan.items || []).map((it) => unitKey(it.unit)));
+  const tasksMoved = c.tasks || c.gates;
   await Promise.all([
     c.units.length && view === "recent" ? loadActivity() : null,
-    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
+    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (tasksMoved && (route.task || pr)) ? loadDetail() : null,
     c.plan || c.units.some((u) => planned.has(u)) ? loadPlan() : null,
     c.gates ? loadRoundGates() : null,
-    c.tasks ? loadTasks(route, c.units) : null,
+    tasksMoved ? loadTasks(route, c.units) : null,
     c.tasks || c.all || c.units.length ? loadHome() : null,
     c.tasks || c.all || c.units.length ? loadQueue() : null,
   ]);
