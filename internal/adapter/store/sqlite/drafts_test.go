@@ -280,7 +280,7 @@ func TestEditDuringApproveConflicts(t *testing.T) {
 	go func() { approved <- gs.Approve(ctx, d.ID) }()
 	<-fx.entered
 	fx.entered = nil
-	if _, err := svc.Edit(ctx, d.ID, "B"); err != nil {
+	if _, err := svc.Edit(ctx, d.ID, "B", d.Rev); err != nil {
 		t.Fatal(err)
 	}
 	close(fx.release)

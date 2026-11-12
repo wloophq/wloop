@@ -193,7 +193,7 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := gate.Gate{Kind: gate.KindDraft, Unit: got.Unit, Subject: strconv.FormatInt(int64(got.ID), 10)}
+	g := gate.Gate{Kind: gate.KindDraft, Unit: got.Unit, Subject: strconv.FormatInt(int64(got.ID), 10), ApprovedRev: got.Rev}
 	switch got.State {
 	case draft.Held:
 		_, err = r.s.deps.Gates.Open(ctx, g, nil)

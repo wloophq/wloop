@@ -107,7 +107,7 @@ func (e *env) tasklessHeld(purpose string, on task.ID) draft.Draft {
 	if err != nil {
 		panic(err)
 	}
-	g := gateOf(d)
+	g := gateOf(d, nil)
 	g.Name, g.Intents, g.Task = "draft", []string{"approve", "discard"}, on
 	if _, err := e.gates.Open(ctx, g); err != nil {
 		panic(err)

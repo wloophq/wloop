@@ -27,7 +27,7 @@ type memStore struct {
 func (m *memStore) Insert(ctx context.Context, d draft.Draft) (draft.Draft, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	d.ID = draft.ID(len(m.drafts) + 1)
+	d.ID, d.Rev = draft.ID(len(m.drafts)+1), 1
 	d.Items = slices.Clone(d.Items)
 	m.drafts = append(m.drafts, d)
 	return d, nil
@@ -187,7 +187,7 @@ func (e *env) decide(id draft.ID, intent string) error {
 // approve approves draft id's gate as a person, as the daemon does: the draft prepared at its rev, then its gate.
 func (e *env) approve(id draft.ID, text *string) (draft.Draft, error) {
 	if text != nil && *text != e.get(id).Text {
-		if _, err := e.svc.Edit(context.Background(), id, *text); err != nil {
+		if _, err := e.svc.Edit(context.Background(), id, *text, e.get(id).Rev); err != nil {
 			return draft.Draft{}, err
 		}
 	}
@@ -225,7 +225,7 @@ func (e *env) insertApproved(d draft.Draft) (draft.Draft, error) {
 	if err != nil {
 		return d, err
 	}
-	g := gateOf(d)
+	g := gateOf(d, nil)
 	g.Name, g.Intents, g.Intent, g.By = "draft", []string{"approve", "discard"}, "approve", task.ActorPerson
 	_, err = e.gates.RecordSent(context.Background(), g)
 	return d, err

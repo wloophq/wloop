@@ -14,3 +14,10 @@ func TestGateStoreContract(t *testing.T) {
 		return s, s, s
 	})
 }
+
+func TestDraftGateContract(t *testing.T) {
+	gatestest.DraftGateContract(t, func(t *testing.T) (gates.Store, gates.Reader, gates.Sent) {
+		s := gatestest.NewStore(func() time.Time { return gatestest.Epoch })
+		return s, s, s
+	})
+}

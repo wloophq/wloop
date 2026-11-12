@@ -53,3 +53,4 @@ func TestVocabularyIsOutboxKinds(t *testing.T) {
 		t.Errorf("an undeclared kind shaped: %v", err)
 	}
 }
+

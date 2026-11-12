@@ -1,6 +1,7 @@
 package outboxtest
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,9 @@ type Kinds struct {
 	Specs []draft.KindSpec
 	// Fields are each kind's payload fields, by "<provider>/<name>"; a kind absent takes any field.
 	Fields map[string][]string
+	// Defaults are each provider's default delivery, which Shape gives a draft of no kind and an
+	// undeclared delivery.
+	Defaults map[string]string
 	// Required are each kind's required payload fields, by "<provider>/<name>".
 	Required map[string][]string
 }
@@ -33,6 +37,40 @@ func (k Kinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
 		}
 	}
 	return draft.KindSpec{}, false
+}
+
+// Shape mirrors draft.Catalog's Shape over Specs, with Defaults as each provider's default delivery.
+func (k Kinds) Shape(provider string, d draft.Draft) (draft.Draft, error) {
+	mine := slices.DeleteFunc(slices.Clone(k.Specs), func(s draft.KindSpec) bool { return s.Provider != provider })
+	if len(mine) == 0 {
+		d.Purpose = cmp.Or(d.Purpose, string(d.Kind))
+		return d, nil
+	}
+	name := string(d.Kind)
+	if name == "" {
+		name = k.kindOf(mine, d.Purpose, string(d.Delivery), k.Defaults[provider])
+	}
+	spec, ok := k.Lookup(provider, name)
+	if !ok {
+		return d, fmt.Errorf("%w: %w: %q of %s", outbox.ErrInvalid, draft.ErrUnknownKind, cmp.Or(name, d.Purpose), provider)
+	}
+	d.Kind, d.Purpose, d.Delivery = draft.Kind(spec.Name), cmp.Or(d.Purpose, spec.Name), draft.Delivery(spec.Delivery)
+	return d, nil
+}
+
+func (Kinds) kindOf(mine []draft.KindSpec, purpose, delivery, fallback string) string {
+	declared := slices.ContainsFunc(mine, func(s draft.KindSpec) bool { return s.Delivery == delivery })
+	if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Name == purpose }); i >= 0 &&
+		(delivery == "" || !declared || mine[i].Delivery == delivery) {
+		return purpose
+	}
+	if !declared {
+		delivery = fallback
+	}
+	if i := slices.IndexFunc(mine, func(s draft.KindSpec) bool { return s.Delivery == delivery }); i >= 0 {
+		return mine[i].Name
+	}
+	return ""
 }
 
 func (k Kinds) Validate(spec draft.KindSpec, payload json.RawMessage) error {
