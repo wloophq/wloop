@@ -498,7 +498,11 @@ func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) er
 	if err != nil {
 		return err
 	}
-	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1]}); err != nil {
+	d, err := c.Draft(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1], "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
 		return err
 	}
 	fmt.Fprintf(e.Out, "draft %d edited\n", id)

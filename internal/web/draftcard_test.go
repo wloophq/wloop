@@ -168,3 +168,86 @@ done({ Notes: cls(c, "d-note").map((x) => x.textContent), Buttons: walk(c, (x) =
 		t.Errorf("buttons %q, %d values: want none, and the payload it posted", got.Buttons, got.Values)
 	}
 }
+
+// TestCardLocksTextItsKindLocks offers no text editor on a draft whose kind locks its text, no Edit at all when
+// nothing of it is editable, and approves an edited field without sending a text.
+func TestCardLocksTextItsKindLocks(t *testing.T) {
+	var got struct {
+		Bare      []string
+		Textareas int
+		Selects   int
+		Posts     []map[string]any
+	}
+	bare := pendingDraft()
+	bare.Kind, bare.Text, bare.TextLocked = "resolve", "", true
+	review := reviewDraft()
+	review.TextLocked = true
+	runGate(t, `
+const bare = walk(draft(input.bare), (x) => x.tag === "button").map((b) => b.textContent);
+await focus(draft(input.review), "outbox:open:approve:draft:7").on.click();
+const c = draft(input.review);
+const sel = walk(c, (x) => x.tag === "select")[0];
+await sel.on.change({ target: { value: "COMMENT" } });
+await focus(draft(input.review), "outbox:approve:draft:7").on.click();
+done({ Bare: bare, Textareas: walk(c, (x) => x.tag === "textarea").length, Selects: walk(c, (x) => x.tag === "select").length, Posts: posts });`,
+		map[string]any{"bare": bare, "review": review}, &got)
+	if slices.Contains(got.Bare, "edit") {
+		t.Errorf("a draft with nothing editable offers %q", got.Bare)
+	}
+	if got.Textareas != 0 || got.Selects != 1 {
+		t.Errorf("%d text editors, %d selects: want only the verdict's", got.Textareas, got.Selects)
+	}
+	if len(got.Posts) != 1 {
+		t.Fatalf("posts %v", got.Posts)
+	}
+	args := got.Posts[0]["body"].(map[string]any)["args"].(map[string]any)
+	if _, ok := args["text"]; ok || args["payload"] == nil || args["rev"] != "3" {
+		t.Errorf("approved with %v, want the payload and rev, no text", args)
+	}
+}
+
+// TestCardShowsARevisionMadeWhileEditing shows, on a draft revised since its edit began, that it changed, who
+// wrote it and its new text, drops the edits of its fields, and approves at the rev now shown.
+func TestCardShowsARevisionMadeWhileEditing(t *testing.T) {
+	var got struct {
+		Conflict string
+		Selected []string
+		Posts    []map[string]any
+	}
+	revised := reviewDraft()
+	revised.Rev, revised.Text, revised.Author = 4, "One finding left.", "Last written by an agent"
+	runGate(t, `
+await focus(draft(input.draft), "outbox:open:approve:draft:7").on.click();
+await walk(draft(input.draft), (x) => x.tag === "select")[0].on.change({ target: { value: "COMMENT" } });
+const c = draft(input.revised);
+const conflict = cls(c, "d-conflict").map((x) => x.textContent).join("");
+const selected = walk(c, (x) => x.tag === "option" && "selected" in x.attrs).map((o) => attr(o, "value"));
+await focus(c, "outbox:approve:draft:7").on.click();
+done({ Conflict: conflict, Selected: selected, Posts: posts });`, map[string]any{"draft": reviewDraft(), "revised": revised}, &got)
+	for _, s := range []string{"changed since you began editing", "Last written by an agent", "One finding left."} {
+		if !strings.Contains(got.Conflict, s) {
+			t.Errorf("the conflict says %q, lacks %q", got.Conflict, s)
+		}
+	}
+	if !slices.Equal(got.Selected, []string{"REQUEST_CHANGES"}) {
+		t.Errorf("selected %q, want the revision's verdict, the stale edit dropped", got.Selected)
+	}
+	args := got.Posts[0]["body"].(map[string]any)["args"].(map[string]any)
+	if args["rev"] != "4" || args["payload"] != nil {
+		t.Errorf("approved with %v, want rev 4 and no dropped payload edit", args)
+	}
+}
+
+// TestCardOffersNoControlForAFieldWithoutOptions keeps a field the kind makes editable but whose schema gives
+// no enum as its value, so no edit posts a value of the wrong type.
+func TestCardOffersNoControlForAFieldWithoutOptions(t *testing.T) {
+	var got int
+	d := reviewDraft()
+	d.Fields[1].Fields[0].Fields[1].Editable = true
+	runGate(t, `
+await focus(draft(input.draft), "outbox:open:approve:draft:7").on.click();
+done(walk(draft(input.draft), (x) => ["input", "select"].includes(x.tag)).length);`, map[string]any{"draft": d}, &got)
+	if got != 1 {
+		t.Errorf("%d controls, want the verdict's only", got)
+	}
+}

@@ -478,8 +478,8 @@ done({ On: on, Plain: checked(draft(input.plain)), Sent: box(draft(input.sent)).
 		t.Errorf("a sent draft's checkbox disabled %v, want off", got.Sent)
 	}
 	posted := mustJS(t, got.Posts)
-	if len(got.Posts) != 1 || !strings.Contains(posted, "/api/tasks/draft:7/edit") || !strings.Contains(posted, `"broadcast":"false"`) {
-		t.Errorf("posts %s, want the draft's edit verb with broadcast false", posted)
+	if len(got.Posts) != 1 || !strings.Contains(posted, "/api/tasks/draft:7/edit") || !strings.Contains(posted, `"broadcast":"false"`) || !strings.Contains(posted, `"rev":"3"`) {
+		t.Errorf("posts %s, want the draft's edit verb with broadcast false at the rev shown", posted)
 	}
 }
 

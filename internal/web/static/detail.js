@@ -4,7 +4,7 @@
 // gate and a draft's in its card (gate.js); the verb whose handler replies is in the composer.
 const SKIP_HANDLERS = new Set(["seen", "answer", "edit", "retry"]);
 const detailState = {
-  id: "", task: null, error: "", seenFor: "", editing: new Map(), payloads: new Map(), unitKey: "", unitTasks: [], compose: { key: "", text: "", reaction: "" },
+  id: "", task: null, error: "", seenFor: "", editing: new Map(), payloads: new Map(), editRevs: new Map(), unitKey: "", unitTasks: [], compose: { key: "", text: "", reaction: "" },
 };
 
 // detailEnv is what the pane reaches of the page; tests replace it.
@@ -110,7 +110,7 @@ function draftTarget(e) {
 // approveEdited approves the draft of e with the text being edited.
 async function approveEdited(e) {
   const d = draftOf(e);
-  const out = await taskAct(draftTarget(e), verbFor("approve"), { text: detailState.editing.get(e.id), ...editedPayload(d, e.id), rev: String(d.rev) });
+  const out = await taskAct(draftTarget(e), verbFor("approve"), { ...editedText(d, e.id), ...editedPayload(d, e.id), rev: String(d.rev) });
   if (out) stopEditing(e.id);
   return out;
 }

@@ -93,6 +93,8 @@ type Draft struct {
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
 	Stale bool   `json:"stale,omitempty"`
+	// TextLocked says the draft's kind lets no person change its text, which its publisher may not post.
+	TextLocked bool `json:"text_locked,omitempty"`
 	// Hold keeps every approval rule from releasing the draft.
 	Hold bool `json:"hold,omitempty"`
 	// By is who wrote the draft's current content (person, session, rule or window), Author that in the
@@ -109,7 +111,7 @@ type Draft struct {
 // DraftField is a value of a draft's payload as its card shows it: Label is the plugin's word for its key
 // (ui.toml's drafts.<kind>.fields), else the key, or the item's position in a list. A scalar has Value, as
 // posted, and Shown, its word when the plugin words it; an object or a list has Fields. Editable says a
-// person may change it, to one of Options, its schema's enum.
+// person may change it, to one of Options, its schema's enum; a field with no enum is never editable on the card.
 type DraftField struct {
 	Pointer  string        `json:"pointer"`
 	Label    string        `json:"label"`

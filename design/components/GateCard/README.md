@@ -19,7 +19,7 @@ A `section.d-draft` on `raise`: its purpose and, once it left your hands, its st
 
 While a gate's or a draft's intent is on its way, its card dims (`.resolving`, `aria-busy`, over `motion-fast`) and takes no clicks; the next redraw drops it, and a failure brings it back.
 
-While a draft is being edited, each field the daemon marks editable is a control: a `select` over its schema's options in the plugin's words, else a line; approving sends the edited payload with the rev the card showed. A stale draft's approval (and retry) is off, titled with the stale note; edit and discard stay.
+While a draft is being edited, each field the daemon marks editable is a `select` over its schema's options in the plugin's words; a field with no options stays a value. The text is a textarea unless the draft's kind locks it (`text_locked`), and a draft with nothing editable offers no Edit. Approving sends the edits with the rev the card showed. When the draft is revised while it is being edited, the card says so in a note with who wrote it and its new text, and drops the edits of its fields. A stale draft's approval (and retry) is off, titled with the stale note; edit and discard stay.
 
 On a draft's own task its actions are the task's verbs (approve, edit, discard, retry); on any other task, its gate's intents. **Close without a message** and **Don't nudge this conversation** show only when the draft serves them among its actions, off with their reason when refused.
 

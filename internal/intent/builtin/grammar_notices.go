@@ -14,7 +14,7 @@ var Notices = []ToolAnswer{
 	{Name: NoticeChatStarted, Doc: "Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.",
 		Fields: []AnswerField{str("Intent"), {Name: "Resumed"}}},
 	{Name: NoticeDraftSent, Doc: "Tells the person that the reply they sent at once, Draft, is approved and goes out.", Fields: []AnswerField{num("Draft")}},
-	{Name: NoticeDraftByRule, Doc: "Tells the person that a rule of theirs, Rule, posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.",
+	{Name: NoticeDraftByRule, Doc: "Tells the person that a rule of theirs, Rule (its name as the gates record it, such as \"workflows/review gates.approval rule 0\"), posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.",
 		Fields: []AnswerField{num("Draft"), str("Where"), str("Rule"), str("Link")}},
 	{Name: NoticeDraftSaved, Doc: "Tells the person that the reply they wrote, Draft, waits for their approval.", Fields: []AnswerField{num("Draft")}},
 	{Name: NoticeReplyPlaceholder, Doc: "The placeholder of a notification's input that saves a reply for approval."},

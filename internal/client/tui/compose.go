@@ -170,7 +170,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 			m.status = m.w().T("{verb} {task} cancelled: nothing typed", map[string]any{"verb": m.actionWord(c.verb), "task": c.Label})
 			return Command{}, false
 		}
-		c.args = map[string]string{"text": text}
+		c.args = map[string]string{"text": text, "rev": strconv.FormatInt(d.Rev, 10)}
 		return m.send(c)
 	}
 	if strings.Contains(d.Text, "\n") {

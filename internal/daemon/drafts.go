@@ -210,13 +210,16 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"approve takes the rev you saw"}
 		}
-		got, err = s.decideDraft(ctx, d, gate.Approved, draftEdit{a.Text, a.Payload}, actor)
+		got, err = s.decideDraft(ctx, d, gate.Approved, draftEdit{a.Text, a.Payload, a.Rev}, actor)
 	case "edit":
 		if a.Text == nil && a.Payload == nil && a.Broadcast == nil {
 			return draft.Draft{}, badRequest{"edit takes the draft's new text, payload or broadcast"}
 		}
-		if a.Payload != nil && a.Rev == nil {
-			return draft.Draft{}, badRequest{"an edit of the payload takes the rev you saw"}
+		if a.Rev == nil {
+			return draft.Draft{}, badRequest{"edit takes the rev you saw"}
+		}
+		if err := s.checkEditable(d, a.Text, a.Payload); err != nil {
+			return draft.Draft{}, err
 		}
 		got, err = s.amend(ctx, id, personAmendment(a.Text, a.Payload, a.Broadcast, a.Rev))
 	case "discard":
@@ -243,6 +246,8 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 type draftEdit struct {
 	Text    *string
 	Payload *json.RawMessage
+	// Rev is the rev the person saw; an edit that changes the draft needs it.
+	Rev *int64
 }
 
 // changes says whether e changes d.
@@ -303,6 +308,12 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 	case actor.Actor == task.ActorAgent && g.Session == actor.Session:
 		return fmt.Errorf("%w: draft gate %d holds a draft session %s proposed, which it does not resolve", gates.ErrRefused, g.ID, actor.Session)
 	}
+	if (edit.Text != nil || edit.Payload != nil) && edit.Rev == nil {
+		return badRequest{"an approval that changes the draft takes the rev you saw"}
+	}
+	if g.Status != gate.Open {
+		return fmt.Errorf("%w: draft gate %d is %s", gates.ErrResolved, g.ID, g.Status)
+	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
 		o := s.deps.Outbox
 		n, err := strconv.ParseInt(g.Subject, 10, 64)
@@ -315,6 +326,9 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 			return err
 		}
 		if edit.changes(d) {
+			if err := s.checkEditable(d, edit.Text, edit.Payload); err != nil {
+				return err
+			}
 			if d, err = s.amend(ctx, id, personAmendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
 				return err
 			}

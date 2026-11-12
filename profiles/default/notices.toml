@@ -27,7 +27,7 @@ draft_sent = "Draft {{.Draft}} approved; it goes out in a moment."
 
 draft_saved = "Draft {{.Draft}} saved for your approval."
 
-draft_by_rule = "Posted by your rule ({{.Rule}}) to {{.Where}}."
+draft_by_rule = "Posted by one of your approval rules to {{.Where}}."
 
 reply_placeholder = "Your reply, saved for your approval"
 

@@ -199,7 +199,7 @@ func TestRuleSentNotifies(t *testing.T) {
 	}
 	sub.mu.Unlock()
 	if len(notices) != 1 || notices[0].ID != "draft:"+strconv.FormatInt(int64(byRule.ID), 10)+":by-rule" || notices[0].Unit != r7u ||
-		!strings.Contains(notices[0].Text, "gates.approval rule 0") || !strings.HasPrefix(notices[0].Text, "Posted by your rule") {
+		notices[0].Text != "Posted by one of your approval rules to acme/api#7." {
 		t.Fatalf("notices %+v, want one for the rule-sent draft in the profile's words", notices)
 	}
 	var res api.DraftsResponse
@@ -222,6 +222,128 @@ func BenchmarkDraftCardFields(b *testing.B) {
 		for range 500 {
 			var v api.Draft
 			r.s.cardFields(context.Background(), d, gate.Gate{}, &v)
+		}
+	}
+}
+
+// agentRevised is a held draft a person saw at rev 0 under gate seen, which an agent then revised to rev 1.
+func agentRevised(t *testing.T, r *outboxRig) (draft.Draft, int64) {
+	t.Helper()
+	ctx := context.Background()
+	d := r.propose(t, r7u, "Original", draft.Wait)
+	seen, _, err := r.o.GateOf(ctx, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "Agent revision"
+	if d, err = r.o.Amend(ctx, d.ID, outbox.Amendment{Text: &text}); err != nil || d.Rev != 1 {
+		t.Fatalf("agent revision: %+v %v", d, err)
+	}
+	return d, seen.ID
+}
+
+func taskArgs(args map[string]string) string {
+	body, _ := json.Marshal(api.TaskRequest{Args: args, Source: "cli"})
+	return string(body)
+}
+
+// TestGateApproveEditWithoutRevRefused holds review focus 5 on the gate route: an approval that changes the
+// draft needs the rev the person saw, and a gate an agent's revision superseded resolves nothing, so the
+// agent's revision is never replaced unseen.
+func TestGateApproveEditWithoutRevRefused(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d, seen := agentRevised(t, r)
+	path := api.GatesPath + "/" + strconv.FormatInt(seen, 10) + "/approve"
+	for _, c := range []struct {
+		args map[string]string
+		code int
+	}{
+		{map[string]string{"text": "Person's edit of rev 0"}, 400},
+		{map[string]string{"payload": `{"event":"COMMENT"}`}, 400},
+		{map[string]string{"text": "Person's edit of rev 0", "rev": "0"}, 409},
+		{map[string]string{"text": "Person's edit of rev 0", "rev": "1"}, 409},
+	} {
+		if rec := post(t, r.s, path, taskArgs(c.args)); rec.Code != c.code {
+			t.Errorf("approve %v on the superseded gate: %d %s, want %d", c.args, rec.Code, rec.Body.String(), c.code)
+		}
+	}
+	stored, _ := r.o.Store.Get(context.Background(), d.ID)
+	if stored.Text != "Agent revision" || stored.State != draft.Held || stored.Rev != 1 {
+		t.Fatalf("stored %q %s rev %d, want the agent's revision still held", stored.Text, stored.State, stored.Rev)
+	}
+}
+
+// TestEditWithoutRevRefused refuses every edit that does not name the rev the person saw, and an edit of a rev
+// an agent has since revised, so neither replaces the agent's text.
+func TestEditWithoutRevRefused(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d, _ := agentRevised(t, r)
+	path := api.TaskPath("draft:"+strconv.FormatInt(int64(d.ID), 10), "edit")
+	for _, c := range []struct {
+		args map[string]string
+		code int
+	}{
+		{map[string]string{"text": "Person's edit of rev 0"}, 400},
+		{map[string]string{"broadcast": "true"}, 400},
+		{map[string]string{"text": "Person's edit of rev 0", "rev": "0"}, 409},
+	} {
+		if rec := post(t, r.s, path, taskArgs(c.args)); rec.Code != c.code {
+			t.Errorf("edit %v: %d %s, want %d", c.args, rec.Code, rec.Body.String(), c.code)
+		}
+	}
+	if stored, _ := r.o.Store.Get(context.Background(), d.ID); stored.Text != "Agent revision" {
+		t.Fatalf("stored %q, want the agent's revision", stored.Text)
+	}
+	if rec := post(t, r.s, path, taskArgs(map[string]string{"text": "Seen and changed", "rev": "1"})); rec.Code != 200 {
+		t.Fatalf("an edit at the rev seen: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// lockedKinds declares a reply locked as GitHub's resolve is, its text no person's to change, and its review, whose text and /event are a
+// person's to change.
+type lockedKinds struct{ reviewKinds }
+
+func (k lockedKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	if kind == string(draft.Reply) {
+		return draft.KindSpec{Provider: provider, Name: kind, Delivery: "resolve"}, true
+	}
+	return k.reviewKinds.Lookup(provider, kind)
+}
+
+// TestEditRefusesWhatTheKindLocks refuses a person's text on a kind whose editable lacks text, through the edit
+// verb and an approval, and a payload change outside the kind's editable pointers; the card says the text is
+// locked.
+func TestEditRefusesWhatTheKindLocks(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.s.deps.DraftKinds = lockedKinds{}
+	d := r.propose(t, r7u, "thread resolved", draft.Wait)
+	id := strconv.FormatInt(int64(d.ID), 10)
+	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "0"})); rec.Code != 400 {
+		t.Errorf("text on a resolve draft: %d %s", rec.Code, rec.Body.String())
+	}
+	g, _, _ := r.o.GateOf(context.Background(), d)
+	if rec := post(t, r.s, api.GatesPath+"/"+strconv.FormatInt(g.ID, 10)+"/approve", taskArgs(map[string]string{"text": "a sentence", "rev": "0"})); rec.Code != 400 {
+		t.Errorf("approving a resolve draft with text: %d %s", rec.Code, rec.Body.String())
+	}
+	if stored, _ := r.o.Store.Get(context.Background(), d.ID); stored.Text != d.Text || stored.State != draft.Held || stored.Rev != d.Rev {
+		t.Fatalf("stored %q %s, want no text, still held", stored.Text, stored.State)
+	}
+	if v := r.s.draftView(context.Background(), d, g); !v.TextLocked {
+		t.Error("the resolve draft's card does not lock its text")
+	}
+	review := reviewDraftOf(draft.Held)
+	for p, ok := range map[string]bool{
+		`{"event":"COMMENT","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`: true,
+		`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":43,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}]}`: false,
+		`{"event":"REQUEST_CHANGES","comments":[]}`: false,
+		`{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},{"path":"api/retry.go","start_line":50,"line":58,"body":"Back off\nbetween tries.","extra":true}],"draft":true}`: false,
+	} {
+		raw := json.RawMessage(p)
+		if err := r.s.checkEditable(review, nil, &raw); (err == nil) != ok {
+			t.Errorf("payload %s: %v, want allowed %v", p, err, ok)
 		}
 	}
 }

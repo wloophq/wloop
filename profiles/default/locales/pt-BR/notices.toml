@@ -6,7 +6,7 @@ chat_started = "Enviado: nenhuma sessão da tarefa estava viva, então um turno 
 draft_sent = "Rascunho {{.Draft}} aprovado; sai em instantes."
 draft_saved = "Rascunho {{.Draft}} guardado para sua aprovação."
 
-draft_by_rule = "Publicado pela sua regra ({{.Rule}}) em {{.Where}}."
+draft_by_rule = "Publicado por uma das suas regras de aprovação em {{.Where}}."
 reply_placeholder = "Sua resposta, guardada para sua aprovação"
 reply_button = "Salvar"
 send_reply_placeholder = "Sua resposta, enviada agora"

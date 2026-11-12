@@ -398,12 +398,15 @@ func (s *Server) resolveDraftGateAt(ctx context.Context, g gate.Gate, intent str
 		return err
 	}
 	rev := d.Rev
+	var edit draftEdit
 	if raw, ok := args["rev"]; ok {
 		if rev, err = strconv.ParseInt(raw, 10, 64); err != nil || rev < 0 {
 			return badRequest{fmt.Sprintf("rev is the draft's revision, not %q", raw)}
 		}
 	}
-	var edit draftEdit
+	if _, ok := args["rev"]; ok {
+		edit.Rev = &rev
+	}
 	if t, ok := args["text"]; ok {
 		edit.Text = &t
 	}

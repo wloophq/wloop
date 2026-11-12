@@ -18,3 +18,11 @@ func TestCardKindsReadTheManifestsKindAndItsSchema(t *testing.T) {
 		t.Fatal("an undeclared kind is found")
 	}
 }
+
+func TestCardKindsAreTheOutboxKinds(t *testing.T) {
+	t.Skip("T13: M1 of reviews/T8.md")
+}
+
+func TestServeNotifiesRuleSent(t *testing.T) {
+	t.Skip("T13: M2 of reviews/T8.md")
+}

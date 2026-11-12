@@ -814,7 +814,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `chat_queued`: Tells the person that their chat message waits for the busy agent of a live session of the task, which is told of it when it stops.
   - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
   - `draft_sent`: Tells the person that the reply they sent at once, Draft, is approved and goes out.
-  - `draft_by_rule`: Tells the person that a rule of theirs, Rule, posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.
+  - `draft_by_rule`: Tells the person that a rule of theirs, Rule (its name as the gates record it, such as "workflows/review gates.approval rule 0"), posted draft Draft to Where, at Link once it is known; the notification and the draft's card show it.
   - `draft_saved`: Tells the person that the reply they wrote, Draft, waits for their approval.
   - `reply_placeholder`: The placeholder of a notification's input that saves a reply for approval.
   - `reply_button`: The button of a notification's input that saves a reply for approval.
