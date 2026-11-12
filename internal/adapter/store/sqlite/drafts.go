@@ -33,11 +33,11 @@ const (
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
 	insertDraft = `INSERT INTO drafts (` + draftFields + `, rev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
-	// updateDraft's author is the one given, or with none the stored one while the content stays and a
-	// person once it changes; the expressions read the row as it was.
+	// updateDraft's author is the stored one while the content stays, and once it changes the one given, a
+	// person when none is; the expressions read the row as it was.
 	updateDraft = `UPDATE drafts SET (` + draftContentFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1),
-	by_kind = CASE WHEN ? != '' THEN ? WHEN text = ? AND payload = ? AND basis = ? THEN by_kind ELSE ? END,
-	by_session = CASE WHEN ? != '' THEN ? WHEN text = ? AND payload = ? AND basis = ? THEN by_session ELSE '' END
+	by_kind = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_kind WHEN ? != '' THEN ? ELSE ? END,
+	by_session = CASE WHEN text = ? AND payload = ? AND basis = ? THEN by_session WHEN ? != '' THEN ? ELSE '' END
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -269,8 +269,8 @@ func updateArgs(d draft.Draft, from draft.State) []any {
 	args := draftArgs(d)
 	args = args[:len(args)-2]
 	kind, text, payload := string(d.By.Kind), d.Text, string(d.Payload)
-	args = append(args, kind, kind, text, payload, d.Basis, string(draft.ActorPerson),
-		kind, d.By.Session, text, payload, d.Basis)
+	args = append(args, text, payload, d.Basis, kind, kind, string(draft.ActorPerson),
+		text, payload, d.Basis, kind, d.By.Session)
 	return append(args, int64(d.ID), string(from), d.Rev)
 }
 
@@ -292,13 +292,11 @@ func (s draftStore) Update(ctx context.Context, d draft.Draft, from draft.State)
 			if _, err := tx.ExecContext(ctx, insertChangedRevision, revisionArgs(next, d.UpdatedAt)...); err != nil {
 				return err
 			}
-			if d.By.Kind == "" {
-				var by string
-				if err := tx.QueryRowContext(ctx, `SELECT by_kind, by_session FROM drafts WHERE id = ?`, int64(d.ID)).Scan(&by, &d.By.Session); err != nil {
-					return err
-				}
-				d.By.Kind = draft.ActorKind(by)
+			var by string
+			if err := tx.QueryRowContext(ctx, `SELECT by_kind, by_session FROM drafts WHERE id = ?`, int64(d.ID)).Scan(&by, &d.By.Session); err != nil {
+				return err
 			}
+			d.By.Kind = draft.ActorKind(by)
 			tx.Touch(port.TopicDrafts, d.Unit)
 			if pendingDraft(from) == pendingDraft(d.State) {
 				return nil

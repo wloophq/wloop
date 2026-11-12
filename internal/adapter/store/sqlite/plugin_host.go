@@ -19,8 +19,12 @@ const (
 		WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?1))
 		AND (?2 = '[]' OR kind IN (SELECT value FROM json_each(?2))) AND at >= ?3 ORDER BY at, id`
 	rehomeDraftSQL = `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE provider = ? AND unit_key = ?`
-	// rehomeDraftGatesSQL moves the gates of the drafts it moves along, so a draft's gate stays on its unit.
-	rehomeDraftGatesSQL = `UPDATE gates SET unit_key = ? WHERE kind = 'draft' AND provider = ? AND unit_key = ?`
+	// rehomeDraftGatesSQL moves the gates of the drafts it moves along, so a draft's gate stays on its unit, and
+	// with them the rev a waiting or approved one approves: the draft posts to the same conversation.
+	rehomeDraftGatesSQL = `UPDATE gates SET unit_key = ?1,
+		approved_rev = iif(status IN ('open', 'approved') AND approved_rev + 1 = (SELECT d.rev FROM drafts d WHERE d.id = CAST(gates.subject AS INTEGER)),
+			approved_rev + 1, approved_rev)
+		WHERE kind = 'draft' AND provider = ?2 AND unit_key = ?3`
 )
 
 // RecordSourceEvents stores the events a source plugin observed on its

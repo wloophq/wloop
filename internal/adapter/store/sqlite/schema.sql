@@ -473,13 +473,15 @@ CREATE TABLE draft_revisions (
   PRIMARY KEY (draft_id, rev)
 ) WITHOUT ROWID;
 
--- A rev that moves with the content unchanged (a state, a task, a unit) moves the rev its draft's waiting or
--- approved gate approves along: approval is of the content, and only a revision opens a new gate.
+-- A rev that moves with everything posted unchanged (a state, a task) moves the rev its draft's waiting or
+-- approved gate approves along: approval is of what is posted, and a change to any of it leaves the gate behind.
 CREATE TRIGGER drafts_rev_keeps_approval AFTER UPDATE OF rev ON drafts
 WHEN NEW.rev != OLD.rev AND NEW.text = OLD.text AND NEW.payload = OLD.payload AND NEW.basis = OLD.basis
+AND NEW.target = OLD.target AND NEW.reaction = OLD.reaction AND NEW.broadcast = OLD.broadcast AND NEW.delivery = OLD.delivery
+AND NEW.kind = OLD.kind AND NEW.provider = OLD.provider AND NEW.unit_key = OLD.unit_key
 BEGIN
   UPDATE gates SET approved_rev = NEW.rev
-  WHERE provider = NEW.provider AND unit_key IN (OLD.unit_key, NEW.unit_key) AND kind = 'draft'
+  WHERE provider = NEW.provider AND unit_key = NEW.unit_key AND kind = 'draft'
   AND subject = CAST(NEW.id AS TEXT) AND status IN ('open', 'approved') AND approved_rev = OLD.rev;
 END;
 

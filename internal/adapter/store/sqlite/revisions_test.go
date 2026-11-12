@@ -460,18 +460,66 @@ func TestARehomedHeldDraftKeepsItsApproval(t *testing.T) {
 	approvesAndSends(t, db, d.ID, g)
 }
 
-func TestARevisionLeavesTheOldApprovalBehind(t *testing.T) {
+func TestAChangeToWhatIsPostedLeavesTheOldApprovalBehind(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for name, change := range map[string]func(*draft.Draft){
+		"text":      func(d *draft.Draft) { d.Text = "hello" },
+		"payload":   func(d *draft.Draft) { d.Payload = json.RawMessage(`{"event":"APPROVE"}`) },
+		"basis":     func(d *draft.Draft) { d.Basis = "f00d" },
+		"target":    func(d *draft.Draft) { d.Target = "thread:C0123/1.2" },
+		"reaction":  func(d *draft.Draft) { d.Reaction = "eyes" },
+		"broadcast": func(d *draft.Draft) { d.Broadcast = draft.BroadcastOn },
+		"delivery":  func(d *draft.Draft) { d.Delivery = "review" },
+		"kind":      func(d *draft.Draft) { d.Kind, d.Purpose = "nudge", "nudge" },
+		"unit":      func(d *draft.Draft) { d.Unit = unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"} },
+		"provider":  func(d *draft.Draft) { d.Unit = unit.Unit{Provider: "slack", Key: acmePull.Key} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			db, _ := openTemp(t)
+			d, g := heldWithGate(t, db, acmePull)
+			change(&d)
+			moved, err := db.Drafts().Update(ctx, d, draft.Held)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := db.Gates(func() time.Time { return noteAt }).Get(ctx, g.ID)
+			if err != nil || got.ApprovedRev != g.ApprovedRev || got.ApprovedRev == moved.Rev {
+				t.Fatalf("a change of %s to rev %d moved the gate's approval from %d to %d %v", name, moved.Rev, g.ApprovedRev, got.ApprovedRev, err)
+			}
+		})
+	}
+}
+
+func TestAMoveThatPostsTheSameKeepsTheApproval(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	d, g := heldWithGate(t, db, acmePull)
-	d.Text, d.By = "hello", draft.Actor{Kind: draft.ActorSession, Session: "s-2"}
-	revised, err := db.Drafts().Update(ctx, d, draft.Held)
+	d.Why, d.Hold, d.State = "because", true, draft.Queued
+	moved, err := db.Drafts().Update(ctx, d, draft.Held)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := db.Gates(time.Now).Get(ctx, g.ID); err != nil || got.ApprovedRev == revised.Rev {
-		t.Fatalf("a revision to rev %d moved the gate's approval along: %+v %v", revised.Rev, got, err)
+	if got, err := db.Gates(func() time.Time { return noteAt }).Get(ctx, g.ID); err != nil || got.ApprovedRev != moved.Rev {
+		t.Fatalf("the draft moved to rev %d and its gate approves %d %v", moved.Rev, got.ApprovedRev, err)
+	}
+}
+
+func TestAnAuthorNamedWithoutAChangeKeepsTheStoredOne(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	d, _ := heldWithGate(t, db, acmePull)
+	d.By, d.State = draft.Actor{Kind: draft.ActorSession, Session: "s-other"}, draft.Queued
+	moved, err := db.Drafts().Update(ctx, d, draft.Held)
+	want := draft.Actor{Kind: draft.ActorSession, Session: "s-1"}
+	if err != nil || moved.By != want {
+		t.Fatalf("returned author %+v %v, want %+v", moved.By, err, want)
+	}
+	if got, err := db.Drafts().Get(ctx, d.ID); err != nil || got.By != want {
+		t.Fatalf("stored author %+v %v, want %+v", got.By, err, want)
 	}
 }
 
