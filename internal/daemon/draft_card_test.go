@@ -14,9 +14,9 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/outbox/outboxtest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
 )
 
 const reviewPayload = `{"event":"REQUEST_CHANGES","comments":[{"path":"api/handler.go","line":42,"side":"RIGHT","body":"Return the error."},` +
@@ -126,7 +126,7 @@ func TestDraftCardReadsStaleLiveForHeldDraftsOnly(t *testing.T) {
 }
 
 // eventEditable are kinds whose payload's /event a person may change too.
-type eventEditable struct{ outboxtest.Shapes }
+type eventEditable struct{ bundledtest.Shapes }
 
 func (k eventEditable) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	spec, ok := k.Shapes.Lookup(provider, kind)
@@ -139,7 +139,7 @@ func (k eventEditable) Lookup(provider, kind string) (draft.KindSpec, bool) {
 func TestCardEditPayloadMakesNewRev(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.o.Kinds = eventEditable{outboxtest.Shapes{}}
+	r.o.Kinds = eventEditable{bundledtest.Shapes{}}
 	var seen []outbox.Amendment
 	r.s.amender = func(ctx context.Context, id draft.ID, a outbox.Amendment) (draft.Draft, error) {
 		seen = append(seen, a)
@@ -315,7 +315,7 @@ func TestEditWithoutRevRefused(t *testing.T) {
 }
 
 // lockedShapes are the outbox's kinds with a reply's text locked, as lockedKinds declare it.
-type lockedShapes struct{ outboxtest.Shapes }
+type lockedShapes struct{ bundledtest.Shapes }
 
 func (k lockedShapes) Lookup(provider, kind string) (draft.KindSpec, bool) {
 	spec, ok := k.Shapes.Lookup(provider, kind)
@@ -343,7 +343,7 @@ func TestEditRefusesWhatTheKindLocks(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.s.deps.DraftKinds = lockedKinds{}
-	r.o.Kinds = lockedShapes{outboxtest.Shapes{}}
+	r.o.Kinds = lockedShapes{bundledtest.Shapes{}}
 	d := r.propose(t, r7u, "thread resolved", draft.Wait)
 	id := strconv.FormatInt(int64(d.ID), 10)
 	if rec := post(t, r.s, api.TaskPath("draft:"+id, "edit"), taskArgs(map[string]string{"text": "a sentence nobody posts", "rev": "1"})); rec.Code != 400 {
