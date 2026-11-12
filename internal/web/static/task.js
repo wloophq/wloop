@@ -485,7 +485,7 @@ function unitActionButtons(e) {
 // the actions its units offer on it.
 function taskVerbs(e) {
   const buttons = [...primaryVerbs(e), ...taskIntentButtons(e), ...unitActionButtons(e)].filter(Boolean);
-  return buttons.length ? h("div", { class: "verbs d-actions" }, ...buttons) : null;
+  return buttons.length ? [h("div", { class: "verbs d-actions" }, ...buttons), actionResult(buttons)] : null;
 }
 
 // taskPage is a task's page: its head, facts, units, the decisions that wait on it, its verbs, its tabs and the

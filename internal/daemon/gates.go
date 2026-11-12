@@ -169,7 +169,7 @@ func writeGateError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, gates.ErrNoGate):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, gates.ErrResolved), errors.Is(err, messages.ErrNotApplied):
+	case errors.Is(err, gates.ErrResolved), errors.Is(err, messages.ErrNotApplied), errors.Is(err, outbox.ErrStale):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())

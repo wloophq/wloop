@@ -174,8 +174,60 @@ const state = { roundGates: new Map(), specs: { version: "", byId: {} }, planSpe
   explore: { result: null, busy: false, error: "", recent: [], sel: "", status: {} } };
 let lastFocus = null;
 
+// actionRun is what the page knows of its action buttons, by their data-focus key: those whose request is on its
+// way, which take no click until it answers; what each last answered, shown beside it; and the button the page's
+// notices answer for while its request is on its way.
+const actionRun = { pending: new Set(), results: new Map(), owner: "" };
+
+// runAction runs click, the action of the button under key: the button, and the one each redraw makes under key,
+// is off until it answers, and the notices it raises meanwhile are its result, which the redraw its answer asks
+// for shows beside it.
+async function runAction(key, node, click, ev) {
+  if (actionRun.pending.has(key)) return undefined;
+  actionRun.pending.add(key);
+  actionRun.results.delete(key);
+  const owner = actionRun.owner;
+  actionRun.owner = key;
+  const was = !!node.disabled;
+  node.disabled = true;
+  node.setAttribute("disabled", "");
+  node.setAttribute("aria-busy", "true");
+  try {
+    return await click(ev);
+  } finally {
+    if (actionRun.owner === key) actionRun.owner = owner;
+    actionRun.pending.delete(key);
+    node.disabled = was;
+    if (!was) node.removeAttribute("disabled");
+    node.removeAttribute("aria-busy");
+  }
+}
+
+// actionNotice keeps text as the result of the button whose action raised it; false when no action is on its way.
+function actionNotice(text, isError) {
+  if (!actionRun.owner || !text) return false;
+  actionRun.results.set(actionRun.owner, { text, err: !!isError });
+  return true;
+}
+
+// actionResult is the last answer of the first of buttons that has one, drawn beside them; null for none.
+function actionResult(buttons) {
+  for (const b of (buttons || []).flat(Infinity)) {
+    if (!b) continue;
+    const key = b.getAttribute ? b.getAttribute("data-focus") : b.attrs && b.attrs["data-focus"];
+    const r = key && actionRun.results.get(key);
+    if (r) return h("p", { class: "act-result" + (r.err ? " err" : ""), "aria-live": "polite" }, r.text);
+  }
+  return null;
+}
+
 function h(tag, attrs, ...children) {
   const node = document.createElement(tag);
+  const key = attrs && attrs["data-focus"];
+  if (tag === "button" && key && typeof attrs.onclick === "function") {
+    const click = attrs.onclick;
+    attrs = { ...attrs, onclick: (ev) => runAction(key, node, click, ev), disabled: attrs.disabled || actionRun.pending.has(key) || undefined };
+  }
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v === undefined || v === null || v === false) continue;
     if (k === "class") node.className = v;
@@ -910,6 +962,7 @@ function visibleRows() {
 }
 
 function setNotice(text, isError) {
+  if (actionNotice(text, isError)) return;
   const n = document.getElementById("notice");
   n.textContent = text || "";
   n.classList.toggle("err", !!isError);
@@ -1972,6 +2025,7 @@ function questionBlock(d) {
     !asked && !q.queued && last ? [h("div", { class: "muted small" }, t("Last message")), h("pre", { class: "q-text" }, last)] : null,
     asked && q.kind === "free" && q.recommend ? h("p", { class: "recommend" }, t("Agent recommends: {answer}", { answer: q.recommend })) : null,
     choices.length ? h("div", { class: "q-options" }, choices) : null,
+    actionResult(choices),
     asked && questionPins(q) ? h("p", { class: "d-note" }, t("An answer approves a draft: open the question's task to see it before you answer.")) : null,
     answerBlock(r, choices.length > 0),
     h("div", { class: "q-turn" },
@@ -2139,8 +2193,10 @@ function renderDetail() {
     trimmedNote(d),
     intakeBlock(r),
     inCard ? null : h("label", { class: "d-sub", for: "guidance" }, guidanceLabel(r)));
+  const detailButtons = actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) });
   const acts = h("div", { class: "d-acts" },
-    h("div", { class: "d-actions" }, actionButtons(r, "detail", { scope: "detail", run: (id) => act(r, id, { guidance: guidance ? guidance.value.trim() : answerNote(r) }) })),
+    h("div", { class: "d-actions" }, detailButtons),
+    actionResult(detailButtons),
     actionNotes(r, "detail"),
     briefBlock(d.brief, r, readLens()));
   const log = h("div", { class: "d-log" },
@@ -2946,7 +3002,8 @@ async function act(row, name, extra = {}) {
     }
   } catch (err) {
     if (copy) copy.pending.reject(err);
-    state.actionError = t("{action} failed: {error}", { action: `${name} ${labelOf(row)}`, error: err.message });
+    const failed = t("{action} failed: {error}", { action: `${name} ${labelOf(row)}`, error: err.message });
+    if (!actionNotice(failed, true)) state.actionError = failed;
 
     state.actionDetail = err.detail || "";
     state.actionSource = err.source || "";

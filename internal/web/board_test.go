@@ -384,7 +384,7 @@ process.stdout.write(JSON.stringify(["revisor", "reviewer", "zebra"].map((q) => 
 // the page wrote, its plain text and HTML read after the write settles.
 func copyPrelude(t *testing.T) string {
 	src := appJS(t)
-	return `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+	return actionJS(t) + `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const state = { busy: new Set(), answered: new Map(), guidance: {}, specs: { byId: {} } };
 let answer = { ok: true, status: 200, body: {} };
 const notices = [];
@@ -888,7 +888,7 @@ process.stdout.write(JSON.stringify(log));`
 
 func TestQuestionBlockRenders(t *testing.T) {
 	src := appJS(t)
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+	prelude := actionJS(t) + `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
 const state = { busy: new Set(), answered: new Map(), guidance: { "github:acme/api#7": " check the CI first " }, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
@@ -944,7 +944,7 @@ const document = { getElementById: () => null };
 			Body map[string]any `json:"body"`
 		} `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "actionResult", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const view = (n) => { const all = walk(n); return {
@@ -997,7 +997,7 @@ const document = { getElementById: () => null };
 
 func TestQuestionCardSendsTheChoiceWithTheNoteOrTheTextAlone(t *testing.T) {
 	src := appJS(t)
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+	prelude := actionJS(t) + `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
 const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 const posts = [];
@@ -1016,7 +1016,7 @@ const document = { getElementById: () => null };
 		Ready bool             `json:"ready"`
 		Posts []map[string]any `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "actionResult", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const click = async (label, note) => {
@@ -1047,7 +1047,7 @@ const document = { getElementById: () => null };
 
 func TestQuestionCardKeepsItsControlsOffOnceAnAnswerIsSent(t *testing.T) {
 	src := appJS(t)
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+	prelude := actionJS(t) + `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
 const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 let refuse = false;
@@ -1063,7 +1063,7 @@ const document = { getElementById: () => null };
 		"turn": map[string]any{"turn": map[string]any{"seq": 1}, "records": []any{}, "answers": []any{}},
 	}
 	var got map[string][]bool
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "actionResult", "artifactBlock", "questionBlock", "guidanceLabel", "act", "acceptedNote", "settleCopy", "copied"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const buttons = () => walk(questionBlock(input)).filter((x) => x.tag === "button" && !text(x).startsWith("Send answer"));
@@ -1969,7 +1969,7 @@ func TestActivityNamesAnEventByItsUnitsLabel(t *testing.T) {
 
 func TestAQueuedAnswerHidesTheQuestionsOptions(t *testing.T) {
 	src := appJS(t)
-	prelude := `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
+	prelude := actionJS(t) + `function h(tag, attrs, ...c) { return { tag, attrs: attrs || {}, children: c.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false) }; }
 const roundGate = () => undefined;
 const state = { busy: new Set(), answered: new Map(), guidance: {}, health: { viewer: "me" }, specs: { byId: { answer: { id: "answer", input: { kind: "answer" } } } } };
 function render() {}
@@ -1993,7 +1993,7 @@ const document = { getElementById: () => null };
 		Open    bool     `json:"open"`
 		Queued  bool     `json:"queued"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "questionShown", "answerSent", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "questionPins", "actionResult", "artifactBlock", "questionBlock", "guidanceLabel", "answerableQuestion", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const block = questionBlock(input.queued);
@@ -2012,4 +2012,10 @@ const document = { getElementById: () => null };
 	if !got.Open || got.Queued {
 		t.Errorf("the keys answer an open question %v, a queued one %v", got.Open, got.Queued)
 	}
+}
+
+// actionJS is app.js's record of its action buttons, and the functions that keep and draw their results.
+func actionJS(t *testing.T) string {
+	src := appJS(t)
+	return jsConst(t, src, "actionRun") + jsFunction(t, src, "actionNotice") + jsFunction(t, src, "actionResult")
 }

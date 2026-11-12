@@ -82,6 +82,9 @@ func (s *Server) byRuleText(d draft.Draft, rule, where string) string {
 // stale is whether held draft d's unit moved past its basis, read live by the outbox within the page's lookup
 // deadline; false when it cannot tell, since approving re-checks it.
 func (s *Server) stale(ctx context.Context, d draft.Draft) bool {
+	if rev, ok := s.refusedStale.Load(d.ID); ok && rev.(int64) == d.Rev {
+		return true
+	}
 	check := s.deps.Stale
 	if check == nil {
 		st, ok := any(s.deps.Outbox).(staler)
@@ -388,4 +391,12 @@ func personAmendment(text *string, payload *json.RawMessage, broadcast *bool, re
 		a.Rev = *rev
 	}
 	return a
+}
+
+// noteStale remembers that draft id was refused at rev as stale, so its card says so and keeps its approval off
+// until it is revised, whatever a later live read within the page's deadline can tell.
+func (s *Server) noteStale(id draft.ID, rev int64, err error) {
+	if errors.Is(err, outbox.ErrStale) {
+		s.refusedStale.Store(id, rev)
+	}
 }
