@@ -43,7 +43,7 @@ launchctl kickstart gui/$(id -u)/io.github.{{org}}.{{name}}   # macOS, after app
 {{command}} serve                                               # or in a terminal
 ```
 
-The menu bar shows `PR ?` until the daemon answers. When the store is the reason, `doctor` says so under the daemon error. If the LaunchAgent is missing or runs another command, `{{command}} app install` rewrites it.
+The menu bar shows `{{app}} ?` until the daemon answers. When the store is the reason, `doctor` says so under the daemon error. If the LaunchAgent is missing or runs another command, `{{command}} app install` rewrites it.
 
 ## The store needs attention
 

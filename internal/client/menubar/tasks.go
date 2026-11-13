@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -99,7 +100,7 @@ func (c *Controller) title() string {
 	if c.counters != nil {
 		badge = c.counters.Badge
 	}
-	return c.words().T("PR {n}", map[string]any{"n": badge})
+	return c.words().T("{name} {n}", map[string]any{"name": brand.Name, "n": badge})
 }
 
 func (c *Controller) taskSection(label string, view string) []MenuItem {

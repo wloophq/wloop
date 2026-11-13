@@ -28,14 +28,14 @@ func TestTitleIsTheBadge(t *testing.T) {
 	r.d.rows["needs-me"] = []api.Row{reviewRow(1), reviewRow(2)}
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 0, "outbox": 0}, Badge: 4}
 	r.c.Refresh(context.Background())
-	if got := r.title(); got != "PR 4" {
+	if got := r.title(); got != brand.Name+" 4" {
 		t.Fatalf("title %q, want the badge", got)
 	}
 	r.d.mu.Lock()
 	r.d.counters.Badge = 6
 	r.d.mu.Unlock()
 	r.c.apply(context.Background(), api.Change{Type: "changed", Epoch: "e1", Rev: 1, Units: []unit.Unit{uref(1)}, Counters: &api.Counters{Badge: 6}})
-	if got := r.title(); got != "PR 6" {
+	if got := r.title(); got != brand.Name+" 6" {
 		t.Fatalf("title %q after a change with counters", got)
 	}
 }
@@ -47,7 +47,7 @@ func TestBadgeAgreesWithTheInbox(t *testing.T) {
 	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "outbox": 1}, Badge: 4}
 	r.c.Refresh(context.Background())
 	got := titles(r.tray.menu)
-	if r.title() != "PR 4" || index(got, "Inbox (3)") < 0 || index(got, "Outbox (1)") < 0 {
+	if r.title() != brand.Name+" 4" || index(got, "Inbox (3)") < 0 || index(got, "Outbox (1)") < 0 {
 		t.Fatalf("title %q, menu %q", r.title(), got)
 	}
 }
@@ -121,7 +121,7 @@ func TestAStoreTheDaemonCannotOpenShowsWhyAndTheCommand(t *testing.T) {
 	r.d.rowsErr = errors.New("the store is not open")
 	r.d.health = api.Health{Store: &api.StoreStatus{State: api.StoreFailed, Message: "the store migration from version 1 failed", Fix: "fix-it migrate"}}
 	r.c.Refresh(context.Background())
-	if r.title() != "PR !" {
+	if r.title() != brand.Name+" !" {
 		t.Fatalf("title %q", r.title())
 	}
 	got := titles(r.tray.menu)
@@ -139,7 +139,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	r := newRig(t)
 	r.d.err = errors.New("dial unix: connection refused")
 	r.c.Refresh(context.Background())
-	if r.title() != "PR ?" {
+	if r.title() != brand.Name+" ?" {
 		t.Fatalf("title %q", r.title())
 	}
 	got := titles(r.tray.menu)
@@ -152,7 +152,7 @@ func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	r.d.counters = api.Counters{Badge: 1}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
-	if r.title() != "PR 1" {
+	if r.title() != brand.Name+" 1" {
 		t.Fatalf("did not recover: %q", r.title())
 	}
 }

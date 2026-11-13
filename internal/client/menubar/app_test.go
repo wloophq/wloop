@@ -633,7 +633,7 @@ func TestMenuShowsBeforeThePermissionIsAnswered(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- r.c.Run(ctx) }()
-	waitFor(t, func() bool { return r.title() == "PR 1" })
+	waitFor(t, func() bool { return r.title() == brand.Name+" 1" })
 	close(r.notes.block)
 	cancel()
 	<-done

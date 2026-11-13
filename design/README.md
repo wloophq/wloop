@@ -85,7 +85,7 @@ The menu bar notifications use four 128px PNG badges (assets group **Notificatio
 |---|---|
 | Cockpit | all tokens, both themes from `prefers-color-scheme` |
 | Terminal client | the same views, keys and words; bold for the current view, dim for disabled actions; no hues of its own |
-| Menu bar | `PR <n>` title, menu sections in cockpit order, the four notification badges |
+| Menu bar | `wloop <n>` title, menu sections in cockpit order, the four notification badges |
 | Docs | Starlight with `me` as its accent and the loop mark |
 
 ## Further sections
