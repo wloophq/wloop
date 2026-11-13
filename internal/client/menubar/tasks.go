@@ -96,11 +96,19 @@ func (c *Controller) firstView() string {
 }
 
 func (c *Controller) title() string {
+	params := map[string]any{}
 	badge := 0
 	if c.counters != nil {
 		badge = c.counters.Badge
+		for view, n := range c.counters.Views {
+			params[view] = n
+		}
 	}
-	return c.words().T("{name} {n}", map[string]any{"name": brand.Name, "n": badge})
+	params["name"], params["n"] = brand.Name, badge
+	if c.health.Paused {
+		return c.words().T("{name} {n} paused", params)
+	}
+	return c.words().T("{name} {n}", params)
 }
 
 func (c *Controller) taskSection(label string, view string) []MenuItem {

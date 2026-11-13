@@ -23,6 +23,7 @@
 "Task {task} has no unit to act on" = "A tarefa {task} não tem unidade para agir"
 "This notification offers no {action}" = "Esta notificação não oferece {action}"
 "{name} {n}" = "{name} {n}"
+"{name} {n} paused" = "{name} {n} pausado"
 "{name} !" = "{name} !"
 "{name} ?" = "{name} ?"
 "Daemon not answering: {error}" = "O daemon não responde: {error}"

@@ -40,6 +40,32 @@ func TestTitleIsTheBadge(t *testing.T) {
 	}
 }
 
+func TestTitleReadsEachViewsCount(t *testing.T) {
+	r := newRig(t)
+	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{needs-me}/{inbox} of {n}"}}}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "needs-me": 2}, Badge: 5}
+	r.c.Refresh(context.Background())
+	if got := r.title(); got != "2/3 of 5" {
+		t.Fatalf("title %q, want each view's count", got)
+	}
+}
+
+func TestTitleSaysPausedWhileAutomaticRoundsAre(t *testing.T) {
+	r := newRig(t)
+	r.d.health.Paused = true
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3}, Badge: 3}
+	r.c.Refresh(context.Background())
+	if got := r.title(); got != brand.Name+" 3 paused" {
+		t.Fatalf("title %q, want the paused title", got)
+	}
+	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n} paused": {"other": "⏸ {inbox}"}}}
+	r.d.health.Strings = "custom-1"
+	r.c.Refresh(context.Background())
+	if got := r.title(); got != "⏸ 3" {
+		t.Fatalf("title %q, want the profile's paused title with the view's count", got)
+	}
+}
+
 func TestBadgeAgreesWithTheInbox(t *testing.T) {
 	r := newRig(t)
 	r.d.tasks["inbox"] = []api.TaskView{plainTask(1), plainTask(2), plainTask(3)}
