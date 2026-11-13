@@ -89,3 +89,7 @@ mode = "send"
 [[gates.approval.rule]]
 when = 'draft.delivery == "request_review"'
 mode = "send"
+
+[[gates.approval.rule]]
+when = 'draft.delivery == "comment"'
+mode = "send"
