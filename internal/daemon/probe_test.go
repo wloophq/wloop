@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -21,11 +22,13 @@ import (
 type probeLauncher struct {
 	svc      *turns.Service
 	launches []turns.Launch
+	held     []bool
 	err      error
 }
 
 func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) error {
 	l.launches = append(l.launches, x)
+	l.held = append(l.held, lock.Held(ctx))
 	if l.err != nil {
 		return l.err
 	}
@@ -49,8 +52,8 @@ func TestProbeAPI(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatal(err)
 	}
-	if len(l.launches) != 1 {
-		t.Fatalf("launches %+v", l.launches)
+	if len(l.launches) != 1 || !l.held[0] {
+		t.Fatalf("launches %+v, loop held %v", l.launches, l.held)
 	}
 	x := l.launches[0]
 	if x.Intent != turn.Intent(dintent.Probe) || x.Trigger != turn.Automated || x.WorkspaceID != "ws-e2e" || x.Home != "/homes/a" || x.Model != "haiku" || x.ResumeOf != 0 ||

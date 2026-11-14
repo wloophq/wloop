@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -600,11 +601,11 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 // delegate runs d on u with call: under the loop when it writes to it, the
 // pending round dropped first when it sends one, its event recorded after.
 func (s *Server) delegate(ctx context.Context, d delegated, u unit.Unit, call Call) error {
-	if d.loop && !LoopHeld(ctx) {
+	if d.loop && !lock.Held(ctx) {
 		ctx = s.readAhead(ctx, u, d.full)
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
-		ctx = withLoopHeld(ctx)
+		ctx = lock.WithHeld(ctx)
 	}
 	if d.event == builtin.EventRoundSent {
 		if err := s.dropPending(ctx, u, askedByYou); err != nil {
@@ -638,12 +639,12 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	}
 	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Task: req.Task,
 		Manager: req.Manager, Parent: req.Parent}
-	if a, ok := s.deps.Actions.(AheadPreparer); ok && !LoopHeld(ctx) {
+	if a, ok := s.deps.Actions.(AheadPreparer); ok && !lock.Held(ctx) {
 		if err := a.PrepareAhead(ctx, name, u, call); err != nil {
 			return err
 		}
 	}
-	if !LoopHeld(ctx) {
+	if !lock.Held(ctx) {
 		ctx = s.readAhead(ctx, u, false)
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()

@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -36,7 +37,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.WithoutCancel(r.Context())
 	s.deps.LoopMu.Lock()
-	u, err := s.probe(ctx, req, d)
+	u, err := s.probe(lock.WithHeld(ctx), req, d)
 	s.deps.LoopMu.Unlock()
 	if err != nil {
 		writeAgentError(w, err)

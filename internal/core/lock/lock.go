@@ -1,4 +1,5 @@
-// Package lock holds a mutual exclusion lock a waiter can give up on.
+// Package lock holds a mutual exclusion lock a waiter can give up on, and
+// the context mark of a caller that holds the loop's.
 package lock
 
 import (

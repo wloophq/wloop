@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -75,8 +76,6 @@ type byHandOutcome struct {
 	err error
 }
 
-type loopHeldKey struct{}
-
 type briefMissingKey struct{}
 
 // BriefMissing is why the turn an intake starts under ctx goes without a
@@ -84,18 +83,6 @@ type briefMissingKey struct{}
 func BriefMissing(ctx context.Context) string {
 	why, _ := ctx.Value(briefMissingKey{}).(string)
 	return why
-}
-
-// withLoopHeld marks ctx as run by a caller that holds the loop mutex.
-func withLoopHeld(ctx context.Context) context.Context {
-	return context.WithValue(ctx, loopHeldKey{}, true)
-}
-
-// LoopHeld tells a context whose caller holds the daemon's loop mutex, as
-// an intake's start does: what runs under it must not take the mutex again.
-func LoopHeld(ctx context.Context) bool {
-	held, _ := ctx.Value(loopHeldKey{}).(bool)
-	return held
 }
 
 func (s *Server) newIntakes(d Deps) *intake.Service {
@@ -375,7 +362,7 @@ func (st intakeStarter) ReadAhead(ctx context.Context, i intake.Intake) context.
 
 func (st intakeStarter) Start(ctx context.Context, i intake.Intake, out io.Writer) (intake.StartedTurn, error) {
 	s := st.s
-	ctx = withLoopHeld(context.WithoutCancel(ctx))
+	ctx = lock.WithHeld(context.WithoutCancel(ctx))
 	if i.Brief != intake.BriefReady && i.Note != "" {
 		ctx = context.WithValue(ctx, briefMissingKey{}, i.Note)
 	}

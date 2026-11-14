@@ -7,6 +7,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
@@ -17,6 +18,7 @@ import (
 // the pending items whose window ended with default run; the caller holds
 // the loop lock.
 func (e *Engine) DueRun(ctx context.Context) (err error) {
+	ctx = lock.WithHeld(ctx)
 	pause, err := e.pause(ctx)
 	if err != nil {
 		return err

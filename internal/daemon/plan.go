@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -211,7 +212,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	}
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
-	done, err := p.Act(withLoopHeld(ctx), id, planActions[action], guidance)
+	done, err := p.Act(lock.WithHeld(ctx), id, planActions[action], guidance)
 	if done.ID == "" {
 		done = it
 	}

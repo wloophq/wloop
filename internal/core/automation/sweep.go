@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -102,6 +103,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 
 	loop.Lock()
 	defer loop.Unlock()
+	ctx = lock.WithHeld(ctx)
 	pause, err := e.pause(ctx)
 	if err != nil {
 		return "", "", err

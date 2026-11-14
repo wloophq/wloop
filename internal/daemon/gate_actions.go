@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -51,13 +52,13 @@ func (s *Server) Release(ctx context.Context, g gate.Gate) error {
 	if s.deps.Plan == nil {
 		return errPlanUnavailable
 	}
-	if !LoopHeld(ctx) {
+	if !lock.Held(ctx) {
 		if s.forge(g.Unit) {
 			ctx = s.readAhead(ctx, g.Unit, true)
 		}
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
-		ctx = withLoopHeld(ctx)
+		ctx = lock.WithHeld(ctx)
 	}
 	return s.deps.Plan.Release(ctx, g)
 }

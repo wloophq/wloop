@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -45,7 +46,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx = s.readAhead(ctx, task.UnitOf(e.ID), false)
 	s.deps.LoopMu.Lock()
-	res, err := s.deps.Messages.Chat(withLoopHeld(ctx), messages.ChatRequest{Task: e.ID, Text: req.Text, Intent: strings.TrimSpace(req.Intent)})
+	res, err := s.deps.Messages.Chat(lock.WithHeld(ctx), messages.ChatRequest{Task: e.ID, Text: req.Text, Intent: strings.TrimSpace(req.Intent)})
 	s.deps.LoopMu.Unlock()
 	var refused messages.ChatRefusal
 	switch {

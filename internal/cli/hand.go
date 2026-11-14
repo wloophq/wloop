@@ -48,7 +48,7 @@ func (e *Env) byHand(loopMu *lock.Mutex) func(ctx context.Context, r api.ByHandR
 		if err != nil {
 			return api.ByHandResult{}, daemon.BadRequest(err.Error())
 		}
-		if !daemon.LoopHeld(ctx) {
+		if !lock.Held(ctx) {
 			u, err := e.byHandRef(ctx, r, handle)
 			if err != nil {
 				return api.ByHandResult{}, err
@@ -63,6 +63,7 @@ func (e *Env) byHand(loopMu *lock.Mutex) func(ctx context.Context, r api.ByHandR
 			}
 			loopMu.Lock()
 			defer loopMu.Unlock()
+			ctx = lock.WithHeld(ctx)
 		}
 		var text, notes bytes.Buffer
 		q := *e

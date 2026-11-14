@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -59,11 +60,11 @@ func (s *Server) Deliver(ctx context.Context, g gate.Gate) error {
 	if s.deps.Messages == nil {
 		return errors.New("the Inbox is not wired")
 	}
-	if !LoopHeld(ctx) {
+	if !lock.Held(ctx) {
 		ctx = s.readAhead(ctx, g.Unit, false)
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
-		ctx = withLoopHeld(ctx)
+		ctx = lock.WithHeld(ctx)
 	}
 	return s.deps.Messages.Deliver(ctx, g)
 }
