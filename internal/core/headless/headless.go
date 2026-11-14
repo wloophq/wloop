@@ -194,9 +194,7 @@ func (x *runner) Guard(_ context.Context, t turns.Turn) error {
 }
 
 func (x *runner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
-	r := x.r
-	r.Guidance, r.Inputs = t.Guidance(), t.Inputs()
-	st, err := x.s.begin(ctx, r)
+	st, err := x.s.begin(ctx, t, x.r)
 	if err != nil {
 		return turns.Outcome{}, err
 	}
@@ -235,12 +233,11 @@ func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.An
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
-	t, err := s.Starter.Resume(ctx, u, q.Seq)
+	t, err := s.Starter.ResumeAnswered(ctx, u, q.Seq, said)
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
-	st, err := s.begin(ctx, Request{Unit: t.Unit(), Items: turns.ItemsOf(q), Task: turns.TaskOf(q), Intent: t.Intent(), Guidance: said,
-		Inputs: t.Inputs(), Trigger: t.Trigger(), Workflow: q.Workflow, ResumeOf: t.ResumeOf()})
+	st, err := s.begin(ctx, t, Request{Items: turns.ItemsOf(q), Task: turns.TaskOf(q), Workflow: q.Workflow})
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
@@ -273,11 +270,10 @@ func (s *Service) def(u unit.Unit, name turn.Intent) (intent.Def, error) {
 	return def, nil
 }
 
-// begin renders and stores r's turn, a new one Start admitted or a resume.
-func (s *Service) begin(ctx context.Context, r Request) (started, error) {
-	if r.Trigger == "" {
-		r.Trigger = turn.ByHand
-	}
+// begin renders and stores t, a new turn Start admitted or a resume, with
+// r's items, task and workflow.
+func (s *Service) begin(ctx context.Context, t turns.Turn, r Request) (started, error) {
+	r.Unit, r.Intent, r.Trigger, r.Guidance, r.Inputs, r.ResumeOf = t.Unit(), t.Intent(), t.Trigger(), t.Guidance(), t.Inputs(), t.ResumeOf()
 	def, err := s.def(r.Unit, r.Intent)
 	if err != nil {
 		return started{}, err
@@ -325,8 +321,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 		return started{}, err
 	}
 	id := randomHex()
-	seq, err := s.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: r.Unit, Intent: r.Intent, Turn: id, Trigger: r.Trigger,
-		Guidance: r.Guidance, Inputs: r.Inputs, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Task: r.Task, ResumeOf: r.ResumeOf})
+	seq, err := s.Turns.BeginHeadless(ctx, t, turns.HeadlessStart{Turn: id, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Task: r.Task})
 	if err != nil {
 		return started{}, err
 	}

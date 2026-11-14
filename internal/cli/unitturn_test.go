@@ -268,6 +268,36 @@ func TestThreadTurnResumes(t *testing.T) {
 	}
 }
 
+func TestAnAnsweredUnitTurnResumesWithTheItemsAndTaskOfTheTurnItResumes(t *testing.T) {
+	te, m := threadTurnEnv(t)
+	ctx := context.Background()
+	if _, err := client.New(te.Socket).Action(ctx, thread1, "discuss", api.ActionRequest{Guidance: "be brief"}); err != nil {
+		t.Fatal(err)
+	}
+	round := discussRound(t, m.Prompts[0].Text)
+	b := te.threadBook(t)
+	b.Turns[0].Inputs = map[string]any{"items": []string{"item-3"}, "task": "t-9"}
+	if _, err := te.repo.Save(ctx, b); err != nil {
+		t.Fatal(err)
+	}
+	id := te.sessionOf(t, "fake", m.Prompts[0].Handle)
+	if _, err := te.Turns.Start(ctx, id, round); err != nil {
+		t.Fatal(err)
+	}
+	rec := record.Record{State: record.Asked, Summary: "asked which answer to post", Resume: "post the answer the user picks",
+		Question: &record.Question{Kind: "free", Text: "Post the short answer?"}}
+	if _, err := te.Turns.RecordTurnEnd(ctx, turns.RecordRequest{Session: id, Turn: round, Unit: thread1, Via: "socket", Record: rec}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := te.Turns.Answer(ctx, turns.AnswerRequest{Unit: thread1, Text: "yes, the short one", Source: dturn.Source("cli")}); err != nil || got.Route != dturn.Resumed {
+		t.Fatalf("answer %+v %v\n%s", got, err, te.err)
+	}
+	b = te.threadBook(t)
+	if len(b.Turns) != 2 || !slices.Equal(turns.ItemsOf(b.Turns[1]), []string{"item-3"}) || turns.TaskOf(b.Turns[1]) != "t-9" {
+		t.Fatalf("turns %+v, want the resume to keep item-3 and t-9", b.Turns)
+	}
+}
+
 // numberedSessions is the fake manager whose sessions each get their own
 // terminal, live in sessions.
 type numberedSessions struct {

@@ -36,10 +36,12 @@ import (
 
 // unitRun is a round on a unit of a provider other than GitHub.
 type unitRun struct {
-	def      dintent.Def
-	cfg      config.Config
-	r        turn.Request
-	resumeOf int64
+	def dintent.Def
+	cfg config.Config
+	r   turn.Request
+	// turn is the turn the round records: a new one its start admitted, or
+	// a resume.
+	turn turns.Turn
 	// manager and parent are the request's workspace manager and the
 	// caller's worktree, for the worktree the round creates.
 	manager, parent string
@@ -84,7 +86,7 @@ func (x *askedUnitRunner) Guard(ctx context.Context, t turns.Turn) error {
 
 func (x *askedUnitRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
 	r := turn.Request{Intent: turn.Intent(x.d.Name), Trigger: turn.ByHand, Unit: t.Unit(), Guidance: t.Guidance(), Inputs: x.inputs, Items: x.c.Items, Task: x.c.Task}
-	return x.e.runOnUnit(ctx, unitRun{def: x.d, cfg: x.cfg, r: r, manager: x.c.Manager, parent: x.c.Parent})
+	return x.e.runOnUnit(ctx, unitRun{def: x.d, cfg: x.cfg, r: r, turn: t, manager: x.c.Manager, parent: x.c.Parent})
 }
 
 // launchUnit is cliLauncher.Launch on a unit of a provider other than
@@ -107,9 +109,8 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) (tu
 		if !ok {
 			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", l.Unit.Label(), l.ResumeOf)
 		}
-		r.Trigger, r.Guidance = requestTrigger(prev.Trigger), cmp.Or(l.Guidance, prev.Guidance)
 		if r.Inputs == nil {
-			r.Inputs = prev.Inputs
+			r.Inputs = turns.InputsOf(prev)
 		}
 		r.Items, r.Task = turns.ItemsOf(prev), turns.TaskOf(prev)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
@@ -120,7 +121,7 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) (tu
 			return turns.Outcome{}, err
 		}
 	}
-	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, resumeOf: l.ResumeOf})
+	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, turn: l.Turn})
 }
 
 // runOnUnit builds and stores the round's turn, types it into a session of
@@ -135,7 +136,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error)
 	if run.def.WorkspaceRepo != nil {
 		run.cfg = scoped(run)
 	}
-	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, resumeOf: run.resumeOf, unit: u})
+	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, unit: u})
 	ws, shared, err := e.runWorkspace(ctx, run, opts)
 	if err != nil {
 		return turns.Outcome{}, err
@@ -160,11 +161,10 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error)
 	case a.Busy && !shared:
 		opts.keepLive, opts.busy = true, true
 	}
-	sent, err := e.sendTurn(ctx, run.cfg, run.r)
+	sent, err := e.sendTurn(ctx, run.cfg, run.turn, run.r)
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	sent.resume(run.resumeOf)
 	handle, verb, err := e.session(ctx, run.cfg, ws, u, opts)
 	if err != nil {
 		e.blockUnit(ctx, run, err)

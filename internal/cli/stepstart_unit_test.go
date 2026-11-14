@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -154,7 +155,8 @@ help = "owner/name"
 	if err != nil {
 		t.Fatal(err)
 	}
-	run := unitRun{def: d, cfg: r.te.cfg, r: turn.Request{Intent: "implement", Trigger: turn.ByHand, Unit: thread1, Inputs: map[string]any{"repo": "acme/api"}}}
+	run := unitRun{def: d, cfg: r.te.cfg, r: turn.Request{Intent: "implement", Trigger: turn.ByHand, Unit: thread1, Inputs: map[string]any{"repo": "acme/api"}},
+		turn: turnstest.Started(turns.Request{Unit: thread1, Intent: "implement", Trigger: dturn.ByHand, Inputs: map[string]any{"repo": "acme/api"}})}
 	if _, err := r.te.runOnUnit(context.Background(), run); err != nil {
 		t.Fatalf("%v\n%s", err, r.te.err)
 	}
@@ -162,6 +164,7 @@ help = "owner/name"
 		t.Fatalf("writes %q", r.m.Writes)
 	}
 	run.r.Unit, run.r.Inputs = thread2, map[string]any{"repo": "evil/elsewhere"}
+	run.turn = turnstest.Started(turns.Request{Unit: thread2, Intent: "implement", Trigger: dturn.ByHand, Inputs: run.r.Inputs})
 	if _, err := r.te.runOnUnit(context.Background(), run); err == nil || !strings.Contains(err.Error(), "is not registered") {
 		t.Fatalf("a repository the manager does not know: %v", err)
 	}
@@ -224,11 +227,11 @@ func TestTheAutomatedBudgetCountsTheDayOutsideTheRoundProviders(t *testing.T) {
 	ctx := context.Background()
 	at := r.te.Now()
 	for i, u := range []unit.Unit{thread1, ghUnit(7)} {
-		if _, err := r.te.Turns.Send(ctx, turns.SendRequest{Unit: u, Intent: "implement", Turn: "t" + string(rune('a'+i)), Trigger: dturn.Automated, Records: true}); err != nil {
+		if _, err := turnstest.Send(ctx, r.te.Turns, turns.SendRequest{Unit: u, Intent: "implement", Turn: "t" + string(rune('a'+i)), Trigger: dturn.Automated, Records: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := r.te.Turns.Send(ctx, turns.SendRequest{Unit: thread2, Intent: "implement", Turn: "tc", Trigger: dturn.ByHand, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, r.te.Turns, turns.SendRequest{Unit: thread2, Intent: "implement", Turn: "tc", Trigger: dturn.ByHand, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	day := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location())

@@ -219,7 +219,7 @@ func TestARoundReadsAnyRegistryIntent(t *testing.T) {
 	userProfile(t, te, nil)
 	for _, intent := range []dintent.Name{dintent.Probe, "ask-author"} {
 		te.out.Reset()
-		sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(intent), Unit: r7.Unit(), Payload: &turn.PR{}})
+		sent, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(intent), Unit: r7.Unit(), Payload: &turn.PR{}})
 		if err != nil {
 			t.Fatal(err)
 		}

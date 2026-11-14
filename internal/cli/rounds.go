@@ -65,6 +65,8 @@ type step struct {
 	address *turn.RoundReason
 	// inputs are the round's turn inputs, as its role's prepare filled them.
 	inputs map[string]any
+	// turn is the turn the round records, as its start admitted it.
+	turn turns.Turn
 }
 
 func (s step) key() string { return s.pr.String() }
@@ -284,6 +286,8 @@ type roundCall struct {
 	OnSent, OnSkipped map[string]string
 	Guidance          string
 	Inputs            map[string]any
+	// Turn is the turn the round records, as its start admitted it.
+	Turn turns.Turn
 	// BriefMissing is why the round goes without its brief, "" with one.
 	BriefMissing string
 	// Observed is a round the facts only log: its workspace is gone and its
@@ -310,7 +314,7 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (turn
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
 		head: c.Head, onSent: c.OnSent, onSkipped: c.OnSkipped,
 		read: &pr.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
-		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs}, c.Guidance)
+		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs, turn: c.Turn}, c.Guidance)
 }
 
 func (s *sweep) send(ctx context.Context, st step, guidance string) (o turns.Outcome, err error) {
@@ -344,7 +348,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (turns.O
 		}
 		return s.openRound(ctx, st, guidance, turn.PlannedFollowUp)
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, st.turn, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
 		Inputs: st.inputs, BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return turns.Outcome{}, err
@@ -401,7 +405,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, st.turn, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
 		Inputs: st.inputs, BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return turns.Outcome{}, err
@@ -469,7 +473,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (turns.Ou
 	}
 	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, Inputs: st.inputs,
 		BriefMissing: st.briefMissing, Why: st.why}
-	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
+	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read, turn: st.turn}))
 	out := turns.Outcome{ID: turnID}
 	if err != nil {
 		return out, err

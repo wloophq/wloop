@@ -133,3 +133,52 @@ func (e *Effects) Befores() int {
 	defer e.mu.Unlock()
 	return e.befores
 }
+
+// Started is the turn a start of r admits, for a test that hands a sink a
+// turn of its own: no prepare runs and no guidance is taken.
+func Started(r turns.Request) turns.Turn {
+	var got turns.Turn
+	s := &turns.Starter{Defs: anyDefs{}, Preparer: &Prepares{}, Kept: noKept{}, Loop: noLoop{}, Effects: noEffects{}}
+	if _, err := s.Start(context.Background(), r, admit{&got}); err != nil {
+		panic(err)
+	}
+	return got
+}
+
+// anyDefs know every intent, with no role.
+type anyDefs struct{}
+
+func (anyDefs) Def(name turn.Intent) (turns.Def, bool) {
+	return turns.Def{Def: dintent.Def{Name: dintent.Name(name)}}, true
+}
+
+func (anyDefs) ByRole(string, unit.ProviderID) (turns.Def, bool) { return turns.Def{}, false }
+
+// admit is a runner that keeps the turn it is given, unused.
+type admit struct{ got *turns.Turn }
+
+func (a admit) Run(_ context.Context, t turns.Turn) (turns.Outcome, error) {
+	*a.got = t
+	return turns.Outcome{}, nil
+}
+
+// Sent is the turn admitted with the identity r carries.
+func Sent(r turns.SendRequest) turns.Turn {
+	return Started(turns.Request{Unit: r.Unit, Intent: r.Intent, Guidance: r.Guidance, Inputs: r.Inputs, Trigger: r.Trigger, ResumeOf: r.ResumeOf})
+}
+
+// Send is s.Send of r, as a turn admitted with r's identity.
+func Send(ctx context.Context, s *turns.Service, r turns.SendRequest) (turn.Turn, error) {
+	return s.Send(ctx, Sent(r), r)
+}
+
+// StartByHand is s.StartByHand of r, as a turn admitted with r's identity.
+func StartByHand(ctx context.Context, s *turns.Service, r turns.SendRequest, handle string) (turn.Turn, error) {
+	return s.StartByHand(ctx, Sent(r), r, handle)
+}
+
+// BeginHeadless is s.BeginHeadless of h, as a turn admitted with h's identity.
+func BeginHeadless(ctx context.Context, s *turns.Service, h turns.HeadlessStart) (int64, error) {
+	x := Started(turns.Request{Unit: h.Unit, Intent: h.Intent, Guidance: h.Guidance, Inputs: h.Inputs, Trigger: h.Trigger, ResumeOf: h.ResumeOf})
+	return s.BeginHeadless(ctx, x, h)
+}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -302,7 +303,7 @@ func TestApprovedOptionDraftFailedFreesTheUnit(t *testing.T) {
 			t.Fatalf("%s: turn %s, records %+v", state, b.Turns[0].State, b.Records)
 		}
 		req := turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "next", Trigger: turn.Automated, Head: "h2", Records: true}
-		if _, err := s.Send(ctx, req); err != nil {
+		if _, err := turnstest.Send(ctx, s, req); err != nil {
 			t.Fatalf("%s: an automated round after the draft %s: %v", state, state, err)
 		}
 	}

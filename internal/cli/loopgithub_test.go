@@ -152,7 +152,7 @@ func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	mctx, sc := metertest.Start(t, ctx)
-	if _, err := (cliLauncher{te.Env}).Launch(mctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
+	if _, err := te.launchAdmitted(mctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 0})

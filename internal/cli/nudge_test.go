@@ -205,7 +205,7 @@ func TestANudgeRecordsTheTurnItSent(t *testing.T) {
 		},
 		"resuming a turn that never started": func(t *testing.T, te *testEnv) error {
 			seq := storedTurn(t, te, r7, dintent.Nudge, inputs)
-			_, err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r7).Unit(), Intent: dturn.Intent(dintent.Nudge), ResumeOf: seq, Answer: "go on"})
+			_, err := te.launchAdmitted(context.Background(), turns.Launch{Unit: pr.Ref(r7).Unit(), Intent: dturn.Intent(dintent.Nudge), ResumeOf: seq, Answer: "go on"})
 			return err
 		},
 	} {

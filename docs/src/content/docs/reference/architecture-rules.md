@@ -55,6 +55,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, an agent through a session the user drives, a trusted policy rule or a passed window. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestOnlyTheWindowAdapterImportsWails` | No Go file outside `internal/client/window/wails` imports Wails, test files and files a build tag leaves out of this build included: the window host stays one adapter behind the window client's port. |
+| `TestOnlyTurnsRecordsATurn` | Outside `internal/core/turns`, the store adapters (`storetest` among them) and the domain's turn book, no code calls Send, SendOn or Start on a turn.Book, or a Save that takes a turn.Book: a turn is recorded only by the turn service's sinks, which take the Turn `turns.Starter` admitted. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestPluginsImportOnlyTheSDK` | No package under `plugins/`, nor the stand-in plugin's, imports a package under `internal/` or a package of another plugin, tests included: every plugin builds against the SDK and its own packages alone. |
 | `TestProseInternalMarksStayFew` | The clients mark as no text a person reads exactly proseInternalMarks literals, so a mark is a reviewed exception. |
@@ -68,6 +69,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
 | `TestTheSDKImportsNoInternal` | No package under `pkg/`, tests included, imports a package under `internal/`: plugins built outside this module compile against it. |
+| `TestTurnstestOnlyInTests` | Only `_test.go` files import `internal/core/turns/turnstest`, whose Started admits a turn without going through an entry's `turns.Starter`. |
 
 ## Allowlists
 

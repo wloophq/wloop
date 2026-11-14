@@ -8,6 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
@@ -34,7 +35,7 @@ func TestFailedCallWithoutCostChargesTheCap(t *testing.T) {
 func TestInterruptedTurnChargesTheCap(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	if _, err := r.turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "cut", Trigger: turn.ByHand}); err != nil {
+	if _, err := turnstest.BeginHeadless(ctx, r.turns, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "cut", Trigger: turn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.newTurns().EndInterruptedHeadless(ctx, 0.5); err != nil {

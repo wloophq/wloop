@@ -181,6 +181,21 @@ func TestAReviewByHandTakesTheKeptGuidance(t *testing.T) {
 	}
 }
 
+func TestAReviewByHandItsGuardRefusesKeepsItsGuidanceAndSaysSo(t *testing.T) {
+	t.Parallel()
+	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
+	te.gh.basics = strings.Replace(openBasics, `"OPEN"`, `"CLOSED"`, 1)
+	if code := te.run("instructions", "review", r7.URL(), "--", "only", "the", "tests"); code == 0 {
+		t.Fatalf("a review by hand of a closed pull request ran: %s", te.out)
+	}
+	if o, _ := te.Store.Override(context.Background(), r7); o.NextGuidance != "only the tests" {
+		t.Fatalf("kept guidance %q", o.NextGuidance)
+	}
+	if out := te.out.String() + te.err.String(); !strings.Contains(out, r7.String()+": your guidance is kept for the next round") {
+		t.Fatalf("output %q", out)
+	}
+}
+
 func TestTheTakeOverQuestionKeepsTheKeptGuidanceAndDropsNothing(t *testing.T) {
 	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-5", DisplayName: "feat-x"})

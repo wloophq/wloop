@@ -421,7 +421,7 @@ func TestAChatTurnRunsItsRolesPrepareOnItsCutGuidance(t *testing.T) {
 	if saw := p.Saw(); !slices.Equal(saw, []string{"Look at the "}) {
 		t.Fatalf("the prepare saw %q", saw)
 	}
-	if l := r.launch.launches; len(l) != 1 || l[0].Guidance != "Look at the " || l[0].Inputs["who"] != "ana" {
+	if l := r.launch.launches; len(l) != 1 || l[0].Turn.Guidance() != "Look at the " || l[0].Turn.Inputs()["who"] != "ana" {
 		t.Fatalf("launched %+v", l)
 	}
 }

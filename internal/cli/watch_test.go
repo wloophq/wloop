@@ -384,7 +384,7 @@ func TestALeftoverBranchAtAStoredHeadIsResetOnlyWithTheFlag(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			sent, err := sc.te.sendTurn(context.Background(), sc.te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: sc.ref.Unit(), Payload: turnPR(pr)})
+			sent, err := sc.te.sendAdmitted(context.Background(), sc.te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: sc.ref.Unit(), Payload: turnPR(pr)})
 			if err != nil {
 				t.Fatal(err)
 			}

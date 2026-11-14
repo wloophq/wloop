@@ -7,6 +7,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/turn"
@@ -14,14 +15,13 @@ import (
 
 // nudge sends r in a new agent session, so it never types into a
 // conversation the user or an earlier round is having, and returns the id
-// of the turn sent; resumeOf is the turn it resumes, 0 for none.
-func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *pr.PullRequest, resumeOf int64) (string, error) {
+// of the turn sent; t is the turn it records.
+func (e *Env) nudge(ctx context.Context, cfg config.Config, t turns.Turn, r turn.Request, pr *pr.PullRequest) (string, error) {
 	ref := prOf(r.Unit)
-	sent, err := e.sendTurn(ctx, cfg, r)
+	sent, err := e.sendTurn(ctx, cfg, t, r)
 	if err != nil {
 		return "", err
 	}
-	sent.resume(resumeOf)
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return "", err

@@ -36,7 +36,7 @@ func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) (turns.Outco
 	if l.err != nil {
 		return turns.Outcome{}, l.err
 	}
-	if _, err := l.svc.Send(ctx, turns.SendRequest{Unit: x.Unit, Intent: x.Intent, Turn: "probe1round", Trigger: x.Trigger, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, l.svc, turns.SendRequest{Unit: x.Unit, Intent: x.Intent, Turn: "probe1round", Trigger: x.Trigger, Records: true}); err != nil {
 		return turns.Outcome{}, err
 	}
 	return turns.Outcome{ID: "probe1round", Submitted: true}, l.svc.SentTo(ctx, x.Unit, "probe1round", "term_probe")

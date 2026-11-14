@@ -1,6 +1,7 @@
 package turns
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -147,6 +148,8 @@ type Request struct {
 	// Reason is how the person asked for it, as the host's sent effects
 	// record it; "" for the route's own.
 	Reason string
+	// ResumeOf is the turn whose session the new turn resumes, 0 none.
+	ResumeOf int64
 }
 
 // Started is a turn Start ran.
@@ -170,6 +173,7 @@ type Turn struct {
 	byPerson bool
 	reason   string
 	resumeOf int64
+	resumed  bool
 }
 
 func (t Turn) Unit() unit.Unit        { return t.unit }
@@ -182,9 +186,19 @@ func (t Turn) Route() string          { return t.route }
 func (t Turn) ByPerson() bool         { return t.byPerson }
 func (t Turn) ResumeOf() int64        { return t.resumeOf }
 
+// Resumed is a turn Resume admitted, whose effects its first turn's start
+// applied: Start applied none of its own.
+func (t Turn) Resumed() bool { return t.resumed }
+
 func admitted(t Turn) Turn {
 	t.ok, t.used = true, new(atomic.Bool)
 	return t
+}
+
+// identify is r with t's identity.
+func (t Turn) identify(r SendRequest) SendRequest {
+	r.Unit, r.Intent, r.Trigger, r.Guidance, r.ResumeOf = t.unit, t.intent, t.trigger, t.guidance, t.resumeOf
+	return r
 }
 
 // Use claims t for the one record it allows.
@@ -235,8 +249,8 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 			whole = kept
 		}
 	}
-	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: r.Trigger,
-		why: r.Why, route: r.Route, byPerson: r.ByPerson, reason: r.Reason})
+	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: cmp.Or(r.Trigger, turn.ByHand),
+		why: r.Why, route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf})
 	o, err := s.run(ctx, d, &t, x)
 	back := whole
 	if errors.Is(err, ErrAnswered) {
@@ -320,6 +334,17 @@ func (s *Starter) Resume(ctx context.Context, u unit.Unit, seq int64) (Turn, err
 	return resume(ctx, s.Store, u, seq)
 }
 
+// ResumeAnswered is Resume of a turn whose guidance is the answer said, as
+// a headless turn, which reads no resume of its own, takes it.
+func (s *Starter) ResumeAnswered(ctx context.Context, u unit.Unit, seq int64, said string) (Turn, error) {
+	t, err := resume(ctx, s.Store, u, seq)
+	if err != nil {
+		return Turn{}, err
+	}
+	t.guidance = said
+	return t, nil
+}
+
 func resume(ctx context.Context, store Store, u unit.Unit, seq int64) (Turn, error) {
 	b, err := store.Books(ctx, u)
 	if err != nil {
@@ -330,7 +355,7 @@ func resume(ctx context.Context, store Store, u unit.Unit, seq int64) (Turn, err
 	if !ok {
 		return Turn{}, Gone{Reason: fmt.Sprintf("%s has no turn %d", u.Label(), seq)}
 	}
-	return admitted(Turn{unit: u, intent: q.Intent, guidance: q.Guidance, inputs: InputsOf(*q), trigger: q.Trigger, resumeOf: seq}), nil
+	return admitted(Turn{unit: u, intent: q.Intent, guidance: q.Guidance, inputs: InputsOf(*q), trigger: cmp.Or(q.Trigger, turn.ByHand), resumeOf: seq, resumed: true}), nil
 }
 
 func (s *Starter) logf(format string, args ...any) {

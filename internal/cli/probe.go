@@ -62,7 +62,6 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) (
 		if !ok {
 			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
 		}
-		r.Trigger = requestTrigger(prev.Trigger)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
 		if wsID == "" {
 			s, ok, err := e.Turns.Registry.Session(ctx, prev.SentTo)
@@ -118,11 +117,10 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) (
 	if err := e.preflight(ctx, a, s, m); err != nil {
 		return turns.Outcome{}, err
 	}
-	sent, err := e.storeTurn(ctx, cfg, r)
+	sent, err := e.storeTurn(ctx, cfg, l.Turn, r)
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	sent.resume(l.ResumeOf)
 	name, err := e.sessionName(dintent.Name(r.Intent), r.Unit, nil)
 	if err != nil {
 		return turns.Outcome{}, err

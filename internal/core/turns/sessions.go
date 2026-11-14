@@ -182,6 +182,10 @@ type Launch struct {
 	Why *workflow.Why
 	// ByPerson is a new turn a person asked for, whatever its Trigger.
 	ByPerson bool
+	// Turn is the turn the Launcher records, as Start or Resume admitted
+	// it; its Unit, Intent, Guidance, Inputs, Trigger and ResumeOf are the
+	// launch's.
+	Turn Turn
 }
 
 // Launcher runs a turn the core asks for (a resume or a Continue) through the

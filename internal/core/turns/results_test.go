@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -58,7 +59,7 @@ func beginService(t *testing.T, attach bool) (*turns.Service, *results) {
 func beginOn(t *testing.T, s *turns.Service, u unit.Unit) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := s.Send(ctx, turns.SendRequest{Unit: u, Intent: "begin", Turn: "b1", Trigger: turn.ByHand, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: u, Intent: "begin", Turn: "b1", Trigger: turn.ByHand, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	s.SentTo(ctx, u, "b1", "term_1")

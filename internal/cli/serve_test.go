@@ -228,7 +228,7 @@ func TestServeNoJobsWritesNoCard(t *testing.T) {
 			defer cancel()
 			d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 			ref := pr.Ref(r7)
-			if _, err := d.Turns.Send(ctx, turns.SendRequest{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), Turn: "abc", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
+			if _, err := turnstest.Send(ctx, d.Turns, turns.SendRequest{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), Turn: "abc", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := d.Turns.Start(ctx, "term_1", "abc"); err != nil {
@@ -545,7 +545,7 @@ func sinksOf(ss ...*testsink.Sink) func(*inventory.Store, config.Config) (turns.
 // projectDone ends a review turn of r7, which every sink shows as done.
 func projectDone(t *testing.T, ctx context.Context, d daemon.Deps) {
 	t.Helper()
-	if _, err := d.Turns.Send(ctx, turns.SendRequest{Unit: r7.Unit(), Intent: dturn.Intent(dintent.Review), Turn: "abc", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, d.Turns, turns.SendRequest{Unit: r7.Unit(), Intent: dturn.Intent(dintent.Review), Turn: "abc", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.Turns.Start(ctx, "term_1", "abc"); err != nil {
@@ -1104,7 +1104,7 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	u := r7.Unit()
 	board.Place(u, string(view.InReview))
-	if _, err := d.Turns.Send(ctx, turns.SendRequest{Unit: u, Intent: dturn.Intent(dintent.Address), Turn: "a1", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, d.Turns, turns.SendRequest{Unit: u, Intent: dturn.Intent(dintent.Address), Turn: "a1", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.Turns.Start(ctx, "term_1", "a1"); err != nil {

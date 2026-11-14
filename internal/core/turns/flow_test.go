@@ -73,7 +73,7 @@ func TestFlowRunsWithoutEditingTheCore(t *testing.T) {
 		}
 		sess.Put("ws", turns.Terminal{Session: "term_1", LastOutput: t0})
 
-		if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Head: "h1", Records: true}); err != nil {
+		if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Head: "h1", Records: true}); err != nil {
 			t.Fatal(err)
 		}
 		if ok, err := s.Capable(ctx, "term_1"); err != nil || !ok {

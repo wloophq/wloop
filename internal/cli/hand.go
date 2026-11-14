@@ -54,12 +54,26 @@ func (e *Env) byHand() func(ctx context.Context, r api.ByHandRequest, handle str
 		q.Out, q.Err, q.HomeOverride = &notes, &notes, &home
 		err = q.turnByHand(ctx, handTurn{def: d, url: r.URL, agent: r.Agent, guidance: r.Guidance, inputs: r.Inputs, cwd: r.Cwd, handle: handle}, &text)
 		res := api.ByHandResult{Text: text.String()}
-		if n := strings.TrimRight(notes.String(), "\n"); n != "" {
+		n := strings.TrimRight(notes.String(), "\n")
+		if err != nil && n != "" {
+			return res, notedError{err: err, notes: n}
+		}
+		if n != "" {
 			res.Notes = strings.Split(n, "\n")
 		}
 		return res, err
 	}
 }
+
+// notedError is a turn by hand that failed after writing notes, such as
+// the guidance it kept back, which reach the caller only with the error.
+type notedError struct {
+	err   error
+	notes string
+}
+
+func (e notedError) Error() string { return e.err.Error() + "\n" + e.notes }
+func (e notedError) Unwrap() error { return e.err }
 
 // byHandRef is the unit a turn by hand is about, found as the turn finds
 // it.
@@ -175,7 +189,7 @@ func (x *handRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 	e := x.e
 	r := x.req
 	r.Guidance, r.Inputs = t.Guidance(), t.Inputs()
-	sent, err := e.sendTurn(ctx, x.cfg, r)
+	sent, err := e.sendTurn(ctx, x.cfg, t, r)
 	if err != nil {
 		return turns.Outcome{}, err
 	}
@@ -184,7 +198,7 @@ func (x *handRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 		o.Head = x.pr.HeadRefOid
 	}
 	if sent.send != nil {
-		if _, err := e.Turns.StartByHand(ctx, *sent.send, x.h.handle); err != nil {
+		if _, err := e.Turns.StartByHand(ctx, sent.turn, *sent.send, x.h.handle); err != nil {
 			return turns.Outcome{}, err
 		}
 	}

@@ -39,8 +39,8 @@ type roundOptions struct {
 	confirmed bool
 	// keepLive sends to the live session however long it has been idle.
 	keepLive bool
-	// resumeOf is the turn the round's turn resumes, 0 for none.
-	resumeOf int64
+	// turn is the admitted turn the round records.
+	turn turns.Turn
 	// trusted is the pull request's verdict from trusts.
 	trusted bool
 	// busy refuses the round, rather than start a session beside the live
@@ -159,11 +159,10 @@ func (e *Env) startAddress(ctx context.Context, cfg config.Config, ws wsdomain.W
 		verb = "prompt queued in the busy agent session"
 	}
 	r.Owned, r.Local, r.Queued = true, local, queued
-	sent, err := e.sendTurn(ctx, cfg, r)
+	sent, err := e.sendTurn(ctx, cfg, opts.turn, r)
 	if err != nil {
 		return false, "", "", err
 	}
-	sent.resume(opts.resumeOf)
 	submitted, err = e.deliver(ctx, r.Unit, &sent, p, queued)
 	if err != nil {
 		return false, "", sent.ID, err
@@ -647,7 +646,7 @@ func (e *Env) awaitCapable(ctx context.Context, id, home string) error {
 // stays started; one whose prompt could not be typed is withdrawn.
 func (e *Env) deliver(ctx context.Context, u unit.Unit, sent *sentTurn, p proc, queued bool) (bool, error) {
 	if sent.send != nil {
-		t, err := e.Turns.Send(ctx, *sent.send)
+		t, err := e.Turns.Send(ctx, sent.turn, *sent.send)
 		if err != nil {
 			return false, err
 		}

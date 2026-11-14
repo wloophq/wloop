@@ -251,11 +251,28 @@ func (d *TestDaemon) Start(t testing.TB, u unit.Unit, intent string) TestSession
 	if err := d.e.Turns.MCPSeen(d.ctx, s.Handle); err != nil {
 		t.Fatalf("session %s: %v", s.Handle, err)
 	}
-	r := turns.SendRequest{Unit: u, Intent: dturn.Intent(intent), Turn: s.Round, Trigger: dturn.ByHand, Records: true, Agent: "echo"}
-	if _, err := d.e.Turns.StartByHand(d.ctx, r, id); err != nil {
+	x := testSessionTurn{turns: d.e.Turns, r: turns.SendRequest{Turn: s.Round, Records: true, Agent: "echo"}, handle: id}
+	if _, err := d.e.Turns.Starter.Start(d.ctx, turns.Request{Unit: u, Intent: dturn.Intent(intent), Trigger: dturn.ByHand, Route: src.RouteSession}, x); err != nil {
 		t.Fatalf("starting a %s turn on %s: %v", intent, u.Label(), err)
 	}
 	return s
+}
+
+// testSessionTurn records the turn of a test session that asked for it by
+// hand, rendering nothing and applying no turn effect.
+type testSessionTurn struct {
+	turns  *turns.Service
+	r      turns.SendRequest
+	handle string
+}
+
+func (testSessionTurn) MarksStandIn() bool { return true }
+
+func (x testSessionTurn) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	if _, err := x.turns.StartByHand(ctx, t, x.r, x.handle); err != nil {
+		return turns.Outcome{}, err
+	}
+	return turns.Outcome{ID: x.r.Turn, Submitted: true}, nil
 }
 
 // EndTurn records the end of s's turn, as the agent's turn_end call does.

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -25,14 +24,15 @@ type cliLauncher struct{ e *Env }
 
 var _ turns.Launcher = cliLauncher{}
 
-// Launch sends a resume of turn l.ResumeOf, or a new turn when it is 0, in
-// the workspace the intent's manifest names, created again when it is gone;
-// a probe goes to a new session of the workspace it names, or of the one its
-// resumed turn was sent to. A new turn's effects are its start's; a resume on
-// a pull request applies its plugin's turn effects and records the guidance
-// it carries.
+// Launch sends l's turn, a new one or a resume of turn l.ResumeOf, in the
+// workspace the intent's manifest names, created again when it is gone; a
+// probe goes to a new session of the workspace it names, or of the one its
+// resumed turn was sent to. A new turn's effects are its start's; a resumed
+// turn on a pull request applies its plugin's turn effects and records the
+// guidance it carries.
 func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome, error) {
 	e := c.e
+	l = admittedLaunch(l)
 	d, err := e.intentDef(string(l.Intent))
 	if err != nil {
 		return turns.Outcome{}, err
@@ -80,10 +80,10 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 		if !ok {
 			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
 		}
-		r.Trigger, r.Guidance = requestTrigger(prev.Trigger), cmp.Or(l.Guidance, prev.Guidance)
 		if r.Inputs == nil {
-			r.Inputs = prev.Inputs
+			r.Inputs = turns.InputsOf(prev)
 		}
+		r.Items, r.Task = turns.ItemsOf(prev), turns.TaskOf(prev)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, pr.HeadRefOid, "")
 		if r.Resume != nil {
 			r.Resume.Drafts = e.resumeDrafts(ctx, b, l.ResumeOf, pr.HeadRefOid)
@@ -92,13 +92,13 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 			return turns.Outcome{}, err
 		}
 	}
-	resume := l.ResumeOf != 0
+	resume := l.Turn.Resumed()
 	if resume {
 		if err := e.checkEffects(d, ref.Unit()); err != nil {
 			return turns.Outcome{}, err
 		}
 	}
-	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
+	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, turn: l.Turn})
 	if resume && id != "" {
 		e.recordGuidance(ctx, ref, r.Guidance)
 	}
@@ -110,6 +110,13 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 		e.applyPluginEffects(ctx, d, ref.Unit(), src.TurnRef{ID: id, Head: pr.HeadRefOid}, src.RouteLaunch, submitted, r.Inputs)
 	}
 	return out, nil
+}
+
+// admittedLaunch is l with the identity of the turn it carries.
+func admittedLaunch(l turns.Launch) turns.Launch {
+	t := l.Turn
+	l.Unit, l.Intent, l.Guidance, l.Inputs, l.Trigger, l.ResumeOf = t.Unit(), t.Intent(), t.Guidance(), t.Inputs(), t.Trigger(), t.ResumeOf()
+	return l
 }
 
 // roundAgentHome is the agent home remembered for the pull request's rounds.
@@ -149,11 +156,10 @@ func (e *Env) runInReview(ctx context.Context, run roundRun) (string, bool, erro
 	if run.st != nil && run.rememberHome != "" {
 		run.st.SetAgentHome(ref.String(), run.rememberHome)
 	}
-	sent, err := e.sendTurn(ctx, run.cfg, run.r)
+	sent, err := e.sendTurn(ctx, run.cfg, run.turn, run.r)
 	if err != nil {
 		return "", false, err
 	}
-	sent.resume(run.resumeOf)
 	submitted, err := e.openReview(ctx, run.cfg, ref, run.pr, sent, run.options(roundOptions{allowUserActive: true, pr: run.pr}))
 	return sent.ID, submitted, err
 }
@@ -169,7 +175,8 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, erro
 	var ws wsdomain.Workspace
 	var action string
 	var err error
-	if run.resumeOf != 0 {
+	resumeOf := run.turn.ResumeOf()
+	if resumeOf != 0 {
 		var repos []wsdomain.Repo
 		var all []wsdomain.Workspace
 		if repos, err = e.WS.Repos(ctx); err != nil {
@@ -185,17 +192,17 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, erro
 	if err != nil {
 		return "", false, err
 	}
-	if action != "" && run.resumeOf == 0 {
+	if action != "" && resumeOf == 0 {
 		fmt.Fprintf(e.Out, "%s\n", action)
 	}
-	submitted, verb, id, err := e.startAddress(ctx, cfg, ws, r, run.options(roundOptions{allowUserActive: true, resumeOf: run.resumeOf, trusted: trusts(cfg, pr), pr: pr}))
+	submitted, verb, id, err := e.startAddress(ctx, cfg, ws, r, run.options(roundOptions{allowUserActive: true, turn: run.turn, trusted: trusts(cfg, pr), pr: pr}))
 	if err != nil {
 		return id, submitted, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
 	}
-	if run.resumeOf != 0 {
+	if resumeOf != 0 {
 		fmt.Fprintf(e.Out, "%s; triage in %s, %s: %s\n", action, ws.DisplayName, verb, pr.Title)
 	} else {
 		fmt.Fprintf(e.Out, "triage in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
@@ -207,7 +214,7 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, erro
 // workspace, else of the repository's main checkout, or in the caller's own
 // session.
 func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (string, bool, error) {
-	id, err := e.nudge(ctx, run.cfg, run.r, run.pr, run.resumeOf)
+	id, err := e.nudge(ctx, run.cfg, run.turn, run.r, run.pr)
 	return id, true, err
 }
 
@@ -259,7 +266,7 @@ func (x *askedRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, err
 	e := x.e
 	r := turn.Request{Intent: turn.Intent(x.d.Name), Trigger: turn.ByHand, Unit: x.ref.Unit(), Payload: turnPR(x.pr), Guidance: t.Guidance(), Inputs: t.Inputs()}
 	e.withAddressReason(ctx, x.cfg, x.d, &r)
-	rr := roundRun{def: x.d, cfg: x.cfg, r: r, pr: x.pr, rememberHome: x.remember}
+	rr := roundRun{def: x.d, cfg: x.cfg, r: r, pr: x.pr, turn: t, rememberHome: x.remember}
 	if x.remember == "" {
 		id, submitted, err := x.run(e, ctx, rr)
 		return turns.Outcome{ID: id, Head: x.pr.HeadRefOid, Submitted: submitted}, err

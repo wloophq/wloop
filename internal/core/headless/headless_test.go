@@ -236,7 +236,7 @@ func TestHeadlessRunIsATurn(t *testing.T) {
 func TestOneHeadlessRunPerUnit(t *testing.T) {
 	r := newRig(t, scripted{json: answerJSON(t, done)})
 	ctx := context.Background()
-	if _, err := r.turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "first", Trigger: turn.ByHand}); err != nil {
+	if _, err := turnstest.BeginHeadless(ctx, r.turns, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "first", Trigger: turn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.svc.Run(ctx, headless.Request{Unit: thread}); !errors.Is(err, headless.ErrBusy) {
@@ -255,7 +255,7 @@ func TestOneHeadlessRunPerUnit(t *testing.T) {
 func TestHeadlessTurnInterruptedByRestart(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
-	seq, err := r.turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "cut", Trigger: turn.ByHand, Items: []string{"i1"}})
+	seq, err := turnstest.BeginHeadless(ctx, r.turns, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "cut", Trigger: turn.ByHand, Items: []string{"i1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,12 +277,12 @@ func TestSessionPathsSkipHeadlessTurns(t *testing.T) {
 	r := newRig(t)
 	r.turns.Usage = nil
 	ctx := context.Background()
-	started, err := r.turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "live", Trigger: turn.ByHand})
+	started, err := turnstest.BeginHeadless(ctx, r.turns, turns.HeadlessStart{Unit: thread, Intent: turn.Intent(dintent.Act), Turn: "live", Trigger: turn.ByHand})
 	if err != nil {
 		t.Fatal(err)
 	}
 	other := unit.Unit{Provider: "thread", Key: "C1/1700000000.000200"}
-	if _, err := r.turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: other, Intent: turn.Intent(dintent.Act), Turn: "ended", Trigger: turn.ByHand}); err != nil {
+	if _, err := turnstest.BeginHeadless(ctx, r.turns, turns.HeadlessStart{Unit: other, Intent: turn.Intent(dintent.Act), Turn: "ended", Trigger: turn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.turns.EndHeadless(ctx, mustSeq(t, r, other), turns.HeadlessEnd{Err: errors.New("boom")}); err != nil {

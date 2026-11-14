@@ -197,7 +197,7 @@ func TestDeliverKeepsATurnTheAgentStartedFirst(t *testing.T) {
 	m := &fake.Manager{}
 	te := newTestEnv(t, m)
 	ctx := context.Background()
-	sent, err := te.sendTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Add x", Head: "c2"}})
+	sent, err := te.sendAdmitted(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Add x", Head: "c2"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestAFailedResumeLeavesTheQuestionOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = cliLauncher{te.Env}.Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"})
+	_, err = te.launchAdmitted(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"})
 	if err == nil || !strings.Contains(err.Error(), "terminal closed") {
 		t.Fatalf("err = %v", err)
 	}

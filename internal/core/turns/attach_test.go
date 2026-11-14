@@ -27,7 +27,7 @@ func TestAnAttachedSessionStopsWithoutBeingAskedForARecord(t *testing.T) {
 	} {
 		reg.Put(turn.Session{ID: c.handle, Handle: c.handle, AgentSession: "s" + c.handle, StartedAt: t0, MCPAt: t0})
 		id := "turn-" + string(c.intent)
-		if _, err := s.StartByHand(ctx, turns.SendRequest{Unit: c.task, Intent: c.intent, Turn: id, Trigger: turn.ByHand, Records: true}, c.handle); err != nil {
+		if _, err := turnstest.StartByHand(ctx, s, turns.SendRequest{Unit: c.task, Intent: c.intent, Turn: id, Trigger: turn.ByHand, Records: true}, c.handle); err != nil {
 			t.Fatal(err)
 		}
 		for n, prompt := range []string{"p1", "p1", "p2"} {
@@ -55,7 +55,7 @@ func TestEachSessionAttachedToATaskIsARunOfItsOwn(t *testing.T) {
 	}
 	attach := func(id, handle string) {
 		t.Helper()
-		if _, err := s.StartByHand(ctx, turns.SendRequest{Unit: tk, Intent: "attach", Turn: id, Trigger: turn.ByHand, Records: true, PerSession: true}, handle); err != nil {
+		if _, err := turnstest.StartByHand(ctx, s, turns.SendRequest{Unit: tk, Intent: "attach", Turn: id, Trigger: turn.ByHand, Records: true, PerSession: true}, handle); err != nil {
 			t.Fatal(err)
 		}
 	}

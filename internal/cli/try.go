@@ -200,7 +200,7 @@ func (e *Env) dryRunTurn(ctx context.Context, r api.DryRunTurnRequest) (api.DryR
 	if err != nil {
 		return api.DryRunTurn{}, err
 	}
-	sent, err := e.storeTurn(ctx, cfg, turn.Request{Intent: turn.Intent(e.roleIntent(builtin.RoleReview)), Trigger: turn.ByHand, Unit: ref.Unit(), Plain: true, Why: r.Why})
+	sent, err := e.storeTurn(ctx, cfg, turns.Turn{}, turn.Request{Intent: turn.Intent(e.roleIntent(builtin.RoleReview)), Trigger: turn.ByHand, Unit: ref.Unit(), Plain: true, Why: r.Why})
 	if err != nil {
 		return api.DryRunTurn{}, err
 	}

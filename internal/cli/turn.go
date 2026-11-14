@@ -61,12 +61,8 @@ type sentTurn struct {
 	// send is the turn deliver stores before typing the prompt; nil when the
 	// text asks for no record or the process keeps no turns.
 	send *turns.SendRequest
-}
-
-func (s *sentTurn) resume(seq int64) {
-	if s.send != nil {
-		s.send.ResumeOf = seq
-	}
+	// turn is the admitted turn send records.
+	turn turns.Turn
 }
 
 func turnTrigger(t turn.Trigger) dturn.Trigger {
@@ -265,7 +261,7 @@ func (e *Env) renderTurnBy(ctx context.Context, cfg config.Config, r turn.Reques
 
 // storeTurn renders a turn and keeps it under its id, so the agent reads by
 // id whatever changes afterwards.
-func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) (sentTurn, error) {
+func (e *Env) storeTurn(ctx context.Context, cfg config.Config, t turns.Turn, r turn.Request) (sentTurn, error) {
 	c, out, err := e.renderTurn(ctx, cfg, r)
 	if err != nil {
 		return sentTurn{}, err
@@ -281,7 +277,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 		return sentTurn{}, err
 	}
 	e.recordTrimmed(ctx, r.Unit, out.ID, turn.Trimmed(c))
-	sent := sentTurn{ID: out.ID, Prompt: turn.Prompt(c, out.ID), Text: out.Text}
+	sent := sentTurn{ID: out.ID, Prompt: turn.Prompt(c, out.ID), Text: out.Text, turn: t}
 	if out.Records && e.Turns != nil {
 		sent.send = &turns.SendRequest{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Turn: out.ID, Trigger: turnTrigger(r.Trigger),
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
@@ -340,7 +336,7 @@ func (e *Env) saveTurnText(ctx context.Context, t dinv.StoredTurn) error {
 
 // sendTurn is the turn of a round about to go out: it carries the history
 // of its turns and the verdict they last published.
-func (e *Env) sendTurn(ctx context.Context, cfg config.Config, r turn.Request) (sentTurn, error) {
+func (e *Env) sendTurn(ctx context.Context, cfg config.Config, t turns.Turn, r turn.Request) (sentTurn, error) {
 	if e.Turns != nil {
 		books, err := e.Turns.Store.Books(ctx, r.Unit)
 		if err != nil {
@@ -356,7 +352,7 @@ func (e *Env) sendTurn(ctx context.Context, cfg config.Config, r turn.Request) (
 			r.LastVerdict = &turn.RecordedVerdict{Head: v.Head, Endorsed: v.Endorsed, At: v.At}
 		}
 	}
-	return e.storeTurn(ctx, cfg, r)
+	return e.storeTurn(ctx, cfg, t, r)
 }
 
 // lastVerdict is the newest verdict b's turns of intent's role published,

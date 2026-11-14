@@ -60,7 +60,7 @@ func TestInstructionsByRoundIgnoresLaterEdits(t *testing.T) {
 	user := t.TempDir()
 	os.WriteFile(filepath.Join(user, "intent=review.md"), []byte("FIRST"), 0o600)
 	te.cfg.Profile = user
-	sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
+	sent, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestInstructionsStopsOnAMissingProfile(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Profile = "/nope"
 	te.gh.basics = openBasics
-	_, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
+	_, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
 	var m profile.MissingError
 	if !errors.As(err, &m) {
 		t.Fatalf("%v", err)

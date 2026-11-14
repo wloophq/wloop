@@ -11,6 +11,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
+// SendRequest is what a runner rendered of a turn. Its Unit, Intent,
+// Trigger, Guidance and ResumeOf are the admitted Turn's: a sink records
+// those of the Turn it is given.
 type SendRequest struct {
 	Unit           unit.Unit
 	Intent         turn.Intent
@@ -45,18 +48,25 @@ func AnswerOnItsWay(i turn.Intent) string {
 	return "its " + string(i) + " question has an answer on its way"
 }
 
-// Send stores a new turn, replacing the open one of the same intent. The
+// Send stores t, a new turn, replacing the open one of the same intent. The
 // views learn it from SentTo, once it is typed.
-func (s *Service) Send(ctx context.Context, r SendRequest) (turn.Turn, error) {
+func (s *Service) Send(ctx context.Context, t Turn, r SendRequest) (turn.Turn, error) {
+	if err := t.Use(); err != nil {
+		return turn.Turn{}, err
+	}
 	if !r.Records {
 		return turn.Turn{}, nil
 	}
-	return s.send(ctx, r, false, "")
+	return s.send(ctx, t.identify(r), false, "")
 }
 
-// StartByHand stores a turn the user started in handle's session, "" when
-// the session runs outside Orca.
-func (s *Service) StartByHand(ctx context.Context, r SendRequest, handle string) (turn.Turn, error) {
+// StartByHand stores t, a turn the user started in handle's session, ""
+// when the session runs outside Orca.
+func (s *Service) StartByHand(ctx context.Context, x Turn, r SendRequest, handle string) (turn.Turn, error) {
+	if err := x.Use(); err != nil {
+		return turn.Turn{}, err
+	}
+	r = x.identify(r)
 	t, err := s.send(ctx, r, true, handle)
 	if err != nil {
 		return turn.Turn{}, err

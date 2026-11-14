@@ -16,6 +16,9 @@ import (
 	dusage "github.com/wloophq/wloop/internal/domain/usage"
 )
 
+// HeadlessStart is what a headless runner rendered of a turn. Its Unit,
+// Intent, Trigger, Guidance, Inputs and ResumeOf are the admitted Turn's:
+// BeginHeadless records those of the Turn it is given.
 type HeadlessStart struct {
 	Unit     unit.Unit
 	Intent   turn.Intent
@@ -132,9 +135,13 @@ func bound(inputs map[string]any, items []string, task string) map[string]any {
 	return out
 }
 
-// BeginHeadless stores a turn sent and started with Mode headless and no handle, with Items in the
+// BeginHeadless stores t, a turn sent and started with Mode headless and no handle, with Items in the
 // turn's Inputs under "items"; ErrHeadlessBusy when the unit already has a headless turn started.
-func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, error) {
+func (s *Service) BeginHeadless(ctx context.Context, t Turn, h HeadlessStart) (int64, error) {
+	if err := t.Use(); err != nil {
+		return 0, err
+	}
+	h.Unit, h.Intent, h.Trigger, h.Guidance, h.Inputs, h.ResumeOf = t.unit, t.intent, t.trigger, t.guidance, t.inputs, t.resumeOf
 	if h.Turn == "" {
 		return 0, errors.New("a turn needs an id")
 	}
@@ -164,15 +171,15 @@ func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, er
 		s.mu.Unlock()
 		return 0, err
 	}
-	t, _ := saved.ByID(h.Turn)
+	begun, _ := saved.ByID(h.Turn)
 	if s.begun == nil {
 		s.begun = map[int64]unit.Unit{}
 	}
-	s.begun[t.Seq] = h.Unit
+	s.begun[begun.Seq] = h.Unit
 	s.mu.Unlock()
 	s.publish(evs...)
 	s.changed(ctx, h.Unit)
-	return t.Seq, nil
+	return begun.Seq, nil
 }
 
 // EndHeadless stores the record (failed with Err as its summary when set, or with the problems of a record

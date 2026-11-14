@@ -35,7 +35,7 @@ func ledgerServer(t *testing.T, l *turnstest.Ledger) (*Server, *turnstest.Store,
 		svc.Items = l
 	}
 	ctx := context.Background()
-	if _, err := svc.Send(ctx, turns.SendRequest{Unit: r7, Intent: "review", Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, svc, turns.SendRequest{Unit: r7, Intent: "review", Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	svc.SentTo(ctx, r7, "abc", "term_1")

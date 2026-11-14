@@ -17,6 +17,7 @@ import (
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -48,7 +49,7 @@ func ledgerTurn(t *testing.T, round string) (*testEnv, unit.Unit) {
 		Anchor: unit.Anchor{Ref: "comment:1"}, Fields: &items.Fields{Kind: &kind, Summary: &sum}}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := te.Turns.Send(ctx, turns.SendRequest{Unit: u, Intent: "review", Turn: round, Trigger: dturn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, te.Turns, turns.SendRequest{Unit: u, Intent: "review", Turn: round, Trigger: dturn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	te.registerSession(t, dturn.Session{ID: "term_1", WorkspaceID: "ws-1"})

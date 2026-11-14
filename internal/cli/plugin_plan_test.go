@@ -325,11 +325,38 @@ func TestAResumeAppliesItsPluginEffects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: u, Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
+	if _, err := te.launchAdmitted(ctx, turns.Launch{Unit: u, Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	if got := p.applied(); len(got) != 1 || got[0].Effect != "pr.reviewed" {
 		t.Fatalf("applied %+v", got)
+	}
+}
+
+func TestANewTurnThatResumesASessionAppliesItsPluginEffectsOnce(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.te.gh.basics = openBasics
+	p := newStubPlanner(nil)
+	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
+	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
+	rec := &memRecorder{}
+	sc.env.Rec = rec
+	ctx := context.Background()
+	u := sc.ref.Unit()
+	saved, err := sc.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), ID: "r0", Trigger: dturn.ByHand, Head: "c1", State: dturn.Unrecorded, SentAt: testNow}}},
+		port.Event{Unit: u, Kind: turns.KindTurnSent, Key: "r0", At: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sc.env.Turns.Launch(ctx, turns.Launch{Unit: u, Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand, ResumeOf: saved.Turns[0].Seq, Guidance: "check the retries"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := p.applied(); len(got) != 1 || got[0].Effect != "pr.reviewed" {
+		t.Fatalf("applied %+v, want its start's pr.reviewed once", got)
+	}
+	if got := guidanceEvents(rec); !slices.Equal(got, []string{"check the retries"}) {
+		t.Fatalf("guidance events %+v, want its start's one", got)
 	}
 }
 

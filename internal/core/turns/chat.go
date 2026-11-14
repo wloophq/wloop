@@ -132,13 +132,18 @@ func (s *Service) Launch(ctx context.Context, l Launch) error {
 	if s.Starter == nil {
 		return errors.New("no turn starter is wired")
 	}
-	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: l.Trigger, Why: l.Why,
-		Route: RouteLaunch, ByPerson: l.ByPerson}, launched{s.Launcher, l})
+	trigger := l.Trigger
+	if l.ResumeOf != 0 {
+		if prev, err := resume(ctx, s.Store, l.Unit, l.ResumeOf); err == nil {
+			trigger = prev.Trigger()
+		}
+	}
+	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: trigger, Why: l.Why,
+		Route: RouteLaunch, ByPerson: l.ByPerson, ResumeOf: l.ResumeOf}, launched{s.Launcher, l})
 	return err
 }
 
-// launched runs a turn Start admitted through the Launcher, with the
-// guidance and inputs Start settled.
+// launched runs a turn Start admitted through the Launcher.
 type launched struct {
 	launcher Launcher
 	l        Launch
@@ -146,6 +151,6 @@ type launched struct {
 
 func (x launched) Run(ctx context.Context, t Turn) (Outcome, error) {
 	l := x.l
-	l.Guidance, l.Inputs = t.Guidance(), t.Inputs()
+	l.Turn = t
 	return x.launcher.Launch(ctx, l)
 }

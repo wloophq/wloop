@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/omnibox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -242,7 +243,7 @@ func assertTurnEndCommits(t *testing.T, te *testEnv) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	seq, err := te.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: headlessThread, Intent: dturn.Intent(dintent.Act), Turn: "r1", Trigger: dturn.ByHand})
+	seq, err := turnstest.BeginHeadless(ctx, te.Turns, turns.HeadlessStart{Unit: headlessThread, Intent: dturn.Intent(dintent.Act), Turn: "r1", Trigger: dturn.ByHand})
 	if err != nil {
 		t.Fatal(err)
 	}

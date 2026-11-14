@@ -64,13 +64,13 @@ func TestStartedTurnKeepsItsAgentSession(t *testing.T) {
 	if err := s.SessionStarted(ctx, turns.SessionStart{Session: "term_1", AgentSession: "s1", Source: "startup"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := s.Start(ctx, "term_1", "abc"); err != nil || got.AgentSession != "s1" {
 		t.Fatalf("started %+v %v", got, err)
 	}
-	if got, err := s.StartByHand(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Address), Turn: "def", Trigger: turn.ByHand, Records: true}, "term_1"); err != nil || got.AgentSession != "s1" {
+	if got, err := turnstest.StartByHand(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Address), Turn: "def", Trigger: turn.ByHand, Records: true}, "term_1"); err != nil || got.AgentSession != "s1" {
 		t.Fatalf("started by hand %+v %v", got, err)
 	}
 	b := bookOf(t, store, r7)
@@ -83,7 +83,7 @@ func TestStartedTurnKeepsItsAgentSession(t *testing.T) {
 
 func TestSentTurnKeepsItsAgent(t *testing.T) {
 	s, store, _, _, _ := newService(t)
-	got, err := s.Send(context.Background(), turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Agent: "kind-a", Records: true})
+	got, err := turnstest.Send(context.Background(), s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Agent: "kind-a", Records: true})
 	if err != nil || got.Agent != "kind-a" {
 		t.Fatalf("sent %+v %v", got, err)
 	}
@@ -165,13 +165,13 @@ func TestAnUnreadableSessionStartsTheTurnWithoutAnAgentSession(t *testing.T) {
 	l := &logs{}
 	s.Registry, s.Log = unreadableSessions{reg}, l.logf
 	ctx := context.Background()
-	if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "abc", Trigger: turn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := s.Start(ctx, "term_1", "abc"); err != nil || got.State != turn.Started || got.AgentSession != "" {
 		t.Fatalf("started %+v %v", got, err)
 	}
-	if got, err := s.StartByHand(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Address), Turn: "def", Trigger: turn.ByHand, Records: true}, "term_2"); err != nil || got.State != turn.Started || got.AgentSession != "" {
+	if got, err := turnstest.StartByHand(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Address), Turn: "def", Trigger: turn.ByHand, Records: true}, "term_2"); err != nil || got.State != turn.Started || got.AgentSession != "" {
 		t.Fatalf("started by hand %+v %v", got, err)
 	}
 	l.count(t, 2, "locked")

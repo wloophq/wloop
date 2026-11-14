@@ -146,8 +146,9 @@ type roundRun struct {
 	cfg config.Config
 	r   turn.Request
 	pr  *pr.PullRequest
-	// resumeOf is the turn a resume continues, 0 for a new round.
-	resumeOf int64
+	// turn is the turn the round records: a new one its start admitted, or
+	// a resume.
+	turn turns.Turn
 	// st is the round state of a round asked for by hand; nil on a resume.
 	st *round.Store
 	// rememberHome is the agent home to keep for the pull request's next

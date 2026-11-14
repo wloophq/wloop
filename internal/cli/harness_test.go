@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
+	"github.com/wloophq/wloop/internal/turn"
 
 	"github.com/wloophq/wloop/plugins/github/api/apitest"
 	ghpr "github.com/wloophq/wloop/plugins/github/pr"
@@ -1046,4 +1047,24 @@ func (r layeredReports) Reported(ctx context.Context, units []unit.Unit) (map[un
 	}
 	maps.Copy(out, kept)
 	return out, nil
+}
+
+// sendAdmitted is sendTurn of r as the turn its start admitted.
+func (e *Env) sendAdmitted(ctx context.Context, cfg config.Config, r turn.Request) (sentTurn, error) {
+	x := turnstest.Started(turns.Request{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Guidance: r.Guidance, Inputs: r.Inputs, Trigger: turnTrigger(r.Trigger)})
+	return e.sendTurn(ctx, cfg, x, r)
+}
+
+// launchAdmitted launches l as the turn its start admitted, or its resume
+// when l resumes a turn.
+func (e *Env) launchAdmitted(ctx context.Context, l turns.Launch) (turns.Outcome, error) {
+	if l.ResumeOf == 0 {
+		l.Turn = turnstest.Started(turns.Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: l.Trigger, Why: l.Why})
+	} else {
+		var err error
+		if l.Turn, err = (&turns.Starter{Store: e.Turns.Store}).Resume(ctx, l.Unit, l.ResumeOf); err != nil {
+			return turns.Outcome{}, err
+		}
+	}
+	return cliLauncher{e}.Launch(ctx, l)
 }

@@ -500,7 +500,7 @@ func (x *heldRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	sent, err := e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(x.held.Name), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: ref.Unit(), Payload: turnPR(x.pr),
+	sent, err := e.sendTurn(ctx, cfg, t, turn.Request{Intent: turn.Intent(x.held.Name), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: ref.Unit(), Payload: turnPR(x.pr),
 		Guidance: t.Guidance(), Inputs: t.Inputs()})
 	if err != nil {
 		return turns.Outcome{}, err

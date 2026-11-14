@@ -51,14 +51,14 @@ func TestTurnKeepsItsBriefRun(t *testing.T) {
 	te := newTestEnv(t, nil)
 	te.cfg.Brief.Enabled = true
 	id := seedBriefOf(t, te.Store, r7)
-	sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Batch export"}})
+	sent, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Batch export"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sent.send == nil || sent.send.BriefRun != id {
 		t.Fatalf("send %+v, want brief run %d", sent.send, id)
 	}
-	if _, err := te.Turns.Send(context.Background(), *sent.send); err != nil {
+	if _, err := te.Turns.Send(context.Background(), sent.turn, *sent.send); err != nil {
 		t.Fatal(err)
 	}
 	books, err := te.Turns.Store.Books(context.Background(), pr.Ref(r7).Unit())

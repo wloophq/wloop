@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -60,7 +61,7 @@ func TestLaunchedAndFirstTurnSetTheSessionsUnit(t *testing.T) {
 	if err := s.SessionStarted(ctx, turns.SessionStart{Session: "hook", AgentSession: "a", Source: "startup"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "r1", Trigger: turn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "r1", Trigger: turn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SentTo(ctx, r7, "r1", "hook"); err != nil {
@@ -69,7 +70,7 @@ func TestLaunchedAndFirstTurnSetTheSessionsUnit(t *testing.T) {
 	if got, _, _ := reg.Session(ctx, "hook"); got.Unit != r7 {
 		t.Fatalf("hook session after its first turn: %+v", got)
 	}
-	if _, err := s.Send(ctx, turns.SendRequest{Unit: threadB, Intent: turn.Intent(dintent.Review), Turn: "r2", Trigger: turn.Automated, Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, s, turns.SendRequest{Unit: threadB, Intent: turn.Intent(dintent.Review), Turn: "r2", Trigger: turn.Automated, Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SentTo(ctx, threadB, "r2", "hook"); err != nil {
@@ -81,7 +82,7 @@ func TestLaunchedAndFirstTurnSetTheSessionsUnit(t *testing.T) {
 	if err := s.SessionStarted(ctx, turns.SessionStart{Session: "byhand", AgentSession: "b", Source: "startup"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.StartByHand(ctx, turns.SendRequest{Unit: threadB, Intent: turn.Intent(dintent.Address), Turn: "r3", Trigger: turn.ByHand, Records: true}, "byhand"); err != nil {
+	if _, err := turnstest.StartByHand(ctx, s, turns.SendRequest{Unit: threadB, Intent: turn.Intent(dintent.Address), Turn: "r3", Trigger: turn.ByHand, Records: true}, "byhand"); err != nil {
 		t.Fatal(err)
 	}
 	if got, _, _ := reg.Session(ctx, "byhand"); got.Unit != threadB {

@@ -28,7 +28,7 @@ func withOps(r record.Record) record.Record {
 func startedRound(t *testing.T, s *turns.Service, round string) {
 	t.Helper()
 	ctx := context.Background()
-	s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: round, Trigger: turn.Automated, Records: true})
+	turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: round, Trigger: turn.Automated, Records: true})
 	s.SentTo(ctx, r7, round, "term_1")
 	if _, err := s.Start(ctx, "term_1", round); err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestLateRecordAppliesNoOps(t *testing.T) {
 	s.Items = l
 	ctx := context.Background()
 	startedRound(t, s, "abc")
-	s.Send(ctx, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "def", Trigger: turn.Automated, Records: true})
+	turnstest.Send(ctx, s, turns.SendRequest{Unit: r7, Intent: turn.Intent(dintent.Review), Turn: "def", Trigger: turn.Automated, Records: true})
 	s.SentTo(ctx, r7, "def", "term_1")
 	got, err := s.RecordTurnEnd(ctx, turns.RecordRequest{Session: "term_1", Turn: "abc", Record: withOps(record.Record{State: record.Settled, Summary: "late"})})
 	if err != nil || got.Note == "" || got.Ledger != nil || len(l.Calls) != 0 || got.Dropped != 2 || !strings.Contains(got.DroppedNote(), "not applied; this turn already ended") {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -14,14 +15,14 @@ func TestEndHeadlessForgetsTheTurnsItBegan(t *testing.T) {
 	s, _, _, _, _ := newService(t)
 	ctx := context.Background()
 	u := unit.Unit{Provider: "thread", Key: "1"}
-	ended, err := s.BeginHeadless(ctx, turns.HeadlessStart{Unit: u, Intent: "act", Turn: "a", Trigger: turn.ByHand})
+	ended, err := turnstest.BeginHeadless(ctx, s, turns.HeadlessStart{Unit: u, Intent: "act", Turn: "a", Trigger: turn.ByHand})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.EndHeadless(ctx, ended, turns.HeadlessEnd{Err: errors.New("boom")}); err != nil {
 		t.Fatal(err)
 	}
-	dismissed, err := s.BeginHeadless(ctx, turns.HeadlessStart{Unit: u, Intent: "act", Turn: "b", Trigger: turn.ByHand})
+	dismissed, err := turnstest.BeginHeadless(ctx, s, turns.HeadlessStart{Unit: u, Intent: "act", Turn: "b", Trigger: turn.ByHand})
 	if err != nil {
 		t.Fatal(err)
 	}

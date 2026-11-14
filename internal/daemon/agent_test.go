@@ -73,7 +73,7 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 func sendTurn(t *testing.T, s *Server, svc *turns.Service, ref pr.Ref, intent turn.Intent, round string) {
 	t.Helper()
 	ctx := context.Background()
-	if _, err := svc.Send(ctx, turns.SendRequest{Unit: ref.Unit(), Intent: intent, Turn: round, Trigger: turn.Automated, Head: "h2", Records: true}); err != nil {
+	if _, err := turnstest.Send(ctx, svc, turns.SendRequest{Unit: ref.Unit(), Intent: intent, Turn: round, Trigger: turn.Automated, Head: "h2", Records: true}); err != nil {
 		t.Fatal(err)
 	}
 	stored := dinv.StoredTurn{ID: round, Kind: string(intent), Repo: ref.Owner + "/" + ref.Repo, Text: "Instructions " + round + " for " + string(intent) + "\n"}

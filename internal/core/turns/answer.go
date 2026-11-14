@@ -748,6 +748,6 @@ func (s *Service) relaunch(ctx context.Context, u unit.Unit, q turn.Turn, said s
 	if err != nil {
 		return err
 	}
-	_, err = s.Launcher.Launch(ctx, Launch{Unit: t.Unit(), Intent: t.Intent(), ResumeOf: t.ResumeOf(), Answer: said, Inputs: q.Inputs})
+	_, err = s.Launcher.Launch(ctx, Launch{Unit: t.Unit(), Intent: t.Intent(), ResumeOf: t.ResumeOf(), Answer: said, Turn: t})
 	return err
 }

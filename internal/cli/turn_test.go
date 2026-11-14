@@ -84,7 +84,7 @@ func turnText(t *testing.T, te *testEnv, prompt string) string {
 func TestASentTurnIsReadByItsRound(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Add x"}, Guidance: "look at the migration first"})
+	sent, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Add x"}, Guidance: "look at the migration first"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestAStoredTurnSurvivesItsProfileDirectoryGoingAway(t *testing.T) {
 		t.Fatal(err)
 	}
 	te.cfg.Profile = dir
-	sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
+	sent, err := te.sendAdmitted(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
 	ctx := context.Background()
 	drifted := &turn.PR{Title: "Add x", Head: "c9", Prior: &turn.PriorReview{Verdict: pr.ReviewApproved, Head: "m8"}}
 	te := newTestEnv(t, &fake.Manager{})
-	sent, err := te.sendTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
+	sent, err := te.sendAdmitted(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
 	if _, err := te.repo.Save(ctx, saved); err != nil {
 		t.Fatal(err)
 	}
-	sent, err = te.sendTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
+	sent, err = te.sendAdmitted(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
 		t.Fatalf("the recorded head did not win over the drifted commit:\n%s", sent.Text)
 	}
 	resumed := turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted, History: []instructions.PastTurn{}}
-	if sent, err = te.sendTurn(ctx, te.cfg, resumed); err != nil || !strings.Contains(sent.Text, "git diff c3..HEAD") {
+	if sent, err = te.sendAdmitted(ctx, te.cfg, resumed); err != nil || !strings.Contains(sent.Text, "git diff c3..HEAD") {
 		t.Fatalf("a turn that brings its history lost the recorded head: %v\n%s", err, sent.Text)
 	}
 }
@@ -176,7 +176,7 @@ func TestARenamedReviewKeepsTheVerdictTheBundledReviewRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 	drifted := &turn.PR{Title: "Add x", Head: "c9", Prior: &turn.PriorReview{Verdict: pr.ReviewApproved, Head: "m8"}}
-	sent, err := te.sendTurn(ctx, te.cfg, turn.Request{Intent: "my-review", Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
+	sent, err := te.sendAdmitted(ctx, te.cfg, turn.Request{Intent: "my-review", Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
 	if err != nil {
 		t.Fatal(err)
 	}

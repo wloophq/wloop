@@ -59,7 +59,7 @@ func TestResumeRecreatesTheAuthorWorkspace(t *testing.T) {
 	te.git.ancestor["/worktrees/feat/mine"] = true
 	seq := stoppedAddress(t, te)
 
-	_, err := cliLauncher{te.Env}.Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
+	_, err := te.launchAdmitted(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
 	if err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
@@ -94,7 +94,7 @@ func TestAResumeKeepsTheSelfReview(t *testing.T) {
 	te.git.ancestor["/worktrees/feat/mine"] = true
 	seq := stoppedAddressWith(t, te, map[string]any{"self_review": true})
 
-	_, err := cliLauncher{te.Env}.Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
+	_, err := te.launchAdmitted(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
 	if err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
@@ -120,7 +120,7 @@ func TestResumeRefusesUnpushedCommits(t *testing.T) {
 	te.git.tips["feat/mine"] = "local1"
 	seq := stoppedAddress(t, te)
 
-	_, err := cliLauncher{te.Env}.Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
+	_, err := te.launchAdmitted(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"})
 	if err == nil || !strings.Contains(err.Error(), "local branch feat/mine has commits not on the PR") {
 		t.Fatalf("err = %v", err)
 	}
@@ -145,7 +145,7 @@ func TestResumeOfAReviewRunsInTheReviewWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	seq := saved.Turns[0].Seq
-	if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: seq, Answer: "publish"}); err != nil {
+	if _, err := te.launchAdmitted(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: seq, Answer: "publish"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	if len(m.Prompts) != 1 || m.Prompts[0].Handle != "term-rev" {
@@ -170,7 +170,7 @@ func TestAResumedReviewRecordsTheGuidanceItCarries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
+	if _, err := te.launchAdmitted(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	var handed []string

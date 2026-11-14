@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -52,7 +53,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if got := state("left"); got != dturn.Failed {
 		t.Fatalf("the turn a stop left is %s", got)
 	}
-	if _, err := te.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: unit.Unit{Provider: "thread", Key: "C1/2"}, Intent: dturn.Intent(dintent.Act), Turn: "live", Trigger: dturn.ByHand}); err != nil {
+	if _, err := turnstest.BeginHeadless(ctx, te.Turns, turns.HeadlessStart{Unit: unit.Unit{Provider: "thread", Key: "C1/2"}, Intent: dturn.Intent(dintent.Act), Turn: "live", Trigger: dturn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
 	te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)

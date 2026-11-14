@@ -690,7 +690,7 @@ type sweepRound struct {
 
 func (x sweepRound) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
 	c := x.call
-	c.Guidance, c.Inputs = t.Guidance(), t.Inputs()
+	c.Guidance, c.Inputs, c.Turn = t.Guidance(), t.Inputs(), t
 	return x.e.sendRound(ctx, x.st, c)
 }
 
