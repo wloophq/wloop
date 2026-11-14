@@ -14,9 +14,13 @@ make fuzz         # fuzz the predicate compilers for 60 s each
 make test-brand   # the tests, built with a test product name (SHARD=<name> for one CI shard)
 make scan-brand   # check that nothing the program writes names the default product name
 make proto        # lint proto/ and regenerate the plugin protocol's Go code
+make web          # build the cockpit's bundle into internal/web/static/app
+make test-web     # the cockpit's component tests (vitest) and type check (svelte-check)
 ```
 
 `make proto` runs `buf`, `protoc-gen-go` and `protoc-gen-go-grpc` through `go tool`, at the versions the `tool` directives of `go.mod` pin, so it needs no `protoc`. The generated code is committed, and CI fails when it drifts from `proto/`.
+
+The cockpit is a Svelte 5 project in `internal/web/ui`, built with Vite. Node is a build-time dependency only: the bundle is committed under `internal/web/static/app/` and embedded, so `go build` and `go install` need no Node. `make web` and `make test-web` run `npm ci` first when the lockfile changed; use the Node version `internal/web/ui/.nvmrc` names. After changing anything under `internal/web/ui/src`, run `make web` and commit the bundle with the sources; CI rebuilds it and fails when the committed bundle differs.
 
 ## Running your checkout
 

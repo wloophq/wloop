@@ -51,8 +51,8 @@ var bundledIDs = sync.OnceValues(func() ([]string, error) {
 	return ids, nil
 })
 
-// TestCockpitScriptsNameNoPlugin checks that the cockpit's scripts quote no
-// plugin's id.
+// TestCockpitScriptsNameNoPlugin checks that the cockpit's scripts, modules
+// and components quote no plugin's id.
 func TestCockpitScriptsNameNoPlugin(t *testing.T) {
 	dir := filepath.Join("..", "..", webStatic)
 	files, err := filepath.Glob(filepath.Join(dir, "*.js"))
@@ -65,6 +65,11 @@ func TestCockpitScriptsNameNoPlugin(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, b := range ruleWebProvider(webStatic+"/"+filepath.Base(f), string(raw), pluginIDs()) {
+			t.Error(b)
+		}
+	}
+	for file, src := range cockpitSources(t) {
+		for _, b := range ruleWebProvider(file, src, pluginIDs()) {
 			t.Error(b)
 		}
 	}

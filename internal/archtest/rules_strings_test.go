@@ -256,6 +256,9 @@ func proseBucket(file string) string {
 	if strings.HasPrefix(file, webStatic+"/") {
 		return strings.TrimPrefix(file, webStatic+"/")
 	}
+	if strings.HasPrefix(file, webUI+"/") {
+		return "ui/" + strings.TrimPrefix(file, webUI+"/")
+	}
 	rest := strings.TrimPrefix(file, "internal/client/")
 	return strings.SplitN(rest, "/", 2)[0]
 }
@@ -277,7 +280,7 @@ func cockpitScripts(t *testing.T) map[string]string {
 	return out
 }
 
-// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts, its page and the Go clients quote no text
+// TestClientsQuoteNoProseOutsideTheCatalog checks that the cockpit's scripts and components, its page and the Go clients quote no text
 // a person reads outside the string catalog (`strings.toml`, through `t`/`tn` and `texts.Catalog`), but for
 // the debts `proseDebts` counts, which only shrink.
 func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
@@ -287,6 +290,13 @@ func TestClientsQuoteNoProseOutsideTheCatalog(t *testing.T) {
 			continue
 		}
 		got[proseBucket(file)] = append(got[proseBucket(file)], ruleClientProse(file, src)...)
+	}
+	for file, src := range cockpitSources(t) {
+		rule := ruleClientProse
+		if strings.HasSuffix(file, ".svelte") {
+			rule = ruleSvelteProse
+		}
+		got[proseBucket(file)] = append(got[proseBucket(file)], rule(file, src)...)
 	}
 	page, err := os.ReadFile(filepath.Join("..", "..", webStatic, "index.html"))
 	if err != nil {
@@ -341,8 +351,10 @@ var (
 func TestCatalogKeysAreUsedAndKnown(t *testing.T) {
 	keys := catalogKeys(t)
 	used := map[string]bool{}
-	for file, src := range cockpitScripts(t) {
-		for _, l := range jsLiterals(src) {
+	sources := cockpitScripts(t)
+	maps.Copy(sources, cockpitSources(t))
+	for file, src := range sources {
+		for _, l := range cockpitLiterals(file, src) {
 			if jsKeyCall.MatchString(l.before) {
 				used[l.text] = true
 				if !keys[l.text] {
