@@ -1241,3 +1241,25 @@ func TestALaunchIsAPersonsOnlyWhenItsEntrySaysSo(t *testing.T) {
 		}
 	}
 }
+
+func TestAChatAPersonWritesOnAnAutomatedTurnsSessionIsByHand(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		byPerson bool
+		want     turn.Trigger
+	}{
+		{"a person's chat", true, turn.ByHand},
+		{"a launch no person asked for", false, turn.Automated},
+	} {
+		s, store, _, _, rec := newService(t)
+		putTurn(store, false)
+		s.Starter = turnstest.Starter(turnstest.Defs{Registry: turnstest.Intents()}, store, nil)
+		l := turns.Launch{Unit: r7, Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, ByPerson: c.byPerson, ResumeOf: 1}
+		if err := s.Launch(context.Background(), l); err != nil {
+			t.Fatal(err)
+		}
+		if len(rec.admitted) != 1 || rec.admitted[0].Trigger() != c.want {
+			t.Errorf("%s: admitted %+v, want trigger %s", c.name, rec.admitted, c.want)
+		}
+	}
+}

@@ -127,13 +127,14 @@ func (s *Service) LastRun(ctx context.Context, u unit.Unit) (turn.Turn, bool, er
 }
 
 // Launch starts l's turn through the Starter, which runs it through the
-// Launcher. A turn that resumes an earlier one's session is a new turn too.
+// Launcher. A turn that resumes an earlier one's session is a new turn too,
+// by hand when a person asked for it whatever the turn it resumes was.
 func (s *Service) Launch(ctx context.Context, l Launch) error {
 	if s.Starter == nil {
 		return errors.New("no turn starter is wired")
 	}
 	trigger := l.Trigger
-	if l.ResumeOf != 0 {
+	if l.ResumeOf != 0 && !l.ByPerson {
 		if prev, err := resume(ctx, s.Store, l.Unit, l.ResumeOf); err == nil {
 			trigger = prev.Trigger()
 		}

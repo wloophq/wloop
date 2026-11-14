@@ -172,8 +172,8 @@ type Launch struct {
 	Answer   string
 	Guidance string
 	Inputs   map[string]any
-	// Trigger is a new turn's; a resume inherits the trigger of the turn it
-	// resumes and ignores this.
+	// Trigger is a new turn's; a resume no person asked for inherits the
+	// trigger of the turn it resumes and ignores this.
 	Trigger turn.Trigger
 	// WorkspaceID, Home and Model are set by the probe: run in this
 	// workspace, with this agent home and model, instead of the intent's rules.
