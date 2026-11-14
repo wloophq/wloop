@@ -2,10 +2,6 @@ package cli
 
 import (
 	"context"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -16,69 +12,34 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
 
-// startEntries are the entries a new turn starts from. Each drives its turn
-// with an intent whose role has a prepare and a guidance.max and checks
-// that the prepare ran under the loop and the guidance was cut; a resume,
-// or an intent with no guidance, checks that the prepare ran or none did.
-// An entry tested in another package names that test, which must exist.
+// startEntries are the entries of this package a new turn starts from.
+// Each drives its turn with an intent whose role has a prepare and a
+// guidance.max and checks that the prepare ran under the loop and the
+// guidance was cut. The decision log names the tests of the chat and the
+// probe, which their own packages drive.
 var startEntries = []struct {
 	entry string
 	run   func(*testing.T)
-	// elsewhere is the package directory and test of an entry its own
-	// package drives.
-	elsewhere [2]string
 }{
-	{entry: "P1 by hand", run: TestAReviewByHandPreparesUnderTheLoopAndCutsItsGuidance},
-	{entry: "P1a attach", run: TestAnAttachRunsItsRolesPrepare},
-	{entry: "intake start", run: TestATurnByHandThroughAnIntakePreparesAtItsStart},
-	{entry: "P2 action on a pull request", run: TestAnActionOnAPullRequestPreparesUnderTheLoopAndCutsItsGuidance},
-	{entry: "P2 action on a unit", run: TestAnActionOnAUnitPreparesUnderTheLoopAndCutsItsGuidance},
-	{entry: "run_now", run: TestRunNowPreparesUnderTheLoopAndHandsTheKeptGuidanceCut},
-	{entry: "TrustAndRun", run: TestTrustAndRunPreparesUnderTheLoopAndCutsItsGuidance},
-	{entry: "Release", run: TestAReleasedHeldRoundPreparesUnderTheDaemonsLoopAndCutsItsGuidance},
-	{entry: "P3 round", run: TestAWorkflowRoundRunsItsRolesPrepare},
-	{entry: "P3 non-round", run: TestAWorkflowNudgeLaunchesWithWhatItsPrepareFilled},
-	{entry: "P3 unit", run: TestAWorkflowTurnOnAUnitPreparesUnderTheLoopAndCutsItsGuidance},
-	{entry: "P3 headless", run: TestAHeadlessWorkflowTurnStartsThroughItsRolesPrepareOnItsCutGuidance},
-	{entry: "daemon headless route", run: TestAHeadlessActionStartsThroughItsRolesPrepareOnItsCutGuidance},
-	{entry: "chat", elsewhere: [2]string{"internal/core/messages", "TestAChatTurnRunsItsRolesPrepareOnItsCutGuidance"}},
-	{entry: "probe", elsewhere: [2]string{"internal/daemon", "TestAProbeStartsThroughTheStarterAndTakesNoGuidance"}},
-	{entry: "headless Again", elsewhere: [2]string{"internal/core/headless", "TestAHeadlessRunAgainResumesWithoutAPrepare"}},
+	{"P1 by hand", TestAReviewByHandPreparesUnderTheLoopAndCutsItsGuidance},
+	{"P1a attach", TestAnAttachRunsItsRolesPrepare},
+	{"intake start", TestATurnByHandThroughAnIntakePreparesAtItsStart},
+	{"P2 action on a pull request", TestAnActionOnAPullRequestPreparesUnderTheLoopAndCutsItsGuidance},
+	{"P2 action on a unit", TestAnActionOnAUnitPreparesUnderTheLoopAndCutsItsGuidance},
+	{"run_now", TestRunNowPreparesUnderTheLoopAndHandsTheKeptGuidanceCut},
+	{"TrustAndRun", TestTrustAndRunPreparesUnderTheLoopAndCutsItsGuidance},
+	{"Release", TestAReleasedHeldRoundPreparesUnderTheDaemonsLoopAndCutsItsGuidance},
+	{"P3 round", TestAWorkflowRoundRunsItsRolesPrepare},
+	{"P3 non-round", TestAWorkflowNudgeLaunchesWithWhatItsPrepareFilled},
+	{"P3 unit", TestAWorkflowTurnOnAUnitPreparesUnderTheLoopAndCutsItsGuidance},
+	{"P3 headless", TestAHeadlessWorkflowTurnStartsThroughItsRolesPrepareOnItsCutGuidance},
+	{"daemon headless route", TestAHeadlessActionStartsThroughItsRolesPrepareOnItsCutGuidance},
 }
 
-func TestEveryEntryStartsThroughThePrepareAndTheCut(t *testing.T) {
+func TestEveryEntryOfTheCLIStartsThroughThePrepareAndTheCut(t *testing.T) {
 	for _, e := range startEntries {
-		t.Run(e.entry, func(t *testing.T) {
-			if e.run != nil {
-				e.run(t)
-				return
-			}
-			if !declaresTest(t, filepath.Join("..", "..", e.elsewhere[0]), e.elsewhere[1]) {
-				t.Fatalf("%s declares no %s", e.elsewhere[0], e.elsewhere[1])
-			}
-		})
+		t.Run(e.entry, e.run)
 	}
-}
-
-// declaresTest says whether a _test.go file of dir declares the test name.
-func declaresTest(t *testing.T, dir, name string) bool {
-	t.Helper()
-	files, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range files {
-		file, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.SkipObjectResolution)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, d := range file.Decls {
-			if fn, ok := d.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.Name == name {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func TestAReviewByHandPreparesUnderTheLoopAndCutsItsGuidance(t *testing.T) {
