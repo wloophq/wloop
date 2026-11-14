@@ -185,13 +185,15 @@ func TestAResumedReviewRecordsTheGuidanceItCarries(t *testing.T) {
 }
 
 // askedIntent runs a round of the intent the user asked for through the
-// daemon's action, as envActions.Intent does.
+// daemon's action, as envActions.Intent does, with the inputs its prepare
+// would fill given.
 func askedIntent(e *Env, cfg config.Config, ref pr.Ref, name dintent.Name, guidance string, inputs map[string]any, home string) error {
 	d, ok := e.loadedIntents().Registry.Get(name)
 	if !ok {
 		return fmt.Errorf("no intent %s", name)
 	}
-	return e.askedRound(context.Background(), d, cfg, ref, guidance, inputs, home)
+	e.Turns.Starter.Preparer = startPreparer{&fakePreparer{}}
+	return e.askedRound(context.Background(), d, cfg, ref, guidance, inputs, home, "")
 }
 
 func nudgePR(_ context.Context, e *Env, cfg config.Config, ref pr.Ref, situation string, maintainers bool, guidance, home string) error {

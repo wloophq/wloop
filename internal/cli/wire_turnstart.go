@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -139,6 +140,56 @@ func (l *latePlan) get() (daemon.Plan, bool) {
 // unit's pending plan items and records its round.
 const askedByYou = "asked by you"
 
+// hostEffect is a turn effect the host applies, with what it does in each
+// phase of a person's turn; every other turn effect is its plugin's, applied
+// through ApplyEffect.
+type hostEffect struct {
+	name string
+	// before runs before the turn goes out.
+	before func(f startEffects, ctx context.Context, u unit.Unit) error
+	// sent runs once the turn went out.
+	sent func(f startEffects, ctx context.Context, o turns.TurnOut)
+	// started is an effect the start itself applies, read from the intent
+	// as turns.Def.
+	started bool
+}
+
+// hostEffects are the host's turn effects, in the order each phase runs them.
+var hostEffects = []hostEffect{
+	{name: builtin.EffectPlanCleared, before: func(f startEffects, ctx context.Context, u unit.Unit) error {
+		p, ok := f.plan.get()
+		if !ok {
+			return nil
+		}
+		return p.Drop(ctx, u, askedByYou)
+	}},
+	{name: builtin.EffectGuidanceHanded, started: true},
+	{name: builtin.EffectRoundSent, sent: func(f startEffects, ctx context.Context, o turns.TurnOut) {
+		ref, err := githubRef(o.Unit)
+		if err != nil {
+			return
+		}
+		why := cmp.Or(o.Reason, askedByYou)
+		if o.Reason == "" && o.Route == src.RouteSession {
+			why = handInSession
+		}
+		f.e.recordEvent(ctx, ref, dinv.KindRoundSent, withInstructions(why, o.Outcome.ID))
+	}},
+}
+
+// hostEffectsOf are the host's turn effects d names, in table order.
+func hostEffectsOf(d dintent.Def) []hostEffect {
+	return slices.DeleteFunc(slices.Clone(hostEffects), func(h hostEffect) bool { return !slices.Contains(d.Effects, h.name) })
+}
+
+func hostEffectNames() []string {
+	names := make([]string, len(hostEffects))
+	for i, h := range hostEffects {
+		names[i] = h.name
+	}
+	return names
+}
+
 // startEffects are the turn effects a start applies: the plugin's through
 // its ApplyEffect, and the host's.
 type startEffects struct {
@@ -151,14 +202,15 @@ func (f startEffects) Check(_ context.Context, d turns.Def, u unit.Unit) error {
 }
 
 func (f startEffects) Before(ctx context.Context, d turns.Def, u unit.Unit) error {
-	if !slices.Contains(d.Effects, builtin.EffectPlanCleared) {
-		return nil
+	for _, h := range hostEffectsOf(d.Def) {
+		if h.before == nil {
+			continue
+		}
+		if err := h.before(f, ctx, u); err != nil {
+			return err
+		}
 	}
-	p, ok := f.plan.get()
-	if !ok {
-		return nil
-	}
-	return p.Drop(ctx, u, askedByYou)
+	return nil
 }
 
 func (f startEffects) Recorded(ctx context.Context, o turns.TurnOut) error {
@@ -167,15 +219,11 @@ func (f startEffects) Recorded(ctx context.Context, o turns.TurnOut) error {
 }
 
 func (f startEffects) Sent(ctx context.Context, o turns.TurnOut) error {
-	ref, err := githubRef(o.Unit)
-	if err != nil || !slices.Contains(o.Def.Effects, builtin.EffectRoundSent) {
-		return nil
+	for _, h := range hostEffectsOf(o.Def.Def) {
+		if h.sent != nil {
+			h.sent(f, ctx, o)
+		}
 	}
-	why := askedByYou
-	if o.Route == src.RouteSession {
-		why = handInSession
-	}
-	f.e.recordEvent(ctx, ref, dinv.KindRoundSent, withInstructions(why, o.Outcome.ID))
 	return nil
 }
 

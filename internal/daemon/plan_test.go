@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -476,12 +475,6 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 		{"pause", func(t *testing.T, r *planRig) {
 			if rec := post(t, r.s, "/api/pause", `{"paused":true,"except":["acme/other"]}`); rec.Code != http.StatusOK {
 				t.Fatalf("%d %s", rec.Code, rec.Body)
-			}
-		}},
-		{"by hand", func(t *testing.T, r *planRig) {
-			r.s.deps.Actions = &fakeActions{}
-			if err := r.s.act(context.Background(), "run_now", u7, api.ActionRequest{}, personRequest, &bytes.Buffer{}); err != nil {
-				t.Fatal(err)
 			}
 		}},
 	} {

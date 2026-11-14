@@ -4,28 +4,25 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-func TestEveryTurnEffectRunsOnARoute(t *testing.T) {
+func TestEveryHostTurnEffectHasAnImplementationInTheOneTable(t *testing.T) {
 	t.Parallel()
-	for _, e := range onSent {
-		runs := false
-		for _, c := range e.on {
-			runs = runs || c.guide != nil || c.unsent != nil
+	for _, h := range hostEffects {
+		if h.before == nil && h.sent == nil && !h.started {
+			t.Errorf("%s runs in no phase", h.name)
 		}
-		if !runs {
-			t.Errorf("%s runs on no route", e.name)
+		if fx, ok := builtin.EffectOf(h.name); !ok || fx.Plugin || fx.Applies&builtin.AppliesTurn == 0 {
+			t.Errorf("%s is no host turn effect of builtin.Effects", h.name)
 		}
 	}
-	theirs := daemon.Builtins().Effects
 	for _, name := range builtin.TurnEffectNames() {
 		if fx, _ := builtin.EffectOf(name); fx.Plugin {
 			continue
 		}
-		if !slices.ContainsFunc(onSent, func(e onSentEffect) bool { return e.name == name }) && !slices.Contains(theirs, name) {
-			t.Errorf("the turn effect %s is in neither the command line's table nor the daemon's", name)
+		if !slices.ContainsFunc(hostEffects, func(h hostEffect) bool { return h.name == name }) {
+			t.Errorf("the turn effect %s is not in the host's table", name)
 		}
 	}
 }

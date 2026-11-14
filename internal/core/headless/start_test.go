@@ -97,3 +97,15 @@ func TestAHeadlessTurnIsAPersonsOnlyWhenItsEntrySaysSo(t *testing.T) {
 		}
 	}
 }
+
+func TestAHeadlessTurnRecordsNoGuidanceItsIntentDoesNotHand(t *testing.T) {
+	r := newRig(t, scripted{json: answerJSON(t, done)})
+	fx := &turnstest.Effects{}
+	r.svc.Starter.Effects = fx
+	if _, err := r.svc.Run(context.Background(), headless.Request{Unit: thread, Guidance: "Ask about the retries first.", Trigger: turn.ByHand, ByPerson: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fx.Guidances(); len(got) != 0 {
+		t.Fatalf("guidance events %q", got)
+	}
+}

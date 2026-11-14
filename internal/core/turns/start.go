@@ -69,6 +69,7 @@ type TurnOut struct {
 	Def      Def
 	Unit     unit.Unit
 	Route    string
+	Reason   string
 	Guidance string
 	Inputs   map[string]any
 	Outcome  Outcome
@@ -84,7 +85,7 @@ type TurnEffects interface {
 	Recorded(ctx context.Context, o TurnOut) error
 	// Sent applies the host's effects of a person's turn that went out.
 	Sent(ctx context.Context, o TurnOut) error
-	// Handed records the guidance a turn was handed.
+	// Handed records the guidance a turn carried.
 	Handed(ctx context.Context, o TurnOut) error
 }
 
@@ -113,6 +114,19 @@ type MarksStandIn interface {
 	MarksStandIn() bool
 }
 
+// KeptBack is a Runner told of the guidance Start kept back for the unit's
+// next turn, so the person who asked hears of it.
+type KeptBack interface {
+	KeptBack(guidance string)
+}
+
+// Sessionless is a Runner whose turn runs in no agent session, such as a
+// headless call: the guidance of its turn is recorded only when its intent
+// hands guidance.
+type Sessionless interface {
+	Sessionless() bool
+}
+
 // RouteLaunch is the route of a turn the turn service or the headless
 // runner starts, as the plugin protocol names it.
 const RouteLaunch = "launch"
@@ -130,6 +144,9 @@ type Request struct {
 	Route string
 	// ByPerson is a turn a person asked for.
 	ByPerson bool
+	// Reason is how the person asked for it, as the host's sent effects
+	// record it; "" for the route's own.
+	Reason string
 }
 
 // Started is a turn Start ran.
@@ -151,6 +168,7 @@ type Turn struct {
 	why      *workflow.Why
 	route    string
 	byPerson bool
+	reason   string
 	resumeOf int64
 }
 
@@ -218,7 +236,7 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 		}
 	}
 	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: r.Trigger,
-		why: r.Why, route: r.Route, byPerson: r.ByPerson})
+		why: r.Why, route: r.Route, byPerson: r.ByPerson, reason: r.Reason})
 	o, err := s.run(ctx, d, &t, x)
 	back := whole
 	if errors.Is(err, ErrAnswered) {
@@ -227,6 +245,8 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 	if d.HandsGuidance && back != "" && (err != nil || !o.Submitted) {
 		if kerr := s.Kept.Keep(ctx, r.Unit, back); kerr != nil {
 			s.logf("%s: keeping the guidance back: %v", r.Unit, kerr)
+		} else if k, ok := x.(KeptBack); ok {
+			k.KeptBack(back)
 		}
 	}
 	if err != nil {
@@ -237,7 +257,7 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 
 // run is Start past the take: prepare, check, guard, before, run, then the
 // effects of the recorded turn; a turn recorded and not run through still
-// records the guidance it was handed.
+// records the guidance it carried.
 func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, error) {
 	if d.Prepare != "" {
 		filled, err := s.Preparer.PrepareTurn(ctx, string(t.intent), t.unit, t.guidance, maps.Clone(t.inputs))
@@ -264,9 +284,11 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		}
 	}
 	o, err := x.Run(ctx, *t)
-	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o}
+	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Reason: t.reason, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o}
+	sl, ok := x.(Sessionless)
+	recordsGuidance := d.HandsGuidance || !ok || !sl.Sessionless()
 	handed := func() {
-		if d.HandsGuidance && t.guidance != "" && o.ID != "" {
+		if recordsGuidance && t.guidance != "" && o.ID != "" {
 			s.effect(ctx, "recording the guidance handed", out, s.Effects.Handed)
 		}
 	}

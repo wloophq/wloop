@@ -26,13 +26,13 @@ import (
 
 // runHeld runs the round the daily cap held, by hand: the plan gate's
 // approving intent on a row with no round pending.
-var runHeld = delegated{loop: true, full: true, event: builtin.EventRoundSent, data: "run now", call: Actions.Run}
+var runHeld = delegated{loop: true, full: true, call: Actions.Run}
 
 // unblocks are a trust gate's consequences, by whether it was approved:
 // trust the folder and run the round, or lift the block until the round's
 // next trigger.
 var unblocks = map[bool]delegated{
-	true:  {loop: true, full: true, event: builtin.EventRoundSent, data: "trusted its folder and ran", call: unblocking(Unblocker.TrustAndRun)},
+	true:  {loop: true, full: true, call: unblocking(Unblocker.TrustAndRun)},
 	false: {loop: true, event: builtin.EventRoundUnblocked, data: "dismissed by you", call: unblocking(Unblocker.Unblock)},
 }
 

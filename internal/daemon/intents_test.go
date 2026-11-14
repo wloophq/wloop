@@ -169,7 +169,7 @@ func TestPrepareRunsOnTheActionRoute(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{}
+	fa := startingActions(s)
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"g","source":"cli"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -496,49 +496,6 @@ func TestNudgeRecordsOnlyDoneOrFailed(t *testing.T) {
 	rec = agentCall(t, h, "POST", api.AgentTurnsEnd, "term_1", `{"turn":"nudge1nudge1","pr":"`+agentRef.URL()+`","record":{"state":"done","summary":"nudged","outcome":{"url":"https://github.com/acme/api/pull/7#issuecomment-1"}}}`)
 	if rec.Code != 200 {
 		t.Fatalf("a done nudge: %d %s", rec.Code, rec.Body)
-	}
-}
-
-func TestActionRouteRunsTodaysEffects(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
-		intent    string
-		ref       github.Ref
-		dropped   bool
-		event     string
-		eventData string
-	}{
-		{"review", r7, true, dinv.KindRoundSent, askedByYou},
-		{"address", r7, true, dinv.KindRoundSent, askedByYou},
-		{"nudge", r9, false, "", ""},
-	} {
-		t.Run(c.intent, func(t *testing.T) {
-			t.Parallel()
-			rig := newCatalogRig(t)
-			rig.s.intakes = nil
-			fa := &fakeActions{}
-			rig.s.deps.Actions = fa
-			seedWaitingOnAna(t, rig.s)
-			adopt(t, rig.s, r7)
-			rig.plan.propose(c.ref.Unit())
-			path := api.UnitPath(pr.Ref{Owner: "acme", Repo: "api", Number: c.ref.Number}.Unit(), c.intent)
-			if rec := post(t, rig.s, path, `{"source":"cli"}`); rec.Code != 200 {
-				t.Fatalf("%d %s", rec.Code, rec.Body)
-			}
-			if pending := rig.plan.isPending(c.ref.Unit()); pending == c.dropped {
-				t.Errorf("pending round after the %s: %v", c.intent, pending)
-			}
-			evs, _ := rig.st.Events(context.Background(), c.ref)
-			if c.event != "" && !slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == c.event && e.Data == c.eventData }) {
-				t.Errorf("no %s %q: %+v", c.event, c.eventData, evs)
-			}
-			if c.event == "" && slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindNudged }) {
-				t.Errorf("the daemon recorded a nudge the command line records with its turn: %+v", evs)
-			}
-			if len(fa.calls) != 1 {
-				t.Errorf("calls %v", fa.calls)
-			}
-		})
 	}
 }
 

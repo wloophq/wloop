@@ -25,11 +25,14 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // errDaemonDown is every command's answer when no daemon listens: the loop's
@@ -382,8 +385,12 @@ func (a envActions) Intent(ctx context.Context, name string, u unit.Unit, c daem
 	if err != nil {
 		return err
 	}
-	return e.liftPassedBlock(ctx, u, e.askedRound(ctx, d, cfg, ref, c.Guidance, c.Inputs, profile))
+	return e.liftPassedBlock(ctx, u, e.askedRound(ctx, d, cfg, ref, c.Guidance, c.Inputs, profile, ""))
 }
+
+// ranNow is why a round a cap held, run by hand, drops the unit's pending
+// plan items and records its round.
+const ranNow = "run now"
 
 func (a envActions) Run(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	ref := prOf(u)
@@ -391,7 +398,7 @@ func (a envActions) Run(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	if err != nil {
 		return err
 	}
-	return e.liftPassedBlock(ctx, u, runHeldRound(ctx, e, cfg, ref, profile))
+	return e.liftPassedBlock(ctx, u, runHeldRound(ctx, e, cfg, ref, profile, ranNow))
 }
 
 // liftPassedBlock records the start block of u lifted when err, the
@@ -419,11 +426,11 @@ func (e *Env) recordLifted(ctx context.Context, u unit.Unit) {
 	}
 }
 
-// runHeldRound sends at once the round a cap held back: a follow-up in the
-// review workspace, else a round of the intent run.resolve picks for the
-// pull request's role. It counts as asked for by the user, so it never
-// counts against the caps.
-func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, profile string) error {
+// runHeldRound starts at once, as a person's turn, the round a cap held
+// back: a follow-up in the review workspace, else a round of the intent
+// run.resolve picks for the pull request's role; reason is how the person
+// asked for it. It never counts against the caps.
+func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, profile, reason string) error {
 	cfg := prConfig(base, ref, profile)
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
@@ -440,8 +447,7 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 	if err != nil {
 		return err
 	}
-	remoteKey := ref.RemoteKey()
-	ws, found := findReviewWorkspace(cfg, repos, all, remoteKey, ref.Number, pr.HeadRefName)
+	ws, found := findReviewWorkspace(cfg, repos, all, ref.RemoteKey(), ref.Number, pr.HeadRefName)
 	facts := catalog.RoleFacts{ReviewWorkspace: found}
 	if !found {
 		if facts, err = e.heldRoleFacts(ctx, cfg, repos, all, ref, pr); err != nil {
@@ -454,30 +460,56 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 		return fmt.Errorf("%s: no single intent drives a row from a %s workspace", ref, role)
 	}
 	if !found {
-		return e.askedRound(ctx, held, base, ref, "", nil, profile)
+		return e.askedRound(ctx, held, base, ref, "", nil, profile, reason)
 	}
+	if e.Turns == nil || e.Turns.Starter == nil {
+		return errors.New("no turn starts here: the daemon runs a round a cap held")
+	}
+	_, err = e.Turns.Starter.Start(ctx, turns.Request{Unit: ref.Unit(), Intent: dturn.Intent(held.Name), Trigger: dturn.Automated,
+		Route: src.RouteAsked, ByPerson: true, Reason: reason}, &heldRunner{e: e, cfg: cfg, ref: ref, ws: ws, pr: pr, held: held})
+	return err
+}
 
+// heldRunner sends a held round as a follow-up in the review workspace ws;
+// the marks it records stand in for the plugin's turn effects, as a sweep's
+// follow-up's do.
+type heldRunner struct {
+	e    *Env
+	cfg  config.Config
+	ref  pr.Ref
+	ws   wsdomain.Workspace
+	pr   *pr.PullRequest
+	held dintent.Def
+}
+
+func (x *heldRunner) MarksStandIn() bool { return true }
+
+func (x *heldRunner) KeptBack(string) { x.e.noteKeptBack(x.ref) }
+
+func (x *heldRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	e, cfg, ref, ws := x.e, x.cfg, x.ref, x.ws
 	rounds, err := e.rounds()
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	st, err := rounds.Load(ctx)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	full, viewer, err := e.readPR(ctx, cfg, ref)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
-	sent, err := e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(held.Name), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: ref.Unit(), Payload: turnPR(pr)})
+	sent, err := e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(x.held.Name), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: ref.Unit(), Payload: turnPR(x.pr),
+		Guidance: t.Guidance(), Inputs: t.Inputs()})
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
-	submitted, verb, err := e.startRound(ctx, cfg, ws, ref, &sent, intentOptions(held, roundOptions{allowUserActive: true, trusted: trusts(cfg, full), pr: full}))
+	submitted, verb, err := e.startRound(ctx, cfg, ws, ref, &sent, intentOptions(x.held, roundOptions{allowUserActive: true, trusted: trusts(cfg, full), pr: full}))
 	if err != nil {
-		return fmt.Errorf("%s: %w", ws.DisplayName, err)
+		return turns.Outcome{}, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
-	e.alignWithPR(ctx, ws, pr)
+	e.alignWithPR(ctx, ws, x.pr)
 	if err := e.setReviewStatus(ctx, cfg, ref, ws, false); err != nil {
 		fmt.Fprintf(e.Err, "warning: setting the board status: %v\n", err)
 	}
@@ -486,8 +518,8 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 	} else {
 		e.recordReviewed(st, cfg, ref, ws, full, viewer)
 	}
-	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
-	return rounds.Save(ctx, st)
+	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, x.pr.Title, ws.Path)
+	return turns.Outcome{ID: sent.ID, Head: full.HeadRefOid, Submitted: submitted}, rounds.Save(ctx, st)
 }
 
 // fetchPR has the GitHub plugin read ref in full and report it, and

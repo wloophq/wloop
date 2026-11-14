@@ -132,13 +132,15 @@ func (e *startEffects) Handed(ctx context.Context, o turns.TurnOut) error {
 }
 
 type startRunner struct {
-	r        *startRig
-	out      turns.Outcome
-	err      error
-	guardErr error
-	standIn  bool
-	ran      []turns.Turn
-	useErr   error
+	r         *startRig
+	out       turns.Outcome
+	err       error
+	guardErr  error
+	standIn   bool
+	noSession bool
+	keptBack  []string
+	ran       []turns.Turn
+	useErr    error
 }
 
 func (x *startRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
@@ -154,6 +156,10 @@ func (x *startRunner) Guard(ctx context.Context, t turns.Turn) error {
 }
 
 func (x *startRunner) MarksStandIn() bool { return x.standIn }
+
+func (x *startRunner) Sessionless() bool { return x.noSession }
+
+func (x *startRunner) KeptBack(g string) { x.keptBack = append(x.keptBack, g) }
 
 // plainRunner is a Runner with neither a guard nor marks of its own.
 type plainRunner struct{ x *startRunner }
@@ -468,21 +474,26 @@ func TestSentEffectsRunOnlyOnAPersonsSubmittedTurn(t *testing.T) {
 	}
 }
 
-func TestTheGuidanceEventIsRecordedOnlyForAnIntentThatHandsGuidance(t *testing.T) {
+func TestTheGuidanceEventIsRecordedForASessionTurnAndForASessionlessOneWhoseIntentHandsIt(t *testing.T) {
 	for _, c := range []struct {
 		name      string
 		intent    turn.Intent
 		submitted bool
+		noSession bool
 		want      int
 	}{
-		{"handed and submitted", guided, true, 1},
-		{"handed and not submitted", guided, false, 1},
-		{"an intent that hands none", plain, true, 0},
+		{"handed and submitted", guided, true, false, 1},
+		{"handed and not submitted", guided, false, false, 1},
+		{"a session turn of an intent that hands none", plain, true, false, 1},
+		{"a sessionless turn of an intent that hands it", guided, true, true, 1},
+		{"a sessionless turn of an intent that hands none", plain, true, true, 0},
 	} {
 		r := newStartRig(t)
 		req := automated(c.intent)
 		req.Guidance = "look at the tests"
-		if _, err := r.s.Start(context.Background(), req, r.runner(c.submitted)); err != nil {
+		x := r.runner(c.submitted)
+		x.noSession = c.noSession
+		if _, err := r.s.Start(context.Background(), req, x); err != nil {
 			t.Fatal(err)
 		}
 		if len(r.effects.handed) != c.want {
@@ -491,6 +502,18 @@ func TestTheGuidanceEventIsRecordedOnlyForAnIntentThatHandsGuidance(t *testing.T
 		if c.want == 1 && r.effects.handed[0].Guidance != "look at the tests" {
 			t.Errorf("%s: handed %+v", c.name, r.effects.handed[0])
 		}
+	}
+}
+
+func TestTheSentEffectsReadTheReasonThePersonAskedWith(t *testing.T) {
+	r := newStartRig(t)
+	req := byPerson(plain)
+	req.Reason = "run now"
+	if _, err := r.s.Start(context.Background(), req, r.runner(true)); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.effects.sent) != 1 || r.effects.sent[0].Reason != "run now" {
+		t.Fatalf("sent %+v", r.effects.sent)
 	}
 }
 
@@ -684,5 +707,23 @@ func TestAGuardThatAnswersItselfGivesBackOnlyTheKeptGuidance(t *testing.T) {
 		if len(x.ran) != 0 || slices.Contains(r.trace, "before") || r.kept[startUnit] != c.want {
 			t.Errorf("%s: trace %v, kept %q, want %q", name, r.trace, r.kept[startUnit], c.want)
 		}
+	}
+}
+
+func TestARunnerIsToldOfTheGuidanceKeptBack(t *testing.T) {
+	r := newStartRig(t)
+	req := byPerson(guided)
+	req.Guidance = "look at the tests"
+	x := r.runner(false)
+	if _, err := r.s.Start(context.Background(), req, x); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(x.keptBack, []string{"look at the tests"}) {
+		t.Fatalf("kept back %q", x.keptBack)
+	}
+	r = newStartRig(t)
+	x = r.runner(true)
+	if _, err := r.s.Start(context.Background(), req, x); err != nil || len(x.keptBack) != 0 {
+		t.Fatalf("a submitted turn kept back %q: %v", x.keptBack, err)
 	}
 }

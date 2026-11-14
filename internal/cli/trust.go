@@ -132,8 +132,12 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err := e.Rec.Record(ctx, ev); err != nil {
 		return err
 	}
-	return runHeldRound(ctx, e, cfg, ref, profile)
+	return runHeldRound(ctx, e, cfg, ref, profile, trustedAndRan)
 }
+
+// trustedAndRan is why a round a trust gate's approval runs drops the
+// unit's pending plan items and records its round.
+const trustedAndRan = "trusted its folder and ran"
 
 // Unblock marks handled the trigger of the round blocked on ref, so no sweep
 // starts it again before a new one.

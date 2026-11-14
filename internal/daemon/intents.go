@@ -140,14 +140,6 @@ func undeclared(reg *dintent.Registry, d dintent.Def, name string) string {
 	return fmt.Sprintf("%s takes no input %s", d.Name, name)
 }
 
-// cutGuidance cuts guidance at the intent's guidance.max runes.
-func cutGuidance(d dintent.Def, g string) string {
-	if r := []rune(g); d.Guidance.Max > 0 && len(r) > d.Guidance.Max {
-		return string(r[:d.Guidance.Max])
-	}
-	return g
-}
-
 // profileWarning is the health warning while a user intent does not load, or stored tasks hold a state the
 // profile does not declare (held).
 func profileWarning(l *intentload.Loaded, held intentload.Problems) string {

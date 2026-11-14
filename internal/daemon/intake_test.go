@@ -143,10 +143,6 @@ func TestReviewActionAnswersWithTheIntake(t *testing.T) {
 	if !slices.Contains(got.Log, "starting the review") || !slices.Contains(got.Log, "review sent") {
 		t.Fatalf("log %q", got.Log)
 	}
-	evs, _ := s.store().Events(context.Background(), r7)
-	if !slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindRoundSent && e.Data == askedByYou }) {
-		t.Fatalf("no round_sent: %+v", evs)
-	}
 }
 
 func TestRunTakesTheIntentOfWhoseThePullRequestIs(t *testing.T) {

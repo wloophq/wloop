@@ -41,89 +41,11 @@ const beforeTakeOver = "take_over"
 // request.
 const contextPR = builtin.ContextPR
 
-// route is a way a round of an intent goes out from the command line.
-type route int
-
-const (
-	// routeAsked is a round asked for through the daemon's action (askedRound).
-	routeAsked route = iota
-	// routeLaunch is a resume or a launch the turn service asks for.
-	routeLaunch
-)
-
-// wire is rt as an effect request names it.
-func (rt route) wire() string {
-	if rt == routeAsked {
-		return src.RouteAsked
-	}
-	return src.RouteLaunch
-}
-
-// sentRound is what a turn effect reads of a round on its way out; the
-// route fills it as the round goes.
-type sentRound struct {
-	env       *Env
-	ctx       context.Context
-	ref       pr.Ref
-	pr        *pr.PullRequest
-	cfg       config.Config
-	inputs    map[string]any
-	id        string
-	submitted bool
-	guidance  string
-}
-
-// effectRun is what a host effect does on a route, by phase: guide before
-// the round, unsent when it did not go out.
-type effectRun struct {
-	guide, unsent func(r *sentRound)
-}
-
-// onSentEffect is a turn effect the host applies and what it does on each
-// route; every other turn effect is its plugin's, applied through
-// ApplyEffect once the round went out.
-type onSentEffect struct {
-	name string
-	on   map[route]effectRun
-}
-
-var keepsGuidance = effectRun{
-	guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
-	unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
-}
-
-// onSent is the turn effects the command line applies, in the order each
-// phase runs them.
-var onSent = []onSentEffect{
-	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeAsked: keepsGuidance}},
-}
-
-type phase func(c effectRun, r *sentRound)
-
-func guidePhase(c effectRun, r *sentRound) { runCell(c.guide, r) }
-
-func unsentPhase(c effectRun, r *sentRound) { runCell(c.unsent, r) }
-
-func runCell(f func(r *sentRound), r *sentRound) {
-	if f != nil {
-		f(r)
-	}
-}
-
-// runPhase runs p of the host's turn effects d names, on route rt.
-func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
-	for _, e := range onSent {
-		if slices.Contains(d.Effects, e.name) {
-			p(e.on[rt], r)
-		}
-	}
-}
-
 // pluginEffects are the turn effects of d the plugin of u applies.
 func pluginEffects(d dintent.Def, u unit.Unit) []string {
 	var names []string
 	for _, name := range d.Effects {
-		hosts := slices.ContainsFunc(onSent, func(h onSentEffect) bool { return h.name == name })
+		hosts := slices.ContainsFunc(hostEffects, func(h hostEffect) bool { return h.name == name })
 		if fx, ok := builtin.EffectOf(name); ok && !hosts && fx.Plugin && fx.Provider == u.Provider && fx.Applies&builtin.AppliesTurn != 0 {
 			names = append(names, name)
 		}
@@ -142,16 +64,6 @@ func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 		return fmt.Errorf("%s: no running plugin applies %s; the turn was not sent", u.Label(), strings.Join(names, ", "))
 	}
 	return nil
-}
-
-// applySentEffects applies the turn effects of d the plugin of r's unit
-// applies, once r went out on route rt.
-func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
-	head := ""
-	if r.pr != nil {
-		head = r.pr.HeadRefOid
-	}
-	e.applyPluginEffects(ctx, d, r.ref.Unit(), src.TurnRef{ID: r.id, Head: head}, rt.wire(), r.submitted, r.inputs)
 }
 
 // applyPluginEffects applies, through ApplyEffect, the turn effects of d the
@@ -345,20 +257,12 @@ func cliBuiltins() map[string][]string {
 	return map[string][]string{
 		string(builtin.SlotWorkspace): append(slices.Sorted(maps.Keys(workspaceRuns())), "given"),
 		string(builtin.SlotBefore):    {beforeTakeOver},
-		"effects":                     onSentNames(),
+		"effects":                     hostEffectNames(),
 		"policy":                      slices.Sorted(maps.Keys(policies)),
 		"context":                     {contextPR, builtin.ContextSynthetic},
 		"launch":                      {"", builtin.LaunchProbe},
 		"reconcile":                   {"", turns.ReconcileMyReview},
 	}
-}
-
-func onSentNames() []string {
-	names := make([]string, len(onSent))
-	for i, e := range onSent {
-		names[i] = e.name
-	}
-	return names
 }
 
 // options are the session options the round's manifest asks for.

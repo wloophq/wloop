@@ -186,6 +186,8 @@ type runner struct {
 	st started
 }
 
+func (x *runner) Sessionless() bool { return true }
+
 func (x *runner) Guard(_ context.Context, t turns.Turn) error {
 	_, err := x.s.def(t.Unit(), t.Intent())
 	return err

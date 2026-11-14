@@ -3,6 +3,7 @@ package turnstest
 import (
 	"context"
 	"maps"
+	"slices"
 	"sync"
 
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -96,12 +97,27 @@ func (noEffects) Recorded(context.Context, turns.TurnOut) error      { return ni
 func (noEffects) Sent(context.Context, turns.TurnOut) error          { return nil }
 func (noEffects) Handed(context.Context, turns.TurnOut) error        { return nil }
 
-// Effects are turn effects that apply nothing and count the Before phases
-// they were asked for.
+// Effects are turn effects that apply nothing, counting the Before phases
+// they were asked for and keeping the guidance each Handed recorded.
 type Effects struct {
 	noEffects
 	mu      sync.Mutex
 	befores int
+	handed  []string
+}
+
+func (e *Effects) Handed(_ context.Context, o turns.TurnOut) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.handed = append(e.handed, o.Guidance)
+	return nil
+}
+
+// Guidances are the guidance each recorded turn's Handed recorded, in order.
+func (e *Effects) Guidances() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.handed)
 }
 
 func (e *Effects) Before(context.Context, turns.Def, unit.Unit) error {

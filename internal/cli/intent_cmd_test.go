@@ -14,7 +14,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -354,7 +353,7 @@ func TestTheNotOwnedErrorCarriesTheRequestsFlags(t *testing.T) {
 
 func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 	t.Parallel()
-	ours, theirs := cliBuiltins(), daemon.Builtins()
+	ours := cliBuiltins()
 	for slot, names := range builtin.Names {
 		for _, name := range names {
 			if !slices.Contains(ours[string(slot)], name) {
@@ -367,7 +366,7 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 			}
 		}
 	}
-	effects := append(slices.Clone(ours["effects"]), theirs.Effects...)
+	effects := ours["effects"]
 	for _, name := range builtin.TurnEffectNames() {
 		if fx, _ := builtin.EffectOf(name); !fx.Plugin && !slices.Contains(effects, name) {
 			t.Errorf("the turn effect %q has no implementation", name)

@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -166,6 +165,12 @@ func (x *handRunner) askTakeOver(ctx context.Context, inputs map[string]any) err
 	return turns.ErrAnswered
 }
 
+func (x *handRunner) KeptBack(string) {
+	if isPR(x.u) {
+		x.e.noteKeptBack(prOf(x.u))
+	}
+}
+
 func (x *handRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
 	e := x.e
 	r := x.req
@@ -185,9 +190,6 @@ func (x *handRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 	}
 	if _, err := fmt.Fprint(x.text, sent.Text); err != nil {
 		return o, err
-	}
-	if isPR(x.u) && !startDef(x.h.def).HandsGuidance {
-		e.recordGuidance(ctx, prOf(x.u), r.Guidance)
 	}
 	return o, nil
 }
@@ -372,42 +374,6 @@ func (e *Env) recordTurnEvent(ctx context.Context, ref pr.Ref, kind, turn, data 
 	if err := e.Rec.Record(context.WithoutCancel(ctx), ev); err != nil {
 		fmt.Fprintf(e.Err, "warning: %s: recording %s: %v\n", ref, kind, err)
 	}
-}
-
-// handRound runs a round asked for by hand on route rt, with the phases of
-// the host effects d names around it: guide first, unsent when the round
-// does not go out. send gets the round state when keepsHome, which
-// remembers the caller's agent home in it, and the round with its guidance,
-// fills in what the round sent, and reports whether the round went out.
-func (e *Env) handRound(ctx context.Context, rt route, ref pr.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
-	if err := e.checkEffects(d, ref.Unit()); err != nil {
-		return err
-	}
-	r := &sentRound{env: e, ctx: ctx, ref: ref, guidance: guidance}
-	runPhase(rt, d, r, guidePhase)
-	sent := false
-	defer func() {
-		if !sent {
-			runPhase(rt, d, r, unsentPhase)
-		}
-	}()
-	if !keepsHome {
-		var err error
-		sent, err = send(nil, r)
-		return err
-	}
-	rounds, err := e.rounds()
-	if err != nil {
-		return err
-	}
-	st, err := rounds.Load(ctx)
-	if err != nil {
-		return err
-	}
-	if sent, err = send(st, r); err != nil {
-		return err
-	}
-	return rounds.Save(ctx, st)
 }
 
 // locators know the unit a checkout holds: each source plugin's this

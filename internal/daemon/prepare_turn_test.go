@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -77,3 +79,24 @@ type kindError struct{ kind, err error }
 
 func (e kindError) Error() string   { return e.err.Error() }
 func (e kindError) Unwrap() []error { return []error{e.kind, e.err} }
+
+func TestAPrepareRefusalAnswersTheStatusOfItsDaemonError(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	seedWaitingOnAna(t, s)
+	sentNudge(t, s, "t1", "@ana")
+	_, err := s.PrepareTurn(context.Background(), string(dintent.Nudge), r9.Unit(), "", nil)
+	rec := httptest.NewRecorder()
+	writeActionError(rec, err)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "already nudged") || strings.Contains(rec.Body.String(), src.ErrUnfit.Error()) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	off, _ := newActServer(t, func(p unit.ProviderID) bool { return p != unit.GitHub })
+	seedWaitingOnAna(t, off)
+	_, err = off.PrepareTurn(context.Background(), string(dintent.Nudge), r9.Unit(), "", nil)
+	rec = httptest.NewRecorder()
+	writeActionError(rec, err)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("a disabled plugin's prepare: %d %s", rec.Code, rec.Body)
+	}
+}

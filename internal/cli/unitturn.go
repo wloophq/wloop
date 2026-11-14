@@ -31,6 +31,7 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // unitRun is a round on a unit of a provider other than GitHub.
@@ -44,23 +45,46 @@ type unitRun struct {
 	manager, parent string
 }
 
-// unitRound sends a round of d the user asked for on u, a unit of a
+// unitRound starts a round of d a person asked for on u, a unit of a
 // provider other than GitHub, in the workspace its placement names; the
 // turn keeps the call's items and task for its drafts.
 func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemon.Call) error {
-	cfg, err := e.loadConfig()
+	if e.Turns == nil || e.Turns.Starter == nil {
+		return errors.New("no turn starts here: the daemon runs a round asked for by hand")
+	}
+	_, err := e.Turns.Starter.Start(ctx, turns.Request{Unit: u, Intent: dturn.Intent(d.Name), Guidance: c.Guidance, Inputs: c.Inputs,
+		Trigger: dturn.ByHand, Route: src.RouteAsked, ByPerson: true}, &askedUnitRunner{e: e, d: d, c: c})
+	return err
+}
+
+// askedUnitRunner runs a round asked for through the daemon's action on a
+// unit other than a pull request: its guard reads the config and the
+// repository the turn runs in.
+type askedUnitRunner struct {
+	e *Env
+	d dintent.Def
+	c daemon.Call
+
+	cfg    config.Config
+	inputs map[string]any
+}
+
+func (x *askedUnitRunner) Guard(ctx context.Context, t turns.Turn) error {
+	cfg, err := x.e.loadConfig()
 	if err != nil {
 		return err
 	}
 	if cfg.AgentHome == "" {
-		cfg.AgentHome = c.AgentHome
+		cfg.AgentHome = x.c.AgentHome
 	}
-	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Task: c.Task}
-	if r.Inputs, err = e.keptRepo(ctx, d, u, r.Inputs); err != nil {
-		return err
-	}
-	_, err = e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, manager: c.Manager, parent: c.Parent})
+	x.cfg = cfg
+	x.inputs, err = x.e.keptRepo(ctx, x.d, t.Unit(), t.Inputs())
 	return err
+}
+
+func (x *askedUnitRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	r := turn.Request{Intent: turn.Intent(x.d.Name), Trigger: turn.ByHand, Unit: t.Unit(), Guidance: t.Guidance(), Inputs: x.inputs, Items: x.c.Items, Task: x.c.Task}
+	return x.e.runOnUnit(ctx, unitRun{def: x.d, cfg: x.cfg, r: r, manager: x.c.Manager, parent: x.c.Parent})
 }
 
 // launchUnit is cliLauncher.Launch on a unit of a provider other than

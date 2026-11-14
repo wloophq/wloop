@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -11,12 +12,12 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // cliLauncher runs the turns the core asks for through the round code.
@@ -29,7 +30,7 @@ var _ turns.Launcher = cliLauncher{}
 // a probe goes to a new session of the workspace it names, or of the one its
 // resumed turn was sent to. A new turn's effects are its start's; a resume on
 // a pull request applies its plugin's turn effects and records the guidance
-// it carries when its intent hands guidance.
+// it carries.
 func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome, error) {
 	e := c.e
 	d, err := e.intentDef(string(l.Intent))
@@ -98,7 +99,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 		}
 	}
 	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
-	if resume && id != "" && startDef(d).HandsGuidance {
+	if resume && id != "" {
 		e.recordGuidance(ctx, ref, r.Guidance)
 	}
 	out := turns.Outcome{ID: id, Head: pr.HeadRefOid, Submitted: submitted}
@@ -106,7 +107,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 		return out, err
 	}
 	if resume {
-		e.applySentEffects(ctx, routeLaunch, d, &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance})
+		e.applyPluginEffects(ctx, d, ref.Unit(), src.TurnRef{ID: id, Head: pr.HeadRefOid}, src.RouteLaunch, submitted, r.Inputs)
 	}
 	return out, nil
 }
@@ -210,36 +211,72 @@ func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (string, bool, 
 	return id, true, err
 }
 
-// askedRound runs a round of d the user asked for through the daemon's
+// askedRound starts a round of d a person asked for through the daemon's
 // action: home is the caller's agent home, kept for the pull request's next
-// rounds when its project names none.
-func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config, ref dpr.Ref, guidance string, inputs map[string]any, home string) error {
+// rounds when its project names none; reason is how they asked, "" for the
+// action itself.
+func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config, ref dpr.Ref, guidance string, inputs map[string]any, home, reason string) error {
 	run, ok := workspaceRuns()[d.Workspace]
 	if !ok {
 		return fmt.Errorf("%s runs from the command line or an agent session in a %s workspace, not from the daemon", d.Name, d.Workspace)
 	}
-	cfg := prConfig(base, ref, home)
+	if e.Turns == nil || e.Turns.Starter == nil {
+		return errors.New("no turn starts here: the daemon runs a round asked for by hand")
+	}
 	remember := ""
 	if base.For(ref.Owner, ref.Repo).AgentHome == "" {
 		remember = home
 	}
-	return e.handRound(ctx, routeAsked, ref, guidance, d, remember != "", func(st *round.Store, sr *sentRound) (bool, error) {
-		pr, err := e.openPR(ctx, ref)
-		if err != nil {
-			return false, err
-		}
-		r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Guidance: sr.guidance, Inputs: inputs}
-		e.withAddressReason(ctx, cfg, d, &r)
-		id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
-		if id != "" && startDef(d).HandsGuidance {
-			e.recordGuidance(ctx, ref, sr.guidance)
-		}
-		sr.pr, sr.cfg, sr.inputs, sr.id, sr.submitted = pr, cfg, inputs, id, submitted
-		if err == nil {
-			e.applySentEffects(ctx, routeAsked, d, sr)
-		}
-		return submitted, err
-	})
+	_, err := e.Turns.Starter.Start(ctx, turns.Request{Unit: ref.Unit(), Intent: dturn.Intent(d.Name), Guidance: guidance, Inputs: inputs,
+		Trigger: dturn.ByHand, Route: src.RouteAsked, ByPerson: true, Reason: reason},
+		&askedRunner{e: e, d: d, cfg: prConfig(base, ref, home), ref: ref, run: run, remember: remember})
+	return err
+}
+
+// askedRunner runs a round asked for through the daemon's action in the
+// workspace its intent names: its guard reads the pull request, refusing
+// one that is not open before any effect applies.
+type askedRunner struct {
+	e        *Env
+	d        dintent.Def
+	cfg      config.Config
+	ref      dpr.Ref
+	run      workspaceRun
+	remember string
+
+	pr *dpr.PullRequest
+}
+
+func (x *askedRunner) Guard(ctx context.Context, _ turns.Turn) error {
+	var err error
+	x.pr, err = x.e.openPR(ctx, x.ref)
+	return err
+}
+
+func (x *askedRunner) KeptBack(string) { x.e.noteKeptBack(x.ref) }
+
+func (x *askedRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	e := x.e
+	r := turn.Request{Intent: turn.Intent(x.d.Name), Trigger: turn.ByHand, Unit: x.ref.Unit(), Payload: turnPR(x.pr), Guidance: t.Guidance(), Inputs: t.Inputs()}
+	e.withAddressReason(ctx, x.cfg, x.d, &r)
+	rr := roundRun{def: x.d, cfg: x.cfg, r: r, pr: x.pr, rememberHome: x.remember}
+	if x.remember == "" {
+		id, submitted, err := x.run(e, ctx, rr)
+		return turns.Outcome{ID: id, Head: x.pr.HeadRefOid, Submitted: submitted}, err
+	}
+	rounds, err := e.rounds()
+	if err != nil {
+		return turns.Outcome{}, err
+	}
+	if rr.st, err = rounds.Load(ctx); err != nil {
+		return turns.Outcome{}, err
+	}
+	id, submitted, err := x.run(e, ctx, rr)
+	out := turns.Outcome{ID: id, Head: x.pr.HeadRefOid, Submitted: submitted}
+	if err != nil {
+		return out, err
+	}
+	return out, rounds.Save(ctx, rr.st)
 }
 
 func githubRef(u unit.Unit) (dpr.Ref, error) {

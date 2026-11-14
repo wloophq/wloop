@@ -791,20 +791,6 @@ func (e *Env) roundStarted(ctx context.Context, u unit.Unit, noViews func() erro
 
 func (e *Env) stamp() string { return e.Now().Format(time.DateTime) }
 
-// handGuidance is the guidance of a round asked for by hand: the user's, else
-// the guidance kept from a round that did not go out. Either way the kept one
-// is used up.
-func (e *Env) handGuidance(ctx context.Context, ref pr.Ref, guidance string) string {
-	if e.Rec == nil {
-		return guidance
-	}
-	kept, err := e.Rec.TakeNextGuidance(ctx, ref)
-	if err != nil {
-		fmt.Fprintf(e.Err, "warning: %s: reading the guidance kept for this round: %v\n", ref, err)
-	}
-	return cmp.Or(guidance, kept)
-}
-
 // recordGuidance records the guidance a round's prompt carried, so the
 // text survives a prompt that never reached the agent.
 func (e *Env) recordGuidance(ctx context.Context, ref pr.Ref, guidance string) {
@@ -828,5 +814,11 @@ func (e *Env) keepGuidance(ctx context.Context, ref pr.Ref, guidance string) {
 		fmt.Fprintf(e.Err, "warning: %s: keeping your guidance for the next round: %v\n", ref, err)
 		return
 	}
+	e.noteKeptBack(ref)
+}
+
+// noteKeptBack tells the person that the guidance of ref's round that did
+// not go out is kept for its next round.
+func (e *Env) noteKeptBack(ref pr.Ref) {
 	fmt.Fprintf(e.Out, "%s: your guidance is kept for the next round\n", ref)
 }

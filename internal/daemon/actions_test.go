@@ -59,6 +59,27 @@ type fakeActions struct {
 	bound []string
 	// store, when set, is marked by an adopt as the real take-over does.
 	store *inventory.Store
+	// start, when set, starts each intent's turn as the command line's
+	// actions do: its guidance cut and its prepare run.
+	start *turns.Starter
+}
+
+// startingActions are actions whose intents start through a turn start
+// whose prepare is s's, as serve wires them.
+func startingActions(s *Server) *fakeActions {
+	return &fakeActions{start: turnstest.Starter(turnstest.Defs{Registry: s.loaded().Registry}, nil, s)}
+}
+
+// startedCall is a fake intent call run as the start's runner.
+type startedCall struct {
+	c    Call
+	call func(c Call) error
+}
+
+func (x startedCall) Run(_ context.Context, t turns.Turn) (turns.Outcome, error) {
+	c := x.c
+	c.Guidance, c.Inputs = t.Guidance(), t.Inputs()
+	return turns.Outcome{ID: "t1", Submitted: true}, x.call(c)
 }
 
 func (f *fakeActions) record(ctx context.Context, call string, c Call) error {
@@ -86,6 +107,14 @@ func (f *fakeActions) Adopt(ctx context.Context, u unit.Unit, c Call) error {
 	return inventorytest.Of(f.store).SetAdopted(ctx, r)
 }
 func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Call) error {
+	if f.start != nil {
+		start := f.start
+		f.start = nil
+		defer func() { f.start = start }()
+		_, err := start.Start(ctx, turns.Request{Unit: u, Intent: turn.Intent(name), Guidance: c.Guidance, Inputs: c.Inputs, Trigger: turn.ByHand, ByPerson: true},
+			startedCall{c: c, call: func(c Call) error { return f.Intent(ctx, name, u, c) }})
+		return err
+	}
 	r := refOf(u)
 	f.inputs = append(f.inputs, c.Inputs)
 	f.bound = append(f.bound, strings.Join(c.Items, ",")+"@"+c.Task)
@@ -248,16 +277,6 @@ func TestDelegatedActions(t *testing.T) {
 	if !slices.Equal(fa.calls, []string{"review acme/api#7 look at the migration", "open acme/api#7", "run acme/api#7"}) {
 		t.Fatalf("%v", fa.calls)
 	}
-	evs, _ := s.store().Events(context.Background(), r7)
-	sent := 0
-	for _, e := range evs {
-		if e.Kind == dinv.KindRoundSent {
-			sent++
-		}
-	}
-	if sent != 2 {
-		t.Fatalf("round_sent events: %d", sent)
-	}
 }
 
 func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
@@ -265,7 +284,7 @@ func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
 	for _, c := range []struct {
 		action, call, kind, data string
 	}{
-		{"trust_run", "trust_run acme/api#7", dinv.KindRoundSent, "trusted its folder and ran"},
+		{"trust_run", "trust_run acme/api#7", "", ""},
 		{"unblock", "unblock acme/api#7", dinv.KindRoundUnblocked, "dismissed by you"},
 	} {
 		t.Run(c.action, func(t *testing.T) {
@@ -295,7 +314,7 @@ func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
 				t.Fatalf("%v", fa.calls)
 			}
 			evs, _ := s.store().Events(context.Background(), r7)
-			if last := evs[len(evs)-1]; last.Kind != c.kind || last.Data != c.data {
+			if last := evs[len(evs)-1]; c.kind != "" && (last.Kind != c.kind || last.Data != c.data) {
 				t.Fatalf("last event %+v", last)
 			}
 		})
@@ -429,7 +448,7 @@ func TestActionOutlivesTheRequest(t *testing.T) {
 			done <- rec.Code
 		}()
 		synctest.Wait()
-		if countEvents(t, s, dinv.KindRoundSent) != 0 {
+		if len(fa.calls) != 0 {
 			t.Fatal("the action ran while the loop mutex was held")
 		}
 		cancel()
@@ -437,7 +456,7 @@ func TestActionOutlivesTheRequest(t *testing.T) {
 		if code := <-done; code != 200 {
 			t.Fatalf("%d", code)
 		}
-		if countEvents(t, s, dinv.KindRoundSent) != 1 || len(fa.calls) != 1 {
+		if len(fa.calls) != 1 {
 			t.Fatalf("calls %v", fa.calls)
 		}
 	})
@@ -599,7 +618,7 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{}
+	fa := startingActions(s)
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"be brief"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -634,7 +653,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 	if err := inventorytest.Of(s.store()).UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
-	fa := &fakeActions{}
+	fa := startingActions(s)
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -737,7 +756,7 @@ func TestGuidanceIsCutAtItsMax(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{}
+	fa := startingActions(s)
 	s.deps.Actions = fa
 	nudge, _ := s.loaded().Registry.Get("nudge")
 	if nudge.Guidance.Max == 0 {
@@ -983,6 +1002,7 @@ func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
 	t.Parallel()
 	fa := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions = fa })
+	fa.start = startingActions(s).start
 	ctx := context.Background()
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
 	old := s.deps.Now().Add(-72 * time.Hour)
