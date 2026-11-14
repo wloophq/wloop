@@ -515,7 +515,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `effects.apply`, `task.set`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
@@ -530,6 +530,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `task.verb`: Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise, `task` for merge, split, relate and unrelate). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. A verb whose `by.workflow` is `gate` opens the verb's gate instead, under the workflow's `[gates.approval]`: released by a rule, the verb runs as the workflow; approved by you, as you; a pair you took apart (`task.undone`) waits for you. It records the `verb_&lt;verb&gt;` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`.
   - `gate.open`: Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it.
   - `items.resolve`: Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing.
+  - `effects.apply`: Applies the draft effects `effects` on the unit with no draft and nothing posted: only effects that apply without a draft's post, such as unit.closed, which closes a unit quietly.
   - `task.set`: Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused.
 - `step[].<name>` (string or list): The step's arguments.
 
@@ -596,6 +597,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
   - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
+  - `leave_unmentionable` (one of `false`, `true`, default `false`): "true" leaves out of whom the draft is to those its unit's plugin knows a message cannot mention (a plugin's unmentionable_fact), such as a bot or a team named by text, and logs them; their items stay open, and a draft with nobody left is not proposed.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
   - `ended` (one of `hold`, `repeat`, default `hold`): What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft.
@@ -619,6 +621,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `name` (string): The gate, of gates.toml, the step opens. Required.
 - `items.resolve`:
   - `resolution` (one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot`, default `done`): How the items resolved.
+- `effects.apply`:
+  - `effects` (list of `unit.closed`): The effects applied, each one that applies without a draft's post. Required.
+  - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
 - `task.set`:
   - `prop` (string): The property, of tasks.toml, the step sets. Required.
   - `value` (string): The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required.
@@ -1509,6 +1514,8 @@ The fields each notice reads besides `Name` and `Command`:
 
 - `drafts` (table): The settings every proposer's drafts share.
 - `drafts.repeat_after` (duration, default `7d`): The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.
+- `drafts.stale_after_days` (integer, default `20`): Working days after the newest ask of a draft's items (draft.items_age_days) past which the bundled Slack nudges and owner questions no longer propose it; 0 never stops them.
+- `drafts.ignored_reactions` (list of strings): The emoji that are no move of whom a draft is to, such as an acknowledgement, so draft.people_reacted_at leaves them out; by default eyes.
 - `notifications` (table): The notifications.
 - `notifications.digest_at` (string, default `09:00`): The local HH:MM of the daily digest; empty for none.
 

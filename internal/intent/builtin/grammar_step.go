@@ -20,9 +20,13 @@ var stepGrammar = []Key{
 	stepEnum(StepDraftPropose, "target", DraftTargets, DraftTargets[0], "Where the draft posts: on the unit, on each item, or, with per = \"person\", in the direct conversation between you and the person it is to; an intent's help.target is free text."),
 	stepEnum(StepDraftPropose, "to", DraftTo, DraftTo[0], "Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both."),
 	{Path: "effects", In: SurfaceStep, Step: StepDraftPropose, Kind: KindList, Elem: KindEnum, Values: effectValues(AppliesDraft), Doc: "What sending the draft applies."},
+	stepEnum(StepDraftPropose, "leave_unmentionable", []string{"false", "true"}, "false", "\"true\" leaves out of whom the draft is to those its unit's plugin knows a message cannot mention (a plugin's unmentionable_fact), such as a bot or a team named by text, and logs them; their items stay open, and a draft with nobody left is not proposed."),
 	stepKey(StepDraftPropose, "repeat_after", KindText, "", "The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after."),
 	stepKey(StepDraftPropose, "repeat_after_sent", KindText, "", "The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever."),
 	stepEnum(StepDraftPropose, "ended", DraftEnded, DraftEnded[0], "What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft."),
+
+	required(Key{Path: "effects", In: SurfaceStep, Step: StepEffectsApply, Kind: KindList, Elem: KindEnum, Values: silentEffectValues,
+		Doc: "The effects applied, each one that applies without a draft's post. Required."}),
 
 	stepKey(StepTurnDismiss, "reason", KindText, "", "The reason the dismissed turn records."),
 	stepKey(StepAnswerRefuse, "reason", KindText, "", "The reason the refused answer records."),

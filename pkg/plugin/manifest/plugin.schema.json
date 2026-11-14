@@ -456,6 +456,10 @@
           "description": "The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read.",
           "type": "string"
         },
+        "posted_fact": {
+          "description": "The list fact of facts that holds, as \u003citem id\u003e \u003cperson key\u003e \u003ctime\u003e, the newest post of each person an open item of a unit waits on after its ask, the time RFC 3339; the host reads it as draft.people_posted_at. Empty: the plugin never tells.",
+          "type": "string"
+        },
         "predicates": {
           "description": "The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds.",
           "items": {
@@ -485,6 +489,10 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "reactions_fact": {
+          "description": "The list fact of facts that holds, as \u003citem id\u003e \u003cperson key\u003e \u003ctime\u003e \u003cemoji\u003e, each emoji such a person put on an item's ask or a later message, with the newest such message's time; the host reads it as draft.people_reacted_at. Empty: the plugin never tells.",
+          "type": "string"
         },
         "roles": {
           "description": "The roles an intent of the plugin may take, each naming host mechanisms.",
@@ -889,6 +897,10 @@
             }
           },
           "type": "object"
+        },
+        "unmentionable_fact": {
+          "description": "The list fact of facts that holds the person keys among those a unit's items name that a message on it cannot mention, such as a bot or a team named by text; a draft counts its people among them as draft.people_unmentionable. Empty: the plugin never tells.",
+          "type": "string"
         }
       },
       "required": [

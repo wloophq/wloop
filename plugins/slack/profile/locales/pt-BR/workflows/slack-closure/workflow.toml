@@ -1,5 +1,5 @@
-summary = "Fechar uma conversa do Slack que você começou quando os itens dela se resolveram, listando a resolução de cada item"
+summary = "Fechar uma conversa do Slack que você começou quando os itens dela se resolveram, publicando a resolução de cada item; desligado por padrão, já que slack-closure-quiet a fecha sem mensagem"
 
 [outbox]
 title = "Encerrar o que se resolveu"
-about = "Rascunhado quando todos os itens de uma conversa que você começou se resolvem."
+about = "Rascunhado quando todos os itens de uma conversa que você começou se resolvem, ninguém espera você nela e você não reagiu à última resposta."

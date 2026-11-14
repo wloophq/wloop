@@ -207,6 +207,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 |---|---|---|---|
 | `drafts` | table |  | The settings every proposer's drafts share. |
 | `drafts.repeat_after` | duration | `7d` | The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again. |
+| `drafts.stale_after_days` | integer | `20` | Working days after the newest ask of a draft's items (draft.items_age_days) past which the bundled Slack nudges and owner questions no longer propose it; 0 never stops them. |
+| `drafts.ignored_reactions` | list of strings |  | The emoji that are no move of whom a draft is to, such as an acknowledgement, so draft.people_reacted_at leaves them out; by default eyes. |
 | `notifications` | table |  | The notifications. |
 | `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
 

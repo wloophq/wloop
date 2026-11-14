@@ -16,6 +16,10 @@ import (
 const (
 	signalAskedReacted = "asked_reacted"
 	signalRepliedLast  = "replied_last"
+	signalLastByMe     = "last_by_me"
+	signalLastToMe     = "last_to_me"
+	// signalExtractionPending is on while the unit's newest stored message waits for an extraction pass.
+	signalExtractionPending = "extraction_pending"
 )
 
 // repliedAfter is how long the viewer's reply stays a unit's newest person's message before replied_last holds.
@@ -30,6 +34,27 @@ var checkMarks = []string{"white_check_mark", "heavy_check_mark", "ballot_box_wi
 // item's ask, at least quietFor ago, and every open item waits on the viewer or got a message from someone else
 // after its ask.
 func unitSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]src.Signal, time.Time) {
+	signals, next := closingSignals(in, quietFor, now)
+	pending := src.Signal{Name: signalExtractionPending, On: slices.ContainsFunc(in.Messages(), in.Human) && !extracted(in)}
+	return append(append(signals, turnSignals(in)...), pending), next
+}
+
+// turnSignals are last_by_me and last_to_me, on since the newest person's message they read.
+func turnSignals(in *slackrows.Input) []src.Signal {
+	byMe, toMe, _ := lastTurn(in)
+	mine, theirs := src.Signal{Name: signalLastByMe, On: byMe}, src.Signal{Name: signalLastToMe, On: toMe}
+	if m, ok := newestHuman(in); ok {
+		for _, s := range []*src.Signal{&mine, &theirs} {
+			if s.On {
+				s.Since = dslack.TSTime(m.TS)
+			}
+		}
+	}
+	return []src.Signal{mine, theirs}
+}
+
+// closingSignals are asked_reacted and replied_last at now, and when the next of them changes with time alone.
+func closingSignals(in *slackrows.Input, quietFor time.Duration, now time.Time) ([]src.Signal, time.Time) {
 	open := slices.DeleteFunc(slices.Clone(in.Items()), func(it items.Item) bool { return it.State != items.Open })
 	asked := src.Signal{Name: signalAskedReacted}
 	replied := src.Signal{Name: signalRepliedLast}

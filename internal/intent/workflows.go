@@ -618,6 +618,9 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepDraftPropose {
 			s.draftPropose(p, st.Args, w.Provider)
 		}
+		if use == builtin.StepDraftPropose || use == builtin.StepEffectsApply {
+			s.effectsOf(p, st.Args, w.Provider)
+		}
 		if use == builtin.StepTaskVerb {
 			s.taskVerb(p, st.Args)
 		}
@@ -775,6 +778,10 @@ func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.Provi
 	if v, ok := arg("repeat_after_sent"); ok && v != builtin.RepeatForever {
 		s.repeatAfter(p+".repeat_after_sent", v)
 	}
+}
+
+// effectsOf checks that each effect a step names applies to the workflow's provider's units.
+func (s *sheet) effectsOf(p string, args map[string]any, provider dunit.ProviderID) {
 	effects, _ := args["effects"].([]string)
 	for i, e := range effects {
 		if eff, ok := builtin.EffectOf(e); ok && eff.Provider != "" && provider != "" && eff.Provider != provider {

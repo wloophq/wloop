@@ -58,6 +58,14 @@ func (a EffectApplier) Apply(ctx context.Context, d draft.Draft) error {
 	if !d.EffectsDue() || !d.EffectsAppliedAt.IsZero() {
 		return nil
 	}
+	if err := a.Run(ctx, d); err != nil {
+		return err
+	}
+	return a.Store.MarkApplied(ctx, d.ID, a.Clock.Now())
+}
+
+// Run runs every effect d declares, in order, and records nothing.
+func (a EffectApplier) Run(ctx context.Context, d draft.Draft) error {
 	for _, name := range d.Effects {
 		fx, ok := a.Effects(d.Unit.Provider, name)
 		if !ok {
@@ -67,7 +75,7 @@ func (a EffectApplier) Apply(ctx context.Context, d draft.Draft) error {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
-	return a.Store.MarkApplied(ctx, d.ID, a.Clock.Now())
+	return nil
 }
 
 func (a EffectApplier) Pending(ctx context.Context) ([]draft.Draft, error) {

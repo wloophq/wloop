@@ -11,6 +11,9 @@ kinds = ["thread"]
 default_delivery = "message"
 language_fact = "slack.language"
 members_fact = "slack.members"
+posted_fact = "slack.waited_posted"
+reactions_fact = "slack.waited_reactions"
+unmentionable_fact = "slack.unmentionable"
 config_reads = ["placement", "items.heat"]
 notify = ["tasks", "gates"]
 
@@ -183,6 +186,53 @@ name = "slack.members"
 type = "list"
 doc = "The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one."
 
+[[source.facts]]
+name = "slack.extracted"
+type = "bool"
+doc = "The extraction's latest pass on the unit read its newest stored message: what the unit's items and facts say is current."
+
+[[source.facts]]
+name = "slack.last_by_me"
+type = "bool"
+doc = "You wrote the unit's newest person's message."
+untrusted = true
+
+[[source.facts]]
+name = "slack.last_to_me"
+type = "bool"
+doc = "Someone else wrote the unit's newest person's message to you: it mentions you, or the conversation is a one-to-one direct one."
+untrusted = true
+
+[[source.facts]]
+name = "slack.reacted_to_last"
+type = "bool"
+doc = "Your reaction is on the newest person's message someone else wrote on the unit."
+untrusted = true
+
+[[source.facts]]
+name = "slack.items_resolved_unanswered"
+type = "int"
+doc = "Resolved items of the unit after whose ask nobody but its requester posted."
+untrusted = true
+
+[[source.facts]]
+name = "slack.waited_posted"
+type = "list"
+doc = "For each open item of the unit and each person it waits on, you aside, who posted on the unit after its ask: `<item id> <person key> <time>`, the time of their newest post, RFC 3339."
+untrusted = true
+
+[[source.facts]]
+name = "slack.waited_reactions"
+type = "list"
+doc = "For each open item of the unit, each person it waits on, you aside, and each emoji they put on its ask or a later message, the skin tone dropped: `<item id> <person key> <time> <emoji>`, the time, RFC 3339, of the newest message carrying it."
+untrusted = true
+
+[[source.facts]]
+name = "slack.unmentionable"
+type = "list"
+doc = "The person keys among those the unit's items name that a message cannot mention, each once: a bot, as the plugin's user cache knows it, a team named by text rather than a user group, and a key of no Slack person."
+untrusted = true
+
 [[source.signals]]
 name = "asked_reacted"
 doc = "Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask."
@@ -190,6 +240,18 @@ doc = "Every open item of the unit has a check mark from whoever asked it or who
 [[source.signals]]
 name = "replied_last"
 doc = "You posted the unit's newest person's message, after every open item's ask, at least 3 days ago, and every open item waits on you or got a message from someone else after its ask."
+
+[[source.signals]]
+name = "last_by_me"
+doc = "You wrote the unit's newest person's message."
+
+[[source.signals]]
+name = "last_to_me"
+doc = "Someone else wrote the unit's newest person's message to you: it mentions you, or the conversation is a one-to-one direct one."
+
+[[source.signals]]
+name = "extraction_pending"
+doc = "The unit's newest stored message waits for an extraction pass, so what its items say may be stale."
 
 [[source.jobs]]
 name = "ingest"

@@ -267,6 +267,9 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_signal.workspace` | bool | A workspace of the pull request remains on disk, a review or an author one, whatever the pull request's state. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.asked_reacted` | bool | Every open item of the unit has a check mark from whoever asked it or whom it waits on, other than you, on a message posted after its ask. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.link_signal.replied_last` | bool | You posted the unit's newest person's message, after every open item's ask, at least 3 days ago, and every open item waits on you or got a message from someone else after its ask. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.last_by_me` | bool | You wrote the unit's newest person's message. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.last_to_me` | bool | Someone else wrote the unit's newest person's message to you: it mentions you, or the conversation is a one-to-one direct one. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_signal.extraction_pending` | bool | The unit's newest stored message waits for an extraction pass, so what its items say may be stale. On when it is on for any unit the task links. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 
@@ -344,6 +347,14 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.language` | string | The language the thread's people write in, an ISO 639-1 code; empty when its text does not tell. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.members` | list | The person keys of the conversation's members, you included: a DM's two people, a group DM's or a channel's as conversations.members last read them, at most a day ago. Absent while the plugin cannot tell, such as before the first read or after a failed one. |
+| `slack.extracted` | bool | The extraction's latest pass on the unit read its newest stored message: what the unit's items and facts say is current. |
+| `slack.last_by_me` | bool | You wrote the unit's newest person's message. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.last_to_me` | bool | Someone else wrote the unit's newest person's message to you: it mentions you, or the conversation is a one-to-one direct one. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.reacted_to_last` | bool | Your reaction is on the newest person's message someone else wrote on the unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.items_resolved_unanswered` | int | Resolved items of the unit after whose ask nobody but its requester posted. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.waited_posted` | list | For each open item of the unit and each person it waits on, you aside, who posted on the unit after its ask: `<item id> <person key> <time>`, the time of their newest post, RFC 3339. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.waited_reactions` | list | For each open item of the unit, each person it waits on, you aside, and each emoji they put on its ask or a later message, the skin tone dropped: `<item id> <person key> <time> <emoji>`, the time, RFC 3339, of the newest message carrying it. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.unmentionable` | list | The person keys among those the unit's items name that a message cannot mention, each once: a bot, as the plugin's user cache knows it, a team named by text rather than a user group, and a key of no Slack person. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Briefs (`brief.*`)
 
@@ -367,6 +378,10 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `draft.person_asks_you` | bool | Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people. |
 | `draft.people_outside` | int | The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted. |
 | `draft.target_joined` | bool | The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft. |
+| `draft.people_posted_at` | timestamp | When the draft's people last posted on its unit, as its plugin knows (a plugin's posted_fact), on every item of the draft since the latest of its ask, its reopening and its task's last nudge: the oldest of each item's newest such post; zero when an item has none or the plugin cannot tell. Test with `> timestamp(0)`. |
+| `draft.people_reacted_at` | timestamp | The same as draft.people_posted_at for the draft's people's reactions on each item's ask or a later message (a plugin's reactions_fact), by the time of the message reacted on, the emoji drafts.ignored_reactions names left out. Test with `> timestamp(0)`. |
+| `draft.people_unmentionable` | int | The draft's people its unit's plugin knows a message there cannot mention, such as a bot or a team named by text (a plugin's unmentionable_fact); 0 when the plugin cannot tell. |
+| `draft.items_age_days` | int | Working days, in the configured location, since the newest of the draft's items was asked or last reopened: every item it lists is at least that old; 0 for a draft of no items. |
 | `draft.failed` | bool | A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it. |
 | `draft.stale` | bool | A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too. |
 | `draft.failed_kind` | string | The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind. |
@@ -404,6 +419,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `config.plugins.github.nudge.silent_days` | int | The plugins.github.nudge.silent_days setting, in calendar days. |
 | `config.tasks.stale_waiting_days` | int | The tasks.stale_waiting_days setting, in working days. |
 | `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
+| `config.drafts.stale_after_days` | int | The drafts.stale_after_days setting, in working days. |
 | `config.turns.per_day` | int | The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together. |
 
 ## Draft approval facts
@@ -438,6 +454,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `task.verb` | task | Runs a verb of tasks.toml on the task as the workflow: `verb`, one whose `by.workflow` lets a workflow run it, with the arguments its handler takes (`until` and `on_activity` for schedule, `on` and `resurface` for waiting, `set` for context and area, `by` for promise, `task` for merge, split, relate and unrelate). The plan blocks it while the task's state or the verb's `by` refuses it, and a verb that closes a task derived from a unit's items, which closes when they resolve. A verb whose `by.workflow` is `gate` opens the verb's gate instead, under the workflow's `[gates.approval]`: released by a rule, the verb runs as the workflow; approved by you, as you; a pair you took apart (`task.undone`) waits for you. It records the `verb_<verb>` event with the workflow as its actor and the chain it runs in, so another workflow may react to it within `trigger.depth`. |
 | `gate.open` | any | Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it. |
 | `items.resolve` | task | Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing. |
+| `effects.apply` | any | Applies the draft effects `effects` on the unit with no draft and nothing posted: only effects that apply without a draft's post, such as unit.closed, which closes a unit quietly. |
 | `task.set` | task | Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused. |
 
 ## Draft effects

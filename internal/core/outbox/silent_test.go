@@ -117,3 +117,41 @@ func TestWithdrawHeldLeavesAnApprovedDraft(t *testing.T) {
 		t.Fatalf("a held draft: %s %v", got.State, err)
 	}
 }
+
+func TestApplySilentlyRunsSilentEffectsOnAUnitWithNoDraft(t *testing.T) {
+	e, l := silentEnv()
+	if err := e.svc.ApplySilently(context.Background(), thread, []string{"unit.closed"}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(l.names(), []string{"unit.closed"}) || len(e.fx.published) != 0 {
+		t.Fatalf("applied %v, published %v", l.names(), e.fx.published)
+	}
+	if ds, err := e.svc.List(context.Background(), Filter{}); err != nil || len(ds) != 0 {
+		t.Fatalf("drafts %+v %v, want none stored", ds, err)
+	}
+}
+
+func TestApplySilentlyRefusesAnEffectThatPostsOrNone(t *testing.T) {
+	e, l := silentEnv()
+	for _, effects := range [][]string{{"unit.closed", "task.nudged"}, nil} {
+		if err := e.svc.ApplySilently(context.Background(), thread, effects); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("%v: err %v, want invalid", effects, err)
+		}
+	}
+	if len(l.names()) != 0 {
+		t.Fatalf("applied %v", l.names())
+	}
+}
+
+func TestSilentlyApplicableNeedsEveryEffectSilentAndImplemented(t *testing.T) {
+	e, _ := silentEnv()
+	if err := e.svc.SilentlyApplicable(thread.Provider, []string{"unit.closed"}); err != nil {
+		t.Fatalf("unit.closed: %v", err)
+	}
+	e.svc.Silent = func(string) bool { return true }
+	for _, effects := range [][]string{{"unknown.effect"}, nil} {
+		if err := e.svc.SilentlyApplicable(thread.Provider, effects); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("%v: err %v, want invalid", effects, err)
+		}
+	}
+}

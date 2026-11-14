@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
@@ -187,6 +188,13 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]*
 			ids = append(ids, m.User)
 			ids = append(ids, m.Mentions...)
 		}
+		for _, it := range in.items {
+			for _, p := range slices.Concat([]items.Person{it.Requester}, it.Assignees, it.WaitingOn) {
+				if id, ok := strings.CutPrefix(p.Key, "slack:"); ok {
+					ids = append(ids, id)
+				}
+			}
+		}
 		out[u] = in
 	}
 	ids = append(ids, viewer)
@@ -298,3 +306,6 @@ func (in *Input) Viewer() string { return in.viewer }
 
 // Human says whether m is a person's message, not a bot's, a deleted one or a hidden subtype.
 func (in *Input) Human(m store.MessageRow) bool { return human(m, in.users) }
+
+// Bot says whether the user cache knows id as a bot.
+func (in *Input) Bot(id string) bool { return in.users[id].IsBot }

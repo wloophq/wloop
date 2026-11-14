@@ -1,4 +1,4 @@
-summary = "Quando você diz que uma tarefa não é sua, propor uma resposta indicando outro caminho a quem pediu, para você editar e aprovar"
+summary = "Quando você diz que uma tarefa não é sua, propor uma resposta indicando outro caminho a quem pediu, para você editar e aprovar; desligado por padrão, já que dizer que uma tarefa não é sua é triagem da sua lista"
 
 [outbox]
 title = "Indicar outro caminho a quem pediu"

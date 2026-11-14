@@ -73,6 +73,9 @@ type draftDeps struct {
 	Languages map[unit.ProviderID]string
 	// Members are the facts that hold who reads a unit's conversation, by provider; nil: builtin.MembersFacts.
 	Members map[unit.ProviderID]string
+	// People are the facts that tell what a unit's people did and whom a message cannot mention, by provider;
+	// nil: builtin.DraftPeopleFacts.
+	People map[unit.ProviderID]builtin.PeopleFacts
 	// Facts are a unit's facts, which the withdrawals read who reads a draft's conversation from; nil reads
 	// none.
 	Facts func(ctx context.Context, u unit.Unit) (workflow.Facts, error)
@@ -115,7 +118,7 @@ type draftArgs struct {
 	delivery                                             draft.Delivery
 	effects                                              []string
 	repeatAfter, repeatAfterSent                         time.Duration
-	forever, holdEnded                                   bool
+	forever, holdEnded, leaveUnmentionable               bool
 }
 
 const (
@@ -141,6 +144,7 @@ func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 	}
 	a.effects = c.list("effects")
 	a.holdEnded = cmp.Or(c.arg("ended"), builtin.DraftEnded[0]) == builtin.DraftEnded[0]
+	a.leaveUnmentionable = c.arg("leave_unmentionable") == "true"
 	var err error
 	if v := c.arg("repeat_after"); v != "" {
 		if a.repeatAfter, err = repeatDuration(v, cfg); err != nil {
@@ -299,7 +303,14 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	lang := s.draftLanguage(unitFacts, sub.unit, l.Locale)
 	rd := deps.readersOf(sub.unit, unitFacts)
 	unplaced := false
+	var leftOut []string
 	keep := func(p items.Person) bool {
+		if a.leaveUnmentionable && named([]string{p.Key}, rd.unmentionable, deps.Codecs) > 0 {
+			if !slices.Contains(leftOut, p.Key) {
+				leftOut = append(leftOut, p.Key)
+			}
+			return false
+		}
 		ok, unknown := rd.addressed(a.to, p, deps.Codecs)
 		unplaced = unplaced || unknown && p.Key != "" && strings.HasPrefix(p.Key, string(sub.unit.Provider)+":")
 		return ok
@@ -307,6 +318,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	defer func() {
 		if a.to == builtin.DraftTo[1] {
 			s.logUnplaced(w.Name, sub.unit, unplaced)
+		}
+		if len(leftOut) > 0 {
+			s.logf("draft.propose %s on %s leaves out %s: a message cannot mention them; their items stay open", w.Name, sub.unit, strings.Join(leftOut, ", "))
 		}
 	}()
 	layers := profile.Chain(deps.Config())
@@ -409,7 +423,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		}
 		if cd.refusal == "" && withdraws {
 			keys := personKeys(to)
-			drafted := draftFactsOf(sub, keys, cd.p.Items, deps.me(), rd.outside(keys, cd.p.Target, deps.Codecs), rd.joined(keys, cd.p.Target, deps.Codecs))
+			drafted := draftFactsOf(sub, keys, cd.p.Items, deps.me(), rd, cd.p.Target, deps.Codecs, now, deps.Config().Drafts.IgnoredReactions)
 			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, drafted, deps.Config, now)
 			if err != nil {
 				return nil, err

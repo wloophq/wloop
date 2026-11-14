@@ -1,0 +1,1 @@
+summary = "Fechar uma conversa do Slack que você começou quando os itens dela se resolveram e a extração leu a mensagem mais nova, sem mensagem: registra o fechamento, que encerra as tarefas que a contêm e deixa de acompanhá-la"

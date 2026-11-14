@@ -112,7 +112,7 @@ summary = "Avisar a quem pediu que você está cuidando: com um prazo, propõe u
 
 [verbs.not-mine]
 label = "Não é comigo"
-summary = "Dizer que não é sua: ela vai para a lixeira com os rascunhos que carrega, e uma resposta indicando a quem pediu outro caminho espera sua aprovação."
+summary = "Dizer que não é sua: ela vai para a lixeira com os rascunhos que carrega; com task-not-mine ligado, uma resposta indicando a quem pediu outro caminho espera sua aprovação."
 
 [verbs.hand-to]
 label = "Passar para"

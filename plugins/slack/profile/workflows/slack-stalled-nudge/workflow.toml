@@ -1,19 +1,20 @@
-summary = "Nudge everyone in the conversation a stalled Slack task waits on in one message on the thread, mentioning each and listing the open items they owe, at most once in the interval your drafts settings set; the message is a draft you approve before it posts"
+summary = "Nudge everyone in the conversation a stalled Slack task waits on in one message on the thread, mentioning each and listing the open items they owe, at most once in the interval your drafts settings set, unless the newest message there is to you or they posted or reacted there within that interval since the ask or the last nudge; the message is a draft you approve before it posts"
 provider = "task"
-when = '"slack" in task.unit_providers && task.owed_by != "me" && task.owed_by != "" && task.check_on > timestamp(0) && task.check_on <= now && task.prop.last_nudge + config.drafts.repeat_after <= now'
+when = '"slack" in task.unit_providers && task.owed_by != "me" && task.owed_by != "" && task.check_on > timestamp(0) && task.check_on <= now && task.prop.last_nudge + config.drafts.repeat_after <= now && !task.link_signal.last_to_me'
 order = 50
 key = ["task.settled_at", "task.owed_by"]
 
 [[step]]
 use = "draft.propose"
 purpose = "nudge"
+leave_unmentionable = "true"
 items = "owed"
 to = "members"
 effects = ["task.nudged"]
 repeat_after = "config.drafts.repeat_after"
 
 [drafts.withdraw]
-when = '!draft.person_waited || draft.items_owed == 0 || draft.person_asks_you'
+when = '!draft.person_waited || draft.items_owed == 0 || draft.person_asks_you || draft.people_posted_at + config.drafts.repeat_after > now || draft.people_reacted_at + config.drafts.repeat_after > now || draft.people_unmentionable > 0 || config.drafts.stale_after_days > 0 && draft.items_age_days >= config.drafts.stale_after_days'
 reason = "moot"
 
 [[drafts.withdraw.rule]]
