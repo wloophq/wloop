@@ -132,6 +132,11 @@ type Drafts struct {
 	// RepeatAfter is how long a nudged, discarded, sent or observed draft
 	// keeps its rule or workflow from proposing it again, by default.
 	RepeatAfter Days `json:"repeat_after"`
+	// StaleAfterDays is how many working days after an ask the bundled nudges and owner questions stop
+	// proposing on it; 0 never stops them.
+	StaleAfterDays int `json:"stale_after_days"`
+	// IgnoredReactions are the emoji that are no move of whom a draft is to, such as an acknowledgement.
+	IgnoredReactions []string `json:"ignored_reactions"`
 }
 
 // IntentConfig is one intent's settings.
@@ -471,7 +476,7 @@ func Defaults() Config {
 		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour)},
+		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
 	}
@@ -697,6 +702,9 @@ func (c Config) validateWorkflows() error {
 	}
 	if c.Drafts.RepeatAfter <= 0 {
 		return fmt.Errorf("drafts.repeat_after must be positive, got %s", time.Duration(c.Drafts.RepeatAfter))
+	}
+	if c.Drafts.StaleAfterDays < 0 {
+		return fmt.Errorf("drafts.stale_after_days must not be negative, got %d", c.Drafts.StaleAfterDays)
 	}
 	for _, intent := range slices.Sorted(maps.Keys(c.Intents)) {
 		ps := c.Intents[intent].ProjectSettings

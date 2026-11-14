@@ -352,7 +352,7 @@ by      = { person = "true", agent = "true" }
 
 [verbs.not-mine]
 label   = "Not mine"
-summary = "Say it is not yours: it goes to the trash with the drafts it carries, and a reply pointing the asker elsewhere waits for your approval."
+summary = "Say it is not yours: it goes to the trash with the drafts it carries; with task-not-mine turned on, a reply pointing the asker elsewhere waits for your approval."
 from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "trash"
 by      = { person = "true", agent = "true" }

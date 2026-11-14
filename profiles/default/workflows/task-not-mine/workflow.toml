@@ -1,6 +1,7 @@
-summary = "When you say a task is not yours, propose a reply pointing the asker elsewhere, for you to edit and approve"
+summary = "When you say a task is not yours, propose a reply pointing the asker elsewhere, for you to edit and approve; off by default, since saying a task is not yours is triage for your list"
 provider = "task"
 when = 'trigger.event.kind == "verb_not-mine"'
+enabled = false
 key = ["trigger.event.id"]
 order = 54
 

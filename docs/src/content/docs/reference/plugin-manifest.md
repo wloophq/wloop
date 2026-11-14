@@ -66,6 +66,9 @@ every = "5m"
 | `steps` | list of strings | The core workflow steps that run on the plugin's units, such as "turn.dismiss". |
 | `language_fact` | string | The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's. |
 | `members_fact` | string | The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells. |
+| `posted_fact` | string | The list fact of facts that holds, as <item id> <person key> <time>, the newest post of each person an open item of a unit waits on after its ask, the time RFC 3339; the host reads it as draft.people_posted_at. Empty: the plugin never tells. |
+| `reactions_fact` | string | The list fact of facts that holds, as <item id> <person key> <time> <emoji>, each emoji such a person put on an item's ask or a later message, with the newest such message's time; the host reads it as draft.people_reacted_at. Empty: the plugin never tells. |
+| `unmentionable_fact` | string | The list fact of facts that holds the person keys among those a unit's items name that a message on it cannot mention, such as a bot or a team named by text; a draft counts its people among them as draft.people_unmentionable. Empty: the plugin never tells. |
 | `jobs` | array of tables | The jobs the host runs on the plugin through Ingest, by name. |
 | `config_reads` | list of strings | The configuration keys outside its own table the plugin reads, such as "sweep" or "items.heat"; Config returns them, checked against the configuration's keys. |
 | `notify` | list of `rounds`, `gates`, `marks`, `tasks`, `turns`, `sessions`, `overrides`, `viewer`, `config`, `events`, `workspaces`, `agents` | The host topics whose changes the host notifies the plugin of. |

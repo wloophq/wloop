@@ -226,6 +226,7 @@ func stepRegistry() map[string]stepEntry {
 		builtin.StepTaskSet:      {check: (*stepSet).taskSetCheck, run: (*stepSet).taskSetRun},
 		builtin.StepGateOpen:     {check: (*stepSet).gateOpenCheck, run: (*stepSet).gateOpenRun},
 		builtin.StepItemsResolve: {check: (*stepSet).itemsResolveCheck, run: (*stepSet).itemsResolveRun},
+		builtin.StepEffectsApply: {check: (*stepSet).effectsApplyCheck, run: (*stepSet).effectsApplyRun},
 	}
 }
 

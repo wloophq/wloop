@@ -30,6 +30,25 @@ func TestDraftsRepeatAfterMustBePositive(t *testing.T) {
 	}
 }
 
+func TestDraftsStaleAfterDaysDefaultsParsesAndRefusesANegative(t *testing.T) {
+	if d := Defaults(); d.Drafts.StaleAfterDays != 20 {
+		t.Fatalf("default %d", d.Drafts.StaleAfterDays)
+	}
+	if c := loadRaw(t, `drafts = {repeat_after = "2d"}`); c.Drafts.StaleAfterDays != 20 {
+		t.Fatalf("drafts.stale_after_days left out lost its default: %d", c.Drafts.StaleAfterDays)
+	}
+	if c := loadRaw(t, `drafts = {stale_after_days = 0}`); c.Drafts.StaleAfterDays != 0 {
+		t.Fatalf("%d", c.Drafts.StaleAfterDays)
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`drafts = {stale_after_days = -1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "drafts.stale_after_days") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestPluginDraftApprovalRefusesABadApproval(t *testing.T) {
 	for name, raw := range map[string]string{
 		"unknown mode":        `plugins.github = {gates = {approval = {mode = "sometimes"}}}`,

@@ -90,7 +90,17 @@ The comment each nudge drafts still waits for you, unless a rule that names its 
 
 ## Tune the Slack proposals
 
-`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `gates.approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`. A Slack message posts, as the Slack plugin's manifest marks it, so only a rule that names its delivery releases one; a rule over a draft's facts applies to draft gates alone, and leaves the workflow's runs as they are:
+`slack-stalled-nudge`, `slack-stalled-nudge-dm` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. A thread you started is closed without a message by `slack-closure-quiet`, with no approval, once the extraction read its newest message; to propose a closing message instead, turn `slack-closure` on and the quiet one off:
+
+```toml
+[workflows.slack-closure]
+enabled = true
+
+[workflows.slack-closure-quiet]
+enabled = false
+```
+
+`workflows.task-not-mine.enabled = true` turns on the reply that points the asker elsewhere when you say a task is not yours. `drafts.stale_after_days` (20) is how many working days after the newest ask of a draft's items the bundled nudges and owner questions stop proposing it, 0 never. The thread nudge holds back for `drafts.repeat_after` after the people it is to posted or reacted on each of its items; `drafts.ignored_reactions` (`["eyes"]`) names the reactions that do not count, and a reaction counts from when the plugin first saw it. The bundled nudges set `leave_unmentionable = "true"` on their step, so a bot or a team named by text is left out of whom they are to, and logged, while the others are still nudged. `gates.approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`. A Slack message posts, as the Slack plugin's manifest marks it, so only a rule that names its delivery releases one; a rule over a draft's facts applies to draft gates alone, and leaves the workflow's runs as they are:
 
 ```toml
 [[workflows.slack-closure.gates.approval.rule]]
@@ -126,7 +136,7 @@ Encerrando:
 
 Each also has a `why.md.tmpl`, the line the Outbox shows above the draft, rendered in your language; `.Since` is when the oldest of its items was asked, in your time zone, and `.People` everyone the draft is to, each with `.Key` and `.Name`. Both files translate as every other text does: `<profile>/locales/pt-BR/workflows/slack-closure/text.md.tmpl` is the closure in a thread written in Portuguese, and a copy of the English file you left unchanged keeps the bundled translations. A translation names only the fields and functions its English text does, `plural` included (`{{plural (len .Items) "one" "this" "other" "these"}}`).
 
-Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
+With `slack-closure` turned on, your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `effects = ["unit.closed"]` still records the closure and ends the thread's tasks. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
 

@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -20,6 +23,7 @@ import (
 // returns the closure its resolved thread gets.
 func firstDayClosure(t *testing.T, r *replay) draft.Draft {
 	t.Helper()
+	closingWithAMessage(r)
 	p := newWorkflowProposer(r)
 	r.scenario(r.now)
 	if err := p.pass(context.Background()); err != nil {
@@ -30,6 +34,13 @@ func firstDayClosure(t *testing.T, r *replay) draft.Draft {
 		t.Fatalf("closures %+v, %v", ds, err)
 	}
 	return ds[0]
+}
+
+// closingWithAMessage turns the closure message on and the quiet closure off, as a user who wants a closing
+// message does.
+func closingWithAMessage(r *replay) {
+	on := true
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-closure": {Enabled: &on}, "slack-closure-quiet": {Enabled: new(bool)}}
 }
 
 func TestAPortugueseClosureTemplateYieldsAPortugueseClosure(t *testing.T) {
@@ -438,5 +449,107 @@ func TestADisabledWorkflowKeepsItsDrafts(t *testing.T) {
 		if d.State != draft.Held {
 			t.Fatalf("stopping a workflow withdrew its draft: %+v", d)
 		}
+	}
+}
+
+// followed starts the scenario with rpD a thread you started whose items resolved, and an open task of yours
+// that holds it.
+func followed(t *testing.T, r *replay) {
+	t.Helper()
+	r.scenario(r.now)
+	r.slack.startedByMe(rpD)
+	at := r.now
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-follow", State: "next",
+		Category: task.CategoryReady, Title: "Follow the release", Origin: task.OriginUser, Units: []unit.Unit{rpD}, Created: at, Updated: at}}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTheQuietClosureClosesTheThreadAndEndsItsTasksWithNoApproval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	p := newWorkflowProposer(r)
+	followed(t, r)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if ds, err := r.svc.List(ctx, outbox.Filter{Workflow: "slack-closure"}); err != nil || len(ds) != 0 {
+		t.Fatalf("closures %+v, %v; want none", ds, err)
+	}
+	if !r.slack.isClosed(rpD) || r.taskOf("t-follow").Open() {
+		t.Fatal("the resolved thread you started is not closed, or its task is still open")
+	}
+	if pending, err := p.eng.Ledger.Items(ctx, automation.Filter{Workflow: "slack-closure-quiet", Decisions: []workflow.Decision{workflow.DecisionPending}}); err != nil || len(pending) != 0 {
+		t.Fatalf("quiet closures waiting for you %+v, %v; want none", pending, err)
+	}
+}
+
+func TestTheQuietClosureWaitsForTheExtractionToReadTheNewestMessage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	p := newWorkflowProposer(r)
+	followed(t, r)
+	r.slack.unextracted(rpD, true)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if r.slack.isClosed(rpD) || !r.taskOf("t-follow").Open() {
+		t.Fatal("closed the thread while its newest message waits for the extraction")
+	}
+	r.slack.unextracted(rpD, false)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !r.slack.isClosed(rpD) {
+		t.Fatal("the next pass after the extraction caught up did not close the thread")
+	}
+}
+
+func TestAHeldDraftOfAWorkflowThatNowShipsOffIsWithdrawn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	held, err := r.svc.Propose(ctx, outbox.Proposal{Unit: rpD, Purpose: "close", Text: "Closing this out.", Effects: []string{"unit.closed"},
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-closure", Rule: "slack-closure", Key: rpD.String()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.db.Drafts().Get(ctx, held.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != draft.Dropped || got.Reason != draft.WithdrawMoot {
+		t.Fatalf("the closure slack-closure held before it shipped off: %s (%s), want withdrawn moot", got.State, got.Reason)
+	}
+}
+
+func TestAWorkflowYourProfileTurnsOffKeepsItsDrafts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	b, err := os.ReadFile(filepath.Join("..", "..", "plugins", "slack", "profile", "workflows", "slack-ask-owner", "workflow.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userProfile(t, r.te, map[string]string{"workflows/slack-ask-owner/workflow.toml": "enabled = false\n" + string(b)})
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	held, err := r.svc.Propose(ctx, outbox.Proposal{Unit: rpD, Purpose: "ask_owner", Text: "Who owns this?",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-ask-owner", Rule: "slack-ask-owner", Key: rpD.String()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := r.db.Drafts().Get(ctx, held.ID); err != nil || got.State != draft.Held {
+		t.Fatalf("a draft of a workflow your profile turned off: %+v, %v; want it kept for you", got, err)
 	}
 }

@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "task"
+when = 'task.items_resolved > 0'
+
+[[step]]
+use = "effects.apply"
+effects = ["task.nudged"]

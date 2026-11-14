@@ -43,26 +43,29 @@ type SourceVocabulary struct {
 	// from the manifest.
 	Provider string `toml:"-"`
 
-	Slot            string      `toml:"slot" doc:"The workflow fact slot of the plugin's units, such as \"pr\"; every fact name starts with it. Required."`
-	BriefSubject    bool        `toml:"brief_subject" doc:"The plugin's units may have a brief, whose facts their workflows read."`
-	Rounds          bool        `toml:"rounds" doc:"The plugin's units count automatic turns per unit, against turns.per_unit_per_day."`
-	Payload         string      `toml:"payload" doc:"The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read."`
-	Facts           []Fact      `toml:"facts" doc:"The workflow facts the plugin reports."`
-	Effects         []Effect    `toml:"effects" doc:"The turn and draft effects the plugin applies through ApplyEffect."`
-	Events          []Event     `toml:"events" doc:"The event kinds only the plugin's units record."`
-	Roles           []Role      `toml:"roles" doc:"The roles an intent of the plugin may take, each naming host mechanisms."`
-	RowKinds        []string    `toml:"row_kinds" doc:"The values of row.kind on the plugin's rows."`
-	Deliveries      []Delivery  `toml:"deliveries" doc:"How the plugin posts drafts."`
-	DraftKinds      []DraftKind `toml:"draft_kinds" doc:"The kinds of the plugin's drafts; the host derives a draft's delivery from its kind."`
-	DefaultDelivery string      `toml:"default_delivery" doc:"The delivery of a draft whose kind names none; one of deliveries."`
-	Signals         []Named     `toml:"signals" doc:"The link signals the plugin reports, read as task.link_signal.<name>."`
-	Predicates      []Predicate `toml:"predicates" doc:"The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds."`
-	Marks           []Named     `toml:"marks" doc:"The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character."`
-	Kinds           []string    `toml:"kinds" doc:"The task kind values the plugin's units give their tasks."`
-	Situations      []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
-	Steps           []string    `toml:"steps" doc:"The core workflow steps that run on the plugin's units, such as \"turn.dismiss\"."`
-	LanguageFact    string      `toml:"language_fact" doc:"The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's."`
-	MembersFact     string      `toml:"members_fact" doc:"The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells."`
+	Slot              string      `toml:"slot" doc:"The workflow fact slot of the plugin's units, such as \"pr\"; every fact name starts with it. Required."`
+	BriefSubject      bool        `toml:"brief_subject" doc:"The plugin's units may have a brief, whose facts their workflows read."`
+	Rounds            bool        `toml:"rounds" doc:"The plugin's units count automatic turns per unit, against turns.per_unit_per_day."`
+	Payload           string      `toml:"payload" doc:"The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read."`
+	Facts             []Fact      `toml:"facts" doc:"The workflow facts the plugin reports."`
+	Effects           []Effect    `toml:"effects" doc:"The turn and draft effects the plugin applies through ApplyEffect."`
+	Events            []Event     `toml:"events" doc:"The event kinds only the plugin's units record."`
+	Roles             []Role      `toml:"roles" doc:"The roles an intent of the plugin may take, each naming host mechanisms."`
+	RowKinds          []string    `toml:"row_kinds" doc:"The values of row.kind on the plugin's rows."`
+	Deliveries        []Delivery  `toml:"deliveries" doc:"How the plugin posts drafts."`
+	DraftKinds        []DraftKind `toml:"draft_kinds" doc:"The kinds of the plugin's drafts; the host derives a draft's delivery from its kind."`
+	DefaultDelivery   string      `toml:"default_delivery" doc:"The delivery of a draft whose kind names none; one of deliveries."`
+	Signals           []Named     `toml:"signals" doc:"The link signals the plugin reports, read as task.link_signal.<name>."`
+	Predicates        []Predicate `toml:"predicates" doc:"The predicates the plugin's profile layer sets in predicates.toml, by name; the plugin asks the host whether one holds through Holds."`
+	Marks             []Named     `toml:"marks" doc:"The marks the plugin's rounds write that a workflow may read with handled(); a name has no slash, space or control character."`
+	Kinds             []string    `toml:"kinds" doc:"The task kind values the plugin's units give their tasks."`
+	Situations        []Situation `toml:"situations" doc:"The situations the plugin derives, in the order the cockpit ranks them."`
+	Steps             []string    `toml:"steps" doc:"The core workflow steps that run on the plugin's units, such as \"turn.dismiss\"."`
+	LanguageFact      string      `toml:"language_fact" doc:"The string fact of facts that tells the language a unit's people write in, as a BCP 47 tag; the drafts of the unit are written in it. Empty: in the user's."`
+	MembersFact       string      `toml:"members_fact" doc:"The list fact of facts that holds the person keys of the members of a unit's conversation, the people who can read a draft posted on it, the user included; a unit leaves it out while the plugin cannot tell. Empty: the plugin never tells."`
+	PostedFact        string      `toml:"posted_fact" doc:"The list fact of facts that holds, as <item id> <person key> <time>, the newest post of each person an open item of a unit waits on after its ask, the time RFC 3339; the host reads it as draft.people_posted_at. Empty: the plugin never tells."`
+	ReactionsFact     string      `toml:"reactions_fact" doc:"The list fact of facts that holds, as <item id> <person key> <time> <emoji>, each emoji such a person put on an item's ask or a later message, with the newest such message's time; the host reads it as draft.people_reacted_at. Empty: the plugin never tells."`
+	UnmentionableFact string      `toml:"unmentionable_fact" doc:"The list fact of facts that holds the person keys among those a unit's items name that a message on it cannot mention, such as a bot or a team named by text; a draft counts its people among them as draft.people_unmentionable. Empty: the plugin never tells."`
 }
 
 // Codec is how a source plugin's unit keys and web addresses are spelled.
@@ -417,8 +420,11 @@ func (s *Source) validate() error {
 	if s.LanguageFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.LanguageFact && f.Type == "string" }) {
 		bad("language_fact %q is not a string fact of facts", s.LanguageFact)
 	}
-	if s.MembersFact != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == s.MembersFact && f.Type == "list" }) {
-		bad("members_fact %q is not a list fact of facts", s.MembersFact)
+	for _, l := range [][2]string{{"members_fact", s.MembersFact}, {"posted_fact", s.PostedFact}, {"reactions_fact", s.ReactionsFact},
+		{"unmentionable_fact", s.UnmentionableFact}} {
+		if l[1] != "" && !slices.ContainsFunc(s.Facts, func(f Fact) bool { return f.Name == l[1] && f.Type == "list" }) {
+			bad("%s %q is not a list fact of facts", l[0], l[1])
+		}
 	}
 	if s.DefaultDelivery != "" && !slices.Contains(deliveries, s.DefaultDelivery) {
 		bad("default_delivery %q is not one of deliveries", s.DefaultDelivery)

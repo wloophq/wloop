@@ -1,8 +1,9 @@
-summary = "Close a Slack thread you started once its items resolved, listing each item's resolution"
+summary = "Close a Slack thread you started once its items resolved, posting each item's resolution; off by default, since slack-closure-quiet closes it without a message"
 provider = "slack"
-when = 'slack.started_by_me && !slack.closure_posted && slack.items_open == 0 && slack.items_resolved > 0'
+when = 'slack.started_by_me && !slack.closure_posted && slack.items_open == 0 && slack.items_resolved > 0 && !slack.last_to_me && !slack.reacted_to_last && slack.items_resolved_unanswered == 0'
 order = 51
 key = ["slack.settled_at"]
+enabled = false
 
 [[step]]
 use = "draft.propose"
@@ -13,9 +14,9 @@ repeat_after = "config.drafts.repeat_after"
 repeat_after_sent = "forever"
 
 [drafts.withdraw]
-when = '!draft.unit_open'
+when = '!draft.unit_open || slack.last_to_me || slack.reacted_to_last || slack.items_resolved_unanswered > 0'
 reason = "moot"
 
 [outbox]
 title = "Close what got resolved"
-about = "Drafted when every item of a thread you started is resolved."
+about = "Drafted when every item of a thread you started is resolved, nobody waits on you there and you have not acknowledged the last answer."

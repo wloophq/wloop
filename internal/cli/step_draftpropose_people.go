@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -115,11 +116,13 @@ func (s draftSubject) unitOwed(me task.Me, absorbed []string, keep func(items.Pe
 	return people, its
 }
 
-// draftFactsOf are the draft slot's facts of a draft on sub to people over the items ids: whether any of
-// people is still waited on, the draft's items still held by any of them (unowned ones for no people),
-// whether every one of them asks you, outside, how many cannot read where it posts, and joined, whether the
-// person it was written to in their own conversation now reads the one it came from.
-func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, outside int, joined bool) workflow.Facts {
+// draftFactsOf are the draft slot's facts at now of a draft on sub to people over the items ids, posting at
+// target, whose unit's plugin tells rd: whether any of people is still waited on, the draft's items still held
+// by any of them (unowned ones for no people), whether every one of them asks you, how many cannot read where
+// it posts, whether the person it was written to in their own conversation now reads the one it came from,
+// when they last moved on every one of its items, how many a message cannot mention, and how old its items are.
+func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, rd readers, target string, codecs unit.KeyComparer, now time.Time,
+	ignored []string) workflow.Facts {
 	var mine []items.Item
 	for _, it := range sub.items {
 		if slices.Contains(ids, it.ID) {
@@ -148,14 +151,107 @@ func draftFactsOf(sub draftSubject, people []string, ids []string, me task.Me, o
 		}
 	}
 	return workflow.Facts{
-		"draft.person_waited":   waited,
-		"draft.items_owed":      held + len(owed),
-		"draft.items_assigned":  owned,
-		"draft.unit_open":       sub.task == nil || sub.task.Open(),
-		"draft.person_asks_you": asks,
-		"draft.people_outside":  outside,
-		"draft.target_joined":   joined,
+		"draft.person_waited":        waited,
+		"draft.items_owed":           held + len(owed),
+		"draft.items_assigned":       owned,
+		"draft.unit_open":            sub.task == nil || sub.task.Open(),
+		"draft.person_asks_you":      asks,
+		"draft.people_outside":       rd.outside(people, target, codecs),
+		"draft.target_joined":        rd.joined(people, target, codecs),
+		"draft.people_posted_at":     movedAt(rd.posted, mine, people, sub.lastNudge(), codecs, nil),
+		"draft.people_reacted_at":    movedAt(rd.reactions, mine, people, sub.lastNudge(), codecs, ignored),
+		"draft.people_unmentionable": named(people, rd.unmentionable, codecs),
+		"draft.items_age_days":       itemsAgeDays(mine, now),
 	}
+}
+
+// lastNudge is when the subject's task was last nudged; zero for none.
+func (s draftSubject) lastNudge() time.Time {
+	if s.task == nil {
+		return time.Time{}
+	}
+	return s.task.Prop(task.PropLastNudge).Time
+}
+
+// movedAt reads moves, "<item id> <person key> <time>[ <emoji>]" as a plugin's posted_fact or reactions_fact
+// holds them: for each of its, the newest move by one of people since the latest of its ask, its reopening and
+// nudged, an emoji among ignored left out; then the oldest of those, so every item moved since; zero when one
+// did not.
+func movedAt(moves []string, its []items.Item, people []string, nudged time.Time, codecs unit.KeyComparer, ignored []string) time.Time {
+	var oldest time.Time
+	for _, it := range its {
+		since := slices.MaxFunc([]time.Time{itemAskedAt(it), it.ReopenedAt, nudged}, time.Time.Compare)
+		var newest time.Time
+		for _, m := range moves {
+			f := strings.Fields(m)
+			if len(f) < 3 || f[0] != it.ID || named(people, f[1:2], codecs) == 0 || len(f) > 3 && slices.Contains(ignored, f[3]) {
+				continue
+			}
+			if at, err := time.Parse(time.RFC3339Nano, f[2]); err == nil && !at.Before(since) && at.After(newest) {
+				newest = at
+			}
+		}
+		if newest.IsZero() {
+			return time.Time{}
+		}
+		if oldest.IsZero() || newest.Before(oldest) {
+			oldest = newest
+		}
+	}
+	return oldest
+}
+
+// itemAskedAt is when it was asked: its anchor's time, else when it was created.
+func itemAskedAt(it items.Item) time.Time {
+	if !it.Origin.At.IsZero() {
+		return it.Origin.At
+	}
+	return it.CreatedAt
+}
+
+// itemsAgeDays are the working days, in now's location, since the newest of its was asked or last reopened;
+// 0 for none.
+func itemsAgeDays(its []items.Item, now time.Time) int {
+	var newest time.Time
+	for _, it := range its {
+		at := itemAskedAt(it)
+		if it.ReopenedAt.After(at) {
+			at = it.ReopenedAt
+		}
+		if at.After(newest) {
+			newest = at
+		}
+	}
+	if newest.IsZero() {
+		return 0
+	}
+	return workdaysBetween(newest, now)
+}
+
+// workdaysBetween is the most working days n, Monday to Friday, with from moved n working days at the same
+// wall-clock time no later than to, in to's location, counted in constant time.
+func workdaysBetween(from, to time.Time) int {
+	from = from.In(to.Location())
+	if !from.Before(to) {
+		return 0
+	}
+	date := func(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) }
+	days := int(date(to).Sub(date(from)).Hours() / 24)
+	clock := func(t time.Time) time.Duration {
+		h, m, sec := t.Clock()
+		return time.Duration(h)*time.Hour + time.Duration(m)*time.Minute + time.Duration(sec)*time.Second + time.Duration(t.Nanosecond())
+	}
+	if clock(to) < clock(from) {
+		days--
+	}
+	n := days / 7 * 5
+	wd := from.Weekday()
+	for range days % 7 {
+		if wd = (wd + 1) % 7; wd != time.Saturday && wd != time.Sunday {
+			n++
+		}
+	}
+	return n
 }
 
 // waitsOn says whether person is still waited on: by an item a task's draft may list as owed, or by an open
