@@ -121,8 +121,8 @@ type Steps interface {
 }
 
 // GuidedSteps are Steps that tell whether a step's turn is handed the
-// guidance kept for its unit; an item none of whose steps is never runs
-// early for that guidance nor takes it.
+// guidance kept for its unit. Only an item with such a step runs early when
+// guidance is kept, and takes that guidance.
 type GuidedSteps interface {
 	HandsGuidance(st workflow.Step, p unit.ProviderID) bool
 }
