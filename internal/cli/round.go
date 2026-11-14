@@ -128,9 +128,6 @@ func (e *Env) startRound(ctx context.Context, cfg config.Config, ws wsdomain.Wor
 // the PR goes in the prompt and keeps the live session, which knows it.
 func (e *Env) startAddress(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, r turn.Request, opts roundOptions) (submitted bool, verb, turnID string, err error) {
 	ref := prOf(r.Unit)
-	if err := e.roundReady(); err != nil {
-		return false, "", "", err
-	}
 	activity, err := e.freshActivity(ctx)
 	if err != nil {
 		return false, "", "", err

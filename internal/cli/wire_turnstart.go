@@ -41,8 +41,13 @@ func (e *Env) wireTurnStart(w *serveWiring) {
 // daemon's, which newDaemon gives it.
 func (e *Env) turnStarter(mu *lock.Mutex, plan *latePlan, logf func(string, ...any)) *turns.Starter {
 	return &turns.Starter{Defs: loadedDefs{e}, Kept: recGuidance{e}, Loop: serveLoop{e: e, mu: mu},
-		Effects: startEffects{e: e, plan: plan}, Store: e.Turns.Store, Log: logf}
+		Effects: startEffects{e: e, plan: plan}, Store: e.Turns.Store, Guides: profileGuides{e}, Log: logf}
 }
+
+// profileGuides are the guides of the loaded profile.
+type profileGuides struct{ e *Env }
+
+func (g profileGuides) Ready(d turns.Def) error { return g.e.guidesReady(d.Def) }
 
 // loadedDefs are the loaded intents as a turn's start reads them.
 type loadedDefs struct{ e *Env }

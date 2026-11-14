@@ -725,3 +725,21 @@ func TestAStarterWithNoPrepareRefusesAnIntentThatHasOne(t *testing.T) {
 		t.Fatalf("start of an intent with no prepare = %v, ran %d", err, len(x.ran))
 	}
 }
+
+type refusingGuides struct{ err error }
+
+func (g refusingGuides) Ready(turns.Def) error { return g.err }
+
+func TestGuidesThatDoNotReadStopATurnBeforeAnythingIsTouched(t *testing.T) {
+	r := newStartRig(t)
+	r.s.Guides = refusingGuides{errors.New("intent=review.md: a broken block")}
+	x := r.runner(true)
+	if _, err := r.s.Start(context.Background(), byPerson(prepared), x); err == nil {
+		t.Fatal("a turn started on guides that do not read")
+	}
+	for _, step := range []string{"prepare", "check", "guard", "before", "run"} {
+		if slices.Contains(r.trace, step) {
+			t.Fatalf("trace %v", r.trace)
+		}
+	}
+}

@@ -50,6 +50,13 @@ type Preparer interface {
 	PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error)
 }
 
+// Guides are the profile's guides an intent's instructions compose.
+type Guides interface {
+	// Ready refuses a turn of d whose instructions compose guides that do
+	// not read.
+	Ready(d Def) error
+}
+
 // KeptGuidance is the user's guidance kept for a unit's next turn.
 type KeptGuidance interface {
 	Take(ctx context.Context, u unit.Unit) (string, error)
@@ -207,6 +214,9 @@ type Starter struct {
 	Loop     Loop
 	Effects  TurnEffects
 	Store    Store
+	// Guides check the profile's guides before anything is touched for a
+	// turn; nil checks none.
+	Guides Guides
 	// Log reports what fails without failing the start; nil drops it.
 	Log func(format string, args ...any)
 }
@@ -255,10 +265,15 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Outcome, erro
 	return o, nil
 }
 
-// run is Start past the take: prepare, check, guard, before, run, then the
-// effects of the recorded turn; a turn recorded and not run through still
-// records the guidance it carried.
+// run is Start past the take: guides, prepare, check, guard, before, run,
+// then the effects of the recorded turn; a turn recorded and not run
+// through still records the guidance it carried.
 func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, error) {
+	if s.Guides != nil {
+		if err := s.Guides.Ready(d); err != nil {
+			return Outcome{}, err
+		}
+	}
 	if d.Prepare != "" {
 		if s.Preparer == nil {
 			return Outcome{}, fmt.Errorf("%s: no prepare runs %s", t.unit, d.Prepare)

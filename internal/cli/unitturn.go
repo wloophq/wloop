@@ -130,8 +130,10 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) (tu
 // gets through lifts the block.
 func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error) {
 	u := run.r.Unit
-	if err := e.roundReady(); err != nil {
-		return turns.Outcome{}, err
+	if run.turn.Resumed() {
+		if err := e.guidesReady(run.def); err != nil {
+			return turns.Outcome{}, err
+		}
 	}
 	if run.def.WorkspaceRepo != nil {
 		run.cfg = scoped(run)

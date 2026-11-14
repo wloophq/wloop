@@ -94,6 +94,9 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 	}
 	resume := l.Turn.Resumed()
 	if resume {
+		if err := e.guidesReady(d); err != nil {
+			return turns.Outcome{}, err
+		}
 		if err := e.checkEffects(d, ref.Unit()); err != nil {
 			return turns.Outcome{}, err
 		}
@@ -150,9 +153,6 @@ func (e *Env) runInReview(ctx context.Context, run roundRun) (string, bool, erro
 	if err != nil {
 		return "", false, err
 	}
-	if err := e.roundReady(); err != nil {
-		return "", false, err
-	}
 	if run.st != nil && run.rememberHome != "" {
 		run.st.SetAgentHome(ref.String(), run.rememberHome)
 	}
@@ -169,9 +169,6 @@ func (e *Env) runInReview(ctx context.Context, run roundRun) (string, bool, erro
 // pull request that is the user's.
 func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, error) {
 	cfg, r, pr := run.cfg, run.r, run.pr
-	if err := e.roundReady(); err != nil {
-		return "", false, err
-	}
 	var ws wsdomain.Workspace
 	var action string
 	var err error

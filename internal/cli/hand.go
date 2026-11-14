@@ -136,9 +136,6 @@ func (x *handRunner) Guard(ctx context.Context, t turns.Turn) error {
 		}
 		x.req.Owned = true
 	}
-	if err := e.roundReady(); err != nil {
-		return err
-	}
 	if inWS && (d.Workspace == workspaceReview || d.Workspace == workspaceAuthor) {
 		if err := e.prepareWorktree(ctx, cfg.For(ref.Owner, ref.Repo), ws, repo, ref, d.Workspace); err != nil {
 			return err

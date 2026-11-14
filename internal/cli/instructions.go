@@ -303,6 +303,15 @@ func (e *Env) roundReady() error {
 	return profile.Guides{Tree: e.loadedIntents().Tree}.Check()
 }
 
+// guidesReady is roundReady for a turn of d, whose instructions compose
+// guides only when it names a profile.
+func (e *Env) guidesReady(d dintent.Def) error {
+	if d.Profile == "" && len(d.AlsoProfiles) == 0 {
+		return nil
+	}
+	return e.roundReady()
+}
+
 // agentClient is a client of the daemon that names, with each call, the
 // calling agent session and the manager that runs it.
 func (e *Env) agentClient() *client.Client {
