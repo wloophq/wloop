@@ -1108,11 +1108,12 @@ type fakeLauncher struct {
 	mu       sync.Mutex
 	loopMu   *lock.Mutex
 	launches []turns.Launch
-	// loopHeld records, per launch, whether the loop mutex was held.
+	// loopHeld records, per launch, whether the loop mutex was held and its
+	// context marked so.
 	loopHeld []bool
 }
 
-func (l *fakeLauncher) Launch(_ context.Context, x turns.Launch) (turns.Outcome, error) {
+func (l *fakeLauncher) Launch(ctx context.Context, x turns.Launch) (turns.Outcome, error) {
 	held := !l.loopMu.TryLock()
 	if !held {
 		l.loopMu.Unlock()
@@ -1120,7 +1121,7 @@ func (l *fakeLauncher) Launch(_ context.Context, x turns.Launch) (turns.Outcome,
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.launches = append(l.launches, x)
-	l.loopHeld = append(l.loopHeld, held)
+	l.loopHeld = append(l.loopHeld, held && lock.Held(ctx))
 	return turns.Outcome{Submitted: true}, nil
 }
 
@@ -1372,6 +1373,28 @@ func TestTurnActionsNeedNoInventoryRow(t *testing.T) {
 	}
 	if len(r.launcher.launches) != 1 || r.launcher.launches[0].Unit != probe.Unit() || r.launcher.launches[0].Intent != turn.Intent(dintent.Probe) {
 		t.Fatalf("launches %+v", r.launcher.launches)
+	}
+}
+
+func TestAQuestionNoGateHoldsIsActedOnUnderTheHeldLoop(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		state      turn.State
+		path, body string
+		question   *record.Question
+	}{
+		"an answer":  {turn.Asked, "answer", `{"guidance":"publish it"}`, &record.Question{Kind: "free", Text: "Publish?"}},
+		"a continue": {turn.Failed, "continue", `{}`, nil},
+	} {
+		r := newTurnRig(t)
+		r.s.deps.Gates = nil
+		r.asked(pr.Ref{Owner: "acme", Repo: "api", Number: 8}, turn.Intent(dintent.Address), c.state, c.question)
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/"+c.path, c.body); rec.Code != 200 {
+			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+		if !slices.Equal(r.launcher.loopHeld, []bool{true}) {
+			t.Errorf("%s: launched with the loop held and marked %v, want once", name, r.launcher.loopHeld)
+		}
 	}
 }
 

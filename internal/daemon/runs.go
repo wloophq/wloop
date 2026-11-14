@@ -7,6 +7,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -140,7 +141,7 @@ func (s *Server) handleRunEnter(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.deps.LoopMu.Lock()
-		err = s.deps.RunHost.Wake(ctx, u, string(run.Turn.Intent), sess)
+		err = s.deps.RunHost.Wake(lock.WithHeld(ctx), u, string(run.Turn.Intent), sess)
 		s.deps.LoopMu.Unlock()
 		if err != nil {
 			writeActionError(w, err)

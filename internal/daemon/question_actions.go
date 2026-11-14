@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -76,6 +77,7 @@ func (s *Server) questionWithoutGate(ctx context.Context, g catalog.GateIntent, 
 		ctx = s.readAhead(ctx, u, false)
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
+		ctx = lock.WithHeld(ctx)
 		a := messages.Answer{Text: strings.TrimSpace(req.Guidance), OptionID: req.OptionID, Yes: req.Yes, No: req.No, Source: source}
 		var res turns.AnswerResult
 		if ok && !m.Open() {
@@ -99,7 +101,7 @@ func (s *Server) questionWithoutGate(ctx context.Context, g catalog.GateIntent, 
 	ctx = s.readAhead(ctx, u, false)
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
-	if err := s.deps.Turns.Continue(ctx, u); err != nil {
+	if err := s.deps.Turns.Continue(lock.WithHeld(ctx), u); err != nil {
 		return err
 	}
 	fmt.Fprintln(out, "the agent continues on "+u.Label())
