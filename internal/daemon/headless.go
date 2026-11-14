@@ -91,8 +91,16 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeError(w, http.StatusServiceUnavailable, "headless turns are not wired")
 		return
 	}
+	var inputs map[string]any
+	if d.Prepare != "" {
+		var err error
+		if inputs, err = s.preparedInputs(r.Context(), d, u, req.Guidance, nil); err != nil {
+			writeActionError(w, err)
+			return
+		}
+	}
 	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Task: req.Task, Intent: turn.Intent(name),
-		Guidance: req.Guidance, Trigger: turn.ByHand})
+		Guidance: req.Guidance, Inputs: inputs, Trigger: turn.ByHand})
 	switch {
 	case errors.Is(err, headless.ErrBusy):
 		writeError(w, http.StatusConflict, err.Error())

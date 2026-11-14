@@ -76,6 +76,9 @@ type stepDeps struct {
 	// automated turns turns.per_day caps.
 	Headless headlessStarter
 	Turns    automatedTurns
+	// Prepare runs the prepare of turn.start's intent; nil refuses an
+	// intent that has one.
+	Prepare turnPreparer
 }
 
 // briefPort is the brief queue as a round asks it: Peek plans, Ready starts

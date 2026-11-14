@@ -119,7 +119,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		d.Planners = e.planners()
 	}
 	sd := stepDeps{Units: units, Keep: unitKeeping{units}, Planners: d.Planners, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
-		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
+		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns, Prepare: servedPreparer{e}}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
 	}

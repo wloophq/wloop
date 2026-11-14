@@ -86,8 +86,12 @@ func (a *asker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
 
 type builder struct{}
 
-func (builder) Instructions(_ context.Context, u unit.Unit, i turn.Intent, its []string) (string, error) {
-	return "# Act on " + u.Key + " for " + string(i) + " on " + strings.Join(its, ","), nil
+func (builder) Instructions(_ context.Context, u unit.Unit, i turn.Intent, its []string, inputs map[string]any) (string, error) {
+	text := "# Act on " + u.Key + " for " + string(i) + " on " + strings.Join(its, ",")
+	if who, ok := inputs["who"].(string); ok {
+		text += ", asking " + who
+	}
+	return text, nil
 }
 
 type placer struct{ dir string }
@@ -555,5 +559,33 @@ func TestHeadlessAnswerRunsAgain(t *testing.T) {
 	}
 	if typed := r.sess.Typed(); len(typed) != 0 {
 		t.Fatalf("typed into a session: %+v", typed)
+	}
+}
+
+func TestAHeadlessRunRendersAndKeepsItsInputsAndItsRunAgainToo(t *testing.T) {
+	r := newRig(t, scripted{json: answerJSON(t, asked())}, scripted{json: answerJSON(t, done)})
+	ctx := context.Background()
+	if _, err := r.svc.Run(ctx, headless.Request{Unit: thread, Items: []string{"i1"}, Inputs: map[string]any{"who": "ana"}, Trigger: turn.Automated}); err != nil {
+		t.Fatal(err)
+	}
+	m := r.inbox()
+	if err := m.Reconcile(ctx, thread); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Gates.(*messagestest.Gates).Answer(ctx, questions(t, m)[0], messages.Answer{OptionID: "mon", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.asker.asks) != 2 {
+		t.Fatalf("%d asks", len(r.asker.asks))
+	}
+	for i, a := range r.asker.asks {
+		if !strings.Contains(a.Prompt, "asking ana") {
+			t.Errorf("call %d never rendered its inputs:\n%s", i, a.Prompt)
+		}
+	}
+	for _, tu := range r.book(t, thread).Turns {
+		if tu.Inputs["who"] != "ana" || !slices.Equal(turns.ItemsOf(tu), []string{"i1"}) {
+			t.Errorf("turn %d inputs %v", tu.Seq, tu.Inputs)
+		}
 	}
 }

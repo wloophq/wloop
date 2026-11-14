@@ -116,20 +116,43 @@ func (s *stepSet) unitStart(ctx context.Context, c stepCall, o automation.RunOpt
 }
 
 // startTurn starts an automated turn of a's intent on u in its runner: a
-// headless call, or a session where the intent runs.
+// headless call, or a session where the intent runs, with the inputs its
+// role's prepare filled.
 func (s *stepSet) startTurn(ctx context.Context, u unit.Unit, a startArgs, guidance string, why *workflow.Why) (string, error) {
 	intent := dturn.Intent(a.intent)
+	inputs, err := s.prepare(ctx, a, u, guidance)
+	if err != nil {
+		return "", err
+	}
 	if a.runnerName() == string(dturn.RunnerHeadless) {
 		if s.d.Headless == nil {
 			return "", errors.New("no headless runner is configured")
 		}
-		if _, err := s.d.Headless.Start(ctx, headless.Request{Unit: u, Intent: intent, Guidance: guidance, Trigger: dturn.Automated, Workflow: why.Workflow}); err != nil {
+		if _, err := s.d.Headless.Start(ctx, headless.Request{Unit: u, Intent: intent, Guidance: guidance, Inputs: inputs, Trigger: dturn.Automated, Workflow: why.Workflow}); err != nil {
 			return "", err
 		}
 		return "started a headless " + a.intent + " turn", nil
 	}
-	if err := (cliLauncher{s.e}).Launch(ctx, turns.Launch{Unit: u, Intent: intent, Guidance: guidance, Trigger: dturn.Automated, Why: why}); err != nil {
+	if err := (cliLauncher{s.e}).Launch(ctx, turns.Launch{Unit: u, Intent: intent, Guidance: guidance, Inputs: inputs, Trigger: dturn.Automated, Why: why}); err != nil {
 		return "", err
 	}
 	return "started a " + a.intent + " turn", nil
+}
+
+// prepare is the inputs the prepare of a's intent fills on u; none when
+// the intent has no prepare.
+func (s *stepSet) prepare(ctx context.Context, a startArgs, u unit.Unit, guidance string) (map[string]any, error) {
+	if a.def.Prepare == "" {
+		return nil, nil
+	}
+	if s.d.Prepare == nil {
+		return nil, fmt.Errorf("the intent %s has a prepare and no daemon runs it", a.intent)
+	}
+	return s.d.Prepare.PrepareTurn(ctx, a.intent, u, guidance, nil)
+}
+
+// turnPreparer runs the prepare of an intent's role on a unit: the inputs
+// it filled, or an error wrapping src.ErrUnfit when it refuses the turn.
+type turnPreparer interface {
+	PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error)
 }
