@@ -140,7 +140,8 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },
 		Default: func(p unit.ProviderID) (dintent.Def, bool) { return reg.ByRole("headless", p) },
-		Caps:    headless.Caps{PerCallUSD: 0.5, PerDayUSD: 5}, Spent: r.spent, Clock: r.clock, Go: func(run func()) { run() }, Log: t.Logf}
+		Caps:    headless.Caps{PerCallUSD: 0.5, PerDayUSD: 5}, Spent: r.spent, Clock: r.clock, Go: func(run func()) { run() }, Log: t.Logf,
+		Starter: turnstest.Starter(turnstest.Defs{Registry: reg}, r.store, nil)}
 	w := bundledWrapper(t)
 	r.svc.Wrapper = func() (headless.Wrapper, error) { return w, nil }
 	r.turns.Headless = r.svc.Again
@@ -160,8 +161,8 @@ func (r *rig) spent(ctx context.Context, day time.Time) (float64, error) {
 
 type noLauncher struct{}
 
-func (noLauncher) Launch(context.Context, turns.Launch) error {
-	return errors.New("a headless turn never launches a session")
+func (noLauncher) Launch(context.Context, turns.Launch) (turns.Outcome, error) {
+	return turns.Outcome{}, errors.New("a headless turn never launches a session")
 }
 
 func (r *rig) book(t *testing.T, u unit.Unit) turn.Book {
@@ -242,7 +243,7 @@ func TestOneHeadlessRunPerUnit(t *testing.T) {
 		t.Fatalf("second run: %v", err)
 	}
 	other := &headless.Service{Turns: r.newTurns(), Build: r.svc.Build, Place: r.svc.Place, Asker: r.svc.Asker, Ledger: r.svc.Ledger, Outbox: r.svc.Outbox,
-		Intents: r.svc.Intents, Default: r.svc.Default, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper}
+		Intents: r.svc.Intents, Default: r.svc.Default, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper, Starter: r.svc.Starter}
 	if _, err := other.Run(ctx, headless.Request{Unit: thread}); !errors.Is(err, headless.ErrBusy) {
 		t.Fatalf("a second service: %v", err)
 	}

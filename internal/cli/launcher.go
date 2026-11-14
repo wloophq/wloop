@@ -28,14 +28,14 @@ var _ turns.Launcher = cliLauncher{}
 // the workspace the intent's manifest names, created again when it is gone;
 // a probe goes to a new session of the workspace it names, or of the one its
 // resumed turn was sent to.
-func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
+func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome, error) {
 	e := c.e
 	d, err := e.intentDef(string(l.Intent))
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	if d.Builds != "" {
-		return fmt.Errorf("the intent %s builds a %s and starts no turn", d.Name, d.Builds)
+		return turns.Outcome{}, fmt.Errorf("the intent %s builds a %s and starts no turn", d.Name, d.Builds)
 	}
 	if d.Launch == builtin.LaunchProbe {
 		return c.probe(ctx, d, l)
@@ -45,37 +45,37 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 	}
 	run, ok := workspaceRuns()[d.Workspace]
 	if !ok {
-		return fmt.Errorf(brand.Name+" cannot launch a %s turn: no launch names its %s workspace", d.Name, d.Workspace)
+		return turns.Outcome{}, fmt.Errorf(brand.Name+" cannot launch a %s turn: no launch names its %s workspace", d.Name, d.Workspace)
 	}
 	ref, err := githubRef(l.Unit)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	base, err := e.loadConfig()
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	home, err := e.roundAgentHome(ctx, ref)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	cfg := prConfig(base, ref, home)
 	pr, err := e.launchPR(ctx, ref)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: requestTrigger(l.Trigger), Unit: ref.Unit(), Payload: turnPR(pr), Guidance: l.Guidance, Inputs: l.Inputs, Why: l.Why}
 	e.withAddressReason(ctx, cfg, d, &r)
 	if l.ResumeOf != 0 {
 		books, err := e.Turns.Store.Books(ctx, l.Unit)
 		if err != nil {
-			return err
+			return turns.Outcome{}, err
 		}
 		b := books[l.Unit]
 		b.Unit = l.Unit
 		prev, ok := turnOf(b, l.ResumeOf)
 		if !ok {
-			return fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
+			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
 		}
 		r.Trigger, r.Guidance = requestTrigger(prev.Trigger), cmp.Or(l.Guidance, prev.Guidance)
 		if r.Inputs == nil {
@@ -86,19 +86,19 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 			r.Resume.Drafts = e.resumeDrafts(ctx, b, l.ResumeOf, pr.HeadRefOid)
 		}
 		if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
-			return err
+			return turns.Outcome{}, err
 		}
 	}
 	if err := e.checkEffects(d, ref.Unit()); err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance}
 	e.applySentEffects(ctx, routeLaunch, d, sr)
-	return nil
+	return turns.Outcome{ID: id, Head: pr.HeadRefOid, Submitted: submitted}, nil
 }
 
 // roundAgentHome is the agent home remembered for the pull request's rounds.

@@ -22,6 +22,8 @@ type Service struct {
 	AgentSessions AgentSessions
 	Sessions      Sessions
 	Launcher      Launcher
+	// Starter admits the new turns Launch starts; nil starts none.
+	Starter *Starter
 	// Answers are the user's answers asked turns reconcile with; nil reads
 	// none.
 	Answers Answers

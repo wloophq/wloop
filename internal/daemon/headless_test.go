@@ -22,9 +22,16 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-type startedHeadless struct{ got []headless.Request }
+type startedHeadless struct {
+	got []headless.Request
+	// err fails every start.
+	err error
+}
 
 func (h *startedHeadless) Start(_ context.Context, r headless.Request) (int64, error) {
+	if h.err != nil {
+		return 0, h.err
+	}
 	h.got = append(h.got, r)
 	return 42, nil
 }

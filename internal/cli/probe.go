@@ -40,37 +40,37 @@ func probeModel(ref pr.Ref) string {
 // probe sends a probe turn in a new session: a first launch in l.WorkspaceID
 // with l.Home and l.Model, a resume in the workspace and home of the session
 // the resumed turn was sent to. It reads nothing from GitHub.
-func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) error {
+func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) (turns.Outcome, error) {
 	e := c.e
 	if e.Turns == nil {
-		return errors.New("a probe runs in the daemon")
+		return turns.Outcome{}, errors.New("a probe runs in the daemon")
 	}
 	ref, err := githubRef(l.Unit)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: requestTrigger(l.Trigger), Unit: ref.Unit()}
 	wsID, home, model := l.WorkspaceID, l.Home, l.Model
 	books, err := e.Turns.Store.Books(ctx, l.Unit)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	b := books[l.Unit]
 	b.Unit = l.Unit
 	if l.ResumeOf != 0 {
 		prev, ok := turnOf(b, l.ResumeOf)
 		if !ok {
-			return fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
+			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", ref, l.ResumeOf)
 		}
 		r.Trigger = requestTrigger(prev.Trigger)
 		r.Resume = instructions.ResumeOf(b, l.ResumeOf, l.Answer, "", "")
 		if wsID == "" {
 			s, ok, err := e.Turns.Registry.Session(ctx, prev.SentTo)
 			if err != nil {
-				return err
+				return turns.Outcome{}, err
 			}
 			if !ok {
-				return fmt.Errorf("%w: %s: the session %q turn %d was sent to is unknown, so the probe has no workspace to resume in", turns.ErrWorkspaceGone, ref, prev.SentTo, l.ResumeOf)
+				return turns.Outcome{}, fmt.Errorf("%w: %s: the session %q turn %d was sent to is unknown, so the probe has no workspace to resume in", turns.ErrWorkspaceGone, ref, prev.SentTo, l.ResumeOf)
 			}
 			wsID, home = s.WorkspaceID, s.Home
 		}
@@ -81,14 +81,14 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) e
 		rememberProbeModel(prOf(l.Unit), model)
 	}
 	if wsID == "" {
-		return errors.New("a probe needs the workspace to run in")
+		return turns.Outcome{}, errors.New("a probe needs the workspace to run in")
 	}
 	if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	loaded, err := e.loadConfig()
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	cfg := loaded.For(ref.Owner, ref.Repo)
 	cfg.AgentHome = home
@@ -98,43 +98,44 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) e
 	r.Agent = cfg.Agent
 	ws, ok, err := e.findFresh(ctx, wsID)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	if !ok {
-		return fmt.Errorf("%w: no workspace %s in %s", turns.ErrWorkspaceGone, wsID, e.managerDisplay())
+		return turns.Outcome{}, fmt.Errorf("%w: no workspace %s in %s", turns.ErrWorkspaceGone, wsID, e.managerDisplay())
 	}
 	a, err := e.agent(cfg.Agent)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	m, err := e.WS.For(ctx, ws)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	s := turns.AgentSession{Worktree: ws.Path, Home: home, Model: model, Policy: policies[d.Policy](e, d.Name, e.controlSurface(loaded)), Trusted: true}
 	if err := workspace.Honors(m, needs(a, cfg, s.Policy)); err != nil {
-		return fmt.Errorf("%s owns %s and cannot launch the probe's session: %w", e.displayOf([]string{m.Name()}), ws.DisplayName, err)
+		return turns.Outcome{}, fmt.Errorf("%s owns %s and cannot launch the probe's session: %w", e.displayOf([]string{m.Name()}), ws.DisplayName, err)
 	}
 	if err := e.preflight(ctx, a, s, m); err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	sent, err := e.storeTurn(ctx, cfg, r)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	sent.resume(l.ResumeOf)
 	name, err := e.sessionName(dintent.Name(r.Intent), r.Unit, nil)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, func(string) bool { return true }, true)
 	if err != nil {
-		return fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
+		return turns.Outcome{}, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}
-	if _, err := e.deliver(ctx, ref.Unit(), &sent, p, false); err != nil {
-		return fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
+	submitted, err := e.deliver(ctx, ref.Unit(), &sent, p, false)
+	if err != nil {
+		return turns.Outcome{}, fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
 	}
-	return nil
+	return turns.Outcome{ID: sent.ID, Submitted: submitted}, nil
 }
 
 // findFresh finds the workspace in WS's list, and asks the managers again

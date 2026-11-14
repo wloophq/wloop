@@ -207,7 +207,7 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	p := newStubPlanner(nil)
 	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
 	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
-	if err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}); err != nil {
+	if _, err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
 	var names []string
@@ -244,7 +244,7 @@ func TestAnEffectThePluginDoesNotApplyIsAHealthProblemOfASentTurn(t *testing.T) 
 	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
 	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
 	launch := turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}
-	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+	if _, err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
 		t.Fatalf("a turn that went out failed its launch: %v", err)
 	}
 	if len(p.applied()) != 1 || len(sc.ws.Prompts) != 1 {
@@ -256,7 +256,7 @@ func TestAnEffectThePluginDoesNotApplyIsAHealthProblemOfASentTurn(t *testing.T) 
 	p.mu.Lock()
 	p.unsupported = false
 	p.mu.Unlock()
-	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+	if _, err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
 		t.Fatal(err)
 	}
 	if got := sc.env.effectProblems.list(); len(got) != 0 {
@@ -273,7 +273,7 @@ func TestAnEffectThatFailsAfterTheSendIsAHealthProblem(t *testing.T) {
 	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
 	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
 	launch := turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}
-	if err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
+	if _, err := (cliLauncher{sc.env}).Launch(context.Background(), launch); err != nil {
 		t.Fatalf("a turn that went out failed its launch: %v", err)
 	}
 	if got := sc.env.effectProblems.list(); len(got) != 1 || !strings.Contains(got[0], "pr.reviewed") || !strings.Contains(got[0], "the store is locked") {
@@ -286,7 +286,7 @@ func TestATurnWhoseEffectsNoPluginAppliesIsNotSent(t *testing.T) {
 	sc := followupScenario(t)
 	sc.te.gh.basics = openBasics
 	sc.env.pluginEffects = func(unit.ProviderID) (effectApplier, bool) { return nil, false }
-	err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
+	_, err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
 	if err == nil || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
 		t.Fatalf("launch = %v, prompts %d; want refused before the send", err, len(sc.ws.Prompts))
 	}

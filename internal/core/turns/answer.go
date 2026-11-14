@@ -151,7 +151,7 @@ func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a tu
 			route = s.runHeadless(ctx, q, said)
 			break
 		}
-		err := s.Launcher.Launch(ctx, Launch{Unit: ref, Intent: q.Intent, ResumeOf: q.Seq, Answer: said, Inputs: q.Inputs})
+		err := s.relaunch(ctx, ref, q, said)
 		switch {
 		case errors.Is(err, ErrWorkspaceGone):
 			route = AnswerResult{Route: turn.Refused, Note: "the workspace is gone"}
@@ -630,7 +630,7 @@ func (s *Service) Continue(ctx context.Context, u unit.Unit) error {
 		if route := s.runHeadless(ctx, *q, ""); route.Route == turn.Refused {
 			return Refusal{"the headless turn did not run again: " + route.Note}
 		}
-	} else if err := s.Launcher.Launch(ctx, Launch{Unit: u, Intent: q.Intent, ResumeOf: q.Seq, Inputs: q.Inputs}); err != nil {
+	} else if err := s.relaunch(ctx, u, *q, ""); err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -740,4 +740,14 @@ func (s *Service) answered(u unit.Unit, a turn.Answer, said string) port.Event {
 		ev.Actor, ev.Session = string(task.ActorAgent), a.BySession
 	}
 	return ev
+}
+
+// relaunch resumes q, u's turn, through the Launcher with the answer said.
+func (s *Service) relaunch(ctx context.Context, u unit.Unit, q turn.Turn, said string) error {
+	t, err := resume(ctx, s.Store, u, q.Seq)
+	if err != nil {
+		return err
+	}
+	_, err = s.Launcher.Launch(ctx, Launch{Unit: t.Unit(), Intent: t.Intent(), ResumeOf: t.ResumeOf(), Answer: said, Inputs: q.Inputs})
+	return err
 }

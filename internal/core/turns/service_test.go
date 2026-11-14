@@ -60,15 +60,15 @@ type recorder struct {
 	changes   []unit.Unit
 }
 
-func (r *recorder) Launch(_ context.Context, l turns.Launch) error {
+func (r *recorder) Launch(_ context.Context, l turns.Launch) (turns.Outcome, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.attempts++
 	if r.launchErr != nil {
-		return r.launchErr
+		return turns.Outcome{}, r.launchErr
 	}
 	r.launches = append(r.launches, l)
-	return nil
+	return turns.Outcome{Submitted: true}, nil
 }
 
 func (r *recorder) Answers(_ context.Context, u unit.Unit, since time.Time) ([]turns.SourceAnswer, error) {

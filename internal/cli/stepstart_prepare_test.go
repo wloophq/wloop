@@ -10,7 +10,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -69,34 +68,6 @@ func TestAWorkflowNudgeItsPrepareRefusesIsRefused(t *testing.T) {
 	}
 	if b := r.sc.te.unitBook(t, r.u); len(b.Turns) != 0 {
 		t.Fatalf("a refused prepare launched %+v", b.Turns)
-	}
-}
-
-func TestAHeadlessWorkflowTurnCarriesWhatItsPrepareFilled(t *testing.T) {
-	t.Parallel()
-	r := nudgeStartRig(t)
-	r.st.Args["runner"] = string(dturn.RunnerHeadless)
-	h := &headlessCalls{}
-	r.steps.d.Headless = h
-	r.steps.d.Prepare = &fakePreparer{filled: preparedNudge}
-	if _, err := r.run(t, automation.RunOpts{}); err != nil {
-		t.Fatal(err)
-	}
-	if len(h.got) != 1 || h.got[0].Inputs["situation"] != preparedNudge["situation"] {
-		t.Fatalf("headless calls %+v", h.got)
-	}
-}
-
-func TestAHeadlessWorkflowTurnItsPrepareRefusesStartsNothing(t *testing.T) {
-	t.Parallel()
-	r := nudgeStartRig(t)
-	r.st.Args["runner"] = string(dturn.RunnerHeadless)
-	h := &headlessCalls{}
-	r.steps.d.Headless = h
-	r.steps.d.Prepare = &fakePreparer{refusal: fmt.Errorf("%w: nobody to ask", src.ErrUnfit)}
-	_, err := r.run(t, automation.RunOpts{})
-	if !errors.As(err, new(automation.Refused)) || len(h.got) != 0 {
-		t.Fatalf("run: %v; headless calls %+v", err, h.got)
 	}
 }
 

@@ -679,6 +679,7 @@ func newTestEnv(t testing.TB, ws workspace.Manager) *testEnv {
 	te.Views = &views.Service{Books: te.repo, Intents: registryPort{te.Env}, State: te.repo, Sinks: []views.Sink{{ViewSink: te.sink, Placements: te.sink}}, Clock: clock, Paused: te.boardPaused}
 	te.Turns = &turns.Service{Intents: registryPort{te.Env}, Notices: profileNotices{te.Env}, Store: te.repo, Registry: te.reg, Sessions: turnstest.NewSessions(), Launcher: cliLauncher{te.Env},
 		Answers: hostAnswers{events: sqlite.New(db), viewer: te.Store}, Changed: te.Views.Changed, Clock: clock, Command: brand.Name, FastJob: 2 * time.Minute}
+	te.Turns.Starter = te.Env.turnStarter(&lock.Mutex{}, nil, nil)
 	var minted atomic.Int64
 	te.Turns.NewID = func() string { return fmt.Sprintf("sid-%d", minted.Add(1)) }
 	return te

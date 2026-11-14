@@ -155,14 +155,14 @@ help = "owner/name"
 		t.Fatal(err)
 	}
 	run := unitRun{def: d, cfg: r.te.cfg, r: turn.Request{Intent: "implement", Trigger: turn.ByHand, Unit: thread1, Inputs: map[string]any{"repo": "acme/api"}}}
-	if err := r.te.runOnUnit(context.Background(), run); err != nil {
+	if _, err := r.te.runOnUnit(context.Background(), run); err != nil {
 		t.Fatalf("%v\n%s", err, r.te.err)
 	}
 	if !r.created() {
 		t.Fatalf("writes %q", r.m.Writes)
 	}
 	run.r.Unit, run.r.Inputs = thread2, map[string]any{"repo": "evil/elsewhere"}
-	if err := r.te.runOnUnit(context.Background(), run); err == nil || !strings.Contains(err.Error(), "is not registered") {
+	if _, err := r.te.runOnUnit(context.Background(), run); err == nil || !strings.Contains(err.Error(), "is not registered") {
 		t.Fatalf("a repository the manager does not know: %v", err)
 	}
 }

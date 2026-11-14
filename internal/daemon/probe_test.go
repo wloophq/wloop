@@ -26,16 +26,16 @@ type probeLauncher struct {
 	err      error
 }
 
-func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) error {
+func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) (turns.Outcome, error) {
 	l.launches = append(l.launches, x)
 	l.held = append(l.held, lock.Held(ctx))
 	if l.err != nil {
-		return l.err
+		return turns.Outcome{}, l.err
 	}
 	if _, err := l.svc.Send(ctx, turns.SendRequest{Unit: x.Unit, Intent: x.Intent, Turn: "probe1round", Trigger: x.Trigger, Records: true}); err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
-	return l.svc.SentTo(ctx, x.Unit, "probe1round", "term_probe")
+	return turns.Outcome{ID: "probe1round", Submitted: true}, l.svc.SentTo(ctx, x.Unit, "probe1round", "term_probe")
 }
 
 func TestProbeAPI(t *testing.T) {

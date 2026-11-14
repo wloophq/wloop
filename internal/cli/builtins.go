@@ -156,13 +156,22 @@ func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 }
 
 // applySentEffects applies the turn effects of d once r went out on route
-// rt: the host's sent phase, then, through ApplyEffect, those of the plugin
-// of r's unit. The turn is out whatever they answer: an effect that fails,
-// or that its plugin does not apply, is a health problem the daemon shows
-// until the next turn of the unit applies it.
+// rt: the host's sent phase, then those of the plugin of r's unit.
 func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
 	runPhase(rt, d, r, sentPhase)
-	u := r.ref.Unit()
+	head := ""
+	if r.pr != nil {
+		head = r.pr.HeadRefOid
+	}
+	e.applyPluginEffects(ctx, d, r.ref.Unit(), src.TurnRef{ID: r.id, Head: head}, rt.wire(), r.submitted, r.inputs)
+}
+
+// applyPluginEffects applies, through ApplyEffect, the turn effects of d the
+// plugin of u applies, to turn t that went out on route. The turn is out
+// whatever they answer: an effect that fails, or that its plugin does not
+// apply, is a health problem the daemon shows until the next turn of the
+// unit applies it.
+func (e *Env) applyPluginEffects(ctx context.Context, d dintent.Def, u unit.Unit, t src.TurnRef, route string, taken bool, turnInputs map[string]any) {
 	names := pluginEffects(d, u)
 	if len(names) == 0 {
 		return
@@ -174,27 +183,22 @@ func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *
 		}
 		return
 	}
-	head := ""
-	if r.pr != nil {
-		head = r.pr.HeadRefOid
-	}
 	var inputs json.RawMessage
-	if len(r.inputs) > 0 {
+	if len(turnInputs) > 0 {
 		var err error
-		if inputs, err = json.Marshal(r.inputs); err != nil {
-			fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", r.ref, err)
+		if inputs, err = json.Marshal(turnInputs); err != nil {
+			fmt.Fprintf(e.Err, "warning: %s: the turn's inputs: %v\n", u.Label(), err)
 		}
 	}
 	for _, name := range names {
-		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &src.TurnRef{ID: r.id, Head: head}, Route: rt.wire(), Taken: r.submitted,
-			Inputs: inputs}
+		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &t, Route: route, Taken: taken, Inputs: inputs}
 		err := a.ApplyEffect(context.WithoutCancel(ctx), req)
 		switch {
 		case errors.Is(err, src.ErrUnsupported):
 			e.effectProblems.set(u, name, fmt.Sprintf("%s: the plugin applies no %s, which the turn that went out names: %v", u.Label(), name, err))
 		case err != nil:
 			e.effectProblems.set(u, name, fmt.Sprintf("%s: applying %s to the turn that went out: %v", u.Label(), name, err))
-			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", r.ref, name, err)
+			fmt.Fprintf(e.Err, "warning: %s: applying %s: %v\n", u.Label(), name, err)
 		default:
 			e.effectProblems.set(u, name, "")
 		}

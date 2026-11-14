@@ -69,7 +69,9 @@ func (knownOnGitHub) IsUser(context.Context, string) (bool, error) { return true
 
 type noLaunch struct{}
 
-func (noLaunch) Launch(context.Context, turns.Launch) error { return nil }
+func (noLaunch) Launch(context.Context, turns.Launch) (turns.Outcome, error) {
+	return turns.Outcome{}, nil
+}
 
 type catalogRig struct {
 	s    *Server

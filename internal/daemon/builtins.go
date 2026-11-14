@@ -48,8 +48,8 @@ func (s *Server) preparedInputs(ctx context.Context, d dintent.Def, u unit.Unit,
 
 // PrepareTurn is inputs with what the prepare of intent's role filled on u,
 // the same an action or a turn by hand of it runs; inputs as given when it
-// has none. A refusal wraps src.ErrUnfit and a plugin out of reach
-// src.ErrUnavailable.
+// has none. A refusal, or a plugin that is off, wraps src.ErrUnfit and a
+// plugin out of reach src.ErrUnavailable.
 func (s *Server) PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error) {
 	d, err := intentDef(s.loaded(), intent)
 	if err != nil || d.Prepare == "" {
@@ -57,10 +57,13 @@ func (s *Server) PrepareTurn(ctx context.Context, intent string, u unit.Unit, gu
 	}
 	filled, err := s.preparedInputs(ctx, d, u, guidance, inputs)
 	var unfit badRequest
+	var off notFound
 	var down unavailable
 	switch {
 	case errors.As(err, &unfit):
 		return nil, fmt.Errorf("%w: %s", src.ErrUnfit, unfit.msg)
+	case errors.As(err, &off):
+		return nil, fmt.Errorf("%w: %s", src.ErrUnfit, off.msg)
 	case errors.As(err, &down):
 		return nil, fmt.Errorf("%w: %s", src.ErrUnavailable, down.msg)
 	}

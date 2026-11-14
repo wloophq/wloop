@@ -89,7 +89,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 				t.Fatal(err)
 			}
 			seq := storedTurn(t, te, ref, intent, inputs)
-			if err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: pr.Ref(ref).Unit(), Intent: dturn.Intent(intent), ResumeOf: seq, Answer: "go on"}); err != nil {
+			if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: pr.Ref(ref).Unit(), Intent: dturn.Intent(intent), ResumeOf: seq, Answer: "go on"}); err != nil {
 				t.Fatalf("%v\n%s", err, te.err)
 			}
 			return te, ref
@@ -155,7 +155,7 @@ func TestAResumeRestoresPersistedInputs(t *testing.T) {
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
 	seq := storedTurn(t, te, r7, dintent.Nudge, nudgeInputs)
-	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r7).Unit(), Intent: dturn.Intent(dintent.Nudge), ResumeOf: seq, Answer: "go on"}); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r7).Unit(), Intent: dturn.Intent(dintent.Nudge), ResumeOf: seq, Answer: "go on"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	b := te.bookOf(t, r7)
@@ -207,7 +207,7 @@ func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
 	te.git.branch["/worktrees/feat/mine"] = "feat/mine"
 	te.git.ancestor["/worktrees/feat/mine"] = true
 	seq := storedTurn(t, te, r21, dintent.Address, nil)
-	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"}); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	if got := effectsOf(t, te, r21); !reflect.DeepEqual(got, effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}) {

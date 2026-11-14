@@ -3,14 +3,15 @@ package daemon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -49,38 +50,30 @@ func TestPrepareTurnOfAnIntentWithoutOneKeepsItsInputs(t *testing.T) {
 	}
 }
 
-func TestAHeadlessActionRunsItsIntentsPrepare(t *testing.T) {
+func TestPrepareTurnOnADisabledPluginIsUnfit(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	m, err := os.ReadFile(filepath.Join("..", "..", "plugins", "github", "profile", "intents", "nudge", "intent.toml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "intents", "nudge"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	headlessNudge := strings.Replace(string(m), "\nworkspace ", "\nrunners = [\"headless\", \"session\"]\nworkspace ", 1)
-	if err := os.WriteFile(filepath.Join(dir, "intents", "nudge", "intent.toml"), []byte(headlessNudge), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cache := cacheOver(t, dir)
-	s, h := newActServer(t, nil)
-	s.deps.Intents = cache.Get
-	if broken := cache.Get().Broken; len(broken) > 0 {
-		t.Fatalf("broken %v", broken)
-	}
+	s, _ := newActServer(t, func(p unit.ProviderID) bool { return p != unit.GitHub })
 	seedWaitingOnAna(t, s)
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"source":"cli"}`); rec.Code != 202 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if len(h.got) != 1 {
-		t.Fatalf("started %+v", h.got)
-	}
-	if who, _ := h.got[0].Inputs["who"].([]string); !slices.Equal(who, []string{"@ana"}) {
-		t.Fatalf("the headless nudge's inputs %#v", h.got[0].Inputs)
-	}
-	sentNudge(t, s, "t1", "@ana")
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"source":"cli"}`); rec.Code/100 == 2 || len(h.got) != 1 {
-		t.Fatalf("a refused prepare still started: %d %s, %d started", rec.Code, rec.Body, len(h.got))
+	if _, err := s.PrepareTurn(context.Background(), string(dintent.Nudge), r9.Unit(), "", nil); !errors.Is(err, src.ErrUnfit) {
+		t.Fatalf("the prepare of a disabled plugin: %v", err)
 	}
 }
+
+func TestAHeadlessActionAnswersItsStartsRefusalAndOutage(t *testing.T) {
+	t.Parallel()
+	s, h := newThreadActServer(t)
+	h.err = kindError{turns.ErrRefused, fmt.Errorf("%w: nobody to ask", src.ErrUnfit)}
+	if rec := post(t, s, threadAct, `{"items":["i1"]}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "nobody to ask") || strings.Contains(rec.Body.String(), src.ErrUnfit.Error()) {
+		t.Fatalf("a refused start: %d %s", rec.Code, rec.Body)
+	}
+	h.err = kindError{turns.ErrTransient, fmt.Errorf("%w: the plugin is restarting", src.ErrUnavailable)}
+	if rec := post(t, s, threadAct, `{"items":["i1"]}`); rec.Code != 503 || !strings.Contains(rec.Body.String(), "the plugin is restarting") {
+		t.Fatalf("a start out of reach: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// kindError is err read as kind too, as the start's prepare answers it.
+type kindError struct{ kind, err error }
+
+func (e kindError) Error() string   { return e.err.Error() }
+func (e kindError) Unwrap() []error { return []error{e.kind, e.err} }

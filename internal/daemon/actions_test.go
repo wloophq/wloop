@@ -1092,7 +1092,7 @@ type fakeLauncher struct {
 	loopHeld []bool
 }
 
-func (l *fakeLauncher) Launch(_ context.Context, x turns.Launch) error {
+func (l *fakeLauncher) Launch(_ context.Context, x turns.Launch) (turns.Outcome, error) {
 	held := !l.loopMu.TryLock()
 	if !held {
 		l.loopMu.Unlock()
@@ -1101,7 +1101,7 @@ func (l *fakeLauncher) Launch(_ context.Context, x turns.Launch) error {
 	defer l.mu.Unlock()
 	l.launches = append(l.launches, x)
 	l.loopHeld = append(l.loopHeld, held)
-	return nil
+	return turns.Outcome{Submitted: true}, nil
 }
 
 type turnRig struct {

@@ -259,7 +259,7 @@ func TestAFailedResumeLeavesTheQuestionOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cliLauncher{te.Env}.Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"})
+	_, err = cliLauncher{te.Env}.Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"})
 	if err == nil || !strings.Contains(err.Error(), "terminal closed") {
 		t.Fatalf("err = %v", err)
 	}

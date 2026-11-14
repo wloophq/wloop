@@ -2,9 +2,19 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
+	"sync/atomic"
 
+	"github.com/wloophq/wloop/internal/core/lock"
+	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/daemon"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -25,6 +35,39 @@ func (e *Env) wireTurnStart(w *serveWiring) {
 	}
 }
 
+// turnStarter is the use case every new turn starts through, over the
+// loaded intents, the daemon's prepare, the guidance kept on the units, the
+// loop mutex mu and the turn effects; plan is the daemon's plan once built.
+func (e *Env) turnStarter(mu *lock.Mutex, plan *latePlan, logf func(string, ...any)) *turns.Starter {
+	return &turns.Starter{Defs: loadedDefs{e}, Preparer: startPreparer{servedPreparer{e}}, Kept: recGuidance{e}, Loop: serveLoop{e: e, mu: mu},
+		Effects: startEffects{e: e, plan: plan}, Store: e.Turns.Store, Log: logf}
+}
+
+// loadedDefs are the loaded intents as a turn's start reads them.
+type loadedDefs struct{ e *Env }
+
+func (d loadedDefs) Def(name dturn.Intent) (turns.Def, bool) {
+	l := d.e.loadedIntents()
+	if l == nil {
+		return turns.Def{}, false
+	}
+	def, ok := l.Registry.Get(dintent.Name(name))
+	return startDef(def), ok
+}
+
+func (d loadedDefs) ByRole(role string, p unit.ProviderID) (turns.Def, bool) {
+	l := d.e.loadedIntents()
+	if l == nil {
+		return turns.Def{}, false
+	}
+	def, ok := l.Registry.ByRole(role, p)
+	return startDef(def), ok
+}
+
+func startDef(d dintent.Def) turns.Def {
+	return turns.Def{Def: d, HandsGuidance: slices.Contains(d.Effects, builtin.EffectGuidanceHanded)}
+}
+
 // servedPreparer runs a turn's prepare in the daemon serve built.
 type servedPreparer struct{ e *Env }
 
@@ -35,4 +78,110 @@ func (p servedPreparer) PrepareTurn(ctx context.Context, intent string, u unit.U
 		}
 	}
 	return nil, fmt.Errorf("%w: no daemon runs the prepare of %s yet", src.ErrUnavailable, intent)
+}
+
+// startPreparer is a prepare whose refusal is the start's: a refusal is
+// turns.ErrRefused and a prepare out of reach turns.ErrTransient, each
+// keeping its plugin's error and text.
+type startPreparer struct{ p turnPreparer }
+
+func (p startPreparer) PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error) {
+	filled, err := p.p.PrepareTurn(ctx, intent, u, guidance, inputs)
+	switch {
+	case errors.Is(err, src.ErrUnfit):
+		return nil, admissionError{kind: turns.ErrRefused, err: err}
+	case errors.Is(err, src.ErrUnavailable):
+		return nil, admissionError{kind: turns.ErrTransient, err: err}
+	}
+	return filled, err
+}
+
+// admissionError is err read as kind too.
+type admissionError struct{ kind, err error }
+
+func (e admissionError) Error() string   { return e.err.Error() }
+func (e admissionError) Unwrap() []error { return []error{e.kind, e.err} }
+
+// serveLoop is the daemon's loop mutex, taken once what a turn of the unit
+// reads of its pull request is read ahead.
+type serveLoop struct {
+	e  *Env
+	mu *lock.Mutex
+}
+
+func (l serveLoop) Enter(ctx context.Context, u unit.Unit) (context.Context, func(), error) {
+	if ref, err := githubRef(u); err == nil {
+		ctx = l.e.ReadAhead(ctx, ref, false)
+	}
+	if err := l.mu.LockContext(ctx); err != nil {
+		return ctx, nil, err
+	}
+	return ctx, l.mu.Unlock, nil
+}
+
+// latePlan is the daemon's plan, which serve builds after the starter.
+type latePlan struct{ p atomic.Pointer[daemon.Plan] }
+
+func (l *latePlan) set(p daemon.Plan) { l.p.Store(&p) }
+
+func (l *latePlan) get() (daemon.Plan, bool) {
+	if l == nil {
+		return nil, false
+	}
+	p := l.p.Load()
+	if p == nil || *p == nil {
+		return nil, false
+	}
+	return *p, true
+}
+
+// askedByYou is why a turn a person asked for outside a session drops the
+// unit's pending plan items and records its round.
+const askedByYou = "asked by you"
+
+// startEffects are the turn effects a start applies: the plugin's through
+// its ApplyEffect, and the host's.
+type startEffects struct {
+	e    *Env
+	plan *latePlan
+}
+
+func (f startEffects) Check(_ context.Context, d turns.Def, u unit.Unit) error {
+	return f.e.checkEffects(d.Def, u)
+}
+
+func (f startEffects) Before(ctx context.Context, d turns.Def, u unit.Unit) error {
+	if !slices.Contains(d.Effects, builtin.EffectPlanCleared) {
+		return nil
+	}
+	p, ok := f.plan.get()
+	if !ok {
+		return nil
+	}
+	return p.Drop(ctx, u, askedByYou)
+}
+
+func (f startEffects) Recorded(ctx context.Context, o turns.TurnOut) error {
+	f.e.applyPluginEffects(ctx, o.Def.Def, o.Unit, src.TurnRef{ID: o.Outcome.ID, Head: o.Outcome.Head}, o.Route, o.Outcome.Submitted, o.Inputs)
+	return nil
+}
+
+func (f startEffects) Sent(ctx context.Context, o turns.TurnOut) error {
+	ref, err := githubRef(o.Unit)
+	if err != nil || !slices.Contains(o.Def.Effects, builtin.EffectRoundSent) {
+		return nil
+	}
+	why := askedByYou
+	if o.Route == src.RouteSession {
+		why = handInSession
+	}
+	f.e.recordEvent(ctx, ref, dinv.KindRoundSent, withInstructions(why, o.Outcome.ID))
+	return nil
+}
+
+func (f startEffects) Handed(ctx context.Context, o turns.TurnOut) error {
+	if ref, err := githubRef(o.Unit); err == nil {
+		f.e.recordGuidance(ctx, ref, o.Guidance)
+	}
+	return nil
 }

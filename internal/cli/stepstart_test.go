@@ -484,7 +484,7 @@ func TestAWorkflowStartedTurnCarriesItsWhy(t *testing.T) {
 		sc := followupScenario(t)
 		sc.te.gh.basics = openBasics
 		why := &workflow.Why{Workflow: "review-again", Trigger: workflow.TriggerSweep}
-		if err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.Automated, Why: why}); err != nil {
+		if _, err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.Automated, Why: why}); err != nil {
 			t.Fatal(err)
 		}
 		if len(sc.ws.Prompts) != 1 || !strings.Contains(turnText(t, sc.te, sc.ws.Prompts[0].Text), "from the workflow `review-again`") {
@@ -646,7 +646,7 @@ func TestTurnRecordsItsWorkflow(t *testing.T) {
 		sc := followupScenario(t)
 		sc.te.gh.basics = openBasics
 		why := &workflow.Why{Workflow: "review-again", Trigger: workflow.TriggerSweep}
-		if err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.Automated, Why: why}); err != nil {
+		if _, err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.Automated, Why: why}); err != nil {
 			t.Fatal(err)
 		}
 		if got := newestWorkflow(t, sc, sc.ref.Unit()); got != "review-again" {
@@ -656,7 +656,7 @@ func TestTurnRecordsItsWorkflow(t *testing.T) {
 	t.Run("by hand", func(t *testing.T) {
 		sc := followupScenario(t)
 		sc.te.gh.basics = openBasics
-		if err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}); err != nil {
+		if _, err := (cliLauncher{sc.env}).Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand}); err != nil {
 			t.Fatal(err)
 		}
 		if got := newestWorkflow(t, sc, sc.ref.Unit()); got != "" {

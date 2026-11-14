@@ -108,6 +108,10 @@ type MarksStandIn interface {
 	MarksStandIn() bool
 }
 
+// RouteLaunch is the route of a turn the turn service or the headless
+// runner starts, as the plugin protocol names it.
+const RouteLaunch = "launch"
+
 // Request is a new turn an entry asks for.
 type Request struct {
 	Unit     unit.Unit
@@ -273,7 +277,11 @@ func (s *Starter) effect(ctx context.Context, what string, o TurnOut, apply func
 // Resume admits the turn that resumes u's stored turn seq: its intent,
 // trigger, guidance and inputs, with no guidance taken and no host effect.
 func (s *Starter) Resume(ctx context.Context, u unit.Unit, seq int64) (Turn, error) {
-	b, err := s.Store.Books(ctx, u)
+	return resume(ctx, s.Store, u, seq)
+}
+
+func resume(ctx context.Context, store Store, u unit.Unit, seq int64) (Turn, error) {
+	b, err := store.Books(ctx, u)
 	if err != nil {
 		return Turn{}, err
 	}

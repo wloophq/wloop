@@ -194,7 +194,11 @@ func (s *Service) Chat(ctx context.Context, r ChatRequest) (ChatResult, error) {
 		texts = append(texts, chatText(ev))
 	}
 	guidance := strings.Join(texts, "\n\n")
-	if err := c.Sessions.Launch(ctx, turns.Launch{Unit: own, Intent: turn.Intent(out.Intent), ResumeOf: out.ResumeOf, Guidance: guidance, Trigger: turn.ByHand}); err != nil {
+	err = c.Sessions.Launch(ctx, turns.Launch{Unit: own, Intent: turn.Intent(out.Intent), ResumeOf: out.ResumeOf, Guidance: guidance, Trigger: turn.ByHand})
+	switch {
+	case errors.Is(err, turns.ErrRefused):
+		return out, ChatRefusal{"the message is on the task, and its " + out.Intent + " turn was refused: " + err.Error()}
+	case err != nil:
 		return out, err
 	}
 	return out, s.markChat(ctx, own, ChatRead, out.Seq)

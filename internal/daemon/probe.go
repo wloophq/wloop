@@ -76,8 +76,9 @@ func (s *Server) probe(ctx context.Context, req api.ProbeRequest, d dintent.Def)
 	if s.deps.Turns.Launcher == nil {
 		return u, errors.New("the daemon has no launcher")
 	}
-	return u, s.deps.Turns.Launcher.Launch(ctx, turns.Launch{Unit: u, Intent: turn.Intent(d.Name), Trigger: turn.Automated,
+	_, err := s.deps.Turns.Launcher.Launch(ctx, turns.Launch{Unit: u, Intent: turn.Intent(d.Name), Trigger: turn.Automated,
 		WorkspaceID: req.WorkspaceID, Home: req.Home, Model: req.Model})
+	return u, err
 }
 
 // probeIntent is the intent holding the probe role on units of p.

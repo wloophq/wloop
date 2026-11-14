@@ -72,14 +72,14 @@ type launcher struct {
 	err error
 }
 
-func (l *launcher) Launch(_ context.Context, x turns.Launch) error {
+func (l *launcher) Launch(_ context.Context, x turns.Launch) (turns.Outcome, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.err != nil {
-		return l.err
+		return turns.Outcome{}, l.err
 	}
 	l.launches = append(l.launches, x)
-	return nil
+	return turns.Outcome{Submitted: true}, nil
 }
 
 func (l *launcher) Answers(context.Context, unit.Unit, time.Time) ([]turns.SourceAnswer, error) {
@@ -202,6 +202,7 @@ func newRig(t *testing.T) *rig {
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
 	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, Answers: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute, Log: r.logf}
+	r.turns.Starter = turnstest.Starter(turnstest.Defs{Registry: turnstest.Intents()}, r.books, nil)
 	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock})
 	r.gateStore = gatestest.NewStore(r.clock.Now)
 	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),

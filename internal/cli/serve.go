@@ -297,6 +297,9 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	host := e.moduleHost(db)
 	store.UseHost(host(forge))
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
+	plan := &latePlan{}
+	starter := e.turnStarter(loopMu, plan, logf)
+	e.Turns.Starter = starter
 	var queue *brief.Queue
 	var briefs *interruptFirst
 	var intakeBriefs intake.Briefs
@@ -407,7 +410,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.callBudget = callBudget(db, cfg, e.Now)
 	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
-	d = e.serveHeadless(ctx, d, db, cfg, mods, logf)
+	d = e.serveHeadless(ctx, d, db, cfg, starter, logf)
 	d.Placer = sessionPlacer{e: e, cfg: cfg}
 	d.UnitEnded = unitsEnded(mods)
 	e.viewFacts().set(authorFacts(mods))
@@ -426,7 +429,9 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	if briefs != nil && briefsItself(mods) {
 		e.startBriefs(ctx, queue, logf)
 	}
-	return withEngine(d, e, ed)
+	d = withEngine(d, e, ed)
+	plan.set(d.Plan)
+	return d
 }
 
 // briefsItself says a module's units are briefed by the queue's own calls,

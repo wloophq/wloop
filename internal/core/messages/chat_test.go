@@ -3,6 +3,7 @@ package messages_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -208,11 +210,11 @@ func TestChatWithNoLiveSessionStartsAChatTurnResumingTheLast(t *testing.T) {
 		{Seq: 2, Intent: "act", ID: "a2", State: turn.Done, SentAt: t0.Add(-2 * time.Hour)},
 	}})
 	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: own, StartedAt: t0.Add(-3 * time.Hour), ClosedAt: t0.Add(-time.Hour)})
-	got, err = r.svc.Chat(context.Background(), messages.ChatRequest{Task: e.ID, Text: "Now the backoff.", Intent: "pair"})
+	got, err = r.svc.Chat(context.Background(), messages.ChatRequest{Task: e.ID, Text: "Now the backoff.", Intent: "start"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = turns.Launch{Unit: own, Intent: "pair", Guidance: "Now the backoff.", Trigger: turn.ByHand, ResumeOf: 1}
+	want = turns.Launch{Unit: own, Intent: "start", Guidance: "Now the backoff.", Trigger: turn.ByHand, ResumeOf: 1}
 	if got.Route != messages.ChatResumed || got.ResumeOf != 1 || len(r.launch.launches) != 2 || !launchIs(r.launch.launches[1], want) {
 		t.Fatalf("chat went %+v, launched %+v", got, r.launch.launches)
 	}
@@ -403,5 +405,37 @@ func TestASessionOfAnotherTaskReadsNoChat(t *testing.T) {
 	mine, err := r.svc.ReadTask(ctx, messages.ReadRequest{Session: "term_1"})
 	if err != nil || len(mine.Chat) != 1 {
 		t.Fatalf("the task's own agent read %+v %v", mine.Chat, err)
+	}
+}
+
+func TestAChatTurnRunsItsRolesPrepareOnItsCutGuidance(t *testing.T) {
+	r, _ := chatRig(t)
+	p := &turnstest.Prepares{Filled: map[string]any{"who": "ana"}}
+	r.turns.Starter = turnstest.Starter(turnstest.Defs{Registry: turnstest.Intents(), Edit: func(d *turns.Def) {
+		d.Prepare, d.Guidance.Max = "action:chat.prepare", 12
+	}}, r.books, p)
+	e := r.capture(t, "Retry the webhook", nil)
+	if _, err := r.svc.Chat(context.Background(), messages.ChatRequest{Task: e.ID, Text: "Look at the retries."}); err != nil {
+		t.Fatal(err)
+	}
+	if saw := p.Saw(); !slices.Equal(saw, []string{"Look at the "}) {
+		t.Fatalf("the prepare saw %q", saw)
+	}
+	if l := r.launch.launches; len(l) != 1 || l[0].Guidance != "Look at the " || l[0].Inputs["who"] != "ana" {
+		t.Fatalf("launched %+v", l)
+	}
+}
+
+func TestAChatTurnItsPrepareRefusesStartsNothing(t *testing.T) {
+	r, _ := chatRig(t)
+	r.turns.Starter = turnstest.Starter(turnstest.Defs{Registry: turnstest.Intents(), Edit: func(d *turns.Def) { d.Prepare = "action:chat.prepare" }},
+		r.books, &turnstest.Prepares{Refusal: fmt.Errorf("%w: nothing to chat about", turns.ErrRefused)})
+	e := r.capture(t, "Retry the webhook", nil)
+	_, err := r.svc.Chat(context.Background(), messages.ChatRequest{Task: e.ID, Text: "Look at the retries."})
+	if !errors.As(err, new(messages.ChatRefusal)) || !strings.Contains(err.Error(), "nothing to chat about") {
+		t.Fatalf("chat: %v, want a refusal with the prepare's reason", err)
+	}
+	if l := r.launch.launches; len(l) != 0 {
+		t.Fatalf("launched %+v", l)
 	}
 }

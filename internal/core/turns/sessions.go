@@ -186,5 +186,5 @@ type Launch struct {
 // round code: it ensures the workspace, picks or starts a turn-capable
 // session, renders and sends the turn through Service.Send.
 type Launcher interface {
-	Launch(ctx context.Context, l Launch) error
+	Launch(ctx context.Context, l Launch) (Outcome, error)
 }

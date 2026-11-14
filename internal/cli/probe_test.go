@@ -31,14 +31,14 @@ func TestProbeResumesInItsWorkspace(t *testing.T) {
 	ctx := context.Background()
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000001}
 	first := turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e", Home: "/homes/a", Model: "haiku"}
-	if err := (cliLauncher{te.Env}).Launch(ctx, first); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(ctx, first); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	b := te.bookOf(t, pr.Ref(ref))
 	if len(b.Turns) != 1 || b.Turns[0].Intent != dturn.Intent(dintent.Probe) || b.Turns[0].Trigger != dturn.Automated || b.Turns[0].SentTo != te.sessionOf(t, "fake", "term-ws-e2e") {
 		t.Fatalf("turns %+v", b.Turns)
 	}
-	if err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), ResumeOf: b.Turns[0].Seq, Answer: "finish"}); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), ResumeOf: b.Turns[0].Seq, Answer: "finish"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	if got := strings.Join(m.Writes, "\n"); got != "session ws-e2e\nsend term-ws-e2e\nsession ws-e2e\nsend term-ws-e2e" {
@@ -66,7 +66,7 @@ func TestProbeRefusesAnUnknownWorkspace(t *testing.T) {
 	m := probeManager()
 	te := newTestEnv(t, m)
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000002}
-	err := cliLauncher{te.Env}.Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), WorkspaceID: "ws-gone"})
+	_, err := cliLauncher{te.Env}.Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), WorkspaceID: "ws-gone"})
 	if err == nil || !strings.Contains(err.Error(), "ws-gone") || len(m.Writes) != 0 {
 		t.Fatalf("err = %v, writes %v", err, m.Writes)
 	}
@@ -77,7 +77,7 @@ func TestProbeWritesNoView(t *testing.T) {
 	m := probeManager()
 	te := newTestEnv(t, m)
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000003}
-	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e"}); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	for _, batch := range te.sink.Batches() {
@@ -149,7 +149,7 @@ func TestAProbeSessionIsTrusted(t *testing.T) {
 	k := &preparedKind{Agent: te.Agents["claude"]}
 	te.Agents = map[string]turns.Agent{"claude": k}
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000004}
-	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e", Home: t.TempDir()}); err != nil {
+	if _, err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e", Home: t.TempDir()}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	if len(k.prepared) != 1 || !k.prepared[0].Trusted {

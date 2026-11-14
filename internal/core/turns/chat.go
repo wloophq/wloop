@@ -2,6 +2,7 @@ package turns
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -125,7 +126,26 @@ func (s *Service) LastRun(ctx context.Context, u unit.Unit) (turn.Turn, bool, er
 	return turn.Turn{}, false, nil
 }
 
-// Launch runs l through the Launcher.
+// Launch starts l's turn through the Starter, which runs it through the
+// Launcher. A turn that resumes an earlier one's session is a new turn too.
 func (s *Service) Launch(ctx context.Context, l Launch) error {
-	return s.Launcher.Launch(ctx, l)
+	if s.Starter == nil {
+		return errors.New("no turn starter is wired")
+	}
+	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: l.Trigger, Why: l.Why,
+		Route: RouteLaunch, ByPerson: l.Trigger == turn.ByHand}, launched{s.Launcher, l})
+	return err
+}
+
+// launched runs a turn Start admitted through the Launcher, with the
+// guidance and inputs Start settled.
+type launched struct {
+	launcher Launcher
+	l        Launch
+}
+
+func (x launched) Run(ctx context.Context, t Turn) (Outcome, error) {
+	l := x.l
+	l.Guidance, l.Inputs = t.Guidance(), t.Inputs()
+	return x.launcher.Launch(ctx, l)
 }

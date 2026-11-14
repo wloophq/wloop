@@ -59,28 +59,29 @@ func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemo
 	if r.Inputs, err = e.keptRepo(ctx, d, u, r.Inputs); err != nil {
 		return err
 	}
-	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, manager: c.Manager, parent: c.Parent})
+	_, err = e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, manager: c.Manager, parent: c.Parent})
+	return err
 }
 
 // launchUnit is cliLauncher.Launch on a unit of a provider other than
 // GitHub: a new turn, or a resume of l.ResumeOf in a new session of the
 // unit's placed workspace.
-func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) error {
+func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) (turns.Outcome, error) {
 	cfg, err := e.loadConfig()
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: requestTrigger(l.Trigger), Unit: l.Unit, Guidance: l.Guidance, Inputs: l.Inputs, Why: l.Why}
 	if l.ResumeOf != 0 {
 		books, err := e.Turns.Store.Books(ctx, l.Unit)
 		if err != nil {
-			return err
+			return turns.Outcome{}, err
 		}
 		b := books[l.Unit]
 		b.Unit = l.Unit
 		prev, ok := turnOf(b, l.ResumeOf)
 		if !ok {
-			return fmt.Errorf("%s has no turn %d to resume", l.Unit.Label(), l.ResumeOf)
+			return turns.Outcome{}, fmt.Errorf("%s has no turn %d to resume", l.Unit.Label(), l.ResumeOf)
 		}
 		r.Trigger, r.Guidance = requestTrigger(prev.Trigger), cmp.Or(l.Guidance, prev.Guidance)
 		if r.Inputs == nil {
@@ -92,7 +93,7 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) err
 			r.Resume.Drafts = e.resumeDrafts(ctx, b, l.ResumeOf, "")
 		}
 		if r.History, err = e.turnHistory(ctx, l.Unit, b, ""); err != nil {
-			return err
+			return turns.Outcome{}, err
 		}
 	}
 	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, resumeOf: l.ResumeOf})
@@ -102,10 +103,10 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) err
 // the unit's placed workspace and records it. A start blocked on the
 // agent's question is recorded as the unit's start block; a round that
 // gets through lifts the block.
-func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
+func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error) {
 	u := run.r.Unit
 	if err := e.roundReady(); err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	if run.def.WorkspaceRepo != nil {
 		run.cfg = scoped(run)
@@ -113,7 +114,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, resumeOf: run.resumeOf, unit: u})
 	ws, shared, err := e.runWorkspace(ctx, run, opts)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	opts.names = e.nameFacts(ctx, u)
 	if w := run.def.WorkspaceRepo; w != nil && w.Name.Src != "" {
@@ -123,7 +124,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	}
 	activity, err := e.freshActivity(ctx)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	// Activity is the workspace's: in a shared one, a waiting agent may be
 	// any unit's, so the round types into no live session.
@@ -131,24 +132,24 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	case a.Waiting && shared:
 		opts.newSession = true
 	case a.Waiting:
-		return errWaiting
+		return turns.Outcome{}, errWaiting
 	case a.Busy && !shared:
 		opts.keepLive, opts.busy = true, true
 	}
 	sent, err := e.sendTurn(ctx, run.cfg, run.r)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	sent.resume(run.resumeOf)
 	handle, verb, err := e.session(ctx, run.cfg, ws, u, opts)
 	if err != nil {
 		e.blockUnit(ctx, run, err)
-		return fmt.Errorf("%s: %w", ws.DisplayName, err)
+		return turns.Outcome{}, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
 	queued := opts.busy && verb == verbExisting
 	submitted, err := e.deliver(ctx, u, &sent, handle, queued)
 	if err != nil {
-		return err
+		return turns.Outcome{}, err
 	}
 	e.liftUnitBlock(ctx, u)
 	if err := e.roundStarted(ctx, u, func() error { return nil }); err != nil {
@@ -158,7 +159,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 		verb += " (submission not observed; check the session)"
 	}
 	fmt.Fprintf(e.Out, "%s of %s in %s, %s\n", run.def.Name, u.Label(), ws.DisplayName, verb)
-	return nil
+	return turns.Outcome{ID: sent.ID, Submitted: submitted}, nil
 }
 
 // runWorkspace is where run's turn goes: the repository its intent's
