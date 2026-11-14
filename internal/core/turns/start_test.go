@@ -688,10 +688,13 @@ func TestResumeOfATurnTheBookDoesNotHoldIsGone(t *testing.T) {
 }
 
 func TestAGuardThatAnswersItselfGivesBackOnlyTheKeptGuidance(t *testing.T) {
-	for name, c := range map[string]struct{ given, kept, want string }{
+	for name, c := range map[string]struct {
+		given, kept, want string
+		told              []string
+	}{
 		"given":      {given: "fix the nit", kept: "look at the tests", want: "look at the tests"},
 		"given only": {given: "fix the nit", want: ""},
-		"kept only":  {kept: "look at the tests", want: "look at the tests"},
+		"kept only":  {kept: "look at the tests", want: "look at the tests", told: []string{"look at the tests"}},
 	} {
 		r := newStartRig(t)
 		if c.kept != "" {
@@ -706,6 +709,9 @@ func TestAGuardThatAnswersItselfGivesBackOnlyTheKeptGuidance(t *testing.T) {
 		}
 		if len(x.ran) != 0 || slices.Contains(r.trace, "before") || r.kept[startUnit] != c.want {
 			t.Errorf("%s: trace %v, kept %q, want %q", name, r.trace, r.kept[startUnit], c.want)
+		}
+		if !slices.Equal(x.keptBack, c.told) {
+			t.Errorf("%s: the runner was told %q kept back, want %q", name, x.keptBack, c.told)
 		}
 	}
 }

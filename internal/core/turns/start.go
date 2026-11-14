@@ -116,7 +116,8 @@ type MarksStandIn interface {
 }
 
 // KeptBack is a Runner told of the guidance Start kept back for the unit's
-// next turn, so the person who asked hears of it.
+// next turn, so the person who asked hears of it; it is not told when the
+// guidance the request gave was dropped.
 type KeptBack interface {
 	KeptBack(guidance string)
 }
@@ -252,14 +253,14 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: cmp.Or(r.Trigger, turn.ByHand),
 		why: r.Why, route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf})
 	o, err := s.run(ctx, d, &t, x)
-	back := whole
+	back, carried := whole, true
 	if errors.Is(err, ErrAnswered) {
-		back = kept
+		back, carried = kept, r.Guidance == ""
 	}
 	if d.HandsGuidance && back != "" && (err != nil || !o.Submitted) {
 		if kerr := s.Kept.Keep(ctx, r.Unit, back); kerr != nil {
 			s.logf("%s: keeping the guidance back: %v", r.Unit, kerr)
-		} else if k, ok := x.(KeptBack); ok {
+		} else if k, ok := x.(KeptBack); ok && carried {
 			k.KeptBack(back)
 		}
 	}

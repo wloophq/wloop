@@ -214,6 +214,9 @@ func TestTheTakeOverQuestionKeepsTheKeptGuidanceAndDropsNothing(t *testing.T) {
 	if o, _ := te.Store.Override(context.Background(), ref); o.NextGuidance != "an old ask" {
 		t.Fatalf("kept guidance %q", o.NextGuidance)
 	}
+	if out := te.out.String() + te.err.String(); strings.Contains(out, "your guidance is kept") {
+		t.Fatalf("the dropped guidance was said to be kept: %q", out)
+	}
 	if got := p.drops(); len(got) != 0 {
 		t.Fatalf("drops %v", got)
 	}
