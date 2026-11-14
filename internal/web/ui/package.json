@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "test": "vitest run",
+    "test": "TZ=UTC vitest run",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
   },
   "devDependencies": {
