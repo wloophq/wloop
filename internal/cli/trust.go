@@ -132,7 +132,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err := e.Rec.Record(ctx, ev); err != nil {
 		return err
 	}
-	return runHeldRound(ctx, e, cfg, ref, profile, trustedAndRan)
+	return runHeldRound(ctx, e, cfg, ref, profile, c.Guidance, trustedAndRan)
 }
 
 // trustedAndRan is why a round a trust gate's approval runs drops the

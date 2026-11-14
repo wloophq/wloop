@@ -336,3 +336,33 @@ func TestANudgeAskedThroughTheActionRecordsItsGuidanceOnce(t *testing.T) {
 		t.Fatalf("guidance events %q", guidance)
 	}
 }
+
+const givenAsk = "check the retries"
+
+func TestRunNowHandsTheGuidanceItIsGivenInPlaceOfTheKeptOne(t *testing.T) {
+	t.Parallel()
+	sc, _ := heldScenario(t)
+	if err := (envActions{sc.env, nil}).Run(context.Background(), sc.ref.Unit(), daemon.Call{Guidance: givenAsk, Out: io.Discard}); err != nil {
+		t.Fatalf("%v\n%s", err, sc.te.err)
+	}
+	if b := sc.te.bookOf(t, sc.ref); len(b.Turns) != 1 || b.Turns[0].Guidance != givenAsk {
+		t.Fatalf("turns %+v, want the round to carry the guidance given", b.Turns)
+	}
+	if o, _ := sc.te.Store.Override(context.Background(), sc.ref); o.NextGuidance != "" {
+		t.Fatalf("kept %q, want the given guidance to consume it", o.NextGuidance)
+	}
+}
+
+func TestAReleasedHeldRoundHandsTheAnswerOfItsGate(t *testing.T) {
+	t.Parallel()
+	sc, _ := heldScenario(t)
+	sc.te.serve(t)
+	preparedIntents(sc.te, sc.te.loop, &fakePreparer{}, dintent.Review)
+	g := gate.Gate{ID: 1, Kind: gate.KindPlan, Unit: sc.ref.Unit(), Subject: round.HeldSubject(testNow), Status: gate.Answered, Answer: "check the retries first", By: task.ActorPerson}
+	if err := sc.te.Env.consequences.Release(context.Background(), g); err != nil {
+		t.Fatalf("%v\n%s", err, sc.te.err)
+	}
+	if b := sc.te.bookOf(t, sc.ref); len(b.Turns) != 1 || b.Turns[0].Guidance != "check t" {
+		t.Fatalf("turns %+v, want the gate's answer cut at guidance.max", b.Turns)
+	}
+}

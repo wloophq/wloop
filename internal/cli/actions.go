@@ -398,7 +398,7 @@ func (a envActions) Run(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	if err != nil {
 		return err
 	}
-	return e.liftPassedBlock(ctx, u, runHeldRound(ctx, e, cfg, ref, profile, ranNow))
+	return e.liftPassedBlock(ctx, u, runHeldRound(ctx, e, cfg, ref, profile, c.Guidance, ranNow))
 }
 
 // liftPassedBlock records the start block of u lifted when err, the
@@ -428,9 +428,10 @@ func (e *Env) recordLifted(ctx context.Context, u unit.Unit) {
 
 // runHeldRound starts at once, as a person's turn, the round a cap held
 // back: a follow-up in the review workspace, else a round of the intent
-// run.resolve picks for the pull request's role; reason is how the person
-// asked for it. It never counts against the caps.
-func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, profile, reason string) error {
+// run.resolve picks for the pull request's role, with the guidance the
+// person gave, if any; reason is how they asked for it. It never counts
+// against the caps.
+func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, profile, guidance, reason string) error {
 	cfg := prConfig(base, ref, profile)
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
@@ -460,12 +461,12 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 		return fmt.Errorf("%s: no single intent drives a row from a %s workspace", ref, role)
 	}
 	if !found {
-		return e.askedRound(ctx, held, base, ref, "", nil, profile, reason)
+		return e.askedRound(ctx, held, base, ref, guidance, nil, profile, reason)
 	}
 	if e.Turns == nil || e.Turns.Starter == nil {
 		return errors.New("no turn starts here: the daemon runs a round a cap held")
 	}
-	_, err = e.Turns.Starter.Start(ctx, turns.Request{Unit: ref.Unit(), Intent: dturn.Intent(held.Name), Trigger: dturn.Automated,
+	_, err = e.Turns.Starter.Start(ctx, turns.Request{Unit: ref.Unit(), Intent: dturn.Intent(held.Name), Guidance: guidance, Trigger: dturn.Automated,
 		Route: src.RouteLaunch, ByPerson: true, Reason: reason}, &heldRunner{e: e, cfg: cfg, ref: ref, ws: ws, pr: pr, held: held})
 	return err
 }
