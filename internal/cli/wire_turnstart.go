@@ -56,15 +56,6 @@ func (d loadedDefs) Def(name dturn.Intent) (turns.Def, bool) {
 	return startDef(def), ok
 }
 
-func (d loadedDefs) ByRole(role string, p unit.ProviderID) (turns.Def, bool) {
-	l := d.e.loadedIntents()
-	if l == nil {
-		return turns.Def{}, false
-	}
-	def, ok := l.Registry.ByRole(role, p)
-	return startDef(def), ok
-}
-
 func startDef(d dintent.Def) turns.Def {
 	return turns.Def{Def: d, HandsGuidance: slices.Contains(d.Effects, builtin.EffectGuidanceHanded)}
 }

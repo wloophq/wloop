@@ -15,7 +15,6 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 var startUnit = unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}
@@ -40,15 +39,6 @@ type startDefs map[turn.Intent]turns.Def
 func (d startDefs) Def(name turn.Intent) (turns.Def, bool) {
 	def, ok := d[name]
 	return def, ok
-}
-
-func (d startDefs) ByRole(role string, p unit.ProviderID) (turns.Def, bool) {
-	for _, def := range d {
-		if def.Role == role && def.Provider == p {
-			return def, true
-		}
-	}
-	return turns.Def{}, false
 }
 
 type startPreparer struct{ r *startRig }
@@ -202,7 +192,7 @@ func byPerson(i turn.Intent) turns.Request {
 }
 
 func automated(i turn.Intent) turns.Request {
-	return turns.Request{Unit: startUnit, Intent: i, Trigger: turn.Automated, Route: "launch", Why: &workflow.Why{Workflow: "follow"}}
+	return turns.Request{Unit: startUnit, Intent: i, Trigger: turn.Automated, Route: "launch"}
 }
 
 func TestStartRunsItsStepsInTheDesignedOrder(t *testing.T) {
@@ -257,12 +247,11 @@ func TestAnIntentThatHandsGuidanceTakesTheKeptOne(t *testing.T) {
 	r := newStartRig(t)
 	r.kept[startUnit] = "look at the tests"
 	x := r.runner(true)
-	got, err := r.s.Start(context.Background(), byPerson(guided), x)
-	if err != nil {
+	if _, err := r.s.Start(context.Background(), byPerson(guided), x); err != nil {
 		t.Fatal(err)
 	}
-	if x.ran[0].Guidance() != "look at the tests" || got.Guidance != "look at the tests" || r.kept[startUnit] != "" {
-		t.Fatalf("turn guidance %q, started %+v, kept %q", x.ran[0].Guidance(), got, r.kept[startUnit])
+	if x.ran[0].Guidance() != "look at the tests" || r.kept[startUnit] != "" {
+		t.Fatalf("turn guidance %q, kept %q", x.ran[0].Guidance(), r.kept[startUnit])
 	}
 }
 
@@ -323,13 +312,12 @@ func TestThePrepareFillsTheTurnsInputs(t *testing.T) {
 	x := r.runner(true)
 	req := automated(prepared)
 	req.Inputs = map[string]any{"tone": "short"}
-	got, err := r.s.Start(context.Background(), req, x)
-	if err != nil {
+	if _, err := r.s.Start(context.Background(), req, x); err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]any{"tone": "short", "topic": "the release"}
-	if !maps.Equal(x.ran[0].Inputs(), want) || !maps.Equal(got.Inputs, want) {
-		t.Fatalf("turn inputs %v, started %v", x.ran[0].Inputs(), got.Inputs)
+	if !maps.Equal(x.ran[0].Inputs(), want) {
+		t.Fatalf("turn inputs %v", x.ran[0].Inputs())
 	}
 	if len(req.Inputs) != 1 {
 		t.Fatalf("the prepare wrote the request's inputs: %v", req.Inputs)
@@ -631,9 +619,11 @@ func TestTheRunnerReadsTheRequestThroughTheTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := x.ran[0]
-	if got.Unit() != startUnit || got.Intent() != plain || got.Trigger() != turn.Automated || got.Why().Workflow != "follow" ||
-		got.Route() != "launch" || got.ByPerson() || got.ResumeOf() != 0 {
+	if got.Unit() != startUnit || got.Intent() != plain || got.Trigger() != turn.Automated || got.ResumeOf() != 0 {
 		t.Fatalf("turn %+v", got)
+	}
+	if len(r.effects.recorded) != 1 || r.effects.recorded[0].Route != "launch" || slices.Contains(r.trace, "before") {
+		t.Fatalf("recorded %+v, trace %v", r.effects.recorded, r.trace)
 	}
 }
 
@@ -667,7 +657,7 @@ func TestResumeCarriesTheStoredTurnAndTakesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Unit() != startUnit || got.Intent() != guided || got.ResumeOf() != 1 || got.Trigger() != turn.Automated ||
-		got.Guidance() != "look at the tests" || got.Inputs()["tone"] != "short" || got.ByPerson() {
+		got.Guidance() != "look at the tests" || got.Inputs()["tone"] != "short" {
 		t.Fatalf("resumed %+v", got)
 	}
 	if len(r.trace) != 0 || r.kept[startUnit] != "for the next review" {

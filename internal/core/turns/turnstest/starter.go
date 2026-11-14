@@ -33,11 +33,6 @@ func (d Defs) Def(name turn.Intent) (turns.Def, bool) {
 	return d.edited(def, ok)
 }
 
-func (d Defs) ByRole(role string, p unit.ProviderID) (turns.Def, bool) {
-	def, ok := d.Registry.ByRole(role, p)
-	return d.edited(def, ok)
-}
-
 func (d Defs) edited(def dintent.Def, ok bool) (turns.Def, bool) {
 	out := turns.Def{Def: def}
 	if ok && d.Edit != nil {
@@ -151,8 +146,6 @@ type anyDefs struct{}
 func (anyDefs) Def(name turn.Intent) (turns.Def, bool) {
 	return turns.Def{Def: dintent.Def{Name: dintent.Name(name)}}, true
 }
-
-func (anyDefs) ByRole(string, unit.ProviderID) (turns.Def, bool) { return turns.Def{}, false }
 
 // admit is a runner that keeps the turn it is given, unused.
 type admit struct{ got *turns.Turn }

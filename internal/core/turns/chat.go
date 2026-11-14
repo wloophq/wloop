@@ -138,7 +138,7 @@ func (s *Service) Launch(ctx context.Context, l Launch) error {
 			trigger = prev.Trigger()
 		}
 	}
-	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: trigger, Why: l.Why,
+	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: trigger,
 		Route: RouteLaunch, ByPerson: l.ByPerson, ResumeOf: l.ResumeOf}, launched{s.Launcher, l})
 	return err
 }

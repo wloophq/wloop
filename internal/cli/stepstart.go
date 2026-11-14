@@ -655,12 +655,12 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	if s.e.Turns == nil || s.e.Turns.Starter == nil {
 		return "", errors.New("no turn starter is wired")
 	}
-	started, err := s.e.Turns.Starter.Start(ctx, turns.Request{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: o.Guidance, Trigger: dturn.Automated,
-		Why: &why, Route: turns.RouteLaunch}, sweepRound{e: s.e, st: st, call: call})
+	sent, err := s.e.Turns.Starter.Start(ctx, turns.Request{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: o.Guidance, Trigger: dturn.Automated,
+		Route: turns.RouteLaunch}, sweepRound{e: s.e, st: st, call: call})
 	switch {
 	case err != nil:
 		return "", startError(err)
-	case !started.Outcome.Submitted:
+	case !sent.Submitted:
 		return "", automation.Transient{Err: errors.New("its submission was not observed")}
 	}
 	return "sent the " + p.args.kindName() + ": " + reason, nil

@@ -12,7 +12,6 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 var (
@@ -43,7 +42,6 @@ type Def struct {
 // Defs are the loaded intents.
 type Defs interface {
 	Def(name turn.Intent) (Def, bool)
-	ByRole(role string, p unit.ProviderID) (Def, bool)
 }
 
 // Preparer runs the prepare of an intent's role, which fills the turn's
@@ -140,8 +138,6 @@ type Request struct {
 	Guidance string
 	Inputs   map[string]any
 	Trigger  turn.Trigger
-	// Why is the workflow that asked for the turn; nil for none.
-	Why *workflow.Why
 	// Route is how the turn goes out, as the plugin's turn effects read it.
 	Route string
 	// ByPerson is a turn a person asked for.
@@ -153,13 +149,6 @@ type Request struct {
 	ResumeOf int64
 }
 
-// Started is a turn Start ran.
-type Started struct {
-	Outcome  Outcome
-	Guidance string
-	Inputs   map[string]any
-}
-
 // Turn is a turn Start or Resume admitted; a sink records it once.
 type Turn struct {
 	ok       bool
@@ -169,7 +158,6 @@ type Turn struct {
 	guidance string
 	inputs   map[string]any
 	trigger  turn.Trigger
-	why      *workflow.Why
 	route    string
 	byPerson bool
 	reason   string
@@ -182,9 +170,6 @@ func (t Turn) Intent() turn.Intent    { return t.intent }
 func (t Turn) Guidance() string       { return t.guidance }
 func (t Turn) Inputs() map[string]any { return maps.Clone(t.inputs) }
 func (t Turn) Trigger() turn.Trigger  { return t.trigger }
-func (t Turn) Why() *workflow.Why     { return t.why }
-func (t Turn) Route() string          { return t.route }
-func (t Turn) ByPerson() bool         { return t.byPerson }
 func (t Turn) ResumeOf() int64        { return t.resumeOf }
 
 // Resumed is a turn Resume admitted, whose effects its first turn's start
@@ -227,15 +212,15 @@ type Starter struct {
 }
 
 // Start admits r's turn under the loop and runs it with x.
-func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, error) {
+func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Outcome, error) {
 	d, ok := s.Defs.Def(r.Intent)
 	if !ok {
-		return Started{}, fmt.Errorf("no intent %s", r.Intent)
+		return Outcome{}, fmt.Errorf("no intent %s", r.Intent)
 	}
 	if !lock.Held(ctx) {
 		lctx, release, err := s.Loop.Enter(ctx, r.Unit)
 		if err != nil {
-			return Started{}, err
+			return Outcome{}, err
 		}
 		defer release()
 		ctx = lock.WithHeld(lctx)
@@ -251,7 +236,7 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 		}
 	}
 	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: cmp.Or(r.Trigger, turn.ByHand),
-		why: r.Why, route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf})
+		route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf})
 	o, err := s.run(ctx, d, &t, x)
 	back, carried := whole, true
 	if errors.Is(err, ErrAnswered) {
@@ -265,9 +250,9 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 		}
 	}
 	if err != nil {
-		return Started{}, err
+		return Outcome{}, err
 	}
-	return Started{Outcome: o, Guidance: t.guidance, Inputs: maps.Clone(t.inputs)}, nil
+	return o, nil
 }
 
 // run is Start past the take: prepare, check, guard, before, run, then the
