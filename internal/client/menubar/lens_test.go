@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 )
 
 // lensViews are a profile's views the menu bar knows nothing of beforehand: two badged, one not.
@@ -70,7 +71,7 @@ func TestBadgeTitleCountsBadgeViews(t *testing.T) {
 	r.d.views = lensViews()
 	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 5}
 	r.c.Refresh(context.Background())
-	if got := r.title(); got != "PR 5" {
+	if got := r.title(); got != brand.Name+" 5" {
 		t.Fatalf("title %q, want the count of the badge views", got)
 	}
 	r.d.mu.Lock()
@@ -78,7 +79,7 @@ func TestBadgeTitleCountsBadgeViews(t *testing.T) {
 	r.d.counters = api.Counters{Views: map[string]int{"stalled": 9, "mine": 2, "asks": 3}, Badge: 9}
 	r.d.mu.Unlock()
 	r.c.Refresh(context.Background())
-	if got, menu := r.title(), titles(r.tray.menu); got != "PR 9" || index(menu, "Stalled (0)") < 0 || index(menu, "Mine") >= 0 {
+	if got, menu := r.title(), titles(r.tray.menu); got != brand.Name+" 9" || index(menu, "Stalled (0)") < 0 || index(menu, "Mine") >= 0 {
 		t.Fatalf("title %q, menu %q after the profile badged another view", got, menu)
 	}
 }

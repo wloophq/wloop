@@ -34,7 +34,7 @@ func TestAppQuitExitsZero(t *testing.T) {
 	tray := &recTray{}
 	te.RunNative = func(_ config.Window, _ *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
 		setup(tray, silentNotifier{}, nil)
-		eventually(t, "the menu from the daemon", func() bool { return tray.title() != "PR ?" && tray.has("Quit "+brand.Name) })
+		eventually(t, "the menu from the daemon", func() bool { return tray.title() != brand.Name+" ?" && tray.has("Quit "+brand.Name) })
 		eventually(t, "the daemon to see the notifier", func() bool {
 			h, err := client.New(d.socket).Health(context.Background())
 			return err == nil && h.Notifier
@@ -73,7 +73,7 @@ func TestAppShowsTheDaemonMissingWhileItWaits(t *testing.T) {
 	tray := &recTray{}
 	te.RunNative = func(_ config.Window, _ *texts.Catalog, setup func(menubar.Tray, menubar.Notifier, window.Host)) {
 		setup(tray, silentNotifier{}, nil)
-		eventually(t, "the menu without the daemon", func() bool { return tray.title() == "PR ?" && tray.has("Quit "+brand.Name) })
+		eventually(t, "the menu without the daemon", func() bool { return tray.title() == brand.Name+" ?" && tray.has("Quit "+brand.Name) })
 		tray.click(t, "Quit "+brand.Name)
 		<-quit
 	}

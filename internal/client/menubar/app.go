@@ -53,6 +53,7 @@ type Daemon interface {
 	Actions(ctx context.Context) (api.ActionsResponse, error)
 	Plugins(ctx context.Context) ([]api.Plugin, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
+	Counters(ctx context.Context, area, query string) (api.Counters, error)
 }
 
 type Config struct {
@@ -338,12 +339,12 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	}
 	if err != nil {
 		if h, herr := c.cfg.Daemon.Health(ctx); herr == nil && h.Store != nil && h.Store.State != api.StoreOK {
-			c.cfg.Tray.SetTitle(c.words().T("PR !", nil))
+			c.cfg.Tray.SetTitle(c.words().T("{name} !", map[string]any{"name": brand.Name}))
 			c.cfg.Tray.SetMenu(c.storeMenu(*h.Store))
 			return
 		}
 		w := c.words()
-		c.cfg.Tray.SetTitle(w.T("PR ?", nil))
+		c.cfg.Tray.SetTitle(w.T("{name} ?", map[string]any{"name": brand.Name}))
 		c.cfg.Tray.SetMenu([]MenuItem{
 			{Title: w.T("Daemon not answering: {error}", map[string]any{"error": err.Error()})},
 			{Separator: true},

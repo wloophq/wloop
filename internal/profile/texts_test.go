@@ -187,6 +187,12 @@ func TestLocalizeRefusesAFieldTheBaseTextDoesNotName(t *testing.T) {
 			t.Errorf("%s: accepted", tr)
 		}
 	}
+	if msg := fieldsProblem("{needs-me}/{inbox}", "{name} {n}"); !strings.Contains(msg, "{needs-me}") {
+		t.Errorf("a hyphenated placeholder the English text lacks: %q", msg)
+	}
+	if msg := fieldsProblem("{needs-me} pendentes", "{needs-me} pending"); msg != "" {
+		t.Errorf("a hyphenated placeholder the English text names: %s", msg)
+	}
 	for _, tr := range []string{"Oi {{name}} {{.n}}", `Oi {{template "t"}} {{$.a}}`} {
 		if msg := fieldsProblem(tr, `Hi {{name}} {{.n}} {{template "t"}} {{$.a}}`); msg != "" {
 			t.Errorf("%s: %s", tr, msg)

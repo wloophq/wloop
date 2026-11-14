@@ -504,7 +504,7 @@ func fieldsProblem(text, base string) string {
 	return ""
 }
 
-var placeholder = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_]*\}`)
+var placeholder = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_-]*\}`)
 
 // fieldsOf are what a template text reaches: its field and variable chains ({{.pr.slug}} as .pr.slug), the
 // functions it calls and the templates it runs; or the {name} placeholders of a plain text.

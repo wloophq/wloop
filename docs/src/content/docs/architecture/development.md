@@ -69,7 +69,7 @@ The native layer has contract tests only. Before a release, on a Mac with a logg
 
 To try a local build, replace the installed binary with a new file (copy it next to the old one, then `mv` it over): `cp` onto the old file keeps its inode, and macOS kills the new binary on a stale signature.
 
-1. `{{command}} app install`. Expect `~/Applications/{{app}}.app`, the LaunchAgents reloaded, and the menu bar item `PR <n>` within a few seconds.
+1. `{{command}} app install`. Expect `~/Applications/{{app}}.app`, the LaunchAgents reloaded, and the menu bar item `{{app}} <n>` within a few seconds.
 2. On the first install macOS asks to allow notifications. Allow. `{{command}} doctor` shows notifications as authorized.
 3. Add a rule `[[workflows.review-follow-up.gates.approval.rule]]` with `when = 'gate.kind == "plan"'`, `mode = "delay"` and `window = "5m"` (and the same for `review-first-round`), restart the daemon (`launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`) and make a review round due. Expect a notification "Round in ... · owner/repo #n".
 4. Choose Skip on it. Expect the row to leave "round soon" in the cockpit, a `round_skipped` event in its timeline, and no new notification for that round.
