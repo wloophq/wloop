@@ -7,6 +7,7 @@ export default defineConfig({
     outDir: "../static/app",
     emptyOutDir: true,
     sourcemap: false,
+    minify: true,
     cssCodeSplit: false,
     lib: {
       entry: "src/main.ts",
