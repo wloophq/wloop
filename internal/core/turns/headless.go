@@ -24,9 +24,10 @@ type HeadlessStart struct {
 	Guidance string
 	Workflow string
 	// Role is the role the turn's intent holds, "" none.
-	Role  string
-	Items []string
-	Task  string
+	Role   string
+	Items  []string
+	Task   string
+	Inputs map[string]any
 	// ResumeOf is the headless turn whose question this run answers, 0 none.
 	ResumeOf int64
 }
@@ -91,6 +92,28 @@ func TaskOf(t turn.Turn) string {
 	return s
 }
 
+// InputsOf are the turn's inputs without the items and task kept among them.
+func InputsOf(t turn.Turn) map[string]any {
+	out := maps.Clone(t.Inputs)
+	delete(out, itemsInput)
+	delete(out, taskInput)
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// headlessInputs are h's inputs with its items, even none, and task kept
+// among them.
+func headlessInputs(h HeadlessStart) map[string]any {
+	in := maps.Clone(h.Inputs)
+	if in == nil {
+		in = map[string]any{}
+	}
+	in[itemsInput] = append([]string{}, h.Items...)
+	return bound(in, nil, h.Task)
+}
+
 // bound is inputs with items and task kept under their reserved names.
 func bound(inputs map[string]any, items []string, task string) map[string]any {
 	if len(items) == 0 && task == "" {
@@ -127,7 +150,7 @@ func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, er
 	}
 	now := s.now()
 	b.Send(turn.Turn{Intent: h.Intent, ID: h.Turn, Trigger: h.Trigger, Guidance: h.Guidance, ResumeOf: h.ResumeOf,
-		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Task), SentAt: now, Runner: turn.RunnerHeadless, Workflow: h.Workflow, Role: h.Role})
+		Inputs: headlessInputs(h), SentAt: now, Runner: turn.RunnerHeadless, Workflow: h.Workflow, Role: h.Role})
 	if _, err := b.Start(h.Turn, "", now); err != nil {
 		s.mu.Unlock()
 		return 0, err

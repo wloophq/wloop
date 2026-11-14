@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -259,11 +258,11 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 // prepareByHand runs the intent's prepare for a turn by hand, whose
 // request then carries what it filled.
 func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, req api.ByHandRequest) (api.ByHandRequest, error) {
-	c := Call{Guidance: req.Guidance, Inputs: maps.Clone(req.Inputs)}
-	if err := s.prepare(ctx, d, u, &c); err != nil {
+	inputs, err := s.preparedInputs(ctx, d, u, req.Guidance, req.Inputs)
+	if err != nil {
 		return req, err
 	}
-	req.Guidance, req.Inputs = c.Guidance, c.Inputs
+	req.Inputs = inputs
 	return req, nil
 }
 

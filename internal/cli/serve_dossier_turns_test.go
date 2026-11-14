@@ -115,7 +115,7 @@ func TestDossierOpenedBeforeLaunch(t *testing.T) {
 func TestHeadlessBuilderLeavesTheDossierToThePrompt(t *testing.T) {
 	t.Parallel()
 	te, _ := servedDossiers(t)
-	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), nil)
+	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

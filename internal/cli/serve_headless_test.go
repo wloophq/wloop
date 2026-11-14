@@ -90,7 +90,7 @@ func TestHeadlessPlacerReadsExistingCheckoutsOnly(t *testing.T) {
 func TestHeadlessBuilderRendersActOnAUnitWithNoPayloadReader(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), []string{"i1"})
+	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), []string{"i1"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -32,6 +32,7 @@ type Request struct {
 	Task     string
 	Intent   turn.Intent // "" is the Service's Default
 	Guidance string
+	Inputs   map[string]any
 	Trigger  turn.Trigger
 	Workflow string // "" by hand
 	// ResumeOf is the headless turn whose question this run answers, 0 none.
@@ -48,7 +49,7 @@ type Result struct {
 
 // Builder renders a unit's instructions for an intent; implemented in internal/cli over internal/turn.
 type Builder interface {
-	Instructions(ctx context.Context, u unit.Unit, intent turn.Intent, items []string) (string, error)
+	Instructions(ctx context.Context, u unit.Unit, intent turn.Intent, items []string, inputs map[string]any) (string, error)
 }
 
 // Placer resolves a placement to an existing directory, implemented in internal/cli:
@@ -163,7 +164,7 @@ func (s *Service) Start(ctx context.Context, r Request) (int64, error) {
 	return st.seq, nil
 }
 
-// Again runs q's intent on q's unit, items and task (kept in q.Inputs) with said as Guidance, q.Trigger
+// Again runs q's intent on q's unit, items, task and inputs (kept in q.Inputs) with said as Guidance, q.Trigger
 // and q.Workflow; ErrNotHeadless when q.Mode is not headless. The route is Resumed.
 func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.AnswerResult, error) {
 	if q.Runner != turn.RunnerHeadless {
@@ -174,7 +175,7 @@ func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.An
 		return turns.AnswerResult{}, err
 	}
 	if _, err := s.Start(ctx, Request{Unit: u, Items: turns.ItemsOf(q), Task: turns.TaskOf(q), Intent: q.Intent, Guidance: said,
-		Trigger: q.Trigger, Workflow: q.Workflow, ResumeOf: q.Seq}); err != nil {
+		Inputs: turns.InputsOf(q), Trigger: q.Trigger, Workflow: q.Workflow, ResumeOf: q.Seq}); err != nil {
 		return turns.AnswerResult{}, err
 	}
 	return turns.AnswerResult{Route: turn.Resumed}, nil
@@ -220,7 +221,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 	if !placed {
 		dir = ""
 	}
-	text, err := s.Build.Instructions(ctx, r.Unit, r.Intent, r.Items)
+	text, err := s.Build.Instructions(ctx, r.Unit, r.Intent, r.Items, r.Inputs)
 	if err != nil {
 		return started{}, err
 	}
@@ -252,7 +253,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 		return started{}, err
 	}
 	seq, err := s.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: r.Unit, Intent: r.Intent, Turn: randomHex(), Trigger: r.Trigger,
-		Guidance: r.Guidance, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Task: r.Task, ResumeOf: r.ResumeOf})
+		Guidance: r.Guidance, Inputs: r.Inputs, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Task: r.Task, ResumeOf: r.ResumeOf})
 	if err != nil {
 		return started{}, err
 	}

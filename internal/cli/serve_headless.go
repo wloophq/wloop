@@ -168,8 +168,8 @@ type headlessBuilder struct {
 	cfg config.Config
 }
 
-func (b headlessBuilder) Instructions(ctx context.Context, u unit.Unit, intent dturn.Intent, _ []string) (string, error) {
-	r := turn.Request{Intent: turn.Intent(intent), Trigger: turn.ByHand, Unit: u}
+func (b headlessBuilder) Instructions(ctx context.Context, u unit.Unit, intent dturn.Intent, _ []string, inputs map[string]any) (string, error) {
+	r := turn.Request{Intent: turn.Intent(intent), Trigger: turn.ByHand, Unit: u, Inputs: inputs}
 	if _, ok := b.e.payloadReaders()[u.Provider]; !ok {
 		r.Payload = unitPayload{u}
 	}

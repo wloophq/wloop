@@ -673,8 +673,8 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 }
 
 // startError is a send's failure as the engine takes it: the workspace not
-// free now or a start block refuse, an unreachable manager or GitHub is
-// tried again, anything else fails.
+// free now, a start block or a prepare's refusal refuse, an unreachable
+// manager or GitHub is tried again, anything else fails.
 func startError(err error) error {
 	var untrusted *turns.UntrustedError
 	var asked *turns.QuestionError
@@ -683,6 +683,8 @@ func startError(err error) error {
 		return automation.Refused{Reason: err.Error()}
 	case errors.As(err, &untrusted), errors.As(err, &asked):
 		return automation.Refused{Reason: "round blocked: " + err.Error()}
+	case errors.Is(err, src.ErrUnfit):
+		return automation.Refused{Reason: strings.TrimPrefix(err.Error(), src.ErrUnfit.Error()+": ")}
 	case errors.Is(err, workspace.ErrUnreachable), errors.Is(err, src.ErrUnavailable), errors.Is(err, dgh.ErrBudget):
 		return automation.Transient{Err: err}
 	}
