@@ -1,0 +1,142 @@
+[
+ {
+  "id": "draft:7",
+  "state": "inbox",
+  "title": "Reply to the deploy thread",
+  "units": [],
+  "verbs": [
+   {
+    "verb": "approve",
+    "enabled": true
+   },
+   {
+    "verb": "edit",
+    "enabled": true
+   },
+   {
+    "verb": "dismiss",
+    "enabled": true
+   },
+   {
+    "verb": "retry",
+    "enabled": false
+   }
+  ],
+  "created": "2026-10-01T09:00:00Z",
+  "updated": "2026-10-01T09:00:00Z",
+  "gates": [
+   {
+    "id": 0,
+    "kind": "draft",
+    "status": "",
+    "intents": [],
+    "delivery": "held",
+    "subject": {
+     "id": 7,
+     "unit": "slack/T1/C1",
+     "items": null,
+     "kind": "reply",
+     "purpose": "",
+     "delivery": "",
+     "effects": null,
+     "target": "C1",
+     "broadcast": "",
+     "where": "#deploys in the thread \"Deploy at five\"",
+     "text": "Deployed, all green.",
+     "why": "",
+     "language": "",
+     "reaction": "",
+     "original": "",
+     "edited": false,
+     "origin": {
+      "kind": "",
+      "turn_seq": 0,
+      "intent": "",
+      "workflow": "",
+      "rule": ""
+     },
+     "state": "held",
+     "error": "",
+     "reason": "",
+     "permalink": "",
+     "deadline": "2026-10-09T15:10:00Z",
+     "actions": null,
+     "rev": 3,
+     "created_at": "0001-01-01T00:00:00Z",
+     "updated_at": "0001-01-01T00:00:00Z"
+    }
+   }
+  ],
+  "drafts": null
+ },
+ {
+  "id": "draft:8",
+  "state": "inbox",
+  "title": "Nudge the reviewer",
+  "units": [],
+  "verbs": [
+   {
+    "verb": "approve",
+    "enabled": false
+   },
+   {
+    "verb": "edit",
+    "enabled": true
+   },
+   {
+    "verb": "dismiss",
+    "enabled": true
+   },
+   {
+    "verb": "retry",
+    "enabled": true
+   }
+  ],
+  "created": "2026-10-01T09:00:00Z",
+  "updated": "2026-10-01T09:00:00Z",
+  "gates": [
+   {
+    "id": 0,
+    "kind": "draft",
+    "status": "",
+    "intents": [],
+    "delivery": "failed",
+    "subject": {
+     "id": 8,
+     "unit": "github/acme/api#8",
+     "items": null,
+     "kind": "nudge",
+     "purpose": "",
+     "delivery": "",
+     "effects": null,
+     "target": "acme/api#8",
+     "broadcast": "",
+     "where": "",
+     "text": "Ping?",
+     "why": "",
+     "language": "",
+     "reaction": "",
+     "original": "",
+     "edited": false,
+     "origin": {
+      "kind": "",
+      "turn_seq": 0,
+      "intent": "",
+      "workflow": "",
+      "rule": ""
+     },
+     "state": "failed",
+     "error": "rate limited",
+     "reason": "",
+     "permalink": "",
+     "deadline": null,
+     "actions": null,
+     "rev": 5,
+     "created_at": "0001-01-01T00:00:00Z",
+     "updated_at": "0001-01-01T00:00:00Z"
+    }
+   }
+  ],
+  "drafts": null
+ }
+]

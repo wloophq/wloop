@@ -1,0 +1,92 @@
+{
+ "briefing": {
+  "template": "default",
+  "sentences": [
+   [
+    {
+     "text": "The agent has "
+    },
+    {
+     "counter": 0
+    },
+    {
+     "text": " for you and the loop handles "
+    },
+    {
+     "counter": 1
+    },
+    {
+     "text": "."
+    }
+   ]
+  ],
+  "counters": [
+   {
+    "id": "answer",
+    "kind": "answer",
+    "view": "decide-answer",
+    "count": 2,
+    "label": "2 questions"
+   },
+   {
+    "id": "loop",
+    "view": "in-loop",
+    "count": 3,
+    "label": "3 tasks"
+   }
+  ]
+ },
+ "sections": [
+  {
+   "id": "blocked",
+   "view": "home-blocked",
+   "label": "Blocked by you",
+   "time": "owed",
+   "rows": [
+    {
+     "id": "t-1",
+     "state": "next",
+     "title": "Task t-1",
+     "units": [],
+     "verbs": [],
+     "created": "2026-10-01T09:00:00Z",
+     "updated": "2026-10-01T09:00:00Z",
+     "drafts": null
+    },
+    {
+     "id": "t-2",
+     "state": "next",
+     "title": "Task t-2",
+     "units": [],
+     "verbs": [],
+     "created": "2026-10-01T09:00:00Z",
+     "updated": "2026-10-01T09:00:00Z",
+     "drafts": null
+    },
+    {
+     "id": "t-3",
+     "state": "next",
+     "title": "Task t-3",
+     "units": [],
+     "verbs": [],
+     "created": "2026-10-01T09:00:00Z",
+     "updated": "2026-10-01T09:00:00Z",
+     "drafts": null
+    }
+   ],
+   "total": 5
+  },
+  {
+   "id": "stalled",
+   "view": "home-stalled",
+   "label": "Stalled the longest",
+   "time": "moved",
+   "rows": [],
+   "total": 0
+  }
+ ],
+ "capture": {
+  "hint": "Capture what's on your mind",
+  "key": "n"
+ }
+}

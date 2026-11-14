@@ -1,0 +1,29 @@
+{
+ "unit": {
+  "provider": "thread",
+  "key": "T1/C1"
+ },
+ "link": "https://chat.example/T1/C1",
+ "label": "#general thread",
+ "title": "Can someone look at the deploy?",
+ "kind": "waiting",
+ "summary": {
+  "waits_on": "me",
+  "since": "0001-01-01T00:00:00Z",
+  "stalled": false,
+  "closed": false,
+  "open_items": 0,
+  "reason": "a question waits on you",
+  "line": "a question waits on you"
+ },
+ "views": [
+  "all"
+ ],
+ "facets": {
+  "where": [
+   "general thread"
+  ]
+ },
+ "actions": [],
+ "specs_version": ""
+}
