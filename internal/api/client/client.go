@@ -249,7 +249,15 @@ func (c *Client) StartTurn(ctx context.Context, handle string, req api.TurnStart
 func (c *Client) TurnByHand(ctx context.Context, handle string, req api.ByHandRequest) (api.ByHandResult, error) {
 	var res api.ByHandResult
 	err := c.doAs(ctx, actionTimeout, handle, http.MethodPost, api.AgentTurnsByHand, req, &res)
-	return res, err
+	return withNotes(res, err), err
+}
+
+// withNotes is res with the notes the daemon answered beside err.
+func withNotes(res api.ByHandResult, err error) api.ByHandResult {
+	if d, ok := errors.AsType[*daemonError](err); ok {
+		res.Notes = d.notes
+	}
+	return res
 }
 
 func (c *Client) EndTurn(ctx context.Context, handle string, req api.TurnEndRequest) (api.TurnEnded, error) {
@@ -422,18 +430,19 @@ func (c *Client) Events(ctx context.Context, client string, since api.Since) (<-
 // refused reads the daemon's answer to a failed request.
 func refused(resp *http.Response) error {
 	var e struct {
-		Error     string `json:"error"`
-		Detail    string `json:"detail"`
-		Source    string `json:"source"`
-		Forceable bool   `json:"forceable"`
-		Fix       string `json:"fix"`
-		Refusal   string `json:"refusal"`
+		Error     string   `json:"error"`
+		Detail    string   `json:"detail"`
+		Source    string   `json:"source"`
+		Forceable bool     `json:"forceable"`
+		Fix       string   `json:"fix"`
+		Refusal   string   `json:"refusal"`
+		Notes     []string `json:"notes"`
 	}
 	raw, _ := io.ReadAll(resp.Body)
 	if json.Unmarshal(raw, &e) != nil || e.Error == "" {
 		e.Error = fmt.Sprintf("%s: %s", resp.Status, bytes.TrimSpace(raw))
 	}
-	return &daemonError{msg: e.Error, detail: e.Detail, source: e.Source, forceable: e.Forceable, fix: e.Fix, refusal: e.Refusal}
+	return &daemonError{msg: e.Error, detail: e.Detail, source: e.Source, forceable: e.Forceable, fix: e.Fix, refusal: e.Refusal, notes: e.Notes}
 }
 
 // daemonError is the daemon's answer to a failed request, with the message of
@@ -446,6 +455,9 @@ type daemonError struct {
 	// refusal is the code of the profile text msg is (api.RefusalNotOffered,
 	// api.BuiltinWhy, api.RefuseCase), "" for another refusal.
 	refusal string
+	// notes are what the loop did before it failed, for the caller's
+	// standard error.
+	notes []string
 }
 
 // Refusal is the refusal's code, "" when it has none.

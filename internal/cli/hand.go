@@ -54,26 +54,12 @@ func (e *Env) byHand() func(ctx context.Context, r api.ByHandRequest, handle str
 		q.Out, q.Err, q.HomeOverride = &notes, &notes, &home
 		err = q.turnByHand(ctx, handTurn{def: d, url: r.URL, agent: r.Agent, guidance: r.Guidance, inputs: r.Inputs, cwd: r.Cwd, handle: handle}, &text)
 		res := api.ByHandResult{Text: text.String()}
-		n := strings.TrimRight(notes.String(), "\n")
-		if err != nil && n != "" {
-			return res, notedError{err: err, notes: n}
-		}
-		if n != "" {
+		if n := strings.TrimRight(notes.String(), "\n"); n != "" {
 			res.Notes = strings.Split(n, "\n")
 		}
 		return res, err
 	}
 }
-
-// notedError is a turn by hand that failed after writing notes, such as
-// the guidance it kept back, which reach the caller only with the error.
-type notedError struct {
-	err   error
-	notes string
-}
-
-func (e notedError) Error() string { return e.err.Error() + "\n" + e.notes }
-func (e notedError) Unwrap() error { return e.err }
 
 // byHandRef is the unit a turn by hand is about, found as the turn finds
 // it.

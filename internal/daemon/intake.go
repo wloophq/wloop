@@ -782,7 +782,7 @@ func (s *Server) turnByHandIntake(w http.ResponseWriter, ctx context.Context, d 
 		s.sessionAsks.forget(i.Seq)
 		out := v.(byHandOutcome)
 		if out.err != nil {
-			writeAgentError(w, out.err)
+			writeByHandError(w, out.err, out.res.Notes)
 			return
 		}
 		writeJSON(w, out.res)

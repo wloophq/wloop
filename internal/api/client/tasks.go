@@ -109,7 +109,7 @@ func (c *Client) Digest(ctx context.Context, day string) (api.Digest, error) {
 func (c *Client) Attach(ctx context.Context, handle, id string, req api.AttachRequest) (api.ByHandResult, error) {
 	var res api.ByHandResult
 	err := c.doAs(ctx, actionTimeout, handle, http.MethodPost, api.TaskPath(id, "attach"), req, &res)
-	return res, err
+	return withNotes(res, err), err
 }
 
 // Chat writes req on task id's chat, as the person: its live session is told, else a turn starts with it.

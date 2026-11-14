@@ -239,7 +239,7 @@ func (s *Server) handleAttach(w http.ResponseWriter, r *http.Request) {
 	res, err := s.deps.TurnByHand(ctx, api.ByHandRequest{Intent: string(d.Name), URL: u.String(), Agent: req.Agent, Cwd: req.Cwd,
 		Pane: req.Pane, AgentSession: req.AgentSession, Home: req.Home}, handle)
 	if err != nil {
-		writeAgentError(w, err)
+		writeByHandError(w, err, res.Notes)
 		return
 	}
 	if err := s.deps.Turns.ClaimFor(ctx, handle, u); err != nil {

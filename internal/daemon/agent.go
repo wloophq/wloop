@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -114,6 +115,25 @@ func writeAgentError(w http.ResponseWriter, err error) {
 	default:
 		writeActionError(w, err)
 	}
+}
+
+// writeByHandError answers a turn by hand's error as writeAgentError does,
+// with the notes of what the loop did before it, such as the guidance it
+// kept back, beside the error.
+func writeByHandError(w http.ResponseWriter, err error, notes []string) {
+	if len(notes) == 0 {
+		writeAgentError(w, err)
+		return
+	}
+	b := &bufferedResponse{header: w.Header(), code: http.StatusOK}
+	writeAgentError(b, err)
+	body := map[string]any{}
+	if json.Unmarshal(b.body.Bytes(), &body) != nil {
+		body = map[string]any{"error": strings.TrimSpace(b.body.String())}
+	}
+	body["notes"] = notes
+	w.WriteHeader(b.code)
+	_ = json.NewEncoder(w).Encode(body)
 }
 
 func (s *Server) handleTurnStart(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +249,7 @@ func (s *Server) handleTurnByHand(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.deps.TurnByHand(ctx, req, handle)
 	if err != nil {
-		writeAgentError(w, err)
+		writeByHandError(w, err, res.Notes)
 		return
 	}
 	writeJSON(w, res)

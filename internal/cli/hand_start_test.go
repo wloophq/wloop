@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -21,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // droppedPlan is a daemon plan that keeps the drops of pending items it was asked for.
@@ -192,6 +194,22 @@ func TestAReviewByHandItsGuardRefusesKeepsItsGuidanceAndSaysSo(t *testing.T) {
 		t.Fatalf("kept guidance %q", o.NextGuidance)
 	}
 	if out := te.out.String() + te.err.String(); !strings.Contains(out, r7.String()+": your guidance is kept for the next round") {
+		t.Fatalf("output %q", out)
+	}
+}
+
+func TestAReviewByHandItsPrepareRefusesKeepsItsGuidanceAndSaysSo(t *testing.T) {
+	t.Parallel()
+	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
+	preparedReview(te.Turns.Starter, &fakePreparer{refusal: fmt.Errorf("%w: %w", src.ErrUnfit, daemon.BadRequest("nothing new to review"))})
+	if code := te.run("instructions", "review", r7.URL(), "--", "only", "the", "tests"); code == 0 {
+		t.Fatalf("a refused review by hand ran: %s", te.out)
+	}
+	if o, _ := te.Store.Override(context.Background(), r7); o.NextGuidance != "only the tests" {
+		t.Fatalf("kept guidance %q", o.NextGuidance)
+	}
+	out := te.out.String() + te.err.String()
+	if !strings.Contains(out, "nothing new to review") || !strings.Contains(out, r7.String()+": your guidance is kept for the next round") {
 		t.Fatalf("output %q", out)
 	}
 }
