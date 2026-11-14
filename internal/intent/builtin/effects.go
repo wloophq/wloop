@@ -46,9 +46,9 @@ const (
 var Effects = slices.Clone(coreEffects)
 
 var coreEffects = []Effect{
-	{Name: EffectPlanCleared, Applies: AppliesTurn, Doc: "Drops the unit's pending plan items."},
-	{Name: EffectGuidanceHanded, Applies: AppliesTurn, Doc: "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent."},
-	{Name: EffectRoundSent, Applies: AppliesTurn, Doc: "Records the round-sent event on the unit when a person sends the turn."},
+	{Name: EffectPlanCleared, Applies: AppliesTurn, Doc: "Drops the unit's pending plan items before a turn a person asked for goes out."},
+	{Name: EffectGuidanceHanded, Applies: AppliesTurn, Doc: "Hands the guidance queued on the unit to the turn when it is given none, guidance given replacing the queued one, and queues it back when the turn fails or its prompt does not land."},
+	{Name: EffectRoundSent, Applies: AppliesTurn, Doc: "Records the round-sent event on the unit, with the turn's instructions id, once the prompt of a turn a person asked for reached its agent."},
 	{Name: EffectTaskNudged, Applies: AppliesDraft, Doc: "Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post."},
 	{Name: EffectUnitClosed, Applies: AppliesDraft, Doc: "Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.", Plugin: true, Silent: true},
 }

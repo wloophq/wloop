@@ -75,6 +75,7 @@ The commands call the daemon through `internal/api/client`. Those that work with
 | A key of a manifest, `actions.toml`, `tasks.toml`, `views.toml`, `gates.toml`, `records.toml`, `keys.toml` or the configuration | a row of `builtin.Grammar` in `internal/intent/builtin/grammar*.go`, with its kind, values, default and doc, and the field that decodes it | `make docs-ref` |
 | A role or an effect | `builtin.Roles` in `internal/intent/builtin/roles.go`, `builtin.Effects` in `internal/intent/builtin/effects.go` | `make docs-ref` |
 | A use case | a package under `internal/core`, with the ports it needs declared there and a fake in `<name>test` | |
+| A new way to start a turn | an entry that calls `turns.Starter.Start` with a runner of its own (`turns.Runner`, in `internal/cli` or the core package that runs the turn); the runner records the turn it is given through `turns.Service` | see [the turn start](/architecture/decisions/every-turn-starts-through-the-turn-start/) |
 | A value or a pure rule | `internal/domain/<name>` | |
 | An outside tool | an adapter under `internal/adapter/<tool>` implementing the core's port, plus one entry in `internal/cli/root.go` | |
 | A source of units | a plugin: see [Plugins](/architecture/plugins/) | |

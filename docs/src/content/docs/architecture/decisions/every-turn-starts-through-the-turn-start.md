@@ -1,0 +1,9 @@
+---
+title: Every turn starts through the turn start
+description: A new turn starts only through turns.Starter, and only internal/core/turns records a turn.
+---
+
+- **Context**: a turn started from several entries (by hand, an action, a held round, a workflow, a chat, a probe, a headless run), each applying its intent's role and effects in its own order, so the guidance cut, the prepare and the effects ran on some entries and not on others.
+- **Decision**: every new turn starts through `turns.Starter.Start`, which applies its intent's role and effects in one order whatever entry asks; a resume is admitted by `Starter.Resume`. Both answer an opaque `turns.Turn`, used once: the turn service's sinks (`Send`, `StartByHand`, `BeginHeadless`) refuse a zero or used one and record the unit, intent, trigger, guidance and resumed turn of the `Turn`, whatever the runner rendered. No code outside `internal/core/turns`, the store adapters and the domain's book calls `turn.Book`'s `Send`, `SendOn` or `Start` or a turn store's `Save`, and only tests import `turnstest`, whose `Started` admits a turn no entry asked for.
+- **Consequence**: a new entry gets the guidance cut, the prepare and the effects by calling the starter with a runner of its own; it cannot record a turn the starter did not admit.
+- **Enforced by**: `TestOnlyTurnsRecordsATurn`, `TestTurnstestOnlyInTests`, `TestEverySinkRefusesATurnNoStartAdmitted`, `TestEverySinkRecordsATurnOnce`, `TestEverySinkRecordsTheIdentityItsTurnWasAdmittedWith`, `TestEveryEntryStartsThroughThePrepareAndTheCut`. See [Profile first](/architecture/profile-first/).
