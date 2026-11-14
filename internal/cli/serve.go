@@ -170,7 +170,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
 			deps.EffectWarnings = e.effectProblems.list
-			srv := daemon.New(deps)
+			srv := e.newDaemon(deps)
 			e.Briefing, e.consequences = srv, srv
 			e.linkStates.Store(srv)
 			if e.jobRunner != nil {
@@ -1137,7 +1137,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 			}
 		}
 	})
-	return daemon.New(deps).Run(dctx)
+	return e.newDaemon(deps).Run(dctx)
 }
 
 // briefQueue is the brief queue and, when the agent cannot brief, why: the

@@ -713,3 +713,15 @@ func TestARunnerIsToldOfTheGuidanceKeptBack(t *testing.T) {
 		t.Fatalf("a submitted turn kept back %q: %v", x.keptBack, err)
 	}
 }
+
+func TestAStarterWithNoPrepareRefusesAnIntentThatHasOne(t *testing.T) {
+	r := newStartRig(t)
+	r.s.Preparer = nil
+	x := r.runner(true)
+	if _, err := r.s.Start(context.Background(), automated(prepared), x); err == nil || len(x.ran) != 0 {
+		t.Fatalf("start = %v, ran %d", err, len(x.ran))
+	}
+	if _, err := r.s.Start(context.Background(), automated(plain), x); err != nil || len(x.ran) != 1 {
+		t.Fatalf("start of an intent with no prepare = %v, ran %d", err, len(x.ran))
+	}
+}

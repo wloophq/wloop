@@ -145,7 +145,7 @@ func ServeForTest(t testing.TB, o TestOptions) *TestDaemon {
 	deps := serveDeps(ctx, e, db, cfg, logf, loopMu, &daemon.AppState{})
 	deps.Startup, deps.StateDir = nil, e.StateDir
 	deps.Socket, deps.LockPath, deps.InfoPath = e.Socket, filepath.Join(dir, daemonLock), filepath.Join(dir, httpInfoFile)
-	srv := daemon.New(deps)
+	srv := e.newDaemon(deps)
 	e.Briefing, e.consequences = srv, srv
 	e.linkStates.Store(srv)
 	done := make(chan error, 1)

@@ -260,6 +260,9 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Outcome, erro
 // records the guidance it carried.
 func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, error) {
 	if d.Prepare != "" {
+		if s.Preparer == nil {
+			return Outcome{}, fmt.Errorf("%s: no prepare runs %s", t.unit, d.Prepare)
+		}
 		filled, err := s.Preparer.PrepareTurn(ctx, string(t.intent), t.unit, t.guidance, maps.Clone(t.inputs))
 		if err != nil {
 			return Outcome{}, err

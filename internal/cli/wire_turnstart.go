@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 	"sync/atomic"
 
@@ -37,10 +36,11 @@ func (e *Env) wireTurnStart(w *serveWiring) {
 }
 
 // turnStarter is the use case every new turn starts through, over the
-// loaded intents, the daemon's prepare, the guidance kept on the units, the
-// loop mutex mu and the turn effects; plan is the daemon's plan once built.
+// loaded intents, the guidance kept on the units, the loop mutex mu and the
+// turn effects; plan is the daemon's plan once built. Its prepare is the
+// daemon's, which newDaemon gives it.
 func (e *Env) turnStarter(mu *lock.Mutex, plan *latePlan, logf func(string, ...any)) *turns.Starter {
-	return &turns.Starter{Defs: loadedDefs{e}, Preparer: startPreparer{servedPreparer{e}}, Kept: recGuidance{e}, Loop: serveLoop{e: e, mu: mu},
+	return &turns.Starter{Defs: loadedDefs{e}, Kept: recGuidance{e}, Loop: serveLoop{e: e, mu: mu},
 		Effects: startEffects{e: e, plan: plan}, Store: e.Turns.Store, Log: logf}
 }
 
@@ -60,16 +60,14 @@ func startDef(d dintent.Def) turns.Def {
 	return turns.Def{Def: d, HandsGuidance: slices.Contains(d.Effects, builtin.EffectGuidanceHanded)}
 }
 
-// servedPreparer runs a turn's prepare in the daemon serve built.
-type servedPreparer struct{ e *Env }
-
-func (p servedPreparer) PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error) {
-	if p.e.linkStates != nil {
-		if s := p.e.linkStates.Load(); s != nil {
-			return s.PrepareTurn(ctx, intent, u, guidance, inputs)
-		}
+// newDaemon is the daemon serve runs over d, which runs the prepares of the
+// turns d's starter starts.
+func (e *Env) newDaemon(d daemon.Deps) *daemon.Server {
+	srv := daemon.New(d)
+	if e.Turns != nil && e.Turns.Starter != nil {
+		e.Turns.Starter.Preparer = startPreparer{srv}
 	}
-	return nil, fmt.Errorf("%w: no daemon runs the prepare of %s yet", src.ErrUnavailable, intent)
+	return srv
 }
 
 // startPreparer is a prepare whose refusal is the start's: a refusal is
