@@ -17,7 +17,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
@@ -219,22 +218,12 @@ func (s *Server) handleTurnByHand(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, err)
 		return
 	}
-	req.Guidance = cutGuidance(d, req.Guidance)
-	intake := s.intakes != nil && s.deps.ByHandRef != nil && d.Intake && d.Brief.Wait
-	var u unit.Unit
-	if intake || d.Prepare != "" {
-		if u, err = s.byHandRef(ctx, req, handle); err != nil {
+	if s.intakes != nil && s.deps.ByHandRef != nil && d.Intake && d.Brief.Wait {
+		u, err := s.byHandRef(ctx, req, handle)
+		if err != nil {
 			writeAgentError(w, err)
 			return
 		}
-	}
-	if d.Prepare != "" {
-		if req, err = s.prepareByHand(ctx, d, u, req); err != nil {
-			writeAgentError(w, err)
-			return
-		}
-	}
-	if intake {
 		s.turnByHandIntake(w, ctx, d, u, req, handle)
 		return
 	}
@@ -254,17 +243,6 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 		return s.deps.ByHandRef(ctx, req, handle)
 	}
 	return unitOfAddress(s.deps.Units, req.URL)
-}
-
-// prepareByHand runs the intent's prepare for a turn by hand, whose
-// request then carries what it filled.
-func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, req api.ByHandRequest) (api.ByHandRequest, error) {
-	inputs, err := s.preparedInputs(ctx, d, u, req.Guidance, req.Inputs)
-	if err != nil {
-		return req, err
-	}
-	req.Inputs = inputs
-	return req, nil
 }
 
 func (s *Server) handleTurnEnd(w http.ResponseWriter, r *http.Request) {

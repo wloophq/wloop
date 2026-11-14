@@ -371,7 +371,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 		NotifierStart: notifierStart(),
 
-		TurnByHand: e.byHand(loopMu),
+		TurnByHand: e.byHand(),
 		Startup:    e.startupOnce(cfg, logf),
 		Homes:      e.liveHomes(cfg),
 		DryRunTurn: e.dryRunTurn,

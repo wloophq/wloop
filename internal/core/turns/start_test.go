@@ -663,3 +663,26 @@ func TestResumeOfATurnTheBookDoesNotHoldIsGone(t *testing.T) {
 		t.Fatalf("err = %v, want Gone", err)
 	}
 }
+
+func TestAGuardThatAnswersItselfGivesBackOnlyTheKeptGuidance(t *testing.T) {
+	for name, c := range map[string]struct{ given, kept, want string }{
+		"given":      {given: "fix the nit", kept: "look at the tests", want: "look at the tests"},
+		"given only": {given: "fix the nit", want: ""},
+		"kept only":  {kept: "look at the tests", want: "look at the tests"},
+	} {
+		r := newStartRig(t)
+		if c.kept != "" {
+			r.kept[startUnit] = c.kept
+		}
+		x := r.runner(true)
+		x.guardErr = fmt.Errorf("asked whether to take it over: %w", turns.ErrAnswered)
+		req := byPerson(guided)
+		req.Guidance = c.given
+		if _, err := r.s.Start(context.Background(), req, x); !errors.Is(err, turns.ErrAnswered) {
+			t.Fatalf("%s: err %v", name, err)
+		}
+		if len(x.ran) != 0 || slices.Contains(r.trace, "before") || r.kept[startUnit] != c.want {
+			t.Errorf("%s: trace %v, kept %q, want %q", name, r.trace, r.kept[startUnit], c.want)
+		}
+	}
+}

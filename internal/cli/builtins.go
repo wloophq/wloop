@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -46,23 +45,18 @@ const contextPR = builtin.ContextPR
 type route int
 
 const (
-	// routeSession is a round asked for from an agent session (byHand).
-	routeSession route = iota
 	// routeAsked is a round asked for through the daemon's action (askedRound).
-	routeAsked
+	routeAsked route = iota
 	// routeLaunch is a resume or a launch the turn service asks for.
 	routeLaunch
 )
 
 // wire is rt as an effect request names it.
 func (rt route) wire() string {
-	switch rt {
-	case routeAsked:
+	if rt == routeAsked {
 		return src.RouteAsked
-	case routeLaunch:
-		return src.RouteLaunch
 	}
-	return src.RouteSession
+	return src.RouteLaunch
 }
 
 // sentRound is what a turn effect reads of a round on its way out; the
@@ -80,9 +74,9 @@ type sentRound struct {
 }
 
 // effectRun is what a host effect does on a route, by phase: guide before
-// the round, sent once it went out, unsent when it did not.
+// the round, unsent when it did not go out.
 type effectRun struct {
-	guide, sent, unsent func(r *sentRound)
+	guide, unsent func(r *sentRound)
 }
 
 // onSentEffect is a turn effect the host applies and what it does on each
@@ -101,17 +95,12 @@ var keepsGuidance = effectRun{
 // onSent is the turn effects the command line applies, in the order each
 // phase runs them.
 var onSent = []onSentEffect{
-	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
-	{name: builtin.EffectRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
-		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
-	}}}},
+	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeAsked: keepsGuidance}},
 }
 
 type phase func(c effectRun, r *sentRound)
 
 func guidePhase(c effectRun, r *sentRound) { runCell(c.guide, r) }
-
-func sentPhase(c effectRun, r *sentRound) { runCell(c.sent, r) }
 
 func unsentPhase(c effectRun, r *sentRound) { runCell(c.unsent, r) }
 
@@ -155,10 +144,9 @@ func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 	return nil
 }
 
-// applySentEffects applies the turn effects of d once r went out on route
-// rt: the host's sent phase, then those of the plugin of r's unit.
+// applySentEffects applies the turn effects of d the plugin of r's unit
+// applies, once r went out on route rt.
 func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
-	runPhase(rt, d, r, sentPhase)
 	head := ""
 	if r.pr != nil {
 		head = r.pr.HeadRefOid

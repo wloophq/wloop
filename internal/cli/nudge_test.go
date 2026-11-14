@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -200,7 +199,8 @@ func TestANudgeRecordsTheTurnItSent(t *testing.T) {
 			return askedIntent(te.Env, te.cfg, r7, dintent.Nudge, "", inputs, "")
 		},
 		"by hand in a session": func(_ *testing.T, te *testEnv) error {
-			_, err := te.byHand(&lock.Mutex{})(context.Background(), api.ByHandRequest{Intent: string(dintent.Nudge), URL: r7.URL(), Inputs: inputs}, "term_1")
+			te.Turns.Starter.Preparer = startPreparer{&fakePreparer{}}
+			_, err := te.byHand()(context.Background(), api.ByHandRequest{Intent: string(dintent.Nudge), URL: r7.URL(), Inputs: inputs}, "term_1")
 			return err
 		},
 		"resuming a turn that never started": func(t *testing.T, te *testEnv) error {

@@ -798,7 +798,7 @@ func (te *testEnv) serveWith(t testing.TB, with func(daemon.Deps) daemon.Deps) {
 	t.Helper()
 	mu := &lock.Mutex{}
 	te.loop = mu
-	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
+	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
 	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub),
@@ -809,6 +809,7 @@ func (te *testEnv) serveWith(t testing.TB, with func(daemon.Deps) daemon.Deps) {
 	}
 	srv := daemon.New(d)
 	te.Env.consequences = srv
+	te.Turns.Starter.Loop, te.Turns.Starter.Preparer = serveLoop{e: te.Env, mu: mu}, startPreparer{srv}
 	te.Socket = serveSocket(t, srv.Handler())
 }
 

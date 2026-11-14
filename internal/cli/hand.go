@@ -18,11 +18,12 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/core/lock"
+	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/turn"
@@ -40,30 +41,13 @@ type handTurn struct {
 const handInSession = "asked by you in a session"
 
 // byHand runs, in the daemon, a turn the user asked for from an agent
-// session, with the inputs the daemon checked and prepared; it waits on the
-// loop.
-func (e *Env) byHand(loopMu *lock.Mutex) func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
+// session, with the inputs the daemon checked; the turn's start waits on the
+// loop and prepares them.
+func (e *Env) byHand() func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
 	return func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
 		d, err := e.intentDef(r.Intent)
 		if err != nil {
 			return api.ByHandResult{}, daemon.BadRequest(err.Error())
-		}
-		if !lock.Held(ctx) {
-			u, err := e.byHandRef(ctx, r, handle)
-			if err != nil {
-				return api.ByHandResult{}, err
-			}
-			r.URL = u.String()
-			if isPR(u) {
-				ref := prOf(u)
-				r.URL = ref.URL()
-				if aheadOf(ctx, ref) == nil {
-					ctx = e.ReadAhead(ctx, ref, false)
-				}
-			}
-			loopMu.Lock()
-			defer loopMu.Unlock()
-			ctx = lock.WithHeld(ctx)
 		}
 		var text, notes bytes.Buffer
 		q := *e
@@ -86,46 +70,72 @@ func (e *Env) byHandRef(ctx context.Context, r api.ByHandRequest, _ string) (uni
 	return e.handUnit(ctx, r.URL, r.Cwd, ws, repo, inWS)
 }
 
-// turnByHand runs a round from the agent session the user is in: it writes
+// turnByHand runs a turn from the agent session the user is in: it writes
 // the turn's instructions to text, starts the turn on the caller's session
 // and reports everything else on e.Out.
 func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error {
-	d, cwd := h.def, h.cwd
-	repos, all := e.workspaceState(ctx)
-	ws, repo, inWS := workspaceAt(cwd, repos, all)
-	u, err := e.handUnit(ctx, h.url, cwd, ws, repo, inWS)
+	if e.Turns == nil || e.Turns.Starter == nil {
+		return errors.New("no turn starts here: the daemon runs a turn by hand")
+	}
+	u, err := e.byHandRef(ctx, api.ByHandRequest{URL: h.url, Cwd: h.cwd}, h.handle)
 	if err != nil {
 		return err
 	}
-	if !isPR(u) {
-		return e.unitTurnByHand(ctx, h, u, text)
+	_, err = e.Turns.Starter.Start(ctx, turns.Request{Unit: u, Intent: dturn.Intent(h.def.Name), Guidance: h.guidance, Inputs: h.inputs,
+		Trigger: dturn.ByHand, Route: src.RouteSession, ByPerson: true}, &handRunner{e: e, h: h, u: u, text: text})
+	if errors.Is(err, turns.ErrAnswered) {
+		return nil
 	}
-	ref := prOf(u)
+	return err
+}
+
+// handRunner runs a turn by hand on the caller's session: its guard reads
+// and readies the unit, refusing before any effect applies, and its run
+// renders the turn and starts it there.
+type handRunner struct {
+	e    *Env
+	h    handTurn
+	u    unit.Unit
+	text io.Writer
+
+	cfg config.Config
+	req turn.Request
+	pr  *pr.PullRequest
+}
+
+func (x *handRunner) Guard(ctx context.Context, t turns.Turn) error {
+	e, d := x.e, x.h.def
 	cfg, err := e.loadConfig()
 	if err != nil {
 		return err
 	}
-	pr, err := e.openPR(ctx, ref)
-	if err != nil {
+	x.cfg = cfg
+	if !isPR(x.u) {
+		if !d.Serves(x.u.Provider) {
+			return fmt.Errorf("the intent %s serves %s units, not %s", d.Name, d.ProviderOrDefault(), x.u.Label())
+		}
+		x.req = turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: x.u, Agent: x.h.agent}
+		return nil
+	}
+	ref := prOf(x.u)
+	if x.pr, err = e.openPR(ctx, ref); err != nil {
 		return err
 	}
-	takeOver := beforeSet(d, h.inputs, beforeTakeOver)
-	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Agent: h.agent, Inputs: h.inputs}
-	e.withAddressReason(ctx, cfg, d, &r)
+	inputs := t.Inputs()
+	takeOver := beforeSet(d, inputs, beforeTakeOver)
+	x.req = turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(x.pr), Agent: x.h.agent}
+	e.withAddressReason(ctx, cfg, d, &x.req)
+	repos, all := e.workspaceState(ctx)
+	ws, repo, inWS := workspaceAt(x.h.cwd, repos, all)
 	if d.OwnerOnly {
-		owned, err := e.ownedByHand(ctx, cfg.For(ref.Owner, ref.Repo), repos, all, ref, pr, cwd)
+		owned, err := e.ownedByHand(ctx, cfg.For(ref.Owner, ref.Repo), repos, all, ref, x.pr, x.h.cwd)
 		if err != nil {
 			return err
 		}
 		if !owned && !takeOver {
-			_, out, err := e.renderTurn(ctx, cfg, r)
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprint(text, out.Text)
-			return err
+			return x.askTakeOver(ctx, inputs)
 		}
-		r.Owned = true
+		x.req.Owned = true
 	}
 	if err := e.roundReady(); err != nil {
 		return err
@@ -136,29 +146,50 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 		}
 	}
 	if takeOver {
-		if err := e.takeOverHere(ctx, cfg, ref, cwd); err != nil {
-			return err
+		return e.takeOverHere(ctx, cfg, ref, x.h.cwd)
+	}
+	return nil
+}
+
+// askTakeOver writes the question an owner-only turn asks on a pull request
+// the user does not own, and starts no turn.
+func (x *handRunner) askTakeOver(ctx context.Context, inputs map[string]any) error {
+	r := x.req
+	r.Inputs = inputs
+	_, out, err := x.e.renderTurn(ctx, x.cfg, r)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(x.text, out.Text); err != nil {
+		return err
+	}
+	return turns.ErrAnswered
+}
+
+func (x *handRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	e := x.e
+	r := x.req
+	r.Guidance, r.Inputs = t.Guidance(), t.Inputs()
+	sent, err := e.sendTurn(ctx, x.cfg, r)
+	if err != nil {
+		return turns.Outcome{}, err
+	}
+	o := turns.Outcome{ID: sent.ID, Submitted: true}
+	if x.pr != nil {
+		o.Head = x.pr.HeadRefOid
+	}
+	if sent.send != nil {
+		if _, err := e.Turns.StartByHand(ctx, *sent.send, x.h.handle); err != nil {
+			return turns.Outcome{}, err
 		}
 	}
-	return e.handRound(ctx, routeSession, ref, h.guidance, d, false, func(_ *round.Store, sr *sentRound) (bool, error) {
-		r.Guidance = sr.guidance
-		sent, err := e.sendTurn(ctx, cfg, r)
-		if err != nil {
-			return false, err
-		}
-		if sent.send != nil {
-			if _, err := e.Turns.StartByHand(ctx, *sent.send, h.handle); err != nil {
-				return false, err
-			}
-		}
-		if _, err := fmt.Fprint(text, sent.Text); err != nil {
-			return false, err
-		}
-		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		e.applySentEffects(ctx, routeSession, d, sr)
-		e.recordGuidance(ctx, ref, sr.guidance)
-		return true, nil
-	})
+	if _, err := fmt.Fprint(x.text, sent.Text); err != nil {
+		return o, err
+	}
+	if isPR(x.u) && !startDef(x.h.def).HandsGuidance {
+		e.recordGuidance(ctx, prOf(x.u), r.Guidance)
+	}
+	return o, nil
 }
 
 // inputList is a list input as JSON or Go left it.
@@ -220,31 +251,6 @@ func (e *Env) handUnit(ctx context.Context, target, cwd string, ws wsdomain.Work
 		return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
 	}
 	return unit.Unit{}, errors.New("no unit here; pass its target")
-}
-
-// unitTurnByHand runs a turn by hand on a unit that is no pull request,
-// through the path a turn.start on it takes: the provider hands its
-// payload, and the turn starts on the caller's session.
-func (e *Env) unitTurnByHand(ctx context.Context, h handTurn, u unit.Unit, text io.Writer) error {
-	cfg, err := e.loadConfig()
-	if err != nil {
-		return err
-	}
-	if !h.def.Serves(u.Provider) {
-		return fmt.Errorf("the intent %s serves %s units, not %s", h.def.Name, h.def.ProviderOrDefault(), u.Label())
-	}
-	r := turn.Request{Intent: turn.Intent(h.def.Name), Trigger: turn.ByHand, Unit: u, Agent: h.agent, Inputs: h.inputs, Guidance: h.guidance}
-	sent, err := e.sendTurn(ctx, cfg, r)
-	if err != nil {
-		return err
-	}
-	if sent.send != nil && e.Turns != nil {
-		if _, err := e.Turns.StartByHand(ctx, *sent.send, h.handle); err != nil {
-			return err
-		}
-	}
-	_, err = fmt.Fprint(text, sent.Text)
-	return err
 }
 
 // workspaceAt is the local workspace whose checkout holds dir, the

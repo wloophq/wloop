@@ -242,7 +242,7 @@ func TestInstructionsPrintsTheNotReadyText(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	mu := &lock.Mutex{}
-	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
+	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing), ByHandRef: te.byHandRef, SessionWait: 50 * time.Millisecond,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store))
 	te.Socket = serveSocketOf(t, srv.Handler())
@@ -267,7 +267,7 @@ func TestATurnByHandStartsUnderTheHeldLoopMutex(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	mu := &lock.Mutex{}
-	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
+	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(intake.Readiness{Go: true}), ByHandRef: te.byHandRef,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store))
 	te.Socket = serveSocketOf(t, srv.Handler())

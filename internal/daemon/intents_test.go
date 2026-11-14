@@ -165,56 +165,53 @@ func TestAProfileEditReachesTheCatalogWithoutARestart(t *testing.T) {
 	}
 }
 
-func TestPrepareRunsOnBothRoutes(t *testing.T) {
+func TestPrepareRunsOnTheActionRoute(t *testing.T) {
 	t.Parallel()
-	wantInputs := func(t *testing.T, in map[string]any) {
-		t.Helper()
-		situation, _ := in["situation"].(string)
-		who, _ := in["who"].([]string)
-		maintainers, isBool := in["waits_on_maintainers"].(bool)
-		if !strings.HasPrefix(situation, "Waiting on: @ana since ") || !slices.Equal(who, []string{"@ana"}) || !isBool || maintainers {
-			t.Fatalf("inputs %#v", in)
-		}
+	s := newServer(t)
+	seedWaitingOnAna(t, s)
+	fa := &fakeActions{}
+	s.deps.Actions = fa
+	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"g","source":"cli"}`); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	t.Run("action", func(t *testing.T) {
-		s := newServer(t)
-		seedWaitingOnAna(t, s)
-		fa := &fakeActions{}
-		s.deps.Actions = fa
-		if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"g","source":"cli"}`); rec.Code != 200 {
-			t.Fatalf("%d %s", rec.Code, rec.Body)
+	in := fa.inputs[0]
+	situation, _ := in["situation"].(string)
+	who, _ := in["who"].([]string)
+	maintainers, isBool := in["waits_on_maintainers"].(bool)
+	if !strings.HasPrefix(situation, "Waiting on: @ana since ") || !slices.Equal(who, []string{"@ana"}) || !isBool || maintainers {
+		t.Fatalf("inputs %#v", in)
+	}
+}
+
+func TestATurnByHandLeavesThePrepareAndTheCutToItsStart(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var asked []api.ByHandRequest
+	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), func(d *Deps) {
+		d.TurnByHand = func(_ context.Context, r api.ByHandRequest, _ string) (api.ByHandResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			asked = append(asked, r)
+			return api.ByHandResult{Text: "the nudge"}, nil
 		}
-		wantInputs(t, fa.inputs[0])
+		d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r9.Unit(), nil }
+		d.SessionWait = time.Hour
 	})
-	t.Run("session", func(t *testing.T) {
-		var mu sync.Mutex
-		var asked []api.ByHandRequest
-		s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), func(d *Deps) {
-			d.TurnByHand = func(_ context.Context, r api.ByHandRequest, _ string) (api.ByHandResult, error) {
-				mu.Lock()
-				defer mu.Unlock()
-				asked = append(asked, r)
-				return api.ByHandResult{Text: "the nudge"}, nil
-			}
-			d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r9.Unit(), nil }
-			d.SessionWait = time.Hour
-		})
-		seedWaitingOnAna(t, s)
-		rec := httptest.NewRecorder()
-		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"nudge","cwd":"/w","guidance":"g"}`))
-		req.Header.Set(api.SessionHeader, "term-1")
-		s.Handler().ServeHTTP(rec, req)
-		if rec.Code != 200 {
-			t.Fatalf("a session nudge waited or failed: %d %s", rec.Code, rec.Body)
-		}
-		if len(asked) != 1 {
-			t.Fatalf("asked %+v", asked)
-		}
-		wantInputs(t, asked[0].Inputs)
-		if open, _ := s.deps.Intakes.Open(context.Background()); len(open) != 0 {
-			t.Fatalf("a session nudge went through an intake: %+v", open)
-		}
-	})
+	seedWaitingOnAna(t, s)
+	long := strings.Repeat("g", 600)
+	rec := httptest.NewRecorder()
+	req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"nudge","cwd":"/w","guidance":"`+long+`"}`))
+	req.Header.Set(api.SessionHeader, "term-1")
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("a session nudge waited or failed: %d %s", rec.Code, rec.Body)
+	}
+	if len(asked) != 1 || asked[0].Guidance != long || asked[0].Inputs["situation"] != nil {
+		t.Fatalf("asked %+v", asked)
+	}
+	if open, _ := s.deps.Intakes.Open(context.Background()); len(open) != 0 {
+		t.Fatalf("a session nudge went through an intake: %+v", open)
+	}
 }
 
 func TestAClientCannotSendAPrepareInput(t *testing.T) {

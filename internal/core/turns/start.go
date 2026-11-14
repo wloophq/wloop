@@ -25,6 +25,9 @@ var (
 	ErrNoTurn = errors.New("no turn was admitted")
 	// ErrUsedTurn is a Turn already used once.
 	ErrUsedTurn = errors.New("the turn was already used")
+	// ErrAnswered is a Guard that answered the request itself, starting no
+	// turn: the guidance given with it is dropped and the kept one stays.
+	ErrAnswered = errors.New("the request was answered without a turn")
 )
 
 // Def is an intent as Start reads it.
@@ -204,10 +207,10 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 		defer release()
 		ctx = lock.WithHeld(lctx)
 	}
-	whole := r.Guidance
+	whole, kept := r.Guidance, ""
 	if d.HandsGuidance {
-		kept, err := s.Kept.Take(ctx, r.Unit)
-		if err != nil {
+		var err error
+		if kept, err = s.Kept.Take(ctx, r.Unit); err != nil {
 			s.logf("%s: reading the kept guidance: %v", r.Unit, err)
 		}
 		if whole == "" {
@@ -217,8 +220,12 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: r.Trigger,
 		why: r.Why, route: r.Route, byPerson: r.ByPerson})
 	o, err := s.run(ctx, d, &t, x)
-	if d.HandsGuidance && whole != "" && (err != nil || !o.Submitted) {
-		if kerr := s.Kept.Keep(ctx, r.Unit, whole); kerr != nil {
+	back := whole
+	if errors.Is(err, ErrAnswered) {
+		back = kept
+	}
+	if d.HandsGuidance && back != "" && (err != nil || !o.Submitted) {
+		if kerr := s.Kept.Keep(ctx, r.Unit, back); kerr != nil {
 			s.logf("%s: keeping the guidance back: %v", r.Unit, kerr)
 		}
 	}

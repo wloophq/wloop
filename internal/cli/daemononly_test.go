@@ -61,7 +61,7 @@ func startDaemonOf(t *testing.T, te *testEnv) {
 	dir := shortDir(t)
 	cfg := te.cfg
 	cfg.HTTP.Port = 0
-	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
+	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(), LoopMu: mu,
 		Startup: te.startupOnce(te.cfg, t.Logf), Homes: te.liveHomes(te.cfg), DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf,
 		StateDir: dir, Socket: filepath.Join(dir, "daemon.sock"), LockPath: filepath.Join(dir, "daemon.lock"), InfoPath: filepath.Join(dir, "http.json")}, te.Store))

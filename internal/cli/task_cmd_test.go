@@ -71,6 +71,19 @@ func TestAttachBindsTheCallingSessionToTheTask(t *testing.T) {
 	}
 }
 
+func TestAnAttachStartsThroughTheTurnStartAsAPersonsTurn(t *testing.T) {
+	te := attachEnv(t)
+	fx := &turnstest.Effects{}
+	te.Turns.Starter.Effects = fx
+	inSession(te, "term_1")
+	if code := te.run("task", "attach", "task:"+string(attachTask)); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if fx.Befores() != 1 {
+		t.Fatalf("the attach ran %d person's before phases", fx.Befores())
+	}
+}
+
 func TestAttachWithoutAHandleRefusesAndChangesNothing(t *testing.T) {
 	te := attachEnv(t)
 	ctx := context.Background()
