@@ -14,7 +14,8 @@ import (
 
 // pullTasks reads the catalog, then each view the profile's badge counts, whole: the menu lists those views
 // first, in the profile's order. A task's attention also moves with its row's notice and its proposed draft,
-// which no task write marks, so a delta would miss it. The badge comes with the first view's page.
+// which no task write marks, so a delta would miss it. The counters come with the first view's page, or on
+// their own when the menu lists no view.
 func (c *Controller) pullTasks(ctx context.Context) error {
 	cat, err := c.cfg.Daemon.Views(ctx)
 	if err != nil {
@@ -41,6 +42,13 @@ func (c *Controller) pullTasks(ctx context.Context) error {
 				loading = append(loading, l)
 			}
 		}
+	}
+	if len(views) == 0 {
+		counters, err := c.cfg.Daemon.Counters(ctx, "", "")
+		if err != nil {
+			return err
+		}
+		c.counters = &counters
 	}
 	c.taskViews, c.tasks, c.tasksLoading = views, tasks, loading
 	c.mu.Lock()

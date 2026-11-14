@@ -50,6 +50,17 @@ func TestTitleReadsEachViewsCount(t *testing.T) {
 	}
 }
 
+func TestTitleReadsTheCountsWithNoBadgeViewInTheRail(t *testing.T) {
+	r := newRig(t)
+	r.d.views = []api.TaskViewSpec{{ID: "inbox", Label: "Inbox", Rail: true}, {ID: "home-blocked", Label: "Blocked by you", Badge: true}}
+	r.d.strings = &api.Strings{Locale: "en", Strings: map[string]api.Text{"{name} {n}": {"other": "{inbox} of {n}"}}}
+	r.d.counters = api.Counters{Views: map[string]int{"inbox": 3, "home-blocked": 1}, Badge: 1}
+	r.c.Refresh(context.Background())
+	if got := r.title(); got != "3 of 1" {
+		t.Fatalf("title %q, want the counts though no badge view is in the rail", got)
+	}
+}
+
 func TestTitleSaysPausedWhileAutomaticRoundsAre(t *testing.T) {
 	r := newRig(t)
 	r.d.health.Paused = true

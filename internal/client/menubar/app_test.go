@@ -179,6 +179,15 @@ func (f *fakeDaemon) Action(_ context.Context, u unit.Unit, name string, req api
 	return f.output, f.failing
 }
 
+func (f *fakeDaemon) Counters(context.Context, string, string) (api.Counters, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return api.Counters{}, f.err
+	}
+	return f.counters, nil
+}
+
 func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

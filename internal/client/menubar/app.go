@@ -53,6 +53,7 @@ type Daemon interface {
 	Actions(ctx context.Context) (api.ActionsResponse, error)
 	Plugins(ctx context.Context) ([]api.Plugin, error)
 	Views(ctx context.Context) (api.ViewsCatalog, error)
+	Counters(ctx context.Context, area, query string) (api.Counters, error)
 }
 
 type Config struct {
