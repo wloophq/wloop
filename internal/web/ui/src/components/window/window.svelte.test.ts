@@ -213,6 +213,7 @@ describe("links and detach", () => {
     expect(takeLinkNotice(win)).toBe(true);
     expect(takeLinkNotice(win)).toBe(false);
     expect(win.location.hash).toBe("#view=inbox");
+    expect(nav.hash).toBe("#view=inbox");
     I18N.strings = { "That link could not be read, so the default view opened": "Esse link não pôde ser lido" };
     win.location.hash = "#link=malformed";
     tellLinkNotice(win);

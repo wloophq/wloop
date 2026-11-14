@@ -46,7 +46,9 @@ export function detachTarget(hash: string, native: boolean): { post?: J; open?: 
 export function takeLinkNotice(win: WinLike): boolean {
   const parts = String(win.location.hash || "").replace(/^#/, "").split("&");
   if (!parts.some((p) => p.startsWith("link="))) return false;
-  win.history.replaceState(null, "", "#" + parts.filter((p) => !p.startsWith("link=")).join("&"));
+  const hash = "#" + parts.filter((p) => !p.startsWith("link=")).join("&");
+  win.history.replaceState(null, "", hash);
+  nav.hash = hash;
   return true;
 }
 

@@ -8,11 +8,8 @@ import { leaves, ownDraftTask, pendingDraft, recordPosts, restoreFetch, reviewDr
 import { resetStore } from "../../testing/reset.svelte";
 import DraftCard from "./DraftCard.svelte";
 import { approveEdited, DRAFT_CARD_HANDLERS, resolving } from "./gates";
+import { settle } from "../../testing/settle";
 
-const settle = async () => {
-  for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
-  flushSync();
-};
 const all = (c: Element, sel: string) => [...c.querySelectorAll(sel)];
 const texts = (c: Element, sel: string) => all(c, sel).map((x) => x.textContent || "");
 const byFocus = (c: Element, f: string) => c.querySelector(`[data-focus="${f}"]`) as HTMLElement;

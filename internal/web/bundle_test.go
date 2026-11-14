@@ -28,10 +28,14 @@ func TestTheBundleRunsNoGeneratedCode(t *testing.T) {
 	}
 }
 
+// placeholder is a brand or build placeholder the server replaces, as {{name}}; compiled code nests blocks ("{{")
+// and the profile's words hold their own templates ({{.age}}), neither of which is one.
+var placeholder = regexp.MustCompile(`\{\{\s*[A-Za-z_]+\s*\}\}`)
+
 func TestTheBundleKeepsNoPlaceholder(t *testing.T) {
 	js := servedBundle(t)
-	if i := strings.Index(js, "{{"); i >= 0 {
-		t.Errorf("the served bundle keeps a placeholder: %q", js[i:min(len(js), i+40)])
+	if m := placeholder.FindString(js); m != "" {
+		t.Errorf("the served bundle keeps the placeholder %s", m)
 	}
 	if !strings.Contains(js, brand.Name) {
 		t.Errorf("the served bundle does not name %q: a brand placeholder did not survive the build", brand.Name)

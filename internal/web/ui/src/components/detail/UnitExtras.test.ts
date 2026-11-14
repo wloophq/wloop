@@ -11,6 +11,7 @@ import { catalog, detailState, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import UnitCard from "./UnitCard.svelte";
 import UnitExtras from "./UnitExtras.svelte";
+import { settle } from "../../testing/settle";
 
 const pr = { provider: "github", key: "acme/api#8" };
 const thread = { provider: "slack", key: "T1/C1/1700.1" };
@@ -34,10 +35,6 @@ beforeEach(() => {
   };
 });
 
-async function settle() {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-  flushSync();
-}
 
 const extras = (d: any) => render(UnitExtras, { d }).container;
 const byFocus = (c: HTMLElement, slot: string) => c.querySelector(`[data-focus="${slot}"]`) as HTMLElement | null;
@@ -63,6 +60,8 @@ test("the composer says what to write first when it holds nothing", async () => 
   await settle();
   expect(posts).toEqual([]);
   expect(results.get("unit:reply:save")).toEqual({ text: "Write a reply or name a reaction first", err: true });
+  flushSync();
+  expect(c.querySelector(".d-compose .act-result.err, .act-result.err")?.textContent).toBe("Write a reply or name a reaction first");
 });
 
 test("the composer starts on the served send", () => {

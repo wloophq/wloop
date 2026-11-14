@@ -3,7 +3,7 @@ import { t } from "../../lib/i18n.svelte";
 import { rowByKey } from "../../lib/lens";
 import { unitKey, type J } from "../../lib/util";
 import { act } from "../../state/actions.svelte";
-import { writeHash } from "../../state/route.svelte";
+import { readHash, writeHash } from "../../state/route.svelte";
 import { plugins, state } from "../../state/store.svelte";
 import PluginDetail from "./PluginDetail.svelte";
 import PluginList from "../rows/PluginList.svelte";
@@ -23,7 +23,7 @@ export interface Host {
 type Sub = { fn: (rows: J[]) => void };
 const subscribers = new Set<Sub>();
 const keys = new Map<string, { label: string; fn: (e: KeyboardEvent) => void }>();
-const mounted = { view: "", el: null as HTMLElement | null, mod: null as J, cancel: null as null | (() => void), seq: 0, rows: null as J[] | null };
+const mounted = { view: "", el: null as HTMLElement | null, mod: null as J, cancel: null as null | (() => void), seq: 0 };
 
 export function pluginModuleURL(plugin: string, module: string): string {
   return "/plugins/" + encodeURIComponent(plugin) + "/" + module.split("/").map(encodeURIComponent).join("/");
@@ -40,7 +40,13 @@ export function pluginTheme(): { mode: string; tokens: Record<string, string> } 
 // pluginContext is the ctx a plugin's mount gets; cancel drops what it subscribed and registered.
 function pluginContext(host: Host): { ctx: J; cancel: () => void } {
   const owned = new Set<() => void>();
+  let cancelled = false;
+  // own records drop to run on cancel; once the view is gone, a late subscribe or register drops at once.
   const own = (drop: () => void) => {
+    if (cancelled) {
+      drop();
+      return () => {};
+    }
     let done = false;
     const cancel = () => {
       if (done) return;
@@ -55,9 +61,10 @@ function pluginContext(host: Host): { ctx: J; cancel: () => void } {
     subscribe(fn: (rows: J[]) => void) {
       const sub = { fn };
       subscribers.add(sub);
-      const rows = host.rows();
+      const cancel = own(() => subscribers.delete(sub));
+      const rows = subscribers.has(sub) ? host.rows() : null;
       if (rows) fn(rows);
-      return own(() => subscribers.delete(sub));
+      return cancel;
     },
     select: (x: J) => host.select(x),
     act: (unit: J, action: string, inputs: J) => Promise.resolve(host.act(unit, action, inputs || {})),
@@ -74,7 +81,10 @@ function pluginContext(host: Host): { ctx: J; cancel: () => void } {
     list: (el: HTMLElement, rows: J[], opts: J) => host.list(el, rows, opts || {}),
     detail: (el: HTMLElement, unit: J) => host.detail(el, unit),
   };
-  return { ctx, cancel: () => [...owned].forEach((c) => c()) };
+  return { ctx, cancel: () => {
+    cancelled = true;
+    [...owned].forEach((c) => c());
+  } };
 }
 
 // drawn are the cockpit's components mounted into the elements a plugin view handed over, with the props they
@@ -111,7 +121,7 @@ export function unmountPluginView(): void {
   if (cancel) cancel();
   undraw();
   if (el) el.textContent = "";
-  Object.assign(mounted, { view: "", el: null, mod: null, cancel: null, rows: null });
+  Object.assign(mounted, { view: "", el: null, mod: null, cancel: null });
 }
 
 // importer is how a plugin view's module loads; tests replace it.
@@ -143,10 +153,8 @@ export async function showPluginView(view: string, el: HTMLElement, host: Host):
   }
 }
 
-// publishPlugins hands the subscribers the rows when they changed since the last time.
+// publishPlugins hands the subscribers rows; the view's effect calls it when the rows change.
 export function publishPlugins(rows: J[]): void {
-  if (rows === mounted.rows) return;
-  mounted.rows = rows;
   for (const sub of [...subscribers]) {
     try {
       sub.fn(rows);
@@ -156,8 +164,9 @@ export function publishPlugins(rows: J[]): void {
   }
 }
 
-// pluginKeyDown runs the mounted view's handler of e's key; false when it has none.
+// pluginKeyDown runs the mounted view's handler of e's key while that view shows; false when it has none.
 export function pluginKeyDown(e: KeyboardEvent): boolean {
+  if (!mounted.view || mounted.view !== readHash().view) return false;
   if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return false;
   const entry = keys.get(e.key);
   if (!entry) return false;
@@ -168,7 +177,7 @@ export function pluginKeyDown(e: KeyboardEvent): boolean {
 // cockpitHost is what a plugin view reaches of the cockpit: its rows, the detail pane, the actions and its list
 // and detail drawn with the cockpit's components.
 export const cockpitHost: Host = {
-  rows: () => (state.loaded ? state.rows : null),
+  rows: () => (state.loaded ? $state.snapshot(state.rows) : null),
   select: (x) => writeHash({ pr: unitKey((x && x.unit) || x) }),
   act: (unit, action, inputs) => act(rowByKey(unitKey(unit)) || { unit, label: unit.key, actions: [] }, action, inputs),
   list: (el, rows, opts) => draw(el, "list", PluginList, { rows, empty: (opts && opts.empty) || "" }),

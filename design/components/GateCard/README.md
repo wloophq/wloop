@@ -1,6 +1,6 @@
 # GateCard
 
-The one decision card: an open gate on a task (a plan step, a question, a post, a proposal) or a draft, with the actions it offers. `static/gate.js` draws it for the detail panel, and the Outbox and the queues call the same functions (`gateCard`, `draftCard`).
+The one decision card: an open gate on a task (a plan step, a question, a post, a proposal) or a draft, with the actions it offers. `GateCard.svelte` and `DraftCard.svelte` in `internal/web/ui/src/components/gates/` draw it for the detail panel, and the Outbox and the queues draw the same components.
 
 ## Gate
 

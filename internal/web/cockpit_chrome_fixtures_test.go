@@ -96,6 +96,54 @@ func buildChromeFixtures(t *testing.T) map[string]any {
 		"stringsPtBR": profileStrings(t, "../../profiles/default/locales/pt-BR/strings.toml"),
 		"stringsEn":   profileStrings(t, "../../profiles/default/strings.toml"),
 		"specs":       specs,
+		"usersRow":    usersRowInput(t),
 		"candidates":  map[string]any{"explore_candidate_mine": rows["explore_candidate_mine"], "untracked_open_not_mine": rows["untracked_open_not_mine"]},
+	}
+}
+
+// usersRowInput is the row a user saw broken in My PRs, with the action specs and the served catalog in pt-BR words
+// it is drawn with; the row's vitest suite draws it for the layout tests.
+func usersRowInput(t *testing.T) map[string]any {
+	t.Helper()
+	pr := lensRows()[1]
+	pr["kind"], pr["waiting_on"], pr["stalled"] = "no_reviewer", "me", true
+	pr["title"] = "fix(parts): resolve messages delivered out of order by the unary ack consumer when the broker redelivers"
+	pr["brief"] = map[string]any{"risk": "medium", "size": "m", "kind": "fix", "open_questions": 2, "tags": []string{"area:messaging", "audience:developers",
+		"audience:operators", "change:fix", "concern:concurrency", "concern:reliability", "domain:parts-matching", "lang:python", "tool:gcp-pubsub",
+		"infra:queue", "infra:db", "prio:high", "customer:acme"}}
+	pr["views"] = []string{"mine", "stalled"}
+	actions := []map[string]any{}
+	specs := map[string]any{}
+	for _, a := range [][2]string{{"review", "Review"}, {"address", "Address"}, {"act", "Agir"}, {"nudge", "Cutucar"}, {"pause", "Pausar"}, {"mute", "Silenciar"},
+		{"open", "Abrir"}, {"remove", "Remover"}} {
+		actions = append(actions, map[string]any{"id": a[0], "enabled": true})
+		specs[a[0]] = map[string]any{"id": a[0], "label": a[1], "group": "control", "surfaces": []string{"row"}}
+	}
+	pr["actions"] = actions
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	var cat map[string]any
+	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
+		t.Fatal(err)
+	}
+	ptBR(cat)
+	return map[string]any{"row": wireRow("me", now, pr), "specs": specs, "catalog": cat, "now": now.UnixMilli()}
+}
+
+// ptBR words the served catalog's situation of no reviewer as the user's locale does.
+func ptBR(cat map[string]any) {
+	for _, s := range cat["situations"].([]any) {
+		if sit := s.(map[string]any); sit["kind"] == "no_reviewer" {
+			sit["label"] = "sem revisor"
+		}
+	}
+	for _, f := range cat["facets"].([]any) {
+		if spec := f.(map[string]any); spec["id"] == "kind" {
+			labels, _ := spec["labels"].(map[string]any)
+			if labels == nil {
+				labels = map[string]any{}
+				spec["labels"] = labels
+			}
+			labels["no_reviewer"] = "sem revisor"
+		}
 	}
 }

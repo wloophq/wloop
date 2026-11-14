@@ -13,23 +13,37 @@ export const MATCH: Record<string, (v: string, q: string) => boolean> = {
   team: (v, q) => v === q || v === "team:" + q,
 };
 
+// changed says whether next differs from what the store holds as cur, by value.
+function changed(cur: unknown, next: unknown): boolean {
+  const plain = (v: unknown) => (v instanceof Map || v instanceof Set ? [...v] : v);
+  return JSON.stringify(plain(cur)) !== JSON.stringify(plain(next));
+}
+
+// keep stores next in obj[key] only when it differs from what obj[key] holds, so a read that changed nothing leaves
+// every value, and whatever derives from it, as it was.
+function keep<T extends object, K extends keyof T>(obj: T, key: K, next: T[K]): void {
+  if (changed(obj[key], next)) obj[key] = next;
+}
+
 export function applyCatalog(c: J, fieldOf: (spec: J) => Field): void {
   catalog.version = c.version || "";
-  catalog.views = (c.views || []).filter((v: J) => (v.surfaces || []).includes("web")).sort((a: J, b: J) => a.order - b.order);
+  keep(catalog, "views", (c.views || []).filter((v: J) => (v.surfaces || []).includes("web")).sort((a: J, b: J) => a.order - b.order));
   const sits = [...(c.situations || [])].sort((a: J, b: J) => a.rank - b.rank);
-  catalog.kinds = new Map(sits.map((x: J) => [`${x.provider}:${x.kind}`, x.label]));
-  catalog.kindOrder = [...new Set(sits.map((x: J) => x.kind as string))];
-  catalog.specs = c.facets || [];
-  catalog.fields = catalog.specs.map(fieldOf);
-  catalog.lens = c.lens || [];
-  catalog.reasons = c.reasons || [];
-  catalog.cardSignals = c.card_signals || [];
-  catalog.events = new Map((c.events || []).map((e: J) => [e.kind, e.label]));
-  catalog.eventData = new Map((c.events || []).filter((e: J) => e.data).map((e: J) => [e.kind, e.data]));
-  catalog.eventTones = new Map((c.events || []).filter((e: J) => e.tone).map((e: J) => [e.kind, e.tone]));
-  catalog.details = c.details || [];
+  keep(catalog, "kinds", new Map(sits.map((x: J) => [`${x.provider}:${x.kind}`, x.label])));
+  keep(catalog, "kindOrder", [...new Set(sits.map((x: J) => x.kind as string))]);
+  if (changed(catalog.specs, c.facets || []) || catalog.fields.length !== (c.facets || []).length) {
+    catalog.specs = c.facets || [];
+    catalog.fields = catalog.specs.map(fieldOf);
+  }
+  keep(catalog, "lens", c.lens || []);
+  keep(catalog, "reasons", c.reasons || []);
+  keep(catalog, "cardSignals", c.card_signals || []);
+  keep(catalog, "events", new Map((c.events || []).map((e: J) => [e.kind, e.label])));
+  keep(catalog, "eventData", new Map((c.events || []).filter((e: J) => e.data).map((e: J) => [e.kind, e.data])));
+  keep(catalog, "eventTones", new Map((c.events || []).filter((e: J) => e.tone).map((e: J) => [e.kind, e.tone])));
+  keep(catalog, "details", c.details || []);
   const searching = (c.views || []).find((v: J) => v.search) || {};
-  catalog.search = searching.search || null;
+  keep(catalog, "search", searching.search || null);
   catalog.searchProvider = searching.provider || "";
 }
 
@@ -45,9 +59,9 @@ export function applyPlugins(list: J[]): void {
     if (!web || !web.module) continue;
     for (const id of web.views || []) views.set(id, { plugin: p.id, module: web.module });
   }
-  plugins.views = views;
-  plugins.reacting = reacting;
-  plugins.names = names;
+  keep(plugins, "views", views);
+  keep(plugins, "reacting", reacting);
+  keep(plugins, "names", names);
 }
 
 // providerName is a provider's service as a person reads it, its id when its plugin names none.

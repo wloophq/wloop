@@ -48,9 +48,7 @@ export function answer(reply: (url: string, body: J) => J | Promise<J>, status =
 }
 
 // settle lets the promises the page started run out.
-export async function settle(times = 10): Promise<void> {
-  for (let i = 0; i < times; i++) await Promise.resolve();
-}
+export { settle } from "./settle";
 
 // followHashes makes writeHash move nav as the page's hashchange would, and returns every hash written.
 export function followHashes(): string[] {

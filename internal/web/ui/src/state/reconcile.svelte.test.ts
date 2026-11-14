@@ -57,3 +57,25 @@ describe("reconcile", () => {
     stop();
   });
 });
+
+describe("what an item wraps", () => {
+  test("an activity item is known by its event, so a new one on top keeps the rest", () => {
+    const ev = (key: string) => ({ event: { unit: { provider: "acme", key: "web#1" }, kind: "commented", key, at: "2026-11-07T12:00:00Z" }, title: "t" });
+    const old = [ev("a"), ev("b")];
+    const [a, b] = old;
+    reconcile(old, [ev("c"), ev("a"), ev("b")]);
+    expect(old[1]).toBe(a);
+    expect(old[2]).toBe(b);
+  });
+
+  test("a timeline node is known by its first event, a queue item by its gate or task", () => {
+    const node = { rule: "said", events: [{ seq: 4 }] };
+    const item = { gate: { id: 9 }, task: { id: "t-1" } };
+    const nodes = [node];
+    const items = [item];
+    reconcile(nodes, [{ rule: "said", events: [{ seq: 5 }] }, { rule: "said", events: [{ seq: 4 }] }]);
+    reconcile(items, [{ gate: { id: 8 }, task: { id: "t-2" } }, { gate: { id: 9 }, task: { id: "t-1" } }]);
+    expect(nodes[1]).toBe(node);
+    expect(items[1]).toBe(item);
+  });
+});

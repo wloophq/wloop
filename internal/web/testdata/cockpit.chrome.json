@@ -4997,6 +4997,1042 @@
   "{verb} {task} failed: {error}": "{verb} {task} falhou: {error}",
   "{what} at {time}": "{what} às {time}"
  },
+ "usersRow": {
+  "catalog": {
+   "card_signals": [
+    {
+     "key": "checks",
+     "label": "checks",
+     "provider": "github",
+     "values": {
+      "failing": "failing",
+      "failing_named": "failing: {{.names}}",
+      "passing": "passing",
+      "pending": "pending"
+     }
+    },
+    {
+     "key": "merge",
+     "label": "merge",
+     "provider": "github",
+     "values": {
+      "conflicts": "conflicts"
+     }
+    },
+    {
+     "key": "review",
+     "label": "review",
+     "provider": "github",
+     "values": {
+      "approved": "approved"
+     }
+    },
+    {
+     "key": "situation",
+     "label": "situation",
+     "notes": {
+      "stalled": "stalled for {{.days}} {{plural .days \"one\" \"working day\" \"other\" \"working days\"}}"
+     },
+     "provider": "github",
+     "values": {
+      "blocked": "round blocked",
+      "changes": "changes asked",
+      "checks": "checks failing",
+      "conflicts": "merge conflicts",
+      "done": "closed",
+      "draft": "draft",
+      "held": "held (cap)",
+      "loop_stopped": "agent stopped",
+      "loop_waiting": "agent asks",
+      "loop_working": "agent working",
+      "merge": "can merge",
+      "muted": "muted",
+      "no_reviewer": "no reviewer",
+      "reply": "reply due",
+      "review": "review",
+      "reviewer_back": "reviewer due",
+      "round_pending": "round soon",
+      "to_address": "to address"
+     }
+    }
+   ],
+   "details": [
+    {
+     "field": "next_guidance",
+     "label": "Next round guidance",
+     "provider": "github",
+     "title": "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
+    },
+    {
+     "field": "profile_chain",
+     "label": "Review profile",
+     "provider": "github",
+     "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+    }
+   ],
+   "events": [
+    {
+     "kind": "opened",
+     "label": "opened",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "push",
+     "label": "pushed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "requested",
+     "kind": "review_requested",
+     "label": "review requested",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "requested",
+     "kind": "review_request_removed",
+     "label": "review request removed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "first_field",
+     "kind": "review",
+     "label": "reviewed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "comment",
+     "label": "commented",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "check",
+     "label": "checks",
+     "provider": "github"
+    },
+    {
+     "kind": "ready",
+     "label": "ready for review",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "draft",
+     "label": "back to draft",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "short_sha",
+     "kind": "merged",
+     "label": "merged",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "closed",
+     "label": "closed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "round_sent",
+     "label": "round sent",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_held",
+     "label": "round held",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_pending",
+     "label": "round pending",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_skipped",
+     "label": "round skipped",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "guidance",
+     "label": "guidance",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_blocked",
+     "label": "round blocked",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_unblocked",
+     "label": "round unblocked",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    }
+   ],
+   "facets": [
+    {
+     "group": true,
+     "id": "where",
+     "label": "Where",
+     "match": "suffix",
+     "menu": true,
+     "provider": "github",
+     "show": "ref",
+     "sort": "text"
+    },
+    {
+     "group": true,
+     "id": "author",
+     "label": "Author",
+     "label_prefix": "by ",
+     "labels": {
+      "me": "me"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "me"
+     ],
+     "row_class": {
+      "me": "mine"
+     },
+     "show": "meta",
+     "show_values": "first",
+     "sort": "rank"
+    },
+    {
+     "colors": {
+      "author": "author",
+      "loop": "loop",
+      "me": "me",
+      "nobody": "nobody",
+      "reviewer": "reviewer"
+     },
+     "group": true,
+     "id": "wait",
+     "label": "Waits on (role)",
+     "labels": {
+      "author": "Waiting on the author",
+      "loop": "In loop",
+      "me": "Waiting on me",
+      "nobody": "Waiting on nobody",
+      "reviewer": "Waiting on a reviewer"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "me",
+      "loop",
+      "reviewer",
+      "author",
+      "nobody"
+     ],
+     "sort": "rank",
+     "strip": true
+    },
+    {
+     "group": true,
+     "id": "waits-on",
+     "label": "Waits on (person)",
+     "labels": {
+      "me": "me"
+     },
+     "match": "team",
+     "menu": true,
+     "provider": "github",
+     "show": "who"
+    },
+    {
+     "group": true,
+     "id": "kind",
+     "label": "Situation",
+     "labels": {
+      "blocked": "round blocked",
+      "changes": "changes asked",
+      "checks": "checks failing",
+      "conflicts": "merge conflicts",
+      "done": "closed",
+      "draft": "draft",
+      "held": "held (cap)",
+      "loop_stopped": "agent stopped",
+      "loop_waiting": "agent asks",
+      "loop_working": "agent working",
+      "merge": "can merge",
+      "muted": "muted",
+      "no_reviewer": "sem revisor",
+      "reply": "reply due",
+      "review": "review",
+      "reviewer_back": "reviewer due",
+      "round_pending": "round soon",
+      "to_address": "to address"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "round_pending",
+      "loop_waiting",
+      "loop_stopped",
+      "blocked",
+      "to_address",
+      "held",
+      "loop_working",
+      "changes",
+      "checks",
+      "conflicts",
+      "reply",
+      "reviewer_back",
+      "review",
+      "no_reviewer",
+      "merge",
+      "draft",
+      "muted",
+      "done"
+     ],
+     "show": "kind",
+     "sort": "rank"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "type",
+     "label": "Type",
+     "menu": true,
+     "provider": "github",
+     "show": "meta",
+     "sort": "text"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "risk",
+     "label": "Risk",
+     "label_prefix": "risk ",
+     "labels": {
+      "high": "high",
+      "low": "low",
+      "medium": "medium"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "high",
+      "medium",
+      "low"
+     ],
+     "show": "meta",
+     "sort": "rank"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "size",
+     "label": "Size",
+     "labels": {
+      "l": "L",
+      "m": "M",
+      "s": "S",
+      "xl": "XL",
+      "xs": "XS"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "xs",
+      "s",
+      "m",
+      "l",
+      "xl"
+     ],
+     "show": "meta",
+     "sort": "rank"
+    },
+    {
+     "empty": "no workspace",
+     "group": true,
+     "id": "status",
+     "label": "Workspace",
+     "menu": true,
+     "provider": "github",
+     "show": "aside",
+     "sort": "text"
+    },
+    {
+     "group": false,
+     "id": "tag",
+     "label": "Tag",
+     "match": "prefix",
+     "menu": true,
+     "provider": "github",
+     "show": "meta",
+     "show_max": 2
+    },
+    {
+     "group": false,
+     "id": "is",
+     "label": "Flags",
+     "labels": {
+      "adopted": "adopted",
+      "approved": "approved",
+      "due": "due",
+      "in-loop": "in loop",
+      "muted": "muted",
+      "needs-me": "needs me",
+      "paused": "paused",
+      "stalled": "stalled",
+      "tracked": "tracked"
+     },
+     "menu": true,
+     "provider": "github",
+     "row_class": {
+      "stalled": "late"
+     },
+     "show": "flag",
+     "show_only": [
+      "paused",
+      "muted"
+     ]
+    },
+    {
+     "empty": "no checks data",
+     "group": true,
+     "id": "ci",
+     "label": "Checks",
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "failure",
+      "pending",
+      "success"
+     ]
+    },
+    {
+     "buckets": [
+      {
+       "id": "1d",
+       "label": "0-1 days",
+       "within": "24h"
+      },
+      {
+       "id": "3d",
+       "label": "1-3 days",
+       "within": "72h"
+      },
+      {
+       "id": "7d",
+       "label": "3-7 days",
+       "within": "168h"
+      },
+      {
+       "id": "2w",
+       "label": "1-2 weeks",
+       "within": "336h"
+      },
+      {
+       "id": "4w",
+       "label": "2-4 weeks",
+       "within": "672h"
+      },
+      {
+       "id": "older",
+       "label": "over 4 weeks",
+       "within": ""
+      }
+     ],
+     "empty": "no opening date",
+     "group": true,
+     "id": "opened",
+     "label": "Opened",
+     "labels": {
+      "1d": "0-1 days",
+      "2w": "1-2 weeks",
+      "3d": "1-3 days",
+      "4w": "2-4 weeks",
+      "7d": "3-7 days",
+      "older": "over 4 weeks"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "1d",
+      "3d",
+      "7d",
+      "2w",
+      "4w",
+      "older"
+     ],
+     "sort": "time"
+    },
+    {
+     "group": false,
+     "id": "scope",
+     "label": "In scope as",
+     "menu": true,
+     "provider": "github"
+    },
+    {
+     "buckets": [
+      {
+       "id": "1d",
+       "label": "0-1 days",
+       "within": "24h"
+      },
+      {
+       "id": "3d",
+       "label": "1-3 days",
+       "within": "72h"
+      },
+      {
+       "id": "7d",
+       "label": "3-7 days",
+       "within": "168h"
+      },
+      {
+       "id": "2w",
+       "label": "1-2 weeks",
+       "within": "336h"
+      },
+      {
+       "id": "4w",
+       "label": "2-4 weeks",
+       "within": "672h"
+      },
+      {
+       "id": "older",
+       "label": "over 4 weeks",
+       "within": ""
+      }
+     ],
+     "group": false,
+     "id": "age",
+     "label": "Waiting for",
+     "menu": true,
+     "provider": "github",
+     "show": "age",
+     "show_label": "since {{.at}}",
+     "sort": "time"
+    },
+    {
+     "group": true,
+     "id": "lane",
+     "label": "Board lane",
+     "labels": {
+      "author": "Waiting on author",
+      "loop": "In loop",
+      "me": "Needs me",
+      "merge": "Can merge",
+      "reviewer": "Waiting on reviewer"
+     },
+     "menu": false,
+     "provider": "github",
+     "rank": [
+      "me",
+      "reviewer",
+      "author",
+      "merge",
+      "loop"
+     ]
+    },
+    {
+     "buckets": [
+      {
+       "id": "later",
+       "label": "later",
+       "within": "-24h"
+      },
+      {
+       "id": "due",
+       "label": "due",
+       "within": "1ms"
+      },
+      {
+       "id": "past",
+       "label": "past",
+       "within": ""
+      }
+     ],
+     "group": false,
+     "id": "due",
+     "label": "Due",
+     "menu": false,
+     "provider": "github",
+     "sort": "time"
+    }
+   ],
+   "reasons": [
+    {
+     "provider": "github",
+     "words": {
+      "agent_asked": "the agent asked you something",
+      "approved_checks_pending": "approved, checks pending",
+      "approved_green": "approved and green",
+      "changes_requested": "changes requested by {{.actor}}",
+      "checks_failing": "checks failing on the head",
+      "checks_failing_more": "checks failing: {{.checks}} and {{.more}} more",
+      "checks_failing_named": "checks failing: {{.checks}}",
+      "closed": "closed",
+      "commented_no_reply": "{{.actor}} commented, no reply",
+      "draft": "draft",
+      "merge_conflicts": "merge conflicts with {{.branch}}",
+      "merged": "merged",
+      "no_review_required": "green, no review required",
+      "no_review_required_checks_pending": "no review required, checks pending",
+      "no_reviewer_requested": "no reviewer requested",
+      "review_requested": "review requested, no review on the head",
+      "review_requested_again": "review requested again after your review",
+      "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
+      "round_blocked": "round blocked: {{.why}}",
+      "round_held": "automatic round held: {{.why}}",
+      "round_in_progress": "review round in progress",
+      "to_address": "review to address, no workspace: {{.why}}"
+     }
+    }
+   ],
+   "situations": [
+    {
+     "kind": "round_pending",
+     "label": "round soon",
+     "provider": "github",
+     "rank": 0
+    },
+    {
+     "kind": "loop_waiting",
+     "label": "agent asks",
+     "provider": "github",
+     "rank": 1
+    },
+    {
+     "kind": "loop_stopped",
+     "label": "agent stopped",
+     "provider": "github",
+     "rank": 2
+    },
+    {
+     "kind": "blocked",
+     "label": "round blocked",
+     "provider": "github",
+     "rank": 3
+    },
+    {
+     "kind": "to_address",
+     "label": "to address",
+     "provider": "github",
+     "rank": 4
+    },
+    {
+     "kind": "held",
+     "label": "held (cap)",
+     "provider": "github",
+     "rank": 5
+    },
+    {
+     "kind": "loop_working",
+     "label": "agent working",
+     "provider": "github",
+     "rank": 6
+    },
+    {
+     "kind": "changes",
+     "label": "changes asked",
+     "provider": "github",
+     "rank": 7
+    },
+    {
+     "kind": "checks",
+     "label": "checks failing",
+     "provider": "github",
+     "rank": 8
+    },
+    {
+     "kind": "conflicts",
+     "label": "merge conflicts",
+     "provider": "github",
+     "rank": 9
+    },
+    {
+     "kind": "reply",
+     "label": "reply due",
+     "provider": "github",
+     "rank": 10
+    },
+    {
+     "kind": "reviewer_back",
+     "label": "reviewer due",
+     "provider": "github",
+     "rank": 11
+    },
+    {
+     "kind": "review",
+     "label": "review",
+     "provider": "github",
+     "rank": 12
+    },
+    {
+     "kind": "no_reviewer",
+     "label": "sem revisor",
+     "provider": "github",
+     "rank": 13
+    },
+    {
+     "kind": "merge",
+     "label": "can merge",
+     "provider": "github",
+     "rank": 14
+    },
+    {
+     "kind": "draft",
+     "label": "draft",
+     "provider": "github",
+     "rank": 15
+    },
+    {
+     "kind": "muted",
+     "label": "muted",
+     "provider": "github",
+     "rank": 16
+    },
+    {
+     "kind": "done",
+     "label": "closed",
+     "provider": "github",
+     "rank": 17
+    }
+   ],
+   "version": "d753e6ef5d59",
+   "views": [
+    {
+     "default_sort": "Waiting longest",
+     "id": "mine",
+     "label": "My PRs",
+     "order": 2,
+     "provider": "github",
+     "rows": true,
+     "surfaces": [
+      "web",
+      "tui"
+     ],
+     "unit": "Pull request"
+    },
+    {
+     "default_sort": "Waiting longest",
+     "id": "dash",
+     "label": "Backlog",
+     "order": 6,
+     "provider": "github",
+     "rows": false,
+     "surfaces": [
+      "web"
+     ]
+    },
+    {
+     "default_sort": "Waiting longest",
+     "id": "all",
+     "label": "All",
+     "order": 8,
+     "provider": "github",
+     "rows": true,
+     "surfaces": [
+      "web"
+     ]
+    },
+    {
+     "id": "explore",
+     "label": "Explore",
+     "order": 9,
+     "provider": "github",
+     "rows": false,
+     "search": {
+      "decisions": {
+       "APPROVED": "approved",
+       "CHANGES_REQUESTED": "changes requested",
+       "REVIEW_REQUIRED": "review required"
+      },
+      "default_sort": "updated-asc",
+      "filters": [
+       {
+        "label": "Not reviewed by me",
+        "term": "-reviewed-by:@me"
+       },
+       {
+        "label": "Ready for review",
+        "term": "draft:false"
+       },
+       {
+        "label": "Requested from me or my teams",
+        "term": "review-requested:@me"
+       },
+       {
+        "label": "Active in the last 30 days",
+        "window": 30
+       }
+      ],
+      "no_decision": "no review required",
+      "presets": [
+       {
+        "label": "Asked of me",
+        "query": "user-review-requested:@me"
+       },
+       {
+        "label": "Asked of my teams",
+        "query": "review-requested:@me -user-review-requested:@me"
+       }
+      ],
+      "sorts": [
+       {
+        "label": "Waiting longest",
+        "shown": "waiting longest",
+        "sort": "updated-asc"
+       },
+       {
+        "label": "Oldest opened",
+        "shown": "oldest opened",
+        "sort": "created-asc"
+       },
+       {
+        "label": "Recently updated",
+        "shown": "most recently updated",
+        "sort": "updated-desc"
+       }
+      ]
+     },
+     "surfaces": [
+      "web"
+     ]
+    }
+   ]
+  },
+  "now": 1791806400000,
+  "row": {
+   "actions": [
+    {
+     "enabled": true,
+     "id": "review"
+    },
+    {
+     "enabled": true,
+     "id": "address"
+    },
+    {
+     "enabled": true,
+     "id": "act"
+    },
+    {
+     "enabled": true,
+     "id": "nudge"
+    },
+    {
+     "enabled": true,
+     "id": "pause"
+    },
+    {
+     "enabled": true,
+     "id": "mute"
+    },
+    {
+     "enabled": true,
+     "id": "open"
+    },
+    {
+     "enabled": true,
+     "id": "remove"
+    }
+   ],
+   "facets": {
+    "age": [
+     "2026-10-09T00:00:00Z"
+    ],
+    "author": [
+     "me",
+     "me"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "stalled"
+    ],
+    "kind": [
+     "no_reviewer"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "medium"
+    ],
+    "scope": null,
+    "size": [
+     "m"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:messaging",
+     "audience:developers",
+     "audience:operators",
+     "change:fix",
+     "concern:concurrency",
+     "concern:reliability",
+     "domain:parts-matching",
+     "lang:python",
+     "tool:gcp-pubsub",
+     "infra:queue",
+     "infra:db",
+     "prio:high",
+     "customer:acme"
+    ],
+    "type": [
+     "fix"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "no_reviewer",
+   "label": "acme/web#2",
+   "payload": {
+    "author": "me",
+    "brief": {
+     "kind": "fix",
+     "open_questions": 2,
+     "risk": "medium",
+     "size": "m",
+     "tags": [
+      "area:messaging",
+      "audience:developers",
+      "audience:operators",
+      "change:fix",
+      "concern:concurrency",
+      "concern:reliability",
+      "domain:parts-matching",
+      "lang:python",
+      "tool:gcp-pubsub",
+      "infra:queue",
+      "infra:db",
+      "prio:high",
+      "customer:acme"
+     ]
+    },
+    "repo": "acme/web",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 2,
+    "owner": "acme",
+    "repo": "web"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-09T00:00:00Z",
+    "stalled": true,
+    "waits_on": "me"
+   },
+   "title": "fix(parts): resolve messages delivered out of order by the unary ack consumer when the broker redelivers",
+   "unit": {
+    "key": "acme/web#2",
+    "provider": "github"
+   },
+   "views": [
+    "mine",
+    "stalled"
+   ]
+  },
+  "specs": {
+   "act": {
+    "group": "control",
+    "id": "act",
+    "label": "Agir",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "address": {
+    "group": "control",
+    "id": "address",
+    "label": "Address",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "mute": {
+    "group": "control",
+    "id": "mute",
+    "label": "Silenciar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "nudge": {
+    "group": "control",
+    "id": "nudge",
+    "label": "Cutucar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "open": {
+    "group": "control",
+    "id": "open",
+    "label": "Abrir",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "pause": {
+    "group": "control",
+    "id": "pause",
+    "label": "Pausar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "remove": {
+    "group": "control",
+    "id": "remove",
+    "label": "Remover",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "review": {
+    "group": "control",
+    "id": "review",
+    "label": "Review",
+    "surfaces": [
+     "row"
+    ]
+   }
+  }
+ },
  "views": {
   "views": [
    {

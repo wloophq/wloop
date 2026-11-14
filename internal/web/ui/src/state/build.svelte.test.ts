@@ -3,7 +3,7 @@ import { resetStore } from "../testing/reset.svelte";
 import { pending } from "./actions.svelte";
 import { checkBuild, checkPanelBuild, page, update } from "./build.svelte";
 import { askConfirm, showOmnibox } from "./overlays.svelte";
-import { busy, detailState, drafts, editPayloads, editing, gateState, taskState } from "./store.svelte";
+import { busy, detailState, drafts, editPayloads, editing, gateState, outboxState, taskState } from "./store.svelte";
 
 let stored = "";
 let reloads = 0;
@@ -35,10 +35,11 @@ describe("a new build reloads or offers to", () => {
     ["text in the capture field", "b2", () => (drafts.capture = "buy milk"), { reloads: 0, banner: true, stored: "" }],
     ["an open dialog", "b2", () => void askConfirm("Sure?"), { reloads: 0, banner: true, stored: "" }],
     ["guidance kept for a closed detail", "b2", () => (drafts.guidance["acme:api#1"] = "rebase first"), { reloads: 0, banner: true, stored: "" }],
-    ["a draft being edited", "b2", () => editing.set("draft:7", "Deployed"), { reloads: 0, banner: true, stored: "" }],
+    ["a draft being edited", "b2", () => (taskState.drafts = [{ id: 7 }], editing.set("draft:7", "Deployed")), { reloads: 0, banner: true, stored: "" }],
+    ["an edit of a draft the page no longer shows", "b2", () => (editing.set("draft:7", "Deployed"), editPayloads.set("draft:8", { a: 1 })), { reloads: 1, banner: false, stored: "b2" }],
     ["an answer typed", "b2", () => (detailState.answer = "after ten"), { reloads: 0, banner: true, stored: "" }],
     ["an answer typed in a gate", "b2", () => gateState.answers.set("g-1", "after ten"), { reloads: 0, banner: true, stored: "" }],
-    ["a draft's field edited", "b2", () => editPayloads.set("draft:7", { title: "x" }), { reloads: 0, banner: true, stored: "" }],
+    ["a draft's field edited", "b2", () => (outboxState.page = { groups: [{ drafts: [{ id: 7 }] }] }, editPayloads.set("draft:7", { title: "x" })), { reloads: 0, banner: true, stored: "" }],
     ["the omnibox open", "b2", () => showOmnibox({ text: "rev" }), { reloads: 0, banner: true, stored: "" }],
     ["an action on its way", "b2", () => busy.add("acme:api#1"), { reloads: 0, banner: true, stored: "" }],
     ["a button's request on its way", "b2", () => pending.add("detail:review"), { reloads: 0, banner: true, stored: "" }],

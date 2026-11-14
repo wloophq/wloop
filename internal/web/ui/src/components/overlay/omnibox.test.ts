@@ -11,6 +11,7 @@ import { resetStore } from "../../testing/reset.svelte";
 import Omnibox from "./Omnibox.svelte";
 import { omniboxAct, omniboxEnter, omniboxNew, omniboxTrap, omniboxType, panelFollow, type OmniEnv } from "./omnibox";
 import PanelOmnibox from "./PanelOmnibox.svelte";
+import { settle } from "../../testing/settle";
 
 vi.mock("../../state/actions.svelte", async (importOriginal) => {
   const m = await importOriginal<typeof import("../../state/actions.svelte")>();
@@ -100,10 +101,6 @@ function fake(input: Input) {
   return { log, env, held, ctl };
 }
 
-const settle = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-  flushSync();
-};
 
 // mount draws the omnibox over the fake daemon input answers; type types into its field and waits for the
 // answer.

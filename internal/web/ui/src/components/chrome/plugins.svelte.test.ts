@@ -70,7 +70,9 @@ describe("a plugin view", () => {
     await showPluginView("fake-board", el, host);
     await settle();
     publishPlugins((rows = [{ id: 1 }, { id: 2 }]));
-    publishPlugins(rows);
+    nav.hash = "#view=inbox";
+    const elsewhere = pluginKeyDown(new KeyboardEvent("keydown", { key: "x" }));
+    nav.hash = "#view=fake-board";
     const handled = pluginKeyDown(new KeyboardEvent("keydown", { key: "x" }));
     unmountPluginView();
     expect(el.childNodes.length).toBe(0);
@@ -87,6 +89,7 @@ describe("a plugin view", () => {
     await showPluginView("fake-board", el, host);
     expect(urls.slice(loads)).toEqual([]);
 
+    expect(elsewhere).toBe(false);
     expect(handled).toBe(true);
     expect(log.filter((x) => x !== "acted:true")).toEqual(["mount", "rows:1", "select:T1/C1", "act:T1/C1:nudge:hi", "list:1:none", "detail:T1/C1", "theme:function", "rows:2", "key:x", "unmount"]);
     expect(log).toContain("acted:true");
@@ -203,5 +206,39 @@ describe("the theme a plugin view gets", () => {
       for (const name of Object.keys(got.tokens)) expect(want[mode], name).toHaveProperty(name);
     }
     vi.unstubAllGlobals();
+  });
+});
+
+describe("what a plugin view leaves behind", () => {
+  test("a key or a subscription the view asks for after it was left takes nothing", async () => {
+    let ctx: J = null;
+    let release!: () => void;
+    importer.load = async () => ({ mount: async (_el: HTMLElement, c: J) => { ctx = c; await new Promise<void>((r) => (release = r)); } });
+    applyPlugins(enabled);
+    nav.hash = "#view=fake-board";
+    const el = document.createElement("section");
+    const host: Host = { rows: () => [{ id: 1 }], select: () => {}, act: async () => true, list: () => {}, detail: () => {} };
+    const mounting = showPluginView("fake-board", el, host);
+    await settle();
+    unmountPluginView();
+    let ran = 0;
+    let fed = 0;
+    ctx.keys.register("r", "Refresh", () => ran++);
+    ctx.subscribe(() => fed++);
+    release();
+    await mounting;
+    nav.hash = "#view=fake-board";
+    expect(pluginKeyDown(new KeyboardEvent("keydown", { key: "r" }))).toBe(false);
+    publishPlugins([{ id: 2 }]);
+    expect([ran, fed]).toEqual([0, 0]);
+  });
+
+  test("a subscriber gets a copy of the rows, never the store's own", () => {
+    state.loaded = true;
+    state.rows = [{ unit: { provider: "acme", key: "web#1" }, title: "One" }];
+    const rows = cockpitHost.rows() as J[];
+    rows[0].title = "Changed by the plugin";
+    rows.reverse();
+    expect(state.rows[0].title).toBe("One");
   });
 });

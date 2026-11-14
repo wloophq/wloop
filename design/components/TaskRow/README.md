@@ -1,6 +1,6 @@
 # TaskRow
 
-One item in any list, a task or a plugin's row: two lines, `row-height` at least, drawn by `rowView` in `static/row.js`.
+One item in any list, a task or a plugin's row: two lines, `row-height` at least, drawn by `RowView.svelte` in `internal/web/ui/src/components/rows/`.
 
 A grid of `16px 1fr auto`:
 

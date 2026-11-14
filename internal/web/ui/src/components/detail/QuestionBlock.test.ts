@@ -7,6 +7,7 @@ import { resetStore } from "../../testing/reset.svelte";
 import TurnButton from "./TurnButton.svelte";
 import UnitDetail from "./UnitDetail.svelte";
 import { wire } from "./wire.test-data";
+import { settle } from "../../testing/settle";
 
 const KEY = "github:acme/api#7";
 const HASH = "#unit=github/acme%2Fapi%237";
@@ -28,10 +29,6 @@ beforeEach(() => {
   };
 });
 
-async function settle() {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-  flushSync();
-}
 
 function show(d: any) {
   state.detail = d;

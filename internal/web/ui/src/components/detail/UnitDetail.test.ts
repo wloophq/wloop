@@ -11,6 +11,7 @@ import { routeUnit } from "../../lib/routes";
 import { nav } from "../../state/route.svelte";
 import UnitDetail from "./UnitDetail.svelte";
 import { wire } from "./wire.test-data";
+import { settle } from "../../testing/settle";
 
 const KEY = "github:acme/api#7";
 const HASH = "#unit=github/acme%2Fapi%237";
@@ -27,10 +28,6 @@ beforeEach(() => {
   };
 });
 
-async function settle() {
-  for (let i = 0; i < 5; i++) await Promise.resolve();
-  flushSync();
-}
 
 function useSpecs(s: any) {
   state.specs = { version: s.version, byId: Object.fromEntries(s.specs.map((x: any) => [x.id, x])) };

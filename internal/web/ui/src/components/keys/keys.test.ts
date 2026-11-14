@@ -384,3 +384,18 @@ describe("queue_test.go", () => {
     expect(k.log.posts.map((p) => p.url)).toEqual(other ? ["/api/tasks/e-1/" + other.action] : []);
   });
 });
+
+test("TestBracketsSwitchTabsOnlyInTheDetail: ] and [ step the review outside the detail and the tabs inside it", async () => {
+  const calls: string[] = [];
+  const keys = createKeys({
+    selected: () => null, verbs: () => [],
+    viewContext: () => "review",
+    step: (a: string) => { calls.push("step:" + a); return true; },
+    detailAt: (el: unknown) => !!(el as { inDetail?: boolean }).inDetail,
+    tab: (dir: string) => { calls.push("tab:" + dir); return true; },
+  } as never);
+  keys.setBindings(BINDINGS);
+  const press = (key: string, inDetail: boolean) => keys.handle({ key, target: { tagName: "DIV", inDetail }, defaultPrevented: false, preventDefault() {} } as never);
+  for (const [key, inDetail] of [["]", false], ["[", false], ["]", true], ["[", true]] as const) await press(key, inDetail);
+  expect(calls).toEqual(["step:next", "step:prev", "tab:next", "tab:prev"]);
+});

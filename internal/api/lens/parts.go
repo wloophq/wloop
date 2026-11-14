@@ -129,7 +129,7 @@ func Age(w api.RowWords, d time.Duration) string {
 	return Word(w.AgeDays, map[string]string{"d": n(mins / (24 * 60)), "h": n(mins / 60 % 24)})
 }
 
-// Countdown is the time left before a pending round sends, in the row words; it mirrors app.js's left.
+// Countdown is the time left before a pending round sends, in the row words; the cockpit's left mirrors it.
 func Countdown(w api.RowWords, left time.Duration) string {
 	s := int((left + time.Second - 1) / time.Second)
 	switch {

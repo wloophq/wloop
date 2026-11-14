@@ -6,7 +6,7 @@ import { taskById } from "../../lib/tasks";
 import { keyOf, unitOf, type J } from "../../lib/util";
 import { readLens } from "../../lib/view";
 import { act, setNotice } from "../../state/actions.svelte";
-import { getJSON, net } from "../../state/api";
+import { net } from "../../state/api";
 import { askInput, overlays } from "../../state/overlays.svelte";
 import { nav, readHash, win, writeHash } from "../../state/route.svelte";
 import { catalog, detailState, plugins, state, tasksState } from "../../state/store.svelte";
@@ -115,8 +115,6 @@ function move(delta: number): boolean {
   return true;
 }
 
-let areas: string[] | null = null;
-
 // appEnv binds the key dispatcher to the cockpit's page.
 export function appEnv(): KeysEnv {
   return {
@@ -175,10 +173,7 @@ export function appEnv(): KeysEnv {
     navigate: (view) => setHashParam("view", view),
     views: () => catalog.views,
     providers: () => [...plugins.names.keys()],
-    areas: async () => {
-      if (!areas) areas = (await getJSON("/api/views")).areas || [];
-      return areas as string[];
-    },
+    areas: async () => ((tasksState.catalog && tasksState.catalog.areas) || []) as string[],
     setArea: (a) => setHashParam("area", a),
     filter: () => {
       const box = document.getElementById("search") as HTMLInputElement | null;

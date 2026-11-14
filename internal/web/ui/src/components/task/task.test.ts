@@ -15,6 +15,7 @@ import { askedArgs, detailPane, propRows, runVerb, shownTabs, selectedTab, taskG
 import TaskDetail from "./TaskDetail.svelte";
 import TaskVerbs from "./TaskVerbs.svelte";
 import TaskProps from "./TaskProps.svelte";
+import { settle } from "../../testing/settle";
 
 const ID = "t-0123456789abcdef";
 const prUnit = { provider: "github", key: "acme/api#8" };
@@ -96,10 +97,6 @@ function serve(answers: Record<string, J>): Net {
   return daemon;
 }
 
-async function settle(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
-  flushSync();
-}
 
 // page loads task id into the store as a sync would and draws the detail once.
 async function page(id: string, answers: Record<string, J> = pageAnswers()): Promise<HTMLElement> {
@@ -241,6 +238,7 @@ test("Send posts to the chat and Save as draft holds a reply; an empty composer 
   expect(text($(compose, ".primary"))).toBe("Send");
   await click(focus(box, "task:compose:send"));
   expect(results.get("task:compose:send")).toEqual({ text: "Write a message first", err: true });
+  expect(text($(compose, ".act-result"))).toBe("Write a message first");
   await type(box, "Take the timeout case first.");
   await click(focus(box, "task:compose:send"));
   await type(box, "We ship Friday.");

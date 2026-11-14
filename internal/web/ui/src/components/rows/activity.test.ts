@@ -61,6 +61,7 @@ describe("the recent activity", () => {
     const a = ev.querySelector("a")!;
     expect([a.getAttribute("href"), a.textContent]).toEqual(["https://chat.example/archives/C2/p17001", "Chatter"]);
     const before = location.hash;
+    container.addEventListener("click", (e) => e.preventDefault(), true);
     await fireEvent.click(a);
     expect(location.hash).toBe(before);
     await fireEvent.click(ev);

@@ -1,6 +1,7 @@
 import { pending } from "./actions.svelte";
 import { omni, overlays } from "./overlays.svelte";
-import { busy, detailState, drafts, editPayloads, editing, gateState, taskState } from "./store.svelte";
+import type { J } from "../lib/util";
+import { busy, detailState, drafts, editPayloads, editing, gateState, outboxState, queueState, taskState, tasksState } from "./store.svelte";
 
 // update says whether the banner that offers a reload into the daemon's new build shows.
 export const update = $state({ shown: false });
@@ -15,11 +16,34 @@ export function buildAction(loaded: string, served: string, blocked: boolean, re
 
 const held = (text: unknown) => String(text || "").trim() !== "";
 
+// draftsShown are the drafts the page holds, as "draft:<id>", the key a draft's edits live under: those of the
+// open task, its drafts, the listed tasks and gates, the Outbox and the queue.
+function draftsShown(): Set<string> {
+  const out = new Set<string>();
+  const subject = (g: J) => g && g.subject && typeof g.subject === "object" && g.subject.id !== undefined && out.add("draft:" + g.subject.id);
+  const task = (e: J) => e && (e.gates || []).forEach(subject);
+  task(detailState.task);
+  for (const d of taskState.drafts) out.add("draft:" + d.id);
+  tasksState.tasks.forEach(task);
+  tasksState.gates.forEach(subject);
+  for (const g of (outboxState.page && outboxState.page.groups) || []) for (const d of g.drafts || []) out.add("draft:" + d.id);
+  for (const it of (queueState.queue && queueState.queue.items) || []) subject(it.gate);
+  return out;
+}
+
+// editsShown says whether a draft the page still shows is being edited: an edit of a draft that left the page,
+// sent or withdrawn elsewhere, holds nothing a reload would lose.
+function editsShown(): boolean {
+  if (!editing.size && !editPayloads.size) return false;
+  const shown = draftsShown();
+  return [...editing.keys(), ...editPayloads.keys()].some((k) => shown.has(k));
+}
+
 // reloadBlocked says whether a reload would lose something: an open overlay or omnibox, an action whose answer is
 // on its way, a draft being edited (its text or its fields), or text the page holds for a composer, a guidance, an answer or the capture field.
 // The filter and the Explore search are left out, since the hash keeps them.
 export function reloadBlocked(): boolean {
-  if (overlays.stack.length || omni.open || busy.size || pending.size || editing.size || editPayloads.size) return true;
+  if (overlays.stack.length || omni.open || busy.size || pending.size || editsShown()) return true;
   const texts = [
     ...Object.values(drafts.guidance), drafts.capture, detailState.answer, detailState.guidance, detailState.compose.text,
     detailState.compose.reaction, taskState.text, ...gateState.answers.values(),

@@ -70,7 +70,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
 - The terminal client's words are `strings.toml`'s, through `texts.Catalog`, its key names (Tab, Ctrl+E) passed as values, never translated.
-- The cockpit's words are `strings.toml`'s, through `t` and `tn` in `internal/web/static/i18n.js`, and the core's event kinds are `timeline.toml`'s; no script quotes a text a person reads outside them (`TestClientsQuoteNoProseOutsideTheCatalog`).
+- The cockpit's words are `strings.toml`'s, through `t` and `tn` in `internal/web/ui/src/lib/i18n.svelte.ts`, which reword the page when the strings or the locale change, and the core's event kinds are `timeline.toml`'s; no module or component quotes a text a person reads outside them (`TestClientsQuoteNoProseOutsideTheCatalog`).
 - The menu bar's words, its items, the notes on what became of an answer and the app window's menus, are `strings.toml`'s, which the daemon serves at `/api/strings` in the interface language (`internal/client/texts`); the app reads them again when their stamp in the health moves, and words the window's menus anew.
 
 ## What Go still owns today

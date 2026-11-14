@@ -20,7 +20,7 @@ const re = /a "quoted" b/;
 el.title = 'Waiting longest';
 getJSON("/api/strings");
 `
-	flagged(t, "js", ruleClientProse("internal/web/static/x.js", js), 3, "goes through t or tn")
+	flagged(t, "js", ruleClientProse("internal/web/ui/src/x.ts", js), 3, "goes through t or tn")
 	src := `package p
 import (
 	"errors"

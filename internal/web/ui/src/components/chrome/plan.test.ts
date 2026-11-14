@@ -162,3 +162,9 @@ describe("the plan", () => {
     expect([...container.querySelectorAll("h2.plan-head")].map(textOf)).toEqual(["Pending (1)", "Blocked (1)"]);
   });
 });
+
+test("TestAPlanItemReadsAsItsServedLabel: a plan item reads as its served label, else its unit", async () => {
+  const { itemLabel } = await import("./plan");
+  expect([itemLabel({ unit: { provider: "linear", key: "PAY-88" }, label: "PAY-88 Retry budget" }), itemLabel({ unit: { provider: "acme", key: "web#7" } })])
+    .toEqual(["PAY-88 Retry budget", "acme:web#7"]);
+});

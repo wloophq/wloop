@@ -15,11 +15,8 @@ import { appEnv, keyHooks } from "./appEnv";
 import { cockpit, installKeys, openOmnibox } from "./install";
 import Keys from "./Keys.svelte";
 import { pageQuestion } from "./page";
+import { settle } from "../../testing/settle";
 
-const settle = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-  flushSync();
-};
 
 // daemon answers GET /api/keys with the fixture's bindings, or refuses it while keys is null, and records the
 // posts.

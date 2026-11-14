@@ -7,11 +7,8 @@ import { askConfirm, askInput, overlays, showPalette, type PaletteItem } from ".
 import { resetStore } from "../../testing/reset.svelte";
 import { omni, showHelp, showOmnibox } from "../../state/overlays.svelte";
 import Overlays from "./Overlays.svelte";
+import { settle } from "../../testing/settle";
 
-const settle = async () => {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-  flushSync();
-};
 
 // track follows a promise: what it settled to, or "open".
 function track<T>(p: Promise<T>): { v: T | "open" } {

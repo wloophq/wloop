@@ -11,13 +11,10 @@ import {
 import { resetStore } from "../../testing/reset.svelte";
 import GateCard from "./GateCard.svelte";
 import { gateAt, resolveDraft, resolveGate, resolving } from "./gates";
+import { settle } from "../../testing/settle";
 
 const task = { id: "t-1", title: "Retry flaky uploads" };
 
-const settle = async () => {
-  for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0));
-  flushSync();
-};
 const all = (c: Element, sel: string) => [...c.querySelectorAll(sel)];
 const texts = (c: Element, sel: string) => all(c, sel).map((x) => x.textContent || "");
 const byFocus = (c: Element, f: string) => c.querySelector(`[data-focus="${f}"]`) as HTMLElement;
@@ -280,5 +277,36 @@ describe("what the migration is for", () => {
     I18N.strings = { recommended: "recomendada" };
     flushSync();
     expect(texts(c, ".rec")).toEqual(["recomendada"]);
+  });
+});
+
+describe("rf1_reattack5_test.go, a pinned recommendation", () => {
+  const pinned = (): J => {
+    const d = { ...reviewDraft(), rev: 3, preview: "Request changes with 2 inline comments" };
+    return {
+      id: 3, task: "t-1", kind: "question", name: "question", status: "open", text: "The agent asks",
+      intents: [{ id: "answer", label: "Answer", answer: true }, { id: "dismiss", label: "Dismiss" }],
+      subject: { id: 3, kind: "question", text: "Hold, post nothing?", pinned: [d], recommend: "post",
+        options: [{ id: "post", label: "Hold, post nothing", draft: { id: 7, rev: 3 } }, { id: "wait", label: "Wait" }] },
+    };
+  };
+
+  test("TestReattackFreeAnswerSendsThePinnedRecommendation: a typed answer does not carry the pinned option along", async () => {
+    const posts = recordPosts();
+    const c = card(pinned());
+    await fireEvent.input(Object.assign(byFocus(c, "gate:3:text"), { value: "rewrite the second finding" }));
+    await fireEvent.click(byFocus(c, "gate:3:answer"));
+    await settle();
+    expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "rewrite the second finding" } } }]);
+  });
+
+  test("TestAPickedPinnedOptionIsSent: picking the pinned option sends it with the text typed", async () => {
+    const posts = recordPosts();
+    const c = card(pinned());
+    await fireEvent.click(byFocus(c, "gate:3:option:post"));
+    await fireEvent.input(Object.assign(byFocus(c, "gate:3:text"), { value: "and thank them" }));
+    await fireEvent.click(byFocus(c, "gate:3:answer"));
+    await settle();
+    expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "post\nand thank them" } } }]);
   });
 });

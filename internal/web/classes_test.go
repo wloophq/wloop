@@ -1,24 +1,27 @@
 package web
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 )
 
 func TestCockpitClassesSayTask(t *testing.T) {
 	old := `(gtd|entry|entries)\b`
 	patterns := map[string]*regexp.Regexp{
-		"static/app.css":    regexp.MustCompile(`\.([\w-]*-)?` + old),
-		"static/index.html": regexp.MustCompile(`class="[^"]*\b` + old),
+		"static/app.css": regexp.MustCompile(`\.([\w-]*-)?` + old),
 	}
-	js, err := filepath.Glob("static/*.js")
+	err := filepath.WalkDir("ui/src", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".svelte") {
+			patterns[p] = regexp.MustCompile(`class=\{?["[][^>]*\b` + old)
+		}
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	for _, f := range js {
-		patterns[f] = regexp.MustCompile(`class: "[^"]*\b` + old)
 	}
 	for f, re := range patterns {
 		b, err := os.ReadFile(f)

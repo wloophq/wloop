@@ -42,7 +42,7 @@ export function mergeRows(page: J): boolean {
   if (!state.loaded || page.epoch !== state.epoch) return false;
   if (page.rev < state.rev) return true;
   const gone = new Set<string>((page.removed || []).map(unitKey));
-  put(state, "rows", mergeList($state.snapshot(state.rows), page.rows || [], gone, rowID));
+  put(state, "rows", mergeList(state.rows, page.rows || [], gone, rowID));
   state.rev = page.rev;
   return true;
 }
@@ -277,7 +277,7 @@ export function applyTasksPage(key: string, page: J): void {
     put(tasksState, "gates", page.gates || []);
   } else {
     const gone = new Set<string>(page.removed || []);
-    put(tasksState, "tasks", mergeList($state.snapshot(tasksState.tasks), page.tasks || [], gone, (e) => e.id));
+    put(tasksState, "tasks", mergeList(tasksState.tasks, page.tasks || [], gone, (e) => e.id));
     if (page.gates) put(tasksState, "gates", page.gates);
   }
   tasksState.key = key;
@@ -290,7 +290,8 @@ export function applyTasksPage(key: string, page: J): void {
 // readViews reads the catalog of the task views; false when it failed.
 export async function readViews(): Promise<boolean> {
   try {
-    tasksState.catalog = await getJSON("/api/views");
+    const next = await getJSON("/api/views");
+    if (JSON.stringify(tasksState.catalog) !== JSON.stringify(next)) tasksState.catalog = next;
     tasksState.catalogError = "";
     return true;
   } catch (err) {

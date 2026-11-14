@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
-	"strings"
 	"testing"
 )
 
@@ -24,7 +23,7 @@ func TestTheBuildChangesWithTheVersionAndAnyAsset(t *testing.T) {
 		}
 	}
 	fewer := maps.Clone(assets())
-	delete(fewer, "app.js")
+	delete(fewer, "app/app.js")
 	if buildOf("dev", fewer) == Build("dev") {
 		t.Error("a dev build keeps its id when an asset goes")
 	}
@@ -43,7 +42,7 @@ func TestThePageNamesItsBuildAndRevalidatesItsAssets(t *testing.T) {
 		t.Errorf("page headers %v", rec.Header())
 	}
 	refs := regexp.MustCompile(`(?:src|href)="(/static/[^"]+)"`).FindAllStringSubmatch(page, -1)
-	if len(refs) < 5 {
+	if len(refs) < 4 {
 		t.Fatalf("assets %v", refs)
 	}
 	for _, m := range refs {
@@ -69,68 +68,5 @@ func TestThePageNamesItsBuildAndRevalidatesItsAssets(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/index.html", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("the page under /static/: %d", rec.Code)
-	}
-}
-
-func TestANewBuildReloadsOrOffersTo(t *testing.T) {
-	type outcome struct {
-		Reloads int    `json:"reloads"`
-		Banner  bool   `json:"banner"`
-		Stored  string `json:"stored"`
-	}
-	cases := []struct {
-		name   string
-		served string
-		setup  string
-		want   outcome
-	}{
-		{"same build", "b1", "", outcome{Banner: false}},
-		{"no build named", "", "", outcome{}},
-		{"a new build and nothing held", "b2", "", outcome{Reloads: 1, Stored: "b2"}},
-		{"text in a composer", "b2", `fields.push({ id: "", value: "half a reply" });`, outcome{Banner: true}},
-		{"text in the filter only", "b2", `fields.push({ id: "search", value: "where:acme" });`, outcome{Reloads: 1, Stored: "b2"}},
-		{"an open dialog", "b2", `dialogOpen = true;`, outcome{Banner: true}},
-		{"guidance kept for a closed detail", "b2", `state.guidance["github:acme/api#1"] = "rebase first";`, outcome{Banner: true}},
-		{"a draft being edited", "b2", `detailState.editing.set("draft:7", "Deployed");`, outcome{Banner: true}},
-		{"an answer typed", "b2", `detailState.answer = "after ten";`, outcome{Banner: true}},
-		{"an action on its way", "b2", `state.busy.add("github:acme/api#1");`, outcome{Banner: true}},
-		{"reloaded for this build already", "b2", `stored = "b2";`, outcome{Banner: true, Stored: "b2"}},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			var got outcome
-			nodeScript(t, `
-const fields = [];
-let dialogOpen = false;
-let stored = "";
-let reloads = 0;
-const banner = { hidden: true };
-const reload = { onclick: null };
-const state = { guidance: {}, busy: new Set(), answered: new Map() };
-const detailState = { answer: "", guidance: "", compose: { key: "", text: "", reaction: "" }, editing: new Map() };
-const document = {
-  querySelector: (sel) => sel.startsWith("meta") ? { getAttribute: () => "b1" } : dialogOpen ? {} : null,
-  querySelectorAll: () => fields,
-  getElementById: (id) => id === "update" ? banner : id === "update-reload" ? reload : null,
-};
-const sessionStorage = { getItem: () => stored, setItem: (k, v) => { stored = v; } };
-const location = { reload: () => { reloads++; } };
-`+staticJS(t, "update.js")+c.setup+`
-checkBuild({ build: input });
-if (!banner.hidden) reload.onclick();
-process.stdout.write(JSON.stringify({ reloads: banner.hidden ? reloads : reloads - 1, banner: !banner.hidden, stored }));`, c.served, &got)
-			if got != c.want {
-				t.Errorf("got %+v, want %+v", got, c.want)
-			}
-		})
-	}
-}
-
-func TestTheCockpitChecksTheBuildOnEveryHealth(t *testing.T) {
-	src := appJS(t)
-	for _, want := range []string{"state.health = health.value;\n    checkBuild(state.health);", "state.health = await getJSON(\"/api/health\");\n      checkBuild(state.health);"} {
-		if !strings.Contains(src, want) {
-			t.Errorf("app.js lacks %q", want)
-		}
 	}
 }

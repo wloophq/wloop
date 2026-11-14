@@ -3,11 +3,13 @@
   import { foldedBlocks, markdownBlocks, markdownInline, type Block, type Inline, type Names } from "../../lib/markdown";
 
   // Agent prose drawn from markdown.ts's tree with elements and text nodes only. A text longer than fold blocks
-  // shows its first fold blocks and a button that opens the rest; the reader's open stays while the component
-  // lives. key names the text, as the callers of the old renderer passed it.
-  let { text, fold = 0, names = null }: { text: unknown; fold?: number; key?: string; names?: Names } = $props();
+  // shows its first fold blocks and a button that opens the rest; the reader's open stays while key, which names
+  // the text, does.
+  let { text, fold = 0, names = null, key = "" }: { text: unknown; fold?: number; key?: string; names?: Names } = $props();
 
-  let opened = $state(false);
+  // openedFor is the key of the text the reader opened, so another text in the same place folds again.
+  let openedFor = $state<string | null>(null);
+  const opened = $derived(openedFor !== null && openedFor === key);
   const view = $derived(foldedBlocks(markdownBlocks(text), opened ? 0 : fold));
 </script>
 
@@ -29,4 +31,4 @@
   {/if}
 {/snippet}
 
-<div class="md">{#each view.shown as b, i (i)}{@render block(b)}{/each}{#if view.folded}<button type="button" class="md-more" onclick={() => (opened = true)}>{t("Read all")}</button>{/if}</div>
+<div class="md">{#each view.shown as b, i (i)}{@render block(b)}{/each}{#if view.folded}<button type="button" class="md-more" onclick={() => (openedFor = key)}>{t("Read all")}</button>{/if}</div>

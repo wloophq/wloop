@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -422,10 +423,16 @@ func TestAPISkew(t *testing.T) {
 func TestCockpitSpeaksTheAPIVersion(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	newServer(t).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `const API_VERSION = "`+api.Version+`"`) ||
-		!strings.Contains(rec.Body.String(), "out.fix") {
-		t.Fatalf("%d: app.js does not declare API %s", rec.Code, api.Version)
+	newServer(t).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/app/app.js", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "X-Loop-API") {
+		t.Fatalf("%d: the served cockpit sends no X-Loop-API", rec.Code)
+	}
+	src, err := os.ReadFile(filepath.Join("..", "web", "ui", "src", "state", "api.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), `export const API_VERSION = "`+api.Version+`"`) || !strings.Contains(string(src), "out.fix") {
+		t.Fatalf("the cockpit's API client does not declare API %s or read the refusal's fix", api.Version)
 	}
 }
 
@@ -761,7 +768,7 @@ func TestCockpitPageIsBehindTheToken(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "loop_token", Value: "secret"})
 	rec = httptest.NewRecorder()
 	s.AuthHandler().ServeHTTP(rec, req)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `id="rail"`) {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `/static/app/app.js`) {
 		t.Fatalf("with cookie: %d %s", rec.Code, rec.Body)
 	}
 }

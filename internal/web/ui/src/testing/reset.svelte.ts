@@ -1,4 +1,5 @@
-import { pending, results } from "../state/actions.svelte";
+import { pending, results, scheduler } from "../state/actions.svelte";
+import { resetSync } from "../state/sync.svelte";
 import { clock } from "../state/clock.svelte";
 import { dropOverlays } from "../state/overlays.svelte";
 import { served } from "../state/keycaps.svelte";
@@ -13,7 +14,11 @@ import { I18N } from "../lib/i18n.svelte";
 const fresh = $state.snapshot({ catalog, state, detailState, drafts, homeState, notice, outboxState, queueState, removeState, reviewState, taskState, tasksState });
 
 // resetStore puts every store back as the page starts, the clock at now and the hash at hash.
+// A test that wants the sync an action asks for drives it itself: resetStore stops any read a previous test left
+// queued on the real debounce, and takes the actions' requests for a sync.
 export function resetStore(now = Date.parse("2026-11-07T12:00:00Z"), hash = ""): void {
+  resetSync();
+  scheduler.load = () => {};
   dropOverlays();
   served.bindings = [];
   const copy = structuredClone(fresh);

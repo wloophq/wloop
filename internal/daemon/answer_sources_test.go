@@ -16,13 +16,13 @@ import (
 // cockpitSource is the source every request of the cockpit names.
 func cockpitSource(t *testing.T) string {
 	t.Helper()
-	js, err := os.ReadFile(filepath.Join("..", "web", "static", "app.js"))
+	src, err := os.ReadFile(filepath.Join("..", "web", "ui", "src", "state", "actions.svelte.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := regexp.MustCompile(`const body = \{ source: "([a-z]+)" \};`).FindSubmatch(js)
+	m := regexp.MustCompile(`const body: J = \{ source: "([a-z]+)" \};`).FindSubmatch(src)
 	if m == nil {
-		t.Fatal("app.js names no source in act's body")
+		t.Fatal("the cockpit's act names no source in its body")
 	}
 	return string(m[1])
 }

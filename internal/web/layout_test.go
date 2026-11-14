@@ -120,72 +120,19 @@ func shotOf(t *testing.T, rows string, viewport, width int, path string) {
 	}
 }
 
-// rowHTML renders pr, a wire row, with the served catalog under change and the action specs given, as the
-// cockpit draws it in view.
-func rowHTML(t *testing.T, pr map[string]any, specs map[string]any, view string, change func(cat map[string]any)) string {
-	t.Helper()
-	var cat map[string]any
-	if err := json.Unmarshal([]byte(servedCatalog(t)), &cat); err != nil {
-		t.Fatal(err)
-	}
-	change(cat)
-	raw, err := json.Marshal(cat)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got struct{ HTML string }
-	rowViewRun(t, raw, `state.rows = [input.pr];
-state.specs = { version: "", byId: input.specs };
-const lens = lensOf({ ...readHash(), view: input.view });
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-const ser = (n) => n instanceof Text ? esc(n.data) : "<" + n.tag + Object.entries(n.attrs).map(([k, v]) => " " + k + "=\"" + esc(v) + "\"").join("") + ">" + n.children.map(ser).join("") + "</" + n.tag + ">";
-process.stdout.write(JSON.stringify({ HTML: ser(rowView(rowModel(input.pr, "", lens, ""), lens)) }));`,
-		map[string]any{"pr": pr, "specs": specs, "view": view, "now": pr["now"]}, &got)
-	return got.HTML
-}
-
-// ptBR words the served catalog's situation of no reviewer as the user's locale does.
-func ptBR(cat map[string]any) {
-	for _, s := range cat["situations"].([]any) {
-		if sit := s.(map[string]any); sit["kind"] == "no_reviewer" {
-			sit["label"] = "sem revisor"
-		}
-	}
-	for _, f := range cat["facets"].([]any) {
-		if spec := f.(map[string]any); spec["id"] == "kind" {
-			labels, _ := spec["labels"].(map[string]any)
-			if labels == nil {
-				labels = map[string]any{}
-				spec["labels"] = labels
-			}
-			labels["no_reviewer"] = "sem revisor"
-		}
-	}
-}
+// usersRowHTML is the user's row as the cockpit draws it, which the row's vitest suite writes (UPDATE_LAYOUT=1)
+// from the row TestTheChromeFixturesAreWhatGoServes keeps in testdata/cockpit.chrome.json.
+const usersRowHTML = "testdata/layout/users-row.html"
 
 // usersRow is the row a user saw broken in My PRs: a pull request of theirs, stalled, waiting on them, with no
 // reviewer, a long title, its brief's type, risk and size, a dozen tags and eight actions, in pt-BR words.
 func usersRow(t *testing.T) string {
 	t.Helper()
-	pr := lensRows()[1]
-	pr["kind"], pr["waiting_on"], pr["stalled"] = "no_reviewer", "me", true
-	pr["title"] = "fix(parts): resolve messages delivered out of order by the unary ack consumer when the broker redelivers"
-	pr["brief"] = map[string]any{"risk": "medium", "size": "m", "kind": "fix", "open_questions": 2, "tags": []string{"area:messaging", "audience:developers",
-		"audience:operators", "change:fix", "concern:concurrency", "concern:reliability", "domain:parts-matching", "lang:python", "tool:gcp-pubsub",
-		"infra:queue", "infra:db", "prio:high", "customer:acme"}}
-	pr["views"] = []string{"mine", "stalled"}
-	actions := []map[string]any{}
-	specs := map[string]any{}
-	for _, a := range [][2]string{{"review", "Review"}, {"address", "Address"}, {"act", "Agir"}, {"nudge", "Cutucar"}, {"pause", "Pausar"}, {"mute", "Silenciar"},
-		{"open", "Abrir"}, {"remove", "Remover"}} {
-		actions = append(actions, map[string]any{"id": a[0], "enabled": true})
-		specs[a[0]] = map[string]any{"id": a[0], "label": a[1], "group": "control", "surfaces": []string{"row"}}
+	raw, err := os.ReadFile(usersRowHTML)
+	if err != nil {
+		t.Fatal(err)
 	}
-	pr["actions"] = actions
-	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
-	row := wireRow("me", now, pr)
-	row["now"] = now.UnixMilli()
-	html := rowHTML(t, row, specs, "mine", ptBR)
+	html := string(raw)
 	for _, want := range []string{`class="row w-me mine late"`, ">sem revisor<", ">fix<", "risk medium", ">M<", ">Remover<"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("the user's row lacks %s: %s", want, html)
@@ -259,7 +206,12 @@ func TestTheUsersRowReadsWholeAtEveryWidth(t *testing.T) {
 // wrap out of sight: those are inert, so neither Tab nor the row's arrows reach them, and every one shown is not.
 func TestAHiddenPieceOrActionLeavesTheFocusOrder(t *testing.T) {
 	html := usersRow(t)
-	probe := jsFunction(t, "\n"+staticJS(t, "row.js"), "markWrapped") + `
+	probe := `
+function markWrapped(box) {
+  const kids = [...box.children];
+  const top = kids.length ? kids[0].offsetTop : 0;
+  for (const k of kids) k.inert = k.offsetTop > top;
+}
 const row = document.querySelector(".row");
 row.querySelectorAll(".pieces, .acts").forEach(markWrapped);
 const r = (el) => el.getBoundingClientRect();

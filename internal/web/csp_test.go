@@ -10,7 +10,7 @@ import (
 
 func TestEveryCockpitResponseCarriesTheCSP(t *testing.T) {
 	h := Handler("")
-	for _, p := range []string{"/", "/static/app.js", "/static/app.css", "/static/vendor/echarts.min.js", "/nowhere"} {
+	for _, p := range []string{"/", "/static/app/app.js", "/static/app.css", "/static/vendor/echarts.min.js", "/nowhere"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
 		csp := rec.Header().Get("Content-Security-Policy")

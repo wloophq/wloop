@@ -157,3 +157,17 @@ test("the text carries no whitespace the prose lacks", () => {
   const c = render(Markdown, { text: "One para.\n\nTwo." }).container;
   expect(c.querySelector(".md")?.textContent).toBe("One para.Two.");
 });
+
+test("an opened text folds again when another text, of another key, takes its place", async () => {
+  const long = Array.from({ length: 8 }, (_, i) => `Paragraph ${i}.`).join("\n\n");
+  const props = $state({ text: long, fold: 2, key: "a" });
+  const c = render(Markdown, props).container;
+  await fireEvent.click(c.querySelector(".md-more") as HTMLButtonElement);
+  expect(c.querySelector(".md-more")).toBeNull();
+  props.text = long + "\n\nMore.";
+  flushSync();
+  expect(c.querySelector(".md-more")).toBeNull();
+  props.key = "b";
+  flushSync();
+  expect(c.querySelector(".md-more")).not.toBeNull();
+});
