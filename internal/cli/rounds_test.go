@@ -78,6 +78,42 @@ func TestAnObservedAddressRecordsWouldAddressOncePerFingerprint(t *testing.T) {
 	}
 }
 
+func TestARoundObservedAtItsPlanSendsNothingWhenTheConfigNowAllowsIt(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		round, intent, would string
+		scenario             func(*testing.T) sweepCase
+		allow                func(sc sweepCase)
+	}{
+		{roundFollowup, string(dintent.Review), dinv.KindWouldReview, followupScenario,
+			func(sc sweepCase) { sc.te.cfg.GitHub.FollowupsWithoutWorkspace = true }},
+		{roundAddress, string(dintent.Address), dinv.KindWouldAddress, addressScenario,
+			func(sc sweepCase) { sc.te.cfg.GitHub.AddressWithoutWorkspace = true }},
+	} {
+		t.Run(c.round, func(t *testing.T) {
+			t.Parallel()
+			sc := c.scenario(t)
+			r := newStartRig(t, sc, c.intent, c.round)
+			r.observed(c.round)
+			c.allow(sc)
+			workspaces := len(sc.ws.WorkspaceList)
+			got, err := r.run(t, automation.RunOpts{Guidance: "only the tests"})
+			if err != nil || !strings.HasPrefix(got, "observed the ") {
+				t.Fatalf("run = %q, %v", got, err)
+			}
+			if n := r.count(c.would); n != 1 {
+				t.Fatalf("%d %s events, want 1: %v", n, c.would, r.rec.kinds())
+			}
+			if len(sc.ws.Prompts) != 0 || len(sc.ws.Writes) != 0 || len(sc.ws.WorkspaceList) != workspaces {
+				t.Fatalf("an observed round sent %v %v, workspaces %+v", sc.ws.Prompts, sc.ws.Writes, sc.ws.WorkspaceList)
+			}
+			if b := bookOf(t, sc.te, sc.ref); len(b.Turns) != 0 {
+				t.Fatalf("turns %+v", b.Turns)
+			}
+		})
+	}
+}
+
 func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 	t.Parallel()
 	sc := addressScenario(t)

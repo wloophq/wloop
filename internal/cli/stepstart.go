@@ -647,7 +647,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	}
 	reason := s.reason(p)
 	call := roundCall{Kind: p.args.kind(), Workspace: p.planned.ws, Unit: c.u, Facts: p.planned.read,
-		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: o.Guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
+		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: o.Guidance, BriefMissing: p.briefMissing,
 		Confirmed: o.Confirmed, Why: &why, Address: p.address(s.e.Now())}
 	if p.observed() {
 		return s.observeRound(ctx, st, p, call)
@@ -669,7 +669,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 // observeRound runs a round the plan only observes: no turn starts, and the
 // guidance it was given waits for the next round.
 func (s *stepSet) observeRound(ctx context.Context, st *round.Store, p startPlan, call roundCall) (string, error) {
-	_, err := s.e.sendRound(ctx, st, call)
+	err := s.e.observeRound(ctx, st, call)
 	if call.Guidance != "" {
 		s.e.keepGuidance(ctx, p.ref, call.Guidance)
 	}

@@ -42,9 +42,6 @@ type step struct {
 	ws     wsdomain.Workspace
 	pr     pr.Ref
 	reason string
-	// observed is a round the facts only log: its workspace is gone and its
-	// project does not let the round recreate it.
-	observed bool
 
 	// head is the head the round's plan saw.
 	head string
@@ -134,18 +131,12 @@ func (s step) describe() string {
 	case stepFirstRound:
 		return fmt.Sprintf("first round %s: %s", s.pr, s.reason)
 	case stepAddress:
-		switch {
-		case s.observed:
-			return fmt.Sprintf("triage %s without a workspace, observed: %s", s.pr, s.reason)
-		case s.ws.ID == "":
+		if s.ws.ID == "" {
 			return fmt.Sprintf("triage %s without a workspace: %s", s.pr, s.reason)
 		}
 		return fmt.Sprintf("triage %s (%s): %s", s.ws.DisplayName, s.pr, s.reason)
 	}
-	switch {
-	case s.observed:
-		return fmt.Sprintf("follow-up %s without a workspace, observed: %s", s.pr, s.reason)
-	case s.ws.ID == "":
+	if s.ws.ID == "" {
 		return fmt.Sprintf("follow-up %s without a workspace: %s", s.pr, s.reason)
 	}
 	return fmt.Sprintf("follow-up %s (%s): %s", s.ws.DisplayName, s.pr, s.reason)
@@ -290,31 +281,50 @@ type roundCall struct {
 	Turn turns.Turn
 	// BriefMissing is why the round goes without its brief, "" with one.
 	BriefMissing string
-	// Observed is a round the facts only log: its workspace is gone and its
-	// project does not let the round recreate it.
-	Observed  bool
-	Confirmed bool
-	Why       *workflow.Why
-	Address   *turn.RoundReason
+	Confirmed    bool
+	Why          *workflow.Why
+	Address      *turn.RoundReason
 }
 
 // sendRound sends c's round with st as the round state, through send, so a
 // round that cannot start records why as the sweep's do. The outcome's ID is
 // the turn the round recorded, "" for a round only observed.
 func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (turns.Outcome, error) {
-	cfg, err := e.loadConfig()
+	s, step, err := e.roundStep(st, c)
 	if err != nil {
 		return turns.Outcome{}, err
+	}
+	return s.send(ctx, step, c.Guidance)
+}
+
+// observeRound logs c's round, which its plan only observes, with st as the
+// round state; it sends nothing whatever the config now allows.
+func (e *Env) observeRound(ctx context.Context, st *round.Store, c roundCall) error {
+	s, step, err := e.roundStep(st, c)
+	if err != nil {
+		return err
+	}
+	if c.Kind == stepAddress {
+		s.observeAddress(ctx, step)
+	} else {
+		s.observe(ctx, step)
+	}
+	return nil
+}
+
+func (e *Env) roundStep(st *round.Store, c roundCall) (*sweep, step, error) {
+	cfg, err := e.loadConfig()
+	if err != nil {
+		return nil, step{}, err
 	}
 	ref, err := githubRef(c.Unit)
 	if err != nil {
-		return turns.Outcome{}, err
+		return nil, step{}, err
 	}
-	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
-	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
+	return &sweep{e: e, cfg: cfg, st: st, now: e.Now()}, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason,
 		head: c.Head, onSent: c.OnSent, onSkipped: c.OnSkipped,
 		read: &pr.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
-		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs, turn: c.Turn}, c.Guidance)
+		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs, turn: c.Turn}, nil
 }
 
 func (s *sweep) send(ctx context.Context, st step, guidance string) (o turns.Outcome, err error) {
