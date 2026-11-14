@@ -1270,6 +1270,34 @@ func TestTheFastJobDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 	}
 }
 
+func TestAQueuedAnswerIsDeliveredUnderTheHeldLoop(t *testing.T) {
+	t.Parallel()
+	for name, deliver := range map[string]func(r *turnRig){
+		"by the fast job": func(r *turnRig) { r.s.reconcileTurns(context.Background()) },
+		"after its stop": func(r *turnRig) {
+			if err := r.s.deliverStopped(context.Background(), "term-1"); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		r := newTurnRig(t)
+		r.busyAsked(&record.Question{Kind: "confirm", Text: "Publish?"})
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", `{"guidance":"publish it"}`); rec.Code != 200 {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		r.sessions.SetAgents(turns.AgentObservation{WorkspaceID: "ws-1", Pane: "tab-1:leaf-1", TerminalKey: "tab-1", State: turn.AgentDone})
+		var held []bool
+		r.sessions.OnType = func(ctx context.Context, _, _ string) (bool, error) {
+			held = append(held, lock.Held(ctx))
+			return true, nil
+		}
+		deliver(r)
+		if !slices.Equal(held, []bool{true}) {
+			t.Errorf("%s: typed with the loop held %v, want once with it marked", name, held)
+		}
+	}
+}
+
 func TestAnswerWithoutATurnIsRefused(t *testing.T) {
 	t.Parallel()
 	r := newTurnRig(t)

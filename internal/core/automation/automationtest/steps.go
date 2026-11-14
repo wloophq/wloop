@@ -45,6 +45,7 @@ type Steps struct {
 	noted     []Call
 	dismissed []Call
 	checks    []Call
+	unguided  map[string]bool
 }
 
 // NewSteps knows the steps of reach, by name, with their reach.
@@ -64,6 +65,23 @@ func (f *Steps) Step(use string, args ...string) workflow.Step {
 		st.Args[args[i]] = args[i+1]
 	}
 	return st
+}
+
+// Unguided makes the turns of use hand no guidance kept for their unit;
+// every other step's do.
+func (f *Steps) Unguided(use string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.unguided == nil {
+		f.unguided = map[string]bool{}
+	}
+	f.unguided[use] = true
+}
+
+func (f *Steps) HandsGuidance(st workflow.Step, _ unit.ProviderID) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return !f.unguided[st.Use]
 }
 
 // Refuse makes Check and Run of use on u refuse with reason; "" clears it.

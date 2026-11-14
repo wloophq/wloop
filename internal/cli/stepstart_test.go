@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -204,7 +206,7 @@ func (r *startRig) run(t *testing.T, o automation.RunOpts) (string, error) {
 	t.Helper()
 	r.load(t)
 	defer r.save(t)
-	return r.steps.Run(context.Background(), r.st, r.u, r.why, o)
+	return r.steps.Run(lock.WithHeld(context.Background()), r.st, r.u, r.why, o)
 }
 
 func trustBlockEvent(ref pr.Ref, at time.Time) dinv.Event {
@@ -433,7 +435,7 @@ func TestRunTakesTheStoredGuidance(t *testing.T) {
 	}
 }
 
-func TestRunGuidanceKeepsTheStoredOne(t *testing.T) {
+func TestRunGuidanceConsumesTheStoredOne(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
@@ -446,8 +448,62 @@ func TestRunGuidanceKeepsTheStoredOne(t *testing.T) {
 	if text := turnText(t, sc.te, sc.ws.Prompts[0].Text); !strings.Contains(text, "mind the tests") || strings.Contains(text, "check the migration") {
 		t.Fatalf("turn %q", text)
 	}
+	if got := r.rec.overrides[sc.ref].NextGuidance; got != "" {
+		t.Fatalf("the older stored guidance stayed: %q", got)
+	}
+}
+
+func TestAKeptGuidanceReadErrorDoesNotFailTheRound(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	r.rec.takeErr = errors.New("database is locked")
+	got, err := r.run(t, automation.RunOpts{})
+	if err != nil || got != "sent the follow-up: the author answered" {
+		t.Fatalf("run = %q, %v", got, err)
+	}
+	if len(sc.ws.Prompts) != 1 {
+		t.Fatalf("prompts %v", sc.ws.Prompts)
+	}
+}
+
+func TestANonRoundWorkflowTurnKeepsTheGuidanceItsPromptDidNotLand(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.te.gh.basics = openBasics
+	sc.ws.NotSubmitted = true
+	r := newStartRig(t, sc, string(dintent.Review), "")
+	r.st.Args["due"] = builtin.TurnDueWhen
+	if err := r.rec.KeepNextGuidance(context.Background(), sc.ref, "check the migration"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(sc.ws.Prompts) != 1 || !strings.Contains(turnText(t, sc.te, sc.ws.Prompts[0].Text), "check the migration") {
+		t.Fatalf("prompts %v", sc.ws.Prompts)
+	}
 	if got := r.rec.overrides[sc.ref].NextGuidance; got != "check the migration" {
-		t.Fatalf("the stored guidance was taken: %q", got)
+		t.Fatalf("the guidance a prompt did not land is lost: %q", got)
+	}
+}
+
+func TestATurnStartHandsGuidanceOnlyWhenItsIntentDoes(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	for _, c := range []struct {
+		st   workflow.Step
+		want bool
+	}{
+		{workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review)}}, true},
+		{workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Address)}}, true},
+		{workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Nudge)}}, false},
+		{workflow.Step{Use: builtin.StepNotifySelf}, false},
+	} {
+		if got := r.steps.HandsGuidance(c.st, unit.GitHub); got != c.want {
+			t.Errorf("%s %v hands guidance = %v, want %v", c.st.Use, c.st.Args, got, c.want)
+		}
 	}
 }
 

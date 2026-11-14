@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 
@@ -440,10 +441,11 @@ func (s *Server) deliverStopped(ctx context.Context, handle string) error {
 	}
 	if s.deps.LoopMu.TryLock() {
 		defer s.deps.LoopMu.Unlock()
-		return t.DeliverStopped(ctx, handle)
+		return t.DeliverStopped(lock.WithHeld(ctx), handle)
 	}
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
+	ctx = lock.WithHeld(ctx)
 	b, ok, err := t.Store.BookOf(ctx, turns.Key{Session: handle})
 	if err != nil || !ok {
 		return err

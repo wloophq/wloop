@@ -63,6 +63,8 @@ type step struct {
 	why *workflow.Why
 	// address is why an address round runs now, nil on other rounds.
 	address *turn.RoundReason
+	// inputs are the round's turn inputs, as its role's prepare filled them.
+	inputs map[string]any
 }
 
 func (s step) key() string { return s.pr.String() }
@@ -281,6 +283,7 @@ type roundCall struct {
 	Head              string
 	OnSent, OnSkipped map[string]string
 	Guidance          string
+	Inputs            map[string]any
 	// BriefMissing is why the round goes without its brief, "" with one.
 	BriefMissing string
 	// Observed is a round the facts only log: its workspace is gone and its
@@ -292,24 +295,25 @@ type roundCall struct {
 }
 
 // sendRound sends c's round with st as the round state, through send, so a
-// round that cannot start records why as the sweep's do.
-func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent bool, err error) {
+// round that cannot start records why as the sweep's do. The outcome's ID is
+// the turn the round recorded, "" for a round only observed.
+func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (turns.Outcome, error) {
 	cfg, err := e.loadConfig()
 	if err != nil {
-		return false, err
+		return turns.Outcome{}, err
 	}
 	ref, err := githubRef(c.Unit)
 	if err != nil {
-		return false, err
+		return turns.Outcome{}, err
 	}
 	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
 		head: c.Head, onSent: c.OnSent, onSkipped: c.OnSkipped,
 		read: &pr.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
-		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
+		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs}, c.Guidance)
 }
 
-func (s *sweep) send(ctx context.Context, st step, guidance string) (sent bool, err error) {
+func (s *sweep) send(ctx context.Context, st step, guidance string) (o turns.Outcome, err error) {
 	defer func() { s.noteStartProblem(ctx, st, err) }()
 	switch st.kind {
 	case stepFirstRound:
@@ -331,24 +335,24 @@ func withGuidance(reason, guidance string) string {
 	return reason + "; with your guidance"
 }
 
-func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, error) {
+func (s *sweep) followup(ctx context.Context, st step, guidance string) (turns.Outcome, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
 		if !cfg.GitHub.FollowupsWithoutWorkspace {
 			s.observe(ctx, st)
-			return false, nil
+			return turns.Outcome{}, nil
 		}
 		return s.openRound(ctx, st, guidance, turn.PlannedFollowUp)
 	}
 	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
-		BriefMissing: st.briefMissing, Why: st.why})
+		Inputs: st.inputs, BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
-		return false, err
+		return turns.Outcome{}, err
 	}
 	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
-	s.e.recordGuidance(ctx, st.pr, guidance)
+	out := turns.Outcome{ID: sent.ID}
 	if err != nil {
-		return false, err
+		return out, err
 	}
 	if st.read != nil {
 		s.e.realign(ctx, st.ws, st.read)
@@ -358,12 +362,13 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 	}
 	if !submitted {
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
-		return false, nil
+		return out, nil
 	}
 	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
-	return true, nil
+	out.Submitted = true
+	return out, nil
 }
 
 // observe logs a follow-up whose review workspace is gone, once per head,
@@ -385,35 +390,36 @@ func (s *sweep) observe(ctx context.Context, st step) {
 	s.logf("would review %s: %s", st.pr, st.reason)
 }
 
-func (s *sweep) firstRound(ctx context.Context, st step, guidance string) (bool, error) {
+func (s *sweep) firstRound(ctx context.Context, st step, guidance string) (turns.Outcome, error) {
 	return s.openRound(ctx, st, guidance, turn.PlannedFirst)
 }
 
 // openRound runs a review round that creates the review workspace.
-func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned turn.Planned) (bool, error) {
+func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned turn.Planned) (turns.Outcome, error) {
 	cfg := s.prConfig(st)
 	pr, err := s.openRead(ctx, st)
 	if err != nil {
-		return false, err
+		return turns.Outcome{}, err
 	}
 	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
-		BriefMissing: st.briefMissing, Why: st.why})
+		Inputs: st.inputs, BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
-		return false, err
+		return turns.Outcome{}, err
 	}
 	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
-	s.e.recordGuidance(ctx, st.pr, guidance)
+	out := turns.Outcome{ID: sent.ID}
 	if err != nil {
-		return false, err
+		return out, err
 	}
 	if !submitted {
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
-		return false, nil
+		return out, nil
 	}
 	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
-	return true, nil
+	out.Submitted = true
+	return out, nil
 }
 
 // openRead is the open pull request a round that creates its workspace is
@@ -441,39 +447,42 @@ func (s *sweep) observeAddress(ctx context.Context, st step) {
 	s.logf("would address %s: %s", st.pr, st.reason)
 }
 
-func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, error) {
+func (s *sweep) address(ctx context.Context, st step, guidance string) (turns.Outcome, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
 		if !cfg.GitHub.AddressWithoutWorkspace {
 			s.observeAddress(ctx, st)
-			return false, nil
+			return turns.Outcome{}, nil
 		}
 		pr, err := s.openRead(ctx, st)
 		if err != nil {
-			return false, err
+			return turns.Outcome{}, err
 		}
 		ws, action, err := s.e.addressWorkspace(ctx, cfg, st.pr, pr, func() (bool, error) { return true, nil })
 		if err != nil {
-			return false, err
+			return turns.Outcome{}, err
 		}
 		if action != "" {
 			s.logf("%s: %s", st.pr, action)
 		}
 		st.ws = ws
 	}
-	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, BriefMissing: st.briefMissing, Why: st.why}
+	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, Inputs: st.inputs,
+		BriefMissing: st.briefMissing, Why: st.why}
 	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
+	out := turns.Outcome{ID: turnID}
 	if err != nil {
-		return false, err
+		return out, err
 	}
 	if !submitted {
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
-		return false, nil
+		return out, nil
 	}
 	st.sent(s.st, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
 	s.logf("%s: %s", st.describe(), verb)
-	return true, nil
+	out.Submitted = true
+	return out, nil
 }
 
 // prConfig applies the project settings of the step's PR, and the agent home

@@ -37,6 +37,8 @@ type Request struct {
 	Workflow string // "" by hand
 	// ResumeOf is the headless turn whose question this run answers, 0 none.
 	ResumeOf int64
+	// ByPerson is a turn a person asked for, whatever its Trigger.
+	ByPerson bool
 }
 
 type Result struct {
@@ -170,7 +172,7 @@ func (s *Service) admit(ctx context.Context, r Request) (started, error) {
 	}
 	x := &runner{s: s, r: r}
 	if _, err := s.Starter.Start(ctx, turns.Request{Unit: r.Unit, Intent: r.Intent, Guidance: r.Guidance, Inputs: r.Inputs, Trigger: r.Trigger,
-		Route: turns.RouteLaunch, ByPerson: r.Trigger == turn.ByHand}, x); err != nil {
+		Route: turns.RouteLaunch, ByPerson: r.ByPerson}, x); err != nil {
 		return started{}, err
 	}
 	return x.st, nil

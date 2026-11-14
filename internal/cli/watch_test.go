@@ -153,7 +153,9 @@ type memRecorder struct {
 	events    []dinv.Event
 	overrides map[pr.Ref]dinv.Override
 	// failures fails that many Record calls first.
-	failures  int
+	failures int
+	// takeErr fails every TakeNextGuidance.
+	takeErr   error
 	questions map[pr.Ref]map[string]bool
 }
 
@@ -220,6 +222,9 @@ func (m *memRecorder) KeepNextGuidance(_ context.Context, ref pr.Ref, guidance s
 func (m *memRecorder) TakeNextGuidance(_ context.Context, ref pr.Ref) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.takeErr != nil {
+		return "", m.takeErr
+	}
 	o, ok := m.overrides[ref]
 	if !ok {
 		return "", nil

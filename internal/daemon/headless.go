@@ -94,7 +94,7 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		return
 	}
 	seq, err := s.deps.Headless.Start(r.Context(), headless.Request{Unit: u, Items: req.Items, Task: req.Task, Intent: turn.Intent(name),
-		Guidance: req.Guidance, Trigger: turn.ByHand})
+		Guidance: req.Guidance, Trigger: turn.ByHand, ByPerson: true})
 	switch {
 	case errors.Is(err, turns.ErrRefused):
 		writeError(w, http.StatusBadRequest, strings.TrimPrefix(err.Error(), src.ErrUnfit.Error()+": "))

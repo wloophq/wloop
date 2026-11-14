@@ -1214,3 +1214,26 @@ func TestAGateReplayRoutesTheAnswerTheDaemonStoppedBeforeRouting(t *testing.T) {
 		t.Fatalf("a routed answer replayed again: %v, launches %d", err, len(rec.launches))
 	}
 }
+
+func TestALaunchIsAPersonsOnlyWhenItsEntrySaysSo(t *testing.T) {
+	thread := unit.Unit{Provider: "thread", Key: "C1 thread 9"}
+	for _, c := range []struct {
+		name string
+		l    turns.Launch
+		want int
+	}{
+		{"asked by a person, automated", turns.Launch{Unit: thread, Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, ByPerson: true}, 1},
+		{"by hand, not asked by a person", turns.Launch{Unit: thread, Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand}, 0},
+	} {
+		s, store, _, _, _ := newService(t)
+		fx := &turnstest.Effects{}
+		s.Starter = turnstest.Starter(turnstest.Defs{Registry: turnstest.Intents()}, store, nil)
+		s.Starter.Effects = fx
+		if err := s.Launch(context.Background(), c.l); err != nil {
+			t.Fatal(err)
+		}
+		if got := fx.Befores(); got != c.want {
+			t.Errorf("%s: %d before phases, want %d", c.name, got, c.want)
+		}
+	}
+}

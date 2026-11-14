@@ -611,10 +611,11 @@ func (s *stepSet) gateWords(ctx context.Context, c stepCall) string {
 	return text
 }
 
-// startRun checks again on current facts, then sends the round through
-// sendRound in the bound round state, or launches a turn of an intent the
-// sweep sends no round of. The trigger stays automated, applied by hand
-// or not.
+// startRun checks again on current facts, then starts the turn: a round
+// through sendRound in the bound round state, or a turn of an intent the
+// sweep sends no round of. An observed round starts none. The turn is the
+// workflow's, applied by hand or not: its trigger stays automated and no
+// person asked for it, so the host's effects of a person's turn do not run.
 func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts) (string, error) {
 	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
 		return s.unitStart(ctx, c, o)
@@ -635,42 +636,65 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 		}
 		return "", automation.Refused{Reason: refusal}
 	}
-	guidance, taken := o.Guidance, false
-	if guidance == "" && s.e.Rec != nil && !p.observed() {
-		if guidance, err = s.e.Rec.TakeNextGuidance(ctx, p.ref); err != nil {
-			return "", err
-		}
-		taken = guidance != ""
-	}
 	why := c.why
 	if !p.round {
-		started, err := s.startTurn(ctx, c.u, p.args, guidance, &why)
+		started, err := s.startTurn(ctx, c.u, p.args, o.Guidance, &why)
 		if err != nil {
-			if taken {
-				s.e.keepGuidance(ctx, p.ref, guidance)
-			}
 			return "", startError(err)
 		}
 		st.RecordSent(p.ref.String(), "", "", s.e.Now())
 		return started, nil
 	}
 	reason := s.reason(p)
-	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.planned.ws, Unit: c.u, Facts: p.planned.read,
-		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
-		Confirmed: o.Confirmed, Why: &why, Address: p.address(s.e.Now())})
-	if !sent && guidance != "" {
-		s.e.keepGuidance(ctx, p.ref, guidance)
+	call := roundCall{Kind: p.args.kind(), Workspace: p.planned.ws, Unit: c.u, Facts: p.planned.read,
+		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: o.Guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
+		Confirmed: o.Confirmed, Why: &why, Address: p.address(s.e.Now())}
+	if p.observed() {
+		return s.observeRound(ctx, st, p, call)
 	}
+	if s.e.Turns == nil || s.e.Turns.Starter == nil {
+		return "", errors.New("no turn starter is wired")
+	}
+	started, err := s.e.Turns.Starter.Start(ctx, turns.Request{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: o.Guidance, Trigger: dturn.Automated,
+		Why: &why, Route: turns.RouteLaunch}, sweepRound{e: s.e, st: st, call: call})
 	switch {
 	case err != nil:
 		return "", startError(err)
-	case p.planned.Observed:
-		return "observed the " + p.args.kindName() + ": " + reason, nil
-	case !sent:
+	case !started.Outcome.Submitted:
 		return "", automation.Transient{Err: errors.New("its submission was not observed")}
 	}
 	return "sent the " + p.args.kindName() + ": " + reason, nil
 }
+
+// observeRound runs a round the plan only observes: no turn starts, and the
+// guidance it was given waits for the next round.
+func (s *stepSet) observeRound(ctx context.Context, st *round.Store, p startPlan, call roundCall) (string, error) {
+	_, err := s.e.sendRound(ctx, st, call)
+	if call.Guidance != "" {
+		s.e.keepGuidance(ctx, p.ref, call.Guidance)
+	}
+	if err != nil {
+		return "", startError(err)
+	}
+	return "observed the " + p.args.kindName() + ": " + call.Reason, nil
+}
+
+// sweepRound is a workflow's round as a turn's start runs it, in the bound
+// round state: the plan's marks it writes once sent stand in for the
+// plugin's turn effects.
+type sweepRound struct {
+	e    *Env
+	st   *round.Store
+	call roundCall
+}
+
+func (x sweepRound) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
+	c := x.call
+	c.Guidance, c.Inputs = t.Guidance(), t.Inputs()
+	return x.e.sendRound(ctx, x.st, c)
+}
+
+func (sweepRound) MarksStandIn() bool { return true }
 
 // startError is a send's failure as the engine takes it: the workspace not
 // free now, a start block or a prepare's refusal refuse, an unreachable

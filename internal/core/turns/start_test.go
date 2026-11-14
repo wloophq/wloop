@@ -526,13 +526,53 @@ func TestATurnItsPromptDidNotReachKeepsItsGuidanceBack(t *testing.T) {
 func TestAFailedRunKeepsTheGuidanceBackAndAppliesNoEffect(t *testing.T) {
 	r := newStartRig(t)
 	r.kept[startUnit] = "look at the tests"
-	x := r.runner(true)
-	x.err = errors.New("the session is busy")
+	x := &startRunner{r: r, err: errors.New("the session is busy")}
 	if _, err := r.s.Start(context.Background(), byPerson(guided), x); err == nil {
 		t.Fatal("a failed run started")
 	}
 	if r.kept[startUnit] != "look at the tests" || len(r.effects.recorded)+len(r.effects.sent)+len(r.effects.handed) != 0 {
 		t.Fatalf("kept %q, trace %v", r.kept[startUnit], r.trace)
+	}
+}
+
+func TestARunThatRecordedItsTurnAndFailedRecordsOnlyTheGuidanceEvent(t *testing.T) {
+	r := newStartRig(t)
+	r.kept[startUnit] = "look at the tests"
+	x := r.runner(false)
+	x.err = errors.New("typing the prompt: the terminal is gone")
+	if _, err := r.s.Start(context.Background(), byPerson(guided), x); err == nil {
+		t.Fatal("a failed run started")
+	}
+	if len(r.effects.handed) != 1 || r.effects.handed[0].Guidance != "look at the tests" || r.effects.handed[0].Outcome.ID != "turn1" {
+		t.Fatalf("handed %+v", r.effects.handed)
+	}
+	if len(r.effects.recorded)+len(r.effects.sent) != 0 || r.kept[startUnit] != "look at the tests" {
+		t.Fatalf("recorded %+v, sent %+v, kept %q", r.effects.recorded, r.effects.sent, r.kept[startUnit])
+	}
+}
+
+func TestARunThatRecordedNoTurnRecordsNoGuidanceEvent(t *testing.T) {
+	r := newStartRig(t)
+	req := automated(guided)
+	req.Guidance = "look at the tests"
+	if _, err := r.s.Start(context.Background(), req, &startRunner{r: r}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.effects.handed) != 0 || r.kept[startUnit] != "look at the tests" {
+		t.Fatalf("handed %+v, kept %q", r.effects.handed, r.kept[startUnit])
+	}
+}
+
+func TestARunnerWhoseMarksStandInIsNotCheckedForPluginEffects(t *testing.T) {
+	r := newStartRig(t)
+	r.effects.checkErr = errors.New("no running plugin applies pr.reviewed")
+	x := r.runner(true)
+	x.standIn = true
+	if _, err := r.s.Start(context.Background(), automated(guided), x); err != nil {
+		t.Fatal(err)
+	}
+	if len(x.ran) != 1 || slices.Contains(r.trace, "check") {
+		t.Fatalf("trace %v", r.trace)
 	}
 }
 

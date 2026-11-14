@@ -76,3 +76,24 @@ func TestAHeadlessRunAgainResumesWithoutAPrepare(t *testing.T) {
 		t.Fatalf("turns %+v", b.Turns)
 	}
 }
+
+func TestAHeadlessTurnIsAPersonsOnlyWhenItsEntrySaysSo(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		req  headless.Request
+		want int
+	}{
+		{"asked by a person, automated", headless.Request{Unit: thread, Trigger: turn.Automated, ByPerson: true}, 1},
+		{"by hand, not asked by a person", headless.Request{Unit: thread, Trigger: turn.ByHand}, 0},
+	} {
+		r := newRig(t, scripted{json: answerJSON(t, done)})
+		fx := &turnstest.Effects{}
+		r.svc.Starter.Effects = fx
+		if _, err := r.svc.Run(context.Background(), c.req); err != nil {
+			t.Fatal(err)
+		}
+		if got := fx.Befores(); got != c.want {
+			t.Errorf("%s: %d before phases, want %d", c.name, got, c.want)
+		}
+	}
+}

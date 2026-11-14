@@ -180,6 +180,8 @@ type Launch struct {
 	WorkspaceID, Home, Model string
 	// Why is the workflow that started the turn; nil for a turn started by hand.
 	Why *workflow.Why
+	// ByPerson is a new turn a person asked for, whatever its Trigger.
+	ByPerson bool
 }
 
 // Launcher runs a turn the core asks for (a resume or a Continue) through the

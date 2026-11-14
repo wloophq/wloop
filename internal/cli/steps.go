@@ -76,9 +76,6 @@ type stepDeps struct {
 	// automated turns turns.per_day caps.
 	Headless headlessStarter
 	Turns    automatedTurns
-	// Prepare runs the prepare of turn.start's intent; nil refuses an
-	// intent that has one.
-	Prepare turnPreparer
 }
 
 // briefPort is the brief queue as a round asks it: Peek plans, Ready starts
@@ -253,6 +250,12 @@ func (s *stepSet) Note(ctx context.Context, st workflow.Step, u unit.Unit, why w
 		return err
 	}
 	return e.note(s, ctx, stepCall{st, u, why}, refusal)
+}
+
+// HandsGuidance is whether st starts a turn of an intent that hands it the
+// guidance kept for a unit of p.
+func (s *stepSet) HandsGuidance(st workflow.Step, p unit.ProviderID) bool {
+	return isTurnStart(st) && startDef(s.e.startOf(st, p).def).HandsGuidance
 }
 
 func (s *stepSet) Run(ctx context.Context, st workflow.Step, u unit.Unit, why workflow.Why, o automation.RunOpts) (string, error) {

@@ -16,8 +16,8 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// handleProbe launches a probe turn through the launcher, which stores it,
-// and answers with the turn id and the terminal it was sent to.
+// handleProbe starts a probe turn, which the launcher stores, and answers
+// with the turn id and the terminal it was sent to.
 func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	if !s.agentTurns(w) {
 		return
@@ -58,7 +58,7 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 }
 
 // probe picks a forge unit no probe used, numbered from the clock, and
-// launches the probe's turn on it.
+// starts the probe's turn on it, which a person asked for.
 func (s *Server) probe(ctx context.Context, req api.ProbeRequest, d dintent.Def) (unit.Unit, error) {
 	n := int(s.deps.Now().Unix())
 	var u unit.Unit
@@ -76,9 +76,8 @@ func (s *Server) probe(ctx context.Context, req api.ProbeRequest, d dintent.Def)
 	if s.deps.Turns.Launcher == nil {
 		return u, errors.New("the daemon has no launcher")
 	}
-	_, err := s.deps.Turns.Launcher.Launch(ctx, turns.Launch{Unit: u, Intent: turn.Intent(d.Name), Trigger: turn.Automated,
-		WorkspaceID: req.WorkspaceID, Home: req.Home, Model: req.Model})
-	return u, err
+	return u, s.deps.Turns.Launch(ctx, turns.Launch{Unit: u, Intent: turn.Intent(d.Name), Trigger: turn.Automated,
+		WorkspaceID: req.WorkspaceID, Home: req.Home, Model: req.Model, ByPerson: true})
 }
 
 // probeIntent is the intent holding the probe role on units of p.

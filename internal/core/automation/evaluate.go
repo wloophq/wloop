@@ -502,7 +502,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		decide(workflow.DecisionRun, "")
 		return
 	}
-	if p.e.Guidance != nil {
+	if p.e.Guidance != nil && p.e.handsGuidance(*it) {
 		g, err := p.e.Guidance.Peek(p.ctx, it.Unit)
 		if err != nil {
 			p.errorf("%s: %s: %v", w.Name, it.Unit, err)
@@ -622,4 +622,11 @@ func heldValue(v any) (string, bool) {
 		return strconv.FormatInt(x, 10), x != 0
 	}
 	return fmt.Sprint(v), true
+}
+
+// handsGuidance is whether a step of it hands its turn the guidance kept
+// for its unit, so the guidance runs it early and goes to it.
+func (e *Engine) handsGuidance(it workflow.Item) bool {
+	g, ok := e.Steps.(GuidedSteps)
+	return ok && slices.ContainsFunc(it.Steps, func(st workflow.Step) bool { return g.HandsGuidance(st, it.Unit.Provider) })
 }

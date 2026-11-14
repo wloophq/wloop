@@ -133,7 +133,7 @@ func (s *Service) Launch(ctx context.Context, l Launch) error {
 		return errors.New("no turn starter is wired")
 	}
 	_, err := s.Starter.Start(ctx, Request{Unit: l.Unit, Intent: l.Intent, Guidance: l.Guidance, Inputs: l.Inputs, Trigger: l.Trigger, Why: l.Why,
-		Route: RouteLaunch, ByPerson: l.Trigger == turn.ByHand}, launched{s.Launcher, l})
+		Route: RouteLaunch, ByPerson: l.ByPerson}, launched{s.Launcher, l})
 	return err
 }
 

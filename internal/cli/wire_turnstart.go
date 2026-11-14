@@ -83,7 +83,7 @@ func (p servedPreparer) PrepareTurn(ctx context.Context, intent string, u unit.U
 // startPreparer is a prepare whose refusal is the start's: a refusal is
 // turns.ErrRefused and a prepare out of reach turns.ErrTransient, each
 // keeping its plugin's error and text.
-type startPreparer struct{ p turnPreparer }
+type startPreparer struct{ p turns.Preparer }
 
 func (p startPreparer) PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error) {
 	filled, err := p.p.PrepareTurn(ctx, intent, u, guidance, inputs)

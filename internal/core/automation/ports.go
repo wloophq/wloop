@@ -120,6 +120,13 @@ type Steps interface {
 	Dismiss(ctx context.Context, st workflow.Step, u unit.Unit, why workflow.Why) error
 }
 
+// GuidedSteps are Steps that tell whether a step's turn is handed the
+// guidance kept for its unit; an item none of whose steps is never runs
+// early for that guidance nor takes it.
+type GuidedSteps interface {
+	HandsGuidance(st workflow.Step, p unit.ProviderID) bool
+}
+
 // Refused is a guard refusing at run time: the item is blocked and
 // re-evaluated, its attempts untouched.
 type Refused struct{ Reason string }

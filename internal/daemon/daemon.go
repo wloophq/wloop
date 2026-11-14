@@ -729,7 +729,7 @@ func (s *Server) deliverQueued(ctx context.Context, units []unit.Unit) {
 		return
 	}
 	defer s.deps.LoopMu.Unlock()
-	if err := s.deps.Turns.Deliver(ctx, units...); err != nil {
+	if err := s.deps.Turns.Deliver(lock.WithHeld(ctx), units...); err != nil {
 		s.logf("queued answers: %v", err)
 	}
 }

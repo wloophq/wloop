@@ -50,9 +50,12 @@ func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *
 		return "", fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}
 	submitted, err := e.deliver(ctx, ref.Unit(), &sent, p, false)
-	e.recordGuidance(ctx, ref, r.Guidance)
+	// A turn of an intent that hands guidance has it recorded by its start or its caller.
+	if !startDef(d).HandsGuidance {
+		e.recordGuidance(ctx, ref, r.Guidance)
+	}
 	if err != nil {
-		return "", fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
+		return sent.ID, fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
 	}
 	note := ""
 	if !submitted {

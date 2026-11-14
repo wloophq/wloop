@@ -165,9 +165,8 @@ func (e *Env) startAddress(ctx context.Context, cfg config.Config, ws wsdomain.W
 	}
 	sent.resume(opts.resumeOf)
 	submitted, err = e.deliver(ctx, r.Unit, &sent, p, queued)
-	e.recordGuidance(ctx, ref, r.Guidance)
 	if err != nil {
-		return false, "", "", err
+		return false, "", sent.ID, err
 	}
 	if err := e.roundStarted(ctx, r.Unit, func() error { return e.setColumn(ctx, cfg, ws, config.ColumnInProgress) }); err != nil {
 		fmt.Fprintf(e.Err, "warning: %s: setting the board status: %v\n", ws.DisplayName, err)

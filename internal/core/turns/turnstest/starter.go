@@ -95,3 +95,25 @@ func (noEffects) Before(context.Context, turns.Def, unit.Unit) error { return ni
 func (noEffects) Recorded(context.Context, turns.TurnOut) error      { return nil }
 func (noEffects) Sent(context.Context, turns.TurnOut) error          { return nil }
 func (noEffects) Handed(context.Context, turns.TurnOut) error        { return nil }
+
+// Effects are turn effects that apply nothing and count the Before phases
+// they were asked for.
+type Effects struct {
+	noEffects
+	mu      sync.Mutex
+	befores int
+}
+
+func (e *Effects) Before(context.Context, turns.Def, unit.Unit) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.befores++
+	return nil
+}
+
+// Befores is how many turns ran their Before phase.
+func (e *Effects) Befores() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.befores
+}

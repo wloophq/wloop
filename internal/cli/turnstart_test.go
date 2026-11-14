@@ -58,7 +58,7 @@ hidden = true
 }
 
 // preparedAct gives act's role a prepare, run by p.
-func preparedAct(st *turns.Starter, p turnPreparer) {
+func preparedAct(st *turns.Starter, p turns.Preparer) {
 	st.Preparer = startPreparer{p}
 	st.Defs = editedDefs{Defs: st.Defs, edit: func(d *turns.Def) {
 		if d.Name == dintent.Act {

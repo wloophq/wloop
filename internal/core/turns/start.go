@@ -92,7 +92,9 @@ type Outcome struct {
 	Submitted bool
 }
 
-// Runner renders, places, records and delivers a turn Start admitted.
+// Runner renders, places, records and delivers a turn Start admitted. An
+// Outcome with no ID is a turn the runner did not record; a runner that
+// recorded the turn and then failed answers its ID with the error.
 type Runner interface {
 	Run(ctx context.Context, t Turn) (Outcome, error)
 }
@@ -103,7 +105,7 @@ type Guarder interface {
 }
 
 // MarksStandIn is a Runner whose own marks stand in for the plugin's turn
-// effects, so Start applies none.
+// effects, so Start neither checks nor applies them.
 type MarksStandIn interface {
 	MarksStandIn() bool
 }
@@ -227,7 +229,8 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Started, erro
 }
 
 // run is Start past the take: prepare, check, guard, before, run, then the
-// effects of the recorded turn.
+// effects of the recorded turn; a turn recorded and not run through still
+// records the guidance it was handed.
 func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, error) {
 	if d.Prepare != "" {
 		filled, err := s.Preparer.PrepareTurn(ctx, string(t.intent), t.unit, t.guidance, maps.Clone(t.inputs))
@@ -236,8 +239,12 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		}
 		t.inputs = filled
 	}
-	if err := s.Effects.Check(ctx, d, t.unit); err != nil {
-		return Outcome{}, err
+	m, ok := x.(MarksStandIn)
+	standIn := ok && m.MarksStandIn()
+	if !standIn {
+		if err := s.Effects.Check(ctx, d, t.unit); err != nil {
+			return Outcome{}, err
+		}
 	}
 	if g, ok := x.(Guarder); ok {
 		if err := g.Guard(ctx, *t); err != nil {
@@ -250,19 +257,23 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		}
 	}
 	o, err := x.Run(ctx, *t)
+	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o}
+	handed := func() {
+		if d.HandsGuidance && t.guidance != "" && o.ID != "" {
+			s.effect(ctx, "recording the guidance handed", out, s.Effects.Handed)
+		}
+	}
 	if err != nil {
+		handed()
 		return Outcome{}, err
 	}
-	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o}
-	if m, ok := x.(MarksStandIn); !ok || !m.MarksStandIn() {
+	if !standIn {
 		s.effect(ctx, "applying the plugin's turn effects", out, s.Effects.Recorded)
 	}
 	if t.byPerson && o.Submitted {
 		s.effect(ctx, "applying the sent effects", out, s.Effects.Sent)
 	}
-	if d.HandsGuidance && t.guidance != "" {
-		s.effect(ctx, "recording the guidance handed", out, s.Effects.Handed)
-	}
+	handed()
 	return o, nil
 }
 

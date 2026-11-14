@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -151,6 +153,34 @@ func TestResumeOfAReviewRunsInTheReviewWorkspace(t *testing.T) {
 	}
 	if b := te.bookOf(t, r7); len(b.Turns) != 2 || b.Turns[1].ResumeOf != seq || b.Turns[1].SentTo != te.sessionOf(t, "fake", "term-rev") {
 		t.Fatalf("turns %+v", b.Turns)
+	}
+}
+
+func TestAResumedReviewRecordsTheGuidanceItCarries(t *testing.T) {
+	t.Parallel()
+	m := warmReviewWorkspace()
+	te := newTestEnv(t, m)
+	te.gh.basics = openBasics
+	rec := &memRecorder{}
+	te.Rec = rec
+	ctx := context.Background()
+	ref := pr.Ref(r7)
+	saved, err := te.repo.Save(ctx, dturn.Book{Unit: ref.Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), ID: "r0", Trigger: dturn.ByHand, Head: "c1",
+		Guidance: "check the migration", State: dturn.Unrecorded, SentAt: testNow}}}, port.Event{Unit: ref.Unit(), Kind: turns.KindTurnSent, Key: "r0", At: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (cliLauncher{te.Env}).Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), ResumeOf: saved.Turns[0].Seq, Answer: "publish"}); err != nil {
+		t.Fatalf("%v\n%s", err, te.err)
+	}
+	var handed []string
+	for _, ev := range rec.events {
+		if ev.Kind == dinv.KindGuidance {
+			handed = append(handed, ev.Data)
+		}
+	}
+	if !slices.Equal(handed, []string{"check the migration"}) {
+		t.Fatalf("guidance events %q", handed)
 	}
 }
 

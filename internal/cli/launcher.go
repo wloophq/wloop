@@ -27,7 +27,9 @@ var _ turns.Launcher = cliLauncher{}
 // Launch sends a resume of turn l.ResumeOf, or a new turn when it is 0, in
 // the workspace the intent's manifest names, created again when it is gone;
 // a probe goes to a new session of the workspace it names, or of the one its
-// resumed turn was sent to.
+// resumed turn was sent to. A new turn's effects are its start's; a resume on
+// a pull request applies its plugin's turn effects and records the guidance
+// it carries when its intent hands guidance.
 func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome, error) {
 	e := c.e
 	d, err := e.intentDef(string(l.Intent))
@@ -89,16 +91,24 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 			return turns.Outcome{}, err
 		}
 	}
-	if err := e.checkEffects(d, ref.Unit()); err != nil {
-		return turns.Outcome{}, err
+	resume := l.ResumeOf != 0
+	if resume {
+		if err := e.checkEffects(d, ref.Unit()); err != nil {
+			return turns.Outcome{}, err
+		}
 	}
 	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
-	if err != nil {
-		return turns.Outcome{}, err
+	if resume && id != "" && startDef(d).HandsGuidance {
+		e.recordGuidance(ctx, ref, r.Guidance)
 	}
-	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance}
-	e.applySentEffects(ctx, routeLaunch, d, sr)
-	return turns.Outcome{ID: id, Head: pr.HeadRefOid, Submitted: submitted}, nil
+	out := turns.Outcome{ID: id, Head: pr.HeadRefOid, Submitted: submitted}
+	if err != nil {
+		return out, err
+	}
+	if resume {
+		e.applySentEffects(ctx, routeLaunch, d, &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance})
+	}
+	return out, nil
 }
 
 // roundAgentHome is the agent home remembered for the pull request's rounds.
@@ -144,9 +154,6 @@ func (e *Env) runInReview(ctx context.Context, run roundRun) (string, bool, erro
 	}
 	sent.resume(run.resumeOf)
 	submitted, err := e.openReview(ctx, run.cfg, ref, run.pr, sent, run.options(roundOptions{allowUserActive: true, pr: run.pr}))
-	if run.resumeOf == 0 {
-		e.recordGuidance(ctx, ref, run.r.Guidance)
-	}
 	return sent.ID, submitted, err
 }
 
@@ -224,6 +231,9 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 		r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Guidance: sr.guidance, Inputs: inputs}
 		e.withAddressReason(ctx, cfg, d, &r)
 		id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
+		if id != "" && startDef(d).HandsGuidance {
+			e.recordGuidance(ctx, ref, sr.guidance)
+		}
 		sr.pr, sr.cfg, sr.inputs, sr.id, sr.submitted = pr, cfg, inputs, id, submitted
 		if err == nil {
 			e.applySentEffects(ctx, routeAsked, d, sr)

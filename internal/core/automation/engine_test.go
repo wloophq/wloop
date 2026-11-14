@@ -825,6 +825,22 @@ func TestPeekedGuidanceRunsAndIsTakenOnlyInRun(t *testing.T) {
 	}
 }
 
+func TestAnItemWhoseStepsHandNoGuidanceIsNotGuided(t *testing.T) {
+	w := windowed(sweepWF("nudge", always, "turn.start"), 5*time.Minute)
+	w.Provider, w.Slot = unit.GitHub, "pr"
+	r := newRig(t, w)
+	r.steps.Unguided("turn.start")
+	r.put(p1, "h1")
+	r.guidance.Set(p1, "check the migration")
+	if it, _ := planItem(r.evaluate(), "nudge", p1); it.Decision != workflow.DecisionPending || it.Reason == "guided by you" {
+		t.Fatalf("an item whose steps hand no guidance = %+v", it)
+	}
+	r.sweep()
+	if len(r.guidance.Taken()) != 0 {
+		t.Fatalf("taken %v", r.guidance.Taken())
+	}
+}
+
 func TestWaitingServesTheReadModel(t *testing.T) {
 	w := windowed(sweepWF("review", always, "turn.start"), 5*time.Minute)
 	w.Provider, w.Slot = unit.GitHub, "pr"
