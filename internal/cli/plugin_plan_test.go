@@ -511,3 +511,29 @@ func TestAFirstRoundDismissedWhileNotDueStaysSkipped(t *testing.T) {
 		t.Fatalf("a first round dismissed while not due is planned once due: %+v", first)
 	}
 }
+
+func TestANudgeOnTheActionRouteReportsWhetherItsPromptLanded(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name         string
+		notSubmitted bool
+	}{{"landed", false}, {"not seen landing", true}} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			m := warmReviewWorkspace()
+			m.NotSubmitted = c.notSubmitted
+			te := newTestEnv(t, m)
+			te.gh.basics = openBasics
+			p := newStubPlanner(nil)
+			cl := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
+			te.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return cl, id == unit.GitHub }
+			if err := askedIntent(te.Env, te.cfg, r7, dintent.Nudge, "", preparedNudge, ""); err != nil {
+				t.Fatalf("%v\n%s", err, te.err)
+			}
+			got := p.applied()
+			if len(got) != 1 || got[0].Effect != "pr.nudged" || got[0].Taken != !c.notSubmitted {
+				t.Fatalf("applied %+v, want pr.nudged taken %v", got, !c.notSubmitted)
+			}
+		})
+	}
+}

@@ -211,8 +211,7 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, erro
 // workspace, else of the repository's main checkout, or in the caller's own
 // session.
 func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (string, bool, error) {
-	id, err := e.nudge(ctx, run.cfg, run.turn, run.r, run.pr)
-	return id, true, err
+	return e.nudge(ctx, run.cfg, run.turn, run.r, run.pr)
 }
 
 // askedRound starts a round of d a person asked for through the daemon's
