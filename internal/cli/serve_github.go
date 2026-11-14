@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
-	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -365,13 +364,6 @@ func (e *Env) adoptInPlugin(ctx context.Context, ref pr.Ref, basics *pr.PullRequ
 	}
 	_, err = e.forgeCalls().Action(ctx, src.ActionRequest{Unit: psource.Wire(ref.Unit()), Action: ghsource.ActionAdopt, Args: args})
 	return err
-}
-
-// recordReviewed marks the reviews of full a held review round in ws
-// covered.
-func (e *Env) recordReviewed(st *round.Store, cfg config.Config, ref pr.Ref, ws wsdomain.Workspace, full *pr.PullRequest, viewer string) {
-	setMarks(st, ref.String(), ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status,
-		CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}))
 }
 
 // roundsPaused says whether the pause holds u's rounds: everything is

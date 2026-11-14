@@ -364,7 +364,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (turns.O
 		return turns.Outcome{}, err
 	}
 	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
-	out := turns.Outcome{ID: sent.ID}
+	out := turns.Outcome{ID: sent.ID, Head: st.head}
 	if err != nil {
 		return out, err
 	}
@@ -421,7 +421,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		return turns.Outcome{}, err
 	}
 	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
-	out := turns.Outcome{ID: sent.ID}
+	out := turns.Outcome{ID: sent.ID, Head: st.head}
 	if err != nil {
 		return out, err
 	}
@@ -484,7 +484,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (turns.Ou
 	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, Inputs: st.inputs,
 		BriefMissing: st.briefMissing, Why: st.why}
 	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read, turn: st.turn}))
-	out := turns.Outcome{ID: turnID}
+	out := turns.Outcome{ID: turnID, Head: st.head}
 	if err != nil {
 		return out, err
 	}

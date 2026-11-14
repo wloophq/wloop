@@ -366,12 +366,12 @@ doc = "A pull request with a review turn and no review workspace closed or merge
 [[source.effects]]
 name = "pr.reviewed"
 applies = ["turn", "draft"]
-doc = "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted."
+doc = "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks."
 
 [[source.effects]]
 name = "pr.addressed"
 applies = ["turn"]
-doc = "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered."
+doc = "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered; a round the plan named leaves them to the plan's marks."
 
 [[source.effects]]
 name = "pr.nudged"

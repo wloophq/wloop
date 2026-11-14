@@ -72,6 +72,8 @@ type TurnOut struct {
 	Guidance string
 	Inputs   map[string]any
 	Outcome  Outcome
+	// Planned is a turn that sends a round its unit's plan named.
+	Planned bool
 }
 
 // TurnEffects apply the turn effects an intent names, each at its phase.
@@ -105,12 +107,6 @@ type Runner interface {
 // Guarder is a Runner that can refuse a turn before any effect applies.
 type Guarder interface {
 	Guard(ctx context.Context, t Turn) error
-}
-
-// MarksStandIn is a Runner whose own marks stand in for the plugin's turn
-// effects, so Start neither checks nor applies them.
-type MarksStandIn interface {
-	MarksStandIn() bool
 }
 
 // KeptBack is a Runner told of the guidance Start kept back for the unit's
@@ -147,6 +143,9 @@ type Request struct {
 	Reason string
 	// ResumeOf is the turn whose session the new turn resumes, 0 none.
 	ResumeOf int64
+	// Planned is a turn that sends a round its unit's plan named, whose
+	// marks the plan writes once the round is sent.
+	Planned bool
 }
 
 // Turn is a turn Start or Resume admitted; a sink records it once.
@@ -163,6 +162,7 @@ type Turn struct {
 	reason   string
 	resumeOf int64
 	resumed  bool
+	planned  bool
 }
 
 func (t Turn) Unit() unit.Unit        { return t.unit }
@@ -236,7 +236,7 @@ func (s *Starter) Start(ctx context.Context, r Request, x Runner) (Outcome, erro
 		}
 	}
 	t := admitted(Turn{unit: r.Unit, intent: r.Intent, guidance: cut(d, whole), inputs: maps.Clone(r.Inputs), trigger: cmp.Or(r.Trigger, turn.ByHand),
-		route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf})
+		route: r.Route, byPerson: r.ByPerson, reason: r.Reason, resumeOf: r.ResumeOf, planned: r.Planned})
 	o, err := s.run(ctx, d, &t, x)
 	back, carried := whole, true
 	if errors.Is(err, ErrAnswered) {
@@ -266,12 +266,8 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		}
 		t.inputs = filled
 	}
-	m, ok := x.(MarksStandIn)
-	standIn := ok && m.MarksStandIn()
-	if !standIn {
-		if err := s.Effects.Check(ctx, d, t.unit); err != nil {
-			return Outcome{}, err
-		}
+	if err := s.Effects.Check(ctx, d, t.unit); err != nil {
+		return Outcome{}, err
 	}
 	if g, ok := x.(Guarder); ok {
 		if err := g.Guard(ctx, *t); err != nil {
@@ -284,7 +280,7 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		}
 	}
 	o, err := x.Run(ctx, *t)
-	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Reason: t.reason, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o}
+	out := TurnOut{Def: d, Unit: t.unit, Route: t.route, Reason: t.reason, Guidance: t.guidance, Inputs: maps.Clone(t.inputs), Outcome: o, Planned: t.planned}
 	sl, ok := x.(Sessionless)
 	recordsGuidance := d.HandsGuidance || !ok || !sl.Sessionless()
 	handed := func() {
@@ -296,9 +292,7 @@ func (s *Starter) run(ctx context.Context, d Def, t *Turn, x Runner) (Outcome, e
 		handed()
 		return Outcome{}, err
 	}
-	if !standIn {
-		s.effect(ctx, "applying the plugin's turn effects", out, s.Effects.Recorded)
-	}
+	s.effect(ctx, "applying the plugin's turn effects", out, s.Effects.Recorded)
 	if t.byPerson && o.Submitted {
 		s.effect(ctx, "applying the sent effects", out, s.Effects.Sent)
 	}

@@ -67,11 +67,11 @@ func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 }
 
 // applyPluginEffects applies, through ApplyEffect, the turn effects of d the
-// plugin of u applies, to turn t that went out on route. The turn is out
+// plugin of u applies, to the turn sent describes. The turn is out
 // whatever they answer: an effect that fails, or that its plugin does not
 // apply, is a health problem the daemon shows until the next turn of the
 // unit applies it.
-func (e *Env) applyPluginEffects(ctx context.Context, d dintent.Def, u unit.Unit, t src.TurnRef, route string, taken bool, turnInputs map[string]any) {
+func (e *Env) applyPluginEffects(ctx context.Context, d dintent.Def, u unit.Unit, sent src.EffectRequest, turnInputs map[string]any) {
 	names := pluginEffects(d, u)
 	if len(names) == 0 {
 		return
@@ -91,7 +91,8 @@ func (e *Env) applyPluginEffects(ctx context.Context, d dintent.Def, u unit.Unit
 		}
 	}
 	for _, name := range names {
-		req := src.EffectRequest{Effect: name, Unit: psource.Wire(u), Turn: &t, Route: route, Taken: taken, Inputs: inputs}
+		req := sent
+		req.Effect, req.Unit, req.Inputs = name, psource.Wire(u), inputs
 		err := a.ApplyEffect(context.WithoutCancel(ctx), req)
 		switch {
 		case errors.Is(err, src.ErrUnsupported):

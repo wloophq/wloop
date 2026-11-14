@@ -466,13 +466,12 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, p
 		return errors.New("no turn starts here: the daemon runs a round a cap held")
 	}
 	_, err = e.Turns.Starter.Start(ctx, turns.Request{Unit: ref.Unit(), Intent: dturn.Intent(held.Name), Trigger: dturn.Automated,
-		Route: src.RouteAsked, ByPerson: true, Reason: reason}, &heldRunner{e: e, cfg: cfg, ref: ref, ws: ws, pr: pr, held: held})
+		Route: src.RouteLaunch, ByPerson: true, Reason: reason}, &heldRunner{e: e, cfg: cfg, ref: ref, ws: ws, pr: pr, held: held})
 	return err
 }
 
-// heldRunner sends a held round as a follow-up in the review workspace ws;
-// the marks it records stand in for the plugin's turn effects, as a sweep's
-// follow-up's do.
+// heldRunner sends a held round as a follow-up in the review workspace ws,
+// launched there as the sweep's follow-up is.
 type heldRunner struct {
 	e    *Env
 	cfg  config.Config
@@ -482,21 +481,11 @@ type heldRunner struct {
 	held dintent.Def
 }
 
-func (x *heldRunner) MarksStandIn() bool { return true }
-
 func (x *heldRunner) KeptBack(string) { x.e.noteKeptBack(x.ref) }
 
 func (x *heldRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
 	e, cfg, ref, ws := x.e, x.cfg, x.ref, x.ws
-	rounds, err := e.rounds()
-	if err != nil {
-		return turns.Outcome{}, err
-	}
-	st, err := rounds.Load(ctx)
-	if err != nil {
-		return turns.Outcome{}, err
-	}
-	full, viewer, err := e.readPR(ctx, cfg, ref)
+	full, _, err := e.readPR(ctx, cfg, ref)
 	if err != nil {
 		return turns.Outcome{}, err
 	}
@@ -515,11 +504,9 @@ func (x *heldRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
-	} else {
-		e.recordReviewed(st, cfg, ref, ws, full, viewer)
 	}
 	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, x.pr.Title, ws.Path)
-	return turns.Outcome{ID: sent.ID, Head: full.HeadRefOid, Submitted: submitted}, rounds.Save(ctx, st)
+	return turns.Outcome{ID: sent.ID, Head: full.HeadRefOid, Submitted: submitted}, nil
 }
 
 // fetchPR has the GitHub plugin read ref in full and report it, and

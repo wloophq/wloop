@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"io"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -212,5 +214,68 @@ func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
 	}
 	if got := effectsOf(t, te, r21); !reflect.DeepEqual(got, effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}) {
 		t.Fatalf("effects %+v", got)
+	}
+}
+
+// roundMarks are the marks a review or address round leaves for the
+// planner on ref.
+func roundMarks(t *testing.T, te *testEnv, ref pr.Ref) map[string]string {
+	t.Helper()
+	st := te.loadRounds(t)
+	out := map[string]string{}
+	for _, name := range []string{ghsource.MarkReviewed, ghsource.MarkAddressedReviews, ghsource.MarkAddressedChecks, ghsource.MarkAddressedConflict} {
+		if v := st.Mark(ref.String(), name); v != "" {
+			out[name] = v
+		}
+	}
+	return out
+}
+
+func TestASentRoundLeavesThePlannerTheMarksItsPlanNamed(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, intent, stage, round string
+		scenario                   func(*testing.T) sweepCase
+	}{
+		{"sweep follow-up", string(dintent.Review), roundFollowup, roundFollowup, followupScenario},
+		{"sweep address", string(dintent.Address), "", roundAddress, addressScenario},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			sc := c.scenario(t)
+			r := newStartRig(t, sc, c.intent, c.stage)
+			planned, ok := r.planner().round(sc.ref.String(), c.round)
+			if !ok {
+				t.Fatalf("no %s planned", c.round)
+			}
+			if _, err := r.run(t, automation.RunOpts{}); err != nil {
+				t.Fatal(err)
+			}
+			if got := roundMarks(t, sc.te, sc.ref); !maps.Equal(got, planned.OnSent) {
+				t.Fatalf("marks %v, want exactly the plan's %v", got, planned.OnSent)
+			}
+			if _, due := offeredRounds(t, sc).round(sc.ref.String(), c.round); due {
+				t.Fatalf("the %s is planned again after it was sent", c.round)
+			}
+		})
+	}
+}
+
+func TestAHeldRoundRunNowLeavesThePlannerTheReviewsItCovered(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	exhaustCap(t, sc)
+	sc.te.gh.basics = openBasics
+	planned, ok := plannedRounds(t, sc).round(sc.ref.String(), roundFollowup)
+	if !ok {
+		t.Fatal("no follow-up planned")
+	}
+	if err := (envActions{sc.env, nil}).Run(context.Background(), sc.ref.Unit(), daemon.Call{Out: io.Discard}); err != nil {
+		t.Fatalf("%v\n%s", err, sc.te.err)
+	}
+	if got := roundMarks(t, sc.te, sc.ref); !maps.Equal(got, planned.OnSent) {
+		t.Fatalf("marks %v, want the reviews the held follow-up covered %v", got, planned.OnSent)
+	}
+	if _, due := offeredRounds(t, sc).round(sc.ref.String(), roundFollowup); due {
+		t.Fatal("the follow-up is planned again after run now sent it")
 	}
 }

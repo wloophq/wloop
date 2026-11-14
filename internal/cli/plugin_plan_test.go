@@ -360,13 +360,31 @@ func TestANewTurnThatResumesASessionAppliesItsPluginEffectsOnce(t *testing.T) {
 	}
 }
 
-func TestASweepRoundAppliesNoPluginEffect(t *testing.T) {
+func TestASweepRoundAppliesItsPluginEffectsAsAPlannedRound(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	planned, _ := r.planner().round(sc.ref.String(), roundFollowup)
+	p := newStubPlanner(nil)
+	c := sourcetest.Launch(t, string(unit.GitHub), p, src.Host{})
+	sc.env.pluginEffects = func(id unit.ProviderID) (effectApplier, bool) { return c, id == unit.GitHub }
+	if got, err := r.run(t, automation.RunOpts{}); err != nil || got != "sent the follow-up: the author answered" {
+		t.Fatalf("run = %q, %v", got, err)
+	}
+	got := p.applied()
+	if len(got) != 1 || got[0].Effect != "pr.reviewed" || !got[0].Planned || !got[0].Taken || got[0].Route != src.RouteLaunch ||
+		got[0].Turn == nil || got[0].Turn.ID == "" || got[0].Turn.Head != planned.Head {
+		t.Fatalf("applied %+v, want pr.reviewed of the planned round at head %s", got, planned.Head)
+	}
+}
+
+func TestASweepRoundWhosePluginEffectsNoPluginAppliesIsRefused(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.env.pluginEffects = func(unit.ProviderID) (effectApplier, bool) { return nil, false }
-	if got, err := r.run(t, automation.RunOpts{}); err != nil || got != "sent the follow-up: the author answered" {
-		t.Fatalf("run = %q, %v; a sweep round's marks stand in for its plugin's effects", got, err)
+	if _, err := r.run(t, automation.RunOpts{}); err == nil || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
+		t.Fatalf("run = %v, prompts %d; want refused before the send", err, len(sc.ws.Prompts))
 	}
 }
 

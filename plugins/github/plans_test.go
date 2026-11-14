@@ -131,6 +131,41 @@ func TestPRReviewedAppliesOnTheLaunchRouteOnly(t *testing.T) {
 	}
 }
 
+func TestTheTurnEffectsOfAPlannedRoundLeaveItsMarksToThePlan(t *testing.T) {
+	h := &fakeHost{listing: apiListing}
+	p := started(t, &githubGraphQL{}, h)
+	ctx := context.Background()
+	if err := p.store().SetViewer(ctx, "ana"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.store().UpsertPR(ctx, pr.PR{Ref: ref7, Author: "bruno", State: "OPEN", HeadOid: "h7", Reasons: []string{"reviewed"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.store().SaveDetail(ctx, ref7, store.Detail{Version: store.DetailVersion, ReadAt: testAt, AuthorAssociation: "MEMBER",
+		Commits: []pr.Commit{{Oid: "h6", Parents: 1}, {Oid: "h7", Parents: 1}},
+		Reviews: []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: "ana", SubmittedAt: testAt.Add(-time.Hour), CommitOid: "h6"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, effect := range []string{EffectReviewed, EffectAddressed} {
+		err := p.ApplyEffect(ctx, src.EffectRequest{Effect: effect, Unit: ref7.Unit(), Turn: &src.TurnRef{ID: "t1", Head: "h7"}, Route: src.RouteLaunch, Taken: true, Planned: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := h.markSets(); len(got) != 0 {
+		t.Fatalf("a planned round's turn effects wrote %v; its plan's marks are the round's", got)
+	}
+	inputs := json.RawMessage(`{"who":["bruno"]}`)
+	if err := p.ApplyEffect(ctx, src.EffectRequest{Effect: nudge.EffectNudged, Unit: ref7.Unit(), Turn: &src.TurnRef{ID: "t2"}, Route: src.RouteLaunch, Inputs: inputs, Planned: true}); err != nil {
+		t.Fatal(err)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if n := len(h.events); n == 0 || h.events[n-1].Kind != pr.KindNudged || h.events[n-1].Key != "t2" {
+		t.Fatalf("events %+v, want the nudge recorded on a planned turn too", h.events)
+	}
+}
+
 func TestPRAddressedAndNudgedApplyOnAnyRoute(t *testing.T) {
 	h := &fakeHost{}
 	p := started(t, &githubGraphQL{}, h)

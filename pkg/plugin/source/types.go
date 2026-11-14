@@ -572,6 +572,9 @@ type EffectRequest struct {
 	Taken bool
 	// Inputs are a turn effect's turn inputs, a JSON object; nil for none.
 	Inputs json.RawMessage
+	// Planned says the turn sends a round the plugin's plan named, whose
+	// OnSent marks the host writes once the round is sent.
+	Planned bool
 }
 
 // The routes a turn goes out on, which EffectRequest.Route names.

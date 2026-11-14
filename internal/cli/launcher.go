@@ -107,7 +107,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) (turns.Outcome,
 		return out, err
 	}
 	if resume {
-		e.applyPluginEffects(ctx, d, ref.Unit(), src.TurnRef{ID: id, Head: pr.HeadRefOid}, src.RouteLaunch, submitted, r.Inputs)
+		e.applyPluginEffects(ctx, d, ref.Unit(), src.EffectRequest{Turn: &src.TurnRef{ID: id, Head: pr.HeadRefOid}, Route: src.RouteLaunch, Taken: submitted}, r.Inputs)
 	}
 	return out, nil
 }

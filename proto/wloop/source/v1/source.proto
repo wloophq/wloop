@@ -838,6 +838,9 @@ message ApplyEffectRequest {
   bool taken = 7;
   // inputs are the turn's inputs as a JSON object.
   bytes inputs = 8;
+  // planned says the turn sends a round the plugin's plan named, whose
+  // on_sent marks the host writes once the round is sent.
+  bool planned = 9;
 }
 
 message ApplyEffectResponse {}

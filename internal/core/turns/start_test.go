@@ -126,7 +126,6 @@ type startRunner struct {
 	out       turns.Outcome
 	err       error
 	guardErr  error
-	standIn   bool
 	noSession bool
 	keptBack  []string
 	ran       []turns.Turn
@@ -145,13 +144,11 @@ func (x *startRunner) Guard(ctx context.Context, t turns.Turn) error {
 	return x.guardErr
 }
 
-func (x *startRunner) MarksStandIn() bool { return x.standIn }
-
 func (x *startRunner) Sessionless() bool { return x.noSession }
 
 func (x *startRunner) KeptBack(g string) { x.keptBack = append(x.keptBack, g) }
 
-// plainRunner is a Runner with neither a guard nor marks of its own.
+// plainRunner is a Runner with no guard.
 type plainRunner struct{ x *startRunner }
 
 func (p plainRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error) {
@@ -426,15 +423,21 @@ func TestPluginEffectsRunOnEveryRecordedTurnWithTakenFromSubmitted(t *testing.T)
 	}
 }
 
-func TestARunnerWhoseMarksStandInGetsNoPluginEffects(t *testing.T) {
+func TestAPlannedRoundIsCheckedAndGetsItsPluginEffectsAsPlanned(t *testing.T) {
 	r := newStartRig(t)
-	x := r.runner(true)
-	x.standIn = true
-	if _, err := r.s.Start(context.Background(), automated(guided), x); err != nil {
+	req := automated(guided)
+	req.Planned = true
+	if _, err := r.s.Start(context.Background(), req, r.runner(true)); err != nil {
 		t.Fatal(err)
 	}
-	if len(r.effects.recorded) != 0 {
-		t.Fatalf("recorded %+v", r.effects.recorded)
+	if !slices.Contains(r.trace, "check") || len(r.effects.recorded) != 1 || !r.effects.recorded[0].Planned {
+		t.Fatalf("trace %v, recorded %+v", r.trace, r.effects.recorded)
+	}
+	if _, err := r.s.Start(context.Background(), automated(guided), r.runner(true)); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.effects.recorded) != 2 || r.effects.recorded[1].Planned {
+		t.Fatalf("recorded %+v, want a turn no plan named unplanned", r.effects.recorded)
 	}
 }
 
@@ -571,19 +574,6 @@ func TestARunThatRecordedNoTurnRecordsNoGuidanceEvent(t *testing.T) {
 	}
 	if len(r.effects.handed) != 0 || r.kept[startUnit] != "look at the tests" {
 		t.Fatalf("handed %+v, kept %q", r.effects.handed, r.kept[startUnit])
-	}
-}
-
-func TestARunnerWhoseMarksStandInIsNotCheckedForPluginEffects(t *testing.T) {
-	r := newStartRig(t)
-	r.effects.checkErr = errors.New("no running plugin applies pr.reviewed")
-	x := r.runner(true)
-	x.standIn = true
-	if _, err := r.s.Start(context.Background(), automated(guided), x); err != nil {
-		t.Fatal(err)
-	}
-	if len(x.ran) != 1 || slices.Contains(r.trace, "check") {
-		t.Fatalf("trace %v", r.trace)
 	}
 }
 

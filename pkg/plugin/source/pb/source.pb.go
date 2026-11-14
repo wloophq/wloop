@@ -6113,7 +6113,10 @@ type ApplyEffectRequest struct {
 	// taken says the agent was seen taking the turn.
 	Taken bool `protobuf:"varint,7,opt,name=taken,proto3" json:"taken,omitempty"`
 	// inputs are the turn's inputs as a JSON object.
-	Inputs        []byte `protobuf:"bytes,8,opt,name=inputs,proto3" json:"inputs,omitempty"`
+	Inputs []byte `protobuf:"bytes,8,opt,name=inputs,proto3" json:"inputs,omitempty"`
+	// planned says the turn sends a round the plugin's plan named, whose
+	// on_sent marks the host writes once the round is sent.
+	Planned       bool `protobuf:"varint,9,opt,name=planned,proto3" json:"planned,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6202,6 +6205,13 @@ func (x *ApplyEffectRequest) GetInputs() []byte {
 		return x.Inputs
 	}
 	return nil
+}
+
+func (x *ApplyEffectRequest) GetPlanned() bool {
+	if x != nil {
+		return x.Planned
+	}
+	return false
 }
 
 type ApplyEffectResponse struct {
@@ -11136,7 +11146,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\aTurnRef\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\x03R\x03seq\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
-	"\x04head\x18\x03 \x01(\tR\x04head\"\xa2\x02\n" +
+	"\x04head\x18\x03 \x01(\tR\x04head\"\xbc\x02\n" +
 	"\x12ApplyEffectRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12\x16\n" +
 	"\x06effect\x18\x02 \x01(\tR\x06effect\x12)\n" +
@@ -11145,7 +11155,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\x05draft\x18\x05 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\x12\x14\n" +
 	"\x05route\x18\x06 \x01(\tR\x05route\x12\x14\n" +
 	"\x05taken\x18\a \x01(\bR\x05taken\x12\x16\n" +
-	"\x06inputs\x18\b \x01(\fR\x06inputs\"\x15\n" +
+	"\x06inputs\x18\b \x01(\fR\x06inputs\x12\x18\n" +
+	"\aplanned\x18\t \x01(\bR\aplanned\"\x15\n" +
 	"\x13ApplyEffectResponse\"k\n" +
 	"\x10ProposalsRequest\x12)\n" +
 	"\x04call\x18\x01 \x01(\v2\x15.wloop.source.v1.CallR\x04call\x12,\n" +

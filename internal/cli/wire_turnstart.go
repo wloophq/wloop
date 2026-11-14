@@ -205,7 +205,8 @@ func (f startEffects) Before(ctx context.Context, d turns.Def, u unit.Unit) erro
 }
 
 func (f startEffects) Recorded(ctx context.Context, o turns.TurnOut) error {
-	f.e.applyPluginEffects(ctx, o.Def.Def, o.Unit, src.TurnRef{ID: o.Outcome.ID, Head: o.Outcome.Head}, o.Route, o.Outcome.Submitted, o.Inputs)
+	f.e.applyPluginEffects(ctx, o.Def.Def, o.Unit, src.EffectRequest{Turn: &src.TurnRef{ID: o.Outcome.ID, Head: o.Outcome.Head}, Route: o.Route,
+		Taken: o.Outcome.Submitted, Planned: o.Planned}, o.Inputs)
 	return nil
 }
 

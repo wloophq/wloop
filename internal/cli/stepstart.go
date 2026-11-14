@@ -656,7 +656,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 		return "", errors.New("no turn starter is wired")
 	}
 	sent, err := s.e.Turns.Starter.Start(ctx, turns.Request{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: o.Guidance, Trigger: dturn.Automated,
-		Route: turns.RouteLaunch}, sweepRound{e: s.e, st: st, call: call})
+		Route: turns.RouteLaunch, Planned: true}, sweepRound{e: s.e, st: st, call: call})
 	switch {
 	case err != nil:
 		return "", startError(err)
@@ -680,8 +680,7 @@ func (s *stepSet) observeRound(ctx context.Context, st *round.Store, p startPlan
 }
 
 // sweepRound is a workflow's round as a turn's start runs it, in the bound
-// round state: the plan's marks it writes once sent stand in for the
-// plugin's turn effects.
+// round state, which takes the marks its plan names once it is sent.
 type sweepRound struct {
 	e    *Env
 	st   *round.Store
@@ -693,8 +692,6 @@ func (x sweepRound) Run(ctx context.Context, t turns.Turn) (turns.Outcome, error
 	c.Guidance, c.Inputs, c.Turn = t.Guidance(), t.Inputs(), t
 	return x.e.sendRound(ctx, x.st, c)
 }
-
-func (sweepRound) MarksStandIn() bool { return true }
 
 // startError is a send's failure as the engine takes it: the workspace not
 // free now, a start block or a prepare's refusal refuse, an unreachable

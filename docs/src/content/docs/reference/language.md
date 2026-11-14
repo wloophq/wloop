@@ -175,14 +175,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `plan.cleared`: Drops the unit's pending plan items before a turn a person asked for goes out.
   - `turn.guidance_handed`: Hands the guidance queued on the unit to the turn when it is given none, guidance given replacing the queued one, and queues it back when the turn fails or its prompt does not land.
   - `turn.round_sent`: Records the round-sent event on the unit, with the turn's instructions id, once the prompt of a turn a person asked for reached its agent.
-  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
-  - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks.
+  - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered; a round the plan named leaves them to the plan's marks.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): The effects its agents may declare on their drafts.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
-  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
 
@@ -594,7 +594,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `effects` (list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged`): What sending the draft applies.
   - `task.nudged`: Writes the last_nudge property of the draft's task and of every open task holding one of the items it lists. It says the people were nudged, so it needs the draft's post.
   - `unit.closed`: Records the closure of the draft's unit through its plugin, which unwatches it after its warm period, then ends the open tasks that hold the unit. It applies without the draft's post too.
-  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
