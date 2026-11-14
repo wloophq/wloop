@@ -8,7 +8,8 @@ import { readLens } from "../../lib/view";
 import { act, setNotice } from "../../state/actions.svelte";
 import { net } from "../../state/api";
 import { askInput, overlays } from "../../state/overlays.svelte";
-import { nav, readHash, win, writeHash } from "../../state/route.svelte";
+import { currentHash, readHash, win, writeHash } from "../../state/route.svelte";
+import { rescueFocus } from "./focus";
 import { catalog, detailState, plugins, state, tasksState } from "../../state/store.svelte";
 import { scheduleLoad } from "../../state/sync.svelte";
 import { actOnPlan, planGroups } from "../chrome/plan";
@@ -20,6 +21,8 @@ import { stepTab } from "../task/task";
 import { keyContextOf, sameUnit, type KeyEvent, type KeysEnv } from "./keys";
 import { answerableQuestion, nextTaskNode, pageQuestion } from "./page";
 import { stateLabel, taskAct } from "../../state/verbs";
+import { openSlot } from "../../lib/lens";
+import { taskSlot } from "../../lib/tasks";
 
 // keyHooks are the keys the page's other parts answer: the queue's, a plugin view's, the window's detach and
 // link copy. Each part sets its own when it mounts; one unset lets the key go on to its other bindings.
@@ -31,7 +34,7 @@ export const keyHooks: {
 } = {};
 
 const active = (): HTMLElement | null => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null));
-const detailOnly = (): boolean => readRoute(nav.hash).layout === "detail";
+const detailOnly = (): boolean => readRoute(currentHash()).layout === "detail";
 
 function setHashParam(name: string, value: string): void {
   const loc = win.location();
@@ -162,12 +165,15 @@ export function appEnv(): KeysEnv {
     },
     close: () => {
       if (detailOnly()) return false;
-      if (readHash().task) {
+      const { task, pr } = readHash();
+      if (task) {
         writeHash({ task: "" });
+        void rescueFocus(document, taskSlot(task));
         return true;
       }
-      if (!readHash().pr) return false;
+      if (!pr) return false;
       writeHash({ pr: "" });
+      void rescueFocus(document, openSlot(pr) || `row:${pr}`);
       return true;
     },
     navigate: (view) => setHashParam("view", view),

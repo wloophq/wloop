@@ -6,7 +6,9 @@ import { isSet, keyOf, unitOf, type J } from "../../lib/util";
 import { clock } from "../../state/clock.svelte";
 import { handlerVerb } from "../../state/loaders.svelte";
 import { readHash, writeHash } from "../../state/route.svelte";
+import { rescueFocus } from "../keys/focus";
 import { catalog, drafts, state, tasksState } from "../../state/store.svelte";
+import { openSlot } from "../../lib/lens";
 
 export const TAG_CHIPS = 3;
 export const ARTIFACT_LINES = 40;
@@ -20,7 +22,9 @@ export function detailOf(): J {
 }
 
 export function closeDetail(): void {
+  const { pr } = readHash();
   writeHash({ pr: "" });
+  if (pr) void rescueFocus(document, openSlot(pr) || `row:${pr}`);
 }
 
 export function countdownOf(r: J): { deadline: string; provider: string; title: string; text: string } {

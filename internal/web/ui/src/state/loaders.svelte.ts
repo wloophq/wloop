@@ -5,7 +5,7 @@ import { keyUnit, PLAN, QUEUE_LIST, readRoute, RECENT, type Route, unitPath, EXP
 import { isSet, unitKey, type J } from "../lib/util";
 import { APIError, getJSON, postJSON } from "./api";
 import { reconcile } from "./reconcile";
-import { nav, readHash, viewHash, type Hash } from "./route.svelte";
+import { currentHash, readHash, viewHash, type Hash } from "./route.svelte";
 import {
   catalog, detailState, homeState, outboxState, queueState, reviewState, state, taskState, tasksState, gateState,
 } from "./store.svelte";
@@ -165,7 +165,7 @@ export async function queueLoad(route: Route): Promise<void> {
     const queue = route.queue === QUEUE_LIST
       ? listQueue((await Promise.all(route.ids.map((id) => getJSON("/api/tasks/" + encodeURIComponent(id)).catch(() => null)))).filter(Boolean))
       : await getJSON(queueURL(route));
-    if (queueKey(readRoute(nav.hash)) !== key) return;
+    if (queueKey(readRoute(currentHash())) !== key) return;
     if (!same) Object.assign(queueState, { at: 0, error: "" });
     queueState.key = key;
     if (same) put(queueState, "queue", queue);
@@ -173,7 +173,7 @@ export async function queueLoad(route: Route): Promise<void> {
     queueState.loadError = "";
     queueState.at = Math.min(queueState.at, Math.max((queue.items || []).length - 1, 0));
   } catch (err) {
-    if (queueKey(readRoute(nav.hash)) !== key) return;
+    if (queueKey(readRoute(currentHash())) !== key) return;
     if (!same) Object.assign(queueState, { key, queue: null, at: 0, error: "" });
     queueState.loadError = t("Could not load the queue: {error}", { error: (err as Error).message });
   }
@@ -186,7 +186,7 @@ export function queueShown(route: Pick<Route, "queue" | "ids" | "q">): J {
 }
 
 export async function loadQueue(): Promise<void> {
-  const route = readRoute(nav.hash);
+  const route = readRoute(currentHash());
   if (route.view === QUEUE) await queueLoad(route);
 }
 

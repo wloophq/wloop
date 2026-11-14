@@ -1,18 +1,19 @@
 import { fillWord, lensWords } from "../../lib/lens";
 import { fmtDate, fmtNumber, t } from "../../lib/i18n.svelte";
 import { catalog } from "../../state/store.svelte";
-import { draftOf, isDraftTask, taskById as findTask, unitLabel } from "../../lib/tasks";
+import { draftOf, isDraftTask, taskById as findTask, taskSlot, unitLabel } from "../../lib/tasks";
 import { isSet, type J } from "../../lib/util";
 import { getJSON, postJSON } from "../../state/api";
 import { scheduler, setNotice } from "../../state/actions.svelte";
 import { handlerVerb, loadDetailPane, loadTaskPage, taskPath, verbFor } from "../../state/loaders.svelte";
 import { askInput, showPalette, type PaletteItem } from "../../state/overlays.svelte";
-import { viewHash, writeHash } from "../../state/route.svelte";
+import { readHash, viewHash, writeHash } from "../../state/route.svelte";
 import { detailState, editing, taskState, tasksState } from "../../state/store.svelte";
 import { draftTarget, editedPayload, editedText } from "../gates/gates";
 
 import { matchPath, PICK_ARG, taskPicker } from "../../lib/palette";
 import { offeredVerb, servedAsk, stateLabel, stopEditing, taskAct, taskCatalog, verbHandler, verbLabel, verbState, verbTask } from "../../state/verbs";
+import { rescueFocus } from "../keys/focus";
 
 export { PICK_ARG };
 
@@ -226,7 +227,9 @@ export const detailPane = {
 };
 
 export function closeDetail(): void {
+  const { task } = readHash();
   writeHash({ task: "" });
+  if (task) void rescueFocus(document, taskSlot(task));
 }
 
 // propText is a property's value as a person reads it: a name, or the word facet f gives the value.

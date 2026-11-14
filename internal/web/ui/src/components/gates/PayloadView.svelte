@@ -19,7 +19,7 @@
           <PayloadView {draft} fields={f.fields} {key} {editing} {scope} />
         {:else if editing && f.editable && (f.options || []).length}
           {@const current = f.pointer in edits ? edits[f.pointer] : f.value}
-          <select class="d-field" aria-label={f.label} data-focus={`${scope}:field:${key}:${f.pointer}`} onchange={(ev) => setFieldEdit(key, f.pointer, ev.currentTarget.value)}>
+          <select class="d-field" aria-label={f.label} data-focus={`${scope}:field:${key}:${f.pointer}`} onchange={(ev) => setFieldEdit(key, draft, f.pointer, ev.currentTarget.value)}>
             {#each f.options as o (o.value)}<option value={o.value} selected={o.value === current}>{o.label}</option>{/each}
           </select>
         {:else if f.markdown}

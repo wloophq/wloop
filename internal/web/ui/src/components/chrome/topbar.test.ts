@@ -212,10 +212,13 @@ describe("the filter", () => {
     expect(readHash().q).toBe("https://github.com/acme/api/pull/1");
     expect(readHash().pr).toBe("");
     box.value = "https://github.com/acme/api/pull/1/files";
+    box.focus();
     await fireEvent.paste(box);
     await fireEvent.input(box, { inputType: "insertText", data: "x" });
     expect(box.value).toBe("");
     expect(readHash()).toMatchObject({ q: "", pr: "github:acme/api#1" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.activeElement).toBe(box);
   });
 
   test("rewords its label and placeholder when the strings change", () => {

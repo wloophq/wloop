@@ -33,7 +33,18 @@ export interface Hash {
   done: boolean;
 }
 
-export function readHash(hash: string = nav.hash): Hash {
+// written is the hash a writeHash set that no hashchange has reported yet, and over the route nav held then.
+const written = { hash: "", over: "" };
+
+// currentHash is the route as it is now: nav's, or a write the browser has not reported yet while the window still
+// holds it (a panel that hands a route over puts its own back); read through nav, so what derives from the route
+// follows each move.
+export function currentHash(): string {
+  const h = nav.hash;
+  return written.hash && written.over === h && win.location().hash === written.hash ? written.hash : h;
+}
+
+export function readHash(hash: string = currentHash()): Hash {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const route = readRoute(hash);
   const view = resolveView(route.view, tasksState.catalog, catalog.views, isPluginView);
@@ -83,9 +94,12 @@ export function viewHash(change: Partial<Hash> & { ctx?: string[] | string }): s
 export function writeHash(change: Partial<Hash> & { ctx?: string[] | string }, replace = false): void {
   const hash = viewHash(change);
   if (!replace) {
+    const over = nav.hash;
     win.location().hash = hash;
+    Object.assign(written, { hash: win.location().hash, over });
     return;
   }
+  written.hash = "";
   win.replaceState("#" + hash);
   nav.hash = "#" + hash;
 }
@@ -94,6 +108,7 @@ export function writeHash(change: Partial<Hash> & { ctx?: string[] | string }, r
 // stop a hashchange from reaching it.
 export function followHash(target: Window): () => void {
   const on = () => {
+    written.hash = "";
     nav.hash = target.location.hash;
   };
   target.addEventListener("hashchange", on);

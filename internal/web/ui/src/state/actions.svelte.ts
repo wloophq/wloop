@@ -197,6 +197,7 @@ export async function act(row: J, name: string, extra: ActExtra = {}): Promise<b
   };
   if (input && input.kind === "text" && input.required && !guidance) return refuse(t("{field} is required", { field: input.label || t("Guidance") }));
   if (input && input.max && [...guidance].length > input.max) return refuse(t("guidance is {length} characters, the limit is {max}", { length: [...guidance].length, max: input.max }));
+  const shown = questionShown(row);
   const copy = extra.claim || (spec.copies ? claimCopy() : null);
   const backOut = (): undefined => {
     if (copy) copy.pending.reject(new Error(t("{action} answered nothing to copy", { action: name })));
@@ -229,7 +230,7 @@ export async function act(row: J, name: string, extra: ActExtra = {}): Promise<b
       setNotice(acceptedNote(name, labelOf(row), out.intake) || t("{action} done: {unit}", { action: name, unit: labelOf(row) }) + (out.output && out.output.length ? ". " + out.output.join(" ") : ""));
     }
     ok = true;
-    if (name === "answer" && row.question) answered.set(key, questionShown(row));
+    if (name === "answer" && shown) answered.set(key, shown);
     if (body.guidance) delete drafts.guidance[key];
   } catch (err) {
     if (copy) copy.pending.reject(err);

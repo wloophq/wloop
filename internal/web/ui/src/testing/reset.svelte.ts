@@ -1,5 +1,6 @@
 import { pending, results, scheduler } from "../state/actions.svelte";
 import { resetSync } from "../state/sync.svelte";
+import { foldTexts } from "../components/common/Markdown.svelte";
 import { clock } from "../state/clock.svelte";
 import { dropOverlays } from "../state/overlays.svelte";
 import { served } from "../state/keycaps.svelte";
@@ -18,6 +19,7 @@ const fresh = $state.snapshot({ catalog, state, detailState, drafts, homeState, 
 // queued on the real debounce, and takes the actions' requests for a sync.
 export function resetStore(now = Date.parse("2026-11-07T12:00:00Z"), hash = ""): void {
   resetSync();
+  foldTexts();
   scheduler.load = () => {};
   dropOverlays();
   served.bindings = [];

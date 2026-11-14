@@ -2,7 +2,7 @@
   import { t } from "../../lib/i18n.svelte";
   import { groupedRows, pipeline, rowByURL } from "../../lib/lens";
   import { keyOf } from "../../lib/util";
-  import { moveFocus, readLens } from "../../lib/view";
+  import { readLens } from "../../lib/view";
   import { QUERY_MAX, readHash, writeHash } from "../../state/route.svelte";
   import { state } from "../../state/store.svelte";
 
@@ -17,7 +17,6 @@
     if (row) {
       el.value = "";
       writeHash({ q: "", pr: keyOf(row) });
-      void moveFocus(`row:${keyOf(row)}`);
       return;
     }
     writeHash({ q: el.value.slice(0, QUERY_MAX) }, true);

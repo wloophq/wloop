@@ -5,7 +5,7 @@ import { act } from "../../state/actions.svelte";
 import { setNotice } from "../../state/actions.svelte";
 import { getJSON } from "../../state/api";
 import { queueLoad, queueShown } from "../../state/loaders.svelte";
-import { hashString, nav, writeHash } from "../../state/route.svelte";
+import { currentHash, hashString, writeHash } from "../../state/route.svelte";
 import { queueState } from "../../state/store.svelte";
 import { draftActions, resolveDraft, resolveGate, type DraftAction } from "../gates/gates";
 
@@ -26,7 +26,7 @@ export const queueDeps = {
   },
 };
 
-export const queueRoute = () => readRoute(nav.hash);
+export const queueRoute = () => readRoute(currentHash());
 
 // queueDraft reports whether gate g is a draft's, which the daemon serves with its delivery and the draft.
 export function queueDraft(g: J): boolean {

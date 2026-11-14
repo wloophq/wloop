@@ -171,3 +171,14 @@ test("an opened text folds again when another text, of another key, takes its pl
   flushSync();
   expect(c.querySelector(".md-more")).not.toBeNull();
 });
+
+test("a text the reader opened stays open when it is drawn again under its key", async () => {
+  const long = Array.from({ length: 8 }, (_, i) => `Paragraph ${i}.`).join("\n\n");
+  const first = render(Markdown, { text: long, fold: 2, key: "brief:t-1" });
+  await fireEvent.click(first.container.querySelector(".md-more") as HTMLButtonElement);
+  first.unmount();
+  const again = render(Markdown, { text: long, fold: 2, key: "brief:t-1" }).container;
+  expect(again.querySelector(".md-more")).toBeNull();
+  const other = render(Markdown, { text: long, fold: 2, key: "brief:t-2" }).container;
+  expect(other.querySelector(".md-more")).not.toBeNull();
+});

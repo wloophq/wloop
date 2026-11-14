@@ -175,6 +175,17 @@ describe("draftcard_test.go", () => {
     expect(args.rev).toBe("3");
   });
 
+  test("a broadcast toggle the daemon refuses shows the draft's own state again", async () => {
+    recordPosts(() => new Error("draft changed"));
+    const d = $state({ ...pendingDraft(), broadcast: "on" });
+    const c = draft(d);
+    const cb = byFocus(c, "outbox:broadcast:draft:7") as HTMLInputElement;
+    cb.checked = false;
+    await fireEvent.change(cb);
+    await settle();
+    expect(cb.checked).toBe(true);
+  });
+
   test("TestCardShowsARevisionMadeWhileEditing", async () => {
     const posts = recordPosts();
     const d = $state(reviewDraft());
@@ -193,6 +204,25 @@ describe("draftcard_test.go", () => {
     await settle();
     expect(posts[0].body.args.rev).toBe("4");
     expect(posts[0].body.args.payload).toBeUndefined();
+  });
+
+  test("a field picked after the draft changed counts, and is what the approval sends", async () => {
+    const posts = recordPosts();
+    const d = $state(reviewDraft());
+    const c = draft(d);
+    await fireEvent.click(byFocus(c, "outbox:open:approve:draft:7"));
+    await settle();
+    Object.assign(d, { rev: 4 });
+    flushSync();
+    const sel = c.querySelector("select") as HTMLSelectElement;
+    sel.value = "APPROVE";
+    await fireEvent.change(sel);
+    flushSync();
+    expect((all(c, "option") as HTMLOptionElement[]).filter((o) => o.selected).map((o) => o.value)).toEqual(["APPROVE"]);
+    await fireEvent.click(byFocus(c, "outbox:approve:draft:7"));
+    await settle();
+    expect(posts[0].body.args.rev).toBe("4");
+    expect(JSON.parse(posts[0].body.args.payload)).toMatchObject({ event: "APPROVE" });
   });
 
   test("TestCardOffersNoControlForAFieldWithoutOptions", async () => {
@@ -322,7 +352,7 @@ describe("what the migration is for", () => {
     const sel = c.querySelector("select") as HTMLSelectElement;
     sel.value = "APPROVE";
     await fireEvent.change(sel);
-    expect(editPayloads.get("draft:7")).toEqual({ "/event": "APPROVE" });
+    expect(editPayloads.get("draft:7")).toEqual({ rev: 3, fields: { "/event": "APPROVE" } });
     const again = draft(reviewDraft());
     expect((byFocus(again, "outbox:draft-text:draft:7") as HTMLTextAreaElement).value).toBe("Only one finding.");
     expect((again.querySelector("select") as HTMLSelectElement).value).toBe("APPROVE");

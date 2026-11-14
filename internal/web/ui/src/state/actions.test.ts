@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { J } from "../lib/util";
 import { resetStore } from "../testing/reset.svelte";
 import { act, answerSent, claimCopy, clipboard, forgetAnswers, questionShown, scheduler } from "./actions.svelte";
-import { apiError } from "./api";
+import { apiError, net } from "./api";
 import { FakeDaemon, Reply } from "../testing/fakedaemon";
 import { testdata } from "../testing/fixtures";
 import { overlays } from "./overlays.svelte";
@@ -188,4 +188,17 @@ describe("apiError", () => {
     expect(old).not.toContain("kickstart");
     expect(apiError(out, "HTTP 503", 503)).toContain("run: launchctl kickstart");
   });
+});
+
+test("an answer is kept against the question the person answered, though a sync moves the row while it is on its way", async () => {
+  const { answered: kept } = await import("./store.svelte");
+  const row: any = { unit: { provider: "acme", key: "web#7" }, label: "acme/web#7", actions: [{ id: "answer", enabled: true }], question: { record_id: "q1", state: "asked", queued: false } };
+  let release!: () => void;
+  net.fetch = () => new Promise<Response>((r) => (release = () => r(new Response("{}", { status: 200 }))));
+  const sent = act(row, "answer", { option_id: "a" });
+  await Promise.resolve();
+  row.question = { record_id: "q1", state: "asked", queued: true };
+  release();
+  await sent;
+  expect(kept.get("acme:web#7")).toBe("q1:asked:false");
 });

@@ -58,7 +58,10 @@
   {#if draft.author}<div class="meta d-by">{draft.author}</div>{/if}
   {#if draft.broadcast}
     <label class="meta broadcast"><input type="checkbox" checked={draft.broadcast === "on"} disabled={!pendingBroadcast} data-focus={`${scope}:broadcast:draft:${draft.id}`}
-        onchange={(ev) => broadcastToggle(draft, ev.currentTarget.checked)} /> {t("Also send to the conversation")}</label>
+        onchange={async (ev) => {
+          const box = ev.currentTarget;
+          if (!(await broadcastToggle(draft, box.checked))) box.checked = draft.broadcast === "on";
+        }} /> {t("Also send to the conversation")}</label>
   {/if}
   {#if conflict}
     <div class="d-conflict">

@@ -299,13 +299,18 @@ export function editConflict(d: J, key: string): boolean {
   return since !== undefined && since !== d.rev;
 }
 
-// fieldEdits are the field edits of d edited under key that still count.
+// fieldEdits are the field edits of d edited under key that still count: those made over the revision d is at
+// now; an edit made before d changed was made over values that may have changed.
 export function fieldEdits(d: J, key: string): Record<string, string> {
-  return editConflict(d, key) ? {} : editPayloads.get(key) || {};
+  const e = editPayloads.get(key);
+  return e && e.rev === d.rev ? e.fields : {};
 }
 
-export function setFieldEdit(key: string, pointer: string, value: string): void {
-  editPayloads.set(key, { ...(editPayloads.get(key) || {}), [pointer]: value });
+// setFieldEdit records a field edit of d, edited under key, over the revision d is at; edits over an older one go.
+export function setFieldEdit(key: string, d: J, pointer: string, value: string): void {
+  const e = editPayloads.get(key);
+  const fields = e && e.rev === d.rev ? e.fields : {};
+  editPayloads.set(key, { rev: d.rev, fields: { ...fields, [pointer]: value } });
 }
 
 // editedText is the text arg of an approval of d edited under key; none when its kind locks its text.
