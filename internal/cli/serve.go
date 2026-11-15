@@ -297,9 +297,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	host := e.moduleHost(db)
 	store.UseHost(host(forge))
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
-	plan := &latePlan{}
-	starter := e.turnStarter(loopMu, plan, logf)
-	e.Turns.Starter = starter
+	starts := e.servedStarts(loopMu, logf)
+	starter := starts.starter
 	var queue *brief.Queue
 	var briefs *interruptFirst
 	var intakeBriefs intake.Briefs
@@ -430,7 +429,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		e.startBriefs(ctx, queue, logf)
 	}
 	d = withEngine(d, e, ed)
-	plan.set(d.Plan)
+	starts.plan.set(d.Plan)
 	return d
 }
 

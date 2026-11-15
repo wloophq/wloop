@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync/atomic"
 
@@ -37,8 +38,7 @@ func (e *Env) wireTurnStart(w *serveWiring) {
 
 // turnStarter is the use case every new turn starts through, over the
 // loaded intents, the guidance kept on the units, the loop mutex mu and the
-// turn effects; plan is the daemon's plan once built. Its prepare is the
-// daemon's, which newDaemon gives it.
+// turn effects; plan is the daemon's plan once built. It has no prepare.
 func (e *Env) turnStarter(mu *lock.Mutex, plan *latePlan, logf func(string, ...any)) *turns.Starter {
 	return &turns.Starter{Defs: loadedDefs{e}, Kept: recGuidance{e}, Loop: serveLoop{e: e, mu: mu},
 		Effects: startEffects{e: e, plan: plan}, Store: e.Turns.Store, Guides: profileGuides{e}, Log: logf}
@@ -65,14 +65,51 @@ func startDef(d dintent.Def) turns.Def {
 	return turns.Def{Def: d, HandsGuidance: slices.Contains(d.Effects, builtin.EffectGuidanceHanded)}
 }
 
+// servedStarts is the starter every server a serve runs shares, so that an
+// action one server delegated, still running after the next is built, reads
+// no field the next one writes; the plan and the prepares are those of the
+// server built last.
+type servedStarts struct {
+	starter  *turns.Starter
+	plan     latePlan
+	prepares daemonPrepares
+}
+
+// servedStarts is e's served starter, built over mu on the first call and
+// made e's turn starter.
+func (e *Env) servedStarts(mu *lock.Mutex, logf func(string, ...any)) *servedStarts {
+	if e.starts == nil {
+		s := &servedStarts{}
+		s.starter = e.turnStarter(mu, &s.plan, logf)
+		s.starter.Preparer = startPreparer{&s.prepares}
+		e.starts = s
+	}
+	if e.Turns.Starter != e.starts.starter {
+		e.Turns.Starter = e.starts.starter
+	}
+	return e.starts
+}
+
 // newDaemon is the daemon serve runs over d, which runs the prepares of the
-// turns d's starter starts.
+// turns the served starter starts.
 func (e *Env) newDaemon(d daemon.Deps) *daemon.Server {
 	srv := daemon.New(d)
-	if e.Turns != nil && e.Turns.Starter != nil {
-		e.Turns.Starter.Preparer = startPreparer{srv}
+	if e.starts != nil {
+		e.starts.prepares.srv.Store(srv)
 	}
 	return srv
+}
+
+// daemonPrepares are the prepares of the daemon newDaemon built last; a
+// prepare before it builds one is turns.ErrTransient.
+type daemonPrepares struct{ srv atomic.Pointer[daemon.Server] }
+
+func (p *daemonPrepares) PrepareTurn(ctx context.Context, intent string, u unit.Unit, guidance string, inputs map[string]any) (map[string]any, error) {
+	srv := p.srv.Load()
+	if srv == nil {
+		return nil, fmt.Errorf("%s: %w: no daemon runs the prepare of %s yet", u.Label(), turns.ErrTransient, intent)
+	}
+	return srv.PrepareTurn(ctx, intent, u, guidance, inputs)
 }
 
 // startPreparer is a prepare whose refusal is the start's: a refusal is
