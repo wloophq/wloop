@@ -288,8 +288,8 @@ func TestATurnWhoseEffectsNoPluginAppliesIsNotSent(t *testing.T) {
 	sc.te.gh.basics = openBasics
 	sc.env.pluginEffects = func(unit.ProviderID) (effectApplier, bool) { return nil, false }
 	err := sc.env.Turns.Launch(context.Background(), turns.Launch{Unit: sc.ref.Unit(), Intent: dturn.Intent(dintent.Review), Trigger: dturn.ByHand})
-	if err == nil || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
-		t.Fatalf("launch = %v, prompts %d; want refused before the send", err, len(sc.ws.Prompts))
+	if !errors.Is(err, src.ErrUnavailable) || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
+		t.Fatalf("launch = %v, prompts %d; want unavailable before the send", err, len(sc.ws.Prompts))
 	}
 }
 
@@ -378,13 +378,15 @@ func TestASweepRoundAppliesItsPluginEffectsAsAPlannedRound(t *testing.T) {
 	}
 }
 
-func TestASweepRoundWhosePluginEffectsNoPluginAppliesIsRefused(t *testing.T) {
+func TestASweepRoundWhosePluginEffectsNoRunningPluginAppliesIsTriedAgain(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.env.pluginEffects = func(unit.ProviderID) (effectApplier, bool) { return nil, false }
-	if _, err := r.run(t, automation.RunOpts{}); err == nil || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
-		t.Fatalf("run = %v, prompts %d; want refused before the send", err, len(sc.ws.Prompts))
+	_, err := r.run(t, automation.RunOpts{})
+	var transient automation.Transient
+	if !errors.As(err, &transient) || !strings.Contains(err.Error(), "pr.reviewed") || len(sc.ws.Prompts) != 0 {
+		t.Fatalf("run = %v, prompts %d; want tried again, before the send", err, len(sc.ws.Prompts))
 	}
 }
 

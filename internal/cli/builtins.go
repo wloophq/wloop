@@ -53,15 +53,16 @@ func pluginEffects(d dintent.Def, u unit.Unit) []string {
 	return names
 }
 
-// checkEffects refuses, before a turn of d on u goes out, one whose plugin
-// effects no running plugin applies.
+// checkEffects stops, before a turn of d on u goes out, one whose plugin
+// effects no running plugin applies: src.ErrUnavailable, since its plugin
+// may run again.
 func (e *Env) checkEffects(d dintent.Def, u unit.Unit) error {
 	names := pluginEffects(d, u)
 	if len(names) == 0 {
 		return nil
 	}
 	if _, ok := e.turnEffects(u.Provider); !ok {
-		return fmt.Errorf("%s: no running plugin applies %s; the turn was not sent", u.Label(), strings.Join(names, ", "))
+		return fmt.Errorf("%s: no running plugin applies %s; the turn was not sent: %w", u.Label(), strings.Join(names, ", "), src.ErrUnavailable)
 	}
 	return nil
 }

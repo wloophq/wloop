@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // Actions are the operations with side effects outside the store. The daemon
@@ -516,7 +517,8 @@ func writeActionError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, missing.msg)
 	case errors.Is(err, gates.ErrRefused), errors.Is(err, gates.ErrIntent), errors.Is(err, gates.ErrNoGate), errors.Is(err, gates.ErrResolved):
 		writeGateError(w, err)
-	case errors.Is(err, errActionsUnavailable), errors.Is(err, errTurnsUnavailable), errors.Is(err, errPlanUnavailable), errors.Is(err, turns.ErrNoIntents):
+	case errors.Is(err, errActionsUnavailable), errors.Is(err, errTurnsUnavailable), errors.Is(err, errPlanUnavailable), errors.Is(err, turns.ErrNoIntents),
+		errors.Is(err, src.ErrUnavailable), errors.Is(err, turns.ErrTransient):
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())

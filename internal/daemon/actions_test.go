@@ -41,6 +41,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/wake"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 type fakeActions struct {
@@ -409,6 +410,27 @@ func TestDelegateErrorIs500AndRecordsNothing(t *testing.T) {
 	}
 	if o, _ := s.store().Override(context.Background(), r7); o.Adopted {
 		t.Fatal("adopted after a failed adopt")
+	}
+}
+
+func TestADelegatedActionWhosePluginIsOutOfReachIs503(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	s.store().AppendEvents(context.Background(), []dinv.Event{{PR: r7, Kind: dinv.KindRoundHeld, At: s.deps.Now().Add(time.Second), Data: "daily cap"}})
+	for _, cause := range []error{
+		fmt.Errorf("%w: acme/api#7: no running plugin applies pr.reviewed", src.ErrUnavailable),
+		fmt.Errorf("%w: no preparer yet", turns.ErrTransient),
+	} {
+		fa := &fakeActions{err: cause}
+		s.deps.Actions = fa
+		for _, action := range []string{"review", "run_now"} {
+			if rec := post(t, s, "/api/units/github/acme%2Fapi%237/"+action, `{"source":"cockpit"}`); rec.Code != 503 || !strings.Contains(rec.Body.String(), strings.SplitN(cause.Error(), ": ", 2)[1]) {
+				t.Fatalf("%s, %v: %d %s", action, cause, rec.Code, rec.Body)
+			}
+		}
+		if len(fa.calls) != 2 {
+			t.Fatalf("calls %v, want both actions delegated", fa.calls)
+		}
 	}
 }
 
