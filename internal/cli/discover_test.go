@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 func requestedPR(number int, branch, owner string, fork bool) obj {
@@ -88,7 +89,7 @@ func TestAFollowUpWhoseSubmissionWasNotObservedStoresNothing(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	st, _ := sc.te.Rounds.Load(context.Background())
-	if st.Mark(sc.ref.String(), ghsource.MarkReviewed) != "" {
+	if st.Mark(sc.ref.String(), ghplan.MarkReviewed) != "" {
 		t.Fatal("fingerprint stored without an observed submission")
 	}
 	if st.CapReason(sc.ref.String(), testNow, 1) != "" {

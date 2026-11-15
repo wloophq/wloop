@@ -29,6 +29,7 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/api/apitest"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // tokenGH is a gh that names a token, the one call the GitHub plugin's API
@@ -165,7 +166,7 @@ func TestARoundPlansLaunchesAndSendsThroughTheGitHubBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan, err := c.Plan(ctx, u, st)
-	if err != nil || len(plan.Rounds) != 1 || plan.Rounds[0].Name != roundFollowup || plan.Rounds[0].Workspace.ID != "ws-rev" || plan.Rounds[0].OnSent[ghsource.MarkReviewed] == "" {
+	if err != nil || len(plan.Rounds) != 1 || plan.Rounds[0].Name != roundFollowup || plan.Rounds[0].Workspace.ID != "ws-rev" || plan.Rounds[0].OnSent[ghplan.MarkReviewed] == "" {
 		t.Fatalf("the binary's plan %+v %v", plan, err)
 	}
 	r.steps.d.Planners = map[unit.ProviderID]roundPlanner{unit.GitHub: c}

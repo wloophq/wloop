@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // inventoryCommandFiles are the inventory commands, which reach GitHub only
@@ -31,7 +32,7 @@ var inventoryCommandFiles = []string{"adopt.go", "ahead.go", "hand.go", "intake.
 // githubMarks are the marks GitHub's rounds write, by their name in the
 // round package.
 var githubMarks = map[string]string{
-	"Reviewed":          ghsource.MarkReviewed,
+	"Reviewed":          ghplan.MarkReviewed,
 	"AddressedReviews":  ghsource.MarkAddressedReviews,
 	"AddressedChecks":   ghsource.MarkAddressedChecks,
 	"AddressedConflict": ghsource.MarkAddressedConflict,

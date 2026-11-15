@@ -25,6 +25,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // effects are what a round left in the round state and the activity log.
@@ -39,7 +40,7 @@ func effectsOf(t *testing.T, te *testEnv, ref pr.Ref) effects {
 	t.Helper()
 	st := te.loadRounds(t)
 	key := ref.String()
-	got := effects{fingerprint: st.Mark(key, ghsource.MarkReviewed)+st.Mark(key, ghsource.MarkAddressedReviews) != "", checksHead: st.Mark(key, ghsource.MarkAddressedChecks), conflictHead: st.Mark(key, ghsource.MarkAddressedConflict)}
+	got := effects{fingerprint: st.Mark(key, ghplan.MarkReviewed)+st.Mark(key, ghsource.MarkAddressedReviews) != "", checksHead: st.Mark(key, ghsource.MarkAddressedChecks), conflictHead: st.Mark(key, ghsource.MarkAddressedConflict)}
 	evs, err := te.Store.Events(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +224,7 @@ func roundMarks(t *testing.T, te *testEnv, ref pr.Ref) map[string]string {
 	t.Helper()
 	st := te.loadRounds(t)
 	out := map[string]string{}
-	for _, name := range []string{ghsource.MarkReviewed, ghsource.MarkAddressedReviews, ghsource.MarkAddressedChecks, ghsource.MarkAddressedConflict} {
+	for _, name := range []string{ghplan.MarkReviewed, ghsource.MarkAddressedReviews, ghsource.MarkAddressedChecks, ghsource.MarkAddressedConflict} {
 		if v := st.Mark(ref.String(), name); v != "" {
 			out[name] = v
 		}

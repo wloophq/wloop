@@ -33,6 +33,7 @@ import (
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // fakePlanner is a plugin's planner that plans fixed rounds, by unit key,
@@ -374,8 +375,8 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		kind          string
 	}{
 		"follow-up": {followupScenario, string(dintent.Review), roundFollowup, func(t *testing.T, st *round.Store, c src.Round, key string) {
-			if want := c.OnSkipped[ghsource.MarkReviewed]; st.Mark(key, ghsource.MarkReviewed) != want || want == "" {
-				t.Errorf("fingerprint %q, want %q", st.Mark(key, ghsource.MarkReviewed), want)
+			if want := c.OnSkipped[ghplan.MarkReviewed]; st.Mark(key, ghplan.MarkReviewed) != want || want == "" {
+				t.Errorf("fingerprint %q, want %q", st.Mark(key, ghplan.MarkReviewed), want)
 			}
 		}, "follow-up"},
 		"triage": {addressScenario, string(dintent.Address), "", func(t *testing.T, st *round.Store, c src.Round, key string) {

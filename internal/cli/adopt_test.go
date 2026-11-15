@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 const adoptBasics = `{"data":{"pr":{"pullRequest":{"number":20,"title":"Theirs","state":"OPEN","headRefName":"feat/theirs","baseRefName":"main","headRefOid":"c9","repository":{"nameWithOwner":"acme/api"}}}}}`
@@ -317,7 +318,7 @@ func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
 	st.SetMark(ref.String(), ghsource.MarkAddressedReviews, "2026-10-18T10:00:00Z")
-	st.SetMark(ref.String(), ghsource.MarkReviewed, "2026-10-18T10:00:00Z@c9")
+	st.SetMark(ref.String(), ghplan.MarkReviewed, "2026-10-18T10:00:00Z@c9")
 	te.saveRounds(t, st)
 	if code := te.run("take-over", ref.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -326,7 +327,7 @@ func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	if got := st.Mark(ref.String(), ghsource.MarkAddressedReviews); got != "" {
 		t.Fatalf("the reviews addressed, %q, survived the take-over", got)
 	}
-	if got := st.Mark(ref.String(), ghsource.MarkReviewed); got == "" {
+	if got := st.Mark(ref.String(), ghplan.MarkReviewed); got == "" {
 		t.Fatal("the take-over forgot my own review")
 	}
 }

@@ -6,8 +6,6 @@ import (
 	"io"
 	"time"
 
-	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-
 	"slices"
 	"strings"
 	"testing"
@@ -28,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 	"github.com/wloophq/wloop/internal/workspace/fake"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // watchLoop starts te's daemon, if not yet, and has te's fake GitHub record
@@ -156,7 +155,7 @@ func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 0})
-	if st := te.loadRounds(t); st.Mark(r7.String(), ghsource.MarkReviewed) == "" {
+	if st := te.loadRounds(t); st.Mark(r7.String(), ghplan.MarkReviewed) == "" {
 		t.Fatal("the launched round marked no reviews covered")
 	}
 }

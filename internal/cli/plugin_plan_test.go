@@ -30,6 +30,7 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
+	ghplan "github.com/wloophq/wloop/plugins/github/plan"
 )
 
 // stubPlanner is a source plugin whose planner plans fixed rounds by unit
@@ -108,7 +109,7 @@ func TestARoundLaunchesFromAPluginPlan(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	key := sc.ref.String()
 	p := newStubPlanner(map[string][]src.Round{key: {{Name: roundFollowup, Workspace: src.WorkspaceRef{Manager: "orca", ID: "ws-rev"},
-		Head: "c3", Reason: "the plugin planned it", OnSent: map[string]string{ghsource.MarkReviewed: "fp-plan", "plugin.own": "x"}}}})
+		Head: "c3", Reason: "the plugin planned it", OnSent: map[string]string{ghplan.MarkReviewed: "fp-plan", "plugin.own": "x"}}}})
 	r.launchPlanner(t, p)
 	got, err := r.run(t, automation.RunOpts{})
 	if err != nil {
@@ -121,7 +122,7 @@ func TestARoundLaunchesFromAPluginPlan(t *testing.T) {
 		t.Fatalf("prompts %+v", sc.ws.Prompts)
 	}
 	st := sc.te.loadRounds(t)
-	if st.Mark(key, ghsource.MarkReviewed) != "fp-plan" || st.Mark(key, "plugin.own") != "x" || st.Days[round.DayKey(testNow)].PerPR[key] != 1 {
+	if st.Mark(key, ghplan.MarkReviewed) != "fp-plan" || st.Mark(key, "plugin.own") != "x" || st.Days[round.DayKey(testNow)].PerPR[key] != 1 {
 		t.Fatalf("marks %v, rounds today %d", st.PRs[key].Marks, st.Days[round.DayKey(testNow)].PerPR[key])
 	}
 	if len(p.planned()) == 0 {
@@ -142,11 +143,11 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	key := sc.ref.String()
 	p := newStubPlanner(map[string][]src.Round{key: {{Name: roundFollowup, Reason: "planned",
-		OnSkipped: map[string]string{ghsource.MarkReviewed: "fp-skip", "plugin.gone": ""}}}})
+		OnSkipped: map[string]string{ghplan.MarkReviewed: "fp-skip", "plugin.gone": ""}}}})
 	r.launchPlanner(t, p)
 	sent := testNow.Add(-time.Hour)
 	st := r.load(t)
-	st.RecordSent(key, ghsource.MarkReviewed, "fp-old", sent)
+	st.RecordSent(key, ghplan.MarkReviewed, "fp-old", sent)
 	st.SetMark(key, "plugin.gone", "y")
 	st.SetAgentHome(key, "/homes/ana")
 	st.Count("acme/api#99", testNow)
@@ -164,7 +165,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 		t.Fatal("the plugin was never asked its plan")
 	}
 	got := states[len(states)-1]
-	if got.Marks[ghsource.MarkReviewed] != "fp-old" || got.Marks["plugin.gone"] != "y" || !got.SentAt.Equal(sent) || got.AgentHome != "/homes/ana" {
+	if got.Marks[ghplan.MarkReviewed] != "fp-old" || got.Marks["plugin.gone"] != "y" || !got.SentAt.Equal(sent) || got.AgentHome != "/homes/ana" {
 		t.Errorf("bookkeeping %+v", got)
 	}
 	if got.Today != 1 || got.DayTotal != 2 {
@@ -184,7 +185,7 @@ func TestPlanReceivesTheRoundState(t *testing.T) {
 	}
 	r.save(t)
 	saved := sc.te.loadRounds(t)
-	if saved.Mark(key, ghsource.MarkReviewed) != "fp-skip" || saved.Mark(key, "plugin.gone") != "" {
+	if saved.Mark(key, ghplan.MarkReviewed) != "fp-skip" || saved.Mark(key, "plugin.gone") != "" {
 		t.Fatalf("a skip writes the plan's OnSkipped: %v", saved.PRs[key].Marks)
 	}
 	if !slicesContainsKind(r.rec.events, dinv.KindRoundSkipped) {
