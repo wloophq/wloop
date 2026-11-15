@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -159,12 +160,18 @@ func TestRunServesSocketAndGuardsTCP(t *testing.T) {
 func TestStaleSocketIsReplaced(t *testing.T) {
 	t.Parallel()
 	d := testDeps(t)
-	stale, err := net.Listen("unix", d.Socket)
+	// Bound, never listening: a socket that had listened would accept for as
+	// long as a child forked meanwhile by a parallel test holds a copy of it.
+	stale, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stale.(*net.UnixListener).SetUnlinkOnClose(false)
-	stale.Close()
+	syscall.CloseOnExec(stale)
+	err = syscall.Bind(stale, &syscall.SockaddrUnix{Name: d.Socket})
+	syscall.Close(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
 	stop := runServer(t, New(d))
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
 	resp, err := socketClient(d.Socket).Get("http://daemon/api/health")

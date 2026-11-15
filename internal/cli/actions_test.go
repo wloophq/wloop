@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -468,15 +469,13 @@ func TestReviewFailsWhenTheDaemonIsDown(t *testing.T) {
 		"no socket": func(t *testing.T) string { return filepath.Join(shortDir(t), "daemon.sock") },
 		"stale socket": func(t *testing.T) string {
 			path := filepath.Join(shortDir(t), "daemon.sock")
-			l, err := net.Listen("unix", path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			l.(*net.UnixListener).SetUnlinkOnClose(false)
-			l.Close()
-			if _, err := os.Stat(path); err != nil {
-				t.Fatal(err)
-			}
+			syscall.Close(staleSocket(t, path))
+			return path
+		},
+		"stale socket a forked child still holds": func(t *testing.T) string {
+			path := filepath.Join(shortDir(t), "daemon.sock")
+			held := staleSocket(t, path)
+			t.Cleanup(func() { syscall.Close(held) })
 			return path
 		},
 	} {
@@ -494,6 +493,25 @@ func TestReviewFailsWhenTheDaemonIsDown(t *testing.T) {
 			}
 		})
 	}
+}
+
+// staleSocket leaves at path the socket file a dead daemon leaves and
+// returns a descriptor of its socket, the copy a child forked meanwhile by a
+// parallel test holds until it execs. The socket is bound and never listens:
+// one that had listened would accept connections for as long as such a copy
+// lives.
+func staleSocket(t *testing.T, path string) int {
+	t.Helper()
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	syscall.CloseOnExec(fd)
+	if err := syscall.Bind(fd, &syscall.SockaddrUnix{Name: path}); err != nil {
+		syscall.Close(fd)
+		t.Fatal(err)
+	}
+	return fd
 }
 
 func TestReviewFailsWhenALiveDaemonDoesNotAnswer(t *testing.T) {
