@@ -331,23 +331,38 @@ func TestRebuildAtLiveSize(t *testing.T) {
 	if race {
 		return
 	}
-	// Under load most rebuilds stall and the fastest stays near the
-	// unloaded cost, so the budget catches a tenfold regression without
-	// failing on a busy machine.
-	best := time.Duration(math.MaxInt64)
+	// A runner can be several times slower than a laptop, so the rebuild is
+	// timed against reading the reports it reads, on the same machine at the
+	// same moment, each the fastest of ten; the ceiling catches what slows
+	// both at once.
+	best, read := time.Duration(math.MaxInt64), time.Duration(math.MaxInt64)
 	for range 10 {
-		f.Log.Note(port.TopicPRs, units...)
 		start := time.Now()
+		if _, err := r.reports.Reported(context.Background(), units); err != nil {
+			t.Fatal(err)
+		}
+		read = min(read, time.Since(start))
+		f.Log.Note(port.TopicPRs, units...)
+		start = time.Now()
 		if _, err := r.m.Rows(context.Background(), api.Since{}); err != nil {
 			t.Fatal(err)
 		}
 		best = min(best, time.Since(start))
 	}
-	t.Logf("fastest rebuild: %s", best)
-	if best > 200*time.Millisecond {
-		t.Errorf("a rebuild at live size took %s, want under 200ms", best)
+	t.Logf("fastest rebuild: %s, fastest read of its reports: %s", best, read)
+	if best > rebuildReads*read {
+		t.Errorf("a rebuild at live size took %s, %.0f times reading its reports (%s), want under %d", best, float64(best)/float64(read), read, rebuildReads)
+	}
+	if best > rebuildCeiling {
+		t.Errorf("a rebuild at live size took %s, want under %s", best, rebuildCeiling)
 	}
 }
+
+// rebuildReads bounds a rebuild at live size in reads of its reports: it
+// takes about 16 of them unloaded and loaded alike.
+const rebuildReads = 60
+
+const rebuildCeiling = time.Second
 
 func BenchmarkRebuildAtLiveSize(b *testing.B) {
 	f := storetest.Seeded(b, storetest.Live)
