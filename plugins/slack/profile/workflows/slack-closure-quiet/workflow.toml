@@ -1,0 +1,8 @@
+summary = "Close a Slack thread you started once its items resolved and the extraction read its newest message, without a message: it records the closure, which ends the tasks that hold the thread and lets it go unwatched"
+provider = "slack"
+when = 'slack.started_by_me && !slack.closure_posted && slack.items_open == 0 && slack.items_resolved > 0 && !slack.last_to_me && slack.extracted'
+order = 52
+
+[[step]]
+use = "effects.apply"
+effects = ["unit.closed"]

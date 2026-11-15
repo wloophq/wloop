@@ -1,5 +1,5 @@
-// Package lens is the one semantics of a view's filter, group and sort over facets. The cockpit's app.js
-// follows it through the shared cases in testdata/cases.json.
+// Package lens is the one semantics of a view's filter, group and sort over facets. The cockpit's lens
+// (internal/web/ui/src/lib/lens.ts) follows it through the shared cases in testdata/cases.json.
 package lens
 
 import (

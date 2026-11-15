@@ -962,8 +962,8 @@ func TestEndingAnOrphansProcessShipsOffAndTheConfigTurnsItOn(t *testing.T) {
 	if applied() {
 		t.Fatal("session-orphan-close runs by default")
 	}
-	if !slices.Contains(disabledWorkflows(te.cfg, te.loadedIntents().Workflows), "session-orphan-close") {
-		t.Error("an off workflow's drafts are not kept as a disabled one's")
+	if slices.Contains(disabledWorkflows(te.cfg, te.loadedIntents().Workflows), "session-orphan-close") {
+		t.Error("a workflow that ships off keeps its drafts as one the configuration turned off does")
 	}
 	on := true
 	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-orphan-close": {Enabled: &on}}

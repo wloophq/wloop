@@ -66,7 +66,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `task.set` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `session.close_orphan`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `task.verb`, `gate.open`, `items.resolve`, `effects.apply`, `task.set` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Gate approval
@@ -125,6 +125,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `target` | one of `unit`, `item`, `person` | `unit` | Where the draft posts: on the unit, on each item, or, with per = "person", in the direct conversation between you and the person it is to; an intent's help.target is free text. |
 | `draft.propose` | `to` | one of `all`, `members`, `non_members` | `all` | Whom of the people the items wait on the draft addresses: all of them, those its unit's plugin knows are members of the conversation it posts on, or those it knows are not; a person whose membership the plugin cannot tell is left out of both. |
 | `draft.propose` | `effects` | list of `task.nudged`, `unit.closed`, `pr.reviewed`, `pr.nudged` |  | What sending the draft applies. |
+| `draft.propose` | `leave_unmentionable` | one of `false`, `true` | `false` | "true" leaves out of whom the draft is to those its unit's plugin knows a message cannot mention (a plugin's unmentionable_fact), such as a bot or a team named by text, and logs them; their items stay open, and a draft with nobody left is not proposed. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
 | `draft.propose` | `ended` | one of `hold`, `repeat` | `hold` | What a draft withdrawn as its task ended does while that task stays ended: hold the workflow's proposals of no task or of that task, or hold them for repeat_after like any settled draft. |
@@ -143,6 +144,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `task.verb` | `each` | string |  | With `task` naming a list fact, `true` runs the verb with every task the list names, in order, each opening its own gate where the verb is gated, so one that waits for you does not hold back the rest; else the verb runs with the first. |
 | `gate.open` | `name` | string |  | The gate, of gates.toml, the step opens. Required. |
 | `items.resolve` | `resolution` | one of `done`, `answered`, `fixed`, `delegated`, `declined`, `dismissed`, `superseded`, `moot` | `done` | How the items resolved. |
+| `effects.apply` | `effects` | list of `unit.closed` |  | The effects applied, each one that applies without a draft's post. Required. |
 | `task.set` | `prop` | string |  | The property, of tasks.toml, the step sets. Required. |
 | `task.set` | `value` | string |  | The value, written as its type reads it: an enum's value, a date as YYYY-MM-DD or as a duration after now such as +2d, a duration, a list comma-separated. Required. |
 

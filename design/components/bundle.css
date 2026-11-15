@@ -897,6 +897,22 @@ body.layout-detail .d-window { right: 0; }
 .next-up { border-top: 1px solid var(--rule); padding-top: var(--space-8); color: var(--muted); }
 .next-up h3 { margin: 0 0 var(--space-4); font-size: var(--text-meta); font-weight: 600; }
 .next-up .more { margin: var(--space-4) 0 0; font-size: var(--text-meta); }
+.pal-back { position: fixed; inset: 0; background: rgb(0 0 0 / 0.25); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; z-index: 50; transition: opacity var(--motion-fast) var(--motion-ease); }
+@starting-style { .pal-back { opacity: 0; } }
+.pal { background: var(--panel); color: var(--ink); border: 1px solid var(--rule); border-radius: 8px; width: min(36rem, calc(100vw - 2rem)); max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgb(0 0 0 / 0.25); font: 14px var(--sans); }
+.pal-head { padding: 0.5rem 0.75rem; color: var(--muted); border-bottom: 1px solid var(--rule); }
+.pal-confirm .pal-head { margin: 0; color: var(--ink); border: 0; }
+.pal-acts { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.5rem 0.75rem; }
+.pal input { margin: 0.5rem 0.75rem; padding: 0.4rem 0.5rem; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; }
+.pal ol, .pal dl { list-style: none; margin: 0; padding: 0 0 0.5rem; overflow: auto; }
+.pal li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.3rem 0.75rem; cursor: pointer; }
+.pal li[aria-selected="true"] { background: var(--sel); }
+.pal kbd { font: 12px var(--mono); color: var(--muted); }
+.pal li .pill { margin-left: auto; }
+.pal-empty { margin: 0; padding: 0 0.75rem 0.5rem; color: var(--muted); }
+.pal-empty:empty { display: none; }
+.pal dt { padding: 0.5rem 0.75rem 0.2rem; color: var(--muted); font-weight: 600; }
+.pal dd { margin: 0; display: flex; justify-content: space-between; gap: 1rem; padding: 0.15rem 0.75rem; }
 .pal.omni { width: min(44rem, calc(100vw - 2rem)); max-height: 76vh; }
 .pal.omni .omni-input { margin: var(--space-8) var(--space-12); padding: var(--space-6) var(--space-8); font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--radius-sm); }
 .omni-results { overflow: auto; padding: 0 var(--space-12) var(--space-8); }

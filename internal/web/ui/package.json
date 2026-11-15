@@ -1,0 +1,24 @@
+{
+  "name": "cockpit",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "TZ=UTC vitest run",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@testing-library/svelte": "5.4.2",
+    "@types/node": "24.10.1",
+    "happy-dom": "21.0.4",
+    "svelte": "5.57.3",
+    "svelte-check": "4.7.7",
+    "typescript": "6.0.3",
+    "vite": "8.3.5",
+    "vitest": "5.1.0"
+  }
+}

@@ -8,6 +8,10 @@ A behavior decision is an intent or a workflow of the profile: when it fires, on
 
 Before adding an `if` on an intent name, a draft kind or a provider, or a string an agent or a person will read, put it in the profile and give Go the fact, step or effect it needs.
 
+## The loop takes work off the user
+
+A move that touches only the user's own tasks (close, done, dismiss, unwatch, relate) runs on its own; only what other people will read waits for approval. Answer a risk in an automatic move with a safeguard in its `when`, not with a new approval: every gate added is one more thing the user must review.
+
 ## Where things live
 
 | What | Where |
@@ -47,7 +51,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the gate guard: every decision waiting on the user is a gate, which only the gates service resolves, by a person, an agent session the user drives (`turn.Session.UserDriven`, never one whose own turn produced the gate's subject), a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for approval unless a user rule that names that delivery releases it, and no agent or thread text resolves a gate (no rule reads an untrusted fact).
+- the gate guard: every decision waiting on the user is a gate, which only the gates service resolves, by a person, an agent session the user drives (`turn.Session.UserDriven`, never one whose own turn produced the gate's subject), a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for approval unless a user rule that names that delivery releases it, and no agent or thread text resolves a gate (no rule that releases a gate reads an untrusted fact; a workflow's `when` may read any fact, and may move the user's own tasks without a person, never post).
 
 Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule, the workflow providers (`builtin.Slots`), and the Slack renderings `slack_read` and `slack_search` return.
 

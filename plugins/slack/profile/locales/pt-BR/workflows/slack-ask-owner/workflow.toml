@@ -1,5 +1,5 @@
-summary = "Perguntar quem é dono dos itens abertos de uma unidade do Slack que você acompanha e que ninguém assumiu depois de um dia útil"
+summary = "Perguntar quem é dono dos itens abertos de uma unidade do Slack que você acompanha e que ninguém assumiu depois de um dia útil, a menos que você a tenha começado, tenha escrito a mensagem mais nova ou a mensagem mais nova de alguém seja para você"
 
 [outbox]
 title = "Perguntar quem é o responsável"
-about = "Rascunhado quando um item sem dono espera um dia útil."
+about = "Rascunhado quando um item sem dono espera um dia útil numa conversa que você não começou e em que ninguém espera você."

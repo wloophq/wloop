@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // CloseSilently applies the effects of draft id, which a person discarded, without posting it: the draft
@@ -44,4 +45,40 @@ func (s *Service) closableSilently(d draft.Draft) error {
 		return fmt.Errorf("%w: an effect of draft %d needs its message", ErrInvalid, d.ID)
 	}
 	return nil
+}
+
+// EffectRunner is an optional capability of an Applier: it runs the effects d declares with no record of them.
+type EffectRunner interface {
+	Run(ctx context.Context, d draft.Draft) error
+}
+
+// SilentlyApplicable says why effects cannot apply on a unit of provider p with no draft, nil when they can:
+// it names effects, every one of them applies without a post, and the Applier implements each for p.
+func (s *Service) SilentlyApplicable(p unit.ProviderID, effects []string) error {
+	switch {
+	case len(effects) == 0:
+		return fmt.Errorf("%w: no effect to apply", ErrInvalid)
+	case s.Silent == nil || slices.ContainsFunc(effects, func(e string) bool { return !s.Silent(e) }):
+		return fmt.Errorf("%w: an effect of %v needs a draft's post", ErrInvalid, effects)
+	}
+	if _, ok := s.Applier.(EffectRunner); !ok {
+		return fmt.Errorf("%w: the outbox applies no effect without a draft", ErrInvalid)
+	}
+	if impl, ok := s.Applier.(Implementer); ok {
+		for _, e := range effects {
+			if !impl.Implements(p, e) {
+				return fmt.Errorf("%w: %s has no implementation for %s", ErrInvalid, e, p)
+			}
+		}
+	}
+	return nil
+}
+
+// ApplySilently applies effects on u with no draft and nothing posted, as a workflow step does; refused
+// (ErrInvalid) unless SilentlyApplicable allows them.
+func (s *Service) ApplySilently(ctx context.Context, u unit.Unit, effects []string) error {
+	if err := s.SilentlyApplicable(u.Provider, effects); err != nil {
+		return err
+	}
+	return s.Applier.(EffectRunner).Run(ctx, draft.Draft{Unit: u, Effects: effects, Evidence: draft.Evidence{At: s.Clock.Now()}})
 }

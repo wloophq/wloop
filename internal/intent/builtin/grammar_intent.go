@@ -50,6 +50,17 @@ func effectValues(a Applies) func() []Value {
 	}
 }
 
+// silentEffectValues are the draft effects that apply without the draft's post.
+func silentEffectValues() []Value {
+	var out []Value
+	for _, v := range effectValues(AppliesDraft)() {
+		if SilentEffect(v.Name) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 // intentGrammar is the intent manifest's keys.
 var intentGrammar = []Key{
 	{Path: "label", In: SurfaceIntent, Localized: true, Kind: KindText, Required: true, Doc: "The name people read. Required."},

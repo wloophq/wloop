@@ -88,10 +88,12 @@ type replay struct {
 	// purpose and event, for a store whose texts stay out of any output.
 	counts map[string]int
 
-	lines  []string
-	known  map[draft.ID]draft.State
-	settle []draft.ID
-	byKey  map[string]int
+	lines []string
+	known map[draft.ID]draft.State
+	// offered are the closed threads already recorded, by unit.
+	offered map[string]bool
+	settle  []draft.ID
+	byKey   map[string]int
 	// slack are the Slack units' facts, which every proposer of the replay
 	// reads.
 	slack *slackFacts
@@ -115,7 +117,7 @@ func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	te := newTestEnv(t, &fake.Manager{})
 	// The job the golden records re-proposed a settled draft after a day.
 	te.cfg.Drafts.RepeatAfter = config.Days(24 * time.Hour)
-	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
+	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, offered: map[string]bool{}, byKey: map[string]int{}}
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
 	r.slack = newSlackFacts(db, clock)
@@ -195,7 +197,10 @@ func refs(its ...items.Item) []task.ItemRef {
 // thread with tasks waiting on two people and one owned by a hand-typed
 // name, a muted waiting task, one with a future check date, a thread I
 // started whose items resolved, a GitHub task and unowned items a working
-// day old; then items resolve and get owners, tasks end, unmute and appear.
+// day old; then items resolve and get owners, Ana answers on her items of
+// thread a, thread f's newest message is to you for a day, Dan reacts to his
+// ask, thread h waits for the extraction for a tick, Bob turns out to be a
+// bot, tasks end, unmute and appear.
 func (r *replay) scenario(at time.Time) {
 	day := func(n, hour int) time.Time {
 		return replayStart.AddDate(0, 0, n).Add(time.Duration(hour-9) * time.Hour)
@@ -238,6 +243,7 @@ func (r *replay) scenario(at time.Time) {
 	case is(day(1, 9)):
 		k1 := r.item(rpK, "k1", items.Open, before, rpEve)
 		waiting("t-k1", rpK, k1)
+		r.slack.setFact(rpF, "slack.last_to_me", true)
 	case is(day(1, 15)):
 		k2 := r.item(rpK, "k2", items.Open, before, rpFay)
 		waiting("t-k2", rpK, k2)
@@ -245,15 +251,29 @@ func (r *replay) scenario(at time.Time) {
 		a2 := r.items(rpA)["a2"]
 		a2.State, a2.Resolution = items.Resolved, items.Done
 		r.commit(a2)
+		for _, id := range []string{"a1", "a3"} {
+			r.slack.posted(rpA, id, rpAna, day(2, 12))
+		}
+		r.slack.setFact(rpF, "slack.last_to_me", nil)
 	case is(day(3, 10)):
 		f2 := r.items(rpF)["f2"]
 		f2.Assignees = []items.Person{rpAna}
 		r.commit(f2)
 		r.item(rpF, "f3", items.Open, day(3, 10))
+		r.slack.setFact(rpC, "slack.waited_reactions", []string{"c1 " + rpDan.Key + " " + day(3, 10).UTC().Format(time.RFC3339Nano) + " eyes"})
 	case is(day(4, 12)):
 		h1 := r.item(rpH, "h1", items.Resolved, day(4, 11))
 		r.slack.startedByMe(rpH)
+		r.slack.unextracted(rpH, true)
+		r.slack.setFact(rpC, "slack.waited_reactions", []string{"c1 " + rpDan.Key + " " + day(3, 10).UTC().Format(time.RFC3339Nano) + " eyes",
+			"c1 " + rpDan.Key + " " + day(4, 12).UTC().Format(time.RFC3339Nano) + " +1"})
 		r.task(task.Task{ID: "t-h", State: "next", Category: task.CategoryReady, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
+	case is(day(6, 12)):
+		for _, id := range []string{"a1", "a3"} {
+			r.slack.posted(rpA, id, rpAna, day(6, 12))
+		}
+	case is(day(4, 15)):
+		r.slack.unextracted(rpH, false)
 	case is(day(7, 9)):
 		r.change("t-b", func(e *task.Task) { e.State, e.Category = "waiting", task.CategoryWaiting })
 		r.change("t-c", func(e *task.Task) { e.State, e.Category = "done", task.CategoryDone })
@@ -263,6 +283,7 @@ func (r *replay) scenario(at time.Time) {
 		}
 		a4 := r.item(rpA, "a4", items.Open, day(8, 12), rpBob)
 		waiting("t-a4", rpA, a4)
+		r.slack.setFact(rpA, "slack.unmentionable", []string{rpBob.Key})
 	case is(day(9, 15)):
 		r.change("t-d", func(e *task.Task) { e.State, e.Category = "someday", task.CategoryDeferred })
 		r.change("t-h", func(e *task.Task) { e.State, e.Category = "done", task.CategoryDone })
@@ -289,8 +310,8 @@ func (r *replay) record() {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	slices.SortFunc(ds, func(a, b draft.Draft) int {
-		return strings.Compare(a.Purpose+"|"+a.Origin.Key, b.Purpose+"|"+b.Origin.Key)
+	slices.SortStableFunc(ds, func(a, b draft.Draft) int {
+		return strings.Compare(a.Purpose+"|"+a.Origin.Key+"|"+a.Task, b.Purpose+"|"+b.Origin.Key+"|"+b.Task)
 	})
 	var proposed, withdrawn []string
 	for _, d := range ds {
@@ -310,9 +331,21 @@ func (r *replay) record() {
 			withdrawn = append(withdrawn, fmt.Sprintf("withdraw %s key=%s reason=%s", d.Purpose, d.Origin.Key, d.Reason))
 		}
 	}
-	for _, l := range append(proposed, withdrawn...) {
+	for _, l := range append(append(proposed, withdrawn...), r.closures()...) {
 		r.stamp("%s", l)
 	}
+}
+
+// closures are the threads a unit.closed newly closed, as the plugin records them.
+func (r *replay) closures() []string {
+	var out []string
+	for _, u := range r.slack.closedUnits() {
+		if !r.offered[u.String()] && r.counts == nil {
+			r.offered[u.String()] = true
+			out = append(out, "closed "+u.String())
+		}
+	}
+	return out
 }
 
 // settleChoice is d's fate in the replay, 0 send, 1 discard, 2 leave, from its purpose, key and proposal day.

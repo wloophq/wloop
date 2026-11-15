@@ -177,6 +177,8 @@ var configGrammar = slices.Concat(
 
 		cfgKey("drafts", KindTable, "", "The settings every proposer's drafts share."),
 		cfgKey("drafts.repeat_after", KindDur, "7d", "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again."),
+		cfgKey("drafts.stale_after_days", KindInt, "20", "Working days after the newest ask of a draft's items (draft.items_age_days) past which the bundled Slack nudges and owner questions no longer propose it; 0 never stops them."),
+		cfgList("drafts.ignored_reactions", "The emoji that are no move of whom a draft is to, such as an acknowledgement, so draft.people_reacted_at leaves them out; by default eyes."),
 		cfgKey("items", KindTable, "", "The items."),
 		cfgKey("items.heat", KindTable, "", "How long a unit stays warm."),
 		cfgKey("items.heat.warm_for", KindDur, "", "How long a unit stays warm after its last item resolved; left out, the heat reader's default."),

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/gates"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -31,9 +32,16 @@ type triageRig struct {
 	eng *automation.Engine
 }
 
-func newTriageRig(t *testing.T) *triageRig {
+func newTriageRig(t *testing.T, workflows ...string) *triageRig {
 	t.Helper()
 	r := newTaskRig(t, nil)
+	on := true
+	for _, name := range workflows {
+		if r.te.cfg.Workflows == nil {
+			r.te.cfg.Workflows = map[string]config.WorkflowConfig{}
+		}
+		r.te.cfg.Workflows[name] = config.WorkflowConfig{Enabled: &on}
+	}
 	r.te.tasksMe = &identity{}
 	r.te.tasksMe.set(task.Me{Keys: []string{"slack:U000ME"}})
 	r.te.newGates(r.db, t.Logf)
@@ -147,10 +155,21 @@ func TestAcknowledgeSetsPromisedAndProposesAReply(t *testing.T) {
 	}
 }
 
+func TestNotMineDraftsNothingByDefault(t *testing.T) {
+	t.Parallel()
+	r := newTriageRig(t)
+	r.ask(t, "t-1", "1.1")
+	r.verb(t, "t-1", "not-mine", nil)
+	r.sweep(t)
+	if ds, _ := r.drafts(t, "task-not-mine"); len(ds) != 0 {
+		t.Fatalf("saying a task is not yours drafted %+v, want nothing: it is triage for your list", ds)
+	}
+}
+
 func TestNotMineProposesARedirect(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	r := newTriageRig(t)
+	r := newTriageRig(t, "task-not-mine")
 	thread := r.ask(t, "t-1", "1.1")
 
 	r.verb(t, "t-1", "not-mine", nil)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -113,7 +114,8 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		switch {
 		case err != nil && d.Task != "" && errors.Is(err, coretasks.ErrNoTask):
 			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false,
-				"draft.person_asks_you": false, "draft.people_outside": 0, "draft.target_joined": false}
+				"draft.person_asks_you": false, "draft.people_outside": 0, "draft.target_joined": false, "draft.people_posted_at": time.Time{},
+				"draft.people_reacted_at": time.Time{}, "draft.people_unmentionable": 0, "draft.items_age_days": 0}
 		case err != nil:
 			return nil, err
 		default:
@@ -122,7 +124,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 				return nil, err
 			}
 			people := draftPeople(d, subject)
-			pd.Facts = draftFactsOf(sub, people, d.Items, w.d.me(), rd.outside(people, d.Target, w.d.Codecs), rd.joined(people, d.Target, w.d.Codecs))
+			pd.Facts = draftFactsOf(sub, people, d.Items, w.d.me(), rd, d.Target, w.d.Codecs, w.d.now(), w.d.ignoredReactions())
 		}
 		out = append(out, pd)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -19,6 +20,9 @@ type readers struct {
 	provider unit.ProviderID
 	keys     []string
 	known    bool
+	// posted, reactions and unmentionable are what its plugin's people facts hold: the moves of whom an item
+	// waits on since its ask, and whom a message cannot mention.
+	posted, reactions, unmentionable []string
 }
 
 // membersFact is the fact that holds who reads p's units' conversations; "" for none.
@@ -29,30 +33,75 @@ func (d *draftDeps) membersFact(p unit.ProviderID) string {
 	return builtin.MembersFacts[p]
 }
 
-// readersOf are the readers facts, u's, tell through its provider's members fact.
+// now is the deps' clock; the wall clock when it has none.
+func (d *draftDeps) now() time.Time {
+	if d.Now == nil {
+		return time.Now()
+	}
+	return d.Now()
+}
+
+// ignoredReactions are the reactions that are no move, as the configuration names them.
+func (d *draftDeps) ignoredReactions() []string {
+	if d.Config == nil {
+		return nil
+	}
+	return d.Config().Drafts.IgnoredReactions
+}
+
+// peopleFacts are the people facts of p's plugin.
+func (d *draftDeps) peopleFacts(p unit.ProviderID) builtin.PeopleFacts {
+	if d.People != nil {
+		return d.People[p]
+	}
+	return builtin.DraftPeopleFacts[p]
+}
+
+// readersOf are the readers facts, u's, tell through its provider's members and people facts.
 func (d *draftDeps) readersOf(u unit.Unit, facts workflow.Facts) readers {
 	r := readers{provider: u.Provider}
-	fact := d.membersFact(u.Provider)
-	if fact == "" {
-		return r
+	pf := d.peopleFacts(u.Provider)
+	r.posted, _ = listFact(facts, pf.Posted)
+	r.reactions, _ = listFact(facts, pf.Reactions)
+	r.unmentionable, _ = listFact(facts, pf.Unmentionable)
+	r.keys, r.known = listFact(facts, d.membersFact(u.Provider))
+	return r
+}
+
+// listFact is the list fact name of facts; false when it is absent or no list.
+func listFact(facts workflow.Facts, name string) ([]string, bool) {
+	if name == "" {
+		return nil, false
 	}
-	switch v := facts[fact].(type) {
+	switch v := facts[name].(type) {
 	case []string:
-		r.keys, r.known = v, true
+		return v, true
 	case []any:
-		r.known = true
+		var out []string
 		for _, k := range v {
 			if s, ok := k.(string); ok {
-				r.keys = append(r.keys, s)
+				out = append(out, s)
 			}
 		}
+		return out, true
 	}
-	return r
+	return nil, false
+}
+
+// named counts people among keys.
+func named(people, keys []string, codecs unit.KeyComparer) int {
+	n := 0
+	for _, p := range people {
+		if (items.Person{Key: p}).Is(items.Identity{Keys: keys, Codecs: codecs}) {
+			n++
+		}
+	}
+	return n
 }
 
 // unitReaders are the readers of u read through the deps' Facts; none known when it reads none or u is gone.
 func (d *draftDeps) unitReaders(ctx context.Context, u unit.Unit) (readers, error) {
-	if d.Facts == nil || d.membersFact(u.Provider) == "" {
+	if d.Facts == nil || d.membersFact(u.Provider) == "" && d.peopleFacts(u.Provider) == (builtin.PeopleFacts{}) {
 		return readers{provider: u.Provider}, nil
 	}
 	facts, err := d.Facts(ctx, u)

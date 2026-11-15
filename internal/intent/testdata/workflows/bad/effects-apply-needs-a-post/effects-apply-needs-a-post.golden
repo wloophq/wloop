@@ -1,0 +1,1 @@
+testdata/workflows/bad/effects-apply-needs-a-post/workflows/case-workflow/workflow.toml:7:12: step[0].effects[0]: "task.nudged" is not one of "unit.closed"

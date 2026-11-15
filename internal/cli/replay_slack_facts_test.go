@@ -33,6 +33,11 @@ type slackFacts struct {
 	due     time.Time
 	started map[unit.Unit]bool
 	closed  map[unit.Unit]bool
+	posts   map[unit.Unit][]string
+	// stale are the units whose newest message waits for the extraction.
+	stale map[unit.Unit]bool
+	// set are facts the scenario gives a unit over the computed ones.
+	set map[unit.Unit]workflow.Facts
 }
 
 var (
@@ -42,7 +47,7 @@ var (
 )
 
 func newSlackFacts(db *sqlite.DB, clock port.Clock) *slackFacts {
-	return &slackFacts{db: db, clock: clock, started: map[unit.Unit]bool{}, closed: map[unit.Unit]bool{}}
+	return &slackFacts{db: db, clock: clock, started: map[unit.Unit]bool{}, closed: map[unit.Unit]bool{}, posts: map[unit.Unit][]string{}, stale: map[unit.Unit]bool{}, set: map[unit.Unit]workflow.Facts{}}
 }
 
 // List is every Slack unit a task is attached to, open or done, in unit order.
@@ -166,9 +171,9 @@ func (f *slackFacts) of(u unit.Unit, es []task.Task, its []items.Item) workflow.
 		}
 	}
 	f.mu.Lock()
-	closed, started := f.closed[u], f.started[u]
+	closed, started, posts, stale, set := f.closed[u], f.started[u], slices.Clone(f.posts[u]), f.stale[u], maps.Clone(f.set[u])
 	f.mu.Unlock()
-	return workflow.Facts{
+	facts := workflow.Facts{
 		"slack.channel":        "",
 		"slack.conversation":   "channel",
 		"slack.started_by_me":  started,
@@ -177,13 +182,23 @@ func (f *slackFacts) of(u unit.Unit, es []task.Task, its []items.Item) workflow.
 		"slack.live_task": slices.ContainsFunc(es, func(e task.Task) bool {
 			return e.Open() && e.Category != task.CategoryDeferred && slices.Contains(e.Units, u)
 		}),
-		"slack.items_open":             open,
-		"slack.items_resolved":         resolved,
-		"slack.items_unowned":          orphans,
-		"slack.items_unowned_age_days": age,
-		"slack.settled_at":             time.Time{},
-		"slack.fingerprint":            u.String() + "||" + updated.UTC().Format(time.RFC3339Nano),
+		"slack.items_open":                open,
+		"slack.items_resolved":            resolved,
+		"slack.items_unowned":             orphans,
+		"slack.items_unowned_age_days":    age,
+		"slack.settled_at":                time.Time{},
+		"slack.fingerprint":               u.String() + "||" + updated.UTC().Format(time.RFC3339Nano),
+		"slack.extracted":                 !stale,
+		"slack.last_by_me":                false,
+		"slack.last_to_me":                false,
+		"slack.reacted_to_last":           false,
+		"slack.items_resolved_unanswered": 0,
+		"slack.waited_posted":             append([]string{}, posts...),
+		"slack.waited_reactions":          []string{},
+		"slack.unmentionable":             []string{},
 	}
+	maps.Copy(facts, set)
+	return facts
 }
 
 // Scope fills slack.settled_at as the plugin's host does.
@@ -205,6 +220,48 @@ func (f *slackFacts) isClosed(u unit.Unit) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.closed[u]
+}
+
+// posted is who's post at at on u, after the ask of item, which waits on who, as the plugin reports it.
+func (f *slackFacts) posted(u unit.Unit, item string, who items.Person, at time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.posts[u] = append(f.posts[u], item+" "+who.Key+" "+at.UTC().Format(time.RFC3339Nano))
+}
+
+// unextracted says whether u's newest message waits for the extraction.
+func (f *slackFacts) unextracted(u unit.Unit, waits bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stale[u] = waits
+}
+
+// setFact gives u the fact name at v over the computed one; a nil v drops it.
+func (f *slackFacts) setFact(u unit.Unit, name string, v any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.set[u] == nil {
+		f.set[u] = workflow.Facts{}
+	}
+	if v == nil {
+		delete(f.set[u], name)
+		return
+	}
+	f.set[u][name] = v
+}
+
+// closedUnits are the units a unit.closed closed.
+func (f *slackFacts) closedUnits() []unit.Unit {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []unit.Unit
+	for u, ok := range f.closed {
+		if ok {
+			out = append(out, u)
+		}
+	}
+	slices.SortFunc(out, func(a, b unit.Unit) int { return cmp.Compare(a.String(), b.String()) })
+	return out
 }
 
 func (f *slackFacts) startedByMe(u unit.Unit) {

@@ -1,0 +1,51 @@
+{
+ "task": {
+  "id": "e-1",
+  "state": "next",
+  "category": "ready",
+  "title": "acme/api#8: Retry flaky uploads",
+  "changed": true,
+  "units": [
+   {
+    "provider": "github",
+    "key": "acme/api#8"
+   }
+  ],
+  "unit_labels": [
+   "acme/api#8"
+  ],
+  "verbs": [],
+  "created": "2026-10-01T09:00:00Z",
+  "updated": "2026-10-01T09:00:00Z",
+  "facets": {
+   "ask": [
+    "Review"
+   ],
+   "moved": [
+    "2026-10-11T16:45:00Z"
+   ],
+   "owed": [
+    "2026-10-12T09:30:00Z"
+   ],
+   "risk": [
+    "high"
+   ],
+   "state": [
+    "next"
+   ],
+   "tag": [
+    "a",
+    "b",
+    "c"
+   ],
+   "turn": [
+    "me"
+   ],
+   "waits-on": [
+    "dana"
+   ]
+  },
+  "reason": "checks fail on the upload test",
+  "drafts": null
+ }
+}

@@ -1,6 +1,6 @@
-summary = "Ask who owns the open items of a Slack unit you track that nobody owns after a working day"
+summary = "Ask who owns the open items of a Slack unit you track that nobody owns after a working day, unless you started it, wrote its newest message or someone's newest message there is to you"
 provider = "slack"
-when = 'slack.live_task && slack.items_unowned > 0 && slack.items_unowned_age_days >= 1'
+when = 'slack.live_task && slack.items_unowned > 0 && slack.items_unowned_age_days >= 1 && !slack.started_by_me && !slack.last_by_me && !slack.last_to_me'
 order = 52
 key = ["slack.settled_at"]
 
@@ -14,10 +14,14 @@ purpose = "ask_owner"
 items = "unowned_aged"
 repeat_after = "config.drafts.repeat_after"
 
+[[drafts.withdraw.rule]]
+when = 'slack.last_by_me || slack.last_to_me || config.drafts.stale_after_days > 0 && draft.items_age_days >= config.drafts.stale_after_days'
+reason = "moot"
+
 [drafts.withdraw]
 when = 'draft.items_assigned > 0'
 reason = "assigned"
 
 [outbox]
 title = "Ask who owns it"
-about = "Drafted when an item nobody owns waits a working day."
+about = "Drafted when an item nobody owns waits a working day in a conversation you did not start and nobody waits on you in."

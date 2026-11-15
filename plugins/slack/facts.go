@@ -65,6 +65,7 @@ func unitFacts(u unit.Unit, in *slackrows.Input, tasks []src.Task, endedAfter ti
 		{Name: "slack.fingerprint", Value: src.String(u.String() + "|" + newest + "|" + updated.UTC().Format(time.RFC3339Nano))},
 		{Name: "slack.language", Value: src.String(threadLanguage(in))},
 	}
+	facts = append(facts, turnFacts(in)...)
 	if members, ok := unitMembers(in); ok {
 		facts = append(facts, src.Fact{Name: "slack.members", Value: src.List(members...)})
 	}

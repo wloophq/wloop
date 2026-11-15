@@ -37,6 +37,7 @@ const (
 	StepGateOpen     = "gate.open"
 	StepTaskSet      = "task.set"
 	StepItemsResolve = "items.resolve"
+	StepEffectsApply = "effects.apply"
 )
 
 // The values of draft.propose's arguments.
@@ -113,6 +114,8 @@ var coreSteps = []StepDef{
 		"Opens the gate `name` of gates.toml on the unit, a decision that waits for you with the intents gates.toml gives it."},
 	{StepItemsResolve, providers(unit.Task), workflow.ReachLocal, nil,
 		"Resolves every open item the task holds, as the workflow, with `resolution` and the workflow as its evidence, so a task derived from its units' items closes; an item you confirmed becomes a proposal, a gate on the task. Posts nothing."},
+	{StepEffectsApply, nil, workflow.ReachLocal, nil,
+		"Applies the draft effects `effects` on the unit with no draft and nothing posted: only effects that apply without a draft's post, such as unit.closed, which closes a unit quietly."},
 	{StepTaskSet, providers(unit.Task), workflow.ReachLocal, nil,
 		"Sets the task's property `prop` of tasks.toml to `value`, written by the workflow; a property the workflow may not write is refused."},
 }

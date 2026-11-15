@@ -518,6 +518,15 @@
                   ],
                   "type": "string"
                 },
+                "leave_unmentionable": {
+                  "default": "false",
+                  "description": "\"true\" leaves out of whom the draft is to those its unit's plugin knows a message cannot mention (a plugin's unmentionable_fact), such as a bot or a team named by text, and logs them; their items stay open, and a draft with nobody left is not proposed.",
+                  "enum": [
+                    "false",
+                    "true"
+                  ],
+                  "type": "string"
+                },
                 "per": {
                   "default": "unit",
                   "description": "One draft per unit, or one per person it waits on.",
@@ -766,6 +775,39 @@
             "if": {
               "properties": {
                 "use": {
+                  "const": "effects.apply"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "effects": {
+                  "description": "The effects applied, each one that applies without a draft's post. Required.",
+                  "items": {
+                    "enum": [
+                      "unit.closed"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "use": {
+                  "const": "effects.apply"
+                }
+              },
+              "required": [
+                "effects"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
                   "const": "task.set"
                 }
               },
@@ -813,6 +855,7 @@
               "task.verb",
               "gate.open",
               "items.resolve",
+              "effects.apply",
               "task.set"
             ],
             "type": "string"

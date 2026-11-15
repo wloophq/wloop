@@ -30,6 +30,10 @@ var migrations = []store.Migration{
 ) WITHOUT ROWID`)
 		return err
 	}},
+	{Version: 4, Up: func(ctx context.Context, tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `ALTER TABLE slack_reactions ADD COLUMN seen_at TEXT NOT NULL DEFAULT ''`)
+		return err
+	}},
 }
 
 var tableRE = regexp.MustCompile(`CREATE TABLE (\w+) \(`)

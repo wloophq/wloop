@@ -1,0 +1,169 @@
+{
+ "groups": [
+  {
+   "workflow": "fake-nudge",
+   "title": "Ask who hasn't answered",
+   "about": "Drafted when a conversation where you asked something goes quiet.",
+   "drafts": [
+    {
+     "id": 7,
+     "unit": "github/acme/api#8",
+     "items": null,
+     "task": "t-1",
+     "kind": "nudge",
+     "purpose": "nudge",
+     "delivery": "",
+     "effects": [
+      "task.nudged"
+     ],
+     "target": "acme/api#8",
+     "broadcast": "",
+     "where": "acme/api#8",
+     "text": "Any news on the retry change?",
+     "why": "No answer since Tuesday",
+     "language": "pt-BR",
+     "reaction": "",
+     "original": "",
+     "edited": false,
+     "origin": {
+      "kind": "workflow",
+      "turn_seq": 0,
+      "intent": "",
+      "workflow": "fake-nudge",
+      "rule": ""
+     },
+     "state": "held",
+     "error": "",
+     "reason": "",
+     "permalink": "https://example.test/thread",
+     "gate": 12,
+     "deadline": null,
+     "intents": {
+      "approved": "approve",
+      "rejected": "discard"
+     },
+     "actions": [],
+     "rev": 3,
+     "created_at": "0001-01-01T00:00:00Z",
+     "updated_at": "0001-01-01T00:00:00Z",
+     "context": {
+      "asks": [
+       {
+        "item": "i1",
+        "summary": "Review the retry change",
+        "asker": "dana",
+        "quotes": [
+         "can you look?"
+        ]
+       }
+      ],
+      "items": [
+       {
+        "id": "i1",
+        "summary": "Review the retry change",
+        "state": "open"
+       }
+      ]
+     }
+    },
+    {
+     "id": 8,
+     "unit": "github/acme/api#8",
+     "items": null,
+     "task": "t-1",
+     "kind": "nudge",
+     "purpose": "nudge",
+     "delivery": "",
+     "effects": [
+      "task.nudged"
+     ],
+     "target": "acme/api#8",
+     "broadcast": "",
+     "where": "acme/api#8",
+     "text": "Still waiting on the upload fix?",
+     "why": "No answer since Tuesday",
+     "language": "pt-BR",
+     "reaction": "",
+     "original": "",
+     "edited": false,
+     "origin": {
+      "kind": "workflow",
+      "turn_seq": 0,
+      "intent": "",
+      "workflow": "fake-nudge",
+      "rule": ""
+     },
+     "state": "held",
+     "error": "",
+     "reason": "",
+     "permalink": "https://example.test/thread",
+     "gate": 12,
+     "deadline": null,
+     "intents": {
+      "approved": "approve",
+      "rejected": "discard"
+     },
+     "actions": [],
+     "rev": 3,
+     "created_at": "0001-01-01T00:00:00Z",
+     "updated_at": "0001-01-01T00:00:00Z",
+     "context": {
+      "asks": [],
+      "items": []
+     }
+    }
+   ]
+  },
+  {
+   "title": "Written by hand",
+   "drafts": [
+    {
+     "id": 9,
+     "unit": "github/acme/api#8",
+     "items": null,
+     "task": "t-1",
+     "kind": "nudge",
+     "purpose": "nudge",
+     "delivery": "",
+     "effects": [
+      "task.nudged"
+     ],
+     "target": "acme/api#8",
+     "broadcast": "",
+     "where": "acme/api#8",
+     "text": "Thanks!",
+     "why": "No answer since Tuesday",
+     "language": "pt-BR",
+     "reaction": "",
+     "original": "",
+     "edited": false,
+     "origin": {
+      "kind": "user",
+      "turn_seq": 0,
+      "intent": "",
+      "workflow": "",
+      "rule": ""
+     },
+     "state": "held",
+     "error": "",
+     "reason": "",
+     "permalink": "https://example.test/thread",
+     "gate": 12,
+     "deadline": null,
+     "intents": {
+      "approved": "approve",
+      "rejected": "discard"
+     },
+     "actions": [],
+     "rev": 3,
+     "created_at": "0001-01-01T00:00:00Z",
+     "updated_at": "0001-01-01T00:00:00Z",
+     "context": {
+      "asks": null,
+      "items": null
+     }
+    }
+   ]
+  }
+ ]
+}

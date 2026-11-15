@@ -1,6 +1,6 @@
 # OutboxGroup
 
-One group of the Outbox: the drafts one workflow proposed, or those of one purpose no workflow proposed, or those written by hand, each drawn as a [GateCard](../GateCard/README.md) draft. `static/outbox.js` draws it for a view whose `layout` is `outbox`, from `GET /api/outbox`.
+One group of the Outbox: the drafts one workflow proposed, or those of one purpose no workflow proposed, or those written by hand, each drawn as a [GateCard](../GateCard/README.md) draft. `Outbox.svelte` (`internal/web/ui/src/components/screens/`) draws it for a view whose `layout` is `outbox`, from `GET /api/outbox`.
 
 ## Anatomy
 

@@ -51,7 +51,7 @@ func (wireBriefs) Briefed(context.Context) (map[github.Ref]brief.Summary, map[gi
 	return map[github.Ref]brief.Summary{{Owner: "acme", Repo: "api", Number: 7}: {Size: "m", Risk: "low", Goal: "Export in batches", OpenQuestions: 1}}, nil, nil
 }
 
-// TestWireShape pins the JSON the clients and app.js read: a row, a detail
+// TestWireShape pins the JSON the clients and the cockpit read: a row, a detail
 // and health, against the golden files the daemon's own types produced.
 func TestWireShape(t *testing.T) {
 	t.Parallel()

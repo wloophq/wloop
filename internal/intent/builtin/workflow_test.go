@@ -30,12 +30,13 @@ var workflowTable = map[string]string{
 		"clarified:B refused_pairs:L undone:L candidates:L linked_candidates:L link_target_tasks:L link_target_units:L title:S notes:S",
 	"gate": "kind:S name:S status:S delivery:S",
 	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_task:B items_open:I items_resolved:I items_unowned:I items_unowned_age_days:I " +
-		"ended:B settled_at:T fingerprint:S language:S members:L",
+		"ended:B settled_at:T fingerprint:S language:S members:L extracted:B last_by_me:B last_to_me:B reacted_to_last:B items_resolved_unanswered:I " +
+		"waited_posted:L waited_reactions:L unmentionable:L",
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",
-	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B person_asks_you:B people_outside:I target_joined:B failed:B stale:B failed_kind:S failed_ref:S",
+	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B person_asks_you:B people_outside:I target_joined:B people_posted_at:T people_reacted_at:T people_unmentionable:I items_age_days:I failed:B stale:B failed_kind:S failed_ref:S",
 	"trigger": "kind:S event.kind:S event.key:S event.id:I event.data:S fired_at:T",
 	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D plugins.github.nudge.silent_days:I " +
-		"tasks.stale_waiting_days:I drafts.repeat_after:D turns.per_day:I",
+		"tasks.stale_waiting_days:I drafts.repeat_after:D drafts.stale_after_days:I turns.per_day:I",
 }
 
 var tableTypes = map[string]expr.Type{"B": expr.Bool, "I": expr.Int, "S": expr.String, "L": expr.List, "D": expr.Duration, "T": expr.Time}

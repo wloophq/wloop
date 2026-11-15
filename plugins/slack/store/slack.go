@@ -67,6 +67,8 @@ type FileRow struct {
 type ReactionRow struct {
 	Name  string
 	Users []string
+	// Seen is when the store first held each user's reaction; a user absent was stored before it kept that.
+	Seen map[string]time.Time
 }
 
 type MessageRow struct {
@@ -216,7 +218,7 @@ const (
 	slackMessagesOfQuery  = `SELECT ` + slackMessageColumns + ` FROM slack_messages WHERE conversation = ?`
 	slackMessagesByAnchor = `SELECT ` + slackMessageColumns + ` FROM slack_messages INDEXED BY slack_messages_anchor WHERE conversation = ?`
 	slackReactionsSQL     = `SELECT name, user FROM slack_reactions WHERE conversation = ? AND ts = ? ORDER BY name, user`
-	slackReactionsOfSQL   = `SELECT ts, name, user FROM slack_reactions
+	slackReactionsOfSQL   = `SELECT ts, name, user, seen_at FROM slack_reactions
 		WHERE conversation = ? AND ts IN (SELECT value FROM json_each(?)) ORDER BY ts, name, user`
 
 	slackInsertChangeSQL = `INSERT OR IGNORE INTO slack_changes (conversation, ts, thread_ts, kind, edited_ts, at) VALUES (?, ?, ?, ?, ?, ?)`
@@ -401,7 +403,7 @@ func saveMessage(ctx context.Context, tx *Tx, m MessageRow, now time.Time) (chan
 	if m.Reactions == nil || m.Deleted {
 		return changed, rows, nil
 	}
-	moved, err := replaceReactions(ctx, tx, m)
+	moved, err := replaceReactions(ctx, tx, m, now)
 	if err != nil {
 		return false, 0, err
 	}
@@ -433,9 +435,9 @@ func insertChange(ctx context.Context, tx *Tx, m MessageRow, kind, editedTS stri
 
 type reactionKey struct{ name, user string }
 
-// replaceReactions makes m's reactions the stored set; moved says whether
-// the set changed.
-func replaceReactions(ctx context.Context, tx *Tx, m MessageRow) (moved bool, err error) {
+// replaceReactions makes m's reactions the stored set, each one new to it seen at now; moved says whether the
+// set changed.
+func replaceReactions(ctx context.Context, tx *Tx, m MessageRow, now time.Time) (moved bool, err error) {
 	var want []reactionKey
 	for _, r := range m.Reactions {
 		for _, u := range r.Users {
@@ -451,16 +453,43 @@ func replaceReactions(ctx context.Context, tx *Tx, m MessageRow) (moved bool, er
 	if slices.Equal(got, want) {
 		return false, nil
 	}
+	seen, err := reactionsSeen(ctx, tx, m.Conversation, m.TS)
+	if err != nil {
+		return false, err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM slack_reactions WHERE conversation = ? AND ts = ?`, m.Conversation, m.TS); err != nil {
 		return false, err
 	}
 	for _, k := range want {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO slack_reactions (conversation, ts, name, user) VALUES (?, ?, ?, ?)`,
-			m.Conversation, m.TS, k.name, k.user); err != nil {
+		at, ok := seen[k]
+		if !ok {
+			at = formatTime(now)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO slack_reactions (conversation, ts, name, user, seen_at) VALUES (?, ?, ?, ?, ?)`,
+			m.Conversation, m.TS, k.name, k.user, at); err != nil {
 			return false, err
 		}
 	}
 	return true, nil
+}
+
+// reactionsSeen are when the store first held each stored reaction of the message at ts, as stored.
+func reactionsSeen(ctx context.Context, r Reader, conv, ts string) (map[reactionKey]string, error) {
+	rows, err := r.QueryContext(ctx, `SELECT name, user, seen_at FROM slack_reactions WHERE conversation = ? AND ts = ?`, conv, ts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[reactionKey]string{}
+	for rows.Next() {
+		var k reactionKey
+		var at string
+		if err := rows.Scan(&k.name, &k.user, &at); err != nil {
+			return nil, err
+		}
+		out[k] = at
+	}
+	return out, rows.Err()
 }
 
 func storedReactions(ctx context.Context, r Reader, conv, ts string) ([]reactionKey, error) {
@@ -919,21 +948,26 @@ func loadReactions(ctx context.Context, tx *sql.Tx, conv string, ms []MessageRow
 	defer rows.Close()
 	var cur string
 	var ks []reactionKey
+	seen := map[reactionKey]time.Time{}
 	flush := func() {
 		if len(ks) > 0 {
-			ms[at[cur]].Reactions = groupReactions(ks)
+			ms[at[cur]].Reactions = groupReactions(ks, seen)
 		}
 		ks = ks[:0]
+		clear(seen)
 	}
 	for rows.Next() {
-		var t string
+		var t, seenAt string
 		var k reactionKey
-		if err := rows.Scan(&t, &k.name, &k.user); err != nil {
+		if err := rows.Scan(&t, &k.name, &k.user, &seenAt); err != nil {
 			return err
 		}
 		if t != cur {
 			flush()
 			cur = t
+		}
+		if seenAt != "" {
+			seen[k] = parseTime(seenAt)
 		}
 		ks = append(ks, k)
 	}
@@ -941,14 +975,20 @@ func loadReactions(ctx context.Context, tx *sql.Tx, conv string, ms []MessageRow
 	return rows.Err()
 }
 
-func groupReactions(ks []reactionKey) []ReactionRow {
+func groupReactions(ks []reactionKey, seen map[reactionKey]time.Time) []ReactionRow {
 	var out []ReactionRow
 	for _, k := range ks {
-		if n := len(out); n > 0 && out[n-1].Name == k.name {
-			out[n-1].Users = append(out[n-1].Users, k.user)
-			continue
+		if n := len(out); n == 0 || out[n-1].Name != k.name {
+			out = append(out, ReactionRow{Name: k.name})
 		}
-		out = append(out, ReactionRow{Name: k.name, Users: []string{k.user}})
+		r := &out[len(out)-1]
+		r.Users = append(r.Users, k.user)
+		if at, ok := seen[k]; ok {
+			if r.Seen == nil {
+				r.Seen = map[string]time.Time{}
+			}
+			r.Seen[k.user] = at
+		}
 	}
 	return out
 }

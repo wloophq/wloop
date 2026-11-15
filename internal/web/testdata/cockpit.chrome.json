@@ -1,0 +1,6747 @@
+{
+ "candidates": {
+  "explore_candidate_mine": {
+   "actions": [
+    {
+     "enabled": true,
+     "id": "review"
+    },
+    {
+     "enabled": true,
+     "id": "address",
+     "primary": true
+    },
+    {
+     "enabled": true,
+     "id": "act",
+     "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
+    },
+    {
+     "enabled": false,
+     "id": "nudge",
+     "reason": "acme/web#4 is not tracked; track it before a nudge",
+     "refusal": "action.refuse[0]"
+    },
+    {
+     "enabled": false,
+     "id": "take_over",
+     "reason": "It is yours already",
+     "refusal": "take_over.why"
+    },
+    {
+     "enabled": true,
+     "id": "track"
+    },
+    {
+     "enabled": true,
+     "id": "open"
+    },
+    {
+     "enabled": true,
+     "id": "copy_review_request"
+    }
+   ],
+   "facets": {
+    "age": [
+     "0001-01-01T00:00:00Z"
+    ],
+    "author": [
+     "me",
+     "me"
+    ],
+    "ci": [
+     "none"
+    ],
+    "lane": [
+     "author"
+    ],
+    "risk": [
+     "none"
+    ],
+    "size": [
+     "none"
+    ],
+    "status": [
+     "none"
+    ],
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "nobody"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "",
+   "label": "acme/web#4",
+   "link": "https://github.com/acme/web/pull/4",
+   "payload": {
+    "approved": false,
+    "author": "me",
+    "head": "",
+    "reasons": [],
+    "repo": "acme/web",
+    "viewer": "me",
+    "workspace": {
+     "agent_states": [],
+     "comment": "",
+     "display_name": "",
+     "id": "",
+     "is_main": false,
+     "is_review": false,
+     "status": ""
+    }
+   },
+   "specs_version": "48551a885afd",
+   "summary": {
+    "closed": false,
+    "line": "",
+    "open_items": 0,
+    "reason": "",
+    "since": "0001-01-01T00:00:00Z",
+    "stalled": false,
+    "waits_on": ""
+   },
+   "title": "Mine",
+   "unit": {
+    "key": "acme/web#4",
+    "provider": "github"
+   },
+   "views": []
+  },
+  "untracked_open_not_mine": {
+   "actions": [
+    {
+     "enabled": true,
+     "id": "review",
+     "primary": true
+    },
+    {
+     "enabled": false,
+     "id": "address",
+     "reason": "Not yours: take it over first",
+     "refusal": "action.refuse[0]"
+    },
+    {
+     "enabled": false,
+     "id": "act",
+     "reason": "Not yours: take it over first",
+     "refusal": "action.refuse[0]"
+    },
+    {
+     "enabled": false,
+     "id": "nudge",
+     "reason": "acme/web#3 is not tracked; track it before a nudge",
+     "refusal": "action.refuse[0]"
+    },
+    {
+     "confirm": "Take over acme/web#3? It becomes yours to develop: {{name}} creates or renames its author workspace.",
+     "enabled": true,
+     "id": "take_over"
+    },
+    {
+     "enabled": true,
+     "id": "track"
+    },
+    {
+     "enabled": true,
+     "id": "open"
+    },
+    {
+     "enabled": true,
+     "id": "copy_review_request"
+    }
+   ],
+   "facets": {
+    "age": [
+     "0001-01-01T00:00:00Z"
+    ],
+    "author": [
+     "zoe"
+    ],
+    "ci": [
+     "none"
+    ],
+    "lane": [
+     "author"
+    ],
+    "risk": [
+     "none"
+    ],
+    "size": [
+     "none"
+    ],
+    "status": [
+     "none"
+    ],
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "nobody"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "",
+   "label": "acme/web#3",
+   "link": "https://github.com/acme/web/pull/3",
+   "payload": {
+    "approved": false,
+    "author": "zoe",
+    "head": "",
+    "reasons": [],
+    "repo": "acme/web",
+    "viewer": "me",
+    "workspace": {
+     "agent_states": [],
+     "comment": "",
+     "display_name": "",
+     "id": "",
+     "is_main": false,
+     "is_review": false,
+     "status": ""
+    }
+   },
+   "specs_version": "48551a885afd",
+   "summary": {
+    "closed": false,
+    "line": "",
+    "open_items": 0,
+    "reason": "",
+    "since": "0001-01-01T00:00:00Z",
+    "stalled": false,
+    "waits_on": ""
+   },
+   "title": "Untracked",
+   "unit": {
+    "key": "acme/web#3",
+    "provider": "github"
+   },
+   "views": []
+  }
+ },
+ "catalog": {
+  "card_signals": [
+   {
+    "key": "checks",
+    "label": "checks",
+    "provider": "github",
+    "values": {
+     "failing": "failing",
+     "failing_named": "failing: {{.names}}",
+     "passing": "passing",
+     "pending": "pending"
+    }
+   },
+   {
+    "key": "merge",
+    "label": "merge",
+    "provider": "github",
+    "values": {
+     "conflicts": "conflicts"
+    }
+   },
+   {
+    "key": "review",
+    "label": "review",
+    "provider": "github",
+    "values": {
+     "approved": "approved"
+    }
+   },
+   {
+    "key": "situation",
+    "label": "situation",
+    "notes": {
+     "stalled": "stalled for {{.days}} {{plural .days \"one\" \"working day\" \"other\" \"working days\"}}"
+    },
+    "provider": "github",
+    "values": {
+     "blocked": "round blocked",
+     "changes": "changes asked",
+     "checks": "checks failing",
+     "conflicts": "merge conflicts",
+     "done": "closed",
+     "draft": "draft",
+     "held": "held (cap)",
+     "loop_stopped": "agent stopped",
+     "loop_waiting": "agent asks",
+     "loop_working": "agent working",
+     "merge": "can merge",
+     "muted": "muted",
+     "no_reviewer": "no reviewer",
+     "reply": "reply due",
+     "review": "review",
+     "reviewer_back": "reviewer due",
+     "round_pending": "round soon",
+     "to_address": "to address"
+    }
+   }
+  ],
+  "details": [
+   {
+    "field": "next_guidance",
+    "label": "Next round guidance",
+    "provider": "github",
+    "title": "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
+   },
+   {
+    "field": "profile_chain",
+    "label": "Review profile",
+    "provider": "github",
+    "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+   }
+  ],
+  "events": [
+   {
+    "kind": "opened",
+    "label": "opened",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "push",
+    "label": "pushed",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "data": "requested",
+    "kind": "review_requested",
+    "label": "review requested",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "data": "requested",
+    "kind": "review_request_removed",
+    "label": "review request removed",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "data": "first_field",
+    "kind": "review",
+    "label": "reviewed",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "comment",
+    "label": "commented",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "check",
+    "label": "checks",
+    "provider": "github"
+   },
+   {
+    "kind": "ready",
+    "label": "ready for review",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "draft",
+    "label": "back to draft",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "data": "short_sha",
+    "kind": "merged",
+    "label": "merged",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "closed",
+    "label": "closed",
+    "provider": "github",
+    "tone": "people"
+   },
+   {
+    "kind": "round_sent",
+    "label": "round sent",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "round_held",
+    "label": "round held",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "round_pending",
+    "label": "round pending",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "round_skipped",
+    "label": "round skipped",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "guidance",
+    "label": "guidance",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "round_blocked",
+    "label": "round blocked",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   },
+   {
+    "kind": "round_unblocked",
+    "label": "round unblocked",
+    "loop": true,
+    "provider": "github",
+    "tone": "loop"
+   }
+  ],
+  "facets": [
+   {
+    "group": true,
+    "id": "where",
+    "label": "Where",
+    "match": "suffix",
+    "menu": true,
+    "provider": "github",
+    "show": "ref",
+    "sort": "text"
+   },
+   {
+    "group": true,
+    "id": "author",
+    "label": "Author",
+    "label_prefix": "by ",
+    "labels": {
+     "me": "me"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "me"
+    ],
+    "row_class": {
+     "me": "mine"
+    },
+    "show": "meta",
+    "show_values": "first",
+    "sort": "rank"
+   },
+   {
+    "colors": {
+     "author": "author",
+     "loop": "loop",
+     "me": "me",
+     "nobody": "nobody",
+     "reviewer": "reviewer"
+    },
+    "group": true,
+    "id": "wait",
+    "label": "Waits on (role)",
+    "labels": {
+     "author": "Waiting on the author",
+     "loop": "In loop",
+     "me": "Waiting on me",
+     "nobody": "Waiting on nobody",
+     "reviewer": "Waiting on a reviewer"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "me",
+     "loop",
+     "reviewer",
+     "author",
+     "nobody"
+    ],
+    "sort": "rank",
+    "strip": true
+   },
+   {
+    "group": true,
+    "id": "waits-on",
+    "label": "Waits on (person)",
+    "labels": {
+     "me": "me"
+    },
+    "match": "team",
+    "menu": true,
+    "provider": "github",
+    "show": "who"
+   },
+   {
+    "group": true,
+    "id": "kind",
+    "label": "Situation",
+    "labels": {
+     "blocked": "round blocked",
+     "changes": "changes asked",
+     "checks": "checks failing",
+     "conflicts": "merge conflicts",
+     "done": "closed",
+     "draft": "draft",
+     "held": "held (cap)",
+     "loop_stopped": "agent stopped",
+     "loop_waiting": "agent asks",
+     "loop_working": "agent working",
+     "merge": "can merge",
+     "muted": "muted",
+     "no_reviewer": "no reviewer",
+     "reply": "reply due",
+     "review": "review",
+     "reviewer_back": "reviewer due",
+     "round_pending": "round soon",
+     "to_address": "to address"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "round_pending",
+     "loop_waiting",
+     "loop_stopped",
+     "blocked",
+     "to_address",
+     "held",
+     "loop_working",
+     "changes",
+     "checks",
+     "conflicts",
+     "reply",
+     "reviewer_back",
+     "review",
+     "no_reviewer",
+     "merge",
+     "draft",
+     "muted",
+     "done"
+    ],
+    "show": "kind",
+    "sort": "rank"
+   },
+   {
+    "empty": "no brief",
+    "group": true,
+    "id": "type",
+    "label": "Type",
+    "menu": true,
+    "provider": "github",
+    "show": "meta",
+    "sort": "text"
+   },
+   {
+    "empty": "no brief",
+    "group": true,
+    "id": "risk",
+    "label": "Risk",
+    "label_prefix": "risk ",
+    "labels": {
+     "high": "high",
+     "low": "low",
+     "medium": "medium"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "show": "meta",
+    "sort": "rank"
+   },
+   {
+    "empty": "no brief",
+    "group": true,
+    "id": "size",
+    "label": "Size",
+    "labels": {
+     "l": "L",
+     "m": "M",
+     "s": "S",
+     "xl": "XL",
+     "xs": "XS"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "xs",
+     "s",
+     "m",
+     "l",
+     "xl"
+    ],
+    "show": "meta",
+    "sort": "rank"
+   },
+   {
+    "empty": "no workspace",
+    "group": true,
+    "id": "status",
+    "label": "Workspace",
+    "menu": true,
+    "provider": "github",
+    "show": "aside",
+    "sort": "text"
+   },
+   {
+    "group": false,
+    "id": "tag",
+    "label": "Tag",
+    "match": "prefix",
+    "menu": true,
+    "provider": "github",
+    "show": "meta",
+    "show_max": 2
+   },
+   {
+    "group": false,
+    "id": "is",
+    "label": "Flags",
+    "labels": {
+     "adopted": "adopted",
+     "approved": "approved",
+     "due": "due",
+     "in-loop": "in loop",
+     "muted": "muted",
+     "needs-me": "needs me",
+     "paused": "paused",
+     "stalled": "stalled",
+     "tracked": "tracked"
+    },
+    "menu": true,
+    "provider": "github",
+    "row_class": {
+     "stalled": "late"
+    },
+    "show": "flag",
+    "show_only": [
+     "paused",
+     "muted"
+    ]
+   },
+   {
+    "empty": "no checks data",
+    "group": true,
+    "id": "ci",
+    "label": "Checks",
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "failure",
+     "pending",
+     "success"
+    ]
+   },
+   {
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "3d",
+      "label": "1-3 days",
+      "within": "72h"
+     },
+     {
+      "id": "7d",
+      "label": "3-7 days",
+      "within": "168h"
+     },
+     {
+      "id": "2w",
+      "label": "1-2 weeks",
+      "within": "336h"
+     },
+     {
+      "id": "4w",
+      "label": "2-4 weeks",
+      "within": "672h"
+     },
+     {
+      "id": "older",
+      "label": "over 4 weeks",
+      "within": ""
+     }
+    ],
+    "empty": "no opening date",
+    "group": true,
+    "id": "opened",
+    "label": "Opened",
+    "labels": {
+     "1d": "0-1 days",
+     "2w": "1-2 weeks",
+     "3d": "1-3 days",
+     "4w": "2-4 weeks",
+     "7d": "3-7 days",
+     "older": "over 4 weeks"
+    },
+    "menu": true,
+    "provider": "github",
+    "rank": [
+     "1d",
+     "3d",
+     "7d",
+     "2w",
+     "4w",
+     "older"
+    ],
+    "sort": "time"
+   },
+   {
+    "group": false,
+    "id": "scope",
+    "label": "In scope as",
+    "menu": true,
+    "provider": "github"
+   },
+   {
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "3d",
+      "label": "1-3 days",
+      "within": "72h"
+     },
+     {
+      "id": "7d",
+      "label": "3-7 days",
+      "within": "168h"
+     },
+     {
+      "id": "2w",
+      "label": "1-2 weeks",
+      "within": "336h"
+     },
+     {
+      "id": "4w",
+      "label": "2-4 weeks",
+      "within": "672h"
+     },
+     {
+      "id": "older",
+      "label": "over 4 weeks",
+      "within": ""
+     }
+    ],
+    "group": false,
+    "id": "age",
+    "label": "Waiting for",
+    "menu": true,
+    "provider": "github",
+    "show": "age",
+    "show_label": "since {{.at}}",
+    "sort": "time"
+   },
+   {
+    "group": true,
+    "id": "lane",
+    "label": "Board lane",
+    "labels": {
+     "author": "Waiting on author",
+     "loop": "In loop",
+     "me": "Needs me",
+     "merge": "Can merge",
+     "reviewer": "Waiting on reviewer"
+    },
+    "menu": false,
+    "provider": "github",
+    "rank": [
+     "me",
+     "reviewer",
+     "author",
+     "merge",
+     "loop"
+    ]
+   },
+   {
+    "buckets": [
+     {
+      "id": "later",
+      "label": "later",
+      "within": "-24h"
+     },
+     {
+      "id": "due",
+      "label": "due",
+      "within": "1ms"
+     },
+     {
+      "id": "past",
+      "label": "past",
+      "within": ""
+     }
+    ],
+    "group": false,
+    "id": "due",
+    "label": "Due",
+    "menu": false,
+    "provider": "github",
+    "sort": "time"
+   }
+  ],
+  "reasons": [
+   {
+    "provider": "github",
+    "words": {
+     "agent_asked": "the agent asked you something",
+     "approved_checks_pending": "approved, checks pending",
+     "approved_green": "approved and green",
+     "changes_requested": "changes requested by {{.actor}}",
+     "checks_failing": "checks failing on the head",
+     "checks_failing_more": "checks failing: {{.checks}} and {{.more}} more",
+     "checks_failing_named": "checks failing: {{.checks}}",
+     "closed": "closed",
+     "commented_no_reply": "{{.actor}} commented, no reply",
+     "draft": "draft",
+     "merge_conflicts": "merge conflicts with {{.branch}}",
+     "merged": "merged",
+     "no_review_required": "green, no review required",
+     "no_review_required_checks_pending": "no review required, checks pending",
+     "no_reviewer_requested": "no reviewer requested",
+     "review_requested": "review requested, no review on the head",
+     "review_requested_again": "review requested again after your review",
+     "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
+     "round_blocked": "round blocked: {{.why}}",
+     "round_held": "automatic round held: {{.why}}",
+     "round_in_progress": "review round in progress",
+     "to_address": "review to address, no workspace: {{.why}}"
+    }
+   }
+  ],
+  "situations": [
+   {
+    "kind": "round_pending",
+    "label": "round soon",
+    "provider": "github",
+    "rank": 0
+   },
+   {
+    "kind": "loop_waiting",
+    "label": "agent asks",
+    "provider": "github",
+    "rank": 1
+   },
+   {
+    "kind": "loop_stopped",
+    "label": "agent stopped",
+    "provider": "github",
+    "rank": 2
+   },
+   {
+    "kind": "blocked",
+    "label": "round blocked",
+    "provider": "github",
+    "rank": 3
+   },
+   {
+    "kind": "to_address",
+    "label": "to address",
+    "provider": "github",
+    "rank": 4
+   },
+   {
+    "kind": "held",
+    "label": "held (cap)",
+    "provider": "github",
+    "rank": 5
+   },
+   {
+    "kind": "loop_working",
+    "label": "agent working",
+    "provider": "github",
+    "rank": 6
+   },
+   {
+    "kind": "changes",
+    "label": "changes asked",
+    "provider": "github",
+    "rank": 7
+   },
+   {
+    "kind": "checks",
+    "label": "checks failing",
+    "provider": "github",
+    "rank": 8
+   },
+   {
+    "kind": "conflicts",
+    "label": "merge conflicts",
+    "provider": "github",
+    "rank": 9
+   },
+   {
+    "kind": "reply",
+    "label": "reply due",
+    "provider": "github",
+    "rank": 10
+   },
+   {
+    "kind": "reviewer_back",
+    "label": "reviewer due",
+    "provider": "github",
+    "rank": 11
+   },
+   {
+    "kind": "review",
+    "label": "review",
+    "provider": "github",
+    "rank": 12
+   },
+   {
+    "kind": "no_reviewer",
+    "label": "no reviewer",
+    "provider": "github",
+    "rank": 13
+   },
+   {
+    "kind": "merge",
+    "label": "can merge",
+    "provider": "github",
+    "rank": 14
+   },
+   {
+    "kind": "draft",
+    "label": "draft",
+    "provider": "github",
+    "rank": 15
+   },
+   {
+    "kind": "muted",
+    "label": "muted",
+    "provider": "github",
+    "rank": 16
+   },
+   {
+    "kind": "done",
+    "label": "closed",
+    "provider": "github",
+    "rank": 17
+   }
+  ],
+  "version": "d753e6ef5d59",
+  "views": [
+   {
+    "default_sort": "Waiting longest",
+    "id": "mine",
+    "label": "My PRs",
+    "order": 2,
+    "provider": "github",
+    "rows": true,
+    "surfaces": [
+     "web",
+     "tui"
+    ],
+    "unit": "Pull request"
+   },
+   {
+    "default_sort": "Waiting longest",
+    "id": "dash",
+    "label": "Backlog",
+    "order": 6,
+    "provider": "github",
+    "rows": false,
+    "surfaces": [
+     "web"
+    ]
+   },
+   {
+    "default_sort": "Waiting longest",
+    "id": "all",
+    "label": "All",
+    "order": 8,
+    "provider": "github",
+    "rows": true,
+    "surfaces": [
+     "web"
+    ]
+   },
+   {
+    "id": "explore",
+    "label": "Explore",
+    "order": 9,
+    "provider": "github",
+    "rows": false,
+    "search": {
+     "decisions": {
+      "APPROVED": "approved",
+      "CHANGES_REQUESTED": "changes requested",
+      "REVIEW_REQUIRED": "review required"
+     },
+     "default_sort": "updated-asc",
+     "filters": [
+      {
+       "label": "Not reviewed by me",
+       "term": "-reviewed-by:@me"
+      },
+      {
+       "label": "Ready for review",
+       "term": "draft:false"
+      },
+      {
+       "label": "Requested from me or my teams",
+       "term": "review-requested:@me"
+      },
+      {
+       "label": "Active in the last 30 days",
+       "window": 30
+      }
+     ],
+     "no_decision": "no review required",
+     "presets": [
+      {
+       "label": "Asked of me",
+       "query": "user-review-requested:@me"
+      },
+      {
+       "label": "Asked of my teams",
+       "query": "review-requested:@me -user-review-requested:@me"
+      }
+     ],
+     "sorts": [
+      {
+       "label": "Waiting longest",
+       "shown": "waiting longest",
+       "sort": "updated-asc"
+      },
+      {
+       "label": "Oldest opened",
+       "shown": "oldest opened",
+       "sort": "created-asc"
+      },
+      {
+       "label": "Recently updated",
+       "shown": "most recently updated",
+       "sort": "updated-desc"
+      }
+     ]
+    },
+    "surfaces": [
+     "web"
+    ]
+   }
+  ]
+ },
+ "copyRow": {
+  "facets": {
+   "age": [
+    "2026-10-13T13:00:00Z"
+   ],
+   "author": [
+    "me",
+    "carol"
+   ],
+   "ci": [
+    "none"
+   ],
+   "is": [
+    "paused"
+   ],
+   "kind": [
+    "conflicts"
+   ],
+   "lane": [
+    "me"
+   ],
+   "risk": [
+    "high"
+   ],
+   "scope": [
+    "author"
+   ],
+   "size": [
+    "m"
+   ],
+   "status": [
+    "in-progress"
+   ],
+   "tag": null,
+   "type": [
+    "none"
+   ],
+   "wait": [
+    "me"
+   ],
+   "waits-on": [
+    "me"
+   ]
+  },
+  "kind": "conflicts",
+  "label": "acme/widgets#4870",
+  "link": "https://github.com/acme/widgets/pull/4870",
+  "payload": {
+   "author": "carol",
+   "brief": {
+    "goal": "Run batches on one connection.",
+    "open_questions": 2,
+    "risk": "high",
+    "size": "m"
+   },
+   "head": "fix/x",
+   "override": {
+    "hold": true
+   },
+   "reasons": [
+    "author"
+   ],
+   "viewer": "carol",
+   "workspace": {
+    "display_name": "fix-x",
+    "status": "in-progress"
+   }
+  },
+  "summary": {
+   "closed": false,
+   "line": "merge conflicts with develop",
+   "reason": "merge conflicts with develop",
+   "since": "2026-10-13T13:00:00Z",
+   "stalled": true,
+   "waits_on": "author"
+  },
+  "title": "perf: one \"conn\"\nper batch",
+  "unit": {
+   "key": "acme/widgets#4870",
+   "provider": "github"
+  }
+ },
+ "copyTask": {
+  "id": "t-1",
+  "state": "next",
+  "title": "Answer the deploy question",
+  "units": [
+   {
+    "provider": "slack",
+    "key": "T1/C1/1"
+   }
+  ],
+  "unit_labels": [
+   "#general thread"
+  ],
+  "verbs": [],
+  "created": "2026-10-01T09:00:00Z",
+  "updated": "2026-10-01T09:00:00Z",
+  "facets": {
+   "asked-by": [],
+   "source": [
+    "slack"
+   ],
+   "where": [
+    "general"
+   ]
+  },
+  "drafts": null
+ },
+ "dashNow": 1792422000000,
+ "dashRows": [
+  {
+   "facets": {
+    "age": [
+     "2026-10-17T15:00:00Z"
+    ],
+    "author": [
+     "ana"
+    ],
+    "ci": [
+     "none"
+    ],
+    "due": [
+     "2026-10-19T17:00:00Z"
+    ],
+    "is": [
+     "stalled",
+     "needs-me"
+    ],
+    "kind": [
+     "review"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "low"
+    ],
+    "scope": null,
+    "size": [
+     "s"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:auth",
+     "lang:go"
+    ],
+    "type": [
+     "fix"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/api"
+    ]
+   },
+   "kind": "review",
+   "label": "acme/api#1",
+   "payload": {
+    "author": "ana",
+    "brief": {
+     "kind": "fix",
+     "risk": "low",
+     "size": "s",
+     "tags": [
+      "area:auth",
+      "lang:go"
+     ]
+    },
+    "repo": "acme/api",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 1,
+    "owner": "acme",
+    "repo": "api"
+   },
+   "round_gate": {
+    "deadline": "2026-10-19T17:00:00Z"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-17T15:00:00Z",
+    "stalled": true,
+    "waits_on": "me"
+   },
+   "title": "t1",
+   "unit": {
+    "key": "acme/api#1",
+    "provider": "github"
+   },
+   "views": [
+    "needs-me",
+    "stalled"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-14T15:00:00Z"
+    ],
+    "author": [
+     "me",
+     "me"
+    ],
+    "ci": [
+     "failure",
+     "lint",
+     "unit"
+    ],
+    "due": [
+     "2026-10-20T21:00:00Z"
+    ],
+    "is": [
+     "stalled"
+    ],
+    "kind": [
+     "checks"
+    ],
+    "lane": [
+     "me"
+    ],
+    "opened": [
+     "2026-10-09T15:00:00Z"
+    ],
+    "risk": [
+     "high"
+    ],
+    "scope": null,
+    "size": [
+     "l"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:auth",
+     "lang:go"
+    ],
+    "type": [
+     "feature"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/api"
+    ]
+   },
+   "kind": "checks",
+   "label": "acme/api#2",
+   "payload": {
+    "author": "me",
+    "brief": {
+     "kind": "feature",
+     "risk": "high",
+     "size": "l",
+     "tags": [
+      "area:auth",
+      "lang:go"
+     ]
+    },
+    "facts": {
+     "changed_files": 12,
+     "checks": {
+      "failing": [
+       "lint",
+       "unit"
+      ],
+      "state": "FAILURE"
+     },
+     "created_at": "2026-10-09T15:00:00Z",
+     "next": [
+      {
+       "at": "2026-10-20T21:00:00Z",
+       "what": "unmute"
+      }
+     ],
+     "turns": {
+      "cost_usd": 1.25,
+      "count": 3,
+      "open": 1,
+      "tokens": 9000
+     }
+    },
+    "repo": "acme/api",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 2,
+    "owner": "acme",
+    "repo": "api"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-14T15:00:00Z",
+    "stalled": true,
+    "waits_on": "author"
+   },
+   "title": "t2",
+   "unit": {
+    "key": "acme/api#2",
+    "provider": "github"
+   },
+   "views": [
+    "mine",
+    "stalled"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-19T05:00:00Z"
+    ],
+    "author": [
+     "bia"
+    ],
+    "ci": [
+     "success"
+    ],
+    "is": [
+     "needs-me"
+    ],
+    "kind": [
+     "review"
+    ],
+    "lane": [
+     "me"
+    ],
+    "opened": [
+     "2026-10-19T03:00:00Z"
+    ],
+    "risk": [
+     "low"
+    ],
+    "scope": null,
+    "size": [
+     "s"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:ui",
+     "lang:ts"
+    ],
+    "type": [
+     "fix"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "review",
+   "label": "acme/web#3",
+   "payload": {
+    "author": "bia",
+    "brief": {
+     "kind": "fix",
+     "risk": "low",
+     "size": "s",
+     "tags": [
+      "area:ui",
+      "lang:ts"
+     ]
+    },
+    "facts": {
+     "checks": {
+      "state": "SUCCESS"
+     },
+     "created_at": "2026-10-19T03:00:00Z"
+    },
+    "repo": "acme/web",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 3,
+    "owner": "acme",
+    "repo": "web"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-19T05:00:00Z",
+    "stalled": false,
+    "waits_on": "me"
+   },
+   "title": "t3",
+   "unit": {
+    "key": "acme/web#3",
+    "provider": "github"
+   },
+   "views": [
+    "needs-me"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-18T15:00:00Z"
+    ],
+    "author": [
+     "ana"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "approved"
+    ],
+    "kind": [
+     "merge"
+    ],
+    "lane": [
+     "merge"
+    ],
+    "risk": [
+     "medium"
+    ],
+    "scope": null,
+    "size": [
+     "m"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:auth",
+     "lang:go"
+    ],
+    "type": [
+     "chore"
+    ],
+    "wait": [
+     "author"
+    ],
+    "waits-on": [
+     "ana"
+    ],
+    "where": [
+     "jus/op"
+    ]
+   },
+   "kind": "merge",
+   "label": "jus/op#4",
+   "payload": {
+    "approved": true,
+    "author": "ana",
+    "brief": {
+     "kind": "chore",
+     "risk": "medium",
+     "size": "m",
+     "tags": [
+      "area:auth",
+      "lang:go"
+     ]
+    },
+    "repo": "jus/op",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 4,
+    "owner": "jus",
+    "repo": "op"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-18T15:00:00Z",
+    "stalled": false,
+    "waits_on": "author"
+   },
+   "title": "t4",
+   "unit": {
+    "key": "jus/op#4",
+    "provider": "github"
+   },
+   "views": [
+    "approved"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-19T12:00:00Z"
+    ],
+    "author": [
+     "bia"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "in-loop"
+    ],
+    "kind": [
+     "loop_working"
+    ],
+    "lane": [
+     "loop"
+    ],
+    "risk": [
+     "low"
+    ],
+    "scope": null,
+    "size": [
+     "xs"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:ui",
+     "lang:go"
+    ],
+    "type": [
+     "fix"
+    ],
+    "wait": [
+     "loop"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "jus/op"
+    ]
+   },
+   "kind": "loop_working",
+   "label": "jus/op#5",
+   "payload": {
+    "author": "bia",
+    "brief": {
+     "kind": "fix",
+     "risk": "low",
+     "size": "xs",
+     "tags": [
+      "area:ui",
+      "lang:go"
+     ]
+    },
+    "repo": "jus/op",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 5,
+    "owner": "jus",
+    "repo": "op"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-19T12:00:00Z",
+    "stalled": false,
+    "waits_on": "me"
+   },
+   "title": "t5",
+   "unit": {
+    "key": "jus/op#5",
+    "provider": "github"
+   },
+   "views": [
+    "loop"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-11T15:00:00Z"
+    ],
+    "author": [
+     "caio"
+    ],
+    "ci": [
+     "failure",
+     "lint"
+    ],
+    "due": [
+     "2026-10-19T20:00:00Z"
+    ],
+    "is": [
+     "stalled"
+    ],
+    "kind": [
+     "conflicts"
+    ],
+    "lane": [
+     "author"
+    ],
+    "opened": [
+     "2026-09-09T15:00:00Z"
+    ],
+    "risk": [
+     "high"
+    ],
+    "scope": null,
+    "size": [
+     "xl"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:billing",
+     "lang:ts"
+    ],
+    "type": [
+     "feature"
+    ],
+    "wait": [
+     "author"
+    ],
+    "waits-on": [
+     "caio"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "conflicts",
+   "label": "acme/web#6",
+   "payload": {
+    "author": "caio",
+    "brief": {
+     "kind": "feature",
+     "risk": "high",
+     "size": "xl",
+     "tags": [
+      "area:billing",
+      "lang:ts"
+     ]
+    },
+    "facts": {
+     "changed_files": 3,
+     "checks": {
+      "failing": [
+       "lint"
+      ],
+      "state": "FAILURE"
+     },
+     "created_at": "2026-09-09T15:00:00Z",
+     "next": [
+      {
+       "at": "2026-10-19T20:00:00Z",
+       "what": "brief_retry"
+      }
+     ],
+     "turns": {
+      "cost_usd": 0.5,
+      "count": 1
+     }
+    },
+    "repo": "acme/web",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 6,
+    "owner": "acme",
+    "repo": "web"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-11T15:00:00Z",
+    "stalled": true,
+    "waits_on": "author"
+   },
+   "title": "t6",
+   "unit": {
+    "key": "acme/web#6",
+    "provider": "github"
+   },
+   "views": [
+    "stalled"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-09-19T15:00:00Z"
+    ],
+    "author": [
+     "ana"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [],
+    "kind": [
+     "done"
+    ],
+    "lane": [
+     "author"
+    ],
+    "risk": [
+     "none"
+    ],
+    "scope": null,
+    "size": [
+     "none"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "nobody"
+    ],
+    "waits-on": null,
+    "where": [
+     "acme/api"
+    ]
+   },
+   "kind": "done",
+   "label": "acme/api#7",
+   "payload": {
+    "author": "ana",
+    "repo": "acme/api",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 7,
+    "owner": "acme",
+    "repo": "api"
+   },
+   "summary": {
+    "closed": true,
+    "line": "",
+    "reason": "",
+    "since": "2026-09-19T15:00:00Z",
+    "stalled": false,
+    "waits_on": "nobody"
+   },
+   "title": "t7",
+   "unit": {
+    "key": "acme/api#7",
+    "provider": "github"
+   },
+   "views": [
+    "done"
+   ]
+  }
+ ],
+ "lensNow": 1793793600000,
+ "mineRows": [
+  {
+   "facets": {
+    "age": [
+     "2026-10-10T00:00:00Z"
+    ],
+    "author": [
+     "ana"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "needs-me"
+    ],
+    "kind": [
+     "review"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "low"
+    ],
+    "scope": null,
+    "size": [
+     "s"
+    ],
+    "status": [
+     "in-review"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "reviewer"
+    ],
+    "waits-on": [
+     "bia"
+    ],
+    "where": [
+     "acme/api"
+    ]
+   },
+   "kind": "review",
+   "label": "acme/api#1",
+   "payload": {
+    "author": "ana",
+    "brief": {
+     "risk": "low",
+     "size": "s"
+    },
+    "repo": "acme/api",
+    "viewer": "me",
+    "workspace": {
+     "status": "in-review"
+    }
+   },
+   "ref": {
+    "number": 1,
+    "owner": "acme",
+    "repo": "api"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-10T00:00:00Z",
+    "stalled": false,
+    "waits_on": "bia"
+   },
+   "title": "t1",
+   "unit": {
+    "key": "acme/api#1",
+    "provider": "github"
+   },
+   "views": [
+    "mine"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-09T00:00:00Z"
+    ],
+    "author": [
+     "me",
+     "me"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "stalled",
+     "needs-me"
+    ],
+    "kind": [
+     "changes"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "high"
+    ],
+    "scope": null,
+    "size": [
+     "l"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "changes",
+   "label": "acme/web#2",
+   "payload": {
+    "author": "me",
+    "brief": {
+     "risk": "high",
+     "size": "l"
+    },
+    "repo": "acme/web",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 2,
+    "owner": "acme",
+    "repo": "web"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-09T00:00:00Z",
+    "stalled": true,
+    "waits_on": "author"
+   },
+   "title": "t2",
+   "unit": {
+    "key": "acme/web#2",
+    "provider": "github"
+   },
+   "views": [
+    "mine"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-08T00:00:00Z"
+    ],
+    "author": [
+     "ana"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "needs-me"
+    ],
+    "kind": [
+     "merge"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "none"
+    ],
+    "scope": null,
+    "size": [
+     "none"
+    ],
+    "status": [
+     "ready-to-merge"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "author"
+    ],
+    "waits-on": [
+     "ana"
+    ],
+    "where": [
+     "acme/widgets"
+    ]
+   },
+   "kind": "merge",
+   "label": "acme/widgets#3",
+   "payload": {
+    "author": "ana",
+    "repo": "acme/widgets",
+    "viewer": "me",
+    "workspace": {
+     "status": "ready-to-merge"
+    }
+   },
+   "ref": {
+    "number": 3,
+    "owner": "acme",
+    "repo": "widgets"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-08T00:00:00Z",
+    "stalled": false,
+    "waits_on": "author"
+   },
+   "title": "t3",
+   "unit": {
+    "key": "acme/widgets#3",
+    "provider": "github"
+   },
+   "views": [
+    "mine"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-12T00:00:00Z"
+    ],
+    "author": [
+     "bia"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "stalled",
+     "needs-me"
+    ],
+    "kind": [
+     "review"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "medium"
+    ],
+    "scope": null,
+    "size": [
+     "m"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/widgets"
+    ]
+   },
+   "kind": "review",
+   "label": "acme/widgets#4",
+   "payload": {
+    "author": "bia",
+    "brief": {
+     "risk": "medium",
+     "size": "m"
+    },
+    "repo": "acme/widgets",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 4,
+    "owner": "acme",
+    "repo": "widgets"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-12T00:00:00Z",
+    "stalled": true,
+    "waits_on": "me"
+   },
+   "title": "t4",
+   "unit": {
+    "key": "acme/widgets#4",
+    "provider": "github"
+   },
+   "views": [
+    "mine"
+   ]
+  },
+  {
+   "facets": {
+    "age": [
+     "2026-10-11T00:00:00Z"
+    ],
+    "author": [
+     "bia"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "needs-me"
+    ],
+    "kind": [
+     "loop_working"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "high"
+    ],
+    "scope": null,
+    "size": [
+     "xs"
+    ],
+    "status": [
+     "reviewing"
+    ],
+    "tag": null,
+    "type": [
+     "none"
+    ],
+    "wait": [
+     "loop"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/api"
+    ]
+   },
+   "kind": "loop_working",
+   "label": "acme/api#5",
+   "payload": {
+    "author": "bia",
+    "brief": {
+     "risk": "high",
+     "size": "xs"
+    },
+    "repo": "acme/api",
+    "viewer": "me",
+    "workspace": {
+     "status": "reviewing"
+    }
+   },
+   "ref": {
+    "number": 5,
+    "owner": "acme",
+    "repo": "api"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-11T00:00:00Z",
+    "stalled": false,
+    "waits_on": "me"
+   },
+   "title": "t5",
+   "unit": {
+    "key": "acme/api#5",
+    "provider": "github"
+   },
+   "views": [
+    "mine"
+   ]
+  }
+ ],
+ "mixedTasks": [
+  {
+   "id": "s-1",
+   "state": "next",
+   "category": "ready",
+   "title": "Answer the deploy question",
+   "units": [
+    {
+     "provider": "slack",
+     "key": "T0001/C0001/1700000000.000100"
+    }
+   ],
+   "unit_labels": [
+    "#general thread"
+   ],
+   "verbs": [],
+   "created": "2026-10-01T09:00:00Z",
+   "updated": "2026-10-01T09:00:00Z",
+   "facets": {
+    "category": [
+     "ready"
+    ],
+    "conversation": [
+     "thread"
+    ],
+    "source": [
+     "slack"
+    ],
+    "state": [
+     "next"
+    ],
+    "turn": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "general"
+    ]
+   },
+   "drafts": null
+  },
+  {
+   "id": "s-2",
+   "state": "next",
+   "category": "ready",
+   "title": "Close the lunch poll",
+   "units": [],
+   "verbs": [],
+   "created": "2026-10-01T09:00:00Z",
+   "updated": "2026-10-01T09:00:00Z",
+   "facets": {
+    "category": [
+     "ready"
+    ],
+    "source": [
+     "slack"
+    ],
+    "state": [
+     "next"
+    ],
+    "turn": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "random"
+    ]
+   },
+   "drafts": null
+  },
+  {
+   "id": "g-1",
+   "state": "doing",
+   "category": "active",
+   "title": "Fix the flaky upload test",
+   "units": [
+    {
+     "provider": "github",
+     "key": "acme/api#8"
+    }
+   ],
+   "verbs": [],
+   "created": "2026-10-01T09:00:00Z",
+   "updated": "2026-10-01T09:00:00Z",
+   "facets": {
+    "category": [
+     "active"
+    ],
+    "ci": [
+     "failure"
+    ],
+    "kind": [
+     "checks"
+    ],
+    "source": [
+     "github"
+    ],
+    "state": [
+     "doing"
+    ],
+    "tag": [
+     "lang:go"
+    ],
+    "turn": [
+     "me"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/api"
+    ]
+   },
+   "drafts": null
+  },
+  {
+   "id": "g-2",
+   "state": "doing",
+   "category": "active",
+   "title": "Review the general settings page",
+   "units": [
+    {
+     "provider": "github",
+     "key": "acme/web#9"
+    }
+   ],
+   "verbs": [],
+   "created": "2026-10-01T09:00:00Z",
+   "updated": "2026-10-01T09:00:00Z",
+   "facets": {
+    "category": [
+     "active"
+    ],
+    "ci": [
+     "success"
+    ],
+    "kind": [
+     "review"
+    ],
+    "source": [
+     "github"
+    ],
+    "state": [
+     "doing"
+    ],
+    "turn": [
+     "others"
+    ],
+    "wait": [
+     "reviewer"
+    ],
+    "waits-on": [
+     "bia"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "drafts": null
+  }
+ ],
+ "quietClose": {
+  "id": "fake-close/task/t-06bec1c03a26fadf/ab",
+  "workflow": "fake-close",
+  "summary": "Close a quiet task; posts nothing",
+  "decision": "pending",
+  "reason": "waits for you",
+  "default": "wait",
+  "observe": false,
+  "unit": {
+   "provider": "task",
+   "key": "t-06bec1c03a26fadf"
+  },
+  "label": "task:t-06bec1c03a26fadf",
+  "steps": [
+   "items.resolve"
+  ],
+  "target": {
+   "task": "t-06bec1c03a26fadf",
+   "title": "Answer Ana about the retries",
+   "units": [
+    {
+     "label": "#general",
+     "link": "https://chat.example/c1"
+    },
+    {
+     "label": "#ops"
+    }
+   ]
+  },
+  "does": [
+   {
+    "use": "items.resolve",
+    "reach": "local",
+    "says": "Resolve its open items as {resolution}",
+    "args": {
+     "resolution": "moot",
+     "resolution_says": "resolved as moot"
+    },
+    "items": [
+     "Ana asks for the retry numbers",
+     "Bea asks when it ships"
+    ]
+   }
+  ],
+  "gain": {
+   "memory_bytes": 0,
+   "disk_bytes": 0
+  },
+  "why": {
+   "trigger": "sweep",
+   "matched": [
+    {
+     "name": "task.items_open",
+     "value": "2"
+    }
+   ]
+  },
+  "actions": []
+ },
+ "railViews": {
+  "views": [
+   {
+    "id": "focus",
+    "label": "Focus",
+    "rail": true
+   },
+   {
+    "id": "inbox",
+    "label": "Inbox",
+    "rail": true
+   },
+   {
+    "id": "outbox",
+    "label": "Outbox",
+    "rail": true
+   },
+   {
+    "id": "fits-now",
+    "label": "Fits now",
+    "rail": true
+   },
+   {
+    "id": "waiting",
+    "label": "Waiting",
+    "rail": true
+   },
+   {
+    "id": "projects",
+    "label": "Projects",
+    "rail": true
+   },
+   {
+    "id": "someday",
+    "label": "Someday",
+    "rail": true
+   },
+   {
+    "id": "logbook",
+    "label": "Logbook",
+    "rail": true
+   }
+  ],
+  "areas": [
+   "OSS",
+   "Hiring"
+  ],
+  "contexts": [
+   "@decide",
+   "@reply"
+  ],
+  "verbs": [
+   {
+    "verb": "approve",
+    "handler": "approve",
+    "label": "Approve",
+    "key": ""
+   },
+   {
+    "verb": "edit",
+    "handler": "edit",
+    "label": "Edit",
+    "key": ""
+   },
+   {
+    "verb": "dismiss",
+    "handler": "drop",
+    "label": "Discard",
+    "key": ""
+   },
+   {
+    "verb": "retry",
+    "handler": "retry",
+    "label": "Retry",
+    "key": ""
+   }
+  ],
+  "lens": {
+   "default_group": "",
+   "board_group": "",
+   "no_group": "",
+   "copied": "",
+   "copied_grouped": "",
+   "tag_key": "",
+   "tag_key_empty": "",
+   "grouped": "",
+   "sorted": "",
+   "descending": "",
+   "no_lens": "",
+   "age_now": "",
+   "age_minutes": "",
+   "age_hours": "",
+   "age_days": "",
+   "filter_label": "",
+   "filter_title": "",
+   "filter_title_group": "",
+   "filter_group": "",
+   "list_count": "",
+   "list_empty": "",
+   "countdown_title": "",
+   "countdown_sending": "",
+   "countdown_seconds": "",
+   "countdown_minutes": "",
+   "tip_named": "",
+   "tip_kind": "",
+   "tip_why": "",
+   "legend_title": "",
+   "sort_by": "",
+   "col_unit": "",
+   "stale": "",
+   "stale_title": "",
+   "briefing": "",
+   "briefing_title": "",
+   "briefing_attempt": "",
+   "briefing_error": "",
+   "questions": "",
+   "questions_title": "",
+   "starred": "",
+   "until": "",
+   "due": "",
+   "unread": "",
+   "unread_title": "",
+   "review_due": "",
+   "no_next_action": "",
+   "open_children": "",
+   "sequential": "",
+   "every": "",
+   "reviewed": "",
+   "more": ""
+  },
+  "detail_verbs": null,
+  "effects": null,
+  "draft_purposes": null,
+  "draft_states": null,
+  "run_states": null,
+  "session_states": null
+ },
+ "slackFacets": [
+  {
+   "id": "conversation",
+   "label": "Conversation",
+   "provider": "slack",
+   "group": true,
+   "sort": "text",
+   "menu": true
+  },
+  {
+   "id": "turn",
+   "label": "Whose turn",
+   "provider": "slack",
+   "group": true,
+   "sort": "rank",
+   "rank": [
+    "me",
+    "others",
+    "nobody"
+   ],
+   "labels": {
+    "me": "Your turn",
+    "nobody": "Nobody's turn",
+    "others": "Others' turn"
+   },
+   "menu": true,
+   "strip": true,
+   "colors": {
+    "me": "me",
+    "nobody": "nobody",
+    "others": "author"
+   }
+  },
+  {
+   "id": "situation",
+   "label": "Conversation state",
+   "provider": "slack",
+   "group": true,
+   "sort": "rank",
+   "rank": [
+    "waits_on_viewer",
+    "needs_closure",
+    "new",
+    "waits_on_others",
+    "fyi",
+    "resolved"
+   ],
+   "labels": {
+    "fyi": "for your information",
+    "needs_closure": "needs closing",
+    "new": "new",
+    "resolved": "resolved",
+    "waits_on_others": "waits on others",
+    "waits_on_viewer": "waits on you"
+   },
+   "menu": true,
+   "show": "kind"
+  }
+ ],
+ "specs": {
+  "plan": [
+   {
+    "group": "plan",
+    "id": "plan_apply",
+    "key": "Enter",
+    "label": "Apply",
+    "source": "builtin",
+    "summary": "Run this plan item now, with the same guards as the sweep. Dismiss drops it instead.",
+    "surfaces": [
+     "tui",
+     "detail",
+     "cli"
+    ],
+    "verb": "approve"
+   },
+   {
+    "group": "plan",
+    "id": "plan_dismiss",
+    "key": "X",
+    "label": "Dismiss",
+    "source": "builtin",
+    "summary": "Drop this plan item for good; it does not run.",
+    "surfaces": [
+     "tui",
+     "detail",
+     "cli"
+    ],
+    "verb": "dismiss"
+   },
+   {
+    "group": "plan",
+    "id": "guide",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "placeholder": "what the round should look at",
+     "required": true
+    },
+    "key": "G",
+    "label": "Guide",
+    "source": "builtin",
+    "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits.",
+    "surfaces": [
+     "tui",
+     "detail"
+    ]
+   },
+   {
+    "group": "plan",
+    "id": "trust_run",
+    "key": "T",
+    "label": "Trust folder and run",
+    "source": "builtin",
+    "summary": "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification"
+    ]
+   },
+   {
+    "group": "plan",
+    "id": "unblock",
+    "key": "D",
+    "label": "Dismiss block",
+    "source": "builtin",
+    "summary": "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification"
+    ]
+   }
+  ],
+  "specs": [
+   {
+    "group": "turn",
+    "id": "answer",
+    "input": {
+     "kind": "answer",
+     "label": "Answer",
+     "required": true
+    },
+    "key": "W",
+    "label": "Answer",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
+    "surfaces": [
+     "detail",
+     "tui",
+     "notification"
+    ],
+    "verb": "answer"
+   },
+   {
+    "group": "turn",
+    "id": "continue",
+    "key": "C",
+    "label": "Continue",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
+    "surfaces": [
+     "detail",
+     "tui",
+     "notification"
+    ]
+   },
+   {
+    "group": "turn",
+    "id": "dismiss",
+    "key": "X",
+    "label": "Dismiss",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
+    "surfaces": [
+     "detail",
+     "tui",
+     "notification"
+    ],
+    "verb": "dismiss"
+   },
+   {
+    "group": "start",
+    "id": "run_now",
+    "intake": true,
+    "key": "R",
+    "label": "Run now",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Run what waits now, without waiting for its delay or the daily budget. Skip drops it instead.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification",
+     "cli"
+    ],
+    "verb": "approve"
+   },
+   {
+    "group": "start",
+    "id": "skip",
+    "key": "S",
+    "label": "Skip",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Drop what waits without running it. Run now runs it instead.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification",
+     "cli"
+    ],
+    "verb": "dismiss"
+   },
+   {
+    "group": "start",
+    "id": "guide",
+    "input": {
+     "kind": "text",
+     "label": "Guide",
+     "required": true
+    },
+    "key": "G",
+    "label": "Guide",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Tell the agent what to look at; your text goes with what waits now, or with the next run when nothing waits.",
+    "surfaces": [
+     "detail",
+     "tui",
+     "notification"
+    ]
+   },
+   {
+    "group": "start",
+    "id": "trust_run",
+    "key": "T",
+    "label": "Trust folder and run",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification"
+    ]
+   },
+   {
+    "group": "start",
+    "id": "unblock",
+    "key": "D",
+    "label": "Dismiss block",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification"
+    ]
+   },
+   {
+    "group": "start",
+    "id": "start",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "placeholder": "the brief: what to build or say, and how to know it is done"
+    },
+    "label": "Start",
+    "plugin": "task",
+    "scope": "unit",
+    "source": "intents/start/intent.toml",
+    "summary": "Start new work from a brief: in a fresh worktree of a repository, or with no checkout",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ]
+   },
+   {
+    "group": "start",
+    "id": "review",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "placeholder": "what the round should look at"
+    },
+    "intake": true,
+    "key": "V",
+    "label": "Review",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "intents/review/intent.toml",
+    "summary": "Start or continue a review round on someone else's pull request, in a dedicated workspace",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ],
+    "verb": "delegate"
+   },
+   {
+    "group": "start",
+    "id": "address",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "placeholder": "what the round should look at"
+    },
+    "intake": true,
+    "key": "F",
+    "label": "Address",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "intents/address/intent.toml",
+    "summary": "Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ],
+    "verb": "delegate"
+   },
+   {
+    "group": "start",
+    "id": "act",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "placeholder": "what to do about the items"
+    },
+    "label": "Act",
+    "scope": "item",
+    "source": "intents/act/intent.toml",
+    "summary": "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ],
+    "verb": "delegate"
+   },
+   {
+    "group": "start",
+    "id": "nudge",
+    "input": {
+     "kind": "text",
+     "label": "Guidance",
+     "max": 500,
+     "placeholder": "what to ask about"
+    },
+    "key": "N",
+    "label": "Nudge",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "intents/nudge/intent.toml",
+    "summary": "Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ]
+   },
+   {
+    "group": "control",
+    "id": "take_over",
+    "key": "A",
+    "label": "Take over",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it.",
+    "surfaces": [
+     "detail",
+     "tui",
+     "cli",
+     "explore"
+    ]
+   },
+   {
+    "group": "control",
+    "id": "pause",
+    "key": "H",
+    "label": "Pause",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Stop automatic rounds on this pull request until you resume it, and drop the one waiting; it stays in your lists. Mute hides it instead.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification",
+     "cli"
+    ],
+    "toggle": "resume"
+   },
+   {
+    "group": "control",
+    "id": "resume",
+    "key": "H",
+    "label": "Resume",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Let automatic rounds run on this pull request again.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "cli"
+    ],
+    "toggle": "pause"
+   },
+   {
+    "group": "control",
+    "id": "mute",
+    "input": {
+     "default": "2d",
+     "kind": "duration",
+     "label": "Mute for",
+     "placeholder": "2d, 36h",
+     "required": true,
+     "until_state": true
+    },
+    "key": "M",
+    "label": "Mute",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Snooze this pull request's task, out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "toggle": "unmute"
+   },
+   {
+    "group": "control",
+    "id": "unmute",
+    "key": "M",
+    "label": "Unmute",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Wake this pull request's task now, back into the lists that wait on you.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "toggle": "mute"
+   },
+   {
+    "group": "control",
+    "id": "track",
+    "label": "Track",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Follow this pull request like one in scope, though no other reason brings it in.",
+    "surfaces": [
+     "detail",
+     "cli",
+     "explore"
+    ],
+    "toggle": "untrack"
+   },
+   {
+    "group": "control",
+    "id": "untrack",
+    "label": "Untrack",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Stop following this pull request because you tracked it; another reason may still keep it.",
+    "surfaces": [
+     "detail",
+     "cli",
+     "explore"
+    ],
+    "toggle": "track"
+   },
+   {
+    "group": "workspace",
+    "id": "open",
+    "key": "O",
+    "label": "Open",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "notification",
+     "cli"
+    ]
+   },
+   {
+    "group": "workspace",
+    "id": "remove",
+    "label": "Remove",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Delete this pull request's workspace when nothing in it would be lost. Force remove deletes it whatever it holds.",
+    "surfaces": [
+     "row",
+     "detail",
+     "cli"
+    ]
+   },
+   {
+    "group": "workspace",
+    "id": "remove_force",
+    "label": "Force remove",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Delete this pull request's workspace though a remove was refused; what it holds is lost for good.",
+    "surfaces": [
+     "row",
+     "detail",
+     "cli"
+    ]
+   },
+   {
+    "group": "brief",
+    "id": "brief_refresh",
+    "label": "Refresh brief",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Make this pull request's brief again now, from what it holds today.",
+    "surfaces": [
+     "detail",
+     "cli"
+    ]
+   },
+   {
+    "copies": true,
+    "group": "brief",
+    "id": "copy_review_request",
+    "key": "Y",
+    "label": "Copy review request",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Copy a review request with the title, link and brief, formatted for a chat message.",
+    "surfaces": [
+     "detail",
+     "task",
+     "tui",
+     "cli"
+    ]
+   },
+   {
+    "group": "intake",
+    "id": "intake_without",
+    "label": "Start without brief",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Start the turn this intake waits on now, without waiting for the brief. Cancel drops the intake instead.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "cli"
+    ]
+   },
+   {
+    "group": "intake",
+    "id": "intake_cancel",
+    "label": "Cancel",
+    "plugin": "github",
+    "scope": "unit",
+    "source": "builtin",
+    "summary": "Drop this intake: the turn it waits on never starts.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "menubar",
+     "cli"
+    ]
+   },
+   {
+    "group": "draft",
+    "id": "draft.edit",
+    "input": {
+     "kind": "text",
+     "label": "Text",
+     "required": true
+    },
+    "label": "Edit",
+    "scope": "draft",
+    "source": "builtin",
+    "summary": "Change the draft's text; it waits for your approval again.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "verb": "edit"
+   },
+   {
+    "group": "draft",
+    "id": "draft.retry",
+    "label": "Retry",
+    "scope": "draft",
+    "source": "builtin",
+    "summary": "Send this draft again after its post failed.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "verb": "retry"
+   },
+   {
+    "group": "draft",
+    "id": "draft.close-silently",
+    "label": "Close without a message",
+    "scope": "draft",
+    "source": "builtin",
+    "summary": "Close the conversation as this draft would, without posting it.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "verb": "close-silently"
+   },
+   {
+    "group": "draft",
+    "id": "draft.skip-workflow",
+    "label": "Don't nudge this conversation",
+    "scope": "draft",
+    "source": "builtin",
+    "summary": "Stop this kind of draft on this conversation; the task stays where it is.",
+    "surfaces": [
+     "row",
+     "detail",
+     "tui",
+     "cli"
+    ],
+    "verb": "skip-workflow"
+   },
+   {
+    "group": "run",
+    "id": "run.open",
+    "label": "Open workspace",
+    "scope": "run",
+    "source": "builtin",
+    "summary": "Bring the run's workspace on screen in the workspace manager it ran in.",
+    "surfaces": [
+     "detail",
+     "cli"
+    ]
+   },
+   {
+    "group": "run",
+    "id": "run.enter",
+    "label": "Enter session",
+    "scope": "run",
+    "source": "builtin",
+    "summary": "Bring the run's agent session on screen to type in it; a session with no live process is woken first.",
+    "surfaces": [
+     "detail",
+     "cli"
+    ]
+   },
+   {
+    "group": "run",
+    "id": "run.transcript",
+    "label": "Transcript",
+    "scope": "run",
+    "source": "builtin",
+    "summary": "Read what the person typed and what the agent answered in the run's session.",
+    "surfaces": [
+     "detail",
+     "cli"
+    ]
+   }
+  ],
+  "version": "48551a885afd"
+ },
+ "stringsEn": {
+  "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",
+  "(stale)": "(stale)",
+  "+{n} more": {
+   "one": "+{n} more",
+   "other": "+{n} more"
+  },
+  "+{n} resolved": {
+   "one": "+{n} resolved",
+   "other": "+{n} resolved"
+  },
+  "A new version is running.": "A new version is running.",
+  "A search runs only when you press Enter or Search; each one spends about 1 point of the hourly API budget of {provider}.": "A search runs only when you press Enter or Search; each one spends about 1 point of the hourly API budget of {provider}.",
+  "API budget {remaining} of {limit} left": "API budget {remaining} of {limit} left",
+  "Action not sent": "Action not sent",
+  "Actions": "Actions",
+  "Acts on": "Acts on",
+  "Agent asks": "Agent asks",
+  "Agent recommends: {answer}": "Agent recommends: {answer}",
+  "Agent stopped": "Agent stopped",
+  "Aging work in progress": "Aging work in progress",
+  "All areas": "All areas",
+  "All keys": "All keys",
+  "Also send to the conversation": "Also send to the conversation",
+  "An answer approves a draft: open the question's task to see it before you answer.": "An answer approves a draft: open the question's task to see it before you answer.",
+  "An open question decides this draft: answer it on its task.": "An open question decides this draft: answer it on its task.",
+  "Answer": "Answer",
+  "Answer in your own words": "Answer in your own words",
+  "Answer not sent": "Answer not sent",
+  "Answer queued": "Answer queued",
+  "Approved": "Approved",
+  "Approves draft #{id} at rev {rev}:": "Approves draft #{id} at rev {rev}:",
+  "Approves draft #{id}, which is gone.": "Approves draft #{id}, which is gone.",
+  "Area": "Area",
+  "Area...": "Area...",
+  "Ascending": "Ascending",
+  "Ask for something else, or add a note to the choice above": "Ask for something else, or add a note to the choice above",
+  "Ask you to decide": "Ask you to decide",
+  "Asking the agent...": "Asking the agent...",
+  "Asks": "Asks",
+  "Authors": "Authors",
+  "Automatic rounds paused": "Automatic rounds paused",
+  "Automatic rounds resumed": "Automatic rounds resumed",
+  "Back": "Back",
+  "Back to the home": "Back to the home",
+  "Backlog dashboard": "Backlog dashboard",
+  "Blocked": "Blocked",
+  "Board": "Board",
+  "Brief": "Brief",
+  "Brief failed. It is tried again later.": "Brief failed. It is tried again later.",
+  "Brief failed: {error}. It is tried again later.": "Brief failed: {error}. It is tried again later.",
+  "Brief pending": "Brief pending",
+  "Brief quota resets": "Brief quota resets",
+  "Brief retry": "Brief retry",
+  "Briefing": "Briefing",
+  "Briefs resume": "Briefs resume",
+  "CI failing": "CI failing",
+  "Cancel": "Cancel",
+  "Candidates": "Candidates",
+  "Capture": "Capture",
+  "Capture a task": "Capture a task",
+  "Capture: {title}": "Capture: {title}",
+  "Card": "Card",
+  "Cause": "Cause",
+  "Changed files by whom it waits on": "Changed files by whom it waits on",
+  "Changed since you saw it": "Changed since you saw it",
+  "Changes asked": "Changes asked",
+  "Children": "Children",
+  "Classify it with an agent call": "Classify it with an agent call",
+  "Clear": "Clear",
+  "Clear filters": "Clear filters",
+  "Click a chart to filter; Alt+click to exclude.": "Click a chart to filter; Alt+click to exclude.",
+  "Close": "Close",
+  "Close detail": "Close detail",
+  "Close the agent session": "Close the agent session",
+  "Close the question; the pull request goes back to whoever it waits on": "Close the question; the pull request goes back to whoever it waits on",
+  "Close without a message": "Close without a message",
+  "Confirm": "Confirm",
+  "Continue": "Continue",
+  "Controls": "Controls",
+  "Copied a link to this view": "Copied a link to this view",
+  "Copied {n} candidates as YAML.": {
+   "one": "Copied {n} candidate as YAML.",
+   "other": "Copied {n} candidates as YAML."
+  },
+  "Copy": "Copy",
+  "Copy a link to this view": "Copy a link to this view",
+  "Copy command: {command}": "Copy command: {command}",
+  "Copy list": "Copy list",
+  "Copy the command that resumes this session": "Copy the command that resumes this session",
+  "Copy the items shown here, in this order, as YAML, to paste for an agent": "Copy the items shown here, in this order, as YAML, to paste for an agent",
+  "Copy these candidates as YAML, to paste for an agent": "Copy these candidates as YAML, to paste for an agent",
+  "Copy this text": "Copy this text",
+  "Could not copy: {error}": "Could not copy: {error}",
+  "Could not list the tasks: {error}": "Could not list the tasks: {error}",
+  "Could not load the Outbox: {error}": "Could not load the Outbox: {error}",
+  "Could not load the actions: {error}": "Could not load the actions: {error}",
+  "Could not load the areas: {error}": "Could not load the areas: {error}",
+  "Could not load the home: {error}": "Could not load the home: {error}",
+  "Could not load the keys: {error}": "Could not load the keys: {error}",
+  "Could not load the plan: {error}": "Could not load the plan: {error}",
+  "Could not load the queue: {error}": "Could not load the queue: {error}",
+  "Could not load the recent activity: {error}": "Could not load the recent activity: {error}",
+  "Could not load the review: {error}": "Could not load the review: {error}",
+  "Could not load the task: {error}": "Could not load the task: {error}",
+  "Could not load the timeline: {error}": "Could not load the timeline: {error}",
+  "Could not load the transcript: {error}": "Could not load the transcript: {error}",
+  "Could not load the {plugin} view: {error}": "Could not load the {plugin} view: {error}",
+  "Could not load the {step} step: {error}": "Could not load the {step} step: {error}",
+  "Could not load the {view} list: {error}": "Could not load the {view} list: {error}",
+  "Could not reach the daemon: {error}": "Could not reach the daemon: {error}",
+  "Counts": "Counts",
+  "Cut": "Cut",
+  "Daemon not answering: {error}": "Daemon not answering: {error}",
+  "Decision queue": "Decision queue",
+  "Descending": "Descending",
+  "Detail": "Detail",
+  "Details": "Details",
+  "Dismiss": "Dismiss",
+  "Dismiss the agent's open turn": "Dismiss the agent's open turn",
+  "Don't nudge this conversation": "Don't nudge this conversation",
+  "Draft": "Draft",
+  "Draft a message you approve before it posts": "Draft a message you approve before it posts",
+  "Draft text": "Draft text",
+  "Draft {id} approved; it goes out in a moment": "Draft {id} approved; it goes out in a moment",
+  "Draft {id} saved to the Outbox for your approval": "Draft {id} saved to the Outbox for your approval",
+  "Draft {purpose}": "Draft {purpose}",
+  "Due in 24h": "Due in 24h",
+  "Edit": "Edit",
+  "Empty": "Empty",
+  "Enter keeps, Esc clears": "Enter keeps, Esc clears",
+  "Enter marks the step done; ] and [ move between steps": "Enter marks the step done; ] and [ move between steps",
+  "Enter runs, Esc closes": "Enter runs, Esc closes",
+  "Enter sends, Esc cancels": "Enter sends, Esc cancels",
+  "Enter session": "Enter session",
+  "Everywhere": "Everywhere",
+  "Explore failed: {error}": "Explore failed: {error}",
+  "Explore it": "Explore it",
+  "Explore pull requests": "Explore pull requests",
+  "Failing checks": "Failing checks",
+  "Filter": "Filter",
+  "Filter is:{flag}; Alt+click excludes": "Filter is:{flag}; Alt+click excludes",
+  "Filter the list": "Filter the list",
+  "Filter, group and sort": "Filter, group and sort",
+  "Filter, group and sort the tasks": "Filter, group and sort the tasks",
+  "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
+  "Filters": "Filters",
+  "Flow stage": "Flow stage",
+  "Forget the workspace whose folder is gone": "Forget the workspace whose folder is gone",
+  "Forward": "Forward",
+  "Group": "Group",
+  "Group by...": "Group by...",
+  "Grouped by": "Grouped by",
+  "Grouped by {field}: {n} groups": {
+   "one": "Grouped by {field}: {n} group",
+   "other": "Grouped by {field}: {n} groups"
+  },
+  "Guidance": "Guidance",
+  "Guidance for the action you pick (optional)": "Guidance for the action you pick (optional)",
+  "Guidance for the next round (optional)": "Guidance for the next round (optional)",
+  "Guidance for the pending round": "Guidance for the pending round",
+  "Guidance for the pending round; {action} sends it at once": "Guidance for the pending round; {action} sends it at once",
+  "Guidance for {workflow} on {item}": "Guidance for {workflow} on {item}",
+  "Guide trimmed over the judgment limit: {blocks}": "Guide trimmed over the judgment limit: {blocks}",
+  "Held by the cap": "Held by the cap",
+  "Hide Others": "Hide Others",
+  "Hide {name}": "Hide {name}",
+  "Home": "Home",
+  "In a question": "In a question",
+  "In a queue": "In a queue",
+  "In loop": "In loop",
+  "In scope as": "In scope as",
+  "In the detail": "In the detail",
+  "In the plan": "In the plan",
+  "In the review": "In the review",
+  "Include done": "Include done",
+  "Intake {seq} ({intent}) waits for the brief": "Intake {seq} ({intent}) waits for the brief",
+  "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "Intake {seq} ({intent}) waits for the brief, attempt {attempt}",
+  "It changed since the question pinned it and is now at rev {rev}: below is what it says now.": "It changed since the question pinned it and is now at rev {rev}: below is what it says now.",
+  "Items": "Items",
+  "Keep it": "Keep it",
+  "Kept {n} with details": {
+   "one": "Kept {n} with details",
+   "other": "Kept {n} with details"
+  },
+  "Kept {n}: {list}.": {
+   "one": "Kept {n}: {list}.",
+   "other": "Kept {n}: {list}."
+  },
+  "Keys": "Keys",
+  "Keys (Esc closes)": "Keys (Esc closes)",
+  "Kinds": "Kinds",
+  "Last error: {error}": "Last error: {error}",
+  "Last message": "Last message",
+  "Layout": "Layout",
+  "List": "List",
+  "Lists": "Lists",
+  "Load and spend": "Load and spend",
+  "Loading the activity.": "Loading the activity.",
+  "Loading the home...": "Loading the home...",
+  "Loading the inventory.": "Loading the inventory.",
+  "Loading the plan.": "Loading the plan.",
+  "Loading the queue...": "Loading the queue...",
+  "Loading the task.": "Loading the task.",
+  "Loading the timeline.": "Loading the timeline.",
+  "Loading {plugin}": "Loading {plugin}",
+  "Loading {plugin}: {reason}": "Loading {plugin}: {reason}",
+  "Loading.": "Loading.",
+  "Loop only": "Loop only",
+  "Mark done": "Mark done",
+  "Mark the agent session dormant": "Mark the agent session dormant",
+  "Merge conflicts": "Merge conflicts",
+  "Merged from": "Merged from",
+  "Message": "Message",
+  "Minimize": "Minimize",
+  "More {n}": "More {n}",
+  "Mute ends": "Mute ends",
+  "Need me": "Need me",
+  "Next": "Next",
+  "Next 72 hours": "Next 72 hours",
+  "Next attempt at {time}": "Next attempt at {time}",
+  "Next up": "Next up",
+  "No": "No",
+  "No agent here can answer from the omnibox: {error}": "No agent here can answer from the omnibox: {error}",
+  "No area": "No area",
+  "No data for this filter yet.": "No data for this filter yet.",
+  "No loop events in the recent activity.": "No loop events in the recent activity.",
+  "No task holds the text": "No task holds the text",
+  "Not applied in Recent": "Not applied in Recent",
+  "Not offered here": "Not offered here",
+  "Not synced yet": "Not synced yet",
+  "Nothing happened in the inventory yet.": "Nothing happened in the inventory yet.",
+  "Nothing here matches \"{query}\".": "Nothing here matches \"{query}\".",
+  "Nothing here right now.": "Nothing here right now.",
+  "Nothing here yet.": "Nothing here yet.",
+  "Nothing in {view} matches \"{filter}\".": "Nothing in {view} matches \"{filter}\".",
+  "Nothing in {view} matches \"{query}\".": "Nothing in {view} matches \"{query}\".",
+  "Nothing in {view} right now.": "Nothing in {view} right now.",
+  "Nothing left in this list.": "Nothing left in this list.",
+  "Nothing left in this queue.": "Nothing left in this queue.",
+  "Nothing matches": "Nothing matches",
+  "Nothing pending or blocked in the plan.": "Nothing pending or blocked in the plan.",
+  "Nothing was typed.": "Nothing was typed.",
+  "Notify you": "Notify you",
+  "On the selection": "On the selection",
+  "Only {group}": "Only {group}",
+  "Open": "Open",
+  "Open as a queue": "Open as a queue",
+  "Open cockpit": "Open cockpit",
+  "Open gates": "Open gates",
+  "Open in a window of its own": "Open in a window of its own",
+  "Open in {manager}": "Open in {manager}",
+  "Open in {name}": "Open in {name}",
+  "Open it": "Open it",
+  "Open it on {provider}": "Open it on {provider}",
+  "Open its task": "Open its task",
+  "Open the omnibox": "Open the omnibox",
+  "Open workspace": "Open workspace",
+  "Or answer in your own words": "Or answer in your own words",
+  "Order": "Order",
+  "PR URL, owner/repo, repo, login, @org/team or a search": "PR URL, owner/repo, repo, login, @org/team or a search",
+  "Past its threshold": "Past its threshold",
+  "Paste": "Paste",
+  "Pause automatic rounds": "Pause automatic rounds",
+  "Pending": "Pending",
+  "People holding the backlog": "People holding the backlog",
+  "Pick a sort to choose its direction": "Pick a sort to choose its direction",
+  "Plan": "Plan",
+  "Plan {n}": "Plan {n}",
+  "Plugin view": "Plugin view",
+  "Plugins": "Plugins",
+  "Posted": "Posted",
+  "Posted {time}": "Posted {time}",
+  "Posts nothing": "Posts nothing",
+  "Press ⌘↵ to ask the agent": "Press ⌘↵ to ask the agent",
+  "Previous": "Previous",
+  "Pull request URL, owner/repo, a repository or login, @org/team or a search": "Pull request URL, owner/repo, a repository or login, @org/team or a search",
+  "Pull request age": "Pull request age",
+  "Pull requests": "Pull requests",
+  "Quit {name}": "Quit {name}",
+  "Reaction": "Reaction",
+  "Read all": "Read all",
+  "Recent": "Recent",
+  "Recent activity": "Recent activity",
+  "Redo": "Redo",
+  "Refuse a queued answer whose route is gone": "Refuse a queued answer whose route is gone",
+  "Related": "Related",
+  "Reload": "Reload",
+  "Remove all clean": "Remove all clean",
+  "Remove filter {label}": "Remove filter {label}",
+  "Remove the workspace": "Remove the workspace",
+  "Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.": {
+   "one": "Remove the workspaces of the {n} task in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.",
+   "other": "Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept."
+  },
+  "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished": "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished",
+  "Remove this filter ({filter})": "Remove this filter ({filter})",
+  "Removed {n}.": {
+   "one": "Removed {n}.",
+   "other": "Removed {n}."
+  },
+  "Removed {n}: {list}.": {
+   "one": "Removed {n}: {list}.",
+   "other": "Removed {n}: {list}."
+  },
+  "Replace the queued answer": "Replace the queued answer",
+  "Reply": "Reply",
+  "Reply not saved": "Reply not saved",
+  "Reply on {unit} failed: {error}": "Reply on {unit} failed: {error}",
+  "Reply saved to the Outbox": "Reply saved to the Outbox",
+  "Reply sent": "Reply sent",
+  "Repositories (color: share stalled)": "Repositories (color: share stalled)",
+  "Repository": "Repository",
+  "Resize the detail panel": "Resize the detail panel",
+  "Resolve its open items as {resolution}": "Resolve its open items as {resolution}",
+  "Results": "Results",
+  "Resume automatic rounds": "Resume automatic rounds",
+  "Resume:": "Resume:",
+  "Review": "Review",
+  "Review done.": "Review done.",
+  "Review done. A new one starts the next time you open it.": "Review done. A new one starts the next time you open it.",
+  "Review steps": "Review steps",
+  "Risk": "Risk",
+  "Risk: {risk}": "Risk: {risk}",
+  "Round blocked": "Round blocked",
+  "Round sends": "Round sends",
+  "Run": "Run",
+  "Run {n}": {
+   "one": "Run {n}",
+   "other": "Run {n}"
+  },
+  "Run {verb} on the task": "Run {verb} on the task",
+  "Run {verb} on the task, with “{task}”": "Run {verb} on the task, with “{task}”",
+  "Runs": "Runs",
+  "Save as draft": "Save as draft",
+  "Save to Outbox": "Save to Outbox",
+  "Search": "Search",
+  "Search or ask": "Search or ask",
+  "Search, paste a link, or ask": "Search, paste a link, or ask",
+  "Searching {provider}…": "Searching {provider}…",
+  "Sections": "Sections",
+  "See all {n}": {
+   "one": "See all {n}",
+   "other": "See all {n}"
+  },
+  "Select All": "Select All",
+  "Send": "Send",
+  "Send answer": "Send answer",
+  "Send now": "Send now",
+  "Send reply": "Send reply",
+  "Send the text as your answer: typed in the agent's session when it is there, else a new session resumes the turn with it": "Send the text as your answer: typed in the agent's session when it is there, else a new session resumes the turn with it",
+  "Sending failed: {error}": "Sending failed: {error}",
+  "Sending to {task}…": "Sending to {task}…",
+  "Sends at {time} unless you decide first": "Sends at {time} unless you decide first",
+  "Sent to {task}": "Sent to {task}",
+  "Sessions closed in the last day ({n})": "Sessions closed in the last day ({n})",
+  "Set {prop} to {value}": "Set {prop} to {value}",
+  "Show All": "Show All",
+  "Show all, not only {group}": "Show all, not only {group}",
+  "Size": "Size",
+  "Size × risk, and type": "Size × risk, and type",
+  "Slow sync: the API budget is low until {time}": "Slow sync: the API budget is low until {time}",
+  "Sort": "Sort",
+  "Sort by...": "Sort by...",
+  "Sorted ascending; click to flip": "Sorted ascending; click to flip",
+  "Sorted by": "Sorted by",
+  "Sorted descending; click to flip": "Sorted descending; click to flip",
+  "Stalled": "Stalled",
+  "Start an agent turn: {intent}": "Start an agent turn: {intent}",
+  "Start in {repo}: {brief}": "Start in {repo}: {brief}",
+  "Start: {brief}": "Start: {brief}",
+  "Stop drafting these": "Stop drafting these",
+  "Stop this workflow": "Stop this workflow",
+  "Stopped {workflow}": "Stopped {workflow}",
+  "Store needs attention: {why}": "Store needs attention: {why}",
+  "Sweep now": "Sweep now",
+  "Synced {time}": "Synced {time}",
+  "Tag concentration": "Tag concentration",
+  "Tag key": "Tag key",
+  "Tags": "Tags",
+  "Tags over-represented among stalled": "Tags over-represented among stalled",
+  "Task {task} has no unit to act on": "Task {task} has no unit to act on",
+  "Tasks": "Tasks",
+  "Tell the agent what to do next": "Tell the agent what to do next",
+  "That link could not be read, so the default view opened": "That link could not be read, so the default view opened",
+  "The agent could not answer: {error}": "The agent could not answer: {error}",
+  "The agent gets it once its session is free. An answer sent now replaces it.": "The agent gets it once its session is free. An answer sent now replaces it.",
+  "The agent goes on with the turn without an answer": "The agent goes on with the turn without an answer",
+  "The agent took too long to answer; nothing changed": "The agent took too long to answer; nothing changed",
+  "The charts library did not load; reload the page.": "The charts library did not load; reload the page.",
+  "The newest events of every unit the loop follows": "The newest events of every unit the loop follows",
+  "The recent activity could not be loaded.": "The recent activity could not be loaded.",
+  "The workflows' plan": "The workflows' plan",
+  "This daemon runs no omnibox agent": "This daemon runs no omnibox agent",
+  "This draft changed since you began editing it; your edit replaces what it says now:": "This draft changed since you began editing it; your edit replaces what it says now:",
+  "This notification offers no {action}": "This notification offers no {action}",
+  "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off": "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off",
+  "Timeline": "Timeline",
+  "Title": "Title",
+  "To": "To",
+  "To confirm": "To confirm",
+  "Today": "Today",
+  "Today's spend cap for agent calls is reached; ask again tomorrow": "Today's spend cap for agent calls is reached; ask again tomorrow",
+  "Tokens per pull request": "Tokens per pull request",
+  "Transcript": "Transcript",
+  "Type what to ask the agent": "Type what to ask the agent",
+  "US$ spent per pull request": "US$ spent per pull request",
+  "Undo": "Undo",
+  "Until {time}": "Until {time}",
+  "Views": "Views",
+  "Waiting on": "Waiting on",
+  "Waiting on whom": "Waiting on whom",
+  "Waiting on you": "Waiting on you",
+  "Waiting time by size and risk": "Waiting time by size and risk",
+  "What blocks": "What blocks",
+  "What the workflows will do, and what waits for you to apply it": "What the workflows will do, and what waits for you to apply it",
+  "What waits on you, and what stalled the longest": "What waits on you, and what stalled the longest",
+  "Where you are": "Where you are",
+  "Why it fired": "Why it fired",
+  "Why it was proposed: {why}": "Why it was proposed: {why}",
+  "Why these tasks?": "Why these tasks?",
+  "Window": "Window",
+  "Workspace": "Workspace",
+  "Write a message first": "Write a message first",
+  "Write a reply or name a reaction first": "Write a reply or name a reaction first",
+  "Write to the agent": "Write to the agent",
+  "Yes": "Yes",
+  "Yesterday": "Yesterday",
+  "Your answer": "Your answer",
+  "Your answer is queued": "Your answer is queued",
+  "Your reply": "Your reply",
+  "Zoom": "Zoom",
+  "a duration such as {example}": "a duration such as {example}",
+  "a newer release wrote it": "a newer release wrote it",
+  "a store command is running": "a store command is running",
+  "a visible step waits for you": "a step posts where others see it, so it waits for you",
+  "a y typed together with the key before it does not confirm": "a y typed together with the key before it does not confirm",
+  "accepted as intake {n}": "accepted as intake {n}",
+  "actions": "actions",
+  "actions not refreshed: {error}": "actions not refreshed: {error}",
+  "added to {name}": "added to {name}",
+  "adding it to {name} failed": "adding it to {name} failed",
+  "adding it to {name}…": "adding it to {name}…",
+  "adopted": "adopted",
+  "agent": "agent",
+  "all": "all",
+  "ambiguous_ref": "{ref} names more than one unit or task",
+  "answer": "answer",
+  "answer queued; the agent session is told of it when the agent stops": "answer queued; the agent session is told of it when the agent stops",
+  "answer {task}: {n}. {answer}?": "answer {task}: {n}. {answer}?",
+  "any key closes": "any key closes",
+  "approves draft #{id}": "approves draft #{id}",
+  "area {area}": "area {area}",
+  "area: {area}": "area: {area}",
+  "artifact": "artifact",
+  "ask": "ask",
+  "asks": "asks",
+  "asks {who}": "asks {who}",
+  "at {time}": "at {time}",
+  "attempt {n}: {error}": "attempt {n}: {error}",
+  "automatic rounds paused": "automatic rounds paused",
+  "blocked": "blocked",
+  "brief": "brief",
+  "brief quota": "brief quota",
+  "briefs unavailable since {time}: {error}": "briefs unavailable since {time}: {error}",
+  "briefs unavailable: {why}": "briefs unavailable: {why}",
+  "by": "by",
+  "by {who}": "by {who}",
+  "cancelled": "cancelled",
+  "capture": "capture",
+  "capture cancelled: nothing typed": "capture cancelled: nothing typed",
+  "capture failed: {error}": "capture failed: {error}",
+  "captured: {title}": "captured: {title}",
+  "changed": "changed",
+  "checks": "checks",
+  "checks {state}": "checks {state}",
+  "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest": "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest",
+  "config.toml does not load, so the running config stays: {error}": "config.toml does not load, so the running config stays: {error}",
+  "connecting": "connecting",
+  "cooling down for {duration}": "its workflow ran on this less than {duration} ago",
+  "copied the resume line of {session}": "copied the resume line of {session}",
+  "cost {cost}, {remaining} of {limit} left": "cost {cost}, {remaining} of {limit} left",
+  "could not copy the resume line of {session}: {error}": "could not copy the resume line of {session}: {error}",
+  "decision": "decision",
+  "delegate {task}: {question} (no agent session: {reason})": "delegate {task}: {question} (no agent session: {reason})",
+  "delegate {task}: {question} ({key}: hand to an agent)": "delegate {task}: {question} ({key}: hand to an agent)",
+  "destination unknown": "destination unknown",
+  "detail of {task} not loaded: {error}": "detail of {task} not loaded: {error}",
+  "discard the draft to {target}?": "discard the draft to {target}?",
+  "disconnected": "disconnected",
+  "disconnected: run `{command} open`": "disconnected: run `{command} open`",
+  "draft": "draft",
+  "draft {n} picked: a approves, i edits, {back} discards, {esc} lets go": "draft {n} picked: a approves, i edits, {back} discards, {esc} lets go",
+  "drafted {verdict}, {blocking} blocking, {nonBlocking} non-blocking": "drafted {verdict}, {blocking} blocking, {nonBlocking} non-blocking",
+  "drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking": "drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking",
+  "drafts": "drafts",
+  "edit the draft to {target} ({key}: editor)": "edit the draft to {target} ({key}: editor)",
+  "edited": "edited",
+  "empty: until it changes": "empty: until it changes",
+  "error": "error",
+  "every area": "every area",
+  "failed at {steps}": "failed at {steps}",
+  "failed {n} times: {error}": "failed {n} times: {error}",
+  "failing: {checks}": "failing: {checks}",
+  "filter": "filter",
+  "filter {text} (Esc clears)": "filter {text} (Esc clears)",
+  "filtered counts not refreshed: {error}": "filtered counts not refreshed: {error}",
+  "frees": "frees",
+  "from {origin}": "from {origin}",
+  "from {who}": "from {who}",
+  "gate": "gate",
+  "group": "group",
+  "guidance is {length} characters, the limit is {max}": "guidance is {length} characters, the limit is {max}",
+  "guided by you": "guided by you",
+  "hand {task} to an agent: {question} ({key}: draft for me)": "hand {task} to an agent: {question} ({key}: draft for me)",
+  "in the Inbox as {task}": "in the Inbox as {task}",
+  "in {manager}": "in {manager}",
+  "incomplete_operation": "The agent proposed {op} without what it needs",
+  "instant": "instant",
+  "intake {n} is already starting the turn; this request changed nothing": "intake {n} is already starting the turn; this request changed nothing",
+  "it has no workspace to find its terminal in: dismiss this": "it has no workspace to find its terminal in: dismiss this",
+  "it left the plan since it was planned": "it left the plan since it was planned",
+  "it needs a migration": "it needs a migration",
+  "it no longer matches since it was planned": "it no longer matches since it was planned",
+  "it waits for you since it was planned": "it waits for you since it was planned",
+  "it was acted on since it was planned": "you acted on it since it was planned",
+  "it was dismissed since it was planned": "it was dismissed since it was planned",
+  "it was done since it was planned": "it ran since it was planned",
+  "its migration failed": "its migration failed",
+  "its process changed while it was being closed": "its process changed while it was being closed",
+  "its process is no longer the orphan the census proved": "its process is no longer the orphan the census proved",
+  "its process is not proven a lasting orphan": "its process is not proven a lasting orphan",
+  "its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold": "its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold",
+  "its source moved since it was planned": "its source changed since it was planned",
+  "its terminal is closed; it ends on its own": "its terminal is closed; it ends on its own",
+  "its terminal is open with no agent in it: close that terminal, or dismiss this": "its terminal is open with no agent in it: close that terminal, or dismiss this",
+  "its unit changed since it was planned": "what it acts on changed since it was planned",
+  "its unit has no link": "its unit has no link",
+  "joined intake {n}": "joined intake {n}",
+  "just now": "just now",
+  "keys": "keys",
+  "last refresh failed: {error}": "last refresh failed: {error}",
+  "last: {who} {what}": "last: {who} {what}",
+  "limit per_day {n} reached": "its workflow ran {n} times today, its limit",
+  "limit per_run {n} reached": "its workflow ran {n} times this sweep, its limit",
+  "limit per_unit_per_day {n} reached": "its workflow ran {n} times today on this, its limit",
+  "listing the tasks…": "listing the tasks…",
+  "load the detail": "load the detail",
+  "loading {parts}": "loading {parts}",
+  "loading…": "loading…",
+  "marking {step} done failed: {error}": "marking {step} done failed: {error}",
+  "matched": "matched",
+  "me": "me",
+  "message": "message",
+  "more…": "more…",
+  "move": "move",
+  "muted until who it waits on changes": "muted until who it waits on changes",
+  "muted until {time}": "muted until {time}",
+  "my review: {review}": "my review: {review}",
+  "my review: {review} (older head)": "my review: {review} (older head)",
+  "next step": "next step",
+  "no": "no",
+  "no US$ cost recorded": "no US$ cost recorded",
+  "no answer on {task}": "no answer on {task}",
+  "no area {n}": "no area {n}",
+  "no brief": "no brief",
+  "no checks": "no checks",
+  "no clipboard took it; copy it from the screen": "no clipboard took it; copy it from the screen",
+  "no draft on screen to {verb}": "no draft on screen to {verb}",
+  "no draft {n}": "no draft {n}",
+  "no editor here: type the text on the bottom line": "no editor here: type the text on the bottom line",
+  "no open question on {task}": "no open question on {task}",
+  "no option {n}": "no option {n}",
+  "no owner": "no owner",
+  "no task holds the text": "no task holds the text",
+  "no {action} on {task}": "no {action} on {task}",
+  "no {plugin} views: the plugin is disabled or not loaded": "no {plugin} views: the plugin is disabled or not loaded",
+  "no {view} view here": "no {view} view here",
+  "no_unit_or_task": "No unit or task is {ref}",
+  "none": "none",
+  "not in {name}": "not in {name}",
+  "not now": "not now",
+  "not offered here": "not offered here",
+  "not offered on a draft": "not offered on a draft",
+  "not opening {link}: only https links open": "not opening {link}: only https links open",
+  "not synced yet": "not synced yet",
+  "notes": "notes",
+  "nothing_named": "Name what to run {verb} on",
+  "now": "now",
+  "observe": "observe",
+  "observe mode": "its workflow only observes: nothing runs until you apply it",
+  "only this": "only this",
+  "open": "open",
+  "open a draft, or pick one with its digit, to edit it": "open a draft, or pick one with its digit, to edit it",
+  "open the draft to {verb} it (Enter)": "open the draft to {verb} it (Enter)",
+  "open the source": "open the source",
+  "opened {b} ago: {c}": "opened {b} ago: {c}",
+  "opening links is not supported here": "opening links is not supported here",
+  "or": "or",
+  "or a reaction, such as eyes": "or a reaction, such as eyes",
+  "out of scope": "out of scope",
+  "outside_vocabulary": "No omnibox verb runs {name}",
+  "owed by": "owed by",
+  "parent": "parent",
+  "pause failed: {error}": "pause failed: {error}",
+  "paused": "paused",
+  "paused since it was planned": "paused since it was planned",
+  "plan not loaded: {error}": "plan not loaded: {error}",
+  "plugin disabled": "plugin disabled",
+  "plugin disabled, read-only": "plugin disabled, read-only",
+  "post again to {target}?": "post again to {target}?",
+  "post to {target} now?": "post to {target} now?",
+  "post to {target}?": "post to {target}?",
+  "previous step": "previous step",
+  "quit": "quit",
+  "reaction": "reaction",
+  "recommended": "recommended",
+  "reconnecting": "reconnecting",
+  "refreshing": "refreshing",
+  "remove all clean failed: {error}": "remove all clean failed: {error}",
+  "resolved": "resolved",
+  "resolved as answered": "answered",
+  "resolved as declined": "declined",
+  "resolved as delegated": "delegated",
+  "resolved as dismissed": "dismissed",
+  "resolved as done": "done",
+  "resolved as fixed": "fixed",
+  "resolved as moot": "no longer relevant",
+  "resolved as superseded": "superseded",
+  "resume failed: {error}": "resume failed: {error}",
+  "resume: {command}": "resume: {command}",
+  "retrying after {error}": "retrying after {error}",
+  "review not refreshed: {error}": "review not refreshed: {error}",
+  "risk {risk}": "risk {risk}",
+  "round in {time}": "round in {time}",
+  "run": "run",
+  "run_conflict": "It did not run: it changed meanwhile",
+  "run_failed": "It did not run",
+  "run_forbidden": "It did not run: not allowed from here",
+  "run_invalid": "It did not run: the request was not valid",
+  "run_not_found": "It did not run: it no longer exists",
+  "run_unavailable": "It did not run: not available right now",
+  "running": "running",
+  "running actions to wait for: {n}; q again leaves without them": "running actions to wait for: {n}; q again leaves without them",
+  "runs at {time}": "runs at {time}",
+  "runs in {minutes}m {seconds}s": "runs in {minutes}m {seconds}s",
+  "runs in {seconds} s": "runs in {seconds} s",
+  "runs in {time}": "runs in {time}",
+  "runs now": "runs now",
+  "runs when its window ends": "runs when its window ends",
+  "sends": "sends",
+  "sends {time}": "sends {time}",
+  "session": "session",
+  "session {state}": "session {state}",
+  "show all": "show all",
+  "since the last activity": "since the last activity",
+  "since {time}": "since {time}",
+  "size {size}": "size {size}",
+  "size {size}, risk {risk}: {n}": "size {size}, risk {risk}: {n}",
+  "slow sync": "slow sync",
+  "sort": "sort",
+  "source": "source",
+  "stalled": "stalled",
+  "state": "state",
+  "status": "status",
+  "step done": "step done",
+  "steps": "steps",
+  "stopped": "stopped",
+  "suspend is not supported here": "suspend is not supported here",
+  "synced {ago}": "synced {ago}",
+  "syncing": "syncing",
+  "tasks not listed: {error}": "tasks not listed: {error}",
+  "tasks not refreshed: {error}": "tasks not refreshed: {error}",
+  "text": "text",
+  "the action does not run a session": "the action does not run a session",
+  "the agent stopped": "the agent stopped",
+  "the review is done": "the review is done",
+  "the task holds no open item": "the task holds no open item",
+  "the task is not derived from items: its items do not close it": "the task is not derived from items: its items do not close it",
+  "this answer approves draft #{id}, which this view does not show: open its task to see it": "this answer approves draft #{id}, which this view does not show: open its task to see it",
+  "this page is older than {name}'s daemon; reload this page": "this page is older than {name}'s daemon; reload this page",
+  "to": "to",
+  "to ask the agent": "to ask the agent",
+  "to close": "to close",
+  "to navigate": "to navigate",
+  "to open": "to open",
+  "type to narrow, Enter picks, Esc closes": "type to narrow, Enter picks, Esc closes",
+  "type {type}": "type {type}",
+  "unclaimed_address": "No plugin recognizes {address}",
+  "unit": "unit",
+  "unknown": "unknown",
+  "unknown error": "unknown error",
+  "unknown_operation": "The omnibox does not run {op}",
+  "unknown_task": "No task {id} exists",
+  "unknown_unit": "No task holds {unit}",
+  "until {time}": "until {time}",
+  "untracked it again": "untracked it again",
+  "untracking it failed too: {error}": "untracking it failed too: {error}",
+  "view": "view",
+  "wait": "wait",
+  "waiting": "waiting",
+  "waiting on {who}": "waiting on {who}",
+  "waiting on {who} for {age} · in {name} as {reasons}": "waiting on {who} for {age} · in {name} as {reasons}",
+  "waiting {time}": "waiting {time}",
+  "waits for you": "waits for you",
+  "waits for you while {facts}": "waits for you while {facts}",
+  "waits for you while {facts}: {refusal}": "waits for you while {facts}: {refusal}",
+  "waits {time} on {who}": "waits {time} on {who}",
+  "wakes {time}": "wakes {time}",
+  "warning: {warning}": "warning: {warning}",
+  "warning: {warning} (+{n} more)": "warning: {warning} (+{n} more)",
+  "why": "why",
+  "workflow": "workflow",
+  "working days": "working days",
+  "workspace": "workspace",
+  "y confirms, any other key cancels": "y confirms, any other key cancels",
+  "y yes · n no": "y yes · n no",
+  "yes": "yes",
+  "you": "you",
+  "your answer is queued until the agent's session is free; an answer now replaces it": "your answer is queued until the agent's session is free; an answer now replaces it",
+  "{action} ({key})": "{action} ({key})",
+  "{action} answered nothing to copy": "{action} answered nothing to copy",
+  "{action} at {time} unless you pick another": "{action} at {time} unless you pick another",
+  "{action} done: {unit}": "{action} done: {unit}",
+  "{action} failed": "{action} failed",
+  "{action} failed: {error}": "{action} failed: {error}",
+  "{action} on {unit}": "{action} on {unit}",
+  "{action} running…": "{action} running…",
+  "{action} sent": "{action} sent",
+  "{action} started; it is in {name} now": "{action} started; it is in {name} now",
+  "{action} {task} failed: {error}": "{action} {task} failed: {error}",
+  "{action} {task} still running": "{action} {task} still running",
+  "{action} {task}: done": "{action} {task}: done",
+  "{action} {task}: {result}": "{action} {task}: {result}",
+  "{action} {unit}: accepted as intake {seq}": "{action} {unit}: accepted as intake {seq}",
+  "{action} {unit}: intake {seq} is already starting the turn; this request changed nothing": "{action} {unit}: intake {seq} is already starting the turn; this request changed nothing",
+  "{action} {unit}: joined intake {seq}": "{action} {unit}: joined intake {seq}",
+  "{action} {unit}: {why}; {undone}": "{action} {unit}: {why}; {undone}",
+  "{action}: write the answer first": "{action}: write the answer first",
+  "{action}: {reason}": "{action}: {reason}",
+  "{address} is not in {views}; {command} shows it": "{address} is not in {views}; {command} shows it",
+  "{age} ago": "{age} ago",
+  "{answer} (from {source})": "{answer} (from {source})",
+  "{answer} (from {source}, queued until the agent stops)": "{answer} (from {source}, queued until the agent stops)",
+  "{count} for {query}": "{count} for {query}",
+  "{count}, the first {shown} of {total}; narrow the search for the rest for {query}": "{count}, the first {shown} of {total}; narrow the search for the rest for {query}",
+  "{count}, the {shown} {order} of {total}; narrow the search for the rest for {query}": "{count}, the {shown} {order} of {total}; narrow the search for the rest for {query}",
+  "{days}d": "{days}d",
+  "{days}d {hours}h": "{days}d {hours}h",
+  "{error}; run: {fix}": "{error}; run: {fix}",
+  "{field} is required": "{field} is required",
+  "{field}: not {values}": "{field}: not {values}",
+  "{field}: not {values} ×": "{field}: not {values} ×",
+  "{field}: {values}": "{field}: {values}",
+  "{field}: {values} ×": "{field}: {values} ×",
+  "{hours}h": "{hours}h",
+  "{hours}h {minutes}m": "{hours}h {minutes}m",
+  "{key}: no such key": "{key}: no such key",
+  "{kind}, {n} lines": {
+   "one": "{kind}, {n} line",
+   "other": "{kind}, {n} lines"
+  },
+  "{label}: {n} changed files": {
+   "one": "{label}: {n} changed file",
+   "other": "{label}: {n} changed files"
+  },
+  "{list} and {last}": "{list} and {last}",
+  "{list} or {last}": "{list} or {last}",
+  "{minutes} min": "{minutes} min",
+  "{minutes}m": "{minutes}m",
+  "{name} !": "{name} !",
+  "{name} ?": "{name} ?",
+  "{name} {n}": "{name} {n}",
+  "{name} {n} paused": "{name} {n} paused",
+  "{name}: terminal too small": "{name}: terminal too small",
+  "{n} comments": {
+   "one": "{n} comment",
+   "other": "{n} comments"
+  },
+  "{n} draft": {
+   "one": "{n} draft",
+   "other": "{n} drafts"
+  },
+  "{n} draft waits for you": {
+   "one": "{n} draft waits for you",
+   "other": "{n} drafts wait for you"
+  },
+  "{n} event": {
+   "one": "{n} event",
+   "other": "{n} events"
+  },
+  "{n} files": {
+   "one": "{n} file",
+   "other": "{n} files"
+  },
+  "{n} of {total}": "{n} of {total}",
+  "{n} open questions in the brief": {
+   "one": "{n} open question in the brief",
+   "other": "{n} open questions in the brief"
+  },
+  "{n} pull requests": {
+   "one": "{n} pull request",
+   "other": "{n} pull requests"
+  },
+  "{n} pull requests, median {median} working days, middle half {low}-{high}": {
+   "one": "{n} pull request, median {median} working days, middle half {low}-{high}",
+   "other": "{n} pull requests, median {median} working days, middle half {low}-{high}"
+  },
+  "{n} results": {
+   "one": "{n} result",
+   "other": "{n} results"
+  },
+  "{n} working days": {
+   "one": "{n} working day",
+   "other": "{n} working days"
+  },
+  "{n} working hours": {
+   "one": "{n} working hour",
+   "other": "{n} working hours"
+  },
+  "{pending} pending, {stalled} stalled": "{pending} pending, {stalled} stalled",
+  "{question} for {task}": "{question} for {task}",
+  "{question}, on {task}, held for approval ({tab}: send now; {editor}: editor)": "{question}, on {task}, held for approval ({tab}: send now; {editor}: editor)",
+  "{question}, on {task}, sent now ({tab}: hold for approval; {editor}: editor)": "{question}, on {task}, sent now ({tab}: hold for approval; {editor}: editor)",
+  "{risk} risk": "{risk} risk",
+  "{shown} of {total}": "{shown} of {total}",
+  "{size} of disk": "{size} of disk",
+  "{size} of memory": "{size} of memory",
+  "{source}'s message": "{source}'s message",
+  "{stalled} of {n} stalled, {lift}% against the backlog": "{stalled} of {n} stalled, {lift}% against the backlog",
+  "{step} is already done": "{step} is already done",
+  "{step}: done": "{step}: done",
+  "{task} has no source to open": "{task} has no source to open",
+  "{task}: the editor failed: {error}": "{task}: the editor failed: {error}",
+  "{time} unless you decide first": "{time} unless you decide first",
+  "{title}: type to narrow": "{title}: type to narrow",
+  "{tokens} tokens over {n} turns": {
+   "one": "{tokens} tokens over {n} turn",
+   "other": "{tokens} tokens over {n} turns"
+  },
+  "{unit} by {author} · opened {opened} · updated {updated}": "{unit} by {author} · opened {opened} · updated {updated}",
+  "{unit} is in the inventory.": "{unit} is in the inventory.",
+  "{unit} is not in the inventory.": "{unit} is not in the inventory.",
+  "{unit} is not in the rows.": "{unit} is not in the rows.",
+  "{verb} task {task}": "{verb} task {task}",
+  "{verb} {task} cancelled": "{verb} {task} cancelled",
+  "{verb} {task} cancelled: nothing typed": "{verb} {task} cancelled: nothing typed",
+  "{verb} {task} cancelled: nothing usable typed": "{verb} {task} cancelled: nothing usable typed",
+  "{verb} {task} failed: {error}": "{verb} {task} failed: {error}",
+  "{what} at {time}": "{what} at {time}"
+ },
+ "stringsPtBR": {
+  "\"state\" to wait until the situation changes": "\"state\" para esperar até a situação mudar",
+  "(stale)": "(desatualizado)",
+  "+{n} more": {
+   "one": "+{n} outra",
+   "other": "+{n} outras"
+  },
+  "+{n} resolved": {
+   "one": "+{n} resolvido",
+   "other": "+{n} resolvidos"
+  },
+  "A new version is running.": "Uma nova versão está rodando.",
+  "A search runs only when you press Enter or Search; each one spends about 1 point of the hourly API budget of {provider}.": "A busca só roda quando você aperta Enter ou Buscar; cada uma gasta cerca de 1 ponto da cota por hora do {provider}.",
+  "API budget {remaining} of {limit} left": "cota da API: restam {remaining} de {limit}",
+  "Action not sent": "Ação não enviada",
+  "Actions": "Ações",
+  "Acts on": "Age sobre",
+  "Agent asks": "O agente pergunta",
+  "Agent recommends: {answer}": "O agente recomenda: {answer}",
+  "Agent stopped": "Agente parado",
+  "Aging work in progress": "Trabalho em andamento envelhecendo",
+  "All areas": "Todas as áreas",
+  "All keys": "Todas as chaves",
+  "Also send to the conversation": "Também enviar na conversa",
+  "An answer approves a draft: open the question's task to see it before you answer.": "Uma resposta aprova um rascunho: abra a tarefa da pergunta para vê-lo antes de responder.",
+  "An open question decides this draft: answer it on its task.": "Uma pergunta em aberto decide este rascunho: responda-a na tarefa dela.",
+  "Answer": "Resposta",
+  "Answer in your own words": "Responder com suas palavras",
+  "Answer not sent": "Resposta não enviada",
+  "Answer queued": "Resposta na fila",
+  "Approved": "Aprovados",
+  "Approves draft #{id} at rev {rev}:": "Aprova o rascunho #{id} na revisão {rev}:",
+  "Approves draft #{id}, which is gone.": "Aprova o rascunho #{id}, que não existe mais.",
+  "Area": "Área",
+  "Area...": "Área...",
+  "Ascending": "Crescente",
+  "Ask for something else, or add a note to the choice above": "Peça outra coisa, ou acrescente uma nota à escolha acima",
+  "Ask you to decide": "Pedir que você decida",
+  "Asking the agent...": "Perguntando ao agente...",
+  "Asks": "Pedidos",
+  "Authors": "Autores",
+  "Automatic rounds paused": "Rodadas automáticas pausadas",
+  "Automatic rounds resumed": "Rodadas automáticas retomadas",
+  "Back": "Voltar",
+  "Back to the home": "Voltar ao início",
+  "Backlog dashboard": "Painel do backlog",
+  "Blocked": "Bloqueados",
+  "Board": "Quadro",
+  "Brief": "Brief",
+  "Brief failed. It is tried again later.": "O brief falhou. Uma nova tentativa é feita mais tarde.",
+  "Brief failed: {error}. It is tried again later.": "O brief falhou: {error}. Uma nova tentativa é feita mais tarde.",
+  "Brief pending": "Brief pendente",
+  "Brief quota resets": "Cota de briefs renova",
+  "Brief retry": "Nova tentativa do brief",
+  "Briefing": "Gerando o brief",
+  "Briefs resume": "Os briefs voltam",
+  "CI failing": "CI falhando",
+  "Cancel": "Cancelar",
+  "Candidates": "Candidatos",
+  "Capture": "Capturar",
+  "Capture a task": "Capturar uma tarefa",
+  "Capture: {title}": "Capturar: {title}",
+  "Card": "Card",
+  "Cause": "Causa",
+  "Changed files by whom it waits on": "Arquivos alterados por quem é esperado",
+  "Changed since you saw it": "Mudou desde que você viu",
+  "Changes asked": "Mudanças pedidas",
+  "Children": "Subtarefas",
+  "Classify it with an agent call": "Classificar com uma chamada ao agente",
+  "Clear": "Limpar",
+  "Clear filters": "Limpar filtros",
+  "Click a chart to filter; Alt+click to exclude.": "Clique num gráfico para filtrar; Alt+clique para excluir.",
+  "Close": "Fechar",
+  "Close detail": "Fechar detalhe",
+  "Close the agent session": "Fechar a sessão do agente",
+  "Close the question; the pull request goes back to whoever it waits on": "Fechar a pergunta; o pull request volta para quem ele espera",
+  "Close without a message": "Encerrar sem mensagem",
+  "Confirm": "Confirmar",
+  "Continue": "Continuar",
+  "Controls": "Controles",
+  "Copied a link to this view": "Link para esta visão copiado",
+  "Copied {n} candidates as YAML.": {
+   "one": "{n} candidato copiado como YAML.",
+   "other": "{n} candidatos copiados como YAML."
+  },
+  "Copy": "Copiar",
+  "Copy a link to this view": "Copiar um link para esta visão",
+  "Copy command: {command}": "Copiar o comando: {command}",
+  "Copy list": "Copiar lista",
+  "Copy the command that resumes this session": "Copiar o comando que retoma esta sessão",
+  "Copy the items shown here, in this order, as YAML, to paste for an agent": "Copiar os itens mostrados aqui, nesta ordem, como YAML, para colar para um agente",
+  "Copy these candidates as YAML, to paste for an agent": "Copiar estes candidatos como YAML, para colar para um agente",
+  "Copy this text": "Copie este texto",
+  "Could not copy: {error}": "Não foi possível copiar: {error}",
+  "Could not list the tasks: {error}": "Não foi possível listar as tarefas: {error}",
+  "Could not load the Outbox: {error}": "Não foi possível carregar a Outbox: {error}",
+  "Could not load the actions: {error}": "Não foi possível carregar as ações: {error}",
+  "Could not load the areas: {error}": "Não foi possível carregar as áreas: {error}",
+  "Could not load the home: {error}": "Não foi possível carregar o início: {error}",
+  "Could not load the keys: {error}": "Não foi possível carregar as teclas: {error}",
+  "Could not load the plan: {error}": "Não foi possível carregar o plano: {error}",
+  "Could not load the queue: {error}": "Não foi possível carregar a fila: {error}",
+  "Could not load the recent activity: {error}": "Não foi possível carregar a atividade recente: {error}",
+  "Could not load the review: {error}": "Não foi possível carregar a revisão: {error}",
+  "Could not load the task: {error}": "Não foi possível carregar a tarefa: {error}",
+  "Could not load the timeline: {error}": "Não foi possível carregar a linha do tempo: {error}",
+  "Could not load the transcript: {error}": "Não foi possível carregar a transcrição: {error}",
+  "Could not load the {plugin} view: {error}": "Não foi possível carregar a visão de {plugin}: {error}",
+  "Could not load the {step} step: {error}": "Não foi possível carregar a etapa {step}: {error}",
+  "Could not load the {view} list: {error}": "Não foi possível carregar a lista {view}: {error}",
+  "Could not reach the daemon: {error}": "Não foi possível falar com o daemon: {error}",
+  "Counts": "Contagens",
+  "Cut": "Recortar",
+  "Daemon not answering: {error}": "O daemon não responde: {error}",
+  "Decision queue": "Fila de decisões",
+  "Descending": "Decrescente",
+  "Detail": "Detalhe",
+  "Details": "Detalhes",
+  "Dismiss": "Dispensar",
+  "Dismiss the agent's open turn": "Descartar o turno aberto do agente",
+  "Don't nudge this conversation": "Não cobrar nesta conversa",
+  "Draft": "Rascunho",
+  "Draft a message you approve before it posts": "Rascunhar uma mensagem que você aprova antes de publicar",
+  "Draft text": "Texto do rascunho",
+  "Draft {id} approved; it goes out in a moment": "Rascunho {id} aprovado; sai em instantes",
+  "Draft {id} saved to the Outbox for your approval": "Rascunho {id} salvo no Outbox para sua aprovação",
+  "Draft {purpose}": "Rascunho: {purpose}",
+  "Due in 24h": "Vencem em 24h",
+  "Edit": "Editar",
+  "Empty": "Vazias",
+  "Enter keeps, Esc clears": "Enter mantém, Esc limpa",
+  "Enter marks the step done; ] and [ move between steps": "Enter marca a etapa como concluída; ] e [ andam entre as etapas",
+  "Enter runs, Esc closes": "Enter executa, Esc fecha",
+  "Enter sends, Esc cancels": "Enter envia, Esc cancela",
+  "Enter session": "Entrar na sessão",
+  "Everywhere": "Em todo lugar",
+  "Explore failed: {error}": "O Explore falhou: {error}",
+  "Explore it": "Explorar",
+  "Explore pull requests": "Explorar pull requests",
+  "Failing checks": "Checks falhando",
+  "Filter": "Filtro",
+  "Filter is:{flag}; Alt+click excludes": "Filtrar is:{flag}; Alt+clique exclui",
+  "Filter the list": "Filtrar a lista",
+  "Filter, group and sort": "Filtrar, agrupar e ordenar",
+  "Filter, group and sort the tasks": "Filtrar, agrupar e ordenar as tarefas",
+  "Filter: text, where:, author:, wait:me, risk:high, tag:lang:go  ( / )": "Filtro: texto, where:, author:, wait:me, risk:high, tag:lang:go  ( / )",
+  "Filters": "Filtros",
+  "Flow stage": "Etapa do fluxo",
+  "Forget the workspace whose folder is gone": "Esquecer o workspace cuja pasta sumiu",
+  "Forward": "Avançar",
+  "Group": "Agrupar",
+  "Group by...": "Agrupar por...",
+  "Grouped by": "Agrupada por",
+  "Grouped by {field}: {n} groups": {
+   "one": "Agrupado por {field}: {n} grupo",
+   "other": "Agrupado por {field}: {n} grupos"
+  },
+  "Guidance": "Orientação",
+  "Guidance for the action you pick (optional)": "Orientação para a ação que você escolher (opcional)",
+  "Guidance for the next round (optional)": "Orientação para a próxima rodada (opcional)",
+  "Guidance for the pending round": "Orientação para a rodada pendente",
+  "Guidance for the pending round; {action} sends it at once": "Orientação para a rodada pendente; {action} envia na hora",
+  "Guidance for {workflow} on {item}": "Orientação para {workflow} em {item}",
+  "Guide trimmed over the judgment limit: {blocks}": "Guia cortado por passar do limite de julgamento: {blocks}",
+  "Held by the cap": "Retido pelo limite",
+  "Hide Others": "Ocultar os outros",
+  "Hide {name}": "Ocultar o {name}",
+  "Home": "Início",
+  "In a question": "Numa pergunta",
+  "In a queue": "Numa fila",
+  "In loop": "No loop",
+  "In scope as": "No escopo como",
+  "In the detail": "No detalhe",
+  "In the plan": "No plano",
+  "In the review": "Na revisão",
+  "Include done": "Incluir concluídos",
+  "Intake {seq} ({intent}) waits for the brief": "A entrada {seq} ({intent}) espera o brief",
+  "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "A entrada {seq} ({intent}) espera o brief, tentativa {attempt}",
+  "It changed since the question pinned it and is now at rev {rev}: below is what it says now.": "Ele mudou desde que a pergunta o fixou e está na revisão {rev}: abaixo está o que ele diz agora.",
+  "Items": "Itens",
+  "Keep it": "Manter",
+  "Kept {n} with details": {
+   "one": "{n} mantido com detalhes",
+   "other": "{n} mantidos com detalhes"
+  },
+  "Kept {n}: {list}.": {
+   "one": "{n} mantido: {list}.",
+   "other": "{n} mantidos: {list}."
+  },
+  "Keys": "Teclas",
+  "Keys (Esc closes)": "Teclas (Esc fecha)",
+  "Kinds": "Tipos",
+  "Last error: {error}": "Último erro: {error}",
+  "Last message": "Última mensagem",
+  "Layout": "Layout",
+  "List": "Lista",
+  "Lists": "Lista",
+  "Load and spend": "Carga e gasto",
+  "Loading the activity.": "Carregando a atividade.",
+  "Loading the home...": "Carregando o início...",
+  "Loading the inventory.": "Carregando o inventário.",
+  "Loading the plan.": "Carregando o plano.",
+  "Loading the queue...": "Carregando a fila...",
+  "Loading the task.": "Carregando a tarefa.",
+  "Loading the timeline.": "Carregando a linha do tempo.",
+  "Loading {plugin}": "Carregando {plugin}",
+  "Loading {plugin}: {reason}": "Carregando {plugin}: {reason}",
+  "Loading.": "Carregando.",
+  "Loop only": "Só o loop",
+  "Mark done": "Marcar como concluída",
+  "Mark the agent session dormant": "Marcar a sessão do agente como adormecida",
+  "Merge conflicts": "Conflitos de merge",
+  "Merged from": "Mesclada de",
+  "Message": "Mensagem",
+  "Minimize": "Minimizar",
+  "More {n}": "Mais {n}",
+  "Mute ends": "Fim do silenciamento",
+  "Need me": "Precisam de mim",
+  "Next": "Próximo",
+  "Next 72 hours": "Próximas 72 horas",
+  "Next attempt at {time}": "Próxima tentativa às {time}",
+  "Next up": "A seguir",
+  "No": "Não",
+  "No agent here can answer from the omnibox: {error}": "Nenhum agente aqui pode responder pela omnibox: {error}",
+  "No area": "Sem área",
+  "No data for this filter yet.": "Ainda não há dados para este filtro.",
+  "No loop events in the recent activity.": "Nenhum evento do loop na atividade recente.",
+  "No task holds the text": "Nenhuma tarefa contém o texto",
+  "Not applied in Recent": "Não se aplica em Recentes",
+  "Not offered here": "Não disponível aqui",
+  "Not synced yet": "Ainda não sincronizado",
+  "Nothing happened in the inventory yet.": "Nada aconteceu no inventário ainda.",
+  "Nothing here matches \"{query}\".": "Nada aqui corresponde a \"{query}\".",
+  "Nothing here right now.": "Nada aqui agora.",
+  "Nothing here yet.": "Nada aqui ainda.",
+  "Nothing in {view} matches \"{filter}\".": "Nada em {view} corresponde a \"{filter}\".",
+  "Nothing in {view} matches \"{query}\".": "Nada em {view} corresponde a \"{query}\".",
+  "Nothing in {view} right now.": "Nada em {view} agora.",
+  "Nothing left in this list.": "Nada mais nesta lista.",
+  "Nothing left in this queue.": "Nada mais nesta fila.",
+  "Nothing matches": "Nada corresponde",
+  "Nothing pending or blocked in the plan.": "Nada pendente ou bloqueado no plano.",
+  "Nothing was typed.": "Nada foi digitado.",
+  "Notify you": "Notificar você",
+  "On the selection": "Na seleção",
+  "Only {group}": "Só {group}",
+  "Open": "Abrir",
+  "Open as a queue": "Abrir como fila",
+  "Open cockpit": "Abrir o cockpit",
+  "Open gates": "Gates abertos",
+  "Open in a window of its own": "Abrir numa janela própria",
+  "Open in {manager}": "Abrir no {manager}",
+  "Open in {name}": "Abrir no {name}",
+  "Open it": "Abrir",
+  "Open it on {provider}": "Abrir no {provider}",
+  "Open its task": "Abrir a tarefa",
+  "Open the omnibox": "Abrir a omnibox",
+  "Open workspace": "Abrir o workspace",
+  "Or answer in your own words": "Ou responda com suas palavras",
+  "Order": "Ordem",
+  "PR URL, owner/repo, repo, login, @org/team or a search": "URL de PR, owner/repo, repo, login, @org/team ou uma busca",
+  "Past its threshold": "Passou do limite",
+  "Paste": "Colar",
+  "Pause automatic rounds": "Pausar as rodadas automáticas",
+  "Pending": "Pendentes",
+  "People holding the backlog": "Quem segura o backlog",
+  "Pick a sort to choose its direction": "Escolha uma ordenação para definir a direção",
+  "Plan": "Plano",
+  "Plan {n}": "Plano {n}",
+  "Plugin view": "Visão do plugin",
+  "Plugins": "Plugins",
+  "Posted": "Publicado",
+  "Posted {time}": "Publicado {time}",
+  "Posts nothing": "Não publica nada",
+  "Press ⌘↵ to ask the agent": "Tecle ⌘↵ para perguntar ao agente",
+  "Previous": "Anterior",
+  "Pull request URL, owner/repo, a repository or login, @org/team or a search": "URL de pull request, owner/repo, um repositório ou login, @org/team ou uma busca",
+  "Pull request age": "Idade dos pull requests",
+  "Pull requests": "Pull requests",
+  "Quit {name}": "Sair do {name}",
+  "Reaction": "Reação",
+  "Read all": "Ler tudo",
+  "Recent": "Recentes",
+  "Recent activity": "Atividade recente",
+  "Redo": "Refazer",
+  "Refuse a queued answer whose route is gone": "Recusar uma resposta na fila cuja rota sumiu",
+  "Related": "Relacionadas",
+  "Reload": "Recarregar",
+  "Remove all clean": "Remover todos os limpos",
+  "Remove filter {label}": "Remover o filtro {label}",
+  "Remove the workspace": "Remover o workspace",
+  "Remove the workspaces of the {n} tasks in {view}? Their checkouts are deleted and their terminals are closed. A workspace whose agent works or waits, or that holds uncommitted files, unpushed commits or ignored files outside build and dependency folders, is kept.": {
+   "one": "Remover os workspaces da {n} tarefa em {view}? Os checkouts deles são apagados e os terminais, fechados. Um workspace cujo agente trabalha ou espera, ou que guarda arquivos não commitados, commits sem push ou arquivos ignorados fora das pastas de build e de dependências, é mantido.",
+   "other": "Remover os workspaces das {n} tarefas em {view}? Os checkouts deles são apagados e os terminais, fechados. Um workspace cujo agente trabalha ou espera, ou que guarda arquivos não commitados, commits sem push ou arquivos ignorados fora das pastas de build e de dependências, é mantido."
+  },
+  "Remove the workspaces of this view's tasks whose checkouts hold nothing unpublished": "Remover os workspaces das tarefas desta visão cujos checkouts não guardam nada sem publicar",
+  "Remove this filter ({filter})": "Remover este filtro ({filter})",
+  "Removed {n}.": {
+   "one": "{n} removido.",
+   "other": "{n} removidos."
+  },
+  "Removed {n}: {list}.": {
+   "one": "{n} removido: {list}.",
+   "other": "{n} removidos: {list}."
+  },
+  "Replace the queued answer": "Substituir a resposta na fila",
+  "Reply": "Resposta",
+  "Reply not saved": "Resposta não salva",
+  "Reply on {unit} failed: {error}": "A resposta em {unit} falhou: {error}",
+  "Reply saved to the Outbox": "Resposta salva no Outbox",
+  "Reply sent": "Resposta enviada",
+  "Repositories (color: share stalled)": "Repositórios (cor: fatia parada)",
+  "Repository": "Repositório",
+  "Resize the detail panel": "Redimensionar o painel de detalhe",
+  "Resolve its open items as {resolution}": "Resolver os itens abertos como {resolution}",
+  "Results": "Resultados",
+  "Resume automatic rounds": "Retomar as rodadas automáticas",
+  "Resume:": "Retomar:",
+  "Review": "Revisão",
+  "Review done.": "Revisão concluída.",
+  "Review done. A new one starts the next time you open it.": "Revisão concluída. Uma nova começa na próxima vez que você abrir.",
+  "Review steps": "Etapas da revisão",
+  "Risk": "Risco",
+  "Risk: {risk}": "Risco: {risk}",
+  "Round blocked": "Rodada bloqueada",
+  "Round sends": "Envio da rodada",
+  "Run": "Rodar",
+  "Run {n}": {
+   "one": "Executar {n}",
+   "other": "Executar {n}"
+  },
+  "Run {verb} on the task": "Executar {verb} na tarefa",
+  "Run {verb} on the task, with “{task}”": "Executar {verb} na tarefa, com “{task}”",
+  "Runs": "Execuções",
+  "Save as draft": "Salvar como rascunho",
+  "Save to Outbox": "Salvar no Outbox",
+  "Search": "Buscar",
+  "Search or ask": "Buscar ou pedir",
+  "Search, paste a link, or ask": "Busque, cole um link ou pergunte",
+  "Searching {provider}…": "Buscando no {provider}…",
+  "Sections": "Seções",
+  "See all {n}": {
+   "one": "Ver {n}",
+   "other": "Ver todas as {n}"
+  },
+  "Select All": "Selecionar tudo",
+  "Send": "Enviar",
+  "Send answer": "Enviar resposta",
+  "Send now": "Enviar agora",
+  "Send reply": "Enviar resposta",
+  "Send the text as your answer: typed in the agent's session when it is there, else a new session resumes the turn with it": "Enviar o texto como sua resposta: digitado na sessão do agente quando ela existe, senão uma nova sessão retoma o turno com ele",
+  "Sending failed: {error}": "O envio falhou: {error}",
+  "Sending to {task}…": "Enviando para {task}…",
+  "Sends at {time} unless you decide first": "Envia às {time}, a menos que você decida antes",
+  "Sent to {task}": "Enviada para {task}",
+  "Sessions closed in the last day ({n})": "Sessões fechadas no último dia ({n})",
+  "Set {prop} to {value}": "Definir {prop} como {value}",
+  "Show All": "Mostrar tudo",
+  "Show all, not only {group}": "Mostrar tudo, não só {group}",
+  "Size": "Tamanho",
+  "Size × risk, and type": "Tamanho × risco, e tipo",
+  "Slow sync: the API budget is low until {time}": "Sincronização lenta: a cota da API está baixa até {time}",
+  "Sort": "Ordenar",
+  "Sort by...": "Ordenar por...",
+  "Sorted ascending; click to flip": "Ordem crescente; clique para inverter",
+  "Sorted by": "Ordenada por",
+  "Sorted descending; click to flip": "Ordem decrescente; clique para inverter",
+  "Stalled": "Parados",
+  "Start an agent turn: {intent}": "Iniciar um turno do agente: {intent}",
+  "Start in {repo}: {brief}": "Iniciar em {repo}: {brief}",
+  "Start: {brief}": "Iniciar: {brief}",
+  "Stop drafting these": "Parar de rascunhar estes",
+  "Stop this workflow": "Parar este workflow",
+  "Stopped {workflow}": "{workflow} parado",
+  "Store needs attention: {why}": "O banco precisa de atenção: {why}",
+  "Sweep now": "Varrer agora",
+  "Synced {time}": "Sincronizado às {time}",
+  "Tag concentration": "Concentração de tags",
+  "Tag key": "Chave da tag",
+  "Tags": "Tags",
+  "Tags over-represented among stalled": "Tags super-representadas entre os parados",
+  "Task {task} has no unit to act on": "A tarefa {task} não tem unidade para agir",
+  "Tasks": "Tarefas",
+  "Tell the agent what to do next": "Diga ao agente o que fazer em seguida",
+  "That link could not be read, so the default view opened": "Não foi possível ler esse link, então a visão padrão abriu",
+  "The agent could not answer: {error}": "O agente não conseguiu responder: {error}",
+  "The agent gets it once its session is free. An answer sent now replaces it.": "O agente recebe assim que a sessão dele ficar livre. Uma resposta enviada agora substitui esta.",
+  "The agent goes on with the turn without an answer": "O agente segue com o turno sem resposta",
+  "The agent took too long to answer; nothing changed": "O agente demorou demais para responder; nada mudou",
+  "The charts library did not load; reload the page.": "A biblioteca de gráficos não carregou; recarregue a página.",
+  "The newest events of every unit the loop follows": "Os eventos mais novos de cada unidade que o loop acompanha",
+  "The recent activity could not be loaded.": "Não foi possível carregar a atividade recente.",
+  "The workflows' plan": "O plano dos workflows",
+  "This daemon runs no omnibox agent": "Este daemon não roda o agente da omnibox",
+  "This draft changed since you began editing it; your edit replaces what it says now:": "Este rascunho mudou desde que você começou a editá-lo; sua edição substitui o que ele diz agora:",
+  "This notification offers no {action}": "Esta notificação não oferece {action}",
+  "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off": "Este workflow observa: ele só planeja, e nada roda até você aplicar um item ou desligar o modo observar",
+  "Timeline": "Linha do tempo",
+  "Title": "Título",
+  "To": "Para",
+  "To confirm": "Para confirmar",
+  "Today": "Hoje",
+  "Today's spend cap for agent calls is reached; ask again tomorrow": "O limite de gasto de hoje com chamadas ao agente foi atingido; pergunte de novo amanhã",
+  "Tokens per pull request": "Tokens por pull request",
+  "Transcript": "Transcrição",
+  "Type what to ask the agent": "Digite o que perguntar ao agente",
+  "US$ spent per pull request": "US$ gastos por pull request",
+  "Undo": "Desfazer",
+  "Until {time}": "Até {time}",
+  "Views": "Visões",
+  "Waiting on": "Esperando",
+  "Waiting on whom": "Esperando quem",
+  "Waiting on you": "Esperando você",
+  "Waiting time by size and risk": "Tempo de espera por tamanho e risco",
+  "What blocks": "O que bloqueia",
+  "What the workflows will do, and what waits for you to apply it": "O que os workflows vão fazer, e o que espera você aplicar",
+  "What waits on you, and what stalled the longest": "O que espera por você, e o que está parado há mais tempo",
+  "Where you are": "Onde você está",
+  "Why it fired": "Por que disparou",
+  "Why it was proposed: {why}": "Por que foi proposto: {why}",
+  "Why these tasks?": "Por que estas tarefas?",
+  "Window": "Janela",
+  "Workspace": "Workspace",
+  "Write a message first": "Escreva uma mensagem antes",
+  "Write a reply or name a reaction first": "Escreva uma resposta ou indique uma reação antes",
+  "Write to the agent": "Escreva para o agente",
+  "Yes": "Sim",
+  "Yesterday": "Ontem",
+  "Your answer": "Sua resposta",
+  "Your answer is queued": "Sua resposta está na fila",
+  "Your reply": "Sua resposta",
+  "Zoom": "Zoom",
+  "a duration such as {example}": "uma duração como {example}",
+  "a newer release wrote it": "uma versão mais nova o gravou",
+  "a store command is running": "um comando do banco está rodando",
+  "a visible step waits for you": "um passo publica onde outros veem, então espera você",
+  "a y typed together with the key before it does not confirm": "um y digitado junto com a tecla anterior não confirma",
+  "accepted as intake {n}": "aceito como pedido {n}",
+  "actions": "ações",
+  "actions not refreshed: {error}": "ações não atualizadas: {error}",
+  "added to {name}": "adicionado ao {name}",
+  "adding it to {name} failed": "falha ao adicionar ao {name}",
+  "adding it to {name}…": "adicionando ao {name}…",
+  "adopted": "adotado",
+  "agent": "agente",
+  "all": "todos",
+  "ambiguous_ref": "{ref} nomeia mais de um item ou tarefa",
+  "answer": "resposta",
+  "answer queued; the agent session is told of it when the agent stops": "resposta na fila; a sessão do agente fica sabendo quando o agente parar",
+  "answer {task}: {n}. {answer}?": "responder {task}: {n}. {answer}?",
+  "any key closes": "qualquer tecla fecha",
+  "approves draft #{id}": "aprova o rascunho #{id}",
+  "area {area}": "área {area}",
+  "area: {area}": "área: {area}",
+  "artifact": "artefato",
+  "ask": "pedido",
+  "asks": "pergunta",
+  "asks {who}": "pede a {who}",
+  "at {time}": "às {time}",
+  "attempt {n}: {error}": "tentativa {n}: {error}",
+  "automatic rounds paused": "rodadas automáticas pausadas",
+  "blocked": "bloqueado",
+  "brief": "resumo",
+  "brief quota": "cota de briefs",
+  "briefs unavailable since {time}: {error}": "briefs indisponíveis desde {time}: {error}",
+  "briefs unavailable: {why}": "briefs indisponíveis: {why}",
+  "by": "por",
+  "by {who}": "por {who}",
+  "cancelled": "cancelado",
+  "capture": "capturar",
+  "capture cancelled: nothing typed": "captura cancelada: nada foi digitado",
+  "capture failed: {error}": "a captura falhou: {error}",
+  "captured: {title}": "capturada: {title}",
+  "changed": "alterada",
+  "checks": "checks",
+  "checks {state}": "checks {state}",
+  "config.toml changed; only these settings apply live: {keys}. Restart the daemon to apply the rest": "o config.toml mudou; só estas configurações valem na hora: {keys}. Reinicie o daemon para aplicar o resto",
+  "config.toml does not load, so the running config stays: {error}": "o config.toml não carrega, então a configuração em uso continua: {error}",
+  "connecting": "conectando",
+  "cooling down for {duration}": "o workflow rodou sobre isto há menos de {duration}",
+  "copied the resume line of {session}": "linha de retomada de {session} copiada",
+  "cost {cost}, {remaining} of {limit} left": "custo {cost}, restam {remaining} de {limit}",
+  "could not copy the resume line of {session}: {error}": "não foi possível copiar a linha de retomada de {session}: {error}",
+  "decision": "decisão",
+  "delegate {task}: {question} (no agent session: {reason})": "delegar {task}: {question} (sem sessão de agente: {reason})",
+  "delegate {task}: {question} ({key}: hand to an agent)": "delegar {task}: {question} ({key}: passar para um agente)",
+  "destination unknown": "destino desconhecido",
+  "detail of {task} not loaded: {error}": "detalhe de {task} não carregou: {error}",
+  "discard the draft to {target}?": "descartar o rascunho para {target}?",
+  "disconnected": "desconectado",
+  "disconnected: run `{command} open`": "desconectado: rode `{command} open`",
+  "draft": "rascunho",
+  "draft {n} picked: a approves, i edits, {back} discards, {esc} lets go": "rascunho {n} escolhido: a aprova, i edita, {back} descarta, {esc} solta",
+  "drafted {verdict}, {blocking} blocking, {nonBlocking} non-blocking": "rascunho: {verdict}, {blocking} bloqueantes, {nonBlocking} não bloqueantes",
+  "drafted {verdict}, {blocking} blocking, {nonblocking} non-blocking": "rascunho {verdict}, {blocking} bloqueantes, {nonblocking} não bloqueantes",
+  "drafts": "rascunhos",
+  "edit the draft to {target} ({key}: editor)": "editar o rascunho para {target} ({key}: editor)",
+  "edited": "editado",
+  "empty: until it changes": "vazio: até mudar",
+  "error": "erro",
+  "every area": "todas as áreas",
+  "failed at {steps}": "falhou em {steps}",
+  "failed {n} times: {error}": "falhou {n} vezes: {error}",
+  "failing: {checks}": "falhando: {checks}",
+  "filter": "filtrar",
+  "filter {text} (Esc clears)": "filtro {text} (Esc limpa)",
+  "filtered counts not refreshed: {error}": "contagens filtradas não atualizadas: {error}",
+  "frees": "libera",
+  "from {origin}": "de {origin}",
+  "from {who}": "de {who}",
+  "gate": "decisão",
+  "group": "agrupar",
+  "guidance is {length} characters, the limit is {max}": "a orientação tem {length} caracteres, o limite é {max}",
+  "guided by you": "orientado por você",
+  "hand {task} to an agent: {question} ({key}: draft for me)": "passar {task} para um agente: {question} ({key}: rascunho para mim)",
+  "in the Inbox as {task}": "na Inbox como {task}",
+  "in {manager}": "em {manager}",
+  "incomplete_operation": "O agente propôs {op} sem o que a operação precisa",
+  "instant": "instantâneo",
+  "intake {n} is already starting the turn; this request changed nothing": "o pedido {n} já está iniciando o turno; este pedido não mudou nada",
+  "it has no workspace to find its terminal in: dismiss this": "ela não tem workspace onde achar o terminal: dispense este item",
+  "it left the plan since it was planned": "saiu do plano desde que foi planejado",
+  "it needs a migration": "ele precisa de uma migração",
+  "it no longer matches since it was planned": "não casa mais desde que foi planejado",
+  "it waits for you since it was planned": "espera você desde que foi planejado",
+  "it was acted on since it was planned": "você agiu sobre ele desde que foi planejado",
+  "it was dismissed since it was planned": "foi descartado desde que foi planejado",
+  "it was done since it was planned": "rodou desde que foi planejado",
+  "its migration failed": "a migração dele falhou",
+  "its process changed while it was being closed": "o processo dela mudou enquanto ela era fechada",
+  "its process is no longer the orphan the census proved": "o processo dela já não é o órfão que o censo provou",
+  "its process is not proven a lasting orphan": "o processo dela não está provado como órfão duradouro",
+  "its process lingers orphaned and may come back; it closes once the process is gone, or after cleanup.orphan_hold": "o processo dela continua órfão e pode voltar; ela fecha quando o processo sumir, ou depois de cleanup.orphan_hold",
+  "its source moved since it was planned": "a origem mudou desde que foi planejado",
+  "its terminal is closed; it ends on its own": "o terminal dela foi fechado; ela termina sozinha",
+  "its terminal is open with no agent in it: close that terminal, or dismiss this": "o terminal dela está aberto sem agente: feche esse terminal ou dispense este item",
+  "its unit changed since it was planned": "o que ele afeta mudou desde que foi planejado",
+  "its unit has no link": "a unidade dela não tem link",
+  "joined intake {n}": "juntou-se ao pedido {n}",
+  "just now": "agora mesmo",
+  "keys": "teclas",
+  "last refresh failed: {error}": "a última atualização falhou: {error}",
+  "last: {who} {what}": "último: {who} {what}",
+  "limit per_day {n} reached": "o workflow rodou {n} vezes hoje, o seu limite",
+  "limit per_run {n} reached": "o workflow rodou {n} vezes nesta varredura, o seu limite",
+  "limit per_unit_per_day {n} reached": "o workflow rodou {n} vezes hoje sobre isto, o seu limite",
+  "listing the tasks…": "listando as tarefas…",
+  "load the detail": "carregar o detalhe",
+  "loading {parts}": "carregando {parts}",
+  "loading…": "carregando…",
+  "marking {step} done failed: {error}": "marcar {step} como concluída falhou: {error}",
+  "matched": "correspondeu",
+  "me": "você",
+  "message": "mensagem",
+  "more…": "mais…",
+  "move": "mover",
+  "muted until who it waits on changes": "silenciado até mudar quem ele espera",
+  "muted until {time}": "silenciado até {time}",
+  "my review: {review}": "minha review: {review}",
+  "my review: {review} (older head)": "minha review: {review} (head anterior)",
+  "next step": "próximo passo",
+  "no": "não",
+  "no US$ cost recorded": "sem custo em US$ registrado",
+  "no answer on {task}": "nenhuma resposta em {task}",
+  "no area {n}": "nenhuma área {n}",
+  "no brief": "sem brief",
+  "no checks": "sem checks",
+  "no clipboard took it; copy it from the screen": "nenhum clipboard aceitou; copie da tela",
+  "no draft on screen to {verb}": "nenhum rascunho na tela para {verb}",
+  "no draft {n}": "nenhum rascunho {n}",
+  "no editor here: type the text on the bottom line": "sem editor aqui: digite o texto na linha de baixo",
+  "no open question on {task}": "nenhuma pergunta aberta em {task}",
+  "no option {n}": "nenhuma opção {n}",
+  "no owner": "sem dono",
+  "no task holds the text": "nenhuma tarefa tem o texto",
+  "no {action} on {task}": "nenhum(a) {action} em {task}",
+  "no {plugin} views: the plugin is disabled or not loaded": "nenhuma visão de {plugin}: o plugin está desativado ou não carregou",
+  "no {view} view here": "nenhuma visão {view} aqui",
+  "no_unit_or_task": "Nenhum item ou tarefa é {ref}",
+  "none": "nenhum",
+  "not in {name}": "fora do {name}",
+  "not now": "agora não",
+  "not offered here": "não disponível aqui",
+  "not offered on a draft": "não oferecido em um rascunho",
+  "not opening {link}: only https links open": "não abrindo {link}: só links https abrem",
+  "not synced yet": "ainda não sincronizado",
+  "notes": "notas",
+  "nothing_named": "Diga em que executar {verb}",
+  "now": "agora",
+  "observe": "observar",
+  "observe mode": "o workflow só observa: nada roda até você aplicar",
+  "only this": "só este",
+  "open": "aberto",
+  "open a draft, or pick one with its digit, to edit it": "abra um rascunho, ou escolha um pelo número, para editá-lo",
+  "open the draft to {verb} it (Enter)": "abra o rascunho para {verb} (Enter)",
+  "open the source": "abrir a origem",
+  "opened {b} ago: {c}": "aberto há {b}: {c}",
+  "opening links is not supported here": "abrir links não é suportado aqui",
+  "or": "ou",
+  "or a reaction, such as eyes": "ou uma reação, como eyes",
+  "out of scope": "fora do escopo",
+  "outside_vocabulary": "Nenhum verbo da omnibox executa {name}",
+  "owed by": "a cargo de",
+  "parent": "pai",
+  "pause failed: {error}": "falha ao pausar: {error}",
+  "paused": "pausado",
+  "paused since it was planned": "pausado desde que foi planejado",
+  "plan not loaded: {error}": "plano não carregado: {error}",
+  "plugin disabled": "plugin desativado",
+  "plugin disabled, read-only": "plugin desativado, só leitura",
+  "post again to {target}?": "postar de novo para {target}?",
+  "post to {target} now?": "postar para {target} agora?",
+  "post to {target}?": "postar para {target}?",
+  "previous step": "passo anterior",
+  "quit": "sair",
+  "reaction": "reação",
+  "recommended": "recomendada",
+  "reconnecting": "reconectando",
+  "refreshing": "atualizando",
+  "remove all clean failed: {error}": "remover todos os limpos falhou: {error}",
+  "resolved": "resolvido",
+  "resolved as answered": "respondidos",
+  "resolved as declined": "recusados",
+  "resolved as delegated": "delegados",
+  "resolved as dismissed": "descartados",
+  "resolved as done": "feitos",
+  "resolved as fixed": "corrigidos",
+  "resolved as moot": "sem efeito",
+  "resolved as superseded": "substituídos",
+  "resume failed: {error}": "falha ao retomar: {error}",
+  "resume: {command}": "retomar: {command}",
+  "retrying after {error}": "tentando de novo depois de {error}",
+  "review not refreshed: {error}": "revisão não atualizada: {error}",
+  "risk {risk}": "risco {risk}",
+  "round in {time}": "rodada em {time}",
+  "run": "execução",
+  "run_conflict": "Não rodou: mudou nesse meio-tempo",
+  "run_failed": "Não rodou",
+  "run_forbidden": "Não rodou: não é permitido daqui",
+  "run_invalid": "Não rodou: o pedido não era válido",
+  "run_not_found": "Não rodou: isso não existe mais",
+  "run_unavailable": "Não rodou: indisponível agora",
+  "running": "rodando",
+  "running actions to wait for: {n}; q again leaves without them": "ações em andamento a esperar: {n}; q de novo sai sem elas",
+  "runs at {time}": "roda às {time}",
+  "runs in {minutes}m {seconds}s": "roda em {minutes}m {seconds}s",
+  "runs in {seconds} s": "roda em {seconds} s",
+  "runs in {time}": "roda em {time}",
+  "runs now": "roda agora",
+  "runs when its window ends": "roda quando a janela acabar",
+  "sends": "envia",
+  "sends {time}": "envia às {time}",
+  "session": "sessão",
+  "session {state}": "sessão {state}",
+  "show all": "mostrar tudo",
+  "since the last activity": "desde a última atividade",
+  "since {time}": "desde {time}",
+  "size {size}": "tamanho {size}",
+  "size {size}, risk {risk}: {n}": "tamanho {size}, risco {risk}: {n}",
+  "slow sync": "sincronização lenta",
+  "sort": "ordenar",
+  "source": "fonte",
+  "stalled": "parado",
+  "state": "estado",
+  "status": "status",
+  "step done": "passo feito",
+  "steps": "passos",
+  "stopped": "parada",
+  "suspend is not supported here": "suspender não é suportado aqui",
+  "synced {ago}": "sincronizado {ago}",
+  "syncing": "sincronizando",
+  "tasks not listed: {error}": "tarefas não listadas: {error}",
+  "tasks not refreshed: {error}": "tarefas não atualizadas: {error}",
+  "text": "texto",
+  "the action does not run a session": "a ação não roda uma sessão",
+  "the agent stopped": "o agente parou",
+  "the review is done": "a revisão está concluída",
+  "the task holds no open item": "a tarefa não tem item aberto",
+  "the task is not derived from items: its items do not close it": "a tarefa não veio de itens: os itens dela não a fecham",
+  "this answer approves draft #{id}, which this view does not show: open its task to see it": "esta resposta aprova o rascunho #{id}, que esta tela não mostra: abra a tarefa para vê-lo",
+  "this page is older than {name}'s daemon; reload this page": "esta página é mais antiga que o daemon do {name}; recarregue a página",
+  "to": "para",
+  "to ask the agent": "para perguntar ao agente",
+  "to close": "para fechar",
+  "to navigate": "para navegar",
+  "to open": "para abrir",
+  "type to narrow, Enter picks, Esc closes": "digite para filtrar, Enter escolhe, Esc fecha",
+  "type {type}": "tipo {type}",
+  "unclaimed_address": "Nenhum plugin reconhece {address}",
+  "unit": "item",
+  "unknown": "desconhecido",
+  "unknown error": "erro desconhecido",
+  "unknown_operation": "A omnibox não executa {op}",
+  "unknown_task": "A tarefa {id} não existe",
+  "unknown_unit": "Nenhuma tarefa contém {unit}",
+  "until {time}": "até {time}",
+  "untracked it again": "deixou de acompanhar de novo",
+  "untracking it failed too: {error}": "deixar de acompanhar também falhou: {error}",
+  "view": "visões",
+  "wait": "espera",
+  "waiting": "esperando",
+  "waiting on {who}": "esperando {who}",
+  "waiting on {who} for {age} · in {name} as {reasons}": "esperando {who} há {age} · no {name} como {reasons}",
+  "waiting {time}": "esperando há {time}",
+  "waits for you": "espera você",
+  "waits for you while {facts}": "espera você enquanto {facts}",
+  "waits for you while {facts}: {refusal}": "espera você enquanto {facts}: {refusal}",
+  "waits {time} on {who}": "espera {time} por {who}",
+  "wakes {time}": "acorda em {time}",
+  "warning: {warning}": "aviso: {warning}",
+  "warning: {warning} (+{n} more)": "aviso: {warning} (+{n})",
+  "why": "por quê",
+  "workflow": "workflow",
+  "working days": "dias úteis",
+  "workspace": "workspace",
+  "y confirms, any other key cancels": "y confirma, qualquer outra tecla cancela",
+  "y yes · n no": "y sim · n não",
+  "yes": "sim",
+  "you": "você",
+  "your answer is queued until the agent's session is free; an answer now replaces it": "sua resposta está na fila até a sessão do agente ficar livre; uma resposta agora a substitui",
+  "{action} ({key})": "{action} ({key})",
+  "{action} answered nothing to copy": "{action} não respondeu nada para copiar",
+  "{action} at {time} unless you pick another": "{action} às {time}, a menos que você escolha outra opção",
+  "{action} done: {unit}": "{action} concluído: {unit}",
+  "{action} failed": "{action} falhou",
+  "{action} failed: {error}": "{action} falhou: {error}",
+  "{action} on {unit}": "{action} em {unit}",
+  "{action} running…": "{action} rodando…",
+  "{action} sent": "{action} enviado",
+  "{action} started; it is in {name} now": "{action} iniciado; agora está no {name}",
+  "{action} {task} failed: {error}": "{action} {task} falhou: {error}",
+  "{action} {task} still running": "{action} {task} ainda rodando",
+  "{action} {task}: done": "{action} {task}: feito",
+  "{action} {task}: {result}": "{action} {task}: {result}",
+  "{action} {unit}: accepted as intake {seq}": "{action} {unit}: aceito como entrada {seq}",
+  "{action} {unit}: intake {seq} is already starting the turn; this request changed nothing": "{action} {unit}: a entrada {seq} já está iniciando o turno; este pedido não mudou nada",
+  "{action} {unit}: joined intake {seq}": "{action} {unit}: juntou-se à entrada {seq}",
+  "{action} {unit}: {why}; {undone}": "{action} {unit}: {why}; {undone}",
+  "{action}: write the answer first": "{action}: escreva a resposta antes",
+  "{action}: {reason}": "{action}: {reason}",
+  "{address} is not in {views}; {command} shows it": "{address} não está em {views}; {command} mostra",
+  "{age} ago": "há {age}",
+  "{answer} (from {source})": "{answer} (de {source})",
+  "{answer} (from {source}, queued until the agent stops)": "{answer} (de {source}, na fila até o agente parar)",
+  "{count} for {query}": "{count} para {query}",
+  "{count}, the first {shown} of {total}; narrow the search for the rest for {query}": "{count}, os primeiros {shown} de {total}; refine a busca para ver o resto, para {query}",
+  "{count}, the {shown} {order} of {total}; narrow the search for the rest for {query}": "{count}, os {shown} {order} de {total}; refine a busca para ver o resto, para {query}",
+  "{days}d": "{days}d",
+  "{days}d {hours}h": "{days}d {hours}h",
+  "{error}; run: {fix}": "{error}; rode: {fix}",
+  "{field} is required": "{field} é obrigatório",
+  "{field}: not {values}": "{field}: não {values}",
+  "{field}: not {values} ×": "{field}: não {values} ×",
+  "{field}: {values}": "{field}: {values}",
+  "{field}: {values} ×": "{field}: {values} ×",
+  "{hours}h": "{hours}h",
+  "{hours}h {minutes}m": "{hours}h {minutes}m",
+  "{key}: no such key": "{key}: tecla inexistente",
+  "{kind}, {n} lines": {
+   "one": "{kind}, {n} linha",
+   "other": "{kind}, {n} linhas"
+  },
+  "{label}: {n} changed files": {
+   "one": "{label}: {n} arquivo alterado",
+   "other": "{label}: {n} arquivos alterados"
+  },
+  "{list} and {last}": "{list} e {last}",
+  "{list} or {last}": "{list} ou {last}",
+  "{minutes} min": "{minutes} min",
+  "{minutes}m": "{minutes}m",
+  "{name} !": "{name} !",
+  "{name} ?": "{name} ?",
+  "{name} {n}": "{name} {n}",
+  "{name} {n} paused": "{name} {n} pausado",
+  "{name}: terminal too small": "{name}: terminal pequeno demais",
+  "{n} comments": {
+   "one": "{n} comentário",
+   "other": "{n} comentários"
+  },
+  "{n} draft": {
+   "one": "{n} rascunho",
+   "other": "{n} rascunhos"
+  },
+  "{n} draft waits for you": {
+   "one": "{n} rascunho espera por você",
+   "other": "{n} rascunhos esperam por você"
+  },
+  "{n} event": {
+   "one": "{n} evento",
+   "other": "{n} eventos"
+  },
+  "{n} files": {
+   "one": "{n} arquivo",
+   "other": "{n} arquivos"
+  },
+  "{n} of {total}": "{n} de {total}",
+  "{n} open questions in the brief": {
+   "one": "{n} pergunta em aberto no brief",
+   "other": "{n} perguntas em aberto no brief"
+  },
+  "{n} pull requests": {
+   "one": "{n} pull request",
+   "other": "{n} pull requests"
+  },
+  "{n} pull requests, median {median} working days, middle half {low}-{high}": {
+   "one": "{n} pull request, mediana de {median} dias úteis, metade central {low}-{high}",
+   "other": "{n} pull requests, mediana de {median} dias úteis, metade central {low}-{high}"
+  },
+  "{n} results": {
+   "one": "{n} resultado",
+   "other": "{n} resultados"
+  },
+  "{n} working days": {
+   "one": "{n} dia útil",
+   "other": "{n} dias úteis"
+  },
+  "{n} working hours": {
+   "one": "{n} hora útil",
+   "other": "{n} horas úteis"
+  },
+  "{pending} pending, {stalled} stalled": "pendentes: {pending}, parados: {stalled}",
+  "{question} for {task}": "{question} para {task}",
+  "{question}, on {task}, held for approval ({tab}: send now; {editor}: editor)": "{question}, em {task}, retido para aprovação ({tab}: enviar agora; {editor}: editor)",
+  "{question}, on {task}, sent now ({tab}: hold for approval; {editor}: editor)": "{question}, em {task}, enviado agora ({tab}: reter para aprovação; {editor}: editor)",
+  "{risk} risk": "risco {risk}",
+  "{shown} of {total}": "{shown} de {total}",
+  "{size} of disk": "{size} de disco",
+  "{size} of memory": "{size} de memória",
+  "{source}'s message": "Mensagem do {source}",
+  "{stalled} of {n} stalled, {lift}% against the backlog": "{stalled} de {n} parados, {lift}% em relação ao backlog",
+  "{step} is already done": "{step} já está concluída",
+  "{step}: done": "{step}: concluída",
+  "{task} has no source to open": "{task} não tem origem para abrir",
+  "{task}: the editor failed: {error}": "{task}: o editor falhou: {error}",
+  "{time} unless you decide first": "{time} a menos que você decida antes",
+  "{title}: type to narrow": "{title}: digite para filtrar",
+  "{tokens} tokens over {n} turns": {
+   "one": "{tokens} tokens em {n} turno",
+   "other": "{tokens} tokens em {n} turnos"
+  },
+  "{unit} by {author} · opened {opened} · updated {updated}": "{unit} de {author} · aberto {opened} · atualizado {updated}",
+  "{unit} is in the inventory.": "{unit} está no inventário.",
+  "{unit} is not in the inventory.": "{unit} não está no inventário.",
+  "{unit} is not in the rows.": "{unit} não está nas linhas.",
+  "{verb} task {task}": "{verb} a tarefa {task}",
+  "{verb} {task} cancelled": "{verb} {task} cancelado",
+  "{verb} {task} cancelled: nothing typed": "{verb} {task} cancelado: nada foi digitado",
+  "{verb} {task} cancelled: nothing usable typed": "{verb} {task} cancelado: nada utilizável foi digitado",
+  "{verb} {task} failed: {error}": "{verb} {task} falhou: {error}",
+  "{what} at {time}": "{what} às {time}"
+ },
+ "usersRow": {
+  "catalog": {
+   "card_signals": [
+    {
+     "key": "checks",
+     "label": "checks",
+     "provider": "github",
+     "values": {
+      "failing": "failing",
+      "failing_named": "failing: {{.names}}",
+      "passing": "passing",
+      "pending": "pending"
+     }
+    },
+    {
+     "key": "merge",
+     "label": "merge",
+     "provider": "github",
+     "values": {
+      "conflicts": "conflicts"
+     }
+    },
+    {
+     "key": "review",
+     "label": "review",
+     "provider": "github",
+     "values": {
+      "approved": "approved"
+     }
+    },
+    {
+     "key": "situation",
+     "label": "situation",
+     "notes": {
+      "stalled": "stalled for {{.days}} {{plural .days \"one\" \"working day\" \"other\" \"working days\"}}"
+     },
+     "provider": "github",
+     "values": {
+      "blocked": "round blocked",
+      "changes": "changes asked",
+      "checks": "checks failing",
+      "conflicts": "merge conflicts",
+      "done": "closed",
+      "draft": "draft",
+      "held": "held (cap)",
+      "loop_stopped": "agent stopped",
+      "loop_waiting": "agent asks",
+      "loop_working": "agent working",
+      "merge": "can merge",
+      "muted": "muted",
+      "no_reviewer": "no reviewer",
+      "reply": "reply due",
+      "review": "review",
+      "reviewer_back": "reviewer due",
+      "round_pending": "round soon",
+      "to_address": "to address"
+     }
+    }
+   ],
+   "details": [
+    {
+     "field": "next_guidance",
+     "label": "Next round guidance",
+     "provider": "github",
+     "title": "Guidance waiting for the next round: given with no round pending, or kept from a round that did not go out or whose prompt was not seen landing. The next round, Review or Address included, takes it unless you give other guidance"
+    },
+    {
+     "field": "profile_chain",
+     "label": "Review profile",
+     "provider": "github",
+     "title": "The review profile layers a round here reads, lowest first; the profile show command lists the files"
+    }
+   ],
+   "events": [
+    {
+     "kind": "opened",
+     "label": "opened",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "push",
+     "label": "pushed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "requested",
+     "kind": "review_requested",
+     "label": "review requested",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "requested",
+     "kind": "review_request_removed",
+     "label": "review request removed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "first_field",
+     "kind": "review",
+     "label": "reviewed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "comment",
+     "label": "commented",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "check",
+     "label": "checks",
+     "provider": "github"
+    },
+    {
+     "kind": "ready",
+     "label": "ready for review",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "draft",
+     "label": "back to draft",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "data": "short_sha",
+     "kind": "merged",
+     "label": "merged",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "closed",
+     "label": "closed",
+     "provider": "github",
+     "tone": "people"
+    },
+    {
+     "kind": "round_sent",
+     "label": "round sent",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_held",
+     "label": "round held",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_pending",
+     "label": "round pending",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_skipped",
+     "label": "round skipped",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "guidance",
+     "label": "guidance",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_blocked",
+     "label": "round blocked",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    },
+    {
+     "kind": "round_unblocked",
+     "label": "round unblocked",
+     "loop": true,
+     "provider": "github",
+     "tone": "loop"
+    }
+   ],
+   "facets": [
+    {
+     "group": true,
+     "id": "where",
+     "label": "Where",
+     "match": "suffix",
+     "menu": true,
+     "provider": "github",
+     "show": "ref",
+     "sort": "text"
+    },
+    {
+     "group": true,
+     "id": "author",
+     "label": "Author",
+     "label_prefix": "by ",
+     "labels": {
+      "me": "me"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "me"
+     ],
+     "row_class": {
+      "me": "mine"
+     },
+     "show": "meta",
+     "show_values": "first",
+     "sort": "rank"
+    },
+    {
+     "colors": {
+      "author": "author",
+      "loop": "loop",
+      "me": "me",
+      "nobody": "nobody",
+      "reviewer": "reviewer"
+     },
+     "group": true,
+     "id": "wait",
+     "label": "Waits on (role)",
+     "labels": {
+      "author": "Waiting on the author",
+      "loop": "In loop",
+      "me": "Waiting on me",
+      "nobody": "Waiting on nobody",
+      "reviewer": "Waiting on a reviewer"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "me",
+      "loop",
+      "reviewer",
+      "author",
+      "nobody"
+     ],
+     "sort": "rank",
+     "strip": true
+    },
+    {
+     "group": true,
+     "id": "waits-on",
+     "label": "Waits on (person)",
+     "labels": {
+      "me": "me"
+     },
+     "match": "team",
+     "menu": true,
+     "provider": "github",
+     "show": "who"
+    },
+    {
+     "group": true,
+     "id": "kind",
+     "label": "Situation",
+     "labels": {
+      "blocked": "round blocked",
+      "changes": "changes asked",
+      "checks": "checks failing",
+      "conflicts": "merge conflicts",
+      "done": "closed",
+      "draft": "draft",
+      "held": "held (cap)",
+      "loop_stopped": "agent stopped",
+      "loop_waiting": "agent asks",
+      "loop_working": "agent working",
+      "merge": "can merge",
+      "muted": "muted",
+      "no_reviewer": "sem revisor",
+      "reply": "reply due",
+      "review": "review",
+      "reviewer_back": "reviewer due",
+      "round_pending": "round soon",
+      "to_address": "to address"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "round_pending",
+      "loop_waiting",
+      "loop_stopped",
+      "blocked",
+      "to_address",
+      "held",
+      "loop_working",
+      "changes",
+      "checks",
+      "conflicts",
+      "reply",
+      "reviewer_back",
+      "review",
+      "no_reviewer",
+      "merge",
+      "draft",
+      "muted",
+      "done"
+     ],
+     "show": "kind",
+     "sort": "rank"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "type",
+     "label": "Type",
+     "menu": true,
+     "provider": "github",
+     "show": "meta",
+     "sort": "text"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "risk",
+     "label": "Risk",
+     "label_prefix": "risk ",
+     "labels": {
+      "high": "high",
+      "low": "low",
+      "medium": "medium"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "high",
+      "medium",
+      "low"
+     ],
+     "show": "meta",
+     "sort": "rank"
+    },
+    {
+     "empty": "no brief",
+     "group": true,
+     "id": "size",
+     "label": "Size",
+     "labels": {
+      "l": "L",
+      "m": "M",
+      "s": "S",
+      "xl": "XL",
+      "xs": "XS"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "xs",
+      "s",
+      "m",
+      "l",
+      "xl"
+     ],
+     "show": "meta",
+     "sort": "rank"
+    },
+    {
+     "empty": "no workspace",
+     "group": true,
+     "id": "status",
+     "label": "Workspace",
+     "menu": true,
+     "provider": "github",
+     "show": "aside",
+     "sort": "text"
+    },
+    {
+     "group": false,
+     "id": "tag",
+     "label": "Tag",
+     "match": "prefix",
+     "menu": true,
+     "provider": "github",
+     "show": "meta",
+     "show_max": 2
+    },
+    {
+     "group": false,
+     "id": "is",
+     "label": "Flags",
+     "labels": {
+      "adopted": "adopted",
+      "approved": "approved",
+      "due": "due",
+      "in-loop": "in loop",
+      "muted": "muted",
+      "needs-me": "needs me",
+      "paused": "paused",
+      "stalled": "stalled",
+      "tracked": "tracked"
+     },
+     "menu": true,
+     "provider": "github",
+     "row_class": {
+      "stalled": "late"
+     },
+     "show": "flag",
+     "show_only": [
+      "paused",
+      "muted"
+     ]
+    },
+    {
+     "empty": "no checks data",
+     "group": true,
+     "id": "ci",
+     "label": "Checks",
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "failure",
+      "pending",
+      "success"
+     ]
+    },
+    {
+     "buckets": [
+      {
+       "id": "1d",
+       "label": "0-1 days",
+       "within": "24h"
+      },
+      {
+       "id": "3d",
+       "label": "1-3 days",
+       "within": "72h"
+      },
+      {
+       "id": "7d",
+       "label": "3-7 days",
+       "within": "168h"
+      },
+      {
+       "id": "2w",
+       "label": "1-2 weeks",
+       "within": "336h"
+      },
+      {
+       "id": "4w",
+       "label": "2-4 weeks",
+       "within": "672h"
+      },
+      {
+       "id": "older",
+       "label": "over 4 weeks",
+       "within": ""
+      }
+     ],
+     "empty": "no opening date",
+     "group": true,
+     "id": "opened",
+     "label": "Opened",
+     "labels": {
+      "1d": "0-1 days",
+      "2w": "1-2 weeks",
+      "3d": "1-3 days",
+      "4w": "2-4 weeks",
+      "7d": "3-7 days",
+      "older": "over 4 weeks"
+     },
+     "menu": true,
+     "provider": "github",
+     "rank": [
+      "1d",
+      "3d",
+      "7d",
+      "2w",
+      "4w",
+      "older"
+     ],
+     "sort": "time"
+    },
+    {
+     "group": false,
+     "id": "scope",
+     "label": "In scope as",
+     "menu": true,
+     "provider": "github"
+    },
+    {
+     "buckets": [
+      {
+       "id": "1d",
+       "label": "0-1 days",
+       "within": "24h"
+      },
+      {
+       "id": "3d",
+       "label": "1-3 days",
+       "within": "72h"
+      },
+      {
+       "id": "7d",
+       "label": "3-7 days",
+       "within": "168h"
+      },
+      {
+       "id": "2w",
+       "label": "1-2 weeks",
+       "within": "336h"
+      },
+      {
+       "id": "4w",
+       "label": "2-4 weeks",
+       "within": "672h"
+      },
+      {
+       "id": "older",
+       "label": "over 4 weeks",
+       "within": ""
+      }
+     ],
+     "group": false,
+     "id": "age",
+     "label": "Waiting for",
+     "menu": true,
+     "provider": "github",
+     "show": "age",
+     "show_label": "since {{.at}}",
+     "sort": "time"
+    },
+    {
+     "group": true,
+     "id": "lane",
+     "label": "Board lane",
+     "labels": {
+      "author": "Waiting on author",
+      "loop": "In loop",
+      "me": "Needs me",
+      "merge": "Can merge",
+      "reviewer": "Waiting on reviewer"
+     },
+     "menu": false,
+     "provider": "github",
+     "rank": [
+      "me",
+      "reviewer",
+      "author",
+      "merge",
+      "loop"
+     ]
+    },
+    {
+     "buckets": [
+      {
+       "id": "later",
+       "label": "later",
+       "within": "-24h"
+      },
+      {
+       "id": "due",
+       "label": "due",
+       "within": "1ms"
+      },
+      {
+       "id": "past",
+       "label": "past",
+       "within": ""
+      }
+     ],
+     "group": false,
+     "id": "due",
+     "label": "Due",
+     "menu": false,
+     "provider": "github",
+     "sort": "time"
+    }
+   ],
+   "reasons": [
+    {
+     "provider": "github",
+     "words": {
+      "agent_asked": "the agent asked you something",
+      "approved_checks_pending": "approved, checks pending",
+      "approved_green": "approved and green",
+      "changes_requested": "changes requested by {{.actor}}",
+      "checks_failing": "checks failing on the head",
+      "checks_failing_more": "checks failing: {{.checks}} and {{.more}} more",
+      "checks_failing_named": "checks failing: {{.checks}}",
+      "closed": "closed",
+      "commented_no_reply": "{{.actor}} commented, no reply",
+      "draft": "draft",
+      "merge_conflicts": "merge conflicts with {{.branch}}",
+      "merged": "merged",
+      "no_review_required": "green, no review required",
+      "no_review_required_checks_pending": "no review required, checks pending",
+      "no_reviewer_requested": "no reviewer requested",
+      "review_requested": "review requested, no review on the head",
+      "review_requested_again": "review requested again after your review",
+      "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
+      "round_blocked": "round blocked: {{.why}}",
+      "round_held": "automatic round held: {{.why}}",
+      "round_in_progress": "review round in progress",
+      "to_address": "review to address, no workspace: {{.why}}"
+     }
+    }
+   ],
+   "situations": [
+    {
+     "kind": "round_pending",
+     "label": "round soon",
+     "provider": "github",
+     "rank": 0
+    },
+    {
+     "kind": "loop_waiting",
+     "label": "agent asks",
+     "provider": "github",
+     "rank": 1
+    },
+    {
+     "kind": "loop_stopped",
+     "label": "agent stopped",
+     "provider": "github",
+     "rank": 2
+    },
+    {
+     "kind": "blocked",
+     "label": "round blocked",
+     "provider": "github",
+     "rank": 3
+    },
+    {
+     "kind": "to_address",
+     "label": "to address",
+     "provider": "github",
+     "rank": 4
+    },
+    {
+     "kind": "held",
+     "label": "held (cap)",
+     "provider": "github",
+     "rank": 5
+    },
+    {
+     "kind": "loop_working",
+     "label": "agent working",
+     "provider": "github",
+     "rank": 6
+    },
+    {
+     "kind": "changes",
+     "label": "changes asked",
+     "provider": "github",
+     "rank": 7
+    },
+    {
+     "kind": "checks",
+     "label": "checks failing",
+     "provider": "github",
+     "rank": 8
+    },
+    {
+     "kind": "conflicts",
+     "label": "merge conflicts",
+     "provider": "github",
+     "rank": 9
+    },
+    {
+     "kind": "reply",
+     "label": "reply due",
+     "provider": "github",
+     "rank": 10
+    },
+    {
+     "kind": "reviewer_back",
+     "label": "reviewer due",
+     "provider": "github",
+     "rank": 11
+    },
+    {
+     "kind": "review",
+     "label": "review",
+     "provider": "github",
+     "rank": 12
+    },
+    {
+     "kind": "no_reviewer",
+     "label": "sem revisor",
+     "provider": "github",
+     "rank": 13
+    },
+    {
+     "kind": "merge",
+     "label": "can merge",
+     "provider": "github",
+     "rank": 14
+    },
+    {
+     "kind": "draft",
+     "label": "draft",
+     "provider": "github",
+     "rank": 15
+    },
+    {
+     "kind": "muted",
+     "label": "muted",
+     "provider": "github",
+     "rank": 16
+    },
+    {
+     "kind": "done",
+     "label": "closed",
+     "provider": "github",
+     "rank": 17
+    }
+   ],
+   "version": "d753e6ef5d59",
+   "views": [
+    {
+     "default_sort": "Waiting longest",
+     "id": "mine",
+     "label": "My PRs",
+     "order": 2,
+     "provider": "github",
+     "rows": true,
+     "surfaces": [
+      "web",
+      "tui"
+     ],
+     "unit": "Pull request"
+    },
+    {
+     "default_sort": "Waiting longest",
+     "id": "dash",
+     "label": "Backlog",
+     "order": 6,
+     "provider": "github",
+     "rows": false,
+     "surfaces": [
+      "web"
+     ]
+    },
+    {
+     "default_sort": "Waiting longest",
+     "id": "all",
+     "label": "All",
+     "order": 8,
+     "provider": "github",
+     "rows": true,
+     "surfaces": [
+      "web"
+     ]
+    },
+    {
+     "id": "explore",
+     "label": "Explore",
+     "order": 9,
+     "provider": "github",
+     "rows": false,
+     "search": {
+      "decisions": {
+       "APPROVED": "approved",
+       "CHANGES_REQUESTED": "changes requested",
+       "REVIEW_REQUIRED": "review required"
+      },
+      "default_sort": "updated-asc",
+      "filters": [
+       {
+        "label": "Not reviewed by me",
+        "term": "-reviewed-by:@me"
+       },
+       {
+        "label": "Ready for review",
+        "term": "draft:false"
+       },
+       {
+        "label": "Requested from me or my teams",
+        "term": "review-requested:@me"
+       },
+       {
+        "label": "Active in the last 30 days",
+        "window": 30
+       }
+      ],
+      "no_decision": "no review required",
+      "presets": [
+       {
+        "label": "Asked of me",
+        "query": "user-review-requested:@me"
+       },
+       {
+        "label": "Asked of my teams",
+        "query": "review-requested:@me -user-review-requested:@me"
+       }
+      ],
+      "sorts": [
+       {
+        "label": "Waiting longest",
+        "shown": "waiting longest",
+        "sort": "updated-asc"
+       },
+       {
+        "label": "Oldest opened",
+        "shown": "oldest opened",
+        "sort": "created-asc"
+       },
+       {
+        "label": "Recently updated",
+        "shown": "most recently updated",
+        "sort": "updated-desc"
+       }
+      ]
+     },
+     "surfaces": [
+      "web"
+     ]
+    }
+   ]
+  },
+  "now": 1791806400000,
+  "row": {
+   "actions": [
+    {
+     "enabled": true,
+     "id": "review"
+    },
+    {
+     "enabled": true,
+     "id": "address"
+    },
+    {
+     "enabled": true,
+     "id": "act"
+    },
+    {
+     "enabled": true,
+     "id": "nudge"
+    },
+    {
+     "enabled": true,
+     "id": "pause"
+    },
+    {
+     "enabled": true,
+     "id": "mute"
+    },
+    {
+     "enabled": true,
+     "id": "open"
+    },
+    {
+     "enabled": true,
+     "id": "remove"
+    }
+   ],
+   "facets": {
+    "age": [
+     "2026-10-09T00:00:00Z"
+    ],
+    "author": [
+     "me",
+     "me"
+    ],
+    "ci": [
+     "none"
+    ],
+    "is": [
+     "stalled"
+    ],
+    "kind": [
+     "no_reviewer"
+    ],
+    "lane": [
+     "me"
+    ],
+    "risk": [
+     "medium"
+    ],
+    "scope": null,
+    "size": [
+     "m"
+    ],
+    "status": [
+     "none"
+    ],
+    "tag": [
+     "area:messaging",
+     "audience:developers",
+     "audience:operators",
+     "change:fix",
+     "concern:concurrency",
+     "concern:reliability",
+     "domain:parts-matching",
+     "lang:python",
+     "tool:gcp-pubsub",
+     "infra:queue",
+     "infra:db",
+     "prio:high",
+     "customer:acme"
+    ],
+    "type": [
+     "fix"
+    ],
+    "wait": [
+     "me"
+    ],
+    "waits-on": [
+     "me"
+    ],
+    "where": [
+     "acme/web"
+    ]
+   },
+   "kind": "no_reviewer",
+   "label": "acme/web#2",
+   "payload": {
+    "author": "me",
+    "brief": {
+     "kind": "fix",
+     "open_questions": 2,
+     "risk": "medium",
+     "size": "m",
+     "tags": [
+      "area:messaging",
+      "audience:developers",
+      "audience:operators",
+      "change:fix",
+      "concern:concurrency",
+      "concern:reliability",
+      "domain:parts-matching",
+      "lang:python",
+      "tool:gcp-pubsub",
+      "infra:queue",
+      "infra:db",
+      "prio:high",
+      "customer:acme"
+     ]
+    },
+    "repo": "acme/web",
+    "viewer": "me"
+   },
+   "ref": {
+    "number": 2,
+    "owner": "acme",
+    "repo": "web"
+   },
+   "summary": {
+    "closed": false,
+    "line": "",
+    "reason": "",
+    "since": "2026-10-09T00:00:00Z",
+    "stalled": true,
+    "waits_on": "me"
+   },
+   "title": "fix(parts): resolve messages delivered out of order by the unary ack consumer when the broker redelivers",
+   "unit": {
+    "key": "acme/web#2",
+    "provider": "github"
+   },
+   "views": [
+    "mine",
+    "stalled"
+   ]
+  },
+  "specs": {
+   "act": {
+    "group": "control",
+    "id": "act",
+    "label": "Agir",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "address": {
+    "group": "control",
+    "id": "address",
+    "label": "Address",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "mute": {
+    "group": "control",
+    "id": "mute",
+    "label": "Silenciar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "nudge": {
+    "group": "control",
+    "id": "nudge",
+    "label": "Cutucar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "open": {
+    "group": "control",
+    "id": "open",
+    "label": "Abrir",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "pause": {
+    "group": "control",
+    "id": "pause",
+    "label": "Pausar",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "remove": {
+    "group": "control",
+    "id": "remove",
+    "label": "Remover",
+    "surfaces": [
+     "row"
+    ]
+   },
+   "review": {
+    "group": "control",
+    "id": "review",
+    "label": "Review",
+    "surfaces": [
+     "row"
+    ]
+   }
+  }
+ },
+ "views": {
+  "views": [
+   {
+    "id": "inbox",
+    "label": "Inbox",
+    "summary": "What nobody has clarified yet; once clarified, a task leaves for good.",
+    "empty": "Inbox zero: everything is clarified.",
+    "when": "task.category == 'inbox'",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "needs-me",
+    "label": "Needs me",
+    "summary": "Tasks whose next step is yours: a gate to answer or your own next action.",
+    "empty": "Nothing waits on you.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category != 'inbox' \u0026\u0026 (task.gates_open \u003e 0 || task.category in ['ready', 'active', 'waiting'])",
+    "sort": "-task.sequential_next",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "waiting",
+    "label": "Waiting",
+    "summary": "Tasks whose next step is someone else's, grouped by who owes it.",
+    "empty": "Nobody owes you anything.",
+    "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.owed_by != 'me' \u0026\u0026 (task.owed_by != '' || task.turns_running == 0)",
+    "over": "tasks",
+    "group": "task.owed_by",
+    "rail": false
+   },
+   {
+    "id": "chase",
+    "label": "Chase",
+    "summary": "Tasks someone else owes whose check date passed with nothing moving: time to nudge.",
+    "empty": "Nothing to chase: nobody is late.",
+    "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.owed_by != 'me' \u0026\u0026 task.owed_by != '' \u0026\u0026 !('stalled' in task.link_signals) \u0026\u0026 task.check_on \u003e timestamp(0) \u0026\u0026 task.check_on \u003c now \u0026\u0026 now - task.since_movement \u003c task.check_on",
+    "over": "tasks",
+    "group": "task.owed_by",
+    "rail": false
+   },
+   {
+    "id": "fits-now",
+    "label": "Fits now",
+    "summary": "Your next steps that take half an hour or less.",
+    "empty": "Nothing of yours fits in half an hour.",
+    "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
+    "sort": "task.prop.size",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "blocked-by-me",
+    "label": "Blocked by me",
+    "summary": "Asks that wait on you, grouped by who asked, the oldest first.",
+    "empty": "Nobody is blocked by you.",
+    "when": "task.owed_by == 'me' \u0026\u0026 size(task.askers) \u003e 0 \u0026\u0026 !(task.category in ['deferred', 'done', 'dropped'])",
+    "sort": "-task.ask_age",
+    "over": "tasks",
+    "group": "task.asker_names",
+    "rail": false
+   },
+   {
+    "id": "stalled",
+    "label": "Stalled",
+    "summary": "Tasks waiting too long: a source says they stalled, or their check date passed with nothing moving.",
+    "empty": "Nothing is stalled.",
+    "when": "task.link_signal.stalled || (!('stalled' in task.link_signals) \u0026\u0026 task.owed_by != 'me' \u0026\u0026 task.check_on \u003e timestamp(0) \u0026\u0026 task.check_on \u003c now \u0026\u0026 now - task.since_movement \u003c task.check_on)",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "in-loop",
+    "label": "In loop",
+    "summary": "Tasks an agent is working on right now.",
+    "empty": "No agent is working on anything.",
+    "when": "task.link_signal.in_loop || task.turns_running \u003e 0",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "approved",
+    "label": "Approved",
+    "summary": "Work a source says is approved and ready to land.",
+    "empty": "Nothing in Approved right now.",
+    "when": "task.link_signal.ready",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "snoozed",
+    "label": "Snoozed",
+    "summary": "Tasks asleep until a date, an event or a condition.",
+    "empty": "Nothing is snoozed.",
+    "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "focus",
+    "label": "Focus",
+    "summary": "The tasks you marked to focus on.",
+    "empty": "Nothing in focus: mark a task to focus on it.",
+    "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "projects",
+    "label": "Projects",
+    "summary": "Your open projects.",
+    "empty": "No open projects.",
+    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped'])",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "someday",
+    "label": "Someday",
+    "summary": "Tasks you might do some day, out of the way until then.",
+    "empty": "Nothing in Someday right now.",
+    "when": "task.state == 'someday'",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "logbook",
+    "label": "Logbook",
+    "summary": "What you finished, the latest first.",
+    "empty": "Nothing finished yet.",
+    "when": "task.category == 'done'",
+    "sort": "task.since_movement",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "done",
+    "label": "Done",
+    "summary": "Finished tasks that still hold a workspace on disk, to remove.",
+    "empty": "No finished task holds a workspace.",
+    "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "outbox",
+    "label": "Outbox",
+    "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send.",
+    "empty": "No drafts wait on you.",
+    "when": "gate.kind == 'draft' \u0026\u0026 (gate.status == 'open' || gate.delivery in ['sending', 'failed'])",
+    "over": "gates",
+    "rail": false
+   },
+   {
+    "id": "review-projects",
+    "label": "Projects to review",
+    "summary": "Projects past their review, or with no next action of yours and not in Someday.",
+    "empty": "Every project has a next action and is reviewed.",
+    "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "review",
+    "label": "Review",
+    "summary": "The weekly review: walk each step until the lists are clean.",
+    "empty": "Nothing in Review right now.",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "home-blocked",
+    "label": "Blocked by you",
+    "summary": "Tasks that wait on you: a gate to decide or someone's ask, the longest owed first.",
+    "empty": "Nothing in Blocked by you right now.",
+    "when": "task.owed_by == 'me' \u0026\u0026 (task.gates_open \u003e 0 || size(task.askers) \u003e 0) \u0026\u0026 !(task.category in ['inbox', 'deferred', 'done', 'dropped'])",
+    "sort": "task.owed_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "home-stalled",
+    "label": "Stalled the longest",
+    "summary": "Open tasks no agent is working on, the longest unmoved first.",
+    "empty": "Nothing in Stalled the longest right now.",
+    "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.turns_running == 0",
+    "sort": "-task.since_movement",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-answer",
+    "label": "Agent questions",
+    "summary": "Tasks with a question or a post that waits for your answer.",
+    "empty": "Nothing in Agent questions right now.",
+    "when": "'answer' in task.decisions",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-approve-plan",
+    "label": "Plans to approve",
+    "summary": "Tasks with a plan that waits for your approval.",
+    "empty": "Nothing in Plans to approve right now.",
+    "when": "'approve-plan' in task.decisions",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-send-draft",
+    "label": "Drafts to send",
+    "summary": "Tasks with a draft that waits for you to send it.",
+    "empty": "Nothing in Drafts to send right now.",
+    "when": "'send-draft' in task.decisions",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-review-step",
+    "label": "Steps to review",
+    "summary": "Tasks with a step that waits for your review.",
+    "empty": "Nothing in Steps to review right now.",
+    "when": "'review-step' in task.decisions",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-last-step",
+    "label": "Last steps",
+    "summary": "Your tasks whose work only waits for its last step at its source.",
+    "empty": "Nothing in Last steps right now.",
+    "when": "'last-step' in task.decisions \u0026\u0026 task.owed_by == 'me'",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-pick-someone",
+    "label": "Pick someone",
+    "summary": "Your tasks that wait for you to pick who takes them next.",
+    "empty": "Nothing in Pick someone right now.",
+    "when": "'pick-someone' in task.decisions \u0026\u0026 task.owed_by == 'me'",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   },
+   {
+    "id": "decide-act",
+    "label": "To act on",
+    "summary": "Tasks with a proposal or a request that waits for you to act.",
+    "empty": "Nothing in To act on right now.",
+    "when": "'act' in task.decisions",
+    "sort": "task.decision_since",
+    "over": "tasks",
+    "rail": false
+   }
+  ],
+  "areas": null,
+  "contexts": null,
+  "verbs": null,
+  "facets": [
+   {
+    "id": "source",
+    "label": "Source",
+    "provider": "",
+    "fact": "task.unit_providers",
+    "group": true,
+    "sort": "text",
+    "labels": {
+     "github": "GitHub",
+     "session": "Session",
+     "slack": "Slack",
+     "task": "Task",
+     "workspace": "Workspace"
+    },
+    "menu": true,
+    "show": "meta"
+   },
+   {
+    "id": "state",
+    "label": "State",
+    "provider": "",
+    "fact": "task.state",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "inbox",
+     "next",
+     "waiting",
+     "scheduled",
+     "someday",
+     "done",
+     "reference",
+     "trash"
+    ],
+    "labels": {
+     "done": "Done",
+     "inbox": "Inbox",
+     "next": "Next",
+     "reference": "Reference",
+     "scheduled": "Scheduled",
+     "someday": "Someday",
+     "trash": "Trash",
+     "waiting": "Waiting"
+    },
+    "menu": true,
+    "show": "kind"
+   },
+   {
+    "id": "category",
+    "label": "Category",
+    "provider": "",
+    "fact": "task.category",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "inbox",
+     "ready",
+     "deferred",
+     "done",
+     "dropped"
+    ],
+    "menu": true
+   },
+   {
+    "id": "contexts",
+    "label": "Context",
+    "provider": "",
+    "fact": "task.prop.contexts",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "calls",
+     "computer"
+    ],
+    "empty": "no context",
+    "menu": true,
+    "show": "meta",
+    "label_prefix": "@"
+   },
+   {
+    "id": "waits-on",
+    "label": "Waits on (person)",
+    "provider": "",
+    "fact": "task.owed_by",
+    "group": true,
+    "match": "team",
+    "menu": true,
+    "show": "who"
+   },
+   {
+    "id": "turn",
+    "label": "Whose turn",
+    "provider": "",
+    "fact": "task.turn",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "me",
+     "others",
+     "nobody"
+    ],
+    "labels": {
+     "me": "Your turn",
+     "nobody": "Nobody's turn",
+     "others": "Others' turn"
+    },
+    "menu": true,
+    "strip": true,
+    "colors": {
+     "me": "me",
+     "nobody": "nobody",
+     "others": "author"
+    }
+   },
+   {
+    "id": "asked-by",
+    "label": "Asked by",
+    "provider": "",
+    "fact": "task.asker_names",
+    "group": true,
+    "sort": "text",
+    "menu": true,
+    "show": "meta"
+   },
+   {
+    "id": "placement",
+    "label": "Placement",
+    "provider": "",
+    "fact": "task.placement",
+    "group": true,
+    "sort": "text",
+    "empty": "no placement",
+    "match": "suffix",
+    "menu": true
+   },
+   {
+    "id": "where",
+    "label": "Where",
+    "provider": "",
+    "fact": "task.placement",
+    "group": true,
+    "sort": "text",
+    "match": "suffix",
+    "menu": true
+   },
+   {
+    "id": "owed",
+    "label": "Owed since",
+    "provider": "",
+    "fact": "task.owed_since",
+    "group": false,
+    "sort": "time",
+    "empty": "owed by nobody",
+    "menu": true,
+    "show": "age",
+    "show_when": {
+     "turn": [
+      "me"
+     ]
+    },
+    "show_label": "since {{.at}}"
+   },
+   {
+    "id": "moved",
+    "label": "Moved",
+    "provider": "",
+    "fact": "task.moved_at",
+    "group": true,
+    "sort": "time",
+    "empty": "never moved",
+    "menu": true,
+    "buckets": [
+     {
+      "id": "1d",
+      "label": "0-1 days",
+      "within": "24h"
+     },
+     {
+      "id": "3d",
+      "label": "1-3 days",
+      "within": "72h"
+     },
+     {
+      "id": "7d",
+      "label": "3-7 days",
+      "within": "168h"
+     },
+     {
+      "id": "2w",
+      "label": "1-2 weeks",
+      "within": "336h"
+     },
+     {
+      "id": "4w",
+      "label": "2-4 weeks",
+      "within": "672h"
+     },
+     {
+      "id": "older",
+      "label": "over 4 weeks",
+      "within": ""
+     }
+    ],
+    "show": "age",
+    "show_when": {
+     "turn": [
+      "others",
+      "nobody"
+     ]
+    },
+    "show_label": "moved {{.at}}"
+   },
+   {
+    "id": "gates",
+    "label": "Open gates",
+    "provider": "",
+    "fact": "task.gates_open",
+    "group": true,
+    "sort": "text",
+    "menu": true
+   },
+   {
+    "id": "signal",
+    "label": "Signals",
+    "provider": "",
+    "fact": "task.link_signals",
+    "group": true,
+    "menu": true
+   },
+   {
+    "id": "prop.kind",
+    "label": "Kind",
+    "provider": "",
+    "fact": "task.prop.kind",
+    "group": true,
+    "sort": "text",
+    "rank": [
+     "start",
+     "capture",
+     "project",
+     "pull-request",
+     "thread"
+    ],
+    "labels": {
+     "capture": "capture",
+     "project": "project",
+     "start": "new work"
+    },
+    "menu": true
+   },
+   {
+    "id": "prop.area",
+    "label": "Area",
+    "provider": "",
+    "fact": "task.prop.area",
+    "group": true,
+    "sort": "text",
+    "menu": true,
+    "show": "meta"
+   },
+   {
+    "id": "prop.risk",
+    "label": "Task risk",
+    "provider": "",
+    "fact": "task.prop.risk",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "labels": {
+     "high": "high",
+     "low": "low",
+     "medium": "medium"
+    },
+    "menu": true
+   },
+   {
+    "id": "prop.focus",
+    "label": "Focus",
+    "provider": "",
+    "fact": "task.prop.focus",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "on",
+     "off"
+    ],
+    "labels": {
+     "off": "not starred",
+     "on": "starred"
+    },
+    "menu": true
+   },
+   {
+    "id": "prop.priority",
+    "label": "Priority",
+    "provider": "",
+    "fact": "task.prop.priority",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "high",
+     "normal",
+     "low"
+    ],
+    "labels": {
+     "high": "high",
+     "low": "low",
+     "normal": "normal"
+    },
+    "menu": true
+   },
+   {
+    "id": "type",
+    "label": "Type",
+    "provider": "",
+    "fact": "brief.kind",
+    "group": true,
+    "sort": "text",
+    "empty": "no brief",
+    "menu": true,
+    "show": "meta"
+   },
+   {
+    "id": "risk",
+    "label": "Risk",
+    "provider": "",
+    "fact": "brief.risk",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "high",
+     "medium",
+     "low"
+    ],
+    "labels": {
+     "high": "high",
+     "low": "low",
+     "medium": "medium"
+    },
+    "empty": "no brief",
+    "menu": true,
+    "show": "meta",
+    "label_prefix": "risk "
+   },
+   {
+    "id": "size",
+    "label": "Size",
+    "provider": "",
+    "fact": "brief.size",
+    "group": true,
+    "sort": "rank",
+    "rank": [
+     "xs",
+     "s",
+     "m",
+     "l",
+     "xl"
+    ],
+    "labels": {
+     "l": "L",
+     "m": "M",
+     "s": "S",
+     "xl": "XL",
+     "xs": "XS"
+    },
+    "empty": "no brief",
+    "menu": true,
+    "show": "meta"
+   },
+   {
+    "id": "tag",
+    "label": "Tag",
+    "provider": "",
+    "fact": "brief.tags",
+    "group": false,
+    "match": "prefix",
+    "menu": true,
+    "show": "meta",
+    "show_max": 2
+   }
+  ],
+  "default_sort": "View order",
+  "lens": {
+   "default_group": "{{.label}} (default)",
+   "board_group": "{{.label}} (board)",
+   "no_group": "None",
+   "copied": "Copied {{.count}} from {{.view}} as YAML.",
+   "copied_grouped": "Copied {{.count}} from {{.view}}, grouped by {{.group}}, as YAML.",
+   "tag_key": "{{.label}} {{.key}}",
+   "tag_key_empty": "no {{.key}}",
+   "grouped": "group: {{.label}}",
+   "sorted": "sort: {{.label}}",
+   "descending": "{{.label}} (descending)",
+   "no_lens": "nothing to group or sort here",
+   "age_now": "now",
+   "age_minutes": "{{.m}}m",
+   "age_hours": "{{.h}}h {{.m}}m",
+   "age_days": "{{.d}}d {{.h}}h",
+   "filter_label": "Filter by {{.label}} {{.value}}",
+   "filter_title": "Filter by {{.label}} {{.value}} · Alt+click leaves it out",
+   "filter_title_group": "Filter by {{.label}} {{.value}} · Shift+click groups by {{.group}} · Alt+click leaves it out",
+   "filter_group": "waits on (group)",
+   "list_count": "{{.unit}}: {{.shown}} of {{.total}}",
+   "list_empty": "Nothing here right now.",
+   "countdown_title": "sends at {{.time}}",
+   "countdown_sending": "sending",
+   "countdown_seconds": "in {{.s}} s",
+   "countdown_minutes": "in {{.m}}m {{.s}}s",
+   "tip_named": "{{.strip}} ({{.who}})",
+   "tip_kind": "{{.tip}}: {{.kind}}",
+   "tip_why": "{{.tip}}. {{.why}}",
+   "legend_title": "The strip on the left of each row is the color of whom it waits on",
+   "sort_by": "Sort by {{.label}}",
+   "col_unit": "Item",
+   "stale": "stale",
+   "stale_title": "Its plugin is not reporting; this is its last report",
+   "briefing": "briefing",
+   "briefing_title": "intake {{.seq}} waits for the brief",
+   "briefing_attempt": "attempt {{.n}}",
+   "briefing_error": "last error: {{.error}}",
+   "questions": "? {{.n}}",
+   "questions_title": "{{.n}} open {{plural .n \"one\" \"question\" \"other\" \"questions\"}} in the brief",
+   "starred": "Starred",
+   "until": "until {{.date}}",
+   "due": "due {{.date}}",
+   "unread": "unread {{.lag}}",
+   "unread_title": "The oldest message on its links not yet read by the extraction",
+   "review_due": "review due",
+   "no_next_action": "no next action",
+   "open_children": "{{.n}} open",
+   "sequential": "sequential",
+   "every": "every {{.every}}",
+   "reviewed": "reviewed {{.date}}",
+   "more": "+{{.n}}"
+  },
+  "detail_verbs": null,
+  "effects": null,
+  "draft_purposes": null,
+  "draft_states": null,
+  "run_states": null,
+  "session_states": null
+ }
+}

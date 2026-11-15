@@ -1,13 +1,9 @@
-summary = "Offer to close a Slack task whose threads all ended, with a closing message, a closing mark or long enough without a message, as your Slack settings set, when no other signal offers it; it resolves the task's items as moot"
+summary = "Close a Slack task whose threads all ended, with a closing message, a closing mark or long enough without a message, as your Slack settings set, when no other signal offers it, once the extraction read its newest message; it resolves the task's items as moot"
 provider = "task"
-when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_ended && !(size(task.units) == 1 && (task.link_signal.asked_reacted || task.link_signal.replied_last))'
+when = 'task.prop.kind == "thread" && task.items_open > 0 && !(task.category in ["done", "dropped", "deferred"]) && task.link_ended && !(size(task.units) == 1 && (task.link_signal.asked_reacted || task.link_signal.replied_last)) && !task.link_signal.extraction_pending'
 key = ["task.fingerprint"]
 order = 59
 
 [[step]]
 use = "items.resolve"
 resolution = "moot"
-
-[[gates.approval.rule]]
-when = 'gate.kind == "plan"'
-mode = "wait"

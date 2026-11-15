@@ -9,7 +9,7 @@ WINDOW_TAGS = $(if $(filter darwin,$(1)),-tags purego)
 BRAND_TEST_NAME := zzbrand
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=$(BRAND_TEST_NAME) -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
-.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs proto
+.PHONY: web test-web build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs proto
 
 PLUGINS := github slack
 
@@ -35,6 +35,17 @@ build-targets: ## Build every package, the binary and each plugin's binary for e
 			CGO_ENABLED=0 GOOS=$${t%/*} GOARCH=$${t#*/} go build -o "$$d/$$t/plugins/$$id/$(BINARY)-plugin-$$id" ./plugins/$$id/cmd/wloop-plugin-$$id || exit 1; \
 		done; \
 	done
+
+UI := internal/web/ui
+
+$(UI)/node_modules/.package-lock.json: $(UI)/package-lock.json $(UI)/package.json
+	cd $(UI) && npm ci --no-audit --no-fund
+
+web: $(UI)/node_modules/.package-lock.json ## Build the cockpit's bundle into internal/web/static/app; the bundle is committed
+	cd $(UI) && npm run build
+
+test-web: $(UI)/node_modules/.package-lock.json ## Run the cockpit's component tests and type check
+	cd $(UI) && npm test && npm run check
 
 vet-darwin: ## Vet the darwin build
 	GOOS=darwin CGO_ENABLED=0 go vet $(call WINDOW_TAGS,darwin) ./...

@@ -9,3 +9,4 @@ docs/dist/
 docs/.astro/
 docs/plans/
 docs/superpowers/
+/internal/web/ui/node_modules

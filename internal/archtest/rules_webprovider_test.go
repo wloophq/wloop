@@ -2,8 +2,6 @@ package archtest
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -15,7 +13,7 @@ import (
 
 const webStatic = "internal/web/static"
 
-// ruleWebProvider flags each line of a cockpit script that quotes a
+// ruleWebProvider flags each line of a cockpit source that quotes a
 // plugin's id: the client reads providers from what the daemon serves and
 // never branches on one.
 func ruleWebProvider(file, src string, plugins []string) []string {
@@ -51,20 +49,11 @@ var bundledIDs = sync.OnceValues(func() ([]string, error) {
 	return ids, nil
 })
 
-// TestCockpitScriptsNameNoPlugin checks that the cockpit's scripts quote no
-// plugin's id.
+// TestCockpitScriptsNameNoPlugin checks that the cockpit's modules and
+// components quote no plugin's id.
 func TestCockpitScriptsNameNoPlugin(t *testing.T) {
-	dir := filepath.Join("..", "..", webStatic)
-	files, err := filepath.Glob(filepath.Join(dir, "*.js"))
-	if err != nil || len(files) == 0 {
-		t.Fatalf("no scripts under %s: %v", webStatic, err)
-	}
-	for _, f := range files {
-		raw, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, b := range ruleWebProvider(webStatic+"/"+filepath.Base(f), string(raw), pluginIDs()) {
+	for file, src := range cockpitSources(t) {
+		for _, b := range ruleWebProvider(file, src, pluginIDs()) {
 			t.Error(b)
 		}
 	}

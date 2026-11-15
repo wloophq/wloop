@@ -34,6 +34,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 var _ workspaces.FetchLog = (*sqlite.Fetches)(nil)
@@ -200,8 +201,9 @@ func (e *Env) brokenWorkflows() []string {
 	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
 }
 
-// disabledWorkflows are the workflows of ws, or named in cfg, that cfg turns
-// off or that ship off and cfg does not turn on.
+// disabledWorkflows are the workflows cfg or a profile of yours turns off, whose held drafts stay: whoever
+// stopped one decides them. One the bundled profile ships off, that cfg never turned on, is not among them:
+// its held drafts predate it shipping off, and the withdrawal drops them as moot.
 func disabledWorkflows(cfg config.Config, ws []workflow.Workflow) []string {
 	var out []string
 	for name, wc := range cfg.Workflows {
@@ -209,13 +211,29 @@ func disabledWorkflows(cfg config.Config, ws []workflow.Workflow) []string {
 			out = append(out, name)
 		}
 	}
+	shipped := shippedOff()
 	for _, w := range ws {
-		if off(w, cfg) && !slices.Contains(out, w.Name) {
+		if off(w, cfg) && !slices.Contains(shipped, w.Name) && !slices.Contains(out, w.Name) {
 			out = append(out, w.Name)
 		}
 	}
 	return out
 }
+
+// shippedOff are the bundled profile's workflows whose own manifest ships them off.
+var shippedOff = sync.OnceValue(func() []string {
+	l, err := turn.Bundled()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, w := range l.Workflows {
+		if w.Off {
+			out = append(out, w.Name)
+		}
+	}
+	return out
+})
 
 // off says whether cfg leaves w off: it turns it off, or w ships off and cfg
 // does not turn it on.
@@ -433,6 +451,7 @@ func configFacts(cfg config.Config) workflow.Facts {
 		"config.plugins.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
 		"config.tasks.stale_waiting_days":         cfg.Tasks.StaleWaitingDays,
 		"config.drafts.repeat_after":              time.Duration(cfg.Drafts.RepeatAfter),
+		"config.drafts.stale_after_days":          cfg.Drafts.StaleAfterDays,
 		"config.turns.per_day":                    cfg.Turns.PerDay,
 	}
 }

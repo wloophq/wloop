@@ -1,1 +1,1 @@
-summary = "Oferecer fechar uma tarefa do Slack de uma só conversa quando quem pediu, ou quem ela espera, marcou com um check uma mensagem posterior, como a sua resposta; resolve os itens da tarefa como feitos"
+summary = "Fechar uma tarefa do Slack de uma só conversa quando quem pediu, ou quem ela espera, marcou com um check uma mensagem posterior, como a sua resposta, quando a extração já leu a mensagem mais nova; resolve os itens da tarefa como feitos"

@@ -275,6 +275,10 @@ var otherFacts = []Fact{
 	wf("draft", "person_asks_you", expr.Bool, "Every one of the draft's people asked you something still open on the draft's unit: an open item there that they requested waits on you, or is assigned to you and waits on nobody else. False for a draft of no people."),
 	wf("draft", "people_outside", expr.Int, "The draft's people its unit's plugin knows are not members of the conversation it posts in (a plugin's members_fact); a draft posted in the direct conversation of the person it is to counts none, and a person whose membership the plugin cannot tell is not counted."),
 	wf("draft", "target_joined", expr.Bool, "The person a draft posted in their direct conversation is to is now, as the plugin knows, a member of the conversation the draft came from; false for any other draft."),
+	wf("draft", "people_posted_at", expr.Time, "When the draft's people last posted on its unit, as its plugin knows (a plugin's posted_fact), on every item of the draft since the latest of its ask, its reopening and its task's last nudge: the oldest of each item's newest such post; zero when an item has none or the plugin cannot tell. Test with `> timestamp(0)`."),
+	wf("draft", "people_reacted_at", expr.Time, "The same as draft.people_posted_at for the draft's people's reactions on each item's ask or a later message (a plugin's reactions_fact), by the time of the message reacted on, the emoji drafts.ignored_reactions names left out. Test with `> timestamp(0)`."),
+	wf("draft", "people_unmentionable", expr.Int, "The draft's people its unit's plugin knows a message there cannot mention, such as a bot or a team named by text (a plugin's unmentionable_fact); 0 when the plugin cannot tell."),
+	timeVarying(wf("draft", "items_age_days", expr.Int, "Working days, in the configured location, since the newest of the draft's items was asked or last reopened: every item it lists is at least that old; 0 for a draft of no items.")),
 	unitDraftFact("failed", expr.Bool, "A draft on the unit failed to send and waits for its proposer to revise or withdraw it: its plugin refused it, or the unit moved past what it was written against. The loop restarts nothing on its own; a workflow's when reads it."),
 	unitDraftFact("stale", expr.Bool, "A draft on the unit failed to send because the unit moved past what it was written against, such as a push after a review was read; draft.failed is true too."),
 	unitDraftFact("failed_kind", expr.String, "The kind of the unit's newest draft that failed to send, as its plugin's manifest names it, such as review; empty when none failed. A workflow that restarts a round reads it to restart only for its own kind."),
@@ -297,6 +301,7 @@ var otherFacts = []Fact{
 	wf("config", "plugins.github.nudge.silent_days", expr.Int, "The plugins.github.nudge.silent_days setting, in calendar days."),
 	wf("config", "tasks.stale_waiting_days", expr.Int, "The tasks.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
+	wf("config", "drafts.stale_after_days", expr.Int, "The drafts.stale_after_days setting, in working days."),
 	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together."),
 }
 
