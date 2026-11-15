@@ -455,16 +455,24 @@ export async function loadTaskDrafts(e: J): Promise<void> {
   if (taskState.id === e.id) put(taskState, "drafts", (out && out.drafts) || []);
 }
 
-// loadUnitTasks reads the open tasks that hold the unit key, "<provider>:<key>".
+// loadUnitTasks reads the open tasks that hold the unit key, "<provider>:<key>", and the held and failed drafts
+// that wait on it but those an open question pins, which are that question's to decide; no drafts when they
+// cannot be read.
 export async function loadUnitTasks(key: string): Promise<void> {
   detailState.unitKey = key || "";
   if (!key) {
     detailState.unitTasks = [];
+    detailState.unitDrafts = [];
     return;
   }
-  const out = await getJSON(unitPath(keyUnit(key), "tasks")).catch(() => []);
+  const u = keyUnit(key);
+  const [tasks, drafts] = await Promise.all([
+    getJSON(unitPath(u, "tasks")).catch(() => []),
+    getJSON("/api/drafts?" + new URLSearchParams({ unit: u.provider + "/" + u.key, state: "held,failed" }).toString()).catch(() => null),
+  ]);
   if (detailState.unitKey !== key) return;
-  put(detailState, "unitTasks", out);
+  put(detailState, "unitTasks", tasks);
+  put(detailState, "unitDrafts", ((drafts && drafts.drafts) || []).filter((d: J) => !d.pinned_by));
 }
 
 // loadDetailPane reads the task route names, marking an inbox task seen once, or the open tasks of the unit it

@@ -91,12 +91,20 @@ func (s *Server) handleDrafts(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, id)
 	}
 	f.Task = q.Get("task")
+	if raw := q.Get("unit"); raw != "" {
+		u, err := parseDraftUnit(raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		f.Unit = &u
+	}
 	var ps []outbox.Pending
 	var err error
 	switch {
 	case len(ids) > 0:
 		ps, err = s.draftsByID(r.Context(), ids)
-	case len(f.States) == 0 && f.Task == "":
+	case len(f.States) == 0 && f.Task == "" && f.Unit == nil:
 		ps, err = o.Outbox(r.Context())
 	default:
 		ps, err = s.draftsWithGates(r.Context(), f)

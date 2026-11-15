@@ -36,6 +36,12 @@ beforeEach(() => {
 });
 
 
+const unitDraftsURL = "/api/drafts?unit=github%2Facme%2Fapi%238&state=held%2Cfailed";
+const unitDraft = (id: number, extra: any = {}) => ({
+  id, unit: "github/acme/api#8", task: "e-1", kind: "review", purpose: "review", delivery: "review", state: "held", text: "Two findings block the merge.",
+  gate: 100 + id, intents: { approved: "approve", rejected: "discard" }, rev: 1, fields: [{ pointer: "/event", label: "Verdict", value: "REQUEST_CHANGES" }], ...extra,
+});
+
 const extras = (d: any) => render(UnitExtras, { d }).container;
 const byFocus = (c: HTMLElement, slot: string) => c.querySelector(`[data-focus="${slot}"]`) as HTMLElement | null;
 
@@ -81,13 +87,13 @@ test("the composer's text belongs to its unit: another unit's composer starts em
   expect((byFocus(a, "unit:reply:text") as HTMLTextAreaElement).value).toBe("draft for 8");
 });
 
-test("the unit detail route reads the unit's tasks in one request and lists them with its card", async () => {
+test("the unit detail route reads the unit's tasks and drafts and lists the tasks with its card", async () => {
   tasksState.catalog = { views: [{ id: "fits-now" }] };
   answers["/api/units/github/acme%2Fapi%238/tasks"] = [{ id: "e-1", title: "Task e-1", state: "next" }, { id: "e-3", title: "Task e-3", state: "waiting" }];
   const route = readRoute("#unit=github/acme%2Fapi%238");
   expect(route.unit).toBe("github:acme/api#8");
   await loadDetailPane(route);
-  expect(asked).toEqual(["/api/units/github/acme%2Fapi%238/tasks"]);
+  expect(asked).toEqual(["/api/units/github/acme%2Fapi%238/tasks", unitDraftsURL]);
   expect(detailState.unitTasks.map((e: any) => e.id)).toEqual(["e-1", "e-3"]);
   const c = extras({ row: { unit: pr }, items: [], card: { card: { unit: pr, title: "Retry flaky uploads", state: "open" } } });
   for (const s of ["Retry flaky uploads", "Tasks", "Task e-1", "Task e-3"]) expect(c.textContent).toContain(s);
@@ -154,4 +160,25 @@ test("a card shows its signals in its plugin's words and whom it waits on", () =
   expect(c.querySelector(".flag")?.textContent).toBe("plugin disabled");
   const none = render(UnitCard, { s: { card: { unit: pr, signals: [{ key: "ci", value: "failing" }] } }, signals: false }).container;
   expect(none.querySelector(".signals")).toBeNull();
+});
+
+test("the unit detail shows the drafts that wait on the unit with their verdict and gate actions, not those a question pins", async () => {
+  answers["/api/units/github/acme%2Fapi%238/tasks"] = [{ id: "e-1", title: "Task e-1", state: "next" }];
+  answers[unitDraftsURL] = { drafts: [unitDraft(7), unitDraft(8, { pinned_by: 3, text: "Pinned by a question." })] };
+  await loadDetailPane(readRoute("#unit=github/acme%2Fapi%238"));
+  const c = extras({ row: { unit: pr }, items: [] });
+  expect([...c.querySelectorAll("[data-draft]")].map((x) => x.getAttribute("data-draft"))).toEqual(["7"]);
+  expect(c.textContent).toContain("Two findings block the merge.");
+  expect(c.textContent).not.toContain("Pinned by a question.");
+  expect(c.querySelector('.pv[data-value="REQUEST_CHANGES"]')).not.toBeNull();
+  await fireEvent.click(byFocus(c, "unit:approve:draft:7") as HTMLButtonElement);
+  await settle();
+  expect(posts.map((p) => p.url)).toEqual(["/api/gates/107/approve"]);
+});
+
+test("the unit detail shows no drafts section when none waits on the unit, or the drafts cannot be read", async () => {
+  answers["/api/units/github/acme%2Fapi%238/tasks"] = [];
+  await loadDetailPane(readRoute("#unit=github/acme%2Fapi%238"));
+  expect(detailState.unitDrafts).toEqual([]);
+  expect(extras({ row: { unit: pr }, items: [] }).querySelector("[data-draft]")).toBeNull();
 });

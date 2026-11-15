@@ -179,7 +179,7 @@ Three operations sit on a draft's card beside approve and discard, as the draft'
 - **Don't nudge this conversation** (`POST /api/units/{provider}/{key}/skip/{workflow}`, `DELETE` to undo), offered on a draft that nudges (`task.nudged`), stops the draft's workflow on its unit until you undo it, and withdraws the workflow's drafts held there as `skipped`; the task stays where it is. A workflow plans nothing on a skipped unit, nor on a task one of whose units is skipped, and a draft its workflow proposed on such a subject is withdrawn `skipped` at the next sweep. A unit's detail lists its `skipped_workflows`.
 - **Stop drafting these** (`POST /api/workflows/{name}/disable`), on the head of a workflow's group in the Outbox, writes `workflows.<name>.enabled = false` to the configuration, with a backup, and applies it without a restart; the drafts it already holds stay in the Outbox.
 
-Only you run them, yourself or through a session you drive. A task lists its pending drafts, held or failed, in its `drafts`, and `GET /api/drafts?task=<id>` serves their cards.
+Only you run them, yourself or through a session you drive. A task lists its pending drafts, held or failed, in its `drafts`, and `GET /api/drafts?task=<id>` serves their cards; `GET /api/drafts?unit=<provider>/<key>` serves the cards of a unit's drafts, with `state=held,failed` its pending ones.
 
 ### The Outbox grouped by why
 

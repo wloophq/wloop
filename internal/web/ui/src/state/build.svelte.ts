@@ -17,13 +17,14 @@ export function buildAction(loaded: string, served: string, blocked: boolean, re
 const held = (text: unknown) => String(text || "").trim() !== "";
 
 // draftsShown are the drafts the page holds, as "draft:<id>", the key a draft's edits live under: those of the
-// open task, its drafts, the listed tasks and gates, the Outbox and the queue.
+// open task, its drafts, the open unit's, the listed tasks and gates, the Outbox and the queue.
 function draftsShown(): Set<string> {
   const out = new Set<string>();
   const subject = (g: J) => g && g.subject && typeof g.subject === "object" && g.subject.id !== undefined && out.add("draft:" + g.subject.id);
   const task = (e: J) => e && (e.gates || []).forEach(subject);
   task(detailState.task);
   for (const d of taskState.drafts) out.add("draft:" + d.id);
+  for (const d of detailState.unitDrafts) out.add("draft:" + d.id);
   tasksState.tasks.forEach(task);
   tasksState.gates.forEach(subject);
   for (const g of (outboxState.page && outboxState.page.groups) || []) for (const d of g.drafts || []) out.add("draft:" + d.id);

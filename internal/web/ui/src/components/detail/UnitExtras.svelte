@@ -4,16 +4,18 @@
   import type { J } from "../../lib/util";
   import { viewHash } from "../../state/route.svelte";
   import { detailState } from "../../state/store.svelte";
+  import DraftCard from "../gates/DraftCard.svelte";
   import UnitCard from "./UnitCard.svelte";
   import UnitComposer from "./UnitComposer.svelte";
   import { itemStateWord, RESOLVED_ITEMS_SHOWN } from "./unit";
 
   // What a unit detail shows beside the row: its card, its items with whom each waits on and the task that holds
-  // it, its composer, and the open tasks that hold it.
+  // it, its composer, the drafts that wait on it, and the open tasks that hold it.
   let { d }: { d: J } = $props();
 
   let unfolded = $state(false);
   const tasks = $derived(detailState.unitKey ? detailState.unitTasks : []);
+  const drafts = $derived(detailState.unitKey ? detailState.unitDrafts : []);
   const items = $derived((d && d.items) || []);
   const isOpen = (it: J) => it.state !== "resolved";
   const open = $derived(items.filter(isOpen));
@@ -38,6 +40,12 @@
     {#if hidden}<button type="button" class="act" data-focus="unit:items:more" onclick={() => (unfolded = true)}>{tn("+{n} resolved", hidden)}</button>{/if}
   {/if}
   {#if d && d.row}<UnitComposer u={d.row.unit} />{/if}
+  {#if drafts.length}
+    <section class="d-gates" aria-label={t("Open gates")}>
+      <h2 class="d-sub">{t("Waiting on you")}</h2>
+      {#each drafts as dr (dr.id)}<DraftCard task={null} draft={dr} scope="unit" />{/each}
+    </section>
+  {/if}
   {#if tasks.length}
     <h2 class="d-sub">{t("Tasks")}</h2>
     <ul class="d-tasks">

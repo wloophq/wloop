@@ -4,7 +4,7 @@ import type { J } from "../lib/util";
 import { API_VERSION, getJSON, postJSON, REQUEST_TIMEOUT_MS } from "./api";
 import { FakeDaemon } from "../testing/fakedaemon";
 import { nav } from "./route.svelte";
-import { state, tasksState } from "./store.svelte";
+import { detailState, state, tasksState } from "./store.svelte";
 import { connect, DEBOUNCE_MS, load, onChange, resetSync, scheduleLoad, settled, stream, type EventSourceLike } from "./sync.svelte";
 
 // The sync's contract, ported from deltas_test.go: a debounce gathers the stream's changes into one read, each
@@ -146,6 +146,19 @@ describe("the sync", () => {
     message({ rev: 1, gates: true, units: [unit("a/b#1")] });
     await flush();
     expect(named(daemon.urls)).toContain("detail");
+  });
+
+  test("a draft proposed while a unit is open shows on it", async () => {
+    nav.hash = "#view=needs-me&unit=github/a%2Fb%231";
+    const drafts = "/api/drafts?unit=github%2Fa%2Fb%231&state=held%2Cfailed";
+    daemon.pages[drafts] = { drafts: [] };
+    await boot();
+    expect(detailState.unitDrafts).toEqual([]);
+    daemon.pages[drafts] = { drafts: [{ id: 9, unit: "github/a/b#1", state: "held", text: "Two findings." }] };
+    message({ rev: 1, gates: true });
+    await flush();
+    expect(daemon.urls).toContain(drafts);
+    expect(detailState.unitDrafts.map((d: J) => d.id)).toEqual([9]);
   });
 
   test("an all message reloads whole", async () => {

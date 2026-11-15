@@ -106,8 +106,8 @@ export const tasksState = $state({
   rev: 0,
 });
 
-// detailState is the task the detail shows, the open tasks of the unit it shows, and the text being written in
-// it: the composer, the drafts being edited, by task id.
+// detailState is the task the detail shows, the open tasks of the unit it shows and the drafts that wait on that
+// unit, and the text being written in it: the composer, the drafts being edited, by task id.
 export const detailState = $state({
   id: "",
   task: null as J,
@@ -115,6 +115,7 @@ export const detailState = $state({
   seenFor: "",
   unitKey: "",
   unitTasks: [] as J[],
+  unitDrafts: [] as J[],
   compose: { key: "", text: "", reaction: "" },
   answer: "",
   guidance: "",

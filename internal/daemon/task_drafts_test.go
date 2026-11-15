@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"slices"
 	"strconv"
 	"testing"
@@ -99,5 +100,32 @@ func TestDraftsFilteredByTask(t *testing.T) {
 	}
 	if len(res.Drafts) != 1 || res.Drafts[0].ID != int64(mine.ID) {
 		t.Fatalf("drafts %+v, want only %d (not %s)", res.Drafts, mine.ID, strconv.FormatInt(int64(theirs.ID), 10))
+	}
+}
+
+func TestDraftsFilteredByUnit(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	other := unit.Unit{Provider: unit.GitHub, Key: "acme/web#3"}
+	ctx := context.Background()
+	propose := func(u unit.Unit, text string) draft.Draft {
+		d, err := r.o.Propose(ctx, outbox.Proposal{Unit: u, Kind: draft.Kind("reply"), Text: text,
+			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	mine, theirs := propose(r7u, "one"), propose(other, "two")
+	var res api.DraftsResponse
+	q := url.Values{"unit": {string(r7u.Provider) + "/" + r7u.Key}, "state": {"held,failed"}}
+	if code := get(t, r.s, api.Drafts+"?"+q.Encode(), &res); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	if len(res.Drafts) != 1 || res.Drafts[0].ID != int64(mine.ID) {
+		t.Fatalf("drafts %+v, want only %d (not %d)", res.Drafts, mine.ID, theirs.ID)
+	}
+	if code := get(t, r.s, api.Drafts+"?unit=nokey", &res); code != 400 {
+		t.Fatalf("a unit that is not <provider>/<key>: %d, want 400", code)
 	}
 }

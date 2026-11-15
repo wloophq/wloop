@@ -7,9 +7,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Drafts lists drafts (query parameters state, a comma list, id, a comma list of draft ids, and task; with
-// none, the Outbox's: those whose gate is open, and those whose gate approved them and whose delivery failed)
-// and, posted a DraftCreate, holds a draft the user wrote. A draft's decision is its gate's, resolved through
+// Drafts lists drafts (query parameters state, a comma list, id, a comma list of draft ids, task, and unit,
+// "<provider>/<key>"; with none, the Outbox's: those whose gate is open, and those whose gate approved them and
+// whose delivery failed) and, posted a DraftCreate, holds a draft the user wrote. A draft's decision is its gate's, resolved through
 // GatePath; a draft gate's Subject is its Draft.
 const Drafts = "/api/drafts"
 
