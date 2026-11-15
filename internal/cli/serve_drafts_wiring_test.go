@@ -385,3 +385,34 @@ func TestServeEndsTheTurnAFailedOrDroppedDraftHeld(t *testing.T) {
 		t.Fatalf("ended %v, want %v; draft %d stays held and ends nothing", ended, want, kept.ID)
 	}
 }
+
+func TestServedTaskListsItsHeldDraft(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	td := servedWithGitHub(t, &livePublisher{head: "c2"})
+	u := draftsPR
+	e, err := td.Client().CreateTask(ctx, api.TaskCreate{Title: "Answer the export question", Unit: &u})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := td.Client().CreateDraft(ctx, api.DraftCreate{Unit: draftsPR, Task: e.ID, Kind: "comment", Text: "The export keeps the column.", Source: "cockpit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := td.Client().Task(ctx, e.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Drafts, []int64{d.ID}) {
+		t.Fatalf("task %s lists the drafts %v, want its held draft %d", e.ID, got.Drafts, d.ID)
+	}
+	t.Run("notifies once", func(t *testing.T) {
+		own, err := td.Client().Task(ctx, fmt.Sprintf("draft:%d", d.ID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (got.Attention == nil) == (own.Attention == nil) {
+			t.Fatalf("the task notifies %+v and its draft %+v, want exactly one of them", got.Attention, own.Attention)
+		}
+	})
+}

@@ -61,7 +61,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		e.Turns.DraftGates, e.Turns.DraftVerdict = turnDrafts{e.outbox}, e.draftVerdict
 	}
 	e.hosted.setOutbox(e.outbox)
-	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
+	d.Outbox, d.SendDrafts, d.Drafts = e.outbox, !e.noJobs, e.outbox.Store
 	if d.Gates == nil {
 		d.Gates = e.newGates(db, logf)
 		d.GateReader = e.gateReader
