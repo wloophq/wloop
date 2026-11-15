@@ -131,6 +131,32 @@ func TestPRReviewedAppliesOnTheLaunchRouteOnly(t *testing.T) {
 	}
 }
 
+func TestPRReviewedMarksNothingWhenAPushLandedAfterTheRoundRead(t *testing.T) {
+	h := &fakeHost{listing: apiListing}
+	p := started(t, &githubGraphQL{}, h)
+	ctx := context.Background()
+	if err := p.store().SetViewer(ctx, "ana"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.store().UpsertPR(ctx, pr.PR{Ref: ref7, Author: "bruno", State: "OPEN", HeadOid: "h8", Reasons: []string{"reviewed"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.store().SaveDetail(ctx, ref7, store.Detail{Version: store.DetailVersion, ReadAt: testAt, AuthorAssociation: "MEMBER",
+		Commits: []pr.Commit{{Oid: "h6", Parents: 1}, {Oid: "h7", Parents: 1}, {Oid: "h8", Parents: 1}},
+		Reviews: []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: "ana", SubmittedAt: testAt.Add(-time.Hour), CommitOid: "h6"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, head := range []string{"h7", ""} {
+		err := p.ApplyEffect(ctx, src.EffectRequest{Effect: EffectReviewed, Unit: ref7.Unit(), Turn: &src.TurnRef{ID: "t1", Head: head}, Route: src.RouteLaunch, Taken: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := h.markSets(); len(got) != 0 {
+		t.Fatalf("a round that read h7, or no head, marked the stored h8 reviewed: %v", got)
+	}
+}
+
 func TestTheTurnEffectsOfAPlannedRoundLeaveItsMarksToThePlan(t *testing.T) {
 	h := &fakeHost{listing: apiListing}
 	p := started(t, &githubGraphQL{}, h)

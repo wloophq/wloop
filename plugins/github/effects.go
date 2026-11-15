@@ -51,7 +51,7 @@ func (p *Plugin) applyTurnEffect(ctx context.Context, req src.EffectRequest) err
 		if req.Route != src.RouteLaunch || !req.Taken {
 			return nil
 		}
-		if marks, err = r.reviewedMarks(ctx, ref); err != nil {
+		if marks, err = r.reviewedMarks(ctx, ref, req.Turn); err != nil {
 			return err
 		}
 	case EffectAddressed:
@@ -71,11 +71,12 @@ func (p *Plugin) applyTurnEffect(ctx context.Context, req src.EffectRequest) err
 	return r.host.Recorder.SetMarks(ctx, req.Unit, marks)
 }
 
-// reviewedMarks cover the reviews of the stored pull request a review round
-// saw; none while the store has not read it in full.
-func (r *running) reviewedMarks(ctx context.Context, ref pr.Ref) (map[string]string, error) {
+// reviewedMarks cover the reviews of the stored pull request review round t
+// saw; none while the store has not read it in full, or once a push moved
+// its head off the one t read, whose reviews a follow-up still covers.
+func (r *running) reviewedMarks(ctx context.Context, ref pr.Ref, t *src.TurnRef) (map[string]string, error) {
 	row, ok, err := r.db.PR(ctx, ref)
-	if err != nil || !ok {
+	if err != nil || !ok || t == nil || row.HeadOid != t.Head {
 		return nil, err
 	}
 	details, err := r.db.Details(ctx, []pr.Ref{ref})
