@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -188,4 +190,49 @@ func cockpitLiterals(file, src string) []jsLiteral {
 		return lits
 	}
 	return jsLiterals(src)
+}
+
+// uiImport is a module specifier a cockpit source imports, statically or dynamically.
+var uiImport = regexp.MustCompile(`(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)["']([^"']+)["']`)
+
+// uiInnerLayers are the cockpit's layers below its components: the store and its reads, and the pure modules.
+var uiInnerLayers = []string{"state/", "lib/"}
+
+// ruleUILayers flags each import of a component, or of anything under components/, by a module of the cockpit's
+// state or lib: the components draw the store and call the modules, never the reverse. component says whether a
+// path under ui/src is a component file, since a .svelte.ts module is imported as "x.svelte" too.
+func ruleUILayers(file, src string, component func(rel string) bool) []string {
+	rel := strings.TrimPrefix(file, webUI+"/")
+	if !slices.ContainsFunc(uiInnerLayers, func(l string) bool { return strings.HasPrefix(rel, l) }) {
+		return nil
+	}
+	var out []string
+	for i, line := range strings.Split(src, "\n") {
+		for _, m := range uiImport.FindAllStringSubmatch(line, -1) {
+			spec := m[1]
+			if !strings.HasPrefix(spec, ".") {
+				continue
+			}
+			target := path.Clean(path.Join(path.Dir(rel), spec))
+			if strings.HasPrefix(target, "components/") || target == "components" || component(target) {
+				out = append(out, fmt.Sprintf("%s:%d imports %s; state and lib modules never import a component (R-uilayers)", file, i+1, spec))
+			}
+		}
+	}
+	return out
+}
+
+// TestCockpitStateAndLibImportNoComponent checks that no module of the cockpit's state/ or lib/ imports a
+// component: the components depend on the store and the modules, never the reverse.
+func TestCockpitStateAndLibImportNoComponent(t *testing.T) {
+	root := filepath.Join("..", "..", webUI)
+	component := func(rel string) bool {
+		st, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
+		return err == nil && !st.IsDir() && strings.HasSuffix(rel, ".svelte")
+	}
+	for file, src := range cockpitSources(t) {
+		for _, b := range ruleUILayers(file, src, component) {
+			t.Error(b)
+		}
+	}
 }

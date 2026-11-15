@@ -50,3 +50,17 @@ func TestSvelteProseFlagsAPlantedText(t *testing.T) {
 		}
 	}
 }
+
+func TestRUILayersFlagsAPlantedImport(t *testing.T) {
+	src := `import { t } from "../lib/i18n.svelte";
+import { gateAt } from "../components/gates/gates";
+import Row from "../components/rows/RowView.svelte";
+const lazy = import("../components/chrome/dash");
+import { put } from "./loaders.svelte";
+`
+	component := func(rel string) bool { return rel == "lib/Widget.svelte" }
+	flagged(t, "state", ruleUILayers("internal/web/ui/src/state/x.ts", src, component), 3, "(R-uilayers)")
+	flagged(t, "a component may import anything", ruleUILayers("internal/web/ui/src/components/rows/x.ts", src, component), 0, "")
+	flagged(t, "lib", ruleUILayers("internal/web/ui/src/lib/x.ts", `import X from "./Widget.svelte";`, component), 1, "lib/x.ts:1")
+	flagged(t, "a .svelte.ts module", ruleUILayers("internal/web/ui/src/lib/x.ts", `import { t } from "./i18n.svelte";`, component), 0, "")
+}

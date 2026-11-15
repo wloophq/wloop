@@ -23,6 +23,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestClientsQuoteNoWordOutsideTheCatalog` | The Go clients quote no single word a person reads outside the string catalog (`strings.toml`, through `texts.Catalog`): a single word a client quotes is a catalog key, or is compared, switched on, a key, a constant, an Objective-C name, or one of the `clientTokens`, which let exactly `clientTokenUses` literals pass. |
 | `TestCockpitRebuildsNoDOM` | The cockpit's modules and components never rebuild DOM to reflect data (no replaceChildren, replaceWith, innerHTML, outerHTML, insertAdjacentHTML or {@html}) and carry no <style> block, so every color stays in app.css. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's modules and components quote no plugin's id. |
+| `TestCockpitStateAndLibImportNoComponent` | No module of the cockpit's state/ or lib/ imports a component: the components depend on the store and the modules, never the reverse. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
 | `TestCoreImportsNoPluginDomain` | The core imports no plugin, no plugin imports another, and `pluginDebt` only shrinks. |
