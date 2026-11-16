@@ -133,7 +133,7 @@ var indexesPlannedElsewhere = []string{
 	// reads.
 	"pr_state",
 	"drafts_state", "drafts_unit", "drafts_task", "drafts_rule", "drafts_workflow",
-	"gates_due", "gates_task", "gates_unit",
+	"gates_due", "gates_task", "gates_unit", "gates_subject",
 }
 
 func TestNoUnusedIndex(t *testing.T) {

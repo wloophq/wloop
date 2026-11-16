@@ -55,6 +55,8 @@ func init() {
 	hotPlans = append(hotPlans,
 		hotPlan{name: "drafts in a state", query: draftSelect + ` WHERE state IN (SELECT value FROM json_each(?))` + draftOrder, args: 1,
 			want: []string{"drafts_state (state=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+		hotPlan{name: "drafts by id", query: draftSelect + ` WHERE id IN (SELECT value FROM json_each(?))` + draftOrder, args: 1,
+			want: []string{"SEARCH drafts USING INTEGER PRIMARY KEY (rowid=?)"}},
 		hotPlan{name: "drafts of a task", query: draftSelect + ` WHERE task = ?` + draftOrder, args: 1,
 			want: []string{"drafts_task (task=?)"}},
 		hotPlan{name: "drafts of a unit", query: draftSelect + ` WHERE provider = ? AND unit_key = ?` + draftOrder, args: 2,
@@ -446,5 +448,32 @@ func TestSettledAtIsEachSubjectsNewestSettledDraftOfTheWorkflow(t *testing.T) {
 		if want := draft.SettledAt(all, "nudge", u); !got[u].Equal(want) {
 			t.Errorf("%s: settled at %v, want %v", u, got[u], want)
 		}
+	}
+}
+
+func TestListKeepsTheDraftsWhoseIDItNames(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	s := db.Drafts()
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	for range 3 {
+		if _, err := s.Insert(ctx, sampleDraft(slackThread, at)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := s.List(ctx, outbox.Filter{IDs: []draft.ID{3, 1, 404}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []draft.ID
+	for _, d := range got {
+		ids = append(ids, d.ID)
+	}
+	if !slices.Equal(ids, []draft.ID{3, 1}) {
+		t.Fatalf("drafts 3, 1 and 404: %v", ids)
+	}
+	if got, err := s.List(ctx, outbox.Filter{IDs: []draft.ID{2}, States: []draft.State{draft.Sent}}); err != nil || len(got) != 0 {
+		t.Fatalf("draft 2 when sent: %v %v", got, err)
 	}
 }

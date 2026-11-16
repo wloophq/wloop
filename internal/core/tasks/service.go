@@ -933,13 +933,17 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 	wasOpen := map[task.ID]bool{}
 	var p pending
 	var roused []task.ID
+	read, err := s.readUnits(ctx, units)
+	if err != nil {
+		return nil, err
+	}
 	seen := map[unit.Unit]bool{}
 	for _, u := range units {
 		if seen[u] {
 			continue
 		}
 		seen[u] = true
-		f, ok, err := s.d.Facts.UnitFacts(ctx, u)
+		f, ok, err := read.facts(ctx, u)
 		if err != nil {
 			return nil, fmt.Errorf("facts of %s: %w", u, err)
 		}
@@ -947,11 +951,11 @@ func (s *Service) sync(ctx context.Context, units []unit.Unit) ([]task.Task, err
 			continue
 		}
 		f.Unit = u
-		its, err := s.d.Items.Items(ctx, u)
+		its, err := read.items(ctx, u)
 		if err != nil {
 			return nil, fmt.Errorf("items of %s: %w", u, err)
 		}
-		have, err := s.d.Store.TasksOf(ctx, u)
+		have, err := read.tasks(ctx, u)
 		if err != nil {
 			return nil, err
 		}
@@ -1189,4 +1193,42 @@ func (s *Service) unitClosed(ctx context.Context, u unit.Unit) ([]task.Task, err
 		ended[i] = c.Task
 	}
 	return ended, s.d.Store.Apply(ctx, cs)
+}
+
+// unitReads are what a sync reads of each unit: from what the dependencies that read many units at once read
+// up front, else one unit at a time.
+type unitReads struct {
+	facts func(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error)
+	items func(ctx context.Context, u unit.Unit) ([]items.Item, error)
+	tasks func(ctx context.Context, u unit.Unit) ([]task.Task, error)
+}
+
+func (s *Service) readUnits(ctx context.Context, units []unit.Unit) (unitReads, error) {
+	r := unitReads{facts: s.d.Facts.UnitFacts, items: s.d.Items.Items, tasks: s.d.Store.TasksOf}
+	if b, ok := s.d.Facts.(UnitsFacts); ok {
+		got, err := b.UnitsFacts(ctx, units)
+		if err != nil {
+			return r, fmt.Errorf("facts of %d units: %w", len(units), err)
+		}
+		r.facts = func(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+			f, ok := got[u]
+			return f, ok, nil
+		}
+		units = slices.DeleteFunc(slices.Clone(units), func(u unit.Unit) bool { _, ok := got[u]; return !ok })
+	}
+	if b, ok := s.d.Items.(UnitsItems); ok {
+		got, err := b.Load(ctx, units)
+		if err != nil {
+			return r, fmt.Errorf("items of %d units: %w", len(units), err)
+		}
+		r.items = func(_ context.Context, u unit.Unit) ([]items.Item, error) { return got[u], nil }
+	}
+	if b, ok := s.d.Store.(UnitTasks); ok {
+		got, err := b.TasksOfUnits(ctx, units)
+		if err != nil {
+			return r, fmt.Errorf("tasks of %d units: %w", len(units), err)
+		}
+		r.tasks = func(_ context.Context, u unit.Unit) ([]task.Task, error) { return got[u], nil }
+	}
+	return r, nil
 }

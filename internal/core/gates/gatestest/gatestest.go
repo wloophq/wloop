@@ -157,7 +157,8 @@ func (s *Store) Where(_ context.Context, q gates.Query) ([]gate.Gate, error) {
 	}
 	return s.filter(func(g gate.Gate) bool {
 		return slices.Contains(statuses, g.Status) && (q.Kind == "" || g.Kind == q.Kind) && (q.Name == "" || g.Name == q.Name) &&
-			(q.Task == "" || g.Task == q.Task) && (q.Unit.IsZero() || g.Unit == q.Unit)
+			(q.Task == "" || g.Task == q.Task) && (q.Unit.IsZero() || g.Unit == q.Unit) &&
+			(len(q.Subjects) == 0 || slices.Contains(q.Subjects, g.Subject))
 	}), nil
 }
 
@@ -316,6 +317,35 @@ func StoreContract(t *testing.T, open func(t *testing.T) (gates.Store, gates.Rea
 		}
 		if _, err := r.Get(ctx, 404); !errors.Is(err, gates.ErrNoGate) {
 			t.Fatalf("get: %v", err)
+		}
+	})
+	t.Run("where keeps the gates whose subject it lists", func(t *testing.T) {
+		s, r, _ := open(t)
+		var want []int64
+		for _, subject := range []string{"7", "8", "9", "7"} {
+			g := draft("t-01")
+			g.Subject = subject
+			opened, err := s.Open(ctx, g)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if subject != "8" {
+				want = append(want, opened.ID)
+			}
+		}
+		got, err := r.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: []string{"9", "7", "404"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ids []int64
+		for _, g := range got {
+			ids = append(ids, g.ID)
+		}
+		if !slices.Equal(ids, want) {
+			t.Fatalf("where subjects 9 and 7: %v, want %v", ids, want)
+		}
+		if got, err := r.Where(ctx, gates.Query{Kind: gate.KindDraft}); err != nil || len(got) != 4 {
+			t.Fatalf("where with no subjects: %d %v", len(got), err)
 		}
 	})
 	t.Run("lists are ordered by id", func(t *testing.T) {

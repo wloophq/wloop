@@ -106,3 +106,44 @@ func TestAPassReadsTheCardsOnce(t *testing.T) {
 		t.Fatalf("a unit outside the pass read the cards %d times in all", reads)
 	}
 }
+
+func TestUnitsFactsReadsTheCardsOnceAndLeavesOutDisabledUnits(t *testing.T) {
+	reads := 0
+	off := unit.Unit{Provider: "mail", Key: "m-9"}
+	cs := cardMap{unitU: {Unit: unitU, StartedByMe: true, LastHuman: &card.Human{Who: ana, At: t0}}, unitV: {Unit: unitV, Cares: true}, off: {Unit: off, Cares: true}}
+	f := cardFacts(cs, "mail")
+	f.Cards = countingCards{cs, &reads}
+	got, err := f.UnitsFacts(context.Background(), []unit.Unit{unitU, unitV, off})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reads != 1 {
+		t.Errorf("the cards were read %d times", reads)
+	}
+	if _, held := got[off]; held || len(got) != 2 {
+		t.Fatalf("facts %+v", got)
+	}
+	for _, u := range []unit.Unit{unitU, unitV} {
+		if want, _, _ := cardFacts(cs, "mail").UnitFacts(context.Background(), u); got[u] != want {
+			t.Errorf("%s: %+v, want %+v", u, got[u], want)
+		}
+	}
+}
+
+func TestUnitsFactsInAPassShareItsCards(t *testing.T) {
+	reads := 0
+	cards := countingCards{cardMap{unitU: {Unit: unitU, StartedByMe: true}, unitV: {Unit: unitV, Cares: true}}, &reads}
+	f := coretasks.CardFacts{Cards: cards}
+	pass := &coretasks.Pass{Tasks: []task.Task{{ID: "t-1", Units: []unit.Unit{unitU, unitV}}}}
+	ctx := coretasks.WithPass(context.Background(), pass)
+	if _, _, err := f.UnitFacts(ctx, unitU); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.UnitsFacts(ctx, []unit.Unit{unitU, unitV})
+	if err != nil || !got[unitU].StartedByMe || !got[unitV].Cares {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if reads != 1 {
+		t.Fatalf("the cards were read %d times", reads)
+	}
+}

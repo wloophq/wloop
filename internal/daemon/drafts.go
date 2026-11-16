@@ -137,28 +137,31 @@ func (s *Server) draftsWithGates(ctx context.Context, f outbox.Filter) ([]outbox
 
 // draftsByID are drafts ids that exist, each with its gate.
 func (s *Server) draftsByID(ctx context.Context, ids []draft.ID) ([]outbox.Pending, error) {
+	listed, err := s.deps.Outbox.Store.List(ctx, outbox.Filter{IDs: ids})
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[draft.ID]draft.Draft, len(listed))
+	for _, d := range listed {
+		byID[d.ID] = d
+	}
 	var ds []draft.Draft
 	for _, id := range ids {
-		d, err := s.deps.Outbox.Store.Get(ctx, id)
-		if errors.Is(err, outbox.ErrNotFound) {
-			continue
+		if d, ok := byID[id]; ok {
+			ds = append(ds, d)
 		}
-		if err != nil {
-			return nil, err
-		}
-		ds = append(ds, d)
 	}
 	return s.withGates(ctx, ds)
 }
 
 func (s *Server) withGates(ctx context.Context, ds []draft.Draft) ([]outbox.Pending, error) {
+	gs, err := s.deps.Outbox.GatesOf(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]outbox.Pending, 0, len(ds))
 	for _, d := range ds {
-		g, _, err := s.deps.Outbox.GateOf(ctx, d)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, outbox.Pending{Draft: d, Gate: g})
+		out = append(out, outbox.Pending{Draft: d, Gate: gs[d.ID]})
 	}
 	return out, nil
 }

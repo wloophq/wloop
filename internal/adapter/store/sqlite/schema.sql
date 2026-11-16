@@ -379,6 +379,7 @@ CREATE TABLE gates (
 CREATE INDEX gates_due ON gates (status, deadline);
 CREATE INDEX gates_task ON gates (task_id);
 CREATE INDEX gates_unit ON gates (provider, unit_key);
+CREATE INDEX gates_subject ON gates (subject);
 
 CREATE TABLE task_position (
   only INTEGER PRIMARY KEY CHECK (only = 1),

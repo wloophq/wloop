@@ -194,6 +194,10 @@ func (s draftStore) Get(ctx context.Context, id draft.ID) (draft.Draft, error) {
 func (s draftStore) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error) {
 	var where []string
 	var args []any
+	if len(f.IDs) > 0 {
+		list, _ := json.Marshal(f.IDs)
+		where, args = append(where, `id IN (SELECT value FROM json_each(?))`), append(args, string(list))
+	}
 	if len(f.States) > 0 {
 		list, _ := json.Marshal(f.States)
 		where, args = append(where, `state IN (SELECT value FROM json_each(?))`), append(args, string(list))

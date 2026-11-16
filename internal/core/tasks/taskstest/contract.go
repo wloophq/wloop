@@ -89,6 +89,43 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			t.Fatalf("a missing task: %v", err)
 		}
 	})
+	t.Run("TasksOfUnitsIsTasksOfEachUnit", func(t *testing.T) {
+		s := open(t)
+		batch, ok := s.(coretasks.UnitTasks)
+		if !ok {
+			t.Skip("the store reads the tasks of one unit at a time")
+		}
+		third := unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}
+		none := unit.Unit{Provider: unit.GitHub, Key: "acme/api#404"}
+		both := Full("t-0000000000000011")
+		resolved := Full("t-0000000000000012")
+		resolved.Units, resolved.Items, resolved.Resolved = nil, nil, []task.ItemRef{{Unit: third, Item: "z"}}
+		alone := Full("t-0000000000000013")
+		alone.Units, alone.Items, alone.Resolved = []unit.Unit{third}, nil, nil
+		apply(t, s, both, resolved, alone)
+		units := []unit.Unit{pr, other, third, none}
+		got, err := batch.TasksOfUnits(ctx, units)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, u := range units {
+			want, err := s.TasksOf(ctx, u)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(ids(got[u]), ids(want)) {
+				t.Errorf("tasks of %s: %v, want %v", u, ids(got[u]), ids(want))
+			}
+			for i := range want {
+				if !got[u][i].Same(want[i]) {
+					t.Errorf("task %s of %s reads\n%+v\nwant\n%+v", want[i].ID, u, got[u][i], want[i])
+				}
+			}
+		}
+		if _, held := got[none]; held {
+			t.Errorf("a unit no task names is held: %v", got[none])
+		}
+	})
 	t.Run("AWriteThatOpensOrClosesATaskStampsWhen", func(t *testing.T) {
 		s := open(t)
 		e := Full("t-0000000000000003")

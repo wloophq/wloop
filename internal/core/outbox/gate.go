@@ -191,20 +191,34 @@ func (s *Service) failHeld(ctx context.Context, d draft.Draft, cause draft.Cause
 
 // GateOf is d's gate; false when it has none.
 func (s *Service) GateOf(ctx context.Context, d draft.Draft) (gate.Gate, bool, error) {
-	if s.Gates == nil {
-		return gate.Gate{}, false, nil
+	gs, err := s.GatesOf(ctx, []draft.Draft{d})
+	g, ok := gs[d.ID]
+	return g, ok, err
+}
+
+// GatesOf is the gate of each of ds that has one, read at once.
+func (s *Service) GatesOf(ctx context.Context, ds []draft.Draft) (map[draft.ID]gate.Gate, error) {
+	out := make(map[draft.ID]gate.Gate, len(ds))
+	if s.Gates == nil || len(ds) == 0 {
+		return out, nil
 	}
-	gs, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindDraft, Unit: d.Unit, Statuses: everyStatus})
+	byID := make(map[draft.ID]draft.Draft, len(ds))
+	subjects := make([]string, 0, len(ds))
+	for _, d := range ds {
+		byID[d.ID] = d
+		subjects = append(subjects, strconv.FormatInt(int64(d.ID), 10))
+	}
+	gs, err := s.Gates.Where(ctx, gates.Query{Kind: gate.KindDraft, Subjects: subjects, Statuses: everyStatus})
 	if err != nil {
-		return gate.Gate{}, false, err
+		return nil, err
 	}
-	subject := strconv.FormatInt(int64(d.ID), 10)
-	for _, g := range slices.Backward(gs) {
-		if g.Subject == subject {
-			return g, true, nil
+	for _, g := range gs {
+		id, ok := subjectID(g)
+		if d, listed := byID[id]; ok && listed && g.Unit == d.Unit {
+			out[id] = g
 		}
 	}
-	return gate.Gate{}, false, nil
+	return out, nil
 }
 
 // Pending is a draft the Outbox shows, with its gate.
@@ -280,14 +294,14 @@ func (s *Service) reask(ctx context.Context, f Filter) error {
 	if err != nil {
 		return err
 	}
+	gs, err := s.GatesOf(ctx, ds)
+	if err != nil {
+		return err
+	}
 	var errs []error
 	for _, d := range ds {
-		g, ok, err := s.GateOf(ctx, d)
-		switch {
-		case err != nil:
-			errs = append(errs, err)
-			continue
-		case ok && g.ApprovedRev == d.Rev:
+		g, ok := gs[d.ID]
+		if ok && g.ApprovedRev == d.Rev {
 			continue
 		}
 		if d.State == draft.Queued {

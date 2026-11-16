@@ -66,6 +66,8 @@ type Proposal struct {
 }
 
 type Filter struct {
+	// IDs keeps the drafts whose ID is one of them; empty matches every draft.
+	IDs       []draft.ID
 	States    []draft.State
 	Unit      *unit.Unit
 	Task      string
@@ -1312,16 +1314,14 @@ func (s *Service) PlaceBroadcasts(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	ds = slices.DeleteFunc(ds, func(d draft.Draft) bool { return d.Broadcast != draft.NoBroadcast || d.Reaction != "" })
+	gs, err := s.GatesOf(ctx, ds)
+	if err != nil {
+		return err
+	}
 	var errs []error
 	for _, d := range ds {
-		if d.Broadcast != draft.NoBroadcast || d.Reaction != "" {
-			continue
-		}
-		prev, gated, err := s.GateOf(ctx, d)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
+		prev, gated := gs[d.ID]
 		if d.State == draft.Held && (!gated || prev.Status != gate.Open) {
 			continue
 		}

@@ -328,6 +328,47 @@ func (s taskStore) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error
 	return out, err
 }
 
+const ofUnits = `id IN (SELECT task_id FROM task_units WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?))
+		UNION SELECT task_id FROM task_items WHERE (provider, unit_key) IN (SELECT value->>0, value->>1 FROM json_each(?)))`
+
+func (s taskStore) TasksOfUnits(ctx context.Context, units []unit.Unit) (map[unit.Unit][]task.Task, error) {
+	out := map[unit.Unit][]task.Task{}
+	if len(units) == 0 {
+		return out, nil
+	}
+	pairs, err := UnitPairs(units)
+	if err != nil {
+		return nil, err
+	}
+	var es []task.Task
+	err = s.db.Read(ctx, func(tx *sql.Tx) error {
+		es, err = loadTasks(ctx, tx, ofUnits, pairs, pairs)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	asked := make(map[unit.Unit]bool, len(units))
+	for _, u := range units {
+		asked[u] = true
+	}
+	for _, e := range es {
+		named := map[unit.Unit]bool{}
+		for _, u := range e.Units {
+			named[u] = true
+		}
+		for _, r := range slices.Concat(e.Items, e.Resolved) {
+			named[r.Unit] = true
+		}
+		for u := range named {
+			if asked[u] {
+				out[u] = append(out[u], e)
+			}
+		}
+	}
+	return out, nil
+}
+
 func newEpoch() string {
 	var b [8]byte
 	_, _ = rand.Read(b[:])

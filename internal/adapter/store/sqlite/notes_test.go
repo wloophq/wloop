@@ -538,7 +538,7 @@ var reads = []string{
 	"Classifications.Output", "Classifications.Spent",
 	"Fetches.Last",
 	"DB.AgentTranscript", "DB.WorkflowActivity",
-	"taskStore.MergeOf", "DB.TasksRunByHand", "DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "DB.Props",
+	"taskStore.MergeOf", "DB.TasksRunByHand", "DB.Tasks", "taskStore.Tasks", "taskStore.TasksSince", "taskStore.Task", "taskStore.TasksOf", "taskStore.TasksOfUnits", "DB.Props",
 	"DB.Gates", "GateStore.Get", "GateStore.OfTask", "GateStore.Where", "GateStore.Due", "GateStore.Unapplied", "GateStore.Begun",
 	"DB.Wakes", "WakeStore.Of", "WakeStore.All", "WakeStore.Due", "WakeStore.Watching", "WakeStore.UnitWakes",
 	"draftStore.SettledAt",

@@ -45,16 +45,14 @@ func (s *Service) Adopt(ctx context.Context, ended func(ctx context.Context, id 
 	if err != nil {
 		return 0, 0, err
 	}
+	held = slices.DeleteFunc(held, func(d draft.Draft) bool { return d.Task != "" })
+	gs, err := s.GatesOf(ctx, held)
+	if err != nil {
+		return 0, 0, err
+	}
 	var errs []error
 	for _, d := range held {
-		if d.Task != "" {
-			continue
-		}
-		g, ok, err := s.GateOf(ctx, d)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
+		g, ok := gs[d.ID]
 		if !ok || g.Status != gate.Open || g.Task == "" {
 			continue
 		}

@@ -1,6 +1,7 @@
 package outbox
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strconv"
@@ -188,6 +189,86 @@ func TestADraftApprovedBeforeACrashIsSentOnceAfterIt(t *testing.T) {
 	for _, d := range []draft.Draft{cut, ran} {
 		if got := e.get(d.ID).State; got != draft.Sent {
 			t.Errorf("draft %d is %s", d.ID, got)
+		}
+	}
+}
+
+type whereCounted struct {
+	Gates
+	wheres *int
+}
+
+func (g whereCounted) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	*g.wheres++
+	return g.Gates.Where(ctx, q)
+}
+
+func TestGatesOfReadsEveryDraftsGateAtOnce(t *testing.T) {
+	e := newEnv()
+	held := e.propose(reply("held"))
+	edited := e.propose(reply("edited"))
+	if _, err := e.svc.Edit(ctx, edited.ID, "edited again", edited.Rev); err != nil {
+		t.Fatal(err)
+	}
+	rejected := e.propose(reply("rejected"))
+	if err := e.decide(rejected.ID, "discard"); err != nil {
+		t.Fatal(err)
+	}
+	other := reply("on the pull request")
+	other.Unit = pull
+	elsewhere := e.propose(other)
+	var ds []draft.Draft
+	want := map[draft.ID]gate.Gate{}
+	for _, id := range []draft.ID{held.ID, edited.ID, rejected.ID, elsewhere.ID} {
+		d := e.get(id)
+		ds = append(ds, d)
+		want[id] = e.gate(id)
+	}
+	var wheres int
+	e.svc.Gates = whereCounted{e.svc.Gates, &wheres}
+	got, err := e.svc.GatesOf(ctx, ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wheres != 1 {
+		t.Errorf("GatesOf read the gates %d times", wheres)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("GatesOf: %v, want %v", got, want)
+	}
+	for id, g := range want {
+		if got[id].ID != g.ID || got[id].Status != g.Status {
+			t.Errorf("draft %d: gate %+v, want %+v", id, got[id], g)
+		}
+	}
+}
+
+func TestStartupSweepsReadTheGatesOfTheirDraftsAtOnce(t *testing.T) {
+	sweeps := map[string]func(s *Service) error{
+		"reask": func(s *Service) error { return s.Reask(ctx) },
+		"adopt": func(s *Service) error {
+			_, _, err := s.Adopt(ctx, func(context.Context, task.ID) (bool, error) { return false, nil })
+			return err
+		},
+		"place broadcasts": func(s *Service) error { return s.PlaceBroadcasts(ctx) },
+	}
+	for name, sweep := range sweeps {
+		wheres := func(n int) int {
+			e := newEnv()
+			for i := range n {
+				p := reply("held " + strconv.Itoa(i))
+				p.Broadcast = draft.NoBroadcast
+				e.propose(p)
+			}
+			var count int
+			e.svc.Gates = whereCounted{e.svc.Gates, &count}
+			if err := sweep(e.svc); err != nil {
+				t.Fatal(err)
+			}
+			return count
+		}
+		if one, many := wheres(1), wheres(5); one != many {
+			t.Errorf("%s: 1 draft reads the gates %d times, 5 drafts %d", name, one, many)
 		}
 	}
 }

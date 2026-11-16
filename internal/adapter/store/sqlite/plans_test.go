@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -95,6 +96,14 @@ var hotPlans = []hotPlan{
 	{name: "a task's gates", query: gatesOfTaskSQL, args: 1, want: []string{"gates_task (task_id=?)"}},
 	gatesWherePlan("open gates", gates.Query{}, "gates_due (status=?)", "USE TEMP B-TREE FOR ORDER BY"),
 	gatesWherePlan("gates of a unit", gates.Query{Unit: unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}}, "gates_unit (provider=? AND unit_key=?)", ""),
+	gatesWherePlan("open draft gates", gates.Query{Kind: gate.KindDraft}, "gates_due (status=?)", "USE TEMP B-TREE FOR ORDER BY"),
+	gatesWherePlan("the outbox's draft gates", gates.Query{Kind: gate.KindDraft, Statuses: []gate.Status{gate.Open, gate.Approved}},
+		"gates_due (status=?)", "USE TEMP B-TREE FOR ORDER BY"),
+	gatesWherePlan("draft gates of subjects", gates.Query{Kind: gate.KindDraft, Subjects: []string{"7", "8"},
+		Statuses: []gate.Status{gate.Open, gate.Approved, gate.Rejected, gate.Answered, gate.Dismissed, gate.Superseded}},
+		"gates_subject (subject=?)", "USE TEMP B-TREE FOR ORDER BY"),
+	{name: "tasks of units", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + ofUnits + taskOrder, args: 2,
+		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 }
 
 func gatesWherePlan(name string, q gates.Query, want, tempSort string) hotPlan {

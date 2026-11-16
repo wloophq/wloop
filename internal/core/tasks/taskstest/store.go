@@ -79,15 +79,27 @@ func (s *Store) Task(ctx context.Context, id task.ID) (task.Task, error) {
 }
 
 func (s *Store) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	got, err := s.TasksOfUnits(ctx, []unit.Unit{u})
+	return got[u], err
+}
+
+func (s *Store) TasksOfUnits(_ context.Context, units []unit.Unit) (map[unit.Unit][]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []task.Task
+	out := map[unit.Unit][]task.Task{}
 	for _, e := range s.all() {
-		if slices.Contains(e.Units, u) || slices.ContainsFunc(slices.Concat(e.Items, e.Resolved), func(r task.ItemRef) bool { return r.Unit == u }) {
-			out = append(out, e)
+		for _, u := range units {
+			if names(e, u) && !slices.ContainsFunc(out[u], func(had task.Task) bool { return had.ID == e.ID }) {
+				out[u] = append(out[u], e)
+			}
 		}
 	}
 	return out, nil
+}
+
+// names says whether e lists u among its units or the units of its items, resolved or not.
+func names(e task.Task, u unit.Unit) bool {
+	return slices.Contains(e.Units, u) || slices.ContainsFunc(slices.Concat(e.Items, e.Resolved), func(r task.ItemRef) bool { return r.Unit == u })
 }
 
 func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error {

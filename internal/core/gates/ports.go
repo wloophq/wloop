@@ -84,6 +84,8 @@ type Query struct {
 	Task     task.ID
 	Unit     unit.Unit
 	Statuses []gate.Status
+	// Subjects keeps the gates whose Subject is one of them; empty matches every subject.
+	Subjects []string
 }
 
 // The consequences of a resolved gate, one port per kind.

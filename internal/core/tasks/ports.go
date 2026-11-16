@@ -34,6 +34,12 @@ type Reader interface {
 	TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error)
 }
 
+// UnitTasks is a Reader that reads the tasks of many units at once.
+type UnitTasks interface {
+	// TasksOfUnits is TasksOf of each of units; a unit no task names is absent.
+	TasksOfUnits(ctx context.Context, units []unit.Unit) (map[unit.Unit][]task.Task, error)
+}
+
 type Store interface {
 	Reader
 	// Apply writes cs and evs in one transaction, bumps Rev and notes port.TopicTasks; when cs change
@@ -159,6 +165,18 @@ type Items interface {
 // Facts reads a unit's facts; ok false: plugin disabled.
 type Facts interface {
 	UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error)
+}
+
+// UnitsFacts is a Facts that reads the facts of many units at once.
+type UnitsFacts interface {
+	// UnitsFacts is UnitFacts of each of units; a unit whose plugin is disabled is absent.
+	UnitsFacts(ctx context.Context, units []unit.Unit) (map[unit.Unit]task.UnitFacts, error)
+}
+
+// UnitsItems is an Items that reads the items of many units at once.
+type UnitsItems interface {
+	// Load are the items of units; a unit with none is absent.
+	Load(ctx context.Context, units []unit.Unit) (map[unit.Unit][]items.Item, error)
 }
 
 // ViewSource serves the views over another thing than the stored tasks, such as the gates: Tasks are view

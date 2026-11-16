@@ -71,7 +71,15 @@ func gatesWhereSQL(q gates.Query) (string, []any) {
 		where = append(where, `name = ?`)
 		args = append(args, q.Name)
 	}
-	return `SELECT ` + gateColumns + ` FROM gates WHERE ` + strings.Join(where, ` AND `) + ` ORDER BY id`, args
+	from := `gates`
+	if len(q.Subjects) > 0 {
+		subjects, _ := json.Marshal(q.Subjects)
+		where = append(where, `subject IN (SELECT value FROM json_each(?))`)
+		args = append(args, string(subjects))
+		// Without statistics the planner prefers gates_due, whose status range holds every gate ever closed.
+		from = `gates INDEXED BY gates_subject`
+	}
+	return `SELECT ` + gateColumns + ` FROM ` + from + ` WHERE ` + strings.Join(where, ` AND `) + ` ORDER BY id`, args
 }
 
 const insertGateSQL = `INSERT INTO gates (task_id, provider, unit_key, kind, name, subject, status, intents, intent, answer,
