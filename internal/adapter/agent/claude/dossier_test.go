@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"os/exec"
 	"slices"
@@ -95,6 +96,21 @@ func TestPolicyGrantsTheDossier(t *testing.T) {
 	}
 }
 
+func TestHeadlessGrantsTheDossierThroughSettings(t *testing.T) {
+	var argv []string
+	sh := func(_ context.Context, _ string, _ []string, _, _ string, args ...string) ([]byte, error) {
+		argv = args
+		return nil, nil
+	}
+	s := turns.AgentSession{Worktree: t.TempDir(), Policy: dossierPolicy(dossierPath)}
+	if _, err := (Agent{Sh: sh}).Headless(context.Background(), s, "do it"); err != nil {
+		t.Fatal(err)
+	}
+	if dirs := grantedDirs(t, argv); !slices.Equal(dirs, []string{dossierPath}) {
+		t.Fatalf("the settings grant %q, want %s", dirs, dossierPath)
+	}
+}
+
 func TestAGrantedDirIsQuoted(t *testing.T) {
 	path := `/Users/me/it's a "state"/dossiers/slack/T000/C000/1700.1#`
 	line, err := Agent{}.Command(turns.AgentSession{Policy: dossierPolicy(path)})
@@ -110,7 +126,7 @@ func TestAGrantedDirIsQuoted(t *testing.T) {
 	}
 }
 
-func TestDirsOnlyPolicyPrintsFlags(t *testing.T) {
+func TestDirsOnlyPolicyGrantsThroughSettings(t *testing.T) {
 	p := turns.Policy{Dirs: []turns.Dir{{Path: dossierPath}}}
 	if emptyPolicy(p) {
 		t.Fatal("a policy with only Dirs is empty")

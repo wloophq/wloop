@@ -340,20 +340,27 @@ func (s *Service) MCPSeen(ctx context.Context, handle string) error {
 	if handle == "" {
 		return errors.New("an MCP sighting needs a handle")
 	}
+	// One lock holds the lookup and what follows it: a bind in between would
+	// find no sighting to take, and the one noted after it would be lost.
+	s.mu.Lock()
 	id, ok, err := s.SessionOfHandle(ctx, handle)
-	if err != nil {
+	if err != nil || !ok {
+		if err == nil {
+			s.noteUnboundMCP(handle, s.now())
+		}
+		s.mu.Unlock()
 		return err
 	}
-	if !ok {
-		s.mu.Lock()
-		s.noteUnboundMCP(handle, s.now())
-		s.mu.Unlock()
-		return nil
-	}
-	return s.saveSession(ctx, id, func(cur *turn.Session, now time.Time) (string, string) {
+	ev, err := s.applySession(ctx, id, func(cur *turn.Session, now time.Time) (string, string) {
 		cur.MCPAt = now
 		return KindMCPSeen, id + ":" + now.Format(time.RFC3339Nano)
 	})
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	s.publish(ev)
+	return nil
 }
 
 func (s *Service) saveSession(ctx context.Context, handle string, apply func(cur *turn.Session, now time.Time) (kind, key string)) error {

@@ -100,7 +100,7 @@ The call answers either a list (a text and the ids of the tasks it lists) or a p
 
 ## Dossiers
 
-A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. The session's `--settings` grant it (`permissions.additionalDirectories`), never `--add-dir`: Claude Code stops a session on a trust question for each directory that flag names. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
+A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A session in a terminal is granted it by its `--settings` (`permissions.additionalDirectories`): Claude Code stops such a session on a trust question for each directory `--add-dir` names. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
 
 ## Inspecting turns
 

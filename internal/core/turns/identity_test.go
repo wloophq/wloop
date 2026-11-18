@@ -250,3 +250,41 @@ func TestBindMergesASessionAHookTookFirst(t *testing.T) {
 		t.Fatalf("the adopted twin stays open: %+v", twin)
 	}
 }
+
+// lookupThen runs then once, after the first lookup of a handle's session
+// and before its caller acts on the answer.
+type lookupThen struct {
+	*turnstest.Registry
+	then func()
+}
+
+func (r *lookupThen) SessionOfHandle(ctx context.Context, handle string) (string, string, bool, error) {
+	id, manager, ok, err := r.Registry.SessionOfHandle(ctx, handle)
+	if then := r.then; then != nil {
+		r.then = nil
+		then()
+	}
+	return id, manager, ok, err
+}
+
+func TestAnInitializeRacingItsBindStillCounts(t *testing.T) {
+	ctx := context.Background()
+	s, _, reg, _, _ := newService(t)
+	reg.Put(turn.Session{ID: "s1", Manager: "orca", StartedAt: t0})
+	bind := func() {
+		if err := s.Bind(ctx, "s1", "orca", "h9", ""); err != nil {
+			t.Error(err)
+		}
+	}
+	bound := false
+	s.Registry = &lookupThen{Registry: reg, then: func() { bound = s.Unlocked(bind) }}
+	if err := s.MCPSeen(ctx, "h9"); err != nil {
+		t.Fatal(err)
+	}
+	if !bound {
+		bind()
+	}
+	if got := session(t, reg, "s1"); !got.Capable() {
+		t.Fatalf("the session lost the initialize its bind raced: %+v", got)
+	}
+}

@@ -125,7 +125,8 @@ func (Agent) Settings(p turns.Policy) string {
 			Allow []string `json:"allow"`
 			Deny  []string `json:"deny"`
 			// AdditionalDirectories grants the policy's directories. Claude Code
-			// stops a session on a trust question for each one --add-dir names.
+			// stops an interactive session on a trust question for each one
+			// --add-dir names.
 			AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
 		} `json:"permissions"`
 		DisableAllHooks bool `json:"disableAllHooks,omitempty"`
