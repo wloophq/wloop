@@ -199,10 +199,6 @@ var writes = []writeCase{
 		topics: port.TopicBriefs | port.TopicLoopEvents | port.TopicRecords, units: []unit.Unit{u7},
 	},
 	{
-		method: "DB.DossierMoved",
-		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, 1) },
-	},
-	{
 		method: "DB.SaveAgentSession",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.SaveAgentSession(ctx, AgentSession{ID: "a1", Kind: "claude", Handle: "term_1", FirstSeen: noteAt})
@@ -524,7 +520,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
-	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.CallSpent", "DB.UnitEventKeys", "DB.DossierMoves",
+	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.CallSpent", "DB.UnitEventKeys", "DB.AgentWorktrees",
 	"DB.AllSkips", "DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.MergedInto", "DB.TasksHolding", "DB.ItemsHeld",
 	"Store.Books", "Store.TurnCounts", "Store.BookOf", "Store.UnitsOf", "Store.UnitOfTurn", "Store.Open", "Store.OpenTurns", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",

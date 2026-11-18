@@ -125,16 +125,27 @@ type StartBlock struct {
 	// the block writes, its plan's OnSkipped.
 	Round string
 	Skip  map[string]string
+	// RetryAt is when a block that waits on no question lifts, such as a session that never started; zero for a
+	// block on a question.
+	RetryAt time.Time
 }
 
 // Key keeps each block its own event: a keyed event is recorded once. Its
 // eighth and ninth parts, the reviews and checks head an older release
-// wrote, stay empty, and the tenth is Skip as JSON when it holds a mark.
+// wrote, stay empty, the tenth is Skip as JSON when it holds a mark, and the
+// eleventh RetryAt when set.
 func (b StartBlock) Key(at time.Time) string {
 	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, "", ""}
+	skip := ""
 	if len(b.Skip) > 0 {
-		skip, _ := json.Marshal(b.Skip)
-		parts = append(parts, string(skip))
+		raw, _ := json.Marshal(b.Skip)
+		skip = string(raw)
+	}
+	switch {
+	case !b.RetryAt.IsZero():
+		parts = append(parts, skip, b.RetryAt.UTC().Format(time.RFC3339Nano))
+	case skip != "":
+		parts = append(parts, skip)
 	}
 	return strings.Join(parts, "\n")
 }
@@ -142,12 +153,25 @@ func (b StartBlock) Key(at time.Time) string {
 // StartBlockOf is the StartBlock a round_blocked event's key names.
 func StartBlockOf(e port.Event) (StartBlock, bool) {
 	parts := strings.Split(e.Key, "\n")
-	if e.Kind != dinv.KindRoundBlocked || (len(parts) != 9 && len(parts) != 10) {
+	if e.Kind != dinv.KindRoundBlocked || len(parts) < 9 || len(parts) > 11 {
 		return StartBlock{}, false
 	}
 	b := StartBlock{Question: parts[1], Root: parts[2], Folder: parts[3], Home: parts[4], Round: parts[6]}
 	if parts[5] != "" {
 		b.Homes = strings.Split(parts[5], "\t")
+	}
+	if len(parts) == 11 {
+		at, err := time.Parse(time.RFC3339Nano, parts[10])
+		if err != nil {
+			return StartBlock{}, false
+		}
+		b.RetryAt = at
+		if parts[9] != "" {
+			if err := json.Unmarshal([]byte(parts[9]), &b.Skip); err != nil {
+				return StartBlock{}, false
+			}
+		}
+		return b, true
 	}
 	if len(parts) == 10 && strings.HasPrefix(parts[9], "{") {
 		if err := json.Unmarshal([]byte(parts[9]), &b.Skip); err != nil {

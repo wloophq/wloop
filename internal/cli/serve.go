@@ -390,6 +390,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	}
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
+	e.serveMemory(db, cfg, logf)
 	d = e.serveMessages(ctx, d, db, cfg, logf)
 	mods, err := buildSources(e.sourcePlugins(), cfg, sd, e.pluginUI)
 	if err != nil {
@@ -404,10 +405,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = e.serveAgentDrafts(d, db, cfg, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
-	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
-	serveProjects(d.Tasks, db, dossierSvc)
+	serveProjects(d.Tasks, db)
 	e.callBudget = callBudget(db, cfg, e.Now)
-	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, starter, logf)
 	d.Placer = sessionPlacer{e: e, cfg: cfg}

@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -146,8 +145,14 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 	if err != nil {
 		return err
 	}
-	if err := moveDossier(ctx, tx, from, to); err != nil {
+	dossiers, err := hasDossiers(ctx, tx)
+	if err != nil {
 		return err
+	}
+	if dossiers {
+		if err := moveDossier(ctx, tx, from, to); err != nil {
+			return err
+		}
 	}
 	for _, r := range refs {
 		if r.table == "dossiers" {
@@ -201,8 +206,12 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 		}
 	}
 	var merged int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM (`+mergedOwnersSQL+`)`, "/"+refOwner.spell(id)).Scan(&merged); err != nil {
+	if dossiers, err := hasDossiers(ctx, tx); err != nil {
 		return err
+	} else if dossiers {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM (`+mergedOwnersSQL+`)`, "/"+refOwner.spell(id)).Scan(&merged); err != nil {
+			return err
+		}
 	}
 	if merged > 0 {
 		held = append(held, fmt.Sprintf("dossiers merged into its own (%d rows)", merged))
@@ -326,7 +335,7 @@ func giveDossier(ctx context.Context, tx *sql.Tx, from, name, to string) error {
 	if err != nil {
 		return err
 	}
-	archived, purged := string(dossier.Archived), string(dossier.Purged)
+	archived, purged := dossierArchived, dossierPurged
 	switch {
 	case !has || toStatus == purged:
 		toRel = refDossierPath.spell(to)
@@ -385,8 +394,8 @@ func renameDossier(ctx context.Context, tx *sql.Tx, from, to, rel string) error 
 
 // mergedInto is the owner and the directory of the dossier named name merged into task to's.
 func mergedInto(to, name string) (owner, rel string, err error) {
-	o := dossier.Owner{Unit: unit.Unit{Provider: v7Task, Key: to}, Merged: name}
-	rel, err = dossier.Rel(o)
+	o := dossierOwner{unit: unit.Unit{Provider: v7Task, Key: to}, merged: name}
+	rel, err = o.rel()
 	return o.String(), filepath.ToSlash(rel), err
 }
 
@@ -409,11 +418,11 @@ func moveMerged(ctx context.Context, tx *sql.Tx, from, to string) error {
 		return err
 	}
 	for _, x := range rows {
-		o, err := dossier.ParseOwner(x.owner)
+		o, err := parseDossierOwner(x.owner)
 		if err != nil {
 			return err
 		}
-		owner, rel, err := mergedInto(to, o.Merged)
+		owner, rel, err := mergedInto(to, o.merged)
 		if err != nil {
 			return err
 		}
@@ -432,4 +441,12 @@ func moveMerged(ctx context.Context, tx *sql.Tx, from, to string) error {
 func recordDossierMove(ctx context.Context, tx *sql.Tx, from, to string) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO dossier_moves (from_path, to_path) VALUES (?, ?)`, from, to)
 	return err
+}
+
+// hasDossiers says whether the store still holds the dossiers table, which version 15 drops: a migration
+// before it moves dossier rows along with their task.
+func hasDossiers(ctx context.Context, tx *sql.Tx) (bool, error) {
+	var n int
+	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'dossiers'`).Scan(&n)
+	return n > 0, err
 }

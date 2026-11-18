@@ -66,7 +66,7 @@ func (h runHost) wakeOptions(ctx context.Context, cfg config.Config, u unit.Unit
 	if err != nil {
 		return roundOptions{}, err
 	}
-	opts := intentOptions(d, roundOptions{allowUserActive: true, unit: u})
+	opts := intentOptions(d, roundOptions{allowUserActive: true})
 	opts.names = h.e.nameFacts(ctx, u)
 	if isPR(u) {
 		p, err := h.e.basics(ctx, prOf(u))

@@ -74,7 +74,8 @@ func (k Agent) Explain(ctx context.Context, s turns.AgentSession, question strin
 // a folder above: the dialog already showed that trust at launch did not
 // apply. The imports question counts as answered once the repository
 // records it shown or approved, and the MCP question once the settings
-// Claude Code reads decide every server of the project's .mcp.json.
+// Claude Code reads decide every server of the project's .mcp.json. A
+// question it cannot read the answer of, or does not know, stays unanswered.
 func (k Agent) Unanswered(ctx context.Context, s turns.AgentSession, question string) bool {
 	switch question {
 	case turns.QuestionTrust:
@@ -85,11 +86,11 @@ func (k Agent) Unanswered(ctx context.Context, s turns.AgentSession, question st
 		}
 		f, err := readJSON(claudeJSON(s.Home, k.defaultHome()))
 		if err != nil {
-			return false
+			return true
 		}
 		folder, err := filepath.Abs(s.Worktree)
 		if err != nil {
-			return false
+			return true
 		}
 		projects := object(f.doc, "projects")
 		for _, key := range []string{folder, repositoryRoot(ctx, folder)} {
@@ -102,7 +103,7 @@ func (k Agent) Unanswered(ctx context.Context, s turns.AgentSession, question st
 	case MCPQuestion:
 		return !mcpDecided(ctx, s)
 	}
-	return false
+	return true
 }
 
 // mcpDecided says whether the settings of s's worktree, of its repository

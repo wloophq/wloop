@@ -67,15 +67,6 @@ label = "turno parado"
 [events.guide_trimmed]
 label = "guia cortado"
 
-[events.dossier_restored]
-label = "arquivo do dossiê restaurado"
-
-[events.dossier_granted]
-label = "dossiê concedido à sessão"
-
-[events.dossier_call]
-label = "compactação do dossiê, US$"
-
 [events.omnibox_call]
 label = "chamada ao agente da omnibox, US$"
 

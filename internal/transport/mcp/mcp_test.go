@@ -444,3 +444,16 @@ func TestTurnEndEnumsAreTheFullTables(t *testing.T) {
 		t.Errorf("artifact kind enum %v, want %v", got, record.ArtifactKinds)
 	}
 }
+
+func TestTurnEndCarriesWhatTheTurnLearned(t *testing.T) {
+	ft := &fakeTurns{answer: turns.Recorded{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, State: record.Done, Added: true}}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
+	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
+	body := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","record":{"state":"done","summary":"fixed the parser","learned":"The parser drops BOMs; the fixture under testdata/bom.txt reproduces it."}}}}`
+	if r := decodeResult(t, call(t, s, sid, "term_1", body)); r.Result.IsError {
+		t.Fatalf("%+v", r.Result)
+	}
+	if got := ft.last.Record.Learned; got != "The parser drops BOMs; the fixture under testdata/bom.txt reproduces it." {
+		t.Fatalf("learned %q", got)
+	}
+}

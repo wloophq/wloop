@@ -62,7 +62,6 @@ type Config struct {
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
 	Window        Window        `json:"window"`
-	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
 	Headless      Headless      `json:"headless"`
@@ -84,6 +83,11 @@ type UI struct {
 type Turns struct {
 	PerDay        int `json:"per_day"`
 	PerUnitPerDay int `json:"per_unit_per_day"`
+	// NoStartWait is how long a round whose session never started waits before a sweep starts it again.
+	NoStartWait Days `json:"no_start_wait"`
+	// BlindBlockWait is how long a round blocked on a question waits when its agent home cannot be read for
+	// the answer.
+	BlindBlockWait Days `json:"blind_block_wait"`
 }
 
 // GitHub is the GitHub plugin's settings.
@@ -157,16 +161,6 @@ type Headless struct {
 	Tier       turns.Tier `json:"tier"`
 	PerCallUSD float64    `json:"per_call_usd"`
 	PerDayUSD  float64    `json:"per_day_usd"`
-}
-
-// Dossiers sets the dossiers' lifecycle and quotas; a value of zero or less keeps its default.
-type Dossiers struct {
-	ArchiveAfter Days  `json:"archive_after"` // after its task or unit resolved
-	PurgeAfter   Days  `json:"purge_after"`   // after the archive
-	SoftCapMB    int64 `json:"soft_cap_mb"`   // per dossier, reported by doctor
-	TotalCapMB   int64 `json:"total_cap_mb"`  // dossiers and archives, reported by doctor
-	MaxFileMB    int64 `json:"max_file_mb"`   // a larger file is refused, linked instead
-	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
 // Tasks holds the tasks' settings: when a waiting task goes stale, the areas and contexts offered, and how far
@@ -474,11 +468,9 @@ func Defaults() Config {
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
-		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
-			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
-		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
-		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
+		Drafts:        Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
+		Headless:      Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
+		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap, NoStartWait: Days(2 * time.Hour), BlindBlockWait: Days(24 * time.Hour)},
 	}
 }
 

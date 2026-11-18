@@ -20,7 +20,7 @@ type Wrapper struct{ t *template.Template }
 
 // WrapperData is what the wrapper's templates read.
 type WrapperData struct {
-	Name, Unit, Checkout, Dossier string
+	Name, Unit, Checkout string
 	// Items is the items acted on, each in backquotes, comma-separated.
 	Items string
 	// Guidance is the user's guidance, each line indented four spaces.
@@ -54,12 +54,12 @@ func Markers(what string) (begin, end, nonce string) {
 // Prompt is the headless call's prompt: the wrapper's before, the unit's
 // instructions between this call's markers, the wrapper's after, then the
 // answer schema, last so nothing quoted from the unit follows it.
-func (w Wrapper) Prompt(r Request, checkout, dossier, instructions string) (string, error) {
+func (w Wrapper) Prompt(r Request, checkout, instructions string) (string, error) {
 	if w.t == nil {
 		return "", errors.New("no headless wrapper is loaded")
 	}
 	begin, end, nonce := Markers("UNIT DATA")
-	d := WrapperData{Name: brand.Name, Unit: r.Unit.Label(), Checkout: checkout, Dossier: dossier,
+	d := WrapperData{Name: brand.Name, Unit: r.Unit.Label(), Checkout: checkout,
 		Begin: begin, End: end, Nonce: nonce, MaxDrafts: MaxDrafts}
 	if len(r.Items) > 0 {
 		d.Items = "`" + strings.Join(r.Items, "`, `") + "`"

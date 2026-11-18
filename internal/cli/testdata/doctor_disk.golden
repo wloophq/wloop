@@ -1,5 +1,3 @@
-  [info   ] dossiers: 2, 2.0 MB
-  [info   ] dossier archives: 1, 4.0 KB
   [info   ] agent transcripts of {{name}} worktrees: 2, 5.9 KB
-  [info   ] dossier github/acme/api#1: over the 1.0 MB soft cap
+  [info   ] dossiers: <state>/dossiers is no longer used; remove it by hand once you no longer need its notes
 

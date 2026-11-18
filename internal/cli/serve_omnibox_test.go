@@ -29,12 +29,12 @@ func (a *costAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
 
 func TestTheOmniboxCallIsBookedOnTheHeadlessCaps(t *testing.T) {
 	t.Parallel()
-	te, db := servedDossiers(t)
+	te, db := servedStore(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	a, ok := d.OmniboxAsk.(*omnibox.Asker)
-	if !ok || a.Budget != te.callBudget || a.Budget != te.dossierCalls.Budget || a.Wrapper == nil {
+	if !ok || a.Budget != te.callBudget || a.Wrapper == nil {
 		t.Fatalf("the omnibox asker is not wired on the calls' budget and the profile's wrapper: %+v", d.OmniboxAsk)
 	}
 	agent := &costAsker{cost: 0.4}
@@ -96,7 +96,7 @@ func TestTheOmniboxAgentRunsApartFromTheSnapshots(t *testing.T) {
 }
 
 func TestTheServedOmniboxAskerUsesTheVocabulary(t *testing.T) {
-	te, db := servedDossiers(t)
+	te, db := servedStore(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	a := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil).OmniboxAsk.(*omnibox.Asker)

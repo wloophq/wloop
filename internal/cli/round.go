@@ -57,8 +57,6 @@ type roundOptions struct {
 	// head is the pull request's head branch the round's fetch also brings,
 	// for realign after it; "" for none.
 	head string
-	// unit is the round's unit, whose dossier the session is granted; zero for none.
-	unit unit.Unit
 	// names are the name facts the round knows besides the unit's label and
 	// the time, such as the worktree's name.
 	names map[string]any
@@ -290,7 +288,6 @@ func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Worksp
 			return p, verbWoken, err
 		}
 	}
-	opts.unit = u
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
 		return proc{}, "", err
@@ -350,7 +347,6 @@ func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Ma
 			return proc{}, false, nil
 		}
 	}
-	opts.unit = u
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
 		return proc{}, false, err
@@ -385,12 +381,18 @@ func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Ma
 		fmt.Fprintf(e.Err, "%s waking the session %s failed, starting a new one: %v\n", e.stamp(), sess.ID, err)
 		return proc{}, false, nil
 	}
+	p := proc{sess.ID, m, handle}
 	if !lazyMCP(m) {
 		if err := e.awaitCapable(ctx, sess.ID, e.agentHome(cfg)); err != nil {
-			return proc{}, false, err
+			if errors.As(err, new(errNoMCP)) {
+				if blocked := e.screenBlock(ctx, cfg, p); blocked != nil {
+					return proc{}, false, fmt.Errorf("waking the session %s: %w", sess.ID, e.explainBlocked(ctx, cfg, ws, blocked, opts.trusted))
+				}
+			}
+			return proc{}, false, e.abandon(ctx, p, err)
 		}
 	}
-	return proc{sess.ID, m, handle}, true, nil
+	return p, true, nil
 }
 
 // liveSession is the live agent session of ws a round of u may keep: the
@@ -585,7 +587,6 @@ func (e *Env) launched(ctx context.Context, cfg config.Config, ws wsdomain.Works
 		WorkspaceID: ws.ID, Worktree: ws.Path, Home: cfg.AgentHome, Unit: u}); err != nil {
 		return err
 	}
-	e.grantLaunched(ctx, u, p.id)
 	return nil
 }
 

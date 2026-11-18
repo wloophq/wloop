@@ -300,7 +300,8 @@ CREATE TABLE links (
 CREATE INDEX links_to ON links (to_provider, to_key);
 
 -- category is the category of state, as the profile declares it; review_every (seconds) and reviewed_at are a
--- parent's review; open_changed_at is when the task last opened or closed.
+-- parent's review; open_changed_at is when the task last opened or closed, closed_at when it last moved from open
+-- to closed.
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
   state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
@@ -311,7 +312,8 @@ CREATE TABLE tasks (
   rev INTEGER NOT NULL,
   category TEXT NOT NULL DEFAULT '',
   review_every INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT NOT NULL DEFAULT '',
-  open_changed_at TEXT NOT NULL DEFAULT ''
+  open_changed_at TEXT NOT NULL DEFAULT '',
+  closed_at TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE INDEX tasks_state ON tasks (state);
 CREATE INDEX tasks_rev ON tasks (rev);
@@ -494,23 +496,6 @@ CREATE TABLE review_runs (
   done TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE INDEX review_runs_open ON review_runs (finished_at, started_at);
-
-CREATE TABLE dossiers (
-  owner TEXT PRIMARY KEY,
-  rel_path TEXT NOT NULL, status TEXT NOT NULL,
-  bytes INTEGER NOT NULL DEFAULT 0, files INTEGER NOT NULL DEFAULT 0,
-  last_write_at TEXT NOT NULL DEFAULT '', resolved_at TEXT NOT NULL DEFAULT '',
-  archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
-) WITHOUT ROWID;
-
--- A dossier directory a merge of tasks, or the migration onto tasks, moved in the store and not yet on disk:
--- paths under the dossiers root, an archive at the same path under .archive with .tar.gz. Moves apply in seq
--- order, a later one moving what an earlier one put in place.
-CREATE TABLE dossier_moves (
-  seq INTEGER PRIMARY KEY,
-  from_path TEXT NOT NULL,
-  to_path TEXT NOT NULL
-);
 
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,

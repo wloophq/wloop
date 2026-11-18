@@ -228,9 +228,6 @@ func TestV7RenameLeavesNoEntryReference(t *testing.T) {
 	if got := strings1(t, db, `SELECT id || ' ' || parent FROM tasks ORDER BY id`); !slices.Equal(got, []string{"t-" + hexA + " t-" + hexP, "t-" + hexP + " "}) {
 		t.Errorf("tasks %q", got)
 	}
-	if got := strings1(t, db, `SELECT owner || ' ' || rel_path FROM dossiers`); !slices.Equal(got, []string{"task/t-" + hexA + " task/t-" + hexA + "#"}) {
-		t.Errorf("dossiers %q", got)
-	}
 	if got := strings1(t, db, `SELECT inputs FROM turns ORDER BY seq`); !slices.Equal(got, []string{`{"depth":"deep","task":"t-` + hexA + `"}`, `{"items":["i1"],"task":"t-` + hexA + `"}`}) {
 		t.Errorf("turn inputs %q", got)
 	}
@@ -674,7 +671,7 @@ func bareTask(t *testing.T, db *sql.DB, id string) {
 func TestRekeyTaskMovesTheDossierWithItsFiles(t *testing.T) {
 	t.Parallel()
 	from, to := "t-"+hexA, "t-"+hexB
-	db := rawDB(t, storeAt(t, current))
+	db := rawDB(t, storeAt(t, v7Set(t)))
 	bareTask(t, db, from)
 	dossierOf(t, db, from)
 	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, from, to) })
@@ -689,7 +686,7 @@ func TestRekeyTaskMovesTheDossierWithItsFiles(t *testing.T) {
 func TestRekeyTaskOntoATaskWithADossierMergesTheFiles(t *testing.T) {
 	t.Parallel()
 	from, to, next := "t-"+hexA, "t-"+hexB, "t-"+hexP
-	db := rawDB(t, storeAt(t, current))
+	db := rawDB(t, storeAt(t, v7Set(t)))
 	bareTask(t, db, from)
 	bareTask(t, db, to)
 	dossierOf(t, db, from)
@@ -712,7 +709,7 @@ func TestRekeyTaskOntoATaskWithADossierMergesTheFiles(t *testing.T) {
 func TestDropTaskRefusesAHistoryTableAndADossier(t *testing.T) {
 	t.Parallel()
 	gone := "t-" + hexA
-	db := rawDB(t, storeAt(t, current))
+	db := rawDB(t, storeAt(t, v7Set(t)))
 	bareTask(t, db, gone)
 	dossierOf(t, db, gone)
 	for _, q := range []string{
@@ -766,7 +763,7 @@ func TestDropTaskKeepsAnAliasOfTheDroppedTask(t *testing.T) {
 func TestAnArchivedMergedDossierHasARow(t *testing.T) {
 	t.Parallel()
 	from, to, next := "t-"+hexA, "t-"+hexB, "t-"+hexP
-	db := rawDB(t, storeAt(t, current))
+	db := rawDB(t, storeAt(t, v7Set(t)))
 	bareTask(t, db, from)
 	bareTask(t, db, to)
 	dossierOf(t, db, to)
@@ -811,7 +808,7 @@ func TestAnArchivedMergedDossierHasARow(t *testing.T) {
 func TestALiveDossierMergedIntoAnArchivedOneTakesItsPlace(t *testing.T) {
 	t.Parallel()
 	from, to := "t-"+hexA, "t-"+hexB
-	db := rawDB(t, storeAt(t, current))
+	db := rawDB(t, storeAt(t, v7Set(t)))
 	bareTask(t, db, from)
 	bareTask(t, db, to)
 	dossierOf(t, db, from)

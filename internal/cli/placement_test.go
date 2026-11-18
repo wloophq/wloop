@@ -270,3 +270,45 @@ func TestAWakeNamesTheResumedSession(t *testing.T) {
 		t.Fatalf("wakes %+v", m.Wakes)
 	}
 }
+
+func TestAWokenSessionThatNeverShowsTheToolIsClosed(t *testing.T) {
+	defer func(d time.Duration) { mcpWait = d }(mcpWait)
+	mcpWait = 50 * time.Millisecond
+	te, m := sharedEnv(t, "")
+	m.Sessions = nil
+	te.registerSession(t, dturn.Session{ID: "old", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), AgentSession: "conv-1", StartedAt: testNow.Add(-time.Hour)})
+	ctx := context.Background()
+	if err := te.repo.EndHandle(ctx, "old", testNow.Add(-30*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	te.reg.withoutMCP("old")
+	_, woke, err := te.wake(ctx, te.cfg, m, sharedWS, r7.Unit(), roundOptions{}, func(time.Time) bool { return true })
+	if woke || !errors.As(err, new(errNoMCP)) {
+		t.Fatalf("wake = %v, %v; want the round failed on the missing tool", woke, err)
+	}
+	if got := strings.Join(m.Writes, "\n"); !strings.Contains(got, "close term-"+sharedWS.ID) {
+		t.Fatalf("the woken terminal is left open: writes\n%s", got)
+	}
+}
+
+func TestAWokenSessionStoppedOnAQuestionStaysOpenAndSaysWhich(t *testing.T) {
+	defer func(d time.Duration) { mcpWait = d }(mcpWait)
+	mcpWait = 50 * time.Millisecond
+	te, m := sharedEnv(t, "")
+	m.Sessions = nil
+	m.Screen = importsScreen
+	te.registerSession(t, dturn.Session{ID: "old", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), AgentSession: "conv-1", StartedAt: testNow.Add(-time.Hour)})
+	ctx := context.Background()
+	if err := te.repo.EndHandle(ctx, "old", testNow.Add(-30*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	te.reg.withoutMCP("old")
+	_, woke, err := te.wake(ctx, te.cfg, m, sharedWS, r7.Unit(), roundOptions{}, func(time.Time) bool { return true })
+	var asked *turns.QuestionError
+	if woke || !errors.As(err, &asked) {
+		t.Fatalf("wake = %v, %v; want the question the session waits on", woke, err)
+	}
+	if got := strings.Join(m.Writes, "\n"); strings.Contains(got, "close ") {
+		t.Fatalf("the session waiting on the user was closed: writes\n%s", got)
+	}
+}

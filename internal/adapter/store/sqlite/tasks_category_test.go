@@ -11,7 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
-	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -48,9 +47,6 @@ func TestStoreFiltersByCategory(t *testing.T) {
 	got, err := s.Tasks(ctx, task.Query{})
 	if err != nil || !slices.Equal(taskIDs(got), []task.ID{"t-blocked", "t-doing", "t-next", "t-trash"}) {
 		t.Errorf("the open tasks are %v, %v", taskIDs(got), err)
-	}
-	if open, err := db.Dossiers().Open(ctx, dossier.Owner{Unit: thread}); err != nil || open {
-		t.Errorf("a task in a done-category state keeps its unit open: %v %v", open, err)
 	}
 
 	from := log.Gen()

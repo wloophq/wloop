@@ -324,3 +324,24 @@ func TestAVerdictIsOneItsPluginsDeclare(t *testing.T) {
 		t.Fatal("a verdict taken while the intent's plugins declare none")
 	}
 }
+
+func TestLearnedRoundTripsAndIsBounded(t *testing.T) {
+	parsed, err := Parse([]byte(`{"state":"done","summary":"s","learned":"The flaky test needs the fixture clock.\nRun it with -count=3."}`))
+	if err != nil || parsed.Learned != "The flaky test needs the fixture clock.\nRun it with -count=3." {
+		t.Fatalf("parsed %+v, err %v", parsed, err)
+	}
+	if err := parsed.Validate(rulesFor("address")); err != nil {
+		t.Errorf("valid learned refused: %v", err)
+	}
+	parsed.Learned = strings.Repeat("x", LearnedMax+1)
+	if err := parsed.Validate(rulesFor("address")); err == nil || !strings.Contains(err.Error(), "learned") {
+		t.Errorf("oversized learned: %v", err)
+	}
+}
+
+func TestPlainTextKeepsLinesAndTabsAndDropsOtherControls(t *testing.T) {
+	got := PlainText("a\r\nb\rc d e\u0085f\tg‮h\x07i")
+	if want := "a\nb\nc\nd\ne\nf\tgh" + "i"; got != want {
+		t.Fatalf("PlainText = %q, want %q", got, want)
+	}
+}

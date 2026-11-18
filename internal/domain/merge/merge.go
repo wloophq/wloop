@@ -26,7 +26,7 @@ const RecordKind = "merge_record"
 // Into, by id: Gates, Drafts and Messages. The open gates that would act on Into in From's name, the
 // proposals, plans and steps on From's own unit and the proposals whose subject names From, are superseded,
 // listed in Superseded, and never reopened. Every other row that names From (its events, chat and
-// timeline, turns, sessions, workflow runs and plan items, classifications, links, dossier) stays under
+// timeline, turns, sessions, workflow runs and plan items, classifications, links) stays under
 // From's id, and Into's readers reach it through the ids merged into Into.
 type Record struct {
 	From, Into task.ID

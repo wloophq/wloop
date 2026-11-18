@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/task"
-	"github.com/wloophq/wloop/internal/domain/wake"
 )
 
 // ProjectStore keeps what the projects need beyond their tasks: the Review's runs.
@@ -20,28 +19,17 @@ type ProjectStore interface {
 	PutRun(ctx context.Context, r task.ReviewRun) error
 }
 
-// ProjectDossiers opens a new project's dossier, its task's, and starts its lifecycle once the project ends
-// (#dossier).
-type ProjectDossiers interface {
-	Open(ctx context.Context, id task.ID) error
-	Resolved(ctx context.Context, id task.ID, at time.Time) error
-}
-
 type ProjectDeps struct {
-	Store    ProjectStore
-	Dossiers ProjectDossiers // nil keeps no dossiers
+	Store ProjectStore
 }
-
-// endHandlers end a project, so its dossier's lifecycle starts.
-var endHandlers = []string{HandlerFinish, HandlerDrop}
 
 type projects struct {
 	s *Service
 	d ProjectDeps
 }
 
-// ServeProjects runs the project verbs on s (project with its position, sequential, reviewed), resolves an
-// ending project's dossier, and serves the review.
+// ServeProjects runs the project verbs on s (project with its position, sequential, reviewed) and serves the
+// review.
 func (s *Service) ServeProjects(d ProjectDeps) {
 	p := &projects{s: s, d: d}
 	s.Register(EveryKind, string(task.VerbProject), p.attach)
@@ -50,9 +38,6 @@ func (s *Service) ServeProjects(d ProjectDeps) {
 	})
 	s.Register(task.KindProject, string(task.VerbSequential), p.sequential)
 	s.Register(task.KindProject, string(task.VerbReviewed), p.reviewed)
-	for _, h := range endHandlers {
-		s.Register(task.KindProject, h, p.end)
-	}
 	s.reg.Lock()
 	s.runs = d.Store
 	s.reg.Unlock()
@@ -124,7 +109,6 @@ func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e
 // attach puts e in the project args["id"] names, or in a new one titled args["title"]: after its last action, or
 // at args["position"], shifting the later ones.
 func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result, error) {
-	var created task.Task
 	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		if err := p.s.accepts(e, req.Verb); err != nil {
 			return nil, err
@@ -157,7 +141,6 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			}
 			proj.SetProp(task.PropKind, task.Value{Text: task.KindProject}, task.WriterWorkflow, now)
 			proj.SetRole(p.s.d.States, task.RoleArea, e.Role(p.s.d.States, task.RoleArea), task.WriterPerson, now)
-			created = proj
 			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})
 		default:
 			return nil, fmt.Errorf("%w: project needs id or title", ErrArgs)
@@ -190,13 +173,7 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Task: got}
-	if created.ID != "" && p.d.Dossiers != nil {
-		if err := p.d.Dossiers.Open(ctx, created.ID); err != nil {
-			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not created: %v", created.ID, err))
-		}
-	}
-	return res, nil
+	return Result{Task: got}, nil
 }
 
 // liveProject refuses a project that is done or trashed, naming the verb.
@@ -260,27 +237,4 @@ func interval(raw string) (time.Duration, error) {
 		return 0, fmt.Errorf("%w: every %q is neither a count of days (14d) nor a positive duration", ErrArgs, raw)
 	}
 	return d, nil
-}
-
-// end runs a verb that ends the project as the state change, then starts its dossier's lifecycle.
-func (p *projects) end(ctx context.Context, e task.Task, req Request) (Result, error) {
-	var was task.Task
-	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
-		was = e
-		next, _, err := p.s.transition(e, req, wake.Wake{}, now)
-		if err != nil {
-			return nil, err
-		}
-		return []task.Change{{Op: task.OpUpdate, Task: next, Why: string(req.Verb)}}, nil
-	})
-	if err != nil {
-		return Result{}, err
-	}
-	res := Result{Task: got}
-	if was.Open() && !got.Open() && p.d.Dossiers != nil {
-		if err := p.d.Dossiers.Resolved(ctx, got.ID, got.Updated); err != nil {
-			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not resolved: %v", got.ID, err))
-		}
-	}
-	return res, nil
 }

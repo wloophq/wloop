@@ -418,7 +418,7 @@ func helpGroups(manager string) []helpGroup {
 				About: "Take out the daemon's and the menu bar's LaunchAgents, " + app + ".app, the agent homes' entries, the unchanged bundled skills and the Slack tokens. " +
 					"It keeps the config and the data unless --purge, and asks first unless --yes.",
 				Flags: []helpFlag{
-					{"--purge", "Also delete the state and config directories: the store and its backups, MCP key, dossiers, logs, config and review profiles"},
+					{"--purge", "Also delete the state and config directories: the store and its backups, MCP key, logs, config and review profiles"},
 					{"--dry-run", "Print what would be removed and change nothing"},
 					{"--yes", "Remove without asking"},
 				},

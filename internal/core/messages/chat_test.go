@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -437,5 +438,33 @@ func TestAChatTurnItsPrepareRefusesStartsNothing(t *testing.T) {
 	}
 	if l := r.launch.launches; len(l) != 0 {
 		t.Fatalf("launched %+v", l)
+	}
+}
+
+type fixedMemory struct {
+	of  task.ID
+	got memory.Memory
+}
+
+func (f *fixedMemory) LearnedOf(_ context.Context, e task.Task) ([]memory.Entry, error) {
+	f.of = e.ID
+	return f.got.Learned, nil
+}
+
+func TestReadTaskListsEveryLearnedEntry(t *testing.T) {
+	r, _ := chatRig(t)
+	e := r.capture(t, "Retry the webhook", nil)
+	own := task.UnitOf(e.ID)
+	r.books.Put(turn.Book{Unit: own, Turns: []turn.Turn{{Seq: 1, Intent: "chat", ID: "c1", Session: "term_1", SentTo: "term_1", State: turn.Started, SentAt: t0}}})
+	r.reg.Put(turn.Session{ID: "term_1", WorkspaceID: "ws", Unit: own, StartedAt: t0})
+	entries := []memory.Entry{{Unit: own, At: t0, Text: "the webhook retries on 502 only"}, {Unit: own, At: t0.Add(-time.Hour), Text: "older"}}
+	mem := &fixedMemory{got: memory.Memory{Task: e.ID, Learned: entries}}
+	r.svc.ChatDeps.Memory = mem
+	got, err := r.svc.ReadTask(context.Background(), messages.ReadRequest{Session: "term_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mem.of != e.ID || !slices.Equal(got.Learned, entries) {
+		t.Fatalf("read the memory of %q: %+v", mem.of, got.Learned)
 	}
 }

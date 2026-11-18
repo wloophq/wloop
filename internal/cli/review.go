@@ -125,7 +125,6 @@ func storedHead(b dturn.Book, oid string) bool {
 // next round creates it again. A sent turn with no prompt starts the agent
 // alone. submitted reports whether the agent was seen taking the prompt.
 func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref pr.Ref, repo wsdomain.Repo, req workspace.CreateRequest, sent sentTurn, opts roundOptions) (wsdomain.Workspace, bool, error) {
-	opts.unit = ref.Unit()
 	m, err := e.chooseManager(ctx, cfg, opts)
 	if err != nil {
 		return wsdomain.Workspace{}, false, err

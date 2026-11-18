@@ -29,13 +29,14 @@ A turn's instructions are stored text, rendered when the turn is created and rea
 - the **judgment**: the blocks of your review profile that match this pull request (see [Profiles and intents](/concepts/profiles/));
 - the **brief**, when briefs are on (see [The brief](/concepts/brief/));
 - your **guidance** for this round, verbatim;
-- **Earlier turns**: up to 10 earlier turns of the pull request, newest first, with their state, verdict, the head they covered, what the session wrote and what you said.
+- **Earlier turns**: up to 10 earlier turns of the pull request, newest first, with their state, verdict, the head they covered, what the session wrote and what you said;
+- **What earlier turns learned**: the three newest `learned` entries of the turns of the task, across every unit it holds and the tasks merged into it, and how many older ones `task_read` lists; once the task reopened, the summary and the item resolutions it had closed with. See [What turns learned](#what-turns-learned).
 
 The first line names the turn id. The agent reads them with `{{command}} instructions <intent> --turn <id>`.
 
 ## The record
 
-A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
+A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish. Its optional `learned`, up to 1500 characters, is what a later turn on the task needs and the summary cannot hold.
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
 
@@ -82,15 +83,15 @@ The notice goes:
 
 A session is an agent's conversation in one worktree, under an id {{name}} mints and starts the agent with (`claude --session-id <id>`). It is **active** while it has a process, **dormant** when its manager no longer lists a process for it, and **closed** when its worktree or transcript is gone, you closed it in its manager, or `session.close` closed it. A session missing from its manager's census turns dormant, never closed, and a manager that quits or restarts never touches another manager's sessions. A process the census lists orphaned, one no window of the app shows any longer with no agent in it, turns its session dormant through `hygiene-session-orphaned` without being ended, and a census that shows it in a window again wakes the session; `session-orphan-close`, off unless you turn it on, ends such a process once the census proves the orphan durable (see [Cleanup guards](/concepts/workflows/#cleanup-guards)). See the [glossary](/architecture/glossary/).
 
-A round you start by hand continues in the session of its workspace. An automatic round keeps that session only if it printed within the last hour, while its prompt cache is warm; otherwise it starts a fresh one, which costs less than rereading a long context. A warm dormant session is woken in its own manager: Orca opens a new terminal with `claude --resume`, Claude Desktop reopens the session. {{name}} types a turn only into a session that loaded its MCP server since it last started.
+A round you start by hand continues in the session of its workspace. An automatic round keeps that session only if it printed within the last hour, while its prompt cache is warm; otherwise it starts a fresh one, which costs less than rereading a long context. A warm dormant session is woken in its own manager: Orca opens a new terminal with `claude --resume`, Claude Desktop reopens the session. {{name}} types a turn only into a session that loaded its MCP server since it last started. A session, new or woken, that shows no MCP tool within its wait is closed, its terminal with it, and its round is blocked for `turns.no_start_wait` (2 hours), so no sweep relaunches it at once; a question the agent names on its screen blocks the round until the agent home records the answer, or for `turns.blind_block_wait` (a day) when the session runs with its terminal's own agent home, which {{name}} cannot read, and a question {{name}} cannot read the answer of counts as unanswered.
 
 In Claude Desktop, {{name}} creates the session headlessly, imports it into the app and types each prompt through the app's per-session socket. Prompts typed that way are not slash-expanded, so a slash command reaches the agent as an explicit instruction to run that skill. {{name}} creates Desktop worktrees under its own state directory (`worktrees/<repo>/<name>`), never under `.claude/worktrees`, which the app collects on its own. A worktree the app made there for one of its sessions is still Claude Desktop's while that session is not archived, even when Orca lists it too: a round on the pull request developed in it runs its session there, in Claude Desktop, and moves to the next manager only when Claude Desktop cannot launch the session. Once the app's session is archived, the app may collect the worktree, and Claude Desktop no longer lists it. While Claude Desktop is not running, its worktrees stay listed but their processes cannot be read, so their sessions keep their last state. Importing a session may bring Claude Desktop to the front.
 
 ## Headless turns
 
-A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout and its dossier, and proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
+A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout, proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). and its answer's `learned` is the record's. The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
 
-The same caps count two kinds of calls that are not turns, so no turn row holds them: the dossiers' compaction and closing calls, and the omnibox's agent call. Each reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an event (`dossier_call`, `omnibox_call`); the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
+The same caps count a call that is not a turn, so no turn row holds it: the omnibox's agent call. It reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an `omnibox_call` event; the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
 
 ## The omnibox agent call
 
@@ -98,9 +99,20 @@ A request the omnibox cannot resolve on its own (⌘↵, or a sentence no verb o
 
 The call answers either a list (a text and the ids of the tasks it lists) or a proposal (operations, each with its reason, and one question when something is ambiguous). Tasks and units the snapshot lacks are dropped, and so is every operation the omnibox's vocabulary does not run, each with its reason. Nothing is stored but the call's cost: the proposal is not a gate and resolves none, the client carries a question's answer to the next call, and only the operations the user confirms run, through the same API calls a click makes. Over the day's cap the call answers 429; an agent that fails or answers out of shape, 502; one that passes the two minutes, 504; an installed agent with no restricted mode, 503.
 
-## Dossiers
+## What turns learned
 
-A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
+A task's memory is the `learned` field of its turns' records, kept in the store with them. A turn reads the memory of the task that holds its unit, an open one first, then the oldest; a unit no task holds has its own turns' entries.
+
+```text
+turn ends ── turn_end { summary, next, learned } ──► turn record
+                                                        │
+next turn ◄── instructions: the 3 newest entries of every unit of the task
+              and of the tasks merged into it, "K earlier entries: task_read";
+              once the task reopened, how it had closed
+on demand ── task_read: every entry, newest first, with its unit and date
+```
+
+How a reopened task had closed is derived from the records and the items ledger: the summary of its last turn before it reopened and the last resolution of each item it holds before then. A task is reopened when it opened again after the store stamped it closed; the store stamps it when it moves from an open category to done or dropped, from schema version 15 on. The entries are text earlier sessions and other people wrote, and the instructions and `task_read` quote them as data. A repro script or a profile goes in the branch or on the pull request, and the entry points to it.
 
 ## Inspecting turns
 
