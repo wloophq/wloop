@@ -181,12 +181,13 @@ export function omniboxUnitHref(unit: J): string {
 
 // omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes; a unit
 // the loop does not hold has no detail, and acts on the row its resolution carries. The
-// floating panel holds no detail: it runs the action itself, and hands one that asks for an input to the main
-// window.
+// floating panel holds no detail and asks for no input: it runs the action itself, one whose guidance is
+// optional without it, and hands one that needs an input to the main window.
 export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string): Promise<void> {
   const unit = omniboxUnit(st);
   const spec = (unit.actions || []).find((a: J) => a.id === id) || { id };
-  if (st.panel) return spec.input ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
+  const needsInput = !!spec.input && (spec.input.kind !== "text" || !!spec.input.required);
+  if (st.panel) return needsInput ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
   await env.act(unit.unit, id, !!spec.copies, unit.row);
   if (env.changed) env.changed();
   if (!unit.held) await omniboxResolveAgain(st, env);

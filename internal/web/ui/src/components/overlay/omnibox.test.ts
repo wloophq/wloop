@@ -417,13 +417,26 @@ describe("omnibox_test.go", () => {
     expect(o.log.opened).toEqual([]);
   });
 
-  test("TestOmniboxPanelHandsAnActionThatTakesTextToTheWindow", async () => {
-    const o = mount({ resolve: unitWith({ id: "guide", label: "Guide", input: { kind: "text" } }) }, { panel: true });
+  test("TestOmniboxPanelHandsAnActionThatNeedsAnInputToTheWindow", async () => {
+    for (const input of [{ kind: "text", required: true }, { kind: "duration", required: true }, { kind: "answer" }]) {
+      const o = mount({ resolve: unitWith({ id: "guide", label: "Guide", input }) }, { panel: true });
+      await o.type(ADDRESS);
+      await fireEvent.click(o.button("Guide"));
+      await settle();
+      expect(o.log.opened).toEqual(["#unit=alpha/acme%2Fapi%238"]);
+      expect(o.log.steps).toEqual([]);
+      cleanup();
+    }
+  });
+
+  test("the panel runs an action whose guidance is optional, without it", async () => {
+    const o = mount({ resolve: unitWith({ id: "review", label: "Review", input: { kind: "text" } }) }, { panel: true });
     await o.type(ADDRESS);
-    await fireEvent.click(o.button("Guide"));
+    await fireEvent.click(o.button("Review"));
     await settle();
-    expect(o.log.opened).toEqual(["#unit=alpha/acme%2Fapi%238"]);
-    expect(o.log.steps).toEqual([]);
+    expect(o.log.opened).toEqual([]);
+    expect(o.log.posts.filter((p) => p.url.startsWith("/api/units/")).map((p) => [p.url, p.body])).toEqual([["/api/units/alpha/acme%2Fapi%238/review", { source: "cockpit" }]]);
+    expect(o.log.closed).toBe(1);
   });
 
   test("TestOmniboxPanelRunsAnActionThatCopiesInTheClick", async () => {
