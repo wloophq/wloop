@@ -251,8 +251,8 @@ func TestBindMergesASessionAHookTookFirst(t *testing.T) {
 	}
 }
 
-// lookupThen runs then once, after the first lookup of a handle's session
-// and before its caller acts on the answer.
+// lookupThen runs then after each lookup of a handle's session, before its
+// caller acts on the answer.
 type lookupThen struct {
 	*turnstest.Registry
 	then func()
@@ -260,10 +260,7 @@ type lookupThen struct {
 
 func (r *lookupThen) SessionOfHandle(ctx context.Context, handle string) (string, string, bool, error) {
 	id, manager, ok, err := r.Registry.SessionOfHandle(ctx, handle)
-	if then := r.then; then != nil {
-		r.then = nil
-		then()
-	}
+	r.then()
 	return id, manager, ok, err
 }
 
@@ -271,18 +268,22 @@ func TestAnInitializeRacingItsBindStillCounts(t *testing.T) {
 	ctx := context.Background()
 	s, _, reg, _, _ := newService(t)
 	reg.Put(turn.Session{ID: "s1", Manager: "orca", StartedAt: t0})
-	bind := func() {
-		if err := s.Bind(ctx, "s1", "orca", "h9", ""); err != nil {
-			t.Error(err)
+	lookups := 0
+	s.Registry = &lookupThen{Registry: reg, then: func() {
+		lookups++
+		if s.Unlocked(func() {}) {
+			t.Error("a bind could land between the lookup of the handle's session and the note of its initialize")
 		}
-	}
-	bound := false
-	s.Registry = &lookupThen{Registry: reg, then: func() { bound = s.Unlocked(bind) }}
+	}}
 	if err := s.MCPSeen(ctx, "h9"); err != nil {
 		t.Fatal(err)
 	}
-	if !bound {
-		bind()
+	if lookups == 0 {
+		t.Fatal("the initialize looked no session up: the test watches nothing")
+	}
+	s.Registry = reg
+	if err := s.Bind(ctx, "s1", "orca", "h9", ""); err != nil {
+		t.Fatal(err)
 	}
 	if got := session(t, reg, "s1"); !got.Capable() {
 		t.Fatalf("the session lost the initialize its bind raced: %+v", got)

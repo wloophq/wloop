@@ -18,7 +18,7 @@ func (s *Service) Routing(id int64) {
 }
 
 // Unlocked runs f when no call holds the service's lock, and says whether it
-// ran: a test's stand-in for a concurrent call that got in.
+// ran: whether a concurrent call could get in at this point.
 func (s *Service) Unlocked(f func()) bool {
 	if !s.mu.TryLock() {
 		return false
