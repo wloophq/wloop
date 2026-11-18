@@ -24,12 +24,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
-	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -70,45 +67,6 @@ func dossierPathOf(t *testing.T, te *testEnv, u unit.Unit) string {
 		t.Fatal(err)
 	}
 	return p
-}
-
-func TestDossierOpenedBeforeLaunch(t *testing.T) {
-	t.Parallel()
-	te, _ := servedDossiers(t)
-	ctx := context.Background()
-	path := dossierPathOf(t, te, headlessThread)
-	line, err := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true, unit: headlessThread})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(line, "--add-dir '"+path+"'") || !strings.Contains(line, "Edit(/"+path+"/log/**)") {
-		t.Fatalf("the launch line does not grant %s: %s", path, line)
-	}
-	if _, err := os.Stat(filepath.Join(path, "notes.md")); err != nil {
-		t.Fatalf("the dossier was not opened before the launch: %v", err)
-	}
-	if line, _ := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true}); strings.Contains(line, "--add-dir") {
-		t.Fatalf("a launch with no unit got a grant: %s", line)
-	}
-
-	render := func() string {
-		t.Helper()
-		_, out, err := te.renderTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return out.Text
-	}
-	if text := render(); !strings.Contains(text, "`"+path+"`") || !strings.Contains(text, "append to log/") {
-		t.Fatalf("a granted session's instructions:\n%s", text)
-	}
-	old := dturn.Session{ID: "term-old", Unit: headlessThread, Managed: true, StartedAt: testNow.Add(-time.Hour)}
-	if err := te.Turns.Registry.SaveSession(ctx, old); err != nil {
-		t.Fatal(err)
-	}
-	if text := render(); !strings.Contains(text, "reachable on its next launch") || strings.Contains(text, "append to log/") {
-		t.Fatalf("a session launched before the grant is told to write:\n%s", text)
-	}
 }
 
 func TestHeadlessBuilderLeavesTheDossierToThePrompt(t *testing.T) {
@@ -286,82 +244,3 @@ func TestDossierSpendSurvivesARestart(t *testing.T) {
 	}
 }
 
-func TestOnlyALaunchWithTheGrantIsGranted(t *testing.T) {
-	t.Parallel()
-	te, _ := servedDossiers(t)
-	ctx := context.Background()
-	render := func() string {
-		t.Helper()
-		_, out, err := te.renderTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return out.Text
-	}
-	granted := func(text string) bool { return strings.Contains(text, "append to log/") }
-	if _, err := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true, unit: headlessThread}); err != nil {
-		t.Fatal(err)
-	}
-	ws := wsdomain.Workspace{ID: "ws1", Path: "/wt"}
-	if err := te.launched(ctx, te.cfg, ws, headlessThread, proc{"term-1", te.WS.First(), "term-1"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := te.Turns.SessionStarted(ctx, turns.SessionStart{Session: "term-1", Source: "startup"}); err != nil {
-		t.Fatal(err)
-	}
-	if text := render(); !granted(text) {
-		t.Fatalf("a session the loop launched with the grant:\n%s", text)
-	}
-	now := testNow.Add(time.Hour)
-	te.Now = func() time.Time { return now }
-	if err := te.Turns.SessionStarted(ctx, turns.SessionStart{Session: "term-1", Source: "resume"}); err != nil {
-		t.Fatal(err)
-	}
-	if text := render(); granted(text) {
-		t.Fatal("a session resumed without the grant is told to write")
-	}
-
-	te2, _ := servedDossiers(t)
-	if err := te2.Turns.SessionStarted(ctx, turns.SessionStart{Session: "term-user", Source: "startup"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := te2.Turns.Launched(ctx, dturn.Session{ID: "term-user", Unit: headlessThread}); err != nil {
-		t.Fatal(err)
-	}
-	if _, out, err := te2.renderTurn(ctx, te2.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}}); err != nil || granted(out.Text) {
-		t.Fatalf("a session registered without a grant is told to write: %v", err)
-	}
-}
-
-func TestASessionOnATasksThreadIsGrantedTheTasksDossier(t *testing.T) {
-	t.Parallel()
-	te, db := servedDossiers(t)
-	ctx := context.Background()
-	tk := task.Task{ID: "t-00000000000000f1", State: "next", Category: task.CategoryReady, Title: "Answer Ana",
-		Units: []unit.Unit{headlessThread}, Origin: task.OriginDerived, Created: testNow, Updated: testNow}
-	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: tk}}); err != nil {
-		t.Fatal(err)
-	}
-	path := dossierPathOf(t, te, task.UnitOf(tk.ID))
-	line, err := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true, unit: headlessThread})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(line, "--add-dir '"+path+"'") {
-		t.Fatalf("the launch line does not grant the task's dossier %s: %s", path, line)
-	}
-	ws := wsdomain.Workspace{ID: "ws1", Path: "/wt"}
-	if err := te.launched(ctx, te.cfg, ws, headlessThread, proc{"term-1", te.WS.First(), "term-1"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := te.Turns.SessionStarted(ctx, turns.SessionStart{Session: "term-1", Source: "startup"}); err != nil {
-		t.Fatal(err)
-	}
-	_, out, err := te.renderTurn(ctx, te.cfg, turn.Request{Intent: turn.Intent(dintent.Act), Unit: headlessThread, Payload: unitPayload{headlessThread}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.Text, "`"+path+"`") || !strings.Contains(out.Text, "append to log/") {
-		t.Fatalf("the session's instructions do not grant the task's dossier:\n%s", out.Text)
-	}
-}

@@ -40,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -276,6 +277,8 @@ type Env struct {
 	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
 	// never removes a snapshot a running call of this process reads.
 	omniboxSwept bool
+	// memory reads what the turns of a task learned, built once per daemon by serveMessages.
+	memory *memory.Service
 	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
 	dossierTurns *dossiers.Turns
 	dossierCalls *dossiers.Calls

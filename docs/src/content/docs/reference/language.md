@@ -654,7 +654,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>` (table): An MCP tool, by its name.
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
-  - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
+  - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read.
   - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
   - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again.
   - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
@@ -711,7 +711,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_the_tasks` (`Error`): The session's turns are on no unit of the task it would read.
   - `read_failed` (`Error`): The task could not be read.
   - `nothing` (`ID`: number): Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.
-  - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`): What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each "" when empty.
+  - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`, `Learned`): What was read: the task, its brief record's data, its open gates, the chat since the last read, the conversations and what the task's turns learned, each "" when empty.
+  - `learned_entry` (`At`, `Unit`, `Text`): A part of read: what one turn of the task learned, when, on which unit, its text indented two spaces.
   - `task` (`ID`, `Title`, `State`): A part of read: the task's id, title and state.
   - `gate` (`ID`: number, `Kind`, `Name`, `Intents`): A part of read: one open gate of the task, its kind, its name in gates.toml and the intents that resolve it.
   - `chat_message` (`Text`, `At`): A part of read: one message the user wrote on the task's chat, and when.

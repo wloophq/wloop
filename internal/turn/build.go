@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/wloophq/wloop/internal/core/memory"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
@@ -74,13 +75,13 @@ type Builder struct {
 	Payloads map[unit.ProviderID]PayloadReader
 	// Items nil renders no items.
 	Items ItemsReader
-	// Dossiers nil renders no dossier; a dry run reads none.
-	Dossiers DossierReader
+	// Memory nil renders no memory; a dry run reads none.
+	Memory MemoryReader
 }
 
-// DossierReader opens a unit's dossier for a session turn.
-type DossierReader interface {
-	Dossier(ctx context.Context, u unit.Unit) (Dossier, bool, error)
+// MemoryReader reads the memory of the task that holds a unit.
+type MemoryReader interface {
+	Of(ctx context.Context, u unit.Unit) (memory.Memory, error)
 }
 
 func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
@@ -136,14 +137,12 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 			return Context{}, err
 		}
 	}
-	if b.Dossiers != nil && !r.Plain {
-		d, ok, err := b.Dossiers.Dossier(ctx, c.Unit)
+	if b.Memory != nil && !r.Plain {
+		m, err := b.Memory.Of(ctx, c.Unit)
 		if err != nil {
 			return Context{}, err
 		}
-		if ok {
-			c.Dossier = &d
-		}
+		c.Memory = MemoryOf(m)
 	}
 	c.Brief = st.Brief
 	if c.Brief == nil {

@@ -158,7 +158,20 @@ func (s *Server) readTask(ctx context.Context, got messages.TaskRead, id int64) 
 		chat[i] = s.say(ctx, taskReadName, "chat_message", fields{"Text": m.Text, "At": ev.At.UTC().Format(time.RFC3339)})
 	}
 	f["Chat"] = strings.Join(chat, "\n")
+	learned := make([]string, len(got.Learned))
+	for i, l := range got.Learned {
+		learned[i] = s.say(ctx, taskReadName, "learned_entry", fields{"At": l.At.UTC().Format(time.RFC3339), "Unit": l.Unit.Label(), "Text": indent(l.Text, "  ")})
+	}
+	f["Learned"] = strings.Join(learned, "\n")
 	return "read", f
+}
+
+func indent(text, pad string) string {
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	for i, l := range lines {
+		lines[i] = pad + l
+	}
+	return strings.Join(lines, "\n")
 }
 
 // conversations is convs as task_read words them, one after another.

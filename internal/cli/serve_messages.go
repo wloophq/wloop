@@ -6,6 +6,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/daemon"
 )
@@ -18,11 +19,14 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	}
 	ledger := e.itemsLedger(db, cfg, logf)
 	tasks := e.newTasks(db, cfg, ledger)
+	if e.memory == nil {
+		e.memory = &memory.Service{Tasks: db.Tasks(), Merges: db, Books: e.Turns.Store, Items: turnLedger{Applier: ledger, log: db.Items()}}
+	}
 	if e.messages == nil {
 		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
 			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Drafts: optionDrafts{draftGates{e, db, logf}}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,
 			ProposalText: proposalText(e.loadedIntents, logf),
-			ChatDeps:     messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent}}
+			ChatDeps:     messages.ChatDeps{Sessions: e.Turns, Log: chatLog{db}, Units: db.Tasks(), Merged: db, Intent: e.chatIntent, Memory: e.memory}}
 	}
 	e.Turns.Chats = e.messages.Chats()
 	d.Tasks, d.Messages = tasks, e.messages

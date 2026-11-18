@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
-	"github.com/wloophq/wloop/internal/turn"
 )
 
 // dossierRetryEvery is how often the closing calls and compactions the daily cap deferred are tried again.
@@ -165,58 +164,6 @@ func (e *Env) mergedDossiers(ctx context.Context, u unit.Unit) []string {
 		out = append(out, d.Path)
 	}
 	return out
-}
-
-// dossierReader is the session turns' dossier reader; nil without the dossiers.
-func (e *Env) dossierReader() turn.DossierReader {
-	if e.dossierTurns == nil {
-		return nil
-	}
-	return sessionDossiers{e}
-}
-
-// headlessTurnBuilder is the turn builder of a headless call, whose prompt names the dossier read-only.
-func (e *Env) headlessTurnBuilder(cfg config.Config) turn.Builder {
-	b := e.turnBuilder(cfg)
-	b.Dossiers = nil
-	return b
-}
-
-type sessionDossiers struct{ e *Env }
-
-// Dossier opens u's dossier for a session turn. The session is granted it only when every open session
-// of u was launched by the loop with the grant and has not started again since (a resume): the turn
-// may reach any of them.
-func (s sessionDossiers) Dossier(ctx context.Context, u unit.Unit) (turn.Dossier, bool, error) {
-	t := s.e.dossierTurns
-	d, err := t.Open(ctx, u)
-	if err != nil {
-		t.Log("dossier of %s: opening it for the turn: %v", u.Label(), err)
-		return turn.Dossier{}, false, nil
-	}
-	out := turn.Dossier{Path: d.Path, Merged: s.e.mergedDossiers(ctx, u)}
-	if s.e.Turns == nil || s.e.dossierGrants == nil {
-		return out, true, nil
-	}
-	sessions, err := s.e.Turns.Registry.Sessions(ctx)
-	if err != nil {
-		return out, true, nil
-	}
-	grants, err := s.e.dossierGrants(ctx, u)
-	if err != nil {
-		return out, true, nil
-	}
-	out.Granted = true
-	for _, sess := range sessions {
-		if sess.Unit != u || !sess.ClosedAt.IsZero() {
-			continue
-		}
-		at, ok := grants[sess.ID]
-		if !ok || sess.StartedAt.After(at.Add(grantGrace)) {
-			out.Granted = false
-		}
-	}
-	return out, true, nil
 }
 
 // grantLaunched records that the session handle, launched for u, was granted the dossier u's turns read:

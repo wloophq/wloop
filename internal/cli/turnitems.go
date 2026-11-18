@@ -50,6 +50,14 @@ func (e *Env) itemsReader() turn.ItemsReader {
 	return turnItems{e.Turns.Items}
 }
 
+// memoryReader is the turns' reader of their task's memory; nil outside a serve.
+func (e *Env) memoryReader() turn.MemoryReader {
+	if e.memory == nil {
+		return nil
+	}
+	return e.memory
+}
+
 // turnHistory is the earlier turns of u's book b as instructions carry them,
 // each naming its ledger ops with their logged outcomes, for a send of intent
 // sending ("" for a resume).

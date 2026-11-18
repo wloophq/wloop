@@ -172,7 +172,7 @@ func (b headlessBuilder) Instructions(ctx context.Context, u unit.Unit, intent d
 	if _, ok := b.e.payloadReaders()[u.Provider]; !ok {
 		r.Payload = unitPayload{u}
 	}
-	_, out, err := b.e.renderTurnBy(ctx, b.cfg, r, b.e.headlessTurnBuilder)
+	_, out, err := b.e.renderTurnBy(ctx, b.cfg, r, b.e.turnBuilder)
 	return out.Text, err
 }
 

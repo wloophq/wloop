@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/instructions"
+	"github.com/wloophq/wloop/internal/core/memory"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -220,20 +221,28 @@ type Context struct {
 	Payload Payload
 	Wording Wording
 	Items   []instructions.OpenItem // the unit's open items, filled through Builder.Items
-	// Dossier is the unit's dossier, nil when it has none or the turn names none.
-	Dossier *Dossier
+	// Memory is what the turns of the unit's task learned; nil when they learned nothing.
+	Memory *Memory
 	// WithoutProjectSettings says the session runs without the checkout's
 	// own agent settings, so its instruction files are not in context.
 	WithoutProjectSettings bool
 }
 
-// Dossier is a unit's dossier as a session turn reaches it.
-type Dossier struct {
-	Path string
-	// Granted says the session was launched with the dossier in its policy.
-	Granted bool
-	// Merged are the paths of the dossiers of the tasks merged into the unit's task, which the session reads.
-	Merged []string
+// Memory is a task's memory as the instructions carry it: the outcome of a reopened task, the newest
+// learned entries, and how many older ones task_read lists.
+type Memory struct {
+	Outcome *memory.Outcome
+	Recent  []memory.Entry
+	Earlier int
+}
+
+// MemoryOf is m as the instructions carry it; nil when there is nothing to carry.
+func MemoryOf(m memory.Memory) *Memory {
+	if m.Outcome == nil && len(m.Learned) == 0 {
+		return nil
+	}
+	n := min(len(m.Learned), memory.Recent)
+	return &Memory{Outcome: m.Outcome, Recent: m.Learned[:n], Earlier: len(m.Learned) - n}
 }
 
 // Why is what made a workflow start the turn, as the instructions render it.
