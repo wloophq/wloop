@@ -840,6 +840,16 @@
       "additionalProperties": false,
       "description": "The automated turn budgets.",
       "properties": {
+        "blind_block_wait": {
+          "default": "1d",
+          "description": "How long a round blocked on the agent's question waits when its terminal's own agent home cannot be read for the answer.",
+          "type": "string"
+        },
+        "no_start_wait": {
+          "default": "2h",
+          "description": "How long a round whose session never showed the MCP tool, with no question on its screen, waits before a sweep starts it again.",
+          "type": "string"
+        },
         "per_day": {
           "default": 20,
           "description": "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).",

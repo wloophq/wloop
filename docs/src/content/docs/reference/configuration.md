@@ -189,6 +189,8 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 |---|---|---|---|
 | `turns` | table |  | The automated turn budgets. |
 | `turns.per_day` | integer | `20` | Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today). |
+| `turns.no_start_wait` | duration | `2h` | How long a round whose session never showed the MCP tool, with no question on its screen, waits before a sweep starts it again. |
+| `turns.blind_block_wait` | duration | `1d` | How long a round blocked on the agent's question waits when its terminal's own agent home cannot be read for the answer. |
 | `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none. |
 | `headless` | table |  | The headless turns' caps; a cost of zero leaves it uncapped. |
 | `headless.tier` | one of `fast`, `balanced`, `frontier` | `balanced` | The model tier of their calls. |

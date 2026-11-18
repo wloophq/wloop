@@ -194,6 +194,8 @@ var configGrammar = slices.Concat(
 		cfgKey("headless.per_day_usd", KindNumber, "5", "What they may cost in a day, in USD."),
 		cfgKey("turns", KindTable, "", "The automated turn budgets."),
 		cfgKey("turns.per_day", KindInt, "20", "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today)."),
+		cfgKey("turns.no_start_wait", KindDur, "2h", "How long a round whose session never showed the MCP tool, with no question on its screen, waits before a sweep starts it again."),
+		cfgKey("turns.blind_block_wait", KindDur, "1d", "How long a round blocked on the agent's question waits when its terminal's own agent home cannot be read for the answer."),
 		cfgKey("turns.per_unit_per_day", KindInt, "5", "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none."),
 
 		cfgKey("plugins.slack", KindTable, "", "The Slack plugin's settings; no secret lives here."),

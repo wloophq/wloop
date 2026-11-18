@@ -412,7 +412,7 @@ func (e *Env) liftPassedBlock(ctx context.Context, u unit.Unit, err error) error
 		return err
 	}
 	b, berr := e.startBlockOf(ctx, u)
-	if berr != nil || (asked != nil && asked.Question == b.Question) || (asked == nil && b.Question == turns.QuestionNoStart) {
+	if berr != nil || (asked != nil && asked.Question == b.Question) || (asked == nil && !b.RetryAt.IsZero()) {
 		return err
 	}
 	e.recordLifted(ctx, u)

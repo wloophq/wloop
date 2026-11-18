@@ -14,13 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// blindBlock is how long a start block holds when the session runs with its
-// terminal's own agent home, which the loop cannot read for the answer.
-const blindBlock = 24 * time.Hour
-
-// noStartRetry is how long a round whose session never started waits before a sweep starts it again.
-const noStartRetry = 2 * time.Hour
-
 // startBlocks lifts, before a sweep plans, the start blocks of any unit
 // that the agent home answered, so the round they held may be planned in
 // the same sweep; a plan reads a block still holding as RoundState.Blocked.
@@ -63,7 +56,7 @@ func (b *startBlocks) Refresh(ctx context.Context) error {
 			errs = append(errs, err)
 			continue
 		}
-		cleared, until := answeredBlock(ctx, e.Agents[ucfg.Agent], blk, ucfg.AgentHome, ev.At, now)
+		cleared, until := answeredBlock(ctx, e.Agents[ucfg.Agent], blk, ucfg.AgentHome, ev.At, now, time.Duration(ucfg.Turns.BlindBlockWait))
 		if cleared == "" {
 			if !until.IsZero() && (due.IsZero() || until.Before(due)) {
 				due = until
@@ -93,13 +86,14 @@ func (b *startBlocks) Due() time.Time {
 
 // answeredBlock says what answered b's question, read in home for its
 // repository root or folder; "" while it still holds, with until the
-// instant a blind block lifts.
-func answeredBlock(ctx context.Context, agent turns.Agent, b inventory.StartBlock, home string, at, now time.Time) (cleared string, until time.Time) {
-	if b.Question == turns.QuestionNoStart {
-		if now.Sub(at) < noStartRetry {
-			return "", at.Add(noStartRetry)
+// instant a block with no question to read lifts: at its RetryAt, or blind
+// after a block on a question in a home it cannot read.
+func answeredBlock(ctx context.Context, agent turns.Agent, b inventory.StartBlock, home string, at, now time.Time, blind time.Duration) (cleared string, until time.Time) {
+	if !b.RetryAt.IsZero() {
+		if now.Before(b.RetryAt) {
+			return "", b.RetryAt
 		}
-		return "the retry wait of a session that never started passed", time.Time{}
+		return "its retry time came", time.Time{}
 	}
 	cleared = "the agent's question is answered"
 	if b.Question == turns.QuestionTrust {
@@ -110,10 +104,10 @@ func answeredBlock(ctx context.Context, agent turns.Agent, b inventory.StartBloc
 		return cleared, time.Time{}
 	}
 	if home == "" {
-		if now.Sub(at) < blindBlock {
-			return "", at.Add(blindBlock)
+		if now.Sub(at) < blind {
+			return "", at.Add(blind)
 		}
-		return "a day passed, and " + brand.Name + " cannot read the agent home of its terminal to see an answer", time.Time{}
+		return "its wait passed, and " + brand.Name + " cannot read the agent home of its terminal to see an answer", time.Time{}
 	}
 	if isQuestions {
 		return "", time.Time{}

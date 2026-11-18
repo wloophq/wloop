@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
 
@@ -572,7 +573,7 @@ func (e *Env) blockUnit(ctx context.Context, run unitRun, ws wsdomain.Workspace,
 	case errors.As(err, &asked):
 		block = inventory.StartBlock{Question: asked.Question, Root: asked.Root}
 	case errors.As(err, new(errNoMCP)):
-		block = inventory.StartBlock{Question: turns.QuestionNoStart, Folder: ws.Path}
+		block = inventory.StartBlock{Folder: ws.Path, RetryAt: e.Now().Add(time.Duration(run.cfg.Turns.NoStartWait))}
 	default:
 		return
 	}

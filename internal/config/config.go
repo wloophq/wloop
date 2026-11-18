@@ -83,6 +83,11 @@ type UI struct {
 type Turns struct {
 	PerDay        int `json:"per_day"`
 	PerUnitPerDay int `json:"per_unit_per_day"`
+	// NoStartWait is how long a round whose session never started waits before a sweep starts it again.
+	NoStartWait Days `json:"no_start_wait"`
+	// BlindBlockWait is how long a round blocked on a question waits when its agent home cannot be read for
+	// the answer.
+	BlindBlockWait Days `json:"blind_block_wait"`
 }
 
 // GitHub is the GitHub plugin's settings.
@@ -465,7 +470,7 @@ func Defaults() Config {
 		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
 		Drafts:        Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
 		Headless:      Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
-		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
+		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap, NoStartWait: Days(2 * time.Hour), BlindBlockWait: Days(24 * time.Hour)},
 	}
 }
 

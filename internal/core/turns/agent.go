@@ -112,10 +112,6 @@ type HeadlessAgent interface {
 // QuestionTrust is the agent's question whether to trust the worktree.
 const QuestionTrust = "trust"
 
-// QuestionNoStart is a start block of a session that never showed the loop's MCP tool while its agent named
-// no question it waits on: nothing reads an answer, so the block holds for a while and lifts.
-const QuestionNoStart = "no-start"
-
 // Questions is what an agent knows of the questions a starting session
 // stops on that only the user answers. None of it writes.
 type Questions interface {

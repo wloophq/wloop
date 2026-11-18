@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -114,7 +115,9 @@ func TestTheHostLiftsAStartBlockTheCheckoutAnswers(t *testing.T) {
 	}
 }
 
-const noStartBlockKey = "2026-10-21T14:00:00Z\nno-start\n/w/app\n\n\n\nfirst\n\n"
+// noStartBlockKey is a block of a round whose session never started, recorded an hour before testNow and
+// retrying an hour after it.
+var noStartBlockKey = inventory.StartBlock{Folder: "/w/app", Round: "first", RetryAt: testNow.Add(time.Hour)}.Key(testNow.Add(-time.Hour))
 
 func TestASessionThatNeverStartedHoldsItsRoundForTheRetryWait(t *testing.T) {
 	t.Parallel()
@@ -128,10 +131,10 @@ func TestASessionThatNeverStartedHoldsItsRoundForTheRetryWait(t *testing.T) {
 	if err := b.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.unblocks(); len(got) != 0 || !b.Due().Equal(testNow.Add(noStartRetry-time.Hour)) {
+	if got := r.unblocks(); len(got) != 0 || !b.Due().Equal(testNow.Add(time.Hour)) {
 		t.Fatalf("unblocked %v, due %v; want the block held until the retry", got, b.Due())
 	}
-	r.now = testNow.Add(noStartRetry - time.Hour)
+	r.now = testNow.Add(time.Hour)
 	if err := b.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +149,9 @@ func TestAFollowUpWhoseSessionNeverStartedIsBlockedNotRetriedAtOnce(t *testing.T
 	rec := &memRecorder{}
 	sc.env.Rec = rec
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 3}
-	s := &sweep{e: sc.env, now: testNow, st: round.New()}
+	cfg := config.Defaults()
+	cfg.Turns.NoStartWait = config.Days(3 * time.Hour)
+	s := &sweep{e: sc.env, cfg: cfg, now: testNow, st: round.New()}
 	st := step{kind: stepFollowup, ws: wsdomain.Workspace{ID: "ws-3", Path: "/w/app", DisplayName: "app"}, pr: ref}
 	s.noteStartProblem(context.Background(), st, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
 	var blocks []inventory.StartBlock
@@ -155,7 +160,7 @@ func TestAFollowUpWhoseSessionNeverStartedIsBlockedNotRetriedAtOnce(t *testing.T
 			blocks = append(blocks, b)
 		}
 	}
-	if len(blocks) != 1 || blocks[0].Question != turns.QuestionNoStart || blocks[0].Folder != "/w/app" {
+	if len(blocks) != 1 || blocks[0].Question != "" || !blocks[0].RetryAt.Equal(testNow.Add(3*time.Hour)) || blocks[0].Folder != "/w/app" {
 		t.Fatalf("blocks %+v, events %+v", blocks, rec.events)
 	}
 }
@@ -166,13 +171,15 @@ func TestARoundOnAUnitWhoseSessionNeverStartedIsBlocked(t *testing.T) {
 	rec := &memRecorder{}
 	sc.env.Rec = rec
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 4}
-	run := unitRun{def: dintent.Def{Name: "act"}, r: turn.Request{Unit: ref.Unit()}}
+	cfg := config.Defaults()
+	cfg.Turns.NoStartWait = config.Days(90 * time.Minute)
+	run := unitRun{def: dintent.Def{Name: "act"}, cfg: cfg, r: turn.Request{Unit: ref.Unit()}}
 	sc.env.blockUnit(context.Background(), run, wsdomain.Workspace{Path: "/w/api"}, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
 	if len(rec.events) != 1 {
 		t.Fatalf("events %+v", rec.events)
 	}
 	b, ok := inventory.StartBlockOf(port.Event{Kind: rec.events[0].Kind, Key: rec.events[0].Key})
-	if !ok || b.Question != turns.QuestionNoStart || b.Folder != "/w/api" || b.Round != "act" {
+	if !ok || b.Question != "" || !b.RetryAt.Equal(sc.env.Now().Add(90*time.Minute)) || b.Folder != "/w/api" || b.Round != "act" {
 		t.Fatalf("block %+v", b)
 	}
 }
@@ -188,5 +195,16 @@ func TestARoundByHandWhoseSessionNeverStartsKeepsItsNoStartBlock(t *testing.T) {
 	r2.sc.env.liftPassedBlock(context.Background(), r2.ref.Unit(), errNoMCP{"/home/me/.claude"})
 	if len(r2.unblocks()) != 1 {
 		t.Fatalf("a session past the trust question kept its block: %v", r2.unblocks())
+	}
+}
+
+func TestABlindBlockWaitsAsLongAsTheConfigSays(t *testing.T) {
+	t.Parallel()
+	b := inventory.StartBlock{Question: turns.QuestionTrust, Folder: "/w/app"}
+	if cleared, until := answeredBlock(context.Background(), nil, b, "", testNow, testNow.Add(time.Hour), 6*time.Hour); cleared != "" || !until.Equal(testNow.Add(6*time.Hour)) {
+		t.Fatalf("cleared %q, until %v", cleared, until)
+	}
+	if cleared, _ := answeredBlock(context.Background(), nil, b, "", testNow, testNow.Add(6*time.Hour), 6*time.Hour); cleared == "" {
+		t.Fatal("the blind block holds past its wait")
 	}
 }

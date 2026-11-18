@@ -224,7 +224,7 @@ func (e *Env) sweepOptions(intent dintent.Name, opts roundOptions) roundOptions 
 // the agent's question visible. A round on an untrusted folder, or one that
 // creates its workspace, stays blocked, so no sweep starts it again until
 // the folder is trusted or the user acts, and one whose session never
-// started stays blocked for noStartRetry; any other records why it was
+// started stays blocked for turns.no_start_wait; any other records why it was
 // skipped, once per distinct reason.
 func (s *sweep) noteStartProblem(ctx context.Context, st step, err error) {
 	var block inventory.StartBlock
@@ -239,14 +239,14 @@ func (s *sweep) noteStartProblem(ctx context.Context, st step, err error) {
 	case errors.As(err, &asked):
 		block = inventory.StartBlock{Question: asked.Question, Root: asked.Root}
 	case errors.As(err, new(errNoMCP)):
-		block = inventory.StartBlock{Question: turns.QuestionNoStart, Folder: st.ws.Path}
+		block = inventory.StartBlock{Folder: st.ws.Path, RetryAt: s.now.Add(time.Duration(s.cfg.Turns.NoStartWait))}
 	default:
 		return
 	}
 	if s.e.Rec == nil {
 		return
 	}
-	if untrusted != nil || block.Question == turns.QuestionNoStart || st.kind == stepFirstRound || st.ws.ID == "" {
+	if untrusted != nil || !block.RetryAt.IsZero() || st.kind == stepFirstRound || st.ws.ID == "" {
 		block.Round, block.Skip = st.roundKind(), st.onSkipped
 		s.blockRound(ctx, st.pr, st.roundKind(), why, block.Key(s.now))
 		return
