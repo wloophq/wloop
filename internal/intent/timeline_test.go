@@ -136,3 +136,16 @@ func TestEveryCoreKindConstantIsDeclared(t *testing.T) {
 		}
 	}
 }
+
+func TestATimelineThatStillNamesTheDossierKindsLoads(t *testing.T) {
+	dir := userDir(t, map[string]string{TimelineFile: "[events.dossier_granted]\nlabel = \"dossier granted\"\n\n[facts.round]\nstart = [\"turn_sent\"]\nabsorb = [\"dossier_restored\", \"dossier_call\"]\nlabel = \"Round\"\n"})
+	l, problems := LoadIn("en", userLayer(dir), bundledDefault(t), testBase(), nil)
+	for _, p := range problems {
+		if strings.Contains(p.File, TimelineFile) {
+			t.Errorf("%v", p)
+		}
+	}
+	if _, ok := l.Timeline.Events["dossier_granted"]; ok {
+		t.Errorf("a retired kind got a label: %v", l.Timeline.Events["dossier_granted"])
+	}
+}

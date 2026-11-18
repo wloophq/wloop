@@ -4,6 +4,14 @@ package builtin
 // its events into.
 const SurfaceTimeline Surface = "timeline"
 
+// RetiredEventKinds are the kinds of events a release stopped recording: rows of them still read, and a
+// timeline.toml that still names one loads, the name doing nothing.
+var RetiredEventKinds = []Value{
+	{Name: "dossier_restored", Doc: "A dossier file restored, before the task dossiers went."},
+	{Name: "dossier_granted", Doc: "A dossier granted to a session, before the task dossiers went."},
+	{Name: "dossier_call", Doc: "A dossier compaction call, before the task dossiers went."},
+}
+
 // EventKinds are the kinds of the events the core records on a unit's timeline; a plugin's own kinds are in its
 // manifest.
 var EventKinds = []Value{

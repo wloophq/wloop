@@ -87,3 +87,18 @@ func TestInstructionsWithoutMemoryUnchanged(t *testing.T) {
 	}
 	TestScenariosRenderTheirGolden(t)
 }
+
+func TestAnOldPartialThatCallsTheDossierRendersNothingForIt(t *testing.T) {
+	b, err := Base()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := b.New("old-history").Parse(`before{{template "dossier" .}}after`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := old.Execute(&out, scenario(t, "review/history/injected").Context); err != nil || out.String() != "beforeafter" {
+		t.Fatalf("rendered %q, %v", out.String(), err)
+	}
+}

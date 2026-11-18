@@ -103,6 +103,9 @@ func mergeTimeline(d *TimelineDef, facts map[string]TimelineFact, known []string
 	s := &sheet{file: file, at: positions(src), problems: problems}
 	kinds := builtin.ValueNames(builtin.EventKinds)
 	for _, kind := range slices.Sorted(maps.Keys(m.Events)) {
+		if slices.Contains(builtin.ValueNames(builtin.RetiredEventKinds), kind) {
+			continue
+		}
 		if !slices.Contains(kinds, kind) {
 			s.add("events."+kind, "names no core event kind%s", expr.DidYouMean(kind, kinds))
 			continue
@@ -143,7 +146,7 @@ func timelineFact(s *sheet, known []string, name string, m mTimelineFact) (Timel
 	}{{"start", m.Start}, {"end", m.End}, {"absorb", m.Absorb}} {
 		key := l.key
 		for _, k := range l.list {
-			if !slices.Contains(known, k) {
+			if !slices.Contains(known, k) && !slices.Contains(builtin.ValueNames(builtin.RetiredEventKinds), k) {
 				s.add(at+"."+key, "%q names no event kind of the core, a plugin or a task verb%s", k, expr.DidYouMean(k, known))
 			}
 		}
