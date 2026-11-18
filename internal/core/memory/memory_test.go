@@ -2,6 +2,7 @@ package memory_test
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -106,7 +107,7 @@ func TestAUnitNoTaskHoldsKeepsItsOwnEntries(t *testing.T) {
 
 func TestAReopenedTaskCarriesTheOutcomeItClosedWith(t *testing.T) {
 	reopened := t0.Add(48 * time.Hour)
-	e := task.Task{ID: "t-main", Category: task.CategoryActive, Units: []unit.Unit{pr}, Created: t0, OpenChanged: reopened,
+	e := task.Task{ID: "t-main", Category: task.CategoryActive, Units: []unit.Unit{pr}, Created: t0, OpenChanged: reopened, ClosedAt: t0.Add(30 * time.Hour),
 		Items: []task.ItemRef{{Unit: thread, Item: "i2"}}, Resolved: []task.ItemRef{{Unit: thread, Item: "i1"}}}
 	books := fakeBooks{
 		pr:     {rec(t0.Add(time.Hour), "first try", ""), rec(t0.Add(20*time.Hour), "merged the fix and replied", "")},
@@ -146,4 +147,33 @@ func TestAClosedTaskHasNoOutcomeYet(t *testing.T) {
 	if err != nil || got.Outcome != nil {
 		t.Fatalf("outcome %+v, err %v", got.Outcome, err)
 	}
+}
+
+func TestAnOpenTaskTheStoreNeverSawCloseHasNoOutcome(t *testing.T) {
+	e := task.Task{ID: "t-main", Category: task.CategoryActive, Units: []unit.Unit{pr}, Created: t0, OpenChanged: t0.Add(5 * time.Hour)}
+	s := memory.Service{Tasks: fakeTasks{e.ID: e}, Books: fakeBooks{pr: {rec(t0.Add(time.Hour), "replied", "")}}}
+	got, err := s.OfTask(context.Background(), e)
+	if err != nil || got.Outcome != nil {
+		t.Fatalf("outcome %+v, err %v", got.Outcome, err)
+	}
+}
+
+func TestLearnedOfReadsNoItemOfAReopenedTask(t *testing.T) {
+	e := task.Task{ID: "t-main", Category: task.CategoryActive, Units: []unit.Unit{pr}, Created: t0, OpenChanged: t0.Add(5 * time.Hour),
+		ClosedAt: t0.Add(3 * time.Hour), Items: []task.ItemRef{{Unit: thread, Item: "i1"}}}
+	s := memory.Service{Tasks: fakeTasks{e.ID: e}, Books: fakeBooks{pr: {rec(t0.Add(time.Hour), "s", "a cause")}}, Items: failingItems{}}
+	got, err := s.LearnedOf(context.Background(), e)
+	if err != nil || len(got) != 1 || got[0].Text != "a cause" {
+		t.Fatalf("learned %+v, err %v", got, err)
+	}
+}
+
+type failingItems struct{}
+
+func (failingItems) Items(context.Context, unit.Unit) ([]items.Item, error) {
+	return nil, errors.New("the items were read")
+}
+
+func (failingItems) Log(context.Context, unit.Unit, time.Time) ([]coreitems.LogEntry, error) {
+	return nil, errors.New("the items log was read")
 }

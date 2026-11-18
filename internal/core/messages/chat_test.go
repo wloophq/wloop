@@ -446,9 +446,9 @@ type fixedMemory struct {
 	got memory.Memory
 }
 
-func (f *fixedMemory) OfTask(_ context.Context, e task.Task) (memory.Memory, error) {
+func (f *fixedMemory) LearnedOf(_ context.Context, e task.Task) ([]memory.Entry, error) {
 	f.of = e.ID
-	return f.got, nil
+	return f.got.Learned, nil
 }
 
 func TestReadTaskListsEveryLearnedEntry(t *testing.T) {

@@ -104,6 +104,7 @@ var migrations = []migration{
 	{to: 15, name: "drop_dossiers", up: execAll(
 		`DROP TABLE dossiers`,
 		`DROP TABLE dossier_moves`,
+		`ALTER TABLE tasks ADD COLUMN closed_at TEXT NOT NULL DEFAULT ''`,
 	)},
 }
 

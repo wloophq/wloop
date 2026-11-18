@@ -167,7 +167,7 @@ func (s *Server) readTask(ctx context.Context, got messages.TaskRead, id int64) 
 }
 
 func indent(text, pad string) string {
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(record.PlainText(text), "\n"), "\n")
 	for i, l := range lines {
 		lines[i] = pad + l
 	}

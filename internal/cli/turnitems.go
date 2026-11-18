@@ -3,11 +3,14 @@ package cli
 import (
 	"cmp"
 	"context"
+	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/instructions"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -55,7 +58,22 @@ func (e *Env) memoryReader() turn.MemoryReader {
 	if e.memory == nil {
 		return nil
 	}
-	return e.memory
+	return turnMemory{of: e.memory.Of, err: e.Err}
+}
+
+// turnMemory reads a task's memory for a turn, which renders without it when it cannot be read.
+type turnMemory struct {
+	of  func(ctx context.Context, u unit.Unit) (memory.Memory, error)
+	err io.Writer
+}
+
+func (r turnMemory) Of(ctx context.Context, u unit.Unit) (memory.Memory, error) {
+	m, err := r.of(ctx, u)
+	if err != nil {
+		fmt.Fprintf(r.err, "warning: %s: the turn goes without what earlier turns learned: %v\n", u.Label(), err)
+		return memory.Memory{}, nil
+	}
+	return m, nil
 }
 
 // turnHistory is the earlier turns of u's book b as instructions carry them,

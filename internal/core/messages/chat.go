@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/wloophq/wloop/internal/core/memory"
 	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -78,7 +78,7 @@ type ChatDeps struct {
 
 // TaskMemory reads what the turns of a task learned.
 type TaskMemory interface {
-	OfTask(ctx context.Context, e task.Task) (memory.Memory, error)
+	LearnedOf(ctx context.Context, e task.Task) ([]memory.Entry, error)
 }
 
 // ErrNoChat refuses a chat the service is not wired for.
@@ -374,11 +374,9 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 		return out, err
 	}
 	if s.ChatDeps.Memory != nil {
-		m, err := s.ChatDeps.Memory.OfTask(ctx, e)
-		if err != nil {
+		if out.Learned, err = s.ChatDeps.Memory.LearnedOf(ctx, e); err != nil {
 			return out, err
 		}
-		out.Learned = m.Learned
 	}
 	if len(out.Chat) > 0 {
 		if err := s.markChat(ctx, task.UnitOf(e.ID), ChatRead, out.Chat[len(out.Chat)-1].Seq); err != nil {

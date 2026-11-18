@@ -126,8 +126,13 @@ func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) 
 	s.rev++
 	for _, e := range changed {
 		e.OpenChanged = e.Updated
-		if old, ok := s.tasks[e.ID]; ok && old.Open() == e.Open() {
+		old, ok := s.tasks[e.ID]
+		if ok && old.Open() == e.Open() {
 			e.OpenChanged = old.OpenChanged
+		}
+		e.ClosedAt = old.ClosedAt
+		if ok && old.Open() && !e.Open() {
+			e.ClosedAt = e.Updated
 		}
 		s.tasks[e.ID], s.revs[e.ID] = e, s.rev
 	}

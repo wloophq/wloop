@@ -30,12 +30,19 @@ var _ coretasks.Store = taskStore{}
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
 const taskFields = `id, state, category, title, notes, parent, position, sequential,
-	changed, seen_at, origin, created, updated, review_every, reviewed_at, open_changed_at`
+	changed, seen_at, origin, created, updated, review_every, reviewed_at, open_changed_at, closed_at`
 
 // openChangedSQL keeps open_changed_at while a write leaves the task as open, or as closed, as it was, and takes
 // the write's updated when it opens or closes it. It binds done and dropped twice, after the row's values.
 const openChangedSQL = `CASE WHEN (tasks.category NOT IN (?, ?)) = (excluded.category NOT IN (?, ?))
 	THEN tasks.open_changed_at ELSE excluded.updated END`
+
+// closedAtSQL takes the write's updated when it moves the task from open to closed, and keeps closed_at
+// otherwise.
+const closedAtSQL = `CASE WHEN tasks.category NOT IN ` + closedCategories + ` AND excluded.category IN ` + closedCategories +
+	` THEN excluded.updated ELSE tasks.closed_at END`
+
+const closedCategories = `('` + string(task.CategoryDone) + `', '` + string(task.CategoryDropped) + `')`
 
 // hasWake holds a task that holds a wake.
 const hasWake = `EXISTS (SELECT 1 FROM wakes WHERE wakes.task_id = tasks.id)`
@@ -47,8 +54,12 @@ var upsertTaskSQL = func() string {
 	set := make([]string, 0, len(cols)-1)
 	for _, c := range cols[1:] {
 		c = strings.TrimSpace(c)
-		if c == "open_changed_at" {
+		switch c {
+		case "open_changed_at":
 			set = append(set, c+` = `+openChangedSQL)
+			continue
+		case "closed_at":
+			set = append(set, c+` = `+closedAtSQL)
 			continue
 		}
 		set = append(set, c+` = excluded.`+c)
@@ -85,12 +96,12 @@ func taskTime(s string) (time.Time, error) {
 
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
-	var seenAt, created, updated, reviewed, openChanged string
+	var seenAt, created, updated, reviewed, openChanged, closedAt string
 	var state, category, parent string
 	var every int64
 	if err := row.Scan(&e.ID, &state, &category, &e.Title, &e.Notes, &parent,
 		&e.Position, &e.Sequential, &e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed,
-		&openChanged, &e.Asleep); err != nil {
+		&openChanged, &closedAt, &e.Asleep); err != nil {
 		return task.Task{}, err
 	}
 	e.State, e.Category, e.Parent = task.State(state), task.Category(category), task.ID(parent)
@@ -98,7 +109,7 @@ func scanTask(row scanner) (task.Task, error) {
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
-	}{{&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}, {&e.OpenChanged, openChanged}} {
+	}{{&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}, {&e.OpenChanged, openChanged}, {&e.ClosedAt, closedAt}} {
 		t, err := taskTime(f.raw)
 		if err != nil {
 			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
@@ -502,7 +513,7 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
 		string(e.ID), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
 		e.Sequential, e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
-		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), eventTime(e.Updated), rev, string(task.CategoryDone),
+		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), eventTime(e.Updated), eventTime(e.ClosedAt), rev, string(task.CategoryDone),
 		string(task.CategoryDropped), string(task.CategoryDone), string(task.CategoryDropped)); err != nil {
 		return err
 	}
@@ -546,7 +557,8 @@ var _ coretasks.Recategorizer = taskStore{}
 const (
 	heldStatesSQL   = `SELECT state, category FROM tasks GROUP BY state, category ORDER BY state, category`
 	recategorizeSQL = `UPDATE tasks SET category = ?, rev = ?,
-		open_changed_at = CASE WHEN (category NOT IN (?, ?)) = (? NOT IN (?, ?)) THEN open_changed_at ELSE ? END
+		open_changed_at = CASE WHEN (category NOT IN (?, ?)) = (? NOT IN (?, ?)) THEN open_changed_at ELSE ? END,
+		closed_at = CASE WHEN category NOT IN ` + closedCategories + ` AND ? IN ` + closedCategories + ` THEN ? ELSE closed_at END
 		WHERE state = ? AND category != ?`
 	recategorizedSQL = `SELECT 'task', id FROM tasks WHERE state = ?1 AND rev = ?2
 		UNION SELECT u.provider, u.unit_key FROM task_units u JOIN tasks t ON t.id = u.task_id WHERE t.state = ?1 AND t.rev = ?2
@@ -598,7 +610,7 @@ func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task
 				}
 			}
 			if _, err := tx.ExecContext(ctx, recategorizeSQL, string(c), rev, string(task.CategoryDone), string(task.CategoryDropped),
-				string(c), string(task.CategoryDone), string(task.CategoryDropped), eventTime(at), p.state, string(c)); err != nil {
+				string(c), string(task.CategoryDone), string(task.CategoryDropped), eventTime(at), string(c), eventTime(at), p.state, string(c)); err != nil {
 				return fmt.Errorf("recategorizing %s: %w", p.state, err)
 			}
 			if err := eachRow(ctx, tx, recategorizedSQL, []any{p.state, rev}, func(r *sql.Rows) error {

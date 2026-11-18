@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/domain/event"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/merge"
@@ -93,5 +95,20 @@ func TestTheInstructionsCarryWhatTheTurnsOfTheTaskAndItsMergedTasksLearned(t *te
 	}
 	if len(all.Learned) != 5 || all.Learned[4].Text != "Ana wants March first." || all.Learned[4].Unit != task.UnitOf(merged.ID) {
 		t.Fatalf("what task_read lists %+v", all.Learned)
+	}
+}
+
+func TestATurnRendersWithoutTheMemoryItCannotRead(t *testing.T) {
+	t.Parallel()
+	var warned strings.Builder
+	r := turnMemory{of: func(context.Context, unit.Unit) (memory.Memory, error) {
+		return memory.Memory{}, errors.New("database is locked")
+	}, err: &warned}
+	m, err := r.Of(context.Background(), headlessThread)
+	if err != nil || m.Task != "" || len(m.Learned) != 0 {
+		t.Fatalf("memory %+v, err %v; want none and no error", m, err)
+	}
+	if !strings.Contains(warned.String(), "database is locked") {
+		t.Fatalf("warned %q", warned.String())
 	}
 }

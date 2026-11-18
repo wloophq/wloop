@@ -112,7 +112,7 @@ next turn ◄── instructions: the 3 newest entries of every unit of the task
 on demand ── task_read: every entry, newest first, with its unit and date
 ```
 
-How a reopened task had closed is derived from the records and the items ledger: the summary of its last turn before it reopened and the last resolution of each item it holds before then. The entries are text earlier sessions and other people wrote, and the instructions and `task_read` quote them as data. A repro script or a profile goes in the branch or on the pull request, and the entry points to it.
+How a reopened task had closed is derived from the records and the items ledger: the summary of its last turn before it reopened and the last resolution of each item it holds before then. A task is reopened when it opened again after the store stamped it closed; the store stamps it when it moves from an open category to done or dropped, from schema version 15 on. The entries are text earlier sessions and other people wrote, and the instructions and `task_read` quote them as data. A repro script or a profile goes in the branch or on the pull request, and the entry points to it.
 
 ## Inspecting turns
 

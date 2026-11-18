@@ -141,6 +141,7 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			{task.CategoryDone, 2, "written again while closed"},
 			{task.CategoryDropped, 2, "moved between closed categories"},
 			{task.CategoryReady, 5, "opened again"},
+			{task.CategoryInbox, 5, "moved between open categories after it opened again"},
 		} {
 			e.Category, e.Title, e.Updated = st.category, fmt.Sprint(i), at.Add(time.Duration(i)*time.Hour)
 			apply(t, s, e)
@@ -150,6 +151,13 @@ func Contract(t *testing.T, open func(t *testing.T) coretasks.Store) {
 			}
 			if want := at.Add(time.Duration(st.want) * time.Hour); !got.OpenChanged.Equal(want) {
 				t.Errorf("%s: opened or closed at %v, want %v", st.why, got.OpenChanged, want)
+			}
+			wantClosed := time.Time{}
+			if i >= 2 {
+				wantClosed = at.Add(2 * time.Hour)
+			}
+			if !got.ClosedAt.Equal(wantClosed) {
+				t.Errorf("%s: last closed at %v, want %v", st.why, got.ClosedAt, wantClosed)
 			}
 		}
 	})

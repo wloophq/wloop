@@ -104,10 +104,20 @@ func (s *Service) OfTask(ctx context.Context, e task.Task) (Memory, error) {
 		return Memory{}, err
 	}
 	m := Memory{Task: e.ID, Learned: learned}
-	if e.Open() && e.OpenChanged.After(e.Created) {
+	if e.Open() && !e.ClosedAt.IsZero() && !e.OpenChanged.Before(e.ClosedAt) {
 		m.Outcome, err = s.outcome(ctx, e, books)
 	}
 	return m, err
+}
+
+// LearnedOf is what e's turns learned, newest first, without the outcome OfTask derives.
+func (s *Service) LearnedOf(ctx context.Context, e task.Task) ([]Entry, error) {
+	units, err := s.units(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	learned, _, err := s.learned(ctx, units)
+	return learned, err
 }
 
 func (s *Service) holder(ctx context.Context, u unit.Unit) (task.Task, bool, error) {
