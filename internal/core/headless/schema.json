@@ -70,6 +70,6 @@
         }
       }
     },
-    "log": {"type": "string", "maxLength": 4000, "description": "a Markdown note for the unit's dossier; empty for none"}
+    "log": {"type": "string", "maxLength": 1500, "description": "what this turn learned that a later turn on the task needs and the summary cannot hold; empty for none"}
   }
 }

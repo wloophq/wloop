@@ -85,10 +85,7 @@ type Service struct {
 	Context context.Context
 	Timeout time.Duration                                             // a call's limit; 0 is DefaultTimeout
 	Spent   func(ctx context.Context, day time.Time) (float64, error) // turn_usage of headless turns that day
-	Dossier func(ctx context.Context, u unit.Unit) (path string, ok bool)
-	// Logged writes the answer's log to the unit's dossier once the turn's record is stored; nil writes none.
-	Logged func(ctx context.Context, u unit.Unit, seq int64, log string)
-	Clock  port.Clock
+	Clock   port.Clock
 	// Go runs a started call in the background, for Start and Again; nil runs it on a new goroutine.
 	Go  func(run func())
 	Log func(format string, args ...any)
@@ -294,20 +291,11 @@ func (s *Service) begin(ctx context.Context, t turns.Turn, r Request) (started, 
 		return started{}, err
 	}
 	ask := turns.Ask{Tier: s.tier(), Schema: Schema(), MaxCostUSD: s.Caps.PerCallUSD}
-	var dossier string
 	if dir != "" {
 		ask.Dirs = append(ask.Dirs, dir)
-	}
-	if s.Dossier != nil {
-		if p, ok := s.Dossier(ctx, r.Unit); ok {
-			dossier = p
-			ask.Dirs = append(ask.Dirs, p)
-		}
-	}
-	if len(ask.Dirs) > 0 {
 		ask.Tools = slices.Clone(turns.ReadOnlyTools)
 	}
-	if ask.Prompt, err = s.prompt(r, dir, dossier, text); err != nil {
+	if ask.Prompt, err = s.prompt(r, dir, text); err != nil {
 		return started{}, err
 	}
 	if rd, ok := s.Asker.(Readier); ok {
@@ -328,7 +316,7 @@ func (s *Service) begin(ctx context.Context, t turns.Turn, r Request) (started, 
 	return started{seq: seq, turn: id, req: r, def: def, ask: ask}, nil
 }
 
-func (s *Service) prompt(r Request, checkout, dossier, instructions string) (string, error) {
+func (s *Service) prompt(r Request, checkout, instructions string) (string, error) {
 	if s.Wrapper == nil {
 		return "", errors.New("no headless wrapper is wired")
 	}
@@ -336,7 +324,7 @@ func (s *Service) prompt(r Request, checkout, dossier, instructions string) (str
 	if err != nil {
 		return "", fmt.Errorf("reading the headless wrapper: %w", err)
 	}
-	return w.Prompt(r, checkout, dossier, instructions)
+	return w.Prompt(r, checkout, instructions)
 }
 
 func (s *Service) tier() turns.Tier {
@@ -415,9 +403,6 @@ func (s *Service) finish(ctx context.Context, st started) (Result, error) {
 	if err != nil {
 		return out, err
 	}
-	if s.Logged != nil && strings.TrimSpace(a.Log) != "" {
-		s.Logged(ctx, st.req.Unit, st.seq, a.Log)
-	}
 	if r.got.Ledger != nil {
 		out.Ops = len(r.got.Ledger.Applied)
 	}
@@ -479,6 +464,7 @@ func parse(raw []byte) (answer, record.Record, error) {
 	if err != nil {
 		return answer{}, record.Record{}, fmt.Errorf("%w: %v", turns.ErrUnfit, err)
 	}
+	rec.Learned = cut(strings.TrimSpace(record.PlainText(a.Log)), record.LearnedMax)
 	return a, rec, nil
 }
 

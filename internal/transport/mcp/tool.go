@@ -101,6 +101,7 @@ func inputSchema() *schema {
 		"resume":     str(record.ResumeMax),
 		"next":       str(record.NextMax),
 		"user":       str(record.NextMax),
+		"learned":    str(record.LearnedMax),
 		"suspicious": boolean(),
 		"ledger":     {Type: "array", Items: ledgerOp(), MaxItems: record.LedgerMax},
 	}, "state", "summary")

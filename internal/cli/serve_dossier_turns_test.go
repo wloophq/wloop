@@ -2,12 +2,10 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -136,33 +134,6 @@ func (a *dossierAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error)
 	defer a.mu.Unlock()
 	a.asks = append(a.asks, q)
 	return turns.Answer{JSON: []byte(a.reply)}, nil
-}
-
-func TestHeadlessReadsTheDossier(t *testing.T) {
-	t.Parallel()
-	te, db := servedDossiers(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
-	svc, ok := d.Headless.(*headless.Service)
-	if !ok {
-		t.Fatalf("headless is %T", d.Headless)
-	}
-	raw, _ := json.Marshal(map[string]any{"record": record.Record{State: record.Done, Summary: "read it"}, "drafts": []any{}, "log": "the thread asks for a date"})
-	a := &dossierAsker{reply: string(raw)}
-	svc.Asker = a
-	res, err := svc.Run(ctx, headless.Request{Unit: headlessThread})
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := dossierPathOf(t, te, headlessThread)
-	if len(a.asks) != 1 || !slices.Contains(a.asks[0].Dirs, path) || !slices.Equal(a.asks[0].Tools, turns.ReadOnlyTools) {
-		t.Fatalf("asks %+v", a.asks)
-	}
-	logs, err := filepath.Glob(filepath.Join(path, "log", "*-headless-*.md"))
-	if err != nil || len(logs) != 1 || !strings.HasSuffix(logs[0], "-headless-"+strconv.FormatInt(res.Seq, 10)+".md") {
-		t.Fatalf("logs %v %v", logs, err)
-	}
 }
 
 func TestHeadlessTurnsCountTheDossierCalls(t *testing.T) {

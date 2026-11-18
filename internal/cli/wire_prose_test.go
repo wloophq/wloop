@@ -19,7 +19,7 @@ func TestTheHeadlessWrapperResolvesThroughTheProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := w.Prompt(headless.Request{Unit: unit.Unit{Provider: "slack", Key: "C1/1.2"}}, "", "", "act")
+	p, err := w.Prompt(headless.Request{Unit: unit.Unit{Provider: "slack", Key: "C1/1.2"}}, "", "act")
 	if err != nil || !strings.HasPrefix(p, "MINE on ") || !strings.Contains(p, "MY RULES\n"+headless.Schema()) {
 		t.Fatalf("%v\n%s", err, p)
 	}
@@ -36,7 +36,7 @@ func TestABrokenUserHeadlessWrapperFallsBackToTheBundledOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		p, err := w.Prompt(headless.Request{Unit: unit.Unit{Provider: "slack", Key: "C1/1.2"}}, "", "", "act")
+		p, err := w.Prompt(headless.Request{Unit: unit.Unit{Provider: "slack", Key: "C1/1.2"}}, "", "act")
 		if err != nil || !strings.HasPrefix(p, "This is a headless turn of ") {
 			t.Fatalf("%v\n%s", err, p)
 		}

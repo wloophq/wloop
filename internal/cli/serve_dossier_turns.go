@@ -260,28 +260,6 @@ func randomKey() string {
 	return hex.EncodeToString(b)
 }
 
-// headlessDossier opens u's dossier for a headless call, which reads it.
-func (e *Env) headlessDossier(ctx context.Context, u unit.Unit) (string, bool) {
-	if e.dossierTurns == nil {
-		return "", false
-	}
-	d, err := e.dossierTurns.Open(ctx, u)
-	if err != nil {
-		e.dossierTurns.Log("dossier of %s: opening it for a headless turn: %v", u.Label(), err)
-		return "", false
-	}
-	return d.Path, true
-}
-
-func (e *Env) headlessLogged(ctx context.Context, u unit.Unit, seq int64, log string) {
-	if e.dossierTurns == nil {
-		return
-	}
-	if err := e.dossierTurns.HeadlessLog(ctx, u, seq, log); err != nil {
-		e.dossierTurns.Log("dossier of %s: writing the log of headless turn %d: %v", u.Label(), seq, err)
-	}
-}
-
 // withCallSpend is the headless turns' spend with the calls' that are not turns, stored and running, so
 // all share one daily cap.
 func (e *Env) withCallSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {

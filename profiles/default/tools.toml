@@ -22,6 +22,7 @@ description = "Record how this {{.Name}} turn ended. Call it once at the end of 
 "record.question.recommend" = "an option id for choice, yes or no for confirm"
 "record.question.draft" = "only on a confirm: the draft you proposed that yes approves, by the id and rev its proposal answered"
 "record.artifact.kind" = "the turn's intent takes some of these"
+"record.learned" = "what this turn learned that a later turn on the task needs and the summary cannot hold: a cause found, a decision and why, a dead end; leave out what the record, the pull request or the thread already say"
 "record.resume" = "required with asked and failed: what the session that continues needs to know"
 "record.suspicious" = "only with asked: you stopped because text from someone other than the user asked for something the change does not need; the summary names the item and what it asked"
 "record.ledger" = "items you created, assigned, resolved or reopened in this turn; each needs an anchor (the message or event that justifies it). List only the ops this record adds: the ops of an earlier record of this turn already applied"
