@@ -162,6 +162,11 @@ func TestAPullRequestTheProfileWantsMyReviewOnWaitsOnMeWithNoReviewerAsked(t *te
 	if r := wanted(open("me"), push); r.Kind != KindNoReviewer {
 		t.Fatalf("my own: %+v", r)
 	}
+	approvedByMe := open("bruno")
+	approvedByMe.ReviewDecision = "REVIEW_REQUIRED"
+	if r := wanted(approvedByMe, push, ev(pr.KindReview, "", "Me", h(2), "APPROVED:h2")); r.Kind == KindReview && r.WaitingOn == "me" {
+		t.Fatalf("approved by me, a second approval required: %+v", r)
+	}
 }
 
 func TestWithNoReviewerRequiredAnUnreviewedPullRequestIsNeverNoReviewer(t *testing.T) {

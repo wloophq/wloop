@@ -211,3 +211,26 @@ func TestABlockedPullRequestStaysBlockedWhileTheProfileWantsMyReview(t *testing.
 		})
 	}
 }
+
+func TestAReviewedPullRequestRequestedByNameLeavesItsFollowUpToTheFirstRound(t *testing.T) {
+	t.Parallel()
+	h := &fakeHost{listing: apiListing, wanted: requestedByName}
+	p := started(t, &githubGraphQL{}, h)
+	ref := unrequested(t, p, func(row *pr.PR, _ *store.Detail) { row.ReviewRequests = []string{"ana"} })
+	h.mu.Lock()
+	h.books = []src.Book{{Unit: ref.Unit(), Turns: []src.Turn{{Seq: 1, Intent: "review", Role: "pr.review", State: "done",
+		At: testAt.Add(-time.Hour), SentAt: testAt.Add(-time.Hour), Head: "h7"}}}}
+	h.mu.Unlock()
+	if err := p.Notify(context.Background(), []sdk.Unit{ref.Unit()}, []sdk.Topic{sdk.TopicRounds}); err != nil {
+		t.Fatal(err)
+	}
+	var reason string
+	for _, f := range h.lastReport(t, ref).Facts {
+		if f.Name == "pr.review.reason" {
+			reason = f.Value.String
+		}
+	}
+	if reason != "my review was requested, which starts a first round" {
+		t.Fatalf("pr.review.reason = %q", reason)
+	}
+}

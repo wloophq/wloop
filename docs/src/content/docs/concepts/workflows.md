@@ -11,7 +11,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 
 | Workflow | Does | Ships as |
 |---|---|---|
-| `review-first-round` | starts a first review round on a pull request that requests your review by name | runs after a 60 s delay |
+| `review-first-round` | starts a first review round on a pull request that requests your review by name, or that the GitHub plugin's `review_wanted` predicate wants reviewed | runs after a 60 s delay |
 | `review-follow-up` | starts a follow-up round when the author pushed, replied or re-requested you | runs after a 60 s delay |
 | `address` | starts an address round on your pull request when reviews arrive, checks fail or it conflicts with its base | runs after a 60 s delay |
 | `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `plugins.github.nudge.silent_days` (30) of silence | waits for you |
@@ -31,7 +31,7 @@ An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{
 
 ## Automatic rounds
 
-**First round.** A pull request that requests your review by name (team requests are left out), is open, not a draft, not from a fork, whose author is a member, collaborator or owner (or listed in `plugins.github.trusted_authors`), whose owner is allowed by `plugins.github.owners`, and that has no workspace of yours yet.
+**First round.** A pull request that requests your review by name (team requests are left out), or, where your profile widens the GitHub plugin's `review_wanted` predicate, one it holds for that you never reviewed (by a review round or on GitHub); it is open, not a draft, not yours, not from a fork, whose author is a member, collaborator or owner (or listed in `plugins.github.trusted_authors`), whose owner is allowed by `plugins.github.owners`, and that has no workspace of yours yet.
 
 **Follow-up.** After your last review: new non-merge commits, a comment or review by the author (ignored after an approval), or your review re-requested. There is one follow-up per published review and head, plus one per re-request. A round with nothing new to say publishes nothing and records `settled`; the author's next push starts another. A round that finds the author silent on every point of your last review asks you instead. An approval is never automatic: a round that would approve proposes an APPROVE draft, and it waits for you whatever the round and your rules say.
 

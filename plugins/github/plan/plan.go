@@ -310,8 +310,8 @@ func (p *Planner) notFollowedWithoutWorkspace(f pr.Facts) string {
 		return "it is " + strings.ToLower(f.State)
 	case strings.EqualFold(f.Author, viewer):
 		return "you opened it"
-	case p.wanted(p.byRef[f.Ref]) && p.requestedByName(p.byRef[f.Ref]) || p.Requested(f.Ref):
-		return p.asked(f.Ref) + ", which starts a first round"
+	case p.wanted(p.byRef[f.Ref]) && p.requestedByName(p.byRef[f.Ref]):
+		return "my review was requested, which starts a first round"
 	}
 	for _, w := range p.ws {
 		if w.of(f.Ref) && p.isReviewWorkspace(w) && (w.DisplayName == p.cfg.ReviewPrefix+f.HeadRefName || w.linked == f.Number) {
