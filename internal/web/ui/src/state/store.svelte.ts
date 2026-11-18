@@ -89,6 +89,10 @@ export const drafts = $state({ guidance: {} as Record<string, string>, capture: 
 // notice is the status line's text.
 export const notice = $state({ text: "", err: false, title: "" });
 
+// keptLists are the lists of the task views left last, by query key, each as tasksState held it, to show again at
+// once on coming back while a page since its position catches it up. Each owns its arrays: a page applies in place.
+export const keptLists = new Map<string, { tasks: J[]; gates: J[]; loading: J[]; page: { epoch: string; rev: number } }>();
+
 // tasksState is the task views' catalog and the list of the view shown.
 export const tasksState = $state({
   catalog: null as J,

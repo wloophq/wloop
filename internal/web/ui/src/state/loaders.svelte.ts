@@ -7,7 +7,7 @@ import { APIError, getJSON, postJSON } from "./api";
 import { reconcile } from "./reconcile";
 import { currentHash, readHash, viewHash, type Hash } from "./route.svelte";
 import {
-  catalog, detailState, homeState, outboxState, queueState, reviewState, state, taskState, tasksState, gateState,
+  catalog, detailState, homeState, keptLists, outboxState, queueState, reviewState, state, taskState, tasksState, gateState,
 } from "./store.svelte";
 
 // put stores value as obj[key], in place of what obj[key] holds when both are objects or lists.
@@ -272,7 +272,11 @@ export function applyTasksPage(key: string, page: J): void {
   const cur = tasksState.page;
   const same = tasksState.key === key && cur && cur.epoch === page.epoch;
   if (same && !page.full && page.rev < cur.rev) return;
-  if (!same || page.full) {
+  if (tasksState.key !== key) {
+    keepList();
+    tasksState.tasks = page.tasks || [];
+    tasksState.gates = page.gates || [];
+  } else if (!same || page.full) {
     put(tasksState, "tasks", page.tasks || []);
     put(tasksState, "gates", page.gates || []);
   } else {
@@ -300,10 +304,36 @@ export async function readViews(): Promise<boolean> {
   }
 }
 
-// forgetTasksPage makes the next list read whole.
+// forgetTasksPage makes the next list read whole, and forgets the lists of the views left.
 export function forgetTasksPage(): void {
   tasksState.page = null;
+  keptLists.clear();
 }
+
+// KEPT_LISTS bounds the views whose list is kept: each area and context a view is narrowed to is a view of its own.
+const KEPT_LISTS = 8;
+
+// keepList keeps the list shown, as the list of its view, before another takes its place.
+function keepList(): void {
+  const { key, page } = tasksState;
+  if (!key || !page) return;
+  keptLists.delete(key);
+  keptLists.set(key, { tasks: tasksState.tasks, gates: tasksState.gates, loading: tasksState.loading, page });
+  if (keptLists.size > KEPT_LISTS) keptLists.delete(keptLists.keys().next().value!);
+}
+
+// showKept shows the list kept for key, if any, in place of the one shown.
+function showKept(key: string): void {
+  const kept = keptLists.get(key);
+  if (!kept || tasksState.key === key) return;
+  keepList();
+  keptLists.delete(key);
+  Object.assign(tasksState, kept, { key });
+  tasksState.rev++;
+}
+
+// listReads counts the list reads, so a page read for a view left since is not shown.
+let listReads = 0;
 
 // loadTasks loads the catalog once, then the list of route (the hash's when not given, read once the catalog can
 // resolve it) with its counters, or the counters alone on a plugin view, and the counters the filter narrows.
@@ -326,20 +356,25 @@ async function loadTaskList(route: Hash): Promise<void> {
     return;
   }
   const key = viewQueryKey(route.view, route.area, route.ctx);
+  showKept(key);
+  const read = ++listReads;
   const cur = tasksState.page;
   const since = tasksState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
   const units = tasksState.units;
+  const outbox = (viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT ? loadOutbox() : null;
   let page: J;
   try {
     page = await getJSON(tasksURL(route.view, route.area, route.ctx, since, units));
+    if (read !== listReads) return;
     applyTasksPage(key, page);
     tasksState.units = tasksState.units.filter((u) => !units.includes(u));
     tasksState.error = "";
   } catch (err) {
-    tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
+    if (read === listReads) tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
     return;
+  } finally {
+    await outbox;
   }
-  if ((viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT) await loadOutbox();
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -388,7 +423,10 @@ export async function loadReviewStep(): Promise<void> {
     const page = await getJSON(tasksURL(step.view, "", [], ""));
     const key = "review|" + step.id;
     if (tasksState.key === key) put(tasksState, "tasks", page.tasks || []);
-    else tasksState.tasks = page.tasks || [];
+    else {
+      keepList();
+      tasksState.tasks = page.tasks || [];
+    }
     tasksState.key = key;
     tasksState.page = null;
     tasksState.rev++;

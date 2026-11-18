@@ -7,7 +7,8 @@ import { FakeDaemon } from "../testing/fakedaemon";
 import { servedCatalog, task, viewsCatalog } from "../testing/fixtures";
 import { applyCatalog } from "../lib/catalog";
 import { fieldOf, viewQueryKey } from "../lib/lens";
-import { FILTER_COUNT_DELAY_MS, loadFiltered, loadRoundGates, loadTasks, refreshSpecs, viewCounters } from "./loaders.svelte";
+import { FILTER_COUNT_DELAY_MS, forgetTasksPage, loadFiltered, loadRoundGates, loadTasks, refreshSpecs, viewCounters } from "./loaders.svelte";
+import type { J } from "../lib/util";
 import { readHash } from "./route.svelte";
 import { state, tasksState } from "./store.svelte";
 import { load, resetSync } from "./sync.svelte";
@@ -63,6 +64,62 @@ describe("the task lists", () => {
     await loadTasks(route);
     const held = "/api/tasks?view=inbox&since=ep%3A1&units=github%3Aa%2Fb%231&units=slack%3AT1%2FC1%2F1";
     expect(daemon.urls).toEqual(["/api/views", "/api/tasks?view=inbox", "/api/tasks?view=inbox&since=ep%3A1&units=github%3Aa%2Fb%231", held, "/api/tasks?view=inbox&since=ep%3A1"]);
+  });
+
+  const full = (view: string, ...tasks: J[]) => ({ epoch: "ep", rev: 1, full: true, tasks, removed: [], counters: { views: {} }, view });
+  const routeOf = (view: string) => ({ ...readHash(), view, area: "", ctx: [] });
+
+  test("coming back to a view shows its list at once and reads only what changed since", async () => {
+    daemon.pages["/api/views"] = viewsCatalog();
+    daemon.pages["/api/tasks?view=inbox"] = full("inbox", task("i1", "inbox"));
+    daemon.pages["/api/tasks?view=focus"] = full("focus", task("f1", "next"));
+    await loadTasks(routeOf("inbox"));
+    await loadTasks(routeOf("focus"));
+    let shown: string[] = [];
+    daemon.pages["/api/tasks?view=inbox&since=ep%3A1"] = () => {
+      shown = [tasksState.key, ...tasksState.tasks.map((t) => t.id)];
+      return { epoch: "ep", rev: 2, full: false, tasks: [task("i2", "inbox")], removed: [], counters: { views: {} } };
+    };
+    await loadTasks(routeOf("inbox"));
+    expect(shown).toEqual([viewQueryKey("inbox", "", []), "i1"]);
+    expect(tasksState.tasks.map((t) => t.id)).toEqual(["i1", "i2"]);
+    await loadTasks(routeOf("focus"));
+    expect(daemon.urls[daemon.urls.length - 1]).toBe("/api/tasks?view=focus&since=ep%3A1");
+    expect(tasksState.tasks.map((t) => t.id)).toEqual(["f1"]);
+  });
+
+  test("a list that arrives after its view was left does not replace the one shown", async () => {
+    daemon.pages["/api/views"] = viewsCatalog();
+    let release = (_: J) => {};
+    daemon.pages["/api/tasks?view=inbox"] = () => new Promise((r) => (release = r));
+    daemon.pages["/api/tasks?view=focus"] = full("focus", task("f1", "next"));
+    const slow = loadTasks(routeOf("inbox"));
+    await loadTasks(routeOf("focus"));
+    release(full("inbox", task("i1", "inbox")));
+    await slow;
+    expect([tasksState.key, ...tasksState.tasks.map((t) => t.id)]).toEqual([viewQueryKey("focus", "", []), "f1"]);
+  });
+
+  test("the Outbox reads its drafts beside its list, not after it", async () => {
+    daemon.pages["/api/views"] = { ...viewsCatalog(), views: viewsCatalog().views.map((v: J) => (v.id === "outbox" ? { ...v, layout: "outbox" } : v)) };
+    let release = (_: J) => {};
+    daemon.pages["/api/tasks?view=outbox"] = () => new Promise((r) => (release = r));
+    daemon.pages["/api/outbox"] = { drafts: [] };
+    const read = loadTasks(routeOf("outbox"));
+    await vi.waitFor(() => expect(daemon.urls).toContain("/api/outbox"));
+    release(full("outbox"));
+    await read;
+  });
+
+  test("a reconnect forgets every list it kept", async () => {
+    daemon.pages["/api/views"] = viewsCatalog();
+    daemon.pages["/api/tasks?view=inbox"] = full("inbox", task("i1", "inbox"));
+    daemon.pages["/api/tasks?view=focus"] = full("focus", task("f1", "next"));
+    await loadTasks(routeOf("inbox"));
+    await loadTasks(routeOf("focus"));
+    forgetTasksPage();
+    await loadTasks(routeOf("inbox"));
+    expect(daemon.urls[daemon.urls.length - 1]).toBe("/api/tasks?view=inbox");
   });
 });
 
