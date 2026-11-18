@@ -641,6 +641,8 @@
 "no_unit_or_task" = "Nenhum item ou tarefa é {ref}"
 "ambiguous_ref" = "{ref} nomeia mais de um item ou tarefa"
 "nothing_named" = "Diga em que executar {verb}"
+"unit_unreadable" = "Não foi possível ler {unit} agora, então não há ações"
+"unit_no_row" = "O loop não tem {unit} e a origem não mostra nada em que agir"
 "run_invalid" = "Não rodou: o pedido não era válido"
 "run_forbidden" = "Não rodou: não é permitido daqui"
 "run_not_found" = "Não rodou: isso não existe mais"

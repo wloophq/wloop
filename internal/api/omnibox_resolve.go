@@ -9,6 +9,13 @@ const (
 	OmniboxWhyNothingNamed = "nothing_named"
 )
 
+// Why codes of an OmniboxUnit that offers no action; each is a key of the client strings, worded with the
+// unit's Params.
+const (
+	OmniboxUnitUnreadable = "unit_unreadable"
+	OmniboxUnitNoRow      = "unit_no_row"
+)
+
 // The Error of an OmniboxResult whose handler refused or failed, by its status: each is a key of the client
 // strings, whose words name no handler text; Params["detail"] keeps the handler's own message, in English.
 // Outside the vocabulary and incomplete operations take the drop codes.

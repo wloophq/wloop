@@ -375,15 +375,15 @@ func (m *Model) Presentations(units []unit.Unit) map[unit.Unit]Presentation {
 	return out
 }
 
-// Listed are the presentations of every unit a provider lists.
-func (m *Model) Listed(ctx context.Context) (map[unit.Unit]Presentation, error) {
+// Labels are the labels of every unit a provider lists, as their rows show them.
+func (m *Model) Labels(ctx context.Context) (map[unit.Unit]string, error) {
 	s, err := m.sync(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[unit.Unit]Presentation, len(s.list))
+	out := make(map[unit.Unit]string, len(s.list))
 	for _, e := range s.list {
-		out[e.Row.Unit] = Presentation{Label: e.Row.Label, Title: e.Row.Title, Link: e.Row.Link}
+		out[e.Row.Unit] = e.Row.Label
 	}
 	return out, nil
 }

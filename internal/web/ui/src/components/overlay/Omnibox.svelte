@@ -104,6 +104,12 @@
     }
   }
 
+  // run runs the checked operations; when none is left, the focus the Run button held goes back to the field.
+  async function run() {
+    await omniboxRun(st, env);
+    if (!st.ops.length) input.focus();
+  }
+
   function replyKey(e: KeyboardEvent) {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -158,6 +164,7 @@
             <button type="button" class="act" onclick={() => omniboxUnitAction(st, env, a.id)}>{a.label || a.id}</button>
           {/each}
         </div>
+        {#if resolved.unit.why}<p class="omni-why">{t(resolved.unit.why, resolved.unit.params || {})}</p>{/if}
         {#if acted}
           <p class="err omni-copy-error">{acted.error}</p>
           {#if acted.text}<textarea class="omni-copy" readonly rows="6" aria-label={acted.error} value={acted.text}></textarea>{/if}
@@ -193,6 +200,7 @@
             <li class="omni-op">
               <label><input type="checkbox" data-focus={`omni:op:${i}`} bind:checked={st.checked[i]} /> {omniboxOpLabel(op)}</label>
               {#if op.reason && op.op !== "action"}<p class="why">{op.reason}</p>{/if}
+              {#if op.confirm}<p class="why">{op.confirm}</p>{/if}
               {#if editable}
                 {#each omniboxEdits(op) as f (f.name)}
                   <input type="text" class="omni-edit" aria-label={f.label} data-focus={`omni:edit:${i}:${f.name}`} bind:value={op[f.name]} />
@@ -201,7 +209,7 @@
             </li>
           {/each}
         </ol>
-        <button type="button" class="act primary" disabled={checkedCount === 0} data-focus="omni:run" {...opt("ops")} onclick={() => omniboxRun(st, env)}><kbd>↵</kbd> {tn("Run {n}", checkedCount)}</button>
+        <button type="button" class="act primary" disabled={checkedCount === 0} data-focus="omni:run" {...opt("ops")} onclick={run}><kbd>↵</kbd> {tn("Run {n}", checkedCount)}</button>
       </section>
     {/if}
     {#if st.runError}

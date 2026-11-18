@@ -123,7 +123,7 @@ func TestOmniboxReposNameEachRepositoryOnce(t *testing.T) {
 	}
 }
 
-func TestTheServedResolverReadsAPullRequestKeyThroughItsPlugin(t *testing.T) {
+func TestTheServedUnitCodecsReadAPullRequestKey(t *testing.T) {
 	t.Parallel()
 	_, te := scenario(t)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
@@ -135,16 +135,21 @@ func TestTheServedResolverReadsAPullRequestKeyThroughItsPlugin(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
-	if d.Resolve == nil {
-		t.Fatal("the served daemon resolves no address")
-	}
 	want := unit.Unit{Provider: unit.GitHub, Key: "acme/api#41"}
-	if u, ok, err := d.Resolve(ctx, "acme/api#41"); err != nil || !ok || u != want {
-		t.Fatalf("a key of a pull request the loop does not hold: %v %v %v", u, ok, err)
+	if u, ok := d.Units.ParseKey("acme/api#41"); !ok || u != want {
+		t.Fatalf("a key of a pull request the loop does not hold: %v %v", u, ok)
 	}
-	for _, other := range []string{"api#41", "acme/api", "ligar para Ada", "t-0000000000000008"} {
+	for _, other := range []string{"acme/api#41", "api#41", "acme/api", "ligar para Ada", "t-0000000000000008"} {
+		if other != "acme/api#41" {
+			if u, ok := d.Units.ParseKey(other); ok {
+				t.Errorf("%q is the key of %v", other, u)
+			}
+		}
+		if d.Resolve == nil {
+			continue
+		}
 		if u, ok, err := d.Resolve(ctx, other); err != nil || ok {
-			t.Errorf("%q resolved to %v: %v", other, u, err)
+			t.Errorf("%q resolved as a message's address to %v: %v", other, u, err)
 		}
 	}
 }

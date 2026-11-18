@@ -57,15 +57,20 @@ type OmniboxResolved struct {
 	Preview *OmniboxProposal  `json:"preview,omitempty"`
 }
 
-// OmniboxUnit is a resolved unit: its tasks and actions. Row is the row its plugin derives for a unit the loop
-// does not hold, which serves no detail: a client acts on it as it would on the detail's row.
+// OmniboxUnit is a resolved unit: its tasks and actions. Held says the loop holds it, and so serves its detail;
+// Row is the row its plugin derives for one it does not hold, which a client acts on as it would on the
+// detail's row. Why is the code, snake_case, of why a unit with no task offers no action, and Params the values
+// its words name.
 type OmniboxUnit struct {
-	Unit      unit.Unit    `json:"unit"`
-	Label     string       `json:"label"`
-	Permalink string       `json:"permalink,omitempty"`
-	Tasks     []TaskView   `json:"tasks"`
-	Actions   []ActionSpec `json:"actions"`
-	Row       *Row         `json:"row,omitempty"`
+	Unit      unit.Unit         `json:"unit"`
+	Label     string            `json:"label"`
+	Permalink string            `json:"permalink,omitempty"`
+	Held      bool              `json:"held"`
+	Tasks     []TaskView        `json:"tasks"`
+	Actions   []ActionSpec      `json:"actions"`
+	Row       *Row              `json:"row,omitempty"`
+	Why       string            `json:"why,omitempty"`
+	Params    map[string]string `json:"params,omitempty"`
 }
 
 // OmniboxProposal is a set of operations to confirm, and the question the agent asks first, if any.
@@ -76,7 +81,8 @@ type OmniboxProposal struct {
 }
 
 // OmniboxOperation is one operation: Op "action" (Action on Unit), "verb" (Verb on Task), "capture" (a
-// task titled Title) or "start" (a task from Brief, started in Repo).
+// task titled Title) or "start" (a task from Brief, started in Repo). Confirm is what the unit's row asks
+// before Action runs, for the person confirming the operation to read.
 type OmniboxOperation struct {
 	Op       string     `json:"op"`
 	Unit     *unit.Unit `json:"unit,omitempty"`
@@ -88,6 +94,7 @@ type OmniboxOperation struct {
 	Repo     string     `json:"repo,omitempty"`
 	Guidance string     `json:"guidance,omitempty"`
 	Reason   string     `json:"reason,omitempty"`
+	Confirm  string     `json:"confirm,omitempty"`
 }
 
 // OmniboxRun is the operations the user confirmed.

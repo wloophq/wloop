@@ -146,6 +146,28 @@ func (r *Registry) ParseURL(raw string) (Unit, bool) {
 	return Unit{}, false
 }
 
+// ParseKey is the unit a key names as a person types it, among the
+// providers with addresses: the one whose codec takes raw as a key that its
+// own address reads back. False when no provider's codec does, or more than
+// one.
+func (r *Registry) ParseKey(raw string) (Unit, bool) {
+	var out []Unit
+	for _, p := range r.Providers() {
+		c := r.codecs[p]
+		l, ok := c.(Linker)
+		if !ok || c.Valid(raw) != nil {
+			continue
+		}
+		if key, ok := l.KeyOf(l.URL(raw)); ok && KeysEqual(c, key, raw) {
+			out = append(out, Unit{Provider: p, Key: raw})
+		}
+	}
+	if len(out) != 1 {
+		return Unit{}, false
+	}
+	return out[0], true
+}
+
 // URL is u's web address; ok is false for a provider without addresses.
 func (r *Registry) URL(u Unit) (string, bool) {
 	c, _ := r.Codec(u.Provider)

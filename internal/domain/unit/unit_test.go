@@ -1,7 +1,9 @@
 package unit_test
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -103,5 +105,45 @@ func TestAUnitIsAddressedByItsURLWhenItsCodecHasOne(t *testing.T) {
 	}
 	if got := (unit.Unit{Provider: "thread", Key: "t1"}).Address(); got != "thread:t1" {
 		t.Errorf("an unlinked unit's address = %q", got)
+	}
+}
+
+// forge is a provider with addresses: its keys are repo#n, under https://forge.test/.
+type forge struct{ id unit.ProviderID }
+
+func (f forge) Provider() unit.ProviderID { return f.id }
+
+func (forge) Valid(key string) error {
+	if repo, n, ok := strings.Cut(key, "#"); !ok || repo == "" || n == "" || strings.ContainsAny(key, " /") {
+		return fmt.Errorf("not a forge key: %q", key)
+	}
+	return nil
+}
+
+func (f forge) URL(key string) string {
+	if f.Valid(key) != nil {
+		return ""
+	}
+	return "https://forge.test/" + strings.Replace(key, "#", "/", 1)
+}
+
+func (forge) KeyOf(url string) (string, bool) {
+	rest, ok := strings.CutPrefix(url, "https://forge.test/")
+	return strings.Replace(rest, "/", "#", 1), ok && rest != ""
+}
+
+func TestAKeyAPersonTypesNamesTheUnitOfTheOneProviderWhoseAddressReadsItBack(t *testing.T) {
+	reg := unit.NewRegistry(unit.OpaqueCodec{ID: "thread"}, forge{id: "forge"})
+	if u, ok := reg.ParseKey("api#7"); !ok || u != (unit.Unit{Provider: "forge", Key: "api#7"}) {
+		t.Fatalf("ParseKey = %v %v", u, ok)
+	}
+	for _, raw := range []string{"api", "call ana", "https://forge.test/api/7", ""} {
+		if u, ok := reg.ParseKey(raw); ok {
+			t.Errorf("ParseKey(%q) = %v", raw, u)
+		}
+	}
+	two := unit.NewRegistry(forge{id: "forge"}, forge{id: "mirror"})
+	if u, ok := two.ParseKey("api#7"); ok {
+		t.Errorf("a key two providers take named %v", u)
 	}
 }

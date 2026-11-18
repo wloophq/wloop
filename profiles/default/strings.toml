@@ -649,6 +649,8 @@
 "no_unit_or_task" = "No unit or task is {ref}"
 "ambiguous_ref" = "{ref} names more than one unit or task"
 "nothing_named" = "Name what to run {verb} on"
+"unit_unreadable" = "Could not read {unit} now, so it offers no action"
+"unit_no_row" = "The loop does not hold {unit} and its source shows nothing to act on"
 "run_invalid" = "It did not run: the request was not valid"
 "run_forbidden" = "It did not run: not allowed from here"
 "run_not_found" = "It did not run: it no longer exists"

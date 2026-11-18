@@ -78,8 +78,9 @@ function omniboxOps(st: Omni, ops: OmniOp[]): void {
   st.checked = st.ops.map(() => true);
 }
 
-// omniboxType takes text typed: after a pause it asks for the search and the resolution together; a reply to
-// text older than the newest is dropped, and the request the newer text replaces is aborted.
+// omniboxType takes text typed: after a pause it asks for the search and the resolution together, and shows the
+// search as soon as it answers; a reply to text older than the newest is dropped, and the request the newer
+// text replaces is aborted.
 export function omniboxType(st: Omni, text: string, env: OmniEnv): Promise<void> {
   st.text = text;
   st.sel = "";
@@ -104,12 +105,11 @@ export function omniboxType(st: Omni, text: string, env: OmniEnv): Promise<void>
       const ctl = new AbortController();
       st.abort = ctl;
       const started = env.now();
-      const [search, resolved] = await Promise.all([
-        env.get("/api/search?q=" + encodeURIComponent(text), ctl.signal).catch(() => null),
-        env.post("/api/omnibox/resolve", { text }, ctl.signal).catch(() => null),
-      ]);
+      const searched = env.get("/api/search?q=" + encodeURIComponent(text), ctl.signal).catch(() => null).then((search) => {
+        if (seq === st.seq) st.search = search;
+      });
+      const [, resolved] = await Promise.all([searched, env.post("/api/omnibox/resolve", { text }, ctl.signal).catch(() => null)]);
       if (seq === st.seq) {
-        st.search = search;
         st.resolved = resolved;
         st.answered = text;
         st.took = env.now() - started;
@@ -189,6 +189,15 @@ export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string): Pro
   if (st.panel) return spec.input ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
   await env.act(unit.unit, id, !!spec.copies, unit.row);
   if (env.changed) env.changed();
+  if (!unit.held) await omniboxResolveAgain(st, env);
+}
+
+// omniboxResolveAgain asks for the text's resolution again, after an action changed what the loop holds; an
+// answer to text since replaced is dropped.
+async function omniboxResolveAgain(st: Omni, env: OmniEnv): Promise<void> {
+  const seq = st.seq;
+  const resolved = await env.post("/api/omnibox/resolve", { text: st.text }).catch(() => null);
+  if (resolved && seq === st.seq) st.resolved = resolved;
 }
 
 // omniboxActed is what the panel's last action on the resolved unit left to show: why it failed, and the text
@@ -267,17 +276,19 @@ export interface Choice {
   run: () => unknown;
 }
 
-// omniboxChoices are what Enter may run, in the order the arrows walk them: the operations to confirm, a
-// pasted address's unit (which opens nothing while the loop holds no task or detail of it), the agent where only it would help, each search result, and the selection's actions
-// while nothing is typed.
+// omniboxChoices are what Enter may run, in the order the arrows walk them: the operations to confirm, or
+// nothing right after they all ran; a pasted address's unit, which opens its first task, else its detail when
+// the loop holds it, else nothing; the agent where only it would help; each search result; and the selection's
+// actions while nothing is typed.
 export function omniboxChoices(st: Omni, env: OmniEnv): Choice[] {
   if (!st.text.trim()) return st.items.map((it, i) => ({ id: "item:" + i, run: () => { env.close(); it.run(); } }));
   const out: Choice[] = [];
   if (st.ops.some((_, i) => st.checked[i])) out.push({ id: "ops", run: () => omniboxRun(st, env) });
+  else if (st.ran && !st.ops.length) out.push({ id: "ran", run: () => undefined });
   const unit = omniboxUnit(st);
   if (unit) {
     const first = (unit.tasks || [])[0];
-    const href = first ? "#task=" + encodeURIComponent(first.id) : unit.row ? "" : omniboxUnitHref(unit);
+    const href = first ? "#task=" + encodeURIComponent(first.id) : unit.held ? omniboxUnitHref(unit) : "";
     out.push({ id: "unit", run: () => (href ? env.open(href) : undefined) });
   }
   if (st.resolved && st.resolved.kind === "agent" && !st.answer) out.push({ id: "ask", run: () => omniboxAsk(st, env) });
@@ -392,10 +403,10 @@ export function omniboxSelectionWords(st: Omni, id: string): string {
 }
 
 // omniboxStatusSaid says whether the status only says a selection the omnibox already shows as a control: it is
-// then read out and not drawn.
+// then read out and not drawn. After the agent failed, its hint is drawn nowhere else.
 export function omniboxStatusSaid(st: Omni, env: OmniEnv): boolean {
   const sel = omniboxSelected(st, omniboxChoices(st, env));
-  return !!sel && !omniboxIsOption(sel);
+  return !!sel && !omniboxIsOption(sel) && !(sel === "ask" && !!st.askError);
 }
 
 // omniboxStatus is what the polite status says: the selected choice when it is no option of the list, else

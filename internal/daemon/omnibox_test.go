@@ -210,8 +210,11 @@ func TestOmniboxResolveOffersAnUnheldUnitTheActionsOfItsRow(t *testing.T) {
 	if got.Unit.Row == nil || got.Unit.Row.Unit != unheldPR || !slices.Equal(enabledActions(got.Unit.Row.Actions), want) || got.Unit.Permalink != row.Link {
 		t.Errorf("the derived row %+v, permalink %q", got.Unit.Row, got.Unit.Permalink)
 	}
-	if held := resolve(t, r, "https://forge.example/acme/api/pull/8"); held.Unit.Row != nil {
-		t.Errorf("a unit the loop holds carries a row: %+v", held.Unit.Row)
+	if got.Unit.Held || got.Unit.Why != "" {
+		t.Errorf("held %v, why %q", got.Unit.Held, got.Unit.Why)
+	}
+	if held := resolve(t, r, "https://forge.example/acme/api/pull/8"); held.Unit.Row != nil || !held.Unit.Held {
+		t.Errorf("a unit the loop holds: held %v, row %+v", held.Unit.Held, held.Unit.Row)
 	}
 	if after := storedTasks(t, r); after != before {
 		t.Fatalf("resolving created tasks: %d to %d", before, after)
@@ -225,32 +228,77 @@ func (downOnGitHub) CandidateByRef(context.Context, pr.Ref, string) (dgh.Candida
 	return dgh.CandidatePage{}, errors.New("GitHub does not answer")
 }
 
-func TestOmniboxResolveShowsAUnitItsPluginCannotRead(t *testing.T) {
+func TestOmniboxResolveSaysWhyAUnitOffersNoAction(t *testing.T) {
 	t.Parallel()
-	r := newTasksRig(t, func(d *Deps) { exploreOn(d, downOnGitHub{}) })
-	got := resolve(t, r, "https://github.com/acme/api/pull/99")
-	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || len(got.Unit.Actions) != 0 || got.Unit.Row != nil {
-		t.Fatalf("%+v", got)
+	for name, c := range map[string]struct {
+		github ghSearch
+		why    string
+	}{
+		"its source does not answer": {downOnGitHub{}, api.OmniboxUnitUnreadable},
+		"its source has none":        {missingOnGitHub{}, api.OmniboxUnitNoRow},
+	} {
+		r := newTasksRig(t, func(d *Deps) { exploreOn(d, c.github) })
+		got := resolve(t, r, "https://github.com/acme/api/pull/99")
+		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || len(got.Unit.Actions) != 0 || got.Unit.Row != nil || got.Unit.Held {
+			t.Fatalf("%s: %+v", name, got.Unit)
+		}
+		if got.Unit.Why != c.why || got.Unit.Params["unit"] != "acme/api#99" {
+			t.Errorf("%s: why %q %v", name, got.Unit.Why, got.Unit.Params)
+		}
 	}
 }
 
-func TestOmniboxResolveReadsAKeyThroughTheResolver(t *testing.T) {
+// missingOnGitHub has no pull request.
+type missingOnGitHub struct{ openOnGitHub }
+
+func (missingOnGitHub) CandidateByRef(context.Context, pr.Ref, string) (dgh.CandidatePage, error) {
+	return dgh.CandidatePage{}, nil
+}
+
+func TestOmniboxResolveReadsAKeyThroughTheUnitCodecs(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, func(d *Deps) {
-		d.Resolve = func(_ context.Context, address string) (unit.Unit, bool, error) {
-			return unheldPR, address == "acme/api#99", nil
-		}
+		d.Resolve = func(context.Context, string) (unit.Unit, bool, error) { return unit.Unit{}, false, nil }
 	})
 	got := resolve(t, r, "acme/api#99")
-	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || !slices.Contains(specIDs(got.Unit.Actions), "review") {
+	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || got.Unit.Held || !slices.Contains(specIDs(got.Unit.Actions), "review") {
 		t.Fatalf("a key of a unit the loop does not hold: %+v", got)
 	}
 	verb := resolve(t, r, "assumir acme/api#99")
 	if verb.Kind != "verb" || verb.Preview == nil || len(verb.Preview.Operations) != 1 {
 		t.Fatalf("%+v", verb)
 	}
-	if op := verb.Preview.Operations[0]; op.Op != "action" || op.Action != "take_over" || op.Unit == nil || *op.Unit != unheldPR {
+	op := verb.Preview.Operations[0]
+	if op.Op != "action" || op.Action != "take_over" || op.Unit == nil || *op.Unit != unheldPR {
 		t.Fatalf("%+v", op)
+	}
+	row, err := r.s.currentRow(context.Background(), unheldPR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := offerOf(row, "take_over"); st.Confirm == "" || op.Confirm != st.Confirm {
+		t.Errorf("the operation asks %q, its row's action %q", op.Confirm, st.Confirm)
+	}
+	if review := resolve(t, r, "revisar acme/api#99").Preview.Operations[0]; review.Confirm != "" {
+		t.Errorf("an action that asks nothing carries %q", review.Confirm)
+	}
+}
+
+func TestOmniboxResolveReadsAKeyInAnyCaseAsTheUnitTheLoopKnows(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	listed := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	if got := resolve(t, r, "Acme/API#7"); got.Kind != "unit" || got.Unit.Unit != listed || !got.Unit.Held {
+		t.Fatalf("a row's key in another case: %+v", got.Unit)
+	}
+	r.put(t, task.Task{ID: "t-0000000000000007", State: "next", Category: task.CategoryReady, Title: "review the export", Units: []unit.Unit{listed}})
+	for _, text := range []string{"Acme/API#7", "https://github.com/ACME/api/pull/7"} {
+		if got := resolve(t, r, text); got.Kind != "unit" || got.Unit.Unit != listed || len(got.Unit.Tasks) != 1 {
+			t.Fatalf("%q: %+v", text, got.Unit)
+		}
+	}
+	if got := resolve(t, r, "done ACME/API#7"); got.Kind != "verb" || got.Preview == nil || got.Preview.Operations[0].Task != "t-0000000000000007" {
+		t.Fatalf("a task verb on it: %+v", got)
 	}
 }
 
@@ -290,22 +338,30 @@ func TestOmniboxResolveNeverGuessesAmongRowsOfOneShortLabel(t *testing.T) {
 	}
 }
 
-func TestOmniboxResolveAnswersWhileTheRowsCannotBeRead(t *testing.T) {
+func TestOmniboxResolveNeverGuessesAShortLabelWhileTheRowsCannotBeRead(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, func(d *Deps) {
 		d.Identity = func(context.Context) (src.Identity, error) { return src.Identity{}, src.ErrUnavailable }
 	})
 	r.put(t, task.Task{ID: "t-0000000000000008", State: "next", Category: task.CategoryReady, Title: "review the retries", Units: []unit.Unit{pastedPR}})
-	if _, err := r.s.readModel().Listed(context.Background()); err == nil {
+	if _, err := r.s.readModel().Labels(context.Background()); err == nil {
 		t.Fatal("the rows read without a viewer: the rig no longer fails them")
 	}
-	for _, text := range []string{"https://github.com/acme/api/pull/8", "api#8"} {
+	for _, text := range []string{"https://github.com/acme/api/pull/8", "acme/api#8", "t-0000000000000008"} {
 		got := resolve(t, r, text)
 		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != pastedPR || len(got.Unit.Tasks) != 1 || len(got.Unit.Actions) != 0 {
 			t.Errorf("%q: %+v", text, got)
 		}
+		if got.Unit != nil && got.Unit.Why != api.OmniboxUnitUnreadable {
+			t.Errorf("%q: why %q", text, got.Unit.Why)
+		}
 	}
-	if got := resolve(t, r, "revisar api#8"); got.Kind != "verb" || got.Preview == nil {
-		t.Errorf("a verb on a task's unit: %+v", got)
+	for _, text := range []string{"api#8", "revisar api#8"} {
+		body, _ := json.Marshal(api.OmniboxText{Text: text})
+		rec := httptest.NewRecorder()
+		r.s.Handler().ServeHTTP(rec, apiRequest("POST", api.OmniboxResolvePath, strings.NewReader(string(body))))
+		if rec.Code == 200 {
+			t.Errorf("%q resolved among the tasks alone: %s", text, rec.Body)
+		}
 	}
 }

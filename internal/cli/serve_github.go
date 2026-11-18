@@ -463,8 +463,7 @@ func (e *Env) githubModule(build moduleBuild) moduleBuild {
 }
 
 // relayGitHub is m with its ingestion, slow sweep, tracks, checkouts,
-// publisher and proposals relayed to the GitHub plugin serve runs, which
-// also resolves a key a person types, such as owner/repo#n.
+// publisher and proposals relayed to the GitHub plugin serve runs.
 func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, error) {
 	r := relay{id: unit.GitHub, kind: e.pluginKind, now: e.Now, units: psource.Units{Codecs: e.unitCodecs()}}
 	every := time.Duration(cmp.Or(cfg.Sweep.Fast, config.Defaults().Sweep.Fast))
@@ -482,13 +481,6 @@ func (e *Env) relayGitHub(cfg config.Config, m pluginModule) (pluginModule, erro
 		return summary, skipped, err
 	}
 	m.Track, m.Untrack = r.track, r.untrack
-	codec := m.Codec
-	m.Resolve = func(ctx context.Context, address string) (unit.Unit, bool, error) {
-		if codec == nil || codec.Valid(address) != nil {
-			return unit.Unit{}, false, nil
-		}
-		return r.resolve(ctx, address)
-	}
 	m.Refresh = ghsource.Refresher{PRs: e.reportedPRs(), Read: e.refreshLinked, Every: linksEvery(cfg), Now: e.Now}
 	m.Checkouts = pluginCheckouts{psource.Checkouts{ID: string(unit.GitHub), Units: r.units, Kind: e.pluginKind}}
 	s, err := e.pluginSource(unit.GitHub)

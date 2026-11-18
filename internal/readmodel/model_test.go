@@ -205,6 +205,28 @@ func TestRunPublishesWhatMovedBeforeItStarted(t *testing.T) {
 	}
 }
 
+func TestLabelsAreThoseOfEveryListedUnit(t *testing.T) {
+	p := &threads{}
+	p.set(threadUnits(0, 2))
+	m := readmodel.New(change.NewLog(change.DefaultWindow, nil), nil, nil, nil, nil, p)
+	got, err := m.Labels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := m.Rows(context.Background(), api.Since{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || len(rows.Rows) != 2 {
+		t.Fatalf("labels %v of rows %+v", got, rows.Rows)
+	}
+	for _, row := range rows.Rows {
+		if got[row.Unit] != row.Label || row.Label == "" {
+			t.Errorf("%v labeled %q, its row %q", row.Unit, got[row.Unit], row.Label)
+		}
+	}
+}
+
 func TestPresentationsComeFromTheLatestSnapshot(t *testing.T) {
 	log := change.NewLog(change.DefaultWindow, nil)
 	p := &threads{}

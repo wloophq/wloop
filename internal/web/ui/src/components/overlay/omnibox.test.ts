@@ -139,7 +139,7 @@ const retriesSearch = (): Record<string, J> => ({
 const ADDRESS = "https://example.test/acme/api/pull/8";
 function pastedUnit(...tasks: J[]): Record<string, J> {
   return { [ADDRESS]: { kind: "unit", unit: {
-    unit: { provider: "alpha", key: "acme/api#8" }, label: "acme/api#8", tasks,
+    unit: { provider: "alpha", key: "acme/api#8" }, label: "acme/api#8", held: true, tasks,
     actions: [{ id: "pause", label: "Pause" }, { id: "remove", label: "Remove" }] } } };
 }
 function unitWith(action: J): Record<string, J> {
@@ -215,9 +215,90 @@ describe("omnibox_test.go", () => {
     expect(o.log.posts.filter((p) => p.url === "/api/omnibox/run")).toHaveLength(1);
   });
 
+  test("Enter after every operation ran opens no search result", async () => {
+    const o = mount({ resolve: verbResolve, search: { "done t-1": retriesSearch().re } });
+    await o.type("done t-1");
+    await o.key("Enter");
+    await o.key("Enter");
+    expect(o.log.opened).toEqual([]);
+    expect(o.q(".omni-ran li.ok")).toHaveLength(1);
+    await o.key("ArrowDown");
+    await o.key("Enter");
+    expect(o.log.opened).toEqual(["#task=t-9"]);
+  });
+
+  test("a clicked Run that empties the checklist hands the focus back to the field", async () => {
+    const o = mount({ resolve: verbResolve });
+    await o.type("done t-1");
+    const run = o.button("Run");
+    run.focus();
+    await fireEvent.click(run);
+    await settle();
+    expect(o.q(".omni-ops")).toHaveLength(0);
+    expect(document.activeElement).toBe(o.field);
+  });
+
+  test("an operation shows what its row asks before it runs", async () => {
+    const o = mount({ resolve: { "adopt acme/api#8": { kind: "verb", preview: { operations: [
+      { op: "action", unit: { provider: "alpha", key: "acme/api#8" }, action: "take_over", confirm: "It becomes yours to develop" }] } } } });
+    await o.type("adopt acme/api#8");
+    expect(o.q(".omni-op .why").map((x) => x.textContent)).toEqual(["It becomes yours to develop"]);
+  });
+
+  test("search results show before a slow resolution answers", async () => {
+    const f = fake({ search: retriesSearch() });
+    let answer!: (v: J) => void;
+    const post = f.env.post;
+    f.env.post = (url, body, signal) => (url === "/api/omnibox/resolve" ? new Promise<J>((ok) => { answer = ok; }) : post(url, body, signal));
+    const st = omniboxNew(false, []);
+    const typed = omniboxType(st, "retries", f.env);
+    await settle();
+    expect(st.search.groups.map((g: J) => g.id)).toEqual(["you", "others"]);
+    expect(st.answered).toBe("");
+    answer({ kind: "search" });
+    await typed;
+    expect(st.answered).toBe("retries");
+  });
+
+  test("the hint to ask again stays drawn after the agent failed", async () => {
+    const o = mount({ resolve: { "what waits": { kind: "agent" } }, ask: ["the agent is away"] });
+    await o.type("what waits");
+    expect(o.q("output")[0].classList.contains("said")).toBe(true);
+    await o.key("Enter");
+    expect(o.q(".omni-ask-error")).toHaveLength(1);
+    expect(o.q(".omni-hint")).toHaveLength(0);
+    expect(o.q("output")[0].textContent).toContain("ask the agent");
+    expect(o.q("output")[0].classList.contains("said")).toBe(false);
+  });
+
+  test("a unit that offers no action says why, and Enter opens no detail the loop does not serve", async () => {
+    const r = pastedUnit();
+    Object.assign(r[ADDRESS].unit, { held: false, actions: [], why: "unit_unreadable", params: { unit: "acme/api#8" } });
+    const o = mount({ resolve: r });
+    await o.type(ADDRESS);
+    expect(o.q(".omni-unit .omni-why").map((x) => x.textContent)).toEqual(["unit_unreadable"]);
+    await o.key("Enter");
+    expect(o.log.opened).toEqual([]);
+  });
+
+  test("an action on an unheld unit resolves the text again", async () => {
+    const r = unitWith({ id: "track", label: "Track" });
+    Object.assign(r[ADDRESS].unit, { held: false, row: { unit: r[ADDRESS].unit.unit, title: "Retry the export", actions: [{ id: "track", enabled: true }] } });
+    const o = mount({ resolve: r });
+    await o.type(ADDRESS);
+    Object.assign(r[ADDRESS].unit, { held: true, row: undefined, actions: [{ id: "pause", label: "Pause" }] });
+    await fireEvent.click(o.button("Track"));
+    await settle();
+    expect(o.button("Track")).toBeUndefined();
+    expect(o.button("Pause")).toBeDefined();
+    await o.key("Enter");
+    expect(o.log.opened).toHaveLength(1);
+  });
+
   test("an unheld unit's action runs on the row the resolution carries, with no detail read", async () => {
     const unheld = (): Record<string, J> => {
       const r = unitWith({ id: "open", label: "Open" });
+      r[ADDRESS].unit.held = false;
       r[ADDRESS].unit.row = { unit: r[ADDRESS].unit.unit, title: "Retry the export", actions: [{ id: "open", enabled: true, basis: "b1" }] };
       return r;
     };
