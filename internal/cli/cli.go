@@ -168,6 +168,9 @@ type Env struct {
 	Harness harness.Set
 	// Executable is the binary the LaunchAgent runs.
 	Executable string
+	// ReinstallPlugins installs the plugins' vocabulary again once install
+	// placed the release's, which the process read before it; nil skips it.
+	ReinstallPlugins func() error
 
 	// The native menu bar and the process exit; tests replace them.
 	NativeAvailable func() bool
@@ -342,24 +345,25 @@ func NewEnv() *Env {
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
 	e := (&Env{
-		plugins:       installed,
-		Out:           os.Stdout,
-		Err:           os.Stderr,
-		In:            os.Stdin,
-		Git:           gitx.New(),
-		WS:            newSet(managers, Defaults().WorkspaceManagers),
-		Sh:            execSh,
-		Stdout:        execStdout,
-		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
-		IntentRecheck: intentRecheck,
-		ConfigPath:    config.Path(),
-		StateDir:      stateDir,
-		Home:          home,
-		Now:           time.Now,
-		Socket:        config.DaemonSocket(),
-		Getenv:        os.Getenv,
-		Executable:    exe,
-		Harness:       harnessOf(protocols, managers),
+		plugins:          installed,
+		ReinstallPlugins: InstallPlugins,
+		Out:              os.Stdout,
+		Err:              os.Stderr,
+		In:               os.Stdin,
+		Git:              gitx.New(),
+		WS:               newSet(managers, Defaults().WorkspaceManagers),
+		Sh:               execSh,
+		Stdout:           execStdout,
+		LoadConfig:       func() (config.Config, error) { return config.Load(Defaults()) },
+		IntentRecheck:    intentRecheck,
+		ConfigPath:       config.Path(),
+		StateDir:         stateDir,
+		Home:             home,
+		Now:              time.Now,
+		Socket:           config.DaemonSocket(),
+		Getenv:           os.Getenv,
+		Executable:       exe,
+		Harness:          harnessOf(protocols, managers),
 
 		Languages:       preferredLanguages,
 		NativeAvailable: macos.Available,
