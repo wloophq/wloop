@@ -353,7 +353,7 @@ func (a *promptAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) 
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.asks = append(a.asks, q)
-	raw, err := json.Marshal(map[string]any{"record": record.Record{State: record.Done, Summary: "nothing to post"}, "drafts": []any{}, "log": ""})
+	raw, err := json.Marshal(map[string]any{"record": record.Record{State: record.Done, Summary: "nothing to post"}, "drafts": []any{}, "learned": ""})
 	return turns.Answer{JSON: raw}, err
 }
 

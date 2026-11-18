@@ -360,9 +360,9 @@ func randomHex() string {
 
 // answer is the call's JSON as the schema shapes it.
 type answer struct {
-	Record json.RawMessage `json:"record"`
-	Drafts []proposed      `json:"drafts"`
-	Log    string          `json:"log"`
+	Record  json.RawMessage `json:"record"`
+	Drafts  []proposed      `json:"drafts"`
+	Learned string          `json:"learned"`
 }
 
 type proposed struct {
@@ -464,7 +464,7 @@ func parse(raw []byte) (answer, record.Record, error) {
 	if err != nil {
 		return answer{}, record.Record{}, fmt.Errorf("%w: %v", turns.ErrUnfit, err)
 	}
-	rec.Learned = cut(strings.TrimSpace(record.PlainText(a.Log)), record.LearnedMax)
+	rec.Learned = cut(strings.TrimSpace(record.PlainText(a.Learned)), record.LearnedMax)
 	return a, rec, nil
 }
 

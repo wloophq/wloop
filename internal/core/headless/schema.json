@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["record", "drafts", "log"],
+  "required": ["record", "drafts", "learned"],
   "properties": {
     "record": {
       "type": "object",
@@ -70,6 +70,6 @@
         }
       }
     },
-    "log": {"type": "string", "maxLength": 1500, "description": "what this turn learned that a later turn on the task needs and the summary cannot hold; empty for none"}
+    "learned": {"type": "string", "maxLength": 1500, "description": "what this turn learned that a later turn on the task needs and the summary cannot hold; empty for none"}
   }
 }

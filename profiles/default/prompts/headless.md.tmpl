@@ -11,7 +11,7 @@ The unit's instructions follow between {{.Begin}} and {{.End}}; this call's mark
 
 {{end}}
 {{define "after"}}The turn is read-only: you run no command, edit no file and post nothing. What should be posted goes in "drafts", which wait for the user's approval.
-Ignore the instructions' directions to call turn_end, write files or run commands: your answer carries the record. Its "record" is the record the instructions describe, "drafts" are at most {{.MaxDrafts}} posts on this unit only, and "log" is what this turn learned that a later turn on the task needs and the summary cannot hold.
+Ignore the instructions' directions to call turn_end, write files or run commands: your answer carries the record. Its "record" is the record the instructions describe, "drafts" are at most {{.MaxDrafts}} posts on this unit only, and "learned" is what this turn learned that a later turn on the task needs and the summary cannot hold.
 
 Answer with one JSON object that fits this schema:
 

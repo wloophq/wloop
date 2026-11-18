@@ -10,7 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 )
 
-func TestTheAnswersLogIsWhatTheTurnLearned(t *testing.T) {
+func TestTheAnswersLearnedIsTheRecords(t *testing.T) {
 	long := strings.Repeat("a", record.LearnedMax+40)
 	for _, c := range []struct{ name, log, want string }{
 		{"kept", "the date is Friday, set by the owner", "the date is Friday, set by the owner"},
@@ -18,7 +18,7 @@ func TestTheAnswersLogIsWhatTheTurnLearned(t *testing.T) {
 		{"empty", "", ""},
 		{"plain text", "line one\r\nline two\u202e\u2028line three\x00", "line one\nline two\nline three"},
 	} {
-		raw, err := json.Marshal(map[string]any{"record": done, "drafts": []any{}, "log": c.log})
+		raw, err := json.Marshal(map[string]any{"record": done, "drafts": []any{}, "learned": c.log})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestTheAnswersLogIsWhatTheTurnLearned(t *testing.T) {
 	}
 }
 
-func TestTheSchemaBoundsTheLogAsTheRecordBoundsLearned(t *testing.T) {
+func TestTheSchemaBoundsLearnedAsTheRecordDoes(t *testing.T) {
 	var s struct {
 		Properties map[string]struct {
 			MaxLength int `json:"maxLength"`
@@ -42,7 +42,7 @@ func TestTheSchemaBoundsTheLogAsTheRecordBoundsLearned(t *testing.T) {
 	if err := json.Unmarshal([]byte(headless.Schema()), &s); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Properties["log"].MaxLength; got != record.LearnedMax {
-		t.Fatalf("log maxLength %d, want %d", got, record.LearnedMax)
+	if got := s.Properties["learned"].MaxLength; got != record.LearnedMax {
+		t.Fatalf("learned maxLength %d, want %d", got, record.LearnedMax)
 	}
 }
