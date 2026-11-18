@@ -55,13 +55,17 @@ func (f fakeBooks) Books(_ context.Context, us ...unit.Unit) (map[unit.Unit]turn
 type fakeItems struct {
 	items map[unit.Unit][]items.Item
 	log   map[unit.Unit][]coreitems.LogEntry
+	since *[]time.Time
 }
 
 func (f fakeItems) Items(_ context.Context, u unit.Unit) ([]items.Item, error) {
 	return f.items[u], nil
 }
 
-func (f fakeItems) Log(_ context.Context, u unit.Unit, _ time.Time) ([]coreitems.LogEntry, error) {
+func (f fakeItems) Log(_ context.Context, u unit.Unit, since time.Time) ([]coreitems.LogEntry, error) {
+	if f.since != nil {
+		*f.since = append(*f.since, since)
+	}
 	return f.log[u], nil
 }
 
@@ -126,6 +130,8 @@ func TestAReopenedTaskCarriesTheOutcomeItClosedWith(t *testing.T) {
 			resolve("i2", items.Done, reopened.Add(2*time.Hour)),
 		}},
 	}
+	var since []time.Time
+	its.since = &since
 	s := memory.Service{Tasks: fakeTasks{e.ID: e}, Books: books, Items: its}
 	got, err := s.Of(context.Background(), pr)
 	if err != nil {
@@ -135,6 +141,9 @@ func TestAReopenedTaskCarriesTheOutcomeItClosedWith(t *testing.T) {
 		{Unit: thread, Item: "i1", Summary: "fix the login", Resolution: items.Fixed},
 		{Unit: thread, Item: "i2", Summary: "answer the follow-up", Resolution: items.Answered},
 	}}
+	if len(since) != 1 || !since[0].Equal(e.Created) {
+		t.Errorf("read the items log since %v, want since the task was created", since)
+	}
 	if got.Outcome == nil || got.Outcome.ReopenedAt != want.ReopenedAt || got.Outcome.Summary != want.Summary || !slices.Equal(got.Outcome.Items, want.Items) {
 		t.Fatalf("outcome %+v, want %+v", got.Outcome, want)
 	}

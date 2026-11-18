@@ -6,7 +6,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/daemon"
 )
@@ -19,9 +18,7 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	}
 	ledger := e.itemsLedger(db, cfg, logf)
 	tasks := e.newTasks(db, cfg, ledger)
-	if e.memory == nil {
-		e.memory = &memory.Service{Tasks: db.Tasks(), Merges: db, Books: e.Turns.Store, Items: turnLedger{Applier: ledger, log: db.Items()}}
-	}
+	e.serveMemory(db, cfg, logf)
 	if e.messages == nil {
 		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), e.reportedPRs()}, Turns: e.Turns,
 			Ledger: ledger, Tasks: tasks, Gates: draftGates{e, db, logf}, Drafts: optionDrafts{draftGates{e, db, logf}}, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf,

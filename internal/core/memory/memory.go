@@ -186,7 +186,7 @@ func (s *Service) outcome(ctx context.Context, e task.Task, books map[unit.Unit]
 			}
 		}
 	}
-	resolved, err := s.resolved(ctx, slices.Concat(e.Items, e.Resolved), o.ReopenedAt)
+	resolved, err := s.resolved(ctx, slices.Concat(e.Items, e.Resolved), e.Created, o.ReopenedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -197,8 +197,8 @@ func (s *Service) outcome(ctx context.Context, e task.Task, books map[unit.Unit]
 	return &o, nil
 }
 
-// resolved are refs' last applied resolutions before at, each with its item's summary.
-func (s *Service) resolved(ctx context.Context, refs []task.ItemRef, at time.Time) ([]Resolved, error) {
+// resolved are refs' last applied resolutions logged from since and before at, each with its item's summary.
+func (s *Service) resolved(ctx context.Context, refs []task.ItemRef, since, at time.Time) ([]Resolved, error) {
 	if s.Items == nil {
 		return nil, nil
 	}
@@ -208,7 +208,7 @@ func (s *Service) resolved(ctx context.Context, refs []task.ItemRef, at time.Tim
 		byUnit[r.Unit] = append(byUnit[r.Unit], r.Item)
 	}
 	for u, ids := range byUnit {
-		log, err := s.Items.Log(ctx, u, time.Time{})
+		log, err := s.Items.Log(ctx, u, since)
 		if err != nil {
 			return nil, err
 		}

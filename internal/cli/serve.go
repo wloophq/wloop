@@ -390,6 +390,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	}
 	e.serveTurnLedger(db, cfg, logf)
 	links := e.linkDeps(db, cfg, logf, &sd)
+	e.serveMemory(db, cfg, logf)
 	d = e.serveMessages(ctx, d, db, cfg, logf)
 	mods, err := buildSources(e.sourcePlugins(), cfg, sd, e.pluginUI)
 	if err != nil {

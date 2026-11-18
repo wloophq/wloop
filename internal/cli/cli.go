@@ -276,7 +276,7 @@ type Env struct {
 	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
 	// never removes a snapshot a running call of this process reads.
 	omniboxSwept bool
-	// memory reads what the turns of a task learned, built once per daemon by serveMessages.
+	// memory reads what the turns of a task learned, built once per daemon by serveMemory.
 	memory *memory.Service
 	// callBudget books the headless calls that are not turns, the omnibox's, against
 	// the headless caps; rebuilt by each serve pass.
