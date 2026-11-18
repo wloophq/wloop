@@ -29,13 +29,14 @@ A turn's instructions are stored text, rendered when the turn is created and rea
 - the **judgment**: the blocks of your review profile that match this pull request (see [Profiles and intents](/concepts/profiles/));
 - the **brief**, when briefs are on (see [The brief](/concepts/brief/));
 - your **guidance** for this round, verbatim;
-- **Earlier turns**: up to 10 earlier turns of the pull request, newest first, with their state, verdict, the head they covered, what the session wrote and what you said.
+- **Earlier turns**: up to 10 earlier turns of the pull request, newest first, with their state, verdict, the head they covered, what the session wrote and what you said;
+- **What earlier turns learned**: the three newest `learned` entries of the turns of the task, across every unit it holds and the tasks merged into it, and how many older ones `task_read` lists; once the task reopened, the summary and the item resolutions it had closed with. See [What turns learned](#what-turns-learned).
 
 The first line names the turn id. The agent reads them with `{{command}} instructions <intent> --turn <id>`.
 
 ## The record
 
-A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish.
+A turn of an intent with a `[record]` table ends with a record: its state, a one-line summary, the outcome (verdict, URL, counts) and, for a question, its text, its options (marking those that publish), a recommendation, the draft to read and the notes a new session needs to finish. Its optional `learned`, up to 1500 characters, is what a later turn on the task needs and the summary cannot hold.
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
 
@@ -88,9 +89,9 @@ In Claude Desktop, {{name}} creates the session headlessly, imports it into the 
 
 ## Headless turns
 
-A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout and its dossier, and proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
+A turn of an intent whose manifest's `runners` include `headless` runs as one read-only call of the agent, with no session and no workspace. It may read only the unit's checkout, proposes up to 3 drafts, which wait in the [Outbox](/concepts/tasks/#the-outbox). and its answer's `log` is the record's `learned`. The bundled `act` intent runs this way. `headless.tier`, `headless.per_call_usd` (0.5) and `headless.per_day_usd` (5) cap these calls.
 
-The same caps count two kinds of calls that are not turns, so no turn row holds them: the dossiers' compaction and closing calls, and the omnibox's agent call. Each reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an event (`dossier_call`, `omnibox_call`); the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
+The same caps count a call that is not a turn, so no turn row holds it: the omnibox's agent call. It reserves `headless.per_call_usd` while it runs and records its cost, or that cap when the agent reports none, as an `omnibox_call` event; the day's spend is the headless turns' plus those events, and a call the day's cap leaves no room for is refused.
 
 ## The omnibox agent call
 
@@ -98,9 +99,20 @@ A request the omnibox cannot resolve on its own (⌘↵, or a sentence no verb o
 
 The call answers either a list (a text and the ids of the tasks it lists) or a proposal (operations, each with its reason, and one question when something is ambiguous). Tasks and units the snapshot lacks are dropped, and so is every operation the omnibox's vocabulary does not run, each with its reason. Nothing is stored but the call's cost: the proposal is not a gate and resolves none, the client carries a question's answer to the next call, and only the operations the user confirms run, through the same API calls a click makes. Over the day's cap the call answers 429; an agent that fails or answers out of shape, 502; one that passes the two minutes, 504; an installed agent with no restricted mode, 503.
 
-## Dossiers
+## What turns learned
 
-A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
+A task's memory is the `learned` field of its turns' records, kept in the store with them. A turn reads the memory of the task that holds its unit, an open one first, then the oldest; a unit no task holds has its own turns' entries.
+
+```text
+turn ends ── turn_end { summary, next, learned } ──► turn record
+                                                        │
+next turn ◄── instructions: the 3 newest entries of every unit of the task
+              and of the tasks merged into it, "K earlier entries: task_read";
+              once the task reopened, how it had closed
+on demand ── task_read: every entry, newest first, with its unit and date
+```
+
+How a reopened task had closed is derived from the records and the items ledger: the summary of its last turn before it reopened and the last resolution of each item it holds before then. The entries are text earlier sessions and other people wrote, and the instructions and `task_read` quote them as data. A repro script or a profile goes in the branch or on the pull request, and the entry points to it.
 
 ## Inspecting turns
 

@@ -62,7 +62,6 @@ type Config struct {
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
 	Window        Window        `json:"window"`
-	Dossiers      Dossiers      `json:"dossiers"`
 	Drafts        Drafts        `json:"drafts"`
 	Items         Items         `json:"items"`
 	Headless      Headless      `json:"headless"`
@@ -157,16 +156,6 @@ type Headless struct {
 	Tier       turns.Tier `json:"tier"`
 	PerCallUSD float64    `json:"per_call_usd"`
 	PerDayUSD  float64    `json:"per_day_usd"`
-}
-
-// Dossiers sets the dossiers' lifecycle and quotas; a value of zero or less keeps its default.
-type Dossiers struct {
-	ArchiveAfter Days  `json:"archive_after"` // after its task or unit resolved
-	PurgeAfter   Days  `json:"purge_after"`   // after the archive
-	SoftCapMB    int64 `json:"soft_cap_mb"`   // per dossier, reported by doctor
-	TotalCapMB   int64 `json:"total_cap_mb"`  // dossiers and archives, reported by doctor
-	MaxFileMB    int64 `json:"max_file_mb"`   // a larger file is refused, linked instead
-	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
 // Tasks holds the tasks' settings: when a waiting task goes stale, the areas and contexts offered, and how far
@@ -474,11 +463,9 @@ func Defaults() Config {
 		Tasks:         Tasks{StaleWaitingDays: 2, CandidateWindow: Days(14 * 24 * time.Hour), CandidateCap: 5},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Window:        Window{Enabled: true, Hotkey: "ctrl+option+space"},
-		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
-			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Drafts:   Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
-		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
-		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
+		Drafts:        Drafts{RepeatAfter: Days(7 * 24 * time.Hour), StaleAfterDays: 20, IgnoredReactions: []string{"eyes"}},
+		Headless:      Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
+		Turns:         Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
 	}
 }
 

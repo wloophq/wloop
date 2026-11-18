@@ -138,7 +138,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error)
 	if run.def.WorkspaceRepo != nil {
 		run.cfg = scoped(run)
 	}
-	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, unit: u})
+	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand})
 	ws, shared, err := e.runWorkspace(ctx, run, opts)
 	if err != nil {
 		return turns.Outcome{}, err

@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
-	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
 	factdrafts "github.com/wloophq/wloop/internal/adapter/facts/drafts"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
@@ -33,7 +32,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
-	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
@@ -41,7 +39,6 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/core/workspaces"
-	"github.com/wloophq/wloop/internal/domain/dossier"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -92,19 +89,6 @@ func transcriptPrompts(lookup func(ctx context.Context, agentSession string) (pa
 func agentTranscripts(lookup func(ctx context.Context, agentSession string) (path, kind string, err error)) turns.Transcripts {
 	return claude.Transcripts{Transcript: lookup}
 }
-
-// dossierFiles keeps the dossiers under the state directory; the adapter meters its own git calls.
-func (e *Env) dossierFiles(p dossier.Policy) dossiers.Files {
-	return adossier.Files{StateDir: e.StateDir, Home: e.Home, MaxFile: p.MaxFile, Now: e.Now}
-}
-
-// dossierPages reads and writes the dossiers' single files for the turn checks.
-func (e *Env) dossierPages(p dossier.Policy) dossiers.Pages {
-	return adossier.Files{StateDir: e.StateDir, Home: e.Home, MaxFile: p.MaxFile, Now: e.Now}
-}
-
-// stateCheckout is the repository checkout holding the state directory, or "".
-func (e *Env) stateCheckout() string { return adossier.Checkout(e.StateDir, e.Home) }
 
 // transcriptDir is where the agent keeps the transcripts of the sessions run in worktree; home
 // "" is the user's default agent home.

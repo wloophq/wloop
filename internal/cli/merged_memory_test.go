@@ -3,15 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
-	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/domain/event"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/merge"
@@ -20,7 +17,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/turn"
-	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
 // seedLearned stores one done turn on u per text, an hour apart from at, whose record learned it.
@@ -46,27 +42,9 @@ func seedLearned(t *testing.T, te *testEnv, u unit.Unit, at time.Time, texts ...
 	}
 }
 
-func servedMemory(t *testing.T) (*testEnv, *sqlite.DB) {
-	t.Helper()
-	te := newTestEnv(t, &fake.Manager{})
-	te.cfg = withoutWindows(te.cfg)
-	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
-	if te.memory == nil {
-		t.Fatal("the memory is not wired into the turns")
-	}
-	return te, db
-}
-
 func TestTheInstructionsCarryWhatTheTurnsOfTheTaskAndItsMergedTasksLearned(t *testing.T) {
 	t.Parallel()
-	te, db := servedMemory(t)
+	te, db := servedStore(t)
 	ctx := context.Background()
 	survivor := task.Task{ID: "t-00000000000000f1", State: "next", Category: task.CategoryReady, Title: "Answer Ana",
 		Units: []unit.Unit{headlessThread}, Origin: task.OriginDerived, Created: testNow, Updated: testNow}

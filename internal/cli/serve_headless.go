@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -250,4 +252,43 @@ func (a lazyAsker) Ready(ctx context.Context, q turns.Ask) error {
 		return r.Ready(ctx, q)
 	}
 	return nil
+}
+
+// storedSpend is the day's headless spend as stored: the headless turns' and the calls that are not turns.
+func storedSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {
+	turns := headlessSpent(db)
+	return func(ctx context.Context, day time.Time) (float64, error) {
+		got, err := turns(ctx, day)
+		if err != nil {
+			return 0, err
+		}
+		from := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
+		calls, err := db.CallSpent(ctx, from, from.AddDate(0, 0, 1), omnibox.KindCall)
+		return got + calls, err
+	}
+}
+
+// callBudget books the calls that are not turns against the headless caps and the stored spend.
+func callBudget(db *sqlite.DB, cfg config.Config, now func() time.Time) *turns.Budget {
+	return &turns.Budget{Caps: turns.BudgetCaps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD},
+		Spent: storedSpend(db), Clock: clockFunc(now)}
+}
+
+func randomKey() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// withCallSpend is the headless turns' spend with the calls' that are not turns, stored and running, so
+// all share one daily cap.
+func (e *Env) withCallSpend(db *sqlite.DB) func(ctx context.Context, day time.Time) (float64, error) {
+	stored := storedSpend(db)
+	return func(ctx context.Context, day time.Time) (float64, error) {
+		got, err := stored(ctx, day)
+		if err != nil || e.callBudget == nil {
+			return got, err
+		}
+		return got + e.callBudget.Reserved(), nil
+	}
 }

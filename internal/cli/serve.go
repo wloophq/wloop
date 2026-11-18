@@ -404,10 +404,8 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	d = e.serveAgentDrafts(d, db, cfg, logf)
 	e.servePlacement(mods)
 	d = links.serve(d, mods)
-	dossierSvc := e.serveDossiers(ctx, db, cfg, logf)
-	serveProjects(d.Tasks, db, dossierSvc)
+	serveProjects(d.Tasks, db)
 	e.callBudget = callBudget(db, cfg, e.Now)
-	e.serveDossierTurns(ctx, dossierSvc, db, cfg, logf)
 	e.servePayloads(mods)
 	d = e.serveHeadless(ctx, d, db, cfg, starter, logf)
 	d.Placer = sessionPlacer{e: e, cfg: cfg}

@@ -130,7 +130,7 @@ func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, 
 		return err
 	}
 	cfg = scoped(run)
-	if _, err := e.chooseManager(ctx, cfg, intentOptions(d, roundOptions{unit: u})); err != nil {
+	if _, err := e.chooseManager(ctx, cfg, intentOptions(d, roundOptions{})); err != nil {
 		return err
 	}
 	_, err = e.repoCheckout(ctx, cfg, repo)

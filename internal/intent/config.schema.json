@@ -108,36 +108,37 @@
     },
     "dossiers": {
       "additionalProperties": false,
-      "description": "The dossiers' lifecycle and quotas; a value of zero or less keeps its default.",
+      "deprecated": true,
+      "description": "Retired: the task dossiers are gone, and a config that still sets the table loads.",
       "properties": {
         "archive_after": {
-          "default": "30d",
-          "description": "How long after its task or unit resolved a dossier is archived.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "string"
         },
         "compact_at_kb": {
-          "default": 256,
-          "description": "The log size that triggers compaction.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "integer"
         },
         "max_file_mb": {
-          "default": 5,
-          "description": "The largest file a dossier keeps; a larger one is linked.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "integer"
         },
         "purge_after": {
-          "default": "400d",
-          "description": "How long after the archive it is purged.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "string"
         },
         "soft_cap_mb": {
-          "default": 50,
-          "description": "The size per dossier doctor reports.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "integer"
         },
         "total_cap_mb": {
-          "default": 2048,
-          "description": "The size of dossiers and archives doctor reports.",
+          "deprecated": true,
+          "description": "Retired.",
           "type": "integer"
         }
       },

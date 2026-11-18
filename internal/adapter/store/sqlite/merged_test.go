@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/timeline"
-	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/merge"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -64,7 +63,6 @@ func TestMergedIntoWalksTheAliasesTransitively(t *testing.T) {
 func TestMergedIntoFollowsOnlyTheAliasTheMergeRecordNames(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
-	ctx := context.Background()
 	const part, merged, survivor, gone = "t-part", "t-merged", "t-survivor", "t-gone"
 	for _, id := range []task.ID{part, merged, survivor} {
 		putTask(t, db, id)
@@ -79,10 +77,6 @@ func TestMergedIntoFollowsOnlyTheAliasTheMergeRecordNames(t *testing.T) {
 	}
 	if got := mergedIDs(t, db, survivor); !slices.Equal(got, []task.ID{merged}) {
 		t.Fatalf("merged into the survivor %q", got)
-	}
-	open, err := db.Dossiers().Open(ctx, dossier.Owner{Unit: task.UnitOf(merged)})
-	if err != nil || open {
-		t.Fatalf("the merged task's dossier reads as open through the v7 alias to an open part: %v %v", open, err)
 	}
 }
 

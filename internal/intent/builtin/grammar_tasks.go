@@ -89,7 +89,7 @@ type VerbHandler struct{ Name, Doc string }
 
 // VerbHandlers are the handlers a verb names with handler.
 var VerbHandlers = []VerbHandler{
-	{"finish", "Moves the task to the verb's to; a project's dossier starts its lifecycle."},
+	{"finish", "Moves the task to the verb's to."},
 	{"drop", "Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused."},
 	{"focus", "Stars the task, or takes the star off: toggles the property of role star."},
 	{"schedule", "Hides the task until a date or until its unit moves, then brings it back where it was."},

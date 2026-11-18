@@ -18,7 +18,7 @@ type BudgetCaps struct {
 	PerCallUSD, PerDayUSD float64
 }
 
-// Budget books the headless spend of calls that are not turns (the dossiers' calls, the omnibox's): each
+// Budget books the headless spend of calls that are not turns (the omnibox's): each
 // call reserves its per-call cap before it runs and settles its cost when it returns.
 type Budget struct {
 	Caps BudgetCaps

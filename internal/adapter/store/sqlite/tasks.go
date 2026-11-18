@@ -16,7 +16,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
-	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/gate"
@@ -452,8 +451,7 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 }
 
 // adoptUnits gives open task e what waited on its units for a task to hold them: the gates opened on a unit
-// before any task held it, with the held drafts those gates wait on, and the unit's own dossier, whose directory
-// move dossier_moves records.
+// before any task held it, with the held drafts those gates wait on.
 func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
 	if !e.Open() {
 		return nil
@@ -482,9 +480,6 @@ func adoptUnits(ctx context.Context, tx *Tx, e task.Task) error {
 			return err
 		} else if n > 0 {
 			tx.Touch(port.TopicGates, u, task.UnitOf(e.ID))
-		}
-		if err := giveDossier(ctx, tx.Tx, dossier.Owner{Unit: u}.String(), dossier.Owner{Unit: u}.String(), string(e.ID)); err != nil {
-			return err
 		}
 	}
 	return nil

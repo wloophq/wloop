@@ -28,6 +28,12 @@ func cfgKey(path string, k Kind, def, doc string) Key {
 	return Key{Path: path, In: SurfaceConfig, Kind: k, Default: def, Doc: doc}
 }
 
+// retired marks k as a key a release stopped reading.
+func retired(k Key) Key {
+	k.Retired = true
+	return k
+}
+
 func cfgList(path, doc string) Key {
 	return Key{Path: path, In: SurfaceConfig, Kind: KindList, Elem: KindText, Doc: doc}
 }
@@ -167,13 +173,13 @@ var configGrammar = slices.Concat(
 		cfgKey("window", KindTable, "", "The app's own window on macOS, which the app reads when it starts."),
 		cfgKey("window.enabled", KindBool, "true", "Show the cockpit in the app's own window on macOS; false opens it in the browser."),
 		cfgKey("window.hotkey", KindText, "ctrl+option+space", "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none."),
-		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),
-		cfgKey("dossiers.archive_after", KindDur, "30d", "How long after its task or unit resolved a dossier is archived."),
-		cfgKey("dossiers.purge_after", KindDur, "400d", "How long after the archive it is purged."),
-		cfgKey("dossiers.soft_cap_mb", KindInt, "50", "The size per dossier doctor reports."),
-		cfgKey("dossiers.total_cap_mb", KindInt, "2048", "The size of dossiers and archives doctor reports."),
-		cfgKey("dossiers.max_file_mb", KindInt, "5", "The largest file a dossier keeps; a larger one is linked."),
-		cfgKey("dossiers.compact_at_kb", KindInt, "256", "The log size that triggers compaction."),
+		retired(cfgKey("dossiers", KindTable, "", "Retired: the task dossiers are gone, and a config that still sets the table loads.")),
+		retired(cfgKey("dossiers.archive_after", KindDur, "", "Retired.")),
+		retired(cfgKey("dossiers.purge_after", KindDur, "", "Retired.")),
+		retired(cfgKey("dossiers.soft_cap_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.total_cap_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.max_file_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.compact_at_kb", KindInt, "", "Retired.")),
 
 		cfgKey("drafts", KindTable, "", "The settings every proposer's drafts share."),
 		cfgKey("drafts.repeat_after", KindDur, "7d", "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again."),

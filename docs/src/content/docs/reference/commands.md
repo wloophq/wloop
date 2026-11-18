@@ -851,7 +851,7 @@ Take out the daemon's and the menu bar's LaunchAgents, {{name}}.app, the agent h
 
 | Flag | Description |
 | --- | --- |
-| `--purge` | Also delete the state and config directories: the store and its backups, MCP key, dossiers, logs, config and review profiles |
+| `--purge` | Also delete the state and config directories: the store and its backups, MCP key, logs, config and review profiles |
 | `--dry-run` | Print what would be removed and change nothing |
 | `--yes` | Remove without asking |
 

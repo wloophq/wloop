@@ -495,23 +495,6 @@ CREATE TABLE review_runs (
 ) WITHOUT ROWID;
 CREATE INDEX review_runs_open ON review_runs (finished_at, started_at);
 
-CREATE TABLE dossiers (
-  owner TEXT PRIMARY KEY,
-  rel_path TEXT NOT NULL, status TEXT NOT NULL,
-  bytes INTEGER NOT NULL DEFAULT 0, files INTEGER NOT NULL DEFAULT 0,
-  last_write_at TEXT NOT NULL DEFAULT '', resolved_at TEXT NOT NULL DEFAULT '',
-  archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
-) WITHOUT ROWID;
-
--- A dossier directory a merge of tasks, or the migration onto tasks, moved in the store and not yet on disk:
--- paths under the dossiers root, an archive at the same path under .archive with .tar.gz. Moves apply in seq
--- order, a later one moving what an earlier one put in place.
-CREATE TABLE dossier_moves (
-  seq INTEGER PRIMARY KEY,
-  from_path TEXT NOT NULL,
-  to_path TEXT NOT NULL
-);
-
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,
   body TEXT NOT NULL, state TEXT NOT NULL,

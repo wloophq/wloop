@@ -51,7 +51,7 @@ func (Agent) Resume(home, agentSession string) string {
 }
 
 func emptyPolicy(p turns.Policy) bool {
-	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && len(p.DraftTools) == 0 && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.Dirs) == 0 && len(p.DenyPaths) == 0
+	return len(p.Allow) == 0 && len(p.Deny) == 0 && len(p.WritePaths) == 0 && !p.TurnEnd && len(p.DraftTools) == 0 && !p.NoMCP && !p.Strict && !p.UserSettingsOnly && len(p.DenyPaths) == 0
 }
 
 // IsDefaultHome says whether home is the default home, "" included.
@@ -83,9 +83,6 @@ func (k Agent) flags(s turns.AgentSession) []string {
 	}
 	if s.Policy.NoMCP {
 		out = append(out, "--strict-mcp-config")
-	}
-	for _, d := range s.Policy.Dirs {
-		out = append(out, "--add-dir", d.Path)
 	}
 	return out
 }
@@ -127,9 +124,6 @@ func (Agent) Settings(p turns.Policy) string {
 		Permissions struct {
 			Allow []string `json:"allow"`
 			Deny  []string `json:"deny"`
-			// AdditionalDirectories carries the --add-dir grants for a manager
-			// that passes no flags, as Claude Desktop.
-			AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
 		} `json:"permissions"`
 		DisableAllHooks bool `json:"disableAllHooks,omitempty"`
 	}
@@ -142,23 +136,7 @@ func (Agent) Settings(p turns.Policy) string {
 	for _, d := range p.WritePaths {
 		settings.Permissions.Allow = append(settings.Permissions.Allow, "Edit(./"+d+"/**)")
 	}
-	for _, d := range p.Dirs {
-		for _, w := range d.Write {
-			// An absolute path takes Claude Code's //abs rule form.
-			settings.Permissions.Allow = append(settings.Permissions.Allow, "Edit(/"+d.Path+"/"+w+"/**)")
-		}
-	}
 	settings.Permissions.Deny = rules(p.Deny)
-	for _, d := range p.Dirs {
-		settings.Permissions.AdditionalDirectories = append(settings.Permissions.AdditionalDirectories, d.Path)
-	}
-	for _, d := range p.Dirs {
-		if len(d.Write) == 0 {
-			settings.Permissions.Deny = append(settings.Permissions.Deny, "Edit(/"+d.Path+"/**)")
-			continue
-		}
-		settings.Permissions.Deny = append(settings.Permissions.Deny, "Edit(/"+d.Path+"/.git/**)")
-	}
 	for _, d := range p.DenyPaths {
 		// An absolute path takes Claude Code's //abs rule form; the path itself is denied, a file's, and what
 		// is under it, a directory's.

@@ -101,6 +101,10 @@ var migrations = []migration{
 	{to: 14, name: "gate_subjects", compatible: 13, up: execAll(
 		`CREATE INDEX gates_subject ON gates (subject)`,
 	)},
+	{to: 15, name: "drop_dossiers", up: execAll(
+		`DROP TABLE dossiers`,
+		`DROP TABLE dossier_moves`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

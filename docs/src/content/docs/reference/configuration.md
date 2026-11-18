@@ -247,17 +247,17 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `cleanup.orphan_hold` | duration | `1d` | How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process. |
 | `cleanup.disposable` | list of strings |  | Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing. |
 
-### Dossiers
+### Retired
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `dossiers` | table |  | The dossiers' lifecycle and quotas; a value of zero or less keeps its default. |
-| `dossiers.archive_after` | duration | `30d` | How long after its task or unit resolved a dossier is archived. |
-| `dossiers.purge_after` | duration | `400d` | How long after the archive it is purged. |
-| `dossiers.soft_cap_mb` | integer | `50` | The size per dossier doctor reports. |
-| `dossiers.total_cap_mb` | integer | `2048` | The size of dossiers and archives doctor reports. |
-| `dossiers.max_file_mb` | integer | `5` | The largest file a dossier keeps; a larger one is linked. |
-| `dossiers.compact_at_kb` | integer | `256` | The log size that triggers compaction. |
+| `dossiers` | retired, not read |  | Retired: the task dossiers are gone, and a config that still sets the table loads. |
+| `dossiers.archive_after` | retired, not read |  | Retired. |
+| `dossiers.purge_after` | retired, not read |  | Retired. |
+| `dossiers.soft_cap_mb` | retired, not read |  | Retired. |
+| `dossiers.total_cap_mb` | retired, not read |  | Retired. |
+| `dossiers.max_file_mb` | retired, not read |  | Retired. |
+| `dossiers.compact_at_kb` | retired, not read |  | Retired. |
 
 ### Interface
 

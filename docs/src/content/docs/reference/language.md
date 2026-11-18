@@ -217,7 +217,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
 - `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `promise`, `reviewed`, `sequential`, `merge`, `split`, `relate`, `unrelate`): What the verb runs besides its move, a handler of the loop's; none when absent.
-  - `finish`: Moves the task to the verb's to; a project's dossier starts its lifecycle.
+  - `finish`: Moves the task to the verb's to.
   - `drop`: Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused.
   - `focus`: Stars the task, or takes the star off: toggles the property of role star.
   - `schedule`: Hides the task until a date or until its unit moves, then brings it back where it was.
@@ -1159,9 +1159,6 @@ The fields each notice reads besides `Name` and `Command`:
   - `stop_blocked`: An agent's stop blocked for a reason the loop gave.
   - `turn_stopped`: A turn stopped.
   - `guide_trimmed`: A turn's guide trimmed to its limit.
-  - `dossier_restored`: A dossier file restored.
-  - `dossier_granted`: A dossier granted to a session.
-  - `dossier_call`: A dossier compaction call, with its cost.
   - `omnibox_call`: An omnibox agent call, with its cost.
   - `brief_waiting`: A request waiting for its brief.
   - `intake_accepted`: A request accepted.
@@ -1549,15 +1546,15 @@ The fields each notice reads besides `Name` and `Command`:
 - `cleanup.orphan_hold` (duration, default `1d`): How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process.
 - `cleanup.disposable` (list of strings): Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing.
 
-### Dossiers
+### Retired
 
-- `dossiers` (table): The dossiers' lifecycle and quotas; a value of zero or less keeps its default.
-- `dossiers.archive_after` (duration, default `30d`): How long after its task or unit resolved a dossier is archived.
-- `dossiers.purge_after` (duration, default `400d`): How long after the archive it is purged.
-- `dossiers.soft_cap_mb` (integer, default `50`): The size per dossier doctor reports.
-- `dossiers.total_cap_mb` (integer, default `2048`): The size of dossiers and archives doctor reports.
-- `dossiers.max_file_mb` (integer, default `5`): The largest file a dossier keeps; a larger one is linked.
-- `dossiers.compact_at_kb` (integer, default `256`): The log size that triggers compaction.
+- `dossiers` (retired, not read): Retired: the task dossiers are gone, and a config that still sets the table loads.
+- `dossiers.archive_after` (retired, not read): Retired.
+- `dossiers.purge_after` (retired, not read): Retired.
+- `dossiers.soft_cap_mb` (retired, not read): Retired.
+- `dossiers.total_cap_mb` (retired, not read): Retired.
+- `dossiers.max_file_mb` (retired, not read): Retired.
+- `dossiers.compact_at_kb` (retired, not read): Retired.
 
 ### Interface
 

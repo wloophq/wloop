@@ -117,8 +117,11 @@ func TestEveryConfigKeyIsInTheGrammar(t *testing.T) {
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(rows)) {
-		if _, ok := want[p]; !ok {
+		if _, ok := want[p]; !ok && !rows[p].Retired {
 			t.Errorf("the grammar row %s names no key", p)
+		}
+		if _, ok := want[p]; ok && rows[p].Retired {
+			t.Errorf("the retired grammar row %s names a key the decoder reads", p)
 		}
 	}
 }

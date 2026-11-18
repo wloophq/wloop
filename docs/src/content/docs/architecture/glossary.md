@@ -66,7 +66,6 @@ description: The words the code, the configuration, the facts and these pages us
 - **Endorsement**: whether you stood behind the verdict a turn published, by publishing it by hand or approving it. An automatic follow-up approves only after an endorsed verdict.
 - **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that proposes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).
 - **Intake**: the numbered wait of a first turn for its brief. `{{command}} intake <n>` follows it, and `{{command}} intake without <n>` starts it without the brief.
-- **Dossier**: the working memory of a task, or of a unit no task holds, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. See [Dossiers](/concepts/turns/#dossiers).
 
 ## Profiles and intents
 
@@ -140,7 +139,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Wake**: a task's one wait for a time, an event or a condition over its facts; when it matches, the task gets a `task.woke` event, which the `task-wake` workflow reacts to.
 - **Triage**: the verbs that settle an ask at once: Acknowledge (a reply or a reaction telling the asker you are on it), Not mine (to the trash, with a reply pointing elsewhere) and Hand to (waiting on the person you name). Their drafts come from the bundled `task-*` workflows and wait for your approval. See [Tasks and views](/concepts/tasks/).
 - **Changed**: the mark on a task that new activity by someone else, or an item that reopened, touched since you saw it; the task stays where it is. Opening or moving the task clears it.
-- **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval and a dossier. See [Projects](/concepts/tasks/#projects).
+- **Project**: an outcome that takes more than one action, parallel or sequential, with a review interval. See [Projects](/concepts/tasks/#projects).
 - **The review**: the periodic walk through the views `views.toml`'s `[review]` names, six in the bundled profile, from Inbox to zero to pruning Focus. A review round is a turn of the `review` intent. See [The review](/concepts/tasks/#the-review).
 - **Logbook**: the view of the tasks in the `done` category, the latest moved first.
 

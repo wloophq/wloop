@@ -36,7 +36,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
-	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -279,17 +278,9 @@ type Env struct {
 	omniboxSwept bool
 	// memory reads what the turns of a task learned, built once per daemon by serveMessages.
 	memory *memory.Service
-	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
-	dossierTurns *dossiers.Turns
-	dossierCalls *dossiers.Calls
-	// callBudget books the headless calls that are not turns, the dossiers' and the omnibox's, against
+	// callBudget books the headless calls that are not turns, the omnibox's, against
 	// the headless caps; rebuilt by each serve pass.
 	callBudget *turns.Budget
-	// dossierGrants reads, and recordGrant writes, the sessions launched with their unit's dossier.
-	dossierGrants func(ctx context.Context, u unit.Unit) (map[string]time.Time, error)
-	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error
-	// dossierMu serializes the dossiers' git work across serve passes.
-	dossierMu *sync.Mutex
 	// configMu serializes a serve's edits of the config file; nil outside a serve, whose one command edits once.
 	configMu *sync.Mutex
 	// started is the daemon's start-up reconcile, run once per daemon.
@@ -828,7 +819,6 @@ func commands() map[string]command {
 // manager may launch the session.
 func (e *Env) launchPolicy(ctx context.Context, cfg config.Config, opts roundOptions) turns.Policy {
 	policy := policies[cmp.Or(opts.policy, policyRound)](e, opts.intent, e.controlSurface(cfg))
-	policy.Dirs = e.dossierGrant(ctx, opts.unit)
 	// An untrusted pull request's checkout settings are its author's: they never load.
 	policy.UserSettingsOnly = !cfg.ProjectSettingsFor(string(opts.intent), prFacts(opts.pr)) || opts.pr != nil && !opts.trusted
 	return policy
