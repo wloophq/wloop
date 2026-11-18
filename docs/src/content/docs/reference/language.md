@@ -1424,7 +1424,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `plugins.github.scope.people` (list of strings): Logins whose pull requests it follows.
 - `plugins.github.scope.teams` (list of strings): Teams whose pull requests it follows.
 - `plugins.github.scope.repos` (list of strings): Repositories whose pull requests it follows.
-- `plugins.github.scope.watch` (list of strings): Repositories it watches.
+- `plugins.github.scope.watch` (list of strings): Logins whose pull requests, as author or requested reviewer, it follows.
 - `plugins.github.stalled` (table): When a pull request counts as stalled.
 - `plugins.github.stalled.review` (duration, default `2d`): Waiting on a review for this long.
 - `plugins.github.stalled.reply` (duration, default `1d`): Waiting on a reply for this long.

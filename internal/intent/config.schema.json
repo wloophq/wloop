@@ -477,7 +477,7 @@
                   "type": "array"
                 },
                 "watch": {
-                  "description": "Repositories it watches.",
+                  "description": "Logins whose pull requests, as author or requested reviewer, it follows.",
                   "items": {
                     "type": "string"
                   },
