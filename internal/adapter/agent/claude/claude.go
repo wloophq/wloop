@@ -84,9 +84,6 @@ func (k Agent) flags(s turns.AgentSession) []string {
 	if s.Policy.NoMCP {
 		out = append(out, "--strict-mcp-config")
 	}
-	for _, d := range s.Policy.Dirs {
-		out = append(out, "--add-dir", d.Path)
-	}
 	return out
 }
 
@@ -101,7 +98,7 @@ func (k Agent) Command(s turns.AgentSession) (string, error) {
 	}
 	flags := k.flags(s)
 	for i, f := range flags {
-		if i > 0 && slices.Contains([]string{"--settings", "--model", "--name", "--add-dir", "--resume", "--session-id"}, flags[i-1]) {
+		if i > 0 && slices.Contains([]string{"--settings", "--model", "--name", "--resume", "--session-id"}, flags[i-1]) {
 			f = shell.Quote(f)
 		}
 		parts = append(parts, f)
@@ -127,8 +124,8 @@ func (Agent) Settings(p turns.Policy) string {
 		Permissions struct {
 			Allow []string `json:"allow"`
 			Deny  []string `json:"deny"`
-			// AdditionalDirectories carries the --add-dir grants for a manager
-			// that passes no flags, as Claude Desktop.
+			// AdditionalDirectories grants the policy's directories. Claude Code
+			// stops a session on a trust question for each one --add-dir names.
 			AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
 		} `json:"permissions"`
 		DisableAllHooks bool `json:"disableAllHooks,omitempty"`

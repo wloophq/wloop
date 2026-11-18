@@ -57,7 +57,7 @@ func TestTheSurvivorsDossierIncludesTheMergedTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(line, "--add-dir '"+mergedDir.Path+"'") || strings.Contains(line, "Edit(/"+mergedDir.Path+"/log/**)") ||
+	if !grantsDir(line, mergedDir.Path) || strings.Contains(line, "Edit(/"+mergedDir.Path+"/log/**)") ||
 		!strings.Contains(line, "Edit(/"+mergedDir.Path+"/**)") {
 		t.Fatalf("the launch line does not grant the merged task's dossier read only: %s", line)
 	}

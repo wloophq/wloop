@@ -28,6 +28,28 @@ func shellWords(t *testing.T, line string) []string {
 	return strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
 }
 
+// grantedDirs is the directories the --settings of words grants; a session
+// stops on a question about each directory a flag grants instead.
+func grantedDirs(t *testing.T, words []string) []string {
+	t.Helper()
+	if slices.Contains(words, "--add-dir") {
+		t.Fatalf("a flag grants a directory: %q", words)
+	}
+	i := slices.Index(words, "--settings")
+	if i < 0 {
+		t.Fatalf("no --settings in %q", words)
+	}
+	var s struct {
+		Permissions struct {
+			AdditionalDirectories []string `json:"additionalDirectories"`
+		} `json:"permissions"`
+	}
+	if err := json.Unmarshal([]byte(words[i+1]), &s); err != nil {
+		t.Fatal(err)
+	}
+	return s.Permissions.AdditionalDirectories
+}
+
 func settingsOf(t *testing.T, words []string) []string {
 	t.Helper()
 	i := slices.Index(words, "--settings")
@@ -49,8 +71,8 @@ func TestPolicyGrantsTheDossier(t *testing.T) {
 		t.Fatal(err)
 	}
 	words := shellWords(t, line)
-	if i := slices.Index(words, "--add-dir"); i < 0 || words[i+1] != dossierPath {
-		t.Fatalf("no --add-dir %s in %q", dossierPath, words)
+	if dirs := grantedDirs(t, words); !slices.Equal(dirs, []string{dossierPath}) {
+		t.Fatalf("the settings grant %q, want %s", dirs, dossierPath)
 	}
 	allow := settingsOf(t, words)
 	for _, sub := range []string{"log", "sources", "drafts"} {
@@ -73,15 +95,15 @@ func TestPolicyGrantsTheDossier(t *testing.T) {
 	}
 }
 
-func TestAddDirIsQuoted(t *testing.T) {
+func TestAGrantedDirIsQuoted(t *testing.T) {
 	path := `/Users/me/it's a "state"/dossiers/slack/T000/C000/1700.1#`
 	line, err := Agent{}.Command(turns.AgentSession{Policy: dossierPolicy(path)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	words := shellWords(t, line)
-	if i := slices.Index(words, "--add-dir"); i < 0 || words[i+1] != path {
-		t.Fatalf("--add-dir did not parse back to %q: %q", path, words)
+	if dirs := grantedDirs(t, words); !slices.Equal(dirs, []string{path}) {
+		t.Fatalf("the granted directory did not parse back to %q: %q", path, dirs)
 	}
 	if allow := settingsOf(t, words); !slices.Contains(allow, "Edit(/"+path+"/log/**)") {
 		t.Fatalf("the log rule did not parse back: %q", allow)
@@ -94,8 +116,8 @@ func TestDirsOnlyPolicyPrintsFlags(t *testing.T) {
 		t.Fatal("a policy with only Dirs is empty")
 	}
 	line, _ := Agent{}.Command(turns.AgentSession{Policy: p})
-	if !strings.Contains(line, "--add-dir "+shell.Quote(dossierPath)) || !strings.Contains(line, "--settings") {
-		t.Fatalf("flags missing: %s", line)
+	if dirs := grantedDirs(t, shellWords(t, line)); !slices.Equal(dirs, []string{dossierPath}) {
+		t.Fatalf("the settings grant %q, want %s", dirs, dossierPath)
 	}
 }
 

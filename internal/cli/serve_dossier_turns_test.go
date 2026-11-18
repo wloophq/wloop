@@ -65,6 +65,15 @@ func servedDossiersAfter(t *testing.T, degraded bool) (*testEnv, *sqlite.DB) {
 	return te, db
 }
 
+// grantsDir says whether the settings of a launch line grant dir, with no
+// flag naming a directory: the agent asks about each one a flag grants.
+func grantsDir(line, dir string) bool {
+	_, dirs, ok := strings.Cut(line, `"additionalDirectories":[`)
+	dirs, _, _ = strings.Cut(dirs, "]")
+	quoted, _ := json.Marshal(dir)
+	return ok && !strings.Contains(line, "--add-dir") && strings.Contains(dirs, string(quoted))
+}
+
 func dossierPathOf(t *testing.T, te *testEnv, u unit.Unit) string {
 	t.Helper()
 	p, err := dossier.Dir(te.StateDir, dossier.Owner{Unit: u})
@@ -83,13 +92,13 @@ func TestDossierOpenedBeforeLaunch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(line, "--add-dir '"+path+"'") || !strings.Contains(line, "Edit(/"+path+"/log/**)") {
+	if !grantsDir(line, path) || !strings.Contains(line, "Edit(/"+path+"/log/**)") {
 		t.Fatalf("the launch line does not grant %s: %s", path, line)
 	}
 	if _, err := os.Stat(filepath.Join(path, "notes.md")); err != nil {
 		t.Fatalf("the dossier was not opened before the launch: %v", err)
 	}
-	if line, _ := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true}); strings.Contains(line, "--add-dir") {
+	if line, _ := te.agentCommand(ctx, te.cfg, "/wt", roundOptions{trusted: true}); strings.Contains(line, "additionalDirectories") {
 		t.Fatalf("a launch with no unit got a grant: %s", line)
 	}
 
@@ -376,7 +385,7 @@ func TestASessionOnATasksThreadIsGrantedTheTasksDossier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(line, "--add-dir '"+path+"'") {
+	if !grantsDir(line, path) {
 		t.Fatalf("the launch line does not grant the task's dossier %s: %s", path, line)
 	}
 	ws := wsdomain.Workspace{ID: "ws1", Path: "/wt"}
