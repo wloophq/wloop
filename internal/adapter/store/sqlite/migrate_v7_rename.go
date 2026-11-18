@@ -86,6 +86,9 @@ func v7Rename(ctx context.Context, tx *sql.Tx) error {
 // v7IDs gives the ids r's column holds the t- prefix.
 func v7IDs(ctx context.Context, tx *sql.Tx, r taskRef) error {
 	from, to := v6IDPrefix, v7IDPrefix
+	if r.form == refOwner || r.form == refDossierPath {
+		from, to = v6Task+"/"+v6IDPrefix, v7Task+"/"+v7IDPrefix
+	}
 	c := r.column
 	q := `UPDATE ` + r.table + ` SET ` + c + ` = ?1 || substr(` + c + `, ?3) WHERE substr(` + c + `, 1, ?4) = ?2` //nolint:gosec // the names come from the store's own schema
 	args := []any{to, from, len(from) + 1, len(from)}

@@ -3,21 +3,32 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // refForm is how a column spells a task's id.
 type refForm int
 
 const (
-	refWhole refForm = iota // the value is the id
-	refText                 // the id among other text: a JSON value, a rule key
+	refWhole       refForm = iota // the value is the id
+	refOwner                      // a dossier's owner: "task/<id>"
+	refDossierPath                // a dossier's directory: "task/<id>#"
+	refText                       // the id among other text: a JSON value, a rule key
 )
 
 func (f refForm) spell(id string) string {
-	if f == refText {
+	switch f {
+	case refOwner:
+		return v7Task + "/" + id
+	case refDossierPath:
+		return v7Task + "/" + id + "#"
+	case refText:
 		return `{"task":"` + id + `"}`
 	}
 	return id
@@ -35,6 +46,8 @@ var taskColumns = []struct {
 	{"drafts", "task", refWhole},
 	{"task_aliases", "old_id", refWhole},
 	{"task_aliases", "new_id", refWhole},
+	{"dossiers", "owner", refOwner},
+	{"dossiers", "rel_path", refDossierPath},
 	{"turns", "inputs", refText},
 	{"drafts", "rule_key", refText},
 	{"workflow_runs", "key_value", refText},
@@ -132,7 +145,19 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 	if err != nil {
 		return err
 	}
+	dossiers, err := hasDossiers(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if dossiers {
+		if err := moveDossier(ctx, tx, from, to); err != nil {
+			return err
+		}
+	}
 	for _, r := range refs {
+		if r.table == "dossiers" {
+			continue
+		}
 		if r.form == refText {
 			if err := rewriteText(ctx, tx, r, func(s string) string { return replaceID(s, from, to) }); err != nil {
 				return err
@@ -150,7 +175,8 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 }
 
 // taskStateTables hold a task's own state: dropping the task deletes its rows there. A row of any other
-// table that names the task is history, kept forever, so dropTask refuses until rekeyTask moved it.
+// table that names the task is history, kept forever, so dropTask refuses until rekeyTask moved it; a
+// dossier is refused too, since its files would be left behind.
 var taskStateTables = []string{"tasks", "wakes", "task_items", "task_units", "task_contexts", "task_props", "projects", "unit_marks", "overrides", "unit_cards"}
 
 // keptOnDrop are the references a dropped task leaves as they are: an alias from a former id keeps
@@ -178,6 +204,17 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 		if n > 0 {
 			held = append(held, fmt.Sprintf("%s.%s (%d rows)", r.table, r.column, n))
 		}
+	}
+	var merged int
+	if dossiers, err := hasDossiers(ctx, tx); err != nil {
+		return err
+	} else if dossiers {
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM (`+mergedOwnersSQL+`)`, "/"+refOwner.spell(id)).Scan(&merged); err != nil {
+			return err
+		}
+	}
+	if merged > 0 {
+		held = append(held, fmt.Sprintf("dossiers merged into its own (%d rows)", merged))
 	}
 	if len(held) > 0 {
 		return fmt.Errorf("task %s is still named by %s; rekey them onto another task first", id, strings.Join(held, ", "))
@@ -273,4 +310,143 @@ func replaceID(s, id, to string) string {
 
 func idByte(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c == '-'
+}
+
+// moveDossier gives task to the dossier of task from, with the dossiers merged into it.
+func moveDossier(ctx context.Context, tx *sql.Tx, from, to string) error {
+	if err := moveMerged(ctx, tx, from, to); err != nil {
+		return err
+	}
+	return giveDossier(ctx, tx, refOwner.spell(from), from, to)
+}
+
+// giveDossier gives task to the dossier owned by from and records the move of its directory in dossier_moves,
+// which the CLI applies on disk. When to has no dossier, or a purged one, from's becomes to's. When to's is
+// archived and from's is not, from's becomes to's and to's archive moves into merged/<to> of it. Otherwise
+// from's goes into merged/<name> of to's directory: its files join to's dossier, dropping from's row, or, when
+// archived, it keeps its row as a merged dossier, whose archive the lifecycle purges.
+func giveDossier(ctx context.Context, tx *sql.Tx, from, name, to string) error {
+	fromRel, fromStatus, ok, err := dossierRow(ctx, tx, from)
+	if err != nil || !ok {
+		return err
+	}
+	toOwner := refOwner.spell(to)
+	toRel, toStatus, has, err := dossierRow(ctx, tx, toOwner)
+	if err != nil {
+		return err
+	}
+	archived, purged := dossierArchived, dossierPurged
+	switch {
+	case !has || toStatus == purged:
+		toRel = refDossierPath.spell(to)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, toOwner); err != nil {
+			return err
+		}
+		err = renameDossier(ctx, tx, from, toOwner, toRel)
+	case toStatus == archived && fromStatus != archived && fromStatus != purged:
+		err = keepArchiveMerged(ctx, tx, to, toOwner, toRel)
+		if err == nil {
+			err = renameDossier(ctx, tx, from, toOwner, toRel)
+		}
+	case fromStatus == archived:
+		var merged string
+		if merged, toRel, err = mergedInto(to, name); err == nil {
+			err = renameDossier(ctx, tx, from, merged, toRel)
+		}
+	default:
+		if _, toRel, err = mergedInto(to, name); err == nil {
+			_, err = tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, from)
+		}
+		if err == nil && fromStatus == purged {
+			return nil
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("moving the dossier of %s: %w", from, err)
+	}
+	return recordDossierMove(ctx, tx, fromRel, toRel)
+}
+
+// keepArchiveMerged moves task to's archived dossier, at rel, into merged/<to> of its own directory.
+func keepArchiveMerged(ctx context.Context, tx *sql.Tx, to, owner, rel string) error {
+	kept, keptRel, err := mergedInto(to, to)
+	if err != nil {
+		return err
+	}
+	if err := renameDossier(ctx, tx, owner, kept, keptRel); err != nil {
+		return err
+	}
+	return recordDossierMove(ctx, tx, rel, keptRel)
+}
+
+func dossierRow(ctx context.Context, tx *sql.Tx, owner string) (rel, status string, ok bool, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT rel_path, status FROM dossiers WHERE owner = ?`, owner).Scan(&rel, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", false, nil
+	}
+	return rel, status, err == nil, err
+}
+
+func renameDossier(ctx context.Context, tx *sql.Tx, from, to, rel string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE dossiers SET owner = ?, rel_path = ? WHERE owner = ?`, to, rel, from)
+	return err
+}
+
+// mergedInto is the owner and the directory of the dossier named name merged into task to's.
+func mergedInto(to, name string) (owner, rel string, err error) {
+	o := dossierOwner{unit: unit.Unit{Provider: v7Task, Key: to}, merged: name}
+	rel, err = o.rel()
+	return o.String(), filepath.ToSlash(rel), err
+}
+
+// mergedOwnersSQL selects the dossiers merged into the dossier of the task ?1 names as "/task/<id>".
+const mergedOwnersSQL = `SELECT owner, rel_path FROM dossiers WHERE owner LIKE 'merged/%' AND substr(owner, -length(?1)) = ?1`
+
+// moveMerged puts the dossiers merged into task from's into task to's, under the same names.
+func moveMerged(ctx context.Context, tx *sql.Tx, from, to string) error {
+	type row struct{ owner, rel string }
+	var rows []row
+	err := eachRow(ctx, tx, mergedOwnersSQL, []any{"/" + refOwner.spell(from)}, func(r *sql.Rows) error {
+		var x row
+		if err := r.Scan(&x.owner, &x.rel); err != nil {
+			return err
+		}
+		rows = append(rows, x)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, x := range rows {
+		o, err := parseDossierOwner(x.owner)
+		if err != nil {
+			return err
+		}
+		owner, rel, err := mergedInto(to, o.merged)
+		if err != nil {
+			return err
+		}
+		if err := renameDossier(ctx, tx, x.owner, owner, rel); err != nil {
+			return fmt.Errorf("moving the dossier %s: %w", x.owner, err)
+		}
+		if err := recordDossierMove(ctx, tx, x.rel, rel); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// recordDossierMove records that the dossier directory at from goes to to, after every move recorded
+// before it.
+func recordDossierMove(ctx context.Context, tx *sql.Tx, from, to string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO dossier_moves (from_path, to_path) VALUES (?, ?)`, from, to)
+	return err
+}
+
+// hasDossiers says whether the store still holds the dossiers table, which version 15 drops: a migration
+// before it moves dossier rows along with their task.
+func hasDossiers(ctx context.Context, tx *sql.Tx) (bool, error) {
+	var n int
+	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'dossiers'`).Scan(&n)
+	return n > 0, err
 }
