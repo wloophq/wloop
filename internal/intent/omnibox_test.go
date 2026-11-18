@@ -37,7 +37,7 @@ func TestOmniboxBundledVerbs(t *testing.T) {
 	for _, v := range l.Omnibox.Verbs {
 		got[v.ID] = v.Action + "|" + v.Verb + "|" + v.Op
 	}
-	want := map[string]string{"review": "review||", "track": "track||", "done": "|done|", "capture": "||capture", "delegate": "|delegate|start"}
+	want := map[string]string{"review": "review||", "track": "track||", "take-over": "take_over||", "done": "|done|", "capture": "||capture", "delegate": "|delegate|start"}
 	if !maps.Equal(got, want) {
 		t.Fatalf("verbs %v, want %v", got, want)
 	}

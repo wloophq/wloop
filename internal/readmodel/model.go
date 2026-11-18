@@ -375,6 +375,19 @@ func (m *Model) Presentations(units []unit.Unit) map[unit.Unit]Presentation {
 	return out
 }
 
+// Listed are the presentations of every unit a provider lists.
+func (m *Model) Listed(ctx context.Context) (map[unit.Unit]Presentation, error) {
+	s, err := m.sync(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]Presentation, len(s.list))
+	for _, e := range s.list {
+		out[e.Row.Unit] = Presentation{Label: e.Row.Label, Title: e.Row.Title, Link: e.Row.Link}
+	}
+	return out, nil
+}
+
 // Read is one unit's entry of a snapshot: the served row, what it derives
 // from and the base it was derived with.
 type Read struct {

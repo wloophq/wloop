@@ -25,7 +25,8 @@ vi.mock("../../state/loaders.svelte", async (importOriginal) => {
 // The omnibox over a fake daemon, as omnibox_test.go's harness: input.search answers GET /api/search by query,
 // input.resolve POST /api/omnibox/resolve by text, input.ask the asks in order (a string throws it), input.rows
 // a unit's GET by path, input.actions a unit action's POST by path (a string throws it), input.refuse refuses
-// the clipboard's write, input.confirm answers a confirm; later runs at once unless held.
+// the clipboard's write, input.confirm answers a confirm, input.fails are the tasks whose operation a run
+// refuses; later runs at once unless held.
 interface Input {
   search?: Record<string, J>;
   resolve?: Record<string, J>;
@@ -34,6 +35,7 @@ interface Input {
   actions?: Record<string, J | string>;
   refuse?: string;
   confirm?: boolean;
+  fails?: string[];
 }
 
 function fake(input: Input) {
@@ -58,7 +60,9 @@ function fake(input: Input) {
         if (typeof a === "string") throw new Error(a);
         return a;
       }
-      if (url === "/api/omnibox/run") return { results: body.operations.map(() => ({ ok: true, status: 200 })) };
+      if (url === "/api/omnibox/run") {
+        return { results: body.operations.map((op: J) => ((input.fails || []).includes(op.task) ? { ok: false, status: 409, error: "run_conflict" } : { ok: true, status: 200 })) };
+      }
       if (url.startsWith("/api/units/")) {
         log.steps.push("post");
         const a = (input.actions || {})[url];
@@ -95,7 +99,7 @@ function fake(input: Input) {
     clear: () => {},
     now: () => 0,
     open: (href) => { log.opened.push(href); },
-    act: async (u, id, copies) => { log.acts.push(u.key + " " + id); log.actCopies.push(!!copies); },
+    act: async (u, id, copies, row) => { log.acts.push(u.key + " " + id + (row ? " on " + row.title : "")); log.actCopies.push(!!copies); },
     close: () => { log.closed++; },
   };
   return { log, env, held, ctl };
@@ -187,6 +191,65 @@ describe("omnibox_test.go", () => {
     const ran = o.log.posts.filter((p) => p.url === "/api/omnibox/run").flatMap((p) => p.body.operations);
     expect(ran.map((op: J) => op.unit.key)).toEqual(["acme/api#8"]);
     expect(o.q("li.ok")).toHaveLength(1);
+  });
+
+  test("an operation that ran leaves the checklist, one refused or left unchecked stays", async () => {
+    const ops = ["t-1", "t-2", "t-3"].map((task) => ({ op: "verb", verb: "done", task }));
+    const o = mount({ resolve: { "done t-1 t-2 t-3": { kind: "verb", preview: { operations: ops } } }, fails: ["t-2"] });
+    await o.type("done t-1 t-2 t-3");
+    await fireEvent.click(o.q('input[type="checkbox"]')[2]);
+    await o.key("Enter");
+    expect(o.q(".omni-ran li").map((li) => (li.textContent || "").slice(0, 1))).toEqual(["✓", "✗"]);
+    expect(o.q(".omni-op").map((li) => (li.textContent || "").trim())).toEqual(["done task t-2", "done task t-3"]);
+    expect(o.q('input[type="checkbox"]').map((c) => (c as HTMLInputElement).checked)).toEqual([true, false]);
+  });
+
+  test("a checklist whose operations all ran shows only what ran", async () => {
+    const o = mount({ resolve: verbResolve });
+    await o.type("done t-1");
+    await o.key("Enter");
+    expect(o.q(".omni-ran li.ok")).toHaveLength(1);
+    expect(o.q(".omni-ops")).toHaveLength(0);
+    expect(o.button("Run")).toBeUndefined();
+    await o.key("Enter");
+    expect(o.log.posts.filter((p) => p.url === "/api/omnibox/run")).toHaveLength(1);
+  });
+
+  test("an unheld unit's action runs on the row the resolution carries, with no detail read", async () => {
+    const unheld = (): Record<string, J> => {
+      const r = unitWith({ id: "open", label: "Open" });
+      r[ADDRESS].unit.row = { unit: r[ADDRESS].unit.unit, title: "Retry the export", actions: [{ id: "open", enabled: true, basis: "b1" }] };
+      return r;
+    };
+    const o = mount({ resolve: unheld() });
+    await o.type(ADDRESS);
+    await fireEvent.click(o.button("Open"));
+    await settle();
+    expect(o.log.acts).toEqual(["acme/api#8 open on Retry the export"]);
+    await o.key("Enter");
+    expect(o.selected()).toEqual(["unit"]);
+    expect(o.log.opened).toEqual([]);
+    const p = mount({ resolve: unheld() }, { panel: true });
+    await p.type(ADDRESS);
+    await fireEvent.click(p.button("Open"));
+    await settle();
+    expect(p.log.steps).toEqual(["post"]);
+    expect(p.log.posts.filter((x) => x.url.startsWith("/api/units/")).map((x) => x.body)).toEqual([{ source: "cockpit", basis: "b1" }]);
+  });
+
+  test("omniboxAct acts on a row it is given without reading the unit's detail", async () => {
+    const gets: string[] = [];
+    net.fetch = async (url: string) => {
+      gets.push(url);
+      return new Response("{}", { status: 404 });
+    };
+    vi.mocked(loaders.refreshSpecs).mockResolvedValue();
+    const acts: string[] = [];
+    vi.mocked(actions.act).mockImplementation(async (row: J, id: string) => { acts.push(row.title + " " + id); return true; });
+    state.specs = { version: "", byId: {} };
+    await omniboxAct({ provider: "alpha", key: "acme/api#8" }, "review", false, { title: "Retry the export", actions: [] });
+    expect(gets).toEqual([]);
+    expect(acts).toEqual(["Retry the export review"]);
   });
 
   test("TestOmniboxAgentProposalEditAndConfirm", async () => {
@@ -572,7 +635,9 @@ describe("omnibox_test.go", () => {
     await o.type("done t-1");
     expect(o.field.hasAttribute("aria-activedescendant")).toBe(false);
     expect(o.q("output")[0].textContent).toContain("Run 1");
+    expect(o.q("output")[0].classList.contains("said")).toBe(true);
     await o.key("ArrowDown");
+    expect(o.q("output")[0].classList.contains("said")).toBe(false);
     const id = o.field.getAttribute("aria-activedescendant") as string;
     expect(id).not.toBe("");
     expect(document.getElementById(id)?.getAttribute("role")).toBe("option");

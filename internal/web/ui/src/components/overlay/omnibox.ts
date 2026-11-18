@@ -55,7 +55,7 @@ export interface OmniEnv {
   clear: (id: unknown) => void;
   now: () => number;
   open: (href: string) => void;
-  act: (u: Unit, id: string, copies: boolean) => Promise<unknown>;
+  act: (u: Unit, id: string, copies: boolean, row?: J) => Promise<unknown>;
   claim: () => Claim;
   settle: (name: string, out: J, claim: Claim) => Promise<boolean>;
   confirm: (text: string) => Promise<boolean> | boolean;
@@ -149,14 +149,20 @@ export function omniboxFollow(st: Omni, env: OmniEnv): Promise<void> {
   return omniboxAsk(st, env);
 }
 
-// omniboxRun runs the checked operations through the daemon, which replays each as the click it stands for.
+// omniboxRun runs the checked operations through the daemon, which replays each as the click it stands for. An
+// operation that ran leaves the checklist, so Enter does not run it twice; one refused stays to run again.
 export async function omniboxRun(st: Omni, env: OmniEnv, ops?: OmniOp[]): Promise<void> {
   const run = ops || st.ops.filter((_, i) => st.checked[i]);
   if (!run.length) return;
   st.runError = "";
   try {
     const out = await env.post("/api/omnibox/run", { operations: run });
-    st.ran = { ops: run, results: (out && out.results) || [] };
+    const results: J[] = (out && out.results) || [];
+    st.ran = { ops: run, results };
+    const done = run.filter((_, i) => results[i] && results[i].ok);
+    const left = st.ops.map((op, i) => ({ op, checked: st.checked[i] })).filter((x) => !done.includes(x.op));
+    st.ops = left.map((x) => x.op);
+    st.checked = left.map((x) => x.checked);
     if (env.changed) env.changed();
   } catch (err) {
     st.runError = (err as Error).message;
@@ -173,14 +179,15 @@ export function omniboxUnitHref(unit: J): string {
   return "#" + routeHash("", unit.unit.provider + ":" + unit.unit.key);
 }
 
-// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes. The
+// omniboxUnitAction runs one of a resolved unit's catalog actions as its detail would, then refreshes; a unit
+// the loop does not hold has no detail, and acts on the row its resolution carries. The
 // floating panel holds no detail: it runs the action itself, and hands one that asks for an input to the main
 // window.
 export async function omniboxUnitAction(st: Omni, env: OmniEnv, id: string): Promise<void> {
   const unit = omniboxUnit(st);
   const spec = (unit.actions || []).find((a: J) => a.id === id) || { id };
   if (st.panel) return spec.input ? env.open(omniboxUnitHref(unit)) : omniboxPanelAct(st, env, spec);
-  await env.act(unit.unit, id, !!spec.copies);
+  await env.act(unit.unit, id, !!spec.copies, unit.row);
   if (env.changed) env.changed();
 }
 
@@ -209,7 +216,7 @@ async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J): Promise<void> {
   try {
     let out: J;
     try {
-      const d = await env.get(unitPath(u));
+      const d = resolved.unit.row ? { row: resolved.unit.row } : await env.get(unitPath(u));
       const offered = ((d.row && d.row.actions) || []).find((a: J) => a.id === spec.id) || {};
       if (offered.confirm && !(await env.confirm(offered.confirm))) {
         if (claim) claim.pending.reject(new Error("cancelled"));
@@ -233,11 +240,12 @@ async function omniboxPanelAct(st: Omni, env: OmniEnv, spec: J): Promise<void> {
 }
 
 // omniboxAct runs action id on u as the unit's detail does: through act, on the row the detail serves, which
-// asks for the action's confirm and input. An action that copies claims the clipboard before the first await.
-export async function omniboxAct(u: Unit, id: string, copies: boolean = !!(state.specs.byId[id] || {}).copies): Promise<boolean | undefined> {
+// asks for the action's confirm and input, or on row when the unit serves no detail. An action that copies
+// claims the clipboard before the first await.
+export async function omniboxAct(u: Unit, id: string, copies: boolean = !!(state.specs.byId[id] || {}).copies, row?: J): Promise<boolean | undefined> {
   const claim = copies ? claimCopy() : null;
   try {
-    const d = await getJSON(unitPath(u));
+    const d = row ? { row } : await getJSON(unitPath(u));
     await refreshSpecs([d.row]);
     const input = (state.specs.byId[id] || {}).input;
     const extra: ActExtra = claim ? { claim } : {};
@@ -260,7 +268,7 @@ export interface Choice {
 }
 
 // omniboxChoices are what Enter may run, in the order the arrows walk them: the operations to confirm, a
-// pasted address's unit, the agent where only it would help, each search result, and the selection's actions
+// pasted address's unit (which opens nothing while the loop holds no task or detail of it), the agent where only it would help, each search result, and the selection's actions
 // while nothing is typed.
 export function omniboxChoices(st: Omni, env: OmniEnv): Choice[] {
   if (!st.text.trim()) return st.items.map((it, i) => ({ id: "item:" + i, run: () => { env.close(); it.run(); } }));
@@ -269,7 +277,8 @@ export function omniboxChoices(st: Omni, env: OmniEnv): Choice[] {
   const unit = omniboxUnit(st);
   if (unit) {
     const first = (unit.tasks || [])[0];
-    out.push({ id: "unit", run: () => env.open(first ? "#task=" + encodeURIComponent(first.id) : omniboxUnitHref(unit)) });
+    const href = first ? "#task=" + encodeURIComponent(first.id) : unit.row ? "" : omniboxUnitHref(unit);
+    out.push({ id: "unit", run: () => (href ? env.open(href) : undefined) });
   }
   if (st.resolved && st.resolved.kind === "agent" && !st.answer) out.push({ id: "ask", run: () => omniboxAsk(st, env) });
   for (const g of (st.search && st.search.groups) || []) {
@@ -343,7 +352,7 @@ export function omniboxTrap<T>(e: { key: string; shiftKey?: boolean }, stops: T[
 export function omniboxOpLabel(op: OmniOp): string {
   const unit = op.unit ? op.unit.key : "";
   switch (op.op) {
-    case "action": return t("{action} on {unit}", { action: op.reason || op.action, unit });
+    case "action": return t("{action} on {unit}", { action: op.reason || (state.specs.byId[op.action] || {}).label || op.action, unit });
     case "verb": return t("{verb} task {task}", { verb: op.verb, task: op.task });
     case "capture": return t("Capture: {title}", { title: op.title });
     case "start": return op.repo ? t("Start in {repo}: {brief}", { repo: op.repo, brief: op.brief }) : t("Start: {brief}", { brief: op.brief });
@@ -380,6 +389,13 @@ export function omniboxSelectionWords(st: Omni, id: string): string {
   if (id === "unit") return (omniboxUnit(st) || {}).label || "";
   if (id === "ask") return t("Press ⌘↵ to ask the agent");
   return "";
+}
+
+// omniboxStatusSaid says whether the status only says a selection the omnibox already shows as a control: it is
+// then read out and not drawn.
+export function omniboxStatusSaid(st: Omni, env: OmniEnv): boolean {
+  const sel = omniboxSelected(st, omniboxChoices(st, env));
+  return !!sel && !omniboxIsOption(sel);
 }
 
 // omniboxStatus is what the polite status says: the selected choice when it is no option of the list, else

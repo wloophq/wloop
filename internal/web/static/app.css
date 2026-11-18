@@ -1025,8 +1025,11 @@ body.layout-detail .d-window { right: 0; }
 .omni-results [role="option"] { border-radius: var(--radius-sm); }
 .omni-results [aria-selected="true"], .omni-results [data-selected="true"] { background: var(--sel); }
 .omni-results [role="option"] { cursor: pointer; }
+.omni-results .act.primary[data-selected="true"] { background: var(--me); outline: 2px solid var(--me); outline-offset: 1px; }
+.act.primary kbd { color: inherit; border-color: currentColor; }
 .omni-status { display: block; margin: 0; font-size: var(--text-meta); color: var(--faint); }
 .omni-status:empty { display: none; }
+.omni-status.said { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .omni-keys { margin: 0; padding: var(--space-4) var(--space-12); border-top: 1px solid var(--rule); font-size: var(--text-meta); color: var(--muted); }
 .omni-keys kbd { font: var(--text-meta) var(--mono); }
 .omni-ran .ok { color: var(--ink); }

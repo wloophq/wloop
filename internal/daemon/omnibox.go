@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -66,17 +67,18 @@ func OmniboxVocabulary(l *intentload.Loaded) omnibox.Vocabulary {
 	return out
 }
 
-// omniboxUnit is u with the open tasks that hold it and the actions its row offers now.
+// omniboxUnit is u with the open tasks that hold it and the actions its row offers now: the row the loop
+// holds, else the one its plugin derives from its source. A unit whose row cannot be read offers none.
 func (s *Server) omniboxUnit(ctx context.Context, g *coretasks.Service, refs *taskRefs, u unit.Unit) (api.OmniboxUnit, error) {
 	out := api.OmniboxUnit{Unit: u, Label: s.unitLabel(u), Tasks: []api.TaskView{}, Actions: []api.ActionSpec{}}
-	d, ok, err := s.detail(ctx, u)
-	if err != nil {
-		return api.OmniboxUnit{}, err
+	row, held, ok := s.omniboxRow(ctx, u)
+	if ok && !held {
+		out.Row = &row
 	}
 	if ok {
-		out.Permalink = d.Row.Link
+		out.Permalink = row.Link
 		specs := s.servedSpecs()
-		for _, a := range d.Row.Actions {
+		for _, a := range row.Actions {
 			if i := slices.IndexFunc(specs, func(sp api.ActionSpec) bool { return sp.ID == a.ID }); a.Enabled && i >= 0 {
 				out.Actions = append(out.Actions, specs[i])
 			}
@@ -97,6 +99,23 @@ func (s *Server) omniboxUnit(ctx context.Context, g *coretasks.Service, refs *ta
 		}
 	}
 	return out, nil
+}
+
+// omniboxRow is u's row: the one the loop holds, else the one its plugin derives from its source; ok is false
+// for a unit with neither, or whose row cannot be read now, which is logged.
+func (s *Server) omniboxRow(ctx context.Context, u unit.Unit) (row api.Row, held, ok bool) {
+	d, held, err := s.detail(ctx, u)
+	if err == nil && held {
+		return d.Row, true, true
+	}
+	if err == nil {
+		row, ok, err = s.pluginRow(ctx, api.UnitRowQuery{Unit: u})
+	}
+	if err != nil {
+		s.logf("omnibox: the row of %s: %v", u.Label(), err)
+		return api.Row{}, false, false
+	}
+	return row, false, ok
 }
 
 // taskRefs find what a token names among the open tasks and the plugins' addresses.
@@ -135,8 +154,9 @@ func (t *taskRefs) claim(ctx context.Context, address string) (unit.Unit, bool, 
 	return unit.Unit{}, false, nil
 }
 
-// Find is the unit an address or a unit's label names, with the open task that holds it, or the open tasks
-// whose id starts with token.
+// Find is the unit an address names, or the units whose label or short label token is, among those the open
+// tasks link and those the rows list, each with the open task that holds it; or the open tasks whose id starts
+// with token.
 func (t *taskRefs) Find(ctx context.Context, token string) ([]omnibox.Ref, error) {
 	open, err := t.open(ctx)
 	if err != nil {
@@ -166,18 +186,25 @@ func (t *taskRefs) Find(ctx context.Context, token string) ([]omnibox.Ref, error
 	}
 	want := api.Fold(token)
 	var seen []unit.Unit
+	name := func(u unit.Unit, label string, id task.ID) {
+		label = api.Fold(label)
+		_, short, _ := strings.Cut(label, "/")
+		if (label == want || short == want) && !slices.Contains(seen, u) {
+			seen = append(seen, u)
+			out = append(out, omnibox.Ref{Unit: &u, Task: id})
+		}
+	}
 	for _, e := range open {
 		for _, u := range e.LinkedUnits() {
-			if slices.Contains(seen, u) {
-				continue
-			}
-			label := api.Fold(t.s.unitLabel(u))
-			_, short, _ := strings.Cut(label, "/")
-			if label == want || short == want {
-				seen = append(seen, u)
-				out = append(out, omnibox.Ref{Unit: &u, Task: e.ID})
-			}
+			name(u, t.s.unitLabel(u), e.ID)
 		}
+	}
+	listed, err := t.s.readModel().Listed(ctx)
+	if err != nil {
+		t.s.logf("omnibox: the rows: %v", err)
+	}
+	for _, u := range slices.SortedFunc(maps.Keys(listed), api.CompareUnits) {
+		name(u, listed[u].Label, "")
 	}
 	return out, nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/omnibox"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -119,5 +120,31 @@ func TestOmniboxReposNameEachRepositoryOnce(t *testing.T) {
 	got, err := te.Env.omniboxRepos(context.Background())
 	if want := []string{"acme/api", "acme/web", "scratch"}; err != nil || !slices.Equal(got, want) {
 		t.Fatalf("%v %v, want %v", got, err, want)
+	}
+}
+
+func TestTheServedResolverReadsAPullRequestKeyThroughItsPlugin(t *testing.T) {
+	t.Parallel()
+	_, te := scenario(t)
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	te.serveGitHubPlugin(db, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
+	if d.Resolve == nil {
+		t.Fatal("the served daemon resolves no address")
+	}
+	want := unit.Unit{Provider: unit.GitHub, Key: "acme/api#41"}
+	if u, ok, err := d.Resolve(ctx, "acme/api#41"); err != nil || !ok || u != want {
+		t.Fatalf("a key of a pull request the loop does not hold: %v %v %v", u, ok, err)
+	}
+	for _, other := range []string{"api#41", "acme/api", "ligar para Ada", "t-0000000000000008"} {
+		if u, ok, err := d.Resolve(ctx, other); err != nil || ok {
+			t.Errorf("%q resolved to %v: %v", other, u, err)
+		}
 	}
 }

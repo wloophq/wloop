@@ -57,13 +57,15 @@ type OmniboxResolved struct {
 	Preview *OmniboxProposal  `json:"preview,omitempty"`
 }
 
-// OmniboxUnit is a resolved unit: its tasks and actions.
+// OmniboxUnit is a resolved unit: its tasks and actions. Row is the row its plugin derives for a unit the loop
+// does not hold, which serves no detail: a client acts on it as it would on the detail's row.
 type OmniboxUnit struct {
 	Unit      unit.Unit    `json:"unit"`
 	Label     string       `json:"label"`
 	Permalink string       `json:"permalink,omitempty"`
 	Tasks     []TaskView   `json:"tasks"`
 	Actions   []ActionSpec `json:"actions"`
+	Row       *Row         `json:"row,omitempty"`
 }
 
 // OmniboxProposal is a set of operations to confirm, and the question the agent asks first, if any.

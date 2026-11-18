@@ -3,15 +3,21 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory/inventorytest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/omnibox"
+	dgh "github.com/wloophq/wloop/internal/domain/github"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 var pastedPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
@@ -156,5 +162,150 @@ func TestOmniboxResolveReadsAForgeAddressThroughTheCodecs(t *testing.T) {
 		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != pastedPR || len(got.Unit.Tasks) != 1 {
 			t.Errorf("%s: %+v", name, got)
 		}
+	}
+}
+
+var unheldPR = unit.Unit{Provider: unit.GitHub, Key: "acme/api#99"}
+
+func enabledActions(states []api.ActionState) []string {
+	var out []string
+	for _, st := range states {
+		if st.Enabled {
+			out = append(out, st.ID)
+		}
+	}
+	return out
+}
+
+func specIDs(specs []api.ActionSpec) []string {
+	out := make([]string, len(specs))
+	for i, sp := range specs {
+		out[i] = sp.ID
+	}
+	return out
+}
+
+func TestOmniboxResolveOffersAnUnheldUnitTheActionsOfItsRow(t *testing.T) {
+	t.Parallel()
+	r := resolveRig(t)
+	before := storedTasks(t, r)
+	got := resolve(t, r, "https://github.com/acme/api/pull/99")
+	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || len(got.Unit.Tasks) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	row, err := r.s.currentRow(context.Background(), unheldPR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := enabledActions(row.Actions)
+	offered := specIDs(got.Unit.Actions)
+	if !slices.Equal(offered, want) {
+		t.Fatalf("offered %v, the row its plugin derives offers %v", offered, want)
+	}
+	for _, id := range []string{"review", "track", "take_over"} {
+		if !slices.Contains(offered, id) {
+			t.Errorf("no %s among %v", id, offered)
+		}
+	}
+	if got.Unit.Row == nil || got.Unit.Row.Unit != unheldPR || !slices.Equal(enabledActions(got.Unit.Row.Actions), want) || got.Unit.Permalink != row.Link {
+		t.Errorf("the derived row %+v, permalink %q", got.Unit.Row, got.Unit.Permalink)
+	}
+	if held := resolve(t, r, "https://forge.example/acme/api/pull/8"); held.Unit.Row != nil {
+		t.Errorf("a unit the loop holds carries a row: %+v", held.Unit.Row)
+	}
+	if after := storedTasks(t, r); after != before {
+		t.Fatalf("resolving created tasks: %d to %d", before, after)
+	}
+}
+
+// downOnGitHub reads no pull request: GitHub does not answer.
+type downOnGitHub struct{ openOnGitHub }
+
+func (downOnGitHub) CandidateByRef(context.Context, pr.Ref, string) (dgh.CandidatePage, error) {
+	return dgh.CandidatePage{}, errors.New("GitHub does not answer")
+}
+
+func TestOmniboxResolveShowsAUnitItsPluginCannotRead(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, func(d *Deps) { exploreOn(d, downOnGitHub{}) })
+	got := resolve(t, r, "https://github.com/acme/api/pull/99")
+	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || len(got.Unit.Actions) != 0 || got.Unit.Row != nil {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestOmniboxResolveReadsAKeyThroughTheResolver(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, func(d *Deps) {
+		d.Resolve = func(_ context.Context, address string) (unit.Unit, bool, error) {
+			return unheldPR, address == "acme/api#99", nil
+		}
+	})
+	got := resolve(t, r, "acme/api#99")
+	if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != unheldPR || !slices.Contains(specIDs(got.Unit.Actions), "review") {
+		t.Fatalf("a key of a unit the loop does not hold: %+v", got)
+	}
+	verb := resolve(t, r, "assumir acme/api#99")
+	if verb.Kind != "verb" || verb.Preview == nil || len(verb.Preview.Operations) != 1 {
+		t.Fatalf("%+v", verb)
+	}
+	if op := verb.Preview.Operations[0]; op.Op != "action" || op.Action != "take_over" || op.Unit == nil || *op.Unit != unheldPR {
+		t.Fatalf("%+v", op)
+	}
+}
+
+func TestOmniboxResolveFindsAShortLabelAmongTheRows(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	listed := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	for _, text := range []string{"api#7", "API#7", "acme/api#7"} {
+		got := resolve(t, r, text)
+		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != listed || len(got.Unit.Tasks) != 0 || !slices.Contains(specIDs(got.Unit.Actions), "review") {
+			t.Fatalf("%q, a row no task links: %+v", text, got)
+		}
+	}
+	if got := resolve(t, r, "api#404"); got.Kind != "search" || got.Why != "no_unit_or_task" {
+		t.Fatalf("a label of no row: %+v", got)
+	}
+	r.put(t, task.Task{ID: "t-0000000000000007", State: "next", Category: task.CategoryReady, Title: "review the export", Units: []unit.Unit{listed}})
+	if got := resolve(t, r, "api#7"); got.Kind != "unit" || got.Unit.Unit != listed || len(got.Unit.Tasks) != 1 {
+		t.Fatalf("a row a task links names one unit: %+v", got)
+	}
+}
+
+func TestOmniboxResolveNeverGuessesAmongRowsOfOneShortLabel(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, nil)
+	other := pr.Ref{Owner: "globex", Repo: "api", Number: 7}
+	inventorytest.Of(r.s.store()).UpsertPR(context.Background(), dinv.PR{Ref: other, Title: "Retry the export", Author: "ana", State: "OPEN", HeadOid: "h1", Reasons: []string{"review-requested"}, URL: other.URL()})
+	got := resolve(t, r, "api#7")
+	if got.Kind != "agent" || got.Why != "ambiguous_ref" || got.Params["ref"] != "api#7" || got.Unit != nil {
+		t.Fatalf("%+v", got)
+	}
+	if got := resolve(t, r, "revisar api#7"); got.Kind != "agent" || got.Why != "ambiguous_ref" || got.Preview != nil {
+		t.Fatalf("a verb on it: %+v", got)
+	}
+	if got := resolve(t, r, "globex/api#7"); got.Kind != "unit" || got.Unit.Unit != other.Unit() {
+		t.Fatalf("the whole label: %+v", got)
+	}
+}
+
+func TestOmniboxResolveAnswersWhileTheRowsCannotBeRead(t *testing.T) {
+	t.Parallel()
+	r := newTasksRig(t, func(d *Deps) {
+		d.Identity = func(context.Context) (src.Identity, error) { return src.Identity{}, src.ErrUnavailable }
+	})
+	r.put(t, task.Task{ID: "t-0000000000000008", State: "next", Category: task.CategoryReady, Title: "review the retries", Units: []unit.Unit{pastedPR}})
+	if _, err := r.s.readModel().Listed(context.Background()); err == nil {
+		t.Fatal("the rows read without a viewer: the rig no longer fails them")
+	}
+	for _, text := range []string{"https://github.com/acme/api/pull/8", "api#8"} {
+		got := resolve(t, r, text)
+		if got.Kind != "unit" || got.Unit == nil || got.Unit.Unit != pastedPR || len(got.Unit.Tasks) != 1 || len(got.Unit.Actions) != 0 {
+			t.Errorf("%q: %+v", text, got)
+		}
+	}
+	if got := resolve(t, r, "revisar api#8"); got.Kind != "verb" || got.Preview == nil {
+		t.Errorf("a verb on a task's unit: %+v", got)
 	}
 }

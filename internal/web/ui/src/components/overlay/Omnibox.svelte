@@ -9,7 +9,7 @@
   import Markdown from "../common/Markdown.svelte";
   import {
     OMNI_STOPS, omniboxActed, omniboxAct, omniboxActiveID, omniboxChoices, omniboxEdits, omniboxFollow, omniboxIsOption, omniboxKey, omniboxNew,
-    omniboxOpLabel, omniboxOptionID, omniboxRun, omniboxSelected, omniboxStatus, omniboxTrap, omniboxType, omniboxUnitAction, omniFetch, settleCopy,
+    omniboxOpLabel, omniboxOptionID, omniboxRun, omniboxSelected, omniboxStatus, omniboxStatusSaid, omniboxTrap, omniboxType, omniboxUnitAction, omniFetch, settleCopy,
     type OmniEnv,
   } from "./omnibox";
 
@@ -48,7 +48,7 @@
       win.location().hash = href;
       if (!panel) close();
     },
-    act: (u, id, copies) => omniboxAct(u, id, copies),
+    act: (u, id, copies, row) => omniboxAct(u, id, copies, row),
     claim: () => claimCopy(),
     settle: (name, out, claim) => settleCopy(name, out, claim),
     confirm: (q) => askConfirm(q),
@@ -216,7 +216,7 @@
     {/if}
     {#if st.asking}<p class="loading">{t("Asking the agent...")}</p>{/if}
     {#if st.askError}<p class="err omni-ask-error">{st.askError}</p>{/if}
-    <output class="omni-status" aria-live="polite">{omniboxStatus(st, env)}</output>
+    <output class="omni-status" class:said={omniboxStatusSaid(st, env)} aria-live="polite">{omniboxStatus(st, env)}</output>
     <div class="omni-list" role="listbox" id="omni-list" aria-label={t("Search or ask")}>
       {#each (st.search && st.search.groups) || [] as g (g.id)}
         <section class="omni-group" data-group={g.id} role="group" aria-label={g.label}>
