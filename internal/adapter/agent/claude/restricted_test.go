@@ -73,9 +73,9 @@ func TestAskArgvUnchangedWithoutHeadlessFields(t *testing.T) {
 func TestHeadlessArgvIsRestricted(t *testing.T) {
 	f := &fakeClaude{help: helpWithRestricted}
 	a := fakeAsker(t, f)
-	checkout, dossier := t.TempDir(), t.TempDir()
+	checkout, extra := t.TempDir(), t.TempDir()
 	_, err := a.Ask(context.Background(), turns.Ask{Tier: turns.TierBalanced, Prompt: "p", Schema: `{"type":"object"}`, MaxCostUSD: 0.5,
-		Tools: turns.ReadOnlyTools, Dirs: []string{checkout, dossier}})
+		Tools: turns.ReadOnlyTools, Dirs: []string{checkout, extra}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestHeadlessArgvIsRestricted(t *testing.T) {
 	}
 	want := []string{"-p", "--output-format", "json", "--json-schema", `{"type":"object"}`,
 		"--tools", "Read,Grep,Glob", "--no-session-persistence", "--strict-mcp-config", "--restricted",
-		"--add-dir", checkout, "--add-dir", dossier, "--settings", `{"disableAllHooks":true}`,
+		"--add-dir", checkout, "--add-dir", extra, "--settings", `{"disableAllHooks":true}`,
 		"--disable-slash-commands", "--model", "sonnet", "--max-budget-usd", "0.5"}
 	if !slices.Equal(asks[0], want) {
 		t.Fatalf("argv %q\nwant %q", asks[0], want)

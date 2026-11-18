@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -71,6 +72,13 @@ type ChatDeps struct {
 	Merged MergedTasks
 	// Intent is the profile's chat intent, the turn a message starts when no session of its task is live.
 	Intent func() string
+	// Memory nil reads no learned entry.
+	Memory TaskMemory
+}
+
+// TaskMemory reads what the turns of a task learned.
+type TaskMemory interface {
+	LearnedOf(ctx context.Context, e task.Task) ([]memory.Entry, error)
 }
 
 // ErrNoChat refuses a chat the service is not wired for.
@@ -319,6 +327,8 @@ type TaskRead struct {
 	Gates   []gate.Gate
 	Chat    []timeline.Event
 	Answers []message.Conversation
+	// Learned are what the task's turns learned, newest first.
+	Learned []memory.Entry
 }
 
 // ReadTask is the task's read tool: Read's answers, with the task of the session's turns, its brief, its
@@ -362,6 +372,11 @@ func (s *Service) ReadTask(ctx context.Context, r ReadRequest) (TaskRead, error)
 	}
 	if out.Chat, err = s.unreadChat(ctx, e.ID); err != nil {
 		return out, err
+	}
+	if s.ChatDeps.Memory != nil {
+		if out.Learned, err = s.ChatDeps.Memory.LearnedOf(ctx, e); err != nil {
+			return out, err
+		}
 	}
 	if len(out.Chat) > 0 {
 		if err := s.markChat(ctx, task.UnitOf(e.ID), ChatRead, out.Chat[len(out.Chat)-1].Seq); err != nil {

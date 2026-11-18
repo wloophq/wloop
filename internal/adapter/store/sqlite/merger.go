@@ -54,8 +54,6 @@ var mergeColumns = map[string]mergeHandling{
 	"task_units.unit_key":      mergeKeeps,
 	"brief_runs.unit_key":      mergeKeeps,
 	"classifications.unit_key": mergeKeeps,
-	"dossiers.owner":           mergeKeeps,
-	"dossiers.rel_path":        mergeKeeps,
 	"drafts.unit_key":          mergeKeeps,
 	"drafts.rule_key":          mergeKeeps,
 	"drafts.origin_unit_key":   mergeKeeps,

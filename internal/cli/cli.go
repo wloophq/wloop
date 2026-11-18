@@ -36,10 +36,10 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
-	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/memory"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -168,6 +168,9 @@ type Env struct {
 	Harness harness.Set
 	// Executable is the binary the LaunchAgent runs.
 	Executable string
+	// ReinstallPlugins installs the plugins' vocabulary again once install
+	// placed the release's, which the process read before it; nil skips it.
+	ReinstallPlugins func() error
 
 	// The native menu bar and the process exit; tests replace them.
 	NativeAvailable func() bool
@@ -276,17 +279,11 @@ type Env struct {
 	// omniboxSwept is set once the omnibox snapshots a stopped process left were removed, so a later serve
 	// never removes a snapshot a running call of this process reads.
 	omniboxSwept bool
-	// dossierTurns and dossierCalls are the daemon's dossier turn checks and calls; nil without a store.
-	dossierTurns *dossiers.Turns
-	dossierCalls *dossiers.Calls
-	// callBudget books the headless calls that are not turns, the dossiers' and the omnibox's, against
+	// memory reads what the turns of a task learned, built once per daemon by serveMemory.
+	memory *memory.Service
+	// callBudget books the headless calls that are not turns, the omnibox's, against
 	// the headless caps; rebuilt by each serve pass.
 	callBudget *turns.Budget
-	// dossierGrants reads, and recordGrant writes, the sessions launched with their unit's dossier.
-	dossierGrants func(ctx context.Context, u unit.Unit) (map[string]time.Time, error)
-	recordGrant   func(ctx context.Context, u unit.Unit, handle, path string) error
-	// dossierMu serializes the dossiers' git work across serve passes.
-	dossierMu *sync.Mutex
 	// configMu serializes a serve's edits of the config file; nil outside a serve, whose one command edits once.
 	configMu *sync.Mutex
 	// started is the daemon's start-up reconcile, run once per daemon.
@@ -342,24 +339,25 @@ func NewEnv() *Env {
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
 	e := (&Env{
-		plugins:       installed,
-		Out:           os.Stdout,
-		Err:           os.Stderr,
-		In:            os.Stdin,
-		Git:           gitx.New(),
-		WS:            newSet(managers, Defaults().WorkspaceManagers),
-		Sh:            execSh,
-		Stdout:        execStdout,
-		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
-		IntentRecheck: intentRecheck,
-		ConfigPath:    config.Path(),
-		StateDir:      stateDir,
-		Home:          home,
-		Now:           time.Now,
-		Socket:        config.DaemonSocket(),
-		Getenv:        os.Getenv,
-		Executable:    exe,
-		Harness:       harnessOf(protocols, managers),
+		plugins:          installed,
+		ReinstallPlugins: InstallPlugins,
+		Out:              os.Stdout,
+		Err:              os.Stderr,
+		In:               os.Stdin,
+		Git:              gitx.New(),
+		WS:               newSet(managers, Defaults().WorkspaceManagers),
+		Sh:               execSh,
+		Stdout:           execStdout,
+		LoadConfig:       func() (config.Config, error) { return config.Load(Defaults()) },
+		IntentRecheck:    intentRecheck,
+		ConfigPath:       config.Path(),
+		StateDir:         stateDir,
+		Home:             home,
+		Now:              time.Now,
+		Socket:           config.DaemonSocket(),
+		Getenv:           os.Getenv,
+		Executable:       exe,
+		Harness:          harnessOf(protocols, managers),
 
 		Languages:       preferredLanguages,
 		NativeAvailable: macos.Available,
@@ -825,7 +823,6 @@ func commands() map[string]command {
 // manager may launch the session.
 func (e *Env) launchPolicy(ctx context.Context, cfg config.Config, opts roundOptions) turns.Policy {
 	policy := policies[cmp.Or(opts.policy, policyRound)](e, opts.intent, e.controlSurface(cfg))
-	policy.Dirs = e.dossierGrant(ctx, opts.unit)
 	// An untrusted pull request's checkout settings are its author's: they never load.
 	policy.UserSettingsOnly = !cfg.ProjectSettingsFor(string(opts.intent), prFacts(opts.pr)) || opts.pr != nil && !opts.trusted
 	return policy

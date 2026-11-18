@@ -121,3 +121,35 @@ func recordedPlugins(t testing.TB, stateDir string, ps ...host.Plugin) []host.Pl
 	}
 	return ps
 }
+
+func TestInstallReadsThePlacedPluginsAgainBeforeItWritesTheSkills(t *testing.T) {
+	t.Parallel()
+	te := fakeKindEnv(t, fakeKind{}, nil)
+	home := filepath.Join(t.TempDir(), "home")
+	mkdir(t, home)
+	te.Executable = releaseWith(t, []string{"acme"})
+	var outAtReinstall []string
+	te.ReinstallPlugins = func() error {
+		outAtReinstall = append(outAtReinstall, te.out.String())
+		return nil
+	}
+	if code := te.run("install", "--home", home); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if len(outAtReinstall) != 1 {
+		t.Fatalf("the plugins were read again %d times, want once", len(outAtReinstall))
+	}
+	if at := outAtReinstall[0]; !strings.Contains(at, "placed plugin acme") || strings.Contains(at, " skill ") {
+		t.Errorf("read again with this output so far, want after the placement and before the skills:\n%s", at)
+	}
+	if !strings.Contains(te.out.String(), " skill ") {
+		t.Fatalf("install wrote no skill:\n%s", te.out)
+	}
+
+	te = fakeKindEnv(t, fakeKind{}, nil)
+	te.Executable = releaseWith(t, []string{"acme"})
+	te.ReinstallPlugins = func() error { t.Error("a dry run read the plugins again"); return nil }
+	if code := te.run("install", "--home", home, "--dry-run"); code != 0 {
+		t.Fatalf("dry run: exit %d: %s", code, te.err)
+	}
+}

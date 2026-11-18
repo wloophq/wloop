@@ -217,7 +217,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
 - `verbs.<name>.handler` (one of `finish`, `drop`, `focus`, `schedule`, `wake`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `promise`, `reviewed`, `sequential`, `merge`, `split`, `relate`, `unrelate`): What the verb runs besides its move, a handler of the loop's; none when absent.
-  - `finish`: Moves the task to the verb's to; a project's dossier starts its lifecycle.
+  - `finish`: Moves the task to the verb's to.
   - `drop`: Moves the task to the verb's to; a kind another service serves drops its subject: a draft is discarded, a message's gate refused.
   - `focus`: Stars the task, or takes the star off: toggles the property of role star.
   - `schedule`: Hides the task until a date or until its unit moves, then brings it back where it was.
@@ -654,7 +654,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>` (table): An MCP tool, by its name.
   - `turn_end`: Records how the session's turn ended.
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
-  - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
+  - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read.
   - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
   - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again.
   - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
@@ -711,7 +711,8 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_the_tasks` (`Error`): The session's turns are on no unit of the task it would read.
   - `read_failed` (`Error`): The task could not be read.
   - `nothing` (`ID`: number): Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.
-  - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`): What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each "" when empty.
+  - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`, `Learned`): What was read: the task, its brief record's data, its open gates, the chat since the last read, the conversations and what the task's turns learned, each "" when empty.
+  - `learned_entry` (`At`, `Unit`, `Text`): A part of read: what one turn of the task learned, when, on which unit, its text indented two spaces.
   - `task` (`ID`, `Title`, `State`): A part of read: the task's id, title and state.
   - `gate` (`ID`: number, `Kind`, `Name`, `Intents`): A part of read: one open gate of the task, its kind, its name in gates.toml and the intents that resolve it.
   - `chat_message` (`Text`, `At`): A part of read: one message the user wrote on the task's chat, and when.
@@ -1158,9 +1159,6 @@ The fields each notice reads besides `Name` and `Command`:
   - `stop_blocked`: An agent's stop blocked for a reason the loop gave.
   - `turn_stopped`: A turn stopped.
   - `guide_trimmed`: A turn's guide trimmed to its limit.
-  - `dossier_restored`: A dossier file restored.
-  - `dossier_granted`: A dossier granted to a session.
-  - `dossier_call`: A dossier compaction call, with its cost.
   - `omnibox_call`: An omnibox agent call, with its cost.
   - `brief_waiting`: A request waiting for its brief.
   - `intake_accepted`: A request accepted.
@@ -1424,7 +1422,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `plugins.github.scope.people` (list of strings): Logins whose pull requests it follows.
 - `plugins.github.scope.teams` (list of strings): Teams whose pull requests it follows.
 - `plugins.github.scope.repos` (list of strings): Repositories whose pull requests it follows.
-- `plugins.github.scope.watch` (list of strings): Repositories it watches.
+- `plugins.github.scope.watch` (list of strings): Logins whose pull requests, as author or requested reviewer, it follows.
 - `plugins.github.stalled` (table): When a pull request counts as stalled.
 - `plugins.github.stalled.review` (duration, default `2d`): Waiting on a review for this long.
 - `plugins.github.stalled.reply` (duration, default `1d`): Waiting on a reply for this long.
@@ -1498,6 +1496,8 @@ The fields each notice reads besides `Name` and `Command`:
 
 - `turns` (table): The automated turn budgets.
 - `turns.per_day` (integer, default `20`): Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).
+- `turns.no_start_wait` (duration, default `2h`): How long a round whose session never showed the MCP tool, with no question on its screen, waits before a sweep starts it again.
+- `turns.blind_block_wait` (duration, default `1d`): How long a round blocked on the agent's question waits when its terminal's own agent home cannot be read for the answer.
 - `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none.
 - `headless` (table): The headless turns' caps; a cost of zero leaves it uncapped.
 - `headless.tier` (one of `fast`, `balanced`, `frontier`, default `balanced`): The model tier of their calls.
@@ -1548,15 +1548,15 @@ The fields each notice reads besides `Name` and `Command`:
 - `cleanup.orphan_hold` (duration, default `1d`): How long the close of a dormant session waits while its process lingers orphaned, the app showing some terminal throughout, before it closes the session's record anyway; it ends no process.
 - `cleanup.disposable` (list of strings): Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing.
 
-### Dossiers
+### Retired
 
-- `dossiers` (table): The dossiers' lifecycle and quotas; a value of zero or less keeps its default.
-- `dossiers.archive_after` (duration, default `30d`): How long after its task or unit resolved a dossier is archived.
-- `dossiers.purge_after` (duration, default `400d`): How long after the archive it is purged.
-- `dossiers.soft_cap_mb` (integer, default `50`): The size per dossier doctor reports.
-- `dossiers.total_cap_mb` (integer, default `2048`): The size of dossiers and archives doctor reports.
-- `dossiers.max_file_mb` (integer, default `5`): The largest file a dossier keeps; a larger one is linked.
-- `dossiers.compact_at_kb` (integer, default `256`): The log size that triggers compaction.
+- `dossiers` (retired, not read): Retired: the task dossiers are gone, and a config that still sets the table loads.
+- `dossiers.archive_after` (retired, not read): Retired.
+- `dossiers.purge_after` (retired, not read): Retired.
+- `dossiers.soft_cap_mb` (retired, not read): Retired.
+- `dossiers.total_cap_mb` (retired, not read): Retired.
+- `dossiers.max_file_mb` (retired, not read): Retired.
+- `dossiers.compact_at_kb` (retired, not read): Retired.
 
 ### Interface
 

@@ -46,6 +46,7 @@ const (
 	ItemBodyMax    = 4000
 	ResumeMax      = 4000
 	NextMax        = 1000
+	LearnedMax     = 1500
 	URLMax         = 500
 	VerdictMax     = 60
 	LedgerMax      = 50
@@ -60,6 +61,8 @@ type Record struct {
 	Resume   string    `json:"resume,omitempty"`
 	Next     string    `json:"next,omitempty"`
 	User     string    `json:"user,omitempty"`
+	// Learned is what the turn learned that a later turn on the task needs, beyond the summary.
+	Learned string `json:"learned,omitempty"`
 	// Suspicious says the turn stopped on text from someone other than the
 	// user that looks like an attempt to steer the agent.
 	Suspicious bool `json:"suspicious,omitempty"`
@@ -274,6 +277,7 @@ func (r Record) validate(rules *dintent.RecordRules) error {
 	}
 	c.text("next", r.Next, 0, NextMax, true)
 	c.text("user", r.User, 0, NextMax, true)
+	c.text("learned", r.Learned, 0, LearnedMax, true)
 	if a := r.Artifact; a != nil {
 		switch {
 		case rules != nil && len(rules.Artifacts) == 0:
@@ -450,6 +454,20 @@ func Unrecorded(message string) Record {
 	}
 	return Record{State: UnrecordedState, Summary: summary, Resume: cut(strings.TrimSpace(strings.Map(keep, message)), ResumeMax)}
 }
+
+// PlainText is s with every line break as "\n", tabs kept, and every other control or bidi character dropped:
+// what a multiline field of a record accepts.
+func PlainText(s string) string {
+	s = lineBreaks.Replace(s)
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		return dropControl(r)
+	}, s)
+}
+
+var lineBreaks = strings.NewReplacer("\r\n", "\n", "\r", "\n", "\u2028", "\n", "\u2029", "\n", "\u0085", "\n")
 
 func dropControl(r rune) rune {
 	if unicode.IsControl(r) || (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069) {

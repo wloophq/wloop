@@ -30,8 +30,6 @@ type Policy struct {
 	// settings alone: the worktree's settings, hooks, MCP servers and
 	// instruction files do not load.
 	UserSettingsOnly bool
-	// Dirs are directories outside the worktree the agent may read, and write under their Write subpaths.
-	Dirs []Dir
 	// DenyPaths are absolute paths the agent may neither read nor write.
 	DenyPaths []string
 }
@@ -49,13 +47,6 @@ func (p Policy) Denied(c Control) Policy {
 	p.Deny = append(slices.Clone(p.Deny), c.Commands...)
 	p.DenyPaths = append(slices.Clone(p.DenyPaths), c.Paths...)
 	return p
-}
-
-// Dir is an absolute path and the subpaths the agent may write, e.g. log, sources, drafts; with none, the
-// directory is read only and every edit in it is denied.
-type Dir struct {
-	Path  string
-	Write []string
 }
 
 type AgentSession struct {

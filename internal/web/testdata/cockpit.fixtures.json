@@ -1,7 +1,7 @@
 {
  "apiVersion": "1",
  "bundled": {
-  "version": "dd262f2f56cc",
+  "version": "6fa6adf3ecb4",
   "views": [
    {
     "id": "mine",
@@ -909,6 +909,7 @@
      "no_reviewer_requested": "no reviewer requested",
      "review_requested": "review requested, no review on the head",
      "review_requested_again": "review requested again after your review",
+     "review_wanted": "your review is wanted, no review on the head",
      "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
      "round_blocked": "round blocked: {{.why}}",
      "round_held": "automatic round held: {{.why}}",

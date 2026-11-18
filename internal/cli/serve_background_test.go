@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -44,6 +45,7 @@ func startedSince(before map[string]string) map[string]string {
 // Not parallel: it reads every goroutine of the process.
 func TestStopServingWaitsForServesJobs(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
+	te.changes = change.NewLog(change.DefaultWindow, nil)
 	before := cliGoroutines()
 	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)

@@ -34,7 +34,10 @@ const (
 // recordStep is the words the record step and an empty history add to a
 // turn, measured once; the review's report and board section it replaced
 // cover it there.
-const recordStep = 420
+const recordStep = 420 + learnedStep
+
+// learnedStep is the words the record step's learned field adds.
+const learnedStep = 45
 
 // untrustedStep is the words the address procedure spends on text from
 // other people: what makes an item suspicious and the gate that stops on it.
@@ -237,7 +240,7 @@ func scenarios() []Scenario {
 			Expect:   "A follow-up the user asked for by hand after approving. The agent diffs from the reviewed head and proposes its review as a draft.",
 			Must:     []string{"Follow-up review of acme/api#7, asked for by you.", "### 4a. Later rounds", "git diff 9f8e7d..HEAD", "| every blocking finding resolved | `APPROVE` |"},
 			MustNot:  []string{"ollow-up approval rule", "started by " + brand.Name, brand.Name + " started this round"},
-			MaxWords: oldReview * 9 / 10,
+			MaxWords: oldReview*9/10 + learnedStep,
 		},
 		{
 			Name: "review/dry-run",

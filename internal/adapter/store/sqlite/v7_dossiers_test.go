@@ -1,11 +1,9 @@
 package sqlite
 
 import (
-	"context"
 	"slices"
+	"strings"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/dossier"
 )
 
 const (
@@ -40,9 +38,7 @@ func v6DossiersFixture(t *testing.T) string {
 
 func TestProjectDossiersMoveToTheirTask(t *testing.T) {
 	t.Parallel()
-	path := v6DossiersFixture(t)
-	db := migrateV6(t, path)
-	raw := rawDB(t, path)
+	raw := migrateToV7(t, v6DossiersFixture(t))
 	ship, drop, pull := "t-"+hexShip, "t-"+hexDrop, "t-"+hexPull
 	want := []string{
 		"merged/project%2Fdrop-it/task/" + drop + " task/" + drop + "#/merged/project%2Fdrop-it archived 2 2027-11-09T00:00:00Z",
@@ -66,13 +62,14 @@ func TestProjectDossiersMoveToTheirTask(t *testing.T) {
 	if got := strings1(t, raw, `SELECT name FROM sqlite_schema WHERE name LIKE 'projects%'`); len(got) > 0 {
 		t.Errorf("projects is left: %q", got)
 	}
-	all, err := db.Dossiers().List(context.Background())
-	if err != nil || len(all) != len(want) {
-		t.Fatalf("the store reads %d dossiers, %v", len(all), err)
-	}
-	for _, d := range all {
-		if rel, err := dossier.Rel(d.Owner); err != nil || rel != d.RelPath {
-			t.Errorf("%s lives at %q, its owner's directory is %q (%v)", d.Owner, d.RelPath, rel, err)
+	for _, row := range strings1(t, raw, `SELECT owner || ' ' || rel_path FROM dossiers ORDER BY owner`) {
+		owner, path, _ := strings.Cut(row, " ")
+		o, err := parseDossierOwner(owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rel, err := o.rel(); err != nil || rel != path {
+			t.Errorf("%s lives at %q, its owner's directory is %q (%v)", owner, path, rel, err)
 		}
 	}
 }
@@ -86,9 +83,8 @@ func TestAMigratedEndedTasksDossierGetsNoClosingCall(t *testing.T) {
 		`INSERT INTO dossiers (owner, rel_path, status) VALUES
 			('entry/e-`+hexEnded+`', 'entry/e-`+hexEnded+`#', 'active'), ('entry/e-`+hexPull+`', 'entry/e-`+hexPull+`#', 'active')`,
 	)
-	migrateV6(t, path)
 	want := []string{"task/t-" + hexPull + " active ", "task/t-" + hexEnded + " resolved 2026-10-04T09:00:00.000000000Z"}
-	if got := strings1(t, rawDB(t, path), `SELECT owner || ' ' || status || ' ' || resolved_at FROM dossiers ORDER BY owner`); !slices.Equal(got, want) {
+	if got := strings1(t, migrateToV7(t, path), `SELECT owner || ' ' || status || ' ' || resolved_at FROM dossiers ORDER BY owner`); !slices.Equal(got, want) {
 		t.Fatalf("dossiers %q, want %q", got, want)
 	}
 }

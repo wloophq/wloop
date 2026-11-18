@@ -271,6 +271,7 @@ func (r *running) snapshots(ctx context.Context, refs []pr.Ref) ([]src.Snapshot,
 	if err != nil {
 		return nil, err
 	}
+	pin.Wanted = in.wanted
 	planner := plan.New(ctx, pin)
 	settled := map[pr.Ref]plan.Settlement{}
 	var rev uint64
@@ -320,23 +321,43 @@ func (r *running) rows(ctx context.Context, refs []pr.Ref, at time.Time) ([]deri
 	return out, err
 }
 
-// rowsWith are rows, with what they read of the host.
+// rowsWith are rows, with what they read of the host and the profile's
+// review_wanted over them.
 func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]derived, rowInputs, error) {
-	rows, err := r.db.PRs(ctx, refs)
+	ds, ris, in, err := r.inputsAt(ctx, refs, at)
 	if err != nil {
 		return nil, rowInputs{}, err
+	}
+	required := r.holds(ctx, predicateReviewerRequired, ris, func(row.Input) bool { return true })
+	in.wanted = r.reviewWanted(ctx, ris)
+	out := make([]derived, len(ris))
+	for i, ri := range ris {
+		ri.ReviewerOptional, ri.ReviewWanted = !required[i], in.wanted[ri.PR.Ref]
+		x := row.Derive(ri)
+		ds[i].Row = &x.Payload
+		out[i] = derived{row: x, data: ds[i]}
+	}
+	return out, in, nil
+}
+
+// inputsAt are the data and row inputs of the stored pull requests of refs
+// at at, with what they read of the host.
+func (r *running) inputsAt(ctx context.Context, refs []pr.Ref, at time.Time) ([]Data, []row.Input, rowInputs, error) {
+	rows, err := r.db.PRs(ctx, refs)
+	if err != nil {
+		return nil, nil, rowInputs{}, err
 	}
 	details, err := r.db.Details(ctx, refs)
 	if err != nil {
-		return nil, rowInputs{}, err
+		return nil, nil, rowInputs{}, err
 	}
 	tracked, err := r.db.Tracked(ctx)
 	if err != nil {
-		return nil, rowInputs{}, err
+		return nil, nil, rowInputs{}, err
 	}
 	in, err := r.rowInputs(ctx, refs)
 	if err != nil {
-		return nil, rowInputs{}, err
+		return nil, nil, rowInputs{}, err
 	}
 	var ds []Data
 	var ris []row.Input
@@ -347,7 +368,7 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 		}
 		o, err := r.db.Override(ctx, ref)
 		if err != nil {
-			return nil, rowInputs{}, err
+			return nil, nil, rowInputs{}, err
 		}
 		d := Data{PR: p, Tracked: slices.Contains(tracked, ref), Adopted: o.Adopted}
 		ri := in.of(ref)
@@ -358,29 +379,39 @@ func (r *running) rowsWith(ctx context.Context, refs []pr.Ref, at time.Time) ([]
 		}
 		ds, ris = append(ds, d), append(ris, ri)
 	}
-	required := r.reviewerRequired(ctx, ris)
-	out := make([]derived, len(ris))
-	for i, ri := range ris {
-		ri.ReviewerOptional = !required[i]
-		x := row.Derive(ri)
-		ds[i].Row = &x.Payload
-		out[i] = derived{row: x, data: ds[i]}
-	}
-	return out, in, nil
+	return ds, ris, in, nil
 }
 
-// predicateReviewerRequired is the predicate plugin.toml declares that says
-// whether a pull request waits for a reviewer before its merge.
-const predicateReviewerRequired = "reviewer_required"
+// The predicates plugin.toml declares: whether a pull request waits for a
+// reviewer before its merge, and whether the loop reviews it.
+const (
+	predicateReviewerRequired = "reviewer_required"
+	predicateReviewWanted     = "review_wanted"
+)
 
-// reviewerRequired says, for each of ins, whether the profile's
-// reviewer_required holds over its pull request's facts; true, as the
-// bundled profile sets it, for every one when the host cannot say and for
-// one whose facts it could not evaluate the predicate over.
-func (r *running) reviewerRequired(ctx context.Context, ins []row.Input) []bool {
+// reviewWanted is whether the profile's review_wanted holds over each of
+// ins, by pull request; where the host cannot say, whether it requests the
+// viewer's review by name, as the bundled profile sets it.
+func (r *running) reviewWanted(ctx context.Context, ins []row.Input) map[pr.Ref]bool {
+	byName := func(in row.Input) bool {
+		return in.Viewer != "" && slices.ContainsFunc(in.PR.ReviewRequests, func(l string) bool { return strings.EqualFold(l, in.Viewer) })
+	}
+	holds := r.holds(ctx, predicateReviewWanted, ins, byName)
+	out := make(map[pr.Ref]bool, len(ins))
+	for i, in := range ins {
+		out[in.PR.Ref] = holds[i]
+	}
+	return out
+}
+
+// holds says, for each of ins, whether the profile's predicate holds over
+// its pull request's facts; fallback's answer, as the bundled profile sets
+// it, for every one when the host cannot say and for one whose facts it
+// could not evaluate the predicate over.
+func (r *running) holds(ctx context.Context, predicate string, ins []row.Input, fallback func(row.Input) bool) []bool {
 	out := make([]bool, len(ins))
-	for i := range out {
-		out[i] = true
+	for i, in := range ins {
+		out[i] = fallback(in)
 	}
 	if r.host.Services == nil || len(ins) == 0 {
 		return out
@@ -389,19 +420,19 @@ func (r *running) reviewerRequired(ctx context.Context, ins []row.Input) []bool 
 	for i, in := range ins {
 		facts[i] = row.FactsOf(in)
 	}
-	holds, err := r.host.Services.Holds(ctx, predicateReviewerRequired, facts)
+	holds, err := r.host.Services.Holds(ctx, predicate, facts)
 	if err == nil && len(holds) != len(ins) {
 		err = fmt.Errorf("%d verdicts for %d pull requests", len(holds), len(ins))
 	}
 	if err != nil {
 		if !errors.Is(err, src.ErrUnsupported) {
-			r.logOnce(fmt.Sprintf("%s: %v", predicateReviewerRequired, err))
+			r.logOnce(fmt.Sprintf("%s: %v", predicate, err))
 		}
 		return out
 	}
 	for i, h := range holds {
 		if h.Err != "" {
-			r.logOnce(fmt.Sprintf("%s for %s: %s", predicateReviewerRequired, ins[i].PR.Ref, h.Err))
+			r.logOnce(fmt.Sprintf("%s for %s: %s", predicate, ins[i].PR.Ref, h.Err))
 			continue
 		}
 		out[i] = h.Holds
@@ -431,6 +462,8 @@ type rowInputs struct {
 	events    map[pr.Ref][]pr.Event
 	addressed map[pr.Ref]time.Time
 	books     map[pr.Ref]src.Book
+	// wanted is the profile's review_wanted over the pull requests read.
+	wanted map[pr.Ref]bool
 }
 
 func (in rowInputs) of(ref pr.Ref) row.Input {

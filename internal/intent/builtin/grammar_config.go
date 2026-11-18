@@ -28,6 +28,12 @@ func cfgKey(path string, k Kind, def, doc string) Key {
 	return Key{Path: path, In: SurfaceConfig, Kind: k, Default: def, Doc: doc}
 }
 
+// retired marks k as a key a release stopped reading.
+func retired(k Key) Key {
+	k.Retired = true
+	return k
+}
+
 func cfgList(path, doc string) Key {
 	return Key{Path: path, In: SurfaceConfig, Kind: KindList, Elem: KindText, Doc: doc}
 }
@@ -85,7 +91,7 @@ var configGrammar = slices.Concat(
 		cfgList("plugins.github.scope.people", "Logins whose pull requests it follows."),
 		cfgList("plugins.github.scope.teams", "Teams whose pull requests it follows."),
 		cfgList("plugins.github.scope.repos", "Repositories whose pull requests it follows."),
-		cfgList("plugins.github.scope.watch", "Repositories it watches."),
+		cfgList("plugins.github.scope.watch", "Logins whose pull requests, as author or requested reviewer, it follows."),
 		cfgKey("plugins.github.stalled", KindTable, "", "When a pull request counts as stalled."),
 		cfgKey("plugins.github.stalled.review", KindDur, "2d", "Waiting on a review for this long."),
 		cfgKey("plugins.github.stalled.reply", KindDur, "1d", "Waiting on a reply for this long."),
@@ -167,13 +173,13 @@ var configGrammar = slices.Concat(
 		cfgKey("window", KindTable, "", "The app's own window on macOS, which the app reads when it starts."),
 		cfgKey("window.enabled", KindBool, "true", "Show the cockpit in the app's own window on macOS; false opens it in the browser."),
 		cfgKey("window.hotkey", KindText, "ctrl+option+space", "The global shortcut that opens the omnibox panel, such as cmd+shift+space; empty for none."),
-		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),
-		cfgKey("dossiers.archive_after", KindDur, "30d", "How long after its task or unit resolved a dossier is archived."),
-		cfgKey("dossiers.purge_after", KindDur, "400d", "How long after the archive it is purged."),
-		cfgKey("dossiers.soft_cap_mb", KindInt, "50", "The size per dossier doctor reports."),
-		cfgKey("dossiers.total_cap_mb", KindInt, "2048", "The size of dossiers and archives doctor reports."),
-		cfgKey("dossiers.max_file_mb", KindInt, "5", "The largest file a dossier keeps; a larger one is linked."),
-		cfgKey("dossiers.compact_at_kb", KindInt, "256", "The log size that triggers compaction."),
+		retired(cfgKey("dossiers", KindTable, "", "Retired: the task dossiers are gone, and a config that still sets the table loads.")),
+		retired(cfgKey("dossiers.archive_after", KindDur, "", "Retired.")),
+		retired(cfgKey("dossiers.purge_after", KindDur, "", "Retired.")),
+		retired(cfgKey("dossiers.soft_cap_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.total_cap_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.max_file_mb", KindInt, "", "Retired.")),
+		retired(cfgKey("dossiers.compact_at_kb", KindInt, "", "Retired.")),
 
 		cfgKey("drafts", KindTable, "", "The settings every proposer's drafts share."),
 		cfgKey("drafts.repeat_after", KindDur, "7d", "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again."),
@@ -188,6 +194,8 @@ var configGrammar = slices.Concat(
 		cfgKey("headless.per_day_usd", KindNumber, "5", "What they may cost in a day, in USD."),
 		cfgKey("turns", KindTable, "", "The automated turn budgets."),
 		cfgKey("turns.per_day", KindInt, "20", "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today)."),
+		cfgKey("turns.no_start_wait", KindDur, "2h", "How long a round whose session never showed the MCP tool, with no question on its screen, waits before a sweep starts it again."),
+		cfgKey("turns.blind_block_wait", KindDur, "1d", "How long a round blocked on the agent's question waits when its terminal's own agent home cannot be read for the answer."),
 		cfgKey("turns.per_unit_per_day", KindInt, "5", "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none."),
 
 		cfgKey("plugins.slack", KindTable, "", "The Slack plugin's settings; no secret lives here."),

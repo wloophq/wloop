@@ -634,7 +634,7 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	want := map[pr.Ref]string{
 		skipped: "round_unblocked: its review workspace exists",
 		busy:    "round_blocked: busy is checked out in /w/other",
-		gone:    "round_unblocked: my review is no longer requested",
+		gone:    "round_unblocked: my review is no longer wanted",
 	}
 	if !maps.Equal(got, want) {
 		t.Fatalf("recorded %v, want %v", got, want)

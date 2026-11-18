@@ -204,7 +204,6 @@ func TestV7KindsKeepsTheOldIdOnTheOldestItem(t *testing.T) {
 		`SELECT count(*) FROM unit_marks WHERE provider = 'task' AND unit_key = ?`:                      "1",
 		`SELECT count(*) FROM drafts WHERE task = ?`:                                                    "1",
 		`SELECT count(*) FROM gates WHERE task_id = ? AND subject = '60'`:                               "1",
-		`SELECT count(*) FROM dossiers WHERE owner = 'task/' || ?`:                                      "1",
 	} {
 		if got := strings1(t, raw, q, w); !slices.Equal(got, []string{want}) {
 			t.Errorf("%s: %q, want %s", q, got, want)

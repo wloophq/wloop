@@ -46,7 +46,7 @@ type Ask struct {
 	MaxCostUSD float64
 	// Tools are read-only tools the call may use, a subset of ReadOnlyTools; nil is none.
 	Tools []string
-	// Dirs are absolute directories the call may read (the placed checkout, the dossier).
+	// Dirs are absolute directories the call may read (the placed checkout).
 	Dirs []string
 }
 

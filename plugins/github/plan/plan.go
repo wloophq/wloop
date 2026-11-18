@@ -310,8 +310,8 @@ func (p *Planner) notFollowedWithoutWorkspace(f pr.Facts) string {
 		return "it is " + strings.ToLower(f.State)
 	case strings.EqualFold(f.Author, viewer):
 		return "you opened it"
-	case containsFold(f.ReviewRequests, viewer):
-		return "my review is requested, which starts a first round"
+	case p.wanted(p.byRef[f.Ref]) && p.requestedByName(p.byRef[f.Ref]):
+		return "my review was requested, which starts a first round"
 	}
 	for _, w := range p.ws {
 		if w.of(f.Ref) && p.isReviewWorkspace(w) && (w.DisplayName == p.cfg.ReviewPrefix+f.HeadRefName || w.linked == f.Number) {
@@ -338,20 +338,62 @@ func (p *Planner) follows(ref pr.Ref) bool {
 	return ok
 }
 
-// Requested says whether ref is an open, ready pull request that requests
-// the viewer's review by name.
+// Requested says whether a first round may review ref: an open, ready pull
+// request I did not open, which the profile's review_wanted holds for and,
+// unless it requests my review by name, that I never reviewed.
 func (p *Planner) Requested(ref pr.Ref) bool {
 	row, ok := p.byRef[ref]
-	return ok && row.State == pr.StateOpen && !row.IsDraft && containsFold(row.ReviewRequests, p.in.Viewer)
+	if !ok || row.State != pr.StateOpen || row.IsDraft || strings.EqualFold(row.Author, p.in.Viewer) || !p.wanted(row) {
+		return false
+	}
+	return p.requestedByName(row) || !p.reviewedBefore(ref)
+}
+
+func (p *Planner) requestedByName(row pr.PR) bool {
+	return containsFold(row.ReviewRequests, p.in.Viewer)
+}
+
+// wanted is the profile's review_wanted over row.
+func (p *Planner) wanted(row pr.PR) bool {
+	if w, ok := p.in.Wanted[row.Ref]; ok {
+		return w
+	}
+	return p.requestedByName(row)
+}
+
+// reviewedBefore says I reviewed ref already, by a review turn of the loop
+// or a review on GitHub. Without a request by name, nothing else stops a
+// first round from starting again once its review workspace is gone.
+func (p *Planner) reviewedBefore(ref pr.Ref) bool {
+	if _, ok := NewestReview(p.in.Books[ref]); ok {
+		return true
+	}
+	if d, ok := p.in.Details[ref]; ok {
+		if _, ok := change.LastReview(d.Reviews, p.in.Viewer); ok {
+			return true
+		}
+	}
+	return slices.ContainsFunc(p.in.Events[ref], func(e pr.Event) bool {
+		return e.Kind == pr.KindReview && strings.EqualFold(e.Actor, p.in.Viewer)
+	})
+}
+
+// asked is why a first round would review ref.
+func (p *Planner) asked(ref pr.Ref) string {
+	if p.requestedByName(p.byRef[ref]) {
+		return "my review was requested"
+	}
+	return "the profile wants my review"
 }
 
 func (p *Planner) first(ref pr.Ref, r *Result) {
 	if !p.Requested(ref) {
 		return
 	}
+	asked := p.asked(ref)
 	f, why := p.prOf(ref, p.follows(ref), r)
 	if why != "" {
-		r.first.reason = "my review was requested, but " + why
+		r.first.reason = asked + ", but " + why
 		return
 	}
 	no := func(reason, unblock string) {
@@ -382,12 +424,12 @@ func (p *Planner) first(ref pr.Ref, r *Result) {
 		r.first.reason = "checking its head branch for a first round: " + err.Error()
 		return
 	case quiet:
-		no("my review was requested, but "+why, "its head is the default branch")
+		no(asked+", but "+why, "its head is the default branch")
 	case why != "":
-		r.first.reason = "my review was requested, but " + why
+		r.first.reason = asked + ", but " + why
 		r.first.settle = firstSettle{set: !r.stale, block: why}
 	default:
-		r.first.due, r.first.reason = true, "my review was requested"
+		r.first.due, r.first.reason = true, asked
 		if b, ok := p.block(ref); !ok || !StartBlock(b) {
 			r.first.settle = firstSettle{set: !r.stale, unblock: "the branch is free"}
 		}

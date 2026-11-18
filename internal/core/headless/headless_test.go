@@ -188,7 +188,7 @@ func answerJSON(t *testing.T, rec record.Record, drafts ...map[string]any) strin
 	if drafts == nil {
 		drafts = []map[string]any{}
 	}
-	raw, err := json.Marshal(map[string]any{"record": rec, "drafts": drafts, "log": ""})
+	raw, err := json.Marshal(map[string]any{"record": rec, "drafts": drafts, "learned": ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,10 +407,10 @@ func TestHeadlessResultAppliesOpsAndDrafts(t *testing.T) {
 func TestUnfitAnswerAppliesNothing(t *testing.T) {
 	for name, raw := range map[string]string{
 		"not json":                   "{nope",
-		"unknown field":              `{"record":{"state":"done","summary":"s"},"drafts":[],"log":"","extra":1}`,
-		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"send"}}],"log":""}`,
-		"a draft names its origin":   `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","origin":{"kind":"auto","turn_seq":9}}],"log":""}`,
-		"bad record":                 `{"record":{"state":"settled","summary":"s","ledger":[{"op":"resolve","item":"i1","anchor":{"ref":"x"}}]},"drafts":[{"kind":"reply","text":"hi"}],"log":""}`,
+		"unknown field":              `{"record":{"state":"done","summary":"s"},"drafts":[],"learned":"","extra":1}`,
+		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"send"}}],"learned":""}`,
+		"a draft names its origin":   `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","origin":{"kind":"auto","turn_seq":9}}],"learned":""}`,
+		"bad record":                 `{"record":{"state":"settled","summary":"s","ledger":[{"op":"resolve","item":"i1","anchor":{"ref":"x"}}]},"drafts":[{"kind":"reply","text":"hi"}],"learned":""}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newRig(t, scripted{json: raw})

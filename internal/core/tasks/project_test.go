@@ -12,38 +12,15 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-type fakeDossiers struct {
-	opened   []task.ID
-	resolved map[task.ID]time.Time
-	fail     error
-}
-
-func (f *fakeDossiers) Open(ctx context.Context, id task.ID) error {
-	if f.fail != nil {
-		return f.fail
-	}
-	f.opened = append(f.opened, id)
-	return nil
-}
-
-func (f *fakeDossiers) Resolved(ctx context.Context, id task.ID, at time.Time) error {
-	if f.resolved == nil {
-		f.resolved = map[task.ID]time.Time{}
-	}
-	f.resolved[id] = at
-	return nil
-}
-
 type projectRig struct {
 	*rig
 	projects *taskstest.Projects
-	dossiers *fakeDossiers
 }
 
 func newProjectRig() *projectRig {
-	r := &projectRig{rig: newRig(), dossiers: &fakeDossiers{}}
+	r := &projectRig{rig: newRig()}
 	r.projects = &taskstest.Projects{}
-	r.svc.ServeProjects(coretasks.ProjectDeps{Store: r.projects, Dossiers: r.dossiers})
+	r.svc.ServeProjects(coretasks.ProjectDeps{Store: r.projects})
 	return r
 }
 
@@ -91,13 +68,10 @@ func TestProjectFromTask(t *testing.T) {
 	if !p.IsProject() || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop("area").Text != "OSS" {
 		t.Fatalf("project %+v", p)
 	}
-	if !slices.Equal(r.dossiers.opened, []task.ID{p.ID}) {
-		t.Errorf("dossiers opened %v", r.dossiers.opened)
-	}
 
 	other := r.put(t, task.Task{ID: "t-cap2", State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
 	res = r.do(t, other.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API!"})
-	if p2 := r.task(t, res.Task.Parent); p2.ID == p.ID || !slices.Equal(r.dossiers.opened, []task.ID{p.ID, p2.ID}) {
+	if p2 := r.task(t, res.Task.Parent); p2.ID == p.ID {
 		t.Errorf("a second project of the same name: %+v", p2)
 	}
 
@@ -106,13 +80,6 @@ func TestProjectFromTask(t *testing.T) {
 	}
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbProject}); !errors.Is(err, coretasks.ErrArgs) {
 		t.Errorf("project with neither id nor title: %v, want ErrArgs", err)
-	}
-
-	r.dossiers.fail = errors.New("disk full")
-	third := r.put(t, task.Task{ID: "t-cap3", State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
-	res = r.do(t, third.ID, task.VerbProject, map[string]string{"title": "Broken disk"})
-	if res.Task.Parent == "" || len(res.Lines) == 0 {
-		t.Errorf("a failed dossier still files the project and says so: %+v", res)
 	}
 }
 
@@ -205,25 +172,18 @@ func TestMarkReviewed(t *testing.T) {
 	}
 }
 
-func TestDoneProjectResolvesItsDossier(t *testing.T) {
+func TestAProjectEndsByDoneOrDismiss(t *testing.T) {
 	r := newProjectRig()
 	r.project(t, "p", nil)
 	r.project(t, "q", nil)
 	r.action(t, "a", "p", 1, task.State("next"))
 	r.clock.t = t0.Add(time.Hour)
 	r.do(t, "a", task.VerbDone, nil)
-	if len(r.dossiers.resolved) != 0 {
-		t.Fatalf("an action's done resolved %v", r.dossiers.resolved)
-	}
 	if got := r.do(t, "p", task.VerbDone, nil).Task; got.Category != task.CategoryDone {
 		t.Fatalf("project state %s", got.State)
 	}
-	r.do(t, "q", task.VerbDismiss, nil)
-	want := map[task.ID]time.Time{"p": r.clock.t, "q": r.clock.t}
-	for id, at := range want {
-		if got, ok := r.dossiers.resolved[id]; !ok || !got.Equal(at) {
-			t.Errorf("dossier of %s resolved %v, %v; want at %v", id, got, ok, at)
-		}
+	if got := r.do(t, "q", task.VerbDismiss, nil).Task; got.Open() || !got.Updated.Equal(r.clock.t) {
+		t.Fatalf("dismissed project %+v", got)
 	}
 	if _, err := r.svc.Do(context.Background(), "p", coretasks.Request{Actor: task.ActorPerson, Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("done twice: %v, want ErrVerb", err)

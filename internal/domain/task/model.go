@@ -55,6 +55,9 @@ type Task struct {
 	// OpenChanged is when the task last opened or closed: the Updated of the write that moved it between an
 	// open category and done or dropped, or of its first write; the store keeps it.
 	OpenChanged time.Time
+	// ClosedAt is when the task last moved from an open category to done or dropped, as the store stamps it;
+	// zero when it never did since schema version 15.
+	ClosedAt time.Time
 
 	// A parent's review interval (zero: DefaultReviewEvery) and last review.
 	ReviewEvery time.Duration

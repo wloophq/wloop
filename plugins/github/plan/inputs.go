@@ -35,6 +35,9 @@ type Inputs struct {
 	Details map[pr.Ref]store.Detail
 	// Adopted are the pull requests taken over into the loop.
 	Adopted map[pr.Ref]bool
+	// Wanted is the profile's review_wanted, by pull request; one it does
+	// not name is wanted when it requests the viewer's review by name.
+	Wanted  map[pr.Ref]bool
 	Books   map[pr.Ref]src.Book
 	Rounds  map[pr.Ref]src.RoundState
 	Events  map[pr.Ref][]pr.Event

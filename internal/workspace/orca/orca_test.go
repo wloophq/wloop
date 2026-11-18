@@ -644,3 +644,20 @@ func TestCreateFromPRDropsTheParent(t *testing.T) {
 		t.Fatalf("ws = %+v, err = %v, params = %v", ws, err, rpc.params["worktree.create"])
 	}
 }
+
+func TestAStartWhoseWaitFailsClosesItsTerminal(t *testing.T) {
+	r := &recorder{canned: canned{
+		"terminal create": `{"ok":true,"result":{"terminal":{"handle":"term_x"}}}`,
+		"terminal wait":   `{"ok":false,"error":{"code":"runtime_unavailable","message":"gone"}}`,
+		"terminal close":  `{"ok":true,"result":{}}`,
+	}}
+	m := &Manager{R: r, RPC: r}
+	if h, err := m.StartAgentSession(context.Background(), workspace.StartRequest{WorkspaceID: "a", Command: "claude", Title: "review"}); err == nil || h != "" {
+		t.Fatalf("StartAgentSession = %q, %v", h, err)
+	}
+	if !slices.ContainsFunc(r.calls, func(c string) bool {
+		return strings.Contains(c, "terminal") && strings.Contains(c, "close") && strings.Contains(c, "term_x")
+	}) {
+		t.Fatalf("the terminal is left open: calls %q", r.calls)
+	}
+}

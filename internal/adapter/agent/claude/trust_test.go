@@ -701,3 +701,17 @@ func TestARelativeHomeIsRefused(t *testing.T) {
 		t.Errorf("%s was rewritten: %s", file, raw)
 	}
 }
+
+func TestAQuestionTheHomeCannotAnswerStaysUnanswered(t *testing.T) {
+	isolate(t)
+	wt, _ := linkedWorktree(t)
+	home := t.TempDir()
+	write(t, filepath.Join(home, ".claude.json"), `{"projects": not json`)
+	s := turns.AgentSession{Worktree: wt, Home: home, Trusted: true}
+	if !(Agent{}).Unanswered(context.Background(), s, ImportsQuestion) {
+		t.Error("an unreadable .claude.json answers the imports question")
+	}
+	if !(Agent{}).Unanswered(context.Background(), s, "a question this agent never asks") {
+		t.Error("a question the agent does not know counts as answered")
+	}
+}

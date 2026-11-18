@@ -63,6 +63,7 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 	if len(bad) > 0 {
 		return errors.Join(bad...)
 	}
+	dropRetired(tree)
 	if err := c.takeOther(tree); err != nil {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
@@ -77,6 +78,28 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
 	return nil
+}
+
+// dropRetired removes from tree the keys a release stopped reading, which no field of Config holds.
+func dropRetired(tree map[string]any) {
+	for _, k := range builtin.Grammar {
+		if k.In != builtin.SurfaceConfig || !k.Retired {
+			continue
+		}
+		parts := strings.Split(k.Path, ".")
+		table := tree
+		for _, p := range parts[:len(parts)-1] {
+			next, ok := table[p].(map[string]any)
+			if !ok {
+				table = nil
+				break
+			}
+			table = next
+		}
+		if table != nil {
+			delete(table, parts[len(parts)-1])
+		}
+	}
 }
 
 // jsonName is f's key in the file, "" when its tag names none.

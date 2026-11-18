@@ -72,6 +72,10 @@ func TestAUserRecordPartialReplacesItForEveryIntent(t *testing.T) {
 	}
 }
 
+// retiredPartial is the partial kept empty for the user partials that still call it, which no bundled
+// template does.
+const retiredPartial = "dossier.md.tmpl"
+
 func TestEveryPartialResolvesThroughTheLayers(t *testing.T) {
 	names, err := fs.Glob(profiles.Default, "default/partials/*.tmpl")
 	if err != nil || len(names) == 0 {
@@ -79,6 +83,9 @@ func TestEveryPartialResolvesThroughTheLayers(t *testing.T) {
 	}
 	for _, name := range names {
 		file := path.Base(name)
+		if file == retiredPartial {
+			continue
+		}
 		raw, _ := fs.ReadFile(profiles.Default, name)
 		mine := firstDefine.ReplaceAllString(string(raw), "${0}MINE-"+file)
 		l, problems := loadWith(t, userPartials(t, map[string]string{file: mine}))

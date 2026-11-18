@@ -757,3 +757,24 @@ func TestUILocaleKey(t *testing.T) {
 		t.Fatalf("an unknown ui key: %v", err)
 	}
 }
+
+func TestAConfigWithTheRetiredDossiersKeysLoads(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "config.toml")
+	body := "agent = \"claude\"\n\n[dossiers]\narchive_after = \"30d\"\npurge_after = \"400d\"\nsoft_cap_mb = 50\ntotal_cap_mb = 2048\nmax_file_mb = 5\ncompact_at_kb = 256\n"
+	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(file, tools())
+	if err != nil {
+		t.Fatalf("an old config with dossiers: %v", err)
+	}
+	if c.Agent != "claude" {
+		t.Errorf("agent %q", c.Agent)
+	}
+	if err := os.WriteFile(file, []byte("[dossiers]\narchive_aftr = \"30d\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "unknown key") {
+		t.Errorf("a misspelled key under the retired table loads: %v", err)
+	}
+}

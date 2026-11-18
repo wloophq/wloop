@@ -114,7 +114,7 @@ The same work can reach you from more than one source: a Slack ask to review a p
 
 **The survivor.** The task you shaped by hand stays: one you clarified, moved or filed in a project, yourself or through a session you drive, or whose properties you wrote (`task.clarified`); an agent's property write, such as a brief's, does not count. When neither or both were, the older one stays. The other task's id keeps resolving: its address reads the survivor, through any chain of merges.
 
-**What a merge keeps.** Nothing of the folded task is lost or duplicated. Its items, resolved ones included, its units and its gates move over; open proposals that name it are superseded, since the pair they asked for is done. Its timeline, chat and live session are reachable from the survivor, and its dossier stays open with the survivor, read-only to the survivor's sessions. The survivor's page lists the tasks merged into it ("Merged from"), and the related ones.
+**What a merge keeps.** Nothing of the folded task is lost or duplicated. Its items, resolved ones included, its units and its gates move over; open proposals that name it are superseded, since the pair they asked for is done. Its timeline, chat and live session are reachable from the survivor, and what its turns learned reaches the survivor's turns. The survivor's page lists the tasks merged into it ("Merged from"), and the related ones.
 
 **Sync does not undo it.** A task that holds a merged task's items keeps them, and a unit that syncs again, reopens or gains a sibling item feeds the survivor, never a new task. A merged task's items settle unit by unit: the survivor resolves only when no item of any unit is open.
 
@@ -314,7 +314,7 @@ Their texts are templates of the profile; see [Tune the Slack proposals](/guides
 
 ## Projects
 
-A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one's first open action, `task.sequential_next`, comes first in Needs me. Each project has a review interval, 7 days by default, kept on its task, and opens its task's [dossier](/concepts/turns/#dossiers).
+A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one's first open action, `task.sequential_next`, comes first in Needs me. Each project has a review interval, 7 days by default, kept on its task.
 
 ## The review
 
@@ -339,4 +339,4 @@ contexts = ["@decide", "@reply"]
 digest_at = "09:00"
 ```
 
-The tasks, messages, drafts, items and Slack messages have no retention yet: they grow until a later release prunes them. Only dossiers are archived and purged.
+The tasks, messages, drafts, items and Slack messages have no retention yet: they grow until a later release prunes them.

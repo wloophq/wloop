@@ -224,7 +224,7 @@ func (e *Env) storedViewer(ctx context.Context) (string, error) {
 func (e *Env) turnBuilder(cfg config.Config) turn.Builder {
 	l := e.loadedIntents()
 	b := turn.Builder{Payloads: e.payloadReaders(), Guides: profile.Guides{Tree: l.Tree}, Intents: func() *intentload.Loaded { return l },
-		Viewer: e.viewerLogin, Config: cfg, Command: e.loopCommand(), ManagerBinary: e.controlBinary(cfg), Items: e.itemsReader(), Dossiers: e.dossierReader()}
+		Viewer: e.viewerLogin, Config: cfg, Command: e.loopCommand(), ManagerBinary: e.controlBinary(cfg), Items: e.itemsReader(), Memory: e.memoryReader()}
 	switch {
 	case e.Store != nil:
 		b.Facts = storedFacts{store: e.Store, prs: e.reportedPRs(), briefs: cfg.Brief.Enabled}

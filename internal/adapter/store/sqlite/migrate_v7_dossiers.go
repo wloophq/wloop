@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	"github.com/wloophq/wloop/internal/domain/dossier"
 )
 
 // v6Project is the owner prefix version 6 gave a project's dossier, its slug after it.
@@ -35,7 +33,7 @@ func v7Dossiers(ctx context.Context, tx *sql.Tx) error {
 	}
 	var units []string
 	err = eachRow(ctx, tx, `SELECT owner FROM dossiers WHERE owner NOT LIKE ?1 || '/%' AND owner NOT LIKE ?2 || '/%'
-		AND owner NOT LIKE ?3 || '/%' ORDER BY owner`, []any{v7Task, v6Project, dossier.MergedDir}, func(r *sql.Rows) error {
+		AND owner NOT LIKE ?3 || '/%' ORDER BY owner`, []any{v7Task, v6Project, dossierMergedDir}, func(r *sql.Rows) error {
 		var owner string
 		if err := r.Scan(&owner); err != nil {
 			return err
@@ -47,7 +45,7 @@ func v7Dossiers(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 	for _, owner := range units {
-		o, err := dossier.ParseOwner(owner)
+		o, err := parseDossierOwner(owner)
 		if err != nil {
 			return fmt.Errorf("the dossier %s: %w", owner, err)
 		}
@@ -55,7 +53,7 @@ func v7Dossiers(ctx context.Context, tx *sql.Tx) error {
 		err = tx.QueryRowContext(ctx, `SELECT e.id FROM tasks e WHERE e.id IN (
 			SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2
 			UNION SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2)
-			ORDER BY e.category IN ('done', 'dropped'), e.created, e.id LIMIT 1`, string(o.Unit.Provider), o.Unit.Key).Scan(&id)
+			ORDER BY e.category IN ('done', 'dropped'), e.created, e.id LIMIT 1`, string(o.unit.Provider), o.unit.Key).Scan(&id)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			continue
