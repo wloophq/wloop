@@ -270,6 +270,36 @@ return JSON.stringify({ Panel: r(".omni-panel").width, Field: r(".omni-input").w
 	}
 }
 
+// TestTheOmniboxRunButtonReadsWhileSelected lays the omnibox's checklist out with its Run button selected, as
+// it is until the arrows move: the button and its key keep the primary pair, --on-me on --me, which the
+// selection's background would otherwise replace; the status that only repeats the selection is not drawn.
+func TestTheOmniboxRunButtonReadsWhileSelected(t *testing.T) {
+	const page = `<body><div class="pal omni"><div class="omni-results"><section class="omni-ops">` +
+		`<button class="act primary" data-selected="true"><kbd>↵</kbd> Run 1</button></section>` +
+		`<output class="omni-status said">Run 1</output><output class="omni-status" id="count">2 results</output>` +
+		`<i id="pair" style="background: var(--me); color: var(--on-me)"></i></div></div>`
+	const probe = `const cs = (s) => getComputedStyle(document.querySelector(s));
+const r = (s) => document.querySelector(s).getBoundingClientRect();
+return JSON.stringify({ Back: cs(".act.primary").backgroundColor, Ink: cs(".act.primary").color, Key: cs(".act.primary kbd").color, KeyRule: cs(".act.primary kbd").borderTopColor,
+  Me: cs("#pair").backgroundColor, OnMe: cs("#pair").color, Ring: cs(".act.primary").outlineStyle, Said: r(".omni-status.said").width, Count: r("#count").width });`
+	var got struct {
+		Back, Ink, Key, KeyRule, Me, OnMe, Ring string
+		Said, Count                             float64
+	}
+	if err := json.Unmarshal([]byte(pageProbe(t, page, 800, probe)), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Back != got.Me || got.Ink != got.OnMe || got.Key != got.OnMe || got.KeyRule != got.OnMe {
+		t.Errorf("%+v: the selected Run button and its key read --on-me on --me", got)
+	}
+	if got.Ring != "solid" {
+		t.Errorf("%+v: the selected Run button shows no ring", got)
+	}
+	if got.Said > 1 || got.Count < 10 {
+		t.Errorf("%+v: a status that repeats the selection is not drawn, a count is", got)
+	}
+}
+
 // TestAPlanGateCardReadsWithinTheQueue lays a plan gate's card out at the queue's width and at a detail's: its
 // summary reads as body text, its target and why as meta lines, the why folded behind a styled toggle, and a long
 // fact value cut with an ellipsis rather than widening the card. On the plan page a workflow's summary is not bold.

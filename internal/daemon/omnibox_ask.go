@@ -56,7 +56,11 @@ func (s *Server) handleOmniboxAsk(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeError(w, http.StatusBadGateway, s.word(api.OmniboxAskFailed, map[string]any{"error": err.Error()}))
 	default:
-		writeJSON(w, omniboxAnswer(got, views))
+		out := omniboxAnswer(got, views)
+		if out.Proposal != nil {
+			out.Proposal.Operations = s.asking(r.Context(), out.Proposal.Operations)
+		}
+		writeJSON(w, out)
 	}
 }
 
@@ -97,15 +101,26 @@ func omniboxAnswer(got omnibox.AskReply, views map[string]api.TaskView) api.Omni
 		}
 	}
 	if p := got.Proposal; p != nil {
-		out.Proposal = &api.OmniboxProposal{Summary: p.Summary, Question: p.Question, Operations: make([]api.OmniboxOperation, 0, len(p.Operations))}
-		for _, op := range p.Operations {
-			out.Proposal.Operations = append(out.Proposal.Operations, omniboxOperation(op))
-		}
+		out.Proposal = &api.OmniboxProposal{Summary: p.Summary, Question: p.Question, Operations: omniboxOperations(p.Operations)}
 	}
 	for _, d := range got.Dropped {
 		out.Dropped = append(out.Dropped, api.OmniboxDropped{Operation: omniboxOperation(d.Op), Why: d.Why, Params: d.Params})
 	}
 	return out
+}
+
+func omniboxOperations(ops []omnibox.AskOp) []api.OmniboxOperation {
+	out := make([]api.OmniboxOperation, len(ops))
+	for i, op := range ops {
+		out[i] = omniboxOperation(op)
+	}
+	return out
+}
+
+// askOp is op as the core runs it.
+func askOp(op api.OmniboxOperation) omnibox.AskOp {
+	return omnibox.AskOp{Op: op.Op, Unit: op.Unit, Task: op.Task, Action: op.Action, Verb: op.Verb, Title: op.Title,
+		Brief: op.Brief, Repo: op.Repo, Guidance: op.Guidance, Reason: op.Reason}
 }
 
 func omniboxOperation(op omnibox.AskOp) api.OmniboxOperation {

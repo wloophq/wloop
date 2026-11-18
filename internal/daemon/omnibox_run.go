@@ -41,7 +41,7 @@ func (s *Server) handleOmniboxRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) runOperation(r *http.Request, voc omnibox.Vocabulary, op api.OmniboxOperation) api.OmniboxResult {
-	if why, params := voc.Allowed(omnibox.AskOp(op)); why != "" {
+	if why, params := voc.Allowed(askOp(op)); why != "" {
 		return api.OmniboxResult{Status: http.StatusForbidden, Error: why, Params: params}
 	}
 	incomplete := api.OmniboxResult{Status: http.StatusBadRequest, Error: api.OmniboxDropIncompleteOperation, Params: map[string]string{"op": op.Op}}

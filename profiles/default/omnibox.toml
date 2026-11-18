@@ -15,6 +15,10 @@ action = "review"
 words  = ["track", "follow", "acompanhe", "acompanhar"]
 action = "track"
 
+[verbs.take-over]
+words  = ["take-over", "takeover", "adopt", "assumir", "assuma"]
+action = "take_over"
+
 [verbs.done]
 words = ["done", "close", "feche", "concluir"]
 verb  = "done"

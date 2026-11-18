@@ -375,6 +375,19 @@ func (m *Model) Presentations(units []unit.Unit) map[unit.Unit]Presentation {
 	return out
 }
 
+// Labels are the labels of every unit a provider lists, as their rows show them.
+func (m *Model) Labels(ctx context.Context) (map[unit.Unit]string, error) {
+	s, err := m.sync(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[unit.Unit]string, len(s.list))
+	for _, e := range s.list {
+		out[e.Row.Unit] = e.Row.Label
+	}
+	return out, nil
+}
+
 // Read is one unit's entry of a snapshot: the served row, what it derives
 // from and the base it was derived with.
 type Read struct {
