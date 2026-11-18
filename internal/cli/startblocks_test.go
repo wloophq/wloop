@@ -2,12 +2,20 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/turn"
 )
 
 // answeredQuestions is an agent whose home or checkout answered every
@@ -103,5 +111,82 @@ func TestTheHostLiftsAStartBlockTheCheckoutAnswers(t *testing.T) {
 	}
 	if got := r.unblocks(); len(got) != 1 || got[0].Data != "the agent's question is answered" {
 		t.Fatalf("unblocked %v", got)
+	}
+}
+
+const noStartBlockKey = "2026-10-21T14:00:00Z\nno-start\n/w/app\n\n\n\nfirst\n\n"
+
+func TestASessionThatNeverStartedHoldsItsRoundForTheRetryWait(t *testing.T) {
+	t.Parallel()
+	r := newBlockRig(t, noStartBlockKey)
+	cfg, err := r.sc.env.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.sc.env.Agents = map[string]turns.Agent{cfg.Agent: answeredQuestions{}}
+	b := &startBlocks{e: r.sc.env}
+	if err := b.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.unblocks(); len(got) != 0 || !b.Due().Equal(testNow.Add(noStartRetry-time.Hour)) {
+		t.Fatalf("unblocked %v, due %v; want the block held until the retry", got, b.Due())
+	}
+	r.now = testNow.Add(noStartRetry - time.Hour)
+	if err := b.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.unblocks(); len(got) != 1 {
+		t.Fatalf("after the retry wait unblocked %v", got)
+	}
+}
+
+func TestAFollowUpWhoseSessionNeverStartedIsBlockedNotRetriedAtOnce(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	rec := &memRecorder{}
+	sc.env.Rec = rec
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 3}
+	s := &sweep{e: sc.env, now: testNow, st: round.New()}
+	st := step{kind: stepFollowup, ws: wsdomain.Workspace{ID: "ws-3", Path: "/w/app", DisplayName: "app"}, pr: ref}
+	s.noteStartProblem(context.Background(), st, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	var blocks []inventory.StartBlock
+	for _, e := range rec.events {
+		if b, ok := inventory.StartBlockOf(port.Event{Kind: e.Kind, Key: e.Key}); ok {
+			blocks = append(blocks, b)
+		}
+	}
+	if len(blocks) != 1 || blocks[0].Question != turns.QuestionNoStart || blocks[0].Folder != "/w/app" {
+		t.Fatalf("blocks %+v, events %+v", blocks, rec.events)
+	}
+}
+
+func TestARoundOnAUnitWhoseSessionNeverStartedIsBlocked(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	rec := &memRecorder{}
+	sc.env.Rec = rec
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 4}
+	run := unitRun{def: dintent.Def{Name: "act"}, r: turn.Request{Unit: ref.Unit()}}
+	sc.env.blockUnit(context.Background(), run, wsdomain.Workspace{Path: "/w/api"}, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	if len(rec.events) != 1 {
+		t.Fatalf("events %+v", rec.events)
+	}
+	b, ok := inventory.StartBlockOf(port.Event{Kind: rec.events[0].Kind, Key: rec.events[0].Key})
+	if !ok || b.Question != turns.QuestionNoStart || b.Folder != "/w/api" || b.Round != "act" {
+		t.Fatalf("block %+v", b)
+	}
+}
+
+func TestARoundByHandWhoseSessionNeverStartsKeepsItsNoStartBlock(t *testing.T) {
+	t.Parallel()
+	r := newBlockRig(t, noStartBlockKey)
+	err := r.sc.env.liftPassedBlock(context.Background(), r.ref.Unit(), fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	if !errors.As(err, new(errNoMCP)) || len(r.unblocks()) != 0 {
+		t.Fatalf("err %v, unblocked %v; want the no-start block kept", err, r.unblocks())
+	}
+	r2 := newBlockRig(t, trustBlockKey)
+	r2.sc.env.liftPassedBlock(context.Background(), r2.ref.Unit(), errNoMCP{"/home/me/.claude"})
+	if len(r2.unblocks()) != 1 {
+		t.Fatalf("a session past the trust question kept its block: %v", r2.unblocks())
 	}
 }

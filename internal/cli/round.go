@@ -381,12 +381,18 @@ func (e *Env) wakeSession(ctx context.Context, cfg config.Config, m workspace.Ma
 		fmt.Fprintf(e.Err, "%s waking the session %s failed, starting a new one: %v\n", e.stamp(), sess.ID, err)
 		return proc{}, false, nil
 	}
+	p := proc{sess.ID, m, handle}
 	if !lazyMCP(m) {
 		if err := e.awaitCapable(ctx, sess.ID, e.agentHome(cfg)); err != nil {
-			return proc{}, false, err
+			if errors.As(err, new(errNoMCP)) {
+				if blocked := e.screenBlock(ctx, cfg, p); blocked != nil {
+					return proc{}, false, fmt.Errorf("waking the session %s: %w", sess.ID, e.explainBlocked(ctx, cfg, ws, blocked, opts.trusted))
+				}
+			}
+			return proc{}, false, e.abandon(ctx, p, err)
 		}
 	}
-	return proc{sess.ID, m, handle}, true, nil
+	return p, true, nil
 }
 
 // liveSession is the live agent session of ws a round of u may keep: the

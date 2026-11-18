@@ -169,7 +169,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error)
 	}
 	handle, verb, err := e.session(ctx, run.cfg, ws, u, opts)
 	if err != nil {
-		e.blockUnit(ctx, run, err)
+		e.blockUnit(ctx, run, ws, err)
 		return turns.Outcome{}, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
 	queued := opts.busy && verb == verbExisting
@@ -559,7 +559,7 @@ func unitWorkspaceName(u unit.Unit) string {
 
 // blockUnit records the start block of a round on u whose session waits on
 // the agent's question, as the sweep records a pull request's.
-func (e *Env) blockUnit(ctx context.Context, run unitRun, err error) {
+func (e *Env) blockUnit(ctx context.Context, run unitRun, ws wsdomain.Workspace, err error) {
 	var untrusted *turns.UntrustedError
 	var asked *turns.QuestionError
 	var block inventory.StartBlock
@@ -571,6 +571,8 @@ func (e *Env) blockUnit(ctx context.Context, run unitRun, err error) {
 		why = untrustedWhy(untrusted)
 	case errors.As(err, &asked):
 		block = inventory.StartBlock{Question: asked.Question, Root: asked.Root}
+	case errors.As(err, new(errNoMCP)):
+		block = inventory.StartBlock{Question: turns.QuestionNoStart, Folder: ws.Path}
 	default:
 		return
 	}

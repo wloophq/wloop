@@ -18,6 +18,9 @@ import (
 // terminal's own agent home, which the loop cannot read for the answer.
 const blindBlock = 24 * time.Hour
 
+// noStartRetry is how long a round whose session never started waits before a sweep starts it again.
+const noStartRetry = 2 * time.Hour
+
 // startBlocks lifts, before a sweep plans, the start blocks of any unit
 // that the agent home answered, so the round they held may be planned in
 // the same sweep; a plan reads a block still holding as RoundState.Blocked.
@@ -92,6 +95,12 @@ func (b *startBlocks) Due() time.Time {
 // repository root or folder; "" while it still holds, with until the
 // instant a blind block lifts.
 func answeredBlock(ctx context.Context, agent turns.Agent, b inventory.StartBlock, home string, at, now time.Time) (cleared string, until time.Time) {
+	if b.Question == turns.QuestionNoStart {
+		if now.Sub(at) < noStartRetry {
+			return "", at.Add(noStartRetry)
+		}
+		return "the retry wait of a session that never started passed", time.Time{}
+	}
 	cleared = "the agent's question is answered"
 	if b.Question == turns.QuestionTrust {
 		cleared = "the agent home trusts its folder"

@@ -722,6 +722,9 @@ func (m *Manager) startTerminal(ctx context.Context, workspaceID, command, title
 		} `json:"wait"`
 	}
 	if err := m.do(ctx, &wait, terminalWaitOp(res.Terminal.Handle, 60000)); err != nil {
+		if cerr := m.CloseTerminal(context.WithoutCancel(ctx), res.Terminal.Handle); cerr != nil {
+			return "", fmt.Errorf("%w; closing its terminal %s: %w", err, res.Terminal.Handle, cerr)
+		}
 		return "", err
 	}
 	if reason := wait.Wait.BlockedReason; reason != "" {

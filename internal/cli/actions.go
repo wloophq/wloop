@@ -404,14 +404,15 @@ func (a envActions) Run(ctx context.Context, u unit.Unit, c daemon.Call) error {
 // liftPassedBlock records the start block of u lifted when err, the
 // outcome of a round by hand, shows its session got past the question the
 // block waits on: stopped on another question, or never initializing the
-// loop's MCP server with none on screen. It returns err.
+// loop's MCP server with none on screen, which keeps a no-start block. It
+// returns err.
 func (e *Env) liftPassedBlock(ctx context.Context, u unit.Unit, err error) error {
 	var asked *turns.QuestionError
 	if !errors.As(err, &asked) && !errors.As(err, new(errNoMCP)) {
 		return err
 	}
 	b, berr := e.startBlockOf(ctx, u)
-	if berr != nil || (asked != nil && asked.Question == b.Question) {
+	if berr != nil || (asked != nil && asked.Question == b.Question) || (asked == nil && b.Question == turns.QuestionNoStart) {
 		return err
 	}
 	e.recordLifted(ctx, u)
