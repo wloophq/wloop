@@ -74,6 +74,10 @@ type Input struct {
 	// ReviewerOptional says the profile's reviewer_required does not hold for
 	// the pull request: with no reviewer asked, it is ready as an approved one.
 	ReviewerOptional bool
+	// ReviewWanted says the profile's review_wanted holds for the pull
+	// request: with no reviewer asked, one I did not open and did not review
+	// on its head waits on my review.
+	ReviewWanted bool
 }
 
 type Result struct {
@@ -119,6 +123,7 @@ var Reasons = map[string]string{
 	"reviewer_not_back":       "{{.author}} replied, {{.reviewer}} has not returned",
 	"commented_no_reply":      "{{.actor}} commented, no reply",
 	"no_reviewer_requested":   "no reviewer requested",
+	"review_wanted":           "your review is wanted, no review on the head",
 
 	"no_review_required":                "green, no review required",
 	"no_review_required_checks_pending": "no review required, checks pending",
@@ -317,10 +322,23 @@ func Derive(in Input) Result {
 		}
 		return stalled(Result{Kind: KindReview, WaitingOn: waitingOn(in, pending), Since: since}.because("review_requested"), in.Stalled.Review)
 	}
+	if in.ReviewWanted && !strings.EqualFold(p.Author, in.Viewer) && !reviewedBy(reviewed, in.Viewer) {
+		return stalled(Result{Kind: KindReview, WaitingOn: "me", Since: pushedAt}.because("review_wanted"), in.Stalled.Review)
+	}
 	if in.ReviewerOptional {
 		return ready(in, pushedAt, "no_review_required", "no_review_required_checks_pending")
 	}
 	return stalled(Result{Kind: KindNoReviewer, WaitingOn: "author", Since: pushedAt}.because("no_reviewer_requested"), in.Stalled.Review)
+}
+
+// reviewedBy says login is among the actors of reviewed, in any case.
+func reviewedBy(reviewed map[string]bool, login string) bool {
+	for actor := range reviewed {
+		if strings.EqualFold(actor, login) {
+			return true
+		}
+	}
+	return false
 }
 
 // ready is a pull request nothing but its merge waits on since since, or

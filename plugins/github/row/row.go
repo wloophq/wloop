@@ -38,6 +38,9 @@ type Input struct {
 	// ReviewerOptional says the profile's reviewer_required does not hold for
 	// the pull request.
 	ReviewerOptional bool
+	// ReviewWanted says the profile's review_wanted holds for the pull
+	// request.
+	ReviewWanted bool
 	// MaxDetailAge is the oldest detail the plugin calls fresh.
 	MaxDetailAge time.Duration
 	// Loop is the loop's name, as items it asks of the user name it.
@@ -71,7 +74,7 @@ func Derive(in Input) Row {
 	}
 	res := situation.Derive(situation.Input{PR: p, Events: in.Events, Viewer: in.Viewer, MyTeams: in.Teams, Ignore: in.Ignore,
 		Now: in.Now, Stalled: in.Stalled, AddressedAt: in.AddressedAt, ThreadsSettledAt: settled, AskedAt: in.AskedAt,
-		ReviewerOptional: in.ReviewerOptional})
+		ReviewerOptional: in.ReviewerOptional, ReviewWanted: in.ReviewWanted})
 	ws := WorkspaceOf(p.Workspace)
 	pl := Payload{Author: p.Author, Repo: p.Ref.Owner + "/" + p.Ref.Repo, Head: pr.OneLine(p.HeadBranch, 255), Reasons: nonNil(p.Reasons),
 		Workspace: ws, Override: Override{Adopted: in.Override.Adopted, Tracked: in.Override.Tracked}, Viewer: in.Viewer}

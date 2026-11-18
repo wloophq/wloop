@@ -85,7 +85,7 @@ var configGrammar = slices.Concat(
 		cfgList("plugins.github.scope.people", "Logins whose pull requests it follows."),
 		cfgList("plugins.github.scope.teams", "Teams whose pull requests it follows."),
 		cfgList("plugins.github.scope.repos", "Repositories whose pull requests it follows."),
-		cfgList("plugins.github.scope.watch", "Repositories it watches."),
+		cfgList("plugins.github.scope.watch", "Logins whose pull requests, as author or requested reviewer, it follows."),
 		cfgKey("plugins.github.stalled", KindTable, "", "When a pull request counts as stalled."),
 		cfgKey("plugins.github.stalled.review", KindDur, "2d", "Waiting on a review for this long."),
 		cfgKey("plugins.github.stalled.reply", KindDur, "1d", "Waiting on a reply for this long."),

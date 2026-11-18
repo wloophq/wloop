@@ -257,6 +257,11 @@ func runInstall(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	errs := []error{e.placeBundledPlugins(*dryRun)}
+	if !*dryRun && e.ReinstallPlugins != nil {
+		if err := e.ReinstallPlugins(); err != nil {
+			fmt.Fprintln(e.Err, "warning:", err)
+		}
+	}
 	var roots []string
 	for _, g := range groups {
 		kind, err := e.homeKind(g.kind)

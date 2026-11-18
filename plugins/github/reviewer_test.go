@@ -94,10 +94,10 @@ func TestAShortAnswerKeepsTheDefaultForEveryPullRequest(t *testing.T) {
 	}
 }
 
-// TestReviewerRequiredReadsTheFactsThePluginHands checks that the facts plugin.toml lets reviewer_required
-// read are the ones FactsOf hands the host, every one it can, so a predicate over any other is a profile
+// TestThePredicatesReadTheFactsThePluginHands checks that the facts plugin.toml lets each predicate read
+// are the ones FactsOf hands the host, every one it can, so a predicate over any other is a profile
 // problem.
-func TestReviewerRequiredReadsTheFactsThePluginHands(t *testing.T) {
+func TestThePredicatesReadTheFactsThePluginHands(t *testing.T) {
 	m, err := manifest.Load(".")
 	if err != nil {
 		t.Fatal(err)
@@ -106,10 +106,6 @@ func TestReviewerRequiredReadsTheFactsThePluginHands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(s.Predicates, func(p manifest.Predicate) bool { return p.Name == predicateReviewerRequired })
-	if i < 0 {
-		t.Fatalf("plugin.toml declares no %s", predicateReviewerRequired)
-	}
 	at := testAt.Add(-time.Hour)
 	in := row.Input{PR: pr.PR{Ref: ref7, Author: "ana", State: pr.StateOpen, CreatedAt: at, MergedAt: at, ClosedAt: at},
 		Events: []pr.Event{{PR: ref7, Kind: pr.KindComment, Actor: "bob", At: at}}, Viewer: "ana", Now: testAt}
@@ -117,11 +113,17 @@ func TestReviewerRequiredReadsTheFactsThePluginHands(t *testing.T) {
 	for _, f := range row.FactsOf(in) {
 		handed = append(handed, f.Name)
 	}
-	want := slices.Clone(s.Predicates[i].Facts)
 	slices.Sort(handed)
-	slices.Sort(want)
-	if !slices.Equal(handed, want) {
-		t.Errorf("FactsOf hands\n%v\nplugin.toml lets %s read\n%v", handed, predicateReviewerRequired, want)
+	for _, name := range []string{predicateReviewerRequired, predicateReviewWanted} {
+		i := slices.IndexFunc(s.Predicates, func(p manifest.Predicate) bool { return p.Name == name })
+		if i < 0 {
+			t.Fatalf("plugin.toml declares no %s", name)
+		}
+		want := slices.Clone(s.Predicates[i].Facts)
+		slices.Sort(want)
+		if !slices.Equal(handed, want) {
+			t.Errorf("FactsOf hands\n%v\nplugin.toml lets %s read\n%v", handed, name, want)
+		}
 	}
 }
 

@@ -145,6 +145,30 @@ func TestNoReviewerWaitsOnAuthor(t *testing.T) {
 	}
 }
 
+func TestAPullRequestTheProfileWantsMyReviewOnWaitsOnMeWithNoReviewerAsked(t *testing.T) {
+	wanted := func(p pr.PR, evs ...pr.Event) Result {
+		return Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, ReviewWanted: true})
+	}
+	push := ev(pr.KindPush, "h2", "bruno", h(1), "")
+	if r := wanted(open("bruno"), push); r.Kind != KindReview || r.WaitingOn != "me" || !r.Since.Equal(h(1)) || r.ReasonKey != "review_wanted" {
+		t.Fatalf("unreviewed: %+v", r)
+	}
+	if r := wanted(open("bruno"), push, ev(pr.KindReview, "", "me", h(2), "COMMENTED:h2")); r.Kind != KindReply || r.WaitingOn != "author" {
+		t.Fatalf("after my review: %+v", r)
+	}
+	if r := wanted(open("bruno", "carla"), push, requested("carla", "bruno", h(2))); r.Kind != KindReview || r.WaitingOn != "carla" {
+		t.Fatalf("a reviewer asked: %+v", r)
+	}
+	if r := wanted(open("me"), push); r.Kind != KindNoReviewer {
+		t.Fatalf("my own: %+v", r)
+	}
+	approvedByMe := open("bruno")
+	approvedByMe.ReviewDecision = "REVIEW_REQUIRED"
+	if r := wanted(approvedByMe, push, ev(pr.KindReview, "", "Me", h(2), "APPROVED:h2")); r.Kind == KindReview && r.WaitingOn == "me" {
+		t.Fatalf("approved by me, a second approval required: %+v", r)
+	}
+}
+
 func TestWithNoReviewerRequiredAnUnreviewedPullRequestIsNeverNoReviewer(t *testing.T) {
 	solo := func(p pr.PR, evs ...pr.Event) Result {
 		return Derive(Input{PR: p, Events: evs, Viewer: "me", Now: h(10), Stalled: th, ReviewerOptional: true})

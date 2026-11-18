@@ -164,10 +164,7 @@ const whyPaused = "automatic rounds paused"
 // blockRound records a block of the round of kind with key, "" or a
 // StartBlock's. Without an inventory it logs the reason once a day.
 func (s *sweep) blockRound(ctx context.Context, ref pr.Ref, kind, why, key string) {
-	line := fmt.Sprintf("skip %s: my review was requested, but %s", ref, why)
-	if kind != "first round" {
-		line = fmt.Sprintf("skip the %s of %s: %s", kind, ref, why)
-	}
+	line := fmt.Sprintf("skip the %s of %s: %s", kind, ref, why)
 	if s.e.Rec == nil {
 		if s.st.FirstNote(line, s.now) {
 			s.logf("%s", line)

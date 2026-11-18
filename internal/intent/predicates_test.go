@@ -16,6 +16,38 @@ func TestTheBundledReviewerRequiredHoldsForEveryPullRequest(t *testing.T) {
 	}
 }
 
+func TestTheBundledReviewWantedIsARequestOfMyReviewByName(t *testing.T) {
+	l, problems := loadProfile(t, "en", nil)
+	if len(problems) > 0 {
+		t.Fatalf("the bundled profile has problems: %v", problems)
+	}
+	for _, requested := range []bool{true, false} {
+		facts := map[string]any{"pr.review_requested_me": requested, "pr.mine": false, "pr.repo": "acme/api"}
+		if ok, err := l.Predicates.Holds("github", "review_wanted", facts); err != nil || ok != requested {
+			t.Errorf("review_wanted with pr.review_requested_me %v = %v, %v; want %v", requested, ok, err, requested)
+		}
+	}
+}
+
+func TestAUserLayerWantsMyReviewOnEveryPullRequestOfARepository(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{
+		"plugins/github/predicates.toml": `review_wanted = "pr.repo == 'acme/api' && !pr.mine"` + "\n",
+	})
+	if len(problems) > 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	for _, c := range []struct {
+		repo string
+		mine bool
+		want bool
+	}{{"acme/api", false, true}, {"acme/api", true, false}, {"acme/web", false, false}} {
+		facts := map[string]any{"pr.review_requested_me": false, "pr.mine": c.mine, "pr.repo": c.repo}
+		if ok, err := l.Predicates.Holds("github", "review_wanted", facts); err != nil || ok != c.want {
+			t.Errorf("review_wanted for %s mine %v = %v, %v; want %v", c.repo, c.mine, ok, err, c.want)
+		}
+	}
+}
+
 func TestAUserLayerSetsReviewerRequiredPerOwner(t *testing.T) {
 	l, problems := loadProfile(t, "en", map[string]string{
 		"plugins/github/predicates.toml": `reviewer_required = "!(pr.owner in ['solo', 'lone'])"` + "\n",

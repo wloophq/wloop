@@ -25,7 +25,7 @@ func (p *Planner) Plan(ref pr.Ref, r Result) src.Plan {
 	if r.first.due || p.Requested(ref) && !p.firstSkipped(ref) {
 		first := src.Round{Name: RoundFirst, Head: head, Reason: r.first.reason, OnSkipped: map[string]string{MarkFirstSkipped: "1"}}
 		if !r.first.due {
-			first.NotDue = cmp.Or(r.first.reason, "my review was requested")
+			first.NotDue = cmp.Or(r.first.reason, p.asked(ref))
 		}
 		out.Rounds = append(out.Rounds, first)
 	}
@@ -224,8 +224,8 @@ func (p *Planner) stillOpen(ref pr.Ref) bool {
 	return !found || row.State == pr.StateOpen
 }
 
-// stillRequested tells, from the store, whether a blocked pull request may
-// still request my review: the store may not have read it yet.
+// stillRequested tells, from the store, whether the profile may still want
+// my review of a blocked pull request: the store may not have read it yet.
 func (p *Planner) stillRequested(ref pr.Ref) (bool, string) {
 	row, found := p.byRef[ref]
 	switch {
@@ -233,8 +233,8 @@ func (p *Planner) stillRequested(ref pr.Ref) (bool, string) {
 		return true, ""
 	case row.State != pr.StateOpen:
 		return false, "it is " + strings.ToLower(row.State)
-	case !containsFold(row.ReviewRequests, p.in.Viewer):
-		return false, "my review is no longer requested"
+	case !p.wanted(row):
+		return false, "my review is no longer wanted"
 	}
 	return true, ""
 }
