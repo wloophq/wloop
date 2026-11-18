@@ -1,5 +1,5 @@
 {
-  "version": "d753e6ef5d59",
+  "version": "68d2b86b8921",
   "views": [
     {
       "id": "mine",
@@ -755,6 +755,7 @@
         "no_reviewer_requested": "no reviewer requested",
         "review_requested": "review requested, no review on the head",
         "review_requested_again": "review requested again after your review",
+        "review_wanted": "your review is wanted, no review on the head",
         "reviewer_not_back": "{{.author}} replied, {{.reviewer}} has not returned",
         "round_blocked": "round blocked: {{.why}}",
         "round_held": "automatic round held: {{.why}}",

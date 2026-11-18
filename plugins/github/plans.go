@@ -108,7 +108,7 @@ func (p *Plugin) Plan(ctx context.Context, u sdk.Unit, st src.RoundState) (src.P
 	if err != nil {
 		return src.Plan{}, err
 	}
-	ri, err := r.rowInputs(ctx, []pr.Ref{ref})
+	_, ris, ri, err := r.inputsAt(ctx, []pr.Ref{ref}, r.now())
 	if err != nil {
 		return src.Plan{}, err
 	}
@@ -116,6 +116,7 @@ func (p *Plugin) Plan(ctx context.Context, u sdk.Unit, st src.RoundState) (src.P
 	if err != nil {
 		return src.Plan{}, err
 	}
+	in.Wanted = r.reviewWanted(ctx, ris)
 	if in.Details, err = r.db.Details(ctx, []pr.Ref{ref}); err != nil {
 		return src.Plan{}, err
 	}

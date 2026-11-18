@@ -6,3 +6,10 @@
 # repository where nobody reviews, such as
 # "!(pr.owner in ['acme'])", a pull request with no reviewer asked is merge.
 reviewer_required = "true"
+
+# Whether the loop reviews an open, ready pull request I did not open, with
+# no request of my review by name; its first round starts once, under the
+# same trust rules and daily cap. "pr.repo == 'acme/api' && !pr.mine"
+# reviews every pull request of acme/api others open. A fact the author
+# controls, such as pr.labels, lets authors opt themselves in.
+review_wanted = "pr.review_requested_me"

@@ -1,4 +1,4 @@
-summary = "Start the first review round of a pull request that requests my review"
+summary = "Start the first review round of a pull request the profile wants my review on"
 provider = "github"
 when = 'pr.first.due'
 order = 20

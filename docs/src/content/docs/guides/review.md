@@ -74,6 +74,15 @@ A pull request that requests your review by name, from a trusted author in an al
 enabled = false
 ```
 
+The GitHub plugin's `review_wanted` predicate says which pull requests get one. The bundled one is `pr.review_requested_me`, the request by name. Widen it in your profile to review pull requests nobody asked you to, such as every one of a repository that has no CODEOWNERS:
+
+```toml
+# plugins/github/predicates.toml of your profile
+review_wanted = "pr.repo == 'acme/api' && !pr.mine"
+```
+
+It reads the pull request's [facts](/reference/facts/), and the inventory still decides which pull requests it sees: list the repository in `plugins.github.scope.repos`. A draft, your own pull request and one that fails the trust check above never get a first round, whatever it says. One the predicate wants without a request by name gets its first round once: after a review round of the loop or a review of yours on GitHub, only the follow-ups of a review start rounds, so removing its review workspace or a new push does not start a first round again. While it holds and no reviewer is requested, the pull request waits on your review. Some facts are the author's to set, such as `pr.labels`, `pr.draft` or `pr.changed_files`: a predicate over one lets authors opt their pull requests in, and the daily round cap bounds what that costs.
+
 ## The checkout's own agent settings
 
 A review session runs in the pull request's head, and by default loads that checkout's agent settings like any session there: `.claude/settings.json`, `.claude/settings.local.json`, the servers of `.mcp.json` and `CLAUDE.md`. Someone who can push to the pull request can change them. A pull request that fails the trust check (a fork, or an author outside the members, collaborators, owners and `plugins.github.trusted_authors`) never loads them, in a round you start by hand too, so its session runs in a manager that can start Claude Code with your user settings alone, such as Orca. `intents.<intent>.project_settings.when` turns them off where a predicate over the pull request's [facts](/reference/facts/#intent-facts) does not hold:

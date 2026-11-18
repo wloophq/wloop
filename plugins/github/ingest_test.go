@@ -83,9 +83,10 @@ type fakeHost struct {
 	books   []src.Book
 	// profile overrides files of the plugin's profile layer, by path.
 	profile map[string]string
-	// holds answers reviewer_required over a pull request's facts; nil
-	// answers no predicate.
-	holds func([]src.Fact) bool
+	// holds answers reviewer_required over a pull request's facts, and
+	// wanted review_wanted; nil answers neither predicate.
+	holds  func([]src.Fact) bool
+	wanted func([]src.Fact) bool
 	// failOn fails the evaluation of a set it says, and short answers one
 	// verdict fewer than asked.
 	failOn func([]src.Fact) bool
@@ -94,11 +95,13 @@ type fakeHost struct {
 }
 
 func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact) ([]src.Holding, error) {
-	if h.holds == nil {
-		return nil, src.ErrUnsupported
-	}
-	if predicate != "reviewer_required" {
+	answer := map[string]func([]src.Fact) bool{"reviewer_required": h.holds, "review_wanted": h.wanted}
+	fn, known := answer[predicate]
+	if !known {
 		return nil, fmt.Errorf("no predicate %s", predicate)
+	}
+	if fn == nil {
+		return nil, src.ErrUnsupported
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -109,7 +112,7 @@ func (h *fakeHost) Holds(_ context.Context, predicate string, facts [][]src.Fact
 			out[i].Err = "pr.owner has Go type int, want string"
 			continue
 		}
-		out[i].Holds = h.holds(fs)
+		out[i].Holds = fn(fs)
 	}
 	if h.short && len(out) > 0 {
 		out = out[:len(out)-1]

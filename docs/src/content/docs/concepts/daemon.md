@@ -31,7 +31,7 @@ The daemon's **inventory** is the set of pull requests it follows:
 - your own pull requests;
 - those that request your review;
 - those of your area: the pull requests of `plugins.github.scope.people` and of the members of `plugins.github.scope.teams`, plus every pull request of a repository where one of them opened one in the last 90 days, or listed in `plugins.github.scope.repos`;
-- those of the logins in `plugins.github.scope.watch`, which enter as if they requested your review;
+- those the logins in `plugins.github.scope.watch` opened or are asked to review;
 - those that one of your workspaces stands for;
 - those you add with `{{command}} track <url>`.
 
@@ -43,7 +43,7 @@ repos = ["acme/api"]
 watch = ["carla"]
 ```
 
-The loop acts only where a local workspace exists or a rule creates one; a pull request without one stays in the inventory, visible in the cockpit.
+Entering the inventory starts no round. The loop acts only where a local workspace exists or a rule creates one, such as the first review round of a pull request that requests your review by name, or one the GitHub plugin's [`review_wanted`](/guides/review/#first-rounds-on-their-own) predicate holds for; a pull request without one stays in the inventory, visible in the cockpit.
 
 ## Who a pull request waits on
 
