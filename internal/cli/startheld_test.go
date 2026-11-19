@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
@@ -20,6 +21,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -147,5 +149,76 @@ func TestTrustHomesOfTheTerminalsOwnHomeAreTheDefaultAndTheManagersProfileHomes(
 	}
 	if got := te.trustHomes(te.cfg, project); !slices.Equal(got, []string{project}) {
 		t.Fatalf("homes of a named home %v", got)
+	}
+}
+
+func TestAHeldRoundRunByHandRunsAgainWithItsGuidanceOnceTrusted(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	sc.ws.Sessions = nil
+	sc.ws.Blocked = workspace.ReasonTrust
+	sc.te.gh.basics = openBasics
+	home, file := untrustedHome(t)
+	sc.te.cfg.AgentHome = home
+	rec := &memRecorder{}
+	sc.te.Rec = rec
+	ctx := context.Background()
+	if err := (envActions{e: sc.env}).Run(ctx, sc.ref.Unit(), daemon.Call{Guidance: "only the tests", Out: io.Discard}); err == nil {
+		t.Fatal("a blocked held round ran")
+	}
+	if _, b := heldBlock(t, rec, sc.ref); b.Asked == nil || b.Asked.Guidance != "only the tests" {
+		t.Fatalf("block %+v, asked %+v", b, b.Asked)
+	}
+	sc.ws.Blocked = ""
+	if err := (envActions{e: sc.env}).TrustAndRun(ctx, sc.ref.Unit(), daemon.Call{Out: io.Discard}); err != nil {
+		t.Fatalf("TrustAndRun = %v\nstderr:\n%s", err, sc.te.err)
+	}
+	if raw, _ := os.ReadFile(file); !strings.Contains(string(raw), "hasTrustDialogAccepted\": true") {
+		t.Fatalf("not trusted:\n%s", raw)
+	}
+	if len(sc.ws.Prompts) != 1 || !strings.Contains(turnText(t, sc.te, sc.ws.Prompts[0].Text), "only the tests") {
+		t.Fatalf("prompts %+v", sc.ws.Prompts)
+	}
+}
+
+func TestTrustAndRunRunsTheRoundInTheHomeTheBlockedSessionRanWith(t *testing.T) {
+	t.Parallel()
+	m := newRepo()
+	m.Blocked = workspace.ReasonTrust
+	te := newTestEnv(t, m)
+	te.Agents["claude"] = claude.Agent{UserHome: te.Home}
+	te.gh.basics = trustedBasics
+	te.git.branch["/worktrees/REVIEW feat/x"] = "feat/x"
+	home, _ := untrustedHome(t)
+	te.Rec = &memRecorder{}
+	ctx := context.Background()
+	if err := (envActions{e: te.Env}).Intent(ctx, string(dintent.Review), r7.Unit(), daemon.Call{AgentHome: home, Out: io.Discard}); err == nil {
+		t.Fatal("a blocked review ran")
+	}
+	m.Blocked, m.Commands = "", nil
+	if err := (envActions{e: te.Env}).TrustAndRun(ctx, r7.Unit(), daemon.Call{Out: io.Discard}); err != nil {
+		t.Fatalf("TrustAndRun = %v\nstderr:\n%s", err, te.err)
+	}
+	if got := launches(m.Commands); len(got) != 1 || !strings.Contains(got[0], "CLAUDE_CONFIG_DIR='"+home+"'") {
+		t.Fatalf("launches %q, want one in %s", got, home)
+	}
+}
+
+func TestTrustAndRunRefusesAUnitThatIsNotAPullRequest(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, newRepo())
+	te.Rec = &memRecorder{}
+	var refusal daemon.Refusal
+	if err := (envActions{e: te.Env}).TrustAndRun(context.Background(), thread1, daemon.Call{Out: io.Discard}); !errors.As(err, &refusal) {
+		t.Fatalf("TrustAndRun = %v, want a refusal", err)
+	}
+}
+
+func TestAnAskedRoundKeepsOnlyTheInputsTheUserGives(t *testing.T) {
+	t.Parallel()
+	d := dintent.Def{Name: dintent.Nudge, Inputs: []dintent.Input{{Name: "who", From: "prepare"}, {Name: "note", From: "user"}}}
+	h := askedHold(turn.Request{Intent: turn.Intent(dintent.Nudge), Trigger: turn.ByHand, Inputs: map[string]any{"who": "bob", "note": "soon"}}, d)
+	if h.asked == nil || len(h.asked.Inputs) != 1 || h.asked.Inputs["note"] != "soon" {
+		t.Fatalf("asked %+v", h.asked)
 	}
 }

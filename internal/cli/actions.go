@@ -478,7 +478,8 @@ func (x *heldRunner) Run(ctx context.Context, t turns.Turn) (turns.Outcome, erro
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	submitted, verb, err := e.startRound(ctx, cfg, ws, ref, &sent, intentOptions(x.held, roundOptions{allowUserActive: true, trusted: trusts(cfg, full), pr: full}))
+	submitted, verb, err := e.startRound(ctx, cfg, ws, ref, &sent, intentOptions(x.held, roundOptions{allowUserActive: true, trusted: trusts(cfg, full), pr: full,
+		hold: startHold{asked: &inventory.AskedRound{Guidance: t.Guidance()}}}))
 	if err != nil {
 		return turns.Outcome{}, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}

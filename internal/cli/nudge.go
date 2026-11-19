@@ -37,7 +37,7 @@ func (e *Env) nudge(ctx context.Context, cfg config.Config, t turns.Turn, r turn
 	}
 	d, _ := e.loadedIntents().Registry.Get(dintent.Name(r.Intent))
 	opts := intentOptions(d, roundOptions{allowUserActive: r.Trigger == turn.ByHand, trusted: trusts(cfg, pr), pr: pr})
-	opts.hold = askedHold(r)
+	opts.hold = askedHold(r, d)
 	p, _, err := e.startAgent(ctx, cfg, ws, r.Unit, opts, nil)
 	if err != nil {
 		return "", false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)

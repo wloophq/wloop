@@ -113,7 +113,7 @@ func (s step) roundKind() string {
 // blockedIntent is the intent of the round b holds.
 func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
 	switch {
-	case b.Asked != nil:
+	case b.Asked != nil && b.Asked.Intent != "":
 		return dintent.Name(b.Asked.Intent)
 	case b.Round == (step{kind: stepAddress}).roundKind():
 		return e.roleIntent(builtin.RoleAddress)

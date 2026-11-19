@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -32,13 +33,23 @@ type startHold struct {
 	questionSkips bool
 }
 
-// askedHold is the hold of r's round: a new round a person asked for keeps
-// its intent and what they gave it.
-func askedHold(r turn.Request) startHold {
+// askedHold is the hold of r's round of d: a new round a person asked for
+// keeps its intent, guidance and the inputs they give, not those its prepare
+// fills, which the round fills again when it runs.
+func askedHold(r turn.Request, d dintent.Def) startHold {
 	if r.Trigger != turn.ByHand || r.Resume != nil {
 		return startHold{}
 	}
-	return startHold{asked: &inventory.AskedRound{Intent: string(r.Intent), Guidance: r.Guidance, Inputs: r.Inputs}}
+	var inputs map[string]any
+	for _, in := range d.Inputs {
+		if v, ok := r.Inputs[in.Name]; ok && in.From == "user" {
+			if inputs == nil {
+				inputs = map[string]any{}
+			}
+			inputs[in.Name] = v
+		}
+	}
+	return startHold{asked: &inventory.AskedRound{Intent: string(r.Intent), Guidance: r.Guidance, Inputs: inputs}}
 }
 
 // startAgent gives the round of u in ws an agent session that can take its

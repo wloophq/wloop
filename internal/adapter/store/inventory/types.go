@@ -134,6 +134,7 @@ type StartBlock struct {
 }
 
 // AskedRound is a round a person asked for: its intent and what they gave it.
+// An Intent of "" is the round the row's workspace resolves, as Run now runs it.
 type AskedRound struct {
 	Intent   string         `json:"intent"`
 	Guidance string         `json:"guidance,omitempty"`
