@@ -456,6 +456,21 @@
       "description": "The name people read. Required.",
       "type": "string"
     },
+    "outbox": {
+      "additionalProperties": false,
+      "description": "How the Outbox heads the group of the drafts the intent's turns proposed, when drafts group by proposer.",
+      "properties": {
+        "about": {
+          "description": "One line under the title on when the intent drafts them, such as \"Drafted by a review round of a pull request.\"",
+          "type": "string"
+        },
+        "title": {
+          "description": "The group's title, in the plural, such as \"Reviews\"; the label when absent.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "owner_only": {
       "default": false,
       "description": "The unit must be yours or taken over.",

@@ -69,6 +69,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestServeRunsThroughTheHarness` | A test of internal/cli starts serve's jobs only through the harness, so none outlives the test's files. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
+| `TestTheCoreProfileKeysNoPlugin` | No key of the core profile's TOML files is a plugin's id. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
 | `TestTheSDKImportsNoInternal` | No package under `pkg/`, tests included, imports a package under `internal/`: plugins built outside this module compile against it. |
 | `TestTurnstestOnlyInTests` | Only `_test.go` files import `internal/core/turns/turnstest`, whose Started admits a turn without going through an entry's `turns.Starter`. |

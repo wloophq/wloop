@@ -185,6 +185,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
+- `outbox` (table): How the Outbox heads the group of the drafts the intent's turns proposed, when drafts group by proposer.
+- `outbox.title` (string, localized): The group's title, in the plural, such as "Reviews"; the label when absent.
+- `outbox.about` (string, localized): One line under the title on when the intent drafts them, such as "Drafted by a review round of a pull request."
 
 ## Built-in actions (`actions.toml`)
 
@@ -306,7 +309,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
 - `facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
 - `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
-- `facets.<name>.values` (table by name): The text people read for a value, by value.
+- `facets.<name>.values` (table by name): The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.
 - `facets.<name>.values.<name>` (string, localized): The text of one value.
 - `facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
 - `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
@@ -355,12 +358,55 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
-- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists.
+- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string, localized): What the step asks of you, as the review lists it. Required.
+- `draft_facets` (table by name): The draft facets, by id: the fields the Outbox filters, groups and sorts drafts by, in the order the file declares them, a user layer's new ones after the bundled. Their ids match the task facets of the same meaning, and a layer's entry here never touches the task facet of the same id.
+- `draft_facets.<name>` (table): A draft facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `draft_facets.<name>.fact` (fact): The draft fact the facet reads (draft.proposer, draft.kind, draft.where, ...). Required.
+- `draft_facets.<name>.label` (string, localized): The name people read. Required.
+- `draft_facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
+- `draft_facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
+- `draft_facets.<name>.rank` (list of strings): The facet's values in their order, first first.
+- `draft_facets.<name>.values` (table by name): The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.
+- `draft_facets.<name>.values.<name>` (string, localized): The text of one value.
+- `draft_facets.<name>.label_prefix` (string, localized): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a list of them): Not read: a draft's card shows no facet's values.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
+  - `ref`: Beside the title, before the unit's own label: where it lives.
+  - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
+  - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
+  - `who`: Whom it waits on.
+  - `kind`: Its situation or state, the pill under whom it waits on.
+  - `age`: How long since the facet's instant, for a facet that sorts by time; only the first such facet shows.
+  - `aside`: Beside the reason: its workspace and links.
+- `draft_facets.<name>.show_values` (one of `all`, `first`, default `all`): Not read: a draft's card shows no facet's values.
+  - `all`: Every value, in the item's order.
+  - `first`: The first value alone.
+- `draft_facets.<name>.show_when` (table by name): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_when.<name>` (list of strings): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_max` (integer): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_label` (template, localized): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.empty` (string, localized): What a group of drafts with no value shows.
+- `draft_facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
+- `draft_facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
+- `draft_facets.<name>.strip` (bool, default `false`): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.colors` (table by name): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): Not read: a draft's card shows no facet's values.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
+- `draft_facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
+- `draft_facets.<name>.buckets.<name>` (table): A bucket, by its id.
+- `draft_facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
+- `draft_facets.<name>.buckets.<name>.label` (string, localized): The text people read; the id when absent.
+- `draft_facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): Not read: a draft has one value of its fact, so nothing joins.
+- `draft_facets.<name>.units` (one of `all`, `primary`, default `all`): Not read: a draft sits on one unit.
 - `lens.age_now` (template, localized): A row's age under a minute.
 - `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
 - `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
@@ -446,15 +492,19 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `effects` (table by name): What sending a draft does besides posting it, one sentence per effect, by effect name; a draft's card shows the sentences of the effects it carries. A user layer sets only the effects it names; an empty sentence takes a lower layer's off.
 - `effects.<name>` (string, localized): The sentence, such as "The task is marked as nudged."; the key is an effect a draft may carry.
 - `drafts` (table): The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.
-- `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
+- `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer.
 - `drafts.by_hand_about` (string, localized): One line under that title.
+- `drafts.by_session` (string, localized): The title of the Outbox's group of the drafts an agent session wrote outside any intent's turn, when drafts group by proposer.
+- `drafts.by_session_about` (string, localized): One line under that title.
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
 - `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
 - `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.
 - `drafts.authors` (table by name): Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing.
 - `drafts.authors.<name>` (string, localized): The author's words, such as "Revised by an agent"; the key is person, session, rule or window.
-- `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
+- `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
+- `drafts.rules` (table by name): What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own.
+- `drafts.rules.<name>` (string, localized): The rule's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
 - `drafts.states.<name>` (string, localized): The state's words, such as "failed to send"; the key is a draft state: held, queued, sending, sent, failed or dropped.
 - `drafts.reasons` (table by name): Why a dropped draft was withdrawn, by reason, as the Outbox says it.
@@ -1024,6 +1074,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
 - `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
 - `drafts.<name>` (table): One draft kind's words.
+- `drafts.<name>.label` (string, localized): What the draft kind is called to a person, such as "Review": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name.
 - `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
 - `drafts.<name>.fields.<name>` (table): One field's words.
 - `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.

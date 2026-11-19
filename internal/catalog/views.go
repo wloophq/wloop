@@ -102,21 +102,31 @@ func Paged(def intentload.ViewsDef, id string) bool {
 // Sort orders ts, stably, by the facts view id of def sorts by, each task's facts as facts reads them; a
 // view with no sort keeps their order.
 func Sort(def intentload.ViewsDef, id string, ts []task.Task, facts func(task.Task) (workflow.Facts, error)) error {
+	return SortBy(def, id, ts, facts)
+}
+
+// SortBy orders items, stably, by the facts view id of def sorts by, each item's facts as facts reads them; a
+// view with no sort keeps their order.
+func SortBy[T any](def intentload.ViewsDef, id string, items []T, facts func(T) (workflow.Facts, error)) error {
 	v, ok := def.View(id)
 	if !ok || len(v.Sort) == 0 {
 		return nil
 	}
-	fs := make(map[task.ID]workflow.Facts, len(ts))
-	for _, t := range ts {
-		f, err := facts(t)
+	type faced struct {
+		item  T
+		facts workflow.Facts
+	}
+	fs := make([]faced, len(items))
+	for i, it := range items {
+		f, err := facts(it)
 		if err != nil {
 			return err
 		}
-		fs[t.ID] = f
+		fs[i] = faced{it, f}
 	}
-	slices.SortStableFunc(ts, func(a, b task.Task) int {
+	slices.SortStableFunc(fs, func(a, b faced) int {
 		for _, k := range v.Sort {
-			c := compareFact(fs[a.ID][k.Fact], fs[b.ID][k.Fact])
+			c := compareFact(a.facts[k.Fact], b.facts[k.Fact])
 			if k.Desc {
 				c = -c
 			}
@@ -126,6 +136,9 @@ func Sort(def intentload.ViewsDef, id string, ts []task.Task, facts func(task.Ta
 		}
 		return 0
 	})
+	for i, f := range fs {
+		items[i] = f.item
+	}
 	return nil
 }
 

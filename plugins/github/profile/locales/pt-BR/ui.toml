@@ -350,3 +350,36 @@ values = { LEFT = "antigo", RIGHT = "novo" }
 
 [drafts.review.fields.body]
 label = "Comentário"
+
+[drafts.comment]
+label = "Comentário"
+
+[drafts.reply]
+label = "Resposta"
+
+[drafts.nudge]
+label = "Cutucada"
+
+[drafts.close]
+label = "Encerramento"
+
+[drafts.ask_owner]
+label = "Perguntar quem é o responsável"
+
+[drafts.react]
+label = "Reação"
+
+[drafts.edit]
+label = "Edição"
+
+[drafts.review]
+label = "Review"
+
+[drafts.thread_reply]
+label = "Resposta numa thread"
+
+[drafts.resolve]
+label = "Resolver uma thread"
+
+[drafts.request_review]
+label = "Pedir um review"

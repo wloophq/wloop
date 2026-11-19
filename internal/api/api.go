@@ -91,8 +91,8 @@ func WorkflowDisablePath(name string) string {
 	return "/api/workflows/" + url.PathEscape(name) + "/disable"
 }
 
-// OutboxPath serves the Outbox's drafts as an OutboxPage: grouped by why they were drafted, each with its
-// context.
+// OutboxPath serves the Outbox's drafts as an OutboxPage, each with its context, its draft facets' values and its
+// search texts, in the order of the sort of the outbox-layout view ?view= names, else of the profile's first.
 const OutboxPath = "/api/outbox"
 
 // WorkflowSwitch is whether a workflow is enabled.

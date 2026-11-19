@@ -425,8 +425,8 @@ function ownDraftActions(e: J, d: J, key: string, isEditing: boolean): (DraftAct
   ];
 }
 
-// gateDraftActions are the actions of a draft shown on another task, through its gate's intents; retry goes
-// through its own task.
+// gateDraftActions are the actions of a draft shown on another task, through its gate's intents; retry and a
+// failed draft's discard, whose gate a person already approved, go through its own task.
 function gateDraftActions(e: J, d: J, key: string, isEditing: boolean): (DraftAction | null)[] {
   const intents = (d.gate && d.intents) || {};
   const approve = verbFor("approve");
@@ -439,11 +439,14 @@ function gateDraftActions(e: J, d: J, key: string, isEditing: boolean): (DraftAc
   const retry = verbFor("retry");
   const drop = verbFor("drop");
   const dropLabel = gateWord(e, d, "rejected", drop);
+  const own = { id: key, title: d.title || key };
+  const failed = d.state === "failed";
   return [
-    staleOff(d, d.state === "failed" ? act(draftWord("draft.retry"), retry, () => taskAct({ id: key, title: d.title || key }, retry, { rev: String(d.rev) }), primary)
+    staleOff(d, failed ? act(draftWord("draft.retry"), retry, () => taskAct(own, retry, { rev: String(d.rev) }), primary)
       : intents.approved ? act(approveLabel, approve, () => resolveDraft(d, intents.approved, approveLabel, {}), primary) : null),
     intents.approved && draftEditable(d) ? act(draftWord("draft.edit"), "open:" + approve, () => startEditing(key, d), { key: "queue:edit" }) : null,
-    intents.rejected ? act(dropLabel, drop, () => resolveDraft(d, intents.rejected, dropLabel, {}), { key: "queue:discard" }) : null,
+    failed ? act(dropLabel, drop, () => taskAct(own, drop, {}), { key: "queue:discard" })
+      : intents.rejected ? act(dropLabel, drop, () => resolveDraft(d, intents.rejected, dropLabel, {}), { key: "queue:discard" }) : null,
   ];
 }
 

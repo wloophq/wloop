@@ -1,4 +1,5 @@
-import { applyCatalog, applyPlugins, isCoreView, REVIEW, specsStale, viewLabel, viewSpec } from "../lib/catalog";
+import { applyCatalog, applyPlugins, isCoreView, REVIEW, specsStale, viewLabel } from "../lib/catalog";
+import { isOutboxView } from "../lib/drafts";
 import { t } from "../lib/i18n.svelte";
 import { fieldOf, viewQueryKey } from "../lib/lens";
 import { keyUnit, PLAN, QUEUE_LIST, readRoute, RECENT, type Route, unitPath, EXPLORE, HOME, QUEUE } from "../lib/routes";
@@ -191,12 +192,16 @@ export async function loadQueue(): Promise<void> {
 }
 
 export const OUTBOX_PATH = "/api/outbox";
-// OUTBOX_LAYOUT is the served layout of a view the Outbox draws, whatever the view's id.
-export const OUTBOX_LAYOUT = "outbox";
 
-export async function loadOutbox(): Promise<void> {
+// loadOutbox reads the Outbox as view, an outbox view, orders it. The page takes new facet specs only when the
+// served ones changed, so the lens reads its fields again only then.
+export async function loadOutbox(view: string): Promise<void> {
   try {
-    put(outboxState, "page", await getJSON(OUTBOX_PATH));
+    const next = await getJSON(OUTBOX_PATH + "?" + new URLSearchParams({ view }));
+    const facets = (outboxState.page || {}).facets;
+    const same = JSON.stringify(facets) === JSON.stringify(next.facets);
+    put(outboxState, "page", { ...next, facets: same ? facets : null });
+    if (!same) outboxState.page.facets = next.facets;
     outboxState.error = "";
   } catch (err) {
     outboxState.error = t("Could not load the Outbox: {error}", { error: (err as Error).message });
@@ -339,7 +344,7 @@ async function loadTaskList(route: Hash): Promise<void> {
     tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
     return;
   }
-  if ((viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT) await loadOutbox();
+  if (isOutboxView(route.view)) await loadOutbox(route.view);
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -396,7 +401,9 @@ export async function loadReviewStep(): Promise<void> {
     tasksState.error = "";
   } catch (err) {
     tasksState.error = t("Could not load the {step} step: {error}", { step: step.label, error: (err as Error).message });
+    return;
   }
+  if (isOutboxView(step.view)) await loadOutbox(step.view);
 }
 
 export function taskPath(id: string, ...rest: string[]): string {

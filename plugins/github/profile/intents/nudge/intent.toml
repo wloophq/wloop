@@ -11,6 +11,10 @@ profile   = "nudge"
 brief     = { render = false, wait = false }
 effects   = ["pr.nudged"]
 
+[outbox]
+title = "Nudges"
+about = "Drafted when you ask whoever a pull request waits on for the next step."
+
 [[refuse]]
 when = 'pr.nudge.refusal != ""'
 why  = "{{.pr.nudge.refusal}}"

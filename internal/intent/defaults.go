@@ -182,6 +182,14 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	}
 	bindRole(&d)
 	s.provider(&d, m.Provider)
+	if o := m.Outbox; o != nil {
+		if o.Title != nil {
+			d.Outbox.Title = strings.TrimSpace(*o.Title)
+		}
+		if o.About != nil {
+			d.Outbox.About = strings.TrimSpace(*o.About)
+		}
+	}
 	if m.Drafts != nil {
 		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
 		d.AttachPosts = m.Drafts.AttachPosts

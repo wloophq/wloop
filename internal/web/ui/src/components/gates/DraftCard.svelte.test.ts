@@ -305,6 +305,20 @@ describe("detail_test.go, a draft on its own task", () => {
   });
 });
 
+describe("a failed draft on another task", () => {
+  test("offers retry and discard through the draft's own task, its gate already approved", async () => {
+    tasksState.catalog = { verbs: [{ verb: "retry", handler: "retry" }, { verb: "toss", handler: "drop" }, { verb: "approve", handler: "approve" }] };
+    const posts = recordPosts();
+    const d = { id: 12, task: "t-1", unit: "github/acme/api#8", kind: "comment", target: "acme/api#8", text: "Applied the fix.", state: "failed", rev: 3, gate: 5, intents: {} };
+    const e = { id: "t-1", title: "Fix the flaky upload", gates: [{ id: 5, kind: "draft", status: "approved", subject: d }] };
+    const c = render(DraftCard, { task: e, draft: d }).container;
+    expect(byFocus(c, "detail:retry:draft:12")).not.toBeNull();
+    await fireEvent.click(byFocus(c, "detail:toss:draft:12"));
+    await settle();
+    expect(posts).toEqual([{ path: "/api/tasks/draft:12/toss", body: { source: "cockpit" } }]);
+  });
+});
+
 describe("qcard_test.go, a sent draft's card", () => {
   test("TestASentDraftsDetailShowsItsPost: no action, the post linked, why labeled, the unit by its label, Markdown fields", () => {
     const d = reviewDraft();

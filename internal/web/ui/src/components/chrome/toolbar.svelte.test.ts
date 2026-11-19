@@ -44,8 +44,9 @@ describe("the lens bar", () => {
   test("shows each filter as a removable chip", async () => {
     const { container } = bar("#view=mine&q=wait%3Ame+risk%3Ahigh");
     const chips = [...container.querySelectorAll(".chip")] as HTMLElement[];
-    expect(chips.map((c) => c.textContent)).toEqual(["Waits on (role): me ×", "Risk: high ×"]);
-    expect(chips.map((c) => c.getAttribute("aria-label"))).toEqual(["Remove filter Waits on (role): me", "Remove filter Risk: high"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["Waits on (role): Waiting on me ×", "Risk: high ×"]);
+    expect(chips.map((c) => c.getAttribute("aria-label"))).toEqual(["Remove filter Waits on (role): Waiting on me", "Remove filter Risk: high"]);
+    expect(chips.map((c) => c.getAttribute("title"))).toEqual(["Remove this filter (wait:me)", "Remove this filter (risk:high)"]);
     await fireEvent.click(chips.find((c) => c.textContent!.startsWith("Risk"))!);
     expect(written.map(queryOf)).toEqual(["wait:me"]);
   });

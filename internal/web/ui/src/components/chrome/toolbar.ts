@@ -3,6 +3,7 @@ import { fmtNumber, t } from "../../lib/i18n.svelte";
 import {
   fieldById, fillWord, groupedRows, groupField, groupLabel, inView, lensWords, parseSort, qualifierToken, sm, toggledQualifier, rowByKey, withoutQualifiers, type Lens,
 } from "../../lib/lens";
+import { isOutboxView, outboxLensItems } from "../../lib/drafts";
 import { taskLensItems } from "../../lib/tasks";
 import { isSet, labelOf, unitKey, type J } from "../../lib/util";
 import { lensResult, moveFocus, readLens } from "../../lib/view";
@@ -20,8 +21,10 @@ export function sortLabel(sort: string, fields: Field[] = catalog.fields): strin
   return field ? `${(fieldById(field, fields) as Field).label.toLowerCase()} ${desc ? "descending" : "ascending"}` : "";
 }
 
-// lensItems are what lens's view lists before the lens: a task view's tasks, a row view's rows.
+// lensItems are what lens's view lists before the lens: the Outbox's drafts, a task view's tasks, a row view's
+// rows.
 export function lensItems(lens: Lens): J[] {
+  if (isOutboxView(lens.view)) return outboxLensItems();
   if (isCoreView(lens.view)) return taskLensItems();
   return state.rows.filter((r) => inView(r, lens.view, lens.done));
 }
@@ -40,9 +43,11 @@ export interface Entry {
   facets?: Record<string, string[]>;
 }
 
-// copyEntry is what Copy list says of an item: a task by its id, its first unit's link and its units, a row by its
-// label and link, with its summary's reason and since.
+// copyEntry is what Copy list says of an item: a draft by its id, its link, its text and its unit, a task by its
+// id, its first unit's link and its units, a row by its label and link, with its summary's reason and since.
 export function copyEntry(it: J): Entry {
+  const d = it.draft;
+  if (d) return { ref: "draft:" + d.id, url: d.permalink || undefined, title: d.text, units: [d.label || d.unit], facets: it.facets };
   const e = it.task;
   if (e) {
     const linked = (e.units || []).map((u: J) => (rowByKey(unitKey(u)) || {}).link).find(Boolean);
@@ -101,9 +106,16 @@ export async function copyList(lens: Lens): Promise<void> {
   }
 }
 
-// valueLabel is how a filter names a value of the field id: a kind by its label, any other value as shown.
-function valueLabel(id: string, value: string, shown: string): string {
-  return id === "kind" ? kindLabel(value, "") : shown;
+// valueLabel is how a filter names a value of the field id: as shown when its field's labels word it, else a kind
+// by its label, any other value as shown.
+function valueLabel(id: string, value: string, shown: string, worded = false): string {
+  return id === "kind" && !worded ? kindLabel(value, "") : shown;
+}
+
+// labelWord is the word f's labels give value; "" when they give none.
+function labelWord(f: Field | undefined, value: string): string {
+  const word = f && f.show ? f.show(value) : value;
+  return word !== value ? word : "";
 }
 
 // chipWords are what a filter's chip says of its field and values, with its × when removable.
@@ -125,11 +137,13 @@ export interface Chip {
 // lensChips are one chip per filtered field and sign, which takes it out; applied names the fields a view
 // applies, the others' chips off.
 export function lensChips(lens: Lens, applied?: string[]): Chip[] {
-  const by = new Map<string, { field: string; neg: boolean; values: string[] }>();
+  const by = new Map<string, { field: string; neg: boolean; values: string[]; raws: string[] }>();
   for (const x of lens.quals) {
     const k = `${x.field}:${x.neg ? "-" : ""}`;
-    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
-    by.get(k)!.values.push(valueLabel(x.field, x.value, x.raw));
+    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [], raws: [] });
+    const word = labelWord(fieldById(x.field, lens.fields), x.value);
+    by.get(k)!.values.push(valueLabel(x.field, x.value, word || x.raw, !!word));
+    by.get(k)!.raws.push(x.raw);
   }
   const list = [...by.values()];
   const slot = (c: { field: string; neg: boolean }) => `lens:chip:${c.field}:${c.neg ? "-" : ""}`;
@@ -139,7 +153,7 @@ export function lensChips(lens: Lens, applied?: string[]): Chip[] {
     const next = list[i + 1] || list[i - 1];
     return {
       slot: slot(c), off,
-      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
+      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.raws.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
       label: t("Remove filter {label}", { label: chipWords(f.label, c.values, c.neg, false) }),
       text: chipWords(f.label, c.values, c.neg, true),
       remove: () => {
@@ -169,7 +183,7 @@ export function filterValues(f: Field, items: J[]): { value: string; count: numb
   const at = (v: string) => (rank.includes(v) ? rank.indexOf(v) : rank.length);
   return [...counts.entries()]
     .sort((a, b) => at(a[0]) - at(b[0]) || b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
-    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value)) }));
+    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value), !!labelWord(f, value)) }));
 }
 
 // filterPalette opens, through palette, the fields lens filters by, then the values of the one picked, which adds

@@ -181,26 +181,43 @@ Three operations sit on a draft's card beside approve and discard, as the draft'
 
 Only you run them, yourself or through a session you drive. A task lists its pending drafts, held or failed, in its `drafts`, and `GET /api/drafts?task=<id>` serves their cards; `GET /api/drafts?unit=<provider>/<key>` serves the cards of a unit's drafts, with `state=held,failed` its pending ones.
 
-### The Outbox grouped by why
+### The Outbox on the lens
 
-The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `GET /api/outbox`: the same drafts `GET /api/drafts` lists, in groups by why they were drafted.
+The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `GET /api/outbox`: the same drafts `GET /api/drafts` lists, each with its facet values, and the lens of every other view runs over them: the search box, the filter chips, **Group** and **Sort**, and the same `field:value` qualifiers (see [Facets](/concepts/tasks/#facets)). The Outbox opens grouped by who proposed the drafts (its view's `group = "draft.proposer"`) and in the order of its view's `sort` (`draft.created_at`, oldest first); `-draft.created_at` puts the newest first. A search matches a draft's text and title and where its unit is.
+
+`views.toml`'s `[draft_facets.<id>]` tables declare the fields to filter, group and sort drafts by: the keys of a task facet, over a `draft.*` fact. The bundled ones are:
+
+| Facet | Fact | A draft's value |
+|---|---|---|
+| `proposer` | `draft.proposer` | What proposed it: `workflow:<name>`, `intent:<name>`, `rule:<name>`, `user` for you, or `session` for an agent session outside any intent's turn |
+| `workflow` | `draft.workflow` | The workflow behind it, empty for none (`no workflow`) |
+| `kind` | `draft.kind` | Its kind in its plugin's manifest |
+| `source` | `draft.provider` | The provider whose plugin posts it: its unit's, or the one its target names for a draft on a task |
+| `where` | `draft.where` | The repository or channel its unit's row gives, else, for a draft on a task, the task's `where` |
+| `people` | `draft.people` | The people it is to or mentions, by name (the mention key when its plugin resolves no name) |
+| `state` | `draft.state` | Failed, sending, queued or held, in that order |
+| `age` | `draft.created_at` | When it was written |
+
+A draft facet shares its id with the task facet of the same meaning, so a qualifier such as `where:acme/api` reads alike in every view, and a user layer's `[facets.where]` never touches `[draft_facets.where]`. A draft has one value of its fact and sits on one unit, so `merge` and `units` are not read, nor are the keys that place a facet's values on a task's row (`show`, `show_values`, `show_when`, `show_max`, `show_label`, `label_prefix`, `strip`, `colors`): a draft's card shows none. `draft.where` takes the value the unit's row gives for the task facet of the same id, and a draft on a task whose row gives none takes its task's value of that facet (its placement, for the bundled `where`), so keep the id `where` for it.
 
 ```text
-draft ──> its workflow? ──yes──> the workflow's group: [outbox] title and about (summary, else its name)
-              │ no
-              v
-          you wrote it? ──yes──> written by hand: gates.toml's drafts.by_hand, by_hand_about
-              │ no
-              v
-          its purpose's group: gates.toml's drafts.purposes.<purpose> (the purpose as named when absent)
+group by      the head shows
+proposer      workflow:<name> -> the workflow's [outbox] title and about (summary, else its name); Stop drafting these
+              intent:<name>   -> the intent's [outbox] title and about (label, else its name)
+              rule:<name>     -> gates.toml's drafts.rules.<name>
+              user            -> gates.toml's drafts.by_hand and by_hand_about
+              session         -> gates.toml's drafts.by_session and by_session_about
+workflow      the workflow's head, as above
+kind          the plugin's [drafts.<kind>] label, in its ui.toml
+others        the value as the facet's values word it, else as it is
 ```
 
-The largest group comes first, then by title; inside a group the drafts keep the Outbox's order, newest first. Every text is the profile's, in the interface language: a drafting workflow's `[outbox]` table (`title`, `about`) with its translation under `locales/<tag>/workflows/<name>/workflow.toml`, and `gates.toml`'s `[drafts]`. A workflow's group shows its name and **Stop drafting these**, which asks again inline before it disables the workflow.
+The same word names the value in the **Filter** palette and the filter chips; a word the facet's `values` table gives wins over it. A value with no word shows as it is named. Groups are ordered by raw value, as the lens orders every view, not by size. Every text is the profile's, in the interface language, and lives where the thing it words is declared: a workflow's `[outbox]` table (`title`, `about`) with its translation under `locales/<tag>/workflows/<name>/workflow.toml`; an intent's `[outbox]` table in its `intent.toml`; a plugin's `[drafts.<kind>] label` in its `ui.toml` and its rules' words in the `[drafts.rules]` table of its `gates.toml`; the words for drafts you wrote by hand, and for those an agent session wrote outside any intent's turn, in the core `gates.toml`'s `[drafts]`. A kind takes the word of the plugin that posts the draft; two plugins that word one draft kind differently show the word of the plugin that posts the first served draft of that kind. A workflow's head shows **Stop drafting these**, which asks again inline before it disables the workflow.
 
 Each draft comes with its context: the asks of its task, each with the quotes its brief keeps, and the items it is about, each with its state. A draft's card names its purpose and, once it left your hands, its delivery state in `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` words, which the views catalog serves as `draft_purposes` and `draft_states`.
 
 ```sh
-{{command}} outbox                      # drafts that wait on you, by purpose
+{{command}} outbox                      # drafts that wait on you
 {{command}} outbox show <id>            # one draft as it reads: its preview line, its text, every value of its payload (a review's verdict and inline comments), its items and the commands it takes
 {{command}} outbox new <unit|message> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
 {{command}} outbox approve <id>         # shows it, payload included, and approves its gate once you say yes; --text <markdown> --rev <n> posts your text instead

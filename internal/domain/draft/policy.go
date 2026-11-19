@@ -247,7 +247,7 @@ func (d Draft) RuleFacts() map[string]any {
 }
 
 // Proposer names what proposed a draft of o: workflow:<name>, rule:<name>,
-// intent:<name> or user.
+// intent:<name>, user, or session for a session outside any intent's turn.
 func (o Origin) Proposer() string {
 	switch {
 	case o.Kind == OriginAuto && o.Workflow != "":

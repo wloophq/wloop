@@ -8,6 +8,10 @@ runners   = ["headless", "session"]
 session   = { strategy = "new", title = "act", close_when_done = true }
 brief     = { render = true, wait = false }
 
+[outbox]
+title = "Open item replies"
+about = "Drafted when an Act turn settles what a unit has open and proposes the replies it needs."
+
 [drafts]
 allowed_effects = ["task.nudged", "unit.closed"]
 

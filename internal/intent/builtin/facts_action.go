@@ -18,12 +18,20 @@ const DraftActionSlot FactSlot = "draft_action"
 // already stopped on its conversation.
 var DraftRefusals = []string{"", "plugin_off", "state", "posts_nothing", "no_effects", "effect_posts", "not_from_workflow", "skipped"}
 
+// DraftViewSlot holds the facts a draft facet reads: what the Outbox groups,
+// filters, sorts and searches its drafts by.
+const DraftViewSlot FactSlot = "draft_view"
+
+// DraftViewEnv is the env of a draft facet's fact.
+func DraftViewEnv() expr.Env { return Env(DraftViewSlot, nil) }
+
 // RowKindFact is the row's situation kind, which each plugin's row_kinds
 // close on its units.
 const RowKindFact = "row.kind"
 
-// ActionFacts are the facts only the action slot reads, what a row offers
-// decides on them, then the draft actions' facts.
+// ActionFacts are the facts the action slot reads, what a row offers decides
+// on them, then the draft actions' facts, some of which a draft facet reads
+// too.
 var ActionFacts = slices.Concat(rowActionFacts, draftActionFacts)
 
 // coreActionFacts are ActionFacts before Merge adds the plugins' action facts.
@@ -49,13 +57,21 @@ var rowActionFacts = []Fact{
 	taskFact("task.captured_by_user", expr.Bool, act, "The user captured the task: origin user and kind capture; false for a derived task, such as one from a Slack thread."),
 }
 
-var draftActionFacts = []Fact{
-	fact("draft.state", expr.String, []FactSlot{DraftActionSlot}, "The draft's state."),
-	fact("draft.provider", expr.String, []FactSlot{DraftActionSlot}, "The provider of the draft's unit."),
+var draftViewFacts = []Fact{
+	fact("draft.workflow", expr.String, []FactSlot{DraftViewSlot}, "The workflow behind the draft, a turn's draft included; empty for a draft no workflow is behind."),
+	fact("draft.kind", expr.String, []FactSlot{DraftViewSlot}, "The draft's kind as its plugin's manifest names it, such as review, thread_reply or nudge."),
+	fact("draft.where", expr.String, []FactSlot{DraftViewSlot}, "Where the draft's unit is, as its row gives it, a repository or a channel; for a draft on a task whose row gives none, the task's value of the task facet of the same id, such as its placement; empty when neither gives one."),
+	fact("draft.people", expr.List, []FactSlot{DraftViewSlot}, "The people the draft is to or mentions, each by the name its plugin resolves the mention to, else by the mention key, such as slack:U0123."),
+	fact("draft.created_at", expr.Time, []FactSlot{DraftViewSlot}, "When the draft was written. Zero when unset; test with `> timestamp(0)`."),
+}
+
+var draftActionFacts = slices.Concat(draftViewFacts, []Fact{
+	fact("draft.state", expr.String, []FactSlot{DraftActionSlot, DraftViewSlot}, "The draft's state."),
+	fact("draft.provider", expr.String, []FactSlot{DraftActionSlot, DraftViewSlot}, "The provider whose plugin posts the draft: its unit's, or, for a draft on a unit no plugin posts to, such as a task, the one its target names."),
 	enum(fact("draft.refusal", expr.String, []FactSlot{DraftActionSlot}, "Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled."),
 		enumOf(DraftRefusals...)),
 	fact("draft.maybe_posted", expr.Bool, []FactSlot{DraftActionSlot}, "The draft failed after its post may have reached its provider."),
-}
+})
 
 // taskFact is a fact of a task, which only task intents read.
 func taskFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {

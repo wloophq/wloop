@@ -67,10 +67,18 @@
           "type": "object"
         },
         "by_hand": {
-          "description": "The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.",
+          "description": "The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer.",
           "type": "string"
         },
         "by_hand_about": {
+          "description": "One line under that title.",
+          "type": "string"
+        },
+        "by_session": {
+          "description": "The title of the Outbox's group of the drafts an agent session wrote outside any intent's turn, when drafts group by proposer.",
+          "type": "string"
+        },
+        "by_session_about": {
           "description": "One line under that title.",
           "type": "string"
         },
@@ -83,7 +91,7 @@
             "description": "The purpose's word, such as \"Nudge\".",
             "type": "string"
           },
-          "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.",
+          "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head. A purpose with no word shows as it is named.",
           "type": "object"
         },
         "quoted": {
@@ -96,6 +104,14 @@
             "type": "string"
           },
           "description": "Why a dropped draft was withdrawn, by reason, as the Outbox says it.",
+          "type": "object"
+        },
+        "rules": {
+          "additionalProperties": {
+            "description": "The rule's word, such as \"Nudge\".",
+            "type": "string"
+          },
+          "description": "What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own.",
           "type": "object"
         },
         "stale": {

@@ -91,10 +91,8 @@ func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	var page api.OutboxPage
 	get(t, r.s, api.OutboxPath, &page)
 	var listed []int64
-	for _, g := range page.Groups {
-		for _, d := range g.Drafts {
-			listed = append(listed, d.ID)
-		}
+	for _, d := range page.Drafts {
+		listed = append(listed, d.ID)
 	}
 	if len(listed) != 1 || listed[0] != int64(free.ID) {
 		t.Errorf("the Outbox lists %v, want only the draft no question pins", listed)

@@ -31,7 +31,7 @@ var groups = map[builtin.Surface][]group{
 		{"Judgment", []string{"profile", "dims", "also_profile"}},
 		{"What it records", []string{"record"}},
 		{"Gate approval", []string{"gates"}},
-		{"Effects and drafts", []string{"effects", "drafts"}},
+		{"Effects and drafts", []string{"effects", "drafts", "outbox"}},
 	},
 	builtin.SurfaceWorkflow: {
 		{"What it matches", []string{"summary", "provider", "when", "order", "key", "marks"}},

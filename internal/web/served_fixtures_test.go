@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -169,7 +170,7 @@ var tasklensNow = time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 // the sort menu calls a view's own order.
 func servedViews(t *testing.T) api.ViewsCatalog {
 	t.Helper()
-	def, problems := intentload.BundledViews(os.DirFS("../../profiles/default"))
+	def, problems := intentload.BundledViews(os.DirFS("../../profiles/default"), profile.BundledChain()...)
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
@@ -179,7 +180,7 @@ func servedViews(t *testing.T) api.ViewsCatalog {
 	}
 	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: catalog.LensWords(def.Lens)}
 	for _, v := range def.Views {
-		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group})
+		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Layout: v.Layout})
 	}
 	return cat
 }

@@ -1,19 +1,21 @@
 <script lang="ts">
   import { viewSpec, REVIEW } from "../../lib/catalog";
+  import { isOutboxView } from "../../lib/drafts";
   import { t } from "../../lib/i18n.svelte";
   import { lensOf } from "../../lib/lens";
   import { taskItemOf } from "../../lib/tasks";
   import type { J } from "../../lib/util";
   import { minute } from "../../state/clock.svelte";
   import { reviewCurrent, reviewSteps } from "../../state/loaders.svelte";
-  import { reviewState, tasksState } from "../../state/store.svelte";
+  import { outboxState, reviewState, tasksState } from "../../state/store.svelte";
   import RowList from "../rows/RowList.svelte";
+  import DraftList from "./DraftList.svelte";
   import { taskModel } from "../rows/model";
   import ViewIntro from "./ViewIntro.svelte";
   import { pickStep, reviewKey, reviewTitle } from "./review";
 
-  // The review: its steps with their counts, then the step shown with its tasks. A step lists what its view holds,
-  // so its pieces filter nothing.
+  // The review: its steps with their counts, then the step shown with its tasks, or the Outbox's drafts for a step
+  // of the Outbox. A step lists what its view holds, so its pieces filter nothing.
   let { open = "" }: { open?: string } = $props();
 
   const steps = $derived(reviewSteps());
@@ -50,6 +52,15 @@
     {#if tasksState.error}<p class="plan-error">{tasksState.error}</p>{/if}
     {#if tasksState.key !== "review|" + step.id}
       <p class="empty">{t("Loading.")}</p>
+    {:else if isOutboxView(step.view)}
+      {#if outboxState.error}<p class="plan-error">{outboxState.error}</p>{/if}
+      {#if !outboxState.page}
+        <p class="empty">{t("Loading.")}</p>
+      {:else if (outboxState.page.drafts || []).length && lens}
+        <DraftList page={outboxState.page} {lens} />
+      {:else}
+        <p class="empty">{(viewSpec(step.view) || {}).empty}</p>
+      {/if}
     {:else if !tasksState.tasks.length}
       <p class="empty">{(viewSpec(step.view) || {}).empty}</p>
     {:else if lens}

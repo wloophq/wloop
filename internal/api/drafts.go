@@ -140,26 +140,30 @@ type DraftOption struct {
 	Label string `json:"label"`
 }
 
-// OutboxPage is the Outbox's drafts in groups, the largest first, then by title.
+// OutboxPage is the Outbox's drafts, in the order of its view's sort, with the draft facets a lens over them reads.
 type OutboxPage struct {
-	Groups []OutboxGroup `json:"groups"`
+	Drafts []OutboxDraft `json:"drafts"`
+	Facets []FacetSpec   `json:"facets"`
+	// Heads are what a group head shows under a value's title, which the facet's labels carry, by facet id,
+	// then by value; a value with nothing more to say has none.
+	Heads map[string]map[string]OutboxHead `json:"heads,omitempty"`
 }
 
-// OutboxGroup is the drafts one workflow proposed (Workflow its name), else those of one Purpose no workflow
-// proposed, else those written by hand (both ""). Title and About are the profile's words for it, in the
-// served locale.
-type OutboxGroup struct {
-	Workflow string        `json:"workflow,omitempty"`
-	Purpose  string        `json:"purpose,omitempty"`
-	Title    string        `json:"title"`
-	About    string        `json:"about,omitempty"`
-	Drafts   []OutboxDraft `json:"drafts"`
+// OutboxHead is what a group of drafts says beside its title, in the served locale: About why they were
+// written, and Workflow the workflow that drafted them, which a person may stop; "" for a group of no one
+// workflow.
+type OutboxHead struct {
+	About    string `json:"about,omitempty"`
+	Workflow string `json:"workflow,omitempty"`
 }
 
-// OutboxDraft is a draft with what a person reads to decide on it.
+// OutboxDraft is a draft with what a person reads to decide on it, the values of its draft facets, by facet
+// id, and the texts a search over the Outbox matches: its text, its unit's label and title, and where it goes.
 type OutboxDraft struct {
 	Draft
-	Context DraftContext `json:"context"`
+	Context DraftContext        `json:"context"`
+	Facets  map[string][]string `json:"facets,omitempty"`
+	Texts   []string            `json:"texts,omitempty"`
 }
 
 // DraftContext is what a draft answers: the asks of its task, with their quotes, and the items it is about,

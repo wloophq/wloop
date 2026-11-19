@@ -2,6 +2,10 @@ label = "Address"
 summary = "Triar as reviews e os checks falhando de um pull request que você desenvolve, no workspace dele, mudando o código onde elas pedirem; o Agir só resolve itens abertos e rascunha respostas"
 why = "{{.pr.address.reason}}"
 
+[outbox]
+title = "Rodadas de ajuste"
+about = "Rascunhado quando você trata os reviews e checks do seu próprio pull request."
+
 [guidance]
 help = "o que a rodada deve olhar"
 

@@ -1,8 +1,9 @@
 import { clock, minuteNow } from "../state/clock.svelte";
-import { catalog, state, tasksState, type Field } from "../state/store.svelte";
+import { catalog, outboxState, state, tasksState, type Field } from "../state/store.svelte";
 import type { Hash } from "../state/route.svelte";
 import { MATCH, isCoreView, viewSpec, rowKindLabel, eventLabel, REVIEW } from "./catalog";
 import { fmtDate, pluralForm, t } from "./i18n.svelte";
+import { isOutboxView, outboxLensItems } from "./drafts";
 import { DASH, EXPLORE, PLAN, RECENT } from "./routes";
 import { cmp, fold, goDuration, isSet, keyOf, labelOf, rfc3339, tokens, unitOf, unquote, type J } from "./util";
 
@@ -357,11 +358,23 @@ export const NO_GROUP = "none";
 
 const lensMemo: { fields: Field[] | null; viewsCat: J; tasks: Field[] | null; offered: { key: unknown[]; fields: Field[] } | null } = { fields: null, viewsCat: null, tasks: null, offered: null };
 
+const outboxMemo = { specs: null as J[] | null, fields: [] as Field[] };
+
+// outboxFields are the fields of the Outbox's lens: its page's draft facets, read again when the page holds other
+// specs, which loadOutbox gives it only when the served ones changed.
+export function outboxFields(page: J): Field[] {
+  const specs: J[] | null = (page && page.facets) || null;
+  if (specs !== outboxMemo.specs) Object.assign(outboxMemo, { specs, fields: (specs || []).map(fieldOf) });
+  return outboxMemo.fields;
+}
+
 // lensFields are the fields a query over view names: a task view's are the profile's task facets and the
-// plugins' facets, one by id as the daemon counts with them; a row view's are the plugins'.
+// plugins' facets, one by id as the daemon counts with them; the Outbox's its draft facets; a row view's are the
+// plugins'.
 export function lensFields(view: string): Field[] {
   if (view === PLAN) return [];
   if (!isCoreView(view)) return catalog.fields;
+  if (isOutboxView(view)) return outboxFields(outboxState.page);
   const cat = tasksState.catalog;
   if (lensMemo.fields !== catalog.fields || lensMemo.viewsCat !== cat) {
     const byId = new Map(catalog.fields.map((f) => [f.id, f]));
@@ -381,9 +394,14 @@ export function fieldsFor(view: string, items: J[]): Field[] {
 
 export const viewQueryKey = (view: string, area?: string, ctx?: string[]): string => [view, area || "", (ctx || []).join(",")].join("|");
 
-// viewSource is what view lists before the lens, as loaded: a task view's tasks, a row view's rows, which items
-// keeps to the view; null until they are loaded, or for a view the lens does not list.
+// viewSource is what view lists before the lens, as loaded: the Outbox's drafts, a task view's tasks, a row view's
+// rows, which items keeps to the view; null until they are loaded, or for a view the lens does not list.
 export function viewSource(view: string, route: Pick<Hash, "area" | "ctx" | "done">): { all: J[]; items: () => J[] } | null {
+  if (isOutboxView(view)) {
+    if (!outboxState.page) return null;
+    const items = outboxLensItems(outboxState.page);
+    return { all: items, items: () => items };
+  }
   if (isCoreView(view)) {
     const loaded = view !== REVIEW && tasksState.key === viewQueryKey(view, route.area, route.ctx);
     return loaded ? { all: tasksState.tasks, items: () => tasksState.tasks } : null;

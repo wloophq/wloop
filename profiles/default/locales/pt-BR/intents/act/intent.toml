@@ -1,6 +1,10 @@
 label = "Agir"
 summary = "Agir sobre os itens abertos de uma unidade sem mexer no código: resolver o que der e propor as respostas necessárias como rascunhos para você aprovar; o Address trabalha no código de um pull request que você desenvolve"
 
+[outbox]
+title = "Respostas a itens abertos"
+about = "Rascunhado quando um turno do Act resolve o que uma unidade tem em aberto e propõe as respostas necessárias."
+
 [guidance]
 help = "o que fazer com os itens"
 

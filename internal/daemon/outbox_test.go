@@ -3,19 +3,27 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // withFakeWorkflows makes r's profile the bundled one with fake-nudge and fake-close, two drafting workflows
@@ -53,35 +61,199 @@ func (r *outboxRig) outboxPage(t *testing.T) api.OutboxPage {
 	return page
 }
 
-func TestTheOutboxGroupsDraftsByTheirWorkflow(t *testing.T) {
+// roundKinds are the bundled conversation kinds, and a review round's review and resolve, posted as comments.
+type roundKinds struct{ bundledtest.Shapes }
+
+func (k roundKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	if kind == "review" || kind == "resolve" {
+		return draft.KindSpec{Provider: provider, Name: kind, Delivery: "comment", TextRequired: true, Editable: []string{draft.EditableText}}, true
+	}
+	return k.Shapes.Lookup(provider, kind)
+}
+
+func (k roundKinds) Shape(provider string, d draft.Draft) (draft.Draft, error) {
+	if d.Kind == "review" || d.Kind == "resolve" {
+		d.Purpose, d.Delivery = string(d.Kind), "comment"
+		return d, nil
+	}
+	return k.Shapes.Shape(provider, d)
+}
+
+// withRows serves rows as the rows of their units; any other unit has none.
+func (r *outboxRig) withRows(rows map[unit.Unit]api.Row) {
+	r.s.readRows = func(_ context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error) {
+		out := map[unit.Unit]readmodel.Read{}
+		for _, u := range units {
+			if row, ok := rows[u]; ok {
+				out[u] = readmodel.Read{Row: row}
+			}
+		}
+		return out, nil
+	}
+}
+
+var slackThread = unit.Unit{Provider: "slack", Key: "C0ENG:1700000000.000100"}
+
+func TestOutboxServesDraftFacets(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.withFakeWorkflows()
-	auto := func(wf, key string) draft.Origin {
-		return draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Key: key}
+	r.o.Kinds = roundKinds{}
+	github := r.o.Effects
+	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == slackThread.Provider {
+			return r.fx, nil
+		}
+		return github(p)
 	}
-	r.proposeAs(t, outbox.Proposal{Text: "any news?", Purpose: "nudge", Origin: auto("fake-nudge", "a")})
-	r.proposeAs(t, outbox.Proposal{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}, Text: "still there?", Purpose: "nudge", Origin: auto("fake-nudge", "b")})
-	r.proposeAs(t, outbox.Proposal{Text: "closing this", Purpose: "close", Origin: auto("fake-close", "c")})
-	r.proposeAs(t, outbox.Proposal{Text: "ping", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginSession, Key: "d"}})
-	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "e"}})
+	r.withRows(map[unit.Unit]api.Row{r7u: {Facets: map[string][]string{"where": {"acme/api"}}}, slackThread: {Facets: map[string][]string{"where": {"#eng"}}}})
+	alice := items.Op{Op: items.OpCreate, Unit: slackThread, Item: "i1", Anchor: unit.Anchor{Ref: "user:i1"}, Fields: &items.Fields{Kind: ptrOf(items.Todo),
+		Summary: ptrOf("Ship the fix"), Requester: &items.Person{Key: "slack:U0ALICE", Name: "alice"}}}
+	if _, err := r.ledger.Apply(context.Background(), items.User, []items.Op{alice}); err != nil {
+		t.Fatal(err)
+	}
+	turn := func(key string) draft.Origin {
+		return draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Key: key}
+	}
+	review := r.proposeAs(t, outbox.Proposal{Kind: "review", Text: "Looks good overall", Origin: turn("r1")})
+	resolve := r.proposeAs(t, outbox.Proposal{Kind: "resolve", Text: "Fixed in the last push", Origin: turn("r2")})
+	nudge := r.proposeAs(t, outbox.Proposal{Unit: slackThread, Kind: "nudge", Text: "any news, @{slack:U0ALICE} and @{slack:U0BOB}?",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-nudge", Key: "n"}})
 
 	page := r.outboxPage(t)
-	var got []string
-	for _, g := range page.Groups {
-		got = append(got, fmt.Sprintf("%s|%s|%s|%s|%d", g.Workflow, g.Purpose, g.Title, g.About, len(g.Drafts)))
+	want := map[int64]map[string][]string{
+		int64(review.ID):  {"proposer": {"intent:review"}, "kind": {"review"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
+		int64(resolve.ID): {"proposer": {"intent:review"}, "kind": {"resolve"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
+		int64(nudge.ID): {"proposer": {"workflow:fake-nudge"}, "workflow": {"fake-nudge"}, "kind": {"nudge"}, "source": {"slack"}, "where": {"#eng"},
+			"people": {"alice", "slack:U0BOB"}, "state": {"held"}},
 	}
-	want := []string{
-		"fake-nudge||Ask who hasn't answered|Drafted when a conversation where you asked something goes quiet.|2",
-		"fake-close||Archive finished conversations||1",
-		"|nudge|Nudge||1",
-		"||Written by hand|Replies and reactions you wrote yourself, waiting to be sent.|1",
+	if len(page.Drafts) != len(want) {
+		t.Fatalf("%d drafts, want %d", len(page.Drafts), len(want))
 	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("groups\n %q\nwant\n %q", got, want)
+	for _, d := range page.Drafts {
+		got := maps.Clone(d.Facets)
+		if len(got["age"]) != 1 {
+			t.Errorf("draft %d's age %v, want when it was written", d.ID, got["age"])
+		}
+		delete(got, "age")
+		if !reflect.DeepEqual(got, want[d.ID]) {
+			t.Errorf("draft %d's facets\n %v\nwant\n %v", d.ID, got, want[d.ID])
+		}
+		if !slices.Contains(d.Texts, d.Text) || !slices.Contains(d.Texts, d.Label) || !slices.Contains(d.Texts, d.Facets["where"][0]) {
+			t.Errorf("draft %d's search texts %q, want its text, label and where", d.ID, d.Texts)
+		}
+		if d.ID == int64(nudge.ID) && !slices.Contains(d.Texts, "alice") {
+			t.Errorf("draft %d's search texts %q, want the name of whom it mentions", d.ID, d.Texts)
+		}
 	}
-	if d := page.Groups[0].Drafts; d[0].Text != "still there?" || d[1].Text != "any news?" || d[0].Gate == 0 || d[0].Intents["approved"] == "" {
-		t.Errorf("fake-nudge's drafts %+v, want both, newest first, with their gates", d)
+	var ids []string
+	for _, f := range page.Facets {
+		ids = append(ids, f.ID)
+	}
+	if want := []string{"proposer", "workflow", "kind", "source", "where", "people", "state", "age"}; !slices.Equal(ids, want) {
+		t.Errorf("facets %q, want %q", ids, want)
+	}
+}
+
+func TestOutboxHeads(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withFakeWorkflows()
+	r.proposeAs(t, outbox.Proposal{Text: "any news?", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-nudge", Key: "a"}})
+	r.proposeAs(t, outbox.Proposal{Text: "acking", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-ack", Key: "b"}})
+	r.proposeAs(t, outbox.Proposal{Kind: "nudge", Text: "is this still moving?", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "c"}})
+	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "d"}})
+	r.proposeAs(t, outbox.Proposal{Text: "one question", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 2, Intent: "review", Key: "e"}})
+	r.proposeAs(t, outbox.Proposal{Text: "from a session", Origin: draft.Origin{Kind: draft.OriginSession, Session: "s1", Key: "f"}})
+
+	page := r.outboxPage(t)
+	l := r.s.loaded()
+	review, _ := l.Registry.Get("review")
+	nudge := "Ask who hasn't answered"
+	titles := map[string]map[string]string{
+		"proposer": {
+			"workflow:fake-nudge": nudge,
+			"rule:github-nudge":   l.Gates.Drafts.Rules["github-nudge"],
+			"user":                l.Gates.Drafts.ByHand,
+			"session":             l.Gates.Drafts.BySession,
+			"intent:review":       review.Outbox.Title,
+		},
+		"workflow": {"fake-nudge": nudge},
+		"kind":     {"reply": l.UI["github"].Drafts["reply"].Label, "nudge": l.UI["github"].Drafts["nudge"].Label},
+	}
+	for id, words := range titles {
+		for v, title := range words {
+			if title == "" {
+				t.Fatalf("the bundled profile words no %s %s", id, v)
+			}
+		}
+		i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == id })
+		if i < 0 {
+			t.Fatalf("no facet %s served", id)
+		}
+		if !reflect.DeepEqual(page.Facets[i].Labels, words) {
+			t.Errorf("facet %s's labels %v, want %v", id, page.Facets[i].Labels, words)
+		}
+	}
+	nudgeHead := api.OutboxHead{About: "Drafted when a conversation where you asked something goes quiet.", Workflow: "fake-nudge"}
+	want := map[string]map[string]api.OutboxHead{
+		"proposer": {
+			"workflow:fake-nudge": nudgeHead,
+			"user":                {About: l.Gates.Drafts.ByHandAbout},
+			"session":             {About: l.Gates.Drafts.BySessionAbout},
+			"intent:review":       {About: review.Outbox.About},
+		},
+		"workflow": {"fake-nudge": nudgeHead},
+	}
+	if !reflect.DeepEqual(page.Heads, want) {
+		t.Errorf("heads\n %+v\nwant\n %+v", page.Heads, want)
+	}
+}
+
+func TestTheOutboxsWordsLeaveTheProfilesValuesAlone(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	l := *r.s.loaded()
+	l.Views.DraftFacets = slices.Clone(l.Views.DraftFacets)
+	for i, f := range l.Views.DraftFacets {
+		if f.Fact == "draft.proposer" {
+			l.Views.DraftFacets[i].Values = map[string]string{"user": "Mine"}
+		}
+	}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "d"}})
+	r.proposeAs(t, outbox.Proposal{Text: "from a session", Origin: draft.Origin{Kind: draft.OriginSession, Session: "s1", Key: "f"}})
+	for range 2 {
+		page := r.outboxPage(t)
+		i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == "proposer" })
+		if want := map[string]string{"user": "Mine", "session": l.Gates.Drafts.BySession}; !reflect.DeepEqual(page.Facets[i].Labels, want) {
+			t.Errorf("proposer labels %v, want the profile's value word kept and the session's worded: %v", page.Facets[i].Labels, want)
+		}
+		if got := page.Heads["proposer"]["user"].About; got != l.Gates.Drafts.ByHandAbout {
+			t.Errorf("the head of a value the profile words says %q, want %q", got, l.Gates.Drafts.ByHandAbout)
+		}
+	}
+	for _, f := range l.Views.DraftFacets {
+		if f.Fact == "draft.proposer" && len(f.Values) != 1 {
+			t.Errorf("serving the Outbox changed the profile's values: %v", f.Values)
+		}
+	}
+}
+
+func TestOutboxDraftWithoutRow(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	r.proposeAs(t, outbox.Proposal{Text: "hi", Origin: draft.Origin{Kind: draft.OriginUser, Key: "x"}})
+	page := r.outboxPage(t)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("%d drafts, want 1", len(page.Drafts))
+	}
+	if vs, ok := page.Drafts[0].Facets["where"]; ok {
+		t.Errorf("a draft whose unit has no row is where %v, want no value", vs)
+	}
+	if got := page.Drafts[0].Facets["proposer"]; !slices.Equal(got, []string{"user"}) {
+		t.Errorf("proposer %v, want user", got)
 	}
 }
 
@@ -106,10 +278,10 @@ func TestTheOutboxCarriesEachDraftsContext(t *testing.T) {
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-ack", Key: "k"}})
 
 	page := r.outboxPage(t)
-	if len(page.Groups) != 1 || len(page.Groups[0].Drafts) != 1 {
-		t.Fatalf("groups %+v", page.Groups)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("drafts %+v", page.Drafts)
 	}
-	got := page.Groups[0].Drafts[0]
+	got := page.Drafts[0]
 	if got.ID != int64(d.ID) || got.Task != string(id) {
 		t.Fatalf("draft %+v", got.Draft)
 	}
@@ -120,9 +292,6 @@ func TestTheOutboxCarriesEachDraftsContext(t *testing.T) {
 	if its := got.Context.Items; len(its) != 1 || its[0] != (api.OutboxItem{ID: "i1", Summary: "Review the retry change", State: "open"}) {
 		t.Errorf("items %+v, want the draft's item with its state", its)
 	}
-	if g := page.Groups[0]; g.Workflow != "fake-ack" || g.Title != "fake-ack" {
-		t.Errorf("a workflow the profile lacks heads its group %q %q, want its name", g.Workflow, g.Title)
-	}
 }
 
 func TestTheOutboxOfADraftWithNoTaskHasAnEmptyContext(t *testing.T) {
@@ -130,7 +299,7 @@ func TestTheOutboxOfADraftWithNoTaskHasAnEmptyContext(t *testing.T) {
 	r := newOutboxRig(t)
 	r.proposeAs(t, outbox.Proposal{Text: "hi", Origin: draft.Origin{Kind: draft.OriginUser, Key: "x"}})
 	page := r.outboxPage(t)
-	c := page.Groups[0].Drafts[0].Context
+	c := page.Drafts[0].Context
 	if c.Asks == nil || c.Items == nil || len(c.Asks)+len(c.Items) != 0 {
 		t.Errorf("context %+v, want empty lists", c)
 	}
@@ -171,5 +340,131 @@ func BenchmarkOutbox(b *testing.B) {
 		if rec.Code != 200 {
 			b.Fatalf("GET: %d %s", rec.Code, rec.Body)
 		}
+	}
+}
+
+func TestTheOutboxIsInItsViewsOrder(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	base := r.clock.Now()
+	write := func(hours int, kind draft.Kind, key string) draft.ID {
+		r.clock.set(base.Add(time.Duration(hours) * time.Hour))
+		return r.proposeAs(t, outbox.Proposal{Kind: kind, Text: "draft " + key, Origin: draft.Origin{Kind: draft.OriginUser, Key: key}}).ID
+	}
+	late := write(2, "reply", "late")
+	early := write(0, "nudge", "early")
+	middle := write(1, "reply", "middle")
+	order := func(path string) []draft.ID {
+		t.Helper()
+		var page api.OutboxPage
+		if code := get(t, r.s, path, &page); code != 200 {
+			t.Fatalf("GET %s: %d", path, code)
+		}
+		var ids []draft.ID
+		for _, d := range page.Drafts {
+			ids = append(ids, draft.ID(d.ID))
+		}
+		return ids
+	}
+	if got, want := order(api.OutboxPath), []draft.ID{early, middle, late}; !slices.Equal(got, want) {
+		t.Errorf("bundled Outbox order %v, want the oldest first %v", got, want)
+	}
+
+	l := *r.s.loaded()
+	l.Views.Views = slices.Clone(l.Views.Views)
+	for i, v := range l.Views.Views {
+		if v.ID == "outbox" {
+			l.Views.Views[i].Sort = []intentload.SortKey{{Fact: "draft.created_at", Desc: true}}
+			later := v
+			later.ID, later.Sort = "send-later", []intentload.SortKey{{Fact: "draft.kind"}, {Fact: "draft.created_at"}}
+			l.Views.Views = append(l.Views.Views, later)
+			break
+		}
+	}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	if got, want := order(api.OutboxPath), []draft.ID{late, middle, early}; !slices.Equal(got, want) {
+		t.Errorf("Outbox order %v with its sort descending, want the newest first %v", got, want)
+	}
+	if got, want := order(api.OutboxPath+"?view=send-later"), []draft.ID{early, middle, late}; !slices.Equal(got, want) {
+		t.Errorf("send-later order %v, want by kind then oldest first %v", got, want)
+	}
+}
+
+func TestTheOutboxNamesTheSourceOfADraftByItsPublisher(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == slackThread.Provider {
+			return takingFx{r.fx}, nil
+		}
+		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
+	}
+	r.o.Targets = []unit.ProviderID{slackThread.Provider}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "a task"})
+	r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Target: "#general", Kind: "ask_owner", Text: "who owns this?", State: draft.Held,
+		Origin: draft.Origin{Kind: draft.OriginUser, Key: "a"}})
+
+	page := r.outboxPage(t)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("%d drafts, want 1", len(page.Drafts))
+	}
+	if got := page.Drafts[0].Facets["source"]; !slices.Equal(got, []string{"slack"}) {
+		t.Errorf("source %v, want the publisher of its target, slack", got)
+	}
+	want := r.s.loaded().UI["slack"].Drafts["ask_owner"].Label
+	i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == "kind" })
+	if got := page.Facets[i].Labels["ask_owner"]; want == "" || got != want {
+		t.Errorf("kind word %q, want Slack's %q", got, want)
+	}
+}
+
+func TestADraftOnATaskIsWhereItsTaskIs(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	r.s.deps.Row = func(_ context.Context, e task.Task) (catalog.Row, error) {
+		if e.ID == "e1" {
+			return catalog.Row{Facets: map[string][]string{"where": {"acme/infra"}}}, nil
+		}
+		return catalog.Row{}, nil
+	}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "placed"}, task.Task{ID: "e2", State: "next", Category: task.CategoryReady, Title: "unplaced"})
+	placed := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Text: "on a placed task", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "a"}})
+	unplaced := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e2"}, Text: "on an unplaced task", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "b"}})
+	onPR := r.stored(t, draft.Draft{Unit: r7u, Text: "on a pull request with no row", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "c"}})
+
+	want := map[int64][]string{int64(placed.ID): {"acme/infra"}, int64(unplaced.ID): nil, int64(onPR.ID): nil}
+	for _, d := range r.outboxPage(t).Drafts {
+		if got := d.Facets["where"]; !slices.Equal(got, want[d.ID]) {
+			t.Errorf("draft %d (%s) is where %v, want %v", d.ID, d.Text, got, want[d.ID])
+		}
+	}
+}
+
+func TestTheOutboxReadsATasksRowOnceForItsDrafts(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	var mu sync.Mutex
+	read := map[task.ID]int{}
+	r.s.deps.Row = func(_ context.Context, e task.Task) (catalog.Row, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		read[e.ID]++
+		return catalog.Row{Facets: map[string][]string{"where": {"acme/infra"}}}, nil
+	}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "placed"})
+	for _, key := range []string{"a", "b", "c"} {
+		r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Text: "draft " + key, State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: key}})
+	}
+	for _, d := range r.outboxPage(t).Drafts {
+		if got := d.Facets["where"]; !slices.Equal(got, []string{"acme/infra"}) {
+			t.Errorf("draft %d is where %v, want its task's", d.ID, got)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if read["e1"] != 1 {
+		t.Errorf("the task's row was read %d times for its 3 drafts, want once", read["e1"])
 	}
 }

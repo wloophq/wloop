@@ -6,6 +6,10 @@ runners   = ["session"]
 session   = { strategy = "new", title = "start", name = '{{or .workspace.name .task.title}}' }
 brief     = { render = false, wait = false }
 
+[outbox]
+title = "Posts from new work"
+about = "Drafted when work you started attaches something to post."
+
 [target]
 missing = "capture"
 title   = '{{title 72 .guidance}}'

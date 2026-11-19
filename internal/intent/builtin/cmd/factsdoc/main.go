@@ -36,10 +36,15 @@ var intentGroups = []group{
 	{"The task (`task.*`)", []string{"task"}},
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
 	{"A name (`session.*`, `workspace.*`; slot `name`)", []string{"session", "workspace"}},
-	{"A draft's actions (`draft.*`)", []string{"draft"}},
+	{"A draft's facts (`draft.*`)", []string{"draft"}},
 	{"An item proposal's gate (`proposal.*`; slot `proposal`)", []string{"proposal"}},
 	{"A built-in action's copy (`copy.*`; slot `copy`)", []string{"copy"}},
 	{"The configuration (`config.*`)", []string{"config"}},
+}
+
+// groupNotes are the sentences some intent groups carry under their heading.
+var groupNotes = map[string]string{
+	"A draft's facts (`draft.*`)": "A draft's action reads the facts of the `draft_action` slot; a draft facet of `views.toml`'s `[draft_facets]`, and the Outbox view's `group` and `sort`, read those of `draft_view`. `draft.proposer` and `draft.delivery` are in [the draft approval facts](#draft-approval-facts).",
 }
 
 // workflowGroups title the workflow facts' subsections, one per slot of
@@ -216,7 +221,11 @@ func page() (string, error) {
 		return "", err
 	}
 	for i, g := range intentGroups {
-		out = append(out, "### "+g.title, "", intentTable(parts[i]))
+		out = append(out, "### "+g.title, "")
+		if note := groupNotes[g.title]; note != "" {
+			out = append(out, note, "")
+		}
+		out = append(out, intentTable(parts[i]))
 	}
 	out = append(out, "## Workflow facts", "",
 		"A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts ["+providerChoice()+"]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.",

@@ -90,12 +90,19 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `workspace.name` | string | name | The name of the worktree created for the unit; empty when the turn creates none or before it is named. |
 | `session.started` | timestamp | name | When the session starts; a template formats it with Go's layout, as {{.session.started.Format "02/01 15:04"}}. Zero when unset; test with `> timestamp(0)`. |
 
-### A draft's actions (`draft.*`)
+### A draft's facts (`draft.*`)
+
+A draft's action reads the facts of the `draft_action` slot; a draft facet of `views.toml`'s `[draft_facets]`, and the Outbox view's `group` and `sort`, read those of `draft_view`. `draft.proposer` and `draft.delivery` are in [the draft approval facts](#draft-approval-facts).
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
-| `draft.state` | string | draft_action | The draft's state. |
-| `draft.provider` | string | draft_action | The provider of the draft's unit. |
+| `draft.workflow` | string | draft_view | The workflow behind the draft, a turn's draft included; empty for a draft no workflow is behind. |
+| `draft.kind` | string | draft_view | The draft's kind as its plugin's manifest names it, such as review, thread_reply or nudge. |
+| `draft.where` | string | draft_view | Where the draft's unit is, as its row gives it, a repository or a channel; for a draft on a task whose row gives none, the task's value of the task facet of the same id, such as its placement; empty when neither gives one. |
+| `draft.people` | list | draft_view | The people the draft is to or mentions, each by the name its plugin resolves the mention to, else by the mention key, such as slack:U0123. |
+| `draft.created_at` | timestamp | draft_view | When the draft was written. Zero when unset; test with `> timestamp(0)`. |
+| `draft.state` | string | draft_action, draft_view | The draft's state. |
+| `draft.provider` | string | draft_action, draft_view | The provider whose plugin posts the draft: its unit's, or, for a draft on a unit no plugin posts to, such as a task, the one its target names. |
 | `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 
@@ -429,7 +436,7 @@ A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts o
 | Approval fact | Type | Meaning |
 |---|---|---|
 | `draft.delivery` | string | How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for. |
-| `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's. |
+| `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's, user for one you wrote, session for one a session wrote outside any intent's turn. |
 | `draft.effects` | list | The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.purpose` | string | The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.github.review.event` | string | The /event field of a review draft's payload, which the plugin posts as is; absent, and so the empty string, for a draft of any other kind. A rule that sends reads it only as an allow-list: draft.github.review.event == "<value>" or in ["<value>", ...] as a term of the top-level &&. |

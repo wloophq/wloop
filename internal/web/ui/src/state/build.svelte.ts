@@ -27,7 +27,7 @@ function draftsShown(): Set<string> {
   for (const d of detailState.unitDrafts) out.add("draft:" + d.id);
   tasksState.tasks.forEach(task);
   tasksState.gates.forEach(subject);
-  for (const g of (outboxState.page && outboxState.page.groups) || []) for (const d of g.drafts || []) out.add("draft:" + d.id);
+  for (const d of (outboxState.page && outboxState.page.drafts) || []) out.add("draft:" + d.id);
   for (const it of (queueState.queue && queueState.queue.items) || []) subject(it.gate);
   return out;
 }

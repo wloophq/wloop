@@ -72,6 +72,7 @@ var uiGrammar = []Key{
 	}, Doc: "How the event's data shows on a timeline."},
 	{Path: "drafts", In: SurfaceUI, Kind: KindMap, Doc: "The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself."},
 	{Path: "drafts.*", In: SurfaceUI, Kind: KindTable, Doc: "One draft kind's words."},
+	{Path: "drafts.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "What the draft kind is called to a person, such as \"Review\": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name."},
 	{Path: "drafts.*.fields", In: SurfaceUI, Kind: KindMap, Doc: "The payload's fields, by the key they have in the payload, at any depth."},
 	{Path: "drafts.*.fields.*", In: SurfaceUI, Kind: KindTable, Doc: "One field's words."},
 	{Path: "drafts.*.fields.*.label", In: SurfaceUI, Localized: true, Kind: KindText, Doc: "The field's name on the card."},
