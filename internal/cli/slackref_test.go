@@ -15,9 +15,6 @@ import (
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 )
 
-// reactedPurpose is the purpose of a reaction slack_post records.
-const reactedPurpose = "react"
-
 const (
 	refSecond = "1700000000.000200"
 	refThird  = "1700000000.000300"

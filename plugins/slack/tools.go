@@ -37,9 +37,6 @@ const (
 	searchLimitMax = 100
 )
 
-// broadcastToken is a Slack special mention that notifies a whole channel or group.
-var broadcastToken = regexp.MustCompile(`(?i)<!(?:channel|here|everyone|subteam\^)`)
-
 var slackToken = regexp.MustCompile(`(?:xox[a-z]\.)?(?:xox[a-z]|xapp)-[A-Za-z0-9-]+`)
 
 func redactTokens(s string) string { return slackToken.ReplaceAllString(s, "[redacted]") }

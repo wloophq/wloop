@@ -3,7 +3,6 @@ package slack
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"maps"
 	"net/http"
 	"net/url"
@@ -24,8 +23,6 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/send"
 	"github.com/wloophq/wloop/plugins/slack/slacktest"
 )
-
-var updateGolden = flag.Bool("update", false, "rewrite the golden files")
 
 // newLiveSlack is newPubSlack holding msgs, whose writes change what its
 // reads answer: a Verify after a Publish sees the change, as one after a
@@ -583,19 +580,6 @@ func TestEveryKindHasAPreview(t *testing.T) {
 	if !slices.Equal(names, enum) || !slices.Equal(names, offered) {
 		t.Fatalf("kinds %v, slack_post's enum %v, offered %v", names, enum, offered)
 	}
-}
-
-func formOf(v url.Values) string {
-	keys := make([]string, 0, len(v))
-	for k := range v {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = k + "=" + strings.Join(v[k], ",")
-	}
-	return strings.Join(parts, " ")
 }
 
 func TestWithinTheUnitsThread(t *testing.T) {
