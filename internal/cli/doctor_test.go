@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -423,6 +424,34 @@ func TestDoctorLooksUpTheManagersBinary(t *testing.T) {
 		if script != want {
 			t.Errorf("%s: %q, want %q", manager, script, want)
 		}
+	}
+}
+
+func TestPathChecksRunTheLoginShellInTheEnvironmentLaunchdGives(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	var name string
+	var args []string
+	te.Sh = func(_ context.Context, n string, a ...string) ([]byte, error) {
+		name, args = n, a
+		return nil, nil
+	}
+	te.pathChecks(context.Background(), te.cfg)
+	if name != "/usr/bin/env" || len(args) < 4 || args[0] != "-i" {
+		t.Fatalf("the check ran %s %q, not in a cleared environment", name, args)
+	}
+	shell := slices.Index(args, shellPath())
+	if shell < 0 || args[shell+1] != "-lc" {
+		t.Fatalf("the check ran %q, not the login shell", args)
+	}
+	var paths []string
+	for _, kv := range args[1:shell] {
+		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
+			paths = append(paths, v)
+		}
+	}
+	if !slices.Equal(paths, []string{launchdPath}) {
+		t.Fatalf("PATH %q, want launchd's %q alone: the caller's PATH must not reach the check", paths, launchdPath)
 	}
 }
 

@@ -674,9 +674,16 @@ func (e *Env) pathChecks(ctx context.Context, cfg config.Config) []check {
 	return checks
 }
 
-// loginPaths maps each of bins the login shell finds to where it is.
+// launchdPath is the PATH launchd gives a LaunchAgent that sets none.
+const launchdPath = "/usr/bin:/bin:/usr/sbin:/sbin"
+
+// loginPaths maps each of bins the login shell finds to where it is. The
+// shell starts from the environment launchd gives the daemon, not the
+// caller's: a PATH an interactive shell's rc file added would otherwise
+// find a binary the daemon cannot.
 func (e *Env) loginPaths(ctx context.Context, bins []string) map[string]string {
-	out, _ := e.Sh(ctx, shellPath(), "-lc", "command -v "+strings.Join(bins, " "))
+	out, _ := e.Sh(ctx, "/usr/bin/env", "-i", "HOME="+e.Home, "PATH="+launchdPath, "SHELL="+shellPath(),
+		shellPath(), "-lc", "command -v "+strings.Join(bins, " "))
 	found := map[string]string{}
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		line = strings.TrimSpace(line)

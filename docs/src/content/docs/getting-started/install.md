@@ -72,7 +72,7 @@ systemctl --user daemon-reload
 systemctl --user enable --now {{name}}.service
 ```
 
-The login shell (`sh -l`) gives the daemon the `PATH` where `gh`, `git`, `orca` and `claude` live. Without notifications, each automatic round still waits in its approval window, and the cockpit and the terminal client let you act on it.
+The login shell (`sh -l`) gives the daemon the `PATH` where `gh`, `git`, `orca` and `claude` live. It is not interactive: zsh reads `~/.zprofile` there, never `~/.zshrc`, so a directory added to `PATH` only in `~/.zshrc` is missing from the daemon's. `{{command}} doctor` looks the binaries up in that shell started from the environment launchd gives the daemon, not from your terminal's. Without notifications, each automatic round still waits in its approval window, and the cockpit and the terminal client let you act on it.
 
 ## Check the setup
 
