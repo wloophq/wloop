@@ -318,3 +318,37 @@ values = { LEFT = "old", RIGHT = "new" }
 [drafts.review.fields.body]
 label = "Comment"
 markdown = true
+
+# What each draft kind is called: the Outbox's name for the kind, and the head of its group when drafts group by kind.
+[drafts.comment]
+label = "Comment"
+
+[drafts.reply]
+label = "Reply"
+
+[drafts.nudge]
+label = "Nudge"
+
+[drafts.close]
+label = "Close"
+
+[drafts.ask_owner]
+label = "Ask who owns it"
+
+[drafts.react]
+label = "React"
+
+[drafts.edit]
+label = "Edit"
+
+[drafts.review]
+label = "Review"
+
+[drafts.thread_reply]
+label = "Reply in a thread"
+
+[drafts.resolve]
+label = "Resolve a thread"
+
+[drafts.request_review]
+label = "Request a review"

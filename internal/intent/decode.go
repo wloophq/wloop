@@ -38,6 +38,7 @@ type manifest struct {
 	Why         *string           `toml:"why"`
 	Refuse      []mRefuse         `toml:"refuse"`
 	Drafts      *mDrafts          `toml:"drafts"`
+	Outbox      *wOutbox          `toml:"outbox"`
 	Gates       *mGates           `toml:"gates"`
 	Guidance    *mGuidance        `toml:"guidance"`
 	Headline    *mHeadline        `toml:"headline"`

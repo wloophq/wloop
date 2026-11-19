@@ -192,6 +192,38 @@ xl = "XL"
 [facets.tag]
 label = "Tag"
 
+[draft_facets.proposer]
+label = "Proposto por"
+
+[draft_facets.workflow]
+label = "Workflow"
+empty = "sem workflow"
+
+[draft_facets.kind]
+label = "Tipo"
+
+[draft_facets.source]
+label = "Origem"
+
+[draft_facets.where]
+label = "Onde"
+
+[draft_facets.people]
+label = "Para (pessoa)"
+empty = "ninguém"
+
+[draft_facets.state]
+label = "Estado"
+
+[draft_facets.state.values]
+failed = "falhou no envio"
+sending = "enviando"
+queued = "na fila"
+held = "esperando você"
+
+[draft_facets.age]
+label = "Escrito"
+
 [views.inbox]
 label = "Inbox"
 summary = "O que ninguém esclareceu ainda; depois de esclarecida, a tarefa sai de vez."

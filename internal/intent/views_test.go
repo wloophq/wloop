@@ -702,15 +702,11 @@ func TestDraftFacetsLoad(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
-	var ids []string
-	for _, f := range views.DraftFacets {
-		ids = append(ids, f.ID)
-	}
-	if !slices.Equal(ids, []string{"kind", "age"}) {
-		t.Fatalf("draft facets %v", ids)
-	}
-	if f, _ := draftFacetOf(views, "kind"); f.Fact != "draft.kind" || !f.Group || !f.Menu || f.Label != "Kind" {
+	if f, ok := draftFacetOf(views, "kind"); !ok || f.Fact != "draft.kind" || !f.Group || !f.Menu || f.Label != "Kind" {
 		t.Errorf("kind: %+v", f)
+	}
+	if f, ok := draftFacetOf(views, "age"); !ok || f.Fact != "draft.created_at" || f.Label != "Age" || f.Sort != "time" {
+		t.Errorf("age: %+v", f)
 	}
 }
 
@@ -722,8 +718,10 @@ func TestDraftFacetRejectsTaskFact(t *testing.T) {
 			t.Errorf("problems lack %q:\n%s", want, got)
 		}
 	}
-	if len(views.DraftFacets) != 0 {
-		t.Errorf("draft facets with a problem are served: %+v", views.DraftFacets)
+	for _, id := range []string{"state", "who", "kind"} {
+		if _, ok := draftFacetOf(views, id); ok {
+			t.Errorf("draft facet %s with a problem is served", id)
+		}
 	}
 }
 

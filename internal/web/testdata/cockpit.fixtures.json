@@ -4062,7 +4062,9 @@
     "summary": "Drafts waiting for your approval, and approved ones still sending or that failed to send.",
     "empty": "No drafts wait on you.",
     "when": "gate.kind == 'draft' \u0026\u0026 (gate.status == 'open' || gate.delivery in ['sending', 'failed'])",
+    "sort": "draft.created_at",
     "over": "gates",
+    "group": "draft.proposer",
     "rail": false
    },
    {

@@ -312,6 +312,67 @@ merge    = "rows-first"
 show     = "meta"
 show_max = 2
 
+# The draft facets: the fields the Outbox filters, groups and sorts drafts by, each over a draft.* fact. A
+# facet shares its id with the task facet of the same meaning, so a qualifier such as where:acme/api reads
+# the same in every view. A proposer's, a workflow's and a draft kind's words come from where each is declared:
+# the intent, the workflow and the plugin.
+[draft_facets.proposer]
+fact  = "draft.proposer"
+label = "Proposed by"
+group = true
+sort  = "text"
+
+[draft_facets.workflow]
+fact  = "draft.workflow"
+label = "Workflow"
+group = true
+sort  = "text"
+empty = "no workflow"
+
+[draft_facets.kind]
+fact  = "draft.kind"
+label = "Kind"
+group = true
+sort  = "text"
+
+[draft_facets.source]
+fact  = "draft.provider"
+label = "Source"
+group = true
+sort  = "text"
+
+[draft_facets.where]
+fact  = "draft.where"
+label = "Where"
+group = true
+sort  = "text"
+match = "suffix"
+
+[draft_facets.people]
+fact  = "draft.people"
+label = "To (person)"
+group = true
+match = "team"
+empty = "nobody"
+
+[draft_facets.state]
+fact  = "draft.state"
+label = "State"
+group = true
+sort  = "rank"
+rank  = ["failed", "sending", "queued", "held"]
+
+[draft_facets.state.values]
+failed  = "failed to send"
+sending = "sending"
+queued  = "queued"
+held    = "waiting for you"
+
+[draft_facets.age]
+fact  = "draft.created_at"
+label = "Written"
+sort  = "time"
+
 [views.inbox]
 label         = "Inbox"
 summary       = "What nobody has clarified yet; once clarified, a task leaves for good."
@@ -444,6 +505,8 @@ over          = "gates"
 when          = "gate.kind == 'draft' && (gate.status == 'open' || gate.delivery in ['sending', 'failed'])"
 hide_disabled = true
 layout        = "outbox"
+group         = "draft.proposer"
+sort          = "draft.created_at"
 
 [views.review-projects]
 label         = "Projects to review"

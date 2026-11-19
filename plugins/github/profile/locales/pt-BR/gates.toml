@@ -1,2 +1,5 @@
 [effects]
 "pr.nudged" = "O pull request fica marcado como cobrado."
+
+[drafts.rules]
+github-nudge = "Cobrar um pull request parado"

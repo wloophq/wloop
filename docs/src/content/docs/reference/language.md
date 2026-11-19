@@ -185,6 +185,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted; a round the plan named leaves it to the plan's marks.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.attach_posts` (bool, default `false`): On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts.
+- `outbox` (table): How the Outbox heads the group of the drafts the intent's turns proposed, when drafts group by proposer.
+- `outbox.title` (string, localized): The group's title, in the plural, such as "Reviews"; the label when absent.
+- `outbox.about` (string, localized): One line under the title on when the intent drafts them, such as "Drafted by a review round of a pull request."
 
 ## Built-in actions (`actions.toml`)
 
