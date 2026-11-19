@@ -14,9 +14,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/turn"
 )
 
 // answeredQuestions is an agent whose home or checkout answered every
@@ -151,9 +149,11 @@ func TestAFollowUpWhoseSessionNeverStartedIsBlockedNotRetriedAtOnce(t *testing.T
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 3}
 	cfg := config.Defaults()
 	cfg.Turns.NoStartWait = config.Days(3 * time.Hour)
-	s := &sweep{e: sc.env, cfg: cfg, now: testNow, st: round.New()}
-	st := step{kind: stepFollowup, ws: wsdomain.Workspace{ID: "ws-3", Path: "/w/app", DisplayName: "app"}, pr: ref}
-	s.noteStartProblem(context.Background(), st, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	hold := startHold{round: "follow-up", questionSkips: true}
+	err := sc.env.holdRound(context.Background(), cfg, wsdomain.Workspace{ID: "ws-3", Path: "/w/app", DisplayName: "app"}, ref.Unit(), roundOptions{hold: hold}, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	if !errors.As(err, new(errNoMCP)) {
+		t.Fatalf("err %v", err)
+	}
 	var blocks []inventory.StartBlock
 	for _, e := range rec.events {
 		if b, ok := inventory.StartBlockOf(port.Event{Kind: e.Kind, Key: e.Key}); ok {
@@ -173,28 +173,13 @@ func TestARoundOnAUnitWhoseSessionNeverStartedIsBlocked(t *testing.T) {
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 4}
 	cfg := config.Defaults()
 	cfg.Turns.NoStartWait = config.Days(90 * time.Minute)
-	run := unitRun{def: dintent.Def{Name: "act"}, cfg: cfg, r: turn.Request{Unit: ref.Unit()}}
-	sc.env.blockUnit(context.Background(), run, wsdomain.Workspace{Path: "/w/api"}, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
+	sc.env.holdRound(context.Background(), cfg, wsdomain.Workspace{Path: "/w/api"}, ref.Unit(), roundOptions{intent: dintent.Name("act")}, fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
 	if len(rec.events) != 1 {
 		t.Fatalf("events %+v", rec.events)
 	}
 	b, ok := inventory.StartBlockOf(port.Event{Kind: rec.events[0].Kind, Key: rec.events[0].Key})
 	if !ok || b.Question != "" || !b.RetryAt.Equal(sc.env.Now().Add(90*time.Minute)) || b.Folder != "/w/api" || b.Round != "act" {
 		t.Fatalf("block %+v", b)
-	}
-}
-
-func TestARoundByHandWhoseSessionNeverStartsKeepsItsNoStartBlock(t *testing.T) {
-	t.Parallel()
-	r := newBlockRig(t, noStartBlockKey)
-	err := r.sc.env.liftPassedBlock(context.Background(), r.ref.Unit(), fmt.Errorf("%w; closed its session s-1", errNoMCP{"/home/me/.claude"}))
-	if !errors.As(err, new(errNoMCP)) || len(r.unblocks()) != 0 {
-		t.Fatalf("err %v, unblocked %v; want the no-start block kept", err, r.unblocks())
-	}
-	r2 := newBlockRig(t, trustBlockKey)
-	r2.sc.env.liftPassedBlock(context.Background(), r2.ref.Unit(), errNoMCP{"/home/me/.claude"})
-	if len(r2.unblocks()) != 1 {
-		t.Fatalf("a session past the trust question kept its block: %v", r2.unblocks())
 	}
 }
 

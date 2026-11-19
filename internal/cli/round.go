@@ -35,7 +35,7 @@ type roundOptions struct {
 	allowUserActive bool
 	// confirmed is an automated round the user sent from the plan. Unlike
 	// allowUserActive it lifts only the open-workspace check: the session
-	// choice and a blocked start stay those of an automated round.
+	// choice stays that of an automated round.
 	confirmed bool
 	// keepLive sends to the live session however long it has been idle.
 	keepLive bool
@@ -63,6 +63,8 @@ type roundOptions struct {
 	// pr is the round's pull request as read for it, nil for none; the
 	// configuration's project_settings reads its facts.
 	pr *pr.PullRequest
+	// hold is what a start block of the round records.
+	hold startHold
 }
 
 // trusts says whether pr passes the trust check of automated rounds under
@@ -71,14 +73,6 @@ type roundOptions struct {
 // trust.
 func trusts(cfg config.Config, pr *pr.PullRequest) bool {
 	return pr != nil && dchange.Untrusted(pr.Facts, []string{pr.Owner}, cfg.For(pr.Owner, pr.Repo).GitHub.TrustedAuthors) == ""
-}
-
-// keepBlocked says whether a session blocked on the question reason stays
-// open for the user: only in a round the user started by hand, and on the
-// trust question only for an untrusted pull request, since a trusted one's
-// answer is the trust command.
-func (o roundOptions) keepBlocked(reason string) bool {
-	return o.allowUserActive && (!o.trusted || reason != workspace.ReasonTrust)
 }
 
 // startRound moves an existing review workspace to the PR head and hands the
@@ -282,21 +276,14 @@ func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Worksp
 	if m, err = e.WS.For(ctx, ws); err != nil {
 		return proc{}, "", err
 	}
+	var wake func() (proc, bool, error)
 	if !ok {
-		p, woke, err := e.wake(ctx, cfg, m, ws, u, opts, keep)
-		if err != nil || woke {
-			return p, verbWoken, err
-		}
+		wake = func() (proc, bool, error) { return e.wake(ctx, cfg, m, ws, u, opts, keep) }
 	}
-	s, err := e.agentSession(ctx, cfg, ws, opts)
-	if err != nil {
-		return proc{}, "", err
+	p, woke, err := e.startAgent(ctx, cfg, ws, u, opts, wake)
+	if woke {
+		verb = verbWoken
 	}
-	name, err := e.roundName(opts, u)
-	if err != nil {
-		return proc{}, "", err
-	}
-	p, err := e.startSession(ctx, cfg, ws, u, s, name, opts.keepBlocked, opts.trusted)
 	if err != nil {
 		return proc{}, "", err
 	}
@@ -417,10 +404,10 @@ func (e *Env) liveSession(ctx context.Context, cfg config.Config, m workspace.Ma
 
 // startSession mints a session id and starts an agent session of s under it
 // in ws, which the loop will type a turn into, and waits for its MCP tool. A
-// session that cannot take the turn is abandoned, but for one blocked on a
-// prompt with keepBlocked, which stays for the user to answer. trusted is the
+// session that cannot take the turn is abandoned, but with keepBlocked one
+// blocked on a prompt, which stays for the user to answer. trusted is the
 // pull request's verdict from trusts.
-func (e *Env) startSession(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, u unit.Unit, s turns.AgentSession, name string, keepBlocked func(reason string) bool, trusted bool) (proc, error) {
+func (e *Env) startSession(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, u unit.Unit, s turns.AgentSession, name string, keepBlocked, trusted bool) (proc, error) {
 	m, err := e.WS.For(ctx, ws)
 	if err != nil {
 		return proc{}, err
@@ -488,9 +475,9 @@ func (e *Env) startRequest(cfg config.Config, ws wsdomain.Workspace, s turns.Age
 
 // blockedStart explains a session that waits on a prompt and abandons it,
 // unless keepBlocked leaves it open for the user to answer.
-func (e *Env) blockedStart(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, p proc, blocked *workspace.BlockedError, keepBlocked func(reason string) bool, trusted bool) error {
+func (e *Env) blockedStart(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, p proc, blocked *workspace.BlockedError, keepBlocked, trusted bool) error {
 	err := e.explainBlocked(ctx, cfg, ws, blocked, trusted)
-	if keepBlocked(blocked.Reason) {
+	if keepBlocked {
 		return fmt.Errorf("%w; it stays open for you to decide, then run the round again", err)
 	}
 	return e.abandon(ctx, p, err)

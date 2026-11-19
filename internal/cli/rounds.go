@@ -4,18 +4,15 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -64,6 +61,8 @@ type step struct {
 	inputs map[string]any
 	// turn is the turn the round records, as its start admitted it.
 	turn turns.Turn
+	// hold is what a start block of the round records.
+	hold startHold
 }
 
 func (s step) key() string { return s.pr.String() }
@@ -113,10 +112,15 @@ func (s step) roundKind() string {
 
 // blockedIntent is the intent of the round b holds.
 func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
-	if b.Round == (step{kind: stepAddress}).roundKind() {
+	switch {
+	case b.Asked != nil:
+		return dintent.Name(b.Asked.Intent)
+	case b.Round == (step{kind: stepAddress}).roundKind():
 		return e.roleIntent(builtin.RoleAddress)
+	case b.Round == (step{kind: stepFirstRound}).roundKind(), b.Round == (step{kind: stepFollowup}).roundKind():
+		return e.roleIntent(builtin.RoleReview)
 	}
-	return e.roleIntent(builtin.RoleReview)
+	return dintent.Name(b.Round)
 }
 
 // roleIntent is the intent holding role on pull requests; "" when none
@@ -161,24 +165,6 @@ func (s *sweep) warnf(format string, args ...any) {
 // whyPaused is why a pause drops a pending round.
 const whyPaused = "automatic rounds paused"
 
-// blockRound records a block of the round of kind with key, "" or a
-// StartBlock's. Without an inventory it logs the reason once a day.
-func (s *sweep) blockRound(ctx context.Context, ref pr.Ref, kind, why, key string) {
-	line := fmt.Sprintf("skip the %s of %s: %s", kind, ref, why)
-	if s.e.Rec == nil {
-		if s.st.FirstNote(line, s.now) {
-			s.logf("%s", line)
-		}
-		return
-	}
-	ev := port.Event{Unit: ref.Unit(), Kind: dinv.KindRoundBlocked, Key: key, At: s.now, Data: why}
-	if err := s.e.Rec.RecordUnit(ctx, ev); err != nil {
-		s.warnf("%s: recording the blocked %s: %v; the next sweep retries", ref, kind, err)
-		return
-	}
-	s.logf("%s", line)
-}
-
 func (s *sweep) record(ctx context.Context, st step, kind, data string) {
 	if s.e.Rec == nil {
 		return
@@ -210,58 +196,12 @@ func (e *Env) withState(ctx context.Context, fn func(s *sweep) error) error {
 	return rounds.Save(ctx, store)
 }
 
-// sweepOptions are the session options of the rounds of intent, as its
+// options are the session options of st's round of intent, as its
 // manifest declares them.
-func (e *Env) sweepOptions(intent dintent.Name, opts roundOptions) roundOptions {
-	d, _ := e.loadedIntents().Registry.Get(intent)
+func (s *sweep) options(st step, intent dintent.Name, opts roundOptions) roundOptions {
+	d, _ := s.e.loadedIntents().Registry.Get(intent)
+	opts.hold = st.hold
 	return intentOptions(d, opts)
-}
-
-// noteStartProblem makes a round that cannot start until the user answers
-// the agent's question visible. A round on an untrusted folder, or one that
-// creates its workspace, stays blocked, so no sweep starts it again until
-// the folder is trusted or the user acts, and one whose session never
-// started stays blocked for turns.no_start_wait; any other records why it was
-// skipped, once per distinct reason.
-func (s *sweep) noteStartProblem(ctx context.Context, st step, err error) {
-	var block inventory.StartBlock
-	var untrusted *turns.UntrustedError
-	var asked *turns.QuestionError
-	why := strings.TrimPrefix(fmt.Sprint(err), st.ws.DisplayName+": ")
-	switch {
-	case errors.As(err, &untrusted):
-		block = inventory.StartBlock{Question: turns.QuestionTrust, Root: untrusted.Root, Folder: untrusted.Folder, Home: untrusted.Home,
-			Homes: s.e.trustHomes(s.prConfig(st), untrusted.Home)}
-		why = untrustedWhy(untrusted)
-	case errors.As(err, &asked):
-		block = inventory.StartBlock{Question: asked.Question, Root: asked.Root}
-	case errors.As(err, new(errNoMCP)):
-		block = inventory.StartBlock{Folder: st.ws.Path, RetryAt: s.now.Add(time.Duration(s.cfg.Turns.NoStartWait))}
-	default:
-		return
-	}
-	if s.e.Rec == nil {
-		return
-	}
-	if untrusted != nil || !block.RetryAt.IsZero() || st.kind == stepFirstRound || st.ws.ID == "" {
-		block.Round, block.Skip = st.roundKind(), st.onSkipped
-		s.blockRound(ctx, st.pr, st.roundKind(), why, block.Key(s.now))
-		return
-	}
-	sum := sha256.Sum256([]byte(st.roundKind() + "\n" + block.Key(time.Time{})))
-	ev := dinv.Event{PR: st.pr, Kind: dinv.KindRoundSkipped, Key: "start " + hex.EncodeToString(sum[:8]), At: s.now, Data: st.roundKind() + ": " + why}
-	if err := s.e.Rec.Record(ctx, ev); err != nil {
-		s.warnf("%s: recording %s: %v", st.pr, dinv.KindRoundSkipped, err)
-	}
-}
-
-// untrustedWhy is the outcome a round blocked on an untrusted folder shows.
-func untrustedWhy(u *turns.UntrustedError) string {
-	home := "the agent home of its terminal"
-	if u.Home != "" {
-		home = u.Home
-	}
-	return "could not start: " + u.Folder + " is not trusted in " + home
 }
 
 // roundCall is a round a workflow's turn.start sends.
@@ -327,8 +267,8 @@ func (e *Env) roundStep(st *round.Store, c roundCall) (*sweep, step, error) {
 		fresh: true, why: c.Why, address: c.Address, inputs: c.Inputs, turn: c.Turn}, nil
 }
 
-func (s *sweep) send(ctx context.Context, st step, guidance string) (o turns.Outcome, err error) {
-	defer func() { s.noteStartProblem(ctx, st, err) }()
+func (s *sweep) send(ctx context.Context, st step, guidance string) (turns.Outcome, error) {
+	st.hold = startHold{round: st.roundKind(), skip: st.onSkipped, questionSkips: st.kind != stepFirstRound && st.ws.ID != ""}
 	switch st.kind {
 	case stepFirstRound:
 		return s.firstRound(ctx, st, guidance)
@@ -363,7 +303,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (turns.O
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
+	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.options(st, s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
 	out := turns.Outcome{ID: sent.ID, Head: st.head}
 	if err != nil {
 		return out, err
@@ -420,7 +360,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
+	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.options(st, s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
 	out := turns.Outcome{ID: sent.ID, Head: st.head}
 	if err != nil {
 		return out, err
@@ -483,7 +423,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (turns.Ou
 	}
 	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, Inputs: st.inputs,
 		BriefMissing: st.briefMissing, Why: st.why}
-	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read, turn: st.turn}))
+	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.options(st, s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read, turn: st.turn}))
 	out := turns.Outcome{ID: turnID, Head: st.head}
 	if err != nil {
 		return out, err

@@ -125,7 +125,7 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) (
 	if err != nil {
 		return turns.Outcome{}, err
 	}
-	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, func(string) bool { return true }, true)
+	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, true, true)
 	if err != nil {
 		return turns.Outcome{}, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}

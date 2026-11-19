@@ -106,7 +106,9 @@ func withArticle(name string) string {
 }
 
 // TrustAndRun trusts the folder the round of ref is blocked on, lifts the
-// block and sends the round now. Only the user's action calls it.
+// block and sends the round now: the one the person asked for, with the
+// guidance they gave it unless the action brings its own, else the round
+// the loop planned. Only the user's action calls it.
 func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	ref := prOf(u)
 	e, cfg, profile, err := a.prepare(ctx, ref, c)
@@ -132,7 +134,14 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err := e.Rec.Record(ctx, ev); err != nil {
 		return err
 	}
-	return runHeldRound(ctx, e, cfg, ref, profile, c.Guidance, trustedAndRan)
+	if b.Asked == nil {
+		return runHeldRound(ctx, e, cfg, ref, profile, c.Guidance, trustedAndRan)
+	}
+	d, err := e.intentDef(b.Asked.Intent)
+	if err != nil {
+		return err
+	}
+	return e.askedRound(ctx, d, cfg, ref, cmp.Or(c.Guidance, b.Asked.Guidance), b.Asked.Inputs, profile, trustedAndRan)
 }
 
 // trustedAndRan is why a round a trust gate's approval runs drops the

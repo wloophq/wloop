@@ -125,7 +125,7 @@ func TestASessionThatCannotTakeTheRoundIsAbandoned(t *testing.T) {
 			t.Fatalf("writes:\n%s", got)
 		}
 	})
-	t.Run("one of an untrusted pull request blocked on a prompt stays for the user", func(t *testing.T) {
+	t.Run("one of an untrusted pull request blocked on a prompt", func(t *testing.T) {
 		m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, Blocked: "the trust dialog"}
 		te := newTestEnv(t, m)
 		te.gh.basics = openBasics
@@ -133,7 +133,7 @@ func TestASessionThatCannotTakeTheRoundIsAbandoned(t *testing.T) {
 		if code := te.run("review", r7.URL()); code != 1 || !strings.Contains(te.err.String(), "waits on the trust dialog in its terminal term-ws-1") {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
-		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1" {
+		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1\nclose term-ws-1\nremove --force ws-1" {
 			t.Fatalf("writes:\n%s", got)
 		}
 	})

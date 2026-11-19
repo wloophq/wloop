@@ -128,22 +128,38 @@ type StartBlock struct {
 	// RetryAt is when a block that waits on no question lifts, such as a session that never started; zero for a
 	// block on a question.
 	RetryAt time.Time
+	// Asked is the round a person asked for that the block holds, which
+	// trusting its folder runs again; nil for a round the loop planned.
+	Asked *AskedRound
+}
+
+// AskedRound is a round a person asked for: its intent and what they gave it.
+type AskedRound struct {
+	Intent   string         `json:"intent"`
+	Guidance string         `json:"guidance,omitempty"`
+	Inputs   map[string]any `json:"inputs,omitempty"`
 }
 
 // Key keeps each block its own event: a keyed event is recorded once. Its
 // eighth and ninth parts, the reviews and checks head an older release
-// wrote, stay empty, the tenth is Skip as JSON when it holds a mark, and the
-// eleventh RetryAt when set.
+// wrote, stay empty, the tenth is Skip as JSON when it holds a mark, the
+// eleventh RetryAt when set, and the twelfth Asked as JSON.
 func (b StartBlock) Key(at time.Time) string {
 	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, "", ""}
-	skip := ""
+	skip, retry := "", ""
 	if len(b.Skip) > 0 {
 		raw, _ := json.Marshal(b.Skip)
 		skip = string(raw)
 	}
+	if !b.RetryAt.IsZero() {
+		retry = b.RetryAt.UTC().Format(time.RFC3339Nano)
+	}
 	switch {
-	case !b.RetryAt.IsZero():
-		parts = append(parts, skip, b.RetryAt.UTC().Format(time.RFC3339Nano))
+	case b.Asked != nil:
+		raw, _ := json.Marshal(b.Asked)
+		parts = append(parts, skip, retry, string(raw))
+	case retry != "":
+		parts = append(parts, skip, retry)
 	case skip != "":
 		parts = append(parts, skip)
 	}
@@ -153,19 +169,27 @@ func (b StartBlock) Key(at time.Time) string {
 // StartBlockOf is the StartBlock a round_blocked event's key names.
 func StartBlockOf(e port.Event) (StartBlock, bool) {
 	parts := strings.Split(e.Key, "\n")
-	if e.Kind != dinv.KindRoundBlocked || len(parts) < 9 || len(parts) > 11 {
+	if e.Kind != dinv.KindRoundBlocked || len(parts) < 9 || len(parts) > 12 {
 		return StartBlock{}, false
 	}
 	b := StartBlock{Question: parts[1], Root: parts[2], Folder: parts[3], Home: parts[4], Round: parts[6]}
 	if parts[5] != "" {
 		b.Homes = strings.Split(parts[5], "\t")
 	}
-	if len(parts) == 11 {
-		at, err := time.Parse(time.RFC3339Nano, parts[10])
-		if err != nil {
+	if len(parts) == 12 {
+		b.Asked = &AskedRound{}
+		if err := json.Unmarshal([]byte(parts[11]), b.Asked); err != nil {
 			return StartBlock{}, false
 		}
-		b.RetryAt = at
+	}
+	if len(parts) >= 11 {
+		if parts[10] != "" {
+			at, err := time.Parse(time.RFC3339Nano, parts[10])
+			if err != nil {
+				return StartBlock{}, false
+			}
+			b.RetryAt = at
+		}
 		if parts[9] != "" {
 			if err := json.Unmarshal([]byte(parts[9]), &b.Skip); err != nil {
 				return StartBlock{}, false

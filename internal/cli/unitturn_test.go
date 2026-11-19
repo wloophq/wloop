@@ -204,10 +204,10 @@ func TestMCPDialogBlocksAThreadTurn(t *testing.T) {
 	ctx := context.Background()
 	c := client.New(te.Socket)
 	_, err := c.Action(ctx, thread1, "discuss", api.ActionRequest{})
-	if err == nil || !strings.Contains(err.Error(), "which MCP servers") || !strings.Contains(err.Error(), "it stays open for you to decide") {
+	if err == nil || !strings.Contains(err.Error(), "which MCP servers") || !strings.Contains(err.Error(), "the round waits on its start block") {
 		t.Fatalf("err = %v", err)
 	}
-	if len(m.Prompts) != 0 || strings.Contains(strings.Join(m.Writes, "\n"), "close") {
+	if len(m.Prompts) != 0 || !strings.Contains(strings.Join(m.Writes, "\n"), "close") {
 		t.Fatalf("prompts %+v, writes %q", m.Prompts, m.Writes)
 	}
 	blocks, err := te.Store.FirstRoundBlocks(ctx)

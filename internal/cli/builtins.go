@@ -270,6 +270,7 @@ func cliBuiltins() map[string][]string {
 
 // options are the session options the round's manifest asks for.
 func (run roundRun) options(opts roundOptions) roundOptions {
+	opts.hold = askedHold(run.r)
 	return intentOptions(run.def, opts)
 }
 
