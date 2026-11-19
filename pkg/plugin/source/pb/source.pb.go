@@ -8596,7 +8596,10 @@ type GateRef struct {
 	// proposed, approved, or discarded under dry run.
 	State string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
 	// rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
-	Rev           int64 `protobuf:"varint,4,opt,name=rev,proto3" json:"rev,omitempty"`
+	Rev int64 `protobuf:"varint,4,opt,name=rev,proto3" json:"rev,omitempty"`
+	// link is the address of the draft's card in the host's cockpit, where the
+	// user reviews, edits and posts it; "" when unknown.
+	Link          string `protobuf:"bytes,5,opt,name=link,proto3" json:"link,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8659,13 +8662,24 @@ func (x *GateRef) GetRev() int64 {
 	return 0
 }
 
+func (x *GateRef) GetLink() string {
+	if x != nil {
+		return x.Link
+	}
+	return ""
+}
+
 // OpenGateRequest proposes a draft. With a session, the host sets its origin,
 // task and default items from the session's book and refuses effects the
 // session's intent does not allow; without, the origin is the plugin's rule.
 type OpenGateRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Draft         *Draft                 `protobuf:"bytes,1,opt,name=draft,proto3" json:"draft,omitempty"`
-	Session       string                 `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Draft   *Draft                 `protobuf:"bytes,1,opt,name=draft,proto3" json:"draft,omitempty"`
+	Session string                 `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	// post asks the host to post the draft at once, approved through the
+	// session, when the user drives it; from any other session the draft waits
+	// for the user.
+	Post          bool `protobuf:"varint,3,opt,name=post,proto3" json:"post,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8712,6 +8726,13 @@ func (x *OpenGateRequest) GetSession() string {
 		return x.Session
 	}
 	return ""
+}
+
+func (x *OpenGateRequest) GetPost() bool {
+	if x != nil {
+		return x.Post
+	}
+	return false
 }
 
 type OpenGateResponse struct {
@@ -11353,15 +11374,17 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\bturn_seq\x18\x03 \x01(\x03R\aturnSeq\x12\x16\n" +
 	"\x06intent\x18\x04 \x01(\tR\x06intent\x12\x12\n" +
 	"\x04role\x18\x05 \x01(\tR\x04role\x12'\n" +
-	"\x0fallowed_effects\x18\x06 \x03(\tR\x0eallowedEffects\"[\n" +
+	"\x0fallowed_effects\x18\x06 \x03(\tR\x0eallowedEffects\"o\n" +
 	"\aGateRef\x12\x12\n" +
 	"\x04gate\x18\x01 \x01(\tR\x04gate\x12\x14\n" +
 	"\x05draft\x18\x02 \x01(\x03R\x05draft\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x10\n" +
-	"\x03rev\x18\x04 \x01(\x03R\x03rev\"Y\n" +
+	"\x03rev\x18\x04 \x01(\x03R\x03rev\x12\x12\n" +
+	"\x04link\x18\x05 \x01(\tR\x04link\"m\n" +
 	"\x0fOpenGateRequest\x12,\n" +
 	"\x05draft\x18\x01 \x01(\v2\x16.wloop.source.v1.DraftR\x05draft\x12\x18\n" +
-	"\asession\x18\x02 \x01(\tR\asession\"@\n" +
+	"\asession\x18\x02 \x01(\tR\asession\x12\x12\n" +
+	"\x04post\x18\x03 \x01(\bR\x04post\"@\n" +
 	"\x10OpenGateResponse\x12,\n" +
 	"\x04gate\x18\x01 \x01(\v2\x18.wloop.source.v1.GateRefR\x04gate\"o\n" +
 	"\x11RecordSentRequest\x12,\n" +

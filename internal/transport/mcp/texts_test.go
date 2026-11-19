@@ -31,7 +31,7 @@ func describedTools(t *testing.T, s *Server) map[string]tool {
 func TestToolsTakeTheirTextsFromTheProfile(t *testing.T) {
 	var logged []string
 	f := &fakePlugin{}
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Plugins: []PluginTool{f.tool(t, "slack_read"), f.tool(t, "slack_send_message")},
+	s := &Server{Turns: &fakeTurns{}, Port: 47800, Plugins: []PluginTool{f.tool(t, "slack_read"), f.tool(t, "slack_post")},
 		Log: func(f string, a ...any) {
 			if l := fmt.Sprintf(f, a...); strings.HasPrefix(l, "mcp: tools.toml") {
 				logged = append(logged, l)
@@ -53,8 +53,8 @@ func TestToolsTakeTheirTextsFromTheProfile(t *testing.T) {
 	if r := tools["slack_read"]; r.Description != "Read Slack." || r.InputSchema.Properties["target"].Description != "a permalink" {
 		t.Fatalf("slack_read %+v", r)
 	}
-	if tools["slack_send_message"].Description != "" {
-		t.Fatalf("a tool with no text got %q", tools["slack_send_message"].Description)
+	if tools["slack_post"].Description != "" {
+		t.Fatalf("a tool with no text got %q", tools["slack_post"].Description)
 	}
 	if len(logged) != 1 || !strings.Contains(logged[0], "slack_read.params.nope names no parameter") {
 		t.Fatalf("logged %q", logged)

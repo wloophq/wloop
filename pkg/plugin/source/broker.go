@@ -126,7 +126,7 @@ func (s *hostServer) Session(ctx context.Context, r *pb.SessionRequest) (*pb.Ses
 
 func (s *hostServer) OpenGate(ctx context.Context, r *pb.OpenGateRequest) (*pb.OpenGateResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.OpenGateResponse, error) {
-		g, err := h.OpenGate(ctx, GateRequest{Draft: draftGo(r.GetDraft()), Session: r.GetSession()})
+		g, err := h.OpenGate(ctx, GateRequest{Draft: draftGo(r.GetDraft()), Session: r.GetSession(), Post: r.GetPost()})
 		return &pb.OpenGateResponse{Gate: gateRefPB(g)}, err
 	})
 }
@@ -328,7 +328,7 @@ func (h *hostClient) Session(ctx context.Context, handle string) (Session, error
 
 func (h *hostClient) OpenGate(ctx context.Context, req GateRequest) (GateRef, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.OpenGateResponse, error) {
-		return c.OpenGate(ctx, &pb.OpenGateRequest{Draft: draftPB(req.Draft), Session: req.Session})
+		return c.OpenGate(ctx, &pb.OpenGateRequest{Draft: draftPB(req.Draft), Session: req.Session, Post: req.Post})
 	})
 	return gateRefGo(r.GetGate()), err
 }

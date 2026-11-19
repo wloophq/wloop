@@ -62,26 +62,25 @@ func TestRR2OptionDoesNotApproveContentThePersonDidNotSee(t *testing.T) {
 	}
 }
 
-// RR2-B: the session that proposed and pinned the draft answers its own question through the option.
-func TestRR2ProposerCannotPickItsOwnOption(t *testing.T) {
+// RR2-B: the session that proposed and pinned the draft, which the user drives, answers its own question through
+// the option: the user decides through it, so the draft posts.
+func TestRR2AProposerTheUserDrivesPicksItsOwnOption(t *testing.T) {
 	r := newDraftsRig(t)
 	r.review()
 	d := r.propose("REQUEST_CHANGES", "Proposed by the session.", "c2", true)
 	r.end(fmt.Sprintf(`{"state":"asked","summary":"s","resume":"r","question":%s}`,
 		choice("Post?", draftOption("post", "Post it", d), `{"id":"hold","label":"Not yet","consequence":"nothing"}`)))
 	id, intent := r.questionGate()
-	_, err := r.as(r.s.Handle).ResolveGate(r.ctx, id, intent, api.TaskRequest{Args: map[string]string{"answer": "post"}, Source: "claude"})
-	t.Logf("proposer's pick: %v", err)
-	r.send()
-	r.wantPosted()
-	if s := r.draft(d.ID).State; s != "held" {
-		t.Fatalf("the proposing session's own pick moved its draft to %s (resolve err %v)", s, err)
+	if _, err := r.as(r.s.Handle).ResolveGate(r.ctx, id, intent, api.TaskRequest{Args: map[string]string{"answer": "post"}, Source: "claude"}); err != nil {
+		t.Fatalf("the proposer's pick: %v", err)
 	}
+	r.send()
+	r.wantPosted(fmt.Sprintf("%d REQUEST_CHANGES", d.ID))
 }
 
-// RR2-C: a second session revises the draft, the asking turn pins that revision, and the reviser picks the option:
-// the pick is refused outright, so the question stays open and the asking turn hears nothing.
-func TestRR2ReviserCannotPickTheOptionPinningItsRevision(t *testing.T) {
+// RR2-C: a second session revises the draft, the asking turn pins that revision, and the reviser, which the user
+// drives, picks the option: the pick answers the question and posts the revision it pinned.
+func TestRR2AReviserTheUserDrivesPicksTheOptionPinningItsRevision(t *testing.T) {
 	r := newDraftsRig(t)
 	other := r.d.Start(t, draftsPR, "review")
 	r.review()
@@ -99,16 +98,9 @@ func TestRR2ReviserCannotPickTheOptionPinningItsRevision(t *testing.T) {
 	r.end(fmt.Sprintf(`{"state":"asked","summary":"s","resume":"r","question":%s}`,
 		choice("Post?", draftOption("post", "Post it", pinned), `{"id":"hold","label":"Not yet","consequence":"nothing"}`)))
 	id, intent := r.questionGate()
-	_, rerr := rs.ResolveGate(r.ctx, id, intent, api.TaskRequest{Args: map[string]string{"answer": "post"}, Source: "claude"})
-	if rerr == nil {
-		t.Fatal("the reviser's pick of the option pinning its own revision was accepted as an answer")
-	}
-	if again, _ := r.questionGate(); again != id {
-		t.Fatalf("the question %d did not stay open after the refused pick (open: %d)", id, again)
+	if _, err := rs.ResolveGate(r.ctx, id, intent, api.TaskRequest{Args: map[string]string{"answer": "post"}, Source: "claude"}); err != nil {
+		t.Fatalf("the reviser's pick: %v", err)
 	}
 	r.send()
-	r.wantPosted()
-	if s := r.draft(d.ID).State; s != "held" {
-		t.Fatalf("the reviser's pick moved the draft it revised to %s (resolve err %v)", s, rerr)
-	}
+	r.wantPosted(fmt.Sprintf("%d REQUEST_CHANGES", d.ID))
 }

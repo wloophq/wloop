@@ -198,7 +198,7 @@ type Tool struct {
 	Name     string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
 	Doc      string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
 	Input    string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
-	Posts    string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
+	Posts    string   `toml:"posts" doc:"The tool may post as the user at once, so the user's agent settings allow it without a prompt: a write tool whose draft false the host posts from a session the user drives, or a tool that posts itself and records the post as a sent draft; empty posts nothing." enum:"now"`
 	Proposes bool     `toml:"proposes" doc:"The tool only proposes drafts the user approves, so a session policy may allow it without a prompt."`
 	Reads    bool     `toml:"reads" doc:"The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt."`
 	Answers  []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`

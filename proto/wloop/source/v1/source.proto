@@ -1105,6 +1105,9 @@ message GateRef {
   string state = 3;
   // rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
   int64 rev = 4;
+  // link is the address of the draft's card in the host's cockpit, where the
+  // user reviews, edits and posts it; "" when unknown.
+  string link = 5;
 }
 
 // OpenGateRequest proposes a draft. With a session, the host sets its origin,
@@ -1113,6 +1116,10 @@ message GateRef {
 message OpenGateRequest {
   Draft draft = 1;
   string session = 2;
+  // post asks the host to post the draft at once, approved through the
+  // session, when the user drives it; from any other session the draft waits
+  // for the user.
+  bool post = 3;
 }
 
 message OpenGateResponse {

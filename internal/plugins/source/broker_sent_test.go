@@ -75,7 +75,7 @@ func TestSlackToolPostIsARecordedSentGate(t *testing.T) {
 	posted := src.Draft{Unit: plugin.Unit{Provider: "slack", Key: thread.Key}, Purpose: "reply", Delivery: "message", Text: "on it",
 		Evidence: src.Evidence{Ref: "C000AAA/1700000000.000200"}}
 
-	ref, err := g.RecordSent(ctx, posted, "live", "slack_send_message")
+	ref, err := g.RecordSent(ctx, posted, "live", "slack_post")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestSlackToolPostIsARecordedSentGate(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("the post has no gate: %v", err)
 	}
-	if gt.Kind != gate.KindDraft || gt.Status != gate.Approved || gt.By != task.ActorAgent || gt.Rule != "slack_send_message" ||
+	if gt.Kind != gate.KindDraft || gt.Status != gate.Approved || gt.By != task.ActorAgent || gt.Rule != "slack_post" ||
 		gt.Intent != "approve" || gt.Subject != strconv.FormatInt(int64(d.ID), 10) || gt.Unit != thread {
 		t.Fatalf("the post's gate %+v", gt)
 	}

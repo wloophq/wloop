@@ -16,11 +16,11 @@ import (
 
 // The tools of the plugin's manifest.
 const (
-	ToolDraft   = "github_draft"
+	ToolPost    = "github_post"
 	ToolThreads = "github_threads"
 )
 
-// The kinds github_draft proposes, as plugin.toml declares them.
+// The kinds github_post writes, as plugin.toml declares them.
 const (
 	kindComment       = "comment"
 	kindReview        = "review"
@@ -31,9 +31,12 @@ const (
 
 var draftKinds = []string{kindComment, kindReview, kindThreadReply, kindResolve, kindRequestReview}
 
-// The states a draft's gate leaves it in that github_draft answers apart.
+// The states a draft's gate leaves it in that github_post answers apart.
 const (
+	stateHeld    = "held"
 	stateQueued  = "queued"
+	stateSending = "sending"
+	stateSent    = "sent"
 	stateDropped = "dropped"
 )
 
@@ -78,8 +81,8 @@ func (p *Plugin) CallTool(ctx context.Context, call src.ToolCall) (src.ToolResul
 		return src.ToolResult{}, err
 	}
 	switch call.Tool {
-	case ToolDraft:
-		return r.draft(ctx, call), nil
+	case ToolPost:
+		return r.post(ctx, call), nil
 	case ToolThreads:
 		return r.threads(ctx, call), nil
 	}
@@ -109,23 +112,30 @@ func (r *running) sessionRef(ctx context.Context, session string) (pr.Ref, *src.
 	return ref, nil
 }
 
-type draftArgs struct {
+type postArgs struct {
 	Kind    string          `json:"kind"`
 	Target  string          `json:"target"`
 	Text    string          `json:"text"`
 	Payload json.RawMessage `json:"payload"`
 	Basis   string          `json:"basis"`
+	Draft   *bool           `json:"draft"`
 	Hold    bool            `json:"hold"`
 	Effects []string        `json:"effects"`
 	Why     string          `json:"why"`
 }
 
-// problems are what keeps a's draft from fitting its kind.
-func (a draftArgs) problems() []problem {
+// now says a asks to post at once rather than draft.
+func (a postArgs) now() bool { return a.Draft != nil && !*a.Draft }
+
+// problems are what keeps a's post from fitting its kind.
+func (a postArgs) problems() []problem {
 	if !slices.Contains(draftKinds, a.Kind) {
 		return []problem{{Answer: "problem_kind", Fields: fields{"Kinds": strings.Join(draftKinds, ", ")}}}
 	}
 	var out []problem
+	if a.Hold && a.now() {
+		out = append(out, problem{Answer: "problem_hold"})
+	}
 	if (a.Kind == kindComment || a.Kind == kindThreadReply) && strings.TrimSpace(a.Text) == "" {
 		out = append(out, problem{Answer: "problem_text_required"})
 	}
@@ -149,10 +159,10 @@ func (a draftArgs) problems() []problem {
 	return out
 }
 
-// draft proposes a GitHub draft on the pull request of the session's turn,
-// once a review's basis is its head now.
-func (r *running) draft(ctx context.Context, call src.ToolCall) src.ToolResult {
-	var a draftArgs
+// post writes a GitHub post on the pull request of the session's turn, once a review's basis is its head now:
+// a draft for the user, or, with draft false, posted at once when the user drives the session.
+func (r *running) post(ctx context.Context, call src.ToolCall) src.ToolResult {
+	var a postArgs
 	if err := decodeStrict(call.Args, &a); err != nil {
 		return answer("bad_arguments", fields{"Error": err.Error()}, true)
 	}
@@ -179,18 +189,28 @@ func (r *running) draft(ctx context.Context, call src.ToolCall) src.ToolResult {
 	}
 	d := src.Draft{Unit: ref.Unit(), Kind: a.Kind, Target: strings.TrimSpace(a.Target), Text: a.Text, Payload: a.Payload, Basis: a.Basis,
 		Hold: a.Hold, Effects: a.Effects, Why: a.Why}
-	got, err := r.host.Gates.OpenGate(ctx, src.GateRequest{Draft: d, Session: call.Session})
+	got, err := r.host.Gates.OpenGate(ctx, src.GateRequest{Draft: d, Session: call.Session, Post: a.now()})
 	if err != nil {
 		return failed(err)
 	}
-	name := "proposed"
-	switch got.State {
-	case stateQueued:
-		name = "approved"
-	case stateDropped:
-		name = "dry_run"
+	return answer(postAnswer(a.now(), got.State), fields{"ID": got.Draft, "Rev": got.Rev, "Unit": ref.String(), "Link": got.Link}, false)
+}
+
+// postAnswer is github_post's answer for a post whose draft its gate left in state st, now when it asked to post
+// at once: posting once it is on its way, kept when it waits for the user, drafted when it was asked to, approved
+// by a rule of the user's, dry_run under a dry run.
+func postAnswer(now bool, st string) string {
+	switch {
+	case st == stateDropped:
+		return "dry_run"
+	case now && st == stateHeld:
+		return "kept"
+	case now:
+		return "posting"
+	case st == stateQueued || st == stateSending || st == stateSent:
+		return "approved"
 	}
-	return answer(name, fields{"ID": got.Draft, "Rev": got.Rev, "Unit": ref.String()}, false)
+	return "drafted"
 }
 
 // threads answers the unresolved review threads and the latest reviews of

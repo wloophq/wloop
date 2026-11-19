@@ -30,6 +30,30 @@ import (
 type hostedLate struct {
 	outbox  atomic.Pointer[outbox.Service]
 	resolve atomic.Pointer[func(context.Context, string) (unit.Unit, bool, error)]
+	poster  atomic.Pointer[psource.Poster]
+}
+
+func (h *hostedLate) setPoster(p psource.Poster) {
+	if h != nil && p != nil {
+		h.poster.Store(&p)
+	}
+}
+
+// latePoster is the daemon's poster once serve built it: before, a draft waits for the user and links nowhere.
+type latePoster struct{ h *hostedLate }
+
+func (p latePoster) PostDraft(ctx context.Context, session string, id draft.ID, rev int64) (draft.Draft, bool, error) {
+	if po := p.h.poster.Load(); po != nil {
+		return (*po).PostDraft(ctx, session, id, rev)
+	}
+	return draft.Draft{}, false, errNoOutbox
+}
+
+func (p latePoster) DraftLink(id draft.ID) string {
+	if po := p.h.poster.Load(); po != nil {
+		return (*po).DraftLink(id)
+	}
+	return ""
 }
 
 func (h *hostedLate) setResolve(r func(context.Context, string) (unit.Unit, bool, error)) {
@@ -76,7 +100,8 @@ func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedg
 			}
 			return unit.Unit{}, false, nil
 		},
-		Now: e.Now,
+		Poster: latePoster{h},
+		Now:    e.Now,
 	}
 }
 

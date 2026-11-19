@@ -275,7 +275,7 @@ every = "5m"
 | `name` | string | The tool's name; its description lives in the profile's tools.toml. Required. |
 | `doc` | string | What the tool does, for the reference pages. Required. |
 | `input` | string | The JSON schema of the tool's arguments, an object. Required. |
-| `posts` | one of `now` | The tool posts at once, recorded as a sent draft; empty posts nothing. |
+| `posts` | one of `now` | The tool may post as the user at once, so the user's agent settings allow it without a prompt: a write tool whose draft false the host posts from a session the user drives, or a tool that posts itself and records the post as a sent draft; empty posts nothing. |
 | `proposes` | bool | The tool only proposes drafts the user approves, so a session policy may allow it without a prompt. |
 | `reads` | bool | The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt. |
 | `answers` | array of tables | The answers the tool returns, which tools.toml words. |

@@ -90,11 +90,13 @@ func TestABundledFileMissingAToolFails(t *testing.T) {
 	}
 }
 
-func TestTheSlackSendToolTellsTheAgentToAskWhenUnsure(t *testing.T) {
+func TestEveryWriteToolSaysDraftFalsePostsAtOnceOnlyWhenTheUserSaidSo(t *testing.T) {
 	tools, _ := loadTools(profile.BundledChain(), readerOf(os.DirFS("../../profiles/default")))
-	d := tools["slack_send_message"].Description
-	if !strings.Contains(d, "without their approval") || !strings.Contains(d, "ask them first") {
-		t.Fatalf("description %q", d)
+	for _, name := range []string{"slack_post", "github_post", "draft_update"} {
+		d := tools[name].Description
+		if !strings.Contains(d, "posted at once") || !strings.Contains(d, "only when the user told you") {
+			t.Errorf("%s: description %q", name, d)
+		}
 	}
 }
 
@@ -103,8 +105,8 @@ func TestAnAnswerReadsItsFields(t *testing.T) {
 	if got != "" || tools["slack_read"].Answers["failed"] != "read failed: {{.Error}} ({{.Name}})" {
 		t.Fatalf("%q %+v", got, tools["slack_read"].Answers)
 	}
-	_, got = toolsProblems(t, strings.Replace(everyTool(""), "posted = \"posted\"\n", "", 1), "")
-	if !strings.Contains(got, ".answers.posted: is missing") {
+	_, got = toolsProblems(t, strings.Replace(everyTool(""), "posting = \"posting\"\n", "", 1), "")
+	if !strings.Contains(got, "draft_update.answers.posting: is missing") {
 		t.Fatalf("a missing answer: %s", got)
 	}
 }
@@ -115,9 +117,9 @@ func TestAnAnswerIsCheckedWithItsFieldsTypesAndBothBranches(t *testing.T) {
 		ok   bool
 	}{
 		"a number compared":    {"[turn_end.answers]\nledger_applied = \"{{.Count}} op{{if ne .Count 1}}s{{end}}\"\n", true},
-		"a typo in an else":    {"[slack_send_message.answers]\nposted = \"{{if .Permalink}}{{.Permalink}}{{else}}{{.Chanel}}{{end}}\"\n", false},
+		"a typo in an else":    {"[slack_post.answers]\ndrafted = \"{{if .Link}}{{.Link}}{{else}}{{.Wher}}{{end}}\"\n", false},
 		"a len of a number":    {"[turn_end.answers]\nledger_applied = \"{{len .Count}}\"\n", false},
-		"an empty-text branch": {"[slack_send_message.answers]\nposted = \"{{with .Parent}}in {{.}}{{else}}top level{{end}}\"\n", true},
+		"an empty-text branch": {"[slack_post.answers]\ndrafted = \"{{with .Link}}at {{.}}{{else}}nowhere yet{{end}}\"\n", true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, got := toolsProblems(t, everyTool(""), c.user); (got == "") != c.ok {
@@ -142,7 +144,7 @@ func TestAPluginsToolsAreWordedByItsLayer(t *testing.T) {
 	if tools["slack_read"].Description != "read it" {
 		t.Errorf("slack_read %+v", tools["slack_read"])
 	}
-	if got := problems.Error(); !strings.Contains(got, "slack_edit: is missing") || !strings.Contains(got, "slack_read.answers.refused: is missing") {
+	if got := problems.Error(); !strings.Contains(got, "slack_post: is missing") || !strings.Contains(got, "slack_read.answers.refused: is missing") {
 		t.Errorf("the plugin's layer leaves its tools unworded:\n%s", got)
 	}
 }

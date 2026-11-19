@@ -37,7 +37,16 @@ type Hosted struct {
 	Tasks   TaskLookup
 	// Resolve is the unit an address lands in, through every plugin's codec.
 	Resolve func(ctx context.Context, address string) (unit.Unit, bool, error)
-	Now     func() time.Time
+	// Poster posts a session's draft at once and links a draft's card; nil posts none.
+	Poster Poster
+	Now    func() time.Time
+}
+
+// Poster is the daemon's: PostDraft approves held draft id at rev through session at once when the user drives
+// it, posted false leaving it waiting for the user, and DraftLink is the address of a draft's card.
+type Poster interface {
+	PostDraft(ctx context.Context, session string, id draft.ID, rev int64) (d draft.Draft, posted bool, err error)
+	DraftLink(id draft.ID) string
 }
 
 // ItemLedger is the host's items ledger.

@@ -128,9 +128,4 @@ func TestHomeInstallAllowsTheManifestsAtOnceTools(t *testing.T) {
 	if len(want) == 0 || !slices.Equal(got, want) {
 		t.Fatalf("install allows %q at once, want the manifests' %q", got, want)
 	}
-	for _, d := range policies[policyRound](te.Env, "review", te.controlSurface(te.cfg)).DraftTools {
-		if slices.Contains(got, d) {
-			t.Errorf("%s both proposes and posts at once", d)
-		}
-	}
 }

@@ -28,6 +28,8 @@ import (
 // Host is a fake host. Its zero value is ready; set the fields that script
 // it before the plugin calls it.
 type Host struct {
+	// GateState is the state OpenGate answers a draft's gate left it in; "" answers none.
+	GateState string
 	// Now is the ledger's clock; nil is a fixed instant.
 	Now func() time.Time
 	// AskFunc answers Services.Ask; nil answers ErrUnsupported.
@@ -541,7 +543,7 @@ func (h *Host) OpenGate(_ context.Context, req src.GateRequest) (src.GateRef, er
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.gates = append(h.gates, req)
-	return src.GateRef{Gate: "draft", Draft: int64(len(h.gates) + len(h.sent))}, nil
+	return src.GateRef{Gate: "draft", Draft: int64(len(h.gates) + len(h.sent)), State: h.GateState}, nil
 }
 
 func (h *Host) RecordSent(_ context.Context, d src.Draft, session, tool string) (src.GateRef, error) {

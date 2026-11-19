@@ -1,11 +1,9 @@
 package slack
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"maps"
 	"net/http"
 	"net/url"
@@ -428,9 +426,9 @@ func TestSlackDraftKeepsMentionsAndCrossUnit(t *testing.T) {
 			src.Draft{Unit: turnUnit, Kind: "delete", Delivery: "delete", Target: "C100/" + toolReply, Text: "On it"}},
 	} {
 		before := len(f.h.Gates())
-		r := f.call(t, ToolDraft, tc.args)
+		r := f.call(t, ToolPost, tc.args)
 		gates := f.h.Gates()
-		if r.Answer != "proposed" || r.IsError || len(gates) != before+1 {
+		if r.Answer != "drafted" || r.IsError || len(gates) != before+1 {
 			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
 		}
 		g := gates[before].Draft
@@ -447,12 +445,12 @@ func TestSlackDraftKeepsMentionsAndCrossUnit(t *testing.T) {
 		`{"kind":"delete"}`:                                    {"problem_message"},
 		`{"kind":"unreact","target":"C100/` + toolReply + `"}`: {"problem_reaction_required"},
 	} {
-		r := f.call(t, ToolDraft, args)
+		r := f.call(t, ToolPost, args)
 		if got := toolProblems(t, r); r.Answer != "fix_these" || !slices.Equal(got, want) {
 			t.Errorf("%s: %q %v, want %v", args, r.Answer, got, want)
 		}
 	}
-	r := f.call(t, ToolDraft, `{"kind":"edit","target":"`+mineElsewhere+`","text":"x","items":["i1"]}`)
+	r := f.call(t, ToolPost, `{"kind":"edit","target":"`+mineElsewhere+`","text":"x","items":["i1"]}`)
 	if msg, _ := toolFields(t, r)["Error"].(string); r.Answer != "failed" || !strings.HasPrefix(msg, "items:") {
 		t.Errorf("an edit elsewhere answering the turn's items: %q %s", r.Answer, r.Fields)
 	}
@@ -472,7 +470,7 @@ func TestSlackDraftReadsTheMessageItChanges(t *testing.T) {
 		{`{"kind":"delete","target":"C100/` + toolReply + `"}`, "On it", ""},
 	} {
 		before := len(f.h.Gates())
-		if r := f.call(t, ToolDraft, tc.args); r.Answer != "proposed" {
+		if r := f.call(t, ToolPost, tc.args); r.Answer != "drafted" {
 			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
 		}
 		if g := f.h.Gates()[before].Draft; g.Text != tc.text || g.Replaced != tc.replaced {
@@ -491,7 +489,7 @@ func TestSlackDraftReadsTheMessageItChanges(t *testing.T) {
 		`{"kind":"delete","target":"C100/` + toolThread + `"}`:          "problem_message_not_yours",
 		`{"kind":"delete","target":"C100/1700000777.000100"}`:           "problem_message_gone",
 	} {
-		r := f.call(t, ToolDraft, args)
+		r := f.call(t, ToolPost, args)
 		if got := toolProblems(t, r); r.Answer != "fix_these" || !slices.Equal(got, []string{want}) {
 			t.Errorf("%s: %q %v, want %s", args, r.Answer, got, want)
 		}
@@ -514,7 +512,7 @@ func TestSlackDraftPayloadHold(t *testing.T) {
 		{`{"kind":"react","reaction":"eyes","hold":false}`, "", "", false},
 		{`{"text":"Done","payload":{"k":"v"},"basis":"abc123"}`, `{"k":"v"}`, "abc123", false},
 	} {
-		if r := f.call(t, ToolDraft, tc.args); r.Answer != "proposed" {
+		if r := f.call(t, ToolPost, tc.args); r.Answer != "drafted" {
 			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
 		}
 		g := f.h.Gates()[i].Draft
@@ -523,7 +521,7 @@ func TestSlackDraftPayloadHold(t *testing.T) {
 		}
 	}
 	for _, args := range []string{`{"text":"x","hold":"yes"}`, `{"text":"x","payload":[1]}`, `{"text":"x","basis":7}`} {
-		if r := f.call(t, ToolDraft, args); r.Answer != "bad_arguments" {
+		if r := f.call(t, ToolPost, args); r.Answer != "bad_arguments" {
 			t.Errorf("%s: %q", args, r.Answer)
 		}
 	}
@@ -573,7 +571,7 @@ func TestEveryKindHasAPreview(t *testing.T) {
 		} `json:"properties"`
 	}
 	for _, tool := range m.Source.Tools {
-		if tool.Name == ToolDraft {
+		if tool.Name == ToolPost {
 			if err := json.Unmarshal([]byte(tool.Input), &input); err != nil {
 				t.Fatal(err)
 			}
@@ -583,65 +581,7 @@ func TestEveryKindHasAPreview(t *testing.T) {
 	enum := slices.Sorted(slices.Values(input.Properties.Kind.Enum))
 	offered := slices.Sorted(slices.Values(draftKinds))
 	if !slices.Equal(names, enum) || !slices.Equal(names, offered) {
-		t.Fatalf("kinds %v, slack_draft's enum %v, offered %v", names, enum, offered)
-	}
-}
-
-// TestAtOnceToolsUnchanged compares each at-once tool's Slack calls, answer
-// and recorded draft with testdata/at_once_tools.golden, written before
-// drafts could edit, delete and unreact.
-func TestAtOnceToolsUnchanged(t *testing.T) {
-	t.Parallel()
-	methods := []string{"conversations.info", "conversations.history", "conversations.replies", "chat.postMessage", "chat.update",
-		"chat.delete", "reactions.add", "reactions.remove", "chat.getPermalink", "users.info", "users.list"}
-	var out bytes.Buffer
-	for _, c := range []struct{ tool, args string }{
-		{ToolSend, `{"target":"C100/` + toolReply + `","text":"Shipping **today**, @dana","broadcast":true}`},
-		{ToolSend, `{"target":"C100","text":"Top level"}`},
-		{ToolReact, `{"message":"C100/` + toolReply + `","emoji":":eyes:"}`},
-		{ToolReact, `{"message":"C100/` + toolReply + `","emoji":"eyes","remove":true}`},
-		{ToolEdit, `{"message":"C100/` + toolReply + `","text":"On it, done by _noon_"}`},
-		{ToolDelete, `{"message":"https://acme.slack.com/archives/C100/p1700000100000200"}`},
-		{ToolEdit, `{"message":"C100/` + toolThread + `","text":"not mine"}`},
-		{ToolEdit, `{"message":"C100/1700000777.000100","text":"gone"}`},
-		{ToolDelete, `{"message":"C100/1700000777.000100"}`},
-	} {
-		f := newToolFixture(t, true)
-		f.srv.Handle("chat.delete", func(url.Values) any { return map[string]any{} })
-		f.srv.Handle("reactions.remove", func(url.Values) any { return map[string]any{} })
-		f.srv.Handle("users.list", func(url.Values) any {
-			return map[string]any{"members": []map[string]any{{"id": "U001", "name": "dana"}}}
-		})
-		r := f.call(t, c.tool, c.args)
-		fmt.Fprintf(&out, "== %s %s\nanswer %s error=%t %s\n", c.tool, c.args, r.Answer, r.IsError, r.Fields)
-		for _, m := range methods {
-			for _, v := range f.srv.Calls(m) {
-				fmt.Fprintf(&out, "call %s %s\n", m, formOf(v))
-			}
-		}
-		for _, s := range f.h.SentDrafts() {
-			raw, err := json.Marshal(s)
-			if err != nil {
-				t.Fatal(err)
-			}
-			fmt.Fprintf(&out, "recorded %s\n", raw)
-		}
-		if n := len(f.h.Gates()); n != 0 {
-			t.Errorf("%s opened %d gates", c.tool, n)
-		}
-	}
-	golden := filepath.Join("testdata", "at_once_tools.golden")
-	if *updateGolden {
-		if err := os.WriteFile(golden, out.Bytes(), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(golden)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := out.String(); got != string(want) {
-		t.Fatalf("the at-once tools changed:\n%s\nwant:\n%s", got, want)
+		t.Fatalf("kinds %v, slack_post's enum %v, offered %v", names, enum, offered)
 	}
 }
 
@@ -684,9 +624,10 @@ func TestWithinTheUnitsThread(t *testing.T) {
 	}
 }
 
-// TestAtOnceToolsPostNow: the manifest marks exactly the at-once tools
-// posts = "now", which a session policy reads instead of naming them.
-func TestAtOnceToolsPostNow(t *testing.T) {
+// TestTheWriteToolMayPostNow: the manifest marks slack_post, which posts at
+// once with draft false, posts = "now", which a session policy reads instead
+// of naming it.
+func TestTheWriteToolMayPostNow(t *testing.T) {
 	m, err := manifest.Load(".")
 	if err != nil {
 		t.Fatal(err)
@@ -701,7 +642,7 @@ func TestAtOnceToolsPostNow(t *testing.T) {
 			now = append(now, tool.Name)
 		}
 	}
-	if want := []string{ToolSend, ToolReact, ToolEdit, ToolDelete}; !slices.Equal(now, want) {
+	if want := []string{ToolPost}; !slices.Equal(now, want) {
 		t.Fatalf("posts = \"now\" on %v, want %v", now, want)
 	}
 }

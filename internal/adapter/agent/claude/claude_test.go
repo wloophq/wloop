@@ -223,7 +223,7 @@ func settingsAllow(t *testing.T, p turns.Policy) []string {
 }
 
 func TestDraftToolAllowedSendStillAsks(t *testing.T) {
-	draftTool := brand.ToolPrefix() + "slack_draft"
+	draftTool := brand.ToolPrefix() + "github_post"
 	with := settingsAllow(t, turns.Policy{TurnEnd: true, DraftTools: []string{draftTool}})
 	if !slices.Contains(with, draftTool) {
 		t.Fatalf("allow %v lacks %s", with, draftTool)

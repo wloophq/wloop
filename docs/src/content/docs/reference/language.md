@@ -708,15 +708,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
   - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives.
   - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
-  - `github_draft`: Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval.
+  - `github_post`: Writes a GitHub comment, review, review thread reply, thread resolution or review request in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives.
   - `github_threads`: Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review.
-  - `slack_send_message`: Posts to Slack as the user, now.
+  - `slack_post`: Writes a Slack message, a reaction or its removal, or an edit or deletion of one of the user's messages, in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
-  - `slack_draft`: Proposes a Slack message, a reaction or its removal, or an edit or deletion of the user's message, for the user's approval.
-  - `slack_react`: Adds or removes a reaction on a Slack message as the user, now.
-  - `slack_edit`: Replaces the text of one of the user's Slack messages, now.
-  - `slack_delete`: Deletes one of the user's Slack messages, now.
 - `<name>.description` (template): What the tool does and when to call it, over the tool data. Required.
 - `<name>.params` (table by name): A parameter's description, by its path: a nested one as "record.state", an array's element as "items[]".
 - `<name>.params.<name>` (template): The parameter's description, over the tool data.
@@ -799,7 +795,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_found` (`Error`): No such draft.
   - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
-- `github_draft`:
+- `github_post`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
@@ -808,26 +804,37 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_text_required`: A problem: the kind needs a text, and it is missing or empty.
   - `problem_payload` (`Error`): A problem: the payload does not fit the kind's schema.
   - `problem_basis_required`: A problem: the kind needs the head commit the agent read as basis.
-  - `stale` (`Basis`, `Head`): The basis is not the pull request's head now; nothing was drafted.
-  - `proposed` (`ID`: number, `Rev`: number, `Unit`): The draft waits for the user's approval.
-  - `approved` (`ID`: number, `Rev`: number, `Unit`): A rule of the user's approved the draft, and it will be posted.
-  - `dry_run` (`ID`: number, `Rev`: number, `Unit`): The draft's approval is a dry run: it is stored and never posted.
+  - `problem_hold`: A problem: hold is set with draft false.
+  - `stale` (`Basis`, `Head`): The basis is not the pull request's head now; nothing was written.
+  - `drafted` (`ID`: number, `Rev`: number, `Unit`, `Link`): The draft waits for the user: Link is its card, "" when unknown.
+  - `approved` (`ID`: number, `Rev`: number, `Unit`, `Link`): A rule of the user's approved the draft, and it will be posted.
+  - `dry_run` (`ID`: number, `Rev`: number, `Unit`, `Link`): The draft's approval is a dry run: it is stored and never posted.
+  - `posting` (`ID`: number, `Rev`: number, `Unit`, `Link`): With draft false: the post is approved through the session the user drives and on its way.
+  - `kept` (`ID`: number, `Rev`: number, `Unit`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
 - `github_threads`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `failed` (`Error`): GitHub or the daemon failed the call.
   - `threads` (`Unit`, `JSON`): The threads and reviews, as JSON.
-- `slack_send_message`:
+- `slack_post`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_target_required`: A problem: target is missing.
+  - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
+  - `problem_reaction_required`: A problem: a react or unreact post has no reaction.
+  - `problem_message`: A problem: an edit or delete post's target is not a message ref or permalink.
+  - `problem_message_gone`: A problem: Slack holds no message at an edit or delete post's target.
+  - `problem_message_not_yours`: A problem: the message an edit or delete post targets is not the user's.
   - `problem_text_required`: A problem: text is missing or empty.
-  - `broadcast`: The text notifies a whole channel or group.
-  - `posted` (`Conversation`, `Parent`, `Permalink`, `Channel`, `TS`, `Text`): The message is posted: where, its permalink, "" when Slack gave none, and its text as posted.
+  - `problem_hold`: A problem: hold is set with draft false.
+  - `drafted` (`ID`: number, `Unit`, `Where`, `Link`): The draft waits for the user: Unit is "" for one on the session itself, Link its card, "" when unknown.
+  - `approved` (`ID`: number, `Unit`, `Where`, `Link`): A rule of the user's approved the draft, and it will be posted.
+  - `dry_run` (`ID`: number, `Unit`, `Where`, `Link`): The draft's approval is a dry run: it is stored and never posted.
+  - `posting` (`ID`: number, `Unit`, `Where`, `Link`): With draft false: the post is approved through the session the user drives and on its way.
+  - `kept` (`ID`: number, `Unit`, `Where`, `Link`): With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user.
 - `slack_read`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -849,51 +856,6 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_before_after`: A problem: before is not after after.
   - `problem_limit` (`Max`: number): A problem: limit is out of range.
   - `found` (`Text`): The messages found, rendered.
-- `slack_draft`:
-  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
-  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
-  - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `not_logged_in`: Slack is logged out.
-  - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
-  - `problem_reaction_required`: A problem: a react or unreact draft has no reaction.
-  - `problem_message`: A problem: an edit or delete draft's target is not a message ref or permalink.
-  - `problem_message_gone`: A problem: Slack holds no message at an edit or delete draft's target.
-  - `problem_message_not_yours`: A problem: the message an edit or delete draft targets is not the user's.
-  - `problem_text_required`: A problem: text is missing or empty.
-  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user's approval.
-  - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it, and it will be posted.
-  - `dry_run` (`ID`: number, `Unit`, `Where`): The draft's approval is a dry run: it is stored and never posted.
-- `slack_react`:
-  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
-  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
-  - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `not_logged_in`: Slack is logged out.
-  - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_message`: A problem: message is not a message ref or permalink.
-  - `problem_emoji_required`: A problem: emoji is missing or empty.
-  - `reacted` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is added; Permalink is "" when Slack gave none.
-  - `removed` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is removed; Permalink is "" when Slack gave none.
-  - `already` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message already had the user's reaction; Permalink is "" when Slack gave none.
-  - `absent` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message had no such reaction of the user; Permalink is "" when Slack gave none.
-- `slack_edit`:
-  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
-  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
-  - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `not_logged_in`: Slack is logged out.
-  - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_message`: A problem: message is not a message ref or permalink.
-  - `problem_text_required`: A problem: text is missing or empty.
-  - `broadcast`: The text notifies a whole channel or group.
-  - `edited` (`Conversation`, `Message`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its ref and its permalink, "" when Slack gave none, its new text as posted and the text it replaced.
-- `slack_delete`:
-  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
-  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
-  - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `not_logged_in`: Slack is logged out.
-  - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_message`: A problem: message is not a message ref or permalink.
-  - `deleted` (`Conversation`, `Message`, `Permalink`, `Deleted`): The message is deleted: where, its ref and its permalink, "" when Slack gave none, and the text it held.
 
 ## What the loop tells a session (`notices.toml`)
 

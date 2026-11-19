@@ -31,7 +31,7 @@ type Proposal struct {
 	// Broadcast is the broadcast the proposer asks for a thread reply; its
 	// publisher's Placer decides the draft's.
 	Broadcast draft.Broadcast
-	// Replaced is the text a recorded edit replaced.
+	// Replaced is the text an edit replaces.
 	Replaced string
 	Origin   draft.Origin
 	// Policy is the draft's approval policy; nil: resolved by
@@ -240,7 +240,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	now := s.Clock.Now()
 	d, spec, declared, err := s.shape(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
-		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
+		Replaced: p.Replaced, Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
 		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: draft.ProposerOf(p.Origin),
 	})

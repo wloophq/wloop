@@ -86,10 +86,13 @@ type Gates interface {
 }
 
 // GateRequest proposes a draft, from the MCP session with handle Session
-// when one proposes it.
+// when one proposes it. Post asks the host to post it at once, approved
+// through the session, when the user drives the session; from any other the
+// draft waits for the user.
 type GateRequest struct {
 	Draft   Draft
 	Session string
+	Post    bool
 }
 
 // UnitMove moves drafts from one unit to another.
@@ -250,6 +253,9 @@ type GateRef struct {
 	State string
 	// Rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
 	Rev int64
+	// Link is the address of the draft's card in the host's cockpit, where
+	// the user reviews, edits and posts it; "" when unknown.
+	Link string
 }
 
 // Event is an event on a unit, for the timelines of its tasks.

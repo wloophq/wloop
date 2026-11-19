@@ -693,7 +693,7 @@
                 "type": "string"
               },
               "posts": {
-                "description": "The tool posts at once, recorded as a sent draft; empty posts nothing.",
+                "description": "The tool may post as the user at once, so the user's agent settings allow it without a prompt: a write tool whose draft false the host posts from a session the user drives, or a tool that posts itself and records the post as a sent draft; empty posts nothing.",
                 "enum": [
                   "now"
                 ],

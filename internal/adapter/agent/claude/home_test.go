@@ -76,8 +76,8 @@ func fakeMCP(t *testing.T, userHome string, during func()) ShellFunc {
 
 // slackSendTool and testAtOnceTools are the at-once tools the bundled manifests mark posts = "now".
 var (
-	slackSendTool   = brand.ToolPrefix() + "slack_send_message"
-	testAtOnceTools = []string{slackSendTool, brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit", brand.ToolPrefix() + "slack_delete"}
+	slackSendTool   = brand.ToolPrefix() + "slack_post"
+	testAtOnceTools = []string{brand.ToolPrefix() + "github_post", slackSendTool}
 )
 
 func testHome(t *testing.T, during func()) (Home, string) {
@@ -277,10 +277,8 @@ func TestInstallBytesArePinned(t *testing.T) {
   "permissions": {
     "allow": [
       "` + brand.ToolPrefix() + `turn_end",
-      "` + brand.ToolPrefix() + `slack_send_message",
-      "` + brand.ToolPrefix() + `slack_react",
-      "` + brand.ToolPrefix() + `slack_edit",
-      "` + brand.ToolPrefix() + `slack_delete"
+      "` + brand.ToolPrefix() + `github_post",
+      "` + brand.ToolPrefix() + `slack_post"
     ]
   }
 }
