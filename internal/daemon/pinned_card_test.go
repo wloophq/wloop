@@ -62,8 +62,8 @@ func (o outboxDrafts) DraftGate(ctx context.Context, id int64) (draft.Draft, gat
 func (o outboxDrafts) WithdrawOther(context.Context, int64, string) error { return nil }
 
 // TestAPinnedDraftIsItsQuestionsOnly serves a held draft an open question of its turn pins as that question's:
-// its card names the message, the Outbox leaves it out and it notifies nothing of its own; a draft no question
-// pins is served as before.
+// its card names the message, the Outbox leaves it out and it notifies nothing of its own, and the person edits
+// it; a draft no question pins is served as before.
 func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
@@ -99,11 +99,11 @@ func TestAPinnedDraftIsItsQuestionsOnly(t *testing.T) {
 	}
 	edit := api.TaskRequest{Args: map[string]string{"text": "a person's change", "rev": strconv.FormatInt(pinned.Rev, 10)}, Source: "cli"}
 	body, _ := json.Marshal(edit)
-	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(pinned.ID), 10), "edit"), string(body)); rec.Code == 200 {
-		t.Errorf("a person edited a draft an open question pins: %s", rec.Body)
+	if rec := post(t, r.s, api.TaskPath("draft:"+strconv.FormatInt(int64(pinned.ID), 10), "edit"), string(body)); rec.Code != 200 {
+		t.Errorf("a person editing a draft an open question pins: %d %s", rec.Code, rec.Body)
 	}
-	if stored, _ := r.o.Store.Get(ctx, pinned.ID); stored.Text != "Approve it" {
-		t.Errorf("the pinned draft's text %q after a refused edit", stored.Text)
+	if stored, _ := r.o.Store.Get(ctx, pinned.ID); stored.Text != "a person's change" {
+		t.Errorf("the pinned draft's text %q after the person's edit", stored.Text)
 	}
 	var notified []draft.ID
 	for _, d := range r.s.taskViews(ctx, r.s.deps.Tasks, false).openDrafts(ctx) {

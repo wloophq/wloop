@@ -1319,7 +1319,6 @@ const (
 	HostService_Workspaces_FullMethodName   = "/wloop.source.v1.HostService/Workspaces"
 	HostService_Session_FullMethodName      = "/wloop.source.v1.HostService/Session"
 	HostService_OpenGate_FullMethodName     = "/wloop.source.v1.HostService/OpenGate"
-	HostService_RecordSent_FullMethodName   = "/wloop.source.v1.HostService/RecordSent"
 	HostService_RehomeDrafts_FullMethodName = "/wloop.source.v1.HostService/RehomeDrafts"
 	HostService_SetOverride_FullMethodName  = "/wloop.source.v1.HostService/SetOverride"
 	HostService_RecordEvents_FullMethodName = "/wloop.source.v1.HostService/RecordEvents"
@@ -1358,7 +1357,6 @@ type HostServiceClient interface {
 	Session(ctx context.Context, in *SessionRequest, opts ...grpc.CallOption) (*SessionResponse, error)
 	// Gates.
 	OpenGate(ctx context.Context, in *OpenGateRequest, opts ...grpc.CallOption) (*OpenGateResponse, error)
-	RecordSent(ctx context.Context, in *RecordSentRequest, opts ...grpc.CallOption) (*RecordSentResponse, error)
 	RehomeDrafts(ctx context.Context, in *RehomeDraftsRequest, opts ...grpc.CallOption) (*RehomeDraftsResponse, error)
 	SetOverride(ctx context.Context, in *SetOverrideRequest, opts ...grpc.CallOption) (*SetOverrideResponse, error)
 	// Recorder.
@@ -1482,16 +1480,6 @@ func (c *hostServiceClient) OpenGate(ctx context.Context, in *OpenGateRequest, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(OpenGateResponse)
 	err := c.cc.Invoke(ctx, HostService_OpenGate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *hostServiceClient) RecordSent(ctx context.Context, in *RecordSentRequest, opts ...grpc.CallOption) (*RecordSentResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RecordSentResponse)
-	err := c.cc.Invoke(ctx, HostService_RecordSent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1660,7 +1648,6 @@ type HostServiceServer interface {
 	Session(context.Context, *SessionRequest) (*SessionResponse, error)
 	// Gates.
 	OpenGate(context.Context, *OpenGateRequest) (*OpenGateResponse, error)
-	RecordSent(context.Context, *RecordSentRequest) (*RecordSentResponse, error)
 	RehomeDrafts(context.Context, *RehomeDraftsRequest) (*RehomeDraftsResponse, error)
 	SetOverride(context.Context, *SetOverrideRequest) (*SetOverrideResponse, error)
 	// Recorder.
@@ -1719,9 +1706,6 @@ func (UnimplementedHostServiceServer) Session(context.Context, *SessionRequest) 
 }
 func (UnimplementedHostServiceServer) OpenGate(context.Context, *OpenGateRequest) (*OpenGateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method OpenGate not implemented")
-}
-func (UnimplementedHostServiceServer) RecordSent(context.Context, *RecordSentRequest) (*RecordSentResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RecordSent not implemented")
 }
 func (UnimplementedHostServiceServer) RehomeDrafts(context.Context, *RehomeDraftsRequest) (*RehomeDraftsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RehomeDrafts not implemented")
@@ -1962,24 +1946,6 @@ func _HostService_OpenGate_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(HostServiceServer).OpenGate(ctx, req.(*OpenGateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _HostService_RecordSent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RecordSentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(HostServiceServer).RecordSent(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: HostService_RecordSent_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(HostServiceServer).RecordSent(ctx, req.(*RecordSentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2282,10 +2248,6 @@ var HostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "OpenGate",
 			Handler:    _HostService_OpenGate_Handler,
-		},
-		{
-			MethodName: "RecordSent",
-			Handler:    _HostService_RecordSent_Handler,
 		},
 		{
 			MethodName: "RehomeDrafts",

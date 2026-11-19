@@ -54,7 +54,7 @@ func (e *Env) agentProposer(hosted func(id string) *psource.Hosted) daemon.Agent
 		if b == nil {
 			return 0, fmt.Errorf("%w: no plugin %s drafts on %s", errNoDraftPlugin, id, u.Label())
 		}
-		ref, err := b.Host().Gates.OpenGate(ctx, src.GateRequest{Session: session, Draft: src.Draft{
+		ref, err := b.Host().Gates.OpenGate(ctx, src.GateRequest{Session: session, Post: p.Draft != nil && !*p.Draft, Draft: src.Draft{
 			Unit: plugin.Unit{Provider: id, Key: u.Key}, Kind: p.Kind, Target: p.Target, Text: p.Text, Payload: p.Payload, Basis: p.Basis,
 			Hold: p.Hold, Items: p.Items, Effects: p.Effects, Why: p.Why,
 		}})

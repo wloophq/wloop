@@ -118,9 +118,9 @@ fields = [{name = "Title"}, {name = "Count", number = true}]
 
 [[source.tools]]
 name = "pull_comment"
-doc = "Comments at once."
+doc = "Writes a comment."
 input = '{"type": "object"}'
-posts = "now"
+writes = true
 
 [source.ui]
 web = "web"
@@ -176,7 +176,7 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 	}
 	if src.Provider != "pulls" || src.Slot != "pull" || len(src.Facts) != 2 || src.Jobs[0].Every != Duration(5*time.Minute) || src.Jobs[0].EveryFrom != "sweep.fast" ||
 		!src.Deliveries[0].Posts || src.Deliveries[1].Posts || src.Events[0].Resolves != "merged" || !src.Events[1].AnswersAskedTurn ||
-		src.Situations[0].Rank != 2 || src.Tools[0].Answers[0].Fields[1] != (AnswerField{Name: "Count", Number: true}) || src.Tools[1].Posts != "now" ||
+		src.Situations[0].Rank != 2 || src.Tools[0].Answers[0].Fields[1] != (AnswerField{Name: "Count", Number: true}) || !src.Tools[1].Writes ||
 		src.UI.Web != "web" || src.DraftKinds[1].Delivery != "reaction" {
 		t.Errorf("source %+v", src)
 	}

@@ -27,7 +27,6 @@ var (
 	_ gates.Store  = GateStore{}
 	_ gates.Begun  = GateStore{}
 	_ gates.Reader = GateStore{}
-	_ gates.Sent   = GateStore{}
 )
 
 // Gates is the store of the gates.
@@ -91,18 +90,6 @@ func (s GateStore) Open(ctx context.Context, g gate.Gate) (gate.Gate, error) {
 	g.Status, g.OpenedAt = gate.Open, s.now()
 	g.Intent, g.By, g.BySession, g.Rule, g.Answer, g.ClosedAt = "", "", "", "", "", time.Time{}
 	return s.insert(ctx, g)
-}
-
-// RecordSent stores g closed as approved, opened and closed now, its
-// consequence applied: the tool posted it.
-func (s GateStore) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
-	at := s.now()
-	g.Status, g.OpenedAt, g.ClosedAt = gate.Approved, at, at
-	g, err := s.insert(ctx, g)
-	if err != nil {
-		return gate.Gate{}, err
-	}
-	return g, s.Applied(ctx, g.ID)
 }
 
 // Applied marks resolved gate id's consequence as run.

@@ -3,6 +3,7 @@ package source_test
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func (s gateSessions) BookOf(context.Context, string) (dturn.Book, bool, error) 
 }
 
 type gateDrafts struct {
-	proposed, sent []outbox.Proposal
+	proposed []outbox.Proposal
 	// policy is the state the approval policy leaves a proposed draft in.
 	policy draft.State
 }
@@ -44,18 +45,24 @@ func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft,
 	return draft.Draft{ID: draft.ID(len(d.proposed)), State: cmp.Or(d.policy, draft.Held), Rev: 3}, nil
 }
 
-func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
-	d.sent = append(d.sent, p)
-	return draft.Draft{ID: draft.ID(len(d.sent)), State: draft.Sent}, nil
+func (d *gateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID {
+	if strings.HasPrefix(dr.Target, "#") {
+		return "acme"
+	}
+	return dr.Unit.Provider
 }
 
-func (d *gateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID { return dr.Unit.Provider }
-
-// gatesOver is the gates of plugin acme, whose tool post_now posts at once,
+// gatesOver is the gates of plugin acme, whose tool write writes drafts,
 // with session live on the turn of a reply intent on acme's unit t1 that
 // allows the effect unit.closed, session bare live with no turn, and
 // session gone closed.
 func gatesOver(t *testing.T) (src.Gates, *gateDrafts) {
+	t.Helper()
+	return gatesPosting(t, nil)
+}
+
+// gatesPosting is gatesOver with po as the host's poster.
+func gatesPosting(t *testing.T, po psource.Poster) (src.Gates, *gateDrafts) {
 	t.Helper()
 	c, err := codec.Of("acme", manifest.Codec{Keys: []string{"{thread}"}})
 	if err != nil {
@@ -67,8 +74,8 @@ func gatesOver(t *testing.T) (src.Gates, *gateDrafts) {
 	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
 	ds := &gateDrafts{}
 	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)},
-		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "post_now", Posts: "now"}, {Name: "read_only"}}},
-		Hosted: &psource.Hosted{Drafts: ds,
+		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "write", Writes: true}, {Name: "read_only"}}},
+		Hosted: &psource.Hosted{Drafts: ds, Poster: po,
 			Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "bare": {ID: "bare"}, "gone": {ID: "gone", ClosedAt: at}}, book: book},
 			Intents: func() *dintent.Registry {
 				return dintent.NewRegistry([]dintent.Def{{Name: "reply", AllowedEffects: []string{"unit.closed"}}})
@@ -119,26 +126,6 @@ func TestTheGatesRefuseWhatThePluginCannotGrantItself(t *testing.T) {
 			_, err := g.OpenGate(ctx, src.GateRequest{Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Origin: src.DraftOrigin{Kind: "turn"}}})
 			return err
 		}},
-		{"a tool that does not post at once", "does not post at once", func(g src.Gates) error {
-			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "read_only")
-			return err
-		}},
-		{"a tool the manifest lacks", "does not post at once", func(g src.Gates) error {
-			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "unknown")
-			return err
-		}},
-		{"a closed session", "not live", func(g src.Gates) error {
-			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "gone", "post_now")
-			return err
-		}},
-		{"an unknown session", "not live", func(g src.Gates) error {
-			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "nobody", "post_now")
-			return err
-		}},
-		{"a sent draft on another provider's unit", "acme", func(g src.Gates) error {
-			_, err := g.RecordSent(ctx, src.Draft{Unit: plugin.Unit{Provider: "github", Key: "o/r#1"}, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "post_now")
-			return err
-		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -147,43 +134,10 @@ func TestTheGatesRefuseWhatThePluginCannotGrantItself(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("got %v, want a refusal naming %q", err, c.want)
 			}
-			if len(ds.proposed)+len(ds.sent) != 0 {
-				t.Fatalf("a refused call reached the outbox: %+v %+v", ds.proposed, ds.sent)
+			if len(ds.proposed) != 0 {
+				t.Fatalf("a refused call reached the outbox: %+v", ds.proposed)
 			}
 		})
-	}
-}
-
-func TestADirectPostRecordsAsASentDraftOfTheSessionsTurn(t *testing.T) {
-	t.Parallel()
-	g, ds := gatesOver(t)
-	d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Purpose: "reply", Delivery: "message", Text: "hi", State: "approved",
-		Origin: src.DraftOrigin{Kind: "user"}}
-	if _, err := g.RecordSent(context.Background(), d, "live", "post_now"); err != nil {
-		t.Fatal(err)
-	}
-	if p := ds.sent[0]; p.Origin.Kind != draft.OriginSession || p.Origin.TurnSeq != 7 {
-		t.Fatalf("recorded %+v, want the session's turn as its origin", p)
-	}
-}
-
-func TestAPostWithNoSessionRecordsAsASentDraftOfNoTurn(t *testing.T) {
-	t.Parallel()
-	for _, session := range []string{"", "bare"} {
-		g, ds := gatesOver(t)
-		d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Purpose: "reply", Delivery: "message", Text: "hi"}
-		ref, err := g.RecordSent(context.Background(), d, session, "post_now")
-		if err != nil {
-			t.Fatalf("session %q: %v", session, err)
-		}
-		if p := ds.sent[0]; p.Origin != (draft.Origin{Kind: draft.OriginSession, Session: session}) || ref.State != string(draft.Sent) {
-			t.Fatalf("session %q: recorded %+v as %q, want the session origin, sent", session, p, ref.State)
-		}
-	}
-	g, ds := gatesOver(t)
-	if _, err := g.RecordSent(context.Background(), src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t2"}, Text: "hi"}, "", "read_only"); err == nil ||
-		len(ds.sent) != 0 {
-		t.Fatalf("a tool that does not post at once with no session: %v, %+v", err, ds.sent)
 	}
 }
 
@@ -226,24 +180,6 @@ func TestAGateAnswersTheStateThePolicyLeftItsDraftIn(t *testing.T) {
 	}
 }
 
-func TestAToolThatPostsAtOnceIsRefusedForASessionThatIsNotLive(t *testing.T) {
-	t.Parallel()
-	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
-	tools := psource.Tools{ID: "acme", Kind: &psource.Kind{},
-		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "post_now", Posts: "now"}, {Name: "read_only"}}},
-		Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "gone": {ID: "gone", ClosedAt: at}}}}
-	for _, session := range []string{"gone", "nobody"} {
-		if _, err := tools.Call(context.Background(), "post_now", nil, session, ""); err == nil || !strings.Contains(err.Error(), "not live") {
-			t.Fatalf("post_now for session %q: %v, want a refusal before the plugin runs", session, err)
-		}
-	}
-	for _, c := range []struct{ tool, session string }{{"post_now", "live"}, {"post_now", ""}, {"read_only", "gone"}} {
-		if _, err := tools.Call(context.Background(), c.tool, nil, c.session, ""); err == nil || strings.Contains(err.Error(), "not live") {
-			t.Fatalf("%s for session %q: %v, want the call to reach the plugin, which is not running", c.tool, c.session, err)
-		}
-	}
-}
-
 func TestAPluginsDraftCarriesNoDeliveryOfItsOwn(t *testing.T) {
 	t.Parallel()
 	g, ds := gatesOver(t)
@@ -267,5 +203,62 @@ func TestAPluginsDraftCarriesNoDeliveryOfItsOwn(t *testing.T) {
 	}
 	if ds.proposed[0].Purpose != "nudge" || ds.proposed[1].Kind != draft.Kind("reply") {
 		t.Fatalf("proposed %+v", ds.proposed)
+	}
+}
+
+// poster posts every draft through a session it drives and refuses the others, as the daemon's does.
+type poster struct {
+	driven map[string]bool
+	posted []draft.ID
+}
+
+func (p *poster) PostDraft(_ context.Context, session string, id draft.ID, rev int64) (draft.Draft, bool, error) {
+	if !p.driven[session] {
+		return draft.Draft{ID: id, Rev: rev, State: draft.Held}, false, nil
+	}
+	p.posted = append(p.posted, id)
+	return draft.Draft{ID: id, Rev: rev, State: draft.Queued}, true, nil
+}
+
+func (p *poster) DraftLink(id draft.ID) string {
+	return fmt.Sprintf("http://127.0.0.1:1/#task=draft%%3A%d", id)
+}
+
+// A write with Post goes through the host's poster, which posts it from a session the user drives and keeps it a
+// draft from any other; either answer carries the draft's link. Without Post nothing is posted.
+func TestAWriteWithPostGoesThroughTheHostsPoster(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	own := plugin.Unit{Provider: "acme", Key: "t1"}
+	for _, c := range []struct {
+		post   bool
+		driven bool
+		want   draft.State
+	}{{true, true, draft.Queued}, {true, false, draft.Held}, {false, true, draft.Held}} {
+		po := &poster{driven: map[string]bool{"live": c.driven}}
+		g, _ := gatesPosting(t, po)
+		ref, err := g.OpenGate(ctx, src.GateRequest{Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi"}, Session: "live", Post: c.post})
+		if err != nil || ref.State != string(c.want) || ref.Link != "http://127.0.0.1:1/#task=draft%3A1" {
+			t.Fatalf("post %v, driven %v: %+v %v, want %s with its link", c.post, c.driven, ref, err, c.want)
+		}
+		if posted := len(po.posted) == 1; posted != (c.post && c.driven) {
+			t.Fatalf("post %v, driven %v: posted %v", c.post, c.driven, po.posted)
+		}
+	}
+}
+
+// A write from a session with no turn that names no unit is on the session's own unit, posted to its target.
+func TestAWriteThatNamesNoUnitIsOnTheSessionsUnit(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: src.Draft{Kind: "reply", Text: "hi", Target: "#general"}, Session: "bare"}); err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.proposed[0]; p.Unit != dturn.SessionUnit("bare") || p.Target != "#general" || p.Origin.Kind != draft.OriginSession {
+		t.Fatalf("proposed %+v, want the session's unit and its target", p)
+	}
+	g, ds = gatesOver(t)
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: src.Draft{Kind: "reply", Text: "hi", Target: "#general"}, Session: "live"}); err == nil || len(ds.proposed) != 0 {
+		t.Fatalf("a session with a turn naming no unit: %v, %+v", err, ds.proposed)
 	}
 }

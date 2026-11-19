@@ -15,9 +15,6 @@ import (
 	dslack "github.com/wloophq/wloop/plugins/slack/domain"
 )
 
-// reactedPurpose is the purpose of a reaction slack_react records.
-const reactedPurpose = "react"
-
 const (
 	refSecond = "1700000000.000200"
 	refThird  = "1700000000.000300"
@@ -52,16 +49,14 @@ func TestAnAgentReactsToTheThirdMessageOfAThreadByTheRefSlackReadPrints(t *testi
 	if strings.Contains(read, "ts=") {
 		t.Fatalf("slack_read still prints a bare ts:\n%s", read)
 	}
-	got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"message":"`+m[1]+`","emoji":"white_check_mark"}`)
-	if isErr || !strings.Contains(got, "#random") {
-		t.Fatalf("slack_react %s = %q", m[1], got)
+	if got := w.post(t, draftHandle, `{"kind":"react","target":"`+m[1]+`","reaction":"white_check_mark","draft":false}`); !strings.Contains(got, "reactions.add") {
+		t.Fatalf("slack_post react %s called %s", m[1], got)
 	}
 	adds := w.st.srv.Calls("reactions.add")
 	if len(adds) != 1 || adds[0].Get("channel") != sessThreaded || adds[0].Get("timestamp") != refThird || adds[0].Get("name") != "white_check_mark" {
 		t.Fatalf("reactions.add %v", adds)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != thread || ds[0].Purpose != reactedPurpose || ds[0].Target != m[1] ||
-		ds[0].Evidence.Ref != m[1] || !strings.Contains(ds[0].Evidence.Permalink, "p"+strings.ReplaceAll(refThird, ".", "")) {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != thread || ds[0].Kind != draft.Kind("react") || ds[0].Target != m[1] || ds[0].State != draft.Sent {
 		t.Fatalf("records %+v", ds)
 	}
 	if n := len(w.st.srv.Calls("conversations.replies")); n != 0 {
@@ -73,8 +68,8 @@ func TestASessionReplyToARefInAStoredThreadLandsInThatThread(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	storeRefThread(t, w)
-	if calls, want := w.send(t, sessThreaded+"/"+refThird), "conversations.info chat.postMessage chat.getPermalink"; calls != want {
-		t.Fatalf("calls %s, want %s: the store places the reply", calls, want)
+	if calls := w.send(t, sessThreaded+"/"+refThird); strings.Contains(calls, "conversations.replies") {
+		t.Fatalf("calls %s: the store places the reply, with no read of the thread from Slack", calls)
 	}
 	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessThreaded || posts[0].Get("thread_ts") != sessParent {
 		t.Fatalf("posts %v", posts)
@@ -111,7 +106,7 @@ func TestSlackDraftOnARefPostsInItsThreadOnceApproved(t *testing.T) {
 	}
 	ref := sessThreaded + "/" + refThird
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out","target":"`+ref+`"}`); isErr || !strings.Contains(got, "#random") {
-		t.Fatalf("slack_draft = %q", got)
+		t.Fatalf("slack_post = %q", got)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) || ds[0].Target != ref {

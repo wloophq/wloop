@@ -534,42 +534,11 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 	}
 }
 
-func TestRecordSentSkipsPublish(t *testing.T) {
+func TestADeletionDraftKeepsTheTextItRemoves(t *testing.T) {
 	e := newEnv()
-	ap := &fakeApplier{}
-	e.svc.Evidence = EvidenceTo(ap.apply)
-	ran := 0
-	e.svc.OnSent = []func(context.Context, draft.Draft) error{func(context.Context, draft.Draft) error { ran++; return nil }}
-	p := reply("posted by the session")
-	p.Items = []string{"i1"}
-	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 9}
-	d, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "9.9", Permalink: "https://example.test/9"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.State != draft.Sent || d.Evidence.Ref != "9.9" || d.Evidence.At.IsZero() {
-		t.Fatalf("%+v", d)
-	}
-	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1" || ran != 1 {
-		t.Fatalf("published %v ops %+v onsent %d", e.fx.published, ap.ops, ran)
-	}
-	e.disabled["slack"] = true
-	if _, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "9.10"}); err != nil {
-		t.Fatalf("a post already made is recorded even with the plugin off: %v", err)
-	}
-}
-
-func TestRecordSentKeepsADeletionWithTheTextItRemoved(t *testing.T) {
-	e := newEnv()
-	for _, text := range []string{"posted twice", ""} {
-		p := Proposal{Unit: thread, Kind: draft.Kind("delete"), Text: text, Target: "C1/1.2"}
-		d, err := e.svc.RecordSent(ctx, p, draft.Evidence{Ref: "C1/1.2"})
-		if err != nil {
-			t.Fatalf("a deletion of %q: %v", text, err)
-		}
-		if got := e.get(d.ID); got.Kind != draft.Kind("delete") || got.Delivery != draft.Delivery("delete") || got.Text != text || got.State != draft.Sent {
-			t.Fatalf("%+v", got)
-		}
+	d := e.propose(Proposal{Unit: thread, Kind: draft.Kind("delete"), Text: "posted twice", Target: "C1/1.2"})
+	if got := e.get(d.ID); got.Kind != draft.Kind("delete") || got.Delivery != draft.Delivery("delete") || got.Text != "posted twice" {
+		t.Fatalf("%+v", got)
 	}
 	if len(e.fx.published) != 0 {
 		t.Fatalf("published %v", e.fx.published)
@@ -607,7 +576,6 @@ func TestOutboxLogHasNoText(t *testing.T) {
 	e.svc.Send(ctx)
 	sending(e, secret+" d")
 	e.svc.Recover(ctx)
-	e.svc.RecordSent(ctx, reply(secret+" e"), draft.Evidence{Ref: "1"})
 	if len(e.logs) < 6 {
 		t.Fatalf("only %d log lines", len(e.logs))
 	}

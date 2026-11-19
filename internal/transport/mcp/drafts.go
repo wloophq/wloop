@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/record"
 )
 
@@ -40,7 +41,7 @@ func (s *Server) draftTools() []registered {
 	return []registered{
 		{tool{Name: draftReadName, InputSchema: object(map[string]*schema{"id": draftID()}, "id")}, true, s.draftRead},
 		{tool{Name: draftUpdateName, InputSchema: object(map[string]*schema{
-			"id": draftID(), "rev": draftID(), "text": str(record.TextMax), "payload": {Type: "object"}, "basis": str(200),
+			"id": draftID(), "rev": draftID(), "text": str(record.TextMax), "payload": {Type: "object"}, "basis": str(200), "draft": {Type: "boolean"},
 		}, "id", "rev")}, true, s.draftUpdate},
 		{tool{Name: draftWithdrawName, InputSchema: object(map[string]*schema{"id": draftID(), "rev": draftID(), "reason": str(40)}, "id", "rev")},
 			true, s.draftWithdraw},
@@ -85,7 +86,14 @@ func (s *Server) draftUpdate(ctx context.Context, session string, arguments json
 		return s.badArguments(ctx, draftUpdateName, err)
 	}
 	d, err := s.Drafts.Update(ctx, session, a)
-	return s.draftAnswer(ctx, draftUpdateName, "updated", d, err)
+	done := "updated"
+	if a.Draft != nil && !*a.Draft {
+		done = "posting"
+		if d.State == string(draft.Held) {
+			done = "waits"
+		}
+	}
+	return s.draftAnswer(ctx, draftUpdateName, done, d, err)
 }
 
 func (s *Server) draftWithdraw(ctx context.Context, session string, arguments json.RawMessage) any {
@@ -101,7 +109,7 @@ func (s *Server) draftAnswer(ctx context.Context, tool, done string, d api.Agent
 	var name string
 	switch {
 	case err == nil:
-		return s.answer(ctx, tool, done, fields{"Draft": DraftJSON(d)}, false)
+		return s.answer(ctx, tool, done, fields{"Draft": DraftJSON(d), "ID": d.ID, "Link": d.Link}, false)
 	case errors.Is(err, outbox.ErrNotFound):
 		name = "not_found"
 	case errors.Is(err, outbox.ErrOutOfScope):

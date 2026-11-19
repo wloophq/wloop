@@ -54,10 +54,10 @@ type Home struct {
 	Command, MCPURL, DefaultHome string
 	// MCPKey is the secret the MCP endpoint requires, "" before install writes one.
 	MCPKey string
-	// AtOnceTools are the tools that post as the user at once, which install allows.
-	AtOnceTools []string
-	Sh          ShellFunc
-	Now         func() time.Time
+	// WriteTools are the tools that write in the user's name, which install allows.
+	WriteTools []string
+	Sh         ShellFunc
+	Now        func() time.Time
 }
 
 func (h Home) isDefault(home string) bool { return isDefault(home, h.DefaultHome) }
@@ -345,7 +345,7 @@ func (h Home) Check(_ context.Context, home string) ([]setup.Finding, error) {
 		perm = "missing"
 	}
 	out = append(out, finding("permission "+TurnEndTool, perm))
-	for _, tool := range h.AtOnceTools {
+	for _, tool := range h.WriteTools {
 		post := ""
 		switch {
 		case slices.Contains(permissionList(settings.doc, "ask"), any(tool)):
@@ -431,7 +431,7 @@ func (h Home) installSettings(doc map[string]any) []string {
 	if addPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "add permission "+TurnEndTool)
 	}
-	for _, tool := range h.AtOnceTools {
+	for _, tool := range h.WriteTools {
 		if addPermission(doc, "allow", tool) {
 			out = append(out, "add permission "+tool)
 		}
@@ -537,7 +537,7 @@ func (h Home) removeSettings(doc map[string]any) []string {
 	if dropPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "remove permission "+TurnEndTool)
 	}
-	for _, tool := range h.AtOnceTools {
+	for _, tool := range h.WriteTools {
 		if dropPermission(doc, "allow", tool) {
 			out = append(out, "remove permission "+tool)
 		}

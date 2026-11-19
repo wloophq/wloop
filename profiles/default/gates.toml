@@ -6,13 +6,13 @@
 
 [gates.draft]
 kind = "draft"
-label = "Send this draft?"
+label = "Post this draft?"
 # A task opened only to hold this gate ends with it: done once the draft is
 # approved, in the trash once it is discarded or withdrawn.
 ends_task = { approved = "done", rejected = "dropped", superseded = "dropped" }
 
 [gates.draft.intents.approve]
-label = "Approve"
+label = "Post"
 status = "approved"
 
 [gates.draft.intents.discard]

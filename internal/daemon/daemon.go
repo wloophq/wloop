@@ -411,6 +411,8 @@ func (s *Server) background(run runFunc) runFunc {
 
 type Server struct {
 	deps Deps
+	// cockpitPort is the port the cockpit listens on, 0 before it listens.
+	cockpitPort atomic.Int32
 	// heldStates are the states stored tasks hold that the profile does not declare, as of the last
 	// recategorize pass.
 	heldStates atomic.Pointer[[]string]
@@ -541,6 +543,14 @@ func New(d Deps) *Server {
 	s.intakes = s.newIntakes(d)
 	s.registerMessages()
 	s.registerOutbox()
+	if a := d.AgentDrafts; a != nil {
+		if a.Post == nil {
+			a.Post = s.PostDraft
+		}
+		if a.Link == nil {
+			a.Link = s.DraftLink
+		}
+	}
 	if d.Startup == nil {
 		close(s.reconcile.ready)
 		close(s.reconcile.done)
@@ -870,6 +880,7 @@ func (s *Server) Run(ctx context.Context) error {
 	if t := reusableToken(d.InfoPath); t != "" {
 		s.token = t
 	}
+	s.cockpitPort.Store(int32(tcpLn.Addr().(*net.TCPAddr).Port)) //nolint:gosec // G115: a TCP port fits in 16 bits
 	if err := writeInfo(d.InfoPath, tcpLn.Addr().(*net.TCPAddr).Port, s.token); err != nil {
 		unixLn.Close()
 		tcpLn.Close()

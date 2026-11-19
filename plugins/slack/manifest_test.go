@@ -27,7 +27,7 @@ func TestTheManifestDeclaresTheJobsAndTools(t *testing.T) {
 	for _, tl := range s.Tools {
 		tools[tl.Name] = true
 	}
-	for _, name := range []string{ToolSend, ToolRead, ToolSearch, ToolDraft, ToolReact, ToolEdit} {
+	for _, name := range []string{ToolPost, ToolRead, ToolSearch} {
 		if !tools[name] {
 			t.Errorf("the manifest has no tool %s", name)
 		}

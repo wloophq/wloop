@@ -16,9 +16,6 @@ type Tools struct {
 	Kind *Kind
 	// Manifest is the plugin's [source] table.
 	Manifest *manifest.Source
-	// Sessions are the host's sessions; a tool that posts at once runs only
-	// for no session or a live one.
-	Sessions SessionBooks
 }
 
 // Answer is a tool's answer by name, and the fields its wording reads.
@@ -28,15 +25,8 @@ type Answer struct {
 	IsError bool
 }
 
-// Call runs tool with args for the MCP session handle, during turn. A tool
-// that posts at once is refused before it runs for a session that is not
-// live, whose post nothing could record.
+// Call runs tool with args for the MCP session handle, during turn.
 func (t Tools) Call(ctx context.Context, tool string, args json.RawMessage, session, turn string) (Answer, error) {
-	if session != "" && postsNow(t.Manifest, tool) {
-		if err := liveSession(ctx, t.Sessions, session); err != nil {
-			return Answer{}, err
-		}
-	}
 	c, err := t.Kind.Client(t.ID)
 	if err != nil {
 		return Answer{}, err

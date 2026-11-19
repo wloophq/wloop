@@ -61,7 +61,7 @@ func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 	want := `Intents
-  act              bundled   Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop
+  act              bundled   Act on the open items of a unit without touching its code: settle what you can and draft the replies it needs for you to post; Address works on the code of a pull request you develop
   address          bundled   Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies
   ask-author       ` + filepath.Join(dir, "intents", "ask-author", "intent.toml") + `   Ask the author one question
   attach           bundled   Make a session started outside the loop a run of a task, keeping its context

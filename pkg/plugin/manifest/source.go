@@ -195,13 +195,12 @@ type Command struct {
 
 // Tool is an MCP tool the plugin serves.
 type Tool struct {
-	Name     string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
-	Doc      string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
-	Input    string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
-	Posts    string   `toml:"posts" doc:"The tool posts at once, recorded as a sent draft; empty posts nothing." enum:"now"`
-	Proposes bool     `toml:"proposes" doc:"The tool only proposes drafts the user approves, so a session policy may allow it without a prompt."`
-	Reads    bool     `toml:"reads" doc:"The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt."`
-	Answers  []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
+	Name    string   `toml:"name" doc:"The tool's name; its description lives in the profile's tools.toml. Required."`
+	Doc     string   `toml:"doc" doc:"What the tool does, for the reference pages. Required."`
+	Input   string   `toml:"input" doc:"The JSON schema of the tool's arguments, an object. Required."`
+	Writes  bool     `toml:"writes" doc:"The tool writes in the user's name: a draft by default, which the host posts at once with draft false from a session the user drives; a session policy and the user's agent settings allow it without a prompt."`
+	Reads   bool     `toml:"reads" doc:"The tool only reads the source, writing nothing to it, so a session policy may allow it without a prompt."`
+	Answers []Answer `toml:"answers" doc:"The answers the tool returns, which tools.toml words."`
 }
 
 // Answer is one answer of a tool, worded by tools.toml.
@@ -501,9 +500,6 @@ func (s *Source) validate() error {
 		}
 		if t.Doc == "" {
 			bad("tool %q: doc is required", t.Name)
-		}
-		if t.Posts != "" && t.Posts != "now" {
-			bad("tool %q: posts %q is not now", t.Name, t.Posts)
 		}
 		for _, a := range t.Answers {
 			if !regexp.MustCompile(`^[a-z][a-z0-9_]*$`).MatchString(a.Name) {

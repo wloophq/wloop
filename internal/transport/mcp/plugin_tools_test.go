@@ -80,7 +80,7 @@ func (f *fakePlugin) tool(t *testing.T, name string) PluginTool {
 }
 
 func TestSlackToolsComeFromTheManifest(t *testing.T) {
-	for _, name := range []string{"slack_send_message", "slack_read", "slack_search", "slack_draft", "slack_react", "slack_edit", "slack_delete"} {
+	for _, name := range []string{"slack_post", "slack_read", "slack_search"} {
 		m := manifestTool(t, name)
 		if !slices.ContainsFunc(builtin.Tools, func(v builtin.Value) bool { return v.Name == name && v.Doc == m.Doc }) {
 			t.Errorf("%s is not the manifest's tool in builtin.Tools", name)
@@ -128,10 +128,10 @@ func TestAPluginsProblemsAreWordedOnePerLine(t *testing.T) {
 
 func TestAPluginsFailureIsTheFailedAnswerRedacted(t *testing.T) {
 	f := &fakePlugin{err: errors.New("slack: token xoxp-1111-fake refused")}
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Texts: bundledTexts, Plugins: []PluginTool{f.tool(t, "slack_send_message")}}
+	s := &Server{Turns: &fakeTurns{}, Port: 47800, Texts: bundledTexts, Plugins: []PluginTool{f.tool(t, "slack_post")}}
 	sid := call(t, s, "", "", initialize).Header().Get("Mcp-Session-Id")
-	res := decodeResult(t, call(t, s, sid, "", toolCallBody("slack_send_message", `{"target":"#releases","text":"hi"}`)))
-	if got := res.Result.Content[0].Text; !res.Result.IsError || got != "Slack send failed: slack: token [redacted] refused" {
+	res := decodeResult(t, call(t, s, sid, "", toolCallBody("slack_post", `{"target":"#releases","text":"hi"}`)))
+	if got := res.Result.Content[0].Text; !res.Result.IsError || got != "Nothing was written: slack: token [redacted] refused" {
 		t.Fatalf("failed = %q (error %v)", got, res.Result.IsError)
 	}
 	if len(f.calls) != 1 || f.calls[0].session != "" {
@@ -148,21 +148,21 @@ func TestRedactSecretsCoversEveryKind(t *testing.T) {
 }
 
 func TestAnswersComeFromTheProfile(t *testing.T) {
-	f := &fakePlugin{answer: psource.Answer{Name: "posted", Fields: map[string]any{"Conversation": "#releases", "Parent": "", "Channel": "C1",
-		"TS": "1.2", "Permalink": "https://acme.slack.com/archives/C1/p1", "Text": "hi"}}}
-	texts := map[string]ToolText{"slack_send_message": {Answers: map[string]string{
-		"posted": "Sent to {{.Conversation}} by {{.Name}}; check it shows: {{.Permalink}}",
+	f := &fakePlugin{answer: psource.Answer{Name: "drafted", Fields: map[string]any{"ID": 7, "Rev": 1, "Unit": "", "Where": "#releases",
+		"Link": "http://127.0.0.1:1/#task=draft%3A7"}}}
+	texts := map[string]ToolText{"slack_post": {Answers: map[string]string{
+		"drafted": "Drafted for {{.Where}} by {{.Name}}; review it at {{.Link}}",
 	}}}
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Plugins: []PluginTool{f.tool(t, "slack_send_message")},
+	s := &Server{Turns: &fakeTurns{}, Port: 47800, Plugins: []PluginTool{f.tool(t, "slack_post")},
 		Texts: func() map[string]ToolText { return texts }, Bundled: bundledTexts}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
-	res := decodeResult(t, call(t, s, sid, "term_1", toolCallBody("slack_send_message", `{"target":"#releases","text":"hi"}`)))
-	if got := res.Result.Content[0].Text; got != "Sent to #releases by "+brand.Name+"; check it shows: https://acme.slack.com/archives/C1/p1" {
+	res := decodeResult(t, call(t, s, sid, "term_1", toolCallBody("slack_post", `{"target":"#releases","text":"hi"}`)))
+	if got := res.Result.Content[0].Text; got != "Drafted for #releases by "+brand.Name+"; review it at http://127.0.0.1:1/#task=draft%3A7" {
 		t.Fatalf("%q", got)
 	}
 	f.answer = psource.Answer{Name: "fix_these", IsError: true, Fields: map[string]any{"Problems": []any{map[string]any{"answer": "problem_text_required"}}}}
-	res = decodeResult(t, call(t, s, sid, "term_1", toolCallBody("slack_send_message", `{"target":"#releases","text":" "}`)))
-	if got := res.Result.Content[0].Text; !strings.HasPrefix(got, "Nothing was sent; fix these and call slack_send_message again:\ntext: required") {
+	res = decodeResult(t, call(t, s, sid, "term_1", toolCallBody("slack_post", `{"target":"#releases","text":" "}`)))
+	if got := res.Result.Content[0].Text; !strings.HasPrefix(got, "Nothing was written; fix these and call slack_post again:\ntext: required") {
 		t.Fatalf("the bundled answer: %q", got)
 	}
 }

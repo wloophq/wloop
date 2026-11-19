@@ -151,15 +151,16 @@ func (r reader) Session(ctx context.Context, handle string) (src.Session, error)
 	if h == nil || h.Sessions == nil {
 		return src.Session{}, src.ErrUnsupported
 	}
+	var out src.Session
 	b, ok, err := h.Sessions.BookOf(ctx, handle)
 	if err != nil || !ok {
-		return src.Session{}, err
+		return out, err
 	}
 	t, ok := b.OfSession(handle)
 	if !ok {
-		return src.Session{}, nil
+		return out, nil
 	}
-	out := src.Session{Unit: Wire(b.Unit), Turn: t.ID, TurnSeq: t.Seq, Intent: string(t.Intent), Role: t.Role}
+	out.Unit, out.Turn, out.TurnSeq, out.Intent, out.Role = Wire(b.Unit), t.ID, t.Seq, string(t.Intent), t.Role
 	out.AllowedEffects = slices.Clone(h.allowedEffects(string(t.Intent)))
 	return out, nil
 }

@@ -188,13 +188,6 @@ func TestApprovedRevStored(t *testing.T) {
 	if again, err := gs.Get(ctx, open.ID); err != nil || again.ApprovedRev != 2 || again.Status != gate.Approved {
 		t.Fatalf("after resolve %+v %v", again, err)
 	}
-	sent, err := gs.RecordSent(ctx, gate.Gate{Kind: gate.KindDraft, Unit: acmePull, Subject: "2", Intents: []string{"approve"}, ApprovedRev: 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, err := gs.Get(ctx, sent.ID); err != nil || got.ApprovedRev != 5 || got.Sessions == nil || len(got.Sessions) != 0 {
-		t.Fatalf("recorded send %+v %v", got, err)
-	}
 }
 
 // storeAtV12 is a store at version 12 holding drafts in every state a send

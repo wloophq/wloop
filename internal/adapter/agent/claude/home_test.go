@@ -74,15 +74,15 @@ func fakeMCP(t *testing.T, userHome string, during func()) ShellFunc {
 	}
 }
 
-// slackSendTool and testAtOnceTools are the at-once tools the bundled manifests mark posts = "now".
+// slackSendTool and testWriteTools are the write tools the bundled manifests mark writes.
 var (
-	slackSendTool   = brand.ToolPrefix() + "slack_send_message"
-	testAtOnceTools = []string{slackSendTool, brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit", brand.ToolPrefix() + "slack_delete"}
+	slackSendTool  = brand.ToolPrefix() + "slack_post"
+	testWriteTools = []string{brand.ToolPrefix() + "github_post", slackSendTool}
 )
 
 func testHome(t *testing.T, during func()) (Home, string) {
 	user := t.TempDir()
-	return Home{Command: "'/bin/" + brand.Name + "'", MCPURL: testURL, MCPKey: testKey, AtOnceTools: testAtOnceTools, DefaultHome: filepath.Join(user, ".claude"), Sh: fakeMCP(t, user, during),
+	return Home{Command: "'/bin/" + brand.Name + "'", MCPURL: testURL, MCPKey: testKey, WriteTools: testWriteTools, DefaultHome: filepath.Join(user, ".claude"), Sh: fakeMCP(t, user, during),
 		Now: func() time.Time { return time.Date(2026, 10, 18, 9, 30, 0, 0, time.UTC) }}, t.TempDir()
 }
 
@@ -277,10 +277,8 @@ func TestInstallBytesArePinned(t *testing.T) {
   "permissions": {
     "allow": [
       "` + brand.ToolPrefix() + `turn_end",
-      "` + brand.ToolPrefix() + `slack_send_message",
-      "` + brand.ToolPrefix() + `slack_react",
-      "` + brand.ToolPrefix() + `slack_edit",
-      "` + brand.ToolPrefix() + `slack_delete"
+      "` + brand.ToolPrefix() + `github_post",
+      "` + brand.ToolPrefix() + `slack_post"
     ]
   }
 }

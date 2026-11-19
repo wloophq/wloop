@@ -132,12 +132,6 @@ type Begun interface {
 	Begun(ctx context.Context) ([]gate.Gate, error)
 }
 
-// Sent records a post an agent made at once with a tool as a gate already
-// approved. It is no resolution: no agent resolves an open gate.
-type Sent interface {
-	RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error)
-}
-
 var (
 	ErrNoGate   = errors.New("no such gate")
 	ErrResolved = errors.New("the gate is resolved already")

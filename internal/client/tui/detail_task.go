@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -159,7 +160,7 @@ func (c askCard) answers(w *texts.Catalog) []string {
 		if pin == nil {
 			return ""
 		}
-		return " · " + w.T("approves draft #{id}", map[string]any{"id": pin.ID})
+		return " · " + w.T("posts draft #{id}", map[string]any{"id": pin.ID})
 	}
 	if c.confirm {
 		return []string{w.T("yes", nil) + approves(c.draft), w.T("no", nil)}
@@ -245,7 +246,37 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	}
 	e, _ := m.selectedTask()
 	verb := m.verbOf(handlerAnswer)
-	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: verb, task: c.task, verb: verb, args: args})
+	cmd := Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: verb, task: c.task, verb: verb, args: args}
+	if pin := c.pin(n); pin != nil {
+		return m.pickPinned(cmd, c.pinnedDraft(pin), read)
+	}
+	return m.send(cmd)
+}
+
+// pinnedDraft is the draft pin names as the card shows it.
+func (c askCard) pinnedDraft(pin *record.DraftRef) api.Draft {
+	i := slices.IndexFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
+	return c.pinned[i]
+}
+
+// pickPinned asks, before answer c, which approves pinned draft d, goes, for d's text as it will post: Enter posts
+// what the prompt holds, d's own text unless the person changed it, Ctrl+E edits it in the editor. The answer
+// carries the rev the card shows, so it approves what the person saw.
+func (m *Model) pickPinned(c Command, d api.Draft, read uint64) (Command, bool) {
+	submit := func(text string) (Command, bool) {
+		c.args["rev"] = strconv.FormatInt(d.Rev, 10)
+		if text != "" && text != strings.TrimSpace(d.Text) && !d.TextLocked {
+			c.args["text"] = text
+		}
+		return m.send(c)
+	}
+	p := &prompt{action: c.verb, read: read, submit: submit, editor: !d.TextLocked, editText: d.Text,
+		label: m.w().T("post draft #{id} as it reads, Enter, or change it first ({key}: editor)", map[string]any{"id": d.ID, "key": "Ctrl+E"})}
+	if !strings.Contains(d.Text, "\n") && !d.TextLocked {
+		p.text = []rune(d.Text)
+	}
+	m.prompt = p
+	return Command{}, false
 }
 
 // resolveGate resolves the card's gate with intent x, asking first for the
@@ -609,13 +640,13 @@ func servedWord(words map[string]string, name string) string {
 func (m *Model) pinFacts(c askCard, pin *record.DraftRef, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	i := slices.IndexFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
 	if i < 0 {
-		fact("", m.w().T("Approves draft #{id}, which is gone.", map[string]any{"id": pin.ID}), m.t.Red)
+		fact("", m.w().T("Picking this option posts draft #{id}, which is gone.", map[string]any{"id": pin.ID}), m.t.Red)
 		return
 	}
 	d := c.pinned[i]
-	fact("", m.w().T("Approves draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": pin.Rev}), m.t.Dim)
+	fact("", m.w().T("Picking this option posts draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": d.Rev}), m.t.Dim)
 	if d.Rev != pin.Rev {
-		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}: below is what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
+		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
 	}
 	m.draftFacts(&d, fact, para)
 }

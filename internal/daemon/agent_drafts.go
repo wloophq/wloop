@@ -37,6 +37,11 @@ type AgentDrafts struct {
 	// Unit is the unit of session's turns; ok is false for a session with none.
 	Unit     func(ctx context.Context, session string) (u unit.Unit, ok bool, err error)
 	Proposer AgentProposer
+	// Post approves a held draft through the session at once when the user drives it; posted is false when
+	// the draft waits for the user.
+	Post func(ctx context.Context, session string, id draft.ID, rev int64) (d draft.Draft, posted bool, err error)
+	// Link is the cockpit's address of a draft's card, "" when unknown.
+	Link func(id draft.ID) string
 }
 
 var (
@@ -101,7 +106,8 @@ func (a *AgentDrafts) Read(ctx context.Context, session string, id int64) (api.A
 	return a.read(ctx, c, draft.ID(id))
 }
 
-// Update revises draft u.ID at u.Rev for session.
+// Update revises draft u.ID at u.Rev for session, when u changes its content, then, with u.Draft false, posts
+// it at once when the user drives the session, else leaves it waiting for them: the draft's state says which.
 func (a *AgentDrafts) Update(ctx context.Context, session string, u api.AgentDraftUpdate) (api.AgentDraft, error) {
 	c, err := a.caller(ctx, session)
 	if err != nil {
@@ -110,13 +116,29 @@ func (a *AgentDrafts) Update(ctx context.Context, session string, u api.AgentDra
 	if u.Rev < 1 {
 		return api.AgentDraft{}, errNoRev
 	}
-	am := outbox.Amendment{Text: u.Text, Basis: u.Basis, Rev: u.Rev, By: draft.Actor{Kind: draft.ActorSession, Session: c.Session}}
-	if len(u.Payload) > 0 {
-		payload := u.Payload
-		am.Payload = &payload
-	}
-	if _, err := a.Outbox.AgentAmend(ctx, c, draft.ID(u.ID), am); err != nil {
+	post := u.Draft != nil && !*u.Draft
+	rev := u.Rev
+	if u.Text != nil || u.Basis != nil || len(u.Payload) > 0 || !post {
+		am := outbox.Amendment{Text: u.Text, Basis: u.Basis, Rev: u.Rev, By: draft.Actor{Kind: draft.ActorSession, Session: c.Session}}
+		if len(u.Payload) > 0 {
+			payload := u.Payload
+			am.Payload = &payload
+		}
+		d, err := a.Outbox.AgentAmend(ctx, c, draft.ID(u.ID), am)
+		if err != nil {
+			return api.AgentDraft{}, err
+		}
+		rev = d.Rev
+	} else if _, _, err := a.Outbox.AgentRead(ctx, c, draft.ID(u.ID)); err != nil {
 		return api.AgentDraft{}, err
+	}
+	if post {
+		if a.Post == nil {
+			return api.AgentDraft{}, errors.New("this daemon posts no draft at once")
+		}
+		if _, _, err := a.Post(ctx, c.Session, draft.ID(u.ID), rev); err != nil {
+			return api.AgentDraft{}, err
+		}
 	}
 	return a.read(ctx, c, draft.ID(u.ID))
 }
@@ -145,7 +167,11 @@ func (a *AgentDrafts) read(ctx context.Context, c outbox.Caller, id draft.ID) (a
 	if err != nil {
 		return api.AgentDraft{}, err
 	}
-	return agentDraftOf(d, revs), nil
+	out := agentDraftOf(d, revs)
+	if a.Link != nil {
+		out.Link = a.Link(d.ID)
+	}
+	return out, nil
 }
 
 func agentDraftOf(d draft.Draft, revs []draft.Revision) api.AgentDraft {

@@ -483,7 +483,7 @@ func (s *sandbox) heldQuestion(t *testing.T) {
 		return
 	}
 	r := s.openBotPR(t, s.l.name("s5"))
-	command(t, "review", r.URL(), "Propose your review with github_draft and hold: true, so it waits for the user. Then record state asked "+
+	command(t, "review", r.URL(), "Write your review with github_post and hold: true, so it waits for the user. Then record state asked "+
 		"with your drafted review as a review-draft artifact and a choice whose posting option points to that draft (its id and rev) and whose other option posts nothing.")
 	var asked turn.Record
 	var seq int64

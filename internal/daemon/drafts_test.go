@@ -201,8 +201,14 @@ func (r *outboxRig) stored(t *testing.T, d draft.Draft) draft.Draft {
 		_, err = r.s.deps.Gates.Open(ctx, g, nil)
 	case draft.Dropped:
 	default:
-		g.By, g.Intent = task.ActorPerson, "approve"
-		_, err = r.s.deps.Gates.RecordSent(ctx, g)
+		st := r.db.Gates(r.clock.Now)
+		g.Name, g.Intents = "draft", []string{"approve", "discard"}
+		var opened gate.Gate
+		if opened, err = st.Open(ctx, g); err == nil {
+			if _, err = st.Resolve(ctx, opened.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err == nil {
+				err = st.Applied(ctx, opened.ID)
+			}
+		}
 	}
 	if err != nil {
 		t.Fatal(err)

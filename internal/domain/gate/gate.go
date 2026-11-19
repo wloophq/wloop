@@ -87,7 +87,7 @@ type Gate struct {
 	// Publish) and in ApproveOption, never at send: content changes only while a draft is held or failed,
 	// and a revision opens a new gate. 0, as on a gate opened before it existed, never matches.
 	ApprovedRev int64
-	// Sessions are every session that proposed or revised the gate's draft, none of which resolves it.
+	// Sessions are every session that proposed or revised the gate's draft.
 	Sessions []string
 }
 
@@ -96,8 +96,8 @@ func (g Gate) ByUser() bool {
 	return g.Rule == "" && (g.By == task.ActorPerson || g.By == task.ActorAgent && g.BySession != "")
 }
 
-// Stamps says whether session produced g's subject (Session) or proposed or revised its draft (Sessions), so
-// it never resolves g nor answers through it; "" stamps nothing. The outbox stamps a draft's origin session
+// Stamps says whether session produced g's subject (Session) or proposed or revised its draft (Sessions); ""
+// stamps nothing. The outbox stamps a draft's origin session
 // among Sessions when its gate opens.
 func (g Gate) Stamps(session string) bool {
 	return session != "" && (g.Session == session || slices.Contains(g.Sessions, session))

@@ -22,10 +22,12 @@ const RuleWindow = "window"
 
 var (
 	// ErrRefused is a resolution the gate does not accept: by an agent through
-	// a session the user does not drive or whose turn produced the gate's
-	// subject, by a plugin, by a rule the trusted policy does not hold, or by
-	// a window that has not passed.
+	// a session the user does not drive, by a plugin, by a rule the trusted
+	// policy does not hold, or by a window that has not passed.
 	ErrRefused = errors.New("the gate refuses the resolution")
+	// ErrMoved is a pick of a draft at a rev its gate no longer waits on, a kind of ErrRefused: the resolver
+	// saw another version of the draft.
+	ErrMoved = errors.New("the draft is at another rev than the one picked")
 	// ErrIntent is an intent the gate does not offer, or one gates.toml does
 	// not declare for it.
 	ErrIntent = errors.New("the gate offers no such intent")
@@ -224,8 +226,7 @@ func (s *Service) Open(ctx context.Context, g gate.Gate, p Policy) (gate.Gate, e
 }
 
 // Resolve closes open gate id with r. It accepts a person's intent, an
-// agent's through a session the user drives whose turns did not produce the
-// gate's subject, the Default of a gate whose Deadline passed with the rule
+// agent's through a session the user drives, the Default of a gate whose Deadline passed with the rule
 // window, and a rule the service's trusted Policy holds for the gate now, but
 // for a draft a question pins, which only the pick approves; it refuses
 // anything else, an unattended agent's or a plugin's above all. Status comes from
@@ -247,8 +248,7 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 
 // resolveOption approves, through ApproveOption, the draft that r's answer to open question gate id picks,
 // and answers the question with it; done is false when r picks no draft, or when ApproveOption refuses it
-// before resolving anything, so the answer resolves the question as any answer does. A pick whose resolver
-// proposed or revised the draft (Gate.Stamps) is refused outright: the question stays open.
+// before resolving anything, so the answer resolves the question as any answer does.
 func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (done bool, err error) {
 	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
 		return false, nil
@@ -265,7 +265,7 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 		return false, err
 	}
 	err = s.ApproveOption(ctx, q, r, drafted, rev)
-	if errors.Is(err, ErrRefused) && !errors.Is(err, errStamped) {
+	if errors.Is(err, ErrRefused) {
 		if now, gerr := s.d.Reader.Get(ctx, id); gerr == nil && now.Status == gate.Open {
 			s.logf("gate %d: the option's draft gate %d is not approved (%v); the answer resolves the question alone", id, drafted.ID, err)
 			return false, nil
@@ -275,10 +275,10 @@ func (s *Service) resolveOption(ctx context.Context, id int64, r Resolution) (do
 }
 
 // resolvePinned answers, as a pick of the option that pins it, the open question whose message pins the draft of
-// draft gate id at its rev, when r approves that draft: a question is one decision, so approving a draft it pins,
-// by any route, is picking its option, which approves the draft (ApproveOption, which refuses a resolver who
-// proposed or revised it) and answers the question, whose other options' drafts are then withdrawn. done is false
-// for any other resolution, and when no open question pins the draft at its rev.
+// draft gate id, when r approves that draft at the rev it waits on, which its resolver saw: a question is one
+// decision, so approving a draft it pins, by any route, is picking its option, which approves the draft
+// (ApproveOption) and answers the question, whose other options' drafts are then withdrawn. done is false
+// for any other resolution, and when no open question pins the draft.
 func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (done bool, err error) {
 	if s.d.Options == nil || r.Rule != "" || r.By != task.ActorPerson && r.By != task.ActorAgent {
 		return false, nil
@@ -294,14 +294,12 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 	if rs, err := withStatus(g, def, r); err != nil || rs.Status != gate.Approved {
 		return false, nil
 	}
-	q, answer, rev, ok, err := s.d.Options.Pinning(ctx, g)
+	q, answer, _, ok, err := s.d.Options.Pinning(ctx, g)
 	switch {
 	case err != nil || !ok:
 		return false, err
 	case q.ID == 0:
 		return true, fmt.Errorf("%w: a question about to open decides draft gate %d: answer it once it opens", ErrRefused, id)
-	case rev != g.ApprovedRev:
-		return true, fmt.Errorf("%w: open question gate %d decides draft gate %d, which it pinned at rev %d: answer the question", ErrRefused, q.ID, id, rev)
 	}
 	qdef, err := s.def(q)
 	if err != nil {
@@ -313,7 +311,7 @@ func (s *Service) resolvePinned(ctx context.Context, id int64, r Resolution) (do
 	}
 	pick := Resolution{Intent: qdef.Intents[i].Name, Answer: answer, By: r.By, Session: r.Session}
 	s.logf("gate %d: approving its draft picks the option of question gate %d that pins it", id, q.ID)
-	return true, s.ApproveOption(ctx, q, pick, g, rev)
+	return true, s.ApproveOption(ctx, q, pick, g, g.ApprovedRev)
 }
 
 // Decides refuses, with ErrRefused, a retry of the draft of draft gate drafted while a question decides it: an open
@@ -431,7 +429,7 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 	user := by == task.ActorPerson
 	switch by {
 	case task.ActorAgent:
-		if err := s.vouch(ctx, gate.Gate{}, session); err != nil {
+		if err := s.vouch(ctx, session); err != nil {
 			return fmt.Errorf("%w: the gates of task %s close with it, not by %s", err, id, by)
 		}
 		user = true
@@ -464,43 +462,6 @@ func (s *Service) TaskEnded(ctx context.Context, id task.ID, by task.Actor, sess
 		}
 	}
 	return errors.Join(errs...)
-}
-
-// RecordSent records g, a post a tool made at once, as a gate already
-// approved by g.By with g.Rule, worded by gates.toml and on the task of its
-// unit when one holds it. It resolves no gate and applies no consequence.
-func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
-	sent, ok := s.d.Store.(Sent)
-	if !ok {
-		return gate.Gate{}, errors.New("the gates store records no sent post")
-	}
-	def, err := s.def(g)
-	if err != nil {
-		return gate.Gate{}, err
-	}
-	g.Name, g.Kind = def.Name, def.Kind
-	if len(g.Intents) == 0 {
-		for _, in := range def.Intents {
-			g.Intents = append(g.Intents, in.Name)
-		}
-	}
-	if approve, ok := statusIntent(g, def, gate.Approved); ok {
-		g.Intent = approve.Name
-	}
-	if g.Task == "" {
-		if id, ok := task.IDOf(g.Unit); ok {
-			g.Task = id
-		} else if s.d.Tasks != nil && !g.Unit.IsZero() {
-			ts, err := s.d.Tasks.TasksOf(ctx, g.Unit)
-			if err != nil {
-				return gate.Gate{}, err
-			}
-			if len(ts) > 0 {
-				g.Task = ts[0].ID
-			}
-		}
-	}
-	return sent.RecordSent(ctx, g)
 }
 
 // Tick resolves every open gate whose Deadline is not after now to its
@@ -575,7 +536,7 @@ func (s *Service) resolve(ctx context.Context, id int64, r Resolution, now time.
 	case r.By == task.ActorPerson && r.Rule == "":
 		r.Session = ""
 	case r.By == task.ActorAgent && r.Rule == "":
-		if err := s.vouch(ctx, g, r.Session); err != nil {
+		if err := s.vouch(ctx, r.Session); err != nil {
 			return gate.Gate{}, err
 		}
 	case r.Rule == RuleWindow && (r.By == "" || r.By == task.ActorWorkflow):
@@ -598,21 +559,18 @@ func (s *Service) resolve(ctx context.Context, id int64, r Resolution, now time.
 	return s.close(ctx, g, r)
 }
 
-// vouch refuses, with ErrRefused, an agent acting on g through session unless the user drives the session and
-// its turns did not produce g's subject.
-func (s *Service) vouch(ctx context.Context, g gate.Gate, session string) error {
+// vouch refuses, with ErrRefused, an agent acting through session unless the user drives the session, which may
+// have produced the gate's subject itself: the user, prompting it, decides.
+func (s *Service) vouch(ctx context.Context, session string) error {
 	if session == "" || s.d.Sessions == nil {
 		return fmt.Errorf("%w: an agent resolves a gate only through a session the user drives", ErrRefused)
-	}
-	if g.Stamps(session) {
-		return fmt.Errorf("%w: gate %d's subject came from session %s's own turn, or that session revised it, so it does not resolve it", ErrRefused, g.ID, session)
 	}
 	driven, err := s.d.Sessions.UserDriven(ctx, session)
 	switch {
 	case err != nil:
 		return err
 	case !driven:
-		return fmt.Errorf("%w: the user does not drive session %s: it runs a turn the loop sent, or the loop typed into it last", ErrRefused, session)
+		return fmt.Errorf("%w: the user does not drive session %s: the loop typed into it last, and the user has not prompted it since", ErrRefused, session)
 	}
 	return nil
 }

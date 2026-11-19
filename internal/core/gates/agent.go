@@ -48,14 +48,49 @@ func (s *Service) TaskOf(ctx context.Context, g gate.Gate) (task.ID, error) {
 // the user drives) picked points to at rev, the rev the option pinned, then resolves question gate
 // question with r, the option picked (Intent, Answer) and who picked it (By, Session). It reads both gates
 // again from the store first, trusting neither value the caller passes, and resolves nothing when drafted
-// is no longer open (or approved already by r's resolver) at rev, is on another unit than the question, came
-// from another session than the question's, or stamps r.Session (gate.Gate.Stamps), or when r is a rule's:
+// is no longer open (or approved already by r's resolver) at rev, is on another unit than the question, or came
+// from another session than the question's, or when r is a rule's:
 // each is ErrRefused. The draft is approved before the question is answered, so an answered question names the
 // one draft its answer approved: a later call on an answered question completes only with that draft gate
 // approved, and refuses any other draft gate, another option's or a revision's, with ErrRefused. A draft
 // that loses its approval to a race (a revision) leaves the question open. Each step is idempotent, so a
 // call cut short completes when it is made again with the same r.
 func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64) error {
+	return s.approveOption(ctx, question, r, drafted, rev, nil)
+}
+
+// Edit is a person's change of an option's draft, made as they pick the option: it revises the draft drafted
+// holds, which supersedes drafted, and returns the open gate the revision waits on.
+type Edit func(ctx context.Context, drafted gate.Gate) (gate.Gate, error)
+
+// PickOption answers open question gate id with r, which picks an option pinning a held draft, approving that
+// draft at rev, the rev the person saw, which may be newer than the one the option pinned, after edit (nil for
+// none) changes it, all under the question's claim, as ApproveOption does. It refuses with ErrRefused an answer
+// that picks no held draft, and a rev the draft no longer waits on: the person saw another version of it.
+func (s *Service) PickOption(ctx context.Context, id int64, r Resolution, rev int64, edit Edit) error {
+	if s.d.Options == nil {
+		return fmt.Errorf("%w: question gate %d picks no draft here", ErrRefused, id)
+	}
+	q, err := s.d.Reader.Get(ctx, id)
+	switch {
+	case err != nil:
+		return err
+	case q.Kind != gate.KindQuestion:
+		return fmt.Errorf("%w: gate %d is a %s gate, not a question", ErrRefused, id, q.Kind)
+	case q.Status != gate.Open:
+		return fmt.Errorf("%w: %d is %s", ErrResolved, id, q.Status)
+	}
+	drafted, _, ok, err := s.d.Options.OptionDraft(ctx, q, r)
+	switch {
+	case err != nil:
+		return err
+	case !ok:
+		return fmt.Errorf("%w: the answer to question gate %d picks no draft waiting on the user", ErrRefused, id)
+	}
+	return s.approveOption(ctx, q, r, drafted, rev, edit)
+}
+
+func (s *Service) approveOption(ctx context.Context, question gate.Gate, r Resolution, drafted gate.Gate, rev int64, edit Edit) error {
 	release, ok := s.claimQuestion(question.ID)
 	if !ok {
 		return fmt.Errorf("%w: question gate %d is being decided", ErrResolved, question.ID)
@@ -80,6 +115,14 @@ func (s *Service) ApproveOption(ctx context.Context, question gate.Gate, r Resol
 	}
 	if err := s.answers(ctx, q, r); err != nil {
 		return err
+	}
+	if edit != nil && d.Status == gate.Open {
+		if d, err = edit(ctx, d); err != nil {
+			return err
+		}
+		if err := s.pinned(q, d, r, d.ApprovedRev); err != nil {
+			return err
+		}
 	}
 	if d.Status == gate.Open {
 		if err := s.approveDraft(ctx, d, r); err != nil {
@@ -114,7 +157,7 @@ func (s *Service) answers(ctx context.Context, q gate.Gate, r Resolution) error 
 		return fmt.Errorf("%w: intent %q of gate %d does not answer it, so it picks no option", ErrRefused, r.Intent, q.ID)
 	}
 	if r.By == task.ActorAgent {
-		return s.vouch(ctx, q, r.Session)
+		return s.vouch(ctx, r.Session)
 	}
 	return nil
 }
@@ -160,22 +203,16 @@ func (s *Service) pinned(q, d gate.Gate, r Resolution, rev int64) error {
 	case d.Status != gate.Open && d.Status != gate.Approved:
 		return fmt.Errorf("%w: the draft of gate %d was revised or settled since the option pointed to it", ErrRefused, d.ID)
 	case rev < 1 || d.ApprovedRev != rev:
-		return fmt.Errorf("%w: the option points to rev %d of the draft of gate %d, which waits on rev %d", ErrRefused, rev, d.ID, d.ApprovedRev)
+		return fmt.Errorf("%w: %w: rev %d of the draft of gate %d was picked, and it waits on rev %d: read it again and pick again", ErrRefused, ErrMoved, rev, d.ID, d.ApprovedRev)
 	case d.Unit != q.Unit:
 		return fmt.Errorf("%w: the draft of gate %d is on %s, not on the question's %s", ErrRefused, d.ID, d.Unit, q.Unit)
 	case q.Session != "" && d.Session != q.Session:
 		return fmt.Errorf("%w: the draft of gate %d is not of the session that asked", ErrRefused, d.ID)
 	case r.By != task.ActorPerson && r.By != task.ActorAgent:
 		return fmt.Errorf("%w: an option is picked by a person or a session the user drives, not by %s", ErrRefused, r.By)
-	case d.Stamps(r.Session):
-		return fmt.Errorf("%w: %w: session %s proposed or revised the draft of gate %d", ErrRefused, errStamped, r.Session, d.ID)
 	}
 	return nil
 }
-
-// errStamped marks an option refused because its resolver proposed or revised the draft: such a pick is no
-// answer at all, unlike a stale pin, whose person did choose.
-var errStamped = errors.New("the resolver proposed or revised the option's draft")
 
 func sessionOf(r Resolution) string {
 	if r.By == task.ActorPerson {

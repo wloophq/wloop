@@ -1,31 +1,35 @@
-[github_draft]
-description = "Propose a GitHub post on the pull request of your turn, to be made as the user once they, or a rule of theirs, approve it in the {{.Name}} Outbox. It posts nothing itself: a comment, a review with its verdict and inline comments, a reply in a review thread, a thread's resolution, or a request for reviews. A review states the head commit you read as basis; a push since makes it stale, and it is not posted."
+[github_post]
+description = "Write a GitHub post on the pull request of your turn, in the user's name: a comment, a review with its verdict and inline comments, a reply in a review thread, a thread's resolution, or a request for reviews. With draft true, the default, it is a draft that waits for the user in {{.Name}}, where they review, edit and post it, unless one of their approval rules posts it. With draft false it is posted at once, as the user: set it only when the user told you, in this session, to post it. A review states the head commit you read as basis; a push since makes it stale, and it is not posted."
 
-[github_draft.params]
+[github_post.params]
 "kind" = "comment, review, thread_reply, resolve or request_review"
 "target" = "empty for the pull request; comment:<id> for a thread_reply or a resolve, the REST id of a review comment in the thread, as github_threads lists them"
 "text" = "the comment, the review's body or the reply, in Markdown; empty for a resolve"
 "payload" = "what the kind's schema shapes beside text: for a review, its event (APPROVE, REQUEST_CHANGES or COMMENT) and its inline comments; for a request_review, its reviewers, GitHub logins without @"
 "basis" = "for a review, the head commit you read the pull request at"
-"hold" = "true to wait for the user even where a rule of theirs would send it"
-"effects" = "what sending it does besides posting; empty for none"
+"draft" = "true, the default, makes a draft for the user; false posts it at once in the user's name, only when the user told you to"
+"hold" = "true: no approval rule of the user's posts this draft; use it for a draft your question pins"
+"effects" = "what posting it does besides the post; empty for none"
 "effects[]" = "an effect name your intent lists in drafts.allowed_effects"
-"why" = "why you propose it, for the user approving it"
+"why" = "why you write it, for the user reviewing it"
 
-[github_draft.answers]
-refused = "github_draft refused: {{.Error}}."
-bad_arguments = "Nothing was drafted: the arguments are not an object with kind, and target, text, payload, basis, hold and effects when needed{{with .Error}} ({{.}}){{end}}."
-fix_these = """Nothing was drafted; fix these and call github_draft again:
+[github_post.answers]
+refused = "github_post refused: {{.Error}}."
+bad_arguments = "Nothing was written: the arguments are not an object with kind, and target, text, payload, basis, draft, hold and effects when needed{{with .Error}} ({{.}}){{end}}."
+fix_these = """Nothing was written; fix these and call github_post again:
 {{.Problems}}"""
-failed = "Nothing was drafted: {{.Error}}"
+failed = "Nothing was written: {{.Error}}"
 problem_kind = "kind: one of {{.Kinds}}"
 problem_text_required = "text: required for this kind, not empty"
 problem_payload = "payload: {{.Error}}"
 problem_basis_required = "basis: required for a review, the head commit you read"
-stale = "Nothing was drafted: you read the pull request at {{.Basis}}, and its head is {{.Head}} now; read what changed and propose again."
-proposed = "Proposed draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}: it will be posted once the user approves it in the {{.Name}} Outbox; nothing was posted."
-approved = "Draft {{.ID}} (rev {{.Rev}}) on {{.Unit}} is approved by a rule of the user's and will be posted; nothing was posted yet."
-dry_run = "Draft {{.ID}} (rev {{.Rev}}) on {{.Unit}} is a dry run: its approval stores drafts and never sends them, so it will not be posted."
+problem_hold = "hold: only with draft true; a post with draft false waits for nobody"
+stale = "Nothing was written: you read the pull request at {{.Basis}}, and its head is {{.Head}} now; read what changed and write it again."
+drafted = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; nothing was posted. It waits for the user{{with .Link}} at {{.}}{{end}}, where they review, edit and post it."
+rule_posts = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; one of the user's approval rules posts it now."
+dry_run = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}} as a dry run: the user's approval stores drafts and never posts them, so it will not be posted."
+posting = "Posting {{.ID}} (rev {{.Rev}}) on {{.Unit}} now, in the user's name; draft_read shows its link once it is posted."
+waits = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
 
 [github_threads]
 description = "Read the unresolved review threads of the pull request of your turn, each with its comments and their REST ids, which a thread_reply or a resolve targets as comment:<id>, and each reviewer's latest review. It writes nothing."

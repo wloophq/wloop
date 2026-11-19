@@ -1,5 +1,5 @@
 {
-  "version": "48551a885afd",
+  "version": "e67ef4df4627",
   "specs": [
     {
       "id": "answer",
@@ -210,7 +210,7 @@
     {
       "id": "act",
       "label": "Act",
-      "summary": "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop",
+      "summary": "Act on the open items of a unit without touching its code: settle what you can and draft the replies it needs for you to post; Address works on the code of a pull request you develop",
       "group": "start",
       "surfaces": [
         "row",

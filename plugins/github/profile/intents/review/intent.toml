@@ -56,7 +56,7 @@ concludes = ["APPROVE"]
 outcome_doc = '''
 `outcome`: on `done` and on `asked`, the `verdict` your review draft
   posts, `blocking` and `non_blocking`, and on `done` the `draft` you
-  proposed (its `id` and `rev`); leave `url` out: it is filled when the
+  wrote (its `id` and `rev`); leave `url` out: it is filled when the
   draft is posted.'''
 require = [
   { state = "done", fields = ["verdict", "url"] },

@@ -97,6 +97,7 @@ func (e *Env) newDaemon(d daemon.Deps) *daemon.Server {
 	if e.starts != nil {
 		e.starts.prepares.srv.Store(srv)
 	}
+	e.hosted.setPoster(srv)
 	return srv
 }
 

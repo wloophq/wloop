@@ -85,8 +85,10 @@ type prompt struct {
 	// mode; nil when it has none.
 	tab func(p *prompt)
 	// editor lets Ctrl+E hand the text to the editor, whose text submit
-	// then takes.
-	editor bool
+	// then takes; editText is the text it hands while the prompt's own is
+	// empty.
+	editor   bool
+	editText string
 }
 
 // EditRequest is a prompt's text handed to the editor; Submit takes what
@@ -611,7 +613,7 @@ func (m *Model) promptKey(k Key) (Command, bool) {
 		p.tab(p)
 	case k.Name == KeyCtrlE && p.editor && p.submit != nil:
 		m.prompt = nil
-		m.edit = &EditRequest{Label: p.action, Text: string(p.text), submit: p.submit}
+		m.edit = &EditRequest{Label: p.action, Text: cmp.Or(string(p.text), p.editText), submit: p.submit}
 	case k.Name == KeyBackspace:
 		if len(p.text) > 0 {
 			p.text = p.text[:len(p.text)-1]

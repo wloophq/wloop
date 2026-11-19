@@ -16,20 +16,24 @@ import (
 )
 
 // TestARevisedPinnedDraftIsDecidedByItsQuestionOnly (RE2-A): the agent revises draft 42 to rev 2 after its question
-// pinned rev 1. Approving draft 42's card (outbox approve, the task verb) is refused, since the open question is
-// the decision; picking the question's comment option then approves draft 43 alone. One question, one verdict.
+// pinned rev 1. Approving draft 42's card at rev 2, which the person sees, picks the option that pins it: the
+// question is answered with it and the comment option's draft 43 withdrawn, so picking comment after finds the
+// question answered. One question, one verdict.
 func TestARevisedPinnedDraftIsDecidedByItsQuestionOnly(t *testing.T) {
 	ctx := context.Background()
 	r, od, m := draftRig(t)
 	od.put(heldDraft(42, r7, 1, 2), "term_1")
-	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("approving draft 42 at rev 2 beside its open question: %v, want ErrRefused", err)
+	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatalf("approving draft 42 at rev 2 beside its open question: %v", err)
 	}
-	if _, err := r.answer(m, messages.Answer{OptionID: "comment", Source: turn.Cockpit}); err != nil {
-		t.Fatalf("picking comment: %v", err)
+	if q := r.gateOf(t, m); q.Status != gate.Answered || q.Answer != messages.GateAnswer(messages.Answer{OptionID: "approve"}) {
+		t.Fatalf("question %+v, want answered with the option pinning draft 42", q)
 	}
-	if len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(43).ID || od.gateOf(42).Status != gate.Superseded && od.gateOf(42).Status != gate.Open {
-		t.Errorf("one question approved %+v; draft 42's gate %s: want draft 43's approval only", od.approvals, od.gateOf(42).Status)
+	if _, err := r.answer(m, messages.Answer{OptionID: "comment", Source: turn.Cockpit}); err == nil {
+		t.Fatal("picking comment after the question was answered went through")
+	}
+	if len(od.approvals) != 1 || od.approvals[0].drafted != od.gateOf(42).ID || !slices.Contains(od.withdrawn, withdrawal{43, messages.ReasonOtherOption}) {
+		t.Errorf("one question approved %+v, withdrawn %+v: want draft 42's approval only", od.approvals, od.withdrawn)
 	}
 }
 

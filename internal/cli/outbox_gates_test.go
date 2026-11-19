@@ -29,11 +29,6 @@ func (s taskless) Open(ctx context.Context, g gate.Gate) (gate.Gate, error) {
 	return s.GateStore.Open(ctx, g)
 }
 
-func (s taskless) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
-	g.Task = ""
-	return s.GateStore.RecordSent(ctx, g)
-}
-
 // decideDraft resolves draft id's open gate with intent as a person, through o's gates: the daemon's service for
 // an outbox serve built, the bound one for a test's.
 func decideDraftAs(ctx context.Context, o *outbox.Service, id draft.ID, intent string) error {

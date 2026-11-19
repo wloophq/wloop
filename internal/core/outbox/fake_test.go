@@ -231,9 +231,16 @@ func (e *env) insertApproved(d draft.Draft) (draft.Draft, error) {
 		return d, err
 	}
 	g := gateOf(d, nil)
-	g.Name, g.Intents, g.Intent, g.By = "draft", []string{"approve", "discard"}, "approve", task.ActorPerson
-	_, err = e.gates.RecordSent(context.Background(), g)
-	return d, err
+	g.Name, g.Intents = "draft", []string{"approve", "discard"}
+	ctx := context.Background()
+	opened, err := e.gates.Open(ctx, g)
+	if err != nil {
+		return d, err
+	}
+	if _, err := e.gates.Resolve(ctx, opened.ID, gates.Resolution{Status: gate.Approved, Intent: "approve", By: task.ActorPerson}); err != nil {
+		return d, err
+	}
+	return d, e.gates.Applied(ctx, opened.ID)
 }
 
 // tick resolves the gates whose window passed.

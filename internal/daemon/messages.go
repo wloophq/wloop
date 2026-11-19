@@ -176,7 +176,35 @@ func (s *Server) resolveTaskGate(ctx context.Context, e task.Task, role builtin.
 		}
 	}
 	r.By, r.Session = req.Actor, req.Session
+	if _, picksAt := req.Args["rev"]; picksAt && g.Kind == gate.KindQuestion && s.deps.Outbox != nil {
+		return true, s.pickTaskOption(ctx, g, r, req, ar.Source, out)
+	}
 	return true, s.resolveGate(ctx, g, r, ar.Source, out)
+}
+
+// pickTaskOption answers question gate g with r, picking the option whose draft req's args name at the rev the
+// person saw, with their edit of it, as the gate route's pick does.
+func (s *Server) pickTaskOption(ctx context.Context, g gate.Gate, r gates.Resolution, req coretasks.Request, source string, out io.Writer) error {
+	src, err := answerSource(source)
+	if err != nil {
+		return err
+	}
+	args := map[string]string{"answer": r.Answer}
+	for _, k := range []string{"rev", "text", "payload"} {
+		if v, ok := req.Args[k]; ok {
+			args[k] = v
+		}
+	}
+	d := &messages.Delivery{Source: src}
+	if err := s.pickOption(messages.WithDelivery(ctx, d), g, r.Intent, args, requestOf(req)); err != nil {
+		return err
+	}
+	if d.Route.Route == "" {
+		fmt.Fprintf(out, "%s: %s\n", s.gateWords(g), r.Intent)
+		return nil
+	}
+	writeRoute(out, d.Route.Route, d.Route.Note)
+	return nil
 }
 
 // taskGate is e's oldest open gate that takes role and how ar resolves it; false when none does.

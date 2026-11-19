@@ -919,10 +919,10 @@ usage = "<yyyy-mm-dd>"
 name = "teams"
 
 [[source.tools]]
-name = "github_draft"
-doc = "Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval."
-proposes = true
-input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve","request_review"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
+name = "github_post"
+doc = "Writes a GitHub comment, review, review thread reply, thread resolution or review request in the user's name: a draft for the user by default, posted at once with draft false from a session the user drives."
+writes = true
+input = '{"type":"object","properties":{"kind":{"type":"string","enum":["comment","review","thread_reply","resolve","request_review"]},"target":{"type":"string"},"text":{"type":"string"},"payload":{"type":"object"},"basis":{"type":"string"},"draft":{"type":"boolean"},"hold":{"type":"boolean"},"effects":{"type":"array","items":{"type":"string"}},"why":{"type":"string"}},"required":["kind"],"additionalProperties":false}'
 
 [[source.tools.answers]]
 name = "failed"
@@ -948,24 +948,38 @@ name = "problem_basis_required"
 doc = "A problem: the kind needs the head commit the agent read as basis."
 
 [[source.tools.answers]]
+name = "problem_hold"
+doc = "A problem: hold is set with draft false."
+
+[[source.tools.answers]]
 name = "stale"
-doc = "The basis is not the pull request's head now; nothing was drafted."
+doc = "The basis is not the pull request's head now; nothing was written."
 fields = [{ name = "Basis" }, { name = "Head" }]
 
 [[source.tools.answers]]
-name = "proposed"
-doc = "The draft waits for the user's approval."
-fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+name = "drafted"
+doc = "The draft waits for the user: Link is its card, \"\" when unknown."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools.answers]]
-name = "approved"
-doc = "A rule of the user's approved the draft, and it will be posted."
-fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+name = "rule_posts"
+doc = "A rule of the user's posts the draft."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools.answers]]
 name = "dry_run"
 doc = "The draft's approval is a dry run: it is stored and never posted."
-fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }]
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
+
+[[source.tools.answers]]
+name = "posting"
+doc = "With draft false: the post is approved through the session the user drives and on its way."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
+
+[[source.tools.answers]]
+name = "waits"
+doc = "With draft false from a session the user does not drive: nothing was posted, and the draft waits for the user."
+fields = [{ name = "ID", number = true }, { name = "Rev", number = true }, { name = "Unit" }, { name = "Link" }]
 
 [[source.tools]]
 name = "github_threads"

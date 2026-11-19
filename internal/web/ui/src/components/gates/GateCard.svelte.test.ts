@@ -237,10 +237,11 @@ describe("qcard_test.go, the question's card", () => {
     expect(all(c, ".d-pin[data-draft]").map((x) => x.getAttribute("data-draft"))).toEqual(["42", "43"]);
     expect(all(c, ".opt").map((o) => o.getAttribute("data-pin"))).toEqual(["42@3", "43@3", "44@1"]);
     expect(all(c, '.opt[aria-pressed="true"]')).toHaveLength(0);
-    expect(all(c, ".d-pin button")).toHaveLength(0);
+    expect(texts(c, ".d-pin button")).toHaveLength(2);
     const second = all(c, ".d-pin")[1];
     expect(texts(second, ".d-note.err")[0]).toContain("now at rev 4");
-    expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Approves draft #44, which is gone."]);
+    expect(second.getAttribute("data-rev")).toBe("4");
+    expect(texts(all(c, ".d-pin")[2], ".d-note.err")).toEqual(["Picking this option posts draft #44, which is gone."]);
     expect(texts(c, ".d-pin .pv").length).toBeGreaterThan(0);
   });
 });
@@ -307,6 +308,27 @@ describe("rf1_reattack5_test.go, a pinned recommendation", () => {
     await fireEvent.input(Object.assign(byFocus(c, "gate:3:text"), { value: "and thank them" }));
     await fireEvent.click(byFocus(c, "gate:3:answer"));
     await settle();
-    expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "post\nand thank them" } } }]);
+    expect(posts).toEqual([{ path: "/api/gates/3/answer", body: { source: "cockpit", args: { answer: "post\nand thank them", rev: "3" } } }]);
+  });
+
+  test("TestAPickCarriesThePersonsEditOfThePinnedDraft: the pinned draft is edited on the card and the pick sends the edit", async () => {
+    const posts = recordPosts();
+    const c = card(pinned());
+    await fireEvent.click(byFocus(c, "gate:3:option:post:edit:pin:7"));
+    flushSync();
+    const box = byFocus(c, "gate:3:option:post:draft-text:pin:7") as HTMLTextAreaElement;
+    expect(box.value).toBe("Two findings block the merge.");
+    await fireEvent.input(Object.assign(box, { value: "One finding blocks the merge." }));
+    const verdict = byFocus(c, "gate:3:option:post:field:pin:7:/event") as HTMLSelectElement;
+    await fireEvent.change(Object.assign(verdict, { value: "COMMENT" }));
+    await fireEvent.click(byFocus(c, "gate:3:option:post"));
+    await fireEvent.click(byFocus(c, "gate:3:answer"));
+    await settle();
+    expect(posts).toHaveLength(1);
+    const args = posts[0].body.args;
+    expect(args.answer).toBe("post");
+    expect(args.rev).toBe("3");
+    expect(args.text).toBe("One finding blocks the merge.");
+    expect(JSON.parse(args.payload).event).toBe("COMMENT");
   });
 });

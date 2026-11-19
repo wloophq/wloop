@@ -64,23 +64,10 @@ func TestASessionTheUserDrivesApprovesAHeldRoundsGateAsItself(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := "/api/units/github/acme%2Fapi%237/run_now"
-	if rec := postFrom(t, s, "term_2", path, `{"source":"cockpit"}`); rec.Code == http.StatusOK {
-		t.Fatalf("a session approved the held round its own turn produced: %d %s", rec.Code, rec.Body)
-	}
-	if got, _ := st.Get(ctx, own.ID); got.Status != gate.Open {
-		t.Fatalf("the refused approval left the gate %+v", got)
-	}
-	if err := svc.Supersede(ctx, own.ID, task.ActorPerson); err != nil {
-		t.Fatal(err)
-	}
-	g, err := svc.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: r7.Unit(), Subject: round.HeldSubject(s.deps.Now())}, holdForYou{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if rec := postFrom(t, s, "term_2", path, `{"source":"cockpit"}`); rec.Code != http.StatusOK {
-		t.Fatalf("run_now on the held round from a session the user drives: %d %s", rec.Code, rec.Body)
+		t.Fatalf("run_now on the held round its own turn produced, from a session the user drives: %d %s", rec.Code, rec.Body)
 	}
-	if got, _ := st.Get(ctx, g.ID); got.Status != gate.Approved || got.By != task.ActorAgent || got.BySession != mine {
+	if got, _ := st.Get(ctx, own.ID); got.Status != gate.Approved || got.By != task.ActorAgent || got.BySession != mine {
 		t.Fatalf("the held round's gate %+v, want approved by an agent through %s", got, mine)
 	}
 }

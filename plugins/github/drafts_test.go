@@ -131,10 +131,6 @@ func cmpOr(a, b string) string {
 	return b
 }
 
-func (h *draftHost) RecordSent(context.Context, src.Draft, string, string) (src.GateRef, error) {
-	return src.GateRef{}, src.ErrUnsupported
-}
-
 func (h *draftHost) RehomeDrafts(context.Context, []src.UnitMove) (int, error) { return 0, nil }
 
 func (h *draftHost) SetOverride(context.Context, sdk.Unit, map[string]string, map[string]string) (bool, error) {
@@ -172,9 +168,9 @@ func startedLive(t testing.TB) (*Plugin, *liveGitHub, *draftHost) {
 	return p, gh, h
 }
 
-func callDraft(t *testing.T, p *Plugin, session, args string) (string, map[string]any) {
+func callPost(t *testing.T, p *Plugin, session, args string) (string, map[string]any) {
 	t.Helper()
-	res, err := p.CallTool(context.Background(), src.ToolCall{Tool: ToolDraft, Args: json.RawMessage(args), Session: session})
+	res, err := p.CallTool(context.Background(), src.ToolCall{Tool: ToolPost, Args: json.RawMessage(args), Session: session})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,11 +205,11 @@ func TestBasisLive(t *testing.T) {
 	}
 }
 
-func TestGithubDraftProposes(t *testing.T) {
+func TestGithubPostDrafts(t *testing.T) {
 	t.Parallel()
 	p, gh, h := startedLive(t)
 	if !slices.Contains(src.Capabilities(p), src.CapabilityTooler) {
-		t.Fatal("the plugin serves no tools, so MCP lists no github_draft")
+		t.Fatal("the plugin serves no tools, so MCP lists no github_post")
 	}
 	review, err := os.ReadFile(filepath.Join("drafts", "testdata", "review.json"))
 	if err != nil {
@@ -229,8 +225,8 @@ func TestGithubDraftProposes(t *testing.T) {
 	args["effects"] = []string{EffectReviewed}
 	raw, _ := json.Marshal(args)
 	h.rev = 3
-	name, f := callDraft(t, p, "s1", string(raw))
-	if name != "proposed" || f["ID"] != float64(42) || f["Rev"] != float64(3) || f["Unit"] != "acme/api#7" {
+	name, f := callPost(t, p, "s1", string(raw))
+	if name != "drafted" || f["ID"] != float64(42) || f["Rev"] != float64(3) || f["Unit"] != "acme/api#7" {
 		t.Fatalf("answered %s %v, want the rev the host stored", name, f)
 	}
 	got := h.gates()
@@ -244,20 +240,20 @@ func TestGithubDraftProposes(t *testing.T) {
 	}
 
 	h.state = "queued"
-	if name, _ := callDraft(t, p, "s1", `{"kind":"comment","text":"Thanks!"}`); name != "approved" {
+	if name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Thanks!"}`); name != "rule_posts" {
 		t.Fatalf("a rule's approval answered %s", name)
 	}
 	h.state = "dropped"
-	if name, _ := callDraft(t, p, "s1", `{"kind":"thread_reply","target":"comment:1234567","text":"Fixed."}`); name != "dry_run" {
+	if name, _ := callPost(t, p, "s1", `{"kind":"thread_reply","target":"comment:1234567","text":"Fixed."}`); name != "dry_run" {
 		t.Fatalf("a dry run answered %s", name)
 	}
 	h.state = ""
-	if name, _ := callDraft(t, p, "s1", `{"kind":"request_review","payload":{"reviewers":["bob"]}}`); name != "proposed" {
+	if name, _ := callPost(t, p, "s1", `{"kind":"request_review","payload":{"reviewers":["bob"]}}`); name != "drafted" {
 		t.Fatalf("a review request answered %s", name)
 	}
 
 	gh.setHead(headB)
-	if name, f := callDraft(t, p, "s1", string(raw)); name != "stale" || f["Basis"] != headA || f["Head"] != headB {
+	if name, f := callPost(t, p, "s1", string(raw)); name != "stale" || f["Basis"] != headA || f["Head"] != headB {
 		t.Fatalf("a stale review answered %s %v", name, f)
 	}
 	for args, want := range map[string]string{
@@ -268,16 +264,16 @@ func TestGithubDraftProposes(t *testing.T) {
 		`{"kind":"resolve","target":"comment:1","payload":{"event":"APPROVE"}}`: "problem_payload",
 		`{"kind":"request_review","payload":{"reviewers":[]}}`:                  "problem_payload",
 	} {
-		name, f := callDraft(t, p, "s1", args)
+		name, f := callPost(t, p, "s1", args)
 		ps, _ := json.Marshal(f["Problems"])
 		if name != "fix_these" || !strings.Contains(string(ps), `"`+want+`"`) {
 			t.Errorf("%s answered %s %s, want %s", args, name, ps, want)
 		}
 	}
-	if name, _ := callDraft(t, p, "s1", `{"kind":"comment","text":"x","merge":true}`); name != "bad_arguments" {
+	if name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"x","merge":true}`); name != "bad_arguments" {
 		t.Errorf("an unknown argument answered %s", name)
 	}
-	if name, _ := callDraft(t, p, "", `{"kind":"comment","text":"x"}`); name != "refused" {
+	if name, _ := callPost(t, p, "", `{"kind":"comment","text":"x"}`); name != "refused" {
 		t.Errorf("no session answered %s", name)
 	}
 	if n := len(h.gates()); n != 4 {
@@ -290,7 +286,7 @@ func TestNudgeCommentEffect(t *testing.T) {
 	p, _, h := startedLive(t)
 	h.session.Intent = "nudge"
 	ctx := context.Background()
-	if name, f := callDraft(t, p, "s1", `{"kind":"comment","text":"@{github:bob}, could you take a look?","effects":["pr.nudged"]}`); name != "proposed" {
+	if name, f := callPost(t, p, "s1", `{"kind":"comment","text":"@{github:bob}, could you take a look?","effects":["pr.nudged"]}`); name != "drafted" {
 		t.Fatalf("answered %s %v", name, f)
 	}
 	d := h.gates()[0].Draft
@@ -439,10 +435,31 @@ func BenchmarkGithubDraftReview(b *testing.B) {
 	args := `{"kind":"review","basis":"` + headA + `","text":"x","payload":{"event":"COMMENT"}}`
 	before := gh.count("GET /repos/acme/api/pulls/7")
 	for b.Loop() {
-		res, err := p.CallTool(context.Background(), src.ToolCall{Tool: ToolDraft, Args: json.RawMessage(args), Session: "s1"})
-		if err != nil || res.Answer != "proposed" {
+		res, err := p.CallTool(context.Background(), src.ToolCall{Tool: ToolPost, Args: json.RawMessage(args), Session: "s1"})
+		if err != nil || res.Answer != "drafted" {
 			b.Fatal(res, err)
 		}
 	}
 	b.ReportMetric(float64(gh.count("GET /repos/acme/api/pulls/7")-before)/float64(b.N), "head-reads/op")
+}
+
+// With draft false the post asks the host to post at once; the host's state says whether it is on its way or, from
+// a session the user does not drive, kept as a draft, and hold with draft false is refused.
+func TestGithubPostDraftFalseAsksTheHostToPost(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "waits"}} {
+		p, _, h := startedLive(t)
+		h.state = c.state
+		name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Looks good.","draft":false}`)
+		if name != c.want {
+			t.Errorf("host state %s: answered %s, want %s", c.state, name, c.want)
+		}
+		if got := h.gates(); len(got) != 1 || !got[0].Post {
+			t.Errorf("host state %s: opened %+v, want one request to post", c.state, got)
+		}
+	}
+	p, _, h := startedLive(t)
+	if name, _ := callPost(t, p, "s1", `{"kind":"comment","text":"Looks good.","draft":false,"hold":true}`); name != "fix_these" || len(h.gates()) != 0 {
+		t.Fatalf("hold with draft false: answered %s, opened %+v", name, h.gates())
+	}
 }

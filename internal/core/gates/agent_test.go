@@ -31,33 +31,34 @@ func approveBy(session string) gates.Resolution {
 	return gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: session}
 }
 
-func TestProposerCannotResolve(t *testing.T) {
+// The user is in charge of what is posted in their name: a session they drive approves a draft it proposed or
+// revised, and a session they do not drive approves none.
+func TestASessionTheUserDrivesApprovesADraftItProposedOrRevised(t *testing.T) {
 	ctx := context.Background()
-	f := newFixture(t, nil, bundled)
-	f.drive("s-worker", "s-user")
-	g := f.draftGate(t)
-	if err := f.svc.Resolve(ctx, g.ID, approveBy("s-worker")); !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("the proposer resolved its draft's gate: %v", err)
-	}
-	if got := f.get(t, g.ID); got.Status != gate.Open || len(f.cons.Calls) != 0 {
-		t.Fatalf("after the proposer's try: %+v, %v", got, f.cons.Calls)
-	}
-	if err := f.svc.Resolve(ctx, g.ID, approveBy("s-user")); err != nil {
-		t.Fatalf("a session the user drives that never touched the draft: %v", err)
-	}
-	if got := f.get(t, g.ID); got.Status != gate.Approved || got.ApprovedRev != 3 || got.BySession != "s-user" {
-		t.Fatalf("approved %+v", got)
+	for _, session := range []string{"s-worker", "s-reviser"} {
+		f := newFixture(t, nil, bundled)
+		f.drive(session)
+		g := f.draftGate(t)
+		if err := f.svc.Resolve(ctx, g.ID, approveBy("s-other")); !errors.Is(err, gates.ErrRefused) {
+			t.Fatalf("a session the user does not drive: %v", err)
+		}
+		if got := f.get(t, g.ID); got.Status != gate.Open || len(f.cons.Calls) != 0 {
+			t.Fatalf("after the unattended try: %+v, %v", got, f.cons.Calls)
+		}
+		if err := f.svc.Resolve(ctx, g.ID, approveBy(session)); err != nil {
+			t.Fatalf("%s, which the user drives: %v", session, err)
+		}
+		if got := f.get(t, g.ID); got.Status != gate.Approved || got.ApprovedRev != 3 || got.BySession != session || !got.ByUser() {
+			t.Fatalf("%s: approved %+v", session, got)
+		}
 	}
 }
 
-func TestReviserCannotResolve(t *testing.T) {
+func TestAReviserEndingTheTaskApprovesNothing(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t, nil, bundled)
 	f.drive("s-reviser")
 	g := f.draftGate(t)
-	if err := f.svc.Resolve(ctx, g.ID, approveBy("s-reviser")); !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("a reviser resolved the gate of its revision: %v", err)
-	}
 	if err := f.svc.TaskEnded(ctx, f.get(t, g.ID).Task, task.ActorAgent, "s-reviser", opened); err != nil {
 		t.Fatal(err)
 	}
@@ -103,8 +104,7 @@ func TestApproveOptionPinsRev(t *testing.T) {
 	}{
 		{"a rev the draft is not at", answer(task.ActorPerson, ""), 2, nil},
 		{"rev 0", answer(task.ActorPerson, ""), 0, nil},
-		{"a resolver that revised the draft", answer(task.ActorAgent, "s-reviser"), 3, nil},
-		{"a resolver that proposed the draft", answer(task.ActorAgent, "s-worker"), 3, nil},
+		{"a resolver the user does not drive", answer(task.ActorAgent, "s-stranger"), 3, nil},
 		{"a draft on another unit", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Unit.Key = "acme/api#8" }},
 		{"a draft of another session", answer(task.ActorPerson, ""), 3, func(g *gate.Gate) { g.Session, g.Sessions = "s-other", nil }},
 		{"a rule", gates.Resolution{Intent: "answer", Answer: "x", By: task.ActorWorkflow, Rule: "rule 0"}, 3, nil},

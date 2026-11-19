@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/auth"
 	"github.com/wloophq/wloop/plugins/slack/config"
@@ -136,20 +137,16 @@ func TestCallToolNamesEachArgumentProblem(t *testing.T) {
 		tool, args string
 		want       []string
 	}{
-		{ToolSend, `{}`, []string{"problem_target_required", "problem_text_required"}},
-		{ToolSend, `{"target":" ","text":"hi"}`, []string{"problem_target_required"}},
 		{ToolRead, `{"limit":0}`, []string{"problem_target_required", "problem_limit"}},
 		{ToolRead, `{"target":"C100","limit":201}`, []string{"problem_limit"}},
 		{ToolSearch, `{"after":"soon","before":"later"}`, []string{"problem_query_required", "problem_after", "problem_before"}},
 		{ToolSearch, `{"query":"plan","after":"2026-01-02","before":"2026-01-01"}`, []string{"problem_before_after"}},
 		{ToolSearch, `{"query":"plan","limit":101}`, []string{"problem_limit"}},
-		{ToolReact, `{}`, []string{"problem_message", "problem_emoji_required"}},
-		{ToolReact, `{"message":"C100/` + toolReply + `"}`, []string{"problem_emoji_required"}},
-		{ToolEdit, `{"message":"#general","text":"hi"}`, []string{"problem_message"}},
-		{ToolEdit, `{"message":"C100/` + toolReply + `"}`, []string{"problem_text_required"}},
-		{ToolDraft, `{"kind":"shout","text":"hi"}`, []string{"problem_kind"}},
-		{ToolDraft, `{}`, []string{"problem_text_required"}},
-		{ToolDraft, `{"kind":"react"}`, []string{"problem_reaction_required"}},
+		{ToolPost, `{"kind":"shout","text":"hi"}`, []string{"problem_kind"}},
+		{ToolPost, `{}`, []string{"problem_text_required"}},
+		{ToolPost, `{"kind":"react"}`, []string{"problem_reaction_required"}},
+		{ToolPost, `{"kind":"edit","target":"#general","text":"hi"}`, []string{"problem_message"}},
+		{ToolPost, `{"text":"hi","draft":false,"hold":true}`, []string{"problem_hold"}},
 	} {
 		r := f.call(t, c.tool, c.args)
 		if r.Answer != "fix_these" || !r.IsError {
@@ -163,7 +160,7 @@ func TestCallToolNamesEachArgumentProblem(t *testing.T) {
 	if r := f.call(t, ToolRead, `{"target":"C100","limit":0}`); toolFields(t, r)["Problems"].([]any)[0].(map[string]any)["fields"].(map[string]any)["Max"] != float64(readLimitMax) {
 		t.Errorf("problem_limit fields %s", r.Fields)
 	}
-	for _, tool := range []string{ToolSend, ToolRead, ToolSearch, ToolDraft, ToolReact, ToolEdit} {
+	for _, tool := range []string{ToolRead, ToolSearch, ToolPost} {
 		if r := f.call(t, tool, `{"unknown":1}`); r.Answer != "bad_arguments" || !r.IsError {
 			t.Errorf("%s with an unknown argument: %q", tool, r.Answer)
 		}
@@ -177,59 +174,60 @@ func TestCallToolAnswersNotLoggedIn(t *testing.T) {
 	t.Parallel()
 	f := newToolFixture(t, false)
 	for _, c := range []struct{ tool, args string }{
-		{ToolSend, `{"target":"C100","text":"hi"}`},
 		{ToolRead, `{"target":"C100/` + toolThread + `"}`},
 		{ToolSearch, `{"query":"plan"}`},
-		{ToolDraft, `{"text":"hi"}`},
-		{ToolReact, `{"message":"C100/` + toolReply + `","emoji":"eyes"}`},
-		{ToolEdit, `{"message":"C100/` + toolReply + `","text":"hi"}`},
+		{ToolPost, `{"text":"hi"}`},
 	} {
 		if r := f.call(t, c.tool, c.args); r.Answer != "not_logged_in" || !r.IsError {
 			t.Errorf("%s: answer %q error %t", c.tool, r.Answer, r.IsError)
 		}
 	}
-	if len(f.srv.Calls("chat.postMessage")) != 0 || len(f.h.Gates()) != 0 || len(f.h.SentDrafts()) != 0 {
+	if len(f.srv.Calls("chat.postMessage")) != 0 || len(f.h.Gates()) != 0 {
 		t.Fatal("a logged-out call posted or recorded")
 	}
 }
 
-func TestCallToolRecordsWhatItPostsAtOnce(t *testing.T) {
+// With draft false, slack_post asks the host to post at once and answers by the state the host left the draft
+// in: on its way, or kept for the user when the host would not post it from this session.
+func TestCallToolPostDraftFalseAsksTheHostToPost(t *testing.T) {
 	t.Parallel()
-	f := newToolFixture(t, true)
-	if r := f.call(t, ToolSend, `{"target":"C100","text":"Shipping today"}`); r.Answer != "posted" || r.IsError ||
-		toolFields(t, r)["TS"] != "1700000900.000100" {
-		t.Fatalf("send: %q %s", r.Answer, r.Fields)
-	}
-	if r := f.call(t, ToolReact, `{"message":"C100/`+toolReply+`","emoji":":eyes:"}`); r.Answer != "reacted" || toolFields(t, r)["Emoji"] != "eyes" {
-		t.Fatalf("react: %q %s", r.Answer, r.Fields)
-	}
-	if r := f.call(t, ToolEdit, `{"message":"C100/`+toolReply+`","text":"On it, done by noon"}`); r.Answer != "edited" ||
-		toolFields(t, r)["Replaced"] != "On it" {
-		t.Fatalf("edit: %q %s", r.Answer, r.Fields)
-	}
-	sent := f.h.SentDrafts()
-	if len(sent) != 3 {
-		t.Fatalf("recorded %d posts: %+v", len(sent), sent)
-	}
-	for i, want := range []struct{ tool, purpose, ref string }{
-		{ToolSend, sentPurpose, "C100/1700000900.000100"},
-		{ToolReact, reactedPurpose, "C100/" + toolReply},
-		{ToolEdit, editedPurpose, "C100/" + toolReply},
-	} {
-		s := sent[i]
-		if s.Tool != want.tool || s.Session != toolSession || s.Draft.Purpose != want.purpose || s.Draft.Evidence.Ref != want.ref ||
-			s.Draft.State != "sent" || s.Draft.Unit.Provider != string(dslack.Provider) {
-			t.Errorf("post %d: %+v", i, s)
+	for _, c := range []struct{ state, want string }{{"queued", "posting"}, {"held", "waits"}} {
+		f := newToolFixture(t, true)
+		f.h.GateState = c.state
+		r := f.call(t, ToolPost, `{"text":"Shipping today","draft":false}`)
+		if r.Answer != c.want || r.IsError {
+			t.Errorf("host state %s: %q %s, want %s", c.state, r.Answer, r.Fields, c.want)
+		}
+		if gates := f.h.Gates(); len(gates) != 1 || !gates[0].Post || gates[0].Session != toolSession {
+			t.Errorf("host state %s: gates %+v, want one request to post", c.state, gates)
+		}
+		if len(f.srv.Calls("chat.postMessage")) != 0 {
+			t.Errorf("host state %s: the plugin posted itself", c.state)
 		}
 	}
 }
 
-func TestCallToolDraftOpensTheSessionsGate(t *testing.T) {
+// A session with no turn writes to a channel: the draft names no unit, for the host to place, and its target.
+func TestCallToolPostFromASessionWithNoTurnNamesNoUnit(t *testing.T) {
+	t.Parallel()
+	f := newToolFixture(t, true)
+	f.h.SetSession(toolSession, src.Session{})
+	r := f.call(t, ToolPost, `{"target":"#general","text":"Shipping today","draft":false}`)
+	if r.IsError || toolFields(t, r)["Unit"] != "" {
+		t.Fatalf("answer %q %s", r.Answer, r.Fields)
+	}
+	gates := f.h.Gates()
+	if len(gates) != 1 || gates[0].Draft.Unit != (sdk.Unit{}) || gates[0].Draft.Target != "#general" || !gates[0].Post {
+		t.Fatalf("gates %+v", gates)
+	}
+}
+
+func TestCallToolPostOpensTheSessionsGate(t *testing.T) {
 	t.Parallel()
 	f := newToolFixture(t, true)
 	turnUnit := dslack.ThreadUnit(toolTeam, "C100", toolThread)
-	r := f.call(t, ToolDraft, `{"text":"Reviewing it now","items":["i1"],"effects":["unit.closed"]}`)
-	if r.Answer != "proposed" || r.IsError || toolFields(t, r)["Unit"] != turnUnit.String() {
+	r := f.call(t, ToolPost, `{"text":"Reviewing it now","items":["i1"],"effects":["unit.closed"]}`)
+	if r.Answer != "drafted" || r.IsError || toolFields(t, r)["Unit"] != turnUnit.String() {
 		t.Fatalf("draft: %q %s", r.Answer, r.Fields)
 	}
 	gates := f.h.Gates()
@@ -246,7 +244,7 @@ func TestCallToolDraftOpensTheSessionsGate(t *testing.T) {
 		`{"text":"Wrong place","target":"` + elsewhere + `","items":["i1"]}`:            "items:",
 		`{"text":"Wrong place","target":"` + elsewhere + `","effects":["unit.closed"]}`: "effects:",
 	} {
-		r := f.call(t, ToolDraft, args)
+		r := f.call(t, ToolPost, args)
 		if msg, _ := toolFields(t, r)["Error"].(string); r.Answer != "failed" || !r.IsError || !strings.HasPrefix(msg, why) {
 			t.Errorf("%s: %q %s", args, r.Answer, r.Fields)
 		}
@@ -254,14 +252,14 @@ func TestCallToolDraftOpensTheSessionsGate(t *testing.T) {
 	if n := len(f.h.Gates()); n != 1 {
 		t.Fatalf("a refused draft opened a gate: %d", n)
 	}
-	r = f.call(t, ToolDraft, `{"text":"Over here","target":"`+elsewhere+`"}`)
+	r = f.call(t, ToolPost, `{"text":"Over here","target":"`+elsewhere+`"}`)
 	otherUnit := dslack.ThreadUnit(toolTeam, "C100", toolOther)
-	if gates := f.h.Gates(); r.Answer != "proposed" || len(gates) != 2 || gates[1].Draft.Unit != otherUnit.Wire() || gates[1].Session != toolSession {
+	if gates := f.h.Gates(); r.Answer != "drafted" || len(gates) != 2 || gates[1].Draft.Unit != otherUnit.Wire() || gates[1].Session != toolSession {
 		t.Fatalf("draft elsewhere: %q %s, gates %+v", r.Answer, r.Fields, gates)
 	}
 }
 
-func TestCallToolDraftCarriesTheBroadcastItAsks(t *testing.T) {
+func TestCallToolPostCarriesTheBroadcastItAsks(t *testing.T) {
 	t.Parallel()
 	f := newToolFixture(t, true)
 	for i, tc := range []struct{ args, want string }{
@@ -269,7 +267,7 @@ func TestCallToolDraftCarriesTheBroadcastItAsks(t *testing.T) {
 		{`{"text":"Done","broadcast":false}`, "off"},
 		{`{"text":"Done"}`, ""},
 	} {
-		if r := f.call(t, ToolDraft, tc.args); r.Answer != "proposed" {
+		if r := f.call(t, ToolPost, tc.args); r.Answer != "drafted" {
 			t.Fatalf("%s: %q %s", tc.args, r.Answer, r.Fields)
 		}
 		if got := f.h.Gates()[i].Draft.Broadcast; got != tc.want {

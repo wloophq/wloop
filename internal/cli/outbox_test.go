@@ -159,6 +159,17 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			t.Fatal("an agent's shell changed it")
 		}
 	})
+	t.Run("a payload without the rev seen, or not JSON", func(t *testing.T) {
+		for _, args := range [][]string{{"outbox", "approve", "1", "--payload", `{"event":"COMMENT"}`, "--yes"}, {"outbox", "approve", "1", "--payload", "COMMENT", "--rev", "1", "--yes"}} {
+			te, db, d := seed(t, true)
+			if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "--payload") {
+				t.Fatalf("%v: exit %d: %s", args, code, te.err)
+			}
+			if got := te.draftState(t, db, d.ID); got.State != draft.Held {
+				t.Fatalf("%v approved it", args)
+			}
+		}
+	})
 	t.Run("answered no", func(t *testing.T) {
 		te, db, d := seed(t, true)
 		te.In = strings.NewReader("n\n")
@@ -558,9 +569,9 @@ func TestOutboxEditAndApproveTextSendTheRevShown(t *testing.T) {
 	}
 }
 
-// TestASessionShellsNewSendWaitsForTheUsersPolicy: outbox new --send from the shell of a session the user drives
-// writes the session's draft, never the person's, and under the default policy it waits; the command says so.
-func TestASessionShellsNewSendWaitsForTheUsersPolicy(t *testing.T) {
+// TestASessionShellsNewSendPostsAtOnce: outbox new --send from the shell of a session the user drives writes the
+// session's draft, never the person's, and approves it through the session at once; the command says so.
+func TestASessionShellsNewSendPostsAtOnce(t *testing.T) {
 	ctx := context.Background()
 	te := newTestEnv(t, &fake.Manager{})
 	db := outboxDaemon(t, te, false, func(d *daemon.Deps) { d.Turns = te.Turns })
@@ -579,11 +590,11 @@ func TestASessionShellsNewSendWaitsForTheUsersPolicy(t *testing.T) {
 		}
 		return ""
 	}
-	if code := te.run("outbox", "new", "thread:"+threadUnit.Key, "Shipped", "--send"); code != 0 || !strings.Contains(te.out.String(), "waits for the user's approval") {
+	if code := te.run("outbox", "new", "thread:"+threadUnit.Key, "Shipped", "--send"); code != 0 || !strings.Contains(te.out.String(), "queued") {
 		t.Fatalf("exit %d: %s %s", code, te.out, te.err)
 	}
 	got := te.draftState(t, db, 1)
-	if got.State != draft.Held || got.Origin.Session != mine || got.By != (draft.Actor{Kind: draft.ActorSession, Session: mine}) {
+	if got.State != draft.Queued || got.Origin.Session != mine || got.By != (draft.Actor{Kind: draft.ActorSession, Session: mine}) {
 		t.Fatalf("the session's draft %+v by %+v", got, got.By)
 	}
 }

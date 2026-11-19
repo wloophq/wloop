@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/slack/auth"
@@ -24,13 +25,9 @@ import (
 
 // The tools of the plugin's manifest.
 const (
-	ToolSend   = "slack_send_message"
+	ToolPost   = "slack_post"
 	ToolRead   = "slack_read"
 	ToolSearch = "slack_search"
-	ToolDraft  = "slack_draft"
-	ToolReact  = "slack_react"
-	ToolEdit   = "slack_edit"
-	ToolDelete = "slack_delete"
 )
 
 const (
@@ -39,9 +36,6 @@ const (
 	searchLimit    = 20
 	searchLimitMax = 100
 )
-
-// broadcastToken is a Slack special mention that notifies a whole channel or group.
-var broadcastToken = regexp.MustCompile(`(?i)<!(?:channel|here|everyone|subteam\^)`)
 
 var slackToken = regexp.MustCompile(`(?:xox[a-z]\.)?(?:xox[a-z]|xapp)-[A-Za-z0-9-]+`)
 
@@ -109,20 +103,12 @@ func (s *Plugin) CallTool(ctx context.Context, call src.ToolCall) (src.ToolResul
 	}
 	t := tools{p: p, session: call.Session}
 	switch call.Tool {
-	case ToolSend:
-		return t.send(ctx, call.Args), nil
+	case ToolPost:
+		return t.post(ctx, call.Args), nil
 	case ToolRead:
 		return t.read(ctx, call.Args), nil
 	case ToolSearch:
 		return t.search(ctx, call.Args), nil
-	case ToolDraft:
-		return t.draft(ctx, call.Args), nil
-	case ToolReact:
-		return t.react(ctx, call.Args), nil
-	case ToolEdit:
-		return t.edit(ctx, call.Args), nil
-	case ToolDelete:
-		return t.delete(ctx, call.Args), nil
 	}
 	return src.ToolResult{}, src.ErrNotFound
 }
@@ -146,167 +132,6 @@ func (t tools) sender() (*send.Service, bool) {
 		s.Stored = StoredOver(p.db, p.log)
 	}
 	return s, true
-}
-
-func (t tools) send(ctx context.Context, raw json.RawMessage) src.ToolResult {
-	var a struct {
-		Target    *string `json:"target"`
-		Text      *string `json:"text"`
-		Thread    *bool   `json:"thread"`
-		Broadcast bool    `json:"broadcast"`
-	}
-	if err := decodeStrict(raw, &a); err != nil {
-		return badArguments(err)
-	}
-	var problems []Problem
-	if a.Target == nil || strings.TrimSpace(*a.Target) == "" {
-		problems = append(problems, Problem{Answer: "problem_target_required"})
-	}
-	if a.Text == nil || strings.TrimSpace(*a.Text) == "" {
-		problems = append(problems, Problem{Answer: "problem_text_required"})
-	}
-	if len(problems) > 0 {
-		return fixThese(problems)
-	}
-	if broadcastToken.MatchString(*a.Text) {
-		return answer("broadcast", nil, true)
-	}
-	s, ok := t.sender()
-	if !ok {
-		return notLoggedIn()
-	}
-	req := send.Request{Target: strings.TrimSpace(*a.Target), Text: *a.Text, Thread: a.Thread, Broadcast: a.Broadcast, Source: "session"}
-	sent, err := s.Send(ctx, req)
-	if err != nil {
-		return failed(err)
-	}
-	t.recordPost(ctx, req, sent)
-	return answer("posted", fields{"Conversation": sent.Conversation, "Parent": sent.Parent, "Permalink": sent.Permalink,
-		"Channel": sent.Channel, "TS": sent.TS, "Text": sent.Text}, false)
-}
-
-func (t tools) react(ctx context.Context, raw json.RawMessage) src.ToolResult {
-	var a struct {
-		Message *string `json:"message"`
-		Emoji   *string `json:"emoji"`
-		Remove  bool    `json:"remove"`
-	}
-	if err := decodeStrict(raw, &a); err != nil {
-		return badArguments(err)
-	}
-	msg, emoji, refusal := actArgs("problem_emoji_required", a.Message, a.Emoji)
-	if refusal != nil {
-		return *refusal
-	}
-	s, ok := t.sender()
-	if !ok {
-		return notLoggedIn()
-	}
-	r := send.Reaction{Message: msg, Name: strings.Trim(strings.TrimSpace(emoji), ":"), Remove: a.Remove}
-	got, err := s.React(ctx, r)
-	if err != nil {
-		return failed(err)
-	}
-	if !got.Unchanged {
-		t.recordReaction(ctx, r, got)
-	}
-	name := "reacted"
-	switch {
-	case a.Remove && got.Unchanged:
-		name = "absent"
-	case a.Remove:
-		name = "removed"
-	case got.Unchanged:
-		name = "already"
-	}
-	return answer(name, fields{"Emoji": got.Name, "Conversation": got.Conversation, "Message": send.Ref(got.Channel, got.TS),
-		"Permalink": got.Permalink}, false)
-}
-
-func (t tools) edit(ctx context.Context, raw json.RawMessage) src.ToolResult {
-	var a struct {
-		Message *string `json:"message"`
-		Text    *string `json:"text"`
-	}
-	if err := decodeStrict(raw, &a); err != nil {
-		return badArguments(err)
-	}
-	msg, body, refusal := actArgs("problem_text_required", a.Message, a.Text)
-	if refusal != nil {
-		return *refusal
-	}
-	if broadcastToken.MatchString(body) {
-		return answer("broadcast", nil, true)
-	}
-	s, ok := t.sender()
-	if !ok {
-		return notLoggedIn()
-	}
-	tok, err := t.p.slack.Tokens.Load()
-	if err != nil {
-		return failed(err)
-	}
-	e := send.Edit{Message: msg, Text: body, User: tok.User}
-	got, err := s.Edit(ctx, e)
-	if err != nil {
-		return failed(err)
-	}
-	t.recordEdit(ctx, e, got)
-	return answer("edited", fields{"Conversation": got.Conversation, "Message": send.Ref(got.Channel, got.TS), "Permalink": got.Permalink,
-		"Text": got.Text, "Replaced": got.Replaced}, false)
-}
-
-func (t tools) delete(ctx context.Context, raw json.RawMessage) src.ToolResult {
-	var a struct {
-		Message *string `json:"message"`
-	}
-	if err := decodeStrict(raw, &a); err != nil {
-		return badArguments(err)
-	}
-	msg := ""
-	if a.Message != nil {
-		msg = strings.TrimSpace(*a.Message)
-	}
-	if !send.IsMessage(msg) {
-		return fixThese([]Problem{{Answer: "problem_message"}})
-	}
-	s, ok := t.sender()
-	if !ok {
-		return notLoggedIn()
-	}
-	tok, err := t.p.slack.Tokens.Load()
-	if err != nil {
-		return failed(err)
-	}
-	d := send.Delete{Message: msg, User: tok.User}
-	got, err := s.Delete(ctx, d)
-	if err != nil {
-		return failed(err)
-	}
-	t.recordDelete(ctx, d, got)
-	return answer("deleted", fields{"Conversation": got.Conversation, "Message": send.Ref(got.Channel, got.TS), "Permalink": got.Permalink,
-		"Deleted": got.Deleted}, false)
-}
-
-// actArgs checks the arguments of slack_react or slack_edit: a message ref
-// or permalink and the other argument, whose absence is the answer missing.
-func actArgs(missing string, msg, value *string) (string, string, *src.ToolResult) {
-	var problems []Problem
-	m := ""
-	if msg != nil {
-		m = strings.TrimSpace(*msg)
-	}
-	if !send.IsMessage(m) {
-		problems = append(problems, Problem{Answer: "problem_message"})
-	}
-	if value == nil || strings.TrimSpace(*value) == "" {
-		problems = append(problems, Problem{Answer: missing})
-	}
-	if len(problems) > 0 {
-		r := fixThese(problems)
-		return "", "", &r
-	}
-	return m, *value, nil
 }
 
 func (t tools) read(ctx context.Context, raw json.RawMessage) src.ToolResult {
@@ -406,15 +231,15 @@ func searchDate(s string) (time.Time, bool) {
 //go:embed plugin.toml drafts
 var pluginFiles embed.FS
 
-// draftKind is a kind the manifest declares: what slack_draft proposes and
-// how it reaches Slack.
+// draftKind is a kind the manifest declares: what slack_post writes and how
+// it reaches Slack.
 type draftKind struct {
 	name, purpose string
 	delivery      draft.Delivery
 }
 
 // declaredKinds are the manifest's draft kinds, in its order; the first is
-// slack_draft's default.
+// slack_post's default.
 var declaredKinds = func() []draftKind {
 	raw, err := pluginFiles.ReadFile(manifest.File)
 	if err != nil {
@@ -436,7 +261,7 @@ var declaredKinds = func() []draftKind {
 	return out
 }()
 
-// draftKinds are the names of the kinds slack_draft offers.
+// draftKinds are the names of the kinds slack_post offers.
 var draftKinds = func() []string {
 	out := make([]string, len(declaredKinds))
 	for i, k := range declaredKinds {
@@ -453,9 +278,9 @@ func kindNamed(name string) (draftKind, bool) {
 	return declaredKinds[i], true
 }
 
-var errNoDraftTurn = errors.New("this session has no turn; slack_draft drafts on the unit of a turn sent to or started in this session")
-
-func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
+// post writes a Slack post as the user: a draft for the user, or, with draft false, posted at once when the user
+// drives the session, which the host decides.
+func (t tools) post(ctx context.Context, raw json.RawMessage) src.ToolResult {
 	var a struct {
 		Text      *string         `json:"text"`
 		Kind      string          `json:"kind"`
@@ -466,6 +291,7 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 		Broadcast *bool           `json:"broadcast"`
 		Payload   json.RawMessage `json:"payload"`
 		Basis     string          `json:"basis"`
+		Draft     *bool           `json:"draft"`
 		Hold      bool            `json:"hold"`
 	}
 	if err := decodeStrict(raw, &a); err != nil {
@@ -475,8 +301,9 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 		return badArguments(errors.New("payload: an object"))
 	}
 	if t.session == "" {
-		return answer("refused", fields{"Error": "the call names no session; slack_draft drafts for a session"}, true)
+		return answer("refused", fields{"Error": "the call names no session; slack_post writes for a session"}, true)
 	}
+	now := a.Draft != nil && !*a.Draft
 	d := draft.Draft{Kind: draft.Kind(cmp.Or(strings.TrimSpace(a.Kind), draftKinds[0])), Target: strings.TrimSpace(a.Target), Items: a.Items,
 		Reaction: strings.TrimSpace(a.Reaction), Effects: a.Effects, Payload: a.Payload, Basis: a.Basis, Hold: a.Hold}
 	if a.Broadcast != nil {
@@ -494,6 +321,9 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 		d.Text = *a.Text
 	}
 	var problems []Problem
+	if a.Hold && now {
+		problems = append(problems, Problem{Answer: "problem_hold"})
+	}
 	if d.Delivery.ChangesAMessage() && !send.IsMessage(d.Target) {
 		problems = append(problems, Problem{Answer: "problem_message"})
 	}
@@ -519,7 +349,7 @@ func (t tools) draft(ctx context.Context, raw json.RawMessage) src.ToolResult {
 			return fixThese([]Problem{{Answer: problem}})
 		}
 	}
-	res, err := t.propose(ctx, s, d)
+	res, err := t.propose(ctx, s, d, now)
 	if err != nil {
 		return failed(err)
 	}
@@ -551,11 +381,11 @@ func (t tools) changed(ctx context.Context, s *send.Service, d *draft.Draft) (pr
 	return "", nil
 }
 
-// propose opens the gate of d for the session: on the unit of the
-// session's turn, or on the unit of its message target when that is
-// another or the session has no turn, which answers none of the turn's
-// items and declares no effect.
-func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src.ToolResult, error) {
+// propose opens the gate of d for the session, posting it at once with now: on the unit of the session's turn,
+// or on the unit of its message target when that is another or the session has no turn, which answers none of
+// the turn's items and declares no effect; with no turn and no such unit, it names no unit and the host places
+// it.
+func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft, now bool) (src.ToolResult, error) {
 	p := t.p
 	if d.Text != "" {
 		text, err := s.Mentions(ctx, d.Text, func(user string) string { return "@{" + string(dslack.Provider) + ":" + user + "}" })
@@ -590,10 +420,11 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 			d.Unit = u
 		}
 	}
+	wire := WireDraft(d)
 	if noTurn && d.Unit == turnUnit {
-		return src.ToolResult{}, errNoDraftTurn
+		wire.Unit = sdk.Unit{}
 	}
-	ref, err := h.Gates.OpenGate(ctx, src.GateRequest{Draft: WireDraft(d), Session: t.session})
+	ref, err := h.Gates.OpenGate(ctx, src.GateRequest{Draft: wire, Session: t.session, Post: now})
 	if err != nil {
 		return src.ToolResult{}, err
 	}
@@ -601,108 +432,30 @@ func (t tools) propose(ctx context.Context, s *send.Service, d draft.Draft) (src
 	if pub, err := p.publisher(); err == nil {
 		where, _ = pub.Where(ctx, d)
 	}
-	return answer(proposedAnswer(draft.State(ref.State)), fields{"ID": ref.Draft, "Unit": d.Unit.String(), "Where": where}, false), nil
+	return answer(postAnswer(now, draft.State(ref.State)), fields{"ID": ref.Draft, "Rev": ref.Rev, "Unit": unitName(wire.Unit, d.Unit), "Where": where, "Link": ref.Link}, false), nil
 }
 
-// proposedAnswer is slack_draft's answer for a draft its gate left in
-// state st: queued when a rule approved it, dropped by a dry run.
-func proposedAnswer(st draft.State) string {
-	switch st {
-	case draft.Queued:
-		return "approved"
-	case draft.Dropped:
+// unitName is the unit a draft is on as its answer names it: "" for one that named none.
+func unitName(wire sdk.Unit, u unit.Unit) string {
+	if wire == (sdk.Unit{}) {
+		return ""
+	}
+	return u.String()
+}
+
+// postAnswer is slack_post's answer for a post whose draft its gate left in state st, now when it asked to post
+// at once: posting once it is on its way, waits when it waits for the user, drafted when it was asked to,
+// rule_posts when a rule of the user's posts it, dry_run under a dry run.
+func postAnswer(now bool, st draft.State) string {
+	switch {
+	case st == draft.Dropped:
 		return "dry_run"
+	case now && st == draft.Held:
+		return "waits"
+	case now:
+		return "posting"
+	case st == draft.Queued || st == draft.Sending || st == draft.Sent:
+		return "rule_posts"
 	}
-	return "proposed"
-}
-
-// The purposes of the posts a session makes itself.
-const (
-	sentPurpose      = "reply"
-	reactedPurpose   = "react"
-	unreactedPurpose = "unreact"
-	editedPurpose    = "edit"
-	deletedPurpose   = "delete"
-)
-
-func (t tools) recordPost(ctx context.Context, req send.Request, sent send.Sent) {
-	where := func(ctx context.Context, team string) (unit.Unit, error) {
-		thread := cmp.Or(sent.ThreadTS, sent.TS)
-		if t.p.db != nil {
-			u, ok, err := LandingOver(t.p.db, t.p.log).UnitOf(ctx, team, sent.Channel, sent.TS, sent.ThreadTS)
-			if err != nil || ok {
-				return u, err
-			}
-		}
-		return dslack.ThreadUnit(team, sent.Channel, thread), nil
-	}
-	t.record(ctx, ToolSend, where, draft.Draft{Purpose: sentPurpose, Delivery: draft.Message, Target: req.Target, Text: req.Text},
-		draft.Evidence{Ref: send.Ref(sent.Channel, sent.TS), Permalink: sent.Permalink})
-}
-
-func (t tools) recordReaction(ctx context.Context, r send.Reaction, got send.Reacted) {
-	purpose := reactedPurpose
-	if r.Remove {
-		purpose = unreactedPurpose
-	}
-	t.record(ctx, ToolReact, t.messageUnit(r.Message), draft.Draft{Purpose: purpose, Delivery: draft.Reaction, Target: r.Message, Reaction: got.Name},
-		draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
-}
-
-func (t tools) recordEdit(ctx context.Context, e send.Edit, got send.Edited) {
-	t.record(ctx, ToolEdit, t.messageUnit(e.Message), draft.Draft{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: e.Message,
-		Text: e.Text, Replaced: got.Replaced}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
-}
-
-// recordDelete finds the unit from the thread read before the deletion:
-// Slack no longer holds the message.
-func (t tools) recordDelete(ctx context.Context, d send.Delete, got send.Deleted) {
-	where := func(ctx context.Context, team string) (unit.Unit, error) {
-		if t.p.db != nil {
-			u, ok, err := LandingOver(t.p.db, t.p.log).UnitOf(ctx, team, got.Channel, got.TS, got.ThreadTS)
-			if err != nil || ok {
-				return u, err
-			}
-		}
-		return dslack.ThreadUnit(team, got.Channel, cmp.Or(got.ThreadTS, got.TS)), nil
-	}
-	t.record(ctx, ToolDelete, where, draft.Draft{Purpose: deletedPurpose, Delivery: draft.DeleteDelivery, Target: d.Message,
-		Text: got.Deleted}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
-}
-
-func (t tools) messageUnit(message string) func(context.Context, string) (unit.Unit, error) {
-	return func(ctx context.Context, team string) (unit.Unit, error) {
-		if t.p.db == nil {
-			return FollowUnit(ctx, t.p.slack.Client, team, message)
-		}
-		return LandingOver(t.p.db, t.p.log).MessageUnit(ctx, t.p.slack.Client, team, message)
-	}
-}
-
-// record keeps d, which a tool posted at once, as a sent draft on the unit
-// where says the post landed in; it never changes or fails the post.
-func (t tools) record(ctx context.Context, tool string, where func(ctx context.Context, team string) (unit.Unit, error), d draft.Draft,
-	ev draft.Evidence) {
-	p := t.p
-	ctx = context.WithoutCancel(ctx)
-	if p.host.Host.Gates == nil {
-		return
-	}
-	tok, err := p.slack.Tokens.Load()
-	if err != nil {
-		p.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
-		return
-	}
-	u, err := where(ctx, tok.Team)
-	if err != nil {
-		p.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
-		return
-	}
-	d.Unit, d.Kind, d.State, d.Evidence = u, draft.KindOf(d.Purpose, d.Delivery), draft.Sent, ev
-	ref, err := p.host.Host.Gates.RecordSent(ctx, WireDraft(d), t.session, tool)
-	if err != nil {
-		p.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
-		return
-	}
-	p.logf("slack_sent_recorded draft=%d unit=%s", ref.Draft, u)
+	return "drafted"
 }

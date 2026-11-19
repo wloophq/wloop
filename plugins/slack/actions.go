@@ -52,7 +52,7 @@ func (s *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMes
 		return nil, err
 	}
 	if slices.Contains([]string{ActionSend, ActionThread}, req.Action) && req.Actor != src.ActorPerson {
-		return nil, fmt.Errorf("slack %s is the person's command; an agent drafts with slack_draft or posts with the slack_* tools", req.Action)
+		return nil, fmt.Errorf("slack %s is the person's command; an agent writes with slack_post", req.Action)
 	}
 	switch req.Action {
 	case ActionSend:

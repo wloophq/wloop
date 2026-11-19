@@ -495,7 +495,7 @@ func (s *Server) forUser(w http.ResponseWriter, r *http.Request, what string) (r
 
 // unattended is the refusal of what to a session the user does not drive.
 func unattended(what string) string {
-	return what + " acts for you, so only you run it, or a session you drive; this session runs a turn the loop sent or the loop typed into it last"
+	return what + " acts for you, so only you run it, or a session you drive; the loop typed into this session last, and you have not prompted it since"
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is

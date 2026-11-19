@@ -96,8 +96,8 @@ type Draft struct {
 	// past it, so approving it is refused.
 	Basis string `json:"basis,omitempty"`
 	Stale bool   `json:"stale,omitempty"`
-	// PinnedBy is the open question message whose option or confirm pins the draft: only an answer to that
-	// question decides it, so clients show the draft under that option and offer no card of its own; 0 for none.
+	// PinnedBy is the open question message whose option or confirm pins the draft, 0 for none. Approving the
+	// draft at the pinned rev picks that option; clients show it under the option where the question shows.
 	PinnedBy int64 `json:"pinned_by,omitempty"`
 	// StaleUnknown says the unit's live basis could not be read in time, so Stale is not known; the approval
 	// stays offered, and approving and sending re-check it live.
@@ -114,7 +114,7 @@ type Draft struct {
 	ByRule string `json:"by_rule,omitempty"`
 	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,
 	// notices.toml's draft_by_rule), in that order, and, on the draft an agent session just wrote and asked to
-	// send, last, notices.toml's draft_rule_sends or draft_waits.
+	// send, last, notices.toml's draft_sent.
 	Notes []string `json:"notes,omitempty"`
 }
 

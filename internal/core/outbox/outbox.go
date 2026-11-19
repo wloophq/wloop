@@ -31,7 +31,7 @@ type Proposal struct {
 	// Broadcast is the broadcast the proposer asks for a thread reply; its
 	// publisher's Placer decides the draft's.
 	Broadcast draft.Broadcast
-	// Replaced is the text a recorded edit replaced.
+	// Replaced is the text an edit replaces.
 	Replaced string
 	Origin   draft.Origin
 	// Policy is the draft's approval policy; nil: resolved by
@@ -50,8 +50,6 @@ type Proposal struct {
 	// RepeatAfter is how long a settled draft of the same origin holds this
 	// proposal from being proposed again; zero keeps Service.RepeatAfter.
 	RepeatAfter time.Duration
-	// Tool is the tool that made a post RecordSent records.
-	Tool string
 	// Why is why the draft is proposed, in the user's language; Language
 	// is the locale Text is written in.
 	Why, Language string
@@ -240,7 +238,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	now := s.Clock.Now()
 	d, spec, declared, err := s.shape(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Broadcast: p.Broadcast, Text: p.Text, Reaction: p.Reaction,
-		Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
+		Replaced: p.Replaced, Original: p.Text, Origin: p.Origin, State: draft.Held, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects, Why: p.Why, Language: p.Language,
 		Payload: p.Payload, Basis: p.Basis, Hold: p.Hold, By: draft.ProposerOf(p.Origin),
 	})
@@ -776,8 +774,7 @@ type Amendment struct {
 
 // Amend applies a, a person's at a.Rev, to held or failed draft id at once, all changes or none; its gate is
 // handled as Edit's. A rev below 1 is ErrInvalid, a draft at another rev ErrRevConflict. An amendment by a
-// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped, so it never approves
-// what it wrote. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
+// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
 func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
 	if a.By.Kind != "" && a.By.Kind != draft.ActorPerson {
 		return draft.Draft{}, fmt.Errorf("%w: %w: %s %s changes draft %d through draft_update, not a person's edit",
@@ -1056,46 +1053,6 @@ func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 		ds[i], _ = s.current(ds[i])
 	}
 	return ds, err
-}
-
-// RecordSent stores a post already made outside the outbox (origin
-// session), by p.Tool, as sent, with a gate already approved by the agent
-// that made it. It resolves no gate: no agent resolves an open one.
-func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence) (draft.Draft, error) {
-	if s.Gates == nil {
-		return draft.Draft{}, ErrNoGates
-	}
-	now := s.Clock.Now()
-	if p.Origin.Kind == "" {
-		p.Origin.Kind = draft.OriginSession
-	}
-	if ev.At.IsZero() {
-		ev.At = now
-	}
-	d, spec, _, err := s.shape(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
-		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
-		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
-	})
-	if err != nil {
-		return draft.Draft{}, err
-	}
-	if err := checkFields(d, spec); err != nil {
-		return draft.Draft{}, err
-	}
-	d, err = s.Store.Insert(ctx, d)
-	if err != nil {
-		return draft.Draft{}, err
-	}
-	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind)
-	g := gateOf(d, nil)
-	g.By, g.Rule = task.ActorAgent, p.Tool
-	var errs []error
-	if _, err := s.Gates.RecordSent(ctx, g); err != nil {
-		s.logf("draft %d: its gate was not recorded", d.ID)
-		errs = append(errs, fmt.Errorf("the gate of sent draft %d: %w", d.ID, err))
-	}
-	return d, errors.Join(append(errs, s.afterSent(ctx, d))...)
 }
 
 func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {

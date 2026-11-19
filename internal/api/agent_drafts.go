@@ -18,19 +18,23 @@ type AgentDraftProposal struct {
 	// Basis is what the agent read the unit at, such as a pull request's head, for a kind that takes one.
 	Basis string `json:"basis,omitempty"`
 	// Hold keeps the draft waiting for the user whatever the approval rules say.
-	Hold    bool     `json:"hold,omitempty"`
+	Hold bool `json:"hold,omitempty"`
+	// Draft false posts it at once from a session the user drives; true or absent makes a draft.
+	Draft   *bool    `json:"draft,omitempty"`
 	Items   []string `json:"items,omitempty"`
 	Effects []string `json:"effects,omitempty"`
 	Why     string   `json:"why,omitempty"`
 }
 
-// AgentDraftUpdate revises draft ID at Rev, the rev the agent read; an absent field is left as it is.
+// AgentDraftUpdate revises draft ID at Rev, the rev the agent read; an absent field is left as it is. Draft false
+// posts the draft, revised or not, at once from a session the user drives; true or absent leaves it a draft.
 type AgentDraftUpdate struct {
 	ID      int64           `json:"id"`
 	Rev     int64           `json:"rev"`
 	Text    *string         `json:"text,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 	Basis   *string         `json:"basis,omitempty"`
+	Draft   *bool           `json:"draft,omitempty"`
 }
 
 // AgentDraftWithdrawal withdraws draft ID at Rev for Reason.
@@ -58,6 +62,8 @@ type AgentDraft struct {
 	Error     string `json:"error,omitempty"`
 	Reason    string `json:"reason,omitempty"`
 	Permalink string `json:"permalink,omitempty"`
+	// Link is the address of its card in the cockpit, where the user reviews, edits and posts it.
+	Link string `json:"link,omitempty"`
 	// Revisions are its content's revisions, oldest first.
 	Revisions []AgentDraftRevision `json:"revisions,omitempty"`
 }

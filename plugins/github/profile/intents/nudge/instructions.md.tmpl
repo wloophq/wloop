@@ -1,4 +1,4 @@
-{{define "task"}}Ask whoever {{.PR.URL}} waits on for the next step, in one comment you propose to post under the user's name.
+{{define "task"}}Ask whoever {{.PR.URL}} waits on for the next step, in one comment you draft to post under the user's name.
 
 {{.Inputs.situation}}{{end}}
 {{- define "guidance"}}Guidance is what to ask about: a topic, a thread, a focus ("the migration
@@ -46,10 +46,12 @@ change anything under "Always"; where it contradicts a rule there, follow
 the rule and say so in your report.
 
 Run no other command than the `gh` commands in these instructions and the
-record step's, and call no other tool than `github_draft` and the record
-step's. This session writes nothing to GitHub: it refuses every command that
-comments or changes anything there. The comment is a draft you propose;
-{{name}} posts it once the user approves it.
+record step's, and call no other tool than `github_post` and the record
+step's. This session posts nothing to GitHub on its own: it refuses every
+command that comments or changes anything there. The comment is a draft you
+write with `github_post`, which waits for the user unless a rule of theirs
+posts it; set `draft: false` only when the user tells you, in this session,
+to post.
 
 {{if .Automated -}}
 A workflow of the user's started this nudge. The comment goes out under the
@@ -70,7 +72,7 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments --jq '.[] | {user: .user.login, c
 
 The first shows the state, the requested reviewers, each reviewer's latest
 review (`submittedAt`), the conversation comments and the commits; the second
-the replies in review threads, which the first does not list. Propose nothing
+the replies in review threads, which the first does not list. Draft nothing
 and end the turn with one line saying why, recorded `done` with that line
 as the summary, when:
 
@@ -141,16 +143,16 @@ read as "the maintainers".
   or worktree names.
 - No deadline or consequence the facts do not carry.
 
-### 3. Propose and report
+### 3. Draft and report
 
-Call `github_draft` with `kind` `comment`, no `target`, and the comment as
-`text`. If this session has no such tool, propose through
-`{{.Command}} draft propose`, whose help says how.
+Call `github_post` with `kind` `comment`, no `target`, and the comment as
+`text`. If this session has no such tool, draft through
+`{{.Command}} draft write`, whose help says how.
 
-Propose exactly one comment. Never review, approve, request changes, edit
-labels or reviewers, push, or touch the checkout. Never propose it twice:
+Draft exactly one comment. Never review, approve, request changes, edit
+labels or reviewers, push, or touch the checkout. Never draft it twice:
 if the call fails or its outcome is unclear, report what you know without
-proposing again. Reply to the user with the draft's id and the text
-proposed, then record `done`.
+drafting again. Reply to the user with the draft's id, the text
+drafted and whether it waits or is posting now, then record `done`.
 {{template "record" .}}
 {{template "judgment" .}}

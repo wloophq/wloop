@@ -102,7 +102,9 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 	te.Env.slack = st.slack
 	db := te.db
 	sessionSlack(st)
-	st.saveToken(t, fakeToken())
+	tok := fakeToken()
+	tok.Scopes = append(tok.Scopes, "reactions:write")
+	st.saveToken(t, tok)
 	w := &sessionWiring{te: te, st: st, db: db}
 	target, err := url.Parse(st.srv.URL)
 	if err != nil {
@@ -131,20 +133,31 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 		_, err := te.pluginKind.Client(string(slackPlugin))
 		return err == nil
 	})
-	w.deps = (mcpEndpoint{tools: te.pluginTools(db), intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{tools: te.pluginTools, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
+	te.newDaemon(w.deps)
 	return w
 }
 
-// send calls slack_send_message to target as the draft session and returns
-// the Slack methods it called.
+// send calls slack_post with draft false to target as the draft session, then runs the Outbox's sender, and
+// returns the Slack methods both called.
 func (w *sessionWiring) send(t *testing.T, target string) string {
+	t.Helper()
+	return w.post(t, draftHandle, `{"target":"`+target+`","text":"a session message","draft":false}`)
+}
+
+// post calls slack_post with args as handle, then runs the Outbox's sender, and returns the Slack methods both
+// called.
+func (w *sessionWiring) post(t *testing.T, handle, args string) string {
 	t.Helper()
 	w.mu.Lock()
 	w.methods = nil
 	w.mu.Unlock()
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_send_message", `{"target":"`+target+`","text":"a session message"}`); isErr {
-		t.Fatalf("send to %s: %s", target, got)
+	if got, isErr := w.callTool(t, "", handle, "slack_post", args); isErr {
+		t.Fatalf("slack_post %s: %s", args, got)
+	}
+	if _, _, err := w.deps.Outbox.Send(context.Background()); err != nil {
+		t.Fatalf("sending: %v", err)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -193,6 +206,8 @@ func (w *sessionWiring) segments(t *testing.T, team, conversation string, spans 
 	return out
 }
 
+// A session with no turn posts at once to a channel, a reply's thread and a person: a post to a message lands on
+// that message's thread, any other on the session's own unit, each sent through the Outbox.
 func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
@@ -207,13 +222,13 @@ func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
 	golden(t, "session_send_calls.golden", b.String())
 	var units []unit.Unit
 	for _, d := range w.drafts(t) {
-		parts := strings.Split(d.Unit.Key, "/")
-		if len(parts) < 2 || d.State != draft.Sent || noSession(d.Origin) != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != parts[1]+"/"+sessPosted {
+		if d.State != draft.Sent || noSession(d.Origin) != (draft.Origin{Kind: draft.OriginSession}) || !strings.HasSuffix(d.Evidence.Ref, "/"+sessPosted) {
 			t.Fatalf("draft %+v", d)
 		}
 		units = append(units, d.Unit)
 	}
-	want := []unit.Unit{slackThreadUnit("T000", sessDM, sessPosted), slackThreadUnit("T000", sessThreaded, sessParent), slackThreadUnit("T000", sessChannel, sessPosted)}
+	mine := dturn.SessionUnit(draftHandle)
+	want := []unit.Unit{mine, slackThreadUnit("T000", sessThreaded, sessParent), mine}
 	if !slices.Equal(units, want) {
 		t.Fatalf("recorded on %v, want %v", units, want)
 	}
@@ -241,7 +256,7 @@ func (w *sessionWiring) draftTool(t *testing.T, handle, args string) (string, bo
 	if sid == "" {
 		t.Fatalf("initialize: %d %s", init.Code, init.Body)
 	}
-	return w.callTool(t, sid, handle, "slack_draft", args)
+	return w.callTool(t, sid, handle, "slack_post", args)
 }
 
 func (w *sessionWiring) callTool(t *testing.T, sid, handle, name, args string) (string, bool) {
@@ -295,8 +310,8 @@ func TestSlackDraftProposes(t *testing.T) {
 	newest := stored.Turns[len(stored.Turns)-1]
 
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"on it, **today**","items":[]}`)
-	if isErr || !strings.Contains(got, "draft 1") || !strings.Contains(got, "#general") {
-		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	if isErr || !strings.Contains(got, "Drafted 1") || !strings.Contains(got, "#general") {
+		t.Fatalf("slack_post = %q (error %v)", got, isErr)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 {
@@ -308,7 +323,7 @@ func TestSlackDraftProposes(t *testing.T) {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
-		t.Fatalf("slack_draft posted %d times", n)
+		t.Fatalf("a draft posted %d times", n)
 	}
 
 	if got, isErr := w.draftTool(t, "term_other1", `{"text":"hi"}`); !isErr || !strings.Contains(got, "no turn") {
@@ -328,9 +343,8 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 	w.seedSlack(t, dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessThreaded, Name: "random", Kind: dslack.KindChannel, IsMember: true}},
 		Threads: []dslack.Thread{{Conversation: sessThreaded, TS: sessParent, Messages: []dslack.Message{{TS: sessParent, ThreadTS: sessParent, User: "U000", Text: "parent"}}}}})
 	reply := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "")
-	calls := w.send(t, reply)
-	if want := "conversations.info conversations.replies conversations.replies chat.postMessage chat.getPermalink"; calls != want {
-		t.Fatalf("calls %s, want phase 0's %s", calls, want)
+	if calls := w.send(t, reply); !strings.Contains(calls, "chat.postMessage") {
+		t.Fatalf("calls %s, want a post", calls)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 {
@@ -346,6 +360,8 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 	}
 }
 
+// A session with no turn posts at once to a person whose direct messages are tracked: the post is on the session's
+// own unit and reaches the person's direct message.
 func TestSessionSendToASegmentIsRecorded(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
@@ -356,7 +372,7 @@ func TestSessionSendToASegmentIsRecorded(t *testing.T) {
 	}
 	w.send(t, sessUser)
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != units[0] || ds[0].State != draft.Sent || ds[0].Evidence.Ref != sessDM+"/"+sessPosted {
+	if len(ds) != 1 || ds[0].Unit != dturn.SessionUnit(draftHandle) || ds[0].State != draft.Sent || ds[0].Evidence.Ref != sessDM+"/"+sessPosted {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -372,7 +388,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
-		t.Fatalf("slack_draft = %q", got)
+		t.Fatalf("slack_post = %q", got)
 	}
 	d := w.drafts(t)[0]
 	if err := approveDraft(ctx, w.deps.Outbox, d.ID); err != nil {
@@ -403,7 +419,7 @@ func TestSlackDraftIsTiedToTheTaskTheTurnWasAskedFrom(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"done"}`); isErr {
-		t.Fatalf("slack_draft = %q", got)
+		t.Fatalf("slack_post = %q", got)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 || ds[0].Task != "e42" {
@@ -523,7 +539,7 @@ func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 	}
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close","effects":["unit.closed"]}`)
 	if !isErr || !strings.Contains(got, "the reply intent lists in drafts.allowed_effects") {
-		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+		t.Fatalf("slack_post = %q (error %v)", got, isErr)
 	}
 	if len(w.drafts(t)) != 0 {
 		t.Fatal("a refused effect stored a draft")
@@ -552,7 +568,7 @@ func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	}
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"any news?","effects":["pr.nudged"]}`)
 	if !isErr || !strings.Contains(got, "pr.nudged") {
-		t.Fatalf("slack_draft = %q (error %v); broken %v", got, isErr, w.te.loadedIntents().Broken)
+		t.Fatalf("slack_post = %q (error %v); broken %v", got, isErr, w.te.loadedIntents().Broken)
 	}
 	if len(w.drafts(t)) != 0 {
 		t.Fatal("a draft whose effect never applies on Slack was stored")
@@ -584,7 +600,7 @@ window = "10m"
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
-		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
+		t.Fatalf("slack_post = %q; broken %v", got, w.te.loadedIntents().Broken)
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Held || decided(t, w.deps.Outbox, ds[0]).Mode != draft.Delay {
 		t.Fatalf("drafts %+v", ds)
@@ -597,9 +613,9 @@ func TestSlackDraftTellsTheAgentWhatItsApprovalPolicyDid(t *testing.T) {
 		state draft.State
 		says  string
 	}{
-		"wait":    {draft.Held, "once the user approves it"},
-		"send":    {draft.Queued, "is approved by its policy"},
-		"dry_run": {draft.Dropped, "is a dry run"},
+		"wait":    {draft.Held, "It waits for the user"},
+		"send":    {draft.Queued, "approval rules posts it"},
+		"dry_run": {draft.Dropped, "as a dry run"},
 	} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
@@ -616,7 +632,7 @@ func TestSlackDraftTellsTheAgentWhatItsApprovalPolicyDid(t *testing.T) {
 			}
 			got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`)
 			if isErr || !strings.Contains(got, c.says) {
-				t.Fatalf("slack_draft = %q, want it to say %q; broken %v", got, c.says, w.te.loadedIntents().Broken)
+				t.Fatalf("slack_post = %q, want it to say %q; broken %v", got, c.says, w.te.loadedIntents().Broken)
 			}
 			if ds := w.drafts(t); len(ds) != 1 || ds[0].State != c.state {
 				t.Fatalf("drafts %+v, want one %s", ds, c.state)
@@ -648,8 +664,8 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	}
 
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out","target":"`+link+`"}`)
-	if isErr || !strings.Contains(got, "approves it in the") || !strings.Contains(got, "#random") {
-		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	if isErr || !strings.Contains(got, "It waits for the user") || !strings.Contains(got, "#random") {
+		t.Fatalf("slack_post = %q (error %v)", got, isErr)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 {
@@ -672,7 +688,25 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	}
 }
 
-func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testing.T) {
+// approveAndSend approves every held draft as the person and runs the Outbox's sender.
+func (w *sessionWiring) approveAndSend(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	for _, d := range w.drafts(t) {
+		if d.State == draft.Held {
+			if err := approveDraft(ctx, w.deps.Outbox, d.ID); err != nil {
+				t.Fatalf("approving draft %d: %v", d.ID, err)
+			}
+		}
+	}
+	if _, _, err := w.deps.Outbox.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// From a pull request turn, an edit and reactions on a Slack message are drafts, which post once the user approves
+// them; an edit of another's message is refused.
+func TestFromAPullRequestTurnEditsAndReactionsPostOnceApproved(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
@@ -692,16 +726,20 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	w.st.srv.Handle("reactions.remove", func(url.Values) any { return map[string]any{} })
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
 
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"message":"`+link+`","text":"release 1.2 **done**"}`); isErr || !strings.Contains(got, "#random") {
-		t.Fatalf("slack_edit = %q", got)
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"edit","target":"`+link+`","text":"release 1.2 **done**"}`); isErr || !strings.Contains(got, "#random") {
+		t.Fatalf("an edit = %q", got)
 	}
+	for _, args := range []string{`{"kind":"react","target":"` + link + `","reaction":"white_check_mark"}`, `{"kind":"unreact","target":"` + link + `","reaction":"hourglass"}`} {
+		if got, isErr := w.callTool(t, "", draftHandle, "slack_post", args); isErr || !strings.Contains(got, "#random") {
+			t.Fatalf("slack_post %s = %q", args, got)
+		}
+	}
+	if n := len(w.st.srv.Calls("chat.update")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
+		t.Fatalf("%d posts before the user approved them", n)
+	}
+	w.approveAndSend(t)
 	if ups := w.st.srv.Calls("chat.update"); len(ups) != 1 || ups[0].Get("channel") != sessThreaded || ups[0].Get("ts") != sessReply || ups[0].Get("text") != "release 1.2 *done*" {
 		t.Fatalf("chat.update %v", ups)
-	}
-	for _, args := range []string{`{"message":"` + link + `","emoji":"white_check_mark"}`, `{"message":"` + link + `","emoji":"hourglass","remove":true}`} {
-		if got, isErr := w.callTool(t, "", draftHandle, "slack_react", args); isErr || !strings.Contains(got, "#random") {
-			t.Fatalf("slack_react %s = %q", args, got)
-		}
 	}
 	if adds, removes := w.st.srv.Calls("reactions.add"), w.st.srv.Calls("reactions.remove"); len(adds) != 1 || adds[0].Get("timestamp") != sessReply ||
 		len(removes) != 1 || removes[0].Get("name") != "hourglass" {
@@ -709,7 +747,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	}
 	ds := w.drafts(t)
 	slices.SortFunc(ds, func(a, b draft.Draft) int { return int(a.ID - b.ID) })
-	origin := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "address", Unit: prUnit}
+	origin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "address", Unit: prUnit}
 	thread := slackThreadUnit("T000", sessThreaded, sessParent)
 	if len(ds) != 3 {
 		t.Fatalf("records %+v", ds)
@@ -719,12 +757,12 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 			t.Fatalf("record %d %+v", i, d)
 		}
 	}
-	if d := ds[0]; d.Kind != draft.Kind("edit") || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" || d.Evidence.Ref != sessThreaded+"/"+sessReply {
+	if d := ds[0]; d.Kind != draft.Kind("edit") || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" {
 		t.Fatalf("edit record %+v", d)
 	}
 
 	author = "U0000000077"
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"message":"`+link+`","text":"hijacked"}`); !isErr || !strings.Contains(got, "only the user's own") {
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"edit","target":"`+link+`","text":"hijacked"}`); !isErr || !strings.Contains(got, "only the user's own") {
 		t.Fatalf("another's message: %q", got)
 	}
 	if n := len(w.st.srv.Calls("chat.update")); n != 1 {
@@ -732,7 +770,9 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	}
 }
 
-func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *testing.T) {
+// From a pull request turn, a deletion of the user's Slack message is a draft that keeps the text it removes and
+// deletes it once approved; a deletion of another's message is refused.
+func TestFromAPullRequestTurnADeletionKeepsItsTextAndDeletesOnceApproved(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
@@ -765,7 +805,7 @@ func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *test
 	mu.Lock()
 	author = "U0000000077"
 	mu.Unlock()
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_delete", `{"message":"`+ref+`"}`); !isErr || !strings.Contains(got, "only the user's own") {
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"delete","target":"`+ref+`"}`); !isErr || !strings.Contains(got, "only the user's own") {
 		t.Fatalf("another's message: %q", got)
 	}
 	if n := len(w.st.srv.Calls("chat.delete")); n != 0 {
@@ -774,20 +814,20 @@ func TestFromAPullRequestTurnADeletionGoesAtOnceAndTheOutboxKeepsItsText(t *test
 	mu.Lock()
 	author = "U000"
 	mu.Unlock()
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_delete", `{"message":"`+ref+`"}`); isErr || !strings.Contains(got, "#random") ||
-		!strings.Contains(got, "posted twice") {
-		t.Fatalf("slack_delete = %q", got)
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"delete","target":"`+ref+`"}`); isErr || !strings.Contains(got, "#random") {
+		t.Fatalf("slack_post delete = %q", got)
 	}
+	w.approveAndSend(t)
 	if dels := w.st.srv.Calls("chat.delete"); len(dels) != 1 || dels[0].Get("channel") != sessThreaded || dels[0].Get("ts") != sessReply {
 		t.Fatalf("chat.delete %v", dels)
 	}
 	ds := w.drafts(t)
-	origin := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "address", Unit: prUnit}
+	origin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "address", Unit: prUnit}
 	if len(ds) != 1 {
 		t.Fatalf("records %+v", ds)
 	}
 	if d := ds[0]; d.State != draft.Sent || d.Kind != draft.Kind("delete") || d.Purpose != "delete" || d.Text != "posted twice" ||
-		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || noSession(d.Origin) != origin || d.Evidence.Ref != ref {
+		d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || noSession(d.Origin) != origin {
 		t.Fatalf("delete record %+v", d)
 	}
 }
@@ -808,7 +848,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"@dana and dana@example.com, see `+"`@dana`"+`"}`); isErr {
-		t.Fatalf("slack_draft = %q", got)
+		t.Fatalf("slack_post = %q", got)
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].Text != "@{slack:"+sessUser+"} and @{slack:"+sessUser+"}, see `@dana`" {
 		t.Fatalf("drafts %+v", ds)
@@ -818,7 +858,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	if w.srv.Tasks == nil || len(w.srv.Plugins) != 7 {
+	if w.srv.Tasks == nil || len(w.srv.Plugins) != 3 {
 		t.Fatal("the wiring serves only some tools")
 	}
 	init := rpc(t, w.srv, "", draftHandle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
@@ -848,7 +888,7 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	if want := slices.DeleteFunc(builtin.ValueNames(builtin.Tools), func(n string) bool { return !served(n) }); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
 		t.Errorf("listed %v, tools.toml describes %v", names, want)
 	}
-	for _, call := range []struct{ tool, args string }{{"slack_send_message", `{}`}, {"slack_draft", `{"kind":"nope"}`}, {"turn_end", `[]`}} {
+	for _, call := range []struct{ tool, args string }{{"slack_post", `{"kind":"nope"}`}, {"turn_end", `[]`}} {
 		if got, isErr := w.callTool(t, "", draftHandle, call.tool, call.args); !isErr || strings.Contains(got, "map[") {
 			t.Errorf("%s answered %q", call.tool, got)
 		}
@@ -862,9 +902,9 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	}
 }
 
-// TestPostingOutsideATurn posts at once from a session with no turn, whose
-// posts are recorded, and from no session, whose posts are not; neither
-// drafts.
+// TestPostingOutsideATurn posts at once from a session with no turn the user drives, through the Outbox, on the
+// thread of the message it targets; a draft from it waits on that thread; no session, or a closed one, posts
+// nothing.
 func TestPostingOutsideATurn(t *testing.T) {
 	t.Parallel()
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
@@ -875,11 +915,19 @@ func TestPostingOutsideATurn(t *testing.T) {
 			w := newSessionWiring(t)
 			w.te.registerSession(t, dturn.Session{ID: "term_closed1", WorkspaceID: "ws-1", ClosedAt: testNow})
 			w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
-			if got, isErr := w.callTool(t, "", handle, "slack_send_message", `{"target":"`+link+`","text":"release 1.2 is out"}`); isErr {
-				t.Fatalf("slack_send_message = %q", got)
+			post, isErr := w.callTool(t, "", handle, "slack_post", `{"target":"`+link+`","text":"release 1.2 is out","draft":false}`)
+			react, _ := w.callTool(t, "", handle, "slack_post", `{"kind":"react","target":"`+link+`","reaction":"white_check_mark","draft":false}`)
+			if handle != "term_other1" {
+				if !isErr || len(w.drafts(t)) != 0 {
+					t.Fatalf("slack_post from %s = %q, %q; drafts %+v", name, post, react, w.drafts(t))
+				}
+				return
 			}
-			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"message":"`+link+`","emoji":"white_check_mark"}`); isErr {
-				t.Fatalf("slack_react = %q", got)
+			if isErr {
+				t.Fatalf("slack_post = %q", post)
+			}
+			if _, _, err := w.deps.Outbox.Send(context.Background()); err != nil {
+				t.Fatal(err)
 			}
 			for _, d := range w.drafts(t) {
 				if d.State != draft.Sent || d.Unit != thread || noSession(d.Origin) != session {
@@ -889,22 +937,16 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if n := len(w.drafts(t)); n != 2 {
 				t.Fatalf("records %d", n)
 			}
-
-			got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`)
-			if handle != "term_other1" {
-				if !isErr || !strings.Contains(got, "slack_draft refused") {
-					t.Fatalf("slack_draft with no session = %q", got)
-				}
-				return
+			if got, isErr := w.callTool(t, "", handle, "slack_post", `{"text":"any news?","target":"`+link+`"}`); isErr {
+				t.Fatalf("slack_post = %q", got)
 			}
-			if isErr {
-				t.Fatalf("slack_draft = %q", got)
-			}
-			if d := w.drafts(t)[0]; d.State != draft.Held || d.Unit != thread || noSession(d.Origin) != session || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
+			ds := w.drafts(t)
+			newest := slices.MaxFunc(ds, func(a, b draft.Draft) int { return int(a.ID - b.ID) })
+			if d := newest; d.State != draft.Held || d.Unit != thread || noSession(d.Origin) != session || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 				t.Fatalf("draft %+v", d)
 			}
-			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
-				t.Fatalf("slack_draft with no permalink = %q", got)
+			if got, isErr := w.callTool(t, "", handle, "slack_post", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
+				t.Fatalf("slack_post with no target = %q", got)
 			}
 		})
 	}
@@ -915,8 +957,8 @@ func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
 	w := newSessionWiring(t)
 	w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
 	reply := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "")
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"message":"`+reply+`","emoji":"eyes"}`); isErr {
-		t.Fatalf("slack_react = %q", got)
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"react","target":"`+reply+`","reaction":"eyes","draft":false}`); isErr {
+		t.Fatalf("slack_post react = %q", got)
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessThreaded, sessParent) {
 		t.Fatalf("records %+v", ds)
@@ -939,7 +981,7 @@ func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 	}
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"the new search is live","target":"`+sessChannel+`"}`)
 	if isErr || !strings.Contains(got, "#general") {
-		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+		t.Fatalf("slack_post = %q (error %v)", got, isErr)
 	}
 	ds := w.drafts(t)
 	if len(ds) != 1 {
@@ -970,14 +1012,16 @@ func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"x","target":"`+sessChannel+`"}`); !isErr || !strings.Contains(got, "a target it posts to") {
-		t.Fatalf("slack_draft = %q", got)
+		t.Fatalf("slack_post = %q", got)
 	}
 	if len(w.drafts(t)) != 0 {
 		t.Fatal("a refused call stored a draft")
 	}
 }
 
-func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
+// A post with draft false from a task turn still running, in a session the loop never typed into, posts at once on
+// the task, its origin the turn.
+func TestASendFromATaskTurnPostsAtOnceWithTheTurnAsOrigin(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	task := unit.Unit{Provider: unit.Task, Key: "t1"}
@@ -987,10 +1031,12 @@ func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	w.send(t, sessChannel)
+	if calls := w.send(t, sessChannel); !strings.Contains(calls, "chat.postMessage") {
+		t.Fatalf("a session the user drives did not post at once: %s", calls)
+	}
 	ds := w.drafts(t)
-	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: task}
-	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || noSession(ds[0].Origin) != want {
+	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}
+	if len(ds) != 1 || ds[0].Unit != task || ds[0].State != draft.Sent || noSession(ds[0].Origin) != want {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -1028,7 +1074,7 @@ items = "unowned_aged"
 				t.Fatal(err)
 			}
 			if got, isErr := w.draftTool(t, draftHandle, `{"text":"who owns this?"}`); isErr {
-				t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
+				t.Fatalf("slack_post = %q; broken %v", got, w.te.loadedIntents().Broken)
 			}
 			if ds := w.drafts(t); len(ds) != 1 || ds[0].State != c.state {
 				t.Fatalf("drafts %+v, want one %s", ds, c.state)

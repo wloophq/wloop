@@ -64,17 +64,14 @@ type Reader interface {
 
 // Gates proposes what waits on the user.
 type Gates interface {
-	// OpenGate proposes a draft, which the host's approval policy holds or
-	// releases; no plugin approves one. With a session, the host sets the
+	// OpenGate writes a draft, which the host's approval policy holds or
+	// releases, or, with Post, the host approves through a session the user
+	// drives; no plugin approves one. With a session, the host sets the
 	// draft's origin, task and default items from the session's book and
 	// refuses an effect the session's intent does not allow; without, the
 	// origin is the plugin's rule, checked against the manifest. The host
 	// derives the delivery from the draft's kind through the manifest.
 	OpenGate(ctx context.Context, req GateRequest) (GateRef, error)
-	// RecordSent records a post a tool made at once as a sent draft. The
-	// host refuses it for a session that is not live, or for a tool the
-	// manifest does not mark posts = "now".
-	RecordSent(ctx context.Context, d Draft, session, tool string) (GateRef, error)
 	// RehomeDrafts moves every draft of each move's From, open or sent, onto
 	// its To in one host transaction, and counts them; applying it twice
 	// changes nothing, so a plugin retries it after a crash.
@@ -86,10 +83,13 @@ type Gates interface {
 }
 
 // GateRequest proposes a draft, from the MCP session with handle Session
-// when one proposes it.
+// when one proposes it. Post asks the host to post it at once, approved
+// through the session, when the user drives the session; from any other the
+// draft waits for the user.
 type GateRequest struct {
 	Draft   Draft
 	Session string
+	Post    bool
 }
 
 // UnitMove moves drafts from one unit to another.
@@ -250,6 +250,9 @@ type GateRef struct {
 	State string
 	// Rev is the draft's rev once proposed, the one an agent revises it at and pins it by.
 	Rev int64
+	// Link is the address of the draft's card in the host's cockpit, where
+	// the user reviews, edits and posts it; "" when unknown.
+	Link string
 }
 
 // Event is an event on a unit, for the timelines of its tasks.

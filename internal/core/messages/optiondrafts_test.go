@@ -295,7 +295,8 @@ func TestAnOptionDraftApprovesOnlyWithTheResolversAuthority(t *testing.T) {
 		approve bool
 	}{
 		{"a session the user drives", gates.Resolution{Intent: "answer", By: task.ActorAgent, Session: "driver"}, true},
-		{"the session that revised the draft", gates.Resolution{Intent: "answer", By: task.ActorAgent, Session: "reviser"}, false},
+		{"the session that revised the draft, which the user drives", gates.Resolution{Intent: "answer", By: task.ActorAgent, Session: "reviser"}, true},
+		{"a session the user does not drive", gates.Resolution{Intent: "answer", By: task.ActorAgent, Session: "stranger"}, false},
 	} {
 		r, od, m := draftRig(t, "driver", "reviser")
 		q := r.gateOf(t, m)
@@ -306,7 +307,7 @@ func TestAnOptionDraftApprovesOnlyWithTheResolversAuthority(t *testing.T) {
 		if got := len(od.approvals) == 1; got != c.approve {
 			t.Fatalf("%s: approvals %+v", c.name, od.approvals)
 		}
-		if c.approve && (od.approvals[0].by != task.ActorAgent || od.approvals[0].session != "driver") {
+		if c.approve && (od.approvals[0].by != task.ActorAgent || od.approvals[0].session != c.res.Session) {
 			t.Fatalf("%s: approved as %+v", c.name, od.approvals[0])
 		}
 		if !c.approve && len(od.withdrawn) != 0 {
@@ -377,7 +378,7 @@ func TestAnOptionApprovesOnlyThePinSeenForAResolverItsGateAllows(t *testing.T) {
 	}{
 		{"a person", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorPerson}, nil, true},
 		{"a session the user drives", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "driver"}, nil, true},
-		{"the session that revised it", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"}, nil, false},
+		{"the session that revised it, which the user drives", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"}, nil, true},
 		{"the turn's session", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "term_1"}, nil, false},
 		{"a rule", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorWorkflow, Rule: "send"}, nil, false},
 		{"a rev other than the pin", gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorPerson},
@@ -427,18 +428,17 @@ func TestApproveOptionApprovesNothingForAResolutionThatDoesNotAnswer(t *testing.
 	}
 }
 
-// A session that revised the option's draft picks it: no answer at all, so the question stays open and the turn
-// hears nothing; a pin gone stale is still the person's answer.
-func TestAPickByTheDraftsReviserIsRefusedOutright(t *testing.T) {
+// A session the user drives that revised the option's draft picks it: the user, prompting it, decides, so the
+// draft is approved and the question answered with its option.
+func TestAPickByTheDraftsReviserTheUserDrivesApprovesIt(t *testing.T) {
 	ctx := context.Background()
 	answer := messages.GateAnswer(messages.Answer{OptionID: "approve"})
 	r, od, m := draftRig(t, "driver", "reviser")
 	q := r.gateOf(t, m)
-	err := r.gates.Resolve(ctx, q.ID, gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"})
-	if !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("the reviser's pick: %v, want ErrRefused", err)
+	if err := r.gates.Resolve(ctx, q.ID, gates.Resolution{Intent: "answer", Answer: answer, By: task.ActorAgent, Session: "reviser"}); err != nil {
+		t.Fatalf("the reviser's pick: %v", err)
 	}
-	if got := r.gateOf(t, m); got.Status != gate.Open || od.gateOf(42).Status != gate.Open || len(r.sess.Typed()) != 0 {
-		t.Fatalf("question %s, draft gate %s, typed %v: want both open and the turn untouched", got.Status, od.gateOf(42).Status, r.sess.Typed())
+	if got := r.gateOf(t, m); got.Status != gate.Answered || od.gateOf(42).Status != gate.Approved || od.gateOf(42).BySession != "reviser" {
+		t.Fatalf("question %s, draft gate %+v: want the question answered and the draft approved through the reviser", got.Status, od.gateOf(42))
 	}
 }

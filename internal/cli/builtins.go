@@ -212,13 +212,13 @@ func writeCommands(srcs []*manifest.Source) [][]string {
 	return out
 }
 
-// draftTools are the tools a session may call without a prompt because they only propose or read drafts the
-// user approves: those srcs mark so, and the loop's own draft tools, as an agent names them.
+// draftTools are the tools a session may call without a prompt because they write drafts, which post at once only
+// from a session the user drives: those srcs mark writes, and the loop's own draft tools, as an agent names them.
 func draftTools(srcs []*manifest.Source) []string {
 	var out []string
 	for _, s := range srcs {
 		for _, t := range s.Tools {
-			if t.Proposes {
+			if t.Writes {
 				out = append(out, brand.ToolPrefix()+t.Name)
 			}
 		}
@@ -226,12 +226,12 @@ func draftTools(srcs []*manifest.Source) []string {
 	return append(out, mcp.DraftTools()...)
 }
 
-// atOnceTools are the tools srcs mark posts = "now", which post as the user at once, as an agent names them.
-func atOnceTools(srcs []*manifest.Source) []string {
+// writeTools are the tools srcs mark writes, which write in the user's name, as an agent names them.
+func writeTools(srcs []*manifest.Source) []string {
 	var out []string
 	for _, s := range srcs {
 		for _, t := range s.Tools {
-			if t.Posts == "now" {
+			if t.Writes {
 				out = append(out, brand.ToolPrefix()+t.Name)
 			}
 		}

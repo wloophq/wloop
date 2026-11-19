@@ -149,10 +149,6 @@ func (g draftGates) Withdraw(ctx context.Context, id int64, reason string) error
 	return g.e.newGates(g.db, g.logf).Withdraw(ctx, id, reason)
 }
 
-func (g draftGates) RecordSent(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
-	return g.e.newGates(g.db, g.logf).RecordSent(ctx, gt)
-}
-
 // TaskOf is the task the gates service opens gt on, so a draft takes it before its gate opens and is not
 // written again, at a new rev, to adopt it.
 func (g draftGates) TaskOf(ctx context.Context, gt gate.Gate) (task.ID, error) {

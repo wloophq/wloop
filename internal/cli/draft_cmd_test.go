@@ -159,3 +159,49 @@ func TestDraftCLIAndMCPSameAnswer(t *testing.T) {
 		t.Fatalf("stored: cli %+v, mcp %+v", c, m)
 	}
 }
+
+// draftCalls records the agent API calls the draft command makes.
+type draftCalls struct {
+	proposed []api.AgentDraftProposal
+	updated  []api.AgentDraftUpdate
+}
+
+func (d *draftCalls) ProposeDraft(_ context.Context, _ string, req api.AgentDraftProposal) (api.AgentDraft, error) {
+	d.proposed = append(d.proposed, req)
+	return api.AgentDraft{ID: 1, Rev: 1}, nil
+}
+
+func (d *draftCalls) ReadDraft(context.Context, string, int64) (api.AgentDraft, error) {
+	return api.AgentDraft{}, nil
+}
+
+func (d *draftCalls) UpdateDraft(_ context.Context, _ string, req api.AgentDraftUpdate) (api.AgentDraft, error) {
+	d.updated = append(d.updated, req)
+	return api.AgentDraft{ID: req.ID, Rev: req.Rev}, nil
+}
+
+func (d *draftCalls) WithdrawDraft(context.Context, string, api.AgentDraftWithdrawal) (api.AgentDraft, error) {
+	return api.AgentDraft{}, nil
+}
+
+// The draft command asks to post at once only with --draft=false; left out, it makes and keeps drafts.
+func TestTheDraftCommandPostsAtOnceOnlyWithDraftFalse(t *testing.T) {
+	ctx := context.Background()
+	c := &draftCalls{}
+	for _, args := range [][]string{{"--kind", "comment", "--text", "hi"}, {"--kind", "comment", "--text", "hi", "--draft=false"}} {
+		if _, code, err := draftCall(ctx, c, "term_1", "write", args); code != 0 || err != nil {
+			t.Fatalf("propose %v: %d %v", args, code, err)
+		}
+	}
+	for _, args := range [][]string{{"7", "--rev", "2"}, {"7", "--rev", "2", "--draft=false"}} {
+		if _, code, err := draftCall(ctx, c, "term_1", "update", args); code != 0 || err != nil {
+			t.Fatalf("update %v: %d %v", args, code, err)
+		}
+	}
+	if c.proposed[0].Draft != nil || c.proposed[1].Draft == nil || *c.proposed[1].Draft {
+		t.Fatalf("proposed %+v", c.proposed)
+	}
+	if c.updated[0].Draft != nil || c.updated[1].Draft == nil || *c.updated[1].Draft {
+		t.Fatalf("updated %+v", c.updated)
+	}
+}

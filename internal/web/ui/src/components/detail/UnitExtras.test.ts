@@ -162,18 +162,18 @@ test("a card shows its signals in its plugin's words and whom it waits on", () =
   expect(none.querySelector(".signals")).toBeNull();
 });
 
-test("the unit detail shows the drafts that wait on the unit with their verdict and gate actions, not those a question pins", async () => {
+test("the unit detail shows every draft that waits on the unit, one a question pins included, with its verdict and gate actions", async () => {
   answers["/api/units/github/acme%2Fapi%238/tasks"] = [{ id: "e-1", title: "Task e-1", state: "next" }];
   answers[unitDraftsURL] = { drafts: [unitDraft(7), unitDraft(8, { pinned_by: 3, text: "Pinned by a question." })] };
   await loadDetailPane(readRoute("#unit=github/acme%2Fapi%238"));
   const c = extras({ row: { unit: pr }, items: [] });
-  expect([...c.querySelectorAll("[data-draft]")].map((x) => x.getAttribute("data-draft"))).toEqual(["7"]);
+  expect([...c.querySelectorAll("[data-draft]")].map((x) => x.getAttribute("data-draft"))).toEqual(["7", "8"]);
   expect(c.textContent).toContain("Two findings block the merge.");
-  expect(c.textContent).not.toContain("Pinned by a question.");
+  expect(c.textContent).toContain("Pinned by a question.");
   expect(c.querySelector('.pv[data-value="REQUEST_CHANGES"]')).not.toBeNull();
-  await fireEvent.click(byFocus(c, "unit:approve:draft:7") as HTMLButtonElement);
+  await fireEvent.click(byFocus(c, "unit:approve:draft:8") as HTMLButtonElement);
   await settle();
-  expect(posts.map((p) => p.url)).toEqual(["/api/gates/107/approve"]);
+  expect(posts.map((p) => p.url)).toEqual(["/api/gates/108/approve"]);
 });
 
 test("the unit detail shows no drafts section when none waits on the unit, or the drafts cannot be read", async () => {

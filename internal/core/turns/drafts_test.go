@@ -91,8 +91,8 @@ func TestTurnDoneByApproval(t *testing.T) {
 		{"a session the user drives approved it", draftGate("42", task.ActorAgent, "", "driver"), true},
 		{"a rule released it", draftGate("42", task.ActorWorkflow, "send", ""), false},
 		{"a window released it", draftGate("42", task.ActorWorkflow, gates.RuleWindow, ""), false},
-		{"the session that revised it", draftGate("42", task.ActorAgent, "", "reviser"), false},
-		{"the session that proposed it", draftGate("42", task.ActorAgent, "", "proposer"), false},
+		{"the session that revised it, through which the user approved it", draftGate("42", task.ActorAgent, "", "reviser"), true},
+		{"the session that proposed it, through which the user approved it", draftGate("42", task.ActorAgent, "", "proposer"), true},
 		{"the gate of another draft", draftGate("43", task.ActorPerson, "", ""), false},
 	} {
 		s, store, _, _, rec := newService(t)

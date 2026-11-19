@@ -16,7 +16,7 @@ func TestByUser(t *testing.T) {
 		{"a person", Gate{By: task.ActorPerson}, true},
 		{"an agent through a session the user drives", Gate{By: task.ActorAgent, BySession: "s-user"}, true},
 		{"an agent through no session", Gate{By: task.ActorAgent}, false},
-		{"a tool that posted at once", Gate{By: task.ActorAgent, BySession: "s-user", Rule: "slack_send_message"}, false},
+		{"a tool that posted at once", Gate{By: task.ActorAgent, BySession: "s-user", Rule: "slack_post"}, false},
 		{"a rule", Gate{By: task.ActorWorkflow, Rule: "gates.approval rule 0"}, false},
 		{"a window", Gate{By: task.ActorWorkflow, Rule: "window"}, false},
 	} {
