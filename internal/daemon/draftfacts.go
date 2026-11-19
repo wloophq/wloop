@@ -2,9 +2,12 @@ package daemon
 
 import (
 	"cmp"
+	"context"
 	"slices"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -26,15 +29,34 @@ func draftViewFacts(d draft.Draft, publisher unit.ProviderID, where string, peop
 	}
 }
 
-// rowWhere is where a draft's unit is as its row says it: the first value the row gives the facet whose id
-// is that of the draft facet reading draft.where, "" for none.
-func rowWhere(defs []intentload.FacetDef, row map[string][]string) string {
-	for _, f := range defs {
-		if f.Fact == "draft.where" && len(row[f.ID]) > 0 {
-			return row[f.ID][0]
-		}
+// draftWhere is where a draft on u is: the first value u's row gives the facet whose id is that of the draft
+// facet reading draft.where, else, for a task's unit, the first its task's facet of that id has; "" for none.
+func (ev *taskViewer) draftWhere(ctx context.Context, defs []intentload.FacetDef, u unit.Unit, row map[string][]string) (string, error) {
+	i := slices.IndexFunc(defs, func(f intentload.FacetDef) bool { return f.Fact == "draft.where" })
+	if i < 0 {
+		return "", nil
 	}
-	return ""
+	id := defs[i].ID
+	if vs := row[id]; len(vs) > 0 {
+		return vs[0], nil
+	}
+	tid, ok := task.IDOf(u)
+	if !ok || ev.g == nil {
+		return "", nil
+	}
+	e, ok, err := ev.taskOf(ctx, tid)
+	if err != nil || !ok {
+		return "", err
+	}
+	var v api.TaskView
+	if err := ev.row(ctx, e, &v); err != nil {
+		return "", err
+	}
+	ev.facets(ctx, e, &v)
+	if vs := v.Facets[id]; len(vs) > 0 {
+		return vs[0], nil
+	}
+	return "", nil
 }
 
 // mentioned are the people text mentions, each once: the name names gives a mention key, else the key.

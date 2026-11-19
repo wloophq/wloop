@@ -179,7 +179,7 @@ func servedViews(t *testing.T) api.ViewsCatalog {
 	}
 	cat := api.ViewsCatalog{Facets: catalog.TaskFacets(def.Facets, tasks, []string{"calls", "computer"}), DefaultSort: def.DefaultSort, Lens: catalog.LensWords(def.Lens)}
 	for _, v := range def.Views {
-		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group})
+		cat.Views = append(cat.Views, api.TaskViewSpec{ID: v.ID, Label: v.Label, Summary: v.Summary, Empty: v.Empty, When: v.WhenText, Sort: v.SortText, Over: v.Over, Group: v.Group, Layout: v.Layout})
 	}
 	return cat
 }

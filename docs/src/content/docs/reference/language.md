@@ -373,8 +373,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft_facets.<name>.rank` (list of strings): The facet's values in their order, first first.
 - `draft_facets.<name>.values` (table by name): The text people read for a value, by value.
 - `draft_facets.<name>.values.<name>` (string, localized): The text of one value.
-- `draft_facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
-- `draft_facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a list of them): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+- `draft_facets.<name>.label_prefix` (string, localized): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a list of them): Not read: a draft's card shows no facet's values.
   - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
   - `ref`: Beside the title, before the unit's own label: where it lives.
   - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
@@ -383,19 +383,19 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `kind`: Its situation or state, the pill under whom it waits on.
   - `age`: How long since the facet's instant, for a facet that sorts by time; only the first such facet shows.
   - `aside`: Beside the reason: its workspace and links.
-- `draft_facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
+- `draft_facets.<name>.show_values` (one of `all`, `first`, default `all`): Not read: a draft's card shows no facet's values.
   - `all`: Every value, in the item's order.
   - `first`: The first value alone.
-- `draft_facets.<name>.show_when` (table by name): Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = ["me"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.
-- `draft_facets.<name>.show_when.<name>` (list of strings): The values one facet must hold.
-- `draft_facets.<name>.show_max` (integer): How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.
-- `draft_facets.<name>.show_label` (template, localized): For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.
+- `draft_facets.<name>.show_when` (table by name): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_when.<name>` (list of strings): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_max` (integer): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.show_label` (template, localized): Not read: a draft's card shows no facet's values.
 - `draft_facets.<name>.empty` (string, localized): What a group of drafts with no value shows.
 - `draft_facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `draft_facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
-- `draft_facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
-- `draft_facets.<name>.colors` (table by name): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
-- `draft_facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+- `draft_facets.<name>.strip` (bool, default `false`): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.colors` (table by name): Not read: a draft's card shows no facet's values.
+- `draft_facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): Not read: a draft's card shows no facet's values.
   - `me`: Yours: the next step is the viewer's.
   - `author`: Someone else's, such as a pull request's author.
   - `reviewer`: Another person's, apart from the author, such as a reviewer.

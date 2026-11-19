@@ -47,7 +47,7 @@
           },
           "colors": {
             "additionalProperties": {
-              "description": "One value's hue.",
+              "description": "Not read: a draft's card shows no facet's values.",
               "enum": [
                 "me",
                 "author",
@@ -57,7 +57,7 @@
               ],
               "type": "string"
             },
-            "description": "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "object"
           },
           "empty": {
@@ -78,7 +78,7 @@
             "type": "string"
           },
           "label_prefix": {
-            "description": "Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "string"
           },
           "match": {
@@ -115,7 +115,7 @@
             "type": "array"
           },
           "show": {
-            "description": "The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = [\"paused\", \"muted\"] }`, or `\"\"` to take a facet a lower layer places off the row. Absent or `\"\"`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "oneOf": [
               {
                 "type": "string"
@@ -129,16 +129,16 @@
             ]
           },
           "show_label": {
-            "description": "For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "string"
           },
           "show_max": {
-            "description": "How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "integer"
           },
           "show_values": {
             "default": "all",
-            "description": "How many of an item's values the part shows: all, or the first alone.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "enum": [
               "all",
               "first"
@@ -147,13 +147,13 @@
           },
           "show_when": {
             "additionalProperties": {
-              "description": "The values one facet must hold.",
+              "description": "Not read: a draft's card shows no facet's values.",
               "items": {
                 "type": "string"
               },
               "type": "array"
             },
-            "description": "Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = [\"me\"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "object"
           },
           "sort": {
@@ -167,7 +167,7 @@
           },
           "strip": {
             "default": false,
-            "description": "Whether each row's strip is colored by the facet's first value, its rank the strip's legend.",
+            "description": "Not read: a draft's card shows no facet's values.",
             "type": "boolean"
           },
           "units": {

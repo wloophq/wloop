@@ -140,7 +140,7 @@ type DraftOption struct {
 	Label string `json:"label"`
 }
 
-// OutboxPage is the Outbox's drafts, newest first, with the draft facets a lens over them reads.
+// OutboxPage is the Outbox's drafts, in the order of its view's sort, with the draft facets a lens over them reads.
 type OutboxPage struct {
 	Drafts []OutboxDraft `json:"drafts"`
 	Facets []FacetSpec   `json:"facets"`

@@ -6048,7 +6048,8 @@
     "empty": "Inbox zero: everything is clarified.",
     "when": "task.category == 'inbox'",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "needs-me",
@@ -6058,7 +6059,8 @@
     "when": "task.owed_by == 'me' \u0026\u0026 task.category != 'inbox' \u0026\u0026 (task.gates_open \u003e 0 || task.category in ['ready', 'active', 'waiting'])",
     "sort": "-task.sequential_next",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "waiting",
@@ -6068,7 +6070,8 @@
     "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.owed_by != 'me' \u0026\u0026 (task.owed_by != '' || task.turns_running == 0)",
     "over": "tasks",
     "group": "task.owed_by",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "chase",
@@ -6078,7 +6081,8 @@
     "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.owed_by != 'me' \u0026\u0026 task.owed_by != '' \u0026\u0026 !('stalled' in task.link_signals) \u0026\u0026 task.check_on \u003e timestamp(0) \u0026\u0026 task.check_on \u003c now \u0026\u0026 now - task.since_movement \u003c task.check_on",
     "over": "tasks",
     "group": "task.owed_by",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "fits-now",
@@ -6088,7 +6092,8 @@
     "when": "task.owed_by == 'me' \u0026\u0026 task.category in ['ready', 'active'] \u0026\u0026 task.prop.size \u003e duration('0s') \u0026\u0026 task.prop.size \u003c= duration('30m')",
     "sort": "task.prop.size",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "blocked-by-me",
@@ -6099,7 +6104,8 @@
     "sort": "-task.ask_age",
     "over": "tasks",
     "group": "task.asker_names",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "stalled",
@@ -6108,7 +6114,8 @@
     "empty": "Nothing is stalled.",
     "when": "task.link_signal.stalled || (!('stalled' in task.link_signals) \u0026\u0026 task.owed_by != 'me' \u0026\u0026 task.check_on \u003e timestamp(0) \u0026\u0026 task.check_on \u003c now \u0026\u0026 now - task.since_movement \u003c task.check_on)",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "in-loop",
@@ -6117,7 +6124,8 @@
     "empty": "No agent is working on anything.",
     "when": "task.link_signal.in_loop || task.turns_running \u003e 0",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "approved",
@@ -6126,7 +6134,8 @@
     "empty": "Nothing in Approved right now.",
     "when": "task.link_signal.ready",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "snoozed",
@@ -6135,7 +6144,8 @@
     "empty": "Nothing is snoozed.",
     "when": "task.wake_until \u003e timestamp(0) || task.wake_when != '' || task.state == 'scheduled'",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "focus",
@@ -6144,7 +6154,8 @@
     "empty": "Nothing in focus: mark a task to focus on it.",
     "when": "task.prop.focus == 'on' \u0026\u0026 !(task.category in ['done', 'dropped'])",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "projects",
@@ -6153,7 +6164,8 @@
     "empty": "No open projects.",
     "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped'])",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "someday",
@@ -6162,7 +6174,8 @@
     "empty": "Nothing in Someday right now.",
     "when": "task.state == 'someday'",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "logbook",
@@ -6172,7 +6185,8 @@
     "when": "task.category == 'done'",
     "sort": "task.since_movement",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "done",
@@ -6181,7 +6195,8 @@
     "empty": "No finished task holds a workspace.",
     "when": "task.category == 'done' \u0026\u0026 task.link_signal.workspace",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "outbox",
@@ -6192,7 +6207,8 @@
     "sort": "draft.created_at",
     "over": "gates",
     "group": "draft.proposer",
-    "rail": false
+    "rail": false,
+    "layout": "outbox"
    },
    {
     "id": "review-projects",
@@ -6201,7 +6217,8 @@
     "empty": "Every project has a next action and is reviewed.",
     "when": "task.prop.kind == 'project' \u0026\u0026 !(task.category in ['done', 'dropped']) \u0026\u0026 (task.review_due || (!task.children_mine \u0026\u0026 task.state != 'someday'))",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "review",
@@ -6209,7 +6226,8 @@
     "summary": "The weekly review: walk each step until the lists are clean.",
     "empty": "Nothing in Review right now.",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "home-blocked",
@@ -6219,7 +6237,8 @@
     "when": "task.owed_by == 'me' \u0026\u0026 (task.gates_open \u003e 0 || size(task.askers) \u003e 0) \u0026\u0026 !(task.category in ['inbox', 'deferred', 'done', 'dropped'])",
     "sort": "task.owed_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "home-stalled",
@@ -6229,7 +6248,8 @@
     "when": "task.category in ['ready', 'active', 'waiting'] \u0026\u0026 task.turns_running == 0",
     "sort": "-task.since_movement",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-answer",
@@ -6239,7 +6259,8 @@
     "when": "'answer' in task.decisions",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-approve-plan",
@@ -6249,7 +6270,8 @@
     "when": "'approve-plan' in task.decisions",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-send-draft",
@@ -6259,7 +6281,8 @@
     "when": "'send-draft' in task.decisions",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-review-step",
@@ -6269,7 +6292,8 @@
     "when": "'review-step' in task.decisions",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-last-step",
@@ -6279,7 +6303,8 @@
     "when": "'last-step' in task.decisions \u0026\u0026 task.owed_by == 'me'",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-pick-someone",
@@ -6289,7 +6314,8 @@
     "when": "'pick-someone' in task.decisions \u0026\u0026 task.owed_by == 'me'",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    },
    {
     "id": "decide-act",
@@ -6299,7 +6325,8 @@
     "when": "'act' in task.decisions",
     "sort": "task.decision_since",
     "over": "tasks",
-    "rail": false
+    "rail": false,
+    "layout": "list"
    }
   ],
   "areas": null,

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -413,5 +414,28 @@ func TestTheOutboxNamesTheSourceOfADraftByItsPublisher(t *testing.T) {
 	i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == "kind" })
 	if got := page.Facets[i].Labels["ask_owner"]; want == "" || got != want {
 		t.Errorf("kind word %q, want Slack's %q", got, want)
+	}
+}
+
+func TestADraftOnATaskIsWhereItsTaskIs(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	r.s.deps.Row = func(_ context.Context, e task.Task) (catalog.Row, error) {
+		if e.ID == "e1" {
+			return catalog.Row{Facets: map[string][]string{"where": {"acme/infra"}}}, nil
+		}
+		return catalog.Row{}, nil
+	}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "placed"}, task.Task{ID: "e2", State: "next", Category: task.CategoryReady, Title: "unplaced"})
+	placed := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Text: "on a placed task", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "a"}})
+	unplaced := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e2"}, Text: "on an unplaced task", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "b"}})
+	onPR := r.stored(t, draft.Draft{Unit: r7u, Text: "on a pull request with no row", State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: "c"}})
+
+	want := map[int64][]string{int64(placed.ID): {"acme/infra"}, int64(unplaced.ID): nil, int64(onPR.ID): nil}
+	for _, d := range r.outboxPage(t).Drafts {
+		if got := d.Facets["where"]; !slices.Equal(got, want[d.ID]) {
+			t.Errorf("draft %d (%s) is where %v, want %v", d.ID, d.Text, got, want[d.ID])
+		}
 	}
 }

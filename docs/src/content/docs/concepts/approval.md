@@ -193,12 +193,12 @@ The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `G
 | `workflow` | `draft.workflow` | The workflow behind it, empty for none (`no workflow`) |
 | `kind` | `draft.kind` | Its kind in its plugin's manifest |
 | `source` | `draft.provider` | The provider whose plugin posts it: its unit's, or the one its target names for a draft on a task |
-| `where` | `draft.where` | The repository or channel its unit's row gives |
+| `where` | `draft.where` | The repository or channel its unit's row gives, else, for a draft on a task, the task's `where` |
 | `people` | `draft.people` | The people it is to or mentions, by name (the mention key when its plugin resolves no name) |
 | `state` | `draft.state` | Failed, sending, queued or held, in that order |
 | `age` | `draft.created_at` | When it was written |
 
-A draft facet shares its id with the task facet of the same meaning, so a qualifier such as `where:acme/api` reads alike in every view, and a user layer's `[facets.where]` never touches `[draft_facets.where]`. A draft has one value of its fact and sits on one unit, so `merge` and `units` are not read. `draft.where` takes the value the unit's row gives for the task facet of the same id, so keep the id `where` for it.
+A draft facet shares its id with the task facet of the same meaning, so a qualifier such as `where:acme/api` reads alike in every view, and a user layer's `[facets.where]` never touches `[draft_facets.where]`. A draft has one value of its fact and sits on one unit, so `merge` and `units` are not read, nor are the keys that place a facet's values on a task's row (`show`, `show_values`, `show_when`, `show_max`, `show_label`, `label_prefix`, `strip`, `colors`): a draft's card shows none. `draft.where` takes the value the unit's row gives for the task facet of the same id, and a draft on a task whose row gives none takes its task's value of that facet (its placement, for the bundled `where`), so keep the id `where` for it.
 
 ```text
 group by      the head shows

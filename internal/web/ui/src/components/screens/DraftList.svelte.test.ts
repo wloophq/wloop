@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createRawSnippet, flushSync } from "svelte";
 import { I18N } from "../../lib/i18n.svelte";
-import { groupedRows, lensOf, viewQueryKey, type Lens, type Pipeline } from "../../lib/lens";
+import { groupedRows, lensFields, lensOf, viewQueryKey, type Lens, type Pipeline } from "../../lib/lens";
+import { loadOutbox } from "../../state/loaders.svelte";
 import { lensResult } from "../../lib/view";
 import type { J } from "../../lib/util";
 import { net } from "../../state/api";
@@ -11,6 +12,7 @@ import { outboxState, tasksState } from "../../state/store.svelte";
 import { filterPalette, lensItems, listYAML } from "../chrome/toolbar";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, useCatalogs } from "../rows/testdata/fixtures";
+import LensBar from "../chrome/LensBar.svelte";
 import DraftList from "./DraftList.svelte";
 import TaskViewPage from "./TaskViewPage.svelte";
 
@@ -18,12 +20,10 @@ const NOW = Date.parse("2026-11-04T12:00:00Z");
 
 afterEach(cleanup);
 
-// outboxView opens the Outbox at hash, the views catalog drawing it in the outbox layout, its page served.
+// outboxView opens the Outbox at hash, its page served.
 function outboxView(hash: string): void {
   resetStore(NOW, hash);
-  const views = fixture("views.json");
-  views.views = views.views.map((v: J) => (v.id === "outbox" ? { ...v, layout: "outbox" } : v));
-  useCatalogs(fixture("catalog.github.json"), views);
+  useCatalogs(fixture("catalog.github.json"), fixture("views.json"));
   I18N.strings = { "{n} draft": { one: "{n} draft", other: "{n} drafts" } };
   tasksState.key = viewQueryKey("outbox", "", []);
   tasksState.tasks = [];
@@ -95,6 +95,16 @@ describe("the Outbox through the lens", () => {
     expect([r.q, r.g, r.s]).toEqual(["where:acme/api", "kind", "age-desc"]);
   });
 
+  it("offers no list/board switch, the Outbox drawing only its list", () => {
+    const bar = (hash: string) => {
+      nav.hash = hash;
+      return render(LensBar, { lens: lensOf(readHash()), res: null }).container;
+    };
+    expect(bar("#view=outbox").querySelector('[data-focus="lens:board"]')).toBeNull();
+    cleanup();
+    expect(bar("#view=needs-me").querySelector('[data-focus="lens:board"]')).not.toBeNull();
+  });
+
   it("shows the lens bar over the drafts' facets", () => {
     const tools = createRawSnippet((lens: () => Lens, res: () => Pipeline | null) => ({
       render: () => `<i id="seen" data-shown="${res() ? res()!.shown : ""}" data-group="${lens().defaultGroup}" data-offered="${lens().offered.map((f) => f.id).join(",")}"></i>`,
@@ -124,6 +134,20 @@ describe("filtering the Outbox", () => {
     filterPalette(lens, lensItems(lens), (p) => palettes.push(p));
     palettes[0].items.find((it: J) => it.label === "Kind").run();
     expect(palettes[1].items.map((it: J) => it.label).sort()).toEqual(["Nudge", "Review", "comment"]);
+  });
+});
+
+describe("reloading the Outbox", () => {
+  beforeEach(() => outboxView("#view=outbox"));
+
+  it("reads the words of the facets the reload serves", async () => {
+    const where = () => lensFields("outbox").find((f) => f.id === "where")!;
+    expect(where().show).toBeUndefined();
+    const next = fixture("outbox-page.json");
+    next.facets.find((f: J) => f.id === "where").labels = { "acme/api": "The API" };
+    net.fetch = async () => new Response(JSON.stringify(next), { status: 200 });
+    await loadOutbox("outbox");
+    expect(where().show!("acme/api")).toBe("The API");
   });
 });
 

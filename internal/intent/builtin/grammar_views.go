@@ -1,6 +1,9 @@
 package builtin
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // The layouts a view is drawn in.
 const (
@@ -115,13 +118,19 @@ const (
 )
 
 // draftFacetsGrammar is the keys of draft_facets: those of facets, over draft facts.
-var draftFacetsGrammar = func() []Key {
+var draftFacetsGrammar = draftFacetsOf(viewsGrammar)
+
+// notReadByDrafts are the facet keys only a task's row reads, by name: a draft's card shows no facet.
+var notReadByDrafts = []string{"show", "show_values", "show_when", "show_when.*", "show_max", "show_label", "label_prefix", "strip", "colors", "colors.*"}
+
+// draftFacetsOf are the keys of draft_facets the facets keys among keys give.
+func draftFacetsOf(keys []Key) []Key {
 	var out []Key
-	for _, k := range viewsGrammar {
-		rest, ok := strings.CutPrefix(k.Path, "facets")
-		if !ok {
+	for _, k := range keys {
+		if k.Path != "facets" && !strings.HasPrefix(k.Path, "facets.") {
 			continue
 		}
+		rest := strings.TrimPrefix(k.Path, "facets")
 		k.Path = "draft_facets" + rest
 		switch k.Path {
 		case "draft_facets":
@@ -137,7 +146,10 @@ var draftFacetsGrammar = func() []Key {
 		case "draft_facets.*.units":
 			k.Doc = "Not read: a draft sits on one unit."
 		}
+		if name, ok := strings.CutPrefix(k.Path, "draft_facets.*."); ok && slices.Contains(notReadByDrafts, name) {
+			k.Doc = "Not read: a draft's card shows no facet's values."
+		}
 		out = append(out, k)
 	}
 	return out
-}()
+}

@@ -358,13 +358,13 @@ export const NO_GROUP = "none";
 
 const lensMemo: { fields: Field[] | null; viewsCat: J; tasks: Field[] | null; offered: { key: unknown[]; fields: Field[] } | null } = { fields: null, viewsCat: null, tasks: null, offered: null };
 
-const outboxMemo = { key: "", fields: [] as Field[] };
+const outboxMemo = { specs: null as J[] | null, fields: [] as Field[] };
 
-// outboxFields are the fields of the Outbox's lens: its page's draft facets.
+// outboxFields are the fields of the Outbox's lens: its page's draft facets, read again when the page holds other
+// specs, which loadOutbox gives it only when the served ones changed.
 export function outboxFields(page: J): Field[] {
-  const specs: J[] = (page && page.facets) || [];
-  const key = JSON.stringify(specs);
-  if (key !== outboxMemo.key) Object.assign(outboxMemo, { key, fields: specs.map(fieldOf) });
+  const specs: J[] | null = (page && page.facets) || null;
+  if (specs !== outboxMemo.specs) Object.assign(outboxMemo, { specs, fields: (specs || []).map(fieldOf) });
   return outboxMemo.fields;
 }
 

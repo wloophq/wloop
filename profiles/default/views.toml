@@ -312,10 +312,8 @@ merge    = "rows-first"
 show     = "meta"
 show_max = 2
 
-# The draft facets: the fields the Outbox filters, groups and sorts drafts by, each over a draft.* fact. A
-# facet shares its id with the task facet of the same meaning, so a qualifier such as where:acme/api reads
-# the same in every view. A proposer's, a workflow's and a draft kind's words come from where each is declared:
-# the intent, the workflow and the plugin.
+# The draft facets: the fields the Outbox filters, groups and sorts drafts by, each over a draft.* fact. Give
+# one the id of the task facet of the same meaning, so a qualifier such as where:acme/api reads alike.
 [draft_facets.proposer]
 fact  = "draft.proposer"
 label = "Proposed by"

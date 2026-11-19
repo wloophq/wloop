@@ -103,9 +103,7 @@ describe("the review", () => {
 describe("the Review's Outbox step", () => {
   beforeEach(() => {
     resetStore(NOW, "#view=review");
-    const views = fixture("views.json");
-    views.views = views.views.map((v: J) => (v.id === "outbox" ? { ...v, layout: "outbox" } : v));
-    useCatalogs(fixture("catalog.github.json"), views);
+    useCatalogs(fixture("catalog.github.json"), fixture("views.json"));
     I18N.strings = { "{n} draft": { one: "{n} draft", other: "{n} drafts" } };
     reviewState.review = { steps: [{ id: "outbox", view: "outbox", label: "Outbox", count: 4, done: false }] };
     reviewState.step = "outbox";

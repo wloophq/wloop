@@ -53,16 +53,19 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		where := rowWhere(l.Views.DraftFacets, rows[p.Draft.Unit].Row.Facets)
+		where, err := ev.draftWhere(ctx, l.Views.DraftFacets, p.Draft.Unit, rows[p.Draft.Unit].Row.Facets)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		people := mentioned(p.Draft.Text, d.Names)
 		facts := draftViewFacts(p.Draft, s.publisherOf(p.Draft), where, people)
-		facets := catalog.FactFacets(l.Views.DraftFacets, facts)
-		if len(facets) == 0 {
-			facets = nil
-		}
-		listed = append(listed, faced{api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(append([]string{d.Text, d.Label, d.Title, d.Where, where}, people...)...)}, facts})
+		listed = append(listed, faced{api.OutboxDraft{Draft: d, Context: c, Facets: catalog.FactFacets(l.Views.DraftFacets, facts), Texts: draftTexts(append([]string{d.Text, d.Label, d.Title, d.Where, where}, people...)...)}, facts})
 	}
-	_ = catalog.SortBy(l.Views, outboxView(l.Views, r.URL.Query().Get("view")), listed, func(f faced) (workflow.Facts, error) { return f.facts, nil })
+	if err := catalog.SortBy(l.Views, outboxView(l.Views, r.URL.Query().Get("view")), listed, func(f faced) (workflow.Facts, error) { return f.facts, nil }); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	out := make([]api.OutboxDraft, 0, len(listed))
 	for _, f := range listed {
 		out = append(out, f.draft)

@@ -98,7 +98,7 @@ A draft's action reads the facts of the `draft_action` slot; a draft facet of `v
 |---|---|---|---|
 | `draft.workflow` | string | draft_view | The workflow behind the draft, a turn's draft included; empty for a draft no workflow is behind. |
 | `draft.kind` | string | draft_view | The draft's kind as its plugin's manifest names it, such as review, thread_reply or nudge. |
-| `draft.where` | string | draft_view | Where the draft's unit is, as its row gives it, a repository or a channel; empty when the row gives none. |
+| `draft.where` | string | draft_view | Where the draft's unit is, as its row gives it, a repository or a channel; for a draft on a task whose row gives none, the task's value of the task facet of the same id, such as its placement; empty when neither gives one. |
 | `draft.people` | list | draft_view | The people the draft is to or mentions, each by the name its plugin resolves the mention to, else by the mention key, such as slack:U0123. |
 | `draft.created_at` | timestamp | draft_view | When the draft was written. Zero when unset; test with `> timestamp(0)`. |
 | `draft.state` | string | draft_action, draft_view | The draft's state. |

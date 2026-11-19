@@ -193,10 +193,15 @@ export async function loadQueue(): Promise<void> {
 
 export const OUTBOX_PATH = "/api/outbox";
 
-// loadOutbox reads the Outbox as view, an outbox view, orders it.
+// loadOutbox reads the Outbox as view, an outbox view, orders it. The page takes new facet specs only when the
+// served ones changed, so the lens reads its fields again only then.
 export async function loadOutbox(view: string): Promise<void> {
   try {
-    put(outboxState, "page", await getJSON(OUTBOX_PATH + "?" + new URLSearchParams({ view })));
+    const next = await getJSON(OUTBOX_PATH + "?" + new URLSearchParams({ view }));
+    const facets = (outboxState.page || {}).facets;
+    const same = JSON.stringify(facets) === JSON.stringify(next.facets);
+    put(outboxState, "page", { ...next, facets: same ? facets : null });
+    if (!same) outboxState.page.facets = next.facets;
     outboxState.error = "";
   } catch (err) {
     outboxState.error = t("Could not load the Outbox: {error}", { error: (err as Error).message });

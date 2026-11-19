@@ -103,6 +103,31 @@ func TestDefaultProfileDraftFacets(t *testing.T) {
 					t.Errorf("intent %s has no outbox title", name)
 				}
 			}
+			if l.Gates.Drafts.BySession == "" || l.Gates.Drafts.BySessionAbout == "" {
+				t.Error("the drafts a session wrote have no words")
+			}
 		})
+	}
+}
+
+func TestDefaultProfileWordsTheOutboxInPortuguese(t *testing.T) {
+	en, problems := loadProfile(t, "en", nil)
+	if len(problems) != 0 {
+		t.Fatalf("problems %v", problems)
+	}
+	pt, problems := loadProfile(t, "pt-BR", nil)
+	if len(problems) != 0 {
+		t.Fatalf("problems %v", problems)
+	}
+	enReview, _ := en.Registry.Get(dintent.Review)
+	ptReview, _ := pt.Registry.Get(dintent.Review)
+	for _, c := range []struct{ name, en, pt string }{
+		{"review's outbox about", enReview.Outbox.About, ptReview.Outbox.About},
+		{"drafts.by_hand", en.Gates.Drafts.ByHand, pt.Gates.Drafts.ByHand},
+		{"drafts.by_session", en.Gates.Drafts.BySession, pt.Gates.Drafts.BySession},
+	} {
+		if c.pt == "" || c.pt == c.en {
+			t.Errorf("pt-BR %s is %q, want a translation of %q", c.name, c.pt, c.en)
+		}
 	}
 }
