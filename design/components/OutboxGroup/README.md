@@ -1,6 +1,6 @@
 # OutboxGroup
 
-One group of the Outbox: the drafts one workflow proposed, or those of one purpose no workflow proposed, or those written by hand, each drawn as a [GateCard](../GateCard/README.md) draft. `Outbox.svelte` (`internal/web/ui/src/components/screens/`) draws it for a view whose `layout` is `outbox`, from `GET /api/outbox`.
+One group of the Outbox: the drafts that hold one value of the facet the lens groups by (by default who proposed them: a workflow, an intent, a rule or your own hand), each drawn as a [GateCard](../GateCard/README.md) draft. `DraftList.svelte` (`internal/web/ui/src/components/screens/`) draws it for a view whose `layout` is `outbox` and for the Review's step of that view, from `GET /api/outbox`. With the lens grouping by nothing, the drafts sit in one group without a head.
 
 ## Anatomy
 
@@ -10,17 +10,17 @@ A `section.ob-group`, its groups `space-24` apart:
 - one line on why the group exists (`ob-about`, `muted`, `text-meta`), when the profile has one;
 - a draft card per draft (`draftCard(null, d, { scope: "outbox", context })`), whose `d-context` block, above where it posts, shows the asks of its task with their quotes on a quote bar, and the items it is about, each with its state in a `mono` tag.
 
-**Stop drafting these** shows only on a workflow's group. Pressed, it turns into an inline pair, **Stop this workflow** (`primary`) and **Keep it**; only the first posts `POST /api/workflows/<name>/disable`. No browser dialog.
+**Stop drafting these** shows only on a group whose head names a workflow. Pressed, it turns into an inline pair, **Stop this workflow** (`primary`) and **Keep it**; only the first posts `POST /api/workflows/<name>/disable`. No browser dialog.
 
 Motion: a card's border answers focus within it over `motion-fast`; nothing moves on its own.
 
 ## Consumer provides
 
-The page as `GET /api/outbox` serves it: groups, the largest first, each with its `workflow` or `purpose`, `title` and `about` in the served locale (a workflow's `[outbox]` texts, gates.toml's `[drafts]` words), and its drafts with their `context` (`asks`, `items`). The catalog's `draft_purposes`, `draft_states` and `effects` for the cards.
+The page as `GET /api/outbox` serves it: its drafts, each with its `facets`, its search `texts` and its `context` (`asks`, `items`); the draft facets' specs, which the lens reads as its fields; and `heads`, by facet and value, each with a `title`, an `about` and the `workflow` behind it in the served locale (a workflow's `[outbox]` texts, an intent's, gates.toml's `[drafts]` words, a plugin's kind words). A value without a head is named by its facet's `labels`, else as served. The catalog's `draft_purposes`, `draft_states` and `effects` for the cards.
 
 ## Do / don't
 
 - Do take every title and line from the page; never word a group in the client.
-- Do keep the daemon's order of groups and of drafts inside a group.
+- Do keep the daemon's order of drafts until the lens picks a sort, and order groups as the lens orders them.
 - Don't post the disable before the inline confirm, and don't use `confirm()`.
-- Don't offer **Stop drafting these** on a purpose's group or on the hand-written one: no workflow stands behind them.
+- Don't offer **Stop drafting these** on a group whose head names no workflow: none stands behind it.

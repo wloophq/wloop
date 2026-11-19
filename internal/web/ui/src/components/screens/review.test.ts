@@ -9,7 +9,6 @@ import { nav } from "../../state/route.svelte";
 import { outboxState, reviewState, tasksState } from "../../state/store.svelte";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, task, useCatalogs } from "../rows/testdata/fixtures";
-import Outbox from "./Outbox.svelte";
 import TaskViewPage from "./TaskViewPage.svelte";
 import { reviewKey } from "./review";
 
@@ -101,52 +100,36 @@ describe("the review", () => {
   });
 });
 
-describe("the Outbox", () => {
+describe("the Review's Outbox step", () => {
   beforeEach(() => {
-    resetStore(NOW, "#view=outbox");
-    useCatalogs();
+    resetStore(NOW, "#view=review");
+    const views = fixture("views.json");
+    views.views = views.views.map((v: J) => (v.id === "outbox" ? { ...v, layout: "outbox" } : v));
+    useCatalogs(fixture("catalog.github.json"), views);
     I18N.strings = { "{n} draft": { one: "{n} draft", other: "{n} drafts" } };
+    reviewState.review = { steps: [{ id: "outbox", view: "outbox", label: "Outbox", count: 4, done: false }] };
+    reviewState.step = "outbox";
   });
 
-  it("draws one card per draft under its group", () => {
-    const c = render(Outbox, { page: fixture("outbox-page.json") }).container;
-    const marks = ["ob-title", "ob-n", "ob-about", "ob-workflow", "d-draft"];
-    const order = Array.from(c.querySelectorAll("*")).filter((x) => marks.some((m) => x.classList.contains(m)))
-      .map((x) => (x.getAttribute("data-draft") ? "card " + x.getAttribute("data-draft") : x.textContent));
-    expect(order).toEqual(["Ask who hasn't answered", "2 drafts", "fake-nudge", "Drafted when a conversation where you asked something goes quiet.", "card 7", "card 8", "Written by hand", "1 draft", "card 9"]);
-    expect(Array.from(c.querySelectorAll(".d-draft")).map((d) => d.querySelectorAll(".d-context").length)).toEqual([1, 0, 0]);
-  });
-
-  it("stops drafting a workflow once its inline confirm is pressed", async () => {
-    const posts: J[] = [];
-    net.fetch = async (url: string, init?: RequestInit) => {
-      posts.push({ path: url, body: JSON.parse(String(init && init.body)) });
-      return new Response("{}", { status: 200 });
+  it("reads the Outbox with the step's tasks", async () => {
+    const gets: string[] = [];
+    net.fetch = async (url: string) => {
+      gets.push(url);
+      return new Response(JSON.stringify(url === "/api/outbox" ? fixture("outbox-page.json") : { tasks: [] }), { status: 200 });
     };
-    const c = render(Outbox, { page: fixture("outbox-page.json") }).container;
-    const buttons = () => Array.from(c.querySelectorAll(".ob-stop button")).map((b) => b.getAttribute("data-focus"));
-    expect(buttons()).toEqual(["outbox:stop:fake-nudge"]);
-    await fireEvent.click(c.querySelector('[data-focus="outbox:stop:fake-nudge"]')!);
-    expect(buttons()).toEqual(["outbox:stop-confirm:fake-nudge", "outbox:stop-cancel:fake-nudge"]);
-    expect(posts).toEqual([]);
-    await fireEvent.click(c.querySelector('[data-focus="outbox:stop-cancel:fake-nudge"]')!);
-    expect(buttons()).toEqual(["outbox:stop:fake-nudge"]);
-    await fireEvent.click(c.querySelector('[data-focus="outbox:stop:fake-nudge"]')!);
-    await fireEvent.click(c.querySelector('[data-focus="outbox:stop-confirm:fake-nudge"]')!);
-    await new Promise((r) => setTimeout(r, 0));
-    expect(posts).toEqual([{ path: "/api/workflows/fake-nudge/disable", body: { source: "cockpit" } }]);
-    expect(outboxState.confirming).toBe("");
+    await loadReviewStep();
+    expect(gets).toEqual(["/api/tasks?view=outbox", "/api/outbox"]);
+    expect(outboxState.page.drafts.map((d: J) => d.id)).toEqual([10, 9, 8, 7]);
   });
 
-  it("keeps each card's node across a reload", () => {
+  it("draws the Outbox's list, grouped by who proposed each draft", () => {
+    tasksState.key = "review|outbox";
+    tasksState.tasks = [];
     outboxState.page = fixture("outbox-page.json");
-    const c = render(Outbox, { page: outboxState.page }).container;
-    const card = c.querySelector('[data-draft="8"]');
-    const next = fixture("outbox-page.json");
-    next.groups[0].drafts[1].text = "Still waiting?";
-    outboxState.page.groups = next.groups;
-    flushSync();
-    expect(card).not.toBeNull();
-    expect(c.querySelector('[data-draft="8"]')).toBe(card);
+    const c = render(TaskViewPage).container;
+    const list = c.querySelector("#tasks-body .outbox")!;
+    expect(Array.from(list.querySelectorAll(".ob-title")).map((n) => n.textContent)).toEqual(["Reviews", "Written by hand", "Ask who hasn't answered"]);
+    expect(Array.from(list.querySelectorAll("[data-draft]")).map((n) => n.getAttribute("data-draft"))).toEqual(["10", "9", "8", "7"]);
+    expect(list.querySelectorAll(".ob-stop button").length).toBe(1);
   });
 });

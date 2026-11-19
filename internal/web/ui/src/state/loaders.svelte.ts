@@ -1,4 +1,5 @@
-import { applyCatalog, applyPlugins, isCoreView, REVIEW, specsStale, viewLabel, viewSpec } from "../lib/catalog";
+import { applyCatalog, applyPlugins, isCoreView, REVIEW, specsStale, viewLabel } from "../lib/catalog";
+import { isOutboxView } from "../lib/drafts";
 import { t } from "../lib/i18n.svelte";
 import { fieldOf, viewQueryKey } from "../lib/lens";
 import { keyUnit, PLAN, QUEUE_LIST, readRoute, RECENT, type Route, unitPath, EXPLORE, HOME, QUEUE } from "../lib/routes";
@@ -191,8 +192,6 @@ export async function loadQueue(): Promise<void> {
 }
 
 export const OUTBOX_PATH = "/api/outbox";
-// OUTBOX_LAYOUT is the served layout of a view the Outbox draws, whatever the view's id.
-export const OUTBOX_LAYOUT = "outbox";
 
 export async function loadOutbox(): Promise<void> {
   try {
@@ -339,7 +338,7 @@ async function loadTaskList(route: Hash): Promise<void> {
     tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
     return;
   }
-  if ((viewSpec(route.view) || {}).layout === OUTBOX_LAYOUT) await loadOutbox();
+  if (isOutboxView(route.view)) await loadOutbox();
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -396,7 +395,9 @@ export async function loadReviewStep(): Promise<void> {
     tasksState.error = "";
   } catch (err) {
     tasksState.error = t("Could not load the {step} step: {error}", { step: step.label, error: (err as Error).message });
+    return;
   }
+  if (isOutboxView(step.view)) await loadOutbox();
 }
 
 export function taskPath(id: string, ...rest: string[]): string {
