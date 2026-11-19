@@ -358,7 +358,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `views.<name>.hide_disabled` (bool, default `false`): The view hides the tasks whose units are all of a disabled plugin, and the gates on a disabled plugin's units.
 - `views.<name>.rail` (bool, default `true`): The rail lists the view; false keeps it for the home, a queue or search.
 - `views.<name>.remove_clean` (bool, default `false`): The view offers to remove at once the workspaces its tasks' links hold whose checkouts hold nothing that is not published, as each link's remove action does; the rest are kept, with why.
-- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists.
+- `views.<name>.layout` (one of `list`, `board`, `outbox`, default `list`): How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists.
 - `badge` (table): The menu bar's badge.
 - `badge.views` (list of strings): The views whose counts the badge adds up, each a view of views.
 - `review` (table): The review's steps, in the order the review walks them.
@@ -390,7 +390,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft_facets.<name>.show_when.<name>` (list of strings): The values one facet must hold.
 - `draft_facets.<name>.show_max` (integer): How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.
 - `draft_facets.<name>.show_label` (template, localized): For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.
-- `draft_facets.<name>.empty` (string, localized): What a group of tasks with no value shows.
+- `draft_facets.<name>.empty` (string, localized): What a group of drafts with no value shows.
 - `draft_facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
 - `draft_facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
 - `draft_facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
@@ -405,8 +405,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft_facets.<name>.buckets.<name>` (table): A bucket, by its id.
 - `draft_facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
 - `draft_facets.<name>.buckets.<name>.label` (string, localized): The text people read; the id when absent.
-- `draft_facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.
-- `draft_facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
+- `draft_facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): Not read: a draft has one value of its fact, so nothing joins.
+- `draft_facets.<name>.units` (one of `all`, `primary`, default `all`): Not read: a draft sits on one unit.
 - `lens.age_now` (template, localized): A row's age under a minute.
 - `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
 - `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
@@ -492,14 +492,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `effects` (table by name): What sending a draft does besides posting it, one sentence per effect, by effect name; a draft's card shows the sentences of the effects it carries. A user layer sets only the effects it names; an empty sentence takes a lower layer's off.
 - `effects.<name>` (string, localized): The sentence, such as "The task is marked as nudged."; the key is an effect a draft may carry.
 - `drafts` (table): The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.
-- `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.
+- `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer.
 - `drafts.by_hand_about` (string, localized): One line under that title.
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
 - `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
 - `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.
 - `drafts.authors` (table by name): Who wrote a draft's current content, by author, as its card says it; an author with no words shows nothing.
 - `drafts.authors.<name>` (string, localized): The author's words, such as "Revised by an agent"; the key is person, session, rule or window.
-- `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
+- `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
 - `drafts.rules` (table by name): What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own.
 - `drafts.rules.<name>` (string, localized): The rule's word, such as "Nudge".

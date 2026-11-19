@@ -90,7 +90,9 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `workspace.name` | string | name | The name of the worktree created for the unit; empty when the turn creates none or before it is named. |
 | `session.started` | timestamp | name | When the session starts; a template formats it with Go's layout, as {{.session.started.Format "02/01 15:04"}}. Zero when unset; test with `> timestamp(0)`. |
 
-### A draft's actions (`draft.*`)
+### A draft's facts (`draft.*`)
+
+A draft's action reads the facts of the `draft_action` slot; a draft facet of `views.toml`'s `[draft_facets]`, and the Outbox view's `group` and `sort`, read those of `draft_view`. `draft.proposer` and `draft.delivery` are in [the draft approval facts](#draft-approval-facts).
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|

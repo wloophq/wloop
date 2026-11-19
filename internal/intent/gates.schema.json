@@ -67,7 +67,7 @@
           "type": "object"
         },
         "by_hand": {
-          "description": "The title of the Outbox's group of the drafts no workflow proposed and no purpose names: those written by hand.",
+          "description": "The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer.",
           "type": "string"
         },
         "by_hand_about": {
@@ -83,7 +83,7 @@
             "description": "The purpose's word, such as \"Nudge\".",
             "type": "string"
           },
-          "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.",
+          "description": "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head. A purpose with no word shows as it is named.",
           "type": "object"
         },
         "quoted": {

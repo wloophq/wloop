@@ -61,7 +61,7 @@
             "type": "object"
           },
           "empty": {
-            "description": "What a group of tasks with no value shows.",
+            "description": "What a group of drafts with no value shows.",
             "type": "string"
           },
           "fact": {
@@ -99,7 +99,7 @@
           },
           "merge": {
             "default": "union",
-            "description": "How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.",
+            "description": "Not read: a draft has one value of its fact, so nothing joins.",
             "enum": [
               "union",
               "rows-first",
@@ -172,7 +172,7 @@
           },
           "units": {
             "default": "all",
-            "description": "Which of a task's units contribute rows' values: all of them, or the primary unit alone.",
+            "description": "Not read: a draft sits on one unit.",
             "enum": [
               "all",
               "primary"
@@ -755,7 +755,7 @@
           },
           "layout": {
             "default": "list",
-            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts grouped by the workflow or purpose that proposed them, read from the Outbox's own route whatever the view lists.",
+            "description": "How the cockpit draws the view: list, its rows; board, a lane per group, which a person may switch back to the list; outbox, the Outbox's drafts, which the lens filters, groups and sorts over the `draft_facets` and the view's own `group` and `sort` (draft facts), read from the Outbox's own route whatever the view lists.",
             "enum": [
               "list",
               "board",
