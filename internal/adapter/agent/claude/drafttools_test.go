@@ -10,7 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/transport/mcp"
 )
 
-// writeTools are the tools the bundled manifests mark proposes = true, as an agent calls them.
+// writeTools are the tools the bundled manifests mark writes = true, as an agent calls them.
 func writeTools(t *testing.T) (proposes, others []string) {
 	t.Helper()
 	ms, err := bundled.Manifests()
