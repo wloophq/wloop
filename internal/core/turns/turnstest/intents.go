@@ -13,7 +13,7 @@ func Intents() *dintent.Registry {
 			Record: dintent.RecordRules{
 				States: []string{"done", "settled", "asked", "failed"}, Missing: "missing-record", Artifacts: []string{"review-draft"}, Outcome: []string{"verdict", "url", "draft"},
 				Verdicts: []string{"APPROVE", "REQUEST_CHANGES", "COMMENT"}, Concludes: []string{"APPROVE"},
-				OutcomeDoc: "`outcome`: on `done` and on `asked`, the `verdict` your review draft\n  posts, `blocking` and `non_blocking`, and on `done` the `draft` you\n  proposed (its `id` and `rev`); leave `url` out: it is filled when the\n  draft is posted.",
+				OutcomeDoc: "`outcome`: on `done` and on `asked`, the `verdict` your review draft\n  posts, `blocking` and `non_blocking`, and on `done` the `draft` you\n  wrote (its `id` and `rev`); leave `url` out: it is filled when the\n  draft is posted.",
 				Require: []dintent.Require{
 					{State: "done", Fields: []string{"verdict", "url"}},
 					{State: "asked", Artifact: "review-draft", Fields: []string{"verdict"}},
@@ -24,15 +24,15 @@ func Intents() *dintent.Registry {
 		{Name: dintent.Nudge, Role: "pr.nudge", UserFacing: true, Session: dintent.Session{Title: "nudge", CloseWhenDone: true, NoSourceWrites: true},
 			Record: dintent.RecordRules{
 				States: []string{"done", "failed"}, Outcome: []string{"url", "draft"},
-				OutcomeDoc: "`outcome` (done): `draft`, the `id` and `rev` of the comment you proposed; leave `url` out: it is filled when the draft is posted.",
+				OutcomeDoc: "`outcome` (done): `draft`, the `id` and `rev` of the comment you drafted; leave `url` out: it is filled when the draft is posted.",
 				Require:    []dintent.Require{{State: "done", Fields: []string{"url"}}},
 			}},
 		{Name: dintent.Probe, Role: "probe", Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Missing: "missing-record"}},
 		{Name: dintent.Act, Role: "headless", UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Runners: []string{"headless", "session"}, Verb: "delegate",
 			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Missing: "missing-record"}},
 		{Name: "start", UserFacing: true, Answerable: true, Provider: "task", Session: dintent.Session{Title: "start"},
-			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Outcome: []string{"url"},
-				OutcomeDoc: "`outcome` (done): `url`, the pull request you opened or the message you posted.", AttachURL: true,
+			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Outcome: []string{"url", "draft"},
+				OutcomeDoc: "`outcome` (done): `url`, the pull request you opened, or `draft`, the `id` and `rev` of the message you wrote; its url is filled once it is posted.", AttachURL: true,
 				Requires: "report", Missing: "missing-record"}},
 		{Name: "chat", UserFacing: true, Answerable: true, Provider: "task", Runners: []string{"session"}, Session: dintent.Session{Title: "chat"},
 			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Outcome: []string{"url"},

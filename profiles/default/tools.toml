@@ -168,7 +168,7 @@ description = "Revise a draft an agent wrote on your turn's unit, or wrote from 
 
 [draft_update.answers]
 refused = "draft_update refused: {{.Error}}."
-bad_arguments = "Nothing was revised: the arguments are an object with id, rev, and text, payload or basis{{with .Error}} ({{.}}){{end}}."
+bad_arguments = "Nothing was revised: the arguments are an object with id and rev, and text, payload, basis or draft{{with .Error}} ({{.}}){{end}}."
 fix_these = """Nothing was revised; fix these and call draft_update again:
 {{.Problems}}"""
 updated = """Revised draft {{.ID}}; it waits for the user{{with .Link}}, at {{.}}{{end}}:

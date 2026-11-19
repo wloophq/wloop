@@ -47,8 +47,8 @@ line = 'Start the work {{.unit.ref}} describes, {{template "started_by" .}}.'
 
 [record]
 states      = ["done", "asked", "failed"]
-outcome     = ["url"]
+outcome     = ["url", "draft"]
 attach_url  = true
 requires    = "report"
 missing     = "missing-record"
-outcome_doc = "`outcome` (done): `url`, the pull request you opened or the message you posted."
+outcome_doc = "`outcome` (done): `url`, the pull request you opened, or `draft`, the `id` and `rev` of the message you wrote; its url is filled once it is posted."
