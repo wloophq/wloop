@@ -36,9 +36,9 @@ type GatesDef struct {
 	Drafts DraftWords
 }
 
-// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts written by
-// hand, BySession and BySessionAbout that of the drafts a session wrote with no intent, Purposes name a purpose, States a delivery state and Reasons why a
-// dropped draft was withdrawn, by its id.
+// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts written
+// by hand, BySession and BySessionAbout that of the drafts a session wrote with no intent, Purposes name a
+// purpose, States a delivery state and Reasons why a dropped draft was withdrawn, by its id.
 type DraftWords struct {
 	ByHand, ByHandAbout       string
 	BySession, BySessionAbout string
