@@ -44,19 +44,35 @@ func (ev *taskViewer) draftWhere(ctx context.Context, defs []intentload.FacetDef
 	if !ok || ev.g == nil {
 		return "", nil
 	}
-	e, ok, err := ev.taskOf(ctx, tid)
-	if err != nil || !ok {
-		return "", err
+	facets, err := ev.taskFacetsOf(ctx, tid)
+	if vs := facets[id]; len(vs) > 0 {
+		return vs[0], err
+	}
+	return "", err
+}
+
+// taskFacetsOf are the facets of the task id as its view joins them, read once per page; none for a task that
+// does not exist.
+func (ev *taskViewer) taskFacetsOf(ctx context.Context, id task.ID) (map[string][]string, error) {
+	if facets, ok := ev.taskFacets[id]; ok {
+		return facets, nil
+	}
+	e, ok, err := ev.taskOf(ctx, id)
+	if err != nil {
+		return nil, err
 	}
 	var v api.TaskView
-	if err := ev.row(ctx, e, &v); err != nil {
-		return "", err
+	if ok {
+		if err := ev.row(ctx, e, &v); err != nil {
+			return nil, err
+		}
+		ev.facets(ctx, e, &v)
 	}
-	ev.facets(ctx, e, &v)
-	if vs := v.Facets[id]; len(vs) > 0 {
-		return vs[0], nil
+	if ev.taskFacets == nil {
+		ev.taskFacets = map[task.ID]map[string][]string{}
 	}
-	return "", nil
+	ev.taskFacets[id] = v.Facets
+	return v.Facets, nil
 }
 
 // mentioned are the people text mentions, each once: the name names gives a mention key, else the key.

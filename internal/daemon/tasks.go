@@ -888,6 +888,8 @@ type taskViewer struct {
 	refs map[task.ID]taskRef
 	// items are the items of the units the page's drafts are on, each unit's read once.
 	items map[unit.Unit][]items.Item
+	// taskFacets are the facets of the tasks the page's drafts are on, each task's read once.
+	taskFacets map[task.ID]map[string][]string
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 	// as is who the page is for, whose verbs it offers.

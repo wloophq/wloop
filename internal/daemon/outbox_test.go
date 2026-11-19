@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -437,5 +438,33 @@ func TestADraftOnATaskIsWhereItsTaskIs(t *testing.T) {
 		if got := d.Facets["where"]; !slices.Equal(got, want[d.ID]) {
 			t.Errorf("draft %d (%s) is where %v, want %v", d.ID, d.Text, got, want[d.ID])
 		}
+	}
+}
+
+func TestTheOutboxReadsATasksRowOnceForItsDrafts(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	var mu sync.Mutex
+	read := map[task.ID]int{}
+	r.s.deps.Row = func(_ context.Context, e task.Task) (catalog.Row, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		read[e.ID]++
+		return catalog.Row{Facets: map[string][]string{"where": {"acme/infra"}}}, nil
+	}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "placed"})
+	for _, key := range []string{"a", "b", "c"} {
+		r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Text: "draft " + key, State: draft.Held, Origin: draft.Origin{Kind: draft.OriginUser, Key: key}})
+	}
+	for _, d := range r.outboxPage(t).Drafts {
+		if got := d.Facets["where"]; !slices.Equal(got, []string{"acme/infra"}) {
+			t.Errorf("draft %d is where %v, want its task's", d.ID, got)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if read["e1"] != 1 {
+		t.Errorf("the task's row was read %d times for its 3 drafts, want once", read["e1"])
 	}
 }
