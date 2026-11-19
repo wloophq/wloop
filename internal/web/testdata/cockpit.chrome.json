@@ -4327,7 +4327,7 @@
   "Include done": "Incluir concluídos",
   "Intake {seq} ({intent}) waits for the brief": "A entrada {seq} ({intent}) espera o brief",
   "Intake {seq} ({intent}) waits for the brief, attempt {attempt}": "A entrada {seq} ({intent}) espera o brief, tentativa {attempt}",
-  "It changed since the question pinned it and is now at rev {rev}: below is what it says now.": "Ele mudou desde que a pergunta o fixou e está na revisão {rev}: abaixo está o que ele diz agora.",
+  "It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.": "Ele mudou desde que a pergunta o fixou e está na revisão {rev}; escolher esta opção posta o que ele diz agora.",
   "Items": "Itens",
   "Keep it": "Manter",
   "Kept {n} with details": {
@@ -4579,6 +4579,7 @@
   "Yesterday": "Ontem",
   "Your answer": "Sua resposta",
   "Your answer is queued": "Sua resposta está na fila",
+  "Your edit posts when you pick this option and answer.": "Sua edição é postada quando você escolhe esta opção e responde.",
   "Your reply": "Sua resposta",
   "Zoom": "Zoom",
   "a duration such as {example}": "uma duração como {example}",

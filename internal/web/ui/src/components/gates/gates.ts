@@ -70,8 +70,29 @@ export function pickOption(g: J, id: string): void {
   gateState.picked.set(String(g.id), gateOption(g) === id ? "" : id);
 }
 
+// pinKey is the key the edits of pinned draft id live under on its question's card.
+export function pinKey(id: number | string): string {
+  return "pin:" + id;
+}
+
+// pinnedOf is the draft option pick of g pins, as the card shows it now; null when it pins none.
+export function pinnedOf(g: J, pick: string): J {
+  const subject = subjectOf(g);
+  const option = (subject.options || []).find((o: J) => o.id === pick);
+  if (!option || !option.draft) return null;
+  return (subject.pinned || []).find((d: J) => d.id === option.draft.id) || null;
+}
+
+// pinArgs are what a pick of the option pinning d sends: the rev the person sees and, while they edit it, its text
+// and fields as edited.
+function pinArgs(d: J): Record<string, string> {
+  const key = pinKey(d.id);
+  return { rev: String(d.rev), ...(editing.has(key) ? { ...editedText(d, key), ...editedPayload(d, key) } : {}) };
+}
+
 // resolveGate resolves gate g of task e with intent id; an intent that takes an answer sends the option given,
-// else the one picked on the card, then the text typed in it.
+// else the one picked on the card, then the text typed in it, and, when the option pins a draft, the draft's rev as
+// the card shows it and the person's edit of it.
 export async function resolveGate(e: J, g: J, id: string, option?: string): Promise<J> {
   const intent = (g.intents || []).find((x: J) => x.id === id);
   if (!intent) return null;
@@ -85,6 +106,8 @@ export async function resolveGate(e: J, g: J, id: string, option?: string): Prom
       return null;
     }
     args.answer = [pick, text].filter(Boolean).join("\n");
+    const pinned = pick ? pinnedOf(g, pick) : null;
+    if (pinned) Object.assign(args, pinArgs(pinned));
   }
   const mark = "gate:" + g.id;
   resolving.set(mark, gateMark(g));
@@ -93,6 +116,7 @@ export async function resolveGate(e: J, g: J, id: string, option?: string): Prom
     setNotice(`${intent.label}: ${(e && (e.title || e.id)) || g.text || g.kind}`);
     gateState.answers.delete(key);
     gateState.picked.delete(key);
+    for (const d of subjectOf(g).pinned || []) stopEditing(pinKey(d.id));
     answered.add(mark);
     changed();
     return out || {};
