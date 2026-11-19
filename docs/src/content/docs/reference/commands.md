@@ -78,7 +78,7 @@ Resolve a unit's open items, replies as drafts.
 {{command}} act <url|ref|permalink|slack:key> [guidance...]
 ```
 
-Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
+Act on the open items of a unit without touching its code: settle what you can and draft the replies it needs for you to post; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
