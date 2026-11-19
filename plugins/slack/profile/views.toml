@@ -1,0 +1,6 @@
+# The words of the Slack plugin's provider in the core's source facets.
+[facets.source.values]
+slack = "Slack"
+
+[draft_facets.source.values]
+slack = "Slack"

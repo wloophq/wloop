@@ -106,6 +106,14 @@ func TestDefaultProfileDraftFacets(t *testing.T) {
 			if l.Gates.Drafts.BySession == "" || l.Gates.Drafts.BySessionAbout == "" {
 				t.Error("the drafts a session wrote have no words")
 			}
+			for _, list := range [][]intent.FacetDef{l.Views.Facets, l.Views.DraftFacets} {
+				i := slices.IndexFunc(list, func(f intent.FacetDef) bool { return f.ID == "source" })
+				for _, id := range []string{"github", "slack"} {
+					if i < 0 || list[i].Values[id] == "" {
+						t.Errorf("source has no word for %s, which its plugin's layer gives", id)
+					}
+				}
+			}
 		})
 	}
 }
@@ -129,5 +137,27 @@ func TestDefaultProfileWordsTheOutboxInPortuguese(t *testing.T) {
 		if c.pt == "" || c.pt == c.en {
 			t.Errorf("pt-BR %s is %q, want a translation of %q", c.name, c.pt, c.en)
 		}
+	}
+}
+
+// TestAUserLayerWordsOneSourceValueAndKeepsThePluginsOthers checks that a layer's values of a facet join the
+// lower layers' by value, so a plugin layer or the user's words one value without dropping another layer's.
+func TestAUserLayerWordsOneSourceValueAndKeepsThePluginsOthers(t *testing.T) {
+	l, problems := loadProfile(t, "en", map[string]string{"views.toml": "[facets.source.values]\ngithub = \"Hub\"\n\n[draft_facets.source.values]\nslack = \"Chat\"\n"})
+	if len(problems) != 0 {
+		t.Fatalf("problems %v", problems)
+	}
+	words := func(list []intent.FacetDef) map[string]string {
+		i := slices.IndexFunc(list, func(f intent.FacetDef) bool { return f.ID == "source" })
+		if i < 0 {
+			t.Fatal("no source facet")
+		}
+		return list[i].Values
+	}
+	if w := words(l.Views.Facets); w["github"] != "Hub" || w["slack"] != "Slack" || w["session"] != "Session" {
+		t.Errorf("task source words %v", w)
+	}
+	if w := words(l.Views.DraftFacets); w["github"] != "GitHub" || w["slack"] != "Chat" {
+		t.Errorf("draft source words %v", w)
 	}
 }

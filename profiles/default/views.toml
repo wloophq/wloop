@@ -82,8 +82,6 @@ sort  = "text"
 show  = "meta"
 
 [facets.source.values]
-github    = "GitHub"
-slack     = "Slack"
 session   = "Session"
 workspace = "Workspace"
 task      = "Task"
@@ -338,10 +336,6 @@ fact  = "draft.provider"
 label = "Source"
 group = true
 sort  = "text"
-
-[draft_facets.source.values]
-github = "GitHub"
-slack  = "Slack"
 
 [draft_facets.where]
 fact  = "draft.where"

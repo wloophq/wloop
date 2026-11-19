@@ -184,7 +184,7 @@
               "description": "The text of one value.",
               "type": "string"
             },
-            "description": "The text people read for a value, by value.",
+            "description": "The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.",
             "type": "object"
           }
         },
@@ -409,7 +409,7 @@
               "description": "The text of one value.",
               "type": "string"
             },
-            "description": "The text people read for a value, by value.",
+            "description": "The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.",
             "type": "object"
           }
         },

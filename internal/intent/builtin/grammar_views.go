@@ -38,7 +38,7 @@ var viewsGrammar = []Key{
 	{Path: "facets.*.group", In: SurfaceViews, Kind: KindBool, Default: "false", Doc: "Whether a list can group by the facet."},
 	{Path: "facets.*.sort", In: SurfaceViews, Kind: KindEnum, Values: named("rank", "text", "time"), Doc: "How the facet's values order: by rank, as text, or as instants (time). Absent, as text."},
 	{Path: "facets.*.rank", In: SurfaceViews, Kind: KindList, Elem: KindText, Doc: "The facet's values in their order, first first."},
-	{Path: "facets.*.values", In: SurfaceViews, Kind: KindMap, Doc: "The text people read for a value, by value."},
+	{Path: "facets.*.values", In: SurfaceViews, Kind: KindMap, Doc: "The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`."},
 	{Path: "facets.*.values.*", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "The text of one value."},
 	{Path: "facets.*.label_prefix", In: SurfaceViews, Localized: true, Kind: KindText, Doc: "Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does."},
 	{Path: "facets.*.show", In: SurfaceViews, Kind: KindAny, Values: ShowParts, Doc: ShowDoc},

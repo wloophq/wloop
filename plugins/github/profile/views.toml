@@ -1,0 +1,6 @@
+# The words of the GitHub plugin's provider in the core's source facets.
+[facets.source.values]
+github = "GitHub"
+
+[draft_facets.source.values]
+github = "GitHub"

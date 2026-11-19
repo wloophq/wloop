@@ -234,10 +234,10 @@ type mBadge struct {
 	Views []string `toml:"views"`
 }
 
-// BundledViews is the views of the bundled profile alone.
-func BundledViews(bundled fs.FS) (ViewsDef, Problems) {
-	out, tasks, problems := loadViews(nil, readerOf(bundled), nil)
-	records, recordProblems := loadRecords(nil, readerOf(bundled), &tasks)
+// BundledViews is the views of the bundled profile with layers over it, none for the bundled profile alone.
+func BundledViews(bundled fs.FS, layers ...profile.Layer) (ViewsDef, Problems) {
+	out, tasks, problems := loadViews(layers, readerOf(bundled), nil)
+	records, recordProblems := loadRecords(layers, readerOf(bundled), &tasks)
 	return out, slices.Concat(problems, recordProblems, out.checkFacets(tasks, records))
 }
 
@@ -442,7 +442,7 @@ func (l *viewsLoad) mergeFacets(s *sheet, table string, facets map[string]mFacet
 			f.Rank = slices.Clone(m.Rank)
 		}
 		if m.Values != nil {
-			f.Values = maps.Clone(m.Values)
+			f.Values = mergeMap(f.Values, m.Values, func(_, y string) string { return y })
 		}
 		if m.Buckets != nil {
 			buckets, bad := []FacetBucket(nil), false

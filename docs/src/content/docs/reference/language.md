@@ -309,7 +309,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
 - `facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
 - `facets.<name>.rank` (list of strings): The facet's values in their order, first first.
-- `facets.<name>.values` (table by name): The text people read for a value, by value.
+- `facets.<name>.values` (table by name): The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.
 - `facets.<name>.values.<name>` (string, localized): The text of one value.
 - `facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
 - `facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a table): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
@@ -371,7 +371,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `draft_facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
 - `draft_facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
 - `draft_facets.<name>.rank` (list of strings): The facet's values in their order, first first.
-- `draft_facets.<name>.values` (table by name): The text people read for a value, by value.
+- `draft_facets.<name>.values` (table by name): The text people read for a value, by value. A layer adds or replaces the values it names and keeps the lower layers' others, so a plugin's layer words its own id, such as its provider in `source`.
 - `draft_facets.<name>.values.<name>` (string, localized): The text of one value.
 - `draft_facets.<name>.label_prefix` (string, localized): Not read: a draft's card shows no facet's values.
 - `draft_facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a list of them): Not read: a draft's card shows no facet's values.

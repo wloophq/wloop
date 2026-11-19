@@ -1,0 +1,5 @@
+[facets.source.values]
+slack = "Slack"
+
+[draft_facets.source.values]
+slack = "Slack"
