@@ -9,7 +9,7 @@ import type { J } from "../../lib/util";
 import { net } from "../../state/api";
 import { nav, readHash } from "../../state/route.svelte";
 import { outboxState, tasksState } from "../../state/store.svelte";
-import { filterPalette, lensItems, listYAML } from "../chrome/toolbar";
+import { filterPalette, lensChips, lensItems, listYAML } from "../chrome/toolbar";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, useCatalogs } from "../rows/testdata/fixtures";
 import LensBar from "../chrome/LensBar.svelte";
@@ -126,6 +126,11 @@ describe("filtering the Outbox", () => {
     filterPalette(lens, items, (p) => palettes.push(p));
     palettes[0].items.find((it: J) => it.label === "Proposed by").run();
     expect(palettes[1].items.map((it: J) => it.label).sort()).toEqual(["Ask who hasn't answered", "Reviews", "Written by hand"]);
+  });
+
+  it("words a chip's value as the palette does", () => {
+    nav.hash = "#view=outbox&q=" + encodeURIComponent("proposer:intent:review kind:nudge");
+    expect(lensChips(lensOf(readHash())).map((c) => c.text)).toEqual(["Proposed by: Reviews ×", "Kind: Nudge ×"]);
   });
 
   it("words the drafts' kinds by the plugin that posts them", () => {

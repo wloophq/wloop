@@ -112,6 +112,12 @@ function valueLabel(id: string, value: string, shown: string, worded = false): s
   return id === "kind" && !worded ? kindLabel(value, "") : shown;
 }
 
+// labelWord is the word f's labels give value; "" when they give none.
+function labelWord(f: Field | undefined, value: string): string {
+  const word = f && f.show ? f.show(value) : value;
+  return word !== value ? word : "";
+}
+
 // chipWords are what a filter's chip says of its field and values, with its × when removable.
 export function chipWords(label: string, values: string[], neg: boolean, removable: boolean): string {
   const vars = { field: label, values: values.join(" " + t("or") + " ") };
@@ -135,7 +141,8 @@ export function lensChips(lens: Lens, applied?: string[]): Chip[] {
   for (const x of lens.quals) {
     const k = `${x.field}:${x.neg ? "-" : ""}`;
     if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
-    by.get(k)!.values.push(valueLabel(x.field, x.value, x.raw));
+    const word = labelWord(fieldById(x.field, lens.fields), x.value);
+    by.get(k)!.values.push(valueLabel(x.field, x.value, word || x.raw, !!word));
   }
   const list = [...by.values()];
   const slot = (c: { field: string; neg: boolean }) => `lens:chip:${c.field}:${c.neg ? "-" : ""}`;
@@ -175,7 +182,7 @@ export function filterValues(f: Field, items: J[]): { value: string; count: numb
   const at = (v: string) => (rank.includes(v) ? rank.indexOf(v) : rank.length);
   return [...counts.entries()]
     .sort((a, b) => at(a[0]) - at(b[0]) || b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
-    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value), !!f.show && f.show(value) !== value) }));
+    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value), !!labelWord(f, value)) }));
 }
 
 // filterPalette opens, through palette, the fields lens filters by, then the values of the one picked, which adds
