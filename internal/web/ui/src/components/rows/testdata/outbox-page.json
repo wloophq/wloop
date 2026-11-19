@@ -180,6 +180,9 @@
    "broadcast": "",
    "where": "acme/api#8",
    "text": "Thanks, @{github:alice}!",
+   "names": {
+    "github:alice": "alice"
+   },
    "why": "No answer since Tuesday",
    "language": "pt-BR",
    "reaction": "",
@@ -225,7 +228,7 @@
      "acme/api"
     ],
     "people": [
-     "github:alice"
+     "alice"
     ],
     "state": [
      "held"
@@ -237,7 +240,8 @@
    "texts": [
     "Thanks, @{github:alice}!",
     "acme/api#8",
-    "acme/api"
+    "acme/api",
+    "alice"
    ]
   },
   {

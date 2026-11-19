@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -35,12 +36,12 @@ func rowWhere(defs []intentload.FacetDef, row map[string][]string) string {
 	return ""
 }
 
-// mentioned are the keys of the people text mentions, as its plugin resolves their names, each once.
-func mentioned(text string) []string {
+// mentioned are the people text mentions, each once: the name names gives a mention key, else the key.
+func mentioned(text string, names map[string]string) []string {
 	var out []string
 	for _, m := range mentionKey.FindAllStringSubmatch(text, -1) {
-		if !slices.Contains(out, m[1]) {
-			out = append(out, m[1])
+		if p := cmp.Or(names[m[1]], m[1]); !slices.Contains(out, p) {
+			out = append(out, p)
 		}
 	}
 	return out

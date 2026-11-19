@@ -194,7 +194,7 @@ The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `G
 | `kind` | `draft.kind` | Its kind in its plugin's manifest |
 | `source` | `draft.provider` | The provider of its unit |
 | `where` | `draft.where` | The repository or channel its unit's row gives |
-| `people` | `draft.people` | The people it is to or mentions |
+| `people` | `draft.people` | The people it is to or mentions, by name (the mention key when its plugin resolves no name) |
 | `state` | `draft.state` | Failed, sending, queued or held, in that order |
 | `age` | `draft.created_at` | When it was written |
 

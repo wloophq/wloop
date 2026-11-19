@@ -65,6 +65,15 @@ describe("the Outbox through the lens", () => {
     expect(cards(body(c))).toEqual([10, 8]);
   });
 
+  it("groups and filters by the names of the people the drafts mention", () => {
+    nav.hash = "#view=outbox&q=" + encodeURIComponent("people:alice");
+    const c = render(TaskViewPage).container;
+    expect(cards(body(c))).toEqual([9]);
+    nav.hash = "#view=outbox&g=people";
+    flushSync();
+    expect(heads(body(c))).toContain("alice 1 draft");
+  });
+
   it("says nothing matches a qualifier no facet reads", () => {
     nav.hash = "#view=outbox&q=" + encodeURIComponent("color:blue");
     const c = render(TaskViewPage).container;

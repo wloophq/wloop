@@ -60,7 +60,7 @@ var draftViewFacts = []Fact{
 	fact("draft.workflow", expr.String, []FactSlot{DraftViewSlot}, "The workflow behind the draft, a turn's draft included; empty for a draft no workflow is behind."),
 	fact("draft.kind", expr.String, []FactSlot{DraftViewSlot}, "The draft's kind as its plugin's manifest names it, such as review, thread_reply or nudge."),
 	fact("draft.where", expr.String, []FactSlot{DraftViewSlot}, "Where the draft's unit is, as its row gives it, a repository or a channel; empty when the row gives none."),
-	fact("draft.people", expr.List, []FactSlot{DraftViewSlot}, "The people the draft is to or mentions, by the mention keys its plugin resolves."),
+	fact("draft.people", expr.List, []FactSlot{DraftViewSlot}, "The people the draft is to or mentions, each by the name its plugin resolves the mention to, else by the mention key, such as slack:U0123."),
 	fact("draft.created_at", expr.Time, []FactSlot{DraftViewSlot}, "When the draft was written. Zero when unset; test with `> timestamp(0)`."),
 }
 

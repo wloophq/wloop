@@ -105,12 +105,17 @@ func TestOutboxServesDraftFacets(t *testing.T) {
 		return github(p)
 	}
 	r.withRows(map[unit.Unit]api.Row{r7u: {Facets: map[string][]string{"where": {"acme/api"}}}, slackThread: {Facets: map[string][]string{"where": {"#eng"}}}})
+	alice := items.Op{Op: items.OpCreate, Unit: slackThread, Item: "i1", Anchor: unit.Anchor{Ref: "user:i1"}, Fields: &items.Fields{Kind: ptrOf(items.Todo),
+		Summary: ptrOf("Ship the fix"), Requester: &items.Person{Key: "slack:U0ALICE", Name: "alice"}}}
+	if _, err := r.ledger.Apply(context.Background(), items.User, []items.Op{alice}); err != nil {
+		t.Fatal(err)
+	}
 	turn := func(key string) draft.Origin {
 		return draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Key: key}
 	}
 	review := r.proposeAs(t, outbox.Proposal{Kind: "review", Text: "Looks good overall", Origin: turn("r1")})
 	resolve := r.proposeAs(t, outbox.Proposal{Kind: "resolve", Text: "Fixed in the last push", Origin: turn("r2")})
-	nudge := r.proposeAs(t, outbox.Proposal{Unit: slackThread, Kind: "nudge", Text: "any news, @{slack:U0ALICE}?",
+	nudge := r.proposeAs(t, outbox.Proposal{Unit: slackThread, Kind: "nudge", Text: "any news, @{slack:U0ALICE} and @{slack:U0BOB}?",
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-nudge", Key: "n"}})
 
 	page := r.outboxPage(t)
@@ -118,7 +123,7 @@ func TestOutboxServesDraftFacets(t *testing.T) {
 		int64(review.ID):  {"proposer": {"intent:review"}, "kind": {"review"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
 		int64(resolve.ID): {"proposer": {"intent:review"}, "kind": {"resolve"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
 		int64(nudge.ID): {"proposer": {"workflow:fake-nudge"}, "workflow": {"fake-nudge"}, "kind": {"nudge"}, "source": {"slack"}, "where": {"#eng"},
-			"people": {"slack:U0ALICE"}, "state": {"held"}},
+			"people": {"alice", "slack:U0BOB"}, "state": {"held"}},
 	}
 	if len(page.Drafts) != len(want) {
 		t.Fatalf("%d drafts, want %d", len(page.Drafts), len(want))
@@ -134,6 +139,9 @@ func TestOutboxServesDraftFacets(t *testing.T) {
 		}
 		if !slices.Contains(d.Texts, d.Text) || !slices.Contains(d.Texts, d.Label) || !slices.Contains(d.Texts, d.Facets["where"][0]) {
 			t.Errorf("draft %d's search texts %q, want its text, label and where", d.ID, d.Texts)
+		}
+		if d.ID == int64(nudge.ID) && !slices.Contains(d.Texts, "alice") {
+			t.Errorf("draft %d's search texts %q, want the name of whom it mentions", d.ID, d.Texts)
 		}
 	}
 	var ids []string

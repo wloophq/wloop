@@ -58,12 +58,13 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		where := rowWhere(l.Views.DraftFacets, rows[p.Draft.Unit].Row.Facets)
-		facts := draftViewFacts(p.Draft, where, mentioned(p.Draft.Text))
+		people := mentioned(p.Draft.Text, d.Names)
+		facts := draftViewFacts(p.Draft, where, people)
 		facets := catalog.FactFacets(l.Views.DraftFacets, facts)
 		if len(facets) == 0 {
 			facets = nil
 		}
-		listed = append(listed, faced{api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(d.Text, d.Label, d.Title, d.Where, where)}, facts})
+		listed = append(listed, faced{api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(append([]string{d.Text, d.Label, d.Title, d.Where, where}, people...)...)}, facts})
 	}
 	_ = catalog.SortBy(l.Views, outboxView(l.Views, r.URL.Query().Get("view")), listed, func(f faced) (workflow.Facts, error) { return f.facts, nil })
 	out := make([]api.OutboxDraft, 0, len(listed))
