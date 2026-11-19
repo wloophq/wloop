@@ -704,8 +704,8 @@ func (w *sessionWiring) approveAndSend(t *testing.T) {
 	}
 }
 
-// From a pull request turn still running, an edit and reactions on a Slack message are drafts, which post once the
-// user approves them; an edit of another's message is refused.
+// From a pull request turn, an edit and reactions on a Slack message are drafts, which post once the user approves
+// them; an edit of another's message is refused.
 func TestFromAPullRequestTurnEditsAndReactionsPostOnceApproved(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
@@ -726,8 +726,8 @@ func TestFromAPullRequestTurnEditsAndReactionsPostOnceApproved(t *testing.T) {
 	w.st.srv.Handle("reactions.remove", func(url.Values) any { return map[string]any{} })
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
 
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"edit","target":"`+link+`","text":"release 1.2 **done**","draft":false}`); isErr || !strings.Contains(got, "Nothing was posted") {
-		t.Fatalf("an edit with draft false from a turn still running = %q", got)
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_post", `{"kind":"edit","target":"`+link+`","text":"release 1.2 **done**"}`); isErr || !strings.Contains(got, "#random") {
+		t.Fatalf("an edit = %q", got)
 	}
 	for _, args := range []string{`{"kind":"react","target":"` + link + `","reaction":"white_check_mark"}`, `{"kind":"unreact","target":"` + link + `","reaction":"hourglass"}`} {
 		if got, isErr := w.callTool(t, "", draftHandle, "slack_post", args); isErr || !strings.Contains(got, "#random") {
@@ -1019,9 +1019,9 @@ func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
 	}
 }
 
-// A post with draft false from a task turn still running stays a draft on the task, its origin the turn, and posts
-// once the user approves it.
-func TestASendFromATaskTurnRunningStaysADraftWithTheTurnAsOrigin(t *testing.T) {
+// A post with draft false from a task turn still running, in a session the loop never typed into, posts at once on
+// the task, its origin the turn.
+func TestASendFromATaskTurnPostsAtOnceWithTheTurnAsOrigin(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	task := unit.Unit{Provider: unit.Task, Key: "t1"}
@@ -1031,17 +1031,13 @@ func TestASendFromATaskTurnRunningStaysADraftWithTheTurnAsOrigin(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	if calls := w.send(t, sessChannel); strings.Contains(calls, "chat.postMessage") {
-		t.Fatalf("a turn still running posted at once: %s", calls)
+	if calls := w.send(t, sessChannel); !strings.Contains(calls, "chat.postMessage") {
+		t.Fatalf("a session the user drives did not post at once: %s", calls)
 	}
 	ds := w.drafts(t)
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}
-	if len(ds) != 1 || ds[0].Unit != task || ds[0].State != draft.Held || noSession(ds[0].Origin) != want {
+	if len(ds) != 1 || ds[0].Unit != task || ds[0].State != draft.Sent || noSession(ds[0].Origin) != want {
 		t.Fatalf("drafts %+v", ds)
-	}
-	w.approveAndSend(t)
-	if ds := w.drafts(t); ds[0].State != draft.Sent || len(w.st.srv.Calls("chat.postMessage")) != 1 {
-		t.Fatalf("after the user approved it: %+v", ds[0])
 	}
 }
 

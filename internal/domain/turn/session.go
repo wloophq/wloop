@@ -74,19 +74,9 @@ func (SessionCodec) Provider() unit.ProviderID { return unit.Session }
 
 func (SessionCodec) Valid(key string) error { return unit.OpaqueCodec{ID: unit.Session}.Valid(key) }
 
-// UserDriven says whether the user drives the session, given turns, the
-// turns of its book: the loop never typed into it or the user prompted it
-// since, and no turn the loop sent runs in it. A turn that asks waits on the
-// user, so it does not count as running.
-func (s Session) UserDriven(turns []Turn) bool {
-	if !s.TypedAt.IsZero() && !s.UserPromptAt.After(s.TypedAt) {
-		return false
-	}
-	for _, t := range turns {
-		running := t.State == Sent || t.State == Started
-		if running && t.Runner != RunnerHeadless && (t.Session == s.ID || t.SentTo == s.ID) {
-			return false
-		}
-	}
-	return true
+// UserDriven says whether the user drives the session: the loop never typed
+// into it, or the user prompted it after the loop's last typed line, whatever
+// turn of the loop still runs in it.
+func (s Session) UserDriven() bool {
+	return s.TypedAt.IsZero() || s.UserPromptAt.After(s.TypedAt)
 }

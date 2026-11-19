@@ -29,7 +29,7 @@ drafted = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; nothing was posted. It w
 approved = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}}; one of the user's approval rules posts it now."
 dry_run = "Drafted {{.ID}} (rev {{.Rev}}) on {{.Unit}} as a dry run: the user's approval stores drafts and never posts them, so it will not be posted."
 posting = "Posting {{.ID}} (rev {{.Rev}}) on {{.Unit}} now, in the user's name; draft_read shows its link once it is posted."
-kept = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and this one runs a turn {{.Name}} sent, or {{.Name}} typed into it last. It is draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
+kept = "Nothing was posted: {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. It is draft {{.ID}} (rev {{.Rev}}) on {{.Unit}}{{with .Link}}, at {{.}}{{end}}. Give the user the link and tell them: \"It is ready in {{.Name}}; post it from there, or tell me here to post it.\""
 
 [github_threads]
 description = "Read the unresolved review threads of the pull request of your turn, each with its comments and their REST ids, which a thread_reply or a resolve targets as comment:<id>, and each reviewer's latest review. It writes nothing."

@@ -607,7 +607,7 @@ func (s *Service) vouch(ctx context.Context, session string) error {
 	case err != nil:
 		return err
 	case !driven:
-		return fmt.Errorf("%w: the user does not drive session %s: it runs a turn the loop sent, or the loop typed into it last", ErrRefused, session)
+		return fmt.Errorf("%w: the user does not drive session %s: the loop typed into it last, and the user has not prompted it since", ErrRefused, session)
 	}
 	return nil
 }

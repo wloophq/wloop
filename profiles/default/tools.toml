@@ -175,7 +175,7 @@ updated = """Revised draft {{.ID}}; it waits for the user{{with .Link}}, at {{.}
 {{.Draft}}"""
 posting = """Posting draft {{.ID}} now, in the user's name; draft_read shows its link once it is posted:
 {{.Draft}}"""
-kept = """Nothing was posted: draft {{.ID}} stays a draft{{with .Link}} at {{.}}{{end}}, because {{.Name}} posts at once only from a session the user drives, and this one runs a turn {{.Name}} sent, or {{.Name}} typed into it last. Give the user the link and tell them: "It is ready in {{.Name}}; post it from there, or tell me here to post it."
+kept = """Nothing was posted: draft {{.ID}} stays a draft{{with .Link}} at {{.}}{{end}}, because {{.Name}} posts at once only from a session the user drives, and {{.Name}} typed into this one last, with no prompt of the user's since. Give the user the link and tell them: "It is ready in {{.Name}}; post it from there, or tell me here to post it."
 {{.Draft}}"""
 rev_conflict = "Nothing was revised: {{.Error}}. Read it again with draft_read and revise the rev it shows."
 stale = "Nothing was revised: {{.Error}}. Read the unit again and pass the basis you read."

@@ -13,7 +13,7 @@ task_merged = "{{.Task}} was merged into {{.Into}}: open {{.Into}} and run {{.Ve
 
 nothing_to_pick = "{{if eq .Pick \"merged\"}}No task was merged into this one{{else}}No task is related to this one{{end}}."
 
-verb_for_you = "{{.Verb}} acts for you, so only you run it, or a session you drive; this session runs a turn the loop sent or the loop typed into it last."
+verb_for_you = "{{.Verb}} acts for you, so only you run it, or a session you drive; the loop typed into this session last, and you have not prompted it since."
 
 chat_not_yours = "This session has no turn on {{.Unit}}: it reads the answers and the chat of the tasks it works on only, and nothing was read."
 

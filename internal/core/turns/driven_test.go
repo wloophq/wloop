@@ -8,7 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
-func TestUserDrivenReadsTheSessionAndItsTurns(t *testing.T) {
+func TestUserDrivenReadsTheSession(t *testing.T) {
 	ctx := context.Background()
 	e := newCloseEnv(t, cleanupCase{sess: quietSession("term_1")})
 	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || got {
@@ -30,8 +30,8 @@ func TestUserDrivenReadsTheSessionAndItsTurns(t *testing.T) {
 	}
 	running := doneTurn("term_1", turn.Started)
 	e.store.Put(turn.Book{Unit: ref(len("term_1")), Turns: running})
-	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || got {
-		t.Fatalf("a loop turn runs in it: %v %v", got, err)
+	if got, err := e.s.UserDriven(ctx, "term_1"); err != nil || !got {
+		t.Fatalf("a loop turn runs in it after the user prompted it: %v %v", got, err)
 	}
 	if got, err := e.s.UserDriven(ctx, "term_9"); err != nil || got {
 		t.Fatalf("an unknown session: %v %v", got, err)
