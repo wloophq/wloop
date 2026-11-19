@@ -1,5 +1,5 @@
 ---
-title: A draft is what its proposer declares
+title: A draft is what its author declares
 description: A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person.
 ---
 

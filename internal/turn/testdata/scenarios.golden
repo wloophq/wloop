@@ -472,11 +472,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/changes-requested
-id: c932bf4f4920
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn c932bf4f4920 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 31d6affef570
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 31d6affef570 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions c932bf4f4920 for review in acme/api.
+Instructions 31d6affef570 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -606,7 +606,7 @@ record, never in the review.
 3. **Nothing new.** No open thread was settled or answered and the delta
    raises no new finding: draft nothing and record `settled`, so the loop
    files the pull request as reviewed.
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
@@ -751,11 +751,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/no-review-read
-id: 862107ffdc50
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 862107ffdc50 https://github.com/acme/api/pull/7` and follow what it prints.
+id: faf128ebbbe5
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn faf128ebbbe5 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 862107ffdc50 for review in acme/api.
+Instructions faf128ebbbe5 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -885,7 +885,7 @@ record, never in the review.
 3. **Nothing new.** No open thread was settled or answered and the delta
    raises no new finding: draft nothing and record `settled`, so the loop
    files the pull request as reviewed.
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
@@ -1030,11 +1030,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first-planned/automated/reviewed-before
-id: b214a4f98207
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn b214a4f98207 https://github.com/acme/api/pull/7` and follow what it prints.
+id: a5d01f32f3b6
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn a5d01f32f3b6 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions b214a4f98207 for review in acme/api.
+Instructions a5d01f32f3b6 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -1164,7 +1164,7 @@ record, never in the review.
 3. **Nothing new.** No open thread was settled or answered and the delta
    raises no new finding: draft nothing and record `settled`, so the loop
    files the pull request as reviewed.
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
@@ -1309,11 +1309,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/by-hand/approved
-id: 2871d2e6a93b
-prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 2871d2e6a93b https://github.com/acme/api/pull/7` and follow what it prints.
+id: 7cb8d62139c0
+prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 7cb8d62139c0 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 2871d2e6a93b for review in acme/api.
+Instructions 7cb8d62139c0 for review in acme/api.
 
 # Follow-up review of acme/api#7, asked for by you.
 
@@ -1443,7 +1443,7 @@ record, never in the review.
 3. **Nothing new.** No open thread was settled or answered and the delta
    raises no new finding: draft nothing and record `settled`, so the loop
    files the pull request as reviewed.
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
@@ -4604,11 +4604,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/history/injected
-id: 725c9f7c1a1a
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 725c9f7c1a1a https://github.com/acme/api/pull/7` and follow what it prints.
+id: b9f551489ef6
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn b9f551489ef6 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 725c9f7c1a1a for review in acme/api.
+Instructions b9f551489ef6 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -4757,7 +4757,7 @@ record, never in the review.
 3. **Nothing new.** No open thread was settled or answered and the delta
    raises no new finding: draft nothing and record `settled`, so the loop
    files the pull request as reviewed.
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|
@@ -5364,11 +5364,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == review/follow-up/automated/re-requested-after-approval
-id: c8e987d6d7af
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn c8e987d6d7af https://github.com/acme/api/pull/7` and follow what it prints.
+id: 512b202662b6
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 512b202662b6 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions c8e987d6d7af for review in acme/api.
+Instructions 512b202662b6 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -5502,7 +5502,7 @@ record, never in the review.
    after thread replies: draft the event the table below gives. When your
    last verdict was `APPROVED` and nothing is new, that is `APPROVE` with an
    empty body, which waits for the user like every approval (section 5).
-4. **Otherwise propose a review**, choosing the event by what changed:
+4. **Otherwise draft a review**, choosing the event by what changed:
 
 | Since your last review | Event |
 |---|---|

@@ -64,7 +64,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Question** and **answer**: a turn that records `asked` stops on a question, a message with its gate; your answer names that message and gate, and the session gets a notice naming the gate, and reads the answer with `task_read`, or a resume turn carries it. See [Answers](/concepts/turns/#answers).
 - **Resume turn**: a new turn of the same intent, in a new session, that carries the stopped turn's question, draft, notes and your answer. **Continue** sends one without an answer.
 - **Endorsement**: whether you stood behind the verdict a turn published, by publishing it by hand or approving it. An automatic follow-up approves only after an endorsed verdict.
-- **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that proposes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).
+- **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that writes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).
 - **Intake**: the numbered wait of a first turn for its brief. `{{command}} intake <n>` follows it, and `{{command}} intake without <n>` starts it without the brief.
 
 ## Profiles and intents

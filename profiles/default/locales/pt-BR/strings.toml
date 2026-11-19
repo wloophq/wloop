@@ -214,7 +214,7 @@
 "posts draft #{id}" = "posta o rascunho #{id}"
 "this answer approves draft #{id}, which this view does not show: open its task to see it" = "esta resposta aprova o rascunho #{id}, que esta tela não mostra: abra a tarefa para vê-lo"
 "An open question decides this draft: answer it on its task." = "Uma pergunta em aberto decide este rascunho: responda-a na tarefa dela."
-"Why it was proposed: {why}" = "Por que foi proposto: {why}"
+"Why it was written: {why}" = "Por que foi escrito: {why}"
 "Posted {time}" = "Publicado {time}"
 "Posted" = "Publicado"
 "Draft text" = "Texto do rascunho"

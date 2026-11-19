@@ -331,7 +331,7 @@ describe("qcard_test.go, a sent draft's card", () => {
     const posted = c.querySelector(".d-posted")!;
     expect(posted.textContent).not.toBe("");
     expect(posted.querySelector("a")!.getAttribute("href")).toBe(d.permalink);
-    expect(texts(c, ".why").join("")).toBe("Why it was proposed: REQUEST_CHANGES held for the user");
+    expect(texts(c, ".why").join("")).toBe("Why it was written: REQUEST_CHANGES held for the user");
     expect(c.querySelector(".ref")!.textContent).toBe("acme/api#7");
     expect(texts(c, "strong")).toEqual(["error"]);
   });

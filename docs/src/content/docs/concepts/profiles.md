@@ -45,7 +45,7 @@ A turn of any intent records, asks, takes answers and resumes the same way. A us
 | `review` | `V` | the review workspace, at the pull request's head | reviews someone else's pull request and publishes the review |
 | `address` | `F` | the author workspace | triages the reviews and failing checks of a pull request you develop |
 | `nudge` | `N` | the pull request's workspace, else the repository's main checkout | asks whoever the pull request waits on for the next step, in one comment |
-| `act` | | headless, or a session | resolves the open items of a unit and proposes the replies as drafts |
+| `act` | | headless, or a session | resolves the open items of a unit and writes the replies as drafts |
 | `start` | | a fresh worktree of the repository you name, else no checkout | starts new work on a task from its brief (`{{command}} start`) |
 | `chat` | | the task's last session when it can resume, else a new one | talks with an agent about a task, when you write on its chat and no session of it is live |
 | `attach` | | the session it is run from | makes an agent session started outside the loop a run of a task (`{{command}} task attach`) |

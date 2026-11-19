@@ -132,7 +132,7 @@ pointer = "/event"
 ```
 
 - **Facts.** A fact's pointer must be required, a string and an `enum` in the schema, and the loader refuses anything else. Such a fact is trusted and read by rules as an allow-list.
-- **Payloads.** A payload is checked against its kind's schema at propose and at every revision, and one that holds an object key twice is refused: readers that keep the first value and readers that keep the last would show a person one value and post another.
+- **Payloads.** A payload is checked against its kind's schema when it is written and at every revision, and one that holds an object key twice is refused: readers that keep the first value and readers that keep the last would show a person one value and post another.
 - **Verdicts.** A kind's `verdict` points at the required string enum its payload carries as the record verdict, such as a review's `/event`. The verdicts a turn's record may give are the enum values of the verdict fields of the draft kinds of the plugins its intent serves, so a third plugin's verdicts need no host edit; which of them end the work, and show the review done on the board, is the intent's `[record] concludes` in the profile, and a value there that no verdict matches is a load problem.
 - **Card.** A draft's card reads its kind's payload schema from the loaded manifests, a discovered plugin's included.
 - **Your drafts.** A reply you write takes its publisher's default kind and a reaction its first kind posted as an emoji (a delivery marked `emoji`), as the outbox's kinds shape them; no client or the daemon names a kind.

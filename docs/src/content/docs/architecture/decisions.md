@@ -9,7 +9,7 @@ Each entry is a file under `docs/src/content/docs/architecture/decisions/`, with
 
 | Decision | What it holds |
 |---|---|
-| [A draft is what its proposer declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
+| [A draft is what its author declares](/architecture/decisions/a-draft-is-what-its-proposer-declares/) | A draft carries its purpose, delivery and effects; nothing follows from its kind, and a draft that posts waits for a person. |
 | [A gate's consequence runs once](/architecture/decisions/a-gates-consequence-runs-once/) | A resolved gate records when its consequence ran; the tick reruns one a stopped daemon left, and every consequence is idempotent. |
 | [A kind that takes a basis is read by its plugin](/architecture/decisions/a-kind-that-takes-a-basis-is-read-by-its-plugin/) | A plugin whose draft kinds take a basis serves Drafter, or the host refuses to start it. |
 | [A provider is asked what it can do](/architecture/decisions/a-provider-is-asked-what-it-can-do/) | A plugin declares its capabilities, and a provider id appears only in its plugin and the tables. |

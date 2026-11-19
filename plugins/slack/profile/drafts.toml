@@ -1,5 +1,5 @@
 # Whether a draft that replies in a thread is also posted to its
-# conversation (Slack's reply_broadcast) when its proposer did not say. The
+# conversation (Slack's reply_broadcast) when its writer did not say. The
 # person turns it on the draft before approving it. A user profile's
 # plugins/slack/drafts.toml replaces this file; a key it leaves out is false.
 

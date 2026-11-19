@@ -217,7 +217,7 @@
 "posts draft #{id}" = "posts draft #{id}"
 "this answer approves draft #{id}, which this view does not show: open its task to see it" = "this answer approves draft #{id}, which this view does not show: open its task to see it"
 "An open question decides this draft: answer it on its task." = "An open question decides this draft: answer it on its task."
-"Why it was proposed: {why}" = "Why it was proposed: {why}"
+"Why it was written: {why}" = "Why it was written: {why}"
 "Posted {time}" = "Posted {time}"
 "Posted" = "Posted"
 "Draft text" = "Draft text"

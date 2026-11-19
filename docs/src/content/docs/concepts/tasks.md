@@ -298,7 +298,7 @@ The live session is a session whose unit is the task or one it holds, a pull req
 
 ## The Outbox
 
-Every post an agent or a rule proposes is a draft first, held by its draft gate until its approval policy lets it out, and listed in the Outbox. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep. A draft a workflow proposes on a task goes to the unit its first item is on, else to its first unit:
+Every post an agent or a rule writes is a draft first, held by its draft gate until its approval policy lets it out, and listed in the Outbox. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep. A draft a workflow proposes on a task goes to the unit its first item is on, else to its first unit:
 
 | Workflow or rule | Proposes |
 |---|---|

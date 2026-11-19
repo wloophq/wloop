@@ -79,7 +79,7 @@
   {/if}
   <PayloadView {draft} fields={draft.fields || []} {key} editing={isEditing} {scope} />
   {#each draft.notes || [] as n, i (i)}<p class={"d-note" + (draft.stale ? " err" : "")}>{n}</p>{/each}
-  {#if draft.why}<p class="why">{t("Why it was proposed: {why}", { why: draft.why })}</p>{/if}
+  {#if draft.why}<p class="why">{t("Why it was written: {why}", { why: draft.why })}</p>{/if}
   {#if draft.quoted}<p class="why">{draft.quoted}</p>{/if}
   {#if effects.length}<ul class="effects">{#each effects as x, i (i)}<li>{x}</li>{/each}</ul>{/if}
   {#if draft.error}<p class="err">{draft.error}</p>{/if}
