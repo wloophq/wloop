@@ -205,6 +205,10 @@ label = "Tipo"
 [draft_facets.source]
 label = "Origem"
 
+[draft_facets.source.values]
+github = "GitHub"
+slack = "Slack"
+
 [draft_facets.where]
 label = "Onde"
 

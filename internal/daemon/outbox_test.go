@@ -3,19 +3,24 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strconv"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/plugins/bundled/bundledtest"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // withFakeWorkflows makes r's profile the bundled one with fake-nudge and fake-close, two drafting workflows
@@ -53,35 +58,140 @@ func (r *outboxRig) outboxPage(t *testing.T) api.OutboxPage {
 	return page
 }
 
-func TestTheOutboxGroupsDraftsByTheirWorkflow(t *testing.T) {
+// roundKinds are the bundled conversation kinds, and a review round's review and resolve, posted as comments.
+type roundKinds struct{ bundledtest.Shapes }
+
+func (k roundKinds) Lookup(provider, kind string) (draft.KindSpec, bool) {
+	if kind == "review" || kind == "resolve" {
+		return draft.KindSpec{Provider: provider, Name: kind, Delivery: "comment", TextRequired: true, Editable: []string{draft.EditableText}}, true
+	}
+	return k.Shapes.Lookup(provider, kind)
+}
+
+func (k roundKinds) Shape(provider string, d draft.Draft) (draft.Draft, error) {
+	if d.Kind == "review" || d.Kind == "resolve" {
+		d.Purpose, d.Delivery = string(d.Kind), "comment"
+		return d, nil
+	}
+	return k.Shapes.Shape(provider, d)
+}
+
+// withRows serves rows as the rows of their units; any other unit has none.
+func (r *outboxRig) withRows(rows map[unit.Unit]api.Row) {
+	r.s.readRows = func(_ context.Context, units []unit.Unit) (map[unit.Unit]readmodel.Read, error) {
+		out := map[unit.Unit]readmodel.Read{}
+		for _, u := range units {
+			if row, ok := rows[u]; ok {
+				out[u] = readmodel.Read{Row: row}
+			}
+		}
+		return out, nil
+	}
+}
+
+var slackThread = unit.Unit{Provider: "slack", Key: "C0ENG:1700000000.000100"}
+
+func TestOutboxServesDraftFacets(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.withFakeWorkflows()
-	auto := func(wf, key string) draft.Origin {
-		return draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Key: key}
+	r.o.Kinds = roundKinds{}
+	github := r.o.Effects
+	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == slackThread.Provider {
+			return r.fx, nil
+		}
+		return github(p)
 	}
-	r.proposeAs(t, outbox.Proposal{Text: "any news?", Purpose: "nudge", Origin: auto("fake-nudge", "a")})
-	r.proposeAs(t, outbox.Proposal{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}, Text: "still there?", Purpose: "nudge", Origin: auto("fake-nudge", "b")})
-	r.proposeAs(t, outbox.Proposal{Text: "closing this", Purpose: "close", Origin: auto("fake-close", "c")})
-	r.proposeAs(t, outbox.Proposal{Text: "ping", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginSession, Key: "d"}})
-	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "e"}})
+	r.withRows(map[unit.Unit]api.Row{r7u: {Facets: map[string][]string{"where": {"acme/api"}}}, slackThread: {Facets: map[string][]string{"where": {"#eng"}}}})
+	turn := func(key string) draft.Origin {
+		return draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Key: key}
+	}
+	review := r.proposeAs(t, outbox.Proposal{Kind: "review", Text: "Looks good overall", Origin: turn("r1")})
+	resolve := r.proposeAs(t, outbox.Proposal{Kind: "resolve", Text: "Fixed in the last push", Origin: turn("r2")})
+	nudge := r.proposeAs(t, outbox.Proposal{Unit: slackThread, Kind: "nudge", Text: "any news, @{slack:U0ALICE}?",
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-nudge", Key: "n"}})
 
 	page := r.outboxPage(t)
-	var got []string
-	for _, g := range page.Groups {
-		got = append(got, fmt.Sprintf("%s|%s|%s|%s|%d", g.Workflow, g.Purpose, g.Title, g.About, len(g.Drafts)))
+	want := map[int64]map[string][]string{
+		int64(review.ID):  {"proposer": {"intent:review"}, "kind": {"review"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
+		int64(resolve.ID): {"proposer": {"intent:review"}, "kind": {"resolve"}, "source": {"github"}, "where": {"acme/api"}, "state": {"held"}},
+		int64(nudge.ID): {"proposer": {"workflow:fake-nudge"}, "workflow": {"fake-nudge"}, "kind": {"nudge"}, "source": {"slack"}, "where": {"#eng"},
+			"people": {"slack:U0ALICE"}, "state": {"held"}},
 	}
-	want := []string{
-		"fake-nudge||Ask who hasn't answered|Drafted when a conversation where you asked something goes quiet.|2",
-		"fake-close||Archive finished conversations||1",
-		"|nudge|Nudge||1",
-		"||Written by hand|Replies and reactions you wrote yourself, waiting to be sent.|1",
+	if len(page.Drafts) != len(want) {
+		t.Fatalf("%d drafts, want %d", len(page.Drafts), len(want))
 	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("groups\n %q\nwant\n %q", got, want)
+	for _, d := range page.Drafts {
+		got := maps.Clone(d.Facets)
+		if len(got["age"]) != 1 {
+			t.Errorf("draft %d's age %v, want when it was written", d.ID, got["age"])
+		}
+		delete(got, "age")
+		if !reflect.DeepEqual(got, want[d.ID]) {
+			t.Errorf("draft %d's facets\n %v\nwant\n %v", d.ID, got, want[d.ID])
+		}
+		if !slices.Contains(d.Texts, d.Text) || !slices.Contains(d.Texts, d.Label) || !slices.Contains(d.Texts, d.Facets["where"][0]) {
+			t.Errorf("draft %d's search texts %q, want its text, label and where", d.ID, d.Texts)
+		}
 	}
-	if d := page.Groups[0].Drafts; d[0].Text != "still there?" || d[1].Text != "any news?" || d[0].Gate == 0 || d[0].Intents["approved"] == "" {
-		t.Errorf("fake-nudge's drafts %+v, want both, newest first, with their gates", d)
+	var ids []string
+	for _, f := range page.Facets {
+		ids = append(ids, f.ID)
+	}
+	if want := []string{"proposer", "workflow", "kind", "source", "where", "people", "state", "age"}; !slices.Equal(ids, want) {
+		t.Errorf("facets %q, want %q", ids, want)
+	}
+}
+
+func TestOutboxHeads(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withFakeWorkflows()
+	r.proposeAs(t, outbox.Proposal{Text: "any news?", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-nudge", Key: "a"}})
+	r.proposeAs(t, outbox.Proposal{Text: "acking", Purpose: "nudge", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-ack", Key: "b"}})
+	r.proposeAs(t, outbox.Proposal{Kind: "nudge", Text: "is this still moving?", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "c"}})
+	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "d"}})
+	r.proposeAs(t, outbox.Proposal{Text: "one question", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 2, Intent: "review", Key: "e"}})
+
+	page := r.outboxPage(t)
+	l := r.s.loaded()
+	review, _ := l.Registry.Get("review")
+	nudgeHead := api.OutboxHead{Title: "Ask who hasn't answered", About: "Drafted when a conversation where you asked something goes quiet.", Workflow: "fake-nudge"}
+	want := map[string]map[string]api.OutboxHead{
+		"proposer": {
+			"workflow:fake-nudge": nudgeHead,
+			"rule:github-nudge":   {Title: l.Gates.Drafts.Rules["github-nudge"]},
+			"user":                {Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout},
+			"intent:review":       {Title: review.Outbox.Title, About: review.Outbox.About},
+		},
+		"workflow": {"fake-nudge": nudgeHead},
+		"kind":     {"reply": {Title: l.UI["github"].Drafts["reply"].Label}, "nudge": {Title: l.UI["github"].Drafts["nudge"].Label}},
+	}
+	if !reflect.DeepEqual(page.Heads, want) {
+		t.Errorf("heads\n %+v\nwant\n %+v", page.Heads, want)
+	}
+	for _, h := range []api.OutboxHead{want["proposer"]["rule:github-nudge"], want["proposer"]["user"], want["proposer"]["intent:review"], want["kind"]["reply"]} {
+		if h.Title == "" {
+			t.Fatalf("the bundled profile words none of %+v", want)
+		}
+	}
+}
+
+func TestOutboxDraftWithoutRow(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.withRows(nil)
+	r.proposeAs(t, outbox.Proposal{Text: "hi", Origin: draft.Origin{Kind: draft.OriginUser, Key: "x"}})
+	page := r.outboxPage(t)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("%d drafts, want 1", len(page.Drafts))
+	}
+	if vs, ok := page.Drafts[0].Facets["where"]; ok {
+		t.Errorf("a draft whose unit has no row is where %v, want no value", vs)
+	}
+	if got := page.Drafts[0].Facets["proposer"]; !slices.Equal(got, []string{"user"}) {
+		t.Errorf("proposer %v, want user", got)
 	}
 }
 
@@ -106,10 +216,10 @@ func TestTheOutboxCarriesEachDraftsContext(t *testing.T) {
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "fake-ack", Key: "k"}})
 
 	page := r.outboxPage(t)
-	if len(page.Groups) != 1 || len(page.Groups[0].Drafts) != 1 {
-		t.Fatalf("groups %+v", page.Groups)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("drafts %+v", page.Drafts)
 	}
-	got := page.Groups[0].Drafts[0]
+	got := page.Drafts[0]
 	if got.ID != int64(d.ID) || got.Task != string(id) {
 		t.Fatalf("draft %+v", got.Draft)
 	}
@@ -120,9 +230,6 @@ func TestTheOutboxCarriesEachDraftsContext(t *testing.T) {
 	if its := got.Context.Items; len(its) != 1 || its[0] != (api.OutboxItem{ID: "i1", Summary: "Review the retry change", State: "open"}) {
 		t.Errorf("items %+v, want the draft's item with its state", its)
 	}
-	if g := page.Groups[0]; g.Workflow != "fake-ack" || g.Title != "fake-ack" {
-		t.Errorf("a workflow the profile lacks heads its group %q %q, want its name", g.Workflow, g.Title)
-	}
 }
 
 func TestTheOutboxOfADraftWithNoTaskHasAnEmptyContext(t *testing.T) {
@@ -130,7 +237,7 @@ func TestTheOutboxOfADraftWithNoTaskHasAnEmptyContext(t *testing.T) {
 	r := newOutboxRig(t)
 	r.proposeAs(t, outbox.Proposal{Text: "hi", Origin: draft.Origin{Kind: draft.OriginUser, Key: "x"}})
 	page := r.outboxPage(t)
-	c := page.Groups[0].Drafts[0].Context
+	c := page.Drafts[0].Context
 	if c.Asks == nil || c.Items == nil || len(c.Asks)+len(c.Items) != 0 {
 		t.Errorf("context %+v, want empty lists", c)
 	}

@@ -341,6 +341,10 @@ label = "Source"
 group = true
 sort  = "text"
 
+[draft_facets.source.values]
+github = "GitHub"
+slack  = "Slack"
+
 [draft_facets.where]
 fact  = "draft.where"
 label = "Where"

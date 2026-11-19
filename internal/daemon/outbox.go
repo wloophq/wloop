@@ -9,14 +9,17 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-// handleOutbox serves the Outbox's drafts, read as GET Drafts reads them, grouped by why they were drafted,
-// each with the asks of its task and the items it is about.
+// handleOutbox serves the Outbox's drafts, read as GET Drafts reads them, each with the asks of its task, the
+// items it is about, its draft facets' values and its search texts, and the draft facets with their heads.
 func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	o := s.deps.Outbox
 	if o == nil {
@@ -28,10 +31,16 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	l := s.loaded()
 	ev := s.taskViews(r.Context(), s.deps.Tasks, false)
 	ctx := whereBy(r.Context(), time.Now().Add(s.whereBudget()))
-	out := make([]api.OutboxDraft, 0, len(ps))
 	pins := s.openPins(r.Context())
+	units := make([]unit.Unit, 0, len(ps))
+	for _, p := range ps {
+		units = append(units, p.Draft.Unit)
+	}
+	rows := ev.rowsOf(r.Context(), units)
+	out := make([]api.OutboxDraft, 0, len(ps))
 	for _, p := range ps {
 		if p.Draft.State == draft.Held && pins[int64(p.Draft.ID)] != 0 {
 			continue
@@ -42,9 +51,25 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		out = append(out, api.OutboxDraft{Draft: d, Context: c})
+		where := rowWhere(l.Views.DraftFacets, rows[p.Draft.Unit].Row.Facets)
+		facets := catalog.FactFacets(l.Views.DraftFacets, draftViewFacts(p.Draft, where, mentioned(p.Draft.Text)))
+		if len(facets) == 0 {
+			facets = nil
+		}
+		out = append(out, api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(d.Text, d.Label, d.Title, d.Where, where)})
 	}
-	writeJSON(w, outboxPage(s.loaded(), out))
+	writeJSON(w, api.OutboxPage{Drafts: out, Facets: catalog.DraftFacets(l.Views.DraftFacets), Heads: outboxHeads(l, out)})
+}
+
+// draftTexts are texts without the empty ones, each once.
+func draftTexts(texts ...string) []string {
+	var out []string
+	for _, t := range texts {
+		if t != "" && !slices.Contains(out, t) {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // draftContext is what d answers: the asks of its task, with the quotes its brief keeps, and its items.
@@ -73,52 +98,74 @@ func (ev *taskViewer) draftContext(ctx context.Context, d api.Draft) (api.DraftC
 	return c, nil
 }
 
-// outboxGroupKey is what a draft's group is: its workflow's, else, for one a person did not write, its purpose's,
-// else the group of the drafts written by hand.
-type outboxGroupKey struct{ workflow, purpose string }
-
-func groupOf(d api.Draft) outboxGroupKey {
-	switch {
-	case d.Origin.Workflow != "":
-		return outboxGroupKey{workflow: d.Origin.Workflow}
-	case d.Origin.Kind == string(draft.OriginUser):
-		return outboxGroupKey{}
+// outboxHeads are l's words for the values ds hold of the draft facets that read who proposed a draft, its
+// workflow and its kind, by facet id, then by value. A kind takes the word of the plugin of the first draft
+// whose plugin words it.
+func outboxHeads(l *intentload.Loaded, ds []api.OutboxDraft) map[string]map[string]api.OutboxHead {
+	heads := map[string]map[string]api.OutboxHead{}
+	for _, f := range l.Views.DraftFacets {
+		var word func(value string, d api.OutboxDraft) (api.OutboxHead, bool)
+		switch f.Fact {
+		case "draft.proposer":
+			word = func(v string, _ api.OutboxDraft) (api.OutboxHead, bool) { return proposerHead(l, v) }
+		case "draft.workflow":
+			word = func(v string, _ api.OutboxDraft) (api.OutboxHead, bool) { return workflowHead(l, v) }
+		case "draft.kind":
+			word = func(v string, d api.OutboxDraft) (api.OutboxHead, bool) {
+				provider, _, _ := strings.Cut(d.Unit, "/")
+				label := l.UI[provider].Drafts[v].Label
+				return api.OutboxHead{Title: label}, label != ""
+			}
+		default:
+			continue
+		}
+		for _, d := range ds {
+			for _, v := range d.Facets[f.ID] {
+				if _, ok := heads[f.ID][v]; ok {
+					continue
+				}
+				if h, ok := word(v, d); ok {
+					if heads[f.ID] == nil {
+						heads[f.ID] = map[string]api.OutboxHead{}
+					}
+					heads[f.ID][v] = h
+				}
+			}
+		}
 	}
-	return outboxGroupKey{purpose: d.Purpose}
+	if len(heads) == 0 {
+		return nil
+	}
+	return heads
 }
 
-// outboxPage groups ds, keeping their order inside each group, and heads each group with l's words: a workflow's
-// [outbox], a purpose's word of gates.toml, or gates.toml's words for the drafts written by hand. The largest
-// group comes first, then by title.
-func outboxPage(l *intentload.Loaded, ds []api.OutboxDraft) api.OutboxPage {
-	workflows := map[string]workflow.Workflow{}
-	for _, w := range l.Workflows {
-		workflows[w.Name] = w
+// proposerHead is the head of v, a draft.proposer value: an intent's [outbox] words, else its label; a
+// workflow's; a rule's word of gates.toml; or gates.toml's words for the drafts written by hand.
+func proposerHead(l *intentload.Loaded, v string) (api.OutboxHead, bool) {
+	by, name, _ := strings.Cut(v, ":")
+	switch by {
+	case "intent":
+		def, ok := l.Registry.Get(dintent.Name(name))
+		h := api.OutboxHead{Title: cmp.Or(def.Outbox.Title, def.Label), About: def.Outbox.About}
+		return h, ok && h.Title != ""
+	case "workflow":
+		return workflowHead(l, name)
+	case "rule":
+		title := l.Gates.Drafts.Rules[name]
+		return api.OutboxHead{Title: title}, title != ""
+	case "user":
+		return api.OutboxHead{Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout}, l.Gates.Drafts.ByHand != ""
 	}
-	words := l.Gates.Drafts
-	byKey := map[outboxGroupKey]int{}
-	page := api.OutboxPage{Groups: []api.OutboxGroup{}}
-	for _, d := range ds {
-		k := groupOf(d.Draft)
-		i, ok := byKey[k]
-		if !ok {
-			g := api.OutboxGroup{Workflow: k.workflow, Purpose: k.purpose}
-			switch w := workflows[k.workflow]; {
-			case k.workflow != "":
-				g.Title, g.About = cmp.Or(w.Outbox.Title, w.Summary, k.workflow), w.Outbox.About
-			case k.purpose != "":
-				g.Title = cmp.Or(words.Purposes[k.purpose], k.purpose)
-			default:
-				g.Title, g.About = words.ByHand, words.ByHandAbout
-			}
-			i = len(page.Groups)
-			byKey[k] = i
-			page.Groups = append(page.Groups, g)
-		}
-		page.Groups[i].Drafts = append(page.Groups[i].Drafts, d)
+	return api.OutboxHead{}, false
+}
+
+// workflowHead is the head of the drafts of the workflow name: its [outbox] words, else its summary.
+func workflowHead(l *intentload.Loaded, name string) (api.OutboxHead, bool) {
+	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == name })
+	if i < 0 {
+		return api.OutboxHead{}, false
 	}
-	slices.SortStableFunc(page.Groups, func(a, b api.OutboxGroup) int {
-		return cmp.Or(len(b.Drafts)-len(a.Drafts), strings.Compare(a.Title, b.Title), strings.Compare(a.Workflow, b.Workflow), strings.Compare(a.Purpose, b.Purpose))
-	})
-	return page
+	w := l.Workflows[i]
+	h := api.OutboxHead{Title: cmp.Or(w.Outbox.Title, w.Summary), About: w.Outbox.About, Workflow: name}
+	return h, h.Title != ""
 }
