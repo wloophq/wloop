@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -278,5 +279,52 @@ func BenchmarkOutbox(b *testing.B) {
 		if rec.Code != 200 {
 			b.Fatalf("GET: %d %s", rec.Code, rec.Body)
 		}
+	}
+}
+
+func TestTheOutboxIsInItsViewsOrder(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	base := r.clock.Now()
+	write := func(hours int, kind draft.Kind, key string) draft.ID {
+		r.clock.set(base.Add(time.Duration(hours) * time.Hour))
+		return r.proposeAs(t, outbox.Proposal{Kind: kind, Text: "draft " + key, Origin: draft.Origin{Kind: draft.OriginUser, Key: key}}).ID
+	}
+	late := write(2, "reply", "late")
+	early := write(0, "nudge", "early")
+	middle := write(1, "reply", "middle")
+	order := func(path string) []draft.ID {
+		t.Helper()
+		var page api.OutboxPage
+		if code := get(t, r.s, path, &page); code != 200 {
+			t.Fatalf("GET %s: %d", path, code)
+		}
+		var ids []draft.ID
+		for _, d := range page.Drafts {
+			ids = append(ids, draft.ID(d.ID))
+		}
+		return ids
+	}
+	if got, want := order(api.OutboxPath), []draft.ID{early, middle, late}; !slices.Equal(got, want) {
+		t.Errorf("bundled Outbox order %v, want the oldest first %v", got, want)
+	}
+
+	l := *r.s.loaded()
+	l.Views.Views = slices.Clone(l.Views.Views)
+	for i, v := range l.Views.Views {
+		if v.ID == "outbox" {
+			l.Views.Views[i].Sort = []intentload.SortKey{{Fact: "draft.created_at", Desc: true}}
+			later := v
+			later.ID, later.Sort = "send-later", []intentload.SortKey{{Fact: "draft.kind"}, {Fact: "draft.created_at"}}
+			l.Views.Views = append(l.Views.Views, later)
+			break
+		}
+	}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	if got, want := order(api.OutboxPath), []draft.ID{late, middle, early}; !slices.Equal(got, want) {
+		t.Errorf("Outbox order %v with its sort descending, want the newest first %v", got, want)
+	}
+	if got, want := order(api.OutboxPath+"?view=send-later"), []draft.ID{early, middle, late}; !slices.Equal(got, want) {
+		t.Errorf("send-later order %v, want by kind then oldest first %v", got, want)
 	}
 }

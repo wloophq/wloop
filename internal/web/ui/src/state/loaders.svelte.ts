@@ -193,9 +193,10 @@ export async function loadQueue(): Promise<void> {
 
 export const OUTBOX_PATH = "/api/outbox";
 
-export async function loadOutbox(): Promise<void> {
+// loadOutbox reads the Outbox as view, an outbox view, orders it.
+export async function loadOutbox(view: string): Promise<void> {
   try {
-    put(outboxState, "page", await getJSON(OUTBOX_PATH));
+    put(outboxState, "page", await getJSON(OUTBOX_PATH + "?" + new URLSearchParams({ view })));
     outboxState.error = "";
   } catch (err) {
     outboxState.error = t("Could not load the Outbox: {error}", { error: (err as Error).message });
@@ -338,7 +339,7 @@ async function loadTaskList(route: Hash): Promise<void> {
     tasksState.error = t("Could not load the {view} list: {error}", { view: route.view, error: (err as Error).message });
     return;
   }
-  if (isOutboxView(route.view)) await loadOutbox();
+  if (isOutboxView(route.view)) await loadOutbox(route.view);
   if (page.specs && page.specs !== (tasksState.catalog || {}).version) await readViews();
 }
 
@@ -397,7 +398,7 @@ export async function loadReviewStep(): Promise<void> {
     tasksState.error = t("Could not load the {step} step: {error}", { step: step.label, error: (err as Error).message });
     return;
   }
-  if (isOutboxView(step.view)) await loadOutbox();
+  if (isOutboxView(step.view)) await loadOutbox(step.view);
 }
 
 export function taskPath(id: string, ...rest: string[]): string {

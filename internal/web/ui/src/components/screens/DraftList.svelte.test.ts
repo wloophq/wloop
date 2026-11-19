@@ -40,7 +40,7 @@ describe("the Outbox through the lens", () => {
   it("groups by who proposed each draft, each head in the served words", () => {
     const c = render(TaskViewPage).container;
     expect(heads(body(c))).toEqual(["Reviews 1 draft", "Written by hand 1 draft", "Ask who hasn't answered 2 drafts"]);
-    expect(cards(body(c))).toEqual([10, 9, 8, 7]);
+    expect(cards(body(c))).toEqual([10, 9, 7, 8]);
     expect(c.querySelector("#tasks-body > .outbox")).not.toBeNull();
   });
 
@@ -125,7 +125,7 @@ describe("a workflow's head", () => {
     const order = Array.from(c.querySelectorAll("*")).filter((x) => marks.some((m) => x.classList.contains(m)))
       .map((x) => (x.getAttribute("data-draft") ? "card " + x.getAttribute("data-draft") : x.textContent));
     expect(order).toEqual(["Reviews", "1 draft", "Drafted by a review round on someone else's pull request.", "card 10", "Written by hand", "1 draft", "card 9",
-      "Ask who hasn't answered", "2 drafts", "fake-nudge", "Drafted when a conversation where you asked something goes quiet.", "card 8", "card 7"]);
+      "Ask who hasn't answered", "2 drafts", "fake-nudge", "Drafted when a conversation where you asked something goes quiet.", "card 7", "card 8"]);
     const buttons = () => Array.from(c.querySelectorAll(".ob-stop button")).map((b) => b.getAttribute("data-focus"));
     expect(buttons()).toEqual(["outbox:stop:fake-nudge"]);
     await fireEvent.click(c.querySelector('[data-focus="outbox:stop:fake-nudge"]')!);
@@ -151,7 +151,7 @@ describe("a workflow's head", () => {
     const c = render(DraftList, { page: outboxState.page, lens: lensOf(readHash()) }).container;
     const card = c.querySelector('[data-draft="8"]');
     const next = fixture("outbox-page.json");
-    next.drafts[2].text = "Still waiting?";
+    next.drafts[1].text = "Still waiting?";
     outboxState.page.drafts = next.drafts;
     flushSync();
     expect(card).not.toBeNull();

@@ -115,11 +115,11 @@ describe("the Review's Outbox step", () => {
     const gets: string[] = [];
     net.fetch = async (url: string) => {
       gets.push(url);
-      return new Response(JSON.stringify(url === "/api/outbox" ? fixture("outbox-page.json") : { tasks: [] }), { status: 200 });
+      return new Response(JSON.stringify(url.startsWith("/api/outbox") ? fixture("outbox-page.json") : { tasks: [] }), { status: 200 });
     };
     await loadReviewStep();
-    expect(gets).toEqual(["/api/tasks?view=outbox", "/api/outbox"]);
-    expect(outboxState.page.drafts.map((d: J) => d.id)).toEqual([10, 9, 8, 7]);
+    expect(gets).toEqual(["/api/tasks?view=outbox", "/api/outbox?view=outbox"]);
+    expect(outboxState.page.drafts.map((d: J) => d.id)).toEqual([7, 8, 9, 10]);
   });
 
   it("draws the Outbox's list, grouped by who proposed each draft", () => {
@@ -129,7 +129,7 @@ describe("the Review's Outbox step", () => {
     const c = render(TaskViewPage).container;
     const list = c.querySelector("#tasks-body .outbox")!;
     expect(Array.from(list.querySelectorAll(".ob-title")).map((n) => n.textContent)).toEqual(["Reviews", "Written by hand", "Ask who hasn't answered"]);
-    expect(Array.from(list.querySelectorAll("[data-draft]")).map((n) => n.getAttribute("data-draft"))).toEqual(["10", "9", "8", "7"]);
+    expect(Array.from(list.querySelectorAll("[data-draft]")).map((n) => n.getAttribute("data-draft"))).toEqual(["10", "9", "7", "8"]);
     expect(list.querySelectorAll(".ob-stop button").length).toBe(1);
   });
 });

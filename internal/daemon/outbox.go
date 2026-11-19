@@ -16,10 +16,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // handleOutbox serves the Outbox's drafts, read as GET Drafts reads them, each with the asks of its task, the
-// items it is about, its draft facets' values and its search texts, and the draft facets with their heads.
+// items it is about, its draft facets' values and its search texts, in the order the sort of the Outbox view
+// the query names (else the profile's first) gives them, and the draft facets with their heads.
 func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	o := s.deps.Outbox
 	if o == nil {
@@ -40,7 +42,11 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 		units = append(units, p.Draft.Unit)
 	}
 	rows := ev.rowsOf(r.Context(), units)
-	out := make([]api.OutboxDraft, 0, len(ps))
+	type faced struct {
+		draft api.OutboxDraft
+		facts workflow.Facts
+	}
+	listed := make([]faced, 0, len(ps))
 	for _, p := range ps {
 		if p.Draft.State == draft.Held && pins[int64(p.Draft.ID)] != 0 {
 			continue
@@ -52,13 +58,36 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		where := rowWhere(l.Views.DraftFacets, rows[p.Draft.Unit].Row.Facets)
-		facets := catalog.FactFacets(l.Views.DraftFacets, draftViewFacts(p.Draft, where, mentioned(p.Draft.Text)))
+		facts := draftViewFacts(p.Draft, where, mentioned(p.Draft.Text))
+		facets := catalog.FactFacets(l.Views.DraftFacets, facts)
 		if len(facets) == 0 {
 			facets = nil
 		}
-		out = append(out, api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(d.Text, d.Label, d.Title, d.Where, where)})
+		listed = append(listed, faced{api.OutboxDraft{Draft: d, Context: c, Facets: facets, Texts: draftTexts(d.Text, d.Label, d.Title, d.Where, where)}, facts})
+	}
+	_ = catalog.SortBy(l.Views, outboxView(l.Views, r.URL.Query().Get("view")), listed, func(f faced) (workflow.Facts, error) { return f.facts, nil })
+	out := make([]api.OutboxDraft, 0, len(listed))
+	for _, f := range listed {
+		out = append(out, f.draft)
 	}
 	writeJSON(w, api.OutboxPage{Drafts: out, Facets: catalog.DraftFacets(l.Views.DraftFacets), Heads: outboxHeads(l, out)})
+}
+
+// outboxView is id when it is a view def draws in the outbox layout, else the first such view; "" for none.
+func outboxView(def intentload.ViewsDef, id string) string {
+	first := ""
+	for _, v := range def.Views {
+		if v.Layout != builtin.ViewLayoutOutbox {
+			continue
+		}
+		if v.ID == id {
+			return id
+		}
+		if first == "" {
+			first = v.ID
+		}
+	}
+	return first
 }
 
 // draftTexts are texts without the empty ones, each once.

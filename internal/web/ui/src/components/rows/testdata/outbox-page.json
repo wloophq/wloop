@@ -1,228 +1,6 @@
 {
  "drafts": [
   {
-   "id": 10,
-   "unit": "github/acme/web#3",
-   "items": null,
-   "task": "t-1",
-   "kind": "review",
-   "purpose": "review",
-   "delivery": "",
-   "effects": [
-    "task.nudged"
-   ],
-   "target": "acme/web#3",
-   "broadcast": "",
-   "where": "acme/web#3",
-   "text": "Looks good overall",
-   "why": "No answer since Tuesday",
-   "language": "pt-BR",
-   "reaction": "",
-   "original": "",
-   "edited": false,
-   "origin": {
-    "kind": "turn",
-    "turn_seq": 4,
-    "intent": "review",
-    "workflow": "",
-    "rule": ""
-   },
-   "state": "held",
-   "error": "",
-   "reason": "",
-   "permalink": "https://example.test/thread",
-   "gate": 12,
-   "deadline": null,
-   "intents": {
-    "approved": "approve",
-    "rejected": "discard"
-   },
-   "actions": [],
-   "rev": 3,
-   "created_at": "2026-11-04T11:00:00Z",
-   "updated_at": "2026-11-04T11:00:00Z",
-   "context": {
-    "asks": [],
-    "items": []
-   },
-   "label": "acme/web#3",
-   "facets": {
-    "proposer": [
-     "intent:review"
-    ],
-    "kind": [
-     "review"
-    ],
-    "source": [
-     "github"
-    ],
-    "where": [
-     "acme/web"
-    ],
-    "state": [
-     "held"
-    ],
-    "age": [
-     "2026-11-04T11:00:00Z"
-    ]
-   },
-   "texts": [
-    "Looks good overall",
-    "acme/web#3",
-    "acme/web"
-   ]
-  },
-  {
-   "id": 9,
-   "unit": "github/acme/api#8",
-   "items": null,
-   "task": "t-1",
-   "kind": "comment",
-   "purpose": "comment",
-   "delivery": "",
-   "effects": [
-    "task.nudged"
-   ],
-   "target": "acme/api#8",
-   "broadcast": "",
-   "where": "acme/api#8",
-   "text": "Thanks, @{github:alice}!",
-   "why": "No answer since Tuesday",
-   "language": "pt-BR",
-   "reaction": "",
-   "original": "",
-   "edited": false,
-   "origin": {
-    "kind": "user",
-    "turn_seq": 0,
-    "intent": "",
-    "workflow": "",
-    "rule": ""
-   },
-   "state": "held",
-   "error": "",
-   "reason": "",
-   "permalink": "https://example.test/thread",
-   "gate": 12,
-   "deadline": null,
-   "intents": {
-    "approved": "approve",
-    "rejected": "discard"
-   },
-   "actions": [],
-   "rev": 3,
-   "created_at": "2026-11-04T10:30:00Z",
-   "updated_at": "2026-11-04T10:30:00Z",
-   "context": {
-    "asks": null,
-    "items": null
-   },
-   "label": "acme/api#8",
-   "facets": {
-    "proposer": [
-     "user"
-    ],
-    "kind": [
-     "comment"
-    ],
-    "source": [
-     "github"
-    ],
-    "where": [
-     "acme/api"
-    ],
-    "people": [
-     "github:alice"
-    ],
-    "state": [
-     "held"
-    ],
-    "age": [
-     "2026-11-04T10:30:00Z"
-    ]
-   },
-   "texts": [
-    "Thanks, @{github:alice}!",
-    "acme/api#8",
-    "acme/api"
-   ]
-  },
-  {
-   "id": 8,
-   "unit": "github/acme/web#5",
-   "items": null,
-   "task": "t-1",
-   "kind": "nudge",
-   "purpose": "nudge",
-   "delivery": "",
-   "effects": [
-    "task.nudged"
-   ],
-   "target": "acme/web#5",
-   "broadcast": "",
-   "where": "acme/web#5",
-   "text": "Still waiting on the upload fix?",
-   "why": "No answer since Tuesday",
-   "language": "pt-BR",
-   "reaction": "",
-   "original": "",
-   "edited": false,
-   "origin": {
-    "kind": "workflow",
-    "turn_seq": 0,
-    "intent": "",
-    "workflow": "fake-nudge",
-    "rule": ""
-   },
-   "state": "held",
-   "error": "",
-   "reason": "",
-   "permalink": "https://example.test/thread",
-   "gate": 12,
-   "deadline": null,
-   "intents": {
-    "approved": "approve",
-    "rejected": "discard"
-   },
-   "actions": [],
-   "rev": 3,
-   "created_at": "2026-11-04T10:15:00Z",
-   "updated_at": "2026-11-04T10:15:00Z",
-   "context": {
-    "asks": [],
-    "items": []
-   },
-   "label": "acme/web#5",
-   "facets": {
-    "proposer": [
-     "workflow:fake-nudge"
-    ],
-    "workflow": [
-     "fake-nudge"
-    ],
-    "kind": [
-     "nudge"
-    ],
-    "source": [
-     "github"
-    ],
-    "where": [
-     "acme/web"
-    ],
-    "state": [
-     "held"
-    ],
-    "age": [
-     "2026-11-04T10:15:00Z"
-    ]
-   },
-   "texts": [
-    "Still waiting on the upload fix?",
-    "acme/web#5",
-    "acme/web"
-   ]
-  },
-  {
    "id": 7,
    "unit": "github/acme/api#8",
    "items": null,
@@ -310,6 +88,228 @@
     "Any news on the retry change?",
     "acme/api#8",
     "acme/api"
+   ]
+  },
+  {
+   "id": 8,
+   "unit": "github/acme/web#5",
+   "items": null,
+   "task": "t-1",
+   "kind": "nudge",
+   "purpose": "nudge",
+   "delivery": "",
+   "effects": [
+    "task.nudged"
+   ],
+   "target": "acme/web#5",
+   "broadcast": "",
+   "where": "acme/web#5",
+   "text": "Still waiting on the upload fix?",
+   "why": "No answer since Tuesday",
+   "language": "pt-BR",
+   "reaction": "",
+   "original": "",
+   "edited": false,
+   "origin": {
+    "kind": "workflow",
+    "turn_seq": 0,
+    "intent": "",
+    "workflow": "fake-nudge",
+    "rule": ""
+   },
+   "state": "held",
+   "error": "",
+   "reason": "",
+   "permalink": "https://example.test/thread",
+   "gate": 12,
+   "deadline": null,
+   "intents": {
+    "approved": "approve",
+    "rejected": "discard"
+   },
+   "actions": [],
+   "rev": 3,
+   "created_at": "2026-11-04T10:15:00Z",
+   "updated_at": "2026-11-04T10:15:00Z",
+   "context": {
+    "asks": [],
+    "items": []
+   },
+   "label": "acme/web#5",
+   "facets": {
+    "proposer": [
+     "workflow:fake-nudge"
+    ],
+    "workflow": [
+     "fake-nudge"
+    ],
+    "kind": [
+     "nudge"
+    ],
+    "source": [
+     "github"
+    ],
+    "where": [
+     "acme/web"
+    ],
+    "state": [
+     "held"
+    ],
+    "age": [
+     "2026-11-04T10:15:00Z"
+    ]
+   },
+   "texts": [
+    "Still waiting on the upload fix?",
+    "acme/web#5",
+    "acme/web"
+   ]
+  },
+  {
+   "id": 9,
+   "unit": "github/acme/api#8",
+   "items": null,
+   "task": "t-1",
+   "kind": "comment",
+   "purpose": "comment",
+   "delivery": "",
+   "effects": [
+    "task.nudged"
+   ],
+   "target": "acme/api#8",
+   "broadcast": "",
+   "where": "acme/api#8",
+   "text": "Thanks, @{github:alice}!",
+   "why": "No answer since Tuesday",
+   "language": "pt-BR",
+   "reaction": "",
+   "original": "",
+   "edited": false,
+   "origin": {
+    "kind": "user",
+    "turn_seq": 0,
+    "intent": "",
+    "workflow": "",
+    "rule": ""
+   },
+   "state": "held",
+   "error": "",
+   "reason": "",
+   "permalink": "https://example.test/thread",
+   "gate": 12,
+   "deadline": null,
+   "intents": {
+    "approved": "approve",
+    "rejected": "discard"
+   },
+   "actions": [],
+   "rev": 3,
+   "created_at": "2026-11-04T10:30:00Z",
+   "updated_at": "2026-11-04T10:30:00Z",
+   "context": {
+    "asks": null,
+    "items": null
+   },
+   "label": "acme/api#8",
+   "facets": {
+    "proposer": [
+     "user"
+    ],
+    "kind": [
+     "comment"
+    ],
+    "source": [
+     "github"
+    ],
+    "where": [
+     "acme/api"
+    ],
+    "people": [
+     "github:alice"
+    ],
+    "state": [
+     "held"
+    ],
+    "age": [
+     "2026-11-04T10:30:00Z"
+    ]
+   },
+   "texts": [
+    "Thanks, @{github:alice}!",
+    "acme/api#8",
+    "acme/api"
+   ]
+  },
+  {
+   "id": 10,
+   "unit": "github/acme/web#3",
+   "items": null,
+   "task": "t-1",
+   "kind": "review",
+   "purpose": "review",
+   "delivery": "",
+   "effects": [
+    "task.nudged"
+   ],
+   "target": "acme/web#3",
+   "broadcast": "",
+   "where": "acme/web#3",
+   "text": "Looks good overall",
+   "why": "No answer since Tuesday",
+   "language": "pt-BR",
+   "reaction": "",
+   "original": "",
+   "edited": false,
+   "origin": {
+    "kind": "turn",
+    "turn_seq": 4,
+    "intent": "review",
+    "workflow": "",
+    "rule": ""
+   },
+   "state": "held",
+   "error": "",
+   "reason": "",
+   "permalink": "https://example.test/thread",
+   "gate": 12,
+   "deadline": null,
+   "intents": {
+    "approved": "approve",
+    "rejected": "discard"
+   },
+   "actions": [],
+   "rev": 3,
+   "created_at": "2026-11-04T11:00:00Z",
+   "updated_at": "2026-11-04T11:00:00Z",
+   "context": {
+    "asks": [],
+    "items": []
+   },
+   "label": "acme/web#3",
+   "facets": {
+    "proposer": [
+     "intent:review"
+    ],
+    "kind": [
+     "review"
+    ],
+    "source": [
+     "github"
+    ],
+    "where": [
+     "acme/web"
+    ],
+    "state": [
+     "held"
+    ],
+    "age": [
+     "2026-11-04T11:00:00Z"
+    ]
+   },
+   "texts": [
+    "Looks good overall",
+    "acme/web#3",
+    "acme/web"
    ]
   }
  ],
