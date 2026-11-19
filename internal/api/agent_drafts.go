@@ -18,7 +18,9 @@ type AgentDraftProposal struct {
 	// Basis is what the agent read the unit at, such as a pull request's head, for a kind that takes one.
 	Basis string `json:"basis,omitempty"`
 	// Hold keeps the draft waiting for the user whatever the approval rules say.
-	Hold    bool     `json:"hold,omitempty"`
+	Hold bool `json:"hold,omitempty"`
+	// Draft false posts it at once from a session the user drives; true or absent makes a draft.
+	Draft   *bool    `json:"draft,omitempty"`
 	Items   []string `json:"items,omitempty"`
 	Effects []string `json:"effects,omitempty"`
 	Why     string   `json:"why,omitempty"`
