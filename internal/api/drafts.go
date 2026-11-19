@@ -114,7 +114,7 @@ type Draft struct {
 	ByRule string `json:"by_rule,omitempty"`
 	// Notes are the profile's sentences on how the draft stands (gates.toml's drafts.stale and drafts.hold,
 	// notices.toml's draft_by_rule), in that order, and, on the draft an agent session just wrote and asked to
-	// send, last, notices.toml's draft_rule_sends or draft_waits.
+	// send, last, notices.toml's draft_sent.
 	Notes []string `json:"notes,omitempty"`
 }
 

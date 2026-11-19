@@ -38,17 +38,27 @@ func TestApprovingAPinnedDraftPicksItsOption(t *testing.T) {
 	}
 }
 
-// TestApprovingAPinnedDraftIsRefusedToItsReviser refuses a session that revised a pinned draft the approval of its
-// card, as picking its option would be, and leaves the question and both drafts open.
-func TestApprovingAPinnedDraftIsRefusedToItsReviser(t *testing.T) {
+// TestApprovingAPinnedDraftThroughItsReviserPicksItsOption approves, through a session the user drives that revised a
+// pinned draft, the draft's card as the person would: the question is answered with its option, the other
+// option's draft withdrawn; a session the user does not drive leaves the question and both drafts open.
+func TestApprovingAPinnedDraftThroughItsReviserPicksItsOption(t *testing.T) {
 	ctx := context.Background()
 	r, od, m := draftRig(t, "driver", "reviser")
-	err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "reviser"})
+	err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "stranger"})
 	if !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("the reviser's approval: %v, want ErrRefused", err)
+		t.Fatalf("an unattended session's approval: %v, want ErrRefused", err)
 	}
 	if q := r.gateOf(t, m); q.Status != gate.Open || od.gateOf(42).Status != gate.Open || od.gateOf(43).Status != gate.Open || len(od.approvals) != 0 {
 		t.Fatalf("question %s, drafts %s and %s, approvals %+v: want all open", q.Status, od.gateOf(42).Status, od.gateOf(43).Status, od.approvals)
+	}
+	if err := r.gates.Resolve(ctx, od.gateOf(42).ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "reviser"}); err != nil {
+		t.Fatalf("the reviser's approval: %v", err)
+	}
+	if q := r.gateOf(t, m); q.Status != gate.Answered || od.gateOf(42).Status != gate.Approved {
+		t.Fatalf("question %s, draft 42 %s: want the option picked", q.Status, od.gateOf(42).Status)
+	}
+	if want := []withdrawal{{43, messages.ReasonOtherOption}}; !slices.Equal(od.withdrawn, want) {
+		t.Fatalf("withdrawn %+v, want the other option's draft", od.withdrawn)
 	}
 }
 

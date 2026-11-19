@@ -61,8 +61,7 @@ func (s *Service) OptionDraft(ctx context.Context, question gate.Gate, r gates.R
 
 // approvedOption says whether g, m's answered gate, approved the draft the answer a picks, as
 // OptionDraft named it: the draft gate approved by g's own resolver. The gates service let that resolver
-// approve it (a person, or a session the user drives the gate does not stamp) at the pinned rev, which stays
-// the draft's until its content changes. It then
+// approve it (a person, or a session the user drives) at the rev they saw. It then
 // withdraws the drafts the other options point to, so the answer ends the turn on the draft's send instead
 // of resuming it; a call made again completes what is left.
 func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Message, a Answer) (bool, error) {
@@ -70,7 +69,7 @@ func (s *Service) approvedOption(ctx context.Context, g gate.Gate, m message.Mes
 		return false, nil
 	}
 	ref, ok := pickedDraft(m, a)
-	if !ok || g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() || g.BySession != "" && g.BySession == g.Session {
+	if !ok || g.Kind != gate.KindQuestion || g.Status != gate.Answered || !g.ByUser() {
 		return false, nil
 	}
 	held := s.turnDrafts(m)

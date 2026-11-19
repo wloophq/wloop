@@ -133,9 +133,19 @@ func (s *Server) handleGate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	intent := r.PathValue("intent")
-	if g.Kind == gate.KindDraft && s.deps.Outbox != nil {
+	_, picksAt := req.Args["rev"]
+	switch {
+	case g.Kind == gate.KindDraft && s.deps.Outbox != nil:
 		err = s.resolveDraftGateAt(ctx, g, intent, req.Args, q)
-	} else {
+	case g.Kind == gate.KindQuestion && picksAt && s.deps.Outbox != nil:
+		source := turn.Cockpit
+		if q.Actor == task.ActorPerson {
+			source, err = answerSource(req.Source)
+		}
+		if err == nil {
+			err = s.pickOption(messages.WithDelivery(ctx, &messages.Delivery{Source: source}), g, intent, req.Args, q)
+		}
+	default:
 		source := turn.Cockpit
 		if q.Actor == task.ActorPerson {
 			source, err = answerSource(req.Source)
@@ -163,6 +173,8 @@ func writeGateError(w http.ResponseWriter, err error) {
 	case errors.As(err, &off), errors.As(err, &none), errors.Is(err, outbox.ErrConflict), errors.Is(err, outbox.ErrInvalid),
 		errors.Is(err, outbox.ErrNotFound), errors.As(err, new(badRequest)):
 		writeDraftError(w, err)
+	case errors.Is(err, gates.ErrMoved):
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, gates.ErrRefused):
 		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, gates.ErrIntent):
@@ -382,6 +394,63 @@ func (ev *taskViewer) openGates(ctx context.Context, e task.Task, v *api.TaskVie
 		}
 	}
 	return nil
+}
+
+// pickOption answers question gate g with intent as actor, picking the option its args' answer names, whose draft
+// it approves at the args' rev, the rev actor saw, with the args' text and payload as their edit of it, all in one
+// step under draftMu and the question's claim. A draft no longer at that rev refuses the pick, with nothing changed.
+func (s *Server) pickOption(ctx context.Context, g gate.Gate, intent string, args map[string]string, actor requester) error {
+	if !actor.user() {
+		return fmt.Errorf("%w: question gate %d %s", gates.ErrRefused, g.ID, unattended("is answered: it"))
+	}
+	edit, err := draftEditOf(args)
+	if err != nil {
+		return err
+	}
+	rev := *edit.Rev
+	s.draftMu.Lock()
+	defer s.draftMu.Unlock()
+	o := s.deps.Outbox
+	apply := func(ctx context.Context, drafted gate.Gate) (gate.Gate, error) {
+		n, err := strconv.ParseInt(drafted.Subject, 10, 64)
+		if err != nil {
+			return gate.Gate{}, fmt.Errorf("draft gate %d names no draft: %q", drafted.ID, drafted.Subject)
+		}
+		id := draft.ID(n)
+		d, err := o.Prepare(ctx, id, rev)
+		if err != nil {
+			return gate.Gate{}, err
+		}
+		if p := o.PublisherOf(d); !s.pluginEnabled(p) {
+			return gate.Gate{}, pluginOff{p}
+		}
+		if !edit.changes(d) {
+			return drafted, nil
+		}
+		return s.applyEdit(ctx, id, edit, rev, actor)
+	}
+	r := gates.Resolution{Intent: intent, Answer: args["answer"], By: actor.Actor, Session: actor.Session}
+	return s.deps.Gates.PickOption(ctx, g.ID, r, rev, apply)
+}
+
+// draftEditOf is the edit args carry: their rev, required, and their text and payload.
+func draftEditOf(args map[string]string) (draftEdit, error) {
+	rev, err := strconv.ParseInt(args["rev"], 10, 64)
+	if err != nil || rev < 1 {
+		return draftEdit{}, badRequest{fmt.Sprintf("rev is the revision of the draft you saw, not %q", args["rev"])}
+	}
+	e := draftEdit{Rev: &rev}
+	if t, ok := args["text"]; ok {
+		e.Text = &t
+	}
+	if raw, ok := args["payload"]; ok {
+		if !json.Valid([]byte(raw)) {
+			return draftEdit{}, badRequest{fmt.Sprintf("payload is the draft's payload as JSON, not %q", raw)}
+		}
+		p := json.RawMessage(raw)
+		e.Payload = &p
+	}
+	return e, nil
 }
 
 // resolveDraftGateAt resolves draft gate g with intent as actor, under draftMu: an approval readies its draft at the

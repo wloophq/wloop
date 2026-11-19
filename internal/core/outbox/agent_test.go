@@ -339,14 +339,11 @@ func TestFailedRevisedGoesHeld(t *testing.T) {
 	}
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e},
 		Sessions: driven{"s-worker": true}})
-	if err := e.decider.Resolve(ctx, e.gate(d.ID).ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "s-worker"}); !errors.Is(err, gates.ErrRefused) {
-		t.Fatalf("the reviser approved its revision: %v", err)
-	}
-	if _, err := e.approve(d.ID, nil); err != nil {
-		t.Fatal(err)
+	if err := e.decider.Resolve(ctx, e.gate(d.ID).ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "s-worker"}); err != nil {
+		t.Fatalf("the reviser, a session the user drives, approving its revision: %v", err)
 	}
 	if sent, _, err := e.svc.Send(ctx); sent != 1 || err != nil {
-		t.Fatalf("a person's approval: sent %d, %v", sent, err)
+		t.Fatalf("the user's approval through the reviser: sent %d, %v", sent, err)
 	}
 }
 

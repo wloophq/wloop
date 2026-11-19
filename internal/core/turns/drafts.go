@@ -273,13 +273,9 @@ func (s *Service) draftGate(ctx context.Context, d draft.Draft) (gate.Gate, bool
 	return s.DraftGates.GateOf(ctx, d)
 }
 
-// UserApproved says whether g, d's gate, approved d by the user: a person, or a session the user drives
-// that is not one that proposed or revised d.
+// UserApproved says whether g, d's gate, approved d by the user: a person, or a session the user drives.
 func UserApproved(g gate.Gate, d draft.Draft) bool {
-	if g.Kind != gate.KindDraft || g.Subject != strconv.FormatInt(int64(d.ID), 10) || g.Status != gate.Approved || !g.ByUser() {
-		return false
-	}
-	return !g.Stamps(g.BySession)
+	return g.Kind == gate.KindDraft && g.Subject == strconv.FormatInt(int64(d.ID), 10) && g.Status == gate.Approved && g.ByUser()
 }
 
 // UnheldPin is a pin of a record's question, at Where in the record, on draft Draft that no answer decides: its

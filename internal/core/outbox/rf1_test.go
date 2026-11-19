@@ -123,7 +123,9 @@ func TestACrossUnitDraftCountsAsOutside(t *testing.T) {
 	}
 }
 
-func TestTwoRevisersOfAFailedDraftCannotApproveEachOther(t *testing.T) {
+// Two sessions revise a failed draft at once: one revision wins and waits on one gate, which only a session the
+// user drives approves.
+func TestTwoRevisersOfAFailedDraftLeaveOneGateForTheUser(t *testing.T) {
 	e, bases := reviewEnv()
 	withPolicy(e, sendsPosts)
 	d := e.propose(review("REQUEST_CHANGES"))
@@ -154,14 +156,18 @@ func TestTwoRevisersOfAFailedDraftCannotApproveEachOther(t *testing.T) {
 		t.Fatalf("open gates %+v, want one", open)
 	}
 	e.decider = gates.New(gates.Deps{Store: e.gates, Reader: e.gates, Profile: draftProfile{}, Clock: e.clock, Publisher: publishTo{e},
-		Sessions: driven{"s-a": true, "s-b": true}})
-	for _, g := range open {
-		for _, s := range []string{"s-a", "s-b"} {
-			_ = e.decider.Resolve(ctx, g.ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: s})
-		}
+		Sessions: driven{"s-b": true}})
+	if err := e.decider.Resolve(ctx, open[0].ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "s-a"}); !errors.Is(err, gates.ErrRefused) {
+		t.Fatalf("a session the user does not drive approved B's revision: %v", err)
 	}
 	if sent, _, _ := e.svc.Send(ctx); sent != 0 {
-		t.Fatalf("B's revision posted, approved by a session")
+		t.Fatalf("B's revision posted without the user")
+	}
+	if err := e.decider.Resolve(ctx, open[0].ID, gates.Resolution{Intent: "approve", By: task.ActorAgent, Session: "s-b"}); err != nil {
+		t.Fatalf("B, a session the user drives, approving its revision: %v", err)
+	}
+	if sent, _, _ := e.svc.Send(ctx); sent != 1 {
+		t.Fatalf("B's revision did not post once the user approved it through B")
 	}
 }
 

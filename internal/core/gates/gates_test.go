@@ -127,7 +127,6 @@ func TestNoUnattendedAgentResolvesAGate(t *testing.T) {
 	for _, r := range []gates.Resolution{
 		{Intent: "answer", Answer: "yes", By: task.ActorAgent},
 		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-worker"},
-		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-user"},
 		{Intent: "answer", Answer: "yes", By: task.ActorAgent, Session: "s-user", Rule: "rule[0]"},
 		{Intent: "dismiss", By: task.ActorPlugin},
 		{Intent: "dismiss"},
@@ -154,8 +153,8 @@ func TestNoUnattendedAgentResolvesAGate(t *testing.T) {
 	}
 }
 
-// Authority comes from the user: through a session they drive an agent resolves a gate of every kind, but not
-// one its own turn produced; an unattended session resolves none.
+// Authority comes from the user: through a session they drive an agent resolves a gate of every kind, one its own
+// turn produced among them; an unattended session resolves none.
 func TestOnlyAUserDrivenSessionResolvesAGateOfEveryKind(t *testing.T) {
 	ctx := context.Background()
 	var prof profile
@@ -171,7 +170,8 @@ func TestOnlyAUserDrivenSessionResolvesAGateOfEveryKind(t *testing.T) {
 				want                  bool
 			}{
 				{"a worker session", "", "s-worker", false},
-				{"a user-driven session on its own turn's subject", "s-user", "s-user", false},
+				{"a user-driven session on its own turn's subject", "s-user", "s-user", true},
+				{"a worker session on its own turn's subject", "s-worker", "s-worker", false},
 				{"a user-driven session", "s-worker", "s-user", true},
 			} {
 				g := f.open(t, gate.Gate{Kind: k, Session: c.origin}, nil)

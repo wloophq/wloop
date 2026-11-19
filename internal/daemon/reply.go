@@ -105,7 +105,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(ctx, d, c.Send)}})
+	writeJSON(w, api.TaskResult{Task: view, Lines: []string{s.userDraftLine(d)}})
 }
 
 // replyDraft is the draft a reply on e writes: on its first unit, for the task and its items there.
@@ -194,15 +194,8 @@ func sendArg(raw string) (bool, error) {
 	return false, fmt.Errorf("%w: send is \"now\" or \"draft\", not %q", coretasks.ErrArgs, raw)
 }
 
-// userDraftLine says where a draft written on a person's route went, as the profile words it: a session's
-// asked to be sent says whether a rule of the user's sent it or it waits for them.
-func (s *Server) userDraftLine(ctx context.Context, d draft.Draft, send bool) string {
-	if send && d.Origin.Session != "" {
-		if g, ok, err := s.deps.Outbox.GateOf(ctx, d); err == nil && ok && g.Status == gate.Approved && !g.ByUser() {
-			return s.notice(builtin.NoticeDraftRuleSends, map[string]any{"Draft": int64(d.ID), "Rule": g.Rule})
-		}
-		return s.notice(builtin.NoticeDraftWaits, map[string]any{"Draft": int64(d.ID)})
-	}
+// userDraftLine says where a draft written on a person's route went, as the profile words it.
+func (s *Server) userDraftLine(d draft.Draft) string {
 	if d.State == draft.Queued {
 		return s.notice(builtin.NoticeDraftSent, map[string]any{"Draft": int64(d.ID)})
 	}
@@ -250,15 +243,14 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	detail := s.draftDetail(ctx, d, g, nil)
 	if c.Send && d.Origin.ByAgent() {
-		detail.Notes = append(detail.Notes, s.userDraftLine(ctx, d, true))
+		detail.Notes = append(detail.Notes, s.userDraftLine(d))
 	}
 	writeJSON(w, detail)
 }
 
-// writeUserDraft proposes the draft written on a person's route. A person's waits whatever the unit's policy,
-// and c.Send approves its gate right away: the same approval and publish path a draft takes from the Outbox.
-// An agent session's is the session's, stamped so it never resolves its gate, and c.Send leaves it to the
-// user's approval policy, as any agent's draft: a rule of theirs sends it, or it waits for them.
+// writeUserDraft proposes the draft written on a person's route, which waits whatever the unit's policy, and
+// c.Send approves its gate right away: the same approval and publish path a draft takes from the Outbox. An
+// agent session's, which only a session the user drives sends, is the session's, stamped with it.
 func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q requester) (draft.Draft, error) {
 	if c.Send && !q.user() {
 		return draft.Draft{}, fmt.Errorf("%w: a draft sent at once %s", gates.ErrRefused, unattended("is approved: it"))
@@ -291,9 +283,6 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	origin, policy := draft.Origin{Kind: draft.OriginUser}, draft.Fixed(draft.Approval{Mode: draft.Wait})
 	if q.Actor == task.ActorAgent {
 		origin = s.sessionOrigin(ctx, q.Session, c.Unit)
-		if c.Send {
-			policy = nil
-		}
 	}
 	o := s.deps.Outbox
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Task: c.Task, Kind: kind, Text: c.Text, Target: strings.TrimSpace(c.Target),
@@ -301,7 +290,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate, q reques
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}
-	if err != nil || !c.Send || origin.ByAgent() {
+	if err != nil || !c.Send {
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)

@@ -21,8 +21,8 @@ func TestReattackSessionsThroughTheHook(t *testing.T) {
 		rerr := r.gates.Resolve(messages.WithDelivery(ctx, &messages.Delivery{}), open[i].ID,
 			gates.Resolution{Intent: "answer", Answer: "approve", By: task.ActorAgent, Session: s})
 		t.Logf("%s: err %v, draft gate %s, approvals %+v", s, rerr, od.gateOf(42).Status, od.approvals)
-		if s != "driver" && od.gateOf(42).Status == gate.Approved {
-			t.Errorf("%s approved draft 42", s)
+		if approved := od.gateOf(42).Status == gate.Approved; approved != (s != "stranger") {
+			t.Errorf("%s: draft 42 approved %v; only a session the user drives approves it", s, approved)
 		}
 	}
 }

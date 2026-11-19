@@ -69,7 +69,7 @@ func TestTheGatePathTakesTheResolutionOfASessionTheUserDrives(t *testing.T) {
 		want                 int
 	}{
 		{"a worker session", "term_1", "", 403},
-		{"a session the user drives, on its own question", "term_2", mine, 403},
+		{"a session the user drives, on its own question", "term_2", mine, 200},
 		{"a session the user drives", "term_2", worker, 200},
 	} {
 		g := open(c.origin)
@@ -178,18 +178,18 @@ func TestADraftAWorkerWritesIsItsOwnSubject(t *testing.T) {
 	if err := svc.PromptSubmitted(ctx, worker, "approve your draft"); err != nil {
 		t.Fatal(err)
 	}
-	if rec := postFrom(t, r.s, "term_1", fmt.Sprintf("/api/gates/%d/approve", held.ID), `{"source":"claude"}`); rec.Code != 403 || !strings.Contains(rec.Body.String(), "proposed, which it does not resolve") {
-		t.Errorf("a worker approved the draft it wrote unattended once the user drove it: %d %s", rec.Code, rec.Body)
+	if rec := postFrom(t, r.s, "term_1", fmt.Sprintf("/api/gates/%d/approve", held.ID), `{"source":"claude"}`); rec.Code != 200 {
+		t.Errorf("a worker the user now drives approving the draft it wrote unattended: %d %s", rec.Code, rec.Body)
 	}
 	_, own := write("term_2", "")
 	if own.Session != mine {
 		t.Fatalf("the draft a session the user drives writes is the session's, its gate %+v", own)
 	}
-	if rec := postFrom(t, r.s, "term_2", fmt.Sprintf("/api/gates/%d/approve", own.ID), `{"source":"claude"}`); rec.Code != 403 {
-		t.Errorf("a session the user drives approved the draft it wrote: %d %s", rec.Code, rec.Body)
+	if rec := postFrom(t, r.s, "term_2", fmt.Sprintf("/api/gates/%d/approve", own.ID), `{"source":"claude"}`); rec.Code != 200 {
+		t.Errorf("a session the user drives approving the draft it wrote: %d %s", rec.Code, rec.Body)
 	}
-	if _, g := write("term_2", `,"send":true`); g.Status != gate.Open || g.Session != mine {
-		t.Errorf("a draft a session the user drives asks to send, under the default policy: %+v", g)
+	if _, g := write("term_2", `,"send":true`); g.Status != gate.Approved || g.Session != mine || g.BySession != mine {
+		t.Errorf("a draft a session the user drives asks to send: %+v, want approved through it", g)
 	}
 }
 

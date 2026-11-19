@@ -223,9 +223,6 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a draf
 		if a.Rev == nil {
 			return draft.Draft{}, badRequest{"edit takes the rev you saw"}
 		}
-		if err := s.questionDecides(ctx, d, actor); err != nil {
-			return draft.Draft{}, err
-		}
 		got, err = s.amend(ctx, id, actor.amendment(a.Text, a.Payload, a.Broadcast, a.Rev))
 	case "discard":
 		if d.State == draft.Held {
@@ -302,15 +299,11 @@ func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Statu
 }
 
 // resolveDraftGate resolves draft gate g with intent as actor, under draftMu. Only the user, a person or an agent
-// through a session they drive that did not propose the draft, resolves a draft's gate here, refused before
-// anything is written. An approval readies its draft at rev; with text or a payload other than the draft's, it
+// through a session they drive, resolves a draft's gate here, refused before anything is written. An approval readies its draft at rev; with text or a payload other than the draft's, it
 // edits the draft at rev first, which supersedes g, and approves the gate that edit opened.
 func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, edit draftEdit, actor requester) error {
-	switch {
-	case !actor.user():
+	if !actor.user() {
 		return fmt.Errorf("%w: draft gate %d %s", gates.ErrRefused, g.ID, unattended("is resolved: it"))
-	case actor.Actor == task.ActorAgent && g.Session == actor.Session:
-		return fmt.Errorf("%w: draft gate %d holds a draft session %s proposed, which it does not resolve", gates.ErrRefused, g.ID, actor.Session)
 	}
 	if (edit.Text != nil || edit.Payload != nil) && edit.Rev == nil {
 		return badRequest{"an approval that changes the draft takes the rev you saw"}
@@ -330,26 +323,33 @@ func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent strin
 			return err
 		}
 		if edit.changes(d) {
-			if err := s.questionDecides(ctx, d, actor); err != nil {
+			if g, err = s.applyEdit(ctx, id, edit, rev, actor); err != nil {
 				return err
 			}
-			if d, err = s.amend(ctx, id, actor.amendment(edit.Text, edit.Payload, nil, &rev)); err != nil {
-				return err
-			}
-			ng, ok, err := o.GateOf(ctx, d)
-			switch {
-			case err != nil:
-				return err
-			case !ok || ng.Status != gate.Open:
-				return fmt.Errorf("%w: draft %d has no open gate after its edit", outbox.ErrConflict, id)
-			}
-			if _, err := o.Prepare(ctx, id, d.Rev); err != nil {
-				return err
-			}
-			g = ng
 		}
 	}
 	return s.deps.Gates.Resolve(ctx, g.ID, gates.Resolution{Intent: intent, By: actor.Actor, Session: actor.Session})
+}
+
+// applyEdit makes actor's edit of held draft id, seen at rev, and readies the draft for the approval of the gate the
+// edit opened, which it returns.
+func (s *Server) applyEdit(ctx context.Context, id draft.ID, edit draftEdit, rev int64, actor requester) (gate.Gate, error) {
+	o := s.deps.Outbox
+	d, err := s.amend(ctx, id, actor.amendment(edit.Text, edit.Payload, nil, &rev))
+	if err != nil {
+		return gate.Gate{}, err
+	}
+	ng, ok, err := o.GateOf(ctx, d)
+	switch {
+	case err != nil:
+		return gate.Gate{}, err
+	case !ok || ng.Status != gate.Open:
+		return gate.Gate{}, fmt.Errorf("%w: draft %d has no open gate after its edit", outbox.ErrConflict, id)
+	}
+	if _, err := o.Prepare(ctx, id, d.Rev); err != nil {
+		return gate.Gate{}, err
+	}
+	return ng, nil
 }
 
 // gateIntentOf is the first intent g offers that gates.toml resolves to want.
@@ -868,14 +868,4 @@ func (s *Server) closeSilently(ctx context.Context, id draft.ID, rev int64, acto
 		return draft.Draft{}, err
 	}
 	return o.CloseSilently(ctx, id)
-}
-
-// questionDecides refuses a person's change of held draft d while an open question pins it: the question is its one
-// decision, and a change would leave the question's pin behind it. The agent revises a pinned draft through its own
-// route, after which the question's pick of the old pin resumes its turn.
-func (s *Server) questionDecides(ctx context.Context, d draft.Draft, actor requester) error {
-	if actor.Actor == task.ActorAgent || d.State != draft.Held || s.openPins(ctx)[int64(d.ID)] == 0 {
-		return nil
-	}
-	return fmt.Errorf("%w: an open question decides draft %d: answer the question", gates.ErrRefused, d.ID)
 }

@@ -776,8 +776,7 @@ type Amendment struct {
 
 // Amend applies a, a person's at a.Rev, to held or failed draft id at once, all changes or none; its gate is
 // handled as Edit's. A rev below 1 is ErrInvalid, a draft at another rev ErrRevConflict. An amendment by a
-// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped, so it never approves
-// what it wrote. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
+// session is refused (gates.ErrRefused): an agent revises through AgentAmend, stamped. A change the draft's kind does not let a person make is ErrInvalid (draft.ErrNotEditable).
 func (s *Service) Amend(ctx context.Context, id draft.ID, a Amendment) (draft.Draft, error) {
 	if a.By.Kind != "" && a.By.Kind != draft.ActorPerson {
 		return draft.Draft{}, fmt.Errorf("%w: %w: %s %s changes draft %d through draft_update, not a person's edit",
