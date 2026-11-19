@@ -137,12 +137,13 @@ export interface Chip {
 // lensChips are one chip per filtered field and sign, which takes it out; applied names the fields a view
 // applies, the others' chips off.
 export function lensChips(lens: Lens, applied?: string[]): Chip[] {
-  const by = new Map<string, { field: string; neg: boolean; values: string[] }>();
+  const by = new Map<string, { field: string; neg: boolean; values: string[]; raws: string[] }>();
   for (const x of lens.quals) {
     const k = `${x.field}:${x.neg ? "-" : ""}`;
-    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [] });
+    if (!by.has(k)) by.set(k, { field: x.field, neg: x.neg, values: [], raws: [] });
     const word = labelWord(fieldById(x.field, lens.fields), x.value);
     by.get(k)!.values.push(valueLabel(x.field, x.value, word || x.raw, !!word));
+    by.get(k)!.raws.push(x.raw);
   }
   const list = [...by.values()];
   const slot = (c: { field: string; neg: boolean }) => `lens:chip:${c.field}:${c.neg ? "-" : ""}`;
@@ -152,7 +153,7 @@ export function lensChips(lens: Lens, applied?: string[]): Chip[] {
     const next = list[i + 1] || list[i - 1];
     return {
       slot: slot(c), off,
-      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.values.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
+      title: off ? t("Not applied in Recent") : t("Remove this filter ({filter})", { filter: c.raws.map((v) => qualifierToken(c.field, v, c.neg)).join(" ") }),
       label: t("Remove filter {label}", { label: chipWords(f.label, c.values, c.neg, false) }),
       text: chipWords(f.label, c.values, c.neg, true),
       remove: () => {
