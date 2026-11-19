@@ -36,11 +36,12 @@ type GatesDef struct {
 	Drafts DraftWords
 }
 
-// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts no
-// workflow proposed and no purpose names, Purposes name a purpose, States a delivery state and Reasons why a
+// DraftWords name drafts to a person: ByHand and ByHandAbout head the Outbox's group of the drafts written by
+// hand, BySession and BySessionAbout that of the drafts a session wrote with no intent, Purposes name a purpose, States a delivery state and Reasons why a
 // dropped draft was withdrawn, by its id.
 type DraftWords struct {
 	ByHand, ByHandAbout       string
+	BySession, BySessionAbout string
 	Purposes, States, Reasons map[string]string
 	// Rules name an approval rule to a person, by the rule's name.
 	Rules map[string]string
@@ -222,16 +223,18 @@ type mGatesFile struct {
 }
 
 type mDraftWords struct {
-	ByHand      *string           `toml:"by_hand"`
-	ByHandAbout *string           `toml:"by_hand_about"`
-	Quoted      *string           `toml:"quoted"`
-	Stale       *string           `toml:"stale"`
-	Hold        *string           `toml:"hold"`
-	Purposes    map[string]string `toml:"purposes"`
-	States      map[string]string `toml:"states"`
-	Reasons     map[string]string `toml:"reasons"`
-	Authors     map[string]string `toml:"authors"`
-	Rules       map[string]string `toml:"rules"`
+	ByHand         *string           `toml:"by_hand"`
+	ByHandAbout    *string           `toml:"by_hand_about"`
+	BySession      *string           `toml:"by_session"`
+	BySessionAbout *string           `toml:"by_session_about"`
+	Quoted         *string           `toml:"quoted"`
+	Stale          *string           `toml:"stale"`
+	Hold           *string           `toml:"hold"`
+	Purposes       map[string]string `toml:"purposes"`
+	States         map[string]string `toml:"states"`
+	Reasons        map[string]string `toml:"reasons"`
+	Authors        map[string]string `toml:"authors"`
+	Rules          map[string]string `toml:"rules"`
 }
 
 type mGate struct {
@@ -378,16 +381,11 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 	if m == nil {
 		return
 	}
-	if m.ByHand != nil {
-		w.ByHand = strings.TrimSpace(*m.ByHand)
-	}
-	if m.ByHandAbout != nil {
-		w.ByHandAbout = strings.TrimSpace(*m.ByHandAbout)
-	}
 	for _, f := range []struct {
 		to   *string
 		from *string
-	}{{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
+	}{{&w.ByHand, m.ByHand}, {&w.ByHandAbout, m.ByHandAbout}, {&w.BySession, m.BySession}, {&w.BySessionAbout, m.BySessionAbout},
+		{&w.Quoted, m.Quoted}, {&w.Stale, m.Stale}, {&w.Hold, m.Hold}} {
 		if f.from != nil {
 			*f.to = strings.TrimSpace(*f.from)
 		}

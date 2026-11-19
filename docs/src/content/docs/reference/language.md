@@ -494,6 +494,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts` (table): The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off.
 - `drafts.by_hand` (string, localized): The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer.
 - `drafts.by_hand_about` (string, localized): One line under that title.
+- `drafts.by_session` (string, localized): The title of the Outbox's group of the drafts an agent session wrote outside any intent's turn, when drafts group by proposer.
+- `drafts.by_session_about` (string, localized): One line under that title.
 - `drafts.quoted` (string, localized): What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation.
 - `drafts.stale` (string, localized): What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.
 - `drafts.hold` (string, localized): What a draft's card says of a held draft its proposer asked no approval rule to send.

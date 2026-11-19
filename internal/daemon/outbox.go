@@ -169,7 +169,8 @@ func outboxHeads(l *intentload.Loaded, ds []api.OutboxDraft) map[string]map[stri
 }
 
 // proposerHead is the head of v, a draft.proposer value: an intent's [outbox] words, else its label; a
-// workflow's; a rule's word of gates.toml; or gates.toml's words for the drafts written by hand.
+// workflow's; a rule's word of gates.toml; or gates.toml's words for the drafts written by hand or by a
+// session outside any intent's turn.
 func proposerHead(l *intentload.Loaded, v string) (api.OutboxHead, bool) {
 	by, name, _ := strings.Cut(v, ":")
 	switch by {
@@ -184,6 +185,8 @@ func proposerHead(l *intentload.Loaded, v string) (api.OutboxHead, bool) {
 		return api.OutboxHead{Title: title}, title != ""
 	case "user":
 		return api.OutboxHead{Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout}, l.Gates.Drafts.ByHand != ""
+	case "session":
+		return api.OutboxHead{Title: l.Gates.Drafts.BySession, About: l.Gates.Drafts.BySessionAbout}, l.Gates.Drafts.BySession != ""
 	}
 	return api.OutboxHead{}, false
 }

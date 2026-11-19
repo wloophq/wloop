@@ -154,6 +154,7 @@ func TestOutboxHeads(t *testing.T) {
 	r.proposeAs(t, outbox.Proposal{Kind: "nudge", Text: "is this still moving?", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: "c"}})
 	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "d"}})
 	r.proposeAs(t, outbox.Proposal{Text: "one question", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 2, Intent: "review", Key: "e"}})
+	r.proposeAs(t, outbox.Proposal{Text: "from a session", Origin: draft.Origin{Kind: draft.OriginSession, Session: "s1", Key: "f"}})
 
 	page := r.outboxPage(t)
 	l := r.s.loaded()
@@ -164,6 +165,7 @@ func TestOutboxHeads(t *testing.T) {
 			"workflow:fake-nudge": nudgeHead,
 			"rule:github-nudge":   {Title: l.Gates.Drafts.Rules["github-nudge"]},
 			"user":                {Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout},
+			"session":             {Title: l.Gates.Drafts.BySession, About: l.Gates.Drafts.BySessionAbout},
 			"intent:review":       {Title: review.Outbox.Title, About: review.Outbox.About},
 		},
 		"workflow": {"fake-nudge": nudgeHead},
@@ -172,7 +174,7 @@ func TestOutboxHeads(t *testing.T) {
 	if !reflect.DeepEqual(page.Heads, want) {
 		t.Errorf("heads\n %+v\nwant\n %+v", page.Heads, want)
 	}
-	for _, h := range []api.OutboxHead{want["proposer"]["rule:github-nudge"], want["proposer"]["user"], want["proposer"]["intent:review"], want["kind"]["reply"]} {
+	for _, h := range []api.OutboxHead{want["proposer"]["rule:github-nudge"], want["proposer"]["user"], want["proposer"]["session"], want["proposer"]["intent:review"], want["kind"]["reply"]} {
 		if h.Title == "" {
 			t.Fatalf("the bundled profile words none of %+v", want)
 		}

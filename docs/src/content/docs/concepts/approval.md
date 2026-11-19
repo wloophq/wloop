@@ -189,7 +189,7 @@ The cockpit draws a view whose `layout` is `outbox` (the bundled Outbox) from `G
 
 | Facet | Fact | A draft's value |
 |---|---|---|
-| `proposer` | `draft.proposer` | What proposed it: `workflow:<name>`, `intent:<name>`, `rule:<name>` or `user` |
+| `proposer` | `draft.proposer` | What proposed it: `workflow:<name>`, `intent:<name>`, `rule:<name>`, `user` for you, or `session` for an agent session outside any intent's turn |
 | `workflow` | `draft.workflow` | The workflow behind it, empty for none (`no workflow`) |
 | `kind` | `draft.kind` | Its kind in its plugin's manifest |
 | `source` | `draft.provider` | The provider of its unit |
@@ -206,12 +206,13 @@ proposer      workflow:<name> -> the workflow's [outbox] title and about (summar
               intent:<name>   -> the intent's [outbox] title and about (label, else its name)
               rule:<name>     -> gates.toml's drafts.rules.<name>
               user            -> gates.toml's drafts.by_hand and by_hand_about
+              session         -> gates.toml's drafts.by_session and by_session_about
 workflow      the workflow's head, as above
 kind          the plugin's [drafts.<kind>] label, in its ui.toml
 others        the value as the facet's values word it, else as it is
 ```
 
-A value with no word shows as it is named. Groups are ordered by raw value, as the lens orders every view, not by size. Every text is the profile's, in the interface language, and lives where the thing it words is declared: a workflow's `[outbox]` table (`title`, `about`) with its translation under `locales/<tag>/workflows/<name>/workflow.toml`; an intent's `[outbox]` table in its `intent.toml`; a plugin's `[drafts.<kind>] label` in its `ui.toml` and its rules' words in the `[drafts.rules]` table of its `gates.toml`; the words for drafts you wrote by hand in the core `gates.toml`'s `[drafts]`. Two plugins that word one draft kind differently show the word of the plugin of the first served draft of that kind. A workflow's head shows **Stop drafting these**, which asks again inline before it disables the workflow.
+A value with no word shows as it is named. Groups are ordered by raw value, as the lens orders every view, not by size. Every text is the profile's, in the interface language, and lives where the thing it words is declared: a workflow's `[outbox]` table (`title`, `about`) with its translation under `locales/<tag>/workflows/<name>/workflow.toml`; an intent's `[outbox]` table in its `intent.toml`; a plugin's `[drafts.<kind>] label` in its `ui.toml` and its rules' words in the `[drafts.rules]` table of its `gates.toml`; the words for drafts you wrote by hand, and for those an agent session wrote outside any intent's turn, in the core `gates.toml`'s `[drafts]`. Two plugins that word one draft kind differently show the word of the plugin of the first served draft of that kind. A workflow's head shows **Stop drafting these**, which asks again inline before it disables the workflow.
 
 Each draft comes with its context: the asks of its task, each with the quotes its brief keeps, and the items it is about, each with its state. A draft's card names its purpose and, once it left your hands, its delivery state in `gates.toml`'s `[drafts.purposes]` and `[drafts.states]` words, which the views catalog serves as `draft_purposes` and `draft_states`.
 

@@ -29,6 +29,8 @@ var gatesGrammar = []Key{
 	{Path: "drafts", In: SurfaceGates, Kind: KindTable, Doc: "The words a draft's card and the Outbox name drafts with. A user layer sets only the words it names; an empty word takes a lower layer's off."},
 	{Path: "drafts.by_hand", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The title of the Outbox's group of the drafts you wrote by hand, when drafts group by proposer."},
 	{Path: "drafts.by_hand_about", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "One line under that title."},
+	{Path: "drafts.by_session", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The title of the Outbox's group of the drafts an agent session wrote outside any intent's turn, when drafts group by proposer."},
+	{Path: "drafts.by_session_about", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "One line under that title."},
 	{Path: "drafts.quoted", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a draft posted in the direct conversation of the person it is to, which quotes items of another conversation: `{conversation}` names that conversation."},
 	{Path: "drafts.stale", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off."},
 	{Path: "drafts.hold", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "What a draft's card says of a held draft its proposer asked no approval rule to send."},

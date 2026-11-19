@@ -436,7 +436,7 @@ A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts o
 | Approval fact | Type | Meaning |
 |---|---|---|
 | `draft.delivery` | string | How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for. |
-| `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's. |
+| `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's, user for one you wrote, session for one a session wrote outside any intent's turn. |
 | `draft.effects` | list | The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.purpose` | string | The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.github.review.event` | string | The /event field of a review draft's payload, which the plugin posts as is; absent, and so the empty string, for a draft of any other kind. A rule that sends reads it only as an allow-list: draft.github.review.event == "<value>" or in ["<value>", ...] as a term of the top-level &&. |

@@ -74,6 +74,14 @@
           "description": "One line under that title.",
           "type": "string"
         },
+        "by_session": {
+          "description": "The title of the Outbox's group of the drafts an agent session wrote outside any intent's turn, when drafts group by proposer.",
+          "type": "string"
+        },
+        "by_session_about": {
+          "description": "One line under that title.",
+          "type": "string"
+        },
         "hold": {
           "description": "What a draft's card says of a held draft its proposer asked no approval rule to send.",
           "type": "string"
