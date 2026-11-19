@@ -167,24 +167,73 @@ func TestOutboxHeads(t *testing.T) {
 	page := r.outboxPage(t)
 	l := r.s.loaded()
 	review, _ := l.Registry.Get("review")
-	nudgeHead := api.OutboxHead{Title: "Ask who hasn't answered", About: "Drafted when a conversation where you asked something goes quiet.", Workflow: "fake-nudge"}
+	nudge := "Ask who hasn't answered"
+	titles := map[string]map[string]string{
+		"proposer": {
+			"workflow:fake-nudge": nudge,
+			"rule:github-nudge":   l.Gates.Drafts.Rules["github-nudge"],
+			"user":                l.Gates.Drafts.ByHand,
+			"session":             l.Gates.Drafts.BySession,
+			"intent:review":       review.Outbox.Title,
+		},
+		"workflow": {"fake-nudge": nudge},
+		"kind":     {"reply": l.UI["github"].Drafts["reply"].Label, "nudge": l.UI["github"].Drafts["nudge"].Label},
+	}
+	for id, words := range titles {
+		for v, title := range words {
+			if title == "" {
+				t.Fatalf("the bundled profile words no %s %s", id, v)
+			}
+		}
+		i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == id })
+		if i < 0 {
+			t.Fatalf("no facet %s served", id)
+		}
+		if !reflect.DeepEqual(page.Facets[i].Labels, words) {
+			t.Errorf("facet %s's labels %v, want %v", id, page.Facets[i].Labels, words)
+		}
+	}
+	nudgeHead := api.OutboxHead{About: "Drafted when a conversation where you asked something goes quiet.", Workflow: "fake-nudge"}
 	want := map[string]map[string]api.OutboxHead{
 		"proposer": {
 			"workflow:fake-nudge": nudgeHead,
-			"rule:github-nudge":   {Title: l.Gates.Drafts.Rules["github-nudge"]},
-			"user":                {Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout},
-			"session":             {Title: l.Gates.Drafts.BySession, About: l.Gates.Drafts.BySessionAbout},
-			"intent:review":       {Title: review.Outbox.Title, About: review.Outbox.About},
+			"user":                {About: l.Gates.Drafts.ByHandAbout},
+			"session":             {About: l.Gates.Drafts.BySessionAbout},
+			"intent:review":       {About: review.Outbox.About},
 		},
 		"workflow": {"fake-nudge": nudgeHead},
-		"kind":     {"reply": {Title: l.UI["github"].Drafts["reply"].Label}, "nudge": {Title: l.UI["github"].Drafts["nudge"].Label}},
 	}
 	if !reflect.DeepEqual(page.Heads, want) {
 		t.Errorf("heads\n %+v\nwant\n %+v", page.Heads, want)
 	}
-	for _, h := range []api.OutboxHead{want["proposer"]["rule:github-nudge"], want["proposer"]["user"], want["proposer"]["session"], want["proposer"]["intent:review"], want["kind"]["reply"]} {
-		if h.Title == "" {
-			t.Fatalf("the bundled profile words none of %+v", want)
+}
+
+func TestTheOutboxsWordsLeaveTheProfilesValuesAlone(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	l := *r.s.loaded()
+	l.Views.DraftFacets = slices.Clone(l.Views.DraftFacets)
+	for i, f := range l.Views.DraftFacets {
+		if f.Fact == "draft.proposer" {
+			l.Views.DraftFacets[i].Values = map[string]string{"user": "Mine"}
+		}
+	}
+	r.s.deps.Intents = func() *intentload.Loaded { return &l }
+	r.proposeAs(t, outbox.Proposal{Text: "thanks!", Origin: draft.Origin{Kind: draft.OriginUser, Key: "d"}})
+	r.proposeAs(t, outbox.Proposal{Text: "from a session", Origin: draft.Origin{Kind: draft.OriginSession, Session: "s1", Key: "f"}})
+	for range 2 {
+		page := r.outboxPage(t)
+		i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == "proposer" })
+		if want := map[string]string{"user": "Mine", "session": l.Gates.Drafts.BySession}; !reflect.DeepEqual(page.Facets[i].Labels, want) {
+			t.Errorf("proposer labels %v, want the profile's value word kept and the session's worded: %v", page.Facets[i].Labels, want)
+		}
+		if got := page.Heads["proposer"]["user"].About; got != l.Gates.Drafts.ByHandAbout {
+			t.Errorf("the head of a value the profile words says %q, want %q", got, l.Gates.Drafts.ByHandAbout)
+		}
+	}
+	for _, f := range l.Views.DraftFacets {
+		if f.Fact == "draft.proposer" && len(f.Values) != 1 {
+			t.Errorf("serving the Outbox changed the profile's values: %v", f.Values)
 		}
 	}
 }
@@ -361,7 +410,8 @@ func TestTheOutboxNamesTheSourceOfADraftByItsPublisher(t *testing.T) {
 		t.Errorf("source %v, want the publisher of its target, slack", got)
 	}
 	want := r.s.loaded().UI["slack"].Drafts["ask_owner"].Label
-	if got := page.Heads["kind"]["ask_owner"].Title; want == "" || got != want {
-		t.Errorf("kind head %q, want Slack's word %q", got, want)
+	i := slices.IndexFunc(page.Facets, func(f api.FacetSpec) bool { return f.ID == "kind" })
+	if got := page.Facets[i].Labels["ask_owner"]; want == "" || got != want {
+		t.Errorf("kind word %q, want Slack's %q", got, want)
 	}
 }

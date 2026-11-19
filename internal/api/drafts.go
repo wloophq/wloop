@@ -144,15 +144,15 @@ type DraftOption struct {
 type OutboxPage struct {
 	Drafts []OutboxDraft `json:"drafts"`
 	Facets []FacetSpec   `json:"facets"`
-	// Heads are the words of a facet's values a group head shows, by facet id, then by value; a value the
-	// profile words nothing has none.
+	// Heads are what a group head shows under a value's title, which the facet's labels carry, by facet id,
+	// then by value; a value with nothing more to say has none.
 	Heads map[string]map[string]OutboxHead `json:"heads,omitempty"`
 }
 
-// OutboxHead is the profile's words for a group of drafts, in the served locale. Workflow names the workflow
-// that drafted them, which a person may stop; "" for a group of no one workflow.
+// OutboxHead is what a group of drafts says beside its title, in the served locale: About why they were
+// written, and Workflow the workflow that drafted them, which a person may stop; "" for a group of no one
+// workflow.
 type OutboxHead struct {
-	Title    string `json:"title"`
 	About    string `json:"about,omitempty"`
 	Workflow string `json:"workflow,omitempty"`
 }

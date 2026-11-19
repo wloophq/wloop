@@ -325,7 +325,12 @@
    "group": true,
    "sort": "text",
    "menu": true,
-   "provider": ""
+   "provider": "",
+   "labels": {
+    "intent:review": "Reviews",
+    "user": "Written by hand",
+    "workflow:fake-nudge": "Ask who hasn't answered"
+   }
   },
   {
    "id": "workflow",
@@ -335,7 +340,10 @@
    "sort": "text",
    "empty": "no workflow",
    "menu": true,
-   "provider": ""
+   "provider": "",
+   "labels": {
+    "fake-nudge": "Ask who hasn't answered"
+   }
   },
   {
    "id": "kind",
@@ -344,7 +352,11 @@
    "group": true,
    "sort": "text",
    "menu": true,
-   "provider": ""
+   "provider": "",
+   "labels": {
+    "nudge": "Nudge",
+    "review": "Review"
+   }
   },
   {
    "id": "source",
@@ -411,31 +423,17 @@
  "heads": {
   "proposer": {
    "intent:review": {
-    "title": "Reviews",
     "about": "Drafted by a review round on someone else's pull request."
    },
-   "user": {
-    "title": "Written by hand"
-   },
    "workflow:fake-nudge": {
-    "title": "Ask who hasn't answered",
     "about": "Drafted when a conversation where you asked something goes quiet.",
     "workflow": "fake-nudge"
    }
   },
   "workflow": {
    "fake-nudge": {
-    "title": "Ask who hasn't answered",
     "about": "Drafted when a conversation where you asked something goes quiet.",
     "workflow": "fake-nudge"
-   }
-  },
-  "kind": {
-   "nudge": {
-    "title": "Nudge"
-   },
-   "review": {
-    "title": "Review"
    }
   }
  }

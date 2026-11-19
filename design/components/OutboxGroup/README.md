@@ -16,7 +16,7 @@ Motion: a card's border answers focus within it over `motion-fast`; nothing move
 
 ## Consumer provides
 
-The page as `GET /api/outbox` serves it: its drafts, each with its `facets`, its search `texts` and its `context` (`asks`, `items`); the draft facets' specs, which the lens reads as its fields; and `heads`, by facet and value, each with a `title`, an `about` and the `workflow` behind it in the served locale (a workflow's `[outbox]` texts, an intent's, gates.toml's `[drafts]` words, a plugin's kind words). A value without a head is named by its facet's `labels`, else as served. The catalog's `draft_purposes`, `draft_states` and `effects` for the cards.
+The page as `GET /api/outbox` serves it: its drafts, each with its `facets`, its search `texts` and its `context` (`asks`, `items`); the draft facets' specs, which the lens reads as its fields, whose `labels` word each value in the served locale (a workflow's `[outbox]` title, an intent's, gates.toml's `[drafts]` words, a plugin's kind words, the facet's `values`), the title of its group and its entry in the Filter palette; and `heads`, by facet and value, each with the `about` line and the `workflow` behind it. A value with no label shows as served. The catalog's `draft_purposes`, `draft_states` and `effects` for the cards.
 
 ## Do / don't
 

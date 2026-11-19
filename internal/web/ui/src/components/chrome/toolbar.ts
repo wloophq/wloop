@@ -106,9 +106,10 @@ export async function copyList(lens: Lens): Promise<void> {
   }
 }
 
-// valueLabel is how a filter names a value of the field id: a kind by its label, any other value as shown.
-function valueLabel(id: string, value: string, shown: string): string {
-  return id === "kind" ? kindLabel(value, "") : shown;
+// valueLabel is how a filter names a value of the field id: as shown when its field's labels word it, else a kind
+// by its label, any other value as shown.
+function valueLabel(id: string, value: string, shown: string, worded = false): string {
+  return id === "kind" && !worded ? kindLabel(value, "") : shown;
 }
 
 // chipWords are what a filter's chip says of its field and values, with its × when removable.
@@ -174,7 +175,7 @@ export function filterValues(f: Field, items: J[]): { value: string; count: numb
   const at = (v: string) => (rank.includes(v) ? rank.indexOf(v) : rank.length);
   return [...counts.entries()]
     .sort((a, b) => at(a[0]) - at(b[0]) || b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
-    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value)) }));
+    .map(([value, count]) => ({ value, count, label: valueLabel(f.id, value, groupLabel(f, value), !!f.show && f.show(value) !== value) }));
 }
 
 // filterPalette opens, through palette, the fields lens filters by, then the values of the one picked, which adds

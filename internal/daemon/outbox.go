@@ -67,7 +67,8 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	for _, f := range listed {
 		out = append(out, f.draft)
 	}
-	writeJSON(w, api.OutboxPage{Drafts: out, Facets: catalog.DraftFacets(l.Views.DraftFacets), Heads: outboxHeads(l, listed)})
+	facets, heads := outboxWords(l, listed)
+	writeJSON(w, api.OutboxPage{Drafts: out, Facets: facets, Heads: heads})
 }
 
 // faced is a draft the Outbox serves with the facts its draft facets read.
@@ -130,23 +131,24 @@ func (ev *taskViewer) draftContext(ctx context.Context, d api.Draft) (api.DraftC
 	return c, nil
 }
 
-// outboxHeads are l's words for the values ds hold of the draft facets that read who proposed a draft, its
-// workflow and its kind, by facet id, then by value. A kind takes the word of the plugin that posts the first
-// draft whose plugin words it.
-func outboxHeads(l *intentload.Loaded, ds []faced) map[string]map[string]api.OutboxHead {
+// outboxWords are the draft facets, each with l's words for the values ds hold of those that read who proposed
+// a draft, its workflow and its kind among its labels, and the heads of those values that say more, by facet id,
+// then by value. A value the facet's values table words keeps that word. A kind takes the word of the plugin
+// that posts the first draft whose plugin words it.
+func outboxWords(l *intentload.Loaded, ds []faced) ([]api.FacetSpec, map[string]map[string]api.OutboxHead) {
+	specs := catalog.DraftFacets(l.Views.DraftFacets)
 	heads := map[string]map[string]api.OutboxHead{}
-	for _, f := range l.Views.DraftFacets {
-		var word func(value string, d faced) (api.OutboxHead, bool)
+	for i, f := range l.Views.DraftFacets {
+		var word func(value string, d faced) (string, api.OutboxHead)
 		switch f.Fact {
 		case "draft.proposer":
-			word = func(v string, _ faced) (api.OutboxHead, bool) { return proposerHead(l, v) }
+			word = func(v string, _ faced) (string, api.OutboxHead) { return proposerWords(l, v) }
 		case "draft.workflow":
-			word = func(v string, _ faced) (api.OutboxHead, bool) { return workflowHead(l, v) }
+			word = func(v string, _ faced) (string, api.OutboxHead) { return workflowWords(l, v) }
 		case "draft.kind":
-			word = func(v string, d faced) (api.OutboxHead, bool) {
+			word = func(v string, d faced) (string, api.OutboxHead) {
 				publisher, _ := d.facts["draft.provider"].(string)
-				label := l.UI[publisher].Drafts[v].Label
-				return api.OutboxHead{Title: label}, label != ""
+				return l.UI[publisher].Drafts[v].Label, api.OutboxHead{}
 			}
 		default:
 			continue
@@ -156,7 +158,14 @@ func outboxHeads(l *intentload.Loaded, ds []faced) map[string]map[string]api.Out
 				if _, ok := heads[f.ID][v]; ok {
 					continue
 				}
-				if h, ok := word(v, d); ok {
+				title, h := word(v, d)
+				if _, ok := specs[i].Labels[v]; !ok && title != "" {
+					if specs[i].Labels == nil {
+						specs[i].Labels = map[string]string{}
+					}
+					specs[i].Labels[v] = title
+				}
+				if h != (api.OutboxHead{}) {
 					if heads[f.ID] == nil {
 						heads[f.ID] = map[string]api.OutboxHead{}
 					}
@@ -166,41 +175,41 @@ func outboxHeads(l *intentload.Loaded, ds []faced) map[string]map[string]api.Out
 		}
 	}
 	if len(heads) == 0 {
-		return nil
+		heads = nil
 	}
-	return heads
+	return specs, heads
 }
 
-// proposerHead is the head of v, a draft.proposer value: an intent's [outbox] words, else its label; a
-// workflow's; a rule's word of gates.toml; or gates.toml's words for the drafts written by hand or by a
-// session outside any intent's turn.
-func proposerHead(l *intentload.Loaded, v string) (api.OutboxHead, bool) {
+// proposerWords are the title and head of v, a draft.proposer value: an intent's [outbox] words, else its
+// label; a workflow's; a rule's word of gates.toml; or gates.toml's words for the drafts written by hand or by
+// a session outside any intent's turn.
+func proposerWords(l *intentload.Loaded, v string) (string, api.OutboxHead) {
 	by, name, _ := strings.Cut(v, ":")
 	switch by {
 	case "intent":
 		def, ok := l.Registry.Get(dintent.Name(name))
-		h := api.OutboxHead{Title: cmp.Or(def.Outbox.Title, def.Label), About: def.Outbox.About}
-		return h, ok && h.Title != ""
+		if !ok {
+			return "", api.OutboxHead{}
+		}
+		return cmp.Or(def.Outbox.Title, def.Label), api.OutboxHead{About: def.Outbox.About}
 	case "workflow":
-		return workflowHead(l, name)
+		return workflowWords(l, name)
 	case "rule":
-		title := l.Gates.Drafts.Rules[name]
-		return api.OutboxHead{Title: title}, title != ""
+		return l.Gates.Drafts.Rules[name], api.OutboxHead{}
 	case "user":
-		return api.OutboxHead{Title: l.Gates.Drafts.ByHand, About: l.Gates.Drafts.ByHandAbout}, l.Gates.Drafts.ByHand != ""
+		return l.Gates.Drafts.ByHand, api.OutboxHead{About: l.Gates.Drafts.ByHandAbout}
 	case "session":
-		return api.OutboxHead{Title: l.Gates.Drafts.BySession, About: l.Gates.Drafts.BySessionAbout}, l.Gates.Drafts.BySession != ""
+		return l.Gates.Drafts.BySession, api.OutboxHead{About: l.Gates.Drafts.BySessionAbout}
 	}
-	return api.OutboxHead{}, false
+	return "", api.OutboxHead{}
 }
 
-// workflowHead is the head of the drafts of the workflow name: its [outbox] words, else its summary.
-func workflowHead(l *intentload.Loaded, name string) (api.OutboxHead, bool) {
+// workflowWords are the title and head of the drafts of the workflow name: its [outbox] words, else its summary.
+func workflowWords(l *intentload.Loaded, name string) (string, api.OutboxHead) {
 	i := slices.IndexFunc(l.Workflows, func(w workflow.Workflow) bool { return w.Name == name })
 	if i < 0 {
-		return api.OutboxHead{}, false
+		return "", api.OutboxHead{}
 	}
 	w := l.Workflows[i]
-	h := api.OutboxHead{Title: cmp.Or(w.Outbox.Title, w.Summary), About: w.Outbox.About, Workflow: name}
-	return h, h.Title != ""
+	return cmp.Or(w.Outbox.Title, w.Summary), api.OutboxHead{About: w.Outbox.About, Workflow: name}
 }

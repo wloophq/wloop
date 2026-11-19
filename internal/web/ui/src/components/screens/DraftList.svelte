@@ -7,8 +7,9 @@
   import DraftCard from "../gates/DraftCard.svelte";
   import { disableWorkflow } from "./outbox";
 
-  // The Outbox's drafts through lens: filtered, sorted and grouped as a task view's tasks are, each group under the
-  // head the page serves for its value, a workflow's carrying why it drafts and the inline confirm that stops it.
+  // The Outbox's drafts through lens: filtered, sorted and grouped as a task view's tasks are, each group under its
+  // value's word, with what the page's head for it says: why its drafts were written and, for a workflow's, the
+  // inline confirm that stops it.
   let { page, lens }: { page: J; lens: Lens } = $props();
 
   const res = $derived(pipelineOf(outboxLensItems(page), lens, null));
@@ -17,7 +18,7 @@
       .filter((g) => g.rows.length)
       .map((g) => {
         const head = res.group ? outboxHead(page, res.group, g.raw) : null;
-        return { key: g.key, title: (head && head.title) || g.label, about: (head && head.about) || "", workflow: (head && head.workflow) || "", drafts: g.rows.map((it) => it.draft) };
+        return { key: g.key, title: g.label, about: (head && head.about) || "", workflow: (head && head.workflow) || "", drafts: g.rows.map((it) => it.draft) };
       }),
   );
 </script>

@@ -14,8 +14,8 @@ export function outboxLensItems(page: J = outboxState.page): J[] {
   return ((page && page.drafts) || []).map((d: J) => ({ draft: d, facets: d.facets || {}, texts: d.texts || [] }));
 }
 
-// outboxHead is what the page says of the group of value under the facet field: its title, why its drafts were
-// written, the workflow that wrote them.
+// outboxHead is what the page says of the group of value under the facet field beside its title: why its drafts
+// were written, the workflow that wrote them.
 export function outboxHead(page: J, field: string, value: string): J {
   return (((page && page.heads) || {})[field] || {})[value] || null;
 }

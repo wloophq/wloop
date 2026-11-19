@@ -8,7 +8,7 @@ import type { J } from "../../lib/util";
 import { net } from "../../state/api";
 import { nav, readHash } from "../../state/route.svelte";
 import { outboxState, tasksState } from "../../state/store.svelte";
-import { lensItems, listYAML } from "../chrome/toolbar";
+import { filterPalette, lensItems, listYAML } from "../chrome/toolbar";
 import { resetStore } from "../../testing/reset.svelte";
 import { fixture, useCatalogs } from "../rows/testdata/fixtures";
 import DraftList from "./DraftList.svelte";
@@ -103,6 +103,27 @@ describe("the Outbox through the lens", () => {
     expect(seen.getAttribute("data-shown")).toBe("4");
     expect(seen.getAttribute("data-group")).toBe("proposer");
     expect(seen.getAttribute("data-offered")).toBe("proposer,workflow,kind,source,where,people,state,age");
+  });
+});
+
+describe("filtering the Outbox", () => {
+  beforeEach(() => outboxView("#view=outbox"));
+
+  it("words the values of who proposed the drafts as their group heads do", () => {
+    const lens = lensOf(readHash());
+    const items = lensItems(lens);
+    const palettes: J[] = [];
+    filterPalette(lens, items, (p) => palettes.push(p));
+    palettes[0].items.find((it: J) => it.label === "Proposed by").run();
+    expect(palettes[1].items.map((it: J) => it.label).sort()).toEqual(["Ask who hasn't answered", "Reviews", "Written by hand"]);
+  });
+
+  it("words the drafts' kinds by the plugin that posts them", () => {
+    const lens = lensOf(readHash());
+    const palettes: J[] = [];
+    filterPalette(lens, lensItems(lens), (p) => palettes.push(p));
+    palettes[0].items.find((it: J) => it.label === "Kind").run();
+    expect(palettes[1].items.map((it: J) => it.label).sort()).toEqual(["Nudge", "Review", "comment"]);
   });
 });
 
