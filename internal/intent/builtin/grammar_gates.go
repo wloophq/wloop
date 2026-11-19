@@ -36,6 +36,8 @@ var gatesGrammar = []Key{
 	{Path: "drafts.authors.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The author's words, such as \"Revised by an agent\"; the key is person, session, rule or window."},
 	{Path: "drafts.purposes", In: SurfaceGates, Kind: KindMap, Doc: "What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named."},
 	{Path: "drafts.purposes.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The purpose's word, such as \"Nudge\"."},
+	{Path: "drafts.rules", In: SurfaceGates, Kind: KindMap, Doc: "What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own."},
+	{Path: "drafts.rules.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The rule's word, such as \"Nudge\"."},
 	{Path: "drafts.states", In: SurfaceGates, Kind: KindMap, Doc: "Where a draft's delivery stands, by state, as its card says it."},
 	{Path: "drafts.states.*", In: SurfaceGates, Localized: true, Kind: KindText, Doc: "The state's words, such as \"failed to send\"; the key is a draft state: held, queued, sending, sent, failed or dropped."},
 	{Path: "drafts.reasons", In: SurfaceGates, Kind: KindMap, Doc: "Why a dropped draft was withdrawn, by reason, as the Outbox says it."},

@@ -42,6 +42,8 @@ type GatesDef struct {
 type DraftWords struct {
 	ByHand, ByHandAbout       string
 	Purposes, States, Reasons map[string]string
+	// Rules name an approval rule to a person, by the rule's name.
+	Rules map[string]string
 	// Quoted says a draft posted in the direct conversation of the person it is to quotes {conversation}.
 	Quoted string
 	// Stale says a draft was written against what its unit no longer is; Hold that no rule sends it.
@@ -229,6 +231,7 @@ type mDraftWords struct {
 	States      map[string]string `toml:"states"`
 	Reasons     map[string]string `toml:"reasons"`
 	Authors     map[string]string `toml:"authors"`
+	Rules       map[string]string `toml:"rules"`
 }
 
 type mGate struct {
@@ -390,6 +393,7 @@ func mergeDraftWords(s *sheet, w *DraftWords, m *mDraftWords) {
 		}
 	}
 	w.Purposes = mergeWords(w.Purposes, m.Purposes, declared(s, "drafts.purposes", m.Purposes))
+	w.Rules = mergeWords(w.Rules, m.Rules, declared(s, "drafts.rules", m.Rules))
 	states := make([]string, len(draft.States))
 	for i, st := range draft.States {
 		states[i] = string(st)

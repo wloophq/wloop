@@ -361,6 +361,49 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `review` (table): The review's steps, in the order the review walks them.
 - `review.<name>` (table): A step of the review, by the view it walks, which views declares. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones, and comes after the steps below it.
 - `review.<name>.label` (string, localized): What the step asks of you, as the review lists it. Required.
+- `draft_facets` (table by name): The draft facets, by id: the fields the Outbox filters, groups and sorts drafts by, in the order the file declares them, a user layer's new ones after the bundled. Their ids match the task facets of the same meaning, and a layer's entry here never touches the task facet of the same id.
+- `draft_facets.<name>` (table): A draft facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
+- `draft_facets.<name>.fact` (fact): The draft fact the facet reads (draft.proposer, draft.kind, draft.where, ...). Required.
+- `draft_facets.<name>.label` (string, localized): The name people read. Required.
+- `draft_facets.<name>.group` (bool, default `false`): Whether a list can group by the facet.
+- `draft_facets.<name>.sort` (one of `rank`, `text`, `time`): How the facet's values order: by rank, as text, or as instants (time). Absent, as text.
+- `draft_facets.<name>.rank` (list of strings): The facet's values in their order, first first.
+- `draft_facets.<name>.values` (table by name): The text people read for a value, by value.
+- `draft_facets.<name>.values.<name>` (string, localized): The text of one value.
+- `draft_facets.<name>.label_prefix` (string, localized): Text before the label of each value the facet shows on a row, such as the `@` of a context, never in a group's head; a label that has it already keeps it, as a context configured as `@calls` does.
+- `draft_facets.<name>.show` (one of ``, `ref`, `meta`, `flag`, `who`, `kind`, `age`, `aside`, or a list of them): The part of a row the facet's values show in, each a button that filters by its value: a part's name, or a table of one part to the values it shows there, such as `{ flag = ["paused", "muted"] }`, or `""` to take a facet a lower layer places off the row. Absent or `""`, the facet is only for filters, groups and sorts. A value `none` and a time facet's item without a time never show.
+  - ``: Nowhere: the facet is for the lens alone, as when a user layer takes a lower layer's placement off the row.
+  - `ref`: Beside the title, before the unit's own label: where it lives.
+  - `meta`: Under the title: who opened it, its contexts, its brief's type, size, risk and tags.
+  - `flag`: Under the title, after the meta: a state worth a glance, such as paused.
+  - `who`: Whom it waits on.
+  - `kind`: Its situation or state, the pill under whom it waits on.
+  - `age`: How long since the facet's instant, for a facet that sorts by time; only the first such facet shows.
+  - `aside`: Beside the reason: its workspace and links.
+- `draft_facets.<name>.show_values` (one of `all`, `first`, default `all`): How many of an item's values the part shows: all, or the first alone.
+  - `all`: Every value, in the item's order.
+  - `first`: The first value alone.
+- `draft_facets.<name>.show_when` (table by name): Shows the facet only on a row that holds, in each facet it names, one of the listed values, such as `{ turn = ["me"] }`; each named facet must be declared. Two age facets with opposite show_when place the row's one date by whom it waits on.
+- `draft_facets.<name>.show_when.<name>` (list of strings): The values one facet must hold.
+- `draft_facets.<name>.show_max` (integer): How many of an item's values the part shows at most; the rest count into one piece in the `more` row word. Absent or 0, all.
+- `draft_facets.<name>.show_label` (template, localized): For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone.
+- `draft_facets.<name>.empty` (string, localized): What a group of tasks with no value shows.
+- `draft_facets.<name>.match` (one of `exact`, `suffix`, `prefix`, `team`, default `exact`): How a filter's text matches a value: the whole value, its last segment, its first, or a person's team.
+- `draft_facets.<name>.menu` (bool, default `true`): Whether the facet is offered in the filter menu.
+- `draft_facets.<name>.strip` (bool, default `false`): Whether each row's strip is colored by the facet's first value, its rank the strip's legend.
+- `draft_facets.<name>.colors` (table by name): For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's.
+- `draft_facets.<name>.colors.<name>` (one of `me`, `author`, `reviewer`, `loop`, `nobody`): One value's hue.
+  - `me`: Yours: the next step is the viewer's.
+  - `author`: Someone else's, such as a pull request's author.
+  - `reviewer`: Another person's, apart from the author, such as a reviewer.
+  - `loop`: The loop's: an agent works on it or is due to.
+  - `nobody`: Nobody's: a faint strip.
+- `draft_facets.<name>.buckets` (table by name): For a facet that sorts by time: the buckets its instants fall in, by id, in the order the file declares them; the first whose within covers the time since the instant wins, and one with no within takes the rest.
+- `draft_facets.<name>.buckets.<name>` (table): A bucket, by its id.
+- `draft_facets.<name>.buckets.<name>.within` (duration): How long ago an instant may be and still fall in the bucket.
+- `draft_facets.<name>.buckets.<name>.label` (string, localized): The text people read; the id when absent.
+- `draft_facets.<name>.merge` (one of `union`, `rows-first`, `own`, default `union`): How a task's value joins its units' rows' values: union adds it to them, rows-first uses it only when no row has a value, own keeps it alone.
+- `draft_facets.<name>.units` (one of `all`, `primary`, default `all`): Which of a task's units contribute rows' values: all of them, or the primary unit alone.
 - `lens.age_now` (template, localized): A row's age under a minute.
 - `lens.age_minutes` (template, localized): A row's age under an hour, over its minutes as `{{.m}}`.
 - `lens.age_hours` (template, localized): A row's age under a day, over its hours `{{.h}}` and the minutes past them `{{.m}}`.
@@ -455,6 +498,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `drafts.authors.<name>` (string, localized): The author's words, such as "Revised by an agent"; the key is person, session, rule or window.
 - `drafts.purposes` (table by name): What a draft is for, by the purpose its proposer names (nudge, close, ...): its card's head, and the title of the Outbox's group of the drafts of that purpose no workflow proposed. A purpose with no word shows as it is named.
 - `drafts.purposes.<name>` (string, localized): The purpose's word, such as "Nudge".
+- `drafts.rules` (table by name): What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own.
+- `drafts.rules.<name>` (string, localized): The rule's word, such as "Nudge".
 - `drafts.states` (table by name): Where a draft's delivery stands, by state, as its card says it.
 - `drafts.states.<name>` (string, localized): The state's words, such as "failed to send"; the key is a draft state: held, queued, sending, sent, failed or dropped.
 - `drafts.reasons` (table by name): Why a dropped draft was withdrawn, by reason, as the Outbox says it.
@@ -1024,6 +1069,7 @@ The fields each notice reads besides `Name` and `Command`:
   - `requested`: Whom it asks or stops asking: shown as from that person or team, not as data.
 - `drafts` (table by name): The words of a draft's payload on its card, by the draft kind the manifest declares; a field with no word shows as its key, a value with none as itself.
 - `drafts.<name>` (table): One draft kind's words.
+- `drafts.<name>.label` (string, localized): What the draft kind is called to a person, such as "Review": the Outbox's name for the kind, and the head of its group when drafts group by kind. A kind with no label shows its name.
 - `drafts.<name>.fields` (table by name): The payload's fields, by the key they have in the payload, at any depth.
 - `drafts.<name>.fields.<name>` (table): One field's words.
 - `drafts.<name>.fields.<name>.label` (string, localized): The field's name on the card.

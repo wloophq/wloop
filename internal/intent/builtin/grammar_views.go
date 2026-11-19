@@ -1,5 +1,7 @@
 package builtin
 
+import "strings"
+
 // The layouts a view is drawn in.
 const (
 	ViewLayoutList   = "list"
@@ -111,3 +113,25 @@ const (
 	ShowLabelDoc  = "For a facet shown in the age part: the label of its date, a template over `{{.age}}`, the age in the row words, and `{{.at}}`, the time, which each client writes in its own locale, such as `since {{.at}}`. Absent, the age alone."
 	ColorsDoc     = "For the facet that colors the strip: the hue of each value's strip and dot, by value; a value it does not name takes nobody's."
 )
+
+// draftFacetsGrammar is the keys of draft_facets: those of facets, over draft facts.
+var draftFacetsGrammar = func() []Key {
+	var out []Key
+	for _, k := range viewsGrammar {
+		rest, ok := strings.CutPrefix(k.Path, "facets")
+		if !ok {
+			continue
+		}
+		k.Path = "draft_facets" + rest
+		switch k.Path {
+		case "draft_facets":
+			k.Doc = "The draft facets, by id: the fields the Outbox filters, groups and sorts drafts by, in the order the file declares them, a user layer's new ones after the bundled. Their ids match the task facets of the same meaning, and a layer's entry here never touches the task facet of the same id."
+		case "draft_facets.*":
+			k.Doc = "A draft facet, by its id. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones."
+		case "draft_facets.*.fact":
+			k.Doc = "The draft fact the facet reads (draft.proposer, draft.kind, draft.where, ...). Required."
+		}
+		out = append(out, k)
+	}
+	return out
+}()

@@ -41,6 +41,8 @@ type ViewsDef struct {
 	Lens LensWords
 	// Facets are the task facets in their declared order.
 	Facets []FacetDef
+	// DraftFacets are the draft facets, over draft facts, in their declared order.
+	DraftFacets []FacetDef
 }
 
 // FacetDef is a task facet: the fact (or the "<record>.<field>" of a
@@ -60,7 +62,8 @@ type FacetDef struct {
 	Buckets      []FacetBucket
 	Merge, Units string
 
-	from map[string]*sheet
+	from  map[string]*sheet
+	table string
 }
 
 // FacetBucket is a bucket of a facet that sorts by time; a Within of 0 takes the rest.
@@ -73,11 +76,17 @@ type FacetBucket struct {
 func (f FacetDef) Problem(key, format string, args ...any) Problem {
 	top, _, _ := strings.Cut(key, ".")
 	s := cmp.Or(f.from[key], f.from[top], f.from["fact"])
+	field := cmp.Or(f.table, facetsTable) + "." + f.ID + "." + key
 	if s == nil {
-		return Problem{File: ViewsFile, Field: "facets." + f.ID + "." + key, Msg: fmt.Sprintf(format, args...)}
+		return Problem{File: ViewsFile, Field: field, Msg: fmt.Sprintf(format, args...)}
 	}
-	return s.problem("facets."+f.ID+"."+key, format, args...)
+	return s.problem(field, format, args...)
 }
+
+const (
+	facetsTable      = "facets"
+	draftFacetsTable = "draft_facets"
+)
 
 // ViewDef is a view: Summary, one line on what it lists; what it lists (Over,
 // task.OverTasks or task.OverGates); When, which of them, compiled over their
@@ -153,6 +162,7 @@ type mViews struct {
 	DefaultSort *string                `toml:"default_sort"`
 	Lens        map[string]string      `toml:"lens"`
 	Facets      map[string]mFacet      `toml:"facets"`
+	DraftFacets map[string]mFacet      `toml:"draft_facets"`
 	Views       map[string]mView       `toml:"views"`
 	Review      map[string]mReviewStep `toml:"review"`
 	Badge       *mBadge                `toml:"badge"`
@@ -348,7 +358,8 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 		word(s, "lens.no_lens", at("no_lens"), &l.def.Lens.NoLens)
 		mergeRowWords(s, "lens", w, &l.def.Lens.Row)
 	}
-	l.mergeFacets(s, m.Facets)
+	l.mergeFacets(s, facetsTable, m.Facets, &l.def.Facets)
+	l.mergeFacets(s, draftFacetsTable, m.DraftFacets, &l.def.DraftFacets)
 	l.mergeViews(s, m.Views)
 	l.mergeReview(s, m.Review)
 	if m.Badge != nil && m.Badge.Views != nil {
@@ -363,13 +374,13 @@ func (l *viewsLoad) merge(file string, src []byte) Problems {
 	return s.problems
 }
 
-func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
-	for _, id := range declared(s, "facets", facets) {
-		path, m := "facets."+id, facets[id]
-		i := slices.IndexFunc(l.def.Facets, func(f FacetDef) bool { return f.ID == id })
-		f := FacetDef{ID: id, Menu: true, Merge: "union", Units: "all", from: map[string]*sheet{}}
+func (l *viewsLoad) mergeFacets(s *sheet, table string, facets map[string]mFacet, list *[]FacetDef) {
+	for _, id := range declared(s, table, facets) {
+		path, m := table+"."+id, facets[id]
+		i := slices.IndexFunc(*list, func(f FacetDef) bool { return f.ID == id })
+		f := FacetDef{ID: id, Menu: true, Merge: "union", Units: "all", from: map[string]*sheet{}, table: table}
 		if i >= 0 {
-			f = l.def.Facets[i]
+			f = (*list)[i]
 			f.from = maps.Clone(f.from)
 		}
 		n := len(s.problems)
@@ -458,9 +469,9 @@ func (l *viewsLoad) mergeFacets(s *sheet, facets map[string]mFacet) {
 		switch {
 		case len(s.problems) > n && i < 0:
 		case i < 0:
-			l.def.Facets = append(l.def.Facets, f)
+			*list = append(*list, f)
 		default:
-			l.def.Facets[i] = f
+			(*list)[i] = f
 		}
 	}
 }
@@ -607,12 +618,14 @@ func ViewEnv(over string, tasks TasksDef) expr.Env {
 // share a key.
 func (l *viewsLoad) check(tasks TasksDef) Problems {
 	var out Problems
-	for i := range l.def.Facets {
-		f := &l.def.Facets[i]
-		for _, facet := range slices.Sorted(maps.Keys(f.Show.When)) {
-			if !slices.ContainsFunc(l.def.Facets, func(g FacetDef) bool { return g.ID == facet }) {
-				out = append(out, f.Problem("show_when."+facet, "names no facet"))
-				delete(f.Show.When, facet)
+	for _, list := range [][]FacetDef{l.def.Facets, l.def.DraftFacets} {
+		for i := range list {
+			f := &list[i]
+			for _, facet := range slices.Sorted(maps.Keys(f.Show.When)) {
+				if !slices.ContainsFunc(list, func(g FacetDef) bool { return g.ID == facet }) {
+					out = append(out, f.Problem("show_when."+facet, "names no facet"))
+					delete(f.Show.When, facet)
+				}
 			}
 		}
 	}
@@ -621,7 +634,11 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 		v := &l.def.Views[i]
 		path := "views." + v.ID
 		env := ViewEnv(v.Over, tasks)
-		facts := env.Names()
+		lens := env
+		if v.Layout == builtin.ViewLayoutOutbox {
+			lens = builtin.DraftViewEnv()
+		}
+		facts := lens.Names()
 		v.When = nil
 		if r, ok := l.refs[path+".when"]; ok {
 			pred, err := expr.CompileWorkflow(r.name, env)
@@ -633,13 +650,13 @@ func (l *viewsLoad) check(tasks TasksDef) Problems {
 			}
 			v.When = pred
 		}
-		if _, ok := env[v.Group]; v.Group != "" && !ok {
+		if _, ok := lens[v.Group]; v.Group != "" && !ok {
 			out = append(out, v.groupProblem("%s names no fact of a view over %s%s", v.Group, v.Over, expr.DidYouMean(v.Group, facts)))
 			v.Group = ""
 		}
 		var keep []SortKey
 		for _, k := range v.Sort {
-			if _, ok := env[k.Fact]; !ok {
+			if _, ok := lens[k.Fact]; !ok {
 				out = append(out, Problem{File: ViewsFile, Field: path + ".sort", Msg: fmt.Sprintf("%s names no fact of a view over %s%s", k.Fact, v.Over, expr.DidYouMean(k.Fact, facts))})
 				continue
 			}
@@ -689,6 +706,7 @@ func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
 		}
 		return true
 	})
+	out = append(out, d.checkDraftFacets()...)
 	for i := range d.Views {
 		v := &d.Views[i]
 		if v.Over != task.OverTasks || v.Group == "" || slices.ContainsFunc(d.Facets, func(f FacetDef) bool { return f.Fact == v.Group }) {
@@ -697,6 +715,26 @@ func (d *ViewsDef) checkFacets(tasks TasksDef, records RecordsDef) Problems {
 		out = append(out, v.groupProblem("%s is read by no facet of %s", v.Group, ViewsFile))
 		v.Group = ""
 	}
+	return out
+}
+
+// checkDraftFacets leaves out the draft facets that read no draft fact, or sort by time what is no instant.
+func (d *ViewsDef) checkDraftFacets() Problems {
+	var out Problems
+	env := builtin.DraftViewEnv()
+	facts := env.Names()
+	d.DraftFacets = slices.DeleteFunc(d.DraftFacets, func(f FacetDef) bool {
+		typ, ok := env[f.Fact]
+		switch {
+		case !ok:
+			out = append(out, f.Problem("fact", "%s names no draft fact%s; the draft facts are %s", f.Fact, expr.DidYouMean(f.Fact, facts), strings.Join(facts, ", ")))
+		case f.Sort == "time" && typ != expr.Time:
+			out = append(out, f.Problem("sort", "time sorts instants, and %s is not one", f.Fact))
+		default:
+			return false
+		}
+		return true
+	})
 	return out
 }
 

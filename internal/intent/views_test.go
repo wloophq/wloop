@@ -688,3 +688,106 @@ func TestACopiedViewsFileFromTheLastReleaseLoads(t *testing.T) {
 		t.Errorf("a plugin's ui.toml with a retired row word: %s", problems.Error())
 	}
 }
+
+func draftFacetOf(d ViewsDef, id string) (FacetDef, bool) {
+	i := slices.IndexFunc(d.DraftFacets, func(f FacetDef) bool { return f.ID == id })
+	if i < 0 {
+		return FacetDef{}, false
+	}
+	return d.DraftFacets[i], true
+}
+
+func TestDraftFacetsLoad(t *testing.T) {
+	views, problems := loadFacets(t, "[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\ngroup = true\n\n[draft_facets.age]\nfact = \"draft.created_at\"\nlabel = \"Age\"\nsort = \"time\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	var ids []string
+	for _, f := range views.DraftFacets {
+		ids = append(ids, f.ID)
+	}
+	if !slices.Equal(ids, []string{"kind", "age"}) {
+		t.Fatalf("draft facets %v", ids)
+	}
+	if f, _ := draftFacetOf(views, "kind"); f.Fact != "draft.kind" || !f.Group || !f.Menu || f.Label != "Kind" {
+		t.Errorf("kind: %+v", f)
+	}
+}
+
+func TestDraftFacetRejectsTaskFact(t *testing.T) {
+	views, problems := loadFacets(t, "[draft_facets.state]\nfact = \"task.state\"\nlabel = \"State\"\n\n[draft_facets.who]\nfact = \"draft.proposr\"\nlabel = \"Who\"\n\n[draft_facets.kind]\nfact = \"draft.kind\"\nlabel = \"Kind\"\nsort = \"time\"\n")
+	got := problems.Error()
+	for _, want := range []string{"draft_facets.state.fact: task.state names no draft fact", "draft.proposer", `did you mean "draft.proposer"?`, "draft_facets.kind.sort"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("problems lack %q:\n%s", want, got)
+		}
+	}
+	if len(views.DraftFacets) != 0 {
+		t.Errorf("draft facets with a problem are served: %+v", views.DraftFacets)
+	}
+}
+
+func TestDraftFacetsSeparateFromTaskFacets(t *testing.T) {
+	user := "[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Place\"\n\n[facets.source]\nlabel = \"Origin\"\n"
+	bundled := "empty = \"x\"\ndefault_sort = \"y\"\n\n[facets.where]\nfact = \"task.placement\"\nlabel = \"Where\"\n\n[facets.source]\nfact = \"task.provider\"\nlabel = \"Source\"\n\n[draft_facets.where]\nfact = \"draft.where\"\nlabel = \"Where\"\n\n[draft_facets.source]\nfact = \"draft.provider\"\nlabel = \"Source\"\n"
+	texts, problems := loadListsWith(t, bundled, user)
+	if problems != "" {
+		t.Fatal(problems)
+	}
+	taskWhere, _ := facetOf(texts.ViewsDef, "where")
+	draftWhere, _ := draftFacetOf(texts.ViewsDef, "where")
+	taskSource, _ := facetOf(texts.ViewsDef, "source")
+	draftSource, _ := draftFacetOf(texts.ViewsDef, "source")
+	if taskWhere.Label != "Where" || taskWhere.Fact != "task.placement" || draftWhere.Label != "Place" || draftWhere.Fact != "draft.where" {
+		t.Errorf("where: task %+v, draft %+v", taskWhere, draftWhere)
+	}
+	if taskSource.Label != "Origin" || draftSource.Label != "Source" {
+		t.Errorf("source: task %q, draft %q", taskSource.Label, draftSource.Label)
+	}
+}
+
+func TestOutboxViewGroupsByDraftFact(t *testing.T) {
+	views, problems := loadFacets(t, "[views.outbox]\ngroup = \"draft.proposer\"\nsort = \"-draft.created_at\"\n")
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if v, _ := views.View("outbox"); v.Group != "draft.proposer" || len(v.Sort) != 1 || v.Sort[0].Fact != "draft.created_at" || !v.Sort[0].Desc {
+		t.Errorf("outbox: group %q, sort %+v", v.Group, v.Sort)
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ViewsFile), []byte("[views.outbox]\ngroup = \"task.state\"\nsort = \"gate.status\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	layers := []profile.Layer{{Name: "user", Dir: dir}}
+	_, _, ps := loadViews(layers, readerOf(os.DirFS("../../profiles/default")), nil)
+	got := ps.Error()
+	for _, want := range []string{"views.outbox.group", "task.state names no fact", "views.outbox.sort", "gate.status names no fact"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("problems lack %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestPluginDraftKindLabel(t *testing.T) {
+	plugin, user := t.TempDir(), t.TempDir()
+	write := func(dir, body string) {
+		if err := os.WriteFile(filepath.Join(dir, UIFile), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(plugin, "[drafts.note]\nlabel = \"Note\"\n\n[drafts.note.fields.body]\nlabel = \"Text\"\n")
+	write(user, "[drafts.note]\nlabel = \"Memo\"\n")
+	layers := []profile.Layer{{Name: profile.PluginLayer("acme"), Dir: plugin}}
+	texts, problems := loadUI(layers, readerOf(nil))
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if d := texts["acme"].Drafts["note"]; d.Label != "Note" || d.Fields["body"].Label != "Text" {
+		t.Errorf("note: %+v", d)
+	}
+	texts, problems = loadUI(append(layers, profile.Layer{Name: "user:acme", Dir: user}), readerOf(nil))
+	if d := texts["acme"].Drafts["note"]; len(problems) > 0 || d.Label != "Memo" || d.Fields["body"].Label != "Text" {
+		t.Errorf("note over a user layer: %+v, %s", d, problems.Error())
+	}
+}

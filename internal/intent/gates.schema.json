@@ -98,6 +98,14 @@
           "description": "Why a dropped draft was withdrawn, by reason, as the Outbox says it.",
           "type": "object"
         },
+        "rules": {
+          "additionalProperties": {
+            "description": "The rule's word, such as \"Nudge\".",
+            "type": "string"
+          },
+          "description": "What an approval rule is called to a person, by the rule's name, such as the rule a plugin ships: the Outbox's name for the rule that sent or holds a draft. A rule with no words shows its name; a plugin's profile layer words its own.",
+          "type": "object"
+        },
         "stale": {
           "description": "What a draft's card says of a draft written against what its unit no longer is, such as an older head of a pull request; it is also why its approval is off.",
           "type": "string"

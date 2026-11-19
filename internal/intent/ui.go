@@ -55,6 +55,8 @@ type UIField struct {
 
 // UIDraft is a draft kind's words: its payload's fields, by the key they have in it.
 type UIDraft struct {
+	// Label is what the kind is called to a person.
+	Label  string                  `toml:"label"`
 	Fields map[string]UIDraftField `toml:"fields"`
 }
 
@@ -293,6 +295,9 @@ func mergeUI(into, over UITexts) UITexts {
 	})
 	into.Detail = mergeMap(into.Detail, over.Detail, func(_, y UIField) UIField { return y })
 	into.Drafts = mergeMap(into.Drafts, over.Drafts, func(a, b UIDraft) UIDraft {
+		if b.Label != "" {
+			a.Label = b.Label
+		}
 		a.Fields = mergeMap(a.Fields, b.Fields, func(x, y UIDraftField) UIDraftField {
 			if y.Label != "" {
 				x.Label = y.Label
