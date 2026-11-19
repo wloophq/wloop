@@ -12,7 +12,7 @@ var Tools = []Value{
 	{Name: "task_post", Doc: "Posts a question or a note on the session's task during a turn, waiting on a gate."},
 	{Name: "task_read", Doc: "Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read."},
 	{Name: "draft_read", Doc: "Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions."},
-	{Name: "draft_update", Doc: "Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again."},
+	{Name: "draft_update", Doc: "Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives."},
 	{Name: "draft_withdraw", Doc: "Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read."},
 }
 
@@ -111,9 +111,13 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("task_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
 			str("Option"), str("Label"), str("Choice"), str("Text"), str("At")),
 
-		answer("draft_read", "read", "The draft, as JSON.", str("Draft")),
-		answer("draft_update", "updated", "The revised draft, as JSON.", str("Draft")),
-		answer("draft_withdraw", "withdrawn", "The withdrawn draft, as JSON.", str("Draft")),
+		answer("draft_read", "read", "The draft, as JSON, its id and the address of its card in the cockpit, \"\" when unknown.", str("Draft"), num("ID"), str("Link")),
+		answer("draft_update", "updated", "The revised draft, as JSON, waiting for the user, its id and the address of its card.", str("Draft"), num("ID"), str("Link")),
+		answer("draft_update", "posting", "With draft false: the draft, revised or not, approved through the session the user drives and being posted, as JSON.",
+			str("Draft"), num("ID"), str("Link")),
+		answer("draft_update", "kept", "With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.",
+			str("Draft"), num("ID"), str("Link")),
+		answer("draft_withdraw", "withdrawn", "The withdrawn draft, as JSON, its id and the address of its card.", str("Draft"), num("ID"), str("Link")),
 		answer("draft_update", "rev_conflict", "The draft is at another rev than the one given.", str("Error")),
 		answer("draft_withdraw", "rev_conflict", "The draft is at another rev than the one given.", str("Error")),
 		answer("draft_update", "stale", "The basis given is not the unit's live one.", str("Error")),

@@ -706,7 +706,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
   - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read, the user's answers and what the task's turns learned, and marks them read.
   - `draft_read`: Reads a draft on the session's turn's unit or proposed from it: its content, delivery state and revisions.
-  - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again.
+  - `draft_update`: Revises a draft an agent proposed on the session's turn's unit or from it, at the rev it read; the revision waits for the user's approval again, and with draft false is posted at once from a session the user drives.
   - `draft_withdraw`: Withdraws a draft an agent proposed on the session's turn's unit or from it, at the rev it read.
   - `github_draft`: Proposes a GitHub comment, review, review thread reply, thread resolution or review request for the user's approval.
   - `github_threads`: Reads the unresolved review threads of the session's pull request, with their comment ids, and each reviewer's latest review.
@@ -774,7 +774,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `read` (`Draft`): The draft, as JSON.
+  - `read` (`Draft`, `ID`: number, `Link`): The draft, as JSON, its id and the address of its card in the cockpit, "" when unknown.
   - `not_found` (`Error`): No such draft.
   - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
   - `failed` (`Error`): The call failed.
@@ -782,7 +782,9 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `updated` (`Draft`): The revised draft, as JSON.
+  - `updated` (`Draft`, `ID`: number, `Link`): The revised draft, as JSON, waiting for the user, its id and the address of its card.
+  - `posting` (`Draft`, `ID`: number, `Link`): With draft false: the draft, revised or not, approved through the session the user drives and being posted, as JSON.
+  - `kept` (`Draft`, `ID`: number, `Link`): With draft false from a session the user does not drive: the draft, revised or not, still waiting for the user, as JSON, its id and the address of its card.
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `stale` (`Error`): The basis given is not the unit's live one.
   - `not_found` (`Error`): No such draft.
@@ -792,7 +794,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
-  - `withdrawn` (`Draft`): The withdrawn draft, as JSON.
+  - `withdrawn` (`Draft`, `ID`: number, `Link`): The withdrawn draft, as JSON, its id and the address of its card.
   - `rev_conflict` (`Error`): The draft is at another rev than the one given.
   - `not_found` (`Error`): No such draft.
   - `out_of_scope` (`Error`): The draft is neither on the session's turn's unit nor proposed from it, or, to revise, a person's or a workflow's.
