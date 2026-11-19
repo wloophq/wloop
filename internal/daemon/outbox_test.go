@@ -338,3 +338,30 @@ func TestTheOutboxIsInItsViewsOrder(t *testing.T) {
 		t.Errorf("send-later order %v, want by kind then oldest first %v", got, want)
 	}
 }
+
+func TestTheOutboxNamesTheSourceOfADraftByItsPublisher(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == slackThread.Provider {
+			return takingFx{r.fx}, nil
+		}
+		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
+	}
+	r.o.Targets = []unit.ProviderID{slackThread.Provider}
+	r.put(t, task.Task{ID: "e1", State: "next", Category: task.CategoryReady, Title: "a task"})
+	r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Target: "#general", Kind: "ask_owner", Text: "who owns this?", State: draft.Held,
+		Origin: draft.Origin{Kind: draft.OriginUser, Key: "a"}})
+
+	page := r.outboxPage(t)
+	if len(page.Drafts) != 1 {
+		t.Fatalf("%d drafts, want 1", len(page.Drafts))
+	}
+	if got := page.Drafts[0].Facets["source"]; !slices.Equal(got, []string{"slack"}) {
+		t.Errorf("source %v, want the publisher of its target, slack", got)
+	}
+	want := r.s.loaded().UI["slack"].Drafts["ask_owner"].Label
+	if got := page.Heads["kind"]["ask_owner"].Title; want == "" || got != want {
+		t.Errorf("kind head %q, want Slack's word %q", got, want)
+	}
+}

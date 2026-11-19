@@ -42,10 +42,6 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 		units = append(units, p.Draft.Unit)
 	}
 	rows := ev.rowsOf(r.Context(), units)
-	type faced struct {
-		draft api.OutboxDraft
-		facts workflow.Facts
-	}
 	listed := make([]faced, 0, len(ps))
 	for _, p := range ps {
 		if p.Draft.State == draft.Held && pins[int64(p.Draft.ID)] != 0 {
@@ -59,7 +55,7 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 		}
 		where := rowWhere(l.Views.DraftFacets, rows[p.Draft.Unit].Row.Facets)
 		people := mentioned(p.Draft.Text, d.Names)
-		facts := draftViewFacts(p.Draft, where, people)
+		facts := draftViewFacts(p.Draft, s.publisherOf(p.Draft), where, people)
 		facets := catalog.FactFacets(l.Views.DraftFacets, facts)
 		if len(facets) == 0 {
 			facets = nil
@@ -71,7 +67,13 @@ func (s *Server) handleOutbox(w http.ResponseWriter, r *http.Request) {
 	for _, f := range listed {
 		out = append(out, f.draft)
 	}
-	writeJSON(w, api.OutboxPage{Drafts: out, Facets: catalog.DraftFacets(l.Views.DraftFacets), Heads: outboxHeads(l, out)})
+	writeJSON(w, api.OutboxPage{Drafts: out, Facets: catalog.DraftFacets(l.Views.DraftFacets), Heads: outboxHeads(l, listed)})
+}
+
+// faced is a draft the Outbox serves with the facts its draft facets read.
+type faced struct {
+	draft api.OutboxDraft
+	facts workflow.Facts
 }
 
 // outboxView is id when it is a view def draws in the outbox layout, else the first such view; "" for none.
@@ -129,28 +131,28 @@ func (ev *taskViewer) draftContext(ctx context.Context, d api.Draft) (api.DraftC
 }
 
 // outboxHeads are l's words for the values ds hold of the draft facets that read who proposed a draft, its
-// workflow and its kind, by facet id, then by value. A kind takes the word of the plugin of the first draft
-// whose plugin words it.
-func outboxHeads(l *intentload.Loaded, ds []api.OutboxDraft) map[string]map[string]api.OutboxHead {
+// workflow and its kind, by facet id, then by value. A kind takes the word of the plugin that posts the first
+// draft whose plugin words it.
+func outboxHeads(l *intentload.Loaded, ds []faced) map[string]map[string]api.OutboxHead {
 	heads := map[string]map[string]api.OutboxHead{}
 	for _, f := range l.Views.DraftFacets {
-		var word func(value string, d api.OutboxDraft) (api.OutboxHead, bool)
+		var word func(value string, d faced) (api.OutboxHead, bool)
 		switch f.Fact {
 		case "draft.proposer":
-			word = func(v string, _ api.OutboxDraft) (api.OutboxHead, bool) { return proposerHead(l, v) }
+			word = func(v string, _ faced) (api.OutboxHead, bool) { return proposerHead(l, v) }
 		case "draft.workflow":
-			word = func(v string, _ api.OutboxDraft) (api.OutboxHead, bool) { return workflowHead(l, v) }
+			word = func(v string, _ faced) (api.OutboxHead, bool) { return workflowHead(l, v) }
 		case "draft.kind":
-			word = func(v string, d api.OutboxDraft) (api.OutboxHead, bool) {
-				provider, _, _ := strings.Cut(d.Unit, "/")
-				label := l.UI[provider].Drafts[v].Label
+			word = func(v string, d faced) (api.OutboxHead, bool) {
+				publisher, _ := d.facts["draft.provider"].(string)
+				label := l.UI[publisher].Drafts[v].Label
 				return api.OutboxHead{Title: label}, label != ""
 			}
 		default:
 			continue
 		}
 		for _, d := range ds {
-			for _, v := range d.Facets[f.ID] {
+			for _, v := range d.draft.Facets[f.ID] {
 				if _, ok := heads[f.ID][v]; ok {
 					continue
 				}

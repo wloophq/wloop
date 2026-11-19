@@ -66,7 +66,7 @@ var draftViewFacts = []Fact{
 
 var draftActionFacts = slices.Concat(draftViewFacts, []Fact{
 	fact("draft.state", expr.String, []FactSlot{DraftActionSlot, DraftViewSlot}, "The draft's state."),
-	fact("draft.provider", expr.String, []FactSlot{DraftActionSlot, DraftViewSlot}, "The provider of the draft's unit."),
+	fact("draft.provider", expr.String, []FactSlot{DraftActionSlot, DraftViewSlot}, "The provider whose plugin posts the draft: its unit's, or, for a draft on a unit no plugin posts to, such as a task, the one its target names."),
 	enum(fact("draft.refusal", expr.String, []FactSlot{DraftActionSlot}, "Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled."),
 		enumOf(DraftRefusals...)),
 	fact("draft.maybe_posted", expr.Bool, []FactSlot{DraftActionSlot}, "The draft failed after its post may have reached its provider."),

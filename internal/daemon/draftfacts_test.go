@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"testing"
 	"time"
 
@@ -12,11 +13,12 @@ import (
 func TestDraftViewFacts(t *testing.T) {
 	created := time.Date(2026, 11, 18, 9, 0, 0, 0, time.UTC)
 	tests := []struct {
-		name   string
-		draft  draft.Draft
-		where  string
-		people []string
-		want   workflow.Facts
+		name      string
+		draft     draft.Draft
+		publisher unit.ProviderID
+		where     string
+		people    []string
+		want      workflow.Facts
 	}{
 		{
 			name: "a review round's turn draft",
@@ -45,6 +47,15 @@ func TestDraftViewFacts(t *testing.T) {
 				"draft.people": []string{}, "draft.created_at": created},
 		},
 		{
+			name: "a draft on a task its target's plugin posts",
+			draft: draft.Draft{Unit: unit.Unit{Provider: unit.Task, Key: "e1"}, Target: "#general", Kind: "ask_owner", Delivery: "message", State: "held", CreatedAt: created,
+				Origin: draft.Origin{Kind: draft.OriginUser}},
+			publisher: "slack",
+			want: workflow.Facts{"draft.proposer": "user", "draft.workflow": "", "draft.kind": "ask_owner",
+				"draft.delivery": "message", "draft.provider": "slack", "draft.state": "held", "draft.where": "",
+				"draft.people": []string{}, "draft.created_at": created},
+		},
+		{
 			name: "a user's draft",
 			draft: draft.Draft{Unit: unit.Unit{Provider: "slack", Key: "C1:1.2"}, Kind: "message", Delivery: "message", State: "failed", CreatedAt: created,
 				Origin: draft.Origin{Kind: draft.OriginUser}},
@@ -55,7 +66,7 @@ func TestDraftViewFacts(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := draftViewFacts(tc.draft, tc.where, tc.people)
+			got := draftViewFacts(tc.draft, cmp.Or(tc.publisher, tc.draft.Unit.Provider), tc.where, tc.people)
 			if len(got) != len(tc.want) {
 				t.Fatalf("facts = %v, want %v", got, tc.want)
 			}

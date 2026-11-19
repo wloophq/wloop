@@ -102,7 +102,7 @@ A draft's action reads the facts of the `draft_action` slot; a draft facet of `v
 | `draft.people` | list | draft_view | The people the draft is to or mentions, each by the name its plugin resolves the mention to, else by the mention key, such as slack:U0123. |
 | `draft.created_at` | timestamp | draft_view | When the draft was written. Zero when unset; test with `> timestamp(0)`. |
 | `draft.state` | string | draft_action, draft_view | The draft's state. |
-| `draft.provider` | string | draft_action, draft_view | The provider of the draft's unit. |
+| `draft.provider` | string | draft_action, draft_view | The provider whose plugin posts the draft: its unit's, or, for a draft on a unit no plugin posts to, such as a task, the one its target names. |
 | `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state, posts_nothing, no_effects, effect_posts, not_from_workflow or skipped; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 

@@ -5,19 +5,20 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-// draftViewFacts are the facts of d a draft facet reads; where and people come
-// from the draft's unit and its plugin.
-func draftViewFacts(d draft.Draft, where string, people []string) workflow.Facts {
+// draftViewFacts are the facts of d a draft facet reads; publisher is the plugin that posts it, and where and
+// people come from the draft's unit and its plugin.
+func draftViewFacts(d draft.Draft, publisher unit.ProviderID, where string, people []string) workflow.Facts {
 	return workflow.Facts{
 		"draft.proposer":   d.Origin.Proposer(),
 		"draft.workflow":   d.Origin.Workflow,
 		"draft.kind":       string(d.Kind),
 		"draft.delivery":   string(d.Delivery),
-		"draft.provider":   string(d.Unit.Provider),
+		"draft.provider":   string(publisher),
 		"draft.state":      string(d.State),
 		"draft.where":      where,
 		"draft.people":     append([]string{}, people...),
