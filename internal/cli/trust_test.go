@@ -135,12 +135,12 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 			t.Errorf("wrote into the home: %v", entries)
 		}
 	})
-	t.Run("the trust dialog of an untrusted pull request is the user's to answer", func(t *testing.T) {
+	t.Run("the trust dialog of an untrusted pull request names no fix", func(t *testing.T) {
 		m := trustDialog()
 		te := start(t, m, openBasics, t.TempDir())
-		contains(t, te.err.String(), "so its terminal term-ws-1 waits on the trust dialog; it stays open for you to decide, then run the round again")
+		contains(t, te.err.String(), "so its terminal term-ws-1 waits on the trust dialog; closed its session")
 		lacks(t, te.err.String(), brand.Name+" trust")
-		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1" {
+		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1\nclose term-ws-1\nremove --force ws-1" {
 			t.Errorf("writes:\n%s", got)
 		}
 	})
@@ -149,7 +149,7 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 		contains(t, te.err.String(), "is not trusted in the agent home of its terminal (set agent_home to have "+brand.Name+" name it)")
 		lacks(t, te.err.String(), brand.Name+" trust", ".claude")
 	})
-	t.Run("the imports dialog of a round by hand stays open", func(t *testing.T) {
+	t.Run("the imports dialog of a round by hand", func(t *testing.T) {
 		defer func(d time.Duration) { mcpWait = d }(mcpWait)
 		mcpWait = 50 * time.Millisecond
 		m := newRepo()
@@ -163,28 +163,28 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 			t.Fatalf("exit %d", code)
 		}
 		contains(t, te.err.String(),
-			"the agent waits on Claude Code's question whether to allow the external CLAUDE.md imports of /worktrees/REVIEW feat/x; "+brand.Name+" leaves the answer to you: give it once in a Claude Code session there with the agent home "+te.cfg.AgentHome+"; it stays open for you to decide, then run the round again")
-		lacks(t, te.err.String(), "closed its session", claude.ImportsQuestion)
+			"the agent waits on Claude Code's question whether to allow the external CLAUDE.md imports of /worktrees/REVIEW feat/x; "+brand.Name+" leaves the answer to you: give it once in a Claude Code session there with the agent home "+te.cfg.AgentHome+"; closed its session")
+		lacks(t, te.err.String(), claude.ImportsQuestion)
 	})
 	t.Run("the imports dialog of a session that initializes gets no prompt", func(t *testing.T) {
 		m := newRepo()
 		m.Screen = importsScreen
 		te := start(t, m, trustedBasics, t.TempDir())
-		contains(t, te.err.String(), "external CLAUDE.md imports", "it stays open for you to decide")
+		contains(t, te.err.String(), "external CLAUDE.md imports", "closed its session")
 		if len(m.Prompts) != 0 {
 			t.Fatalf("typed into the imports dialog: %+v", m.Prompts)
 		}
 	})
-	t.Run("the imports dialog of an untrusted pull request stays open", func(t *testing.T) {
+	t.Run("the imports dialog of an untrusted pull request", func(t *testing.T) {
 		m := newRepo()
 		m.Screen = importsScreen
 		te := start(t, m, openBasics, "")
-		contains(t, te.err.String(), "external CLAUDE.md imports", "with the agent home of its terminal", "it stays open for you to decide")
-		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1" {
+		contains(t, te.err.String(), "external CLAUDE.md imports", "with the agent home of its terminal", "closed its session")
+		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1\nclose term-ws-1\nremove --force ws-1" {
 			t.Errorf("writes:\n%s", got)
 		}
 	})
-	t.Run("the MCP dialog of a round by hand stays open", func(t *testing.T) {
+	t.Run("the MCP dialog of a round by hand", func(t *testing.T) {
 		defer func(d time.Duration) { mcpWait = d }(mcpWait)
 		mcpWait = 50 * time.Millisecond
 		m := newRepo()
@@ -198,9 +198,9 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 			t.Fatalf("exit %d", code)
 		}
 		contains(t, te.err.String(),
-			"the agent waits on Claude Code's question which MCP servers of the .mcp.json of /worktrees/REVIEW feat/x to enable; "+brand.Name+" never answers it: answer it in a Claude Code session there; it stays open for you to decide, then run the round again")
+			"the agent waits on Claude Code's question which MCP servers of the .mcp.json of /worktrees/REVIEW feat/x to enable; "+brand.Name+" never answers it: answer it in a Claude Code session there; closed its session")
 		lacks(t, te.err.String(), "has no "+brand.Name+" MCP tool", claude.MCPQuestion)
-		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1" || len(m.Prompts) != 0 {
+		if got := strings.Join(m.Writes, "\n"); got != "create REVIEW feat/x\nsession ws-1\nclose term-ws-1\nremove --force ws-1" || len(m.Prompts) != 0 {
 			t.Errorf("writes:\n%s\nprompts %+v", got, m.Prompts)
 		}
 	})
@@ -375,7 +375,7 @@ func TestTrustAndRunInTheTerminalsOwnHomeTrustsTheHomesTheBlockNames(t *testing.
 	}
 }
 
-func TestARoundByHandPastTheBlockedQuestionLiftsTheBlock(t *testing.T) {
+func TestARoundByHandPastTheBlockedQuestionReplacesTheBlock(t *testing.T) {
 	m, te, rec, file := blockedTriage(t)
 	writeFile(t, file, `{"projects":{"/wt/auth":{"hasTrustDialogAccepted":true}}}`)
 	m.Screen = mcpScreen
@@ -386,9 +386,9 @@ func TestARoundByHandPastTheBlockedQuestionLiftsTheBlock(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "which MCP servers") {
 		t.Fatalf("Run = %v\nstderr:\n%s", err, te.err)
 	}
-	evs := blocksOf(rec, pr9)
-	if len(evs) != 2 || evs[1].Kind != dinv.KindRoundUnblocked || evs[1].Data != "a later session got past its question" {
-		t.Fatalf("events %+v", evs)
+	blocks, _ := rec.FirstRoundBlocks(context.Background())
+	if b, ok := inventory.StartBlockOf(blocks[pr9.Unit()]); !ok || b.Question != claude.MCPQuestion {
+		t.Fatalf("block %+v, events %+v", b, blocksOf(rec, pr9))
 	}
 }
 
@@ -399,7 +399,8 @@ func TestARoundByHandStoppedOnTheBlockedQuestionKeepsTheBlock(t *testing.T) {
 	if err := (envActions{e: te.Env}).Run(context.Background(), pr9.Unit(), daemon.Call{Out: &strings.Builder{}}); err == nil {
 		t.Fatal("Run on an untrusted folder succeeded")
 	}
-	if evs := blocksOf(rec, pr9); len(evs) != 1 {
-		t.Fatalf("events %+v", evs)
+	blocks, _ := rec.FirstRoundBlocks(context.Background())
+	if b, ok := inventory.StartBlockOf(blocks[pr9.Unit()]); !ok || b.Question != turns.QuestionTrust {
+		t.Fatalf("block %+v, events %+v", b, blocksOf(rec, pr9))
 	}
 }

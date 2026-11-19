@@ -60,13 +60,17 @@ The daemon checks again every five seconds, so it starts once the store fits; no
 
 ## A round is blocked on an untrusted folder
 
-Claude Code asks to trust a folder before it works there. {{name}} never trusts a folder for you: a round that finds one untrusted is shown as blocked, with the command, and goes ahead on the next sweep once you run it:
+Claude Code asks to trust a folder before it works there. {{name}} never trusts a folder for you. A round that stops on the trust dialog, whether a sweep planned it or you asked for it (Review, Address, Act, Nudge), ends the same way: a session it started is closed, a workspace it created is removed, and its row shows the round blocked with **Trust folder and run** and **Dismiss block**. A request of yours that hit the dialog ends failed, its reason saying the round waits on its start block.
+
+Trust folder and run trusts the folder in the agent homes the block names and runs the round now, in the agent home the blocked session ran with: the one you asked for, of the same intent and with the guidance you gave it, unless you give it new guidance, else the round the sweep planned. It runs only a pull request's round; for another unit, trust the folder with the command below and ask again. A session that ran in its terminal's own agent home (no `agent_home` set) names the home the trust command uses by default and each profile home of an enabled workspace manager that exists, such as Orca's, so the folder is trusted in every home the next session may start in.
+
+You can also trust it yourself; the round goes ahead on the next sweep:
 
 ```sh
 {{command}} trust ~/projects/api
 ```
 
-It trusts the main repository root, which covers every worktree of it; `--exact` trusts the folder alone.
+It trusts the main repository root, which covers every worktree of it; `--exact` trusts the folder alone. A start that stops on another question of the agent, such as which MCP servers of the project to enable, is blocked the same way, offers only Dismiss block, and lifts once you answer the question in a session there; a round the sweep planned in a workspace that already exists is skipped instead, and planned again on its next trigger.
 
 ## A turn ended without a record
 

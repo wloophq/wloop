@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/domain/pr"
 
@@ -20,11 +19,9 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	coreplacement "github.com/wloophq/wloop/internal/core/placement"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/placement"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -126,9 +123,8 @@ func (e *Env) launchUnit(ctx context.Context, d dintent.Def, l turns.Launch) (tu
 }
 
 // runOnUnit builds and stores the round's turn, types it into a session of
-// the unit's placed workspace and records it. A start blocked on the
-// agent's question is recorded as the unit's start block; a round that
-// gets through lifts the block.
+// the unit's placed workspace and records it. A round that gets through
+// lifts the unit's start block.
 func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error) {
 	u := run.r.Unit
 	if run.turn.Resumed() {
@@ -170,7 +166,6 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) (turns.Outcome, error)
 	}
 	handle, verb, err := e.session(ctx, run.cfg, ws, u, opts)
 	if err != nil {
-		e.blockUnit(ctx, run, ws, err)
 		return turns.Outcome{}, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
 	queued := opts.busy && verb == verbExisting
@@ -556,36 +551,6 @@ var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 // unitWorkspaceName names the workspace created for u.
 func unitWorkspaceName(u unit.Unit) string {
 	return string(u.Provider) + "-" + strings.Trim(unsafeName.ReplaceAllString(u.Key, "-"), "-")
-}
-
-// blockUnit records the start block of a round on u whose session waits on
-// the agent's question, as the sweep records a pull request's.
-func (e *Env) blockUnit(ctx context.Context, run unitRun, ws wsdomain.Workspace, err error) {
-	var untrusted *turns.UntrustedError
-	var asked *turns.QuestionError
-	var block inventory.StartBlock
-	why := err.Error()
-	switch {
-	case errors.As(err, &untrusted):
-		block = inventory.StartBlock{Question: turns.QuestionTrust, Root: untrusted.Root, Folder: untrusted.Folder, Home: untrusted.Home,
-			Homes: e.trustHomes(run.cfg, untrusted.Home)}
-		why = untrustedWhy(untrusted)
-	case errors.As(err, &asked):
-		block = inventory.StartBlock{Question: asked.Question, Root: asked.Root}
-	case errors.As(err, new(errNoMCP)):
-		block = inventory.StartBlock{Folder: ws.Path, RetryAt: e.Now().Add(time.Duration(run.cfg.Turns.NoStartWait))}
-	default:
-		return
-	}
-	if e.Rec == nil {
-		return
-	}
-	block.Round = string(run.def.Name)
-	now := e.Now()
-	ev := port.Event{Unit: run.r.Unit, Kind: dinv.KindRoundBlocked, Key: block.Key(now), At: now, Data: why}
-	if rerr := e.Rec.RecordUnit(context.WithoutCancel(ctx), ev); rerr != nil {
-		fmt.Fprintf(e.Err, "warning: %s: recording the blocked round: %v\n", run.r.Unit.Label(), rerr)
-	}
 }
 
 // liftUnitBlock records u's start block lifted by a round that went out.

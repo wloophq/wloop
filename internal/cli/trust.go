@@ -106,8 +106,14 @@ func withArticle(name string) string {
 }
 
 // TrustAndRun trusts the folder the round of ref is blocked on, lifts the
-// block and sends the round now. Only the user's action calls it.
+// block and sends the round now, in the agent home the blocked session ran
+// with: the one the person asked for, with the guidance they gave it unless
+// the action brings its own, else the round the loop planned. Only the
+// user's action calls it.
 func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call) error {
+	if !isPR(u) {
+		return daemon.Refusal{Reason: "only a pull request's round runs from here; trust the folder with `" + brand.Command + " trust` and ask for the round again"}
+	}
 	ref := prOf(u)
 	e, cfg, profile, err := a.prepare(ctx, ref, c)
 	if err != nil {
@@ -120,6 +126,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if b.Question != turns.QuestionTrust {
 		return fmt.Errorf("the round of %s is not blocked on an untrusted folder", ref)
 	}
+	profile = cmp.Or(b.Home, profile)
 	pcfg := prConfig(cfg, ref, profile)
 	pr, _, err := e.readPR(ctx, pcfg, ref)
 	if err != nil {
@@ -132,7 +139,18 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err := e.Rec.Record(ctx, ev); err != nil {
 		return err
 	}
-	return runHeldRound(ctx, e, cfg, ref, profile, c.Guidance, trustedAndRan)
+	guidance := c.Guidance
+	if b.Asked != nil {
+		guidance = cmp.Or(guidance, b.Asked.Guidance)
+	}
+	if b.Asked == nil || b.Asked.Intent == "" {
+		return runHeldRound(ctx, e, cfg, ref, profile, guidance, trustedAndRan)
+	}
+	d, err := e.intentDef(b.Asked.Intent)
+	if err != nil {
+		return err
+	}
+	return e.askedRound(ctx, d, cfg, ref, guidance, b.Asked.Inputs, profile, trustedAndRan)
 }
 
 // trustedAndRan is why a round a trust gate's approval runs drops the

@@ -145,11 +145,11 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref pr.Ref
 	if !req.Checkout.Fork && ws.BranchRenamed {
 		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.Checkout.Branch))
 	}
-	s, err := e.agentSession(ctx, cfg, ws, opts)
-	if err != nil {
-		return ws, false, e.discard(ctx, ws, err)
-	}
 	if sent.Prompt == "" {
+		s, err := e.agentSession(ctx, cfg, ws, opts)
+		if err != nil {
+			return ws, false, e.discard(ctx, ws, err)
+		}
 		start, err := e.startRequest(cfg, ws, s, "")
 		if err != nil {
 			return ws, false, e.discard(ctx, ws, err)
@@ -164,14 +164,7 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref pr.Ref
 		}
 		return ws, true, nil
 	}
-	name, err := e.roundName(opts, ref.Unit())
-	if err != nil {
-		return ws, false, e.discard(ctx, ws, err)
-	}
-	p, err := e.startSession(ctx, cfg, ws, ref.Unit(), s, name, opts.keepBlocked, opts.trusted)
-	if blocked := (*workspace.BlockedError)(nil); errors.As(err, &blocked) && opts.keepBlocked(blocked.Reason) {
-		return ws, false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
-	}
+	p, _, err := e.startAgent(ctx, cfg, ws, ref.Unit(), opts, nil)
 	if err != nil {
 		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err))
 	}
