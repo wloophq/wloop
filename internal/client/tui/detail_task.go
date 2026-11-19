@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -245,7 +246,37 @@ func (m *Model) answer(c askCard, n int, read uint64) (Command, bool) {
 	}
 	e, _ := m.selectedTask()
 	verb := m.verbOf(handlerAnswer)
-	return m.send(Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: verb, task: c.task, verb: verb, args: args})
+	cmd := Command{Unit: taskUnit(c.task), Label: taskLabel(e), Action: verb, task: c.task, verb: verb, args: args}
+	if pin := c.pin(n); pin != nil {
+		return m.pickPinned(cmd, c.pinnedDraft(pin), read)
+	}
+	return m.send(cmd)
+}
+
+// pinnedDraft is the draft pin names as the card shows it.
+func (c askCard) pinnedDraft(pin *record.DraftRef) api.Draft {
+	i := slices.IndexFunc(c.pinned, func(d api.Draft) bool { return d.ID == pin.ID })
+	return c.pinned[i]
+}
+
+// pickPinned asks, before answer c, which approves pinned draft d, goes, for d's text as it will post: Enter posts
+// what the prompt holds, d's own text unless the person changed it, Ctrl+E edits it in the editor. The answer
+// carries the rev the card shows, so it approves what the person saw.
+func (m *Model) pickPinned(c Command, d api.Draft, read uint64) (Command, bool) {
+	submit := func(text string) (Command, bool) {
+		c.args["rev"] = strconv.FormatInt(d.Rev, 10)
+		if text != "" && text != strings.TrimSpace(d.Text) && !d.TextLocked {
+			c.args["text"] = text
+		}
+		return m.send(c)
+	}
+	p := &prompt{action: c.verb, read: read, submit: submit, editor: !d.TextLocked, editText: d.Text,
+		label: m.w().T("post draft #{id} as it reads, Enter, or change it first ({key}: editor)", map[string]any{"id": d.ID, "key": "Ctrl+E"})}
+	if !strings.Contains(d.Text, "\n") && !d.TextLocked {
+		p.text = []rune(d.Text)
+	}
+	m.prompt = p
+	return Command{}, false
 }
 
 // resolveGate resolves the card's gate with intent x, asking first for the

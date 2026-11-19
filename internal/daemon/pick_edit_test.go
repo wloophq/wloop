@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 // pickRig is an Outbox rig whose open question 9 pins a held review reply in its approve option, with the question's
@@ -35,7 +36,8 @@ func pickRig(t *testing.T) (*outboxRig, draft.Draft, gate.Gate) {
 	svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{r.s.loaded().Gates}, Clock: r.clock, Options: m,
 		Publisher: publishTo(func(ctx context.Context, g gate.Gate) error { return r.o.Publish(ctx, g) })})
 	r.s.deps.Gates, r.s.deps.GateReader, r.o.Gates = svc, st, rigGates{svc, st}
-	qg, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: r7u, Subject: "9"}, nil)
+	r.put(t, unitTask("t-1", task.OriginDerived, r7u))
+	qg, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Unit: r7u, Task: "t-1", Subject: "9"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,5 +97,19 @@ func TestAPickOfAnotherRevIsRefused(t *testing.T) {
 	}
 	if qg, _ := r.s.deps.GateReader.Get(ctx, q.ID); qg.Status != gate.Open {
 		t.Fatalf("the question %+v after a refused pick, want open", qg)
+	}
+}
+
+// The task's answer verb, the TUI's digit on a pinned option, picks with an edit as the gate route does.
+func TestTheAnswerVerbPicksWithAnEdit(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r, d, q := pickRig(t)
+	body, _ := json.Marshal(api.TaskRequest{Args: map[string]string{"option_id": "approve", "rev": strconv.FormatInt(d.Rev, 10), "text": "Approve it, edited"}, Source: "tui"})
+	if rec := post(t, r.s, api.TaskPath(string(q.Task), "answer"), string(body)); rec.Code != 200 {
+		t.Fatalf("answer with an edit: %d %s", rec.Code, rec.Body)
+	}
+	if got, _ := r.o.Store.Get(ctx, d.ID); got.Text != "Approve it, edited" || got.State != draft.Queued {
+		t.Fatalf("the draft %+v, want the edit queued", got)
 	}
 }

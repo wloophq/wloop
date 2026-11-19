@@ -159,6 +159,17 @@ func TestOutboxApproveConfirms(t *testing.T) {
 			t.Fatal("an agent's shell changed it")
 		}
 	})
+	t.Run("a payload without the rev seen, or not JSON", func(t *testing.T) {
+		for _, args := range [][]string{{"outbox", "approve", "1", "--payload", `{"event":"COMMENT"}`, "--yes"}, {"outbox", "approve", "1", "--payload", "COMMENT", "--rev", "1", "--yes"}} {
+			te, db, d := seed(t, true)
+			if code := te.run(args...); code == 0 || !strings.Contains(te.err.String(), "--payload") {
+				t.Fatalf("%v: exit %d: %s", args, code, te.err)
+			}
+			if got := te.draftState(t, db, d.ID); got.State != draft.Held {
+				t.Fatalf("%v approved it", args)
+			}
+		}
+	})
 	t.Run("answered no", func(t *testing.T) {
 		te, db, d := seed(t, true)
 		te.In = strings.NewReader("n\n")

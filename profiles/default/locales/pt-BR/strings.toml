@@ -98,6 +98,7 @@
 "any key closes" = "qualquer tecla fecha"
 "not offered on a draft" = "não oferecido em um rascunho"
 "edit the draft to {target} ({key}: editor)" = "editar o rascunho para {target} ({key}: editor)"
+"post draft #{id} as it reads, Enter, or change it first ({key}: editor)" = "postar o rascunho #{id} como está, Enter, ou mudá-lo antes ({key}: editor)"
 "delegate {task}: {question} ({key}: hand to an agent)" = "delegar {task}: {question} ({key}: passar para um agente)"
 "hand {task} to an agent: {question} ({key}: draft for me)" = "passar {task} para um agente: {question} ({key}: rascunho para mim)"
 "{question}, on {task}, held for approval ({tab}: send now; {editor}: editor)" = "{question}, em {task}, retido para aprovação ({tab}: enviar agora; {editor}: editor)"

@@ -38,7 +38,8 @@ func TestARowsPinnedAnswerIsRefused(t *testing.T) {
 }
 
 // TestATasksPinnedOptionShowsItsDraft shows, under the option that pins a draft, the draft as its card serves
-// it, its preview and payload included, and a line when it changed since; the digit then answers it. Without the
+// it, its preview and payload included, and a line when it changed since; the digit then asks for the draft's
+// text as it will post, and Enter answers with the rev shown and the text when the person changed it. Without the
 // pinned draft in view, the digit is refused.
 func TestATasksPinnedOptionShowsItsDraft(t *testing.T) {
 	pin := &record.DraftRef{ID: 42, Rev: 3}
@@ -61,8 +62,24 @@ func TestATasksPinnedOptionShowsItsDraft(t *testing.T) {
 			t.Errorf("screen lacks %q:\n%s", want, screen)
 		}
 	}
-	if c, ok := press(m, Key{Rune: '2'}); !ok || c.args["option_id"] != "late" {
-		t.Fatalf("2 with the draft shown: %+v %v", c, ok)
+	if c, ok := press(m, Key{Rune: '2'}); ok || m.prompt == nil || string(m.prompt.text) != "Ship it." {
+		t.Fatalf("2 with the draft shown: %+v %v, want the draft's text to confirm or change", c, ok)
+	}
+	if c, ok := press(m, Key{Name: KeyEnter}); !ok || c.args["option_id"] != "late" || c.args["rev"] != "4" || c.args["text"] != "" {
+		t.Fatalf("Enter on the draft as it reads: %+v %v", c, ok)
+	}
+	m = viewsModel(t)
+	chord(m, "gi")
+	press(m, Key{Name: KeyEnter})
+	m.SetDetail("e2", task([]api.Draft{shown}), nil)
+	press(m, Key{Rune: '2'})
+	keys := make([]Key, 0, 4)
+	for range len("Ship it.") {
+		keys = append(keys, Key{Name: KeyBackspace})
+	}
+	keys = append(append(keys, typed("Hold it.")...), Key{Name: KeyEnter})
+	if c, ok := press(m, keys...); !ok || c.args["option_id"] != "late" || c.args["rev"] != "4" || c.args["text"] != "Hold it." {
+		t.Fatalf("the draft changed before the pick: %+v %v", c, ok)
 	}
 	m = viewsModel(t)
 	chord(m, "gi")

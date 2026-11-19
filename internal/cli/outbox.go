@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -26,7 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown> --rev <n>] [--yes] | edit <id> <markdown> --rev <n> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--payload <json>] [--rev <n>] [--yes] | edit <id> <markdown> --rev <n> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
 
 // outboxInteractive says whether e reads from a terminal; tests replace it.
 var outboxInteractive = func(e *Env) bool {
@@ -308,7 +309,8 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 	fs.SetOutput(e.Err)
 	text := fs.String("text", "", "the text to post instead of the draft's")
 	yes := fs.Bool("yes", false, "approve without asking, after showing the draft")
-	rev := fs.Int64("rev", -1, "with --text: the rev of the draft you read, as outbox show prints it")
+	payload := fs.String("payload", "", "the payload to post instead of the draft's, whole, as JSON, such as a review's {\"event\":\"COMMENT\"}")
+	rev := fs.Int64("rev", -1, "with --text or --payload: the rev of the draft you read, as outbox show prints it")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -325,19 +327,33 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 		return err
 	}
 	shown, seen := d.Text, d.Rev
-	if flagSet(fs, "text") {
-		shown = *text
+	decision := map[string]string{}
+	if flagSet(fs, "text") || flagSet(fs, "payload") {
 		if *rev < 0 {
-			return usageError{usage: outboxUsage, why: "approve --text takes --rev, the rev of the draft you read (outbox show prints it)"}
+			return usageError{usage: outboxUsage, why: "approve --text or --payload takes --rev, the rev of the draft you read (outbox show prints it)"}
 		}
 		seen = *rev
 	}
+	if flagSet(fs, "text") {
+		shown = *text
+	}
+	if flagSet(fs, "payload") {
+		if !json.Valid([]byte(*payload)) {
+			return usageError{usage: outboxUsage, why: "approve --payload takes the draft's whole payload as JSON"}
+		}
+		decision["payload"] = *payload
+		d.Fields = nil
+	}
 	printDraft(e.Out, d, shown)
+	if flagSet(fs, "payload") {
+		fmt.Fprintf(e.Out, "payload:  %s\n", *payload)
+	}
 	if !*yes && !e.confirmed("Approve and post this?") {
 		fmt.Fprintln(e.Out, "Not approved.")
 		return exitCode(1)
 	}
-	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(seen, 10)}); err != nil {
+	decision["text"], decision["rev"] = shown, strconv.FormatInt(seen, 10)
+	if err := decideDraft(ctx, c, d, gate.Approved, decision); err != nil {
 		return err
 	}
 	got, err := c.Draft(ctx, id)
