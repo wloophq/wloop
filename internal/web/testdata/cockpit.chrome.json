@@ -94,7 +94,7 @@
      "status": ""
     }
    },
-   "specs_version": "48551a885afd",
+   "specs_version": "e67ef4df4627",
    "summary": {
     "closed": false,
     "line": "",
@@ -206,7 +206,7 @@
      "status": ""
     }
    },
-   "specs_version": "48551a885afd",
+   "specs_version": "e67ef4df4627",
    "summary": {
     "closed": false,
     "line": "",
@@ -2933,7 +2933,7 @@
     "label": "Act",
     "scope": "item",
     "source": "intents/act/intent.toml",
-    "summary": "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop",
+    "summary": "Act on the open items of a unit without touching its code: settle what you can and draft the replies it needs for you to post; Address works on the code of a pull request you develop",
     "surfaces": [
      "row",
      "detail",
@@ -3294,7 +3294,7 @@
     ]
    }
   ],
-  "version": "48551a885afd"
+  "version": "e67ef4df4627"
  },
  "stringsEn": {
   "\"state\" to wait until the situation changes": "\"state\" to wait until the situation changes",

@@ -61,12 +61,12 @@ what you wrote on its task's chat, with `task_read`. Do not type into that agent
 
 While the user drives this session, {{name}} takes what you run for theirs: you
 can move tasks, start turns, answer another agent's question and approve a
-draft or a round, as they can. It stops the moment a turn the loop sent runs
-here, or the loop typed into this session last, and refuses a gate whose
-draft or question this session's own turn produced. Approving a draft, or
-answering for the user, publishes or decides in their name: do it when they
-asked for it, and when it is unclear whether they want it, ask them here
-first.
+draft or a round, as they can, one this session wrote included. It stops
+the moment a turn the loop sent runs here, or the loop typed into this
+session last. A write tool posts at once with `draft: false`, and a waiting
+draft posts with `draft_update` and `draft: false`: both publish in the
+user's name, so do it when they asked for it, and when it is unclear whether
+they want it, ask them here first.
 
 ## Reading `{{command}} status`
 

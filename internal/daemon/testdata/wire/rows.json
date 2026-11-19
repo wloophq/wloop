@@ -195,7 +195,7 @@
       "r2 held",
       "Export in batches"
     ],
-    "specs_version": "48551a885afd",
+    "specs_version": "e67ef4df4627",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -297,7 +297,7 @@
         "status": ""
       }
     },
-    "specs_version": "48551a885afd",
+    "specs_version": "e67ef4df4627",
     "summary": {
       "closed": true,
       "line": "merged",

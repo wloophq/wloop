@@ -185,9 +185,9 @@ func TestInstructionsNameDraftTools(t *testing.T) {
 				t.Errorf("%s: the instructions still write through %q", s.Name, w)
 			}
 		}
-		proposes := !s.Context.Plain && !s.Context.NeedsTakeOver
-		if got := strings.Contains(r.Text, "`github_draft`"); got != proposes {
-			t.Errorf("%s: names github_draft %v, want %v", s.Name, got, proposes)
+		drafts := !s.Context.Plain && !s.Context.NeedsTakeOver
+		if got := strings.Contains(r.Text, "`github_post`"); got != drafts {
+			t.Errorf("%s: names github_post %v, want %v", s.Name, got, drafts)
 		}
 	}
 	if seen == 0 {

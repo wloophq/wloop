@@ -644,9 +644,9 @@ func (m *Model) pinFacts(c askCard, pin *record.DraftRef, fact func(label, text 
 		return
 	}
 	d := c.pinned[i]
-	fact("", m.w().T("Approves draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": pin.Rev}), m.t.Dim)
+	fact("", m.w().T("Approves draft #{id} at rev {rev}:", map[string]any{"id": pin.ID, "rev": d.Rev}), m.t.Dim)
 	if d.Rev != pin.Rev {
-		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}: below is what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
+		fact("", m.w().T("It changed since the question pinned it and is now at rev {rev}; picking this option posts what it says now.", map[string]any{"rev": d.Rev}), m.t.Red)
 	}
 	m.draftFacts(&d, fact, para)
 }
